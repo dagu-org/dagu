@@ -20,88 +20,249 @@ import (
 )
 
 func TestBuild(t *testing.T) {
-	t.Run("SkipIfSuccessful", func(t *testing.T) {
-		data := []byte(`
+	t.Parallel()
+
+	// Simple field tests grouped into table-driven format
+	simpleTests := []struct {
+		name  string
+		yaml  string
+		check func(t *testing.T, dag *core.DAG)
+	}{
+		{
+			name: "SkipIfSuccessful",
+			yaml: `
 skipIfSuccessful: true
 steps:
   - "true"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.True(t, th.SkipIfSuccessful)
-	})
-	t.Run("ParamsWithSubstitution", func(t *testing.T) {
-		data := []byte(`
+`,
+			check: func(t *testing.T, dag *core.DAG) {
+				assert.True(t, dag.SkipIfSuccessful)
+			},
+		},
+		{
+			name: "MailOnBoth",
+			yaml: `
+steps:
+  - "true"
+mailOn:
+  failure: true
+  success: true
+`,
+			check: func(t *testing.T, dag *core.DAG) {
+				assert.True(t, dag.MailOn.Failure)
+				assert.True(t, dag.MailOn.Success)
+			},
+		},
+		{
+			name: "ValidTags",
+			yaml: `
+tags: daily,monthly
+steps:
+  - echo 1
+`,
+			check: func(t *testing.T, dag *core.DAG) {
+				assert.True(t, dag.HasTag("daily"))
+				assert.True(t, dag.HasTag("monthly"))
+			},
+		},
+		{
+			name: "ValidTagsList",
+			yaml: `
+tags:
+  - daily
+  - monthly
+steps:
+  - echo 1
+`,
+			check: func(t *testing.T, dag *core.DAG) {
+				assert.True(t, dag.HasTag("daily"))
+				assert.True(t, dag.HasTag("monthly"))
+			},
+		},
+		{
+			name: "LogDir",
+			yaml: `
+logDir: /tmp/logs
+steps:
+  - "true"
+`,
+			check: func(t *testing.T, dag *core.DAG) {
+				assert.Equal(t, "/tmp/logs", dag.LogDir)
+			},
+		},
+		{
+			name: "MaxHistRetentionDays",
+			yaml: `
+histRetentionDays: 365
+`,
+			check: func(t *testing.T, dag *core.DAG) {
+				assert.Equal(t, 365, dag.HistRetentionDays)
+			},
+		},
+		{
+			name: "CleanUpTime",
+			yaml: `
+maxCleanUpTimeSec: 10
+steps:
+  - "true"
+`,
+			check: func(t *testing.T, dag *core.DAG) {
+				assert.Equal(t, 10*time.Second, dag.MaxCleanUpTime)
+			},
+		},
+		{
+			name: "DefaultTypeIsChain",
+			yaml: `
+steps:
+  - echo 1
+`,
+			check: func(t *testing.T, dag *core.DAG) {
+				assert.Equal(t, core.TypeChain, dag.Type)
+			},
+		},
+		{
+			name: "MaxActiveRuns",
+			yaml: `
+maxActiveRuns: 5
+`,
+			check: func(t *testing.T, dag *core.DAG) {
+				assert.Equal(t, 5, dag.MaxActiveRuns)
+			},
+		},
+		{
+			name: "MaxActiveSteps",
+			yaml: `
+maxActiveSteps: 3
+`,
+			check: func(t *testing.T, dag *core.DAG) {
+				assert.Equal(t, 3, dag.MaxActiveSteps)
+			},
+		},
+		{
+			name: "RunConfig",
+			yaml: `
+runConfig:
+  disableParamEdit: true
+  disableRunIdEdit: true
+`,
+			check: func(t *testing.T, dag *core.DAG) {
+				require.NotNil(t, dag.RunConfig)
+				assert.True(t, dag.RunConfig.DisableParamEdit)
+				assert.True(t, dag.RunConfig.DisableRunIdEdit)
+			},
+		},
+		{
+			name: "MaxOutputSizeCustom",
+			yaml: `
+description: Test DAG with custom maxOutputSize
+maxOutputSize: 524288
+steps:
+  - echo "test output"
+`,
+			check: func(t *testing.T, dag *core.DAG) {
+				assert.Equal(t, 524288, dag.MaxOutputSize)
+			},
+		},
+		{
+			name: "MaxOutputSizeDefault",
+			yaml: `
+steps:
+  - "true"
+`,
+			check: func(t *testing.T, dag *core.DAG) {
+				assert.Equal(t, 0, dag.MaxOutputSize)
+			},
+		},
+		{
+			name: "Preconditions",
+			yaml: `
+preconditions:
+  - condition: "test -f file.txt"
+    expected: "true"
+`,
+			check: func(t *testing.T, dag *core.DAG) {
+				require.Len(t, dag.Preconditions, 1)
+				assert.Equal(t, &core.Condition{Condition: "test -f file.txt", Expected: "true"}, dag.Preconditions[0])
+			},
+		},
+		{
+			name: "PreconditionsWithNegate",
+			yaml: `
+preconditions:
+  - condition: "${STATUS}"
+    expected: "success"
+    negate: true
+`,
+			check: func(t *testing.T, dag *core.DAG) {
+				require.Len(t, dag.Preconditions, 1)
+				assert.Equal(t, &core.Condition{Condition: "${STATUS}", Expected: "success", Negate: true}, dag.Preconditions[0])
+			},
+		},
+	}
+
+	for _, tt := range simpleTests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dag, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			require.NoError(t, err)
+			tt.check(t, dag)
+		})
+	}
+
+	// Params tests grouped into table-driven format
+	paramTests := []struct {
+		name       string
+		yaml       string
+		opts       *spec.BuildOpts
+		wantParams []string
+	}{
+		{
+			name: "ParamsWithSubstitution",
+			yaml: `
 params: "TEST_PARAM $1"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		th.AssertParam(t, "1=TEST_PARAM", "2=TEST_PARAM")
-	})
-	t.Run("ParamsWithQuotedValues", func(t *testing.T) {
-		data := []byte(`
+`,
+			wantParams: []string{"1=TEST_PARAM", "2=TEST_PARAM"},
+		},
+		{
+			name: "ParamsWithQuotedValues",
+			yaml: `
 params: x="a b c" y="d e f"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		th.AssertParam(t, "x=a b c", "y=d e f")
-	})
-	t.Run("ParamsAsMap", func(t *testing.T) {
-		data := []byte(`
+`,
+			wantParams: []string{"x=a b c", "y=d e f"},
+		},
+		{
+			name: "ParamsAsMap",
+			yaml: `
 params:
   - FOO: foo
   - BAR: bar
   - BAZ: "` + "`echo baz`" + `"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		th.AssertParam(t,
-			"FOO=foo",
-			"BAR=bar",
-			"BAZ=baz",
-		)
-	})
-	t.Run("ParamsAsMapOverride", func(t *testing.T) {
-		data := []byte(`
+`,
+			wantParams: []string{"FOO=foo", "BAR=bar", "BAZ=baz"},
+		},
+		{
+			name: "ParamsAsMapOverride",
+			yaml: `
 params:
   - FOO: foo
   - BAR: bar
   - BAZ: "` + "`echo baz`" + `"
-`)
-		dag, err := spec.LoadYAMLWithOpts(context.Background(), data, spec.BuildOpts{Parameters: "FOO=X BAZ=Y"})
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		th.AssertParam(t,
-			"FOO=X",
-			"BAR=bar",
-			"BAZ=Y",
-		)
-	})
-	t.Run("ParamsWithComplexValues", func(t *testing.T) {
-		data := []byte(`
+`,
+			opts:       &spec.BuildOpts{Parameters: "FOO=X BAZ=Y"},
+			wantParams: []string{"FOO=X", "BAR=bar", "BAZ=Y"},
+		},
+		{
+			name: "ParamsWithComplexValues",
+			yaml: `
 params: first P1=foo P2=${A001} P3=` + "`/bin/echo BAR`" + ` X=bar Y=${P1} Z="A B C"
 env:
   - A001: TEXT
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		th.AssertParam(t,
-			"1=first",
-			"P1=foo",
-			"P2=TEXT",
-			"P3=BAR",
-			"X=bar",
-			"Y=foo",
-			"Z=A B C",
-		)
-	})
-	t.Run("ParamsWithSubstringAndDefaults", func(t *testing.T) {
-		data := []byte(`
+`,
+			wantParams: []string{"1=first", "P1=foo", "P2=TEXT", "P3=BAR", "X=bar", "Y=foo", "Z=A B C"},
+		},
+		{
+			name: "ParamsWithSubstringAndDefaults",
+			yaml: `
 env:
   - SOURCE_ID: HBL01_22OCT2025_0536
 params:
@@ -109,36 +270,90 @@ params:
   - PREFIX: ${BASE:0:5}
   - REMAINDER: ${BASE:5}
   - FALLBACK: ${MISSING_VALUE:-fallback}
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-
-		th := DAG{t: t, DAG: dag}
-		th.AssertParam(t,
-			"BASE=HBL01_22OCT2025_0536",
-			"PREFIX=HBL01",
-			"REMAINDER=_22OCT2025_0536",
-			"FALLBACK=fallback",
-		)
-	})
-	t.Run("ParamsNoEvalPreservesRaw", func(t *testing.T) {
-		data := []byte(`
+`,
+			wantParams: []string{"BASE=HBL01_22OCT2025_0536", "PREFIX=HBL01", "REMAINDER=_22OCT2025_0536", "FALLBACK=fallback"},
+		},
+		{
+			name: "ParamsNoEvalPreservesRaw",
+			yaml: `
 env:
   - SOURCE_ID: HBL01_22OCT2025_0536
 params:
   - BASE: ${SOURCE_ID}
   - PREFIX: ${BASE:0:5}
-`)
-		dag, err := spec.LoadYAMLWithOpts(context.Background(), data, spec.BuildOpts{Flags: spec.BuildFlagNoEval})
-		require.NoError(t, err)
+`,
+			opts:       &spec.BuildOpts{Flags: spec.BuildFlagNoEval},
+			wantParams: []string{"BASE=${SOURCE_ID}", "PREFIX=${BASE:0:5}"},
+		},
+	}
 
-		th := DAG{t: t, DAG: dag}
-		th.AssertParam(t,
-			"BASE=${SOURCE_ID}",
-			"PREFIX=${BASE:0:5}",
-		)
-	})
-	t.Run("ParamsWithLocalSchemaReference", func(t *testing.T) {
+	for _, tt := range paramTests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var dag *core.DAG
+			var err error
+			if tt.opts != nil {
+				dag, err = spec.LoadYAMLWithOpts(context.Background(), []byte(tt.yaml), *tt.opts)
+			} else {
+				dag, err = spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			}
+			require.NoError(t, err)
+			th := DAG{t: t, DAG: dag}
+			th.AssertParam(t, tt.wantParams...)
+		})
+	}
+}
+
+func TestBuildParamsWithLocalSchemaReference(t *testing.T) {
+	t.Parallel()
+
+	schemaContent := `{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "batch_size": {
+      "type": "integer",
+      "default": 10,
+      "minimum": 1
+    },
+    "environment": {
+      "type": "string",
+      "default": "dev",
+      "enum": ["dev", "staging", "prod"]
+    }
+  }
+}`
+
+	tmpFile, err := os.CreateTemp("", "test-schema-*.json")
+	require.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	_, err = tmpFile.WriteString(schemaContent)
+	require.NoError(t, err)
+	tmpFile.Close()
+
+	data := []byte(fmt.Sprintf(`
+params:
+  schema: "%s"
+  values:
+    batch_size: 25
+    environment: "staging"
+`, tmpFile.Name()))
+
+	dag, err := spec.LoadYAML(context.Background(), data)
+	require.NoError(t, err)
+	th := DAG{t: t, DAG: dag}
+
+	require.Len(t, th.Params, 2)
+	require.Contains(t, th.Params, "batch_size=25")
+	require.Contains(t, th.Params, "environment=staging")
+}
+
+func TestBuildParamsWithRemoteSchemaReference(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/schemas/dag-params.json", func(w http.ResponseWriter, r *http.Request) {
 		schemaContent := `{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
@@ -155,60 +370,14 @@ params:
     }
   }
 }`
-
-		// Create temp schema file
-		tmpFile, err := os.CreateTemp("", "test-schema-*.json")
-		require.NoError(t, err)
-		defer os.Remove(tmpFile.Name())
-
-		_, err = tmpFile.WriteString(schemaContent)
-		require.NoError(t, err)
-		tmpFile.Close()
-
-		data := []byte(fmt.Sprintf(`
-params:
-  schema: "%s"
-  values:
-    batch_size: 25
-    environment: "staging"
-`, tmpFile.Name()))
-
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-
-		// Test that parameters are parsed correctly (order may vary)
-		require.Len(t, th.Params, 2)
-		require.Contains(t, th.Params, "batch_size=25")
-		require.Contains(t, th.Params, "environment=staging")
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(schemaContent))
 	})
-	t.Run("ParamsWithRemoteSchemaReference", func(t *testing.T) {
-		mux := http.NewServeMux()
-		mux.HandleFunc("/schemas/dag-params.json", func(w http.ResponseWriter, r *http.Request) {
-			schemaContent := `{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "properties": {
-    "batch_size": {
-      "type": "integer",
-      "default": 10,
-      "minimum": 1
-    },
-    "environment": {
-      "type": "string",
-      "default": "dev",
-      "enum": ["dev", "staging", "prod"]
-    }
-  }
-}`
-			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(schemaContent))
-		})
 
-		server := httptest.NewServer(mux)
-		defer server.Close()
+	server := httptest.NewServer(mux)
+	defer server.Close()
 
-		data := []byte(fmt.Sprintf(`
+	data := []byte(fmt.Sprintf(`
 params:
   schema: "%s/schemas/dag-params.json"
   values:
@@ -216,19 +385,17 @@ params:
     environment: "prod"
 `, server.URL))
 
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
+	dag, err := spec.LoadYAML(context.Background(), data)
+	require.NoError(t, err)
+	th := DAG{t: t, DAG: dag}
 
-		// Test that parameters are parsed correctly (order may vary)
-		require.Len(t, th.Params, 2)
-		require.Contains(t, th.Params, "batch_size=50")
-		require.Contains(t, th.Params, "environment=prod")
-	})
+	require.Len(t, th.Params, 2)
+	require.Contains(t, th.Params, "batch_size=50")
+	require.Contains(t, th.Params, "environment=prod")
+}
 
-	// Relative path resolution: workingDir, DAG dir, and CWD precedence
-	t.Run("ParamsSchemaResolutionFromWorkingDir", func(t *testing.T) {
-		// Schema with a default to prove it was loaded
+func TestBuildParamsSchemaResolution(t *testing.T) {
+	t.Run("FromWorkingDir", func(t *testing.T) {
 		schemaContent := `{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
@@ -261,12 +428,10 @@ params:
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 
-		// batch_size should be filled by schema default from workingDir schema
 		require.Contains(t, th.Params, "batch_size=42")
 	})
 
-	t.Run("ParamsSchemaResolutionFromDAGDir", func(t *testing.T) {
-		// Schema with different default to detect which file is used
+	t.Run("FromDAGDir", func(t *testing.T) {
 		schemaContent := `{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
@@ -276,7 +441,6 @@ params:
 }`
 
 		dir := t.TempDir()
-		// Write schema.json in same dir as DAG file
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "schema.json"), []byte(schemaContent), 0600))
 
 		dagYaml := []byte(`
@@ -292,12 +456,10 @@ params:
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 
-		// batch_size default should come from schema.json next to DAG file
 		require.Contains(t, th.Params, "batch_size=7")
 	})
 
-	t.Run("ParamsSchemaResolutionPrefersCWDOverWorkingDir", func(t *testing.T) {
-		// Prepare two schemas with different defaults
+	t.Run("PrefersCWDOverWorkingDir", func(t *testing.T) {
 		cwdSchemaContent := `{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
@@ -315,11 +477,9 @@ params:
 
 		cwd := t.TempDir()
 		wd := t.TempDir()
-		// Write schema.json in both locations
 		require.NoError(t, os.WriteFile(filepath.Join(cwd, "schema.json"), []byte(cwdSchemaContent), 0600))
 		require.NoError(t, os.WriteFile(filepath.Join(wd, "schema.json"), []byte(wdSchemaContent), 0600))
 
-		// Change process CWD for this subtest and restore after
 		orig, err := os.Getwd()
 		require.NoError(t, err)
 		require.NoError(t, os.Chdir(cwd))
@@ -337,11 +497,16 @@ params:
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 
-		// Should prefer schema.json from CWD (default 99) over workingDir (default 11)
 		require.Contains(t, th.Params, "batch_size=99")
 	})
+}
 
-	t.Run("ParamsSkipSchemaValidationFlag", func(t *testing.T) {
+func TestBuildParamsSchemaValidation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("SkipSchemaValidationFlag", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 params:
   schema: "missing-schema.json"
@@ -359,7 +524,8 @@ params:
 		th := DAG{t: t, DAG: dag}
 		th.AssertParam(t, "foo=bar")
 	})
-	t.Run("ParamsWithSchemaAndOverrideValidation", func(t *testing.T) {
+
+	t.Run("OverrideValidationFails", func(t *testing.T) {
 		schemaContent := `{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
@@ -378,7 +544,6 @@ params:
   }
 }`
 
-		// Create temp schema file
 		tmpFile, err := os.CreateTemp("", "test-schema-validation-*.json")
 		require.NoError(t, err)
 		defer os.Remove(tmpFile.Name())
@@ -392,14 +557,14 @@ params:
   schema: "%s"
 `, tmpFile.Name()))
 
-		// Inject CLI parameters that override the schema values and should fail validation
 		cliParams := "batch_size=100 environment=prod"
 		_, err = spec.LoadYAML(context.Background(), data, spec.WithParams(cliParams))
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "parameter validation failed")
 		require.Contains(t, err.Error(), "maximum: 100/1 is greater than 50")
 	})
-	t.Run("ParamsWithSchemaDefaultsApplied", func(t *testing.T) {
+
+	t.Run("DefaultsApplied", func(t *testing.T) {
 		schemaContent := `{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
@@ -422,7 +587,6 @@ params:
   }
 }`
 
-		// Create temp schema file
 		tmpFile, err := os.CreateTemp("", "test-schema-defaults-*.json")
 		require.NoError(t, err)
 		defer os.Remove(tmpFile.Name())
@@ -431,30 +595,24 @@ params:
 		require.NoError(t, err)
 		tmpFile.Close()
 
-		// Test case 1: Only provide some parameters, let defaults fill the rest
 		data := []byte(fmt.Sprintf(`
 params:
   schema: "%s"
   values:
     batch_size: 75
-    # environment and debug should get defaults
 `, tmpFile.Name()))
 
 		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 
-		// Should have all 3 parameters: provided batch_size + defaults for environment and debug
 		require.Len(t, th.Params, 3)
-
-		// Check that provided value remains unchanged
 		require.Contains(t, th.Params, "batch_size=75")
-
-		// Check that defaults were applied
 		require.Contains(t, th.Params, "environment=development")
 		require.Contains(t, th.Params, "debug=true")
 	})
-	t.Run("ParamsWithSchemaDefaultsPreserveExistingValues", func(t *testing.T) {
+
+	t.Run("DefaultsPreserveExistingValues", func(t *testing.T) {
 		schemaContent := `{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
@@ -481,7 +639,6 @@ params:
   }
 }`
 
-		// Create temp schema file
 		tmpFile, err := os.CreateTemp("", "test-schema-preserve-*.json")
 		require.NoError(t, err)
 		defer os.Remove(tmpFile.Name())
@@ -490,7 +647,6 @@ params:
 		require.NoError(t, err)
 		tmpFile.Close()
 
-		// Provide all parameters explicitly - defaults should NOT override them
 		data := []byte(fmt.Sprintf(`
 params:
   schema: "%s"
@@ -505,84 +661,31 @@ params:
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 
-		// Should have all 4 parameters with their explicitly provided values
 		require.Len(t, th.Params, 4)
-
-		// Check that all explicitly provided values remain unchanged (defaults should not override)
 		require.Contains(t, th.Params, "batch_size=50")
 		require.Contains(t, th.Params, "environment=production")
 		require.Contains(t, th.Params, "debug=false")
 		require.Contains(t, th.Params, "timeout=600")
 	})
-	t.Run("MailOn", func(t *testing.T) {
-		data := []byte(`
-steps:
-  - "true"
+}
 
-mailOn:
-  failure: true
-  success: true
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.True(t, th.MailOn.Failure)
-		assert.True(t, th.MailOn.Success)
-	})
-	t.Run("ValidTags", func(t *testing.T) {
+func TestBuildMailConfig(t *testing.T) {
+	t.Parallel()
+
+	t.Run("BasicConfig", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
-tags: daily,monthly
-steps:
-  - echo 1
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.True(t, th.HasTag("daily"))
-		assert.True(t, th.HasTag("monthly"))
-	})
-	t.Run("ValidTagsList", func(t *testing.T) {
-		data := []byte(`
-tags:
-  - daily
-  - monthly
-steps:
-  - echo 1
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.True(t, th.HasTag("daily"))
-		assert.True(t, th.HasTag("monthly"))
-	})
-	t.Run("LogDir", func(t *testing.T) {
-		data := []byte(`
-logDir: /tmp/logs
-steps:
-  - "true"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Equal(t, "/tmp/logs", th.LogDir)
-	})
-	t.Run("MailConfig", func(t *testing.T) {
-		data := []byte(`
-# SMTP server settings
 smtp:
   host: "smtp.example.com"
   port: "587"
   username: user@example.com
   password: password
-
-# Error mail configuration
 errorMail:
   from: "error@example.com"
   to: "admin@example.com"
   prefix: "[ERROR]"
   attachLogs: true
-
-# Info mail configuration
 infoMail:
   from: "info@example.com"
   to: "user@example.com"
@@ -592,6 +695,7 @@ infoMail:
 		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
+
 		assert.Equal(t, "smtp.example.com", th.SMTP.Host)
 		assert.Equal(t, "587", th.SMTP.Port)
 		assert.Equal(t, "user@example.com", th.SMTP.Username)
@@ -607,8 +711,10 @@ infoMail:
 		assert.Equal(t, "[INFO]", th.InfoMail.Prefix)
 		assert.True(t, th.InfoMail.AttachLogs)
 	})
-	t.Run("SMTPNumericPort", func(t *testing.T) {
-		// Test SMTP configuration with numeric port
+
+	t.Run("NumericPort", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 smtp:
   host: "smtp.example.com"
@@ -616,7 +722,7 @@ smtp:
   username: "user@example.com"
   password: "password"
 steps:
-  -     echo test
+  - echo test
 `)
 		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -626,26 +732,24 @@ steps:
 		assert.Equal(t, "user@example.com", dag.SMTP.Username)
 		assert.Equal(t, "password", dag.SMTP.Password)
 	})
-	t.Run("MailConfigMultipleRecipients", func(t *testing.T) {
+
+	t.Run("MultipleRecipients", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
-# SMTP server settings
 smtp:
   host: "smtp.example.com"
   port: "587"
   username: user@example.com
   password: password
-
-# Error mail with multiple recipients
 errorMail:
   from: "error@example.com"
-  to: 
+  to:
     - "admin1@example.com"
     - "admin2@example.com"
     - "admin3@example.com"
   prefix: "[ERROR]"
   attachLogs: true
-
-# Info mail with single recipient as array
 infoMail:
   from: "info@example.com"
   to:
@@ -657,42 +761,26 @@ infoMail:
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 
-		// Check error mail with multiple recipients
 		assert.Equal(t, "error@example.com", th.ErrorMail.From)
 		assert.Equal(t, []string{"admin1@example.com", "admin2@example.com", "admin3@example.com"}, th.ErrorMail.To)
 		assert.Equal(t, "[ERROR]", th.ErrorMail.Prefix)
 		assert.True(t, th.ErrorMail.AttachLogs)
 
-		// Check info mail with single recipient as array
 		assert.Equal(t, "info@example.com", th.InfoMail.From)
 		assert.Equal(t, []string{"user@example.com"}, th.InfoMail.To)
 		assert.Equal(t, "[INFO]", th.InfoMail.Prefix)
 		assert.False(t, th.InfoMail.AttachLogs)
 	})
-	t.Run("MaxHistRetentionDays", func(t *testing.T) {
-		data := []byte(`
-histRetentionDays: 365
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Equal(t, 365, th.HistRetentionDays)
-	})
-	t.Run("CleanUpTime", func(t *testing.T) {
-		data := []byte(`
-maxCleanUpTimeSec: 10
-steps:
-  - "true"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Equal(t, time.Duration(10*time.Second), th.MaxCleanUpTime)
-	})
-	t.Run("ChainTypeBasic", func(t *testing.T) {
+}
+
+func TestBuildChainType(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Basic", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 type: chain
-
 steps:
   - echo "First"
   - echo "Second"
@@ -704,33 +792,30 @@ steps:
 		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, core.TypeChain, th.Type)
 
-		// Check that implicit dependencies were added
 		assert.Len(t, th.Steps, 4)
-		assert.Empty(t, th.Steps[0].Depends) // First step has no dependencies
+		assert.Empty(t, th.Steps[0].Depends)
 		assert.Equal(t, []string{"cmd_1"}, th.Steps[1].Depends)
 		assert.Equal(t, []string{"cmd_2"}, th.Steps[2].Depends)
 		assert.Equal(t, []string{"cmd_3"}, th.Steps[3].Depends)
 	})
-	t.Run("ChainTypeWithExplicitDepends", func(t *testing.T) {
+
+	t.Run("WithExplicitDepends", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 type: chain
-
 steps:
   - name: setup
     command: ./setup.sh
-  
   - name: download-a
     command: wget fileA
-  
   - name: download-b
     command: wget fileB
-  
   - name: process-both
     command: process.py fileA fileB
-    depends:  # Override chain to depend on both downloads
+    depends:
       - download-a
       - download-b
-  
   - name: cleanup
     command: rm -f fileA fileB
 `)
@@ -739,20 +824,19 @@ steps:
 		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, core.TypeChain, th.Type)
 
-		// Check dependencies
 		assert.Len(t, th.Steps, 5)
-		assert.Empty(t, th.Steps[0].Depends)                         // setup
-		assert.Equal(t, []string{"setup"}, th.Steps[1].Depends)      // download-a
-		assert.Equal(t, []string{"download-a"}, th.Steps[2].Depends) // download-b
-		// process-both should keep its explicit dependencies
+		assert.Empty(t, th.Steps[0].Depends)
+		assert.Equal(t, []string{"setup"}, th.Steps[1].Depends)
+		assert.Equal(t, []string{"download-a"}, th.Steps[2].Depends)
 		assert.ElementsMatch(t, []string{"download-a", "download-b"}, th.Steps[3].Depends)
-		assert.Equal(t, []string{"process-both"}, th.Steps[4].Depends) // cleanup
+		assert.Equal(t, []string{"process-both"}, th.Steps[4].Depends)
 	})
+
 	t.Run("InvalidType", func(t *testing.T) {
-		// Test will fail with an error containing "invalid type"
+		t.Parallel()
+
 		data := []byte(`
 type: invalid-type
-
 steps:
   - name: step1
     command: echo "test"
@@ -761,176 +845,84 @@ steps:
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid type")
 	})
-	t.Run("DefaultTypeIsChain", func(t *testing.T) {
-		data := []byte(`
-steps:
-  - echo 1
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Equal(t, core.TypeChain, th.Type)
-	})
-	t.Run("ChainTypeWithNoDependencies", func(t *testing.T) {
+
+	t.Run("WithEmptyDependencies", func(t *testing.T) {
+		t.Parallel()
+
 		data := []byte(`
 type: chain
-
 steps:
   - name: step1
     command: echo "First"
-  
   - name: step2
-    command: echo "Second - should depend on step1"
-  
+    command: echo "Second"
   - name: step3
-    command: echo "Third - no dependencies"
-    depends: []  # Explicitly no dependencies
-  
+    command: echo "Third"
+    depends: []
   - name: step4
-    command: echo "Fourth - should depend on step3"
+    command: echo "Fourth"
 `)
 		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Equal(t, core.TypeChain, th.Type)
 
-		// Check dependencies
 		assert.Len(t, th.Steps, 4)
-		assert.Empty(t, th.Steps[0].Depends)                    // step1
-		assert.Equal(t, []string{"step1"}, th.Steps[1].Depends) // step2
-		assert.Empty(t, th.Steps[2].Depends)                    // step3 - explicitly no deps
-		assert.Equal(t, []string{"step3"}, th.Steps[3].Depends) // step4 should depend on step3
+		assert.Empty(t, th.Steps[0].Depends)
+		assert.Equal(t, []string{"step1"}, th.Steps[1].Depends)
+		assert.Empty(t, th.Steps[2].Depends)
+		assert.Equal(t, []string{"step3"}, th.Steps[3].Depends)
 	})
-	t.Run("Preconditions", func(t *testing.T) {
-		data := []byte(`
-preconditions:
-  - condition: "test -f file.txt"
-    expected: "true"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Preconditions, 1)
-		assert.Equal(t, &core.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Preconditions[0])
-	})
-	t.Run("PreconditionsWithNegate", func(t *testing.T) {
-		data := []byte(`
-preconditions:
-  - condition: "${STATUS}"
-    expected: "success"
-    negate: true
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Preconditions, 1)
-		assert.Equal(t, &core.Condition{Condition: "${STATUS}", Expected: "success", Negate: true}, th.Preconditions[0])
-	})
-	t.Run("MaxActiveRuns", func(t *testing.T) {
-		data := []byte(`
-maxActiveRuns: 5
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Equal(t, 5, th.MaxActiveRuns)
-	})
-	t.Run("MaxActiveSteps", func(t *testing.T) {
-		data := []byte(`
-maxActiveSteps: 3
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Equal(t, 3, th.MaxActiveSteps)
-	})
-	t.Run("RunConfig", func(t *testing.T) {
-		data := []byte(`
-runConfig:
-  disableParamEdit: true
-  disableRunIdEdit: true
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		require.NotNil(t, dag.RunConfig)
-		assert.True(t, dag.RunConfig.DisableParamEdit)
-		assert.True(t, dag.RunConfig.DisableRunIdEdit)
-	})
-	t.Run("MaxOutputSize", func(t *testing.T) {
-		// Test custom maxOutputSize
-		data := []byte(`
-description: Test DAG with custom maxOutputSize
+}
 
-# Custom maxOutputSize of 512KB
-maxOutputSize: 524288
+func TestBuildValidationError(t *testing.T) {
+	t.Parallel()
 
-steps:
-  - echo "test output"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Equal(t, 524288, th.MaxOutputSize) // 512KB
-
-		// Test default maxOutputSize when not specified
-		data2 := []byte(`
-steps:
-  - "true"
-`)
-		dag2, err := spec.LoadYAML(context.Background(), data2)
-		require.NoError(t, err)
-		th2 := DAG{t: t, DAG: dag2}
-		assert.Equal(t, 0, th2.MaxOutputSize) // Default 1MB
-	})
-	t.Run("ValidationError", func(t *testing.T) {
-		type testCase struct {
-			name        string
-			yaml        string
-			expectedErr error
-		}
-
-		testCases := []testCase{
-			{
-				name: "InvalidEnv",
-				yaml: `
+	tests := []struct {
+		name        string
+		yaml        string
+		expectedErr error
+	}{
+		{
+			name: "InvalidEnv",
+			yaml: `
 env:
   - VAR: "` + "`invalid command`" + `"`,
-				expectedErr: spec.ErrInvalidEnvValue,
-			},
-			{
-				name: "InvalidParams",
-				yaml: `
+			expectedErr: spec.ErrInvalidEnvValue,
+		},
+		{
+			name: "InvalidParams",
+			yaml: `
 params: "` + "`invalid command`" + `"`,
-				expectedErr: spec.ErrInvalidParamValue,
-			},
-			{
-				name: "InvalidSchedule",
-				yaml: `
+			expectedErr: spec.ErrInvalidParamValue,
+		},
+		{
+			name: "InvalidSchedule",
+			yaml: `
 schedule: "1"`,
-				expectedErr: spec.ErrInvalidSchedule,
-			},
-		}
+			expectedErr: spec.ErrInvalidSchedule,
+		},
+	}
 
-		for _, tc := range testCases {
-			t.Run(tc.name, func(t *testing.T) {
-				data := []byte(tc.yaml)
-				ctx := context.Background()
-				_, err := spec.LoadYAML(ctx, data)
-				if errs, ok := err.(*core.ErrorList); ok && len(*errs) > 0 {
-					found := false
-					for _, e := range *errs {
-						if errors.Is(e, tc.expectedErr) {
-							found = true
-							break
-						}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			if errs, ok := err.(*core.ErrorList); ok && len(*errs) > 0 {
+				found := false
+				for _, e := range *errs {
+					if errors.Is(e, tt.expectedErr) {
+						found = true
+						break
 					}
-					require.True(t, found, "expected error %v, got %v", tc.expectedErr, err)
-				} else {
-					assert.ErrorIs(t, err, tc.expectedErr)
 				}
-			})
-		}
-	})
+				require.True(t, found, "expected error %v, got %v", tt.expectedErr, err)
+			} else {
+				assert.ErrorIs(t, err, tt.expectedErr)
+			}
+		})
+	}
 }
 
 func TestBuildEnv(t *testing.T) {
@@ -1261,160 +1253,168 @@ steps:
 		require.Len(t, dagLegacy.BuildWarnings, 1)
 		assert.Contains(t, dagLegacy.BuildWarnings[0], "Step field 'run' is deprecated")
 	})
-	t.Run("ContinueOn", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+	// ContinueOn success cases
+	continueOnTests := []struct {
+		name        string
+		yaml        string
+		wantSkipped bool
+		wantFailure bool
+		wantExitCode []int
+		wantMarkSuccess bool
+	}{
+		{
+			name: "ContinueOnObject",
+			yaml: `
 steps:
   - command: "echo 1"
     continueOn:
       skipped: true
       failure: true
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Steps, 1)
-		assert.True(t, th.Steps[0].ContinueOn.Failure)
-		assert.True(t, th.Steps[0].ContinueOn.Skipped)
-	})
-	t.Run("ContinueOnStringSkipped", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantSkipped: true,
+			wantFailure: true,
+		},
+		{
+			name: "ContinueOnStringSkipped",
+			yaml: `
 steps:
   - command: "echo 1"
     continueOn: skipped
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Steps, 1)
-		assert.True(t, th.Steps[0].ContinueOn.Skipped)
-		assert.False(t, th.Steps[0].ContinueOn.Failure)
-	})
-	t.Run("ContinueOnStringFailed", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantSkipped: true,
+			wantFailure: false,
+		},
+		{
+			name: "ContinueOnStringFailed",
+			yaml: `
 steps:
   - command: "echo 1"
     continueOn: failed
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Steps, 1)
-		assert.False(t, th.Steps[0].ContinueOn.Skipped)
-		assert.True(t, th.Steps[0].ContinueOn.Failure)
-	})
-	t.Run("ContinueOnStringCaseInsensitive", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantSkipped: false,
+			wantFailure: true,
+		},
+		{
+			name: "ContinueOnStringCaseInsensitive",
+			yaml: `
 steps:
   - command: "echo 1"
     continueOn: SKIPPED
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Steps, 1)
-		assert.True(t, th.Steps[0].ContinueOn.Skipped)
-	})
-	t.Run("ContinueOnInvalidString", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
-steps:
-  - command: "echo 1"
-    continueOn: invalid
-`)
-		_, err := spec.LoadYAML(context.Background(), data)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "continueOn")
-	})
-	t.Run("ContinueOnObjectWithExitCode", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantSkipped: true,
+		},
+		{
+			name: "ContinueOnObjectWithExitCode",
+			yaml: `
 steps:
   - command: "echo 1"
     continueOn:
       exitCode: [1, 2, 3]
       markSuccess: true
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Steps, 1)
-		assert.Equal(t, []int{1, 2, 3}, th.Steps[0].ContinueOn.ExitCode)
-		assert.True(t, th.Steps[0].ContinueOn.MarkSuccess)
-	})
-	t.Run("ContinueOnInvalidFailureType", func(t *testing.T) {
-		t.Parallel()
+`,
+			wantExitCode:    []int{1, 2, 3},
+			wantMarkSuccess: true,
+		},
+	}
 
-		data := []byte(`
+	for _, tt := range continueOnTests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dag, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			require.NoError(t, err)
+			require.Len(t, dag.Steps, 1)
+			assert.Equal(t, tt.wantSkipped, dag.Steps[0].ContinueOn.Skipped)
+			assert.Equal(t, tt.wantFailure, dag.Steps[0].ContinueOn.Failure)
+			if tt.wantExitCode != nil {
+				assert.Equal(t, tt.wantExitCode, dag.Steps[0].ContinueOn.ExitCode)
+			}
+			if tt.wantMarkSuccess {
+				assert.True(t, dag.Steps[0].ContinueOn.MarkSuccess)
+			}
+		})
+	}
+
+	// ContinueOn error cases
+	continueOnErrorTests := []struct {
+		name         string
+		yaml         string
+		errContains  []string
+	}{
+		{
+			name: "ContinueOnInvalidString",
+			yaml: `
+steps:
+  - command: "echo 1"
+    continueOn: invalid
+`,
+			errContains: []string{"continueOn"},
+		},
+		{
+			name: "ContinueOnInvalidFailureType",
+			yaml: `
 steps:
   - command: "echo 1"
     continueOn:
       failure: "true"
-`)
-		_, err := spec.LoadYAML(context.Background(), data)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "continueOn.failure")
-		assert.Contains(t, err.Error(), "boolean")
-	})
-	t.Run("ContinueOnInvalidSkippedType", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			errContains: []string{"continueOn.failure", "boolean"},
+		},
+		{
+			name: "ContinueOnInvalidSkippedType",
+			yaml: `
 steps:
   - command: "echo 1"
     continueOn:
       skipped: 1
-`)
-		_, err := spec.LoadYAML(context.Background(), data)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "continueOn.skipped")
-		assert.Contains(t, err.Error(), "boolean")
-	})
-	t.Run("ContinueOnInvalidMarkSuccessType", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			errContains: []string{"continueOn.skipped", "boolean"},
+		},
+		{
+			name: "ContinueOnInvalidMarkSuccessType",
+			yaml: `
 steps:
   - command: "echo 1"
     continueOn:
       markSuccess: "yes"
-`)
-		_, err := spec.LoadYAML(context.Background(), data)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "continueOn.markSuccess")
-		assert.Contains(t, err.Error(), "boolean")
-	})
-	t.Run("RetryPolicy", func(t *testing.T) {
-		t.Parallel()
+`,
+			errContains: []string{"continueOn.markSuccess", "boolean"},
+		},
+	}
 
-		data := []byte(`
+	for _, tt := range continueOnErrorTests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			require.Error(t, err)
+			for _, s := range tt.errContains {
+				assert.Contains(t, err.Error(), s)
+			}
+		})
+	}
+	// RetryPolicy success tests
+	retryPolicyTests := []struct {
+		name            string
+		yaml            string
+		wantLimit       int
+		wantInterval    time.Duration
+		wantBackoff     float64
+		wantMaxInterval time.Duration
+	}{
+		{
+			name: "RetryPolicyBasic",
+			yaml: `
 steps:
   - command: "echo 2"
     retryPolicy:
       limit: 3
       intervalSec: 10
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Steps, 1)
-		require.NotNil(t, th.Steps[0].RetryPolicy)
-		assert.Equal(t, 3, th.Steps[0].RetryPolicy.Limit)
-		assert.Equal(t, 10*time.Second, th.Steps[0].RetryPolicy.Interval)
-	})
-	t.Run("RetryPolicyWithBackoff", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantLimit:    3,
+			wantInterval: 10 * time.Second,
+		},
+		{
+			name: "RetryPolicyWithBackoff",
+			yaml: `
 steps:
   - name: "test_backoff"
     command: "echo test"
@@ -1423,21 +1423,15 @@ steps:
       intervalSec: 2
       backoff: 2.0
       maxIntervalSec: 30
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Steps, 1)
-		require.NotNil(t, th.Steps[0].RetryPolicy)
-		assert.Equal(t, 5, th.Steps[0].RetryPolicy.Limit)
-		assert.Equal(t, 2*time.Second, th.Steps[0].RetryPolicy.Interval)
-		assert.Equal(t, 2.0, th.Steps[0].RetryPolicy.Backoff)
-		assert.Equal(t, 30*time.Second, th.Steps[0].RetryPolicy.MaxInterval)
-	})
-	t.Run("RetryPolicyWithBackoffBool", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantLimit:       5,
+			wantInterval:    2 * time.Second,
+			wantBackoff:     2.0,
+			wantMaxInterval: 30 * time.Second,
+		},
+		{
+			name: "RetryPolicyWithBackoffBool",
+			yaml: `
 steps:
   - name: "test_backoff_bool"
     command: "echo test"
@@ -1446,22 +1440,41 @@ steps:
       intervalSec: 1
       backoff: true
       maxIntervalSec: 10
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Steps, 1)
-		require.NotNil(t, th.Steps[0].RetryPolicy)
-		assert.Equal(t, 3, th.Steps[0].RetryPolicy.Limit)
-		assert.Equal(t, 1*time.Second, th.Steps[0].RetryPolicy.Interval)
-		assert.Equal(t, 2.0, th.Steps[0].RetryPolicy.Backoff) // true converts to 2.0
-		assert.Equal(t, 10*time.Second, th.Steps[0].RetryPolicy.MaxInterval)
-	})
-	t.Run("RetryPolicyInvalidBackoff", func(t *testing.T) {
-		t.Parallel()
+`,
+			wantLimit:       3,
+			wantInterval:    1 * time.Second,
+			wantBackoff:     2.0, // true converts to 2.0
+			wantMaxInterval: 10 * time.Second,
+		},
+	}
 
-		// Test backoff value <= 1.0
-		data := []byte(`
+	for _, tt := range retryPolicyTests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dag, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			require.NoError(t, err)
+			require.Len(t, dag.Steps, 1)
+			require.NotNil(t, dag.Steps[0].RetryPolicy)
+			assert.Equal(t, tt.wantLimit, dag.Steps[0].RetryPolicy.Limit)
+			assert.Equal(t, tt.wantInterval, dag.Steps[0].RetryPolicy.Interval)
+			if tt.wantBackoff > 0 {
+				assert.Equal(t, tt.wantBackoff, dag.Steps[0].RetryPolicy.Backoff)
+			}
+			if tt.wantMaxInterval > 0 {
+				assert.Equal(t, tt.wantMaxInterval, dag.Steps[0].RetryPolicy.MaxInterval)
+			}
+		})
+	}
+
+	// RetryPolicy error tests
+	retryPolicyErrorTests := []struct {
+		name        string
+		yaml        string
+		errContains string
+	}{
+		{
+			name: "RetryPolicyInvalidBackoff",
+			yaml: `
 steps:
   - name: "test"
     command: "echo test"
@@ -1469,67 +1482,72 @@ steps:
       limit: 3
       intervalSec: 1
       backoff: 0.8
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		assert.Error(t, err)
-		assert.Nil(t, dag)
-		assert.Contains(t, err.Error(), "backoff must be greater than 1.0")
-	})
-	t.Run("RetryPolicyMissingLimit", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			errContains: "backoff must be greater than 1.0",
+		},
+		{
+			name: "RetryPolicyMissingLimit",
+			yaml: `
 steps:
   - name: "test"
     command: "echo test"
     retryPolicy:
       intervalSec: 5
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		assert.Error(t, err)
-		assert.Nil(t, dag)
-		assert.Contains(t, err.Error(), "limit is required when retryPolicy is specified")
-	})
-	t.Run("RetryPolicyMissingIntervalSec", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			errContains: "limit is required when retryPolicy is specified",
+		},
+		{
+			name: "RetryPolicyMissingIntervalSec",
+			yaml: `
 steps:
   - name: "test"
     command: "echo test"
     retryPolicy:
       limit: 3
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		assert.Error(t, err)
-		assert.Nil(t, dag)
-		assert.Contains(t, err.Error(), "intervalSec is required when retryPolicy is specified")
-	})
-	t.Run("RepeatPolicy", func(t *testing.T) {
-		t.Parallel()
+`,
+			errContains: "intervalSec is required when retryPolicy is specified",
+		},
+	}
 
-		// Test basic boolean repeat (backward compatibility)
-		data := []byte(`
+	for _, tt := range retryPolicyErrorTests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dag, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			require.Error(t, err)
+			assert.Nil(t, dag)
+			assert.Contains(t, err.Error(), tt.errContains)
+		})
+	}
+	// RepeatPolicy success tests
+	repeatPolicyTests := []struct {
+		name            string
+		yaml            string
+		wantMode        core.RepeatMode
+		wantInterval    time.Duration
+		wantLimit       int
+		wantExitCode    []int
+		wantCondition   string
+		wantExpected    string
+		wantBackoff     float64
+		wantMaxInterval time.Duration
+		wantNoCondition bool
+	}{
+		{
+			name: "RepeatPolicyBasic",
+			yaml: `
 steps:
   - command: "echo 2"
     repeatPolicy:
       repeat: true
       intervalSec: 60
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Steps, 1)
-		require.NotNil(t, th.Steps[0].RepeatPolicy)
-		assert.Equal(t, core.RepeatModeWhile, th.Steps[0].RepeatPolicy.RepeatMode)
-		assert.Equal(t, 60*time.Second, th.Steps[0].RepeatPolicy.Interval)
-		assert.Equal(t, 0, th.Steps[0].RepeatPolicy.Limit) // No limit set
-	})
-
-	t.Run("RepeatPolicyWhileCondition", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantMode:     core.RepeatModeWhile,
+			wantInterval: 60 * time.Second,
+			wantLimit:    0,
+		},
+		{
+			name: "RepeatPolicyWhileCondition",
+			yaml: `
 steps:
   - name: "repeat-while-condition"
     command: "echo test"
@@ -1538,25 +1556,16 @@ steps:
       condition: "echo hello"
       intervalSec: 5
       limit: 3
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Steps, 1)
-		repeatPolicy := th.Steps[0].RepeatPolicy
-		require.NotNil(t, repeatPolicy)
-		assert.Equal(t, core.RepeatModeWhile, repeatPolicy.RepeatMode)
-		require.NotNil(t, repeatPolicy.Condition)
-		assert.Equal(t, "echo hello", repeatPolicy.Condition.Condition)
-		assert.Equal(t, "", repeatPolicy.Condition.Expected) // No expected value for while mode
-		assert.Equal(t, 5*time.Second, repeatPolicy.Interval)
-		assert.Equal(t, 3, repeatPolicy.Limit)
-	})
-
-	t.Run("RepeatPolicyUntilCondition", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantMode:      core.RepeatModeWhile,
+			wantInterval:  5 * time.Second,
+			wantLimit:     3,
+			wantCondition: "echo hello",
+			wantExpected:  "",
+		},
+		{
+			name: "RepeatPolicyUntilCondition",
+			yaml: `
 steps:
   - name: "repeat-until-condition"
     command: "echo test"
@@ -1566,25 +1575,16 @@ steps:
       expected: "hello"
       intervalSec: 10
       limit: 5
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Steps, 1)
-		repeatPolicy := th.Steps[0].RepeatPolicy
-		require.NotNil(t, repeatPolicy)
-		assert.Equal(t, core.RepeatModeUntil, repeatPolicy.RepeatMode)
-		require.NotNil(t, repeatPolicy.Condition)
-		assert.Equal(t, "echo hello", repeatPolicy.Condition.Condition)
-		assert.Equal(t, "hello", repeatPolicy.Condition.Expected)
-		assert.Equal(t, 10*time.Second, repeatPolicy.Interval)
-		assert.Equal(t, 5, repeatPolicy.Limit)
-	})
-
-	t.Run("RepeatPolicyWhileExitCode", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantMode:      core.RepeatModeUntil,
+			wantInterval:  10 * time.Second,
+			wantLimit:     5,
+			wantCondition: "echo hello",
+			wantExpected:  "hello",
+		},
+		{
+			name: "RepeatPolicyWhileExitCode",
+			yaml: `
 steps:
   - name: "repeat-while-exitcode"
     command: "exit 1"
@@ -1592,23 +1592,15 @@ steps:
       repeat: "while"
       exitCode: [1, 2]
       intervalSec: 15
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Steps, 1)
-		repeatPolicy := th.Steps[0].RepeatPolicy
-		require.NotNil(t, repeatPolicy)
-		assert.Equal(t, core.RepeatModeWhile, repeatPolicy.RepeatMode)
-		assert.Equal(t, []int{1, 2}, repeatPolicy.ExitCode)
-		assert.Equal(t, 15*time.Second, repeatPolicy.Interval)
-		assert.Nil(t, repeatPolicy.Condition) // No condition set
-	})
-
-	t.Run("RepeatPolicyUntilExitCode", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantMode:        core.RepeatModeWhile,
+			wantInterval:    15 * time.Second,
+			wantExitCode:    []int{1, 2},
+			wantNoCondition: true,
+		},
+		{
+			name: "RepeatPolicyUntilExitCode",
+			yaml: `
 steps:
   - name: "repeat-until-exitcode"
     command: "exit 0"
@@ -1616,24 +1608,15 @@ steps:
       repeat: "until"
       exitCode: [0]
       intervalSec: 20
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Steps, 1)
-		repeatPolicy := th.Steps[0].RepeatPolicy
-		require.NotNil(t, repeatPolicy)
-		assert.Equal(t, core.RepeatModeUntil, repeatPolicy.RepeatMode)
-		assert.Equal(t, []int{0}, repeatPolicy.ExitCode)
-		assert.Equal(t, 20*time.Second, repeatPolicy.Interval)
-		assert.Nil(t, repeatPolicy.Condition) // No condition set
-	})
-
-	t.Run("RepeatPolicyBackwardCompatibilityUntil", func(t *testing.T) {
-		t.Parallel()
-
-		// Test backward compatibility: condition + expected should infer "until" mode
-		data := []byte(`
+`,
+			wantMode:        core.RepeatModeUntil,
+			wantInterval:    20 * time.Second,
+			wantExitCode:    []int{0},
+			wantNoCondition: true,
+		},
+		{
+			name: "RepeatPolicyBackwardCompatibilityUntil",
+			yaml: `
 steps:
   - name: "repeat-backward-compatibility-until"
     command: "echo test"
@@ -1641,50 +1624,30 @@ steps:
       condition: "echo hello"
       expected: "hello"
       intervalSec: 25
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Steps, 1)
-		repeatPolicy := th.Steps[0].RepeatPolicy
-		require.NotNil(t, repeatPolicy)
-		assert.Equal(t, core.RepeatModeUntil, repeatPolicy.RepeatMode)
-		require.NotNil(t, repeatPolicy.Condition)
-		assert.Equal(t, "echo hello", repeatPolicy.Condition.Condition)
-		assert.Equal(t, "hello", repeatPolicy.Condition.Expected)
-		assert.Equal(t, 25*time.Second, repeatPolicy.Interval)
-	})
-
-	t.Run("RepeatPolicyBackwardCompatibilityWhile", func(t *testing.T) {
-		t.Parallel()
-
-		// Test backward compatibility: condition only should infer "while" mode
-		data := []byte(`
+`,
+			wantMode:      core.RepeatModeUntil,
+			wantInterval:  25 * time.Second,
+			wantCondition: "echo hello",
+			wantExpected:  "hello",
+		},
+		{
+			name: "RepeatPolicyBackwardCompatibilityWhile",
+			yaml: `
 steps:
   - name: "repeat-backward-compatibility-while"
     command: "echo test"
     repeatPolicy:
       condition: "echo hello"
       intervalSec: 30
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Steps, 1)
-		repeatPolicy := th.Steps[0].RepeatPolicy
-		require.NotNil(t, repeatPolicy)
-		assert.Equal(t, core.RepeatModeWhile, repeatPolicy.RepeatMode)
-		require.NotNil(t, repeatPolicy.Condition)
-		assert.Equal(t, "echo hello", repeatPolicy.Condition.Condition)
-		assert.Equal(t, "", repeatPolicy.Condition.Expected) // No expected value
-		assert.Equal(t, 30*time.Second, repeatPolicy.Interval)
-	})
-
-	t.Run("RepeatPolicyCondition", func(t *testing.T) {
-		t.Parallel()
-
-		// Test existing backward compatibility condition test
-		data := []byte(`
+`,
+			wantMode:      core.RepeatModeWhile,
+			wantInterval:  30 * time.Second,
+			wantCondition: "echo hello",
+			wantExpected:  "",
+		},
+		{
+			name: "RepeatPolicyCondition",
+			yaml: `
 steps:
   - name: "repeat-condition"
     command: "echo hello"
@@ -1692,19 +1655,101 @@ steps:
       condition: "echo hello"
       expected: "hello"
       intervalSec: 1
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Steps, 1)
-		repeatPolicy := th.Steps[0].RepeatPolicy
-		require.NotNil(t, repeatPolicy.Condition)
-		assert.Equal(t, "echo hello", repeatPolicy.Condition.Condition)
-		assert.Equal(t, "hello", repeatPolicy.Condition.Expected)
-		assert.Equal(t, 1*time.Second, repeatPolicy.Interval)
-		// Should infer "until" mode due to condition + expected
-		assert.Equal(t, core.RepeatModeUntil, repeatPolicy.RepeatMode)
-	})
+`,
+			wantMode:      core.RepeatModeUntil,
+			wantInterval:  1 * time.Second,
+			wantCondition: "echo hello",
+			wantExpected:  "hello",
+		},
+		{
+			name: "RepeatPolicyExitCode",
+			yaml: `
+steps:
+  - name: "repeat-exitcode"
+    command: "exit 42"
+    repeatPolicy:
+      exitCode: [42]
+      intervalSec: 2
+`,
+			wantMode:     core.RepeatModeWhile,
+			wantInterval: 2 * time.Second,
+			wantExitCode: []int{42},
+		},
+		{
+			name: "RepeatPolicyWithBackoff",
+			yaml: `
+steps:
+  - name: "test_repeat_backoff"
+    command: "echo test"
+    repeatPolicy:
+      repeat: while
+      intervalSec: 5
+      backoff: 1.5
+      maxIntervalSec: 60
+      limit: 10
+      exitCode: [1]
+`,
+			wantMode:        core.RepeatModeWhile,
+			wantInterval:    5 * time.Second,
+			wantBackoff:     1.5,
+			wantMaxInterval: 60 * time.Second,
+			wantLimit:       10,
+			wantExitCode:    []int{1},
+		},
+		{
+			name: "RepeatPolicyWithBackoffBool",
+			yaml: `
+steps:
+  - name: "test_repeat_backoff_bool"
+    command: "echo test"
+    repeatPolicy:
+      repeat: until
+      intervalSec: 2
+      backoff: true
+      maxIntervalSec: 20
+      limit: 5
+      condition: "echo done"
+      expected: "done"
+`,
+			wantMode:        core.RepeatModeUntil,
+			wantInterval:    2 * time.Second,
+			wantBackoff:     2.0,
+			wantMaxInterval: 20 * time.Second,
+			wantLimit:       5,
+			wantCondition:   "echo done",
+			wantExpected:    "done",
+		},
+	}
+
+	for _, tt := range repeatPolicyTests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dag, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			require.NoError(t, err)
+			require.Len(t, dag.Steps, 1)
+			rp := dag.Steps[0].RepeatPolicy
+			require.NotNil(t, rp)
+			assert.Equal(t, tt.wantMode, rp.RepeatMode)
+			assert.Equal(t, tt.wantInterval, rp.Interval)
+			assert.Equal(t, tt.wantLimit, rp.Limit)
+			if tt.wantExitCode != nil {
+				assert.Equal(t, tt.wantExitCode, rp.ExitCode)
+			}
+			if tt.wantNoCondition {
+				assert.Nil(t, rp.Condition)
+			} else if tt.wantCondition != "" {
+				require.NotNil(t, rp.Condition)
+				assert.Equal(t, tt.wantCondition, rp.Condition.Condition)
+				assert.Equal(t, tt.wantExpected, rp.Condition.Expected)
+			}
+			if tt.wantBackoff > 0 {
+				assert.Equal(t, tt.wantBackoff, rp.Backoff)
+			}
+			if tt.wantMaxInterval > 0 {
+				assert.Equal(t, tt.wantMaxInterval, rp.MaxInterval)
+			}
+		})
+	}
 	t.Run("SignalOnStop", func(t *testing.T) {
 		t.Parallel()
 
@@ -1788,156 +1833,63 @@ steps:
 		assert.Len(t, th.Steps[0].Preconditions, 1)
 		assert.Equal(t, &core.Condition{Condition: "${STATUS}", Expected: "success", Negate: true}, th.Steps[0].Preconditions[0])
 	})
-	t.Run("RepeatPolicyExitCode", func(t *testing.T) {
-		t.Parallel()
-
-		// Test existing backward compatibility exitcode test
-		data := []byte(`
-steps:
-  - name: "repeat-exitcode"
-    command: "exit 42"
-    repeatPolicy:
-      exitCode: [42]
-      intervalSec: 2
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Steps, 1)
-		repeatPolicy := th.Steps[0].RepeatPolicy
-		require.NotNil(t, repeatPolicy)
-		assert.Equal(t, []int{42}, repeatPolicy.ExitCode)
-		assert.Equal(t, 2*time.Second, repeatPolicy.Interval)
-		// Should infer "while" mode due to exitCode only
-		assert.Equal(t, core.RepeatModeWhile, repeatPolicy.RepeatMode)
-	})
-
-	t.Run("RepeatPolicyWithBackoff", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
-steps:
-  - name: "test_repeat_backoff"
-    command: "echo test"
-    repeatPolicy:
-      repeat: while
-      intervalSec: 5
-      backoff: 1.5
-      maxIntervalSec: 60
-      limit: 10
-      exitCode: [1]
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Steps, 1)
-		repeatPolicy := th.Steps[0].RepeatPolicy
-		require.NotNil(t, repeatPolicy)
-		assert.Equal(t, core.RepeatModeWhile, repeatPolicy.RepeatMode)
-		assert.Equal(t, 5*time.Second, repeatPolicy.Interval)
-		assert.Equal(t, 1.5, repeatPolicy.Backoff)
-		assert.Equal(t, 60*time.Second, repeatPolicy.MaxInterval)
-		assert.Equal(t, 10, repeatPolicy.Limit)
-		assert.Equal(t, []int{1}, repeatPolicy.ExitCode)
-	})
-
-	t.Run("RepeatPolicyWithBackoffBool", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
-steps:
-  - name: "test_repeat_backoff_bool"
-    command: "echo test"
-    repeatPolicy:
-      repeat: until
-      intervalSec: 2
-      backoff: true
-      maxIntervalSec: 20
-      limit: 5
-      condition: "echo done"
-      expected: "done"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		th := DAG{t: t, DAG: dag}
-		assert.Len(t, th.Steps, 1)
-		repeatPolicy := th.Steps[0].RepeatPolicy
-		require.NotNil(t, repeatPolicy)
-		assert.Equal(t, core.RepeatModeUntil, repeatPolicy.RepeatMode)
-		assert.Equal(t, 2*time.Second, repeatPolicy.Interval)
-		assert.Equal(t, 2.0, repeatPolicy.Backoff) // true converts to 2.0
-		assert.Equal(t, 20*time.Second, repeatPolicy.MaxInterval)
-		assert.Equal(t, 5, repeatPolicy.Limit)
-		require.NotNil(t, repeatPolicy.Condition)
-		assert.Equal(t, "echo done", repeatPolicy.Condition.Condition)
-		assert.Equal(t, "done", repeatPolicy.Condition.Expected)
-	})
-
-	t.Run("RepeatPolicyErrorCases", func(t *testing.T) {
-		t.Parallel()
-
-		// Test invalid repeat value
-		data := []byte(`
+	// RepeatPolicy error tests
+	repeatPolicyErrorTests := []struct {
+		name        string
+		yaml        string
+		errContains string
+	}{
+		{
+			name: "RepeatPolicyInvalidRepeatValue",
+			yaml: `
 steps:
   - name: "invalid-repeat"
     command: "echo test"
     repeatPolicy:
       repeat: "invalid"
       intervalSec: 10
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		assert.Error(t, err)
-		assert.Nil(t, dag)
-		assert.Contains(t, err.Error(), "invalid value for repeat: 'invalid'")
-
-		// Test explicit while mode without condition or exitCode
-		data = []byte(`
+`,
+			errContains: "invalid value for repeat: 'invalid'",
+		},
+		{
+			name: "RepeatPolicyWhileNoCondition",
+			yaml: `
 steps:
   - name: "while-no-condition"
     command: "echo test"
     repeatPolicy:
       repeat: "while"
       intervalSec: 10
-`)
-		dag, err = spec.LoadYAML(context.Background(), data)
-		assert.Error(t, err)
-		assert.Nil(t, dag)
-		assert.Contains(t, err.Error(), "repeat mode 'while' requires either 'condition' or 'exitCode' to be specified")
-
-		// Test explicit until mode without condition or exitCode
-		data = []byte(`
+`,
+			errContains: "repeat mode 'while' requires either 'condition' or 'exitCode' to be specified",
+		},
+		{
+			name: "RepeatPolicyUntilNoCondition",
+			yaml: `
 steps:
   - name: "until-no-condition"
     command: "echo test"
     repeatPolicy:
       repeat: "until"
       intervalSec: 10
-`)
-		dag, err = spec.LoadYAML(context.Background(), data)
-		assert.Error(t, err)
-		assert.Nil(t, dag)
-		assert.Contains(t, err.Error(), "repeat mode 'until' requires either 'condition' or 'exitCode' to be specified")
-
-		// Test invalid repeat type (not string or bool)
-		data = []byte(`
+`,
+			errContains: "repeat mode 'until' requires either 'condition' or 'exitCode' to be specified",
+		},
+		{
+			name: "RepeatPolicyInvalidType",
+			yaml: `
 steps:
   - name: "invalid-type"
     command: "echo test"
     repeatPolicy:
       repeat: 123
       intervalSec: 10
-`)
-		dag, err = spec.LoadYAML(context.Background(), data)
-		assert.Error(t, err)
-		assert.Nil(t, dag)
-		assert.Contains(t, err.Error(), "invalid value for repeat")
-	})
-
-	t.Run("PolicyBackoffValidation", func(t *testing.T) {
-		t.Parallel()
-
-		// Test repeat policy invalid backoff
-		data := []byte(`
+`,
+			errContains: "invalid value for repeat",
+		},
+		{
+			name: "RepeatPolicyBackoffTooLow",
+			yaml: `
 steps:
   - name: "test"
     command: "echo test"
@@ -1946,14 +1898,12 @@ steps:
       intervalSec: 1
       backoff: 1.0
       exitCode: [1]
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		assert.Error(t, err)
-		assert.Nil(t, dag)
-		assert.Contains(t, err.Error(), "backoff must be greater than 1.0")
-
-		// Test with backoff = 0.5
-		data = []byte(`
+`,
+			errContains: "backoff must be greater than 1.0",
+		},
+		{
+			name: "RepeatPolicyBackoffBelowOne",
+			yaml: `
 steps:
   - name: "test"
     command: "echo test"
@@ -1962,12 +1912,20 @@ steps:
       intervalSec: 1
       backoff: 0.5
       exitCode: [1]
-`)
-		dag, err = spec.LoadYAML(context.Background(), data)
-		assert.Error(t, err)
-		assert.Nil(t, dag)
-		assert.Contains(t, err.Error(), "backoff must be greater than 1.0")
-	})
+`,
+			errContains: "backoff must be greater than 1.0",
+		},
+	}
+
+	for _, tt := range repeatPolicyErrorTests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dag, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			require.Error(t, err)
+			assert.Nil(t, dag)
+			assert.Contains(t, err.Error(), tt.errContains)
+		})
+	}
 }
 
 type DAG struct {
@@ -2433,9 +2391,9 @@ steps:
 func TestStepIDValidation(t *testing.T) {
 	t.Parallel()
 
+	// Success test
 	t.Run("ValidID", func(t *testing.T) {
 		t.Parallel()
-
 		data := []byte(`
 steps:
   - name: step1
@@ -2448,24 +2406,25 @@ steps:
 		assert.Equal(t, "valid_id", dag.Steps[0].ID)
 	})
 
-	t.Run("InvalidIDFormat", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+	// Error tests
+	errorTests := []struct {
+		name        string
+		yaml        string
+		errContains string
+	}{
+		{
+			name: "InvalidIDFormat",
+			yaml: `
 steps:
   - name: step1
     id: 123invalid
     command: echo test
-`)
-		_, err := spec.LoadYAML(context.Background(), data)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid step ID format")
-	})
-
-	t.Run("DuplicateIDs", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			errContains: "invalid step ID format",
+		},
+		{
+			name: "DuplicateIDs",
+			yaml: `
 steps:
   - name: step1
     id: myid
@@ -2473,55 +2432,53 @@ steps:
   - name: step2
     id: myid
     command: echo test2
-`)
-		_, err := spec.LoadYAML(context.Background(), data)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "duplicate step ID")
-	})
-
-	t.Run("IDConflictsWithStepName", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			errContains: "duplicate step ID",
+		},
+		{
+			name: "IDConflictsWithStepName",
+			yaml: `
 steps:
   - name: step1
     id: step2
     command: echo test1
   - name: step2
     command: echo test2
-`)
-		_, err := spec.LoadYAML(context.Background(), data)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "conflicts with another step's name")
-	})
-
-	t.Run("NameConflictsWithStepID", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			errContains: "conflicts with another step's name",
+		},
+		{
+			name: "NameConflictsWithStepID",
+			yaml: `
 steps:
   - name: step1
     id: myid
     command: echo test1
   - name: myid
     command: echo test2
-`)
-		_, err := spec.LoadYAML(context.Background(), data)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "conflicts with another step's name")
-	})
-
-	t.Run("ReservedWordID", func(t *testing.T) {
-		data := []byte(`
+`,
+			errContains: "conflicts with another step's name",
+		},
+		{
+			name: "ReservedWordID",
+			yaml: `
 steps:
   - name: step1
     id: env
     command: echo test
-`)
-		_, err := spec.LoadYAML(context.Background(), data)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "reserved word")
-	})
+`,
+			errContains: "reserved word",
+		},
+	}
+
+	for _, tt := range errorTests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.errContains)
+		})
+	}
 }
 
 func TestStepIDInDependencies(t *testing.T) {
@@ -2789,25 +2746,30 @@ steps:
 func TestBuildOTel(t *testing.T) {
 	t.Parallel()
 
-	t.Run("BasicOTelConfig", func(t *testing.T) {
-		yaml := `
+	tests := []struct {
+		name         string
+		yaml         string
+		wantNil      bool
+		wantEnabled  bool
+		wantEndpoint string
+		checkOTel    func(t *testing.T, otel *core.OTelConfig)
+	}{
+		{
+			name: "BasicConfig",
+			yaml: `
 otel:
   enabled: true
   endpoint: localhost:4317
 steps:
   - name: step1
     command: echo "test"
-`
-		ctx := context.Background()
-		dag, err := spec.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.NotNil(t, dag.OTel)
-		assert.True(t, dag.OTel.Enabled)
-		assert.Equal(t, "localhost:4317", dag.OTel.Endpoint)
-	})
-
-	t.Run("FullOTelConfig", func(t *testing.T) {
-		yaml := `
+`,
+			wantEnabled:  true,
+			wantEndpoint: "localhost:4317",
+		},
+		{
+			name: "FullConfig",
+			yaml: `
 otel:
   enabled: true
   endpoint: otel-collector:4317
@@ -2821,100 +2783,250 @@ otel:
 steps:
   - name: step1
     command: echo "test"
-`
-		ctx := context.Background()
-		dag, err := spec.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.NotNil(t, dag.OTel)
-		assert.True(t, dag.OTel.Enabled)
-		assert.Equal(t, "otel-collector:4317", dag.OTel.Endpoint)
-		assert.Equal(t, "Bearer token", dag.OTel.Headers["Authorization"])
-		assert.True(t, dag.OTel.Insecure)
-		assert.Equal(t, 30*time.Second, dag.OTel.Timeout)
-		assert.Equal(t, "dagu-test", dag.OTel.Resource["service.name"])
-		assert.Equal(t, "1.0.0", dag.OTel.Resource["service.version"])
-	})
-
-	t.Run("DisabledOTel", func(t *testing.T) {
-		yaml := `
+`,
+			wantEnabled:  true,
+			wantEndpoint: "otel-collector:4317",
+			checkOTel: func(t *testing.T, otel *core.OTelConfig) {
+				assert.Equal(t, "Bearer token", otel.Headers["Authorization"])
+				assert.True(t, otel.Insecure)
+				assert.Equal(t, 30*time.Second, otel.Timeout)
+				assert.Equal(t, "dagu-test", otel.Resource["service.name"])
+				assert.Equal(t, "1.0.0", otel.Resource["service.version"])
+			},
+		},
+		{
+			name: "Disabled",
+			yaml: `
 steps:
   - name: step1
     command: echo "test"
-`
-		ctx := context.Background()
-		dag, err := spec.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		assert.Nil(t, dag.OTel)
-	})
+`,
+			wantNil: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dag, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			require.NoError(t, err)
+			if tt.wantNil {
+				assert.Nil(t, dag.OTel)
+				return
+			}
+			require.NotNil(t, dag.OTel)
+			assert.Equal(t, tt.wantEnabled, dag.OTel.Enabled)
+			assert.Equal(t, tt.wantEndpoint, dag.OTel.Endpoint)
+			if tt.checkOTel != nil {
+				tt.checkOTel(t, dag.OTel)
+			}
+		})
+	}
 }
 
 func TestContainer(t *testing.T) {
-	t.Run("BasicContainer", func(t *testing.T) {
-		yaml := `
+	t.Parallel()
+
+	// Basic container tests
+	basicTests := []struct {
+		name           string
+		yaml           string
+		wantImage      string
+		wantName       string
+		wantPullPolicy core.PullPolicy
+		wantNil        bool
+		wantEnv        []string
+	}{
+		{
+			name: "BasicContainer",
+			yaml: `
 container:
   image: python:3.11-slim
   pullPolicy: always
 steps:
   - name: step1
     command: python script.py
-`
-		ctx := context.Background()
-		dag, err := spec.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.NotNil(t, dag.Container)
-		assert.Equal(t, "python:3.11-slim", dag.Container.Image)
-		assert.Equal(t, core.PullPolicyAlways, dag.Container.PullPolicy)
-	})
-
-	t.Run("ContainerWithName", func(t *testing.T) {
-		yaml := `
+`,
+			wantImage:      "python:3.11-slim",
+			wantPullPolicy: core.PullPolicyAlways,
+		},
+		{
+			name: "ContainerWithName",
+			yaml: `
 container:
   name: my-dag-container
   image: alpine:latest
 steps:
   - name: step1
     command: echo hello
-`
-		ctx := context.Background()
-		dag, err := spec.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.NotNil(t, dag.Container)
-		assert.Equal(t, "my-dag-container", dag.Container.Name)
-		assert.Equal(t, "alpine:latest", dag.Container.Image)
-	})
-
-	t.Run("ContainerNameEmpty", func(t *testing.T) {
-		yaml := `
+`,
+			wantImage: "alpine:latest",
+			wantName:  "my-dag-container",
+		},
+		{
+			name: "ContainerNameEmpty",
+			yaml: `
 container:
   image: alpine:latest
 steps:
   - name: step1
     command: echo hello
-`
-		ctx := context.Background()
-		dag, err := spec.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.NotNil(t, dag.Container)
-		assert.Equal(t, "", dag.Container.Name)
-	})
-
-	t.Run("ContainerNameTrimmed", func(t *testing.T) {
-		yaml := `
+`,
+			wantImage: "alpine:latest",
+			wantName:  "",
+		},
+		{
+			name: "ContainerNameTrimmed",
+			yaml: `
 container:
   name: "  my-container  "
   image: alpine:latest
 steps:
   - name: step1
     command: echo hello
-`
-		ctx := context.Background()
-		dag, err := spec.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.NotNil(t, dag.Container)
-		assert.Equal(t, "my-container", dag.Container.Name)
-	})
+`,
+			wantImage: "alpine:latest",
+			wantName:  "my-container",
+		},
+		{
+			name: "ContainerEnvAsMap",
+			yaml: `
+container:
+  image: alpine
+  env:
+    FOO: bar
+    BAZ: qux
+steps:
+  - name: step1
+    command: echo test
+`,
+			wantImage: "alpine",
+			wantEnv:   []string{"FOO=bar", "BAZ=qux"},
+		},
+		{
+			name: "ContainerWithoutPullPolicy",
+			yaml: `
+container:
+  image: alpine
+steps:
+  - name: step1
+    command: echo test
+`,
+			wantImage:      "alpine",
+			wantPullPolicy: core.PullPolicyMissing,
+		},
+		{
+			name: "NoContainer",
+			yaml: `
+steps:
+  - name: step1
+    command: echo test
+`,
+			wantNil: true,
+		},
+	}
 
+	for _, tt := range basicTests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dag, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			require.NoError(t, err)
+			if tt.wantNil {
+				assert.Nil(t, dag.Container)
+				return
+			}
+			require.NotNil(t, dag.Container)
+			if tt.wantImage != "" {
+				assert.Equal(t, tt.wantImage, dag.Container.Image)
+			}
+			if tt.wantName != "" || tt.name == "ContainerNameEmpty" {
+				assert.Equal(t, tt.wantName, dag.Container.Name)
+			}
+			if tt.wantPullPolicy != 0 {
+				assert.Equal(t, tt.wantPullPolicy, dag.Container.PullPolicy)
+			}
+			for _, env := range tt.wantEnv {
+				assert.Contains(t, dag.Container.Env, env)
+			}
+		})
+	}
+
+	// Pull policy variations
+	pullPolicyTests := []struct {
+		name       string
+		pullPolicy string
+		expected   core.PullPolicy
+	}{
+		{"Always", "always", core.PullPolicyAlways},
+		{"Never", "never", core.PullPolicyNever},
+		{"Missing", "missing", core.PullPolicyMissing},
+		{"TrueString", "true", core.PullPolicyAlways},
+		{"FalseString", "false", core.PullPolicyNever},
+	}
+
+	for _, tt := range pullPolicyTests {
+		t.Run("PullPolicy"+tt.name, func(t *testing.T) {
+			t.Parallel()
+			yaml := `
+container:
+  image: alpine
+  pullPolicy: ` + tt.pullPolicy + `
+steps:
+  - name: step1
+    command: echo test
+`
+			dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+			require.NoError(t, err)
+			require.NotNil(t, dag.Container)
+			assert.Equal(t, tt.expected, dag.Container.PullPolicy)
+		})
+	}
+
+	// Error tests
+	errorTests := []struct {
+		name        string
+		yaml        string
+		errContains string
+	}{
+		{
+			name: "InvalidPullPolicy",
+			yaml: `
+container:
+  image: alpine
+  pullPolicy: invalid_policy
+steps:
+  - name: step1
+    command: echo test
+`,
+			errContains: "failed to parse pull policy",
+		},
+		{
+			name: "ContainerWithoutImage",
+			yaml: `
+container:
+  pullPolicy: always
+  env:
+    - FOO: bar
+steps:
+  - name: step1
+    command: echo test
+`,
+			errContains: "image is required when container is specified",
+		},
+	}
+
+	for _, tt := range errorTests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.errContains)
+		})
+	}
+
+	// Complex container with all fields (separate due to many assertions)
 	t.Run("ContainerWithAllFields", func(t *testing.T) {
+		t.Parallel()
 		yaml := `
 container:
   image: node:18-alpine
@@ -2937,11 +3049,9 @@ steps:
   - name: step1
     command: node app.js
 `
-		ctx := context.Background()
-		dag, err := spec.LoadYAML(ctx, []byte(yaml))
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
 		require.NoError(t, err)
 		require.NotNil(t, dag.Container)
-
 		assert.Equal(t, "node:18-alpine", dag.Container.Image)
 		assert.Equal(t, core.PullPolicyMissing, dag.Container.PullPolicy)
 		assert.Contains(t, dag.Container.Env, "NODE_ENV=production")
@@ -2953,132 +3063,6 @@ steps:
 		assert.Equal(t, []string{"8080:8080", "9090:9090"}, dag.Container.Ports)
 		assert.Equal(t, "bridge", dag.Container.Network)
 		assert.True(t, dag.Container.KeepContainer)
-	})
-
-	t.Run("ContainerEnvAsMap", func(t *testing.T) {
-		yaml := `
-container:
-  image: alpine
-  env:
-    FOO: bar
-    BAZ: qux
-steps:
-  - name: step1
-    command: echo test
-`
-		ctx := context.Background()
-		dag, err := spec.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.NotNil(t, dag.Container)
-		assert.Contains(t, dag.Container.Env, "FOO=bar")
-		assert.Contains(t, dag.Container.Env, "BAZ=qux")
-	})
-
-	t.Run("ContainerPullPolicyVariations", func(t *testing.T) {
-		testCases := []struct {
-			name       string
-			pullPolicy string
-			expected   core.PullPolicy
-		}{
-			{"always", "always", core.PullPolicyAlways},
-			{"never", "never", core.PullPolicyNever},
-			{"missing", "missing", core.PullPolicyMissing},
-			{"true", "true", core.PullPolicyAlways},
-			{"false", "false", core.PullPolicyNever},
-		}
-
-		for _, tc := range testCases {
-			t.Run(tc.name, func(t *testing.T) {
-				yaml := `
-container:
-  image: alpine
-  pullPolicy: ` + tc.pullPolicy + `
-steps:
-  - name: step1
-    command: echo test
-`
-				ctx := context.Background()
-				dag, err := spec.LoadYAML(ctx, []byte(yaml))
-				require.NoError(t, err)
-				require.NotNil(t, dag.Container)
-				assert.Equal(t, tc.expected, dag.Container.PullPolicy)
-			})
-		}
-	})
-
-	t.Run("ContainerPullPolicyBoolean", func(t *testing.T) {
-		// Test with boolean true
-		yaml := `
-container:
-  image: alpine
-  pullPolicy: true
-steps:
-  - name: step1
-    command: echo test
-`
-		ctx := context.Background()
-		dag, err := spec.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.NotNil(t, dag.Container)
-		assert.Equal(t, core.PullPolicyAlways, dag.Container.PullPolicy)
-	})
-
-	t.Run("ContainerWithoutPullPolicy", func(t *testing.T) {
-		yaml := `
-container:
-  image: alpine
-steps:
-  - name: step1
-    command: echo test
-`
-		ctx := context.Background()
-		dag, err := spec.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		require.NotNil(t, dag.Container)
-		assert.Equal(t, core.PullPolicyMissing, dag.Container.PullPolicy)
-	})
-
-	t.Run("NoContainer", func(t *testing.T) {
-		yaml := `
-steps:
-  - name: step1
-    command: echo test
-`
-		ctx := context.Background()
-		dag, err := spec.LoadYAML(ctx, []byte(yaml))
-		require.NoError(t, err)
-		assert.Nil(t, dag.Container)
-	})
-
-	t.Run("InvalidPullPolicy", func(t *testing.T) {
-		yaml := `
-container:
-  image: alpine
-  pullPolicy: invalid_policy
-steps:
-  - name: step1
-    command: echo test
-`
-		ctx := context.Background()
-		_, err := spec.LoadYAML(ctx, []byte(yaml))
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to parse pull policy")
-	})
-
-	t.Run("ContainerWithoutImage", func(t *testing.T) {
-		yaml := `
-container:
-  pullPolicy: always
-  env:
-    - FOO: bar
-steps:
-  - name: step1
-    command: echo test
-`
-		ctx := context.Background()
-		_, err := spec.LoadYAML(ctx, []byte(yaml))
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "image is required when container is specified")
 	})
 }
 
@@ -3770,8 +3754,20 @@ steps:
 }
 
 func TestSecrets(t *testing.T) {
-	t.Run("ValidSecretsArray", func(t *testing.T) {
-		data := []byte(`
+	t.Parallel()
+
+	// Success tests
+	successTests := []struct {
+		name         string
+		yaml         string
+		wantCount    int
+		wantEmpty    bool
+		wantNil      bool
+		checkSecrets func(t *testing.T, secrets []core.SecretRef)
+	}{
+		{
+			name: "ValidSecretsArray",
+			yaml: `
 secrets:
   - name: DB_PASSWORD
     provider: gcp-secrets
@@ -3784,26 +3780,22 @@ secrets:
 steps:
   - name: test
     command: echo "test"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		require.Len(t, dag.Secrets, 2)
-
-		// Verify first secret
-		assert.Equal(t, "DB_PASSWORD", dag.Secrets[0].Name)
-		assert.Equal(t, "gcp-secrets", dag.Secrets[0].Provider)
-		assert.Equal(t, "secret/data/prod/db", dag.Secrets[0].Key)
-		assert.Equal(t, "production", dag.Secrets[0].Options["namespace"])
-
-		// Verify second secret
-		assert.Equal(t, "API_KEY", dag.Secrets[1].Name)
-		assert.Equal(t, "env", dag.Secrets[1].Provider)
-		assert.Equal(t, "API_KEY", dag.Secrets[1].Key)
-		assert.Empty(t, dag.Secrets[1].Options)
-	})
-
-	t.Run("MinimalValidSecret", func(t *testing.T) {
-		data := []byte(`
+`,
+			wantCount: 2,
+			checkSecrets: func(t *testing.T, secrets []core.SecretRef) {
+				assert.Equal(t, "DB_PASSWORD", secrets[0].Name)
+				assert.Equal(t, "gcp-secrets", secrets[0].Provider)
+				assert.Equal(t, "secret/data/prod/db", secrets[0].Key)
+				assert.Equal(t, "production", secrets[0].Options["namespace"])
+				assert.Equal(t, "API_KEY", secrets[1].Name)
+				assert.Equal(t, "env", secrets[1].Provider)
+				assert.Equal(t, "API_KEY", secrets[1].Key)
+				assert.Empty(t, secrets[1].Options)
+			},
+		},
+		{
+			name: "MinimalValidSecret",
+			yaml: `
 secrets:
   - name: MY_SECRET
     provider: env
@@ -3811,130 +3803,36 @@ secrets:
 steps:
   - name: test
     command: echo "test"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		require.Len(t, dag.Secrets, 1)
-		assert.Equal(t, "MY_SECRET", dag.Secrets[0].Name)
-		assert.Equal(t, "env", dag.Secrets[0].Provider)
-		assert.Equal(t, "MY_SECRET", dag.Secrets[0].Key)
-	})
-
-	t.Run("MissingNameField", func(t *testing.T) {
-		data := []byte(`
-secrets:
-  - provider: vault
-    key: secret/data/test
-steps:
-  - name: test
-    command: echo "test"
-`)
-		_, err := spec.LoadYAML(context.Background(), data)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "'name' field is required")
-	})
-
-	t.Run("MissingProviderField", func(t *testing.T) {
-		data := []byte(`
-secrets:
-  - name: MY_SECRET
-    key: secret/data/test
-steps:
-  - name: test
-    command: echo "test"
-`)
-		_, err := spec.LoadYAML(context.Background(), data)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "'provider' field is required")
-	})
-
-	t.Run("MissingKeyField", func(t *testing.T) {
-		data := []byte(`
-secrets:
-  - name: MY_SECRET
-    provider: vault
-steps:
-  - name: test
-    command: echo "test"
-`)
-		_, err := spec.LoadYAML(context.Background(), data)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "'key' field is required")
-	})
-
-	t.Run("DuplicateSecretNames", func(t *testing.T) {
-		data := []byte(`
-secrets:
-  - name: API_KEY
-    provider: vault
-    key: secret/v1
-  - name: API_KEY
-    provider: env
-    key: API_KEY
-steps:
-  - name: test
-    command: echo "test"
-`)
-		_, err := spec.LoadYAML(context.Background(), data)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "duplicate secret name")
-		assert.Contains(t, err.Error(), "API_KEY")
-	})
-
-	t.Run("InvalidSecretsType", func(t *testing.T) {
-		data := []byte(`
-secrets: "invalid string"
-steps:
-  - name: test
-    command: echo "test"
-`)
-		_, err := spec.LoadYAML(context.Background(), data)
-		require.Error(t, err)
-		// YAML unmarshaler validates type before our code runs
-		assert.Contains(t, err.Error(), "Secrets")
-		assert.Contains(t, err.Error(), "array or slice")
-	})
-
-	t.Run("InvalidSecretItemType", func(t *testing.T) {
-		data := []byte(`
-secrets:
-  - "invalid string item"
-steps:
-  - name: test
-    command: echo "test"
-`)
-		_, err := spec.LoadYAML(context.Background(), data)
-		require.Error(t, err)
-		// YAML unmarshaler validates type before our code runs
-		assert.Contains(t, err.Error(), "Secrets")
-		assert.Contains(t, err.Error(), "map or struct")
-	})
-
-	t.Run("EmptySecretsArray", func(t *testing.T) {
-		data := []byte(`
+`,
+			wantCount: 1,
+			checkSecrets: func(t *testing.T, secrets []core.SecretRef) {
+				assert.Equal(t, "MY_SECRET", secrets[0].Name)
+				assert.Equal(t, "env", secrets[0].Provider)
+				assert.Equal(t, "MY_SECRET", secrets[0].Key)
+			},
+		},
+		{
+			name: "EmptySecretsArray",
+			yaml: `
 secrets: []
 steps:
   - name: test
     command: echo "test"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		assert.Empty(t, dag.Secrets)
-	})
-
-	t.Run("NoSecretsField", func(t *testing.T) {
-		data := []byte(`
+`,
+			wantEmpty: true,
+		},
+		{
+			name: "NoSecretsField",
+			yaml: `
 steps:
   - name: test
     command: echo "test"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		assert.Nil(t, dag.Secrets)
-	})
-
-	t.Run("ComplexProviderOptions", func(t *testing.T) {
-		data := []byte(`
+`,
+			wantNil: true,
+		},
+		{
+			name: "ComplexProviderOptions",
+			yaml: `
 secrets:
   - name: DB_PASSWORD
     provider: gcp-secrets
@@ -3946,26 +3844,142 @@ secrets:
 steps:
   - name: test
     command: echo "test"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		require.Len(t, dag.Secrets, 1)
-		assert.Equal(t, "DB_PASSWORD", dag.Secrets[0].Name)
-		assert.Equal(t, "gcp-secrets", dag.Secrets[0].Provider)
-		assert.Equal(t, "projects/my-project/secrets/db-password/versions/latest", dag.Secrets[0].Key)
-		assert.Equal(t, "my-project", dag.Secrets[0].Options["projectId"])
-		assert.Equal(t, "30s", dag.Secrets[0].Options["timeout"])
-		assert.Equal(t, "3", dag.Secrets[0].Options["retries"])
-	})
+`,
+			wantCount: 1,
+			checkSecrets: func(t *testing.T, secrets []core.SecretRef) {
+				assert.Equal(t, "DB_PASSWORD", secrets[0].Name)
+				assert.Equal(t, "gcp-secrets", secrets[0].Provider)
+				assert.Equal(t, "projects/my-project/secrets/db-password/versions/latest", secrets[0].Key)
+				assert.Equal(t, "my-project", secrets[0].Options["projectId"])
+				assert.Equal(t, "30s", secrets[0].Options["timeout"])
+				assert.Equal(t, "3", secrets[0].Options["retries"])
+			},
+		},
+	}
+
+	for _, tt := range successTests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dag, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			require.NoError(t, err)
+			if tt.wantNil {
+				assert.Nil(t, dag.Secrets)
+			} else if tt.wantEmpty {
+				assert.Empty(t, dag.Secrets)
+			} else {
+				require.Len(t, dag.Secrets, tt.wantCount)
+				if tt.checkSecrets != nil {
+					tt.checkSecrets(t, dag.Secrets)
+				}
+			}
+		})
+	}
+
+	// Error tests
+	errorTests := []struct {
+		name         string
+		yaml         string
+		errContains  []string
+	}{
+		{
+			name: "MissingNameField",
+			yaml: `
+secrets:
+  - provider: vault
+    key: secret/data/test
+steps:
+  - name: test
+    command: echo "test"
+`,
+			errContains: []string{"'name' field is required"},
+		},
+		{
+			name: "MissingProviderField",
+			yaml: `
+secrets:
+  - name: MY_SECRET
+    key: secret/data/test
+steps:
+  - name: test
+    command: echo "test"
+`,
+			errContains: []string{"'provider' field is required"},
+		},
+		{
+			name: "MissingKeyField",
+			yaml: `
+secrets:
+  - name: MY_SECRET
+    provider: vault
+steps:
+  - name: test
+    command: echo "test"
+`,
+			errContains: []string{"'key' field is required"},
+		},
+		{
+			name: "DuplicateSecretNames",
+			yaml: `
+secrets:
+  - name: API_KEY
+    provider: vault
+    key: secret/v1
+  - name: API_KEY
+    provider: env
+    key: API_KEY
+steps:
+  - name: test
+    command: echo "test"
+`,
+			errContains: []string{"duplicate secret name", "API_KEY"},
+		},
+		{
+			name: "InvalidSecretsType",
+			yaml: `
+secrets: "invalid string"
+steps:
+  - name: test
+    command: echo "test"
+`,
+			errContains: []string{"Secrets", "array or slice"},
+		},
+		{
+			name: "InvalidSecretItemType",
+			yaml: `
+secrets:
+  - "invalid string item"
+steps:
+  - name: test
+    command: echo "test"
+`,
+			errContains: []string{"Secrets", "map or struct"},
+		},
+	}
+
+	for _, tt := range errorTests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			require.Error(t, err)
+			for _, contains := range tt.errContains {
+				assert.Contains(t, err.Error(), contains)
+			}
+		})
+	}
 }
 
 func TestBuildStepParams(t *testing.T) {
 	t.Parallel()
 
-	t.Run("ParamsAsMap", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+	tests := []struct {
+		name        string
+		yaml        string
+		wantEmpty   bool
+		wantParams  map[string]string
+	}{
+		{
+			name: "ParamsAsMap",
+			yaml: `
 steps:
   - name: test
     command: actions/checkout@v4
@@ -3975,45 +3989,31 @@ steps:
       repository: myorg/myrepo
       ref: main
       token: secret123
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-
-		step := dag.Steps[0]
-		params, err := step.Params.AsStringMap()
-		require.NoError(t, err)
-		assert.Equal(t, "myorg/myrepo", params["repository"])
-		assert.Equal(t, "main", params["ref"])
-		assert.Equal(t, "secret123", params["token"])
-	})
-
-	t.Run("ParamsAsString", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantParams: map[string]string{
+				"repository": "myorg/myrepo",
+				"ref":        "main",
+				"token":      "secret123",
+			},
+		},
+		{
+			name: "ParamsAsString",
+			yaml: `
 steps:
   - name: test
     command: actions/setup-go@v5
     executor:
       type: github_action
     params: go-version=1.21 cache=true
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-
-		step := dag.Steps[0]
-		params, err := step.Params.AsStringMap()
-		require.NoError(t, err)
-		assert.Equal(t, "1.21", params["go-version"])
-		assert.Equal(t, "true", params["cache"])
-	})
-
-	t.Run("ParamsWithNumbers", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantParams: map[string]string{
+				"go-version": "1.21",
+				"cache":      "true",
+			},
+		},
+		{
+			name: "ParamsWithNumbers",
+			yaml: `
 steps:
   - name: test
     command: some-action
@@ -4021,138 +4021,127 @@ steps:
       timeout: 300
       retries: 3
       enabled: true
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-
-		step := dag.Steps[0]
-		params, err := step.Params.AsStringMap()
-		require.NoError(t, err)
-		assert.Equal(t, "300", params["timeout"])
-		assert.Equal(t, "3", params["retries"])
-		assert.Equal(t, "true", params["enabled"])
-	})
-
-	t.Run("NoParams", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantParams: map[string]string{
+				"timeout": "300",
+				"retries": "3",
+				"enabled": "true",
+			},
+		},
+		{
+			name: "NoParams",
+			yaml: `
 steps:
   - name: test
     command: echo hello
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-
-		step := dag.Steps[0]
-		assert.True(t, step.Params.IsEmpty())
-	})
-
-	t.Run("EmptyParams", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantEmpty: true,
+		},
+		{
+			name: "EmptyParams",
+			yaml: `
 steps:
   - name: test
     command: echo hello
     params: {}
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-
-		step := dag.Steps[0]
-		params, err := step.Params.AsStringMap()
-		require.NoError(t, err)
-		assert.Empty(t, params)
-	})
-
-	t.Run("ParamsWithQuotedValues", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantParams: map[string]string{},
+		},
+		{
+			name: "ParamsWithQuotedValues",
+			yaml: `
 steps:
   - name: test
     command: some-action
     params: message="hello world" count="42"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
+`,
+			wantParams: map[string]string{
+				"message": "hello world",
+				"count":   "42",
+			},
+		},
+	}
 
-		step := dag.Steps[0]
-		params, err := step.Params.AsStringMap()
-		require.NoError(t, err)
-		assert.Equal(t, "hello world", params["message"])
-		assert.Equal(t, "42", params["count"])
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dag, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			require.NoError(t, err)
+			require.Len(t, dag.Steps, 1)
+
+			step := dag.Steps[0]
+			if tt.wantEmpty {
+				assert.True(t, step.Params.IsEmpty())
+				return
+			}
+
+			params, err := step.Params.AsStringMap()
+			require.NoError(t, err)
+			if len(tt.wantParams) == 0 {
+				assert.Empty(t, params)
+			} else {
+				for k, v := range tt.wantParams {
+					assert.Equal(t, v, params[k])
+				}
+			}
+		})
+	}
 }
 
 func TestBuildShell(t *testing.T) {
-	t.Run("ShellAsSimpleString", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+	// Standard shell configuration tests
+	tests := []struct {
+		name          string
+		yaml          string
+		wantShell     string
+		wantShellArgs []string
+		wantNotEmpty  bool // For default shell tests
+	}{
+		{
+			name: "SimpleString",
+			yaml: `
 shell: bash
 steps:
   - "echo hello"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		assert.Equal(t, "bash", dag.Shell)
-		assert.Empty(t, dag.ShellArgs)
-	})
-
-	t.Run("ShellAsStringWithArgs", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantShell:     "bash",
+			wantShellArgs: nil,
+		},
+		{
+			name: "StringWithArgs",
+			yaml: `
 shell: bash -e
 steps:
   - "echo hello"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		assert.Equal(t, "bash", dag.Shell)
-		assert.Equal(t, []string{"-e"}, dag.ShellArgs)
-	})
-
-	t.Run("ShellAsStringWithMultipleArgs", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantShell:     "bash",
+			wantShellArgs: []string{"-e"},
+		},
+		{
+			name: "StringWithMultipleArgs",
+			yaml: `
 shell: bash -e -u -o pipefail
 steps:
   - "echo hello"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		assert.Equal(t, "bash", dag.Shell)
-		assert.Equal(t, []string{"-e", "-u", "-o", "pipefail"}, dag.ShellArgs)
-	})
-
-	t.Run("ShellAsArray", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantShell:     "bash",
+			wantShellArgs: []string{"-e", "-u", "-o", "pipefail"},
+		},
+		{
+			name: "Array",
+			yaml: `
 shell:
   - bash
   - -e
 steps:
   - "echo hello"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		assert.Equal(t, "bash", dag.Shell)
-		assert.Equal(t, []string{"-e"}, dag.ShellArgs)
-	})
-
-	t.Run("ShellAsArrayWithMultipleArgs", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantShell:     "bash",
+			wantShellArgs: []string{"-e"},
+		},
+		{
+			name: "ArrayWithMultipleArgs",
+			yaml: `
 shell:
   - bash
   - -e
@@ -4161,14 +4150,88 @@ shell:
   - pipefail
 steps:
   - "echo hello"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		assert.Equal(t, "bash", dag.Shell)
-		assert.Equal(t, []string{"-e", "-u", "-o", "pipefail"}, dag.ShellArgs)
-	})
+`,
+			wantShell:     "bash",
+			wantShellArgs: []string{"-e", "-u", "-o", "pipefail"},
+		},
+		{
+			name: "NotSpecified",
+			yaml: `
+steps:
+  - "echo hello"
+`,
+			wantNotEmpty: true,
+		},
+		{
+			name: "EmptyString",
+			yaml: `
+shell: ""
+steps:
+  - "echo hello"
+`,
+			wantNotEmpty: true,
+		},
+		{
+			name: "EmptyArray",
+			yaml: `
+shell: []
+steps:
+  - "echo hello"
+`,
+			wantNotEmpty: true,
+		},
+		{
+			name: "Pwsh",
+			yaml: `
+shell: pwsh
+steps:
+  - "Write-Output hello"
+`,
+			wantShell:     "pwsh",
+			wantShellArgs: nil,
+		},
+		{
+			name: "PwshWithArgs",
+			yaml: `
+shell: pwsh -NoProfile -NonInteractive
+steps:
+  - "Write-Output hello"
+`,
+			wantShell:     "pwsh",
+			wantShellArgs: []string{"-NoProfile", "-NonInteractive"},
+		},
+		{
+			name: "WithQuotedArgs",
+			yaml: `
+shell: bash -c "set -e"
+steps:
+  - "echo hello"
+`,
+			wantShell:     "bash",
+			wantShellArgs: []string{"-c", "set -e"},
+		},
+	}
 
-	t.Run("ShellWithEnvVar", func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dag, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			require.NoError(t, err)
+			if tt.wantNotEmpty {
+				assert.NotEmpty(t, dag.Shell)
+			} else {
+				assert.Equal(t, tt.wantShell, dag.Shell)
+			}
+			if tt.wantShellArgs == nil {
+				assert.Empty(t, dag.ShellArgs)
+			} else {
+				assert.Equal(t, tt.wantShellArgs, dag.ShellArgs)
+			}
+		})
+	}
+
+	// Environment variable tests (cannot use t.Parallel due to t.Setenv)
+	t.Run("WithEnvVar", func(t *testing.T) {
 		t.Setenv("MY_SHELL", "/bin/zsh")
 		data := []byte(`
 shell: $MY_SHELL
@@ -4181,7 +4244,7 @@ steps:
 		assert.Empty(t, dag.ShellArgs)
 	})
 
-	t.Run("ShellArrayWithEnvVar", func(t *testing.T) {
+	t.Run("ArrayWithEnvVar", func(t *testing.T) {
 		t.Setenv("SHELL_ARG", "-x")
 		data := []byte(`
 shell:
@@ -4196,76 +4259,8 @@ steps:
 		assert.Equal(t, []string{"-x"}, dag.ShellArgs)
 	})
 
-	t.Run("ShellNotSpecified", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
-steps:
-  - "echo hello"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		// Should have default shell from cmdutil.GetShellCommand("")
-		assert.NotEmpty(t, dag.Shell)
-	})
-
-	t.Run("ShellEmptyString", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
-shell: ""
-steps:
-  - "echo hello"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		// Should have default shell from cmdutil.GetShellCommand("")
-		assert.NotEmpty(t, dag.Shell)
-	})
-
-	t.Run("ShellEmptyArray", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
-shell: []
-steps:
-  - "echo hello"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		// Should have default shell from cmdutil.GetShellCommand("")
-		assert.NotEmpty(t, dag.Shell)
-	})
-
-	t.Run("ShellPwsh", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
-shell: pwsh
-steps:
-  - "Write-Output hello"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		assert.Equal(t, "pwsh", dag.Shell)
-		assert.Empty(t, dag.ShellArgs)
-	})
-
-	t.Run("ShellPwshWithArgs", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
-shell: pwsh -NoProfile -NonInteractive
-steps:
-  - "Write-Output hello"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		assert.Equal(t, "pwsh", dag.Shell)
-		assert.Equal(t, []string{"-NoProfile", "-NonInteractive"}, dag.ShellArgs)
-	})
-
-	t.Run("ShellNoEvalPreservesRaw", func(t *testing.T) {
+	// NoEval tests (cannot use t.Parallel due to t.Setenv)
+	t.Run("NoEvalPreservesRaw", func(t *testing.T) {
 		t.Setenv("MY_SHELL", "/bin/zsh")
 		data := []byte(`
 shell: $MY_SHELL -e
@@ -4278,7 +4273,7 @@ steps:
 		assert.Equal(t, []string{"-e"}, dag.ShellArgs)
 	})
 
-	t.Run("ShellArrayNoEvalPreservesRaw", func(t *testing.T) {
+	t.Run("ArrayNoEvalPreservesRaw", func(t *testing.T) {
 		t.Setenv("SHELL_ARG", "-x")
 		data := []byte(`
 shell:
@@ -4292,59 +4287,45 @@ steps:
 		assert.Equal(t, "bash", dag.Shell)
 		assert.Equal(t, []string{"$SHELL_ARG"}, dag.ShellArgs)
 	})
-
-	t.Run("ShellWithQuotedArgs", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
-shell: bash -c "set -e"
-steps:
-  - "echo hello"
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		assert.Equal(t, "bash", dag.Shell)
-		assert.Equal(t, []string{"-c", "set -e"}, dag.ShellArgs)
-	})
 }
 
 func TestBuildStepShell(t *testing.T) {
-	t.Run("StepShellAsSimpleString", func(t *testing.T) {
-		t.Parallel()
+	t.Parallel()
 
-		data := []byte(`
+	tests := []struct {
+		name              string
+		yaml              string
+		wantDAGShell      string
+		wantDAGShellArgs  []string
+		wantStepShell     string
+		wantStepShellArgs []string
+		wantStepEmpty     bool
+	}{
+		{
+			name: "SimpleString",
+			yaml: `
 steps:
   - name: test
     shell: zsh
     command: echo hello
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-		assert.Equal(t, "zsh", dag.Steps[0].Shell)
-		assert.Empty(t, dag.Steps[0].ShellArgs)
-	})
-
-	t.Run("StepShellAsStringWithArgs", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantStepShell:     "zsh",
+			wantStepShellArgs: nil,
+		},
+		{
+			name: "StringWithArgs",
+			yaml: `
 steps:
   - name: test
     shell: bash -e -u
     command: echo hello
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-		assert.Equal(t, "bash", dag.Steps[0].Shell)
-		assert.Equal(t, []string{"-e", "-u"}, dag.Steps[0].ShellArgs)
-	})
-
-	t.Run("StepShellAsArray", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantStepShell:     "bash",
+			wantStepShellArgs: []string{"-e", "-u"},
+		},
+		{
+			name: "Array",
+			yaml: `
 steps:
   - name: test
     shell:
@@ -4353,105 +4334,126 @@ steps:
       - -o
       - pipefail
     command: echo hello
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-		assert.Equal(t, "bash", dag.Steps[0].Shell)
-		assert.Equal(t, []string{"-e", "-o", "pipefail"}, dag.Steps[0].ShellArgs)
-	})
-
-	t.Run("StepShellOverridesDAGShell", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantStepShell:     "bash",
+			wantStepShellArgs: []string{"-e", "-o", "pipefail"},
+		},
+		{
+			name: "OverridesDAGShell",
+			yaml: `
 shell: bash -e
 steps:
   - name: test
     shell: zsh
     command: echo hello
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		assert.Equal(t, "bash", dag.Shell)
-		assert.Equal(t, []string{"-e"}, dag.ShellArgs)
-		require.Len(t, dag.Steps, 1)
-		assert.Equal(t, "zsh", dag.Steps[0].Shell)
-		assert.Empty(t, dag.Steps[0].ShellArgs)
-	})
-
-	t.Run("StepShellNotSpecified", func(t *testing.T) {
-		t.Parallel()
-
-		data := []byte(`
+`,
+			wantDAGShell:      "bash",
+			wantDAGShellArgs:  []string{"-e"},
+			wantStepShell:     "zsh",
+			wantStepShellArgs: nil,
+		},
+		{
+			name: "NotSpecified",
+			yaml: `
 steps:
   - name: test
     command: echo hello
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-		// Step shell should be empty when not specified (DAG shell is used at runtime)
-		assert.Empty(t, dag.Steps[0].Shell)
-	})
+`,
+			wantStepEmpty: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dag, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			require.NoError(t, err)
+			require.Len(t, dag.Steps, 1)
+
+			if tt.wantDAGShell != "" {
+				assert.Equal(t, tt.wantDAGShell, dag.Shell)
+				assert.Equal(t, tt.wantDAGShellArgs, dag.ShellArgs)
+			}
+
+			if tt.wantStepEmpty {
+				assert.Empty(t, dag.Steps[0].Shell)
+			} else {
+				assert.Equal(t, tt.wantStepShell, dag.Steps[0].Shell)
+			}
+
+			if tt.wantStepShellArgs == nil {
+				assert.Empty(t, dag.Steps[0].ShellArgs)
+			} else {
+				assert.Equal(t, tt.wantStepShellArgs, dag.Steps[0].ShellArgs)
+			}
+		})
+	}
 }
 
 func TestBuildStepTimeout(t *testing.T) {
 	t.Parallel()
 
-	// Positive timeout
-	t.Run("PositiveTimeout", func(t *testing.T) {
-		data := []byte(`
+	tests := []struct {
+		name        string
+		yaml        string
+		wantTimeout time.Duration
+		wantErr     string
+	}{
+		{
+			name: "Positive",
+			yaml: `
 steps:
   - name: work
     command: echo doing
     timeoutSec: 5
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-		assert.Equal(t, 5*time.Second, dag.Steps[0].Timeout)
-	})
-
-	// Zero timeout (explicit) -> unset/zero duration
-	t.Run("ZeroTimeoutExplicit", func(t *testing.T) {
-		data := []byte(`
+`,
+			wantTimeout: 5 * time.Second,
+		},
+		{
+			name: "ZeroExplicit",
+			yaml: `
 steps:
   - name: work
     command: echo none
     timeoutSec: 0
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-		assert.Equal(t, time.Duration(0), dag.Steps[0].Timeout)
-	})
-
-	// Zero timeout (omitted) -> also zero
-	t.Run("ZeroTimeoutOmitted", func(t *testing.T) {
-		data := []byte(`
+`,
+			wantTimeout: 0,
+		},
+		{
+			name: "ZeroOmitted",
+			yaml: `
 steps:
   - name: work
     command: echo omitted
-`)
-		dag, err := spec.LoadYAML(context.Background(), data)
-		require.NoError(t, err)
-		require.Len(t, dag.Steps, 1)
-		assert.Equal(t, time.Duration(0), dag.Steps[0].Timeout)
-	})
-
-	// Negative timeout should fail validation
-	t.Run("NegativeTimeout", func(t *testing.T) {
-		data := []byte(`
+`,
+			wantTimeout: 0,
+		},
+		{
+			name: "Negative",
+			yaml: `
 steps:
   - name: bad
     command: echo fail
     timeoutSec: -3
-`)
-		_, err := spec.LoadYAML(context.Background(), data)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "timeoutSec must be >= 0")
-	})
+`,
+			wantErr: "timeoutSec must be >= 0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dag, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, dag.Steps, 1)
+			assert.Equal(t, tt.wantTimeout, dag.Steps[0].Timeout)
+		})
+	}
 }
 
 func TestBuildHandlers(t *testing.T) {
