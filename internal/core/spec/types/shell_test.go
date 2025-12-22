@@ -13,15 +13,15 @@ func TestShellValue_UnmarshalYAML(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name          string
-		input         string
-		wantErr       bool
-		errContains   string
-		wantCommand   string
-		wantArgs      []string
-		wantIsArray   bool
-		checkNotZero  bool
-		checkIsZero   bool
+		name         string
+		input        string
+		wantErr      bool
+		errContains  string
+		wantCommand  string
+		wantArgs     []string
+		wantIsArray  bool
+		checkNotZero bool
+		checkIsZero  bool
 	}{
 		{
 			name:         "StringWithoutArgs",
@@ -147,11 +147,11 @@ func TestShellValue_InStruct(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		input       string
-		wantName    string
-		wantCommand string
-		wantIsZero  bool
+		name         string
+		input        string
+		wantName     string
+		wantCommand  string
+		wantIsZero   bool
 		checkNotZero bool
 	}{
 		{
@@ -212,10 +212,10 @@ func TestShellValue_AdditionalCoverage(t *testing.T) {
 			wantValue: "bash",
 		},
 		{
-			name:         "InvalidTypeNumber",
-			input:        "123",
-			wantErr:      true,
-			errContains:  "must be string or array",
+			name:        "InvalidTypeNumber",
+			input:       "123",
+			wantErr:     true,
+			errContains: "must be string or array",
 		},
 		{
 			name:         "IsArrayReturnsFalseForString",

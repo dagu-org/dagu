@@ -224,12 +224,12 @@ func TestContinueOnValue_InStruct(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		input       string
-		wantSkipped bool
-		wantFailed  bool
+		name         string
+		input        string
+		wantSkipped  bool
+		wantFailed   bool
 		wantExitCode []int
-		wantIsZero  bool
+		wantIsZero   bool
 	}{
 		{
 			name: "ContinueOnAsString",
@@ -306,14 +306,14 @@ func TestContinueOnValue_EdgeCases(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name            string
-		input           string
-		wantErr         bool
-		errContains     string
-		checkIsZero     bool
-		wantFailed      bool
-		wantExitCode    []int
-		wantOutputNil   bool
+		name          string
+		input         string
+		wantErr       bool
+		errContains   string
+		checkIsZero   bool
+		wantFailed    bool
+		wantExitCode  []int
+		wantOutputNil bool
 	}{
 		{
 			name:        "NullValue",

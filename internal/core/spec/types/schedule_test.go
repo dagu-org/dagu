@@ -13,24 +13,24 @@ func TestScheduleValue_UnmarshalYAML(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name             string
-		input            string
-		wantErr          bool
-		errContains      string
-		wantStarts       []string
-		wantStops        []string
-		wantRestarts     []string
-		wantHasStop      bool
-		wantHasRestart   bool
-		checkHasStop     bool
-		checkHasRestart  bool
+		name            string
+		input           string
+		wantErr         bool
+		errContains     string
+		wantStarts      []string
+		wantStops       []string
+		wantRestarts    []string
+		wantHasStop     bool
+		wantHasRestart  bool
+		checkHasStop    bool
+		checkHasRestart bool
 	}{
 		{
-			name:         "SingleCronExpression",
-			input:        `"0 * * * *"`,
-			wantStarts:   []string{"0 * * * *"},
-			checkHasStop: true,
-			wantHasStop:  false,
+			name:            "SingleCronExpression",
+			input:           `"0 * * * *"`,
+			wantStarts:      []string{"0 * * * *"},
+			checkHasStop:    true,
+			wantHasStop:     false,
 			checkHasRestart: true,
 			wantHasRestart:  false,
 		},

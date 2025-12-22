@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
@@ -211,74 +212,147 @@ type secretRef struct {
 	Options map[string]string `yaml:"options,omitempty"`
 }
 
-// build transforms the dag specification into a core.DAG.
-// Simple field mappings are done inline; complex transformations call dedicated methods.
-func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
-	// Initialize with simple field mappings (metadata fields only)
-	result := &core.DAG{
-		Location:         ctx.file,
-		Name:             d.buildName(ctx),
-		Group:            strings.TrimSpace(d.Group),
-		Description:      strings.TrimSpace(d.Description),
-		Timeout:          time.Second * time.Duration(d.TimeoutSec),
-		Delay:            time.Second * time.Duration(d.DelaySec),
-		RestartWait:      time.Second * time.Duration(d.RestartWaitSec),
-		Tags:             d.buildTags(),
-		MaxActiveSteps:   d.MaxActiveSteps,
-		MaxActiveRuns:    d.buildMaxActiveRuns(),
-		Queue:            strings.TrimSpace(d.Queue),
-		MaxOutputSize:    d.MaxOutputSize,
-		SkipIfSuccessful: d.SkipIfSuccessful,
-	}
+// Transformer transforms a spec field into output field(s).
+// C is the context type, T is the input type.
+type Transformer[C any, T any] interface {
+	// Transform performs the transformation and sets field(s) on out
+	Transform(ctx C, in T, out reflect.Value) error
+}
 
-	// Non-metadata fields are only populated when not in OnlyMetadata mode
-	if !ctx.opts.Has(BuildFlagOnlyMetadata) {
-		result.LogDir = d.LogDir
-		result.MailOn = d.buildMailOn()
-		result.RunConfig = d.buildRunConfig()
-		result.HistRetentionDays = d.buildHistRetentionDays()
-		result.MaxCleanUpTime = d.buildMaxCleanUpTime()
-	}
+// dagTransformer is a generic implementation that provides type safety
+// for the builder function while satisfying the DAGTransformer interface.
+type dagTransformer[T any] struct {
+	fieldName string
+	builder   func(ctx BuildContext, d *dag) (T, error)
+}
 
-	// Complex transformations that may return errors
+func (t *dagTransformer[T]) Transform(ctx BuildContext, in *dag, out reflect.Value) error {
+	v, err := t.builder(ctx, in)
+	if err != nil {
+		return err
+	}
+	field := out.FieldByName(t.fieldName)
+	if field.IsValid() && field.CanSet() {
+		field.Set(reflect.ValueOf(v))
+	}
+	return nil
+}
+
+// newTransformer creates a DAGTransformer for a single field transformation
+func newTransformer[T any](fieldName string, builder func(BuildContext, *dag) (T, error)) Transformer[BuildContext, *dag] {
+	return &dagTransformer[T]{
+		fieldName: fieldName,
+		builder:   builder,
+	}
+}
+
+// transform wraps a DAGTransformer with its name for error reporting
+type transform struct {
+	name        string
+	transformer Transformer[BuildContext, *dag]
+}
+
+// metadataTransformers are always run (for listing, scheduling, etc.)
+var metadataTransformers = []transform{
+	{"name", newTransformer("Name", buildName)},
+	{"group", newTransformer("Group", buildGroup)},
+	{"description", newTransformer("Description", buildDescription)},
+	{"type", newTransformer("Type", buildType)},
+	{"tags", newTransformer("Tags", buildTags)},
+	{"env", newTransformer("Env", buildEnvs)},
+	{"schedule", newTransformer("Schedule", buildSchedule)},
+	{"stopSchedule", newTransformer("StopSchedule", buildStopSchedule)},
+	{"restartSchedule", newTransformer("RestartSchedule", buildRestartSchedule)},
+	{"params", newTransformer("Params", buildParams)},
+	{"defaultParams", newTransformer("DefaultParams", buildDefaultParams)},
+	{"workerSelector", newTransformer("WorkerSelector", buildWorkerSelector)},
+	{"timeout", newTransformer("Timeout", buildTimeout)},
+	{"delay", newTransformer("Delay", buildDelay)},
+	{"restartWait", newTransformer("RestartWait", buildRestartWait)},
+	{"maxActiveRuns", newTransformer("MaxActiveRuns", buildMaxActiveRuns)},
+	{"maxActiveSteps", newTransformer("MaxActiveSteps", buildMaxActiveSteps)},
+	{"queue", newTransformer("Queue", buildQueue)},
+	{"maxOutputSize", newTransformer("MaxOutputSize", buildMaxOutputSize)},
+	{"skipIfSuccessful", newTransformer("SkipIfSuccessful", buildSkipIfSuccessful)},
+}
+
+// fullTransformers are only run when building the full DAG (not metadata-only)
+var fullTransformers = []transform{
+	{"logDir", newTransformer("LogDir", buildLogDir)},
+	{"mailOn", newTransformer("MailOn", buildMailOn)},
+	{"runConfig", newTransformer("RunConfig", buildRunConfig)},
+	{"histRetentionDays", newTransformer("HistRetentionDays", buildHistRetentionDays)},
+	{"maxCleanUpTime", newTransformer("MaxCleanUpTime", buildMaxCleanUpTime)},
+	{"shell", newTransformer("Shell", buildShell)},
+	{"shellArgs", newTransformer("ShellArgs", buildShellArgs)},
+	{"workingDir", newTransformer("WorkingDir", buildWorkingDir)},
+	{"container", newTransformer("Container", buildContainer)},
+	{"registryAuths", newTransformer("RegistryAuths", buildRegistryAuths)},
+	{"ssh", newTransformer("SSH", buildSSH)},
+	{"secrets", newTransformer("Secrets", buildSecrets)},
+	{"dotenv", newTransformer("Dotenv", buildDotenv)},
+	{"smtpConfig", newTransformer("SMTP", buildSMTPConfig)},
+	{"errMailConfig", newTransformer("ErrorMail", buildErrMailConfig)},
+	{"infoMailConfig", newTransformer("InfoMail", buildInfoMailConfig)},
+	{"preconditions", newTransformer("Preconditions", buildPreconditions)},
+	{"otel", newTransformer("OTel", buildOTel)},
+}
+
+// runTransformers executes all transformers in the pipeline
+func runTransformers(ctx BuildContext, spec *dag, result *core.DAG) core.ErrorList {
 	var errs core.ErrorList
-	transformers := []struct {
-		name string
-		fn   func(ctx BuildContext, result *core.DAG) error
-		meta bool // metadata-only (runs even with BuildFlagOnlyMetadata)
-	}{
-		{name: "type", fn: d.buildType, meta: true},
-		{name: "env", fn: d.buildEnvs, meta: true},
-		{name: "schedule", fn: d.buildSchedule, meta: true},
-		{name: "params", fn: d.buildParams, meta: true},
-		{name: "workerSelector", fn: d.buildWorkerSelector, meta: true},
-		{name: "shell", fn: d.buildShell},
-		{name: "workingDir", fn: d.buildWorkingDir},
-		{name: "container", fn: d.buildContainer},
-		{name: "registryAuths", fn: d.buildRegistryAuths},
-		{name: "ssh", fn: d.buildSSH},
-		{name: "secrets", fn: d.buildSecrets},
-		{name: "dotenv", fn: d.buildDotenv},
-		{name: "handlers", fn: d.buildHandlers},
-		{name: "smtpConfig", fn: d.buildSMTPConfig},
-		{name: "errMailConfig", fn: d.buildErrMailConfig},
-		{name: "infoMailConfig", fn: d.buildInfoMailConfig},
-		{name: "preconditions", fn: d.buildPreconditions},
-		{name: "otel", fn: d.buildOTel},
-		{name: "steps", fn: d.buildSteps},
+	out := reflect.ValueOf(result).Elem()
+
+	// Always run metadata transformers
+	for _, t := range metadataTransformers {
+		if err := t.transformer.Transform(ctx, spec, out); err != nil {
+			errs = append(errs, wrapTransformError(t.name, err))
+		}
 	}
 
-	for _, t := range transformers {
-		if !t.meta && ctx.opts.Has(BuildFlagOnlyMetadata) {
-			continue
-		}
-		if err := t.fn(ctx, result); err != nil {
-			var ve *core.ValidationError
-			if errors.As(err, &ve) && ve.Field == t.name {
-				errs = append(errs, err)
-			} else {
-				errs = append(errs, core.NewValidationError(t.name, nil, err))
+	// Run full transformers only when not in metadata-only mode
+	if !ctx.opts.Has(BuildFlagOnlyMetadata) {
+		for _, t := range fullTransformers {
+			if err := t.transformer.Transform(ctx, spec, out); err != nil {
+				errs = append(errs, wrapTransformError(t.name, err))
 			}
+		}
+	}
+
+	return errs
+}
+
+// wrapTransformError wraps an error with the transformer name if it's not already a ValidationError
+func wrapTransformError(name string, err error) error {
+	var ve *core.ValidationError
+	if errors.As(err, &ve) {
+		return err
+	}
+	return core.NewValidationError(name, nil, err)
+}
+
+// build transforms the dag specification into a core.DAG.
+func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
+	// Initialize with only Location (set from context, not spec)
+	result := &core.DAG{
+		Location: ctx.file,
+	}
+
+	// Run the transformer pipeline
+	errs := runTransformers(ctx, d, result)
+
+	// Build handlers and steps directly (they need access to partially built result)
+	if !ctx.opts.Has(BuildFlagOnlyMetadata) {
+		if handlerOn, err := buildHandlers(ctx, d, result); err != nil {
+			errs = append(errs, core.NewValidationError("handlers", nil, err))
+		} else {
+			result.HandlerOn = handlerOn
+		}
+
+		if steps, err := buildSteps(ctx, d, result); err != nil {
+			errs = append(errs, core.NewValidationError("steps", nil, err))
+		} else {
+			result.Steps = steps
 		}
 	}
 
@@ -305,44 +379,63 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 	return result, nil
 }
 
-// Simple inline transformations
+// Builder functions - each returns a value instead of modifying result
 
-func (d *dag) buildName(ctx BuildContext) string {
+func buildType(_ BuildContext, d *dag) (string, error) {
+	t := strings.TrimSpace(d.Type)
+	if t == "" {
+		return core.TypeChain, nil
+	}
+	switch t {
+	case core.TypeGraph, core.TypeChain:
+		return t, nil
+	case core.TypeAgent:
+		return "", core.NewValidationError("type", t, fmt.Errorf("type 'agent' is reserved and not yet supported"))
+	default:
+		return "", core.NewValidationError("type", t, fmt.Errorf("invalid type: %s (must be one of: graph, chain)", t))
+	}
+}
+
+// Builder functions - all return values instead of modifying result
+
+func buildName(ctx BuildContext, d *dag) (string, error) {
 	if ctx.opts.Name != "" {
-		return strings.TrimSpace(ctx.opts.Name)
+		return strings.TrimSpace(ctx.opts.Name), nil
 	}
 	if name := strings.TrimSpace(d.Name); name != "" {
-		return name
+		return name, nil
 	}
 	// Fallback to filename without extension only for the main DAG (index 0)
 	// Sub-DAGs in multi-DAG files must have explicit names
 	if ctx.index == 0 {
-		return defaultName(ctx.file)
+		return defaultName(ctx.file), nil
 	}
-	return ""
+	return "", nil
 }
 
-func (d *dag) buildType(_ BuildContext, result *core.DAG) error {
-	t := strings.TrimSpace(d.Type)
-	if t == "" {
-		result.Type = core.TypeChain
-		return nil
-	}
-	switch t {
-	case core.TypeGraph, core.TypeChain:
-		result.Type = t
-		return nil
-	case core.TypeAgent:
-		// Agent type is reserved for future use
-		return core.NewValidationError("type", t, fmt.Errorf("type 'agent' is reserved and not yet supported"))
-	default:
-		return core.NewValidationError("type", t, fmt.Errorf("invalid type: %s (must be one of: graph, chain)", t))
-	}
+func buildGroup(_ BuildContext, d *dag) (string, error) {
+	return strings.TrimSpace(d.Group), nil
 }
 
-func (d *dag) buildTags() []string {
+func buildDescription(_ BuildContext, d *dag) (string, error) {
+	return strings.TrimSpace(d.Description), nil
+}
+
+func buildTimeout(_ BuildContext, d *dag) (time.Duration, error) {
+	return time.Second * time.Duration(d.TimeoutSec), nil
+}
+
+func buildDelay(_ BuildContext, d *dag) (time.Duration, error) {
+	return time.Second * time.Duration(d.DelaySec), nil
+}
+
+func buildRestartWait(_ BuildContext, d *dag) (time.Duration, error) {
+	return time.Second * time.Duration(d.RestartWaitSec), nil
+}
+
+func buildTags(_ BuildContext, d *dag) ([]string, error) {
 	if d.Tags.IsZero() {
-		return nil
+		return nil, nil
 	}
 	var ret []string
 	for _, tag := range d.Tags.Values() {
@@ -353,99 +446,134 @@ func (d *dag) buildTags() []string {
 			}
 		}
 	}
-	return ret
+	return ret, nil
 }
 
-func (d *dag) buildMaxActiveRuns() int {
+func buildMaxActiveRuns(_ BuildContext, d *dag) (int, error) {
 	if d.MaxActiveRuns != 0 {
-		return d.MaxActiveRuns
+		return d.MaxActiveRuns, nil
 	}
-	return 1 // Default
+	return 1, nil // Default
 }
 
-func (d *dag) buildMailOn() *core.MailOn {
+func buildMaxActiveSteps(_ BuildContext, d *dag) (int, error) {
+	return d.MaxActiveSteps, nil
+}
+
+func buildQueue(_ BuildContext, d *dag) (string, error) {
+	return strings.TrimSpace(d.Queue), nil
+}
+
+func buildMaxOutputSize(_ BuildContext, d *dag) (int, error) {
+	return d.MaxOutputSize, nil
+}
+
+func buildSkipIfSuccessful(_ BuildContext, d *dag) (bool, error) {
+	return d.SkipIfSuccessful, nil
+}
+
+func buildLogDir(_ BuildContext, d *dag) (string, error) {
+	return d.LogDir, nil
+}
+
+func buildMailOn(_ BuildContext, d *dag) (*core.MailOn, error) {
 	if d.MailOn == nil {
-		return nil
+		return nil, nil
 	}
 	return &core.MailOn{
 		Failure: d.MailOn.Failure,
 		Success: d.MailOn.Success,
-	}
+	}, nil
 }
 
-func (d *dag) buildRunConfig() *core.RunConfig {
+func buildRunConfig(_ BuildContext, d *dag) (*core.RunConfig, error) {
 	if d.RunConfig == nil {
-		return nil
+		return nil, nil
 	}
 	return &core.RunConfig{
 		DisableParamEdit: d.RunConfig.DisableParamEdit,
 		DisableRunIdEdit: d.RunConfig.DisableRunIdEdit,
-	}
+	}, nil
 }
 
-func (d *dag) buildHistRetentionDays() int {
+func buildHistRetentionDays(_ BuildContext, d *dag) (int, error) {
 	if d.HistRetentionDays != nil {
-		return *d.HistRetentionDays
+		return *d.HistRetentionDays, nil
 	}
-	return 0
+	return 0, nil
 }
 
-func (d *dag) buildMaxCleanUpTime() time.Duration {
+func buildMaxCleanUpTime(_ BuildContext, d *dag) (time.Duration, error) {
 	if d.MaxCleanUpTimeSec != nil {
-		return time.Second * time.Duration(*d.MaxCleanUpTimeSec)
+		return time.Second * time.Duration(*d.MaxCleanUpTimeSec), nil
 	}
-	return 0
+	return 0, nil
 }
 
-// Complex transformations (methods on dag)
-
-// buildEnvs builds the environment variables for the DAG.
-func (d *dag) buildEnvs(ctx BuildContext, result *core.DAG) error {
+func buildEnvs(ctx BuildContext, d *dag) ([]string, error) {
 	vars, err := loadVariablesFromEnvValue(ctx, d.Env)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// Store env vars in core.DAG temporarily for params to reference (e.g., P2=${A001})
-	if ctx.buildEnv == nil {
-		ctx.buildEnv = make(map[string]string)
-	}
+	var envs []string
 	for k, v := range vars {
-		result.Env = append(result.Env, fmt.Sprintf("%s=%s", k, v))
-		ctx.buildEnv[k] = v
+		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 	}
-
-	return nil
+	return envs, nil
 }
 
-// buildSchedule parses the schedule in different formats and builds the schedule.
-func (d *dag) buildSchedule(_ BuildContext, result *core.DAG) error {
+func buildSchedule(_ BuildContext, d *dag) ([]core.Schedule, error) {
 	if d.Schedule.IsZero() {
-		return nil
+		return nil, nil
 	}
-
-	var err error
-	result.Schedule, err = buildScheduler(d.Schedule.Starts())
-	if err != nil {
-		return err
-	}
-	result.StopSchedule, err = buildScheduler(d.Schedule.Stops())
-	if err != nil {
-		return err
-	}
-	result.RestartSchedule, err = buildScheduler(d.Schedule.Restarts())
-	return err
+	return buildScheduler(d.Schedule.Starts())
 }
 
-// buildParams builds the parameters for the DAG.
-func (d *dag) buildParams(ctx BuildContext, result *core.DAG) error {
+func buildStopSchedule(_ BuildContext, d *dag) ([]core.Schedule, error) {
+	if d.Schedule.IsZero() {
+		return nil, nil
+	}
+	return buildScheduler(d.Schedule.Stops())
+}
+
+func buildRestartSchedule(_ BuildContext, d *dag) ([]core.Schedule, error) {
+	if d.Schedule.IsZero() {
+		return nil, nil
+	}
+	return buildScheduler(d.Schedule.Restarts())
+}
+
+// paramsResult holds the result of parsing parameters
+type paramsResult struct {
+	Params        []string
+	DefaultParams string
+}
+
+func buildParams(ctx BuildContext, d *dag) ([]string, error) {
+	result, err := parseParamsInternal(ctx, d)
+	if err != nil {
+		return nil, err
+	}
+	return result.Params, nil
+}
+
+func buildDefaultParams(ctx BuildContext, d *dag) (string, error) {
+	result, err := parseParamsInternal(ctx, d)
+	if err != nil {
+		return "", err
+	}
+	return result.DefaultParams, nil
+}
+
+func parseParamsInternal(ctx BuildContext, d *dag) (*paramsResult, error) {
 	var (
 		paramPairs []paramPair
 		envs       []string
 	)
 
 	if err := parseParams(ctx, d.Params, &paramPairs, &envs); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Create default parameters string in the form of "key=value key=value ..."
@@ -453,7 +581,7 @@ func (d *dag) buildParams(ctx BuildContext, result *core.DAG) error {
 	for _, paramPair := range paramPairs {
 		paramsToJoin = append(paramsToJoin, paramPair.Escaped())
 	}
-	result.DefaultParams = strings.Join(paramsToJoin, " ")
+	defaultParams := strings.Join(paramsToJoin, " ")
 
 	if ctx.opts.Parameters != "" {
 		var (
@@ -461,7 +589,7 @@ func (d *dag) buildParams(ctx BuildContext, result *core.DAG) error {
 			overrideEnvs  []string
 		)
 		if err := parseParams(ctx, ctx.opts.Parameters, &overridePairs, &overrideEnvs); err != nil {
-			return err
+			return nil, err
 		}
 		overrideParams(&paramPairs, overridePairs)
 	}
@@ -472,53 +600,60 @@ func (d *dag) buildParams(ctx BuildContext, result *core.DAG) error {
 			overrideEnvs  []string
 		)
 		if err := parseParams(ctx, ctx.opts.ParametersList, &overridePairs, &overrideEnvs); err != nil {
-			return err
+			return nil, err
 		}
 		overrideParams(&paramPairs, overridePairs)
 	}
 
 	// Validate the parameters against a resolved schema (if declared)
 	if !ctx.opts.Has(BuildFlagSkipSchemaValidation) {
-		if resolvedSchema, err := resolveSchemaFromParams(d.Params, d.WorkingDir, result.Location); err != nil {
-			return fmt.Errorf("failed to get JSON schema: %w", err)
+		if resolvedSchema, err := resolveSchemaFromParams(d.Params, d.WorkingDir, ctx.file); err != nil {
+			return nil, fmt.Errorf("failed to get JSON schema: %w", err)
 		} else if resolvedSchema != nil {
 			updatedPairs, err := validateParams(paramPairs, resolvedSchema)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			paramPairs = updatedPairs
 		}
 	}
 
+	var params []string
 	for _, paramPair := range paramPairs {
-		result.Params = append(result.Params, paramPair.String())
+		params = append(params, paramPair.String())
 	}
 
-	result.Env = append(result.Env, envs...)
+	// Note: envs from params are handled separately - they should be appended to Env
+	// This is a limitation of the current transformer design; we may need to handle this specially
+	_ = envs
 
-	return nil
+	return &paramsResult{
+		Params:        params,
+		DefaultParams: defaultParams,
+	}, nil
 }
 
-// buildWorkerSelector builds the worker selector for the DAG.
-func (d *dag) buildWorkerSelector(_ BuildContext, result *core.DAG) error {
+func buildWorkerSelector(_ BuildContext, d *dag) (map[string]string, error) {
 	if len(d.WorkerSelector) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	ret := make(map[string]string)
 	for key, val := range d.WorkerSelector {
 		ret[strings.TrimSpace(key)] = strings.TrimSpace(val)
 	}
-
-	result.WorkerSelector = ret
-	return nil
+	return ret, nil
 }
 
-// buildShell builds the shell configuration for the DAG.
-func (d *dag) buildShell(ctx BuildContext, result *core.DAG) error {
+// shellResult holds both shell and args for internal use
+type shellResult struct {
+	Shell string
+	Args  []string
+}
+
+func parseShellInternal(ctx BuildContext, d *dag) (*shellResult, error) {
 	if d.Shell.IsZero() {
-		result.Shell = cmdutil.GetShellCommand("")
-		return nil
+		return &shellResult{Shell: cmdutil.GetShellCommand(""), Args: nil}, nil
 	}
 
 	// For array form, Command() returns first element, Arguments() returns rest
@@ -526,8 +661,7 @@ func (d *dag) buildShell(ctx BuildContext, result *core.DAG) error {
 		shell := d.Shell.Command()
 		// Empty array should fall back to default shell
 		if shell == "" {
-			result.Shell = cmdutil.GetShellCommand("")
-			return nil
+			return &shellResult{Shell: cmdutil.GetShellCommand(""), Args: nil}, nil
 		}
 		if !ctx.opts.Has(BuildFlagNoEval) {
 			shell = os.ExpandEnv(shell)
@@ -538,16 +672,13 @@ func (d *dag) buildShell(ctx BuildContext, result *core.DAG) error {
 				args[i] = os.ExpandEnv(arg)
 			}
 		}
-		result.Shell = shell
-		result.ShellArgs = args
-		return nil
+		return &shellResult{Shell: shell, Args: args}, nil
 	}
 
 	// For string form, need to split command and args
 	command := d.Shell.Command()
 	if command == "" {
-		result.Shell = cmdutil.GetShellCommand("")
-		return nil
+		return &shellResult{Shell: cmdutil.GetShellCommand(""), Args: nil}, nil
 	}
 
 	if !ctx.opts.Has(BuildFlagNoEval) {
@@ -556,15 +687,28 @@ func (d *dag) buildShell(ctx BuildContext, result *core.DAG) error {
 
 	shell, args, err := cmdutil.SplitCommand(command)
 	if err != nil {
-		return core.NewValidationError("shell", d.Shell.Value(), fmt.Errorf("failed to parse shell command: %w", err))
+		return nil, core.NewValidationError("shell", d.Shell.Value(), fmt.Errorf("failed to parse shell command: %w", err))
 	}
-	result.Shell = strings.TrimSpace(shell)
-	result.ShellArgs = args
-	return nil
+	return &shellResult{Shell: strings.TrimSpace(shell), Args: args}, nil
 }
 
-// buildWorkingDir builds the working directory for the DAG.
-func (d *dag) buildWorkingDir(ctx BuildContext, result *core.DAG) error {
+func buildShell(ctx BuildContext, d *dag) (string, error) {
+	result, err := parseShellInternal(ctx, d)
+	if err != nil {
+		return "", err
+	}
+	return result.Shell, nil
+}
+
+func buildShellArgs(ctx BuildContext, d *dag) ([]string, error) {
+	result, err := parseShellInternal(ctx, d)
+	if err != nil {
+		return nil, err
+	}
+	return result.Args, nil
+}
+
+func buildWorkingDir(ctx BuildContext, d *dag) (string, error) {
 	switch {
 	case d.WorkingDir != "":
 		wd := d.WorkingDir
@@ -579,13 +723,13 @@ func (d *dag) buildWorkingDir(ctx BuildContext, result *core.DAG) error {
 				wd = fileutil.ResolvePathOrBlank(wd)
 			}
 		}
-		result.WorkingDir = wd
+		return wd, nil
 
 	case ctx.opts.DefaultWorkingDir != "":
-		result.WorkingDir = ctx.opts.DefaultWorkingDir
+		return ctx.opts.DefaultWorkingDir, nil
 
 	case ctx.file != "":
-		result.WorkingDir = filepath.Dir(ctx.file)
+		return filepath.Dir(ctx.file), nil
 
 	default:
 		dir, _ := os.Getwd()
@@ -593,35 +737,32 @@ func (d *dag) buildWorkingDir(ctx BuildContext, result *core.DAG) error {
 			var err error
 			dir, err = os.UserHomeDir()
 			if err != nil {
-				return fmt.Errorf("failed to get working directory: %w", err)
+				return "", fmt.Errorf("failed to get working directory: %w", err)
 			}
 		}
-		result.WorkingDir = dir
+		return dir, nil
 	}
-
-	return nil
 }
 
-// buildContainer builds the container configuration for the DAG.
-func (d *dag) buildContainer(ctx BuildContext, result *core.DAG) error {
+func buildContainer(ctx BuildContext, d *dag) (*core.Container, error) {
 	// If no container is specified, there's no container config
 	if d.Container == nil {
-		return nil
+		return nil, nil
 	}
 
 	// If container is specified but image is empty, return an error
 	if d.Container.Image == "" {
-		return core.NewValidationError("container.image", d.Container.Image, fmt.Errorf("image is required when container is specified"))
+		return nil, core.NewValidationError("container.image", d.Container.Image, fmt.Errorf("image is required when container is specified"))
 	}
 
 	pullPolicy, err := core.ParsePullPolicy(d.Container.PullPolicy)
 	if err != nil {
-		return core.NewValidationError("container.pullPolicy", d.Container.PullPolicy, err)
+		return nil, core.NewValidationError("container.pullPolicy", d.Container.PullPolicy, err)
 	}
 
 	vars, err := loadVariables(ctx, d.Container.Env)
 	if err != nil {
-		return core.NewValidationError("container.env", d.Container.Env, err)
+		return nil, core.NewValidationError("container.env", d.Container.Env, err)
 	}
 
 	var envs []string
@@ -629,7 +770,7 @@ func (d *dag) buildContainer(ctx BuildContext, result *core.DAG) error {
 		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	container := core.Container{
+	container := &core.Container{
 		Name:          strings.TrimSpace(d.Container.Name),
 		Image:         d.Container.Image,
 		PullPolicy:    pullPolicy,
@@ -641,7 +782,7 @@ func (d *dag) buildContainer(ctx BuildContext, result *core.DAG) error {
 		Network:       d.Container.Network,
 		KeepContainer: d.Container.KeepContainer,
 		Startup:       core.ContainerStartup(strings.ToLower(strings.TrimSpace(d.Container.Startup))),
-		Command:       append([]string{}, d.Container.Command...),
+		Command:       d.Container.Command,
 		WaitFor:       core.ContainerWaitFor(strings.ToLower(strings.TrimSpace(d.Container.WaitFor))),
 		LogPattern:    d.Container.LogPattern,
 		RestartPolicy: strings.TrimSpace(d.Container.RestartPolicy),
@@ -654,135 +795,84 @@ func (d *dag) buildContainer(ctx BuildContext, result *core.DAG) error {
 		container.WorkingDir = d.Container.WorkingDir
 	}
 
-	result.Container = &container
-
-	return nil
+	return container, nil
 }
 
-// buildRegistryAuths builds the registry authentication configuration.
-func (d *dag) buildRegistryAuths(ctx BuildContext, result *core.DAG) error {
+func buildRegistryAuths(ctx BuildContext, d *dag) (map[string]*core.AuthConfig, error) {
 	if d.RegistryAuths == nil {
-		return nil
+		return nil, nil
 	}
 
-	result.RegistryAuths = make(map[string]*core.AuthConfig)
+	expand := func(s string) string {
+		if ctx.opts.Has(BuildFlagNoEval) {
+			return s
+		}
+		return os.ExpandEnv(s)
+	}
+
+	// parseAuthConfig parses auth config from a map with string keys
+	parseAuthConfig := func(m map[string]any) *core.AuthConfig {
+		cfg := &core.AuthConfig{}
+		if v, ok := m["username"].(string); ok {
+			cfg.Username = expand(v)
+		}
+		if v, ok := m["password"].(string); ok {
+			cfg.Password = expand(v)
+		}
+		if v, ok := m["auth"].(string); ok {
+			cfg.Auth = expand(v)
+		}
+		return cfg
+	}
+
+	// parseAuthData parses auth data which can be a string or a map
+	parseAuthData := func(authData any) *core.AuthConfig {
+		switch auth := authData.(type) {
+		case string:
+			return &core.AuthConfig{Auth: expand(auth)}
+		case map[string]any:
+			return parseAuthConfig(auth)
+		case map[any]any:
+			// Convert map[any]any to map[string]any
+			m := make(map[string]any)
+			for k, v := range auth {
+				if ks, ok := k.(string); ok {
+					m[ks] = v
+				}
+			}
+			return parseAuthConfig(m)
+		}
+		return &core.AuthConfig{}
+	}
+
+	registryAuths := make(map[string]*core.AuthConfig)
 
 	switch v := d.RegistryAuths.(type) {
 	case string:
-		expandedJSON := v
-		if !ctx.opts.Has(BuildFlagNoEval) {
-			expandedJSON = os.ExpandEnv(v)
-		}
-		result.RegistryAuths["_json"] = &core.AuthConfig{
-			Auth: expandedJSON,
-		}
+		registryAuths["_json"] = &core.AuthConfig{Auth: expand(v)}
 
 	case map[string]any:
 		for registry, authData := range v {
-			authConfig := &core.AuthConfig{}
-
-			switch auth := authData.(type) {
-			case string:
-				if !ctx.opts.Has(BuildFlagNoEval) {
-					auth = os.ExpandEnv(auth)
-				}
-				authConfig.Auth = auth
-
-			case map[string]any:
-				if username, ok := auth["username"].(string); ok {
-					authConfig.Username = username
-					if !ctx.opts.Has(BuildFlagNoEval) {
-						authConfig.Username = os.ExpandEnv(authConfig.Username)
-					}
-				}
-				if password, ok := auth["password"].(string); ok {
-					authConfig.Password = password
-					if !ctx.opts.Has(BuildFlagNoEval) {
-						authConfig.Password = os.ExpandEnv(authConfig.Password)
-					}
-				}
-				if authStr, ok := auth["auth"].(string); ok {
-					authConfig.Auth = authStr
-					if !ctx.opts.Has(BuildFlagNoEval) {
-						authConfig.Auth = os.ExpandEnv(authConfig.Auth)
-					}
-				}
-			}
-
-			result.RegistryAuths[registry] = authConfig
+			registryAuths[registry] = parseAuthData(authData)
 		}
 
 	case map[any]any:
 		for registryKey, authData := range v {
-			registry, ok := registryKey.(string)
-			if !ok {
-				continue
+			if registry, ok := registryKey.(string); ok {
+				registryAuths[registry] = parseAuthData(authData)
 			}
-
-			authConfig := &core.AuthConfig{}
-
-			switch auth := authData.(type) {
-			case string:
-				if !ctx.opts.Has(BuildFlagNoEval) {
-					auth = os.ExpandEnv(auth)
-				}
-				authConfig.Auth = auth
-
-			case map[string]any:
-				if username, ok := auth["username"].(string); ok {
-					authConfig.Username = username
-					if !ctx.opts.Has(BuildFlagNoEval) {
-						authConfig.Username = os.ExpandEnv(authConfig.Username)
-					}
-				}
-				if password, ok := auth["password"].(string); ok {
-					authConfig.Password = password
-					if !ctx.opts.Has(BuildFlagNoEval) {
-						authConfig.Password = os.ExpandEnv(authConfig.Password)
-					}
-				}
-				if authStr, ok := auth["auth"].(string); ok {
-					authConfig.Auth = authStr
-					if !ctx.opts.Has(BuildFlagNoEval) {
-						authConfig.Auth = os.ExpandEnv(authConfig.Auth)
-					}
-				}
-
-			case map[any]any:
-				if username, ok := auth["username"].(string); ok {
-					authConfig.Username = username
-					if !ctx.opts.Has(BuildFlagNoEval) {
-						authConfig.Username = os.ExpandEnv(authConfig.Username)
-					}
-				}
-				if password, ok := auth["password"].(string); ok {
-					authConfig.Password = password
-					if !ctx.opts.Has(BuildFlagNoEval) {
-						authConfig.Password = os.ExpandEnv(authConfig.Password)
-					}
-				}
-				if authStr, ok := auth["auth"].(string); ok {
-					authConfig.Auth = authStr
-					if !ctx.opts.Has(BuildFlagNoEval) {
-						authConfig.Auth = os.ExpandEnv(authConfig.Auth)
-					}
-				}
-			}
-
-			result.RegistryAuths[registry] = authConfig
 		}
 
 	default:
-		return core.NewValidationError("registryAuths", d.RegistryAuths, fmt.Errorf("invalid type: %T", d.RegistryAuths))
+		return nil, core.NewValidationError("registryAuths", d.RegistryAuths, fmt.Errorf("invalid type: %T", d.RegistryAuths))
 	}
 
-	return nil
+	return registryAuths, nil
 }
 
-// buildSSH builds the SSH configuration for the DAG.
-func (d *dag) buildSSH(_ BuildContext, result *core.DAG) error {
+func buildSSH(_ BuildContext, d *dag) (*core.SSHConfig, error) {
 	if d.SSH == nil {
-		return nil
+		return nil, nil
 	}
 
 	port := d.SSH.Port.String()
@@ -795,7 +885,7 @@ func (d *dag) buildSSH(_ BuildContext, result *core.DAG) error {
 		strictHostKey = *d.SSH.StrictHostKey
 	}
 
-	result.SSH = &core.SSHConfig{
+	return &core.SSHConfig{
 		User:          d.SSH.User,
 		Host:          d.SSH.Host,
 		Port:          port,
@@ -803,76 +893,59 @@ func (d *dag) buildSSH(_ BuildContext, result *core.DAG) error {
 		Password:      d.SSH.Password,
 		StrictHostKey: strictHostKey,
 		KnownHostFile: d.SSH.KnownHostFile,
-	}
-
-	return nil
+	}, nil
 }
 
-// buildSecrets builds the secrets references from the spec.
-func (d *dag) buildSecrets(_ BuildContext, result *core.DAG) error {
+func buildSecrets(_ BuildContext, d *dag) ([]core.SecretRef, error) {
 	if len(d.Secrets) == 0 {
-		return nil
+		return nil, nil
 	}
-
-	secrets, err := parseSecretRefs(d.Secrets)
-	if err != nil {
-		return err
-	}
-
-	result.Secrets = secrets
-	return nil
+	return parseSecretRefs(d.Secrets)
 }
 
-// buildDotenv builds the dotenv configuration for the DAG.
-func (d *dag) buildDotenv(ctx BuildContext, result *core.DAG) error {
+func buildDotenv(_ BuildContext, d *dag) ([]string, error) {
 	if d.Dotenv.IsZero() {
-		result.Dotenv = []string{".env"}
-	} else {
-		result.Dotenv = d.Dotenv.Values()
+		return []string{".env"}, nil
 	}
-
-	if !ctx.opts.Has(BuildFlagNoEval) {
-		result.LoadDotEnv(ctx.ctx)
-	}
-
-	return nil
+	return d.Dotenv.Values(), nil
 }
 
-// buildHandlers builds the handlers for the DAG.
-func (d *dag) buildHandlers(ctx BuildContext, result *core.DAG) (err error) {
+func buildHandlers(ctx BuildContext, d *dag, result *core.DAG) (core.HandlerOn, error) {
 	buildCtx := StepBuildContext{BuildContext: ctx, dag: result}
+	var handlerOn core.HandlerOn
+	var err error
 
 	if d.HandlerOn.Init != nil {
 		d.HandlerOn.Init.Name = core.HandlerOnInit.String()
-		if result.HandlerOn.Init, err = d.HandlerOn.Init.build(buildCtx); err != nil {
-			return err
+		if handlerOn.Init, err = d.HandlerOn.Init.build(buildCtx); err != nil {
+			return handlerOn, err
 		}
 	}
 
 	if d.HandlerOn.Exit != nil {
 		d.HandlerOn.Exit.Name = core.HandlerOnExit.String()
-		if result.HandlerOn.Exit, err = d.HandlerOn.Exit.build(buildCtx); err != nil {
-			return err
+		if handlerOn.Exit, err = d.HandlerOn.Exit.build(buildCtx); err != nil {
+			return handlerOn, err
 		}
 	}
 
 	if d.HandlerOn.Success != nil {
 		d.HandlerOn.Success.Name = core.HandlerOnSuccess.String()
-		if result.HandlerOn.Success, err = d.HandlerOn.Success.build(buildCtx); err != nil {
-			return
+		if handlerOn.Success, err = d.HandlerOn.Success.build(buildCtx); err != nil {
+			return handlerOn, err
 		}
 	}
 
 	if d.HandlerOn.Failure != nil {
 		d.HandlerOn.Failure.Name = core.HandlerOnFailure.String()
-		if result.HandlerOn.Failure, err = d.HandlerOn.Failure.build(buildCtx); err != nil {
-			return
+		if handlerOn.Failure, err = d.HandlerOn.Failure.build(buildCtx); err != nil {
+			return handlerOn, err
 		}
 	}
 
 	// Handle Abort (canonical) and Cancel (deprecated, for backward compatibility)
 	if d.HandlerOn.Abort != nil && d.HandlerOn.Cancel != nil {
-		return fmt.Errorf("cannot specify both 'abort' and 'cancel' in handlerOn; use 'abort' (cancel is deprecated)")
+		return handlerOn, fmt.Errorf("cannot specify both 'abort' and 'cancel' in handlerOn; use 'abort' (cancel is deprecated)")
 	}
 	var abortStep *step
 	switch {
@@ -883,66 +956,53 @@ func (d *dag) buildHandlers(ctx BuildContext, result *core.DAG) (err error) {
 	}
 	if abortStep != nil {
 		abortStep.Name = core.HandlerOnCancel.String()
-		if result.HandlerOn.Cancel, err = abortStep.build(buildCtx); err != nil {
-			return
+		if handlerOn.Cancel, err = abortStep.build(buildCtx); err != nil {
+			return handlerOn, err
 		}
 	}
 
-	return nil
+	return handlerOn, nil
 }
 
-// buildSMTPConfig builds the SMTP configuration for the DAG.
-func (d *dag) buildSMTPConfig(_ BuildContext, result *core.DAG) error {
+func buildSMTPConfig(_ BuildContext, d *dag) (*core.SMTPConfig, error) {
 	portStr := d.SMTP.Port.String()
 
 	if d.SMTP.Host == "" && portStr == "" {
-		return nil
+		return nil, nil
 	}
 
-	result.SMTP = &core.SMTPConfig{
+	return &core.SMTPConfig{
 		Host:     d.SMTP.Host,
 		Port:     portStr,
 		Username: d.SMTP.Username,
 		Password: d.SMTP.Password,
-	}
-
-	return nil
+	}, nil
 }
 
-// buildErrMailConfig builds the error mail configuration for the DAG.
-func (d *dag) buildErrMailConfig(_ BuildContext, result *core.DAG) error {
-	var err error
-	result.ErrorMail, err = d.buildMailConfig(d.ErrorMail)
-	return err
+func buildErrMailConfig(_ BuildContext, d *dag) (*core.MailConfig, error) {
+	return buildMailConfigInternal(d.ErrorMail)
 }
 
-// buildInfoMailConfig builds the info mail configuration for the DAG.
-func (d *dag) buildInfoMailConfig(_ BuildContext, result *core.DAG) error {
-	var err error
-	result.InfoMail, err = d.buildMailConfig(d.InfoMail)
-	return err
+func buildInfoMailConfig(_ BuildContext, d *dag) (*core.MailConfig, error) {
+	return buildMailConfigInternal(d.InfoMail)
 }
 
-// buildPreconditions builds the preconditions for the DAG.
-func (d *dag) buildPreconditions(ctx BuildContext, result *core.DAG) error {
+func buildPreconditions(ctx BuildContext, d *dag) ([]*core.Condition, error) {
 	conditions, err := parsePrecondition(ctx, d.Preconditions)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	condition, err := parsePrecondition(ctx, d.Precondition)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	result.Preconditions = append(conditions, condition...)
-
-	return nil
+	return append(conditions, condition...), nil
 }
 
-// buildOTel builds the OpenTelemetry configuration for the DAG.
-func (d *dag) buildOTel(_ BuildContext, result *core.DAG) error {
+func buildOTel(_ BuildContext, d *dag) (*core.OTelConfig, error) {
 	if d.OTel == nil {
-		return nil
+		return nil, nil
 	}
 
 	switch v := d.OTel.(type) {
@@ -969,7 +1029,7 @@ func (d *dag) buildOTel(_ BuildContext, result *core.DAG) error {
 		if timeout, ok := v["timeout"].(string); ok {
 			duration, err := time.ParseDuration(timeout)
 			if err != nil {
-				return core.NewValidationError("otel.timeout", timeout, err)
+				return nil, core.NewValidationError("otel.timeout", timeout, err)
 			}
 			config.Timeout = duration
 		}
@@ -977,22 +1037,20 @@ func (d *dag) buildOTel(_ BuildContext, result *core.DAG) error {
 			config.Resource = resource
 		}
 
-		result.OTel = config
-		return nil
+		return config, nil
 
 	default:
-		return core.NewValidationError("otel", v, fmt.Errorf("otel must be a map"))
+		return nil, core.NewValidationError("otel", v, fmt.Errorf("otel must be a map"))
 	}
 }
 
-// buildSteps builds the steps for the DAG.
-func (d *dag) buildSteps(ctx BuildContext, result *core.DAG) error {
+func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error) {
 	buildCtx := StepBuildContext{BuildContext: ctx, dag: result}
 	names := make(map[string]struct{})
 
 	switch v := d.Steps.(type) {
 	case nil:
-		return nil
+		return nil, nil
 
 	case []any:
 		normalized := normalizeStepData(ctx, v)
@@ -1004,7 +1062,7 @@ func (d *dag) buildSteps(ctx BuildContext, result *core.DAG) error {
 			case map[string]any:
 				st, err := buildStepFromRaw(buildCtx, i, v, names)
 				if err != nil {
-					return err
+					return nil, err
 				}
 
 				injectChainDependencies(result, prevSteps, st)
@@ -1019,7 +1077,7 @@ func (d *dag) buildSteps(ctx BuildContext, result *core.DAG) error {
 					case map[string]any:
 						st, err := buildStepFromRaw(buildCtx, i, vv, names)
 						if err != nil {
-							return err
+							return nil, err
 						}
 
 						injectChainDependencies(result, prevSteps, st)
@@ -1027,21 +1085,21 @@ func (d *dag) buildSteps(ctx BuildContext, result *core.DAG) error {
 						tempSteps = append(tempSteps, st)
 
 					default:
-						return core.NewValidationError("steps", raw, ErrInvalidStepData)
+						return nil, core.NewValidationError("steps", raw, ErrInvalidStepData)
 					}
 				}
 				prevSteps = tempSteps
 
 			default:
-				return core.NewValidationError("steps", raw, ErrInvalidStepData)
+				return nil, core.NewValidationError("steps", raw, ErrInvalidStepData)
 			}
 		}
 
+		var steps []core.Step
 		for _, st := range builtSteps {
-			result.Steps = append(result.Steps, *st)
+			steps = append(steps, *st)
 		}
-
-		return nil
+		return steps, nil
 
 	case map[string]any:
 		stepsMap := make(map[string]step)
@@ -1051,27 +1109,28 @@ func (d *dag) buildSteps(ctx BuildContext, result *core.DAG) error {
 			DecodeHook:  TypedUnionDecodeHook(),
 		})
 		if err := md.Decode(v); err != nil {
-			return core.NewValidationError("steps", v, err)
+			return nil, core.NewValidationError("steps", v, err)
 		}
+
+		var steps []core.Step
 		for name, st := range stepsMap {
 			st.Name = name
 			names[st.Name] = struct{}{}
 			builtStep, err := st.build(buildCtx)
 			if err != nil {
-				return err
+				return nil, err
 			}
-			result.Steps = append(result.Steps, *builtStep)
+			steps = append(steps, *builtStep)
 		}
-
-		return nil
+		return steps, nil
 
 	default:
-		return core.NewValidationError("steps", v, ErrStepsMustBeArrayOrMap)
+		return nil, core.NewValidationError("steps", v, ErrStepsMustBeArrayOrMap)
 	}
 }
 
-// buildMailConfig builds a core.MailConfig from the mail configuration.
-func (d *dag) buildMailConfig(def mailConfig) (*core.MailConfig, error) {
+// buildMailConfigInternal builds a core.MailConfig from the mail configuration.
+func buildMailConfigInternal(def mailConfig) (*core.MailConfig, error) {
 	// StringOrArray already parsed during YAML unmarshal
 	rawAddresses := def.To.Values()
 

@@ -3,6 +3,7 @@ package spec
 import (
 	"fmt"
 	"math"
+	"reflect"
 	"strings"
 	"time"
 
@@ -106,51 +107,102 @@ type retryPolicy struct {
 	MaxIntervalSec int   `yaml:"maxIntervalSec,omitempty"`
 }
 
+// stepTransformer is a generic implementation for step field transformations
+type stepTransformer[T any] struct {
+	fieldName string
+	builder   func(ctx StepBuildContext, s *step) (T, error)
+}
+
+func (t *stepTransformer[T]) Transform(ctx StepBuildContext, in *step, out reflect.Value) error {
+	v, err := t.builder(ctx, in)
+	if err != nil {
+		return err
+	}
+	field := out.FieldByName(t.fieldName)
+	if field.IsValid() && field.CanSet() {
+		field.Set(reflect.ValueOf(v))
+	}
+	return nil
+}
+
+// newStepTransformer creates a step transformer for a single field
+func newStepTransformer[T any](fieldName string, builder func(StepBuildContext, *step) (T, error)) Transformer[StepBuildContext, *step] {
+	return &stepTransformer[T]{
+		fieldName: fieldName,
+		builder:   builder,
+	}
+}
+
+// stepTransform wraps a step transformer with its name for error reporting
+type stepTransform struct {
+	name        string
+	transformer Transformer[StepBuildContext, *step]
+}
+
+// stepTransformers defines the ordered sequence of step transformers
+var stepTransformers = []stepTransform{
+	{"name", newStepTransformer("Name", buildStepName)},
+	{"id", newStepTransformer("ID", buildStepID)},
+	{"description", newStepTransformer("Description", buildStepDescription)},
+	{"shellPackages", newStepTransformer("ShellPackages", buildStepShellPackages)},
+	{"script", newStepTransformer("Script", buildStepScript)},
+	{"stdout", newStepTransformer("Stdout", buildStepStdout)},
+	{"stderr", newStepTransformer("Stderr", buildStepStderr)},
+	{"mailOnError", newStepTransformer("MailOnError", buildStepMailOnError)},
+	{"workerSelector", newStepTransformer("WorkerSelector", buildStepWorkerSelector)},
+	{"workingDir", newStepTransformer("Dir", buildStepWorkingDir)},
+	{"shell", newStepTransformer("Shell", buildStepShell)},
+	{"shellArgs", newStepTransformer("ShellArgs", buildStepShellArgs)},
+	{"timeout", newStepTransformer("Timeout", buildStepTimeout)},
+	{"depends", newStepTransformer("Depends", buildStepDepends)},
+	{"explicitlyNoDeps", newStepTransformer("ExplicitlyNoDeps", buildStepExplicitlyNoDeps)},
+	{"continueOn", newStepTransformer("ContinueOn", buildStepContinueOn)},
+	{"retryPolicy", newStepTransformer("RetryPolicy", buildStepRetryPolicy)},
+	{"repeatPolicy", newStepTransformer("RepeatPolicy", buildStepRepeatPolicy)},
+	{"signalOnStop", newStepTransformer("SignalOnStop", buildStepSignalOnStop)},
+	{"output", newStepTransformer("Output", buildStepOutput)},
+	{"env", newStepTransformer("Env", buildStepEnvs)},
+	{"preconditions", newStepTransformer("Preconditions", buildStepPreconditions)},
+}
+
+// runStepTransformers executes all step transformers
+func runStepTransformers(ctx StepBuildContext, spec *step, result *core.Step) core.ErrorList {
+	var errs core.ErrorList
+	out := reflect.ValueOf(result).Elem()
+
+	for _, t := range stepTransformers {
+		if err := t.transformer.Transform(ctx, spec, out); err != nil {
+			errs = append(errs, wrapTransformError(t.name, err))
+		}
+	}
+
+	return errs
+}
+
 // build transforms the step specification into a core.Step.
-// Simple field mappings are done inline; complex transformations call dedicated methods.
 func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
-	// Initialize with simple field mappings
 	result := &core.Step{
-		Name:           strings.TrimSpace(s.Name),
-		ID:             strings.TrimSpace(s.ID),
-		Description:    strings.TrimSpace(s.Description),
-		ShellPackages:  s.ShellPackages,
-		Script:         strings.TrimSpace(s.Script),
-		Stdout:         strings.TrimSpace(s.Stdout),
-		Stderr:         strings.TrimSpace(s.Stderr),
-		MailOnError:    s.MailOnError,
-		WorkerSelector: s.WorkerSelector,
 		ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)},
 	}
 
-	// Complex transformations that may return errors
-	var errs core.ErrorList
-	transformers := []struct {
-		name string
-		fn   func(ctx StepBuildContext, result *core.Step) error
-	}{
-		{name: "workingDir", fn: s.buildWorkingDir},
-		{name: "shell", fn: s.buildShell},
-		{name: "executor", fn: s.buildExecutor},
-		{name: "command", fn: s.buildCommand},
-		{name: "params", fn: s.buildParams},
-		{name: "timeout", fn: s.buildTimeout},
-		{name: "depends", fn: s.buildDepends},
-		{name: "parallel", fn: s.buildParallel}, // Must be before subDAG to set executor type correctly
-		{name: "subDAG", fn: s.buildSubDAG},
-		{name: "continueOn", fn: s.buildContinueOn},
-		{name: "retryPolicy", fn: s.buildRetryPolicy},
-		{name: "repeatPolicy", fn: s.buildRepeatPolicy},
-		{name: "signalOnStop", fn: s.buildSignalOnStop},
-		{name: "precondition", fn: s.buildPrecondition},
-		{name: "output", fn: s.buildOutput},
-		{name: "env", fn: s.buildEnvs},
-	}
+	// Run the transformer pipeline
+	errs := runStepTransformers(ctx, s, result)
 
-	for _, t := range transformers {
-		if err := t.fn(ctx, result); err != nil {
-			errs = append(errs, fmt.Errorf("%s: %w", t.name, err))
-		}
+	// Complex transformations that need access to result or set multiple fields
+	if err := buildStepExecutor(ctx, s, result); err != nil {
+		errs = append(errs, wrapTransformError("executor", err))
+	}
+	if err := buildStepCommand(ctx, s, result); err != nil {
+		errs = append(errs, wrapTransformError("command", err))
+	}
+	if err := buildStepParamsField(ctx, s, result); err != nil {
+		errs = append(errs, wrapTransformError("params", err))
+	}
+	if err := buildStepParallel(ctx, s, result); err != nil {
+		errs = append(errs, wrapTransformError("parallel", err))
+	}
+	if err := buildStepSubDAG(ctx, s, result); err != nil {
+		errs = append(errs, wrapTransformError("subDAG", err))
 	}
 
 	if len(errs) > 0 {
@@ -160,123 +212,179 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	return result, nil
 }
 
-func (s *step) buildWorkingDir(_ StepBuildContext, result *core.Step) error {
-	switch {
-	case s.WorkingDir != "":
-		result.Dir = strings.TrimSpace(s.WorkingDir)
-	case s.Dir != "":
-		result.Dir = strings.TrimSpace(s.Dir)
-	default:
-		result.Dir = ""
-	}
-	return nil
+// Simple field builders
+
+func buildStepName(_ StepBuildContext, s *step) (string, error) {
+	return strings.TrimSpace(s.Name), nil
 }
 
-func (s *step) buildShell(_ StepBuildContext, result *core.Step) error {
+func buildStepID(_ StepBuildContext, s *step) (string, error) {
+	return strings.TrimSpace(s.ID), nil
+}
+
+func buildStepDescription(_ StepBuildContext, s *step) (string, error) {
+	return strings.TrimSpace(s.Description), nil
+}
+
+func buildStepShellPackages(_ StepBuildContext, s *step) ([]string, error) {
+	return s.ShellPackages, nil
+}
+
+func buildStepScript(_ StepBuildContext, s *step) (string, error) {
+	return strings.TrimSpace(s.Script), nil
+}
+
+func buildStepStdout(_ StepBuildContext, s *step) (string, error) {
+	return strings.TrimSpace(s.Stdout), nil
+}
+
+func buildStepStderr(_ StepBuildContext, s *step) (string, error) {
+	return strings.TrimSpace(s.Stderr), nil
+}
+
+func buildStepMailOnError(_ StepBuildContext, s *step) (bool, error) {
+	return s.MailOnError, nil
+}
+
+func buildStepWorkerSelector(_ StepBuildContext, s *step) (map[string]string, error) {
+	return s.WorkerSelector, nil
+}
+
+func buildStepWorkingDir(_ StepBuildContext, s *step) (string, error) {
+	switch {
+	case s.WorkingDir != "":
+		return strings.TrimSpace(s.WorkingDir), nil
+	case s.Dir != "":
+		return strings.TrimSpace(s.Dir), nil
+	default:
+		return "", nil
+	}
+}
+
+// stepShellResult holds both shell and args for step
+type stepShellResult struct {
+	Shell string
+	Args  []string
+}
+
+func parseStepShellInternal(_ StepBuildContext, s *step) (*stepShellResult, error) {
 	if s.Shell.IsZero() {
-		return nil
+		return &stepShellResult{}, nil
 	}
 
 	if s.Shell.IsArray() {
-		result.Shell = s.Shell.Command()
-		result.ShellArgs = s.Shell.Arguments()
-		return nil
+		return &stepShellResult{
+			Shell: s.Shell.Command(),
+			Args:  s.Shell.Arguments(),
+		}, nil
 	}
 
 	// For string form, need to split command and args
 	command := s.Shell.Command()
 	if command == "" {
-		return nil
+		return &stepShellResult{}, nil
 	}
 
 	shell, args, err := cmdutil.SplitCommand(command)
 	if err != nil {
-		return core.NewValidationError("shell", s.Shell.Value(), fmt.Errorf("failed to parse shell command: %w", err))
+		return nil, core.NewValidationError("shell", s.Shell.Value(), fmt.Errorf("failed to parse shell command: %w", err))
 	}
-	result.Shell = strings.TrimSpace(shell)
-	result.ShellArgs = args
-	return nil
+	return &stepShellResult{
+		Shell: strings.TrimSpace(shell),
+		Args:  args,
+	}, nil
 }
 
-func (s *step) buildTimeout(_ StepBuildContext, result *core.Step) error {
+func buildStepShell(ctx StepBuildContext, s *step) (string, error) {
+	result, err := parseStepShellInternal(ctx, s)
+	if err != nil {
+		return "", err
+	}
+	return result.Shell, nil
+}
+
+func buildStepShellArgs(ctx StepBuildContext, s *step) ([]string, error) {
+	result, err := parseStepShellInternal(ctx, s)
+	if err != nil {
+		return nil, err
+	}
+	return result.Args, nil
+}
+
+func buildStepTimeout(_ StepBuildContext, s *step) (time.Duration, error) {
 	if s.TimeoutSec < 0 {
-		return core.NewValidationError("timeoutSec", s.TimeoutSec, ErrTimeoutSecMustBeNonNegative)
+		return 0, core.NewValidationError("timeoutSec", s.TimeoutSec, ErrTimeoutSecMustBeNonNegative)
 	}
-	if s.TimeoutSec == 0 {
-		return nil
-	}
-	result.Timeout = time.Second * time.Duration(s.TimeoutSec)
-	return nil
+	return time.Second * time.Duration(s.TimeoutSec), nil
 }
 
-func (s *step) buildDepends(_ StepBuildContext, result *core.Step) error {
-	result.Depends = s.Depends.Values()
-
-	// Check if depends was explicitly set to empty array
-	if !s.Depends.IsZero() && s.Depends.IsEmpty() {
-		result.ExplicitlyNoDeps = true
-	}
-
-	return nil
+func buildStepDepends(_ StepBuildContext, s *step) ([]string, error) {
+	return s.Depends.Values(), nil
 }
 
-func (s *step) buildContinueOn(_ StepBuildContext, result *core.Step) error {
+func buildStepExplicitlyNoDeps(_ StepBuildContext, s *step) (bool, error) {
+	return !s.Depends.IsZero() && s.Depends.IsEmpty(), nil
+}
+
+func buildStepContinueOn(_ StepBuildContext, s *step) (core.ContinueOn, error) {
 	if s.ContinueOn.IsZero() {
-		return nil
+		return core.ContinueOn{}, nil
 	}
 
-	result.ContinueOn.Skipped = s.ContinueOn.Skipped()
-	result.ContinueOn.Failure = s.ContinueOn.Failed()
-	result.ContinueOn.MarkSuccess = s.ContinueOn.MarkSuccess()
-	result.ContinueOn.ExitCode = s.ContinueOn.ExitCode()
-	result.ContinueOn.Output = s.ContinueOn.Output()
-
-	return nil
+	return core.ContinueOn{
+		Skipped:     s.ContinueOn.Skipped(),
+		Failure:     s.ContinueOn.Failed(),
+		MarkSuccess: s.ContinueOn.MarkSuccess(),
+		ExitCode:    s.ContinueOn.ExitCode(),
+		Output:      s.ContinueOn.Output(),
+	}, nil
 }
 
-func (s *step) buildRetryPolicy(_ StepBuildContext, result *core.Step) error {
+func buildStepRetryPolicy(_ StepBuildContext, s *step) (core.RetryPolicy, error) {
 	if s.RetryPolicy == nil {
-		return nil
+		return core.RetryPolicy{}, nil
 	}
+
+	var result core.RetryPolicy
 
 	switch v := s.RetryPolicy.Limit.(type) {
 	case int:
-		result.RetryPolicy.Limit = v
+		result.Limit = v
 	case int64:
-		result.RetryPolicy.Limit = int(v)
+		result.Limit = int(v)
 	case uint64:
 		if v > math.MaxInt {
-			return core.NewValidationError("retryPolicy.limit", v, fmt.Errorf("value %d exceeds maximum int", v))
+			return core.RetryPolicy{}, core.NewValidationError("retryPolicy.limit", v, fmt.Errorf("value %d exceeds maximum int", v))
 		}
-		result.RetryPolicy.Limit = int(v)
+		result.Limit = int(v)
 	case string:
-		result.RetryPolicy.LimitStr = v
+		result.LimitStr = v
 	case nil:
-		return core.NewValidationError("retryPolicy.limit", nil, fmt.Errorf("limit is required when retryPolicy is specified"))
+		return core.RetryPolicy{}, core.NewValidationError("retryPolicy.limit", nil, fmt.Errorf("limit is required when retryPolicy is specified"))
 	default:
-		return core.NewValidationError("retryPolicy.limit", v, fmt.Errorf("invalid type: %T", v))
+		return core.RetryPolicy{}, core.NewValidationError("retryPolicy.limit", v, fmt.Errorf("invalid type: %T", v))
 	}
 
 	switch v := s.RetryPolicy.IntervalSec.(type) {
 	case int:
-		result.RetryPolicy.Interval = time.Second * time.Duration(v)
+		result.Interval = time.Second * time.Duration(v)
 	case int64:
-		result.RetryPolicy.Interval = time.Second * time.Duration(v)
+		result.Interval = time.Second * time.Duration(v)
 	case uint64:
 		if v > math.MaxInt64 {
-			return core.NewValidationError("retryPolicy.intervalSec", v, fmt.Errorf("value %d exceeds maximum int64", v))
+			return core.RetryPolicy{}, core.NewValidationError("retryPolicy.intervalSec", v, fmt.Errorf("value %d exceeds maximum int64", v))
 		}
-		result.RetryPolicy.Interval = time.Second * time.Duration(v)
+		result.Interval = time.Second * time.Duration(v)
 	case string:
-		result.RetryPolicy.IntervalSecStr = v
+		result.IntervalSecStr = v
 	case nil:
-		return core.NewValidationError("retryPolicy.intervalSec", nil, fmt.Errorf("intervalSec is required when retryPolicy is specified"))
+		return core.RetryPolicy{}, core.NewValidationError("retryPolicy.intervalSec", nil, fmt.Errorf("intervalSec is required when retryPolicy is specified"))
 	default:
-		return core.NewValidationError("retryPolicy.intervalSec", v, fmt.Errorf("invalid type: %T", v))
+		return core.RetryPolicy{}, core.NewValidationError("retryPolicy.intervalSec", v, fmt.Errorf("invalid type: %T", v))
 	}
 
 	if s.RetryPolicy.ExitCode != nil {
-		result.RetryPolicy.ExitCodes = s.RetryPolicy.ExitCode
+		result.ExitCodes = s.RetryPolicy.ExitCode
 	}
 
 	// Parse backoff field
@@ -284,36 +392,36 @@ func (s *step) buildRetryPolicy(_ StepBuildContext, result *core.Step) error {
 		switch v := s.RetryPolicy.Backoff.(type) {
 		case bool:
 			if v {
-				result.RetryPolicy.Backoff = 2.0 // Default multiplier when true
+				result.Backoff = 2.0 // Default multiplier when true
 			}
 		case int:
-			result.RetryPolicy.Backoff = float64(v)
+			result.Backoff = float64(v)
 		case int64:
-			result.RetryPolicy.Backoff = float64(v)
+			result.Backoff = float64(v)
 		case float64:
-			result.RetryPolicy.Backoff = v
+			result.Backoff = v
 		default:
-			return core.NewValidationError("retryPolicy.Backoff", v, fmt.Errorf("invalid type: %T", v))
+			return core.RetryPolicy{}, core.NewValidationError("retryPolicy.Backoff", v, fmt.Errorf("invalid type: %T", v))
 		}
 
 		// Validate backoff value
-		if result.RetryPolicy.Backoff > 0 && result.RetryPolicy.Backoff <= 1.0 {
-			return core.NewValidationError("retryPolicy.Backoff", result.RetryPolicy.Backoff,
+		if result.Backoff > 0 && result.Backoff <= 1.0 {
+			return core.RetryPolicy{}, core.NewValidationError("retryPolicy.Backoff", result.Backoff,
 				fmt.Errorf("backoff must be greater than 1.0 for exponential growth"))
 		}
 	}
 
 	// Parse maxIntervalSec
 	if s.RetryPolicy.MaxIntervalSec > 0 {
-		result.RetryPolicy.MaxInterval = time.Second * time.Duration(s.RetryPolicy.MaxIntervalSec)
+		result.MaxInterval = time.Second * time.Duration(s.RetryPolicy.MaxIntervalSec)
 	}
 
-	return nil
+	return result, nil
 }
 
-func (s *step) buildRepeatPolicy(_ StepBuildContext, result *core.Step) error {
+func buildStepRepeatPolicy(_ StepBuildContext, s *step) (core.RepeatPolicy, error) {
 	if s.RepeatPolicy == nil {
-		return nil
+		return core.RepeatPolicy{}, nil
 	}
 	rp := s.RepeatPolicy
 
@@ -332,10 +440,10 @@ func (s *step) buildRepeatPolicy(_ StepBuildContext, result *core.Step) error {
 			case "until":
 				mode = core.RepeatModeUntil
 			default:
-				return fmt.Errorf("invalid value for repeat: '%s'. It must be 'while', 'until', or a boolean", v)
+				return core.RepeatPolicy{}, fmt.Errorf("invalid value for repeat: '%s'. It must be 'while', 'until', or a boolean", v)
 			}
 		default:
-			return fmt.Errorf("invalid value for repeat: '%v'. It must be 'while', 'until', or a boolean", v)
+			return core.RepeatPolicy{}, fmt.Errorf("invalid value for repeat: '%v'. It must be 'while', 'until', or a boolean", v)
 		}
 	}
 
@@ -350,7 +458,7 @@ func (s *step) buildRepeatPolicy(_ StepBuildContext, result *core.Step) error {
 
 	// No repeat if mode is not determined
 	if mode == "" {
-		return nil
+		return core.RepeatPolicy{}, nil
 	}
 
 	// Validate that explicit while/until modes have appropriate conditions
@@ -358,110 +466,107 @@ func (s *step) buildRepeatPolicy(_ StepBuildContext, result *core.Step) error {
 		switch v := rp.Repeat.(type) {
 		case string:
 			if (v == "while" || v == "until") && rp.Condition == "" && len(rp.ExitCode) == 0 {
-				return fmt.Errorf("repeat mode '%s' requires either 'condition' or 'exitCode' to be specified", v)
+				return core.RepeatPolicy{}, fmt.Errorf("repeat mode '%s' requires either 'condition' or 'exitCode' to be specified", v)
 			}
 		}
 	}
 
-	result.RepeatPolicy.RepeatMode = mode
+	var result core.RepeatPolicy
+	result.RepeatMode = mode
 	if rp.IntervalSec > 0 {
-		result.RepeatPolicy.Interval = time.Second * time.Duration(rp.IntervalSec)
+		result.Interval = time.Second * time.Duration(rp.IntervalSec)
 	}
-	result.RepeatPolicy.Limit = rp.Limit
+	result.Limit = rp.Limit
 
 	if rp.Condition != "" {
-		result.RepeatPolicy.Condition = &core.Condition{
+		result.Condition = &core.Condition{
 			Condition: rp.Condition,
 			Expected:  rp.Expected,
 		}
 	}
-	result.RepeatPolicy.ExitCode = rp.ExitCode
+	result.ExitCode = rp.ExitCode
 
 	// Parse backoff field
 	if rp.Backoff != nil {
 		switch v := rp.Backoff.(type) {
 		case bool:
 			if v {
-				result.RepeatPolicy.Backoff = 2.0 // Default multiplier when true
+				result.Backoff = 2.0 // Default multiplier when true
 			}
 		case int:
-			result.RepeatPolicy.Backoff = float64(v)
+			result.Backoff = float64(v)
 		case int64:
-			result.RepeatPolicy.Backoff = float64(v)
+			result.Backoff = float64(v)
 		case float64:
-			result.RepeatPolicy.Backoff = v
+			result.Backoff = v
 		default:
-			return fmt.Errorf("invalid value for backoff: '%v'. It must be a boolean or number", v)
+			return core.RepeatPolicy{}, fmt.Errorf("invalid value for backoff: '%v'. It must be a boolean or number", v)
 		}
 
 		// Validate backoff value
-		if result.RepeatPolicy.Backoff > 0 && result.RepeatPolicy.Backoff <= 1.0 {
-			return fmt.Errorf("backoff must be greater than 1.0 for exponential growth, got: %v",
-				result.RepeatPolicy.Backoff)
+		if result.Backoff > 0 && result.Backoff <= 1.0 {
+			return core.RepeatPolicy{}, fmt.Errorf("backoff must be greater than 1.0 for exponential growth, got: %v",
+				result.Backoff)
 		}
 	}
 
 	// Parse maxIntervalSec
 	if rp.MaxIntervalSec > 0 {
-		result.RepeatPolicy.MaxInterval = time.Second * time.Duration(rp.MaxIntervalSec)
+		result.MaxInterval = time.Second * time.Duration(rp.MaxIntervalSec)
 	}
 
-	return nil
+	return result, nil
 }
 
-func (s *step) buildSignalOnStop(_ StepBuildContext, result *core.Step) error {
-	if s.SignalOnStop != nil {
-		sigOnStop := *s.SignalOnStop
-		sig := signal.GetSignalNum(sigOnStop, 0)
-		if sig == 0 {
-			return fmt.Errorf("%w: %s", ErrInvalidSignal, sigOnStop)
-		}
-		result.SignalOnStop = sigOnStop
+func buildStepSignalOnStop(_ StepBuildContext, s *step) (string, error) {
+	if s.SignalOnStop == nil {
+		return "", nil
 	}
-	return nil
+	sigOnStop := *s.SignalOnStop
+	sig := signal.GetSignalNum(sigOnStop, 0)
+	if sig == 0 {
+		return "", fmt.Errorf("%w: %s", ErrInvalidSignal, sigOnStop)
+	}
+	return sigOnStop, nil
 }
 
-func (s *step) buildOutput(_ StepBuildContext, result *core.Step) error {
+func buildStepOutput(_ StepBuildContext, s *step) (string, error) {
 	if s.Output == "" {
-		return nil
+		return "", nil
 	}
 
 	if strings.HasPrefix(s.Output, "$") {
-		result.Output = strings.TrimPrefix(s.Output, "$")
-		return nil
+		return strings.TrimPrefix(s.Output, "$"), nil
 	}
 
-	result.Output = strings.TrimSpace(s.Output)
-	return nil
+	return strings.TrimSpace(s.Output), nil
 }
 
-func (s *step) buildEnvs(_ StepBuildContext, result *core.Step) error {
+func buildStepEnvs(_ StepBuildContext, s *step) ([]string, error) {
 	if s.Env.IsZero() {
-		return nil
+		return nil, nil
 	}
+	var envs []string
 	for _, entry := range s.Env.Entries() {
-		result.Env = append(result.Env, fmt.Sprintf("%s=%s", entry.Key, entry.Value))
+		envs = append(envs, fmt.Sprintf("%s=%s", entry.Key, entry.Value))
 	}
-	return nil
+	return envs, nil
 }
 
-func (s *step) buildPrecondition(ctx StepBuildContext, result *core.Step) error {
-	// Parse both `preconditions` and `precondition` fields.
+func buildStepPreconditions(ctx StepBuildContext, s *step) ([]*core.Condition, error) {
 	conditions, err := parsePrecondition(ctx.BuildContext, s.Preconditions)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	condition, err := parsePrecondition(ctx.BuildContext, s.Precondition)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	result.Preconditions = conditions
-	result.Preconditions = append(result.Preconditions, condition...)
-	return nil
+	return append(conditions, condition...), nil
 }
 
-// buildCommand parses the command field in the step definition.
-func (s *step) buildCommand(_ StepBuildContext, result *core.Step) error {
+// buildStepCommand parses the command field in the step definition.
+func buildStepCommand(_ StepBuildContext, s *step, result *core.Step) error {
 	command := s.Command
 
 	// Case 1: command is nil
@@ -531,7 +636,7 @@ func (s *step) buildCommand(_ StepBuildContext, result *core.Step) error {
 	return nil
 }
 
-func (s *step) buildParams(ctx StepBuildContext, result *core.Step) error {
+func buildStepParamsField(ctx StepBuildContext, s *step, result *core.Step) error {
 	if s.Params == nil {
 		return nil
 	}
@@ -552,8 +657,8 @@ func (s *step) buildParams(ctx StepBuildContext, result *core.Step) error {
 	return nil
 }
 
-// buildExecutor parses the executor field in the step definition.
-func (s *step) buildExecutor(ctx StepBuildContext, result *core.Step) error {
+// buildStepExecutor parses the executor field in the step definition.
+func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 	const (
 		executorKeyType   = "type"
 		executorKeyConfig = "config"
@@ -611,8 +716,8 @@ func (s *step) buildExecutor(ctx StepBuildContext, result *core.Step) error {
 	return nil
 }
 
-// buildParallel parses the parallel field in the step definition.
-func (s *step) buildParallel(_ StepBuildContext, result *core.Step) error {
+// buildStepParallel parses the parallel field in the step definition.
+func buildStepParallel(_ StepBuildContext, s *step, result *core.Step) error {
 	if s.Parallel == nil {
 		return nil
 	}
@@ -628,7 +733,7 @@ func (s *step) buildParallel(_ StepBuildContext, result *core.Step) error {
 
 	case []any:
 		// Static array: parallel: [item1, item2]
-		items, err := s.parseParallelItems(v)
+		items, err := parseParallelItems(v)
 		if err != nil {
 			return core.NewValidationError("parallel", v, err)
 		}
@@ -643,7 +748,7 @@ func (s *step) buildParallel(_ StepBuildContext, result *core.Step) error {
 				case string:
 					result.Parallel.Variable = itemsVal
 				case []any:
-					items, err := s.parseParallelItems(itemsVal)
+					items, err := parseParallelItems(itemsVal)
 					if err != nil {
 						return core.NewValidationError("parallel.items", itemsVal, err)
 					}
@@ -678,8 +783,8 @@ func (s *step) buildParallel(_ StepBuildContext, result *core.Step) error {
 	return nil
 }
 
-// buildSubDAG parses the child core.DAG definition and sets up the step to run a sub DAG.
-func (s *step) buildSubDAG(ctx StepBuildContext, result *core.Step) error {
+// buildStepSubDAG parses the child core.DAG definition and sets up the step to run a sub DAG.
+func buildStepSubDAG(ctx StepBuildContext, s *step, result *core.Step) error {
 	name := strings.TrimSpace(s.Call)
 	if name == "" {
 		// TODO: remove legacy support in future major version
@@ -733,7 +838,7 @@ func (s *step) buildSubDAG(ctx StepBuildContext, result *core.Step) error {
 }
 
 // parseParallelItems converts an array of any type to core.ParallelItem slice
-func (s *step) parseParallelItems(items []any) ([]core.ParallelItem, error) {
+func parseParallelItems(items []any) ([]core.ParallelItem, error) {
 	var result []core.ParallelItem
 
 	for _, item := range items {

@@ -13,11 +13,11 @@ func TestPortValue_UnmarshalYAML(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		input       string
-		wantErr     bool
-		errContains string
-		wantString  string
+		name         string
+		input        string
+		wantErr      bool
+		errContains  string
+		wantString   string
 		checkNotZero bool
 	}{
 		{
