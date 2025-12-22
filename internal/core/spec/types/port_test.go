@@ -129,3 +129,34 @@ username: user
 		assert.Equal(t, "587", cfg.Port.String())
 	})
 }
+
+func TestPortValue_AdditionalCoverage(t *testing.T) {
+	t.Run("Value returns raw value - int", func(t *testing.T) {
+		var p types.PortValue
+		err := yaml.Unmarshal([]byte(`22`), &p)
+		require.NoError(t, err)
+		// YAML parses small ints as uint64
+		assert.NotNil(t, p.Value())
+	})
+
+	t.Run("Value returns raw value - string", func(t *testing.T) {
+		var p types.PortValue
+		err := yaml.Unmarshal([]byte(`"22"`), &p)
+		require.NoError(t, err)
+		assert.Equal(t, "22", p.Value())
+	})
+
+	t.Run("null value sets isSet to false", func(t *testing.T) {
+		var p types.PortValue
+		err := yaml.Unmarshal([]byte(`null`), &p)
+		require.NoError(t, err)
+		assert.True(t, p.IsZero())
+	})
+
+	t.Run("large integer", func(t *testing.T) {
+		var p types.PortValue
+		err := yaml.Unmarshal([]byte(`99999`), &p)
+		require.NoError(t, err)
+		assert.Equal(t, "99999", p.String())
+	})
+}

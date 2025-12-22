@@ -141,3 +141,42 @@ shell: bash
 		assert.True(t, cfg.Shell.IsZero())
 	})
 }
+
+func TestShellValue_AdditionalCoverage(t *testing.T) {
+	t.Run("Value returns raw value - string", func(t *testing.T) {
+		var s types.ShellValue
+		err := yaml.Unmarshal([]byte(`bash`), &s)
+		require.NoError(t, err)
+		assert.Equal(t, "bash", s.Value())
+	})
+
+	t.Run("Value returns raw value - array", func(t *testing.T) {
+		var s types.ShellValue
+		err := yaml.Unmarshal([]byte(`["bash", "-e"]`), &s)
+		require.NoError(t, err)
+		val, ok := s.Value().([]any)
+		require.True(t, ok)
+		assert.Len(t, val, 2)
+	})
+
+	t.Run("invalid type - number", func(t *testing.T) {
+		var s types.ShellValue
+		err := yaml.Unmarshal([]byte(`123`), &s)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must be string or array")
+	})
+
+	t.Run("IsArray returns false for string", func(t *testing.T) {
+		var s types.ShellValue
+		err := yaml.Unmarshal([]byte(`"bash -e"`), &s)
+		require.NoError(t, err)
+		assert.False(t, s.IsArray())
+	})
+
+	t.Run("IsArray returns false for nil", func(t *testing.T) {
+		var s types.ShellValue
+		err := yaml.Unmarshal([]byte(`null`), &s)
+		require.NoError(t, err)
+		assert.False(t, s.IsArray())
+	})
+}

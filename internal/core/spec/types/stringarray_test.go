@@ -156,3 +156,49 @@ func TestTagsValue(t *testing.T) {
 		assert.Equal(t, []string{"production", "critical", "monitored"}, tags.Values())
 	})
 }
+
+func TestStringOrArray_AdditionalCoverage(t *testing.T) {
+	t.Run("Value returns raw value - string", func(t *testing.T) {
+		var s types.StringOrArray
+		err := yaml.Unmarshal([]byte(`step1`), &s)
+		require.NoError(t, err)
+		assert.Equal(t, "step1", s.Value())
+	})
+
+	t.Run("Value returns raw value - array", func(t *testing.T) {
+		var s types.StringOrArray
+		err := yaml.Unmarshal([]byte(`["step1", "step2"]`), &s)
+		require.NoError(t, err)
+		val, ok := s.Value().([]any)
+		require.True(t, ok)
+		assert.Len(t, val, 2)
+	})
+
+	t.Run("null value sets isSet to false", func(t *testing.T) {
+		var s types.StringOrArray
+		err := yaml.Unmarshal([]byte(`null`), &s)
+		require.NoError(t, err)
+		assert.True(t, s.IsZero())
+	})
+
+	t.Run("array with numeric values - stringified", func(t *testing.T) {
+		var s types.StringOrArray
+		err := yaml.Unmarshal([]byte(`[1, 2, 3]`), &s)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"1", "2", "3"}, s.Values())
+	})
+
+	t.Run("array with mixed types - stringified", func(t *testing.T) {
+		var s types.StringOrArray
+		err := yaml.Unmarshal([]byte(`["step1", 123, true]`), &s)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"step1", "123", "true"}, s.Values())
+	})
+
+	t.Run("invalid type - number", func(t *testing.T) {
+		var s types.StringOrArray
+		err := yaml.Unmarshal([]byte(`123`), &s)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must be string or array")
+	})
+}

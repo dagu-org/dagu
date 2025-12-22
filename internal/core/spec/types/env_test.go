@@ -210,3 +210,57 @@ env:
 		assert.True(t, cfg.Env.IsZero())
 	})
 }
+
+func TestEnvValue_AdditionalCoverage(t *testing.T) {
+	t.Run("Value returns raw value - map", func(t *testing.T) {
+		data := `KEY: value`
+		var e types.EnvValue
+		err := yaml.Unmarshal([]byte(data), &e)
+		require.NoError(t, err)
+		val, ok := e.Value().(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "value", val["KEY"])
+	})
+
+	t.Run("Value returns raw value - array", func(t *testing.T) {
+		data := `[KEY=value]`
+		var e types.EnvValue
+		err := yaml.Unmarshal([]byte(data), &e)
+		require.NoError(t, err)
+		val, ok := e.Value().([]any)
+		require.True(t, ok)
+		assert.Len(t, val, 1)
+	})
+
+	t.Run("null value sets isSet to false", func(t *testing.T) {
+		data := `null`
+		var e types.EnvValue
+		err := yaml.Unmarshal([]byte(data), &e)
+		require.NoError(t, err)
+		assert.True(t, e.IsZero())
+	})
+
+	t.Run("invalid type in array - number", func(t *testing.T) {
+		data := `[123]`
+		var e types.EnvValue
+		err := yaml.Unmarshal([]byte(data), &e)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected map or string")
+	})
+
+	t.Run("invalid type in array - boolean", func(t *testing.T) {
+		data := `[true]`
+		var e types.EnvValue
+		err := yaml.Unmarshal([]byte(data), &e)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected map or string")
+	})
+
+	t.Run("invalid type - number", func(t *testing.T) {
+		data := `123`
+		var e types.EnvValue
+		err := yaml.Unmarshal([]byte(data), &e)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must be map or array")
+	})
+}

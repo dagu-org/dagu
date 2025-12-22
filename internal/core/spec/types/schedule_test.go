@@ -158,3 +158,59 @@ schedule:
 		assert.True(t, cfg.Schedule.IsZero())
 	})
 }
+
+func TestScheduleValue_AdditionalCoverage(t *testing.T) {
+	t.Run("Value returns raw value - string", func(t *testing.T) {
+		var s types.ScheduleValue
+		err := yaml.Unmarshal([]byte(`"0 * * * *"`), &s)
+		require.NoError(t, err)
+		assert.Equal(t, "0 * * * *", s.Value())
+	})
+
+	t.Run("Value returns raw value - array", func(t *testing.T) {
+		var s types.ScheduleValue
+		err := yaml.Unmarshal([]byte(`["0 * * * *"]`), &s)
+		require.NoError(t, err)
+		val, ok := s.Value().([]any)
+		require.True(t, ok)
+		assert.Len(t, val, 1)
+	})
+
+	t.Run("null value sets isSet to false", func(t *testing.T) {
+		var s types.ScheduleValue
+		err := yaml.Unmarshal([]byte(`null`), &s)
+		require.NoError(t, err)
+		assert.True(t, s.IsZero())
+	})
+
+	t.Run("empty string", func(t *testing.T) {
+		var s types.ScheduleValue
+		err := yaml.Unmarshal([]byte(`""`), &s)
+		require.NoError(t, err)
+		assert.False(t, s.IsZero())
+		assert.Nil(t, s.Starts())
+	})
+
+	t.Run("invalid type - number", func(t *testing.T) {
+		var s types.ScheduleValue
+		err := yaml.Unmarshal([]byte(`123`), &s)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must be string, array, or map")
+	})
+
+	t.Run("invalid schedule entry type in map", func(t *testing.T) {
+		data := `start: 123`
+		var s types.ScheduleValue
+		err := yaml.Unmarshal([]byte(data), &s)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected string or array")
+	})
+
+	t.Run("invalid type in start array", func(t *testing.T) {
+		data := `["0 * * * *", 123]`
+		var s types.ScheduleValue
+		err := yaml.Unmarshal([]byte(data), &s)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected string")
+	})
+}
