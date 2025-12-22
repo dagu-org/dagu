@@ -10,195 +10,300 @@ import (
 )
 
 func TestStringOrArray_UnmarshalYAML(t *testing.T) {
-	t.Run("single string", func(t *testing.T) {
-		var s types.StringOrArray
-		err := yaml.Unmarshal([]byte(`step1`), &s)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"step1"}, s.Values())
-		assert.False(t, s.IsEmpty())
-		assert.False(t, s.IsZero())
-	})
+	t.Parallel()
 
-	t.Run("array of strings inline", func(t *testing.T) {
-		var s types.StringOrArray
-		err := yaml.Unmarshal([]byte(`["step1", "step2", "step3"]`), &s)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"step1", "step2", "step3"}, s.Values())
-	})
+	tests := []struct {
+		name         string
+		input        string
+		wantErr      bool
+		errContains  string
+		wantValues   []string
+		checkIsEmpty bool
+		wantIsEmpty  bool
+		checkNotZero bool
+	}{
+		{
+			name:         "SingleString",
+			input:        "step1",
+			wantValues:   []string{"step1"},
+			checkNotZero: true,
+		},
+		{
+			name:       "ArrayOfStringsInline",
+			input:      `["step1", "step2", "step3"]`,
+			wantValues: []string{"step1", "step2", "step3"},
+		},
+		{
+			name:       "MultilineArray",
+			input:      "- step1\n- step2",
+			wantValues: []string{"step1", "step2"},
+		},
+		{
+			name:         "EmptyString",
+			input:        `""`,
+			wantValues:   []string{""},
+			checkIsEmpty: true,
+			wantIsEmpty:  false,
+			checkNotZero: true,
+		},
+		{
+			name:         "EmptyArray",
+			input:        "[]",
+			wantValues:   nil,
+			checkIsEmpty: true,
+			wantIsEmpty:  true,
+		},
+		{
+			name:        "InvalidTypeMap",
+			input:       "{key: value}",
+			wantErr:     true,
+			errContains: "must be string or array",
+		},
+		{
+			name:       "QuotedStringWithSpaces",
+			input:      `"step with spaces"`,
+			wantValues: []string{"step with spaces"},
+		},
+	}
 
-	t.Run("multiline array", func(t *testing.T) {
-		var s types.StringOrArray
-		err := yaml.Unmarshal([]byte("- step1\n- step2"), &s)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"step1", "step2"}, s.Values())
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var s types.StringOrArray
+			err := yaml.Unmarshal([]byte(tt.input), &s)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+				return
+			}
+			require.NoError(t, err)
+			if tt.wantValues == nil {
+				assert.Empty(t, s.Values())
+			} else {
+				assert.Equal(t, tt.wantValues, s.Values())
+			}
+			if tt.checkIsEmpty {
+				assert.Equal(t, tt.wantIsEmpty, s.IsEmpty())
+			}
+			if tt.checkNotZero {
+				assert.False(t, s.IsZero())
+			}
+		})
+	}
 
-	t.Run("empty string", func(t *testing.T) {
-		var s types.StringOrArray
-		err := yaml.Unmarshal([]byte(`""`), &s)
-		require.NoError(t, err)
-		// Empty string is preserved for validation layer to handle
-		assert.Equal(t, []string{""}, s.Values())
-		assert.False(t, s.IsEmpty()) // Has one element (empty string)
-		assert.False(t, s.IsZero())  // Was set
-	})
-
-	t.Run("empty array", func(t *testing.T) {
-		var s types.StringOrArray
-		err := yaml.Unmarshal([]byte(`[]`), &s)
-		require.NoError(t, err)
-		assert.Empty(t, s.Values())
-		assert.True(t, s.IsEmpty())
-	})
-
-	t.Run("not set - zero value", func(t *testing.T) {
+	t.Run("ZeroValue", func(t *testing.T) {
+		t.Parallel()
 		var s types.StringOrArray
 		assert.True(t, s.IsZero())
 		assert.Nil(t, s.Values())
 	})
-
-	t.Run("invalid type map", func(t *testing.T) {
-		var s types.StringOrArray
-		err := yaml.Unmarshal([]byte(`{key: value}`), &s)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "must be string or array")
-	})
-
-	t.Run("quoted string with spaces", func(t *testing.T) {
-		var s types.StringOrArray
-		err := yaml.Unmarshal([]byte(`"step with spaces"`), &s)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"step with spaces"}, s.Values())
-	})
 }
 
 func TestStringOrArray_InStruct(t *testing.T) {
+	t.Parallel()
+
 	type StepConfig struct {
 		Name    string              `yaml:"name"`
 		Depends types.StringOrArray `yaml:"depends"`
 	}
 
-	t.Run("depends as string", func(t *testing.T) {
-		data := `
+	tests := []struct {
+		name         string
+		input        string
+		wantValues   []string
+		wantIsZero   bool
+		checkIsEmpty bool
+		wantIsEmpty  bool
+	}{
+		{
+			name: "DependsAsString",
+			input: `
 name: step2
 depends: step1
-`
-		var cfg StepConfig
-		err := yaml.Unmarshal([]byte(data), &cfg)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"step1"}, cfg.Depends.Values())
-	})
-
-	t.Run("depends as array", func(t *testing.T) {
-		data := `
+`,
+			wantValues: []string{"step1"},
+		},
+		{
+			name: "DependsAsArray",
+			input: `
 name: step3
 depends:
   - step1
   - step2
-`
-		var cfg StepConfig
-		err := yaml.Unmarshal([]byte(data), &cfg)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"step1", "step2"}, cfg.Depends.Values())
-	})
-
-	t.Run("depends not set", func(t *testing.T) {
-		data := `name: step1`
-		var cfg StepConfig
-		err := yaml.Unmarshal([]byte(data), &cfg)
-		require.NoError(t, err)
-		assert.True(t, cfg.Depends.IsZero())
-	})
-
-	t.Run("depends empty array - explicitly no deps", func(t *testing.T) {
-		data := `
+`,
+			wantValues: []string{"step1", "step2"},
+		},
+		{
+			name:       "DependsNotSet",
+			input:      "name: step1",
+			wantIsZero: true,
+		},
+		{
+			name: "DependsEmptyArray",
+			input: `
 name: step2
 depends: []
-`
-		var cfg StepConfig
-		err := yaml.Unmarshal([]byte(data), &cfg)
-		require.NoError(t, err)
-		assert.False(t, cfg.Depends.IsZero()) // Was set
-		assert.True(t, cfg.Depends.IsEmpty()) // But empty
-	})
+`,
+			checkIsEmpty: true,
+			wantIsEmpty:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var cfg StepConfig
+			err := yaml.Unmarshal([]byte(tt.input), &cfg)
+			require.NoError(t, err)
+			if tt.wantValues != nil {
+				assert.Equal(t, tt.wantValues, cfg.Depends.Values())
+			}
+			if tt.wantIsZero {
+				assert.True(t, cfg.Depends.IsZero())
+			}
+			if tt.checkIsEmpty {
+				assert.False(t, cfg.Depends.IsZero())
+				assert.Equal(t, tt.wantIsEmpty, cfg.Depends.IsEmpty())
+			}
+		})
+	}
 }
 
 func TestMailToValue(t *testing.T) {
-	// MailToValue is an alias for StringOrArray
-	t.Run("single email", func(t *testing.T) {
-		var m types.MailToValue
-		err := yaml.Unmarshal([]byte(`user@example.com`), &m)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"user@example.com"}, m.Values())
-	})
+	t.Parallel()
 
-	t.Run("multiple emails", func(t *testing.T) {
-		var m types.MailToValue
-		err := yaml.Unmarshal([]byte(`["user1@example.com", "user2@example.com"]`), &m)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"user1@example.com", "user2@example.com"}, m.Values())
-	})
+	tests := []struct {
+		name       string
+		input      string
+		wantValues []string
+	}{
+		{
+			name:       "SingleEmail",
+			input:      "user@example.com",
+			wantValues: []string{"user@example.com"},
+		},
+		{
+			name:       "MultipleEmails",
+			input:      `["user1@example.com", "user2@example.com"]`,
+			wantValues: []string{"user1@example.com", "user2@example.com"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var m types.MailToValue
+			err := yaml.Unmarshal([]byte(tt.input), &m)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantValues, m.Values())
+		})
+	}
 }
 
 func TestTagsValue(t *testing.T) {
-	// TagsValue is an alias for StringOrArray
-	t.Run("single tag", func(t *testing.T) {
-		var tags types.TagsValue
-		err := yaml.Unmarshal([]byte(`production`), &tags)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"production"}, tags.Values())
-	})
+	t.Parallel()
 
-	t.Run("multiple tags", func(t *testing.T) {
-		var tags types.TagsValue
-		err := yaml.Unmarshal([]byte(`["production", "critical", "monitored"]`), &tags)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"production", "critical", "monitored"}, tags.Values())
-	})
+	tests := []struct {
+		name       string
+		input      string
+		wantValues []string
+	}{
+		{
+			name:       "SingleTag",
+			input:      "production",
+			wantValues: []string{"production"},
+		},
+		{
+			name:       "MultipleTags",
+			input:      `["production", "critical", "monitored"]`,
+			wantValues: []string{"production", "critical", "monitored"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var tags types.TagsValue
+			err := yaml.Unmarshal([]byte(tt.input), &tags)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantValues, tags.Values())
+		})
+	}
 }
 
 func TestStringOrArray_AdditionalCoverage(t *testing.T) {
-	t.Run("Value returns raw value - string", func(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		input       string
+		wantErr     bool
+		errContains string
+		wantValues  []string
+		checkIsZero bool
+	}{
+		{
+			name:       "ArrayWithNumericValues",
+			input:      "[1, 2, 3]",
+			wantValues: []string{"1", "2", "3"},
+		},
+		{
+			name:       "ArrayWithMixedTypes",
+			input:      `["step1", 123, true]`,
+			wantValues: []string{"step1", "123", "true"},
+		},
+		{
+			name:        "InvalidTypeNumber",
+			input:       "123",
+			wantErr:     true,
+			errContains: "must be string or array",
+		},
+		{
+			name:        "NullValue",
+			input:       "null",
+			checkIsZero: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var s types.StringOrArray
+			err := yaml.Unmarshal([]byte(tt.input), &s)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+				return
+			}
+			require.NoError(t, err)
+			if tt.wantValues != nil {
+				assert.Equal(t, tt.wantValues, s.Values())
+			}
+			if tt.checkIsZero {
+				assert.True(t, s.IsZero())
+			}
+		})
+	}
+
+	t.Run("ValueReturnsRawString", func(t *testing.T) {
+		t.Parallel()
 		var s types.StringOrArray
-		err := yaml.Unmarshal([]byte(`step1`), &s)
+		err := yaml.Unmarshal([]byte("step1"), &s)
 		require.NoError(t, err)
 		assert.Equal(t, "step1", s.Value())
 	})
 
-	t.Run("Value returns raw value - array", func(t *testing.T) {
+	t.Run("ValueReturnsRawArray", func(t *testing.T) {
+		t.Parallel()
 		var s types.StringOrArray
 		err := yaml.Unmarshal([]byte(`["step1", "step2"]`), &s)
 		require.NoError(t, err)
 		val, ok := s.Value().([]any)
 		require.True(t, ok)
 		assert.Len(t, val, 2)
-	})
-
-	t.Run("null value sets isSet to false", func(t *testing.T) {
-		var s types.StringOrArray
-		err := yaml.Unmarshal([]byte(`null`), &s)
-		require.NoError(t, err)
-		assert.True(t, s.IsZero())
-	})
-
-	t.Run("array with numeric values - stringified", func(t *testing.T) {
-		var s types.StringOrArray
-		err := yaml.Unmarshal([]byte(`[1, 2, 3]`), &s)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"1", "2", "3"}, s.Values())
-	})
-
-	t.Run("array with mixed types - stringified", func(t *testing.T) {
-		var s types.StringOrArray
-		err := yaml.Unmarshal([]byte(`["step1", 123, true]`), &s)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"step1", "123", "true"}, s.Values())
-	})
-
-	t.Run("invalid type - number", func(t *testing.T) {
-		var s types.StringOrArray
-		err := yaml.Unmarshal([]byte(`123`), &s)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "must be string or array")
 	})
 }

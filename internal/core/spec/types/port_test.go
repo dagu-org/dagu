@@ -10,153 +10,222 @@ import (
 )
 
 func TestPortValue_UnmarshalYAML(t *testing.T) {
-	t.Run("integer", func(t *testing.T) {
-		var p types.PortValue
-		err := yaml.Unmarshal([]byte(`22`), &p)
-		require.NoError(t, err)
-		assert.Equal(t, "22", p.String())
-		assert.False(t, p.IsZero())
-	})
+	t.Parallel()
 
-	t.Run("string", func(t *testing.T) {
-		var p types.PortValue
-		err := yaml.Unmarshal([]byte(`"8080"`), &p)
-		require.NoError(t, err)
-		assert.Equal(t, "8080", p.String())
-	})
+	tests := []struct {
+		name        string
+		input       string
+		wantErr     bool
+		errContains string
+		wantString  string
+		checkNotZero bool
+	}{
+		{
+			name:         "Integer",
+			input:        "22",
+			wantString:   "22",
+			checkNotZero: true,
+		},
+		{
+			name:       "String",
+			input:      `"8080"`,
+			wantString: "8080",
+		},
+		{
+			name:       "LargePortNumber",
+			input:      "65535",
+			wantString: "65535",
+		},
+		{
+			name:        "InvalidTypeArray",
+			input:       "[22, 80]",
+			wantErr:     true,
+			errContains: "must be string or number",
+		},
+		{
+			name:        "InvalidTypeMap",
+			input:       "{port: 22}",
+			wantErr:     true,
+			errContains: "must be string or number",
+		},
+		{
+			name:        "FloatWithDecimal",
+			input:       "22.5",
+			wantErr:     true,
+			errContains: "port must be an integer",
+		},
+		{
+			name:       "FloatWholeNumber",
+			input:      "22.0",
+			wantString: "22",
+		},
+	}
 
-	t.Run("large port number", func(t *testing.T) {
-		var p types.PortValue
-		err := yaml.Unmarshal([]byte(`65535`), &p)
-		require.NoError(t, err)
-		assert.Equal(t, "65535", p.String())
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var p types.PortValue
+			err := yaml.Unmarshal([]byte(tt.input), &p)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantString, p.String())
+			if tt.checkNotZero {
+				assert.False(t, p.IsZero())
+			}
+		})
+	}
 
-	t.Run("not set - zero value", func(t *testing.T) {
+	t.Run("ZeroValue", func(t *testing.T) {
+		t.Parallel()
 		var p types.PortValue
 		assert.True(t, p.IsZero())
 		assert.Equal(t, "", p.String())
 	})
-
-	t.Run("invalid type - array", func(t *testing.T) {
-		var p types.PortValue
-		err := yaml.Unmarshal([]byte(`[22, 80]`), &p)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "must be string or number")
-	})
-
-	t.Run("invalid type - map", func(t *testing.T) {
-		var p types.PortValue
-		err := yaml.Unmarshal([]byte(`{port: 22}`), &p)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "must be string or number")
-	})
-
-	t.Run("float with decimal - must be integer", func(t *testing.T) {
-		var p types.PortValue
-		err := yaml.Unmarshal([]byte(`22.5`), &p)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "port must be an integer")
-	})
-
-	t.Run("float whole number - allowed", func(t *testing.T) {
-		var p types.PortValue
-		err := yaml.Unmarshal([]byte(`22.0`), &p)
-		require.NoError(t, err)
-		assert.Equal(t, "22", p.String())
-	})
 }
 
 func TestPortValue_InStruct(t *testing.T) {
+	t.Parallel()
+
 	type SSHConfig struct {
 		Host string          `yaml:"host"`
 		Port types.PortValue `yaml:"port"`
 		User string          `yaml:"user"`
 	}
 
-	t.Run("port as integer", func(t *testing.T) {
-		data := `
+	sshTests := []struct {
+		name       string
+		input      string
+		wantHost   string
+		wantPort   string
+		wantUser   string
+		wantIsZero bool
+	}{
+		{
+			name: "PortAsInteger",
+			input: `
 host: example.com
 port: 22
 user: admin
-`
-		var cfg SSHConfig
-		err := yaml.Unmarshal([]byte(data), &cfg)
-		require.NoError(t, err)
-		assert.Equal(t, "example.com", cfg.Host)
-		assert.Equal(t, "22", cfg.Port.String())
-		assert.Equal(t, "admin", cfg.User)
-	})
-
-	t.Run("port as string", func(t *testing.T) {
-		data := `
+`,
+			wantHost: "example.com",
+			wantPort: "22",
+			wantUser: "admin",
+		},
+		{
+			name: "PortAsString",
+			input: `
 host: example.com
 port: "2222"
 user: admin
-`
-		var cfg SSHConfig
-		err := yaml.Unmarshal([]byte(data), &cfg)
-		require.NoError(t, err)
-		assert.Equal(t, "2222", cfg.Port.String())
-	})
-
-	t.Run("port not set", func(t *testing.T) {
-		data := `
+`,
+			wantPort: "2222",
+		},
+		{
+			name: "PortNotSet",
+			input: `
 host: example.com
 user: admin
-`
-		var cfg SSHConfig
-		err := yaml.Unmarshal([]byte(data), &cfg)
-		require.NoError(t, err)
-		assert.True(t, cfg.Port.IsZero())
-	})
-
-	type SMTPConfig struct {
-		Host     string          `yaml:"host"`
-		Port     types.PortValue `yaml:"port"`
-		Username string          `yaml:"username"`
+`,
+			wantIsZero: true,
+		},
 	}
 
-	t.Run("smtp port", func(t *testing.T) {
-		data := `
+	for _, tt := range sshTests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var cfg SSHConfig
+			err := yaml.Unmarshal([]byte(tt.input), &cfg)
+			require.NoError(t, err)
+			if tt.wantHost != "" {
+				assert.Equal(t, tt.wantHost, cfg.Host)
+			}
+			if tt.wantPort != "" {
+				assert.Equal(t, tt.wantPort, cfg.Port.String())
+			}
+			if tt.wantUser != "" {
+				assert.Equal(t, tt.wantUser, cfg.User)
+			}
+			if tt.wantIsZero {
+				assert.True(t, cfg.Port.IsZero())
+			}
+		})
+	}
+
+	t.Run("SMTPPort", func(t *testing.T) {
+		t.Parallel()
+		type SMTPConfig struct {
+			Host     string          `yaml:"host"`
+			Port     types.PortValue `yaml:"port"`
+			Username string          `yaml:"username"`
+		}
+		var cfg SMTPConfig
+		err := yaml.Unmarshal([]byte(`
 host: smtp.example.com
 port: 587
 username: user
-`
-		var cfg SMTPConfig
-		err := yaml.Unmarshal([]byte(data), &cfg)
+`), &cfg)
 		require.NoError(t, err)
 		assert.Equal(t, "587", cfg.Port.String())
 	})
 }
 
 func TestPortValue_AdditionalCoverage(t *testing.T) {
-	t.Run("Value returns raw value - int", func(t *testing.T) {
-		var p types.PortValue
-		err := yaml.Unmarshal([]byte(`22`), &p)
-		require.NoError(t, err)
-		// YAML parses small ints as uint64
-		assert.NotNil(t, p.Value())
-	})
+	t.Parallel()
 
-	t.Run("Value returns raw value - string", func(t *testing.T) {
-		var p types.PortValue
-		err := yaml.Unmarshal([]byte(`"22"`), &p)
-		require.NoError(t, err)
-		assert.Equal(t, "22", p.Value())
-	})
+	tests := []struct {
+		name            string
+		input           string
+		wantValueNotNil bool
+		wantValue       any
+		wantIsZero      bool
+		wantString      string
+	}{
+		{
+			name:            "ValueReturnsRawInt",
+			input:           "22",
+			wantValueNotNil: true,
+		},
+		{
+			name:      "ValueReturnsRawString",
+			input:     `"22"`,
+			wantValue: "22",
+		},
+		{
+			name:       "NullValueSetsIsZeroFalse",
+			input:      "null",
+			wantIsZero: true,
+		},
+		{
+			name:       "LargeInteger",
+			input:      "99999",
+			wantString: "99999",
+		},
+	}
 
-	t.Run("null value sets isSet to false", func(t *testing.T) {
-		var p types.PortValue
-		err := yaml.Unmarshal([]byte(`null`), &p)
-		require.NoError(t, err)
-		assert.True(t, p.IsZero())
-	})
-
-	t.Run("large integer", func(t *testing.T) {
-		var p types.PortValue
-		err := yaml.Unmarshal([]byte(`99999`), &p)
-		require.NoError(t, err)
-		assert.Equal(t, "99999", p.String())
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var p types.PortValue
+			err := yaml.Unmarshal([]byte(tt.input), &p)
+			require.NoError(t, err)
+			if tt.wantValueNotNil {
+				assert.NotNil(t, p.Value())
+			}
+			if tt.wantValue != nil {
+				assert.Equal(t, tt.wantValue, p.Value())
+			}
+			if tt.wantIsZero {
+				assert.True(t, p.IsZero())
+			}
+			if tt.wantString != "" {
+				assert.Equal(t, tt.wantString, p.String())
+			}
+		})
+	}
 }

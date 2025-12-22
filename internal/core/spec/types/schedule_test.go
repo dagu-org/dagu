@@ -10,164 +10,282 @@ import (
 )
 
 func TestScheduleValue_UnmarshalYAML(t *testing.T) {
-	t.Run("single cron expression", func(t *testing.T) {
-		var s types.ScheduleValue
-		err := yaml.Unmarshal([]byte(`"0 * * * *"`), &s)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"0 * * * *"}, s.Starts())
-		assert.Empty(t, s.Stops())
-		assert.Empty(t, s.Restarts())
-		assert.False(t, s.HasStopSchedule())
-		assert.False(t, s.HasRestartSchedule())
-	})
+	t.Parallel()
 
-	t.Run("array of cron expressions", func(t *testing.T) {
-		var s types.ScheduleValue
-		err := yaml.Unmarshal([]byte(`["0 * * * *", "30 * * * *"]`), &s)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"0 * * * *", "30 * * * *"}, s.Starts())
-	})
-
-	t.Run("multiline array", func(t *testing.T) {
-		data := `
+	tests := []struct {
+		name             string
+		input            string
+		wantErr          bool
+		errContains      string
+		wantStarts       []string
+		wantStops        []string
+		wantRestarts     []string
+		wantHasStop      bool
+		wantHasRestart   bool
+		checkHasStop     bool
+		checkHasRestart  bool
+	}{
+		{
+			name:         "SingleCronExpression",
+			input:        `"0 * * * *"`,
+			wantStarts:   []string{"0 * * * *"},
+			checkHasStop: true,
+			wantHasStop:  false,
+			checkHasRestart: true,
+			wantHasRestart:  false,
+		},
+		{
+			name:       "ArrayOfCronExpressions",
+			input:      `["0 * * * *", "30 * * * *"]`,
+			wantStarts: []string{"0 * * * *", "30 * * * *"},
+		},
+		{
+			name: "MultilineArray",
+			input: `
 - "0 8 * * *"
 - "0 12 * * *"
 - "0 18 * * *"
-`
-		var s types.ScheduleValue
-		err := yaml.Unmarshal([]byte(data), &s)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"0 8 * * *", "0 12 * * *", "0 18 * * *"}, s.Starts())
-	})
-
-	t.Run("map with start only", func(t *testing.T) {
-		data := `start: "0 8 * * *"`
-		var s types.ScheduleValue
-		err := yaml.Unmarshal([]byte(data), &s)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"0 8 * * *"}, s.Starts())
-		assert.False(t, s.HasStopSchedule())
-	})
-
-	t.Run("map with start and stop", func(t *testing.T) {
-		data := `
+`,
+			wantStarts: []string{"0 8 * * *", "0 12 * * *", "0 18 * * *"},
+		},
+		{
+			name:         "MapWithStartOnly",
+			input:        `start: "0 8 * * *"`,
+			wantStarts:   []string{"0 8 * * *"},
+			checkHasStop: true,
+			wantHasStop:  false,
+		},
+		{
+			name: "MapWithStartAndStop",
+			input: `
 start: "0 8 * * *"
 stop: "0 18 * * *"
-`
-		var s types.ScheduleValue
-		err := yaml.Unmarshal([]byte(data), &s)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"0 8 * * *"}, s.Starts())
-		assert.Equal(t, []string{"0 18 * * *"}, s.Stops())
-		assert.True(t, s.HasStopSchedule())
-	})
-
-	t.Run("map with all keys", func(t *testing.T) {
-		data := `
+`,
+			wantStarts:   []string{"0 8 * * *"},
+			wantStops:    []string{"0 18 * * *"},
+			checkHasStop: true,
+			wantHasStop:  true,
+		},
+		{
+			name: "MapWithAllKeys",
+			input: `
 start: "0 8 * * *"
 stop: "0 18 * * *"
 restart: "0 0 * * *"
-`
-		var s types.ScheduleValue
-		err := yaml.Unmarshal([]byte(data), &s)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"0 8 * * *"}, s.Starts())
-		assert.Equal(t, []string{"0 18 * * *"}, s.Stops())
-		assert.Equal(t, []string{"0 0 * * *"}, s.Restarts())
-		assert.True(t, s.HasRestartSchedule())
-	})
-
-	t.Run("map with array values", func(t *testing.T) {
-		data := `
+`,
+			wantStarts:      []string{"0 8 * * *"},
+			wantStops:       []string{"0 18 * * *"},
+			wantRestarts:    []string{"0 0 * * *"},
+			checkHasRestart: true,
+			wantHasRestart:  true,
+		},
+		{
+			name: "MapWithArrayValues",
+			input: `
 start:
   - "0 8 * * *"
   - "0 12 * * *"
 stop: "0 18 * * *"
-`
-		var s types.ScheduleValue
-		err := yaml.Unmarshal([]byte(data), &s)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"0 8 * * *", "0 12 * * *"}, s.Starts())
-		assert.Equal(t, []string{"0 18 * * *"}, s.Stops())
-	})
+`,
+			wantStarts: []string{"0 8 * * *", "0 12 * * *"},
+			wantStops:  []string{"0 18 * * *"},
+		},
+		{
+			name:        "InvalidMapKey",
+			input:       `invalid: "0 * * * *"`,
+			wantErr:     true,
+			errContains: "unknown key",
+		},
+		{
+			name: "InvalidArrayElementType",
+			input: `
+start:
+  - 123
+  - 456
+`,
+			wantErr:     true,
+			errContains: "expected string",
+		},
+	}
 
-	t.Run("not set - zero value", func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var s types.ScheduleValue
+			err := yaml.Unmarshal([]byte(tt.input), &s)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+				return
+			}
+			require.NoError(t, err)
+			if tt.wantStarts != nil {
+				assert.Equal(t, tt.wantStarts, s.Starts())
+			}
+			if tt.wantStops != nil {
+				assert.Equal(t, tt.wantStops, s.Stops())
+			}
+			if tt.wantRestarts != nil {
+				assert.Equal(t, tt.wantRestarts, s.Restarts())
+			}
+			if tt.checkHasStop {
+				assert.Equal(t, tt.wantHasStop, s.HasStopSchedule())
+			}
+			if tt.checkHasRestart {
+				assert.Equal(t, tt.wantHasRestart, s.HasRestartSchedule())
+			}
+		})
+	}
+
+	t.Run("ZeroValue", func(t *testing.T) {
+		t.Parallel()
 		var s types.ScheduleValue
 		assert.True(t, s.IsZero())
 		assert.Nil(t, s.Starts())
 	})
-
-	t.Run("invalid map key", func(t *testing.T) {
-		data := `invalid: "0 * * * *"`
-		var s types.ScheduleValue
-		err := yaml.Unmarshal([]byte(data), &s)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unknown key")
-	})
-
-	t.Run("invalid array element type", func(t *testing.T) {
-		data := `
-start:
-  - 123
-  - 456
-`
-		var s types.ScheduleValue
-		err := yaml.Unmarshal([]byte(data), &s)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "expected string")
-	})
 }
 
 func TestScheduleValue_InStruct(t *testing.T) {
+	t.Parallel()
+
 	type DAGConfig struct {
 		Name     string              `yaml:"name"`
 		Schedule types.ScheduleValue `yaml:"schedule"`
 	}
 
-	t.Run("simple schedule", func(t *testing.T) {
-		data := `
+	tests := []struct {
+		name       string
+		input      string
+		wantName   string
+		wantStarts []string
+		wantStops  []string
+		wantIsZero bool
+	}{
+		{
+			name: "SimpleSchedule",
+			input: `
 name: my-dag
 schedule: "0 * * * *"
-`
-		var cfg DAGConfig
-		err := yaml.Unmarshal([]byte(data), &cfg)
-		require.NoError(t, err)
-		assert.Equal(t, "my-dag", cfg.Name)
-		assert.Equal(t, []string{"0 * * * *"}, cfg.Schedule.Starts())
-	})
-
-	t.Run("complex schedule", func(t *testing.T) {
-		data := `
+`,
+			wantName:   "my-dag",
+			wantStarts: []string{"0 * * * *"},
+		},
+		{
+			name: "ComplexSchedule",
+			input: `
 name: my-dag
 schedule:
   start: "0 8 * * 1-5"
   stop: "0 18 * * 1-5"
-`
-		var cfg DAGConfig
-		err := yaml.Unmarshal([]byte(data), &cfg)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"0 8 * * 1-5"}, cfg.Schedule.Starts())
-		assert.Equal(t, []string{"0 18 * * 1-5"}, cfg.Schedule.Stops())
-	})
+`,
+			wantStarts: []string{"0 8 * * 1-5"},
+			wantStops:  []string{"0 18 * * 1-5"},
+		},
+		{
+			name:       "NoSchedule",
+			input:      "name: my-dag",
+			wantIsZero: true,
+		},
+	}
 
-	t.Run("no schedule", func(t *testing.T) {
-		data := `name: my-dag`
-		var cfg DAGConfig
-		err := yaml.Unmarshal([]byte(data), &cfg)
-		require.NoError(t, err)
-		assert.True(t, cfg.Schedule.IsZero())
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var cfg DAGConfig
+			err := yaml.Unmarshal([]byte(tt.input), &cfg)
+			require.NoError(t, err)
+			if tt.wantName != "" {
+				assert.Equal(t, tt.wantName, cfg.Name)
+			}
+			if tt.wantStarts != nil {
+				assert.Equal(t, tt.wantStarts, cfg.Schedule.Starts())
+			}
+			if tt.wantStops != nil {
+				assert.Equal(t, tt.wantStops, cfg.Schedule.Stops())
+			}
+			if tt.wantIsZero {
+				assert.True(t, cfg.Schedule.IsZero())
+			}
+		})
+	}
 }
 
 func TestScheduleValue_AdditionalCoverage(t *testing.T) {
-	t.Run("Value returns raw value - string", func(t *testing.T) {
-		var s types.ScheduleValue
-		err := yaml.Unmarshal([]byte(`"0 * * * *"`), &s)
-		require.NoError(t, err)
-		assert.Equal(t, "0 * * * *", s.Value())
-	})
+	t.Parallel()
 
-	t.Run("Value returns raw value - array", func(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		wantErr     bool
+		errContains string
+		wantValue   any
+		checkIsZero bool
+		wantStarts  []string
+	}{
+		{
+			name:      "ValueReturnsRawString",
+			input:     `"0 * * * *"`,
+			wantValue: "0 * * * *",
+		},
+		{
+			name:        "NullValue",
+			input:       "null",
+			checkIsZero: true,
+		},
+		{
+			name:       "EmptyString",
+			input:      `""`,
+			wantStarts: nil,
+		},
+		{
+			name:        "InvalidTypeNumber",
+			input:       "123",
+			wantErr:     true,
+			errContains: "must be string, array, or map",
+		},
+		{
+			name:        "InvalidScheduleEntryTypeInMap",
+			input:       "start: 123",
+			wantErr:     true,
+			errContains: "expected string or array",
+		},
+		{
+			name:        "InvalidTypeInStartArray",
+			input:       `["0 * * * *", 123]`,
+			wantErr:     true,
+			errContains: "expected string",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var s types.ScheduleValue
+			err := yaml.Unmarshal([]byte(tt.input), &s)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+				return
+			}
+			require.NoError(t, err)
+			if tt.wantValue != nil {
+				assert.Equal(t, tt.wantValue, s.Value())
+			}
+			if tt.checkIsZero {
+				assert.True(t, s.IsZero())
+			}
+			if tt.wantStarts != nil {
+				assert.Equal(t, tt.wantStarts, s.Starts())
+			}
+		})
+	}
+
+	t.Run("ValueReturnsRawArray", func(t *testing.T) {
+		t.Parallel()
 		var s types.ScheduleValue
 		err := yaml.Unmarshal([]byte(`["0 * * * *"]`), &s)
 		require.NoError(t, err)
@@ -176,41 +294,12 @@ func TestScheduleValue_AdditionalCoverage(t *testing.T) {
 		assert.Len(t, val, 1)
 	})
 
-	t.Run("null value sets isSet to false", func(t *testing.T) {
-		var s types.ScheduleValue
-		err := yaml.Unmarshal([]byte(`null`), &s)
-		require.NoError(t, err)
-		assert.True(t, s.IsZero())
-	})
-
-	t.Run("empty string", func(t *testing.T) {
+	t.Run("EmptyStringNotZero", func(t *testing.T) {
+		t.Parallel()
 		var s types.ScheduleValue
 		err := yaml.Unmarshal([]byte(`""`), &s)
 		require.NoError(t, err)
 		assert.False(t, s.IsZero())
 		assert.Nil(t, s.Starts())
-	})
-
-	t.Run("invalid type - number", func(t *testing.T) {
-		var s types.ScheduleValue
-		err := yaml.Unmarshal([]byte(`123`), &s)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "must be string, array, or map")
-	})
-
-	t.Run("invalid schedule entry type in map", func(t *testing.T) {
-		data := `start: 123`
-		var s types.ScheduleValue
-		err := yaml.Unmarshal([]byte(data), &s)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "expected string or array")
-	})
-
-	t.Run("invalid type in start array", func(t *testing.T) {
-		data := `["0 * * * *", 123]`
-		var s types.ScheduleValue
-		err := yaml.Unmarshal([]byte(data), &s)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "expected string")
 	})
 }

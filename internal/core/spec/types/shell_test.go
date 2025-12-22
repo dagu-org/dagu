@@ -10,173 +10,260 @@ import (
 )
 
 func TestShellValue_UnmarshalYAML(t *testing.T) {
-	t.Run("string without args", func(t *testing.T) {
-		var s types.ShellValue
-		err := yaml.Unmarshal([]byte(`bash`), &s)
-		require.NoError(t, err)
-		assert.False(t, s.IsZero())
-		assert.Equal(t, "bash", s.Command())
-		assert.Empty(t, s.Arguments())
-		assert.False(t, s.IsArray())
-	})
+	t.Parallel()
 
-	t.Run("string with args inline", func(t *testing.T) {
-		var s types.ShellValue
-		err := yaml.Unmarshal([]byte(`"bash -e"`), &s)
-		require.NoError(t, err)
-		assert.Equal(t, "bash -e", s.Command())
-		assert.Empty(t, s.Arguments())
-	})
+	tests := []struct {
+		name          string
+		input         string
+		wantErr       bool
+		errContains   string
+		wantCommand   string
+		wantArgs      []string
+		wantIsArray   bool
+		checkNotZero  bool
+		checkIsZero   bool
+	}{
+		{
+			name:         "StringWithoutArgs",
+			input:        "bash",
+			wantCommand:  "bash",
+			wantArgs:     nil,
+			wantIsArray:  false,
+			checkNotZero: true,
+		},
+		{
+			name:        "StringWithArgsInline",
+			input:       `"bash -e"`,
+			wantCommand: "bash -e",
+			wantArgs:    nil,
+		},
+		{
+			name:        "ArrayFormInline",
+			input:       `["bash", "-e", "-x"]`,
+			wantCommand: "bash",
+			wantArgs:    []string{"-e", "-x"},
+			wantIsArray: true,
+		},
+		{
+			name:        "MultilineArrayForm",
+			input:       "- bash\n- -e\n- -x",
+			wantCommand: "bash",
+			wantArgs:    []string{"-e", "-x"},
+		},
+		{
+			name:         "EmptyString",
+			input:        `""`,
+			wantCommand:  "",
+			checkNotZero: true,
+		},
+		{
+			name:        "EmptyArray",
+			input:       "[]",
+			wantCommand: "",
+			wantArgs:    nil,
+		},
+		{
+			name:        "InvalidTypeMap",
+			input:       "{key: value}",
+			wantErr:     true,
+			errContains: "must be string or array",
+		},
+		{
+			name:        "ShellWithEnvVariableSyntax",
+			input:       `"${SHELL}"`,
+			wantCommand: "${SHELL}",
+		},
+		{
+			name:        "NixShellExample",
+			input:       `["nix-shell", "-p", "python3"]`,
+			wantCommand: "nix-shell",
+			wantArgs:    []string{"-p", "python3"},
+		},
+		{
+			name:        "NullValue",
+			input:       "null",
+			checkIsZero: true,
+		},
+		{
+			name:        "ArrayWithNonStringItems",
+			input:       "[123, true]",
+			wantCommand: "123",
+			wantArgs:    []string{"true"},
+		},
+		{
+			name:        "SingleElementArray",
+			input:       `["bash"]`,
+			wantCommand: "bash",
+			wantArgs:    nil,
+			wantIsArray: true,
+		},
+	}
 
-	t.Run("array form inline", func(t *testing.T) {
-		var s types.ShellValue
-		err := yaml.Unmarshal([]byte(`["bash", "-e", "-x"]`), &s)
-		require.NoError(t, err)
-		assert.Equal(t, "bash", s.Command())
-		assert.Equal(t, []string{"-e", "-x"}, s.Arguments())
-		assert.True(t, s.IsArray())
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var s types.ShellValue
+			err := yaml.Unmarshal([]byte(tt.input), &s)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+				return
+			}
+			require.NoError(t, err)
+			if tt.checkIsZero {
+				assert.True(t, s.IsZero())
+				return
+			}
+			if tt.checkNotZero {
+				assert.False(t, s.IsZero())
+			}
+			assert.Equal(t, tt.wantCommand, s.Command())
+			if tt.wantArgs != nil {
+				assert.Equal(t, tt.wantArgs, s.Arguments())
+			} else {
+				assert.Empty(t, s.Arguments())
+			}
+			if tt.wantIsArray {
+				assert.True(t, s.IsArray())
+			}
+		})
+	}
 
-	t.Run("multiline array form", func(t *testing.T) {
-		var s types.ShellValue
-		err := yaml.Unmarshal([]byte("- bash\n- -e\n- -x"), &s)
-		require.NoError(t, err)
-		assert.Equal(t, "bash", s.Command())
-		assert.Equal(t, []string{"-e", "-x"}, s.Arguments())
-	})
-
-	t.Run("empty string", func(t *testing.T) {
-		var s types.ShellValue
-		err := yaml.Unmarshal([]byte(`""`), &s)
-		require.NoError(t, err)
-		assert.False(t, s.IsZero()) // Was set, just empty
-		assert.Equal(t, "", s.Command())
-	})
-
-	t.Run("empty array", func(t *testing.T) {
-		var s types.ShellValue
-		err := yaml.Unmarshal([]byte(`[]`), &s)
-		require.NoError(t, err)
-		assert.Equal(t, "", s.Command())
-		assert.Empty(t, s.Arguments())
-	})
-
-	t.Run("not set - zero value", func(t *testing.T) {
+	t.Run("ZeroValue", func(t *testing.T) {
+		t.Parallel()
 		var s types.ShellValue
 		assert.True(t, s.IsZero())
-	})
-
-	t.Run("invalid type map", func(t *testing.T) {
-		var s types.ShellValue
-		err := yaml.Unmarshal([]byte(`{key: value}`), &s)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "must be string or array")
-	})
-
-	t.Run("shell with environment variable syntax", func(t *testing.T) {
-		var s types.ShellValue
-		err := yaml.Unmarshal([]byte(`"${SHELL}"`), &s)
-		require.NoError(t, err)
-		assert.Equal(t, "${SHELL}", s.Command())
-	})
-
-	t.Run("nix-shell example", func(t *testing.T) {
-		var s types.ShellValue
-		err := yaml.Unmarshal([]byte(`["nix-shell", "-p", "python3"]`), &s)
-		require.NoError(t, err)
-		assert.Equal(t, "nix-shell", s.Command())
-		assert.Equal(t, []string{"-p", "python3"}, s.Arguments())
-	})
-
-	t.Run("null value", func(t *testing.T) {
-		var s types.ShellValue
-		err := yaml.Unmarshal([]byte(`null`), &s)
-		require.NoError(t, err)
-		assert.True(t, s.IsZero())
-	})
-
-	t.Run("array with non-string items - stringified", func(t *testing.T) {
-		var s types.ShellValue
-		err := yaml.Unmarshal([]byte(`[123, true]`), &s)
-		require.NoError(t, err)
-		// Non-string items are stringified for flexibility
-		assert.Equal(t, "123", s.Command())
-		assert.Equal(t, []string{"true"}, s.Arguments())
-	})
-
-	t.Run("single element array", func(t *testing.T) {
-		var s types.ShellValue
-		err := yaml.Unmarshal([]byte(`["bash"]`), &s)
-		require.NoError(t, err)
-		assert.Equal(t, "bash", s.Command())
-		assert.Empty(t, s.Arguments())
-		assert.True(t, s.IsArray())
 	})
 }
 
 func TestShellValue_InStruct(t *testing.T) {
+	t.Parallel()
+
 	type Config struct {
 		Shell types.ShellValue `yaml:"shell"`
 		Name  string           `yaml:"name"`
 	}
 
-	t.Run("shell set", func(t *testing.T) {
-		data := `
+	tests := []struct {
+		name        string
+		input       string
+		wantName    string
+		wantCommand string
+		wantIsZero  bool
+		checkNotZero bool
+	}{
+		{
+			name: "ShellSet",
+			input: `
 name: test
 shell: bash
-`
-		var cfg Config
-		err := yaml.Unmarshal([]byte(data), &cfg)
-		require.NoError(t, err)
-		assert.Equal(t, "test", cfg.Name)
-		assert.Equal(t, "bash", cfg.Shell.Command())
-		assert.False(t, cfg.Shell.IsZero())
-	})
+`,
+			wantName:     "test",
+			wantCommand:  "bash",
+			checkNotZero: true,
+		},
+		{
+			name:       "ShellNotSet",
+			input:      "name: test",
+			wantIsZero: true,
+		},
+	}
 
-	t.Run("shell not set", func(t *testing.T) {
-		data := `name: test`
-		var cfg Config
-		err := yaml.Unmarshal([]byte(data), &cfg)
-		require.NoError(t, err)
-		assert.True(t, cfg.Shell.IsZero())
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var cfg Config
+			err := yaml.Unmarshal([]byte(tt.input), &cfg)
+			require.NoError(t, err)
+			if tt.wantName != "" {
+				assert.Equal(t, tt.wantName, cfg.Name)
+			}
+			if tt.wantCommand != "" {
+				assert.Equal(t, tt.wantCommand, cfg.Shell.Command())
+			}
+			if tt.wantIsZero {
+				assert.True(t, cfg.Shell.IsZero())
+			}
+			if tt.checkNotZero {
+				assert.False(t, cfg.Shell.IsZero())
+			}
+		})
+	}
 }
 
 func TestShellValue_AdditionalCoverage(t *testing.T) {
-	t.Run("Value returns raw value - string", func(t *testing.T) {
-		var s types.ShellValue
-		err := yaml.Unmarshal([]byte(`bash`), &s)
-		require.NoError(t, err)
-		assert.Equal(t, "bash", s.Value())
-	})
+	t.Parallel()
 
-	t.Run("Value returns raw value - array", func(t *testing.T) {
+	tests := []struct {
+		name         string
+		input        string
+		wantErr      bool
+		errContains  string
+		wantValue    any
+		checkIsArray bool
+		wantIsArray  bool
+		checkIsZero  bool
+	}{
+		{
+			name:      "ValueReturnsRawString",
+			input:     "bash",
+			wantValue: "bash",
+		},
+		{
+			name:         "InvalidTypeNumber",
+			input:        "123",
+			wantErr:      true,
+			errContains:  "must be string or array",
+		},
+		{
+			name:         "IsArrayReturnsFalseForString",
+			input:        `"bash -e"`,
+			checkIsArray: true,
+			wantIsArray:  false,
+		},
+		{
+			name:         "IsArrayReturnsFalseForNil",
+			input:        "null",
+			checkIsArray: true,
+			wantIsArray:  false,
+			checkIsZero:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var s types.ShellValue
+			err := yaml.Unmarshal([]byte(tt.input), &s)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+				return
+			}
+			require.NoError(t, err)
+			if tt.wantValue != nil {
+				assert.Equal(t, tt.wantValue, s.Value())
+			}
+			if tt.checkIsArray {
+				assert.Equal(t, tt.wantIsArray, s.IsArray())
+			}
+			if tt.checkIsZero {
+				assert.True(t, s.IsZero())
+			}
+		})
+	}
+
+	t.Run("ValueReturnsRawArray", func(t *testing.T) {
+		t.Parallel()
 		var s types.ShellValue
 		err := yaml.Unmarshal([]byte(`["bash", "-e"]`), &s)
 		require.NoError(t, err)
 		val, ok := s.Value().([]any)
 		require.True(t, ok)
 		assert.Len(t, val, 2)
-	})
-
-	t.Run("invalid type - number", func(t *testing.T) {
-		var s types.ShellValue
-		err := yaml.Unmarshal([]byte(`123`), &s)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "must be string or array")
-	})
-
-	t.Run("IsArray returns false for string", func(t *testing.T) {
-		var s types.ShellValue
-		err := yaml.Unmarshal([]byte(`"bash -e"`), &s)
-		require.NoError(t, err)
-		assert.False(t, s.IsArray())
-	})
-
-	t.Run("IsArray returns false for nil", func(t *testing.T) {
-		var s types.ShellValue
-		err := yaml.Unmarshal([]byte(`null`), &s)
-		require.NoError(t, err)
-		assert.False(t, s.IsArray())
 	})
 }
