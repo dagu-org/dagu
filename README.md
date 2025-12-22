@@ -148,6 +148,62 @@ dagu start-all
 
 Visit http://localhost:8080
 
+## Quick Look for Workflow Definitions
+
+### Sequential Steps
+
+Steps execute one after another:
+
+```yaml
+type: chain
+steps:
+  - command: echo "Hello, dagu!"
+  - command: echo "This is a second step"
+```
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#3A322C', 'primaryTextColor': '#fff', 'lineColor': '#888'}}}%%
+graph LR
+    A["Step 1"] --> B["Step 2"]
+    style A fill:#3A322C,stroke:green,stroke-width:1.6px,color:#fff
+    style B fill:#3A322C,stroke:lime,stroke-width:1.6px,color:#fff
+```
+
+### Parallel Steps
+
+Steps with dependencies run in parallel:
+
+```yaml
+type: graph
+steps:
+  - id: step_1
+    command: echo "Step 1"
+  - id: step_2a
+    command: echo "Step 2a - runs in parallel"
+    depends: [step_1]
+  - id: step_2b
+    command: echo "Step 2b - runs in parallel"
+    depends: [step_1]
+  - id: step_3
+    command: echo "Step 3 - waits for parallel steps"
+    depends: [step_2a, step_2b]
+```
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#3A322C', 'primaryTextColor': '#fff', 'lineColor': '#888'}}}%%
+graph LR
+    A[step_1] --> B[step_2a]
+    A --> C[step_2b]
+    B --> D[step_3]
+    C --> D
+    style A fill:#3A322C,stroke:green,stroke-width:1.6px,color:#fff
+    style B fill:#3A322C,stroke:lime,stroke-width:1.6px,color:#fff
+    style C fill:#3A322C,stroke:lime,stroke-width:1.6px,color:#fff
+    style D fill:#3A322C,stroke:lightblue,stroke-width:1.6px,color:#fff
+```
+
+For more examples, see the [Examples](https://docs.dagu.cloud/writing-workflows/examples) documentation.
+
 ## Docker-Compose
 
 Clone the repository and run with Docker Compose:
