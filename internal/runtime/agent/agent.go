@@ -292,6 +292,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	coordinatorCli := a.createCoordinatorClient(ctx)
 
 	// Resolve secrets if defined
+	a.dag.LoadDotEnv(ctx)
 	secretEnvs, secretErr := a.resolveSecrets(ctx)
 
 	ctx = runtime.NewContext(ctx, a.dag, a.dagRunID, a.logFile,

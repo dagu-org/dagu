@@ -14,6 +14,7 @@ import (
 	"dario.cat/mergo"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/spec/types"
 	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/goccy/go-yaml"
@@ -212,7 +213,7 @@ func LoadYAMLWithOpts(ctx context.Context, data []byte, opts BuildOpts) (*core.D
 		return nil, core.ErrorList{err}
 	}
 
-	return build(BuildContext{ctx: ctx, opts: opts}, def)
+	return def.build(BuildContext{ctx: ctx, opts: opts})
 }
 
 // LoadBaseConfig loads the global configuration from the given file.
@@ -229,7 +230,7 @@ func LoadBaseConfig(ctx BuildContext, file string) (*core.DAG, error) {
 		return nil, err
 	}
 
-	// Decode the raw data into a config definition.
+	// Decode the raw data into a manifest.
 	def, err := decode(raw)
 	if err != nil {
 		return nil, core.ErrorList{err}
@@ -238,12 +239,8 @@ func LoadBaseConfig(ctx BuildContext, file string) (*core.DAG, error) {
 	ctx = ctx.WithOpts(BuildOpts{
 		Flags: ctx.opts.Flags,
 	}).WithFile(file)
-	dag, err := build(ctx, def)
 
-	if err != nil {
-		return nil, core.ErrorList{err}
-	}
-	return dag, nil
+	return def.build(ctx)
 }
 
 // loadDAG loads the core.DAG from the given file.
@@ -255,8 +252,8 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 
 	ctx = ctx.WithFile(filePath)
 
-	// Load base config definition if specified
-	var baseDef *definition
+	// Load base manifest if specified
+	var baseDef *dag
 	if !ctx.opts.Has(BuildFlagOnlyMetadata) && ctx.opts.Base != "" && fileutil.FileExists(ctx.opts.Base) {
 		raw, err := readYAMLFile(ctx.opts.Base)
 		if err != nil {
@@ -308,7 +305,7 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 }
 
 // loadDAGsFromFile loads all DAGs from a multi-document YAML file
-func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([]*core.DAG, error) {
+func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *dag) ([]*core.DAG, error) {
 	// Open the file
 	f, err := os.Open(filePath) //nolint:gosec
 	if err != nil {
@@ -348,13 +345,13 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([
 		// Update the context with the current document index
 		ctx.index = docIndex
 
-		// Decode the document into definition
+		// Decode the document into manifest
 		spec, err := decode(doc)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode document %d: %w", docIndex, err)
 		}
 
-		// Build a fresh base core.DAG from base definition if provided
+		// Build a fresh base core.DAG from base manifest if provided
 		var dest *core.DAG
 		if baseDef != nil {
 			// Build a new base core.DAG for this document
@@ -363,7 +360,7 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([
 			buildCtx.opts.Parameters = ""
 			buildCtx.opts.ParametersList = nil
 			// Build the base core.DAG
-			baseDAG, err := build(buildCtx, baseDef)
+			baseDAG, err := baseDef.build(buildCtx)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build base core.DAG for document %d: %w", docIndex, err)
 			}
@@ -380,7 +377,7 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *definition) ([
 		}
 
 		// Build the core.DAG from the current document
-		dag, err := build(ctx, spec)
+		dag, err := spec.build(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build core.DAG in document %d: %w", docIndex, err)
 		}
@@ -540,17 +537,69 @@ func unmarshalData(data []byte) (map[string]any, error) {
 	return cm, err
 }
 
-// decode decodes the configuration map into a configDefinition.
-func decode(cm map[string]any) (*definition, error) {
-	c := new(definition)
+// decode decodes the configuration map into a manifest.
+func decode(cm map[string]any) (*dag, error) {
+	c := new(dag)
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: true,
 		Result:      c,
 		TagName:     "",
+		DecodeHook:  TypedUnionDecodeHook(),
 	})
 	err := md.Decode(cm)
 
 	return c, err
+}
+
+// TypedUnionDecodeHook returns a decode hook that handles our typed union types.
+// It converts raw map[string]any values to the appropriate typed values.
+func TypedUnionDecodeHook() mapstructure.DecodeHookFunc {
+	return func(_ reflect.Type, to reflect.Type, data any) (any, error) {
+		// Handle types.ShellValue
+		if to == reflect.TypeOf(types.ShellValue{}) {
+			return decodeViaYAML[types.ShellValue](data)
+		}
+		// Handle types.StringOrArray
+		if to == reflect.TypeOf(types.StringOrArray{}) {
+			return decodeViaYAML[types.StringOrArray](data)
+		}
+		// Handle types.ScheduleValue
+		if to == reflect.TypeOf(types.ScheduleValue{}) {
+			return decodeViaYAML[types.ScheduleValue](data)
+		}
+		// Handle types.EnvValue
+		if to == reflect.TypeOf(types.EnvValue{}) {
+			return decodeViaYAML[types.EnvValue](data)
+		}
+		// Handle types.ContinueOnValue
+		if to == reflect.TypeOf(types.ContinueOnValue{}) {
+			return decodeViaYAML[types.ContinueOnValue](data)
+		}
+		// Handle types.PortValue
+		if to == reflect.TypeOf(types.PortValue{}) {
+			return decodeViaYAML[types.PortValue](data)
+		}
+		return data, nil
+	}
+}
+
+// decodeViaYAML converts data to YAML and unmarshals it to the target type.
+// This allows the custom UnmarshalYAML methods to be used.
+func decodeViaYAML[T any](data any) (T, error) {
+	var result T
+	if data == nil {
+		return result, nil
+	}
+	// Convert the data to YAML bytes
+	yamlBytes, err := yaml.Marshal(data)
+	if err != nil {
+		return result, fmt.Errorf("failed to marshal to YAML: %w", err)
+	}
+	// Unmarshal using the custom UnmarshalYAML method
+	if err := yaml.Unmarshal(yamlBytes, &result); err != nil {
+		return result, fmt.Errorf("failed to unmarshal from YAML: %w", err)
+	}
+	return result, nil
 }
 
 // merge merges the source core.DAG into the destination DAG.

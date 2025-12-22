@@ -15,7 +15,7 @@ import (
 func TestLoad(t *testing.T) {
 	t.Parallel()
 
-	t.Run(("WithName"), func(t *testing.T) {
+	t.Run("WithName", func(t *testing.T) {
 		t.Parallel()
 
 		testDAG := createTempYAMLFile(t, `steps:
@@ -26,43 +26,72 @@ func TestLoad(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "testDAG", dag.Name)
 	})
-	t.Run("InvalidPath", func(t *testing.T) {
-		t.Parallel()
 
-		// Use a non-existing file path
-		testDAG := "/tmp/non_existing_file_" + t.Name() + ".yaml"
-		_, err := spec.Load(context.Background(), testDAG)
-		require.Error(t, err)
-	})
-	t.Run("UnknownField", func(t *testing.T) {
-		t.Parallel()
+	// Error cases
+	errorTests := []struct {
+		name        string
+		content     string
+		useFile     bool
+		errContains string
+	}{
+		{
+			name:    "InvalidPath",
+			useFile: false,
+		},
+		{
+			name:        "UnknownField",
+			content:     "invalidKey: test\n",
+			useFile:     true,
+			errContains: "has invalid keys: invalidKey",
+		},
+		{
+			name:        "InvalidYAML",
+			content:     "invalidyaml",
+			useFile:     true,
+			errContains: "invalidyaml",
+		},
+	}
 
-		testDAG := createTempYAMLFile(t, `invalidKey: test
-`)
-		_, err := spec.Load(context.Background(), testDAG)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "has invalid keys: invalidKey")
-	})
-	t.Run("InvalidYAML", func(t *testing.T) {
-		t.Parallel()
+	for _, tt := range errorTests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var testDAG string
+			if tt.useFile {
+				testDAG = createTempYAMLFile(t, tt.content)
+			} else {
+				testDAG = "/tmp/non_existing_file_" + t.Name() + ".yaml"
+			}
+			_, err := spec.Load(context.Background(), testDAG)
+			require.Error(t, err)
+			if tt.errContains != "" {
+				require.Contains(t, err.Error(), tt.errContains)
+			}
+		})
+	}
 
-		testDAG := createTempYAMLFile(t, `invalidyaml`)
-		_, err := spec.Load(context.Background(), testDAG)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "invalidyaml")
-	})
 	t.Run("MetadataOnly", func(t *testing.T) {
 		t.Parallel()
 
-		testDAG := createTempYAMLFile(t, `steps:
+		testDAG := createTempYAMLFile(t, `
+logDir: /var/log/dagu
+histRetentionDays: 90
+maxCleanUpTimeSec: 60
+mailOn:
+  failure: true
+steps:
   - name: "1"
     command: "true"
 `)
 		dag, err := spec.Load(context.Background(), testDAG, spec.OnlyMetadata())
 		require.NoError(t, err)
+		// Steps should not be loaded in metadata-only mode
 		require.Empty(t, dag.Steps)
-		// Check if the metadata is loaded correctly
-		require.Len(t, dag.Steps, 0)
+		// Non-metadata fields from YAML should NOT be populated in metadata-only mode
+		assert.Empty(t, dag.LogDir, "LogDir should be empty in metadata-only mode")
+		assert.Nil(t, dag.MailOn, "MailOn should be nil in metadata-only mode")
+		// Defaults are still applied by InitializeDefaults (not from YAML)
+		assert.Equal(t, 30, dag.HistRetentionDays, "HistRetentionDays should be default (30), not YAML value (90)")
+		assert.Equal(t, 5*time.Second, dag.MaxCleanUpTime, "MaxCleanUpTime should be default (5s), not YAML value (60s)")
 	})
 	t.Run("DefaultConfig", func(t *testing.T) {
 		t.Parallel()
@@ -190,26 +219,44 @@ steps:
 
 func TestLoadYAML(t *testing.T) {
 	t.Parallel()
-	const testDAG = `steps:
+
+	tests := []struct {
+		name        string
+		input       string
+		wantErr     bool
+		wantName    string
+		wantCommand string
+	}{
+		{
+			name: "ValidYAMLData",
+			input: `steps:
   - name: "1"
     command: "true"
-`
-	t.Run("ValidYAMLData", func(t *testing.T) {
-		t.Parallel()
+`,
+			wantName:    "1",
+			wantCommand: "true",
+		},
+		{
+			name:    "InvalidYAMLData",
+			input:   "invalid",
+			wantErr: true,
+		},
+	}
 
-		ret, err := spec.LoadYAMLWithOpts(context.Background(), []byte(testDAG), spec.BuildOpts{})
-		require.NoError(t, err)
-
-		step := ret.Steps[0]
-		require.Equal(t, "1", step.Name)
-		require.Equal(t, "true", step.Command)
-	})
-	t.Run("InvalidYAMLData", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := spec.LoadYAMLWithOpts(context.Background(), []byte(`invalid`), spec.BuildOpts{})
-		require.Error(t, err)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ret, err := spec.LoadYAMLWithOpts(context.Background(), []byte(tt.input), spec.BuildOpts{})
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, ret.Steps, 1)
+			assert.Equal(t, tt.wantName, ret.Steps[0].Name)
+			assert.Equal(t, tt.wantCommand, ret.Steps[0].Command)
+		})
+	}
 }
 
 func TestLoadYAMLWithNameOption(t *testing.T) {
@@ -385,11 +432,15 @@ steps:
 		assert.Nil(t, dag.LocalDAGs) // No sub DAGs for single DAG file
 	})
 
-	t.Run("DuplicateSubDAGNames", func(t *testing.T) {
-		t.Parallel()
-
-		// Multi-DAG file with duplicate names
-		multiDAGContent := `steps:
+	// MultiDAG error cases
+	multiDAGErrorTests := []struct {
+		name        string
+		content     string
+		errContains string
+	}{
+		{
+			name: "DuplicateSubDAGNames",
+			content: `steps:
   - name: step1
     command: echo "main"
 
@@ -404,20 +455,12 @@ name: duplicate-name
 steps:
   - name: step1
     command: echo "second"
-`
-		tmpFile := createTempYAMLFile(t, multiDAGContent)
-
-		// Load should fail due to duplicate names
-		_, err := spec.Load(context.Background(), tmpFile)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "duplicate DAG name")
-	})
-
-	t.Run("SubDAGWithoutName", func(t *testing.T) {
-		t.Parallel()
-
-		// Multi-DAG file where sub DAG has no name
-		multiDAGContent := `steps:
+`,
+			errContains: "duplicate DAG name",
+		},
+		{
+			name: "SubDAGWithoutName",
+			content: `steps:
   - name: step1
     command: echo "main"
 
@@ -425,14 +468,20 @@ steps:
 steps:
   - name: step1
     command: echo "unnamed"
-`
-		tmpFile := createTempYAMLFile(t, multiDAGContent)
+`,
+			errContains: "must have a name",
+		},
+	}
 
-		// Load should fail because sub DAG has no name
-		_, err := spec.Load(context.Background(), tmpFile)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "must have a name")
-	})
+	for _, tt := range multiDAGErrorTests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			tmpFile := createTempYAMLFile(t, tt.content)
+			_, err := spec.Load(context.Background(), tmpFile)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.errContains)
+		})
+	}
 
 	t.Run("EmptyDocumentSeparator", func(t *testing.T) {
 		t.Parallel()
@@ -614,4 +663,148 @@ steps:
 		// The explicit workingDir from the DAG should take precedence
 		assert.Equal(t, explicitDir, dag.WorkingDir)
 	})
+}
+
+func TestLoadWithLoaderOptions(t *testing.T) {
+	t.Parallel()
+
+	t.Run("WithDAGsDir", func(t *testing.T) {
+		t.Parallel()
+
+		// Create a DAGs directory
+		dagsDir := t.TempDir()
+
+		// Create a sub-DAG file
+		subDAGPath := filepath.Join(dagsDir, "subdag.yaml")
+		require.NoError(t, os.WriteFile(subDAGPath, []byte(`
+steps:
+  - name: sub-step
+    command: echo sub
+`), 0644))
+
+		// Create main DAG that calls the sub-DAG
+		mainDAG := createTempYAMLFile(t, `
+steps:
+  - name: main-step
+    command: echo main
+`)
+		// Load with WithDAGsDir
+		dag, err := spec.Load(context.Background(), mainDAG, spec.WithDAGsDir(dagsDir))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+	})
+
+	t.Run("WithAllowBuildErrors", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := createTempYAMLFile(t, `
+steps:
+  - name: test
+    command: echo test
+    depends:
+      - nonexistent-step
+`)
+		// Without AllowBuildErrors, this would fail
+		_, err := spec.Load(context.Background(), testDAG)
+		require.Error(t, err)
+
+		// With AllowBuildErrors, it should succeed but capture errors
+		dag, err := spec.Load(context.Background(), testDAG, spec.WithAllowBuildErrors())
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+		assert.NotEmpty(t, dag.BuildErrors)
+	})
+
+	t.Run("SkipSchemaValidation", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := createTempYAMLFile(t, `
+params:
+  schema: "nonexistent-schema.json"
+  values:
+    foo: bar
+steps:
+  - name: test
+    command: echo test
+`)
+		// Without SkipSchemaValidation, this would fail due to missing schema
+		_, err := spec.Load(context.Background(), testDAG)
+		require.Error(t, err)
+
+		// With SkipSchemaValidation, it should succeed
+		dag, err := spec.Load(context.Background(), testDAG, spec.SkipSchemaValidation())
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+	})
+
+	t.Run("WithSkipBaseHandlers", func(t *testing.T) {
+		t.Parallel()
+
+		// Create base config with handlers
+		baseDir := t.TempDir()
+		baseConfig := filepath.Join(baseDir, "base.yaml")
+		require.NoError(t, os.WriteFile(baseConfig, []byte(`
+handlerOn:
+  success:
+    command: echo base-success
+`), 0644))
+
+		testDAG := createTempYAMLFile(t, `
+steps:
+  - name: test
+    command: echo test
+`)
+		// Load with base config but skip base handlers
+		dag, err := spec.Load(context.Background(), testDAG,
+			spec.WithBaseConfig(baseConfig),
+			spec.WithSkipBaseHandlers())
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+		// The base success handler should not be present
+		assert.Nil(t, dag.HandlerOn.Success)
+	})
+
+	t.Run("WithParamsAsList", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := createTempYAMLFile(t, `
+params: KEY1 KEY2
+steps:
+  - name: test
+    command: echo $KEY1 $KEY2
+`)
+		// Load with params as list
+		dag, err := spec.Load(context.Background(), testDAG,
+			spec.WithParams([]string{"KEY1=value1", "KEY2=value2"}))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+
+		// Check that params were applied
+		found := 0
+		for _, p := range dag.Params {
+			if p == "KEY1=value1" || p == "KEY2=value2" {
+				found++
+			}
+		}
+		assert.Equal(t, 2, found, "Both params should be applied")
+	})
+}
+
+// TestLoadWithoutEval tests the WithoutEval loader option
+// This test cannot be parallel because it uses t.Setenv
+func TestLoadWithoutEval(t *testing.T) {
+	t.Setenv("TEST_VAR", "should-not-expand")
+
+	testDAG := createTempYAMLFile(t, `
+env:
+  - MY_VAR: "${TEST_VAR}"
+steps:
+  - name: test
+    command: echo test
+`)
+	dag, err := spec.Load(context.Background(), testDAG, spec.WithoutEval())
+	require.NoError(t, err)
+
+	// With NoEval, environment variables should not be expanded
+	assert.Contains(t, dag.Env, "MY_VAR=${TEST_VAR}")
 }

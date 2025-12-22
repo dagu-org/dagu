@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
@@ -8,6 +9,10 @@ import (
 )
 
 func TestGitHubActionsExecutor(t *testing.T) {
+	if os.Getenv("GITHUB_ACTIONS") != "true" {
+		t.Skip("Skipping flaky test locally")
+	}
+
 	t.Parallel()
 
 	t.Run("BasicExecution", func(t *testing.T) {

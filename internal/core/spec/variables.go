@@ -7,6 +7,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/spec/types"
 )
 
 // loadVariables loads the environment variables from the map.
@@ -84,6 +85,43 @@ func loadVariables(ctx BuildContext, strVariables any) (
 		}
 
 		vars[pair.key] = value
+	}
+
+	return vars, nil
+}
+
+// loadVariablesFromEnvValue loads environment variables from a types.EnvValue.
+// This function converts the typed EnvValue entries to the expected format
+// and processes them using the same logic as loadVariables.
+func loadVariablesFromEnvValue(ctx BuildContext, env types.EnvValue) (
+	map[string]string, error,
+) {
+	if env.IsZero() {
+		return nil, nil
+	}
+
+	vars := map[string]string{}
+	for _, entry := range env.Entries() {
+		value := entry.Value
+
+		if !ctx.opts.Has(BuildFlagNoEval) {
+			// Evaluate the value of the environment variable.
+			// This also executes command substitution.
+			// Pass accumulated vars so ${VAR} can reference previously defined vars
+			var err error
+
+			value, err = cmdutil.EvalString(ctx.ctx, value, cmdutil.WithVariables(vars))
+			if err != nil {
+				return nil, core.NewValidationError("env", entry.Value, fmt.Errorf("%w: %s", ErrInvalidEnvValue, entry.Value))
+			}
+
+			// Set the environment variable.
+			if err := os.Setenv(entry.Key, value); err != nil {
+				return nil, core.NewValidationError("env", entry.Key, fmt.Errorf("%w: %s", err, entry.Key))
+			}
+		}
+
+		vars[entry.Key] = value
 	}
 
 	return vars, nil
