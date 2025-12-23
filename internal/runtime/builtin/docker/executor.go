@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/core"
@@ -253,8 +254,13 @@ func newDocker(ctx context.Context, step core.Step) (executor.Executor, error) {
 	// Priority 1: Step-level container field (new intuitive syntax)
 	// This is the preferred way to configure containers at step level
 	if step.Container != nil {
-		workDir := runtime.GetEnv(ctx).WorkingDir
-		c, err := LoadConfig(workDir, *step.Container, registryAuths)
+		// Expand environment variables in container fields at execution time
+		env := runtime.GetEnv(ctx)
+		expanded, err := cmdutil.EvalObject(ctx, *step.Container, runtime.AllEnvsMap(ctx))
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate container config: %w", err)
+		}
+		c, err := LoadConfig(env.WorkingDir, expanded, registryAuths)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load step container config: %w", err)
 		}
