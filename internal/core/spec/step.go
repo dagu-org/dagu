@@ -818,16 +818,6 @@ func buildStepContainer(ctx StepBuildContext, s *step, result *core.Step) error 
 		return nil
 	}
 
-	// Validate that step-level workingDir is not set when container is specified
-	// The container has its own workingDir field
-	if s.WorkingDir != "" || s.Dir != "" {
-		return core.NewValidationError(
-			"workingDir",
-			nil,
-			ErrContainerAndWorkingDirConflict,
-		)
-	}
-
 	// Validate that script field is not used with container
 	// Scripts are not supported in container execution
 	if s.Script != "" {

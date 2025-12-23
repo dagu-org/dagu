@@ -1574,29 +1574,6 @@ func TestBuildStepContainer(t *testing.T) {
 		})
 	}
 
-	// Test for container and workingDir conflict
-	t.Run("ContainerAndWorkingDirConflict", func(t *testing.T) {
-		s := &step{
-			Container:  &container{Image: "alpine:latest"},
-			WorkingDir: "/app",
-		}
-		result := &core.Step{}
-		err := buildStepContainer(testStepBuildContext(), s, result)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot use step-level 'workingDir' with 'container' field")
-	})
-
-	t.Run("ContainerAndDeprecatedDirConflict", func(t *testing.T) {
-		s := &step{
-			Container: &container{Image: "alpine:latest"},
-			Dir:       "/app",
-		}
-		result := &core.Step{}
-		err := buildStepContainer(testStepBuildContext(), s, result)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot use step-level 'workingDir' with 'container' field")
-	})
-
 	t.Run("ContainerAndScriptConflict", func(t *testing.T) {
 		s := &step{
 			Container: &container{Image: "alpine:latest"},
