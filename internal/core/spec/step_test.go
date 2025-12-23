@@ -998,6 +998,45 @@ func TestBuildStepExecutor(t *testing.T) {
 		},
 	}
 
+	// Test for container and executor conflict - any executor type is invalid when container is set
+	t.Run("ContainerAndExecutorConflict_StringExecutor", func(t *testing.T) {
+		s := &step{Executor: "docker"}
+		result := &core.Step{
+			Container:      &core.Container{Image: "alpine:latest"},
+			ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)},
+		}
+		err := buildStepExecutor(testStepBuildContext(), s, result)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot use both 'container' field and 'executor' field")
+	})
+
+	t.Run("ContainerAndExecutorConflict_MapExecutor", func(t *testing.T) {
+		s := &step{
+			Executor: map[string]any{
+				"type": "http",
+			},
+		}
+		result := &core.Step{
+			Container:      &core.Container{Image: "alpine:latest"},
+			ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)},
+		}
+		err := buildStepExecutor(testStepBuildContext(), s, result)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot use both 'container' field and 'executor' field")
+	})
+
+	t.Run("ContainerAndExecutorConflict_AnyExecutorType", func(t *testing.T) {
+		// Even non-docker executors should conflict with container field
+		s := &step{Executor: "ssh"}
+		result := &core.Step{
+			Container:      &core.Container{Image: "alpine:latest"},
+			ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)},
+		}
+		err := buildStepExecutor(testStepBuildContext(), s, result)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot use both 'container' field and 'executor' field")
+	})
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := &core.Step{ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)}}
@@ -1534,4 +1573,38 @@ func TestBuildStepContainer(t *testing.T) {
 			assert.Equal(t, tt.expected, result.Container)
 		})
 	}
+
+	// Test for container and workingDir conflict
+	t.Run("ContainerAndWorkingDirConflict", func(t *testing.T) {
+		s := &step{
+			Container:  &container{Image: "alpine:latest"},
+			WorkingDir: "/app",
+		}
+		result := &core.Step{}
+		err := buildStepContainer(testStepBuildContext(), s, result)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot use step-level 'workingDir' with 'container' field")
+	})
+
+	t.Run("ContainerAndDeprecatedDirConflict", func(t *testing.T) {
+		s := &step{
+			Container: &container{Image: "alpine:latest"},
+			Dir:       "/app",
+		}
+		result := &core.Step{}
+		err := buildStepContainer(testStepBuildContext(), s, result)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot use step-level 'workingDir' with 'container' field")
+	})
+
+	t.Run("ContainerAndScriptConflict", func(t *testing.T) {
+		s := &step{
+			Container: &container{Image: "alpine:latest"},
+			Script:    "echo hello\necho world",
+		}
+		result := &core.Step{}
+		err := buildStepContainer(testStepBuildContext(), s, result)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot use 'script' field with 'container' field")
+	})
 }

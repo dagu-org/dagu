@@ -193,6 +193,12 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	errs := runStepTransformers(ctx, s, result)
 
 	// Complex transformations that need access to result or set multiple fields
+	// Note: buildStepContainer must be called before buildStepExecutor because
+	// buildStepExecutor checks result.Container to determine if the step should
+	// use the docker executor.
+	if err := buildStepContainer(ctx, s, result); err != nil {
+		errs = append(errs, wrapTransformError("container", err))
+	}
 	if err := buildStepExecutor(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("executor", err))
 	}
@@ -207,9 +213,6 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	}
 	if err := buildStepSubDAG(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("subDAG", err))
-	}
-	if err := buildStepContainer(ctx, s, result); err != nil {
-		errs = append(errs, wrapTransformError("container", err))
 	}
 
 	if len(errs) > 0 {
@@ -673,13 +676,32 @@ func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 
 	executor := s.Executor
 
-	// Case 1: executor is nil
+	// Validate that container field and executor field are not both set
+	// The container field already specifies the execution method, so setting executor is redundant/conflicting
+	if result.Container != nil && executor != nil {
+		return core.NewValidationError(
+			"executor",
+			nil,
+			ErrContainerAndExecutorConflict,
+		)
+	}
+
+	// Case 1: executor is nil - determine executor from container/SSH config
 	if executor == nil {
+		// Priority 1: Step-level container takes precedence
+		// This is the new intuitive syntax for running steps in containers
+		if result.Container != nil {
+			result.ExecutorConfig.Type = "docker"
+			return nil
+		}
+		// Priority 2: DAG-level container
 		if ctx.dag != nil && ctx.dag.Container != nil {
 			// Translate the container configuration to executor config
 			result.ExecutorConfig.Type = "container"
 			return nil
-		} else if ctx.dag != nil && ctx.dag.SSH != nil {
+		}
+		// Priority 3: DAG-level SSH
+		if ctx.dag != nil && ctx.dag.SSH != nil {
 			result.ExecutorConfig.Type = "ssh"
 			return nil
 		}
@@ -794,6 +816,26 @@ func buildStepParallel(_ StepBuildContext, s *step, result *core.Step) error {
 func buildStepContainer(ctx StepBuildContext, s *step, result *core.Step) error {
 	if s.Container == nil {
 		return nil
+	}
+
+	// Validate that step-level workingDir is not set when container is specified
+	// The container has its own workingDir field
+	if s.WorkingDir != "" || s.Dir != "" {
+		return core.NewValidationError(
+			"workingDir",
+			nil,
+			ErrContainerAndWorkingDirConflict,
+		)
+	}
+
+	// Validate that script field is not used with container
+	// Scripts are not supported in container execution
+	if s.Script != "" {
+		return core.NewValidationError(
+			"script",
+			nil,
+			ErrContainerAndScriptConflict,
+		)
 	}
 
 	ct, err := buildContainerFromSpec(ctx.BuildContext, s.Container)
