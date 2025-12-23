@@ -150,8 +150,11 @@ func (e *docker) Run(ctx context.Context) error {
 	tw := executor.NewTailWriterWithEncoding(e.stderr, 0, env.LogEncodingCharset)
 	e.stderr = tw
 
+	// Only use DAG-level container client if this step does NOT have its own container config.
+	// When a step has its own container configuration (e.cfg != nil), it should run in its own
+	// container instead of the DAG-level shared container.
 	cli := GetContainerClient(ctx)
-	if cli != nil {
+	if cli != nil && e.cfg == nil {
 		logger.Debug(ctx, "Docker executor: using existing container client from context")
 		// If it exists, use the client from the context
 		// This allows sharing the same container client across multiple executors.
