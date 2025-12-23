@@ -590,6 +590,100 @@ func TestLoadConfigFromMap(t *testing.T) {
 				ExecOptions:   &container.ExecOptions{},
 			},
 		},
+		{
+			name: "WorkingDirShortcut",
+			input: map[string]any{
+				"image":      "alpine",
+				"workingDir": "/app",
+			},
+			expected: &Config{
+				Image: "alpine",
+				Pull:  core.PullPolicyMissing,
+				Container: &container.Config{
+					WorkingDir: "/app",
+				},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
+			},
+		},
+		{
+			name: "VolumesShortcut",
+			input: map[string]any{
+				"image":   "alpine",
+				"volumes": []string{"/host/path:/container/path", "/data:/data:ro"},
+			},
+			expected: &Config{
+				Image:     "alpine",
+				Pull:      core.PullPolicyMissing,
+				Container: &container.Config{},
+				Host: &container.HostConfig{
+					Binds: []string{"/host/path:/container/path", "/data:/data:ro"},
+				},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
+			},
+		},
+		{
+			name: "WorkingDirAndVolumesShortcuts",
+			input: map[string]any{
+				"image":      "golang:1.22",
+				"workingDir": "/work",
+				"volumes":    []string{"$PWD:/work"},
+			},
+			expected: &Config{
+				Image: "golang:1.22",
+				Pull:  core.PullPolicyMissing,
+				Container: &container.Config{
+					WorkingDir: "/work",
+				},
+				Host: &container.HostConfig{
+					Binds: []string{"$PWD:/work"},
+				},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
+			},
+		},
+		{
+			name: "WorkingDirShortcutDoesNotOverrideContainerWorkingDir",
+			input: map[string]any{
+				"image":      "alpine",
+				"workingDir": "/shortcut",
+				"container": map[string]any{
+					"WorkingDir": "/explicit",
+				},
+			},
+			expected: &Config{
+				Image: "alpine",
+				Pull:  core.PullPolicyMissing,
+				Container: &container.Config{
+					WorkingDir: "/explicit",
+				},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
+			},
+		},
+		{
+			name: "VolumesShortcutAppendsToHostBinds",
+			input: map[string]any{
+				"image":   "alpine",
+				"volumes": []string{"/new:/new"},
+				"host": map[string]any{
+					"Binds": []string{"/existing:/existing"},
+				},
+			},
+			expected: &Config{
+				Image:     "alpine",
+				Pull:      core.PullPolicyMissing,
+				Container: &container.Config{},
+				Host: &container.HostConfig{
+					Binds: []string{"/existing:/existing", "/new:/new"},
+				},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -617,6 +711,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			// Compare host config
 			assert.Equal(t, tt.expected.Host.AutoRemove, result.Host.AutoRemove)
 			assert.Equal(t, tt.expected.Host.Privileged, result.Host.Privileged)
+			assert.Equal(t, tt.expected.Host.Binds, result.Host.Binds)
 
 			// Compare exec options
 			assert.Equal(t, tt.expected.ExecOptions.User, result.ExecOptions.User)

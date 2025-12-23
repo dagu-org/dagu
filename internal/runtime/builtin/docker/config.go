@@ -62,6 +62,9 @@ func LoadConfigFromMap(data map[string]any, registryAuths map[string]*core.AuthC
 		Platform      string                   `mapstructure:"platform"`
 		ContainerName string                   `mapstructure:"containerName"`
 		Image         string                   `mapstructure:"image"`
+		// User-friendly shortcuts (mapped to nested fields)
+		WorkingDir string   `mapstructure:"workingDir"`
+		Volumes    []string `mapstructure:"volumes"`
 	}{}
 
 	md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
@@ -127,6 +130,17 @@ func LoadConfigFromMap(data map[string]any, registryAuths map[string]*core.AuthC
 			return nil, fmt.Errorf("failed to evaluate autoRemove value: %w", err)
 		}
 		autoRemove = v
+	}
+
+	// Apply user-friendly shortcuts to nested fields
+	// workingDir -> container.WorkingDir (only if container.WorkingDir is not already set)
+	if ret.WorkingDir != "" && ret.Container.WorkingDir == "" {
+		ret.Container.WorkingDir = ret.WorkingDir
+	}
+
+	// volumes -> host.Binds (append to existing binds)
+	if len(ret.Volumes) > 0 {
+		ret.Host.Binds = append(ret.Host.Binds, ret.Volumes...)
 	}
 
 	// Set up registry authentication if provided
