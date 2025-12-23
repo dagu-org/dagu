@@ -1009,7 +1009,11 @@
               "description": "Map format: {KEY1: value1, KEY2: value2}"
             }
           ],
-          "description": "Environment variables specific to this step. These override DAG-level environment variables with the same name. Supports three formats: 1) Map format: env: {KEY: value}, 2) Array of maps: env: [{KEY: value}], 3) Array of Key=Value strings: env: ['KEY=value'] (Docker/docker-compose compatible). Can use shell expansions (${VAR}), references to other environment variables, or command substitutions (`cmd`)."
+          "description": "Environment variables specific to this step. These override DAG-level environment variables with the same name. Supports three formats: 1) Map format: env: {KEY: value}, 2) Array of maps: env: [{KEY: value}], 3) Array of Key=Value strings: env: ['KEY=value'] (Docker/docker-compose compatible). Can use shell expansions (${VAR}), references to other environment variables, or command substitutions (`cmd`). When used with 'container' field, these are merged with container.env."
+        },
+        "container": {
+          "$ref": "#/definitions/container",
+          "description": "Container configuration for this step. When specified, the step runs in its own container instead of the DAG-level container. Uses the same configuration format as the DAG-level container field. Note: Cannot be used together with 'executor', 'workingDir', or 'script' fields."
         }
       }
     },
