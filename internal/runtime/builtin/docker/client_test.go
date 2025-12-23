@@ -3,6 +3,7 @@ package docker
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
@@ -590,6 +591,100 @@ func TestLoadConfigFromMap(t *testing.T) {
 				ExecOptions:   &container.ExecOptions{},
 			},
 		},
+		{
+			name: "WorkingDirShortcut",
+			input: map[string]any{
+				"image":      "alpine",
+				"workingDir": "/app",
+			},
+			expected: &Config{
+				Image: "alpine",
+				Pull:  core.PullPolicyMissing,
+				Container: &container.Config{
+					WorkingDir: "/app",
+				},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
+			},
+		},
+		{
+			name: "VolumesShortcut",
+			input: map[string]any{
+				"image":   "alpine",
+				"volumes": []string{"/host/path:/container/path", "/data:/data:ro"},
+			},
+			expected: &Config{
+				Image:     "alpine",
+				Pull:      core.PullPolicyMissing,
+				Container: &container.Config{},
+				Host: &container.HostConfig{
+					Binds: []string{"/host/path:/container/path", "/data:/data:ro"},
+				},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
+			},
+		},
+		{
+			name: "WorkingDirAndVolumesShortcuts",
+			input: map[string]any{
+				"image":      "golang:1.22",
+				"workingDir": "/work",
+				"volumes":    []string{"$PWD:/work"},
+			},
+			expected: &Config{
+				Image: "golang:1.22",
+				Pull:  core.PullPolicyMissing,
+				Container: &container.Config{
+					WorkingDir: "/work",
+				},
+				Host: &container.HostConfig{
+					Binds: []string{"$PWD:/work"},
+				},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
+			},
+		},
+		{
+			name: "WorkingDirShortcutDoesNotOverrideContainerWorkingDir",
+			input: map[string]any{
+				"image":      "alpine",
+				"workingDir": "/shortcut",
+				"container": map[string]any{
+					"WorkingDir": "/explicit",
+				},
+			},
+			expected: &Config{
+				Image: "alpine",
+				Pull:  core.PullPolicyMissing,
+				Container: &container.Config{
+					WorkingDir: "/explicit",
+				},
+				Host:        &container.HostConfig{},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
+			},
+		},
+		{
+			name: "VolumesShortcutAppendsToHostBinds",
+			input: map[string]any{
+				"image":   "alpine",
+				"volumes": []string{"/new:/new"},
+				"host": map[string]any{
+					"Binds": []string{"/existing:/existing"},
+				},
+			},
+			expected: &Config{
+				Image:     "alpine",
+				Pull:      core.PullPolicyMissing,
+				Container: &container.Config{},
+				Host: &container.HostConfig{
+					Binds: []string{"/existing:/existing", "/new:/new"},
+				},
+				Network:     &network.NetworkingConfig{},
+				ExecOptions: &container.ExecOptions{},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -617,6 +712,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 			// Compare host config
 			assert.Equal(t, tt.expected.Host.AutoRemove, result.Host.AutoRemove)
 			assert.Equal(t, tt.expected.Host.Privileged, result.Host.Privileged)
+			assert.Equal(t, tt.expected.Host.Binds, result.Host.Binds)
 
 			// Compare exec options
 			assert.Equal(t, tt.expected.ExecOptions.User, result.ExecOptions.User)
@@ -1188,6 +1284,80 @@ func TestLoadConfig(t *testing.T) {
 			if tt.expected.Network.EndpointsConfig != nil {
 				assert.Equal(t, tt.expected.Network.EndpointsConfig, result.Network.EndpointsConfig)
 			}
+		})
+	}
+}
+
+func TestMergeEnvVars(t *testing.T) {
+	tests := []struct {
+		name     string
+		base     []string
+		override []string
+		expected []string
+	}{
+		{
+			name:     "EmptyBase",
+			base:     nil,
+			override: []string{"FOO=bar"},
+			expected: []string{"FOO=bar"},
+		},
+		{
+			name:     "EmptyOverride",
+			base:     []string{"FOO=bar"},
+			override: nil,
+			expected: []string{"FOO=bar"},
+		},
+		{
+			name:     "BothEmpty",
+			base:     nil,
+			override: nil,
+			expected: nil,
+		},
+		{
+			name:     "NoOverlap",
+			base:     []string{"A=1", "B=2"},
+			override: []string{"C=3", "D=4"},
+			expected: []string{"A=1", "B=2", "C=3", "D=4"},
+		},
+		{
+			name:     "OverrideTakesPrecedence",
+			base:     []string{"SHARED=base_value", "A=1"},
+			override: []string{"SHARED=override_value", "B=2"},
+			expected: []string{"A=1", "B=2", "SHARED=override_value"},
+		},
+		{
+			name:     "CompleteOverride",
+			base:     []string{"X=old"},
+			override: []string{"X=new"},
+			expected: []string{"X=new"},
+		},
+		{
+			name:     "ValueWithEquals",
+			base:     []string{"URL=http://example.com?a=1&b=2"},
+			override: []string{"OTHER=value"},
+			expected: []string{"OTHER=value", "URL=http://example.com?a=1&b=2"},
+		},
+		{
+			name:     "EmptyValue",
+			base:     []string{"EMPTY="},
+			override: []string{"OTHER=val"},
+			expected: []string{"EMPTY=", "OTHER=val"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := mergeEnvVars(tt.base, tt.override)
+
+			// Sort both for comparison since map iteration order is not deterministic
+			if result != nil {
+				sort.Strings(result)
+			}
+			if tt.expected != nil {
+				sort.Strings(tt.expected)
+			}
+
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

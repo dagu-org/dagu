@@ -24,6 +24,8 @@ var (
 	ErrExecutorConfigValueMustBeMap        = errors.New("executor.config value must be a map")
 	ErrExecutorHasInvalidKey               = errors.New("executor has invalid key")
 	ErrExecutorConfigMustBeStringOrMap     = errors.New("executor config must be string or map")
+	ErrContainerAndExecutorConflict        = errors.New("cannot use both 'container' field and 'executor' field - the 'container' field already specifies the execution method")
+	ErrContainerAndScriptConflict          = errors.New("cannot use 'script' field with 'container' field - use 'command' field instead")
 	ErrInvalidEnvValue                     = errors.New("env config should be map of strings or array of key=value formatted string")
 	ErrInvalidParamValue                   = errors.New("invalid parameter value")
 	ErrStepCommandIsEmpty                  = errors.New("step command is empty")

@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -131,6 +132,12 @@ func (e *docker) Kill(sig os.Signal) error {
 }
 
 func (e *docker) Run(ctx context.Context) error {
+	logger.Debug(ctx, "Docker executor: Run started",
+		slog.String("stepName", e.step.Name),
+		slog.String("command", e.step.Command),
+		slog.Any("args", e.step.Args),
+	)
+
 	ctx, cancelFunc := context.WithCancel(ctx)
 	e.context = ctx
 	e.cancel = cancelFunc
@@ -143,8 +150,12 @@ func (e *docker) Run(ctx context.Context) error {
 	tw := executor.NewTailWriterWithEncoding(e.stderr, 0, env.LogEncodingCharset)
 	e.stderr = tw
 
+	// Only use DAG-level container client if this step does NOT have its own container config.
+	// When a step has its own container configuration (e.cfg != nil), it should run in its own
+	// container instead of the DAG-level shared container.
 	cli := GetContainerClient(ctx)
-	if cli != nil {
+	if cli != nil && e.cfg == nil {
+		logger.Debug(ctx, "Docker executor: using existing container client from context")
 		// If it exists, use the client from the context
 		// This allows sharing the same container client across multiple executors.
 		// Don't set WorkingDir - use the container's default working directory
@@ -175,16 +186,23 @@ func (e *docker) Run(ctx context.Context) error {
 	}
 
 	if e.cfg == nil {
+		logger.Error(ctx, "Docker executor: config is nil")
 		return ErrExecutorConfigRequired
 	}
 
+	logger.Debug(ctx, "Docker executor: initializing new container client",
+		slog.String("image", e.cfg.Image),
+		slog.String("containerName", e.cfg.ContainerName),
+	)
 	cli, err := InitializeClient(ctx, e.cfg)
 	if err != nil {
+		logger.Error(ctx, "Docker executor: failed to initialize client", slog.Any("error", err))
 		if tail := tw.Tail(); tail != "" {
 			return fmt.Errorf("failed to setup container: %w\nrecent stderr (tail):\n%s", err, tail)
 		}
 		return fmt.Errorf("failed to setup container: %w", err)
 	}
+	logger.Debug(ctx, "Docker executor: container client initialized")
 
 	e.container = cli
 	defer e.container.Close(ctx)
@@ -194,17 +212,27 @@ func (e *docker) Run(ctx context.Context) error {
 	if e.step.Command != "" {
 		cmd = append([]string{e.step.Command}, e.step.Args...)
 	}
+	logger.Debug(ctx, "Docker executor: calling container.Run",
+		slog.Any("cmd", cmd),
+	)
 
 	exitCode, err := e.container.Run(ctx, cmd, e.stdout, e.stderr)
+	logger.Debug(ctx, "Docker executor: container.Run returned",
+		slog.Int("exitCode", exitCode),
+		slog.Bool("hasError", err != nil),
+	)
 
 	e.mu.Lock()
 	e.exitCode = exitCode
 	e.mu.Unlock()
 
 	if err != nil {
+		logger.Error(ctx, "Docker executor: Run completed with error", slog.Any("error", err))
 		if tail := tw.Tail(); tail != "" {
 			return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tail)
 		}
+	} else {
+		logger.Debug(ctx, "Docker executor: Run completed successfully")
 	}
 	return err
 }
@@ -218,11 +246,32 @@ func (e *docker) ExitCode() int {
 
 func newDocker(ctx context.Context, step core.Step) (executor.Executor, error) {
 	execCfg := step.ExecutorConfig
+	registryAuths := getRegistryAuth(ctx)
 
 	var cfg *Config
-	if len(execCfg.Config) > 0 {
-		// Get registry auth from context if available
-		registryAuths := getRegistryAuth(ctx)
+
+	// Priority 1: Step-level container field (new intuitive syntax)
+	// This is the preferred way to configure containers at step level
+	if step.Container != nil {
+		// Expand environment variables in container fields at execution time
+		env := runtime.GetEnv(ctx)
+		expanded, err := evalContainerFields(ctx, *step.Container)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate container config: %w", err)
+		}
+		c, err := LoadConfig(env.WorkingDir, expanded, registryAuths)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load step container config: %w", err)
+		}
+		// Set ShouldStart to true for step-level containers
+		// This ensures the container is automatically created and started
+		c.ShouldStart = true
+		// Merge step-level env into container env
+		// Step env comes first, container env comes last (higher priority)
+		c.Container.Env = mergeEnvVars(step.Env, c.Container.Env)
+		cfg = c
+	} else if len(execCfg.Config) > 0 {
+		// Priority 2: Executor config map (legacy syntax: executor.config)
 		c, err := LoadConfigFromMap(execCfg.Config, registryAuths)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load container config: %w", err)
@@ -240,6 +289,100 @@ func newDocker(ctx context.Context, step core.Step) (executor.Executor, error) {
 		stdout: os.Stdout,
 		stderr: os.Stderr,
 	}, nil
+}
+
+// mergeEnvVars merges two env var slices, with later values taking precedence.
+// Both slices use "KEY=VALUE" format. If the same key appears in both,
+// the value from the second slice (higher priority) is used.
+func mergeEnvVars(base, override []string) []string {
+	if len(base) == 0 {
+		return override
+	}
+	if len(override) == 0 {
+		return base
+	}
+
+	// Build a map of key -> value from base
+	envMap := make(map[string]string)
+	for _, env := range base {
+		if idx := strings.Index(env, "="); idx > 0 {
+			envMap[env[:idx]] = env[idx+1:]
+		}
+	}
+
+	// Override with values from the second slice
+	for _, env := range override {
+		if idx := strings.Index(env, "="); idx > 0 {
+			envMap[env[:idx]] = env[idx+1:]
+		}
+	}
+
+	// Convert back to slice
+	result := make([]string, 0, len(envMap))
+	for key, value := range envMap {
+		result = append(result, key+"="+value)
+	}
+
+	return result
+}
+
+// evalContainerFields evaluates environment variables in container fields at runtime.
+// Only fields that commonly use variables are evaluated:
+// - Image, Name, User, WorkingDir, Network (string fields)
+// - Volumes, Ports, Env, Command (slice fields)
+// Fields like PullPolicy, Startup, WaitFor, KeepContainer are NOT evaluated
+// as they have specific enum/boolean values.
+func evalContainerFields(ctx context.Context, ct core.Container) (core.Container, error) {
+	var err error
+
+	// Evaluate string fields
+	if ct.Image, err = runtime.EvalString(ctx, ct.Image); err != nil {
+		return ct, fmt.Errorf("failed to evaluate image: %w", err)
+	}
+	if ct.Name, err = runtime.EvalString(ctx, ct.Name); err != nil {
+		return ct, fmt.Errorf("failed to evaluate name: %w", err)
+	}
+	if ct.User, err = runtime.EvalString(ctx, ct.User); err != nil {
+		return ct, fmt.Errorf("failed to evaluate user: %w", err)
+	}
+	if ct.WorkingDir, err = runtime.EvalString(ctx, ct.WorkingDir); err != nil {
+		return ct, fmt.Errorf("failed to evaluate workingDir: %w", err)
+	}
+	if ct.Network, err = runtime.EvalString(ctx, ct.Network); err != nil {
+		return ct, fmt.Errorf("failed to evaluate network: %w", err)
+	}
+
+	// Evaluate slice fields
+	if ct.Volumes, err = evalStringSlice(ctx, ct.Volumes); err != nil {
+		return ct, fmt.Errorf("failed to evaluate volumes: %w", err)
+	}
+	if ct.Ports, err = evalStringSlice(ctx, ct.Ports); err != nil {
+		return ct, fmt.Errorf("failed to evaluate ports: %w", err)
+	}
+	if ct.Env, err = evalStringSlice(ctx, ct.Env); err != nil {
+		return ct, fmt.Errorf("failed to evaluate env: %w", err)
+	}
+	if ct.Command, err = evalStringSlice(ctx, ct.Command); err != nil {
+		return ct, fmt.Errorf("failed to evaluate command: %w", err)
+	}
+
+	return ct, nil
+}
+
+// evalStringSlice evaluates each string in a slice using runtime.EvalString.
+func evalStringSlice(ctx context.Context, ss []string) ([]string, error) {
+	if len(ss) == 0 {
+		return ss, nil
+	}
+	result := make([]string, len(ss))
+	for i, s := range ss {
+		evaluated, err := runtime.EvalString(ctx, s)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = evaluated
+	}
+	return result, nil
 }
 
 func init() {
