@@ -74,6 +74,10 @@ type Step struct {
 	// Timeout specifies the maximum execution time for the step.
 	// If set, this timeout takes precedence over the DAG-level timeout for this step.
 	Timeout time.Duration `json:"timeout,omitempty"`
+	// Container specifies the container configuration for this step.
+	// If set, the step runs in its own container instead of the DAG-level container.
+	// This uses the same configuration format as the DAG-level container field.
+	Container *Container `json:"container,omitempty"`
 }
 
 // String returns a formatted string representation of the step

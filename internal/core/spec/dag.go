@@ -745,24 +745,28 @@ func buildWorkingDir(ctx BuildContext, d *dag) (string, error) {
 }
 
 func buildContainer(ctx BuildContext, d *dag) (*core.Container, error) {
-	// If no container is specified, there's no container config
 	if d.Container == nil {
 		return nil, nil
 	}
+	return buildContainerFromSpec(ctx, d.Container)
+}
 
+// buildContainerFromSpec is a shared function that builds a core.Container from a container spec.
+// It is used by both DAG-level and step-level container configuration.
+func buildContainerFromSpec(ctx BuildContext, c *container) (*core.Container, error) {
 	// If container is specified but image is empty, return an error
-	if d.Container.Image == "" {
-		return nil, core.NewValidationError("container.image", d.Container.Image, fmt.Errorf("image is required when container is specified"))
+	if c.Image == "" {
+		return nil, core.NewValidationError("container.image", c.Image, fmt.Errorf("image is required when container is specified"))
 	}
 
-	pullPolicy, err := core.ParsePullPolicy(d.Container.PullPolicy)
+	pullPolicy, err := core.ParsePullPolicy(c.PullPolicy)
 	if err != nil {
-		return nil, core.NewValidationError("container.pullPolicy", d.Container.PullPolicy, err)
+		return nil, core.NewValidationError("container.pullPolicy", c.PullPolicy, err)
 	}
 
-	vars, err := loadVariables(ctx, d.Container.Env)
+	vars, err := loadVariables(ctx, c.Env)
 	if err != nil {
-		return nil, core.NewValidationError("container.env", d.Container.Env, err)
+		return nil, core.NewValidationError("container.env", c.Env, err)
 	}
 
 	var envs []string
@@ -770,32 +774,32 @@ func buildContainer(ctx BuildContext, d *dag) (*core.Container, error) {
 		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	container := &core.Container{
-		Name:          strings.TrimSpace(d.Container.Name),
-		Image:         d.Container.Image,
+	result := &core.Container{
+		Name:          strings.TrimSpace(c.Name),
+		Image:         c.Image,
 		PullPolicy:    pullPolicy,
 		Env:           envs,
-		Volumes:       d.Container.Volumes,
-		User:          d.Container.User,
-		Platform:      d.Container.Platform,
-		Ports:         d.Container.Ports,
-		Network:       d.Container.Network,
-		KeepContainer: d.Container.KeepContainer,
-		Startup:       core.ContainerStartup(strings.ToLower(strings.TrimSpace(d.Container.Startup))),
-		Command:       d.Container.Command,
-		WaitFor:       core.ContainerWaitFor(strings.ToLower(strings.TrimSpace(d.Container.WaitFor))),
-		LogPattern:    d.Container.LogPattern,
-		RestartPolicy: strings.TrimSpace(d.Container.RestartPolicy),
+		Volumes:       c.Volumes,
+		User:          c.User,
+		Platform:      c.Platform,
+		Ports:         c.Ports,
+		Network:       c.Network,
+		KeepContainer: c.KeepContainer,
+		Startup:       core.ContainerStartup(strings.ToLower(strings.TrimSpace(c.Startup))),
+		Command:       c.Command,
+		WaitFor:       core.ContainerWaitFor(strings.ToLower(strings.TrimSpace(c.WaitFor))),
+		LogPattern:    c.LogPattern,
+		RestartPolicy: strings.TrimSpace(c.RestartPolicy),
 	}
 
 	// Backward compatibility
-	if d.Container.WorkDir != "" {
-		container.WorkingDir = d.Container.WorkDir
+	if c.WorkDir != "" {
+		result.WorkingDir = c.WorkDir
 	} else {
-		container.WorkingDir = d.Container.WorkingDir
+		result.WorkingDir = c.WorkingDir
 	}
 
-	return container, nil
+	return result, nil
 }
 
 func buildRegistryAuths(ctx BuildContext, d *dag) (map[string]*core.AuthConfig, error) {

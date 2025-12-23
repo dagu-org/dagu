@@ -84,6 +84,10 @@ type step struct {
 	Env types.EnvValue `yaml:"env,omitempty"`
 	// TimeoutSec specifies the maximum runtime for the step in seconds.
 	TimeoutSec int `yaml:"timeoutSec,omitempty"`
+	// Container specifies the container configuration for this step.
+	// If set, the step runs in its own container instead of the DAG-level container.
+	// This uses the same configuration format as the DAG-level container field.
+	Container *container `yaml:"container,omitempty"`
 }
 
 // repeatPolicy defines the repeat policy for a step.
@@ -203,6 +207,9 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	}
 	if err := buildStepSubDAG(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("subDAG", err))
+	}
+	if err := buildStepContainer(ctx, s, result); err != nil {
+		errs = append(errs, wrapTransformError("container", err))
 	}
 
 	if len(errs) > 0 {
@@ -780,6 +787,21 @@ func buildStepParallel(_ StepBuildContext, s *step, result *core.Step) error {
 		return core.NewValidationError("parallel", v, fmt.Errorf("parallel must be string, array, or object, got %T", v))
 	}
 
+	return nil
+}
+
+// buildStepContainer parses the container field in the step definition.
+func buildStepContainer(ctx StepBuildContext, s *step, result *core.Step) error {
+	if s.Container == nil {
+		return nil
+	}
+
+	ct, err := buildContainerFromSpec(ctx.BuildContext, s.Container)
+	if err != nil {
+		return err
+	}
+
+	result.Container = ct
 	return nil
 }
 

@@ -1392,3 +1392,146 @@ func TestParseParallelItems(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildStepContainer(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    *container
+		expected *core.Container
+		wantErr  bool
+	}{
+		{
+			name:     "Nil",
+			input:    nil,
+			expected: nil,
+		},
+		{
+			name:    "MissingImage",
+			input:   &container{},
+			wantErr: true,
+		},
+		{
+			name: "BasicContainer",
+			input: &container{
+				Image: "alpine:latest",
+			},
+			expected: &core.Container{
+				Image:      "alpine:latest",
+				PullPolicy: core.PullPolicyMissing,
+			},
+		},
+		{
+			name: "FullContainerConfig",
+			input: &container{
+				Name:          "my-step-container",
+				Image:         "golang:1.22",
+				PullPolicy:    "always",
+				Volumes:       []string{"./src:/app"},
+				User:          "1000",
+				WorkingDir:    "/app",
+				Platform:      "linux/amd64",
+				Ports:         []string{"8080:8080"},
+				Network:       "host",
+				KeepContainer: false,
+				Startup:       "entrypoint",
+				Command:       []string{"go", "build"},
+				WaitFor:       "running",
+				LogPattern:    "ready",
+				RestartPolicy: "no",
+			},
+			expected: &core.Container{
+				Name:          "my-step-container",
+				Image:         "golang:1.22",
+				PullPolicy:    core.PullPolicyAlways,
+				Volumes:       []string{"./src:/app"},
+				User:          "1000",
+				WorkingDir:    "/app",
+				Platform:      "linux/amd64",
+				Ports:         []string{"8080:8080"},
+				Network:       "host",
+				KeepContainer: false,
+				Startup:       core.StartupEntrypoint,
+				Command:       []string{"go", "build"},
+				WaitFor:       core.WaitForRunning,
+				LogPattern:    "ready",
+				RestartPolicy: "no",
+			},
+		},
+		{
+			name: "ContainerWithEnvAsMap",
+			input: &container{
+				Image: "node:20",
+				Env:   map[string]any{"NODE_ENV": "production"},
+			},
+			expected: &core.Container{
+				Image:      "node:20",
+				PullPolicy: core.PullPolicyMissing,
+				Env:        []string{"NODE_ENV=production"},
+			},
+		},
+		{
+			name: "ContainerWithVolumes",
+			input: &container{
+				Image:   "postgres:16",
+				Volumes: []string{"./data:/var/lib/postgresql/data", "/tmp:/tmp:ro"},
+			},
+			expected: &core.Container{
+				Image:      "postgres:16",
+				PullPolicy: core.PullPolicyMissing,
+				Volumes:    []string{"./data:/var/lib/postgresql/data", "/tmp:/tmp:ro"},
+			},
+		},
+		{
+			name: "PullPolicyNever",
+			input: &container{
+				Image:      "myimage:local",
+				PullPolicy: "never",
+			},
+			expected: &core.Container{
+				Image:      "myimage:local",
+				PullPolicy: core.PullPolicyNever,
+			},
+		},
+		{
+			name: "PullPolicyMissing",
+			input: &container{
+				Image:      "alpine:3.18",
+				PullPolicy: "missing",
+			},
+			expected: &core.Container{
+				Image:      "alpine:3.18",
+				PullPolicy: core.PullPolicyMissing,
+			},
+		},
+		{
+			name: "BackwardCompatWorkDir",
+			input: &container{
+				Image:   "alpine:latest",
+				WorkDir: "/legacy",
+			},
+			expected: &core.Container{
+				Image:      "alpine:latest",
+				PullPolicy: core.PullPolicyMissing,
+				WorkingDir: "/legacy",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &step{Container: tt.input}
+			result := &core.Step{}
+			err := buildStepContainer(testStepBuildContext(), s, result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result.Container)
+		})
+	}
+}
