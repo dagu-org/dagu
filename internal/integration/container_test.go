@@ -513,3 +513,231 @@ func waitForContainerStop(t *testing.T, th test.Helper, dockerClient *client.Cli
 	}
 	return false
 }
+
+// TestStepLevelContainer tests the new step-level container syntax
+// which allows specifying a container field directly on a step instead of
+// using the executor syntax.
+func TestStepLevelContainer(t *testing.T) {
+	tests := []containerTest{
+		{
+			name: "BasicStepContainer",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+steps:
+  - name: run-in-container
+    container:
+      image: %s
+    command: echo "hello from step container"
+    output: STEP_CONTAINER_OUT
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"STEP_CONTAINER_OUT": "hello from step container",
+			},
+		},
+		{
+			name: "StepContainerWithWorkingDir",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+steps:
+  - name: check-workdir
+    container:
+      image: %s
+      workingDir: /tmp
+    command: pwd
+    output: STEP_WORKDIR_OUT
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"STEP_WORKDIR_OUT": "/tmp",
+			},
+		},
+		{
+			name: "StepContainerWithEnv",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+steps:
+  - name: check-env
+    container:
+      image: %s
+      env:
+        - MY_VAR=hello_world
+    command: sh -c "echo $MY_VAR"
+    output: STEP_ENV_OUT
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"STEP_ENV_OUT": "hello_world",
+			},
+		},
+		{
+			name: "StepContainerWithVolume",
+			dagConfigFunc: func(tempDir string) string {
+				return fmt.Sprintf(`
+steps:
+  - name: write-file
+    container:
+      image: %s
+      volumes:
+        - %s:/data
+    command: sh -c "echo 'step volume test' > /data/step_test.txt"
+  - name: read-file
+    container:
+      image: %s
+      volumes:
+        - %s:/data
+    command: cat /data/step_test.txt
+    output: STEP_VOL_OUT
+    depends:
+      - write-file
+`, testImage, tempDir, testImage, tempDir)
+			},
+			expectedOutputs: map[string]any{
+				"STEP_VOL_OUT": "step volume test",
+			},
+		},
+		{
+			name: "MultipleStepsWithDifferentContainers",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+steps:
+  - name: alpine-step
+    container:
+      image: %s
+    command: cat /etc/alpine-release
+    output: ALPINE_VERSION
+  - name: busybox-step
+    container:
+      image: busybox:latest
+    command: echo "busybox step"
+    output: BUSYBOX_OUT
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"BUSYBOX_OUT": "busybox step",
+			},
+		},
+		{
+			name: "StepContainerOverridesDAGContainer",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+# DAG-level container - steps without container field use this
+container:
+  image: busybox:latest
+
+steps:
+  - name: use-dag-container
+    command: echo "in DAG container"
+    output: DAG_CONTAINER_OUT
+  - name: use-step-container
+    container:
+      image: %s
+    command: cat /etc/alpine-release
+    output: STEP_CONTAINER_OUT
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"DAG_CONTAINER_OUT": "in DAG container",
+			},
+		},
+		{
+			name: "StepContainerWithUser",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+steps:
+  - name: check-user
+    container:
+      image: %s
+      user: "nobody"
+    command: whoami
+    output: STEP_USER_OUT
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"STEP_USER_OUT": "nobody",
+			},
+		},
+		{
+			name: "StepContainerWithPullPolicy",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+steps:
+  - name: pull-never
+    container:
+      image: %s
+      pullPolicy: never
+    command: echo "pull never ok"
+    output: PULL_NEVER_OUT
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"PULL_NEVER_OUT": "pull never ok",
+			},
+		},
+		{
+			name: "StepEnvMergedIntoContainer",
+			dagConfigFunc: func(_ string) string {
+				// Test that step.env is merged with container.env
+				// container.env takes precedence for shared keys
+				// Use printenv to show actual environment in container
+				return fmt.Sprintf(`
+steps:
+  - name: check-merged-env
+    env:
+      - STEP_VAR=from_step
+      - SHARED_VAR=step_value
+    container:
+      image: %s
+      env:
+        - CONTAINER_VAR=from_container
+        - SHARED_VAR=container_value
+    command: printenv SHARED_VAR
+    output: MERGED_ENV_OUT
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				// SHARED_VAR should be container_value (container.env takes precedence)
+				"MERGED_ENV_OUT": "container_value",
+			},
+		},
+		{
+			name: "StepEnvOnlyPassedToContainer",
+			dagConfigFunc: func(_ string) string {
+				// Test that step.env is passed to container even without container.env
+				return fmt.Sprintf(`
+steps:
+  - name: step-env-only
+    env:
+      - MY_STEP_VAR=hello_from_step
+    container:
+      image: %s
+    command: printenv MY_STEP_VAR
+    output: STEP_ENV_ONLY_OUT
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"STEP_ENV_ONLY_OUT": "hello_from_step",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tempDir, err := os.MkdirTemp("", fmt.Sprintf("%s-step-%s-*", containerPrefix, tt.name))
+			require.NoError(t, err, "failed to create temporary directory")
+			t.Cleanup(func() { _ = os.RemoveAll(tempDir) })
+
+			if tt.setupFunc != nil {
+				tt.setupFunc(t, tempDir)
+			}
+
+			th := test.Setup(t)
+			dag := th.DAG(t, tt.dagConfigFunc(tempDir))
+			dag.Agent().RunSuccess(t)
+			dag.AssertLatestStatus(t, core.Succeeded)
+			dag.AssertOutputs(t, tt.expectedOutputs)
+		})
+	}
+}

@@ -3,6 +3,7 @@ package docker
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
@@ -1283,6 +1284,80 @@ func TestLoadConfig(t *testing.T) {
 			if tt.expected.Network.EndpointsConfig != nil {
 				assert.Equal(t, tt.expected.Network.EndpointsConfig, result.Network.EndpointsConfig)
 			}
+		})
+	}
+}
+
+func TestMergeEnvVars(t *testing.T) {
+	tests := []struct {
+		name     string
+		base     []string
+		override []string
+		expected []string
+	}{
+		{
+			name:     "EmptyBase",
+			base:     nil,
+			override: []string{"FOO=bar"},
+			expected: []string{"FOO=bar"},
+		},
+		{
+			name:     "EmptyOverride",
+			base:     []string{"FOO=bar"},
+			override: nil,
+			expected: []string{"FOO=bar"},
+		},
+		{
+			name:     "BothEmpty",
+			base:     nil,
+			override: nil,
+			expected: nil,
+		},
+		{
+			name:     "NoOverlap",
+			base:     []string{"A=1", "B=2"},
+			override: []string{"C=3", "D=4"},
+			expected: []string{"A=1", "B=2", "C=3", "D=4"},
+		},
+		{
+			name:     "OverrideTakesPrecedence",
+			base:     []string{"SHARED=base_value", "A=1"},
+			override: []string{"SHARED=override_value", "B=2"},
+			expected: []string{"A=1", "B=2", "SHARED=override_value"},
+		},
+		{
+			name:     "CompleteOverride",
+			base:     []string{"X=old"},
+			override: []string{"X=new"},
+			expected: []string{"X=new"},
+		},
+		{
+			name:     "ValueWithEquals",
+			base:     []string{"URL=http://example.com?a=1&b=2"},
+			override: []string{"OTHER=value"},
+			expected: []string{"OTHER=value", "URL=http://example.com?a=1&b=2"},
+		},
+		{
+			name:     "EmptyValue",
+			base:     []string{"EMPTY="},
+			override: []string{"OTHER=val"},
+			expected: []string{"EMPTY=", "OTHER=val"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := mergeEnvVars(tt.base, tt.override)
+
+			// Sort both for comparison since map iteration order is not deterministic
+			if result != nil {
+				sort.Strings(result)
+			}
+			if tt.expected != nil {
+				sort.Strings(tt.expected)
+			}
+
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
