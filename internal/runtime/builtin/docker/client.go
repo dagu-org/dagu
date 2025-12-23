@@ -93,15 +93,28 @@ type ExecOptions struct {
 
 // InitializeClient creates a new container client
 func InitializeClient(ctx context.Context, cfg *Config) (*Client, error) {
+	logger.Debug(ctx, "Docker: InitializeClient started",
+		slog.String("image", cfg.Image),
+		slog.String("containerName", cfg.ContainerName),
+		slog.Bool("autoRemove", cfg.AutoRemove),
+	)
+
 	dockerCli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
+		logger.Error(ctx, "Docker: failed to create docker client", tag.Error(err))
 		return nil, err
 	}
+	logger.Debug(ctx, "Docker: docker client created successfully")
 
 	platform, err := getPlatform(ctx, dockerCli, cfg)
 	if err != nil {
+		logger.Error(ctx, "Docker: failed to get platform", tag.Error(err))
 		return nil, err
 	}
+	logger.Debug(ctx, "Docker: platform resolved",
+		slog.String("os", platform.OS),
+		slog.String("arch", platform.Architecture),
+	)
 
 	// Check if the container is running when containerName is specified
 	var ctID string
@@ -120,6 +133,9 @@ func InitializeClient(ctx context.Context, cfg *Config) (*Client, error) {
 		}
 	}
 
+	logger.Debug(ctx, "Docker: InitializeClient completed successfully",
+		slog.String("containerID", ctID),
+	)
 	return &Client{
 		cfg:         cfg,
 		containerID: ctID,
@@ -370,10 +386,16 @@ func (c *Client) StopContainerKeepAlive(ctx context.Context) {
 
 // Run executes the command in the container and returns exit code
 func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer) (int, error) {
+	logger.Debug(ctx, "Docker: Run started",
+		slog.Any("cmd", cmd),
+		slog.String("containerID", c.containerID),
+	)
+
 	ctID := c.containerID
 
 	// check if container with the same name already exists
 	if ctID != "" {
+		logger.Debug(ctx, "Docker: Run checking existing container", slog.String("containerID", ctID))
 		// Check if the container is running
 		info, err := c.cli.ContainerInspect(ctx, ctID)
 		if err != nil && !errdefs.IsNotFound(err) {
@@ -392,10 +414,16 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 	// If container is not running, start a new one
 	// The container should be stopped and removed after run with autoRemove
 	// set to true.
+	logger.Debug(ctx, "Docker: Run starting new container",
+		slog.String("containerName", c.cfg.ContainerName),
+		slog.Any("cmd", cmd),
+	)
 	ctID, err := c.startNewContainer(ctx, c.cfg.ContainerName, c.cli, cmd, false)
 	if err != nil {
+		logger.Error(ctx, "Docker: Run failed to start new container", tag.Error(err))
 		return errorExitCode, fmt.Errorf("failed to start a new container: %w", err)
 	}
+	logger.Debug(ctx, "Docker: Run new container started", slog.String("containerID", ctID))
 
 	var once sync.Once
 	defer func() {
@@ -410,9 +438,15 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 		})
 	}()
 
+	logger.Debug(ctx, "Docker: Run calling attachAndWait", slog.String("containerID", ctID))
 	exitCode, err := c.attachAndWait(ctx, c.cli, ctID, stdout, stderr)
+	logger.Debug(ctx, "Docker: Run attachAndWait returned",
+		slog.Int("exitCode", exitCode),
+		slog.Bool("hasError", err != nil),
+	)
 
 	// Wait for container to be stopped before returning
+	logger.Debug(ctx, "Docker: Run waiting for container to stop")
 	for {
 		info, err := c.cli.ContainerInspect(context.Background(), ctID)
 		if err != nil {
@@ -422,12 +456,15 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 			return exitCode, fmt.Errorf("failed to inspect container %s: %w", ctID, err)
 		}
 		if info.State != nil && !info.State.Running {
+			logger.Debug(ctx, "Docker: Run container stopped", slog.String("status", info.State.Status))
 			break
 		}
+		logger.Debug(ctx, "Docker: Run container still running, waiting...")
 
 		time.Sleep(defaultPollInterval)
 	}
 
+	logger.Debug(ctx, "Docker: Run completed", slog.Int("exitCode", exitCode))
 	return exitCode, err
 }
 
@@ -467,10 +504,18 @@ func (c *Client) Stop(sig os.Signal) error {
 }
 
 func (c *Client) startNewContainer(ctx context.Context, name string, cli *client.Client, cmd []string, clearEntrypoint bool) (string, error) {
+	logger.Debug(ctx, "Docker: startNewContainer started",
+		slog.String("name", name),
+		slog.Any("cmd", cmd),
+		slog.Bool("clearEntrypoint", clearEntrypoint),
+	)
+
 	pull, err := c.shouldPullImage(ctx, cli, &c.platform)
 	if err != nil {
+		logger.Error(ctx, "Docker: startNewContainer shouldPullImage failed", tag.Error(err))
 		return "", err
 	}
+	logger.Debug(ctx, "Docker: startNewContainer shouldPullImage result", slog.Bool("pull", pull))
 
 	logger.Info(ctx, "Creating a new container",
 		slog.Any("platform", c.platform),
@@ -481,6 +526,7 @@ func (c *Client) startNewContainer(ctx context.Context, name string, cli *client
 
 	if pull {
 		logger.Infof(ctx, "Pulling the image %q", c.cfg.Image)
+		logger.Debug(ctx, "Docker: startNewContainer beginning image pull")
 
 		// Get pull options with authentication if configured
 		var pullOpts image.PullOptions
@@ -488,19 +534,25 @@ func (c *Client) startNewContainer(ctx context.Context, name string, cli *client
 			var err error
 			pullOpts, err = c.authManager.GetPullOptions(c.cfg.Image, platforms.Format(c.platform))
 			if err != nil {
+				logger.Error(ctx, "Docker: startNewContainer failed to get pull options", tag.Error(err))
 				return "", fmt.Errorf("failed to get pull options: %w", err)
 			}
 		} else {
 			pullOpts = image.PullOptions{Platform: platforms.Format(c.platform)}
 		}
 
+		logger.Debug(ctx, "Docker: startNewContainer calling ImagePull")
 		reader, err := cli.ImagePull(ctx, c.cfg.Image, pullOpts)
 		if err != nil {
+			logger.Error(ctx, "Docker: startNewContainer ImagePull failed", tag.Error(err))
 			return "", err
 		}
-		logger.Infof(ctx, "Successfully pulled the image %q", c.cfg.Image)
+		logger.Debug(ctx, "Docker: startNewContainer ImagePull returned, draining reader")
 		// Output pull-image log to stderr instead of stdout
 		_, _ = io.Copy(io.Discard, reader)
+		_ = reader.Close()
+		logger.Debug(ctx, "Docker: startNewContainer image pull completed")
+		logger.Infof(ctx, "Successfully pulled the image %q", c.cfg.Image)
 	}
 
 	ctCfg := *c.cfg.Container // Copy to avoid mutating original
@@ -514,12 +566,23 @@ func (c *Client) startNewContainer(ctx context.Context, name string, cli *client
 		}
 	}
 
+	logger.Debug(ctx, "Docker: startNewContainer calling ContainerCreate",
+		slog.String("image", ctCfg.Image),
+		slog.Any("cmd", ctCfg.Cmd),
+		slog.Any("entrypoint", ctCfg.Entrypoint),
+		slog.String("workingDir", ctCfg.WorkingDir),
+	)
 	resp, err := cli.ContainerCreate(
 		ctx, &ctCfg, c.cfg.Host, c.cfg.Network, &c.platform, name,
 	)
 	if err != nil {
+		logger.Error(ctx, "Docker: startNewContainer ContainerCreate failed", tag.Error(err))
 		return "", err
 	}
+	logger.Debug(ctx, "Docker: startNewContainer ContainerCreate succeeded",
+		slog.String("containerID", resp.ID),
+		slog.Any("warnings", resp.Warnings),
+	)
 
 	for _, warning := range resp.Warnings {
 		logger.Warn(ctx, warning)
@@ -527,9 +590,12 @@ func (c *Client) startNewContainer(ctx context.Context, name string, cli *client
 
 	c.containerID = resp.ID
 
+	logger.Debug(ctx, "Docker: startNewContainer calling ContainerStart", slog.String("containerID", resp.ID))
 	err = cli.ContainerStart(ctx, resp.ID, container.StartOptions{})
-
-	if err == nil {
+	if err != nil {
+		logger.Error(ctx, "Docker: startNewContainer ContainerStart failed", tag.Error(err))
+	} else {
+		logger.Debug(ctx, "Docker: startNewContainer ContainerStart succeeded")
 		c.started.Store(true)
 	}
 
@@ -622,6 +688,9 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 }
 
 func (c *Client) attachAndWait(ctx context.Context, cli *client.Client, containerID string, stdout, stderr io.Writer) (int, error) {
+	logger.Debug(ctx, "Docker: attachAndWait started", slog.String("containerID", containerID))
+
+	logger.Debug(ctx, "Docker: attachAndWait calling ContainerLogs")
 	out, err := cli.ContainerLogs(
 		ctx, containerID, container.LogsOptions{
 			ShowStdout: true,
@@ -630,9 +699,12 @@ func (c *Client) attachAndWait(ctx context.Context, cli *client.Client, containe
 		},
 	)
 	if err != nil {
+		logger.Error(ctx, "Docker: attachAndWait ContainerLogs failed", tag.Error(err))
 		return 1, err
 	}
+	logger.Debug(ctx, "Docker: attachAndWait ContainerLogs succeeded")
 	defer func() {
+		logger.Debug(ctx, "Docker: attachAndWait closing log reader")
 		_ = out.Close()
 	}()
 
@@ -640,21 +712,29 @@ func (c *Client) attachAndWait(ctx context.Context, cli *client.Client, containe
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		logger.Debug(ctx, "Docker: attachAndWait stdcopy goroutine started")
 		if _, err := stdcopy.StdCopy(stdout, stderr, out); err != nil {
 			logger.Error(ctx, "Docker executor: stdcopy", tag.Error(err))
 		}
+		logger.Debug(ctx, "Docker: attachAndWait stdcopy goroutine finished")
 	}()
 
+	logger.Debug(ctx, "Docker: attachAndWait calling ContainerWait")
 	statusCh, errCh := cli.ContainerWait(
 		ctx, containerID, container.WaitConditionNotRunning,
 	)
+	logger.Debug(ctx, "Docker: attachAndWait waiting for container to finish")
 	select {
 	case err := <-errCh:
+		logger.Debug(ctx, "Docker: attachAndWait received error from errCh", slog.Bool("hasError", err != nil))
 		if err != nil {
 			return 1, err
 		}
 
 	case status := <-statusCh:
+		logger.Debug(ctx, "Docker: attachAndWait received status",
+			slog.Int64("statusCode", status.StatusCode),
+		)
 		if status.StatusCode != 0 {
 			return int(status.StatusCode), fmt.Errorf("exit status %v", status.StatusCode)
 		}
@@ -662,7 +742,9 @@ func (c *Client) attachAndWait(ctx context.Context, cli *client.Client, containe
 	}
 
 	// Wait for log copying to complete
+	logger.Debug(ctx, "Docker: attachAndWait waiting for log copy to complete")
 	wg.Wait()
+	logger.Debug(ctx, "Docker: attachAndWait log copy completed")
 
 	return 0, nil
 }

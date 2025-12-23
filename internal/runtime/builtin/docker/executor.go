@@ -131,6 +131,12 @@ func (e *docker) Kill(sig os.Signal) error {
 }
 
 func (e *docker) Run(ctx context.Context) error {
+	logger.Debug(ctx, "Docker executor: Run started",
+		slog.String("stepName", e.step.Name),
+		slog.String("command", e.step.Command),
+		slog.Any("args", e.step.Args),
+	)
+
 	ctx, cancelFunc := context.WithCancel(ctx)
 	e.context = ctx
 	e.cancel = cancelFunc
@@ -145,6 +151,7 @@ func (e *docker) Run(ctx context.Context) error {
 
 	cli := GetContainerClient(ctx)
 	if cli != nil {
+		logger.Debug(ctx, "Docker executor: using existing container client from context")
 		// If it exists, use the client from the context
 		// This allows sharing the same container client across multiple executors.
 		// Don't set WorkingDir - use the container's default working directory
@@ -175,16 +182,23 @@ func (e *docker) Run(ctx context.Context) error {
 	}
 
 	if e.cfg == nil {
+		logger.Error(ctx, "Docker executor: config is nil")
 		return ErrExecutorConfigRequired
 	}
 
+	logger.Debug(ctx, "Docker executor: initializing new container client",
+		slog.String("image", e.cfg.Image),
+		slog.String("containerName", e.cfg.ContainerName),
+	)
 	cli, err := InitializeClient(ctx, e.cfg)
 	if err != nil {
+		logger.Error(ctx, "Docker executor: failed to initialize client", slog.Any("error", err))
 		if tail := tw.Tail(); tail != "" {
 			return fmt.Errorf("failed to setup container: %w\nrecent stderr (tail):\n%s", err, tail)
 		}
 		return fmt.Errorf("failed to setup container: %w", err)
 	}
+	logger.Debug(ctx, "Docker executor: container client initialized")
 
 	e.container = cli
 	defer e.container.Close(ctx)
@@ -194,17 +208,27 @@ func (e *docker) Run(ctx context.Context) error {
 	if e.step.Command != "" {
 		cmd = append([]string{e.step.Command}, e.step.Args...)
 	}
+	logger.Debug(ctx, "Docker executor: calling container.Run",
+		slog.Any("cmd", cmd),
+	)
 
 	exitCode, err := e.container.Run(ctx, cmd, e.stdout, e.stderr)
+	logger.Debug(ctx, "Docker executor: container.Run returned",
+		slog.Int("exitCode", exitCode),
+		slog.Bool("hasError", err != nil),
+	)
 
 	e.mu.Lock()
 	e.exitCode = exitCode
 	e.mu.Unlock()
 
 	if err != nil {
+		logger.Error(ctx, "Docker executor: Run completed with error", slog.Any("error", err))
 		if tail := tw.Tail(); tail != "" {
 			return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tail)
 		}
+	} else {
+		logger.Debug(ctx, "Docker executor: Run completed successfully")
 	}
 	return err
 }
