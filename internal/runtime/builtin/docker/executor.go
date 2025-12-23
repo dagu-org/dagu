@@ -12,7 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/core"
@@ -256,7 +255,7 @@ func newDocker(ctx context.Context, step core.Step) (executor.Executor, error) {
 	if step.Container != nil {
 		// Expand environment variables in container fields at execution time
 		env := runtime.GetEnv(ctx)
-		expanded, err := cmdutil.EvalObject(ctx, *step.Container, runtime.AllEnvsMap(ctx))
+		expanded, err := evalContainerFields(ctx, *step.Container)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate container config: %w", err)
 		}
@@ -325,6 +324,65 @@ func mergeEnvVars(base, override []string) []string {
 	}
 
 	return result
+}
+
+// evalContainerFields evaluates environment variables in container fields at runtime.
+// Only fields that commonly use variables are evaluated:
+// - Image, Name, User, WorkingDir, Network (string fields)
+// - Volumes, Ports, Env, Command (slice fields)
+// Fields like PullPolicy, Startup, WaitFor, KeepContainer are NOT evaluated
+// as they have specific enum/boolean values.
+func evalContainerFields(ctx context.Context, ct core.Container) (core.Container, error) {
+	var err error
+
+	// Evaluate string fields
+	if ct.Image, err = runtime.EvalString(ctx, ct.Image); err != nil {
+		return ct, fmt.Errorf("failed to evaluate image: %w", err)
+	}
+	if ct.Name, err = runtime.EvalString(ctx, ct.Name); err != nil {
+		return ct, fmt.Errorf("failed to evaluate name: %w", err)
+	}
+	if ct.User, err = runtime.EvalString(ctx, ct.User); err != nil {
+		return ct, fmt.Errorf("failed to evaluate user: %w", err)
+	}
+	if ct.WorkingDir, err = runtime.EvalString(ctx, ct.WorkingDir); err != nil {
+		return ct, fmt.Errorf("failed to evaluate workingDir: %w", err)
+	}
+	if ct.Network, err = runtime.EvalString(ctx, ct.Network); err != nil {
+		return ct, fmt.Errorf("failed to evaluate network: %w", err)
+	}
+
+	// Evaluate slice fields
+	if ct.Volumes, err = evalStringSlice(ctx, ct.Volumes); err != nil {
+		return ct, fmt.Errorf("failed to evaluate volumes: %w", err)
+	}
+	if ct.Ports, err = evalStringSlice(ctx, ct.Ports); err != nil {
+		return ct, fmt.Errorf("failed to evaluate ports: %w", err)
+	}
+	if ct.Env, err = evalStringSlice(ctx, ct.Env); err != nil {
+		return ct, fmt.Errorf("failed to evaluate env: %w", err)
+	}
+	if ct.Command, err = evalStringSlice(ctx, ct.Command); err != nil {
+		return ct, fmt.Errorf("failed to evaluate command: %w", err)
+	}
+
+	return ct, nil
+}
+
+// evalStringSlice evaluates each string in a slice using runtime.EvalString.
+func evalStringSlice(ctx context.Context, ss []string) ([]string, error) {
+	if len(ss) == 0 {
+		return ss, nil
+	}
+	result := make([]string, len(ss))
+	for i, s := range ss {
+		evaluated, err := runtime.EvalString(ctx, s)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = evaluated
+	}
+	return result, nil
 }
 
 func init() {
