@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -242,11 +243,27 @@ func (e *docker) ExitCode() int {
 
 func newDocker(ctx context.Context, step core.Step) (executor.Executor, error) {
 	execCfg := step.ExecutorConfig
+	registryAuths := getRegistryAuth(ctx)
 
 	var cfg *Config
-	if len(execCfg.Config) > 0 {
-		// Get registry auth from context if available
-		registryAuths := getRegistryAuth(ctx)
+
+	// Priority 1: Step-level container field (new intuitive syntax)
+	// This is the preferred way to configure containers at step level
+	if step.Container != nil {
+		workDir := runtime.GetEnv(ctx).WorkingDir
+		c, err := LoadConfig(workDir, *step.Container, registryAuths)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load step container config: %w", err)
+		}
+		// Set ShouldStart to true for step-level containers
+		// This ensures the container is automatically created and started
+		c.ShouldStart = true
+		// Merge step-level env into container env
+		// Step env comes first, container env comes last (higher priority)
+		c.Container.Env = mergeEnvVars(step.Env, c.Container.Env)
+		cfg = c
+	} else if len(execCfg.Config) > 0 {
+		// Priority 2: Executor config map (legacy syntax: executor.config)
 		c, err := LoadConfigFromMap(execCfg.Config, registryAuths)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load container config: %w", err)
@@ -264,6 +281,41 @@ func newDocker(ctx context.Context, step core.Step) (executor.Executor, error) {
 		stdout: os.Stdout,
 		stderr: os.Stderr,
 	}, nil
+}
+
+// mergeEnvVars merges two env var slices, with later values taking precedence.
+// Both slices use "KEY=VALUE" format. If the same key appears in both,
+// the value from the second slice (higher priority) is used.
+func mergeEnvVars(base, override []string) []string {
+	if len(base) == 0 {
+		return override
+	}
+	if len(override) == 0 {
+		return base
+	}
+
+	// Build a map of key -> value from base
+	envMap := make(map[string]string)
+	for _, env := range base {
+		if idx := strings.Index(env, "="); idx > 0 {
+			envMap[env[:idx]] = env[idx+1:]
+		}
+	}
+
+	// Override with values from the second slice
+	for _, env := range override {
+		if idx := strings.Index(env, "="); idx > 0 {
+			envMap[env[:idx]] = env[idx+1:]
+		}
+	}
+
+	// Convert back to slice
+	result := make([]string, 0, len(envMap))
+	for key, value := range envMap {
+		result = append(result, key+"="+value)
+	}
+
+	return result
 }
 
 func init() {
