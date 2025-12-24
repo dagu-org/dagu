@@ -456,6 +456,19 @@
   user-select: none;
 }
 
+/* Log viewer text selection - ensure visible selection on dark backgrounds */
+.log-content::selection,
+.log-content *::selection {
+  background-color: #3b82f6 !important;
+  color: #ffffff !important;
+}
+
+.log-content::-moz-selection,
+.log-content *::-moz-selection {
+  background-color: #3b82f6 !important;
+  color: #ffffff !important;
+}
+
 /* Enhanced line highlighting for search results and code displays */
 .line-highlight {
   background: linear-gradient(

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { components } from '../../../api/v2/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
+import { UnsavedChangesProvider } from '../../../contexts/UnsavedChangesContext';
 import {
   DAGDetailsContent,
   DAGHeader,
@@ -191,52 +192,54 @@ function DAGDetails() {
   const headerDAGRun = currentDAGRun || dagData?.latestDAGRun;
 
   return (
-    <DAGContext.Provider
-      value={{
-        refresh: refreshData,
-        fileName,
-        name: dagRunName,
-      }}
-    >
-      <RootDAGRunContext.Provider
+    <UnsavedChangesProvider>
+      <DAGContext.Provider
         value={{
-          data: rootDAGRunData,
-          setData: setRootDAGRunData,
+          refresh: refreshData,
+          fileName,
+          name: dagRunName,
         }}
       >
-        <div className="w-full h-full flex flex-col">
-          {/* Always render the DAG Header when basic data is available */}
-          {dagData?.dag && headerDAGRun && (
-            <DAGHeader
-              dag={dagData.dag}
-              currentDAGRun={headerDAGRun}
-              fileName={fileName}
-              refreshFn={refreshData}
-              formatDuration={formatDuration}
-              navigateToStatusTab={navigateToStatusTab}
-            />
-          )}
+        <RootDAGRunContext.Provider
+          value={{
+            data: rootDAGRunData,
+            setData: setRootDAGRunData,
+          }}
+        >
+          <div className="w-full h-full flex flex-col">
+            {/* Always render the DAG Header when basic data is available */}
+            {dagData?.dag && headerDAGRun && (
+              <DAGHeader
+                dag={dagData.dag}
+                currentDAGRun={headerDAGRun}
+                fileName={fileName}
+                refreshFn={refreshData}
+                formatDuration={formatDuration}
+                navigateToStatusTab={navigateToStatusTab}
+              />
+            )}
 
-          {/* Render content */}
-          {dagData?.dag && headerDAGRun && (
-            <DAGDetailsContent
-              fileName={fileName}
-              dag={dagData.dag}
-              currentDAGRun={headerDAGRun}
-              refreshFn={refreshData}
-              formatDuration={formatDuration}
-              activeTab={tab}
-              onTabChange={handleTabChange}
-              dagRunId={currentDAGRun?.dagRunId}
-              stepName={stepName}
-              isModal={false}
-              navigateToStatusTab={navigateToStatusTab}
-              skipHeader={true} // Skip header since we're rendering it separately
-            />
-          )}
-        </div>
-      </RootDAGRunContext.Provider>
-    </DAGContext.Provider>
+            {/* Render content */}
+            {dagData?.dag && headerDAGRun && (
+              <DAGDetailsContent
+                fileName={fileName}
+                dag={dagData.dag}
+                currentDAGRun={headerDAGRun}
+                refreshFn={refreshData}
+                formatDuration={formatDuration}
+                activeTab={tab}
+                onTabChange={handleTabChange}
+                dagRunId={currentDAGRun?.dagRunId}
+                stepName={stepName}
+                isModal={false}
+                navigateToStatusTab={navigateToStatusTab}
+                skipHeader={true} // Skip header since we're rendering it separately
+              />
+            )}
+          </div>
+        </RootDAGRunContext.Provider>
+      </DAGContext.Provider>
+    </UnsavedChangesProvider>
   );
 }
 

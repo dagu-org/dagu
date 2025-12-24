@@ -279,27 +279,25 @@ function StepLog({
   // Process log data
   const content =
     logData?.content.replace(new RegExp(ANSI_CODES_REGEX, 'g'), '') || '';
-  const lineCount = logData?.lineCount || 0;
   const totalLines = logData?.totalLines || 0;
   const hasMore = logData?.hasMore || false;
   const isEstimate = logData?.isEstimate || false;
 
-  // Split content into lines for better rendering
-  const lines = content ? content.split('\n') : ['<No log output>'];
+  // Split content into lines, removing trailing empty line from trailing newline
+  const rawLines = content ? content.split('\n') : ['<No log output>'];
+  const lines = rawLines[rawLines.length - 1] === '' ? rawLines.slice(0, -1) : rawLines;
 
-  // Calculate total pages
-  const totalPages = calculateTotalPages(totalLines, pageSize);
+  // API may count trailing newline as extra line; use lines.length if within 1
+  const effectiveTotalLines = (totalLines - lines.length <= 1) ? lines.length : totalLines;
 
-  // Calculate line numbers based on current page and view mode
+  const totalPages = calculateTotalPages(effectiveTotalLines, pageSize);
+
   const getLineNumber = (index: number): number => {
     if (viewMode === 'tail') {
-      // For tail view, line numbers start from (totalLines - lineCount + 1)
-      return totalLines - lineCount + index + 1;
+      return Math.max(1, effectiveTotalLines - lines.length + 1) + index;
     } else if (viewMode === 'head') {
-      // For head view, line numbers start from 1
       return index + 1;
     } else {
-      // For page view, line numbers start from offset
       return (currentPage - 1) * pageSize + index + 1;
     }
   };
@@ -380,12 +378,12 @@ function StepLog({
 
         {/* Stats line - full width on mobile */}
         <div className="text-xs text-muted-foreground flex items-center">
-          Showing {lineCount} of {totalLines} lines{' '}
+          Showing {lines.length} of {effectiveTotalLines} lines{' '}
           {isEstimate ? '(estimated)' : ''} {hasMore ? '(more available)' : ''}
         </div>
 
         {/* Page navigation controls */}
-        {viewMode === 'page' && totalLines > 0 && (
+        {viewMode === 'page' && effectiveTotalLines > 0 && (
           <div className="flex items-center gap-2 mt-2">
             <Button
               size="sm"
@@ -415,7 +413,7 @@ function StepLog({
           <Input
             type="number"
             min={1}
-            max={totalLines}
+            max={effectiveTotalLines}
             value={jumpToLine}
             onChange={(e) =>
               setJumpToLine(e.target.value === '' ? '' : Number(e.target.value))
@@ -426,7 +424,7 @@ function StepLog({
                   !isNavigating &&
                   jumpToLine !== '' &&
                   (jumpToLine as number) >= 1 &&
-                  (jumpToLine as number) <= totalLines
+                  (jumpToLine as number) <= effectiveTotalLines
                 ) {
                   handleJumpToLine();
                 }
@@ -442,7 +440,7 @@ function StepLog({
               isNavigating ||
               jumpToLine === '' ||
               (jumpToLine as number) < 1 ||
-              (jumpToLine as number) > totalLines
+              (jumpToLine as number) > effectiveTotalLines
             }
           >
             Go
@@ -462,7 +460,7 @@ function StepLog({
             </div>
           </div>
         )}
-        <pre className="h-full font-mono text-sm text-slate-100">
+        <pre className="h-full font-mono text-sm text-slate-100 log-content">
           {lines.map((line, index) => (
             <div key={index} className="flex px-2 py-0.5">
               <span
@@ -471,7 +469,7 @@ function StepLog({
               >
                 {getLineNumber(index)}
               </span>
-              <span className="whitespace-pre-wrap break-all flex-grow">
+              <span className="whitespace-pre-wrap break-all flex-grow select-text cursor-text">
                 {line || ' '}
               </span>
             </div>

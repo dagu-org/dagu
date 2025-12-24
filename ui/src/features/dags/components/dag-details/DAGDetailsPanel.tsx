@@ -4,6 +4,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { components } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { UnsavedChangesProvider } from '../../../../contexts/UnsavedChangesContext';
 import { useQuery } from '../../../../hooks/api';
 import dayjs from '../../../../lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
@@ -176,67 +177,69 @@ const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
   }
 
   return (
-    <DAGContext.Provider
-      value={{
-        refresh: refreshFn,
-        fileName: fileName || '',
-        name: displayData.dag?.name || '',
-      }}
-    >
-      <RootDAGRunContext.Provider
+    <UnsavedChangesProvider>
+      <DAGContext.Provider
         value={{
-          data: currentDAGRun,
-          setData: (status: components['schemas']['DAGRunDetails']) => {
-            setCurrentDAGRun(status);
-          },
+          refresh: refreshFn,
+          fileName: fileName || '',
+          name: displayData.dag?.name || '',
         }}
       >
-        <div className="pl-2 pt-2 w-full flex flex-col h-full overflow-hidden">
-          <div className="flex justify-between items-center mb-2 flex-shrink-0">
-            <p className="text-xs text-muted-foreground">
-              Use{' '}
-              <kbd className="px-1 py-0.5 bg-muted rounded text-[10px] font-mono">
-                ↑
-              </kbd>{' '}
-              <kbd className="px-1 py-0.5 bg-muted rounded text-[10px] font-mono">
-                ↓
-              </kbd>{' '}
-              to navigate DAGs
-            </p>
-            <div className="flex gap-2">
-              <Button
-                size="icon"
-                onClick={handleFullscreenClick}
-                title="Open in fullscreen (F) - Cmd/Ctrl+Click to open in new tab"
-              >
-                <Maximize2 className="h-4 w-4" />
-              </Button>
-              <Button size="icon" onClick={onClose} title="Close (Esc)">
-                <X className="h-4 w-4" />
-              </Button>
+        <RootDAGRunContext.Provider
+          value={{
+            data: currentDAGRun,
+            setData: (status: components['schemas']['DAGRunDetails']) => {
+              setCurrentDAGRun(status);
+            },
+          }}
+        >
+          <div className="pl-2 pt-2 w-full flex flex-col h-full overflow-hidden">
+            <div className="flex justify-between items-center mb-2 flex-shrink-0">
+              <p className="text-xs text-muted-foreground">
+                Use{' '}
+                <kbd className="px-1 py-0.5 bg-muted rounded text-[10px] font-mono">
+                  ↑
+                </kbd>{' '}
+                <kbd className="px-1 py-0.5 bg-muted rounded text-[10px] font-mono">
+                  ↓
+                </kbd>{' '}
+                to navigate DAGs
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  size="icon"
+                  onClick={handleFullscreenClick}
+                  title="Open in fullscreen (F) - Cmd/Ctrl+Click to open in new tab"
+                >
+                  <Maximize2 className="h-4 w-4" />
+                </Button>
+                <Button size="icon" onClick={onClose} title="Close (Esc)">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {displayData.dag && (
+                <DAGDetailsContent
+                  fileName={fileName}
+                  dag={displayData.dag}
+                  currentDAGRun={displayData.latestDAGRun}
+                  refreshFn={refreshFn}
+                  formatDuration={formatDuration}
+                  activeTab={activeTab}
+                  onTabChange={setActiveTab}
+                  dagRunId={dagRunId}
+                  stepName={stepName}
+                  isModal={true}
+                  navigateToStatusTab={navigateToStatusTab}
+                />
+              )}
             </div>
           </div>
-
-          <div className="flex-1 overflow-y-auto min-h-0">
-            {displayData.dag && (
-              <DAGDetailsContent
-                fileName={fileName}
-                dag={displayData.dag}
-                currentDAGRun={displayData.latestDAGRun}
-                refreshFn={refreshFn}
-                formatDuration={formatDuration}
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-                dagRunId={dagRunId}
-                stepName={stepName}
-                isModal={true}
-                navigateToStatusTab={navigateToStatusTab}
-              />
-            )}
-          </div>
-        </div>
-      </RootDAGRunContext.Provider>
-    </DAGContext.Provider>
+        </RootDAGRunContext.Provider>
+      </DAGContext.Provider>
+    </UnsavedChangesProvider>
   );
 };
 
