@@ -15,11 +15,12 @@ import {
 import dayjs from '@/lib/dayjs';
 import ActionButton from '@/ui/ActionButton';
 import StatusChip from '@/ui/StatusChip';
-import { Play, RefreshCw, Square } from 'lucide-react'; // Import lucide icons
+import { AlertTriangle, Play, RefreshCw, Square } from 'lucide-react'; // Import lucide icons
 import React from 'react';
 import { components } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
+import { useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';
 import { useClient } from '../../../../hooks/api';
 import ConfirmModal from '../../../../ui/ConfirmModal';
 import LabeledItem from '../../../../ui/LabeledItem';
@@ -60,9 +61,11 @@ function DAGActions({
 }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
+  const { hasUnsavedChanges } = useUnsavedChanges();
   const [isEnqueueModal, setIsEnqueueModal] = React.useState(false);
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
+  const [isUnsavedChangesModal, setIsUnsavedChangesModal] = React.useState(false);
   const [retryDagRunId, setRetryDagRunId] = React.useState<string>('');
   const [stopAllRunning, setStopAllRunning] = React.useState(false);
 
@@ -105,7 +108,13 @@ function DAGActions({
               label={displayMode !== 'compact'}
               icon={<Play className="h-4 w-4" />}
               disabled={!buttonState['enqueue']}
-              onClick={() => setIsEnqueueModal(true)}
+              onClick={() => {
+                if (hasUnsavedChanges) {
+                  setIsUnsavedChangesModal(true);
+                } else {
+                  setIsEnqueueModal(true);
+                }
+              }}
               className="cursor-pointer"
             >
               Enqueue
@@ -535,6 +544,31 @@ function DAGActions({
             setIsEnqueueModal(false);
           }}
         />
+        <ConfirmModal
+          title="Unsaved Changes"
+          buttonText="Run Anyway"
+          visible={isUnsavedChangesModal}
+          dismissModal={() => {
+            setIsUnsavedChangesModal(false);
+          }}
+          onSubmit={() => {
+            setIsUnsavedChangesModal(false);
+            setIsEnqueueModal(true);
+          }}
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
+            <div className="space-y-2">
+              <p className="font-medium">
+                You have unsaved changes in the DAG definition.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                The DAG will run with the last saved version, not your current edits.
+                Save your changes first if you want them to take effect.
+              </p>
+            </div>
+          </div>
+        </ConfirmModal>
       </div>
     </TooltipProvider>
   );

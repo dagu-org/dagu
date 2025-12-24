@@ -13,6 +13,7 @@ import { useSimpleToast } from '../../../../components/ui/simple-toast';
 import { Tab, Tabs } from '../../../../components/ui/tabs';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
+import { useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';
 import { useClient, useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
@@ -38,6 +39,7 @@ function DAGSpec({ fileName }: Props) {
   const client = useClient();
   const config = useConfig();
   const { showToast } = useSimpleToast();
+  const { hasUnsavedChanges, setHasUnsavedChanges } = useUnsavedChanges();
 
   // Editability is derived from permissions; no explicit toggle
   const editable = !!config.permissions.writeDags;
@@ -122,6 +124,23 @@ function DAGSpec({ fileName }: Props) {
     lastFetchedSpecRef.current = fetchedSpec;
     setCurrentValue(fetchedSpec);
   }, [data?.spec]);
+
+  // Track unsaved changes
+  useEffect(() => {
+    if (typeof currentValue === 'undefined' || typeof data?.spec === 'undefined') {
+      setHasUnsavedChanges(false);
+      return;
+    }
+    const hasChanges = currentValue !== data.spec;
+    setHasUnsavedChanges(hasChanges);
+  }, [currentValue, data?.spec, setHasUnsavedChanges]);
+
+  // Clean up unsaved changes state on unmount
+  useEffect(() => {
+    return () => {
+      setHasUnsavedChanges(false);
+    };
+  }, [setHasUnsavedChanges]);
 
   // Save scroll position before saving
   const saveScrollPosition = React.useCallback(() => {
@@ -372,6 +391,7 @@ function DAGSpec({ fileName }: Props) {
                       <Button
                         id="save-config"
                         title="Save changes (Ctrl+S / Cmd+S)"
+                        disabled={!hasUnsavedChanges}
                         onClick={async () => {
                           await handleSave();
                           props.refresh();
