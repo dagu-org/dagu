@@ -4,9 +4,10 @@
    ============================================================================= */
 
 .tab-bar-wrapper {
+  position: relative;
   display: flex;
   align-items: flex-end;
-  padding: 4px 8px 0;
+  padding: 4px 8px 1px; /* 1px bottom for border space */
   background: rgb(var(--sidebar-bg));
   border-bottom: 1px solid rgb(var(--border));
 }
@@ -15,7 +16,9 @@
   display: flex;
   align-items: flex-end;
   gap: 2px;
-  padding-bottom: 0;
+  flex: 1;
+  min-width: 0; /* Allow shrinking */
+  overflow: visible; /* Allow active tab to extend */
 }
 
 /* =============================================================================
@@ -26,10 +29,11 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  min-width: 80px;
+  gap: 4px;
+  padding: 5px 8px;
+  min-width: 40px; /* Allow shrinking to very small */
   max-width: 160px;
+  flex: 1 1 120px; /* Grow and shrink, basis 120px */
   cursor: pointer;
   user-select: none;
   font-size: 12px;
@@ -66,10 +70,9 @@
 .tab-trigger[data-state="active"] {
   background: rgb(var(--bg));
   color: rgb(var(--text));
-  z-index: 2;
-  /* Extend below to cover the border and connect to content */
-  margin-bottom: -1px;
-  padding-bottom: 6px;
+  z-index: 3;
+  margin-bottom: -2px; /* Extend below to cover border */
+  padding-bottom: 7px; /* Compensate for margin */
   /* Stronger bevel for raised appearance */
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.6),
@@ -89,6 +92,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
+  min-width: 0; /* Allow text to shrink */
   text-align: left;
 }
 
@@ -124,6 +128,7 @@
    ============================================================================= */
 
 .tab-add {
+  flex-shrink: 0; /* Never shrink the add button */
   display: flex;
   align-items: center;
   justify-content: center;

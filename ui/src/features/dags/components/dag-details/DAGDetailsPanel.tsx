@@ -160,8 +160,8 @@ const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
           },
         }}
       >
-        <div className="px-4 w-full flex flex-col h-full overflow-hidden">
-          <div className="flex justify-between items-center mb-3 flex-shrink-0">
+        <div className="pl-2 pt-2 w-full flex flex-col h-full overflow-hidden">
+          <div className="flex justify-between items-center mb-2 flex-shrink-0">
             <p className="text-xs text-muted-foreground">
               Use{' '}
               <kbd className="px-1 py-0.5 bg-muted rounded text-[10px] font-mono">
