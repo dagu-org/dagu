@@ -1236,13 +1236,13 @@ function DAGTable({
                     data-state={row.getIsSelected() && 'selected'}
                     className={
                       row.original?.kind === ItemKind.Group
-                        ? 'bg-muted/50 font-semibold cursor-pointer hover:bg-muted/70' // Make group rows clickable
+                        ? 'bg-muted/50 font-semibold cursor-pointer hover:bg-muted/70 border-l-4 border-transparent' // Make group rows clickable
                         : isDAGRow &&
                             'dag' in row.original &&
                             selectedDAG ===
                               (row.original as DAGRow).dag.fileName
                           ? 'cursor-pointer bg-primary/10 hover:bg-primary/15 border-l-4 border-primary' // Highlight selected DAG
-                          : 'cursor-pointer hover:bg-muted/50'
+                          : 'cursor-pointer hover:bg-muted/50 border-l-4 border-transparent'
                     }
                     style={{ fontSize: '0.8125rem' }} // Smaller font size for more density
                     onClick={(e) => {
