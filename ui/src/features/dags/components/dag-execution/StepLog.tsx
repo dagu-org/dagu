@@ -462,7 +462,7 @@ function StepLog({
             </div>
           </div>
         )}
-        <pre className="h-full font-mono text-sm text-slate-100">
+        <pre className="h-full font-mono text-sm text-slate-100 log-content">
           {lines.map((line, index) => (
             <div key={index} className="flex px-2 py-0.5">
               <span
@@ -471,7 +471,7 @@ function StepLog({
               >
                 {getLineNumber(index)}
               </span>
-              <span className="whitespace-pre-wrap break-all flex-grow">
+              <span className="whitespace-pre-wrap break-all flex-grow select-text cursor-text">
                 {line || ' '}
               </span>
             </div>
