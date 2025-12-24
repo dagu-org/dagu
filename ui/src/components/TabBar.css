@@ -1,42 +1,88 @@
+/* =============================================================================
+   90s MAC OS INSPIRED TAB SYSTEM
+   Classic Platinum-era folder tabs with 3D depth
+   ============================================================================= */
+
 .tab-bar-wrapper {
-  background: rgb(var(--border));
-  padding: 8px 8px 0 8px;
+  display: flex;
+  align-items: flex-end;
+  padding: 4px 8px 0;
+  background: rgb(var(--sidebar-bg));
+  border-bottom: 1px solid rgb(var(--border));
 }
 
 .tab-list {
   display: flex;
   align-items: flex-end;
   gap: 2px;
+  padding-bottom: 0;
 }
+
+/* =============================================================================
+   TAB TRIGGER - Folder tab with beveled 3D appearance
+   ============================================================================= */
 
 .tab-trigger {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  min-width: 100px;
-  max-width: 180px;
+  gap: 6px;
+  padding: 5px 12px;
+  min-width: 80px;
+  max-width: 160px;
   cursor: pointer;
   user-select: none;
-  color: rgb(var(--sidebar-text));
-  background: rgb(var(--sidebar-bg));
-  border: none;
-  border-radius: 8px 8px 0 0;
   font-size: 12px;
   font-weight: 500;
+  border: none;
+  border-radius: 5px 5px 0 0;
+  background: linear-gradient(
+    180deg,
+    rgb(var(--btn-secondary-top)) 0%,
+    rgb(var(--btn-secondary-bottom)) 100%
+  );
+  color: rgb(var(--sidebar-text));
+  /* 3D bevel effect - light top, shadow on sides */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 1px 0 0 rgba(255, 255, 255, 0.25),
+    inset -1px 0 0 rgba(0, 0, 0, 0.1);
+  transition: all 0.1s ease;
 }
 
+/* Hover state for inactive tabs */
 .tab-trigger:hover {
-  background: rgb(var(--sidebar-bg));
+  background: linear-gradient(
+    180deg,
+    rgb(var(--btn-secondary-hover-top)) 0%,
+    rgb(var(--btn-secondary-hover-bottom)) 100%
+  );
 }
 
-/* Active tab */
+/* =============================================================================
+   ACTIVE TAB - Raised, connected to content
+   ============================================================================= */
+
 .tab-trigger[data-state="active"] {
-  color: rgb(var(--text));
   background: rgb(var(--bg));
-  z-index: 1;
+  color: rgb(var(--text));
+  z-index: 2;
+  /* Extend below to cover the border and connect to content */
+  margin-bottom: -1px;
+  padding-bottom: 6px;
+  /* Stronger bevel for raised appearance */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 1px 0 0 rgba(255, 255, 255, 0.3),
+    inset -1px 0 0 rgba(0, 0, 0, 0.08),
+    -1px 0 0 rgb(var(--border)),
+    1px 0 0 rgb(var(--border)),
+    0 -1px 0 rgb(var(--border));
 }
+
+/* =============================================================================
+   TAB CONTENT ELEMENTS
+   ============================================================================= */
 
 .tab-title {
   overflow: hidden;
@@ -48,10 +94,19 @@
 
 .tab-close {
   flex-shrink: 0;
-  padding: 2px;
-  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: 3px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, background 0.15s;
+  color: inherit;
 }
 
 .tab-trigger:hover .tab-close,
@@ -61,43 +116,48 @@
 
 .tab-close:hover {
   opacity: 1 !important;
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(var(--text), 0.1);
 }
+
+/* =============================================================================
+   ADD TAB BUTTON - Matching 3D style
+   ============================================================================= */
 
 .tab-add {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   margin-left: 4px;
+  margin-bottom: 2px;
   color: rgb(var(--sidebar-text));
-  border: none;
+  border: 1px solid rgb(var(--btn-secondary-border));
   border-radius: 4px;
-  background: transparent;
+  background: linear-gradient(
+    180deg,
+    rgb(var(--btn-secondary-top)) 0%,
+    rgb(var(--btn-secondary-bottom)) 100%
+  );
   cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: all 0.1s ease;
 }
 
 .tab-add:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: linear-gradient(
+    180deg,
+    rgb(var(--btn-secondary-hover-top)) 0%,
+    rgb(var(--btn-secondary-hover-bottom)) 100%
+  );
 }
 
-/* SVG curves */
-.tab-curve {
-  position: absolute;
-  bottom: 0;
-  fill: rgb(var(--sidebar-bg));
+.tab-add:active {
+  transform: translateY(1px);
 }
 
-.tab-curve-left {
-  left: -8px;
-}
-
-.tab-curve-right {
-  right: -8px;
-}
-
-/* Active tab curves use content background */
-.tab-trigger[data-state="active"] .tab-curve {
-  fill: rgb(var(--bg));
+/* Hide the edge element - not needed with this simpler design */
+.tab-edge-right {
+  display: none;
 }

@@ -83,7 +83,7 @@ const CARD_VIEW_THRESHOLD = 700;
 interface DAGCardProps {
   dag: components['schemas']['DAGFile'];
   isSelected: boolean;
-  onSelect: (fileName: string) => void;
+  onSelect: (fileName: string, title: string) => void;
   onTagClick: (tag: string) => void;
   refreshFn: () => void;
   className?: string;
@@ -91,6 +91,7 @@ interface DAGCardProps {
 
 function DAGCard({ dag, isSelected, onSelect, onTagClick, refreshFn, className = '' }: DAGCardProps) {
   const fileName = dag.fileName;
+  const title = dag.dag.name;
   const status = dag.latestDAGRun.status;
   const statusLabel = dag.latestDAGRun.statusLabel;
   const tags = dag.dag.tags || [];
@@ -102,7 +103,7 @@ function DAGCard({ dag, isSelected, onSelect, onTagClick, refreshFn, className =
     if (e.metaKey || e.ctrlKey) {
       window.open(`/dags/${fileName}`, '_blank');
     } else {
-      onSelect(fileName);
+      onSelect(fileName, title);
     }
   };
 
@@ -238,7 +239,7 @@ type Props = {
   /** Currently selected DAG file name */
   selectedDAG?: string | null;
   /** Handler for DAG selection changes */
-  onSelectDAG?: (fileName: string | null) => void;
+  onSelectDAG?: (fileName: string, title: string) => void;
 };
 
 /**
@@ -858,7 +859,7 @@ function DAGTable({
   };
 
   // Handler for DAG selection
-  const handleSelectDAG = (fileName: string) => {
+  const handleSelectDAG = (fileName: string, title: string) => {
     // Check if screen is small (less than 768px width)
     const isSmallScreen = window.innerWidth < 768;
 
@@ -867,7 +868,7 @@ function DAGTable({
       navigate(`/dags/${fileName}`);
     } else if (onSelectDAG) {
       // For larger screens, call the selection handler
-      onSelectDAG(fileName);
+      onSelectDAG(fileName, title);
     }
   };
 
@@ -1007,7 +1008,7 @@ function DAGTable({
         .filter((row) => (row.original as Data)?.kind === ItemKind.DAG)
         .map((row) => ({
           fileName: (row.original as DAGRow).dag.fileName,
-          row: row.original as DAGRow,
+          title: (row.original as DAGRow).dag.dag.name,
         }));
 
       // Find current index
@@ -1021,13 +1022,13 @@ function DAGTable({
         event.preventDefault();
         const nextDAG = dagRows[currentIndex + 1];
         if (nextDAG) {
-          onSelectDAG(nextDAG.fileName);
+          onSelectDAG(nextDAG.fileName, nextDAG.title);
         }
       } else if (event.key === 'ArrowUp' && currentIndex > 0) {
         event.preventDefault();
         const prevDAG = dagRows[currentIndex - 1];
         if (prevDAG) {
-          onSelectDAG(prevDAG.fileName);
+          onSelectDAG(prevDAG.fileName, prevDAG.title);
         }
       }
     };
@@ -1248,13 +1249,14 @@ function DAGTable({
                       else if (isDAGRow && 'dag' in row.original) {
                         const dagRow = row.original as DAGRow;
                         const fileName = dagRow.dag.fileName;
+                        const title = dagRow.dag.dag.name;
 
                         // If Cmd (Mac) or Ctrl (Windows/Linux) key is pressed, open in new tab
                         if (e.metaKey || e.ctrlKey) {
                           window.open(`/dags/${fileName}`, '_blank');
                         } else {
                           // Normal click behavior - select the DAG
-                          handleSelectDAG(fileName);
+                          handleSelectDAG(fileName, title);
                         }
                       }
                     }}

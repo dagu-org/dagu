@@ -7,8 +7,10 @@ import {
   PathsDagsGetParametersQuerySort,
 } from '../../api/v2/schema';
 import SplitLayout from '../../components/SplitLayout';
+import TabBar from '../../components/TabBar';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
+import { TabProvider, useTabContext } from '../../contexts/TabContext';
 import { useUserPreferences } from '../../contexts/UserPreference';
 import { DAGDetailsPanel } from '../../features/dags/components/dag-details';
 import { DAGErrors } from '../../features/dags/components/dag-editor';
@@ -35,7 +37,7 @@ const areDAGDefinitionsFiltersEqual = (
   a.sortField === b.sortField &&
   a.sortOrder === b.sortOrder;
 
-function DAGs() {
+function DAGsContent() {
   const location = useLocation();
   const query = React.useMemo(
     () => new URLSearchParams(location.search),
@@ -46,6 +48,7 @@ function DAGs() {
   const searchState = useSearchState();
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
   const { preferences, updatePreference } = useUserPreferences();
+  const { tabs, activeTabId, selectDAG, addTab, closeTab, getActiveFileName } = useTabContext();
 
   const defaultFilters = React.useMemo<DAGDefinitionsFilters>(
     () => ({
@@ -69,7 +72,9 @@ function DAGs() {
   );
   const [sortField, setSortField] = React.useState(defaultFilters.sortField);
   const [sortOrder, setSortOrder] = React.useState(defaultFilters.sortOrder);
-  const [selectedDAG, setSelectedDAG] = React.useState<string | null>(null);
+
+  // Get selected DAG from tab context
+  const selectedDAG = getActiveFileName();
 
   const currentFilters = React.useMemo<DAGDefinitionsFilters>(
     () => ({
@@ -318,7 +323,7 @@ function DAGs() {
             sortOrder={sortOrder}
             onSortChange={handleSortChange}
             selectedDAG={selectedDAG}
-            onSelectDAG={setSelectedDAG}
+            onSelectDAG={selectDAG}
           />
         </>
       ) : (
@@ -327,11 +332,35 @@ function DAGs() {
     </div>
   );
 
-  const rightPanel = selectedDAG ? (
-    <DAGDetailsPanel
-      fileName={selectedDAG}
-      onClose={() => setSelectedDAG(null)}
-    />
+  // Handle adding a new tab - creates an empty tab that will be filled on next DAG selection
+  const handleAddTab = () => {
+    // Find a DAG to open in the new tab (first one not already open)
+    const openFileNames = new Set(tabs.map(t => t.fileName));
+    const availableDAG = dagFiles.find(d => !openFileNames.has(d.fileName));
+    if (availableDAG) {
+      addTab(availableDAG.fileName, availableDAG.dag.name);
+    }
+  };
+
+  // Handle closing the active tab
+  const handleCloseActiveTab = () => {
+    if (activeTabId) {
+      closeTab(activeTabId);
+    }
+  };
+
+  const rightPanel = tabs.length > 0 ? (
+    <div className="flex flex-col h-full">
+      <TabBar onAddTab={handleAddTab} />
+      <div className="flex-1 overflow-hidden">
+        {selectedDAG && (
+          <DAGDetailsPanel
+            fileName={selectedDAG}
+            onClose={handleCloseActiveTab}
+          />
+        )}
+      </div>
+    </div>
   ) : null;
 
   return (
@@ -341,6 +370,15 @@ function DAGs() {
       defaultLeftWidth={40}
       emptyRightMessage="Select a DAG to view details"
     />
+  );
+}
+
+// Wrap with TabProvider
+function DAGs() {
+  return (
+    <TabProvider>
+      <DAGsContent />
+    </TabProvider>
   );
 }
 

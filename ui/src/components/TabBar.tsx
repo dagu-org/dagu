@@ -26,8 +26,10 @@ function TabBar({ onAddTab }: TabBarProps) {
             <TabsPrimitive.Trigger
               key={tab.id}
               value={tab.id}
-              className="tab-trigger group"
+              className="tab-trigger"
             >
+              {/* Right angled edge for trapezoid shape */}
+              <span className="tab-edge-right" />
               <span className="tab-title">{tab.title}</span>
               <button
                 onClick={(e) => {
@@ -39,14 +41,6 @@ function TabBar({ onAddTab }: TabBarProps) {
               >
                 <X className="h-3 w-3" />
               </button>
-              {/* Left curve */}
-              <svg className="tab-curve tab-curve-left" width="8" height="8" viewBox="0 0 8 8">
-                <path d="M8 0 Q8 8 0 8 L8 8 Z" />
-              </svg>
-              {/* Right curve */}
-              <svg className="tab-curve tab-curve-right" width="8" height="8" viewBox="0 0 8 8">
-                <path d="M0 0 Q0 8 8 8 L0 8 Z" />
-              </svg>
             </TabsPrimitive.Trigger>
           ))}
           {onAddTab && (
