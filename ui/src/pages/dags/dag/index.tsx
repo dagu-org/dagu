@@ -30,7 +30,8 @@ function DAGDetails() {
   const stepName = searchParams.get('step');
   const subDAGRunId = searchParams.get('subDAGRunId');
   const queriedDAGRunName = searchParams.get('dagRunName');
-  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  // Use remoteNode from URL if present, otherwise from app bar context
+  const remoteNode = searchParams.get('remoteNode') || appBarContext.selectedRemoteNode || 'local';
   const fileName = params.fileName || '';
 
   // Determine active tab
@@ -53,23 +54,34 @@ function DAGDetails() {
     []
   );
 
+  // Build URL with remote node parameter if needed
+  const buildUrl = useCallback(
+    (path: string) => {
+      if (remoteNode && remoteNode !== 'local') {
+        return `${path}?remoteNode=${encodeURIComponent(remoteNode)}`;
+      }
+      return path;
+    },
+    [remoteNode]
+  );
+
   // Navigate to status tab
   const navigateToStatusTab = useCallback(() => {
     if (fileName && tab !== 'status') {
-      navigate(`/dags/${fileName}`);
+      navigate(buildUrl(`/dags/${fileName}`));
     }
-  }, [fileName, tab, navigate]);
+  }, [fileName, tab, navigate, buildUrl]);
 
   // Handle tab changes
   const handleTabChange = useCallback(
     (newTab: string) => {
       if (newTab === 'status' && fileName) {
-        navigate(`/dags/${fileName}`);
+        navigate(buildUrl(`/dags/${fileName}`));
       } else if (fileName) {
-        navigate(`/dags/${fileName}/${newTab}`);
+        navigate(buildUrl(`/dags/${fileName}/${newTab}`));
       }
     },
-    [fileName, navigate]
+    [fileName, navigate, buildUrl]
   );
 
   // Fetch DAG details
