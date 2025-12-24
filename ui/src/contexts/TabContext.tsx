@@ -15,7 +15,6 @@ interface TabContextType {
   setActiveTab: (tabId: string) => void;
   selectDAG: (fileName: string, title: string) => void;
   getActiveFileName: () => string | null;
-  validateTabs: (existingFileNames: Set<string>) => void;
 }
 
 const STORAGE_KEY = 'dagu_dag_tabs';
@@ -114,22 +113,6 @@ export function TabProvider({ children }: { children: React.ReactNode }) {
     }
   }, [tabs, closeTab]);
 
-  // Remove tabs for DAGs that no longer exist
-  const validateTabs = useCallback((existingFileNames: Set<string>) => {
-    setTabs(prev => {
-      const validTabs = prev.filter(t => existingFileNames.has(t.fileName));
-      if (validTabs.length !== prev.length) {
-        // Some tabs were removed, update active tab if needed
-        if (activeTabId && !validTabs.some(t => t.id === activeTabId)) {
-          const newActiveId = validTabs.length > 0 ? validTabs[0]?.id ?? null : null;
-          setActiveTabId(newActiveId);
-        }
-        return validTabs;
-      }
-      return prev;
-    });
-  }, [activeTabId]);
-
   const setActiveTab = useCallback((tabId: string) => {
     setActiveTabId(tabId);
   }, []);
@@ -171,7 +154,6 @@ export function TabProvider({ children }: { children: React.ReactNode }) {
     setActiveTab,
     selectDAG,
     getActiveFileName,
-    validateTabs,
   };
 
   return (

@@ -48,7 +48,7 @@ function DAGsContent() {
   const searchState = useSearchState();
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
   const { preferences, updatePreference } = useUserPreferences();
-  const { tabs, activeTabId, selectDAG, addTab, closeTab, getActiveFileName, validateTabs } = useTabContext();
+  const { tabs, activeTabId, selectDAG, addTab, closeTab, getActiveFileName } = useTabContext();
 
   const defaultFilters = React.useMemo<DAGDefinitionsFilters>(
     () => ({
@@ -236,15 +236,6 @@ function DAGsContent() {
     };
   }, [data]);
 
-  // Validate tabs against existing DAGs - remove tabs for deleted DAGs
-  // Only validate when not filtering (no search text or tag filter active)
-  React.useEffect(() => {
-    const isFiltering = apiSearchText || apiSearchTag;
-    if (!isFiltering && dagFiles.length > 0) {
-      const existingFileNames = new Set(dagFiles.map(d => d.fileName));
-      validateTabs(existingFileNames);
-    }
-  }, [dagFiles, validateTabs, apiSearchText, apiSearchTag]);
 
   const pageChange = (page: number) => {
     addSearchParam('page', page.toString());

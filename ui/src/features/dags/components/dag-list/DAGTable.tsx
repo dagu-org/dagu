@@ -1100,7 +1100,7 @@ function DAGTable({
               <Search className="h-4 w-4" />
             </div>
             <Input
-              type="search"
+              type="text"
               placeholder="Search..."
               value={searchText}
               onChange={(e) => handleSearchTextChange(e.target.value)}
