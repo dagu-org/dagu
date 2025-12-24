@@ -36,7 +36,9 @@ const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
     setActiveTab('status');
   }, []);
 
-  const { data, mutate } = useQuery(
+  const [notFound, setNotFound] = React.useState(false);
+
+  const { data, error, mutate } = useQuery(
     '/dags/{fileName}',
     {
       params: {
@@ -48,8 +50,25 @@ const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
         },
       },
     },
-    { refreshInterval: 2000, keepPreviousData: true }
+    {
+      refreshInterval: notFound ? 0 : 2000, // Stop polling if DAG not found
+      keepPreviousData: true,
+    }
   );
+
+  // Detect if DAG was deleted (404 error)
+  React.useEffect(() => {
+    if (error) {
+      setNotFound(true);
+    } else if (data) {
+      setNotFound(false);
+    }
+  }, [error, data]);
+
+  // Reset notFound state when fileName changes
+  React.useEffect(() => {
+    setNotFound(false);
+  }, [fileName]);
 
   // Keep track of last valid data to prevent flickering
   const [lastValidData, setLastValidData] = React.useState(data);
@@ -135,6 +154,18 @@ const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
     return `${seconds}s`;
   };
 
+  // Show error state if DAG not found
+  if (notFound) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">
+        <p className="text-sm">DAG not found or has been deleted.</p>
+        <Button variant="outline" size="sm" onClick={onClose}>
+          Close Tab
+        </Button>
+      </div>
+    );
+  }
+
   // Only show loading on initial load, not when switching DAGs
   if (!displayData || !displayData.latestDAGRun) {
     return (
@@ -160,8 +191,8 @@ const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
           },
         }}
       >
-        <div className="px-4 w-full flex flex-col h-full overflow-hidden">
-          <div className="flex justify-between items-center mb-3 flex-shrink-0">
+        <div className="pl-2 pt-2 w-full flex flex-col h-full overflow-hidden">
+          <div className="flex justify-between items-center mb-2 flex-shrink-0">
             <p className="text-xs text-muted-foreground">
               Use{' '}
               <kbd className="px-1 py-0.5 bg-muted rounded text-[10px] font-mono">

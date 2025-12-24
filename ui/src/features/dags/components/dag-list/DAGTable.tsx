@@ -71,8 +71,131 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '../../../../components/ui/tooltip';
+import { PanelWidthContext } from '../../../../components/SplitLayout';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
+
+// Threshold in pixels below which we switch to card view
+// Set higher than table's comfortable minimum width (~700px for all columns)
+const CARD_VIEW_THRESHOLD = 700;
+
+// Reusable DAG Card component for mobile and narrow panel views
+interface DAGCardProps {
+  dag: components['schemas']['DAGFile'];
+  isSelected: boolean;
+  onSelect: (fileName: string, title: string) => void;
+  onTagClick: (tag: string) => void;
+  refreshFn: () => void;
+  className?: string;
+}
+
+function DAGCard({ dag, isSelected, onSelect, onTagClick, refreshFn, className = '' }: DAGCardProps) {
+  const fileName = dag.fileName;
+  const title = dag.dag.name;
+  const status = dag.latestDAGRun.status;
+  const statusLabel = dag.latestDAGRun.statusLabel;
+  const tags = dag.dag.tags || [];
+  const description = dag.dag.description;
+  const schedules = dag.dag.schedule || [];
+  const hasSchedule = schedules.length > 0;
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    if (e.metaKey || e.ctrlKey) {
+      window.open(`/dags/${fileName}`, '_blank');
+    } else {
+      onSelect(fileName, title);
+    }
+  };
+
+  return (
+    <div
+      className={`p-2.5 rounded-md border cursor-pointer overflow-hidden ${
+        isSelected
+          ? 'bg-primary/10 border-primary'
+          : 'bg-card border-border hover:bg-muted/50'
+      } ${className}`}
+      onClick={handleCardClick}
+    >
+      {/* Header: Name + Status */}
+      <div className="flex justify-between items-start gap-2 mb-1.5">
+        <div className="font-medium text-xs truncate flex-1 min-w-0">
+          {dag.dag.name}
+        </div>
+        <StatusChip status={status} size="xs">
+          {statusLabel}
+        </StatusChip>
+      </div>
+
+      {/* Description */}
+      {description && (
+        <div className="text-[10px] text-muted-foreground mb-1.5 line-clamp-1">
+          {description}
+        </div>
+      )}
+
+      {/* Schedule & Last Run */}
+      <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground mb-1.5">
+        {schedules.map((schedule, idx) => (
+          <Badge
+            key={idx}
+            variant="outline"
+            className="text-[9px] font-normal px-1 py-0 h-3"
+          >
+            {schedule.expression}
+          </Badge>
+        ))}
+        {dag.latestDAGRun.startedAt && dag.latestDAGRun.startedAt !== '-' && (
+          <span className="flex items-center gap-0.5">
+            <Calendar className="h-2.5 w-2.5" />
+            <span className="text-[9px]">{dag.latestDAGRun.startedAt}</span>
+          </span>
+        )}
+      </div>
+
+      {/* Tags */}
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-0.5 mb-1.5">
+          {tags.map((tag) => (
+            <Badge
+              key={tag}
+              variant="outline"
+              className="text-[9px] px-1 py-0 h-3 rounded-sm border-primary/30 bg-primary/10 text-primary"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTagClick(tag);
+              }}
+            >
+              <div className="h-1 w-1 rounded-full bg-primary/70 mr-0.5"></div>
+              {tag}
+            </Badge>
+          ))}
+        </div>
+      )}
+
+      {/* Actions row: LiveSwitch + DAGActions */}
+      <div className="flex flex-wrap items-center justify-between gap-1 pt-1.5 border-t border-border/50 min-w-0">
+        <div
+          className={`flex items-center gap-1 flex-shrink-0 min-w-0 ${!hasSchedule ? 'opacity-40 pointer-events-none' : ''}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <LiveSwitch dag={dag} refresh={refreshFn} />
+          <span className="text-[9px] text-muted-foreground truncate">
+            {dag.suspended ? 'Suspended' : hasSchedule ? 'Live' : 'No schedule'}
+          </span>
+        </div>
+        <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          <DAGActions
+            dag={dag.dag}
+            status={dag.latestDAGRun}
+            fileName={fileName}
+            label={false}
+            refresh={refreshFn}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Props for the DAGTable component
@@ -116,7 +239,7 @@ type Props = {
   /** Currently selected DAG file name */
   selectedDAG?: string | null;
   /** Handler for DAG selection changes */
-  onSelectDAG?: (fileName: string | null) => void;
+  onSelectDAG?: (fileName: string, title: string) => void;
 };
 
 /**
@@ -736,7 +859,7 @@ function DAGTable({
   };
 
   // Handler for DAG selection
-  const handleSelectDAG = (fileName: string) => {
+  const handleSelectDAG = (fileName: string, title: string) => {
     // Check if screen is small (less than 768px width)
     const isSmallScreen = window.innerWidth < 768;
 
@@ -745,7 +868,7 @@ function DAGTable({
       navigate(`/dags/${fileName}`);
     } else if (onSelectDAG) {
       // For larger screens, call the selection handler
-      onSelectDAG(fileName);
+      onSelectDAG(fileName, title);
     }
   };
 
@@ -885,7 +1008,7 @@ function DAGTable({
         .filter((row) => (row.original as Data)?.kind === ItemKind.DAG)
         .map((row) => ({
           fileName: (row.original as DAGRow).dag.fileName,
-          row: row.original as DAGRow,
+          title: (row.original as DAGRow).dag.dag.name,
         }));
 
       // Find current index
@@ -899,13 +1022,13 @@ function DAGTable({
         event.preventDefault();
         const nextDAG = dagRows[currentIndex + 1];
         if (nextDAG) {
-          onSelectDAG(nextDAG.fileName);
+          onSelectDAG(nextDAG.fileName, nextDAG.title);
         }
       } else if (event.key === 'ArrowUp' && currentIndex > 0) {
         event.preventDefault();
         const prevDAG = dagRows[currentIndex - 1];
         if (prevDAG) {
-          onSelectDAG(prevDAG.fileName);
+          onSelectDAG(prevDAG.fileName, prevDAG.title);
         }
       }
     };
@@ -949,6 +1072,11 @@ function DAGTable({
   tableInstanceRef.current = instance as ReturnType<typeof useReactTable>;
 
   const appBarContext = React.useContext(AppBarContext);
+  const panelWidth = React.useContext(PanelWidthContext);
+
+  // Use card view when panel is narrow (below threshold) on desktop
+  const useCardView = panelWidth !== null && panelWidth < CARD_VIEW_THRESHOLD;
+
   const { data: uniqueTags } = useQuery('/dags/tags', {
     params: {
       query: {
@@ -965,74 +1093,71 @@ function DAGTable({
           isLoading ? 'opacity-70 pointer-events-none' : ''
         }`}
       >
-        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
-          {/* Search and Filter Row */}
-          <div className="flex flex-1 gap-2 min-w-0">
-            {/* Search input */}
-            <div className="relative flex-1 min-w-0">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                <Search className="h-4 w-4" />
-              </div>
-              <Input
-                type="search"
-                placeholder="Search definitions..."
-                value={searchText}
-                onChange={(e) => handleSearchTextChange(e.target.value)}
-                className="pl-10 h-9 border border-border rounded-md w-full"
-              />
-              {searchText && (
-                <button
-                  onClick={() => handleSearchTextChange('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Clear search"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
-                </button>
-              )}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Search input */}
+          <div className="relative flex-1 min-w-[120px] max-w-[280px]">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+              <Search className="h-4 w-4" />
             </div>
-
-            {/* Tag filter */}
-            <Select
-              value={searchTag}
-              onValueChange={(value) =>
-                handleSearchTagChange(value === 'all' ? '' : value)
-              }
-            >
-              <SelectTrigger className="w-auto min-w-[120px] sm:min-w-[160px] h-9 border border-border rounded-md">
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <SelectValue placeholder="Filter by tag" />
-                </div>
-              </SelectTrigger>
-              <SelectContent className="max-h-[280px] overflow-y-auto">
-                <SelectItem value="all">
-                  <span className="font-medium">All Tags</span>
-                </SelectItem>
-                {uniqueTags?.tags?.map((tag) => (
-                  <SelectItem key={tag} value={tag}>
-                    {tag}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Input
+              type="text"
+              placeholder="Search..."
+              value={searchText}
+              onChange={(e) => handleSearchTextChange(e.target.value)}
+              className="pl-10 h-9 border border-border rounded-md w-full"
+            />
+            {searchText && (
+              <button
+                onClick={() => handleSearchTextChange('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Clear search"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            )}
           </div>
 
-          {/* Pagination - on new row on mobile */}
+          {/* Tag filter */}
+          <Select
+            value={searchTag}
+            onValueChange={(value) =>
+              handleSearchTagChange(value === 'all' ? '' : value)
+            }
+          >
+            <SelectTrigger className="w-auto min-w-[80px] h-9 border border-border rounded-md flex-shrink-0">
+              <div className="flex items-center gap-1">
+                <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <SelectValue placeholder="Tag" />
+              </div>
+            </SelectTrigger>
+            <SelectContent className="max-h-[280px] overflow-y-auto">
+              <SelectItem value="all">
+                <span className="font-medium">All Tags</span>
+              </SelectItem>
+              {uniqueTags?.tags?.map((tag) => (
+                <SelectItem key={tag} value={tag}>
+                  {tag}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Pagination - pushed to right */}
           {pagination && (
-            <div className="flex justify-center sm:justify-end sm:ml-auto">
+            <div className="flex-shrink-0 ml-auto">
               <DAGPagination
                 totalPages={pagination.totalPages}
                 page={pagination.page}
@@ -1045,20 +1170,14 @@ function DAGTable({
         </div>
       </div>
 
-      {/* Desktop Table View - Hidden on mobile */}
-      <div className="hidden md:block w-full overflow-hidden">
+      {/* Desktop Table View - Hidden on mobile or when panel is narrow */}
+      <div className={`w-full overflow-hidden ${useCardView ? 'hidden' : 'hidden md:block'}`}>
         <Table
           className={`w-full text-xs ${isLoading ? 'opacity-70' : ''}`}
           style={{ tableLayout: 'fixed' }}
         >
-          <colgroup>
-            <col style={{ width: '5%' }} /> {/* Expand */}
-            <col style={{ width: '37%' }} /> {/* Name */}
-            <col style={{ width: '10%' }} /> {/* Status */}
-            <col style={{ width: '18%' }} /> {/* LastRun */}
-            <col style={{ width: '20%' }} /> {/* ScheduleAndNextRun */}
-            <col style={{ width: '10%' }} /> {/* Actions */}
-          </colgroup>
+{/* Column widths: Expand 5%, Name 37%, Status 10%, LastRun 18%, Schedule 20%, Actions 10% */}
+          <colgroup><col style={{ width: '5%' }} /><col style={{ width: '37%' }} /><col style={{ width: '10%' }} /><col style={{ width: '18%' }} /><col style={{ width: '20%' }} /><col style={{ width: '10%' }} /></colgroup>
           <TableHeader>
             {instance.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -1112,13 +1231,13 @@ function DAGTable({
                     data-state={row.getIsSelected() && 'selected'}
                     className={
                       row.original?.kind === ItemKind.Group
-                        ? 'bg-muted/50 font-semibold cursor-pointer hover:bg-muted/70' // Make group rows clickable
+                        ? 'bg-muted/50 font-semibold cursor-pointer hover:bg-muted/70 border-l-4 border-transparent' // Make group rows clickable
                         : isDAGRow &&
                             'dag' in row.original &&
                             selectedDAG ===
                               (row.original as DAGRow).dag.fileName
                           ? 'cursor-pointer bg-primary/10 hover:bg-primary/15 border-l-4 border-primary' // Highlight selected DAG
-                          : 'cursor-pointer hover:bg-muted/50'
+                          : 'cursor-pointer hover:bg-muted/50 border-l-4 border-transparent'
                     }
                     style={{ fontSize: '0.8125rem' }} // Smaller font size for more density
                     onClick={(e) => {
@@ -1130,13 +1249,14 @@ function DAGTable({
                       else if (isDAGRow && 'dag' in row.original) {
                         const dagRow = row.original as DAGRow;
                         const fileName = dagRow.dag.fileName;
+                        const title = dagRow.dag.dag.name;
 
                         // If Cmd (Mac) or Ctrl (Windows/Linux) key is pressed, open in new tab
                         if (e.metaKey || e.ctrlKey) {
                           window.open(`/dags/${fileName}`, '_blank');
                         } else {
                           // Normal click behavior - select the DAG
-                          handleSelectDAG(fileName);
+                          handleSelectDAG(fileName, title);
                         }
                       }
                     }}
@@ -1179,8 +1299,8 @@ function DAGTable({
         </Table>
       </div>
 
-      {/* Mobile Card View - Visible only on mobile */}
-      <div className="md:hidden space-y-2">
+      {/* Card View - Visible on mobile or when panel is narrow */}
+      <div className={`space-y-2 ${useCardView ? 'block' : 'md:hidden'}`}>
         {instance.getRowModel().rows.length ? (
           instance.getRowModel().rows.map((row) => {
             // Render group rows with collapsible header
@@ -1224,90 +1344,16 @@ function DAGTable({
                           'dag' in subRow.original
                         ) {
                           const dagRow = subRow.original as DAGRow;
-                          const dag = dagRow.dag;
-                          const fileName = dag.fileName;
-                          const status = dag.latestDAGRun.status;
-                          const statusLabel = dag.latestDAGRun.statusLabel;
-                          const tags = dag.dag.tags || [];
-                          const description = dag.dag.description;
-
                           return (
-                            <div
+                            <DAGCard
                               key={subRow.id}
-                              className={`p-2.5 ml-2 rounded-md border ${
-                                selectedDAG === fileName
-                                  ? 'bg-primary/10 border-primary'
-                                  : 'bg-card border-border'
-                              } cursor-pointer active:scale-[0.98] transition-transform`}
-                              onClick={(e) => {
-                                if (e.metaKey || e.ctrlKey) {
-                                  window.open(`/dags/${fileName}`, '_blank');
-                                } else {
-                                  handleSelectDAG(fileName);
-                                }
-                              }}
-                            >
-                              {/* Compact header */}
-                              <div className="flex justify-between items-start gap-2 mb-1.5">
-                                <div className="font-medium text-xs truncate flex-1 min-w-0">
-                                  {dag.dag.name}
-                                </div>
-                                <StatusChip status={status} size="xs">
-                                  {statusLabel}
-                                </StatusChip>
-                              </div>
-
-                              {/* Description - compact */}
-                              {description && (
-                                <div className="text-[10px] text-muted-foreground mb-1.5 line-clamp-1">
-                                  {description}
-                                </div>
-                              )}
-
-                              {/* Schedule & Last Run - inline */}
-                              <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground mb-1.5">
-                                {dag.dag.schedule && dag.dag.schedule.length > 0
-                                  ? dag.dag.schedule.map((schedule, idx) => (
-                                      <Badge
-                                        key={idx}
-                                        variant="outline"
-                                        className="text-[9px] font-normal px-1 py-0 h-3"
-                                      >
-                                        {schedule.expression}
-                                      </Badge>
-                                    ))
-                                  : null}
-                                {dag.latestDAGRun.startedAt &&
-                                  dag.latestDAGRun.startedAt !== '-' && (
-                                    <span className="flex items-center gap-0.5">
-                                      <Calendar className="h-2.5 w-2.5" />
-                                      <span className="text-[9px]">
-                                        {dag.latestDAGRun.startedAt}
-                                      </span>
-                                    </span>
-                                  )}
-                              </div>
-
-                              {/* Tags - compact */}
-                              {tags.length > 0 && (
-                                <div className="flex flex-wrap gap-0.5">
-                                  {tags.map((tag) => (
-                                    <Badge
-                                      key={tag}
-                                      variant="outline"
-                                      className="text-[9px] px-1 py-0 h-3 rounded-sm border-primary/30 bg-primary/10 text-primary"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleSearchTagChange(tag);
-                                      }}
-                                    >
-                                      <div className="h-1 w-1 rounded-full bg-primary/70 mr-0.5"></div>
-                                      {tag}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
+                              dag={dagRow.dag}
+                              isSelected={selectedDAG === dagRow.dag.fileName}
+                              onSelect={handleSelectDAG}
+                              onTagClick={handleSearchTagChange}
+                              refreshFn={refreshFn}
+                              className="ml-2"
+                            />
                           );
                         }
                         return null;
@@ -1326,90 +1372,15 @@ function DAGTable({
               row.depth === 0
             ) {
               const dagRow = row.original as DAGRow;
-              const dag = dagRow.dag;
-              const fileName = dag.fileName;
-              const status = dag.latestDAGRun.status;
-              const statusLabel = dag.latestDAGRun.statusLabel;
-              const tags = dag.dag.tags || [];
-              const description = dag.dag.description;
-
               return (
-                <div
+                <DAGCard
                   key={row.id}
-                  className={`p-2.5 rounded-md border ${
-                    selectedDAG === fileName
-                      ? 'bg-primary/10 border-primary'
-                      : 'bg-card border-border'
-                  } cursor-pointer active:scale-[0.98] transition-transform`}
-                  onClick={(e) => {
-                    if (e.metaKey || e.ctrlKey) {
-                      window.open(`/dags/${fileName}`, '_blank');
-                    } else {
-                      handleSelectDAG(fileName);
-                    }
-                  }}
-                >
-                  {/* Compact header */}
-                  <div className="flex justify-between items-start gap-2 mb-1.5">
-                    <div className="font-medium text-xs truncate flex-1 min-w-0">
-                      {dag.dag.name}
-                    </div>
-                    <StatusChip status={status} size="xs">
-                      {statusLabel}
-                    </StatusChip>
-                  </div>
-
-                  {/* Description - compact */}
-                  {description && (
-                    <div className="text-[10px] text-muted-foreground mb-1.5 line-clamp-1">
-                      {description}
-                    </div>
-                  )}
-
-                  {/* Schedule & Last Run - inline */}
-                  <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground mb-1.5">
-                    {dag.dag.schedule && dag.dag.schedule.length > 0
-                      ? dag.dag.schedule.map((schedule, idx) => (
-                          <Badge
-                            key={idx}
-                            variant="outline"
-                            className="text-[9px] font-normal px-1 py-0 h-3"
-                          >
-                            {schedule.expression}
-                          </Badge>
-                        ))
-                      : null}
-                    {dag.latestDAGRun.startedAt &&
-                      dag.latestDAGRun.startedAt !== '-' && (
-                        <span className="flex items-center gap-0.5">
-                          <Calendar className="h-2.5 w-2.5" />
-                          <span className="text-[9px]">
-                            {dag.latestDAGRun.startedAt}
-                          </span>
-                        </span>
-                      )}
-                  </div>
-
-                  {/* Tags - compact */}
-                  {tags.length > 0 && (
-                    <div className="flex flex-wrap gap-0.5">
-                      {tags.map((tag) => (
-                        <Badge
-                          key={tag}
-                          variant="outline"
-                          className="text-[9px] px-1 py-0 h-3 rounded-sm border-primary/30 bg-primary/10 text-primary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSearchTagChange(tag);
-                          }}
-                        >
-                          <div className="h-1 w-1 rounded-full bg-primary/70 mr-0.5"></div>
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                  dag={dagRow.dag}
+                  isSelected={selectedDAG === dagRow.dag.fileName}
+                  onSelect={handleSelectDAG}
+                  onTagClick={handleSearchTagChange}
+                  refreshFn={refreshFn}
+                />
               );
             }
 

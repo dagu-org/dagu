@@ -26,8 +26,9 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
   const navigate = useNavigate();
   const appBarContext = React.useContext(AppBarContext);
 
-  // Track if animation has already played to prevent re-animation on content changes
-  const hasAnimatedRef = React.useRef(false);
+  // Track if modal should be rendered and if it's visible (for animation)
+  const [shouldRender, setShouldRender] = React.useState(isOpen);
+  const [isVisible, setIsVisible] = React.useState(false);
 
   // Keep previous data to prevent flickering during navigation
   const previousDataRef = React.useRef<{
@@ -36,14 +37,25 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
     dagRunDetails: components['schemas']['DAGRunDetails'];
   } | null>(null);
 
-  // Reset animation flag when modal closes
+  // Handle open/close with animation
   React.useEffect(() => {
-    if (!isOpen) {
-      hasAnimatedRef.current = false;
-      previousDataRef.current = null;
+    if (isOpen) {
+      // Start rendering, then trigger animation on next frame
+      setShouldRender(true);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setIsVisible(true);
+        });
+      });
     } else {
-      // Mark as animated after first render when open
-      hasAnimatedRef.current = true;
+      // Start closing animation
+      setIsVisible(false);
+      // Remove from DOM after animation completes
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+        previousDataRef.current = null;
+      }, 150);
+      return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
@@ -146,22 +158,22 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
     };
   }, [isOpen, onClose, handleFullscreenClick]);
 
-  // Track if this is the initial open to apply animation only once
-  const shouldAnimate = !hasAnimatedRef.current;
-
-  if (!isOpen) return null;
+  // Don't render if not needed
+  if (!shouldRender) return null;
 
   return (
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 h-screen w-screen bg-black/20 z-40 ${shouldAnimate ? 'fade-in' : ''}`}
+        className="fixed inset-0 h-screen w-screen z-40"
         onClick={onClose}
       />
 
-      {/* Side Modal - keep structure consistent to prevent re-animation */}
+      {/* Side Modal */}
       <div
-        className={`fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border z-50 overflow-y-auto ${shouldAnimate ? 'slide-in-from-right' : ''}`}
+        className={`fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border z-50 overflow-y-auto transition-all duration-150 ease-out ${
+          isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+        }`}
       >
         <DAGRunContext.Provider
           value={{
