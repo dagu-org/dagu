@@ -50,6 +50,13 @@
   /* 3D bevel effect */
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
   /* No transition - instant state changes to avoid flicker */
+  /* Remove focus outline */
+  outline: none;
+}
+
+.tab-trigger:focus,
+.tab-trigger:focus-visible {
+  outline: none;
 }
 
 /* Hover state for inactive tabs */
