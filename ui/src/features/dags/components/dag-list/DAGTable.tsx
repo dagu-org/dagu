@@ -1175,14 +1175,8 @@ function DAGTable({
           className={`w-full text-xs ${isLoading ? 'opacity-70' : ''}`}
           style={{ tableLayout: 'fixed' }}
         >
-          <colgroup>
-            <col style={{ width: '5%' }} /> {/* Expand */}
-            <col style={{ width: '37%' }} /> {/* Name */}
-            <col style={{ width: '10%' }} /> {/* Status */}
-            <col style={{ width: '18%' }} /> {/* LastRun */}
-            <col style={{ width: '20%' }} /> {/* ScheduleAndNextRun */}
-            <col style={{ width: '10%' }} /> {/* Actions */}
-          </colgroup>
+{/* Column widths: Expand 5%, Name 37%, Status 10%, LastRun 18%, Schedule 20%, Actions 10% */}
+          <colgroup><col style={{ width: '5%' }} /><col style={{ width: '37%' }} /><col style={{ width: '10%' }} /><col style={{ width: '18%' }} /><col style={{ width: '20%' }} /><col style={{ width: '10%' }} /></colgroup>
           <TableHeader>
             {instance.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>

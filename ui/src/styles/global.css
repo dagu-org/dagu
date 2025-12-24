@@ -5,11 +5,11 @@
 @tailwind utilities;
 
 @layer base {
-  html {
-    @apply bg-background text-foreground;
-  }
+  html,
   body {
     @apply bg-background text-foreground;
+    overflow: hidden;
+    height: 100%;
   }
 }
 

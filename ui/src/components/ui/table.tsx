@@ -9,10 +9,10 @@ function Table({
   ...props
 }: React.ComponentProps<typeof RadixTable.Root>) {
   return (
-    <div className="w-full overflow-hidden">
+    <div className="w-full overflow-hidden border border-border/50">
       <RadixTable.Root
         data-slot="table"
-        variant="surface"
+        variant="ghost"
         className={cn('w-full', className)}
         {...props}
       >
