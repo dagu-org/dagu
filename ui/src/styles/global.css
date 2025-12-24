@@ -458,7 +458,6 @@
 
 /* Enhanced line highlighting for search results and code displays */
 .line-highlight {
-  background: rgba(var(--primary), 0.15) !important;
   background: linear-gradient(
     to right,
     rgba(var(--primary), 0.2) 70%,
