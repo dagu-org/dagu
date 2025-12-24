@@ -409,7 +409,7 @@
 }
 
 .slide-in-from-right {
-  animation: slideInFromRight 0.2s ease-out;
+  animation: slideInFromRight 0.3s ease-out;
 }
 
 @keyframes fadeIn {
@@ -422,7 +422,7 @@
 }
 
 .fade-in {
-  animation: fadeIn 0.15s ease-out;
+  animation: fadeIn 0.5s ease-in-out;
 }
 
 /* Disable text selection for elements with this class */
