@@ -237,12 +237,14 @@ function DAGsContent() {
   }, [data]);
 
   // Validate tabs against existing DAGs - remove tabs for deleted DAGs
+  // Only validate when not filtering (no search text or tag filter active)
   React.useEffect(() => {
-    if (dagFiles.length > 0) {
+    const isFiltering = apiSearchText || apiSearchTag;
+    if (!isFiltering && dagFiles.length > 0) {
       const existingFileNames = new Set(dagFiles.map(d => d.fileName));
       validateTabs(existingFileNames);
     }
-  }, [dagFiles, validateTabs]);
+  }, [dagFiles, validateTabs, apiSearchText, apiSearchTag]);
 
   const pageChange = (page: number) => {
     addSearchParam('page', page.toString());
