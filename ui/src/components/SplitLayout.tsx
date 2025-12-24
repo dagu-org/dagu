@@ -97,7 +97,7 @@ function SplitLayout({
   return (
     <div
       ref={containerRef}
-      className="flex h-[calc(100vh-48px)] overflow-hidden"
+      className="flex h-full overflow-hidden"
     >
       {/* Left Panel - Table/List */}
       <div
