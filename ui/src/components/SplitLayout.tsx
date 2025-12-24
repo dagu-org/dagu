@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
+// Context to provide panel width to children
+export const PanelWidthContext = React.createContext<number | null>(null);
+
 interface SplitLayoutProps {
   leftPanel: React.ReactNode;
   rightPanel: React.ReactNode | null;
@@ -28,6 +31,7 @@ function SplitLayout({
   emptyRightMessage = 'Select an item to view details',
 }: SplitLayoutProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const leftPanelRef = useRef<HTMLDivElement>(null);
   const [leftWidth, setLeftWidth] = useState<number>(() => {
     const saved = localStorage.getItem(storageKey);
     if (saved) {
@@ -39,6 +43,27 @@ function SplitLayout({
     return defaultLeftWidth;
   });
   const [isDragging, setIsDragging] = useState(false);
+  const [leftPanelPixelWidth, setLeftPanelPixelWidth] = useState<number | null>(null);
+
+  // Track actual pixel width of left panel
+  useEffect(() => {
+    if (!leftPanelRef.current) return;
+
+    const updateWidth = () => {
+      if (leftPanelRef.current) {
+        setLeftPanelPixelWidth(leftPanelRef.current.offsetWidth);
+      }
+    };
+
+    // Initial measurement
+    updateWidth();
+
+    // Use ResizeObserver to track size changes
+    const resizeObserver = new ResizeObserver(updateWidth);
+    resizeObserver.observe(leftPanelRef.current);
+
+    return () => resizeObserver.disconnect();
+  }, []);
 
   // Save to localStorage when width changes
   useEffect(() => {
@@ -99,12 +124,15 @@ function SplitLayout({
       ref={containerRef}
       className="flex h-full overflow-hidden"
     >
-      {/* Left Panel - Table/List */}
+      {/* Left Panel - Full width on mobile, percentage width on desktop */}
       <div
-        className="h-full overflow-y-auto overflow-x-hidden w-full md:w-auto flex-shrink-0"
-        style={{ width: `${leftWidth}%` }}
+        ref={leftPanelRef}
+        className="h-full overflow-y-auto overflow-x-hidden flex-shrink-0 w-full md:w-[var(--left-width)]"
+        style={{ '--left-width': `${leftWidth}%` } as React.CSSProperties}
       >
-        {leftPanel}
+        <PanelWidthContext.Provider value={leftPanelPixelWidth}>
+          {leftPanel}
+        </PanelWidthContext.Provider>
       </div>
 
       {/* Draggable Divider - Hidden on mobile */}
