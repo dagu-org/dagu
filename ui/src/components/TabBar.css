@@ -1,0 +1,103 @@
+.tab-bar-wrapper {
+  background: rgb(var(--border));
+  padding: 8px 8px 0 8px;
+}
+
+.tab-list {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.tab-trigger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  min-width: 100px;
+  max-width: 180px;
+  cursor: pointer;
+  user-select: none;
+  color: rgb(var(--sidebar-text));
+  background: rgb(var(--sidebar-bg));
+  border: none;
+  border-radius: 8px 8px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.tab-trigger:hover {
+  background: rgb(var(--sidebar-bg));
+}
+
+/* Active tab */
+.tab-trigger[data-state="active"] {
+  color: rgb(var(--text));
+  background: rgb(var(--bg));
+  z-index: 1;
+}
+
+.tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  text-align: left;
+}
+
+.tab-close {
+  flex-shrink: 0;
+  padding: 2px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.tab-trigger:hover .tab-close,
+.tab-trigger[data-state="active"] .tab-close {
+  opacity: 0.5;
+}
+
+.tab-close:hover {
+  opacity: 1 !important;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.tab-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-left: 4px;
+  color: rgb(var(--sidebar-text));
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.tab-add:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* SVG curves */
+.tab-curve {
+  position: absolute;
+  bottom: 0;
+  fill: rgb(var(--sidebar-bg));
+}
+
+.tab-curve-left {
+  left: -8px;
+}
+
+.tab-curve-right {
+  right: -8px;
+}
+
+/* Active tab curves use content background */
+.tab-trigger[data-state="active"] .tab-curve {
+  fill: rgb(var(--bg));
+}
