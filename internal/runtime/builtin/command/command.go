@@ -270,7 +270,13 @@ func exitCodeFromError(err error) int {
 
 // NewCommand creates an executor that will run the provided step.
 // It returns an executor configured from the step, or an error if creating the command configuration fails.
+// If the step has multiple commands, it returns a multiCommandExecutor that runs them sequentially.
 func NewCommand(ctx context.Context, step core.Step) (executor.Executor, error) {
+	// If there are multiple commands, use the multi-command executor
+	if len(step.Commands) > 1 {
+		return newMultiCommandExecutor(ctx, step)
+	}
+
 	cfg, err := NewCommandConfig(ctx, step)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create command: %w", err)

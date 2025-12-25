@@ -81,33 +81,44 @@ func (e *sshExecutor) Kill(_ os.Signal) error {
 	return nil
 }
 
-func (e *sshExecutor) Run(_ context.Context) error {
-	session, err := e.client.NewSession()
-	if err != nil {
-		return err
+func (e *sshExecutor) Run(ctx context.Context) error {
+	// If no commands, nothing to execute
+	if len(e.step.Commands) == 0 {
+		return nil
 	}
-	e.session = session
-	defer func() {
+
+	// Execute each command sequentially
+	// Each command requires a new session since session.Run can only be called once
+	for i, cmdEntry := range e.step.Commands {
+		// Check context cancellation between commands
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		session, err := e.client.NewSession()
+		if err != nil {
+			return fmt.Errorf("command %d: failed to create session: %w", i+1, err)
+		}
+		e.session = session
+
+		session.Stdout = e.stdout
+		session.Stderr = e.stderr
+
+		command := strings.Join(
+			append([]string{cmdEntry.Command}, cmdEntry.Args...), " ",
+		)
+
+		err = session.Run(command)
 		_ = session.Close()
-	}()
 
-	// Once a Session is created, you can execute a single command on
-	// the remote side using the Run method.
-	session.Stdout = e.stdout
-	session.Stderr = e.stderr
-
-	// Extract command and args from Commands field
-	var stepCommand string
-	var stepArgs []string
-	if len(e.step.Commands) > 0 {
-		stepCommand = e.step.Commands[0].Command
-		stepArgs = e.step.Commands[0].Args
+		if err != nil {
+			return fmt.Errorf("command %d failed: %w", i+1, err)
+		}
 	}
 
-	command := strings.Join(
-		append([]string{stepCommand}, stepArgs...), " ",
-	)
-	return session.Run(command)
+	return nil
 }
 
 // ValidateStep implements StepValidator interface for SSH executor.
