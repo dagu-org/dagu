@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -1038,15 +1039,20 @@ type nodeHelper struct {
 
 type nodeOption func(*runtime.NodeData)
 
-func withNodeCmdArgs(cmd string) nodeOption {
+func withNodeCmdArgs(cmdWithArgs string) nodeOption {
 	return func(data *runtime.NodeData) {
-		data.Step.CmdWithArgs = cmd
+		cmd, args, _ := cmdutil.SplitCommand(cmdWithArgs)
+		data.Step.Commands = []core.CommandEntry{{
+			Command:     cmd,
+			Args:        args,
+			CmdWithArgs: cmdWithArgs,
+		}}
 	}
 }
 
 func withNodeCommand(command string) nodeOption {
 	return func(data *runtime.NodeData) {
-		data.Step.Command = command
+		data.Step.Commands = []core.CommandEntry{{Command: command}}
 	}
 }
 

@@ -26,8 +26,7 @@ func TestHTTPExecutor_SkipTLSVerify(t *testing.T) {
 
 		// Test with skipTLSVerify = true (should succeed)
 		step := core.Step{
-			Command: "GET",
-			Args:    []string{server.URL + "/test"},
+			Commands: []core.CommandEntry{{Command: "GET", Args: []string{server.URL + "/test"}}},
 			ExecutorConfig: core.ExecutorConfig{
 				Type: "http",
 				Config: map[string]any{
@@ -62,8 +61,7 @@ func TestHTTPExecutor_SkipTLSVerify(t *testing.T) {
 
 		// Test with skipTLSVerify = false (should fail due to certificate verification)
 		step := core.Step{
-			Command: "GET",
-			Args:    []string{server.URL + "/test"},
+			Commands: []core.CommandEntry{{Command: "GET", Args: []string{server.URL + "/test"}}},
 			ExecutorConfig: core.ExecutorConfig{
 				Type: "http",
 				Config: map[string]any{
@@ -89,8 +87,7 @@ func TestHTTPExecutor_SkipTLSVerify(t *testing.T) {
 
 	t.Run("ConfigParsingWithSkipTLSVerify", func(t *testing.T) {
 		step := core.Step{
-			Command: "GET",
-			Args:    []string{"https://example.com"},
+			Commands: []core.CommandEntry{{Command: "GET", Args: []string{"https://example.com"}}},
 			Script: `{
 				"skipTLSVerify": true,
 				"timeout": 30,
@@ -122,8 +119,7 @@ func TestHTTPExecutor_StandardFeatures(t *testing.T) {
 		defer server.Close()
 
 		step := core.Step{
-			Command: "GET",
-			Args:    []string{server.URL},
+			Commands: []core.CommandEntry{{Command: "GET", Args: []string{server.URL}}},
 			ExecutorConfig: core.ExecutorConfig{
 				Type: "http",
 				Config: map[string]any{
@@ -208,8 +204,7 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 				defer server.Close()
 
 				step := core.Step{
-					Command: tc.method,
-					Args:    []string{server.URL},
+					Commands: []core.CommandEntry{{Command: tc.method, Args: []string{server.URL}}},
 					ExecutorConfig: core.ExecutorConfig{
 						Type:   "http",
 						Config: tc.config,
@@ -255,8 +250,7 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 		defer server.Close()
 
 		step := core.Step{
-			Command: "GET",
-			Args:    []string{server.URL},
+			Commands: []core.CommandEntry{{Command: "GET", Args: []string{server.URL}}},
 			ExecutorConfig: core.ExecutorConfig{
 				Type: "http",
 				Config: map[string]any{
@@ -304,8 +298,7 @@ func TestHTTPExecutor_CrossPlatform(t *testing.T) {
 		defer server.Close()
 
 		step := core.Step{
-			Command: "GET",
-			Args:    []string{server.URL},
+			Commands: []core.CommandEntry{{Command: "GET", Args: []string{server.URL}}},
 			ExecutorConfig: core.ExecutorConfig{
 				Type: "http",
 				Config: map[string]any{

@@ -36,7 +36,12 @@ func validateStep(step core.Step) error {
 	if step.ExecutorConfig.Type != executorType {
 		return nil
 	}
-	if strings.TrimSpace(step.Command) == "" {
+	// Check for command in Commands field
+	var command string
+	if len(step.Commands) > 0 {
+		command = step.Commands[0].Command
+	}
+	if strings.TrimSpace(command) == "" {
 		return fmt.Errorf("%w: command is required", ErrConfig)
 	}
 	return nil
@@ -64,7 +69,12 @@ func newExecutor(ctx context.Context, step core.Step) (executor.Executor, error)
 		}
 	}
 
-	op := strings.ToLower(strings.TrimSpace(step.Command))
+	// Extract command from Commands field
+	var command string
+	if len(step.Commands) > 0 {
+		command = step.Commands[0].Command
+	}
+	op := strings.ToLower(strings.TrimSpace(command))
 	if op == "" {
 		return nil, fmt.Errorf("%w: command must specify archive operation", ErrConfig)
 	}

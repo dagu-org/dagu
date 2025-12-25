@@ -83,9 +83,11 @@ func withCommand(command string) stepOption {
 		if err != nil {
 			panic(fmt.Errorf("unexpected: %w", err))
 		}
-		step.CmdWithArgs = command
-		step.Command = cmd
-		step.Args = args
+		step.Commands = []core.CommandEntry{{
+			Command:     cmd,
+			Args:        args,
+			CmdWithArgs: command,
+		}}
 	}
 }
 

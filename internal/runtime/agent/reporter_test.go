@@ -53,9 +53,8 @@ func TestReporter(t *testing.T) {
 			nodes := []*execution.Node{
 				{
 					Step: core.Step{
-						Name:    "test-step",
-						Command: "true",
-						Args:    []string{"param-x"},
+						Name:     "test-step",
+						Commands: []core.CommandEntry{{Command: "true", Args: []string{"param-x"}}},
 					},
 					Status:     core.NodeRunning,
 					StartedAt:  stringutil.FormatTime(time.Now()),
@@ -83,10 +82,12 @@ func TestRenderHTMLWithDAGInfo(t *testing.T) {
 		Nodes: []*execution.Node{
 			{
 				Step: core.Step{
-					Name:        "setup-database",
-					Command:     "psql",
-					Args:        []string{"-h", "localhost", "-U", "admin", "-d", "mydb", "-f", "schema.sql"},
-					CmdWithArgs: "psql -h localhost -U admin -d mydb -f schema.sql",
+					Name: "setup-database",
+					Commands: []core.CommandEntry{{
+						Command:     "psql",
+						Args:        []string{"-h", "localhost", "-U", "admin", "-d", "mydb", "-f", "schema.sql"},
+						CmdWithArgs: "psql -h localhost -U admin -d mydb -f schema.sql",
+					}},
 				},
 				Status:     core.NodeSucceeded,
 				StartedAt:  "2025-01-15T10:30:00Z",
@@ -95,10 +96,12 @@ func TestRenderHTMLWithDAGInfo(t *testing.T) {
 			},
 			{
 				Step: core.Step{
-					Name:        "run-migrations",
-					Command:     "migrate",
-					Args:        []string{"up"},
-					CmdWithArgs: "migrate up",
+					Name: "run-migrations",
+					Commands: []core.CommandEntry{{
+						Command:     "migrate",
+						Args:        []string{"up"},
+						CmdWithArgs: "migrate up",
+					}},
 				},
 				Status:     core.NodeFailed,
 				StartedAt:  "2025-01-15T10:31:00Z",
@@ -225,7 +228,8 @@ func testRenderSummary(t *testing.T, _ *reporter, _ *mockSender, dag *core.DAG, 
 func testRenderTable(t *testing.T, _ *reporter, _ *mockSender, _ *core.DAG, nodes []*execution.Node) {
 	summary := renderStepSummary(nodes)
 	require.Contains(t, summary, nodes[0].Step.Name)
-	require.Contains(t, summary, nodes[0].Step.Args[0])
+	require.Len(t, nodes[0].Step.Commands, 1)
+	require.Contains(t, summary, nodes[0].Step.Commands[0].Args[0])
 }
 
 type mockSender struct {
@@ -252,9 +256,8 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 	nodes := []*execution.Node{
 		{
 			Step: core.Step{
-				Name:    "setup-database",
-				Command: "docker",
-				Args:    []string{"run", "-d", "--name", "test-db", "postgres:13"},
+				Name:     "setup-database",
+				Commands: []core.CommandEntry{{Command: "docker", Args: []string{"run", "-d", "--name", "test-db", "postgres:13"}}},
 			},
 			Status:     core.NodeSucceeded,
 			StartedAt:  "2025-01-15T10:30:00Z",
@@ -263,9 +266,8 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 		},
 		{
 			Step: core.Step{
-				Name:    "run-migrations",
-				Command: "python",
-				Args:    []string{"manage.py", "migrate", "--settings=production"},
+				Name:     "run-migrations",
+				Commands: []core.CommandEntry{{Command: "python", Args: []string{"manage.py", "migrate", "--settings=production"}}},
 			},
 			Status:     core.NodeFailed,
 			StartedAt:  "2025-01-15T10:30:45Z",
@@ -274,9 +276,8 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 		},
 		{
 			Step: core.Step{
-				Name:    "deploy-app",
-				Command: "kubectl",
-				Args:    []string{"apply", "-f", "deployment.yaml"},
+				Name:     "deploy-app",
+				Commands: []core.CommandEntry{{Command: "kubectl", Args: []string{"apply", "-f", "deployment.yaml"}}},
 			},
 			Status:     core.NodeSkipped,
 			StartedAt:  "",
@@ -285,9 +286,8 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 		},
 		{
 			Step: core.Step{
-				Name:    "send-notification",
-				Command: "curl",
-				Args:    []string{"-X", "POST", "https://api.slack.com/webhook", "-d", `{"text":"Deployment complete"}`},
+				Name:     "send-notification",
+				Commands: []core.CommandEntry{{Command: "curl", Args: []string{"-X", "POST", "https://api.slack.com/webhook", "-d", `{"text":"Deployment complete"}`}}},
 			},
 			Status:     core.NodeRunning,
 			StartedAt:  "2025-01-15T10:32:00Z",
@@ -296,9 +296,8 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 		},
 		{
 			Step: core.Step{
-				Name:    "cleanup-temp-files",
-				Command: "bash",
-				Args:    nil, // Test nil args
+				Name:     "cleanup-temp-files",
+				Commands: []core.CommandEntry{{Command: "bash", Args: nil}}, // Test nil args
 			},
 			Status:     core.NodeSucceeded,
 			StartedAt:  "2025-01-15T10:32:30Z",
@@ -307,10 +306,12 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 		},
 		{
 			Step: core.Step{
-				Name:        "special-chars-test",
-				Command:     "echo",
-				Args:        []string{"<script>alert('xss')</script>", "&", "\"quotes\""},
-				CmdWithArgs: "echo <script>alert('xss')</script> & \"quotes\"",
+				Name: "special-chars-test",
+				Commands: []core.CommandEntry{{
+					Command:     "echo",
+					Args:        []string{"<script>alert('xss')</script>", "&", "\"quotes\""},
+					CmdWithArgs: "echo <script>alert('xss')</script> & \"quotes\"",
+				}},
 			},
 			Status:     core.NodeFailed,
 			StartedAt:  "2025-01-15T10:33:00Z",

@@ -85,15 +85,17 @@ func createDirectCommand(ctx context.Context, cmd string, args []string, scriptF
 }
 
 // validateCommandStep checks that a Step has a valid command configuration.
-// It considers a step valid when it provides a Command, a Script, both, or a non-nil SubDAG.
+// It considers a step valid when it provides Commands, a Script, both, or a non-nil SubDAG.
 // Returns core.ErrStepCommandIsRequired when none of those are present.
 func validateCommandStep(step core.Step) error {
+	hasCommands := len(step.Commands) > 0
+
 	switch {
-	case step.Command != "" && step.Script != "":
-		// Both command and script provided - valid
-	case step.Command != "" && step.Script == "":
-		// Command only - valid
-	case step.Command == "" && step.Script != "":
+	case hasCommands && step.Script != "":
+		// Both commands and script provided - valid
+	case hasCommands && step.Script == "":
+		// Commands only - valid
+	case !hasCommands && step.Script != "":
 		// Script only - valid
 	case step.SubDAG != nil:
 		// Sub DAG - valid

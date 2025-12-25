@@ -95,8 +95,17 @@ func (e *sshExecutor) Run(_ context.Context) error {
 	// the remote side using the Run method.
 	session.Stdout = e.stdout
 	session.Stderr = e.stderr
+
+	// Extract command and args from Commands field
+	var stepCommand string
+	var stepArgs []string
+	if len(e.step.Commands) > 0 {
+		stepCommand = e.step.Commands[0].Command
+		stepArgs = e.step.Commands[0].Args
+	}
+
 	command := strings.Join(
-		append([]string{e.step.Command}, e.step.Args...), " ",
+		append([]string{stepCommand}, stepArgs...), " ",
 	)
 	return session.Run(command)
 }

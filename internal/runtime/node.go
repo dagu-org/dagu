@@ -425,6 +425,49 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 	}
 
 	step := n.Step()
+
+	// If Commands is already populated (new format), evaluate each command entry
+	if len(step.Commands) > 0 {
+		// Clone the Commands slice to avoid race conditions
+		commands := make([]core.CommandEntry, len(step.Commands))
+		for i, cmdEntry := range step.Commands {
+			// Clone the Args slice
+			args := make([]string, len(cmdEntry.Args))
+			for j, arg := range cmdEntry.Args {
+				value, err := EvalString(ctx, arg, evalOptions...)
+				if err != nil {
+					return fmt.Errorf("failed to eval command args: %w", err)
+				}
+				args[j] = value
+			}
+			commands[i] = core.CommandEntry{
+				Command:     cmdEntry.Command,
+				Args:        args,
+				CmdWithArgs: cmdEntry.CmdWithArgs,
+			}
+
+			// Set ShellCmdArgs for the first command for shell execution
+			if i == 0 && step.ExecutorConfig.IsCommand() {
+				// Prefer CmdWithArgs if available (preserves original quoting)
+				if cmdEntry.CmdWithArgs != "" {
+					evaluated, err := EvalString(ctx, cmdEntry.CmdWithArgs, evalOptions...)
+					if err != nil {
+						return fmt.Errorf("failed to eval command with args: %w", err)
+					}
+					step.ShellCmdArgs = evaluated
+				} else {
+					step.ShellCmdArgs = cmdutil.BuildCommandEscapedString(cmdEntry.Command, args)
+				}
+			}
+		}
+		step.Commands = commands
+
+		n.SetStep(step)
+		n.cmdEvaluated.Store(true)
+		return nil
+	}
+
+	// Legacy path: handle old format fields (for backward compatibility with JSON)
 	switch {
 	case step.CmdArgsSys != "":
 		// In case of the command and args are defined as a list. In this case,
@@ -437,8 +480,12 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 			}
 			args[i] = value
 		}
-		step.Command = cmd
-		step.Args = args
+
+		step.Commands = []core.CommandEntry{{
+			Command:     cmd,
+			Args:        args,
+			CmdWithArgs: cmdutil.BuildCommandEscapedString(cmd, args),
+		}}
 
 		if step.ExecutorConfig.IsCommand() {
 			step.ShellCmdArgs = cmdutil.BuildCommandEscapedString(cmd, args)
@@ -463,11 +510,14 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 			return fmt.Errorf("failed to split command with args: %w", err)
 		}
 
-		step.Command = cmd
-		step.Args = args
+		step.Commands = []core.CommandEntry{{
+			Command:     cmd,
+			Args:        args,
+			CmdWithArgs: cmdWithArgs,
+		}}
 
 	case step.Command != "" && len(step.Args) == 0:
-		// Shouldn't reach here except for testing.
+		// Legacy: Command field set without Args
 
 		cmd, args, err := cmdutil.SplitCommand(step.Command)
 		if err != nil {
@@ -481,28 +531,34 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 			args[i] = value
 		}
 
-		step.CmdWithArgs = step.Command
-		step.Command = cmd
-		step.Args = args
+		step.Commands = []core.CommandEntry{{
+			Command:     cmd,
+			Args:        args,
+			CmdWithArgs: step.Command,
+		}}
 
-	default:
-		// Shouldn't reach here except for testing.
+	case step.Command != "":
+		// Legacy: both Command and Args fields set
 
-		if step.Command != "" {
-			value, err := EvalString(ctx, step.Command, evalOptions...)
-			if err != nil {
-				return fmt.Errorf("failed to eval command: %w", err)
-			}
-			step.Command = value
+		value, err := EvalString(ctx, step.Command, evalOptions...)
+		if err != nil {
+			return fmt.Errorf("failed to eval command: %w", err)
 		}
 
+		args := make([]string, len(step.Args))
 		for i, arg := range step.Args {
-			value, err := EvalString(ctx, arg, evalOptions...)
+			argValue, err := EvalString(ctx, arg, evalOptions...)
 			if err != nil {
 				return fmt.Errorf("failed to eval command args: %w", err)
 			}
-			step.Args[i] = value
+			args[i] = argValue
 		}
+
+		step.Commands = []core.CommandEntry{{
+			Command:     value,
+			Args:        args,
+			CmdWithArgs: cmdutil.BuildCommandEscapedString(value, args),
+		}}
 	}
 
 	n.SetStep(step)

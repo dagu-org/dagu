@@ -207,11 +207,16 @@ type stepDefinition struct {
 }
 
 func (e *githubAction) generateWorkflowYAML(ctx context.Context) (string, error) {
-	if e.step.Command == "" {
+	// Extract command from Commands field
+	var command string
+	if len(e.step.Commands) > 0 {
+		command = e.step.Commands[0].Command
+	}
+	if command == "" {
 		return "", fmt.Errorf("command field is required for GitHub Action executor (e.g., command: actions/checkout@v4)")
 	}
 
-	action := strings.TrimSpace(e.step.Command)
+	action := strings.TrimSpace(command)
 	env := runtime.GetEnv(ctx)
 
 	// Get action inputs from step.Params
@@ -523,7 +528,12 @@ func parseStringSlice(input any) []string {
 }
 
 func newGitHubAction(ctx context.Context, step core.Step) (executor.Executor, error) {
-	if step.Command == "" {
+	// Extract command from Commands field
+	var command string
+	if len(step.Commands) > 0 {
+		command = step.Commands[0].Command
+	}
+	if command == "" {
 		return nil, fmt.Errorf("command field is required for GitHub Action executor (e.g., command: actions/checkout@v4)")
 	}
 

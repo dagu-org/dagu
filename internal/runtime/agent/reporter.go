@@ -134,8 +134,8 @@ func renderStepSummary(nodes []*execution.Node) string {
 			n.FinishedAt,
 			n.Status.String(),
 		}
-		if n.Step.Args != nil {
-			dataRow = append(dataRow, strings.Join(n.Step.Args, " "))
+		if len(n.Step.Commands) > 0 && len(n.Step.Commands[0].Args) > 0 {
+			dataRow = append(dataRow, strings.Join(n.Step.Commands[0].Args, " "))
 		} else {
 			dataRow = append(dataRow, "")
 		}
@@ -256,7 +256,10 @@ func renderHTML(nodes []*execution.Node) string {
 		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"%s\">%s</td>", statusClass, status))
 
 		// Command (join args and escape HTML)
-		command := n.Step.CmdWithArgs
+		var command string
+		if len(n.Step.Commands) > 0 {
+			command = n.Step.Commands[0].CmdWithArgs
+		}
 		command = strings.ReplaceAll(command, "&", "&amp;")
 		command = strings.ReplaceAll(command, "<", "&lt;")
 		command = strings.ReplaceAll(command, ">", "&gt;")
@@ -580,7 +583,10 @@ func renderHTMLWithDAGInfo(dagStatus execution.DAGRunStatus) string {
 		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"%s\">%s</td>", nodeStatusClass, nodeStatus))
 
 		// Command (join args and escape HTML)
-		command := n.Step.CmdWithArgs
+		var command string
+		if len(n.Step.Commands) > 0 {
+			command = n.Step.Commands[0].CmdWithArgs
+		}
 		command = strings.ReplaceAll(command, "&", "&amp;")
 		command = strings.ReplaceAll(command, "<", "&lt;")
 		command = strings.ReplaceAll(command, ">", "&gt;")

@@ -132,10 +132,18 @@ func (e *docker) Kill(sig os.Signal) error {
 }
 
 func (e *docker) Run(ctx context.Context) error {
+	// Extract command and args from Commands field
+	var stepCommand string
+	var stepArgs []string
+	if len(e.step.Commands) > 0 {
+		stepCommand = e.step.Commands[0].Command
+		stepArgs = e.step.Commands[0].Args
+	}
+
 	logger.Debug(ctx, "Docker executor: Run started",
 		slog.String("stepName", e.step.Name),
-		slog.String("command", e.step.Command),
-		slog.Any("args", e.step.Args),
+		slog.String("command", stepCommand),
+		slog.Any("args", stepArgs),
 	)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
@@ -164,8 +172,8 @@ func (e *docker) Run(ctx context.Context) error {
 		// Build command only when a command is explicitly provided.
 		// If command is empty, avoid passing an empty string which overrides image CMD.
 		var cmd []string
-		if e.step.Command != "" {
-			cmd = append([]string{e.step.Command}, e.step.Args...)
+		if stepCommand != "" {
+			cmd = append([]string{stepCommand}, stepArgs...)
 		}
 
 		exitCode, err := cli.Exec(
@@ -209,8 +217,8 @@ func (e *docker) Run(ctx context.Context) error {
 
 	// Build command only when explicitly provided; otherwise use image default CMD/ENTRYPOINT.
 	var cmd []string
-	if e.step.Command != "" {
-		cmd = append([]string{e.step.Command}, e.step.Args...)
+	if stepCommand != "" {
+		cmd = append([]string{stepCommand}, stepArgs...)
 	}
 	logger.Debug(ctx, "Docker executor: calling container.Run",
 		slog.Any("cmd", cmd),

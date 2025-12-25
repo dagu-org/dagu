@@ -287,11 +287,18 @@ func NewCommand(ctx context.Context, step core.Step) (executor.Executor, error) 
 func NewCommandConfig(ctx context.Context, step core.Step) (*commandConfig, error) {
 	env := runtime.GetEnv(ctx)
 
+	var command string
+	var args []string
+	if len(step.Commands) > 0 {
+		command = step.Commands[0].Command
+		args = step.Commands[0].Args
+	}
+
 	return &commandConfig{
 		Ctx:                ctx,
 		Dir:                env.WorkingDir,
-		Command:            step.Command,
-		Args:               step.Args,
+		Command:            command,
+		Args:               args,
 		Script:             step.Script,
 		Shell:              env.Shell(ctx),
 		ShellCommandArgs:   step.ShellCmdArgs,

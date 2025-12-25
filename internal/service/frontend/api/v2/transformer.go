@@ -46,13 +46,22 @@ func toStep(obj core.Step) api.Step {
 		repeatPolicy.Condition = ptrOf(toPrecondition(obj.RepeatPolicy.Condition))
 	}
 
+	// Extract command info from Commands field (new format)
+	var command, cmdWithArgs string
+	var args []string
+	if len(obj.Commands) > 0 {
+		command = obj.Commands[0].Command
+		args = obj.Commands[0].Args
+		cmdWithArgs = obj.Commands[0].CmdWithArgs
+	}
+
 	step := api.Step{
 		Name:          obj.Name,
 		Id:            ptrOf(obj.ID),
 		Description:   ptrOf(obj.Description),
-		Args:          ptrOf(obj.Args),
-		CmdWithArgs:   ptrOf(obj.CmdWithArgs),
-		Command:       ptrOf(obj.Command),
+		Args:          ptrOf(args),
+		CmdWithArgs:   ptrOf(cmdWithArgs),
+		Command:       ptrOf(command),
 		Depends:       ptrOf(obj.Depends),
 		Dir:           ptrOf(obj.Dir),
 		MailOnError:   ptrOf(obj.MailOnError),

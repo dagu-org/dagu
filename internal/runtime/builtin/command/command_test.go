@@ -449,8 +449,8 @@ func TestCommandExecutor_ExitCode(t *testing.T) {
 		{
 			name: "SuccessfulCommand",
 			step: core.Step{
-				Name:    "test",
-				Command: "true",
+				Name:     "test",
+				Commands: []core.CommandEntry{{Command: "true"}},
 			},
 			expectedCode: 0,
 			shouldError:  false,
@@ -458,8 +458,8 @@ func TestCommandExecutor_ExitCode(t *testing.T) {
 		{
 			name: "FailingCommand",
 			step: core.Step{
-				Name:    "test",
-				Command: "false",
+				Name:     "test",
+				Commands: []core.CommandEntry{{Command: "false"}},
 			},
 			expectedCode: 1,
 			shouldError:  true,
@@ -467,9 +467,8 @@ func TestCommandExecutor_ExitCode(t *testing.T) {
 		{
 			name: "ExitWithSpecificCode",
 			step: core.Step{
-				Name:    "test",
-				Command: "/bin/sh",
-				Args:    []string{"-c", "exit 42"},
+				Name:     "test",
+				Commands: []core.CommandEntry{{Command: "/bin/sh", Args: []string{"-c", "exit 42"}}},
 			},
 			expectedCode: 42,
 			shouldError:  true,
@@ -563,9 +562,8 @@ func TestCommandExecutor_SimpleCommand(t *testing.T) {
 		{
 			name: "echo command",
 			step: core.Step{
-				Name:    "test",
-				Command: "echo",
-				Args:    []string{"hello"},
+				Name:     "test",
+				Commands: []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
 			},
 			expectedOutput: "hello\n",
 			shouldError:    false,
@@ -573,9 +571,8 @@ func TestCommandExecutor_SimpleCommand(t *testing.T) {
 		{
 			name: "command with multiple args",
 			step: core.Step{
-				Name:    "test",
-				Command: "echo",
-				Args:    []string{"hello", "world"},
+				Name:     "test",
+				Commands: []core.CommandEntry{{Command: "echo", Args: []string{"hello", "world"}}},
 			},
 			expectedOutput: "hello world\n",
 			shouldError:    false,
@@ -583,16 +580,16 @@ func TestCommandExecutor_SimpleCommand(t *testing.T) {
 		{
 			name: "command that fails",
 			step: core.Step{
-				Name:    "test",
-				Command: "false",
+				Name:     "test",
+				Commands: []core.CommandEntry{{Command: "false"}},
 			},
 			shouldError: true,
 		},
 		{
 			name: "command not found",
 			step: core.Step{
-				Name:    "test",
-				Command: "nonexistent_command_12345",
+				Name:     "test",
+				Commands: []core.CommandEntry{{Command: "nonexistent_command_12345"}},
 			},
 			shouldError: true,
 		},
@@ -811,11 +808,10 @@ func TestCommandExecutor_CommandWithScript(t *testing.T) {
 			}
 
 			step := core.Step{
-				Name:    "test",
-				Command: tt.command,
-				Args:    tt.args,
-				Script:  tt.script,
-				Shell:   tt.shell,
+				Name:     "test",
+				Commands: []core.CommandEntry{{Command: tt.command, Args: tt.args}},
+				Script:   tt.script,
+				Shell:    tt.shell,
 			}
 			ctx := setupTestContext(t, nil, step)
 
@@ -1115,7 +1111,7 @@ func TestValidateCommandStep(t *testing.T) {
 		{
 			name: "command only",
 			step: core.Step{
-				Command: "echo",
+				Commands: []core.CommandEntry{{Command: "echo"}},
 			},
 			expectErr: false,
 		},
@@ -1129,8 +1125,8 @@ func TestValidateCommandStep(t *testing.T) {
 		{
 			name: "command and script",
 			step: core.Step{
-				Command: "python",
-				Script:  "print('hello')",
+				Commands: []core.CommandEntry{{Command: "python"}},
+				Script:   "print('hello')",
 			},
 			expectErr: false,
 		},
@@ -1382,9 +1378,8 @@ func TestCommandExecutor_ConcurrentRun(t *testing.T) {
 	}
 
 	step := core.Step{
-		Name:    "test",
-		Command: "sleep",
-		Args:    []string{"0.1"},
+		Name:     "test",
+		Commands: []core.CommandEntry{{Command: "sleep", Args: []string{"0.1"}}},
 	}
 
 	ctx := setupTestContext(t, nil, step)
@@ -2242,8 +2237,8 @@ func TestNewCommand_ErrorPath(t *testing.T) {
 	// Currently NewCommandConfig always succeeds
 	// This test documents the behavior
 	step := core.Step{
-		Name:    "test",
-		Command: "echo",
+		Name:     "test",
+		Commands: []core.CommandEntry{{Command: "echo"}},
 	}
 
 	exec, err := NewCommand(ctx, step)
