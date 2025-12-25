@@ -879,20 +879,6 @@ func TestBuildStepCommand(t *testing.T) {
 			},
 		},
 		{
-			name:    "ArrayCommand",
-			command: []any{"echo", "hello", "world"},
-			expected: struct {
-				command     string
-				args        []string
-				cmdWithArgs string
-				script      string
-			}{
-				command:     "echo",
-				args:        []string{"hello", "world"},
-				cmdWithArgs: `echo "hello" "world"`,
-			},
-		},
-		{
 			name:    "EmptyStringCommand",
 			command: "   ",
 			wantErr: true,
@@ -920,6 +906,321 @@ func TestBuildStepCommand(t *testing.T) {
 			assert.Equal(t, tt.expected.args, result.Args)
 			assert.Equal(t, tt.expected.cmdWithArgs, result.CmdWithArgs)
 			assert.Equal(t, tt.expected.script, result.Script)
+		})
+	}
+}
+
+func TestBuildStepCommand_MultipleCommands(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		command          any
+		expectedCommands []core.CommandEntry
+		expectedCommand  string // First command for backward compat
+		expectedArgs     []string
+		expectedDisplay  string // CmdWithArgs display string
+		wantErr          bool
+	}{
+		{
+			name:    "SingleCommandInArray",
+			command: []any{"echo hello"},
+			expectedCommands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello"}, CmdWithArgs: "echo hello"},
+			},
+			expectedCommand: "echo",
+			expectedArgs:    []string{"hello"},
+			expectedDisplay: "[1 commands]",
+		},
+		{
+			name:    "TwoSimpleCommands",
+			command: []any{"echo hello", "echo world"},
+			expectedCommands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello"}, CmdWithArgs: "echo hello"},
+				{Command: "echo", Args: []string{"world"}, CmdWithArgs: "echo world"},
+			},
+			expectedCommand: "echo",
+			expectedArgs:    []string{"hello"},
+			expectedDisplay: "[2 commands]",
+		},
+		{
+			name:    "MultipleCommandsWithArgs",
+			command: []any{"npm install", "npm run build", "npm test"},
+			expectedCommands: []core.CommandEntry{
+				{Command: "npm", Args: []string{"install"}, CmdWithArgs: "npm install"},
+				{Command: "npm", Args: []string{"run", "build"}, CmdWithArgs: "npm run build"},
+				{Command: "npm", Args: []string{"test"}, CmdWithArgs: "npm test"},
+			},
+			expectedCommand: "npm",
+			expectedArgs:    []string{"install"},
+			expectedDisplay: "[3 commands]",
+		},
+		{
+			name:    "CommandsWithQuotedArgs",
+			command: []any{`echo "hello world"`, `grep "search term"`},
+			expectedCommands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello world"}, CmdWithArgs: `echo "hello world"`},
+				{Command: "grep", Args: []string{"search term"}, CmdWithArgs: `grep "search term"`},
+			},
+			expectedCommand: "echo",
+			expectedArgs:    []string{"hello world"},
+			expectedDisplay: "[2 commands]",
+		},
+		{
+			name:    "CommandsWithPipes",
+			command: []any{"ls -la", "cat file.txt | grep pattern"},
+			expectedCommands: []core.CommandEntry{
+				{Command: "ls", Args: []string{"-la"}, CmdWithArgs: "ls -la"},
+				{Command: "cat", Args: []string{"file.txt", "|", "grep", "pattern"}, CmdWithArgs: "cat file.txt | grep pattern"},
+			},
+			expectedCommand: "ls",
+			expectedArgs:    []string{"-la"},
+			expectedDisplay: "[2 commands]",
+		},
+		{
+			name:    "SimpleCommandsNoArgs",
+			command: []any{"pwd", "whoami", "date"},
+			expectedCommands: []core.CommandEntry{
+				{Command: "pwd", Args: []string{}, CmdWithArgs: "pwd"},
+				{Command: "whoami", Args: []string{}, CmdWithArgs: "whoami"},
+				{Command: "date", Args: []string{}, CmdWithArgs: "date"},
+			},
+			expectedCommand: "pwd",
+			expectedArgs:    []string{},
+			expectedDisplay: "[3 commands]",
+		},
+		{
+			name:    "EmptyArrayCommand",
+			command: []any{},
+			wantErr: true,
+		},
+		{
+			name:    "ArrayWithOnlyEmptyStrings",
+			command: []any{"", "   ", ""},
+			wantErr: true,
+		},
+		{
+			name:    "ArrayWithMixedEmptyAndValid",
+			command: []any{"", "echo hello", "   "},
+			expectedCommands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello"}, CmdWithArgs: "echo hello"},
+			},
+			expectedCommand: "echo",
+			expectedArgs:    []string{"hello"},
+			expectedDisplay: "[1 commands]",
+		},
+		{
+			name:    "NonStringElementsConverted",
+			command: []any{123, true, 45.6},
+			expectedCommands: []core.CommandEntry{
+				{Command: "123", Args: []string{}, CmdWithArgs: "123"},
+				{Command: "true", Args: []string{}, CmdWithArgs: "true"},
+				{Command: "45.6", Args: []string{}, CmdWithArgs: "45.6"},
+			},
+			expectedCommand: "123",
+			expectedArgs:    []string{},
+			expectedDisplay: "[3 commands]",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &step{Command: tt.command}
+			result := &core.Step{ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)}}
+			err := buildStepCommand(testStepBuildContext(), s, result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+
+			// Verify Commands slice
+			require.Equal(t, len(tt.expectedCommands), len(result.Commands), "Commands count mismatch")
+			for i, expected := range tt.expectedCommands {
+				assert.Equal(t, expected.Command, result.Commands[i].Command, "Command[%d].Command mismatch", i)
+				assert.Equal(t, expected.Args, result.Commands[i].Args, "Command[%d].Args mismatch", i)
+				assert.Equal(t, expected.CmdWithArgs, result.Commands[i].CmdWithArgs, "Command[%d].CmdWithArgs mismatch", i)
+			}
+
+			// Verify backward compatibility fields
+			assert.Equal(t, tt.expectedCommand, result.Command, "Command field mismatch")
+			assert.Equal(t, tt.expectedArgs, result.Args, "Args field mismatch")
+			assert.Equal(t, tt.expectedDisplay, result.CmdWithArgs, "CmdWithArgs display mismatch")
+		})
+	}
+}
+
+func TestBuildSingleCommand(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		command     string
+		wantCommand string
+		wantArgs    []string
+		wantScript  string
+		wantErr     bool
+	}{
+		{
+			name:        "SimpleCommand",
+			command:     "echo hello",
+			wantCommand: "echo",
+			wantArgs:    []string{"hello"},
+		},
+		{
+			name:        "CommandWithMultipleArgs",
+			command:     "python script.py --arg1 value1 --arg2 value2",
+			wantCommand: "python",
+			wantArgs:    []string{"script.py", "--arg1", "value1", "--arg2", "value2"},
+		},
+		{
+			name:        "CommandWithQuotes",
+			command:     `echo "hello world"`,
+			wantCommand: "echo",
+			wantArgs:    []string{"hello world"},
+		},
+		{
+			name:       "MultilineBecomesScript",
+			command:    "echo line1\necho line2",
+			wantScript: "echo line1\necho line2",
+		},
+		{
+			name:        "CommandOnly",
+			command:     "pwd",
+			wantCommand: "pwd",
+			wantArgs:    []string{},
+		},
+		{
+			name:    "EmptyCommand",
+			command: "",
+			wantErr: true,
+		},
+		{
+			name:    "WhitespaceOnly",
+			command: "   \t  ",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := &core.Step{}
+			err := buildSingleCommand(tt.command, result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantCommand, result.Command)
+			assert.Equal(t, tt.wantArgs, result.Args)
+			assert.Equal(t, tt.wantScript, result.Script)
+		})
+	}
+}
+
+func TestBuildMultipleCommands(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		commands         []any
+		expectedCommands []core.CommandEntry
+		wantErr          bool
+	}{
+		{
+			name:     "BasicCommands",
+			commands: []any{"echo foo", "echo bar"},
+			expectedCommands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"foo"}, CmdWithArgs: "echo foo"},
+				{Command: "echo", Args: []string{"bar"}, CmdWithArgs: "echo bar"},
+			},
+		},
+		{
+			name:     "EmptyArray",
+			commands: []any{},
+			wantErr:  true,
+		},
+		{
+			name:     "AllEmpty",
+			commands: []any{"", "", ""},
+			wantErr:  true,
+		},
+		{
+			name:     "SkipsEmptyPreservesValid",
+			commands: []any{"", "valid command", ""},
+			expectedCommands: []core.CommandEntry{
+				{Command: "valid", Args: []string{"command"}, CmdWithArgs: "valid command"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := &core.Step{}
+			err := buildMultipleCommands(tt.commands, result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, len(tt.expectedCommands), len(result.Commands))
+			for i, expected := range tt.expectedCommands {
+				assert.Equal(t, expected.Command, result.Commands[i].Command)
+				assert.Equal(t, expected.Args, result.Commands[i].Args)
+				assert.Equal(t, expected.CmdWithArgs, result.Commands[i].CmdWithArgs)
+			}
+		})
+	}
+}
+
+func TestStepHasMultipleCommands(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		step     *core.Step
+		expected bool
+	}{
+		{
+			name:     "NoCommands",
+			step:     &core.Step{},
+			expected: false,
+		},
+		{
+			name: "SingleCommand",
+			step: &core.Step{
+				Command: "echo hello",
+			},
+			expected: false,
+		},
+		{
+			name: "HasMultipleCommands",
+			step: &core.Step{
+				Commands: []core.CommandEntry{
+					{Command: "echo", Args: []string{"hello"}},
+					{Command: "echo", Args: []string{"world"}},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "EmptyCommandsSlice",
+			step: &core.Step{
+				Commands: []core.CommandEntry{},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.step.HasMultipleCommands())
 		})
 	}
 }

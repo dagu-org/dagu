@@ -586,62 +586,92 @@ func buildStepCommand(_ StepBuildContext, s *step, result *core.Step) error {
 
 	switch val := command.(type) {
 	case string:
-		// Case 2: command is a string
-		val = strings.TrimSpace(val)
-		if val == "" {
-			return core.NewValidationError("command", val, ErrStepCommandIsEmpty)
-		}
-
-		// If the value is multi-line, treat it as a script
-		if strings.Contains(val, "\n") {
-			result.Script = val
-			return nil
-		}
-
-		// We need to split the command into command and args.
-		result.CmdWithArgs = val
-		cmd, args, err := cmdutil.SplitCommand(val)
-		if err != nil {
-			return core.NewValidationError("command", val, fmt.Errorf("failed to parse command: %w", err))
-		}
-		result.Command = strings.TrimSpace(cmd)
-		result.Args = args
+		// Case 2: command is a string (single command)
+		return buildSingleCommand(val, result)
 
 	case []any:
-		// Case 3: command is an array
-		var cmd string
-		var args []string
-		for _, v := range val {
-			strVal, ok := v.(string)
-			if !ok {
-				// If the value is not a string, convert it to a string.
-				strVal = fmt.Sprintf("%v", v)
-			}
-			strVal = strings.TrimSpace(strVal)
-			if cmd == "" {
-				cmd = strVal
-				continue
-			}
-			args = append(args, strVal)
-		}
-
-		// Setup CmdWithArgs
-		var sb strings.Builder
-		for i, arg := range args {
-			if i > 0 {
-				sb.WriteString(" ")
-			}
-			sb.WriteString(fmt.Sprintf("%q", arg))
-		}
-
-		result.Command = cmd
-		result.Args = args
-		result.CmdWithArgs = fmt.Sprintf("%s %s", result.Command, sb.String())
-		result.CmdArgsSys = cmdutil.JoinCommandArgs(result.Command, result.Args)
+		// Case 3: command is an array (multiple commands)
+		return buildMultipleCommands(val, result)
 
 	default:
 		return core.NewValidationError("command", val, ErrStepCommandMustBeArrayOrString)
 	}
+}
+
+// buildSingleCommand parses a single command string and populates the Step fields.
+func buildSingleCommand(val string, result *core.Step) error {
+	val = strings.TrimSpace(val)
+	if val == "" {
+		return core.NewValidationError("command", val, ErrStepCommandIsEmpty)
+	}
+
+	// If the value is multi-line, treat it as a script
+	if strings.Contains(val, "\n") {
+		result.Script = val
+		return nil
+	}
+
+	// We need to split the command into command and args.
+	result.CmdWithArgs = val
+	cmd, args, err := cmdutil.SplitCommand(val)
+	if err != nil {
+		return core.NewValidationError("command", val, fmt.Errorf("failed to parse command: %w", err))
+	}
+	result.Command = strings.TrimSpace(cmd)
+	result.Args = args
+
+	return nil
+}
+
+// buildMultipleCommands parses an array of commands and populates the Step.Commands field.
+// Each array element is treated as a separate command to be executed sequentially.
+func buildMultipleCommands(val []any, result *core.Step) error {
+	if len(val) == 0 {
+		return core.NewValidationError("command", val, ErrStepCommandIsEmpty)
+	}
+
+	var commands []core.CommandEntry
+
+	for i, v := range val {
+		strVal, ok := v.(string)
+		if !ok {
+			// If the value is not a string, convert it to a string.
+			strVal = fmt.Sprintf("%v", v)
+		}
+		strVal = strings.TrimSpace(strVal)
+
+		if strVal == "" {
+			continue // Skip empty commands
+		}
+
+		// Parse the command string to extract command and args
+		cmd, args, err := cmdutil.SplitCommand(strVal)
+		if err != nil {
+			return core.NewValidationError(
+				fmt.Sprintf("command[%d]", i),
+				strVal,
+				fmt.Errorf("failed to parse command: %w", err),
+			)
+		}
+
+		commands = append(commands, core.CommandEntry{
+			Command:     strings.TrimSpace(cmd),
+			Args:        args,
+			CmdWithArgs: strVal,
+		})
+	}
+
+	if len(commands) == 0 {
+		return core.NewValidationError("command", val, ErrStepCommandIsEmpty)
+	}
+
+	result.Commands = commands
+
+	// Set Command/Args/CmdWithArgs for backward compatibility and display purposes.
+	// Use the first command for these fields.
+	result.Command = commands[0].Command
+	result.Args = commands[0].Args
+	result.CmdWithArgs = fmt.Sprintf("[%d commands]", len(commands))
 
 	return nil
 }

@@ -39,6 +39,9 @@ type Step struct {
 	Script string `json:"script,omitempty"`
 	// Args contains the arguments for the command.
 	Args []string `json:"args,omitempty"`
+	// Commands holds multiple commands for sequential execution.
+	// When populated, Command/Args fields represent the first command for display purposes.
+	Commands []CommandEntry `json:"commands,omitempty"`
 	// Stdout is the file to store the standard output.
 	Stdout string `json:"stdout,omitempty"`
 	// Stderr is the file to store the standard error.
@@ -105,6 +108,22 @@ func (s *Step) String() string {
 type SubDAG struct {
 	Name   string `json:"name,omitempty"`
 	Params string `json:"params,omitempty"`
+}
+
+// CommandEntry represents a single command in a multi-command step.
+// Each entry contains a parsed command with its arguments.
+type CommandEntry struct {
+	// Command is the executable name or path.
+	Command string `json:"command"`
+	// Args contains the arguments for the command.
+	Args []string `json:"args,omitempty"`
+	// CmdWithArgs is the original command string for display purposes.
+	CmdWithArgs string `json:"cmdWithArgs,omitempty"`
+}
+
+// HasMultipleCommands returns true if the step has multiple commands to execute.
+func (s *Step) HasMultipleCommands() bool {
+	return len(s.Commands) > 0
 }
 
 // ExecutorConfig contains the configuration for the executor.

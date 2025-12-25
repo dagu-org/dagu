@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/stretchr/testify/assert"
@@ -495,6 +494,7 @@ steps:
 	t.Run("ValidCommandInArray", func(t *testing.T) {
 		t.Parallel()
 
+		// Arrays are now treated as multiple commands (not command + args)
 		data := []byte(`
 steps:
   - command: [echo, 1]
@@ -504,16 +504,19 @@ steps:
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
-		assert.Equal(t,
-			cmdutil.JoinCommandArgs("echo", []string{"1"}),
-			th.Steps[0].CmdArgsSys)
-		assert.Equal(t, "echo", th.Steps[0].Command)
-		assert.Equal(t, []string{"1"}, th.Steps[0].Args)
 		assert.Equal(t, "step1", th.Steps[0].Name)
+		// With new multi-command behavior, each element is a separate command
+		assert.Len(t, th.Steps[0].Commands, 2)
+		assert.Equal(t, "echo", th.Steps[0].Commands[0].Command)
+		assert.Equal(t, "1", th.Steps[0].Commands[1].Command)
+		// First command is used for backward compat fields
+		assert.Equal(t, "echo", th.Steps[0].Command)
+		assert.Equal(t, "[2 commands]", th.Steps[0].CmdWithArgs)
 	})
 	t.Run("ValidCommandInList", func(t *testing.T) {
 		t.Parallel()
 
+		// Arrays are now treated as multiple commands (not command + args)
 		data := []byte(`
 steps:
   - command:
@@ -525,12 +528,39 @@ steps:
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
-		assert.Equal(t,
-			cmdutil.JoinCommandArgs("echo", []string{"1"}),
-			th.Steps[0].CmdArgsSys)
-		assert.Equal(t, "echo", th.Steps[0].Command)
-		assert.Equal(t, []string{"1"}, th.Steps[0].Args)
 		assert.Equal(t, "step1", th.Steps[0].Name)
+		// With new multi-command behavior, each element is a separate command
+		assert.Len(t, th.Steps[0].Commands, 2)
+		assert.Equal(t, "echo", th.Steps[0].Commands[0].Command)
+		assert.Equal(t, "1", th.Steps[0].Commands[1].Command)
+		// First command is used for backward compat fields
+		assert.Equal(t, "echo", th.Steps[0].Command)
+		assert.Equal(t, "[2 commands]", th.Steps[0].CmdWithArgs)
+	})
+	t.Run("MultipleCommandsInArray", func(t *testing.T) {
+		t.Parallel()
+
+		// Test proper multi-command usage
+		data := []byte(`
+steps:
+  - name: build
+    command:
+      - npm install
+      - npm run build
+      - npm test
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		th := DAG{t: t, DAG: dag}
+		assert.Len(t, th.Steps, 1)
+		assert.Equal(t, "build", th.Steps[0].Name)
+		assert.Len(t, th.Steps[0].Commands, 3)
+		assert.Equal(t, "npm", th.Steps[0].Commands[0].Command)
+		assert.Equal(t, []string{"install"}, th.Steps[0].Commands[0].Args)
+		assert.Equal(t, "npm", th.Steps[0].Commands[1].Command)
+		assert.Equal(t, []string{"run", "build"}, th.Steps[0].Commands[1].Args)
+		assert.Equal(t, "npm", th.Steps[0].Commands[2].Command)
+		assert.Equal(t, []string{"test"}, th.Steps[0].Commands[2].Args)
 	})
 	t.Run("HTTPExecutor", func(t *testing.T) {
 		t.Parallel()
