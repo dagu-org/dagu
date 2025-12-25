@@ -1013,12 +1013,12 @@ func TestBuildSingleCommand(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name             string
-		command          string
-		expectedCommand  string
-		expectedArgs     []string
-		expectedScript   string
-		wantErr          bool
+		name            string
+		command         string
+		expectedCommand string
+		expectedArgs    []string
+		expectedScript  string
+		wantErr         bool
 	}{
 		{
 			name:            "SimpleCommand",
