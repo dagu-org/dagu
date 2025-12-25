@@ -205,6 +205,9 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	if err := buildStepCommand(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("command", err))
 	}
+	if err := validateMultipleCommands(result); err != nil {
+		errs = append(errs, wrapTransformError("command", err))
+	}
 	if err := buildStepParamsField(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("params", err))
 	}
@@ -673,6 +676,42 @@ func buildMultipleCommands(val []any, result *core.Step) error {
 	}
 
 	result.Commands = commands
+
+	return nil
+}
+
+// singleCommandOnlyExecutors lists executor types that only support a single command.
+// Executors not in this list (shell, command, docker, container, ssh)
+// can support multiple commands.
+var singleCommandOnlyExecutors = map[string]bool{
+	"jq":            true,
+	"http":          true,
+	"archive":       true,
+	"github_action": true,
+	"github-action": true,
+	"mail":          true,
+	"dag":           true,
+	"parallel":      true,
+}
+
+// validateMultipleCommands checks if the executor type supports multiple commands.
+// Returns an error if multiple commands are specified for an executor that doesn't support them.
+func validateMultipleCommands(result *core.Step) error {
+	// Only validate if there are multiple commands
+	if len(result.Commands) <= 1 {
+		return nil
+	}
+
+	executorType := result.ExecutorConfig.Type
+
+	// Check if executor type is in the single-command-only list
+	if singleCommandOnlyExecutors[executorType] {
+		return core.NewValidationError(
+			"command",
+			result.Commands,
+			fmt.Errorf("%w: executor type %q only supports a single command", ErrExecutorDoesNotSupportMultipleCmd, executorType),
+		)
+	}
 
 	return nil
 }

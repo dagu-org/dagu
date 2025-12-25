@@ -1855,3 +1855,190 @@ func TestBuildStepContainer(t *testing.T) {
 		assert.Contains(t, err.Error(), "cannot use 'script' field with 'container' field")
 	})
 }
+
+func TestValidateMultipleCommands(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		executorType string
+		commands     []core.CommandEntry
+		wantErr      bool
+	}{
+		// Single command - should always pass
+		{
+			name:         "SingleCommand_NoExecutorType",
+			executorType: "",
+			commands:     []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
+			wantErr:      false,
+		},
+		{
+			name:         "SingleCommand_JQExecutor",
+			executorType: "jq",
+			commands:     []core.CommandEntry{{Command: ".foo"}},
+			wantErr:      false,
+		},
+		// Multiple commands - should pass for multi-command executors
+		{
+			name:         "MultipleCommands_NoExecutorType",
+			executorType: "",
+			commands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello"}},
+				{Command: "echo", Args: []string{"world"}},
+			},
+			wantErr: false,
+		},
+		{
+			name:         "MultipleCommands_ShellExecutor",
+			executorType: "shell",
+			commands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello"}},
+				{Command: "echo", Args: []string{"world"}},
+			},
+			wantErr: false,
+		},
+		{
+			name:         "MultipleCommands_CommandExecutor",
+			executorType: "command",
+			commands: []core.CommandEntry{
+				{Command: "npm", Args: []string{"install"}},
+				{Command: "npm", Args: []string{"run", "build"}},
+			},
+			wantErr: false,
+		},
+		{
+			name:         "MultipleCommands_DockerExecutor",
+			executorType: "docker",
+			commands: []core.CommandEntry{
+				{Command: "apt-get", Args: []string{"update"}},
+				{Command: "apt-get", Args: []string{"install", "curl"}},
+			},
+			wantErr: false,
+		},
+		{
+			name:         "MultipleCommands_ContainerExecutor",
+			executorType: "container",
+			commands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello"}},
+				{Command: "echo", Args: []string{"world"}},
+			},
+			wantErr: false,
+		},
+		{
+			name:         "MultipleCommands_SSHExecutor",
+			executorType: "ssh",
+			commands: []core.CommandEntry{
+				{Command: "ls", Args: []string{"-la"}},
+				{Command: "pwd"},
+			},
+			wantErr: false,
+		},
+		// Multiple commands - should fail for single-command executors
+		{
+			name:         "MultipleCommands_JQExecutor",
+			executorType: "jq",
+			commands: []core.CommandEntry{
+				{Command: ".foo"},
+				{Command: ".bar"},
+			},
+			wantErr: true,
+		},
+		{
+			name:         "MultipleCommands_HTTPExecutor",
+			executorType: "http",
+			commands: []core.CommandEntry{
+				{Command: "GET", Args: []string{"https://example.com"}},
+				{Command: "POST", Args: []string{"https://example.com"}},
+			},
+			wantErr: true,
+		},
+		{
+			name:         "MultipleCommands_ArchiveExecutor",
+			executorType: "archive",
+			commands: []core.CommandEntry{
+				{Command: "extract"},
+				{Command: "list"},
+			},
+			wantErr: true,
+		},
+		{
+			name:         "MultipleCommands_GithubActionExecutor_Underscore",
+			executorType: "github_action",
+			commands: []core.CommandEntry{
+				{Command: "actions/checkout@v3"},
+				{Command: "actions/setup-go@v4"},
+			},
+			wantErr: true,
+		},
+		{
+			name:         "MultipleCommands_GithubActionExecutor_Hyphen",
+			executorType: "github-action",
+			commands: []core.CommandEntry{
+				{Command: "actions/checkout@v3"},
+				{Command: "actions/setup-go@v4"},
+			},
+			wantErr: true,
+		},
+		{
+			name:         "MultipleCommands_MailExecutor",
+			executorType: "mail",
+			commands: []core.CommandEntry{
+				{Command: "send"},
+				{Command: "another"},
+			},
+			wantErr: true,
+		},
+		{
+			name:         "MultipleCommands_DAGExecutor",
+			executorType: "dag",
+			commands: []core.CommandEntry{
+				{Command: "dag1"},
+				{Command: "dag2"},
+			},
+			wantErr: true,
+		},
+		{
+			name:         "MultipleCommands_ParallelExecutor",
+			executorType: "parallel",
+			commands: []core.CommandEntry{
+				{Command: "task1"},
+				{Command: "task2"},
+			},
+			wantErr: true,
+		},
+		// Empty commands - should always pass
+		{
+			name:         "NoCommands_JQExecutor",
+			executorType: "jq",
+			commands:     nil,
+			wantErr:      false,
+		},
+		{
+			name:         "EmptyCommands_HTTPExecutor",
+			executorType: "http",
+			commands:     []core.CommandEntry{},
+			wantErr:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := &core.Step{
+				Commands: tt.commands,
+				ExecutorConfig: core.ExecutorConfig{
+					Type: tt.executorType,
+				},
+			}
+			err := validateMultipleCommands(result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "executor does not support multiple commands")
+				assert.Contains(t, err.Error(), tt.executorType)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
