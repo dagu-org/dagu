@@ -838,15 +838,11 @@ func TestBuildStepCommand(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		command  any
-		expected struct {
-			command     string
-			args        []string
-			cmdWithArgs string
-			script      string
-		}
-		wantErr bool
+		name             string
+		command          any
+		expectedScript   string
+		expectedCommands []core.CommandEntry
+		wantErr          bool
 	}{
 		{
 			name:    "NilCommand",
@@ -855,28 +851,14 @@ func TestBuildStepCommand(t *testing.T) {
 		{
 			name:    "SimpleStringCommand",
 			command: "echo hello",
-			expected: struct {
-				command     string
-				args        []string
-				cmdWithArgs string
-				script      string
-			}{
-				command:     "echo",
-				args:        []string{"hello"},
-				cmdWithArgs: "echo hello",
+			expectedCommands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello"}, CmdWithArgs: "echo hello"},
 			},
 		},
 		{
-			name:    "MultilineCommandBecomesScript",
-			command: "echo hello\necho world",
-			expected: struct {
-				command     string
-				args        []string
-				cmdWithArgs string
-				script      string
-			}{
-				script: "echo hello\necho world",
-			},
+			name:           "MultilineCommandBecomesScript",
+			command:        "echo hello\necho world",
+			expectedScript: "echo hello\necho world",
 		},
 		{
 			name:    "EmptyStringCommand",
@@ -902,10 +884,12 @@ func TestBuildStepCommand(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected.command, result.Command)
-			assert.Equal(t, tt.expected.args, result.Args)
-			assert.Equal(t, tt.expected.cmdWithArgs, result.CmdWithArgs)
-			assert.Equal(t, tt.expected.script, result.Script)
+			assert.Equal(t, tt.expectedScript, result.Script)
+			assert.Equal(t, tt.expectedCommands, result.Commands)
+			// Legacy fields should NOT be populated by build functions
+			assert.Empty(t, result.Command)
+			assert.Nil(t, result.Args)
+			assert.Empty(t, result.CmdWithArgs)
 		})
 	}
 }
@@ -917,9 +901,6 @@ func TestBuildStepCommand_MultipleCommands(t *testing.T) {
 		name             string
 		command          any
 		expectedCommands []core.CommandEntry
-		expectedCommand  string // First command for backward compat
-		expectedArgs     []string
-		expectedDisplay  string // CmdWithArgs display string
 		wantErr          bool
 	}{
 		{
@@ -928,9 +909,6 @@ func TestBuildStepCommand_MultipleCommands(t *testing.T) {
 			expectedCommands: []core.CommandEntry{
 				{Command: "echo", Args: []string{"hello"}, CmdWithArgs: "echo hello"},
 			},
-			expectedCommand: "echo",
-			expectedArgs:    []string{"hello"},
-			expectedDisplay: "[1 commands]",
 		},
 		{
 			name:    "TwoSimpleCommands",
@@ -939,9 +917,6 @@ func TestBuildStepCommand_MultipleCommands(t *testing.T) {
 				{Command: "echo", Args: []string{"hello"}, CmdWithArgs: "echo hello"},
 				{Command: "echo", Args: []string{"world"}, CmdWithArgs: "echo world"},
 			},
-			expectedCommand: "echo",
-			expectedArgs:    []string{"hello"},
-			expectedDisplay: "[2 commands]",
 		},
 		{
 			name:    "MultipleCommandsWithArgs",
@@ -951,9 +926,6 @@ func TestBuildStepCommand_MultipleCommands(t *testing.T) {
 				{Command: "npm", Args: []string{"run", "build"}, CmdWithArgs: "npm run build"},
 				{Command: "npm", Args: []string{"test"}, CmdWithArgs: "npm test"},
 			},
-			expectedCommand: "npm",
-			expectedArgs:    []string{"install"},
-			expectedDisplay: "[3 commands]",
 		},
 		{
 			name:    "CommandsWithQuotedArgs",
@@ -962,9 +934,6 @@ func TestBuildStepCommand_MultipleCommands(t *testing.T) {
 				{Command: "echo", Args: []string{"hello world"}, CmdWithArgs: `echo "hello world"`},
 				{Command: "grep", Args: []string{"search term"}, CmdWithArgs: `grep "search term"`},
 			},
-			expectedCommand: "echo",
-			expectedArgs:    []string{"hello world"},
-			expectedDisplay: "[2 commands]",
 		},
 		{
 			name:    "CommandsWithPipes",
@@ -973,9 +942,6 @@ func TestBuildStepCommand_MultipleCommands(t *testing.T) {
 				{Command: "ls", Args: []string{"-la"}, CmdWithArgs: "ls -la"},
 				{Command: "cat", Args: []string{"file.txt", "|", "grep", "pattern"}, CmdWithArgs: "cat file.txt | grep pattern"},
 			},
-			expectedCommand: "ls",
-			expectedArgs:    []string{"-la"},
-			expectedDisplay: "[2 commands]",
 		},
 		{
 			name:    "SimpleCommandsNoArgs",
@@ -985,9 +951,6 @@ func TestBuildStepCommand_MultipleCommands(t *testing.T) {
 				{Command: "whoami", Args: []string{}, CmdWithArgs: "whoami"},
 				{Command: "date", Args: []string{}, CmdWithArgs: "date"},
 			},
-			expectedCommand: "pwd",
-			expectedArgs:    []string{},
-			expectedDisplay: "[3 commands]",
 		},
 		{
 			name:    "EmptyArrayCommand",
@@ -1005,9 +968,6 @@ func TestBuildStepCommand_MultipleCommands(t *testing.T) {
 			expectedCommands: []core.CommandEntry{
 				{Command: "echo", Args: []string{"hello"}, CmdWithArgs: "echo hello"},
 			},
-			expectedCommand: "echo",
-			expectedArgs:    []string{"hello"},
-			expectedDisplay: "[1 commands]",
 		},
 		{
 			name:    "NonStringElementsConverted",
@@ -1017,9 +977,6 @@ func TestBuildStepCommand_MultipleCommands(t *testing.T) {
 				{Command: "true", Args: []string{}, CmdWithArgs: "true"},
 				{Command: "45.6", Args: []string{}, CmdWithArgs: "45.6"},
 			},
-			expectedCommand: "123",
-			expectedArgs:    []string{},
-			expectedDisplay: "[3 commands]",
 		},
 	}
 
@@ -1044,10 +1001,10 @@ func TestBuildStepCommand_MultipleCommands(t *testing.T) {
 				assert.Equal(t, expected.CmdWithArgs, result.Commands[i].CmdWithArgs, "Command[%d].CmdWithArgs mismatch", i)
 			}
 
-			// Verify backward compatibility fields
-			assert.Equal(t, tt.expectedCommand, result.Command, "Command field mismatch")
-			assert.Equal(t, tt.expectedArgs, result.Args, "Args field mismatch")
-			assert.Equal(t, tt.expectedDisplay, result.CmdWithArgs, "CmdWithArgs display mismatch")
+			// Legacy fields should NOT be populated by build functions
+			assert.Empty(t, result.Command)
+			assert.Nil(t, result.Args)
+			assert.Empty(t, result.CmdWithArgs)
 		})
 	}
 }
@@ -1056,41 +1013,41 @@ func TestBuildSingleCommand(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		command     string
-		wantCommand string
-		wantArgs    []string
-		wantScript  string
-		wantErr     bool
+		name             string
+		command          string
+		expectedCommand  string
+		expectedArgs     []string
+		expectedScript   string
+		wantErr          bool
 	}{
 		{
-			name:        "SimpleCommand",
-			command:     "echo hello",
-			wantCommand: "echo",
-			wantArgs:    []string{"hello"},
+			name:            "SimpleCommand",
+			command:         "echo hello",
+			expectedCommand: "echo",
+			expectedArgs:    []string{"hello"},
 		},
 		{
-			name:        "CommandWithMultipleArgs",
-			command:     "python script.py --arg1 value1 --arg2 value2",
-			wantCommand: "python",
-			wantArgs:    []string{"script.py", "--arg1", "value1", "--arg2", "value2"},
+			name:            "CommandWithMultipleArgs",
+			command:         "python script.py --arg1 value1 --arg2 value2",
+			expectedCommand: "python",
+			expectedArgs:    []string{"script.py", "--arg1", "value1", "--arg2", "value2"},
 		},
 		{
-			name:        "CommandWithQuotes",
-			command:     `echo "hello world"`,
-			wantCommand: "echo",
-			wantArgs:    []string{"hello world"},
+			name:            "CommandWithQuotes",
+			command:         `echo "hello world"`,
+			expectedCommand: "echo",
+			expectedArgs:    []string{"hello world"},
 		},
 		{
-			name:       "MultilineBecomesScript",
-			command:    "echo line1\necho line2",
-			wantScript: "echo line1\necho line2",
+			name:           "MultilineBecomesScript",
+			command:        "echo line1\necho line2",
+			expectedScript: "echo line1\necho line2",
 		},
 		{
-			name:        "CommandOnly",
-			command:     "pwd",
-			wantCommand: "pwd",
-			wantArgs:    []string{},
+			name:            "CommandOnly",
+			command:         "pwd",
+			expectedCommand: "pwd",
+			expectedArgs:    []string{},
 		},
 		{
 			name:    "EmptyCommand",
@@ -1115,9 +1072,19 @@ func TestBuildSingleCommand(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantCommand, result.Command)
-			assert.Equal(t, tt.wantArgs, result.Args)
-			assert.Equal(t, tt.wantScript, result.Script)
+			assert.Equal(t, tt.expectedScript, result.Script)
+
+			// Legacy fields should NOT be populated
+			assert.Empty(t, result.Command)
+			assert.Nil(t, result.Args)
+
+			// For non-script commands, Commands should be populated
+			if tt.expectedScript == "" {
+				require.Len(t, result.Commands, 1)
+				assert.Equal(t, tt.expectedCommand, result.Commands[0].Command)
+				assert.Equal(t, tt.expectedArgs, result.Commands[0].Args)
+				assert.Equal(t, tt.command, result.Commands[0].CmdWithArgs)
+			}
 		})
 	}
 }
@@ -1193,11 +1160,13 @@ func TestStepHasMultipleCommands(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "SingleCommand",
+			name: "SingleCommandInCommands",
 			step: &core.Step{
-				Command: "echo hello",
+				Commands: []core.CommandEntry{
+					{Command: "echo", Args: []string{"hello"}},
+				},
 			},
-			expected: false,
+			expected: false, // Single command = not multiple
 		},
 		{
 			name: "HasMultipleCommands",

@@ -612,13 +612,20 @@ func buildSingleCommand(val string, result *core.Step) error {
 	}
 
 	// We need to split the command into command and args.
-	result.CmdWithArgs = val
 	cmd, args, err := cmdutil.SplitCommand(val)
 	if err != nil {
 		return core.NewValidationError("command", val, fmt.Errorf("failed to parse command: %w", err))
 	}
-	result.Command = strings.TrimSpace(cmd)
-	result.Args = args
+
+	cmd = strings.TrimSpace(cmd)
+
+	result.Commands = []core.CommandEntry{
+		{
+			Command:     cmd,
+			Args:        args,
+			CmdWithArgs: val,
+		},
+	}
 
 	return nil
 }
@@ -666,12 +673,6 @@ func buildMultipleCommands(val []any, result *core.Step) error {
 	}
 
 	result.Commands = commands
-
-	// Set Command/Args/CmdWithArgs for backward compatibility and display purposes.
-	// Use the first command for these fields.
-	result.Command = commands[0].Command
-	result.Args = commands[0].Args
-	result.CmdWithArgs = fmt.Sprintf("[%d commands]", len(commands))
 
 	return nil
 }
@@ -915,9 +916,6 @@ func buildStepSubDAG(ctx StepBuildContext, s *step, result *core.Step) error {
 		result.ExecutorConfig.Type = core.ExecutorTypeDAG
 	}
 
-	result.Command = "call"
-	result.Args = []string{name, paramsStr}
-	result.CmdWithArgs = strings.TrimSpace(fmt.Sprintf("%s %s", name, paramsStr))
 	return nil
 }
 

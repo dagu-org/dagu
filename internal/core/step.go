@@ -21,26 +21,31 @@ type Step struct {
 	Shell string `json:"shell,omitempty"`
 	// ShellPackages is the list of packages to install. This is used only when the shell is `nix-shell`.
 	ShellPackages []string `json:"shellPackages,omitempty"`
-	// SHell Args is the list of arguments for the shell program.
+	// ShellArgs is the list of arguments for the shell program.
 	ShellArgs []string `json:"shellArgs,omitempty"`
 	// Dir is the working directory for the step.
 	Dir string `json:"dir,omitempty"`
 	// ExecutorConfig contains the configuration for the executor.
 	ExecutorConfig ExecutorConfig `json:"executorConfig,omitzero"`
-	// CmdWithArgs is the command with arguments (only display purpose).
+	// CmdWithArgs is the command with arguments for display purposes.
+	// Deprecated: Use Commands[0].CmdWithArgs instead. Kept for JSON backward compatibility.
 	CmdWithArgs string `json:"cmdWithArgs,omitempty"`
 	// CmdArgsSys is the command with arguments for the system.
+	// Deprecated: Kept for JSON backward compatibility.
 	CmdArgsSys string `json:"cmdArgsSys,omitempty"`
 	// Command specifies only the command without arguments.
+	// Deprecated: Use Commands field instead. Kept for JSON backward compatibility.
 	Command string `json:"command,omitempty"`
 	// ShellCmdArgs is the shell command with arguments.
 	ShellCmdArgs string `json:"shellCmdArgs,omitempty"`
 	// Script is the script to be executed.
 	Script string `json:"script,omitempty"`
 	// Args contains the arguments for the command.
+	// Deprecated: Use Commands field instead. Kept for JSON backward compatibility.
 	Args []string `json:"args,omitempty"`
-	// Commands holds multiple commands for sequential execution.
-	// When populated, Command/Args fields represent the first command for display purposes.
+	// Commands is the source of truth for commands to execute.
+	// Each entry represents a command to be executed sequentially.
+	// For single commands, this will contain exactly one entry.
 	Commands []CommandEntry `json:"commands,omitempty"`
 	// Stdout is the file to store the standard output.
 	Stdout string `json:"stdout,omitempty"`
@@ -123,7 +128,41 @@ type CommandEntry struct {
 
 // HasMultipleCommands returns true if the step has multiple commands to execute.
 func (s *Step) HasMultipleCommands() bool {
-	return len(s.Commands) > 0
+	return len(s.Commands) > 1
+}
+
+// UnmarshalJSON implements json.Unmarshaler for backward compatibility.
+// It handles old JSON format where command/args fields were used instead of commands.
+func (s *Step) UnmarshalJSON(data []byte) error {
+	// Use type alias to avoid infinite recursion
+	type Alias Step
+	aux := &struct {
+		*Alias
+	}{
+		Alias: (*Alias)(s),
+	}
+
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+
+	// If Commands is already populated, we're done (new format)
+	if len(s.Commands) > 0 {
+		return nil
+	}
+
+	// Migrate legacy command/args to Commands field
+	if s.Command != "" {
+		s.Commands = []CommandEntry{
+			{
+				Command:     s.Command,
+				Args:        s.Args,
+				CmdWithArgs: s.CmdWithArgs,
+			},
+		}
+	}
+
+	return nil
 }
 
 // ExecutorConfig contains the configuration for the executor.

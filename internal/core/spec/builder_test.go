@@ -464,9 +464,10 @@ steps:
 		require.NoError(t, err)
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
-		assert.Equal(t, "echo 1", th.Steps[0].CmdWithArgs)
-		assert.Equal(t, "echo", th.Steps[0].Command)
-		assert.Equal(t, []string{"1"}, th.Steps[0].Args)
+		require.Len(t, th.Steps[0].Commands, 1)
+		assert.Equal(t, "echo 1", th.Steps[0].Commands[0].CmdWithArgs)
+		assert.Equal(t, "echo", th.Steps[0].Commands[0].Command)
+		assert.Equal(t, []string{"1"}, th.Steps[0].Commands[0].Args)
 		assert.Equal(t, "step1", th.Steps[0].Name)
 	})
 	t.Run("CommandAsScript", func(t *testing.T) {
@@ -494,7 +495,6 @@ steps:
 	t.Run("ValidCommandInArray", func(t *testing.T) {
 		t.Parallel()
 
-		// Arrays are now treated as multiple commands (not command + args)
 		data := []byte(`
 steps:
   - command: [echo, 1]
@@ -505,18 +505,13 @@ steps:
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		assert.Equal(t, "step1", th.Steps[0].Name)
-		// With new multi-command behavior, each element is a separate command
 		assert.Len(t, th.Steps[0].Commands, 2)
 		assert.Equal(t, "echo", th.Steps[0].Commands[0].Command)
 		assert.Equal(t, "1", th.Steps[0].Commands[1].Command)
-		// First command is used for backward compat fields
-		assert.Equal(t, "echo", th.Steps[0].Command)
-		assert.Equal(t, "[2 commands]", th.Steps[0].CmdWithArgs)
 	})
 	t.Run("ValidCommandInList", func(t *testing.T) {
 		t.Parallel()
 
-		// Arrays are now treated as multiple commands (not command + args)
 		data := []byte(`
 steps:
   - command:
@@ -529,18 +524,13 @@ steps:
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		assert.Equal(t, "step1", th.Steps[0].Name)
-		// With new multi-command behavior, each element is a separate command
 		assert.Len(t, th.Steps[0].Commands, 2)
 		assert.Equal(t, "echo", th.Steps[0].Commands[0].Command)
 		assert.Equal(t, "1", th.Steps[0].Commands[1].Command)
-		// First command is used for backward compat fields
-		assert.Equal(t, "echo", th.Steps[0].Command)
-		assert.Equal(t, "[2 commands]", th.Steps[0].CmdWithArgs)
 	})
 	t.Run("MultipleCommandsInArray", func(t *testing.T) {
 		t.Parallel()
 
-		// Test proper multi-command usage
 		data := []byte(`
 steps:
   - name: build
@@ -617,12 +607,9 @@ steps:
 		th := DAG{t: t, DAG: dag}
 		assert.Len(t, th.Steps, 1)
 		assert.Equal(t, "dag", th.Steps[0].ExecutorConfig.Type)
-		assert.Equal(t, "call", th.Steps[0].Command)
-		assert.Equal(t, []string{
-			"sub_dag",
-			"param1=\"value1\" param2=\"value2\"",
-		}, th.Steps[0].Args)
-		assert.Equal(t, "sub_dag param1=\"value1\" param2=\"value2\"", th.Steps[0].CmdWithArgs)
+		require.NotNil(t, th.Steps[0].SubDAG)
+		assert.Equal(t, "sub_dag", th.Steps[0].SubDAG.Name)
+		assert.Equal(t, "param1=\"value1\" param2=\"value2\"", th.Steps[0].SubDAG.Params)
 		assert.Empty(t, dag.BuildWarnings)
 
 		// Legacy run field is still accepted
@@ -636,9 +623,8 @@ steps:
 		thLegacy := DAG{t: t, DAG: dagLegacy}
 		assert.Len(t, thLegacy.Steps, 1)
 		assert.Equal(t, "dag", thLegacy.Steps[0].ExecutorConfig.Type)
-		assert.Equal(t, "call", thLegacy.Steps[0].Command)
-		assert.Equal(t, []string{"sub_dag_legacy", ""}, thLegacy.Steps[0].Args)
-		assert.Equal(t, "sub_dag_legacy", thLegacy.Steps[0].CmdWithArgs)
+		require.NotNil(t, thLegacy.Steps[0].SubDAG)
+		assert.Equal(t, "sub_dag_legacy", thLegacy.Steps[0].SubDAG.Name)
 		require.Len(t, dagLegacy.BuildWarnings, 1)
 		assert.Contains(t, dagLegacy.BuildWarnings[0], "Step field 'run' is deprecated")
 	})
@@ -1337,21 +1323,25 @@ steps:
 
 		// First step (sequential)
 		assert.Equal(t, "cmd_1", dag.Steps[0].Name)
-		assert.Equal(t, "echo \"step 1\"", dag.Steps[0].CmdWithArgs)
+		require.Len(t, dag.Steps[0].Commands, 1)
+		assert.Equal(t, "echo \"step 1\"", dag.Steps[0].Commands[0].CmdWithArgs)
 		assert.Empty(t, dag.Steps[0].Depends)
 
 		// Parallel steps
 		assert.Equal(t, "cmd_2", dag.Steps[1].Name)
-		assert.Equal(t, "echo \"parallel 1\"", dag.Steps[1].CmdWithArgs)
+		require.Len(t, dag.Steps[1].Commands, 1)
+		assert.Equal(t, "echo \"parallel 1\"", dag.Steps[1].Commands[0].CmdWithArgs)
 		assert.Equal(t, []string{"cmd_1"}, dag.Steps[1].Depends)
 
 		assert.Equal(t, "cmd_3", dag.Steps[2].Name)
-		assert.Equal(t, "echo \"parallel 2\"", dag.Steps[2].CmdWithArgs)
+		require.Len(t, dag.Steps[2].Commands, 1)
+		assert.Equal(t, "echo \"parallel 2\"", dag.Steps[2].Commands[0].CmdWithArgs)
 		assert.Equal(t, []string{"cmd_1"}, dag.Steps[2].Depends)
 
 		// Last step (sequential, depends on both parallel steps)
 		assert.Equal(t, "cmd_4", dag.Steps[3].Name)
-		assert.Equal(t, "echo \"step 3\"", dag.Steps[3].CmdWithArgs)
+		require.Len(t, dag.Steps[3].Commands, 1)
+		assert.Equal(t, "echo \"step 3\"", dag.Steps[3].Commands[0].CmdWithArgs)
 
 		assert.Contains(t, dag.Steps[3].Depends, "cmd_2")
 		assert.Contains(t, dag.Steps[3].Depends, "cmd_3")
@@ -1499,15 +1489,17 @@ steps:
 		assert.Len(t, dag.Steps, 2)
 
 		// First step
-		assert.Equal(t, "echo \"hello\"", dag.Steps[0].CmdWithArgs)
-		assert.Equal(t, "echo", dag.Steps[0].Command)
-		assert.Equal(t, []string{"hello"}, dag.Steps[0].Args)
+		require.Len(t, dag.Steps[0].Commands, 1)
+		assert.Equal(t, "echo \"hello\"", dag.Steps[0].Commands[0].CmdWithArgs)
+		assert.Equal(t, "echo", dag.Steps[0].Commands[0].Command)
+		assert.Equal(t, []string{"hello"}, dag.Steps[0].Commands[0].Args)
 		assert.Equal(t, "cmd_1", dag.Steps[0].Name) // Auto-generated name
 
 		// Second step
-		assert.Equal(t, "ls -la", dag.Steps[1].CmdWithArgs)
-		assert.Equal(t, "ls", dag.Steps[1].Command)
-		assert.Equal(t, []string{"-la"}, dag.Steps[1].Args)
+		require.Len(t, dag.Steps[1].Commands, 1)
+		assert.Equal(t, "ls -la", dag.Steps[1].Commands[0].CmdWithArgs)
+		assert.Equal(t, "ls", dag.Steps[1].Commands[0].Command)
+		assert.Equal(t, []string{"-la"}, dag.Steps[1].Commands[0].Args)
 		assert.Equal(t, "cmd_2", dag.Steps[1].Name) // Auto-generated name
 	})
 
@@ -1528,16 +1520,19 @@ steps:
 		assert.Len(t, dag.Steps, 3)
 
 		// First step (shorthand)
-		assert.Equal(t, "echo \"starting\"", dag.Steps[0].CmdWithArgs)
+		require.Len(t, dag.Steps[0].Commands, 1)
+		assert.Equal(t, "echo \"starting\"", dag.Steps[0].Commands[0].CmdWithArgs)
 		assert.Equal(t, "cmd_1", dag.Steps[0].Name)
 
 		// Second step (standard)
-		assert.Equal(t, "make build", dag.Steps[1].CmdWithArgs)
+		require.Len(t, dag.Steps[1].Commands, 1)
+		assert.Equal(t, "make build", dag.Steps[1].Commands[0].CmdWithArgs)
 		assert.Equal(t, "build", dag.Steps[1].Name)
 		assert.Contains(t, dag.Steps[1].Env, "DEBUG=true")
 
 		// Third step (shorthand)
-		assert.Equal(t, "ls -la", dag.Steps[2].CmdWithArgs)
+		require.Len(t, dag.Steps[2].Commands, 1)
+		assert.Equal(t, "ls -la", dag.Steps[2].Commands[0].CmdWithArgs)
 		assert.Equal(t, "cmd_3", dag.Steps[2].Name)
 	})
 }
