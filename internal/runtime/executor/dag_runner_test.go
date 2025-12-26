@@ -26,7 +26,7 @@ func TestNewSubDAGExecutor_LocalDAG(t *testing.T) {
 			"local-child": {
 				Name: "local-child",
 				Steps: []core.Step{
-					{Name: "step1", Command: "echo hello"},
+					{Name: "step1", Commands: []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}}},
 				},
 				YamlData: []byte("name: local-child\nsteps:\n  - name: step1\n    command: echo hello"),
 			},

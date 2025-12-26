@@ -135,8 +135,11 @@ func (d *Data) Args() []string {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
-	args := make([]string, len(d.inner.Step.Args))
-	copy(args, d.inner.Step.Args)
+	if len(d.inner.Step.Commands) == 0 {
+		return nil
+	}
+	args := make([]string, len(d.inner.Step.Commands[0].Args))
+	copy(args, d.inner.Step.Commands[0].Args)
 	return args
 }
 
@@ -144,7 +147,10 @@ func (d *Data) SetArgs(args []string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	d.inner.Step.Args = args
+	if len(d.inner.Step.Commands) == 0 {
+		d.inner.Step.Commands = []core.CommandEntry{{}}
+	}
+	d.inner.Step.Commands[0].Args = args
 }
 
 func (d *Data) Step() core.Step {

@@ -425,87 +425,43 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 	}
 
 	step := n.Step()
-	switch {
-	case step.CmdArgsSys != "":
-		// In case of the command and args are defined as a list. In this case,
-		// CmdArgsSys is a string with the command and args separated by special markers.
-		cmd, args := cmdutil.SplitCommandArgs(step.CmdArgsSys)
-		for i, arg := range args {
-			value, err := EvalString(ctx, arg, evalOptions...)
-			if err != nil {
-				return fmt.Errorf("failed to eval command with args: %w", err)
+
+	if len(step.Commands) > 0 {
+		commands := make([]core.CommandEntry, len(step.Commands))
+		for i, cmdEntry := range step.Commands {
+			args := make([]string, len(cmdEntry.Args))
+			for j, arg := range cmdEntry.Args {
+				value, err := EvalString(ctx, arg, evalOptions...)
+				if err != nil {
+					return fmt.Errorf("failed to eval command args: %w", err)
+				}
+				args[j] = value
 			}
-			args[i] = value
-		}
-		step.Command = cmd
-		step.Args = args
 
-		if step.ExecutorConfig.IsCommand() {
-			step.ShellCmdArgs = cmdutil.BuildCommandEscapedString(cmd, args)
-		}
-
-	case step.CmdWithArgs != "":
-		// In case of the command and args are defined as a string.
-		cmdWithArgs, err := EvalString(ctx, step.CmdWithArgs, evalOptions...)
-		if err != nil {
-			return err
-		}
-
-		// Use user defined command as the shell command args that should be already a valid command.
-		if step.ExecutorConfig.IsCommand() {
-			step.ShellCmdArgs = cmdWithArgs
-		}
-
-		// Split the command and args in case shell is not available in the system.
-		// In this case, the command and args need to be split to run the command directly.
-		cmd, args, err := cmdutil.SplitCommand(cmdWithArgs)
-		if err != nil {
-			return fmt.Errorf("failed to split command with args: %w", err)
-		}
-
-		step.Command = cmd
-		step.Args = args
-
-	case step.Command != "" && len(step.Args) == 0:
-		// Shouldn't reach here except for testing.
-
-		cmd, args, err := cmdutil.SplitCommand(step.Command)
-		if err != nil {
-			return fmt.Errorf("failed to split command: %w", err)
-		}
-		for i, arg := range args {
-			value, err := EvalString(ctx, arg, evalOptions...)
-			if err != nil {
-				return fmt.Errorf("failed to eval command args: %w", err)
+			// Evaluate CmdWithArgs if present
+			cmdWithArgs := cmdEntry.CmdWithArgs
+			if cmdWithArgs != "" && step.ExecutorConfig.IsCommand() {
+				evaluated, err := EvalString(ctx, cmdWithArgs, evalOptions...)
+				if err != nil {
+					return fmt.Errorf("failed to eval command with args: %w", err)
+				}
+				cmdWithArgs = evaluated
 			}
-			args[i] = value
-		}
 
-		step.CmdWithArgs = step.Command
-		step.Command = cmd
-		step.Args = args
-
-	default:
-		// Shouldn't reach here except for testing.
-
-		if step.Command != "" {
-			value, err := EvalString(ctx, step.Command, evalOptions...)
-			if err != nil {
-				return fmt.Errorf("failed to eval command: %w", err)
+			commands[i] = core.CommandEntry{
+				Command:     cmdEntry.Command,
+				Args:        args,
+				CmdWithArgs: cmdWithArgs,
 			}
-			step.Command = value
 		}
+		step.Commands = commands
 
-		for i, arg := range step.Args {
-			value, err := EvalString(ctx, arg, evalOptions...)
-			if err != nil {
-				return fmt.Errorf("failed to eval command args: %w", err)
-			}
-			step.Args[i] = value
-		}
+		n.SetStep(step)
+		n.cmdEvaluated.Store(true)
+		return nil
 	}
 
-	n.SetStep(step)
+	// No commands to evaluate
 	n.cmdEvaluated.Store(true)
 	return nil
 }

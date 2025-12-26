@@ -36,12 +36,13 @@ func NewExecutor(ctx context.Context, step core.Step) (Executor, error) {
 	return nil, fmt.Errorf("executor type %q is not registered", step.ExecutorConfig.Type)
 }
 
-// RegisterExecutor registers a new executor type with its corresponding Creator function.
-func RegisterExecutor(executorType string, factory ExecutorFactory, validator core.StepValidator) {
+// RegisterExecutor registers a new executor type with its factory, validator, and capabilities.
+func RegisterExecutor(executorType string, factory ExecutorFactory, validator core.StepValidator, caps core.ExecutorCapabilities) {
 	executorRegistry[executorType] = factory
 	if validator != nil {
 		core.RegisterStepValidator(executorType, validator)
 	}
+	core.RegisterExecutorCapabilities(executorType, caps)
 }
 
 var executorRegistry = make(map[string]ExecutorFactory)

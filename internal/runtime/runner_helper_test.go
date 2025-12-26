@@ -77,15 +77,22 @@ func withOutput(output string) stepOption {
 	}
 }
 
+// parseCommand parses a command string into a CommandEntry.
+func parseCommand(command string) core.CommandEntry {
+	cmd, args, err := cmdutil.SplitCommand(command)
+	if err != nil {
+		panic(fmt.Errorf("failed to parse command %q: %w", command, err))
+	}
+	return core.CommandEntry{
+		Command:     cmd,
+		Args:        args,
+		CmdWithArgs: command,
+	}
+}
+
 func withCommand(command string) stepOption {
 	return func(step *core.Step) {
-		cmd, args, err := cmdutil.SplitCommand(command)
-		if err != nil {
-			panic(fmt.Errorf("unexpected: %w", err))
-		}
-		step.CmdWithArgs = command
-		step.Command = cmd
-		step.Args = args
+		step.Commands = []core.CommandEntry{parseCommand(command)}
 	}
 }
 
@@ -131,15 +138,11 @@ func withMaxActiveRuns(n int) runnerOption {
 	}
 }
 
-func withOnExit(step core.Step) runnerOption {
-	return func(cfg *runtime.Config) {
-		cfg.OnExit = &step
-	}
-}
-
-func withOnCancel(step core.Step) runnerOption {
-	return func(cfg *runtime.Config) {
-		cfg.OnCancel = &step
+func newHandlerStep(_ *testing.T, name, id, command string) core.Step {
+	return core.Step{
+		Name:     name,
+		ID:       id,
+		Commands: []core.CommandEntry{parseCommand(command)},
 	}
 }
 
@@ -152,6 +155,18 @@ func withOnSuccess(step core.Step) runnerOption {
 func withOnFailure(step core.Step) runnerOption {
 	return func(cfg *runtime.Config) {
 		cfg.OnFailure = &step
+	}
+}
+
+func withOnExit(step core.Step) runnerOption {
+	return func(cfg *runtime.Config) {
+		cfg.OnExit = &step
+	}
+}
+
+func withOnCancel(step core.Step) runnerOption {
+	return func(cfg *runtime.Config) {
+		cfg.OnCancel = &step
 	}
 }
 

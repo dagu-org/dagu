@@ -241,7 +241,7 @@ func TestAgent_Retry(t *testing.T) {
 		// Modify the DAG to make it successful
 		dagRunStatus := dagAgent.Status(th.Context)
 		for i := range dag.Steps {
-			dag.Steps[i].CmdWithArgs = "true"
+			dag.Steps[i].Commands = []core.CommandEntry{{Command: "true", CmdWithArgs: "true"}}
 		}
 
 		// Retry the DAG and check if it is successful
@@ -314,8 +314,7 @@ func TestAgent_Retry(t *testing.T) {
 
 		// Modify the DAG to make all steps successful
 		for i := range dag.Steps {
-			dag.Steps[i].Command = "true"
-			dag.Steps[i].CmdWithArgs = "true"
+			dag.Steps[i].Commands = []core.CommandEntry{{Command: "true", CmdWithArgs: "true"}}
 		}
 
 		// Sleep to ensure timestamps will be different

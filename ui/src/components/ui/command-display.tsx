@@ -1,17 +1,26 @@
 import React from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip';
-import { Code, Terminal } from 'lucide-react';
+import { Code, Terminal, ChevronRight } from 'lucide-react';
+import { components } from '../../api/v2/schema';
+
+type CommandEntry = components['schemas']['CommandEntry'];
 
 interface CommandDisplayProps {
-  command: string | undefined;
-  args?: string | string[];
+  commands?: CommandEntry[];
   icon?: 'code' | 'terminal';
   maxLength?: number;
   className?: string;
   showFullInTooltip?: boolean;
 }
 
-const truncateCommand = (
+const formatCommand = (entry: CommandEntry): string => {
+  if (entry.args && entry.args.length > 0) {
+    return `${entry.command} ${entry.args.join(' ')}`;
+  }
+  return entry.command;
+};
+
+const truncateText = (
   text: string,
   maxLength: number
 ): { truncated: string; isTruncated: boolean } => {
@@ -19,11 +28,9 @@ const truncateCommand = (
     return { truncated: text, isTruncated: false };
   }
 
-  // Smart truncation: try to break at a space or special character
-  const cutoff = maxLength - 3; // Leave room for "..."
+  const cutoff = maxLength - 3;
   let breakPoint = cutoff;
 
-  // Look for a good break point (space, slash, dash)
   for (let i = cutoff; i > cutoff - 10 && i > 0; i--) {
     if (' /-_=&|'.includes(text[i] || '')) {
       breakPoint = i;
@@ -38,73 +45,91 @@ const truncateCommand = (
 };
 
 export const CommandDisplay: React.FC<CommandDisplayProps> = ({
-  command,
-  args,
+  commands,
   icon = 'code',
   maxLength = 60,
   className = '',
   showFullInTooltip = true,
 }) => {
-  if (!command) {
+  const Icon = icon === 'code' ? Code : Terminal;
+
+  if (!commands || commands.length === 0) {
     return null;
   }
 
-  const Icon = icon === 'code' ? Code : Terminal;
-  const { truncated: truncatedCommand, isTruncated: isCommandTruncated } =
-    truncateCommand(command, maxLength);
+  // Single command - simple display
+  if (commands.length === 1) {
+    const entry = commands[0]!;
+    const fullCmd = formatCommand(entry);
+    const { truncated, isTruncated } = truncateText(fullCmd, maxLength);
 
-  // Process args
-  const argsString = Array.isArray(args) ? args.join(' ') : args || '';
-  const { truncated: truncatedArgs, isTruncated: isArgsTruncated } =
-    truncateCommand(argsString, maxLength);
-
-  const needsTooltip =
-    showFullInTooltip &&
-    (isCommandTruncated || (argsString && isArgsTruncated));
-
-  const commandElement = (
-    <div className={`space-y-1 ${className}`}>
-      <div className="flex items-center gap-1.5 text-xs font-medium">
+    const element = (
+      <div className={`flex items-center gap-1.5 text-xs font-medium ${className}`}>
         <Icon className="h-4 w-4 text-primary flex-shrink-0" />
         <span className="bg-muted rounded-md px-1.5 py-0.5 text-foreground/90 font-mono">
-          {truncatedCommand}
+          {truncated}
         </span>
       </div>
+    );
 
-      {argsString && (
-        <div className="pl-5 text-xs text-muted-foreground font-mono">
-          <span className="opacity-60"></span> {truncatedArgs}
-        </div>
-      )}
+    if (!showFullInTooltip || !isTruncated) return element;
+
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="cursor-pointer">{element}</div>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-[600px]">
+          <pre className="whitespace-pre-wrap break-all text-xs font-mono">{fullCmd}</pre>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  // Multiple commands - structured list
+  const element = (
+    <div className={`space-y-1 ${className}`}>
+      <div className="flex items-center gap-1.5 text-xs">
+        <Icon className="h-4 w-4 text-primary flex-shrink-0" />
+        <span className="text-muted-foreground font-medium">
+          {commands.length} commands
+        </span>
+      </div>
+      <div className="pl-3 border-l-2 border-primary/20 space-y-0.5">
+        {commands.map((entry, idx) => {
+          const fullCmd = formatCommand(entry);
+          const { truncated } = truncateText(fullCmd, maxLength - 5);
+          return (
+            <div key={idx} className="flex items-center gap-1 text-xs font-mono">
+              <ChevronRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+              <span className="text-foreground/80 truncate">{truncated}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 
-  if (!needsTooltip) {
-    return commandElement;
-  }
+  if (!showFullInTooltip) return element;
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className="cursor-pointer">{commandElement}</div>
+        <div className="cursor-pointer">{element}</div>
       </TooltipTrigger>
       <TooltipContent className="max-w-[600px]">
         <div className="space-y-2">
           <div className="text-xs font-semibold text-muted-foreground">
-            Full Command:
+            Commands ({commands.length}):
           </div>
-          <pre className="whitespace-pre-wrap break-all text-xs font-mono bg-muted p-2 rounded">
-            {command}
-            {argsString && (
-              <>
-                {'\n'}
-                <span className="text-muted-foreground">
-                  Arguments:{' '}
-                </span>
-                {argsString}
-              </>
-            )}
-          </pre>
+          <div className="space-y-1">
+            {commands.map((entry, i) => (
+              <div key={i} className="flex gap-2 text-xs font-mono">
+                <span className="text-muted-foreground w-4 text-right flex-shrink-0">{i + 1}.</span>
+                <pre className="whitespace-pre-wrap break-all flex-1">{formatCommand(entry)}</pre>
+              </div>
+            ))}
+          </div>
         </div>
       </TooltipContent>
     </Tooltip>

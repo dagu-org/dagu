@@ -26,8 +26,8 @@ func TestRunExtractZip(t *testing.T) {
 	destDir := filepath.Join(tempDir, "out")
 
 	step := core.Step{
-		Name:    "extract-zip",
-		Command: opExtract,
+		Name:     "extract-zip",
+		Commands: []core.CommandEntry{{Command: opExtract}},
 		ExecutorConfig: core.ExecutorConfig{
 			Type: executorType,
 			Config: map[string]any{
@@ -85,8 +85,8 @@ func TestRunCreateTarGzAndList(t *testing.T) {
 	destArchive := filepath.Join(tempDir, "bundle.tar.gz")
 
 	createStep := core.Step{
-		Name:    "create-tar",
-		Command: opCreate,
+		Name:     "create-tar",
+		Commands: []core.CommandEntry{{Command: opCreate}},
 		ExecutorConfig: core.ExecutorConfig{
 			Type: executorType,
 			Config: map[string]any{
@@ -133,8 +133,8 @@ func TestRunCreateTarGzAndList(t *testing.T) {
 	checkFile("data/b.txt", "beta")
 
 	listStep := core.Step{
-		Name:    "list-archive",
-		Command: opList,
+		Name:     "list-archive",
+		Commands: []core.CommandEntry{{Command: opList}},
 		ExecutorConfig: core.ExecutorConfig{
 			Type: executorType,
 			Config: map[string]any{

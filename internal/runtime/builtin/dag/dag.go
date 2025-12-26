@@ -147,6 +147,10 @@ func (e *dagExecutor) Kill(sig os.Signal) error {
 }
 
 func init() {
-	executor.RegisterExecutor("subworkflow", newDAGExecutor, nil)
-	executor.RegisterExecutor("dag", newDAGExecutor, nil)
+	caps := core.ExecutorCapabilities{
+		SubDAG:         true,
+		WorkerSelector: true,
+	}
+	executor.RegisterExecutor("subworkflow", newDAGExecutor, nil, caps)
+	executor.RegisterExecutor("dag", newDAGExecutor, nil, caps)
 }

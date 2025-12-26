@@ -192,12 +192,20 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	// Run the transformer pipeline
 	errs := runStepTransformers(ctx, s, result)
 
-	// Complex transformations that need access to result or set multiple fields
-	// Note: buildStepContainer must be called before buildStepExecutor because
-	// buildStepExecutor checks result.Container to determine if the step should
-	// use the docker executor.
+	// validateConflicts checks for mutual exclusivity between step fields.
+	if err := validateConflicts(s); err != nil {
+		errs = append(errs, err)
+	}
+
+	// Action-defining transformations
 	if err := buildStepContainer(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("container", err))
+	}
+	if err := buildStepParallel(ctx, s, result); err != nil {
+		errs = append(errs, wrapTransformError("parallel", err))
+	}
+	if err := buildStepSubDAG(ctx, s, result); err != nil {
+		errs = append(errs, wrapTransformError("subDAG", err))
 	}
 	if err := buildStepExecutor(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("executor", err))
@@ -208,11 +216,28 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	if err := buildStepParamsField(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("params", err))
 	}
-	if err := buildStepParallel(ctx, s, result); err != nil {
-		errs = append(errs, wrapTransformError("parallel", err))
+
+	// Final validators run after the executor type is determined
+	if err := validateCommand(result); err != nil {
+		errs = append(errs, wrapTransformError("command", err))
 	}
-	if err := buildStepSubDAG(ctx, s, result); err != nil {
-		errs = append(errs, wrapTransformError("subDAG", err))
+	if err := validateMultipleCommands(result); err != nil {
+		errs = append(errs, wrapTransformError("command", err))
+	}
+	if err := validateScript(result); err != nil {
+		errs = append(errs, wrapTransformError("script", err))
+	}
+	if err := validateShell(result); err != nil {
+		errs = append(errs, wrapTransformError("shell", err))
+	}
+	if err := validateContainer(result); err != nil {
+		errs = append(errs, wrapTransformError("container", err))
+	}
+	if err := validateSubDAG(result); err != nil {
+		errs = append(errs, wrapTransformError("dag", err))
+	}
+	if err := validateWorkerSelector(result); err != nil {
+		errs = append(errs, wrapTransformError("workerSelector", err))
 	}
 
 	if len(errs) > 0 {
@@ -586,61 +611,239 @@ func buildStepCommand(_ StepBuildContext, s *step, result *core.Step) error {
 
 	switch val := command.(type) {
 	case string:
-		// Case 2: command is a string
-		val = strings.TrimSpace(val)
-		if val == "" {
-			return core.NewValidationError("command", val, ErrStepCommandIsEmpty)
-		}
-
-		// If the value is multi-line, treat it as a script
-		if strings.Contains(val, "\n") {
-			result.Script = val
-			return nil
-		}
-
-		// We need to split the command into command and args.
-		result.CmdWithArgs = val
-		cmd, args, err := cmdutil.SplitCommand(val)
-		if err != nil {
-			return core.NewValidationError("command", val, fmt.Errorf("failed to parse command: %w", err))
-		}
-		result.Command = strings.TrimSpace(cmd)
-		result.Args = args
+		// Case 2: command is a string (single command)
+		return buildSingleCommand(val, result)
 
 	case []any:
-		// Case 3: command is an array
-		var cmd string
-		var args []string
-		for _, v := range val {
-			strVal, ok := v.(string)
-			if !ok {
-				// If the value is not a string, convert it to a string.
-				strVal = fmt.Sprintf("%v", v)
-			}
-			strVal = strings.TrimSpace(strVal)
-			if cmd == "" {
-				cmd = strVal
-				continue
-			}
-			args = append(args, strVal)
-		}
-
-		// Setup CmdWithArgs
-		var sb strings.Builder
-		for i, arg := range args {
-			if i > 0 {
-				sb.WriteString(" ")
-			}
-			sb.WriteString(fmt.Sprintf("%q", arg))
-		}
-
-		result.Command = cmd
-		result.Args = args
-		result.CmdWithArgs = fmt.Sprintf("%s %s", result.Command, sb.String())
-		result.CmdArgsSys = cmdutil.JoinCommandArgs(result.Command, result.Args)
+		// Case 3: command is an array (multiple commands)
+		return buildMultipleCommands(val, result)
 
 	default:
 		return core.NewValidationError("command", val, ErrStepCommandMustBeArrayOrString)
+	}
+}
+
+// buildSingleCommand parses a single command string and populates the Step fields.
+func buildSingleCommand(val string, result *core.Step) error {
+	val = strings.TrimSpace(val)
+	if val == "" {
+		return core.NewValidationError("command", val, ErrStepCommandIsEmpty)
+	}
+
+	// If the value is multi-line, treat it as a script
+	if strings.Contains(val, "\n") {
+		result.Script = val
+		return nil
+	}
+
+	// We need to split the command into command and args.
+	cmd, args, err := cmdutil.SplitCommand(val)
+	if err != nil {
+		return core.NewValidationError("command", val, fmt.Errorf("failed to parse command: %w", err))
+	}
+
+	cmd = strings.TrimSpace(cmd)
+
+	result.Commands = []core.CommandEntry{
+		{
+			Command:     cmd,
+			Args:        args,
+			CmdWithArgs: val,
+		},
+	}
+
+	return nil
+}
+
+// buildMultipleCommands parses an array of commands and populates the Step.Commands field.
+// Each array element is treated as a separate command to be executed sequentially.
+func buildMultipleCommands(val []any, result *core.Step) error {
+	if len(val) == 0 {
+		return core.NewValidationError("command", val, ErrStepCommandIsEmpty)
+	}
+
+	var commands []core.CommandEntry
+
+	for i, v := range val {
+		var strVal string
+		switch tv := v.(type) {
+		case string:
+			strVal = tv
+		case int, int64, uint64, float64, bool:
+			strVal = fmt.Sprintf("%v", tv)
+		default:
+			return core.NewValidationError(
+				fmt.Sprintf("command[%d]", i),
+				v,
+				fmt.Errorf("command array elements must be strings or primitive types, got %T", v),
+			)
+		}
+		strVal = strings.TrimSpace(strVal)
+
+		if strVal == "" {
+			continue // Skip empty commands
+		}
+
+		// Parse the command string to extract command and args
+		cmd, args, err := cmdutil.SplitCommand(strVal)
+		if err != nil {
+			return core.NewValidationError(
+				fmt.Sprintf("command[%d]", i),
+				strVal,
+				fmt.Errorf("failed to parse command: %w", err),
+			)
+		}
+
+		commands = append(commands, core.CommandEntry{
+			Command:     strings.TrimSpace(cmd),
+			Args:        args,
+			CmdWithArgs: strVal,
+		})
+	}
+
+	if len(commands) == 0 {
+		return core.NewValidationError("command", val, ErrStepCommandIsEmpty)
+	}
+
+	result.Commands = commands
+
+	return nil
+}
+
+// validateCommand checks if the executor type supports the command field.
+func validateCommand(result *core.Step) error {
+	if len(result.Commands) == 0 {
+		return nil
+	}
+	if !core.SupportsCommand(result.ExecutorConfig.Type) {
+		return core.NewValidationError(
+			"command",
+			result.Commands,
+			fmt.Errorf("executor type %q does not support command field", result.ExecutorConfig.Type),
+		)
+	}
+	return nil
+}
+
+// validateMultipleCommands checks if the executor type supports multiple commands.
+// Returns an error if multiple commands are specified for an executor that doesn't support them.
+func validateMultipleCommands(result *core.Step) error {
+	if len(result.Commands) <= 1 {
+		return nil
+	}
+	if !core.SupportsMultipleCommands(result.ExecutorConfig.Type) {
+		return core.NewValidationError(
+			"command",
+			result.Commands,
+			fmt.Errorf("%w: executor type %q only supports a single command", ErrExecutorDoesNotSupportMultipleCmd, result.ExecutorConfig.Type),
+		)
+	}
+	return nil
+}
+
+// validateScript checks if the executor type supports the script field.
+func validateScript(result *core.Step) error {
+	if result.Script == "" {
+		return nil
+	}
+	if !core.SupportsScript(result.ExecutorConfig.Type) {
+		return core.NewValidationError(
+			"script",
+			result.Script,
+			fmt.Errorf("executor type %q does not support script field", result.ExecutorConfig.Type),
+		)
+	}
+	return nil
+}
+
+// validateShell checks if the executor type supports shell configuration.
+func validateShell(result *core.Step) error {
+	if result.Shell == "" && len(result.ShellArgs) == 0 && len(result.ShellPackages) == 0 {
+		return nil
+	}
+	if !core.SupportsShell(result.ExecutorConfig.Type) {
+		return core.NewValidationError(
+			"shell",
+			result.Shell,
+			fmt.Errorf("executor type %q does not support shell configuration", result.ExecutorConfig.Type),
+		)
+	}
+	return nil
+}
+
+// validateContainer checks if the executor type supports the container field.
+func validateContainer(result *core.Step) error {
+	if result.Container == nil {
+		return nil
+	}
+	if !core.SupportsContainer(result.ExecutorConfig.Type) {
+		return core.NewValidationError(
+			"container",
+			result.Container,
+			fmt.Errorf("executor type %q does not support container field", result.ExecutorConfig.Type),
+		)
+	}
+	return nil
+}
+
+// validateSubDAG checks if the executor type supports sub-DAG execution.
+func validateSubDAG(result *core.Step) error {
+	if result.SubDAG == nil {
+		return nil
+	}
+	if !core.SupportsSubDAG(result.ExecutorConfig.Type) {
+		return core.NewValidationError(
+			"call",
+			result.SubDAG,
+			fmt.Errorf("executor type %q does not support sub-DAG execution", result.ExecutorConfig.Type),
+		)
+	}
+	return nil
+}
+
+// validateWorkerSelector checks if the executor type supports worker selection.
+func validateWorkerSelector(result *core.Step) error {
+	if len(result.WorkerSelector) == 0 {
+		return nil
+	}
+	if !core.SupportsWorkerSelector(result.ExecutorConfig.Type) {
+		return core.NewValidationError(
+			"workerSelector",
+			result.WorkerSelector,
+			fmt.Errorf("executor type %q does not support workerSelector field", result.ExecutorConfig.Type),
+		)
+	}
+	return nil
+}
+
+// validateConflicts checks for mutual exclusivity between step fields.
+func validateConflicts(s *step) error {
+	hasSubDAG := strings.TrimSpace(s.Call) != "" || strings.TrimSpace(s.Run) != "" || s.Parallel != nil
+	hasExecutor := s.Executor != nil
+	hasCommand := s.Command != nil
+	hasScript := s.Script != ""
+	hasContainer := s.Container != nil
+
+	if hasSubDAG {
+		if hasExecutor {
+			return core.NewValidationError("executor", s.Executor, ErrSubDAGAndExecutorConflict)
+		}
+		if hasCommand {
+			return core.NewValidationError("command", s.Command, ErrSubDAGAndCommandConflict)
+		}
+		if hasScript {
+			return core.NewValidationError("script", s.Script, ErrSubDAGAndScriptConflict)
+		}
+		if hasContainer {
+			return core.NewValidationError("container", s.Container, fmt.Errorf("cannot use 'container' field with sub-DAG execution"))
+		}
+	}
+
+	if hasContainer && hasExecutor {
+		return core.NewValidationError("executor", s.Executor, ErrContainerAndExecutorConflict)
+	}
+	if hasContainer && hasScript {
+		return core.NewValidationError("script", s.Script, ErrContainerAndScriptConflict)
 	}
 
 	return nil
@@ -675,16 +878,6 @@ func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 	)
 
 	executor := s.Executor
-
-	// Validate that container field and executor field are not both set
-	// The container field already specifies the execution method, so setting executor is redundant/conflicting
-	if result.Container != nil && executor != nil {
-		return core.NewValidationError(
-			"executor",
-			nil,
-			ErrContainerAndExecutorConflict,
-		)
-	}
 
 	// Case 1: executor is nil - determine executor from container/SSH config
 	if executor == nil {
@@ -818,16 +1011,6 @@ func buildStepContainer(ctx StepBuildContext, s *step, result *core.Step) error 
 		return nil
 	}
 
-	// Validate that script field is not used with container
-	// Scripts are not supported in container execution
-	if s.Script != "" {
-		return core.NewValidationError(
-			"script",
-			nil,
-			ErrContainerAndScriptConflict,
-		)
-	}
-
 	ct, err := buildContainerFromSpec(ctx.BuildContext, s.Container)
 	if err != nil {
 		return err
@@ -885,9 +1068,6 @@ func buildStepSubDAG(ctx StepBuildContext, s *step, result *core.Step) error {
 		result.ExecutorConfig.Type = core.ExecutorTypeDAG
 	}
 
-	result.Command = "call"
-	result.Args = []string{name, paramsStr}
-	result.CmdWithArgs = strings.TrimSpace(fmt.Sprintf("%s %s", name, paramsStr))
 	return nil
 }
 

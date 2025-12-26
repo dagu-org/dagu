@@ -40,10 +40,17 @@ func newJQ(_ context.Context, step core.Step) (executor.Executor, error) {
 	if err := json.Unmarshal([]byte(step.Script), &input); err != nil {
 		return nil, err
 	}
+
+	// Extract query from Commands field
+	var query string
+	if len(step.Commands) > 0 {
+		query = step.Commands[0].CmdWithArgs
+	}
+
 	return &jq{
 		stdout: os.Stdout,
 		input:  input,
-		query:  step.CmdWithArgs,
+		query:  query,
 		cfg:    &jqCfg,
 	}, nil
 }
@@ -138,5 +145,5 @@ func decodeJqConfig(dat map[string]any, cfg *jqConfig) error {
 }
 
 func init() {
-	executor.RegisterExecutor("jq", newJQ, nil)
+	executor.RegisterExecutor("jq", newJQ, nil, core.ExecutorCapabilities{Command: true, Script: true})
 }

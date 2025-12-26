@@ -468,6 +468,32 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 	return exitCode, err
 }
 
+// StartBackground starts a container in the background without waiting for it to exit.
+// This is useful for starting containers that should stay running while multiple commands
+// are executed via Exec. The container uses the configured startup command (StartCmd) when
+// startup mode is "command", or the default keepalive when in "keepalive" mode.
+// This delegates to CreateContainerKeepAlive which handles all startup modes properly.
+func (c *Client) StartBackground(ctx context.Context) error {
+	logger.Debug(ctx, "Docker: StartBackground started",
+		slog.String("startup", c.cfg.Startup),
+		slog.Any("startCmd", c.cfg.StartCmd),
+	)
+
+	// Use CreateContainerKeepAlive which properly handles:
+	// - keepalive mode (default): uses keepalive binary or sleep fallback
+	// - command mode: uses user-provided StartCmd
+	// - entrypoint mode: respects image ENTRYPOINT/CMD
+	// - readiness waiting (running/healthy)
+	// - log pattern waiting
+	if err := c.CreateContainerKeepAlive(ctx); err != nil {
+		logger.Error(ctx, "Docker: StartBackground failed to start container", tag.Error(err))
+		return fmt.Errorf("failed to start container in background: %w", err)
+	}
+
+	logger.Debug(ctx, "Docker: StartBackground container started", slog.String("containerID", c.containerID))
+	return nil
+}
+
 // Stop stops the running container
 func (c *Client) Stop(sig os.Signal) error {
 	c.mu.Lock()
@@ -564,6 +590,9 @@ func (c *Client) startNewContainer(ctx context.Context, name string, cli *client
 			// Entrypoint should be empty slice to override image ENTRYPOINT
 			ctCfg.Entrypoint = []string{}
 		}
+	} else if c.cfg.Startup == "command" && len(c.cfg.StartCmd) > 0 {
+		// Use StartCmd for startup: command mode when no cmd override provided
+		ctCfg.Cmd = c.cfg.StartCmd
 	}
 
 	logger.Debug(ctx, "Docker: startNewContainer calling ContainerCreate",
