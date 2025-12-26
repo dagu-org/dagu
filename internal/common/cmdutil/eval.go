@@ -266,6 +266,14 @@ func processStructFields(ctx context.Context, v reflect.Value, opts *EvalOptions
 
 		// nolint:exhaustive
 		switch field.Kind() {
+		case reflect.Ptr:
+			if field.IsNil() {
+				continue
+			}
+			if err := processPointerField(ctx, field, opts); err != nil {
+				return err
+			}
+
 		case reflect.String:
 			value := field.String()
 
@@ -302,6 +310,137 @@ func processStructFields(ctx context.Context, v reflect.Value, opts *EvalOptions
 			}
 
 			field.Set(processed)
+
+		case reflect.Slice, reflect.Array:
+			if field.IsNil() {
+				continue
+			}
+			// Create a new slice with new backing array to avoid mutating original
+			newSlice := reflect.MakeSlice(field.Type(), field.Len(), field.Cap())
+			reflect.Copy(newSlice, field)
+			if err := processSliceWithOpts(ctx, newSlice, opts); err != nil {
+				return err
+			}
+			field.Set(newSlice)
+		}
+	}
+	return nil
+}
+
+func processPointerField(ctx context.Context, field reflect.Value, opts *EvalOptions) error {
+	elem := field.Elem()
+	if !elem.CanSet() {
+		return nil
+	}
+
+	// nolint:exhaustive
+	switch elem.Kind() {
+	case reflect.String:
+		value := elem.String()
+		value = expandVariables(ctx, value, opts)
+		if opts.Substitute {
+			var err error
+			value, err = substituteCommands(value)
+			if err != nil {
+				return err
+			}
+		}
+		if opts.ExpandEnv {
+			value = os.ExpandEnv(value)
+		}
+		// Create a new string and update the pointer to point to it
+		// This avoids mutating the original value
+		newStr := reflect.New(elem.Type())
+		newStr.Elem().SetString(value)
+		field.Set(newStr)
+
+	case reflect.Struct:
+		// Create a copy of the struct to avoid mutating the original
+		newStruct := reflect.New(elem.Type())
+		newStruct.Elem().Set(elem)
+		if err := processStructFields(ctx, newStruct.Elem(), opts); err != nil {
+			return err
+		}
+		field.Set(newStruct)
+
+	case reflect.Map:
+		if elem.IsNil() {
+			return nil
+		}
+		processed, err := processMapWithOpts(ctx, elem, opts)
+		if err != nil {
+			return err
+		}
+		// Create a new pointer to the processed map
+		newMap := reflect.New(elem.Type())
+		newMap.Elem().Set(processed)
+		field.Set(newMap)
+
+	case reflect.Slice, reflect.Array:
+		if elem.IsNil() {
+			return nil
+		}
+		// Create a new slice with new backing array to avoid mutating original
+		newSlice := reflect.MakeSlice(elem.Type(), elem.Len(), elem.Cap())
+		reflect.Copy(newSlice, elem)
+		if err := processSliceWithOpts(ctx, newSlice, opts); err != nil {
+			return err
+		}
+		// Create new pointer to the new slice
+		newPtr := reflect.New(elem.Type())
+		newPtr.Elem().Set(newSlice)
+		field.Set(newPtr)
+	}
+
+	return nil
+}
+
+func processSliceWithOpts(ctx context.Context, v reflect.Value, opts *EvalOptions) error {
+	for i := 0; i < v.Len(); i++ {
+		elem := v.Index(i)
+		if !elem.CanSet() {
+			continue
+		}
+
+		// nolint:exhaustive
+		switch elem.Kind() {
+		case reflect.String:
+			value := elem.String()
+			value = expandVariables(ctx, value, opts)
+			if opts.Substitute {
+				var err error
+				value, err = substituteCommands(value)
+				if err != nil {
+					return err
+				}
+			}
+			if opts.ExpandEnv {
+				value = os.ExpandEnv(value)
+			}
+			elem.SetString(value)
+
+		case reflect.Struct:
+			if err := processStructFields(ctx, elem, opts); err != nil {
+				return err
+			}
+
+		case reflect.Map:
+			if elem.IsNil() {
+				continue
+			}
+			processed, err := processMapWithOpts(ctx, elem, opts)
+			if err != nil {
+				return err
+			}
+			elem.Set(processed)
+
+		case reflect.Ptr:
+			if elem.IsNil() {
+				continue
+			}
+			if err := processPointerField(ctx, elem, opts); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

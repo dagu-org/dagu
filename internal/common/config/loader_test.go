@@ -751,6 +751,19 @@ func loadWithEnv(t *testing.T, yaml string, env map[string]string) *Config {
 	return loadFromYAML(t, yaml)
 }
 
+func unsetEnv(t *testing.T, key string) {
+	t.Helper()
+	original, existed := os.LookupEnv(key)
+	os.Unsetenv(key)
+	t.Cleanup(func() {
+		if existed {
+			os.Setenv(key, original)
+			return
+		}
+		os.Unsetenv(key)
+	})
+}
+
 // loadFromYAML loads config from YAML string
 func loadFromYAML(t *testing.T, yaml string) *Config {
 	t.Helper()
@@ -982,4 +995,20 @@ auth:
 		// TTL defaults to 24 hours when not specified
 		assert.Equal(t, 24*time.Hour, cfg.Server.Auth.Builtin.Token.TTL)
 	})
+}
+
+func TestLoad_AuthTokenEnvExpansion(t *testing.T) {
+	t.Parallel()
+	unsetEnv(t, "DAGU_AUTH_TOKEN")
+	unsetEnv(t, "DAGU_AUTHTOKEN")
+
+	cfg := loadWithEnv(t, `
+auth:
+  token:
+    value: "${AUTH_TOKEN}"
+`, map[string]string{
+		"AUTH_TOKEN": "env-token",
+	})
+
+	assert.Equal(t, "env-token", cfg.Server.Auth.Token.Value)
 }
