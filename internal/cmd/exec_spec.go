@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
@@ -36,9 +37,9 @@ type execSpec struct {
 }
 
 type execStep struct {
-	Name    string   `yaml:"name"`
-	Command []string `yaml:"command,omitempty"`
-	Shell   string   `yaml:"shell,omitempty"`
+	Name    string `yaml:"name"`
+	Command string `yaml:"command,omitempty"`
+	Shell   string `yaml:"shell,omitempty"`
 }
 
 func buildExecDAG(ctx *Context, opts ExecOptions) (*core.DAG, string, error) {
@@ -54,6 +55,9 @@ func buildExecDAG(ctx *Context, opts ExecOptions) (*core.DAG, string, error) {
 		return nil, "", fmt.Errorf("invalid DAG name: %w", err)
 	}
 
+	// Build command string from args
+	commandStr := cmdutil.BuildCommandEscapedString(opts.CommandArgs[0], opts.CommandArgs[1:])
+
 	specDoc := execSpec{
 		Name:           name,
 		Type:           core.TypeChain,
@@ -64,7 +68,7 @@ func buildExecDAG(ctx *Context, opts ExecOptions) (*core.DAG, string, error) {
 		Steps: []execStep{
 			{
 				Name:    defaultStepName,
-				Command: opts.CommandArgs,
+				Command: commandStr,
 				Shell:   opts.ShellOverride,
 			},
 		},

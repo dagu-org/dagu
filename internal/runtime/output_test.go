@@ -53,10 +53,12 @@ func TestNode_LargeOutput(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			step := core.Step{
-				Name:    "test",
-				Command: "sh",
-				Args:    []string{"-c", tt.script},
-				Output:  "RESULT",
+				Name:   "test",
+				Output: "RESULT",
+				Commands: []core.CommandEntry{{
+					Command: "sh",
+					Args:    []string{"-c", tt.script},
+				}},
 			}
 
 			node := NewNode(step, NodeState{})
@@ -118,13 +120,15 @@ func TestNode_LargeOutput(t *testing.T) {
 func TestNode_OutputCaptureDeadlock(t *testing.T) {
 	// Test specifically for the pipe deadlock issue
 	step := core.Step{
-		Name:    "deadlock-test",
-		Command: "sh",
-		Args: []string{"-c", `
+		Name:   "deadlock-test",
+		Output: "RESULT",
+		Commands: []core.CommandEntry{{
+			Command: "sh",
+			Args: []string{"-c", `
 			# Generate exactly 64KB + 1 byte to trigger pipe buffer deadlock
 			python3 -c "import sys; sys.stdout.write('x' * (64 * 1024 + 1)); sys.stdout.flush()"
 		`},
-		Output: "RESULT",
+		}},
 	}
 
 	node := NewNode(step, NodeState{})
@@ -167,13 +171,15 @@ func TestNode_OutputCaptureDeadlock(t *testing.T) {
 func TestNode_OutputExceedsLimit(t *testing.T) {
 	// Test that output exceeding the limit returns an error
 	step := core.Step{
-		Name:    "exceed-limit-test",
-		Command: "sh",
-		Args: []string{"-c", `
+		Name:   "exceed-limit-test",
+		Output: "RESULT",
+		Commands: []core.CommandEntry{{
+			Command: "sh",
+			Args: []string{"-c", `
 			# Generate 2MB of output (exceeds default 1MB limit)
 			python3 -c "print('x' * (2 * 1024 * 1024))"
 		`},
-		Output: "RESULT",
+		}},
 	}
 
 	node := NewNode(step, NodeState{})
@@ -200,13 +206,15 @@ func TestNode_OutputExceedsLimit(t *testing.T) {
 func TestNode_CustomOutputLimit(t *testing.T) {
 	// Test with custom output limit
 	step := core.Step{
-		Name:    "custom-limit-test",
-		Command: "sh",
-		Args: []string{"-c", `
+		Name:   "custom-limit-test",
+		Output: "RESULT",
+		Commands: []core.CommandEntry{{
+			Command: "sh",
+			Args: []string{"-c", `
 			# Generate 100KB of output
 			python3 -c "print('x' * (100 * 1024))"
 		`},
-		Output: "RESULT",
+		}},
 	}
 
 	node := NewNode(step, NodeState{})
@@ -236,15 +244,17 @@ func TestNode_CustomOutputLimit(t *testing.T) {
 func TestNode_ConcurrentOutputCapture(t *testing.T) {
 	// Test that output capture doesn't interfere with concurrent writes
 	step := core.Step{
-		Name:    "concurrent-test",
-		Command: "sh",
-		Args: []string{"-c", `
+		Name: "concurrent-test",
+		Commands: []core.CommandEntry{{
+			Command: "sh",
+			Args: []string{"-c", `
 			# Generate output from multiple processes concurrently
 			for i in $(seq 1 10); do
 				(python3 -c "print('Process ' + str($i) + ': ' + 'x' * 10000)") &
 			done
 			wait
 		`},
+		}},
 		Output: "RESULT",
 	}
 

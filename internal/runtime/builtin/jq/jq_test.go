@@ -166,8 +166,8 @@ func TestJQExecutor_RawOutput(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 
 			step := core.Step{
-				CmdWithArgs: tt.query,
-				Script:      tt.script,
+				Commands: []core.CommandEntry{{CmdWithArgs: tt.query}},
+				Script:   tt.script,
 				ExecutorConfig: core.ExecutorConfig{
 					Type: "jq",
 					Config: map[string]any{
@@ -243,8 +243,8 @@ func TestJQExecutor_MultipleOutputs(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 
 			step := core.Step{
-				CmdWithArgs: tt.query,
-				Script:      tt.script,
+				Commands: []core.CommandEntry{{CmdWithArgs: tt.query}},
+				Script:   tt.script,
 				ExecutorConfig: core.ExecutorConfig{
 					Type: "jq",
 					Config: map[string]any{
@@ -274,8 +274,8 @@ func TestJQExecutor_InvalidQuery(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	step := core.Step{
-		CmdWithArgs: "invalid jq syntax {",
-		Script:      `{"foo": "bar"}`,
+		Commands: []core.CommandEntry{{CmdWithArgs: "invalid jq syntax {"}},
+		Script:   `{"foo": "bar"}`,
 		ExecutorConfig: core.ExecutorConfig{
 			Type: "jq",
 			Config: map[string]any{
@@ -299,8 +299,8 @@ func TestJQExecutor_InvalidJSON(t *testing.T) {
 	t.Parallel()
 
 	step := core.Step{
-		CmdWithArgs: ".foo",
-		Script:      `invalid json`,
+		Commands: []core.CommandEntry{{CmdWithArgs: ".foo"}},
+		Script:   `invalid json`,
 		ExecutorConfig: core.ExecutorConfig{
 			Type: "jq",
 			Config: map[string]any{
@@ -320,8 +320,8 @@ func TestJQExecutor_NoConfig(t *testing.T) {
 	var stdout bytes.Buffer
 
 	step := core.Step{
-		CmdWithArgs: ".foo",
-		Script:      `{"foo": "bar"}`,
+		Commands: []core.CommandEntry{{CmdWithArgs: ".foo"}},
+		Script:   `{"foo": "bar"}`,
 		ExecutorConfig: core.ExecutorConfig{
 			Type:   "jq",
 			Config: nil, // No config, should default to raw: false
@@ -345,8 +345,8 @@ func TestJQExecutor_Kill(t *testing.T) {
 	t.Parallel()
 
 	step := core.Step{
-		CmdWithArgs: ".foo",
-		Script:      `{"foo": "bar"}`,
+		Commands: []core.CommandEntry{{CmdWithArgs: ".foo"}},
+		Script:   `{"foo": "bar"}`,
 		ExecutorConfig: core.ExecutorConfig{
 			Type: "jq",
 		},

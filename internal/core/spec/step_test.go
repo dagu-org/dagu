@@ -2,6 +2,8 @@ package spec
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -11,6 +13,45 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestMain(m *testing.M) {
+	// Register executor capabilities for testing.
+	// In production, this is done by runtime/builtin init functions.
+
+	// Command executors: support command, multiple commands, script, shell
+	for _, t := range []string{"", "shell", "command"} {
+		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{
+			Command: true, MultipleCommands: true, Script: true, Shell: true,
+		})
+	}
+	// Docker: supports command, multiple commands, and container
+	for _, t := range []string{"docker", "container"} {
+		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{
+			Command: true, MultipleCommands: true, Container: true,
+		})
+	}
+	// SSH: supports command and multiple commands only
+	core.RegisterExecutorCapabilities("ssh", core.ExecutorCapabilities{
+		Command: true, MultipleCommands: true,
+	})
+	// jq and http: support command and script
+	core.RegisterExecutorCapabilities("jq", core.ExecutorCapabilities{Command: true, Script: true})
+	core.RegisterExecutorCapabilities("http", core.ExecutorCapabilities{Command: true, Script: true})
+	// archive and gha: support command only
+	for _, t := range []string{"archive", "github_action", "github-action", "gha"} {
+		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{Command: true})
+	}
+	// dag/subworkflow/parallel: support SubDAG and WorkerSelector
+	for _, t := range []string{"dag", "subworkflow", "parallel"} {
+		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{
+			SubDAG: true, WorkerSelector: true,
+		})
+	}
+	// mail: no command support
+	core.RegisterExecutorCapabilities("mail", core.ExecutorCapabilities{})
+
+	os.Exit(m.Run())
+}
 
 // testStepBuildContext creates a StepBuildContext for testing
 func testStepBuildContext() StepBuildContext {
@@ -838,15 +879,11 @@ func TestBuildStepCommand(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		command  any
-		expected struct {
-			command     string
-			args        []string
-			cmdWithArgs string
-			script      string
-		}
-		wantErr bool
+		name             string
+		command          any
+		expectedScript   string
+		expectedCommands []core.CommandEntry
+		wantErr          bool
 	}{
 		{
 			name:    "NilCommand",
@@ -855,42 +892,14 @@ func TestBuildStepCommand(t *testing.T) {
 		{
 			name:    "SimpleStringCommand",
 			command: "echo hello",
-			expected: struct {
-				command     string
-				args        []string
-				cmdWithArgs string
-				script      string
-			}{
-				command:     "echo",
-				args:        []string{"hello"},
-				cmdWithArgs: "echo hello",
+			expectedCommands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello"}, CmdWithArgs: "echo hello"},
 			},
 		},
 		{
-			name:    "MultilineCommandBecomesScript",
-			command: "echo hello\necho world",
-			expected: struct {
-				command     string
-				args        []string
-				cmdWithArgs string
-				script      string
-			}{
-				script: "echo hello\necho world",
-			},
-		},
-		{
-			name:    "ArrayCommand",
-			command: []any{"echo", "hello", "world"},
-			expected: struct {
-				command     string
-				args        []string
-				cmdWithArgs string
-				script      string
-			}{
-				command:     "echo",
-				args:        []string{"hello", "world"},
-				cmdWithArgs: `echo "hello" "world"`,
-			},
+			name:           "MultilineCommandBecomesScript",
+			command:        "echo hello\necho world",
+			expectedScript: "echo hello\necho world",
 		},
 		{
 			name:    "EmptyStringCommand",
@@ -916,10 +925,332 @@ func TestBuildStepCommand(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected.command, result.Command)
-			assert.Equal(t, tt.expected.args, result.Args)
-			assert.Equal(t, tt.expected.cmdWithArgs, result.CmdWithArgs)
-			assert.Equal(t, tt.expected.script, result.Script)
+			assert.Equal(t, tt.expectedScript, result.Script)
+			assert.Equal(t, tt.expectedCommands, result.Commands)
+			// Legacy fields should NOT be populated by build functions
+			assert.Empty(t, result.Command)
+			assert.Nil(t, result.Args)
+			assert.Empty(t, result.CmdWithArgs)
+		})
+	}
+}
+
+func TestBuildStepCommand_MultipleCommands(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		command          any
+		expectedCommands []core.CommandEntry
+		wantErr          bool
+	}{
+		{
+			name:    "SingleCommandInArray",
+			command: []any{"echo hello"},
+			expectedCommands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello"}, CmdWithArgs: "echo hello"},
+			},
+		},
+		{
+			name:    "TwoSimpleCommands",
+			command: []any{"echo hello", "echo world"},
+			expectedCommands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello"}, CmdWithArgs: "echo hello"},
+				{Command: "echo", Args: []string{"world"}, CmdWithArgs: "echo world"},
+			},
+		},
+		{
+			name:    "MultipleCommandsWithArgs",
+			command: []any{"npm install", "npm run build", "npm test"},
+			expectedCommands: []core.CommandEntry{
+				{Command: "npm", Args: []string{"install"}, CmdWithArgs: "npm install"},
+				{Command: "npm", Args: []string{"run", "build"}, CmdWithArgs: "npm run build"},
+				{Command: "npm", Args: []string{"test"}, CmdWithArgs: "npm test"},
+			},
+		},
+		{
+			name:    "CommandsWithQuotedArgs",
+			command: []any{`echo "hello world"`, `grep "search term"`},
+			expectedCommands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello world"}, CmdWithArgs: `echo "hello world"`},
+				{Command: "grep", Args: []string{"search term"}, CmdWithArgs: `grep "search term"`},
+			},
+		},
+		{
+			name:    "CommandsWithPipes",
+			command: []any{"ls -la", "cat file.txt | grep pattern"},
+			expectedCommands: []core.CommandEntry{
+				{Command: "ls", Args: []string{"-la"}, CmdWithArgs: "ls -la"},
+				{Command: "cat", Args: []string{"file.txt", "|", "grep", "pattern"}, CmdWithArgs: "cat file.txt | grep pattern"},
+			},
+		},
+		{
+			name:    "SimpleCommandsNoArgs",
+			command: []any{"pwd", "whoami", "date"},
+			expectedCommands: []core.CommandEntry{
+				{Command: "pwd", Args: []string{}, CmdWithArgs: "pwd"},
+				{Command: "whoami", Args: []string{}, CmdWithArgs: "whoami"},
+				{Command: "date", Args: []string{}, CmdWithArgs: "date"},
+			},
+		},
+		{
+			name:    "EmptyArrayCommand",
+			command: []any{},
+			wantErr: true,
+		},
+		{
+			name:    "ArrayWithOnlyEmptyStrings",
+			command: []any{"", "   ", ""},
+			wantErr: true,
+		},
+		{
+			name:    "ArrayWithMixedEmptyAndValid",
+			command: []any{"", "echo hello", "   "},
+			expectedCommands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello"}, CmdWithArgs: "echo hello"},
+			},
+		},
+		{
+			name:    "NonStringElementsConverted",
+			command: []any{123, true, 45.6},
+			expectedCommands: []core.CommandEntry{
+				{Command: "123", Args: []string{}, CmdWithArgs: "123"},
+				{Command: "true", Args: []string{}, CmdWithArgs: "true"},
+				{Command: "45.6", Args: []string{}, CmdWithArgs: "45.6"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &step{Command: tt.command}
+			result := &core.Step{ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)}}
+			err := buildStepCommand(testStepBuildContext(), s, result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+
+			// Verify Commands slice
+			require.Equal(t, len(tt.expectedCommands), len(result.Commands), "Commands count mismatch")
+			for i, expected := range tt.expectedCommands {
+				assert.Equal(t, expected.Command, result.Commands[i].Command, "Command[%d].Command mismatch", i)
+				assert.Equal(t, expected.Args, result.Commands[i].Args, "Command[%d].Args mismatch", i)
+				assert.Equal(t, expected.CmdWithArgs, result.Commands[i].CmdWithArgs, "Command[%d].CmdWithArgs mismatch", i)
+			}
+
+			// Legacy fields should NOT be populated by build functions
+			assert.Empty(t, result.Command)
+			assert.Nil(t, result.Args)
+			assert.Empty(t, result.CmdWithArgs)
+		})
+	}
+}
+
+func TestBuildSingleCommand(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		command         string
+		expectedCommand string
+		expectedArgs    []string
+		expectedScript  string
+		wantErr         bool
+	}{
+		{
+			name:            "SimpleCommand",
+			command:         "echo hello",
+			expectedCommand: "echo",
+			expectedArgs:    []string{"hello"},
+		},
+		{
+			name:            "CommandWithMultipleArgs",
+			command:         "python script.py --arg1 value1 --arg2 value2",
+			expectedCommand: "python",
+			expectedArgs:    []string{"script.py", "--arg1", "value1", "--arg2", "value2"},
+		},
+		{
+			name:            "CommandWithQuotes",
+			command:         `echo "hello world"`,
+			expectedCommand: "echo",
+			expectedArgs:    []string{"hello world"},
+		},
+		{
+			name:           "MultilineBecomesScript",
+			command:        "echo line1\necho line2",
+			expectedScript: "echo line1\necho line2",
+		},
+		{
+			name:            "CommandOnly",
+			command:         "pwd",
+			expectedCommand: "pwd",
+			expectedArgs:    []string{},
+		},
+		{
+			name:    "EmptyCommand",
+			command: "",
+			wantErr: true,
+		},
+		{
+			name:    "WhitespaceOnly",
+			command: "   \t  ",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := &core.Step{}
+			err := buildSingleCommand(tt.command, result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedScript, result.Script)
+
+			// Legacy fields should NOT be populated
+			assert.Empty(t, result.Command)
+			assert.Nil(t, result.Args)
+
+			// For non-script commands, Commands should be populated
+			if tt.expectedScript == "" {
+				require.Len(t, result.Commands, 1)
+				assert.Equal(t, tt.expectedCommand, result.Commands[0].Command)
+				assert.Equal(t, tt.expectedArgs, result.Commands[0].Args)
+				assert.Equal(t, tt.command, result.Commands[0].CmdWithArgs)
+			}
+		})
+	}
+}
+
+func TestBuildMultipleCommands(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		commands         []any
+		expectedCommands []core.CommandEntry
+		wantErr          bool
+	}{
+		{
+			name:     "BasicCommands",
+			commands: []any{"echo foo", "echo bar"},
+			expectedCommands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"foo"}, CmdWithArgs: "echo foo"},
+				{Command: "echo", Args: []string{"bar"}, CmdWithArgs: "echo bar"},
+			},
+		},
+		{
+			name:     "EmptyArray",
+			commands: []any{},
+			wantErr:  true,
+		},
+		{
+			name:     "AllEmpty",
+			commands: []any{"", "", ""},
+			wantErr:  true,
+		},
+		{
+			name:     "SkipsEmptyPreservesValid",
+			commands: []any{"", "valid command", ""},
+			expectedCommands: []core.CommandEntry{
+				{Command: "valid", Args: []string{"command"}, CmdWithArgs: "valid command"},
+			},
+		},
+		{
+			name:     "RejectsMapType",
+			commands: []any{"echo hello", map[string]any{"key": "value"}},
+			wantErr:  true,
+		},
+		{
+			name:     "RejectsNestedArray",
+			commands: []any{"echo hello", []string{"nested"}},
+			wantErr:  true,
+		},
+		{
+			name:     "AcceptsPrimitiveTypes",
+			commands: []any{"echo", 123, true, 45.6},
+			expectedCommands: []core.CommandEntry{
+				{Command: "echo", Args: []string{}, CmdWithArgs: "echo"},
+				{Command: "123", Args: []string{}, CmdWithArgs: "123"},
+				{Command: "true", Args: []string{}, CmdWithArgs: "true"},
+				{Command: "45.6", Args: []string{}, CmdWithArgs: "45.6"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := &core.Step{}
+			err := buildMultipleCommands(tt.commands, result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, len(tt.expectedCommands), len(result.Commands))
+			for i, expected := range tt.expectedCommands {
+				assert.Equal(t, expected.Command, result.Commands[i].Command)
+				assert.Equal(t, expected.Args, result.Commands[i].Args)
+				assert.Equal(t, expected.CmdWithArgs, result.Commands[i].CmdWithArgs)
+			}
+		})
+	}
+}
+
+func TestStepHasMultipleCommands(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		step     *core.Step
+		expected bool
+	}{
+		{
+			name:     "NoCommands",
+			step:     &core.Step{},
+			expected: false,
+		},
+		{
+			name: "SingleCommandInCommands",
+			step: &core.Step{
+				Commands: []core.CommandEntry{
+					{Command: "echo", Args: []string{"hello"}},
+				},
+			},
+			expected: false, // Single command = not multiple
+		},
+		{
+			name: "HasMultipleCommands",
+			step: &core.Step{
+				Commands: []core.CommandEntry{
+					{Command: "echo", Args: []string{"hello"}},
+					{Command: "echo", Args: []string{"world"}},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "EmptyCommandsSlice",
+			step: &core.Step{
+				Commands: []core.CommandEntry{},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.step.HasMultipleCommands())
 		})
 	}
 }
@@ -997,45 +1328,6 @@ func TestBuildStepExecutor(t *testing.T) {
 			wantErr: true,
 		},
 	}
-
-	// Test for container and executor conflict - any executor type is invalid when container is set
-	t.Run("ContainerAndExecutorConflict_StringExecutor", func(t *testing.T) {
-		s := &step{Executor: "docker"}
-		result := &core.Step{
-			Container:      &core.Container{Image: "alpine:latest"},
-			ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)},
-		}
-		err := buildStepExecutor(testStepBuildContext(), s, result)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot use both 'container' field and 'executor' field")
-	})
-
-	t.Run("ContainerAndExecutorConflict_MapExecutor", func(t *testing.T) {
-		s := &step{
-			Executor: map[string]any{
-				"type": "http",
-			},
-		}
-		result := &core.Step{
-			Container:      &core.Container{Image: "alpine:latest"},
-			ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)},
-		}
-		err := buildStepExecutor(testStepBuildContext(), s, result)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot use both 'container' field and 'executor' field")
-	})
-
-	t.Run("ContainerAndExecutorConflict_AnyExecutorType", func(t *testing.T) {
-		// Even non-docker executors should conflict with container field
-		s := &step{Executor: "ssh"}
-		result := &core.Step{
-			Container:      &core.Container{Image: "alpine:latest"},
-			ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)},
-		}
-		err := buildStepExecutor(testStepBuildContext(), s, result)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot use both 'container' field and 'executor' field")
-	})
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1574,16 +1866,811 @@ func TestBuildStepContainer(t *testing.T) {
 		})
 	}
 
-	t.Run("ContainerAndScriptConflict", func(t *testing.T) {
-		s := &step{
-			Container: &container{Image: "alpine:latest"},
-			Script:    "echo hello\necho world",
-		}
-		result := &core.Step{}
-		err := buildStepContainer(testStepBuildContext(), s, result)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot use 'script' field with 'container' field")
-	})
+}
+
+func TestValidateMultipleCommands(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		executorType string
+		commands     []core.CommandEntry
+		wantErr      bool
+	}{
+		// Single command - should always pass
+		{
+			name:         "SingleCommand_NoExecutorType",
+			executorType: "",
+			commands:     []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
+			wantErr:      false,
+		},
+		{
+			name:         "SingleCommand_JQExecutor",
+			executorType: "jq",
+			commands:     []core.CommandEntry{{Command: ".foo"}},
+			wantErr:      false,
+		},
+		// Multiple commands - should pass for multi-command executors
+		{
+			name:         "MultipleCommands_NoExecutorType",
+			executorType: "",
+			commands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello"}},
+				{Command: "echo", Args: []string{"world"}},
+			},
+			wantErr: false,
+		},
+		{
+			name:         "MultipleCommands_ShellExecutor",
+			executorType: "shell",
+			commands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello"}},
+				{Command: "echo", Args: []string{"world"}},
+			},
+			wantErr: false,
+		},
+		{
+			name:         "MultipleCommands_CommandExecutor",
+			executorType: "command",
+			commands: []core.CommandEntry{
+				{Command: "npm", Args: []string{"install"}},
+				{Command: "npm", Args: []string{"run", "build"}},
+			},
+			wantErr: false,
+		},
+		{
+			name:         "MultipleCommands_DockerExecutor",
+			executorType: "docker",
+			commands: []core.CommandEntry{
+				{Command: "apt-get", Args: []string{"update"}},
+				{Command: "apt-get", Args: []string{"install", "curl"}},
+			},
+			wantErr: false,
+		},
+		{
+			name:         "MultipleCommands_ContainerExecutor",
+			executorType: "container",
+			commands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello"}},
+				{Command: "echo", Args: []string{"world"}},
+			},
+			wantErr: false,
+		},
+		{
+			name:         "MultipleCommands_SSHExecutor",
+			executorType: "ssh",
+			commands: []core.CommandEntry{
+				{Command: "ls", Args: []string{"-la"}},
+				{Command: "pwd"},
+			},
+			wantErr: false,
+		},
+		// Multiple commands - should fail for single-command executors
+		{
+			name:         "MultipleCommands_JQExecutor",
+			executorType: "jq",
+			commands: []core.CommandEntry{
+				{Command: ".foo"},
+				{Command: ".bar"},
+			},
+			wantErr: true,
+		},
+		{
+			name:         "MultipleCommands_HTTPExecutor",
+			executorType: "http",
+			commands: []core.CommandEntry{
+				{Command: "GET", Args: []string{"https://example.com"}},
+				{Command: "POST", Args: []string{"https://example.com"}},
+			},
+			wantErr: true,
+		},
+		{
+			name:         "MultipleCommands_ArchiveExecutor",
+			executorType: "archive",
+			commands: []core.CommandEntry{
+				{Command: "extract"},
+				{Command: "list"},
+			},
+			wantErr: true,
+		},
+		{
+			name:         "MultipleCommands_GithubActionExecutor_Underscore",
+			executorType: "github_action",
+			commands: []core.CommandEntry{
+				{Command: "actions/checkout@v3"},
+				{Command: "actions/setup-go@v4"},
+			},
+			wantErr: true,
+		},
+		{
+			name:         "MultipleCommands_GithubActionExecutor_Hyphen",
+			executorType: "github-action",
+			commands: []core.CommandEntry{
+				{Command: "actions/checkout@v3"},
+				{Command: "actions/setup-go@v4"},
+			},
+			wantErr: true,
+		},
+		{
+			name:         "MultipleCommands_MailExecutor",
+			executorType: "mail",
+			commands: []core.CommandEntry{
+				{Command: "send"},
+				{Command: "another"},
+			},
+			wantErr: true,
+		},
+		{
+			name:         "MultipleCommands_DAGExecutor",
+			executorType: "dag",
+			commands: []core.CommandEntry{
+				{Command: "dag1"},
+				{Command: "dag2"},
+			},
+			wantErr: true,
+		},
+		{
+			name:         "MultipleCommands_ParallelExecutor",
+			executorType: "parallel",
+			commands: []core.CommandEntry{
+				{Command: "task1"},
+				{Command: "task2"},
+			},
+			wantErr: true,
+		},
+		// Empty commands - should always pass
+		{
+			name:         "NoCommands_JQExecutor",
+			executorType: "jq",
+			commands:     nil,
+			wantErr:      false,
+		},
+		{
+			name:         "EmptyCommands_HTTPExecutor",
+			executorType: "http",
+			commands:     []core.CommandEntry{},
+			wantErr:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := &core.Step{
+				Commands: tt.commands,
+				ExecutorConfig: core.ExecutorConfig{
+					Type: tt.executorType,
+				},
+			}
+			err := validateMultipleCommands(result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "executor does not support multiple commands")
+				assert.Contains(t, err.Error(), tt.executorType)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateScript(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		executorType string
+		script       string
+		wantErr      bool
+	}{
+		// Executors that support script
+		{
+			name:         "ScriptWithCommandExecutor",
+			executorType: "command",
+			script:       "echo hello",
+			wantErr:      false,
+		},
+		{
+			name:         "ScriptWithShellExecutor",
+			executorType: "shell",
+			script:       "echo hello",
+			wantErr:      false,
+		},
+		{
+			name:         "ScriptWithDockerExecutor",
+			executorType: "docker",
+			script:       "echo hello",
+			wantErr:      true, // Docker doesn't use step.Script field
+		},
+		{
+			name:         "ScriptWithJQExecutor",
+			executorType: "jq",
+			script:       `{"key": "value"}`,
+			wantErr:      false,
+		},
+		{
+			name:         "ScriptWithHTTPExecutor",
+			executorType: "http",
+			script:       `{"body": "data"}`,
+			wantErr:      false,
+		},
+		// Executors that do not support script
+		{
+			name:         "ScriptWithSSHExecutor",
+			executorType: "ssh",
+			script:       "echo hello",
+			wantErr:      true,
+		},
+		{
+			name:         "ScriptWithMailExecutor",
+			executorType: "mail",
+			script:       "echo hello",
+			wantErr:      true,
+		},
+		{
+			name:         "ScriptWithArchiveExecutor",
+			executorType: "archive",
+			script:       "echo hello",
+			wantErr:      true,
+		},
+		{
+			name:         "ScriptWithGHAExecutor",
+			executorType: "gha",
+			script:       "echo hello",
+			wantErr:      true,
+		},
+		// Empty script - should always pass
+		{
+			name:         "EmptyScriptWithSSHExecutor",
+			executorType: "ssh",
+			script:       "",
+			wantErr:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := &core.Step{
+				Script: tt.script,
+				ExecutorConfig: core.ExecutorConfig{
+					Type: tt.executorType,
+				},
+			}
+			err := validateScript(result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "does not support script field")
+				assert.Contains(t, err.Error(), tt.executorType)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateShell(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		executorType string
+		shell        string
+		wantErr      bool
+	}{
+		// Executors that support shell
+		{
+			name:         "ShellWithCommandExecutor",
+			executorType: "command",
+			shell:        "/bin/bash",
+			wantErr:      false,
+		},
+		{
+			name:         "ShellWithDockerExecutor",
+			executorType: "docker",
+			shell:        "/bin/sh",
+			wantErr:      true, // Docker doesn't use step.Shell field
+		},
+		{
+			name:         "ShellWithSSHExecutor",
+			executorType: "ssh",
+			shell:        "/bin/bash",
+			wantErr:      true, // SSH doesn't use step.Shell field
+		},
+		// Executors that do not support shell
+		{
+			name:         "ShellWithJQExecutor",
+			executorType: "jq",
+			shell:        "/bin/bash",
+			wantErr:      true,
+		},
+		{
+			name:         "ShellWithHTTPExecutor",
+			executorType: "http",
+			shell:        "/bin/bash",
+			wantErr:      true,
+		},
+		{
+			name:         "ShellWithMailExecutor",
+			executorType: "mail",
+			shell:        "/bin/bash",
+			wantErr:      true,
+		},
+		// Empty shell - should always pass
+		{
+			name:         "EmptyShellWithJQExecutor",
+			executorType: "jq",
+			shell:        "",
+			wantErr:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := &core.Step{
+				Shell: tt.shell,
+				ExecutorConfig: core.ExecutorConfig{
+					Type: tt.executorType,
+				},
+			}
+			err := validateShell(result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "does not support shell configuration")
+				assert.Contains(t, err.Error(), tt.executorType)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateContainer(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		executorType string
+		container    *core.Container
+		wantErr      bool
+	}{
+		// Executors that support container
+		{
+			name:         "ContainerWithDockerExecutor",
+			executorType: "docker",
+			container:    &core.Container{Image: "alpine"},
+			wantErr:      false,
+		},
+		// Executors that do not support container
+		{
+			name:         "ContainerWithSSHExecutor",
+			executorType: "ssh",
+			container:    &core.Container{Image: "alpine"},
+			wantErr:      true,
+		},
+		{
+			name:         "ContainerWithCommandExecutor",
+			executorType: "command",
+			container:    &core.Container{Image: "alpine"},
+			wantErr:      true,
+		},
+		{
+			name:         "ContainerWithJQExecutor",
+			executorType: "jq",
+			container:    &core.Container{Image: "alpine"},
+			wantErr:      true,
+		},
+		// Nil container - should always pass
+		{
+			name:         "NilContainerWithSSHExecutor",
+			executorType: "ssh",
+			container:    nil,
+			wantErr:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := &core.Step{
+				Container: tt.container,
+				ExecutorConfig: core.ExecutorConfig{
+					Type: tt.executorType,
+				},
+			}
+			err := validateContainer(result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "does not support container field")
+				assert.Contains(t, err.Error(), tt.executorType)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateSubDAG(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		executorType string
+		subDAG       *core.SubDAG
+		wantErr      bool
+	}{
+		// Executors that support SubDAG
+		{
+			name:         "SubDAGWithDAGExecutor",
+			executorType: "dag",
+			subDAG:       &core.SubDAG{Name: "child-dag"},
+			wantErr:      false,
+		},
+		{
+			name:         "SubDAGWithParallelExecutor",
+			executorType: "parallel",
+			subDAG:       &core.SubDAG{Name: "child-dag"},
+			wantErr:      false,
+		},
+		// Executors that do not support SubDAG
+		{
+			name:         "SubDAGWithCommandExecutor",
+			executorType: "command",
+			subDAG:       &core.SubDAG{Name: "child-dag"},
+			wantErr:      true,
+		},
+		{
+			name:         "SubDAGWithSSHExecutor",
+			executorType: "ssh",
+			subDAG:       &core.SubDAG{Name: "child-dag"},
+			wantErr:      true,
+		},
+		{
+			name:         "SubDAGWithDockerExecutor",
+			executorType: "docker",
+			subDAG:       &core.SubDAG{Name: "child-dag"},
+			wantErr:      true,
+		},
+		// Nil SubDAG - should always pass
+		{
+			name:         "NilSubDAGWithCommandExecutor",
+			executorType: "command",
+			subDAG:       nil,
+			wantErr:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := &core.Step{
+				SubDAG: tt.subDAG,
+				ExecutorConfig: core.ExecutorConfig{
+					Type: tt.executorType,
+				},
+			}
+			err := validateSubDAG(result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "does not support sub-DAG execution")
+				assert.Contains(t, err.Error(), tt.executorType)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateCommand(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		executorType string
+		commands     []core.CommandEntry
+		wantErr      bool
+	}{
+		// Executors that support command
+		{
+			name:         "CommandWithDefaultExecutor",
+			executorType: "",
+			commands:     []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
+			wantErr:      false,
+		},
+		{
+			name:         "CommandWithShellExecutor",
+			executorType: "shell",
+			commands:     []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
+			wantErr:      false,
+		},
+		{
+			name:         "CommandWithCommandExecutor",
+			executorType: "command",
+			commands:     []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
+			wantErr:      false,
+		},
+		{
+			name:         "CommandWithDockerExecutor",
+			executorType: "docker",
+			commands:     []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
+			wantErr:      false,
+		},
+		{
+			name:         "CommandWithSSHExecutor",
+			executorType: "ssh",
+			commands:     []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
+			wantErr:      false,
+		},
+		{
+			name:         "CommandWithJQExecutor",
+			executorType: "jq",
+			commands:     []core.CommandEntry{{Command: ".foo"}},
+			wantErr:      false,
+		},
+		{
+			name:         "CommandWithHTTPExecutor",
+			executorType: "http",
+			commands:     []core.CommandEntry{{Command: "GET", Args: []string{"https://example.com"}}},
+			wantErr:      false,
+		},
+		{
+			name:         "CommandWithArchiveExecutor",
+			executorType: "archive",
+			commands:     []core.CommandEntry{{Command: "extract"}},
+			wantErr:      false,
+		},
+		// Executors that do not support command
+		{
+			name:         "CommandWithDAGExecutor",
+			executorType: "dag",
+			commands:     []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
+			wantErr:      true,
+		},
+		{
+			name:         "CommandWithSubworkflowExecutor",
+			executorType: "subworkflow",
+			commands:     []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
+			wantErr:      true,
+		},
+		{
+			name:         "CommandWithParallelExecutor",
+			executorType: "parallel",
+			commands:     []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
+			wantErr:      true,
+		},
+		{
+			name:         "CommandWithMailExecutor",
+			executorType: "mail",
+			commands:     []core.CommandEntry{{Command: "send"}},
+			wantErr:      true,
+		},
+		// Empty commands - should always pass
+		{
+			name:         "NoCommandsWithDAGExecutor",
+			executorType: "dag",
+			commands:     nil,
+			wantErr:      false,
+		},
+		{
+			name:         "EmptyCommandsWithMailExecutor",
+			executorType: "mail",
+			commands:     []core.CommandEntry{},
+			wantErr:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := &core.Step{
+				Commands: tt.commands,
+				ExecutorConfig: core.ExecutorConfig{
+					Type: tt.executorType,
+				},
+			}
+			err := validateCommand(result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "does not support command field")
+				assert.Contains(t, err.Error(), tt.executorType)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateWorkerSelector(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		executorType   string
+		workerSelector map[string]string
+		wantErr        bool
+	}{
+		// Executors that support workerSelector
+		{
+			name:           "WorkerSelectorWithDAGExecutor",
+			executorType:   "dag",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        false,
+		},
+		{
+			name:           "WorkerSelectorWithSubworkflowExecutor",
+			executorType:   "subworkflow",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        false,
+		},
+		{
+			name:           "WorkerSelectorWithParallelExecutor",
+			executorType:   "parallel",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        false,
+		},
+		// Executors that do not support workerSelector
+		{
+			name:           "WorkerSelectorWithShellExecutor",
+			executorType:   "shell",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        true,
+		},
+		{
+			name:           "WorkerSelectorWithCommandExecutor",
+			executorType:   "command",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        true,
+		},
+		{
+			name:           "WorkerSelectorWithDockerExecutor",
+			executorType:   "docker",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        true,
+		},
+		{
+			name:           "WorkerSelectorWithMailExecutor",
+			executorType:   "mail",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        true,
+		},
+		// Empty workerSelector - should always pass
+		{
+			name:           "NoWorkerSelectorWithShellExecutor",
+			executorType:   "shell",
+			workerSelector: nil,
+			wantErr:        false,
+		},
+		{
+			name:           "EmptyWorkerSelectorWithShellExecutor",
+			executorType:   "shell",
+			workerSelector: map[string]string{},
+			wantErr:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := &core.Step{
+				WorkerSelector: tt.workerSelector,
+				ExecutorConfig: core.ExecutorConfig{
+					Type: tt.executorType,
+				},
+			}
+			err := validateWorkerSelector(result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "does not support workerSelector field")
+				assert.Contains(t, err.Error(), tt.executorType)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateConflicts(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		step    step
+		wantErr error
+	}{
+		{
+			name: "CallAndExecutorConflict",
+			step: step{
+				Call:     "sub-dag",
+				Executor: "shell",
+			},
+			wantErr: ErrSubDAGAndExecutorConflict,
+		},
+		{
+			name: "RunAndCommandConflict",
+			step: step{
+				Run:     "sub-dag",
+				Command: "echo hello",
+			},
+			wantErr: ErrSubDAGAndCommandConflict,
+		},
+		{
+			name: "ParallelAndScriptConflict",
+			step: step{
+				Parallel: []any{1, 2, 3},
+				Script:   "echo hello",
+			},
+			wantErr: ErrSubDAGAndScriptConflict,
+		},
+		{
+			name: "ContainerAndExecutorConflict",
+			step: step{
+				Container: &container{Image: "alpine"},
+				Executor:  "shell",
+			},
+			wantErr: ErrContainerAndExecutorConflict,
+		},
+		{
+			name: "ContainerAndScriptConflict",
+			step: step{
+				Container: &container{Image: "alpine"},
+				Script:    "echo hello",
+			},
+			wantErr: ErrContainerAndScriptConflict,
+		},
+		{
+			name: "NoConflictSubDAG",
+			step: step{
+				Call: "sub-dag",
+			},
+			wantErr: nil,
+		},
+		{
+			name: "NoConflictShell",
+			step: step{
+				Command: "echo hello",
+			},
+			wantErr: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateConflicts(&tt.step)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestUnregisteredExecutorValidation(t *testing.T) {
+	t.Parallel()
+
+	yaml := `
+steps:
+  - name: invalid-step
+    executor:
+      type: non-existent
+    command: echo hello
+`
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "test.yaml")
+	err := os.WriteFile(tmpFile, []byte(yaml), 0644)
+	assert.NoError(t, err)
+
+	_, err = Load(context.Background(), tmpFile)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "executor type \"non-existent\" does not support command field")
 }
 
 func TestBuildStepLogOutput(t *testing.T) {

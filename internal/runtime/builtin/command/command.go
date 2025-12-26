@@ -270,7 +270,13 @@ func exitCodeFromError(err error) int {
 
 // NewCommand creates an executor that will run the provided step.
 // It returns an executor configured from the step, or an error if creating the command configuration fails.
+// If the step has multiple commands, it returns a multiCommandExecutor that runs them sequentially.
 func NewCommand(ctx context.Context, step core.Step) (executor.Executor, error) {
+	// If there are multiple commands, use the multi-command executor
+	if len(step.Commands) > 1 {
+		return newMultiCommandExecutor(ctx, step)
+	}
+
 	cfg, err := NewCommandConfig(ctx, step)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create command: %w", err)
@@ -281,20 +287,36 @@ func NewCommand(ctx context.Context, step core.Step) (executor.Executor, error) 
 
 // NewCommandConfig creates a commandConfig populated from the given context and step.
 // The returned config uses the environment from runtime.GetEnv(ctx) for Dir and Shell,
-// copies Command, Args, Script, ShellCmdArgs, and ShellPackages from the step, and sets
-// UserSpecifiedShell to true when the step explicitly provided a Shell.
+// extracts Command/Args from the first command entry, and sets UserSpecifiedShell to true
+// when the step explicitly provided a Shell.
 // It returns the constructed *commandConfig and a nil error.
 func NewCommandConfig(ctx context.Context, step core.Step) (*commandConfig, error) {
 	env := runtime.GetEnv(ctx)
 
+	var command string
+	var args []string
+	var shellCmdArgs string
+
+	// Extract command and args from the first command entry
+	if len(step.Commands) > 0 {
+		command = step.Commands[0].Command
+		args = step.Commands[0].Args
+		shellCmdArgs = step.Commands[0].CmdWithArgs
+	}
+
+	// Fall back to step-level ShellCmdArgs if not set in command entry
+	if shellCmdArgs == "" {
+		shellCmdArgs = step.ShellCmdArgs
+	}
+
 	return &commandConfig{
 		Ctx:                ctx,
 		Dir:                env.WorkingDir,
-		Command:            step.Command,
-		Args:               step.Args,
+		Command:            command,
+		Args:               args,
 		Script:             step.Script,
 		Shell:              env.Shell(ctx),
-		ShellCommandArgs:   step.ShellCmdArgs,
+		ShellCommandArgs:   shellCmdArgs,
 		ShellPackages:      step.ShellPackages,
 		UserSpecifiedShell: step.Shell != "",
 	}, nil
@@ -303,7 +325,13 @@ func NewCommandConfig(ctx context.Context, step core.Step) (*commandConfig, erro
 // init registers command executors ("", "shell", "command") with the executor
 // framework, associating each with NewCommand and validateCommandStep.
 func init() {
-	executor.RegisterExecutor("", NewCommand, validateCommandStep)
-	executor.RegisterExecutor("shell", NewCommand, validateCommandStep)
-	executor.RegisterExecutor("command", NewCommand, validateCommandStep)
+	caps := core.ExecutorCapabilities{
+		Command:          true,
+		MultipleCommands: true,
+		Script:           true,
+		Shell:            true,
+	}
+	executor.RegisterExecutor("", NewCommand, validateCommandStep, caps)
+	executor.RegisterExecutor("shell", NewCommand, validateCommandStep, caps)
+	executor.RegisterExecutor("command", NewCommand, validateCommandStep, caps)
 }

@@ -122,5 +122,5 @@ func decodeMailConfig(dat map[string]any, cfg *mailConfig) error {
 }
 
 func init() {
-	executor.RegisterExecutor("mail", newMail, nil)
+	executor.RegisterExecutor("mail", newMail, nil, core.ExecutorCapabilities{})
 }

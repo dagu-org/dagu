@@ -589,16 +589,18 @@
         "command": {
           "oneOf": [
             {
-              "type": "string"
+              "type": "string",
+              "description": "Single command to execute"
             },
             {
               "type": "array",
               "items": {
                 "type": ["string", "number", "boolean"]
-              }
+              },
+              "description": "Multiple commands to execute sequentially. Each string is a separate command."
             }
           ],
-          "description": "Command to execute. Can be a shell command, script interpreter, or executable."
+          "description": "Command(s) to execute. Can be a single shell command string, or an array of commands to run sequentially (stops on first failure)."
         },
         "shell": {
           "oneOf": [
