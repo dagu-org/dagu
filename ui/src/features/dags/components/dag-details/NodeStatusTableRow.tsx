@@ -606,10 +606,10 @@ function NodeStatusTableRow({
           {/* Combined Command & Args */}
           <TableCell>
             <div className="space-y-1.5">
-              {(node.step.command || node.step.cmdWithArgs) && (
+              {((node.step.command && node.step.command.length > 0) || node.step.cmdWithArgs) && (
                 <CommandDisplay
-                  command={node.step.command || node.step.cmdWithArgs || ''}
-                  args={node.step.command ? node.step.args : undefined}
+                  command={(node.step.command && node.step.command.length > 0) ? node.step.command : node.step.cmdWithArgs}
+                  args={(node.step.command && node.step.command.length > 0) ? node.step.args : undefined}
                   icon="code"
                   maxLength={50}
                 />
@@ -956,7 +956,7 @@ function NodeStatusTableRow({
           Command:
         </div>
         <div className="space-y-1.5">
-          {!node.step.command && node.step.cmdWithArgs ? (
+          {(!node.step.command || node.step.command.length === 0) && node.step.cmdWithArgs ? (
             <div className="flex items-center gap-1.5 text-xs font-medium">
               <Code className="h-4 w-4 text-primary" />
               <span className="bg-muted rounded-md px-1.5 py-0.5 text-foreground/90 break-all whitespace-pre-wrap">
@@ -965,14 +965,16 @@ function NodeStatusTableRow({
             </div>
           ) : null}
 
-          {node.step.command && (
+          {node.step.command && node.step.command.length > 0 && (
             <div className="space-y-1">
-              <div className="flex items-center gap-1.5 text-xs font-medium">
-                <Code className="h-4 w-4 text-primary" />
-                <span className="bg-muted rounded-md px-1.5 py-0.5 text-foreground/90 break-all whitespace-pre-wrap">
-                  {node.step.command}
-                </span>
-              </div>
+              {node.step.command.map((cmd, idx) => (
+                <div key={idx} className="flex items-center gap-1.5 text-xs font-medium">
+                  <Code className="h-4 w-4 text-primary" />
+                  <span className="bg-muted rounded-md px-1.5 py-0.5 text-foreground/90 break-all whitespace-pre-wrap">
+                    {cmd}
+                  </span>
+                </div>
+              ))}
 
               {node.step.args && (
                 <div className="pl-5 text-xs font-medium text-muted-foreground leading-tight">

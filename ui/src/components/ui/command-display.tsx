@@ -3,7 +3,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip';
 import { Code, Terminal } from 'lucide-react';
 
 interface CommandDisplayProps {
-  command: string | undefined;
+  command: string | string[] | undefined;
   args?: string | string[];
   icon?: 'code' | 'terminal';
   maxLength?: number;
@@ -45,13 +45,18 @@ export const CommandDisplay: React.FC<CommandDisplayProps> = ({
   className = '',
   showFullInTooltip = true,
 }) => {
-  if (!command) {
+  if (!command || (Array.isArray(command) && command.length === 0)) {
     return null;
   }
 
   const Icon = icon === 'code' ? Code : Terminal;
+
+  // Normalize command to array
+  const commands = Array.isArray(command) ? command : [command];
+  const fullCommandString = commands.join(' && ');
+
   const { truncated: truncatedCommand, isTruncated: isCommandTruncated } =
-    truncateCommand(command, maxLength);
+    truncateCommand(fullCommandString, maxLength);
 
   // Process args
   const argsString = Array.isArray(args) ? args.join(' ') : args || '';
@@ -60,7 +65,7 @@ export const CommandDisplay: React.FC<CommandDisplayProps> = ({
 
   const needsTooltip =
     showFullInTooltip &&
-    (isCommandTruncated || (argsString && isArgsTruncated));
+    (isCommandTruncated || (argsString && isArgsTruncated) || commands.length > 1);
 
   const commandElement = (
     <div className={`space-y-1 ${className}`}>
@@ -69,6 +74,11 @@ export const CommandDisplay: React.FC<CommandDisplayProps> = ({
         <span className="bg-muted rounded-md px-1.5 py-0.5 text-foreground/90 font-mono">
           {truncatedCommand}
         </span>
+        {commands.length > 1 && (
+          <span className="text-muted-foreground text-[10px]">
+            ({commands.length} commands)
+          </span>
+        )}
       </div>
 
       {argsString && (
@@ -91,10 +101,16 @@ export const CommandDisplay: React.FC<CommandDisplayProps> = ({
       <TooltipContent className="max-w-[600px]">
         <div className="space-y-2">
           <div className="text-xs font-semibold text-muted-foreground">
-            Full Command:
+            {commands.length > 1 ? 'Commands:' : 'Full Command:'}
           </div>
           <pre className="whitespace-pre-wrap break-all text-xs font-mono bg-muted p-2 rounded">
-            {command}
+            {commands.map((cmd, i) => (
+              <React.Fragment key={i}>
+                {i > 0 && '\n'}
+                {commands.length > 1 && <span className="text-muted-foreground">{i + 1}. </span>}
+                {cmd}
+              </React.Fragment>
+            ))}
             {argsString && (
               <>
                 {'\n'}

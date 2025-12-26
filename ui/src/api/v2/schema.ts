@@ -1227,8 +1227,8 @@ export interface components {
             dir?: string;
             /** @description Complete command string including arguments to execute */
             cmdWithArgs?: string;
-            /** @description Base command to execute without arguments */
-            command?: string;
+            /** @description List of commands to execute sequentially */
+            command?: string[];
             /** @description Script content if the step executes a script file */
             script?: string;
             /** @description File path for capturing standard output */

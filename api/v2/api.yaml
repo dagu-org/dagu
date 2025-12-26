@@ -2866,8 +2866,10 @@ components:
           type: string
           description: "Complete command string including arguments to execute"
         command:
-          type: string
-          description: "Base command to execute without arguments"
+          type: array
+          description: "List of commands to execute sequentially"
+          items:
+            type: string
         script:
           type: string
           description: "Script content if the step executes a script file"
