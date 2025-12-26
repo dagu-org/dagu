@@ -1590,9 +1590,11 @@ func TestBuildStepLogOutput(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		yaml     string
-		expected core.LogOutputMode
+		name        string
+		yaml        string
+		expected    core.LogOutputMode
+		wantErr     bool
+		errContains string
 	}{
 		{
 			name:     "Default_InheritFromDAG",
@@ -1614,6 +1616,18 @@ func TestBuildStepLogOutput(t *testing.T) {
 			yaml:     "logOutput: MERGED",
 			expected: core.LogOutputMerged,
 		},
+		{
+			name:        "InvalidValue",
+			yaml:        "logOutput: invalid",
+			wantErr:     true,
+			errContains: "invalid logOutput value",
+		},
+		{
+			name:        "InvalidValue_Both",
+			yaml:        "logOutput: both",
+			wantErr:     true,
+			errContains: "invalid logOutput value",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1622,7 +1636,13 @@ func TestBuildStepLogOutput(t *testing.T) {
 
 			var s step
 			if tt.yaml != "" {
-				require.NoError(t, yaml.Unmarshal([]byte(tt.yaml), &s))
+				err := yaml.Unmarshal([]byte(tt.yaml), &s)
+				if tt.wantErr {
+					require.Error(t, err)
+					assert.Contains(t, err.Error(), tt.errContains)
+					return
+				}
+				require.NoError(t, err)
 			}
 
 			result, err := buildStepLogOutput(testStepBuildContext(), &s)
@@ -1630,14 +1650,4 @@ func TestBuildStepLogOutput(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
-}
-
-func TestBuildStepLogOutput_InvalidValue(t *testing.T) {
-	t.Parallel()
-
-	yamlData := "logOutput: invalid"
-	var s step
-	err := yaml.Unmarshal([]byte(yamlData), &s)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid logOutput value")
 }

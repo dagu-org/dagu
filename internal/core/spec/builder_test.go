@@ -2848,3 +2848,147 @@ steps:
 		require.NotNil(t, dag)
 	})
 }
+
+func TestBuildLogOutput(t *testing.T) {
+	t.Parallel()
+
+	t.Run("DAGLevelSeparate", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+name: test-dag
+logoutput: separate
+steps:
+  - name: step1
+    command: echo hello
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Equal(t, core.LogOutputSeparate, dag.LogOutput)
+	})
+
+	t.Run("DAGLevelMerged", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+name: test-dag
+logoutput: merged
+steps:
+  - name: step1
+    command: echo hello
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Equal(t, core.LogOutputMerged, dag.LogOutput)
+	})
+
+	t.Run("DAGLevelDefault", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+name: test-dag
+steps:
+  - name: step1
+    command: echo hello
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		// Default should be separate
+		assert.Equal(t, core.LogOutputSeparate, dag.LogOutput)
+	})
+
+	t.Run("StepLevelOverride", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+name: test-dag
+logoutput: separate
+steps:
+  - name: step1
+    command: echo hello
+    logOutput: merged
+  - name: step2
+    command: echo world
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+
+		// DAG level is separate
+		assert.Equal(t, core.LogOutputSeparate, dag.LogOutput)
+
+		// Step 1 overrides to merged
+		assert.Equal(t, core.LogOutputMerged, dag.Steps[0].LogOutput)
+
+		// Step 2 inherits from DAG (empty means inherit)
+		assert.Equal(t, core.LogOutputMode(""), dag.Steps[1].LogOutput)
+	})
+
+	t.Run("StepLevelExplicitSeparate", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+name: test-dag
+logoutput: merged
+steps:
+  - name: step1
+    command: echo hello
+    logOutput: separate
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+
+		// DAG level is merged
+		assert.Equal(t, core.LogOutputMerged, dag.LogOutput)
+
+		// Step 1 explicitly sets separate
+		assert.Equal(t, core.LogOutputSeparate, dag.Steps[0].LogOutput)
+	})
+
+	t.Run("CaseInsensitive", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+name: test-dag
+logoutput: MERGED
+steps:
+  - name: step1
+    command: echo hello
+    logOutput: SEPARATE
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+
+		assert.Equal(t, core.LogOutputMerged, dag.LogOutput)
+		assert.Equal(t, core.LogOutputSeparate, dag.Steps[0].LogOutput)
+	})
+
+	t.Run("InvalidValue", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+name: test-dag
+logoutput: invalid
+steps:
+  - name: step1
+    command: echo hello
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid logOutput value")
+	})
+
+	t.Run("InvalidStepValue", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+name: test-dag
+steps:
+  - name: step1
+    command: echo hello
+    logOutput: both
+`)
+		_, err := spec.LoadYAML(context.Background(), data)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid logOutput value")
+	})
+}

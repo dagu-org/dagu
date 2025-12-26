@@ -137,3 +137,26 @@ func TestLogOutputMode_Constants(t *testing.T) {
 	assert.Equal(t, LogOutputMode("separate"), LogOutputSeparate)
 	assert.Equal(t, LogOutputMode("merged"), LogOutputMerged)
 }
+
+func TestLogOutputValue_UnmarshalYAML_NilValue(t *testing.T) {
+	var result struct {
+		LogOutput LogOutputValue `yaml:"logOutput"`
+	}
+
+	// Explicit null value in YAML
+	err := yaml.Unmarshal([]byte("logOutput: null"), &result)
+	require.NoError(t, err)
+	assert.True(t, result.LogOutput.IsZero())
+	assert.Equal(t, LogOutputSeparate, result.LogOutput.Mode())
+}
+
+func TestLogOutputValue_UnmarshalYAML_MapValue(t *testing.T) {
+	var result struct {
+		LogOutput LogOutputValue `yaml:"logOutput"`
+	}
+
+	// Map value should fail with "must be a string" error
+	err := yaml.Unmarshal([]byte("logOutput:\n  key: value"), &result)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must be a string")
+}

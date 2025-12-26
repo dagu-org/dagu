@@ -1754,9 +1754,11 @@ func TestBuildLogOutput(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		yaml     string
-		expected core.LogOutputMode
+		name        string
+		yaml        string
+		expected    core.LogOutputMode
+		wantErr     bool
+		errContains string
 	}{
 		{
 			name:     "Default_Separate",
@@ -1778,6 +1780,18 @@ func TestBuildLogOutput(t *testing.T) {
 			yaml:     "logoutput: MERGED",
 			expected: core.LogOutputMerged,
 		},
+		{
+			name:        "InvalidValue",
+			yaml:        "logoutput: invalid",
+			wantErr:     true,
+			errContains: "invalid logOutput value",
+		},
+		{
+			name:        "InvalidValue_Both",
+			yaml:        "logoutput: both",
+			wantErr:     true,
+			errContains: "invalid logOutput value",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1786,7 +1800,13 @@ func TestBuildLogOutput(t *testing.T) {
 
 			var d dag
 			if tt.yaml != "" {
-				require.NoError(t, yaml.Unmarshal([]byte(tt.yaml), &d))
+				err := yaml.Unmarshal([]byte(tt.yaml), &d)
+				if tt.wantErr {
+					require.Error(t, err)
+					assert.Contains(t, err.Error(), tt.errContains)
+					return
+				}
+				require.NoError(t, err)
 			}
 
 			result, err := buildLogOutput(testBuildContext(), &d)
@@ -1794,16 +1814,6 @@ func TestBuildLogOutput(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
-}
-
-func TestBuildLogOutput_InvalidValue(t *testing.T) {
-	t.Parallel()
-
-	yamlData := "logoutput: invalid"
-	var d dag
-	err := yaml.Unmarshal([]byte(yamlData), &d)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid logOutput value")
 }
 
 // Helper functions
