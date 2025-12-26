@@ -9,11 +9,23 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestMain(m *testing.M) {
+	// Register executor capabilities for testing.
+	// In production, this is done by runtime/builtin init functions.
+	for _, t := range []string{"", "shell", "command"} {
+		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{
+			Command: true, MultipleCommands: true, Script: true, Shell: true,
+		})
+	}
+	os.Exit(m.Run())
+}
 
 func TestStore(t *testing.T) {
 	tmpDir := fileutil.MustTempDir("test-suspend-checker")
