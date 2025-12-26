@@ -134,8 +134,7 @@ func (e *docker) Kill(sig os.Signal) error {
 func (e *docker) Run(ctx context.Context) error {
 	logger.Debug(ctx, "Docker executor: Run started",
 		slog.String("stepName", e.step.Name),
-		slog.String("command", e.step.Command),
-		slog.Any("args", e.step.Args),
+		slog.Int("numCommands", len(e.step.Commands)),
 	)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
@@ -156,33 +155,7 @@ func (e *docker) Run(ctx context.Context) error {
 	cli := GetContainerClient(ctx)
 	if cli != nil && e.cfg == nil {
 		logger.Debug(ctx, "Docker executor: using existing container client from context")
-		// If it exists, use the client from the context
-		// This allows sharing the same container client across multiple executors.
-		// Don't set WorkingDir - use the container's default working directory
-		execOpts := ExecOptions{}
-
-		// Build command only when a command is explicitly provided.
-		// If command is empty, avoid passing an empty string which overrides image CMD.
-		var cmd []string
-		if e.step.Command != "" {
-			cmd = append([]string{e.step.Command}, e.step.Args...)
-		}
-
-		exitCode, err := cli.Exec(
-			ctx,
-			cmd,
-			e.stdout, e.stderr,
-			execOpts,
-		)
-		e.mu.Lock()
-		e.exitCode = exitCode
-		e.mu.Unlock()
-		if err != nil {
-			if tail := tw.Tail(); tail != "" {
-				return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tail)
-			}
-		}
-		return err
+		return e.runInExistingContainer(ctx, cli, tw)
 	}
 
 	if e.cfg == nil {
@@ -207,34 +180,158 @@ func (e *docker) Run(ctx context.Context) error {
 	e.container = cli
 	defer e.container.Close(ctx)
 
-	// Build command only when explicitly provided; otherwise use image default CMD/ENTRYPOINT.
-	var cmd []string
-	if e.step.Command != "" {
-		cmd = append([]string{e.step.Command}, e.step.Args...)
-	}
-	logger.Debug(ctx, "Docker executor: calling container.Run",
-		slog.Any("cmd", cmd),
-	)
+	return e.runInNewContainer(ctx, tw)
+}
 
-	exitCode, err := e.container.Run(ctx, cmd, e.stdout, e.stderr)
-	logger.Debug(ctx, "Docker executor: container.Run returned",
-		slog.Int("exitCode", exitCode),
-		slog.Bool("hasError", err != nil),
-	)
+// runInExistingContainer executes commands in an existing container from context.
+func (e *docker) runInExistingContainer(ctx context.Context, cli *Client, tw *executor.TailWriter) error {
+	execOpts := ExecOptions{}
 
-	e.mu.Lock()
-	e.exitCode = exitCode
-	e.mu.Unlock()
-
-	if err != nil {
-		logger.Error(ctx, "Docker executor: Run completed with error", slog.Any("error", err))
-		if tail := tw.Tail(); tail != "" {
-			return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tail)
+	// If no commands, run with empty command (use image default)
+	if len(e.step.Commands) == 0 {
+		exitCode, err := cli.Exec(ctx, nil, e.stdout, e.stderr, execOpts)
+		e.mu.Lock()
+		e.exitCode = exitCode
+		e.mu.Unlock()
+		if err != nil && tw.Tail() != "" {
+			return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tw.Tail())
 		}
-	} else {
-		logger.Debug(ctx, "Docker executor: Run completed successfully")
+		return err
 	}
-	return err
+
+	// Execute each command sequentially
+	for i, cmdEntry := range e.step.Commands {
+		var cmd []string
+		if cmdEntry.Command != "" {
+			cmd = append([]string{cmdEntry.Command}, cmdEntry.Args...)
+		}
+
+		logger.Debug(ctx, "Docker executor: executing command in existing container",
+			slog.Int("commandIndex", i+1),
+			slog.Int("totalCommands", len(e.step.Commands)),
+			slog.Any("cmd", cmd),
+		)
+
+		exitCode, err := cli.Exec(ctx, cmd, e.stdout, e.stderr, execOpts)
+		e.mu.Lock()
+		e.exitCode = exitCode
+		e.mu.Unlock()
+
+		if err != nil {
+			if tail := tw.Tail(); tail != "" {
+				return fmt.Errorf("command %d failed: %w\nrecent stderr (tail):\n%s", i+1, err, tail)
+			}
+			return fmt.Errorf("command %d failed: %w", i+1, err)
+		}
+
+		// Check context cancellation between commands
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+	}
+
+	return nil
+}
+
+// runInNewContainer executes commands in a newly created container.
+func (e *docker) runInNewContainer(ctx context.Context, tw *executor.TailWriter) error {
+	// If no commands, run with empty command (use image default)
+	if len(e.step.Commands) == 0 {
+		exitCode, err := e.container.Run(ctx, nil, e.stdout, e.stderr)
+		e.mu.Lock()
+		e.exitCode = exitCode
+		e.mu.Unlock()
+		if err != nil {
+			logger.Error(ctx, "Docker executor: Run completed with error", slog.Any("error", err))
+			if tail := tw.Tail(); tail != "" {
+				return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tail)
+			}
+		}
+		return err
+	}
+
+	// For single command, use the simple Run approach
+	if len(e.step.Commands) == 1 {
+		firstCmd := e.step.Commands[0]
+		var cmd []string
+		if firstCmd.Command != "" {
+			cmd = append([]string{firstCmd.Command}, firstCmd.Args...)
+		}
+
+		logger.Debug(ctx, "Docker executor: calling container.Run for single command",
+			slog.Any("cmd", cmd),
+		)
+
+		exitCode, err := e.container.Run(ctx, cmd, e.stdout, e.stderr)
+		e.mu.Lock()
+		e.exitCode = exitCode
+		e.mu.Unlock()
+
+		if err != nil {
+			logger.Error(ctx, "Docker executor: command failed", slog.Any("error", err))
+			if tail := tw.Tail(); tail != "" {
+				return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tail)
+			}
+		}
+		return err
+	}
+
+	// For multiple commands, start container in background and exec all commands
+	logger.Debug(ctx, "Docker executor: starting container in background for multiple commands",
+		slog.Int("numCommands", len(e.step.Commands)),
+	)
+
+	// Start container in background - this will use startup:command mode if configured,
+	// otherwise the default keepalive. The container stays running while we exec commands.
+	if err := e.container.StartBackground(ctx); err != nil {
+		logger.Error(ctx, "Docker executor: failed to start container in background", slog.Any("error", err))
+		if tail := tw.Tail(); tail != "" {
+			return fmt.Errorf("failed to start container: %w\nrecent stderr (tail):\n%s", err, tail)
+		}
+		return fmt.Errorf("failed to start container: %w", err)
+	}
+
+	// Execute all commands via Exec
+	for i, cmdEntry := range e.step.Commands {
+		// Check context cancellation between commands
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		var cmd []string
+		if cmdEntry.Command != "" {
+			cmd = append([]string{cmdEntry.Command}, cmdEntry.Args...)
+		}
+
+		logger.Debug(ctx, "Docker executor: executing command",
+			slog.Int("commandIndex", i+1),
+			slog.Int("totalCommands", len(e.step.Commands)),
+			slog.Any("cmd", cmd),
+		)
+
+		exitCode, err := e.container.Exec(ctx, cmd, e.stdout, e.stderr, ExecOptions{})
+		e.mu.Lock()
+		e.exitCode = exitCode
+		e.mu.Unlock()
+
+		if err != nil {
+			logger.Error(ctx, "Docker executor: command failed",
+				slog.Int("commandIndex", i+1),
+				slog.Any("error", err),
+			)
+			if tail := tw.Tail(); tail != "" {
+				return fmt.Errorf("command %d failed: %w\nrecent stderr (tail):\n%s", i+1, err, tail)
+			}
+			return fmt.Errorf("command %d failed: %w", i+1, err)
+		}
+	}
+
+	logger.Debug(ctx, "Docker executor: all commands completed successfully")
+	return nil
 }
 
 // ExitCode implements ExitCoder.
@@ -386,6 +483,11 @@ func evalStringSlice(ctx context.Context, ss []string) ([]string, error) {
 }
 
 func init() {
-	executor.RegisterExecutor("docker", newDocker, nil)
-	executor.RegisterExecutor("container", newDocker, nil)
+	caps := core.ExecutorCapabilities{
+		Command:          true,
+		MultipleCommands: true,
+		Container:        true,
+	}
+	executor.RegisterExecutor("docker", newDocker, nil, caps)
+	executor.RegisterExecutor("container", newDocker, nil, caps)
 }

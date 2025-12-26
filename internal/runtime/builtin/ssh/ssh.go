@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
+	"sync"
 
-	"golang.org/x/crypto/ssh"
-
+	"github.com/dagu-org/dagu/internal/common/cmdutil"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
+	"golang.org/x/crypto/ssh"
 )
 
 var _ executor.Executor = (*sshExecutor)(nil)
@@ -32,6 +34,7 @@ func getSSHClientFromContext(ctx context.Context) *Client {
 }
 
 type sshExecutor struct {
+	mu      sync.Mutex
 	step    core.Step
 	client  *Client
 	stdout  io.Writer
@@ -75,56 +78,94 @@ func (e *sshExecutor) SetStderr(out io.Writer) {
 }
 
 func (e *sshExecutor) Kill(_ os.Signal) error {
-	if e.session != nil {
-		return e.session.Close()
+	e.mu.Lock()
+	session := e.session
+	e.mu.Unlock()
+
+	if session != nil {
+		return session.Close()
 	}
 	return nil
 }
 
-func (e *sshExecutor) Run(_ context.Context) error {
+func (e *sshExecutor) Run(ctx context.Context) error {
+	// If no commands, nothing to execute
+	if len(e.step.Commands) == 0 {
+		return nil
+	}
+
+	// Execute each command sequentially
+	// Each command requires a new session since session.Run can only be called once
+	for i, cmdEntry := range e.step.Commands {
+		// Check context cancellation between commands
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		if err := e.runCommand(ctx, i, cmdEntry); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// runCommand executes a single command with context cancellation support.
+// Since session.Run() blocks without context awareness, we run it in a goroutine
+// and select on both completion and context cancellation for responsiveness.
+func (e *sshExecutor) runCommand(ctx context.Context, index int, cmdEntry core.CommandEntry) error {
 	session, err := e.client.NewSession()
 	if err != nil {
-		return err
+		return fmt.Errorf("command %d: failed to create session: %w", index+1, err)
 	}
-	e.session = session
-	defer func() {
-		_ = session.Close()
-	}()
 
-	// Once a Session is created, you can execute a single command on
-	// the remote side using the Run method.
+	e.mu.Lock()
+	e.session = session
+	e.mu.Unlock()
+
 	session.Stdout = e.stdout
 	session.Stderr = e.stderr
-	command := strings.Join(
-		append([]string{e.step.Command}, e.step.Args...), " ",
-	)
-	return session.Run(command)
-}
 
-// ValidateStep implements StepValidator interface for SSH executor.
-// SSH executor does not support the script field, only command field.
-func (e *sshExecutor) ValidateStep(step *core.Step) error {
-	if step.Script != "" {
-		return fmt.Errorf(
-			"script field is not supported with SSH executor. " +
-				"Use 'command' field instead. " +
-				"See: https://github.com/dagu-org/dagu/issues/1306",
-		)
+	command := cmdutil.ShellQuote(cmdEntry.Command)
+	if len(cmdEntry.Args) > 0 {
+		command += " " + cmdutil.ShellQuoteArgs(cmdEntry.Args)
 	}
-	return nil
-}
 
-func validateSSHStep(step core.Step) error {
-	if step.Script != "" {
-		return fmt.Errorf(
-			"script field is not supported with SSH executor. " +
-				"Use 'command' field instead. " +
-				"See: https://github.com/dagu-org/dagu/issues/1306",
-		)
+	// Run command in goroutine to enable context cancellation
+	done := make(chan error, 1)
+	go func() {
+		done <- session.Run(command)
+	}()
+
+	// Wait for either command completion or context cancellation
+	select {
+	case err = <-done:
+		// Command completed (success or failure)
+	case <-ctx.Done():
+		// Context cancelled - close session to terminate the command
+		if closeErr := session.Close(); closeErr != nil {
+			logger.Warn(ctx, "SSH session close error during cancellation", tag.Error(closeErr))
+		}
+		return ctx.Err()
 	}
+
+	if closeErr := session.Close(); closeErr != nil {
+		logger.Warn(ctx, "SSH session close error", tag.Error(closeErr))
+	}
+
+	if err != nil {
+		return fmt.Errorf("command %d failed: %w", index+1, err)
+	}
+
 	return nil
 }
 
 func init() {
-	executor.RegisterExecutor("ssh", NewSSHExecutor, validateSSHStep)
+	caps := core.ExecutorCapabilities{
+		Command:          true,
+		MultipleCommands: true,
+	}
+	executor.RegisterExecutor("ssh", NewSSHExecutor, nil, caps)
 }

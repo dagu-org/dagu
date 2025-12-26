@@ -56,9 +56,9 @@ func TestPlan_DependencyStructures(t *testing.T) {
 		{
 			name: "basic",
 			steps: []core.Step{
-				{Name: "step1", Command: "echo 1"},
-				{Name: "step2", Command: "echo 2", Depends: []string{"step1"}},
-				{Name: "step3", Command: "echo 3", Depends: []string{"step2", "step1"}},
+				{Name: "step1", Commands: []core.CommandEntry{{Command: "echo", Args: []string{"1"}}}},
+				{Name: "step2", Commands: []core.CommandEntry{{Command: "echo", Args: []string{"2"}}}, Depends: []string{"step1"}},
+				{Name: "step3", Commands: []core.CommandEntry{{Command: "echo", Args: []string{"3"}}}, Depends: []string{"step2", "step1"}},
 			},
 			wantTotalDeps:     3, // 1->2,1->3,2->3
 			wantOutgoingCount: 2, // step1 (has 2,3), step2 (has 3)

@@ -113,7 +113,8 @@ steps:
 		// Step level
 		require.Len(t, dag.Steps, 1)
 		assert.Equal(t, "1", dag.Steps[0].Name, "1")
-		assert.Equal(t, "true", dag.Steps[0].Command, "true")
+		require.Len(t, dag.Steps[0].Commands, 1)
+		assert.Equal(t, "true", dag.Steps[0].Commands[0].Command)
 	})
 	t.Run("OverrideConfig", func(t *testing.T) {
 		t.Parallel()
@@ -254,7 +255,8 @@ func TestLoadYAML(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, ret.Steps, 1)
 			assert.Equal(t, tt.wantName, ret.Steps[0].Name)
-			assert.Equal(t, tt.wantCommand, ret.Steps[0].Command)
+			require.Len(t, ret.Steps[0].Commands, 1)
+			assert.Equal(t, tt.wantCommand, ret.Steps[0].Commands[0].Command)
 		})
 	}
 }
@@ -275,7 +277,8 @@ steps:
 
 	step := ret.Steps[0]
 	require.Equal(t, "1", step.Name)
-	require.Equal(t, "true", step.Command)
+	require.Len(t, step.Commands, 1)
+	require.Equal(t, "true", step.Commands[0].Command)
 }
 
 // createTempYAMLFile creates a temporary YAML file with the given content
@@ -342,7 +345,8 @@ steps:
 		assert.Equal(t, "transform-data", transformDAG.Name)
 		assert.Len(t, transformDAG.Steps, 1)
 		assert.Equal(t, "transform", transformDAG.Steps[0].Name)
-		assert.Equal(t, "transform.py", transformDAG.Steps[0].Command)
+		require.Len(t, transformDAG.Steps[0].Commands, 1)
+		assert.Equal(t, "transform.py", transformDAG.Steps[0].Commands[0].Command)
 
 		// Check archive-results sub DAG
 		_, exists = dag.LocalDAGs["archive-results"]
@@ -351,7 +355,8 @@ steps:
 		assert.Equal(t, "archive-results", archiveDAG.Name)
 		assert.Len(t, archiveDAG.Steps, 1)
 		assert.Equal(t, "archive", archiveDAG.Steps[0].Name)
-		assert.Equal(t, "archive.sh", archiveDAG.Steps[0].Command)
+		require.Len(t, archiveDAG.Steps[0].Commands, 1)
+		assert.Equal(t, "archive.sh", archiveDAG.Steps[0].Commands[0].Command)
 	})
 
 	t.Run("MultiDAGWithBaseConfig", func(t *testing.T) {

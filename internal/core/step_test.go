@@ -276,3 +276,43 @@ func TestRepeatPolicy_MarshalUnmarshal(t *testing.T) {
 		assert.Equal(t, rp.RepeatMode, rp2.RepeatMode)
 	})
 }
+
+func TestCommandEntry_String(t *testing.T) {
+	tests := []struct {
+		name     string
+		entry    CommandEntry
+		expected string
+	}{
+		{
+			name:     "Empty",
+			entry:    CommandEntry{},
+			expected: "",
+		},
+		{
+			name:     "CommandOnly",
+			entry:    CommandEntry{Command: "echo"},
+			expected: "echo",
+		},
+		{
+			name:     "CommandWithArgs",
+			entry:    CommandEntry{Command: "echo", Args: []string{"hello", "world"}},
+			expected: "echo hello world",
+		},
+		{
+			name:     "CmdWithArgsTakesPriority",
+			entry:    CommandEntry{Command: "echo", Args: []string{"hello"}, CmdWithArgs: "echo 'hello world'"},
+			expected: "echo 'hello world'",
+		},
+		{
+			name:     "CmdWithArgsOnly",
+			entry:    CommandEntry{CmdWithArgs: "ls -la"},
+			expected: "ls -la",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.entry.String())
+		})
+	}
+}

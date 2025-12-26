@@ -196,7 +196,7 @@ func generateTypedStepName(existingNames map[string]struct{}, step *core.Step, i
 		prefix = "dag"
 	} else if step.Script != "" {
 		prefix = "script"
-	} else if step.Command != "" {
+	} else if len(step.Commands) > 0 {
 		prefix = "cmd"
 	} else {
 		prefix = "step"

@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -108,84 +109,84 @@ func TestNode(t *testing.T) {
 	t.Run("Output", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs("echo hello"), withNodeOutput("OUTPUT_TEST"))
+		node := setupNode(t, withNodeCmdArgs(t, "echo hello"), withNodeOutput("OUTPUT_TEST"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT_TEST", "hello")
 	})
 	t.Run("OutputJSON", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(`echo '{"key": "value"}'`), withNodeOutput("OUTPUT_JSON_TEST"))
+		node := setupNode(t, withNodeCmdArgs(t, `echo '{"key": "value"}'`), withNodeOutput("OUTPUT_JSON_TEST"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT_JSON_TEST", `{"key": "value"}`)
 	})
 	t.Run("OutputJSONUnescaped", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(`echo {\"key\":\"value\"}`), withNodeOutput("OUTPUT_JSON_TEST"))
+		node := setupNode(t, withNodeCmdArgs(t, `echo {\"key\":\"value\"}`), withNodeOutput("OUTPUT_JSON_TEST"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT_JSON_TEST", `{"key":"value"}`)
 	})
 	t.Run("OutputTabWithDoubleQuotes", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(`echo "hello\tworld"`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCmdArgs(t, `echo "hello\tworld"`), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", "hello\tworld")
 	})
 	t.Run("OutputTabWithMixedQuotes", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(`echo hello"\t"world`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCmdArgs(t, `echo hello"\t"world`), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", "hello\tworld") // This behavior is aligned with bash
 	})
 	t.Run("OutputTabWithoutQuotes", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(`echo hello\tworld`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCmdArgs(t, `echo hello\tworld`), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", `hellotworld`) // This behavior is aligned with bash
 	})
 	t.Run("OutputNewlineCharacter", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(`echo hello\nworld`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCmdArgs(t, `echo hello\nworld`), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", `hellonworld`) // This behavior is aligned with bash
 	})
 	t.Run("OutputEscapedJSONWithoutQuotes", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(`echo {\"key\":\"value\"}`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCmdArgs(t, `echo {\"key\":\"value\"}`), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", `{"key":"value"}`)
 	})
 	t.Run("OutputEscapedJSONWithQuotes", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(`echo "{\"key\":\"value\"}"`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCmdArgs(t, `echo "{\"key\":\"value\"}"`), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", `{"key":"value"}`)
 	})
 	t.Run("OutputSingleQuotedString", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(`echo 'hello world'`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCmdArgs(t, `echo 'hello world'`), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", `hello world`)
 	})
 	t.Run("OutputMixedQuotesWithSpace", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(`echo hello "world"`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCmdArgs(t, `echo hello "world"`), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", `hello world`)
 	})
 	t.Run("OutputNestedQuotes", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(`echo 'hello "world"'`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCmdArgs(t, `echo 'hello "world"'`), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", `hello "world"`)
 	})
@@ -672,9 +673,11 @@ func TestNodeSetupAndTeardown(t *testing.T) {
 	tempDir := t.TempDir()
 
 	step := core.Step{
-		Name:    "test-step",
-		Command: "echo",
-		Args:    []string{"hello"},
+		Name: "test-step",
+		Commands: []core.CommandEntry{{
+			Command: "echo",
+			Args:    []string{"hello"},
+		}},
 	}
 
 	node := runtime.NewNode(step, runtime.NodeState{})
@@ -730,9 +733,11 @@ func TestNodeInit(t *testing.T) {
 
 func TestNodeCancel(t *testing.T) {
 	step := core.Step{
-		Name:    "test-step",
-		Command: "sleep",
-		Args:    []string{"10"},
+		Name: "test-step",
+		Commands: []core.CommandEntry{{
+			Command: "sleep",
+			Args:    []string{"10"},
+		}},
 	}
 
 	node := runtime.NewNode(step, runtime.NodeState{})
@@ -876,10 +881,12 @@ func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
 
 				// Create a node with output capture
 				step := core.Step{
-					Name:    "test-size-config",
-					Command: "echo",
-					Args:    []string{"test"},
-					Output:  "TEST_VAR",
+					Name: "test-size-config",
+					Commands: []core.CommandEntry{{
+						Command: "echo",
+						Args:    []string{"test"},
+					}},
+					Output: "TEST_VAR",
 				}
 
 				node := runtime.NewNode(step, runtime.NodeState{})
@@ -1038,15 +1045,27 @@ type nodeHelper struct {
 
 type nodeOption func(*runtime.NodeData)
 
-func withNodeCmdArgs(cmd string) nodeOption {
+func withNodeCmdArgs(t *testing.T, cmdWithArgs string) nodeOption {
+	t.Helper()
+	cmd, args, err := cmdutil.SplitCommand(cmdWithArgs)
+	if err != nil {
+		t.Fatalf("failed to parse command %q: %v", cmdWithArgs, err)
+	}
 	return func(data *runtime.NodeData) {
-		data.Step.CmdWithArgs = cmd
+		data.Step.Commands = []core.CommandEntry{{
+			Command:     cmd,
+			Args:        args,
+			CmdWithArgs: cmdWithArgs,
+		}}
 	}
 }
 
 func withNodeCommand(command string) nodeOption {
 	return func(data *runtime.NodeData) {
-		data.Step.Command = command
+		data.Step.Commands = []core.CommandEntry{{
+			Command:     command,
+			CmdWithArgs: command,
+		}}
 	}
 }
 
@@ -1153,10 +1172,12 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		stdoutPath := filepath.Join(tempDir, "output.log")
 
 		step := core.Step{
-			Name:    "test-absolute-path",
-			Command: "echo",
-			Args:    []string{"hello world"},
-			Stdout:  stdoutPath,
+			Name: "test-absolute-path",
+			Commands: []core.CommandEntry{{
+				Command: "echo",
+				Args:    []string{"hello world"},
+			}},
+			Stdout: stdoutPath,
 		}
 
 		node := runtime.NewNode(step, runtime.NodeState{})
@@ -1193,10 +1214,12 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		stdoutPath := "output.log"
 
 		step := core.Step{
-			Name:    "test-relative-path",
-			Command: "echo",
-			Args:    []string{"hello from working dir"},
-			Stdout:  stdoutPath,
+			Name: "test-relative-path",
+			Commands: []core.CommandEntry{{
+				Command: "echo",
+				Args:    []string{"hello from working dir"},
+			}},
+			Stdout: stdoutPath,
 		}
 
 		node := runtime.NewNode(step, runtime.NodeState{})
@@ -1238,10 +1261,12 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		stderrPath := "error.log"
 
 		step := core.Step{
-			Name:    "test-stderr-path",
-			Command: "sh",
-			Args:    []string{"-c", "echo 'error message' >&2"},
-			Stderr:  stderrPath,
+			Name: "test-stderr-path",
+			Commands: []core.CommandEntry{{
+				Command: "sh",
+				Args:    []string{"-c", "echo 'error message' >&2"},
+			}},
+			Stderr: stderrPath,
 		}
 
 		node := runtime.NewNode(step, runtime.NodeState{})
@@ -1284,10 +1309,12 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		stdoutPath := "logs/output.log"
 
 		step := core.Step{
-			Name:    "test-nested-path",
-			Command: "echo",
-			Args:    []string{"nested output"},
-			Stdout:  stdoutPath,
+			Name: "test-nested-path",
+			Commands: []core.CommandEntry{{
+				Command: "echo",
+				Args:    []string{"nested output"},
+			}},
+			Stdout: stdoutPath,
 		}
 
 		node := runtime.NewNode(step, runtime.NodeState{})
