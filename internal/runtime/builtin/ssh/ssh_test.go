@@ -27,4 +27,3 @@ func TestNewSSHExecutor(t *testing.T) {
 	_, err := NewSSHExecutor(ctx, step)
 	require.NoError(t, err)
 }
-
