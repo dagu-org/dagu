@@ -284,7 +284,7 @@ func TestNewEnvForStep_BasicFields(t *testing.T) {
 		Commands: []core.CommandEntry{{
 			Command:     "echo",
 			Args:        []string{"hello", "arg1", "arg2"},
-			CmdWithArgs: "echo hello",
+			CmdWithArgs: "echo hello arg1 arg2",
 		}},
 	}
 

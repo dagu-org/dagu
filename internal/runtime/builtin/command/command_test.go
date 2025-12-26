@@ -2305,9 +2305,9 @@ func TestMultiCommandExecutor(t *testing.T) {
 		step := core.Step{
 			Name: "test",
 			Commands: []core.CommandEntry{
-				{Command: "sh", Args: []string{"-c", "echo first >> " + outputFile}},
-				{Command: "sh", Args: []string{"-c", "echo second >> " + outputFile}},
-				{Command: "sh", Args: []string{"-c", "echo third >> " + outputFile}},
+				{Command: "sh", Args: []string{"-c", `echo first >> "` + outputFile + `"`}},
+				{Command: "sh", Args: []string{"-c", `echo second >> "` + outputFile + `"`}},
+				{Command: "sh", Args: []string{"-c", `echo third >> "` + outputFile + `"`}},
 			},
 		}
 
@@ -2331,9 +2331,9 @@ func TestMultiCommandExecutor(t *testing.T) {
 		step := core.Step{
 			Name: "test",
 			Commands: []core.CommandEntry{
-				{Command: "sh", Args: []string{"-c", "echo first >> " + outputFile}},
+				{Command: "sh", Args: []string{"-c", `echo first >> "` + outputFile + `"`}},
 				{Command: "sh", Args: []string{"-c", "exit 1"}},
-				{Command: "sh", Args: []string{"-c", "echo third >> " + outputFile}},
+				{Command: "sh", Args: []string{"-c", `echo third >> "` + outputFile + `"`}},
 			},
 		}
 
