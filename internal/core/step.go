@@ -126,6 +126,20 @@ type CommandEntry struct {
 	CmdWithArgs string `json:"cmdWithArgs,omitempty"`
 }
 
+// String returns a display string for the command entry.
+func (c CommandEntry) String() string {
+	if c.CmdWithArgs != "" {
+		return c.CmdWithArgs
+	}
+	if c.Command == "" {
+		return ""
+	}
+	if len(c.Args) == 0 {
+		return c.Command
+	}
+	return c.Command + " " + strings.Join(c.Args, " ")
+}
+
 // HasMultipleCommands returns true if the step has multiple commands to execute.
 func (s *Step) HasMultipleCommands() bool {
 	return len(s.Commands) > 1

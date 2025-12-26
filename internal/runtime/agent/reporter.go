@@ -12,6 +12,17 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 
+// formatCommands formats a slice of CommandEntry into a display string.
+func formatCommands(commands []core.CommandEntry) string {
+	parts := make([]string, 0, len(commands))
+	for _, cmd := range commands {
+		if s := cmd.String(); s != "" {
+			parts = append(parts, s)
+		}
+	}
+	return strings.Join(parts, "; ")
+}
+
 // Sender is a mailer interface.
 type Sender interface {
 	Send(ctx context.Context, from string, to []string, subject, body string, attachments []string) error
@@ -134,11 +145,7 @@ func renderStepSummary(nodes []*execution.Node) string {
 			n.FinishedAt,
 			n.Status.String(),
 		}
-		if len(n.Step.Commands) > 0 && len(n.Step.Commands[0].Args) > 0 {
-			dataRow = append(dataRow, strings.Join(n.Step.Commands[0].Args, " "))
-		} else {
-			dataRow = append(dataRow, "")
-		}
+		dataRow = append(dataRow, formatCommands(n.Step.Commands))
 		dataRow = append(dataRow, n.Error)
 		stepTable.AppendRow(dataRow)
 	}
@@ -256,10 +263,7 @@ func renderHTML(nodes []*execution.Node) string {
 		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"%s\">%s</td>", statusClass, status))
 
 		// Command (join args and escape HTML)
-		var command string
-		if len(n.Step.Commands) > 0 {
-			command = n.Step.Commands[0].CmdWithArgs
-		}
+		command := formatCommands(n.Step.Commands)
 		command = strings.ReplaceAll(command, "&", "&amp;")
 		command = strings.ReplaceAll(command, "<", "&lt;")
 		command = strings.ReplaceAll(command, ">", "&gt;")
@@ -583,10 +587,7 @@ func renderHTMLWithDAGInfo(dagStatus execution.DAGRunStatus) string {
 		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"%s\">%s</td>", nodeStatusClass, nodeStatus))
 
 		// Command (join args and escape HTML)
-		var command string
-		if len(n.Step.Commands) > 0 {
-			command = n.Step.Commands[0].CmdWithArgs
-		}
+		command := formatCommands(n.Step.Commands)
 		command = strings.ReplaceAll(command, "&", "&amp;")
 		command = strings.ReplaceAll(command, "<", "&lt;")
 		command = strings.ReplaceAll(command, ">", "&gt;")
