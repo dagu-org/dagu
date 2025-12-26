@@ -40,9 +40,11 @@ func TestMain(m *testing.M) {
 	for _, t := range []string{"archive", "github_action", "github-action", "gha"} {
 		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{Command: true})
 	}
-	// dag/subworkflow/parallel: support SubDAG only (no command)
+	// dag/subworkflow/parallel: support SubDAG and WorkerSelector
 	for _, t := range []string{"dag", "subworkflow", "parallel"} {
-		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{SubDAG: true})
+		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{
+			SubDAG: true, WorkerSelector: true,
+		})
 	}
 	// mail: no command support
 	core.RegisterExecutorCapabilities("mail", core.ExecutorCapabilities{})
@@ -2525,6 +2527,96 @@ func TestValidateCommand(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), "does not support command field")
+				assert.Contains(t, err.Error(), tt.executorType)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateWorkerSelector(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		executorType   string
+		workerSelector map[string]string
+		wantErr        bool
+	}{
+		// Executors that support workerSelector
+		{
+			name:           "WorkerSelectorWithDAGExecutor",
+			executorType:   "dag",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        false,
+		},
+		{
+			name:           "WorkerSelectorWithSubworkflowExecutor",
+			executorType:   "subworkflow",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        false,
+		},
+		{
+			name:           "WorkerSelectorWithParallelExecutor",
+			executorType:   "parallel",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        false,
+		},
+		// Executors that do not support workerSelector
+		{
+			name:           "WorkerSelectorWithShellExecutor",
+			executorType:   "shell",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        true,
+		},
+		{
+			name:           "WorkerSelectorWithCommandExecutor",
+			executorType:   "command",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        true,
+		},
+		{
+			name:           "WorkerSelectorWithDockerExecutor",
+			executorType:   "docker",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        true,
+		},
+		{
+			name:           "WorkerSelectorWithMailExecutor",
+			executorType:   "mail",
+			workerSelector: map[string]string{"env": "prod"},
+			wantErr:        true,
+		},
+		// Empty workerSelector - should always pass
+		{
+			name:           "NoWorkerSelectorWithShellExecutor",
+			executorType:   "shell",
+			workerSelector: nil,
+			wantErr:        false,
+		},
+		{
+			name:           "EmptyWorkerSelectorWithShellExecutor",
+			executorType:   "shell",
+			workerSelector: map[string]string{},
+			wantErr:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := &core.Step{
+				WorkerSelector: tt.workerSelector,
+				ExecutorConfig: core.ExecutorConfig{
+					Type: tt.executorType,
+				},
+			}
+			err := validateWorkerSelector(result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "does not support workerSelector field")
 				assert.Contains(t, err.Error(), tt.executorType)
 			} else {
 				assert.NoError(t, err)

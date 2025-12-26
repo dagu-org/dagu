@@ -14,6 +14,8 @@ type ExecutorCapabilities struct {
 	Container bool
 	// SubDAG indicates whether the executor can execute sub-DAGs.
 	SubDAG bool
+	// WorkerSelector indicates whether the executor supports worker selection.
+	WorkerSelector bool
 }
 
 // executorCapabilitiesRegistry is a typed registry of executor capabilities.
@@ -73,4 +75,9 @@ func SupportsContainer(executorType string) bool {
 // SupportsSubDAG returns whether the executor type can execute sub-DAGs.
 func SupportsSubDAG(executorType string) bool {
 	return executorCapabilities.Get(executorType).SubDAG
+}
+
+// SupportsWorkerSelector returns whether the executor type supports worker selection.
+func SupportsWorkerSelector(executorType string) bool {
+	return executorCapabilities.Get(executorType).WorkerSelector
 }

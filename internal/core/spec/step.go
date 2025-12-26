@@ -221,7 +221,10 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 		errs = append(errs, wrapTransformError("container", err))
 	}
 	if err := validateSubDAG(result); err != nil {
-		errs = append(errs, wrapTransformError("call", err))
+		errs = append(errs, wrapTransformError("dag", err))
+	}
+	if err := validateWorkerSelector(result); err != nil {
+		errs = append(errs, wrapTransformError("workerSelector", err))
 	}
 	if err := buildStepParamsField(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("params", err))
@@ -789,6 +792,21 @@ func validateSubDAG(result *core.Step) error {
 			"call",
 			result.SubDAG,
 			fmt.Errorf("executor type %q does not support sub-DAG execution", result.ExecutorConfig.Type),
+		)
+	}
+	return nil
+}
+
+// validateWorkerSelector checks if the executor type supports worker selection.
+func validateWorkerSelector(result *core.Step) error {
+	if len(result.WorkerSelector) == 0 {
+		return nil
+	}
+	if !core.SupportsWorkerSelector(result.ExecutorConfig.Type) {
+		return core.NewValidationError(
+			"workerSelector",
+			result.WorkerSelector,
+			fmt.Errorf("executor type %q does not support workerSelector field", result.ExecutorConfig.Type),
 		)
 	}
 	return nil

@@ -312,5 +312,9 @@ func (e *parallelExecutor) Kill(sig os.Signal) error {
 }
 
 func init() {
-	executor.RegisterExecutor(core.ExecutorTypeParallel, newParallelExecutor, nil, core.ExecutorCapabilities{SubDAG: true})
+	caps := core.ExecutorCapabilities{
+		SubDAG:         true,
+		WorkerSelector: true,
+	}
+	executor.RegisterExecutor(core.ExecutorTypeParallel, newParallelExecutor, nil, caps)
 }
