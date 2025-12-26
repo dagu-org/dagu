@@ -121,34 +121,10 @@ func (e *sshExecutor) Run(ctx context.Context) error {
 	return nil
 }
 
-// ValidateStep implements StepValidator interface for SSH executor.
-// SSH executor does not support the script field, only command field.
-func (e *sshExecutor) ValidateStep(step *core.Step) error {
-	if step.Script != "" {
-		return fmt.Errorf(
-			"script field is not supported with SSH executor. " +
-				"Use 'command' field instead. " +
-				"See: https://github.com/dagu-org/dagu/issues/1306",
-		)
-	}
-	return nil
-}
-
-func validateSSHStep(step core.Step) error {
-	if step.Script != "" {
-		return fmt.Errorf(
-			"script field is not supported with SSH executor. " +
-				"Use 'command' field instead. " +
-				"See: https://github.com/dagu-org/dagu/issues/1306",
-		)
-	}
-	return nil
-}
-
 func init() {
 	caps := core.ExecutorCapabilities{
 		MultipleCommands: true,
 		Shell:            true,
 	}
-	executor.RegisterExecutor("ssh", NewSSHExecutor, validateSSHStep, caps)
+	executor.RegisterExecutor("ssh", NewSSHExecutor, nil, caps)
 }

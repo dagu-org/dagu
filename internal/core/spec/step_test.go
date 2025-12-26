@@ -2098,3 +2098,315 @@ func TestValidateMultipleCommands(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateScript(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		executorType string
+		script       string
+		wantErr      bool
+	}{
+		// Executors that support script
+		{
+			name:         "ScriptWithCommandExecutor",
+			executorType: "command",
+			script:       "echo hello",
+			wantErr:      false,
+		},
+		{
+			name:         "ScriptWithShellExecutor",
+			executorType: "shell",
+			script:       "echo hello",
+			wantErr:      false,
+		},
+		{
+			name:         "ScriptWithDockerExecutor",
+			executorType: "docker",
+			script:       "echo hello",
+			wantErr:      false,
+		},
+		{
+			name:         "ScriptWithJQExecutor",
+			executorType: "jq",
+			script:       `{"key": "value"}`,
+			wantErr:      false,
+		},
+		{
+			name:         "ScriptWithHTTPExecutor",
+			executorType: "http",
+			script:       `{"body": "data"}`,
+			wantErr:      false,
+		},
+		// Executors that do not support script
+		{
+			name:         "ScriptWithSSHExecutor",
+			executorType: "ssh",
+			script:       "echo hello",
+			wantErr:      true,
+		},
+		{
+			name:         "ScriptWithMailExecutor",
+			executorType: "mail",
+			script:       "echo hello",
+			wantErr:      true,
+		},
+		{
+			name:         "ScriptWithArchiveExecutor",
+			executorType: "archive",
+			script:       "echo hello",
+			wantErr:      true,
+		},
+		{
+			name:         "ScriptWithGHAExecutor",
+			executorType: "gha",
+			script:       "echo hello",
+			wantErr:      true,
+		},
+		// Empty script - should always pass
+		{
+			name:         "EmptyScriptWithSSHExecutor",
+			executorType: "ssh",
+			script:       "",
+			wantErr:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := &core.Step{
+				Script: tt.script,
+				ExecutorConfig: core.ExecutorConfig{
+					Type: tt.executorType,
+				},
+			}
+			err := validateScript(result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "does not support script field")
+				assert.Contains(t, err.Error(), tt.executorType)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateShell(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		executorType string
+		shell        string
+		wantErr      bool
+	}{
+		// Executors that support shell
+		{
+			name:         "ShellWithCommandExecutor",
+			executorType: "command",
+			shell:        "/bin/bash",
+			wantErr:      false,
+		},
+		{
+			name:         "ShellWithDockerExecutor",
+			executorType: "docker",
+			shell:        "/bin/sh",
+			wantErr:      false,
+		},
+		{
+			name:         "ShellWithSSHExecutor",
+			executorType: "ssh",
+			shell:        "/bin/bash",
+			wantErr:      false,
+		},
+		// Executors that do not support shell
+		{
+			name:         "ShellWithJQExecutor",
+			executorType: "jq",
+			shell:        "/bin/bash",
+			wantErr:      true,
+		},
+		{
+			name:         "ShellWithHTTPExecutor",
+			executorType: "http",
+			shell:        "/bin/bash",
+			wantErr:      true,
+		},
+		{
+			name:         "ShellWithMailExecutor",
+			executorType: "mail",
+			shell:        "/bin/bash",
+			wantErr:      true,
+		},
+		// Empty shell - should always pass
+		{
+			name:         "EmptyShellWithJQExecutor",
+			executorType: "jq",
+			shell:        "",
+			wantErr:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := &core.Step{
+				Shell: tt.shell,
+				ExecutorConfig: core.ExecutorConfig{
+					Type: tt.executorType,
+				},
+			}
+			err := validateShell(result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "does not support shell configuration")
+				assert.Contains(t, err.Error(), tt.executorType)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateContainer(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		executorType string
+		container    *core.Container
+		wantErr      bool
+	}{
+		// Executors that support container
+		{
+			name:         "ContainerWithDockerExecutor",
+			executorType: "docker",
+			container:    &core.Container{Image: "alpine"},
+			wantErr:      false,
+		},
+		// Executors that do not support container
+		{
+			name:         "ContainerWithSSHExecutor",
+			executorType: "ssh",
+			container:    &core.Container{Image: "alpine"},
+			wantErr:      true,
+		},
+		{
+			name:         "ContainerWithCommandExecutor",
+			executorType: "command",
+			container:    &core.Container{Image: "alpine"},
+			wantErr:      true,
+		},
+		{
+			name:         "ContainerWithJQExecutor",
+			executorType: "jq",
+			container:    &core.Container{Image: "alpine"},
+			wantErr:      true,
+		},
+		// Nil container - should always pass
+		{
+			name:         "NilContainerWithSSHExecutor",
+			executorType: "ssh",
+			container:    nil,
+			wantErr:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := &core.Step{
+				Container: tt.container,
+				ExecutorConfig: core.ExecutorConfig{
+					Type: tt.executorType,
+				},
+			}
+			err := validateContainer(result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "does not support container field")
+				assert.Contains(t, err.Error(), tt.executorType)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateSubDAG(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		executorType string
+		subDAG       *core.SubDAG
+		wantErr      bool
+	}{
+		// Executors that support SubDAG
+		{
+			name:         "SubDAGWithDAGExecutor",
+			executorType: "dag",
+			subDAG:       &core.SubDAG{Name: "child-dag"},
+			wantErr:      false,
+		},
+		{
+			name:         "SubDAGWithParallelExecutor",
+			executorType: "parallel",
+			subDAG:       &core.SubDAG{Name: "child-dag"},
+			wantErr:      false,
+		},
+		// Executors that do not support SubDAG
+		{
+			name:         "SubDAGWithCommandExecutor",
+			executorType: "command",
+			subDAG:       &core.SubDAG{Name: "child-dag"},
+			wantErr:      true,
+		},
+		{
+			name:         "SubDAGWithSSHExecutor",
+			executorType: "ssh",
+			subDAG:       &core.SubDAG{Name: "child-dag"},
+			wantErr:      true,
+		},
+		{
+			name:         "SubDAGWithDockerExecutor",
+			executorType: "docker",
+			subDAG:       &core.SubDAG{Name: "child-dag"},
+			wantErr:      true,
+		},
+		// Nil SubDAG - should always pass
+		{
+			name:         "NilSubDAGWithCommandExecutor",
+			executorType: "command",
+			subDAG:       nil,
+			wantErr:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := &core.Step{
+				SubDAG: tt.subDAG,
+				ExecutorConfig: core.ExecutorConfig{
+					Type: tt.executorType,
+				},
+			}
+			err := validateSubDAG(result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "does not support sub-DAG execution")
+				assert.Contains(t, err.Error(), tt.executorType)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

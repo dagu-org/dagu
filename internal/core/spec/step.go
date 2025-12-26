@@ -208,6 +208,18 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	if err := validateMultipleCommands(result); err != nil {
 		errs = append(errs, wrapTransformError("command", err))
 	}
+	if err := validateScript(result); err != nil {
+		errs = append(errs, wrapTransformError("script", err))
+	}
+	if err := validateShell(result); err != nil {
+		errs = append(errs, wrapTransformError("shell", err))
+	}
+	if err := validateContainer(result); err != nil {
+		errs = append(errs, wrapTransformError("container", err))
+	}
+	if err := validateSubDAG(result); err != nil {
+		errs = append(errs, wrapTransformError("call", err))
+	}
 	if err := buildStepParamsField(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("params", err))
 	}
@@ -699,6 +711,66 @@ func validateMultipleCommands(result *core.Step) error {
 			"command",
 			result.Commands,
 			fmt.Errorf("%w: executor type %q only supports a single command", ErrExecutorDoesNotSupportMultipleCmd, result.ExecutorConfig.Type),
+		)
+	}
+	return nil
+}
+
+// validateScript checks if the executor type supports the script field.
+func validateScript(result *core.Step) error {
+	if result.Script == "" {
+		return nil
+	}
+	if !core.SupportsScript(result.ExecutorConfig.Type) {
+		return core.NewValidationError(
+			"script",
+			result.Script,
+			fmt.Errorf("executor type %q does not support script field", result.ExecutorConfig.Type),
+		)
+	}
+	return nil
+}
+
+// validateShell checks if the executor type supports shell configuration.
+func validateShell(result *core.Step) error {
+	if result.Shell == "" && len(result.ShellArgs) == 0 && len(result.ShellPackages) == 0 {
+		return nil
+	}
+	if !core.SupportsShell(result.ExecutorConfig.Type) {
+		return core.NewValidationError(
+			"shell",
+			result.Shell,
+			fmt.Errorf("executor type %q does not support shell configuration", result.ExecutorConfig.Type),
+		)
+	}
+	return nil
+}
+
+// validateContainer checks if the executor type supports the container field.
+func validateContainer(result *core.Step) error {
+	if result.Container == nil {
+		return nil
+	}
+	if !core.SupportsContainer(result.ExecutorConfig.Type) {
+		return core.NewValidationError(
+			"container",
+			result.Container,
+			fmt.Errorf("executor type %q does not support container field", result.ExecutorConfig.Type),
+		)
+	}
+	return nil
+}
+
+// validateSubDAG checks if the executor type supports sub-DAG execution.
+func validateSubDAG(result *core.Step) error {
+	if result.SubDAG == nil {
+		return nil
+	}
+	if !core.SupportsSubDAG(result.ExecutorConfig.Type) {
+		return core.NewValidationError(
+			"call",
+			result.SubDAG,
+			fmt.Errorf("executor type %q does not support sub-DAG execution", result.ExecutorConfig.Type),
 		)
 	}
 	return nil

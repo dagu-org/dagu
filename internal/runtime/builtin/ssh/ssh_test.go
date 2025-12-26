@@ -28,20 +28,3 @@ func TestNewSSHExecutor(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestValidateSSHStep(t *testing.T) {
-	t.Parallel()
-
-	// Valid step
-	step := core.Step{
-		Name:    "valid-ssh-step",
-		Command: "echo 'hello'",
-	}
-	err := validateSSHStep(step)
-	require.NoError(t, err)
-
-	// Verify that script field is not allowed
-	step.Script = "echo 'hello'"
-	err = validateSSHStep(step)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "script field is not supported with SSH executor")
-}
