@@ -165,13 +165,13 @@ func (s *Step) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	// Migrate legacy fields to Commands field
-	s.Commands = []CommandEntry{
-		{
+	// Migrate legacy fields to Commands only when legacy command data exists.
+	if s.Command != "" || len(s.Args) > 0 || s.CmdWithArgs != "" {
+		s.Commands = []CommandEntry{{
 			Command:     s.Command,
 			Args:        s.Args,
 			CmdWithArgs: s.CmdWithArgs,
-		},
+		}}
 	}
 
 	return nil

@@ -77,17 +77,22 @@ func withOutput(output string) stepOption {
 	}
 }
 
+// parseCommand parses a command string into a CommandEntry.
+func parseCommand(command string) core.CommandEntry {
+	cmd, args, err := cmdutil.SplitCommand(command)
+	if err != nil {
+		panic(fmt.Errorf("failed to parse command %q: %w", command, err))
+	}
+	return core.CommandEntry{
+		Command:     cmd,
+		Args:        args,
+		CmdWithArgs: command,
+	}
+}
+
 func withCommand(command string) stepOption {
 	return func(step *core.Step) {
-		cmd, args, err := cmdutil.SplitCommand(command)
-		if err != nil {
-			panic(fmt.Errorf("unexpected: %w", err))
-		}
-		step.Commands = []core.CommandEntry{{
-			Command:     cmd,
-			Args:        args,
-			CmdWithArgs: command,
-		}}
+		step.Commands = []core.CommandEntry{parseCommand(command)}
 	}
 }
 
@@ -133,18 +138,11 @@ func withMaxActiveRuns(n int) runnerOption {
 	}
 }
 
-func newHandlerStep(t *testing.T, name, id, command string) core.Step {
-	t.Helper()
-	cmd, args, err := cmdutil.SplitCommand(command)
-	require.NoError(t, err)
+func newHandlerStep(_ *testing.T, name, id, command string) core.Step {
 	return core.Step{
-		Name: name,
-		ID:   id,
-		Commands: []core.CommandEntry{{
-			Command:     cmd,
-			Args:        args,
-			CmdWithArgs: command,
-		}},
+		Name:     name,
+		ID:       id,
+		Commands: []core.CommandEntry{parseCommand(command)},
 	}
 }
 
