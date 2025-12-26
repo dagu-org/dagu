@@ -4,27 +4,15 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/goccy/go-yaml"
-)
-
-// LogOutputMode represents the mode for log output handling.
-// It determines how stdout and stderr are written to log files.
-type LogOutputMode string
-
-const (
-	// LogOutputSeparate keeps stdout and stderr in separate files (.out and .err).
-	// This is the default behavior for backward compatibility.
-	LogOutputSeparate LogOutputMode = "separate"
-
-	// LogOutputMerged combines stdout and stderr into a single log file (.log).
-	// Both streams are interleaved in the order they are written.
-	LogOutputMerged LogOutputMode = "merged"
 )
 
 // LogOutputValue represents a log output configuration that can be unmarshaled from YAML.
 // It accepts a string value that must be one of: "separate" or "merged".
+// This type uses core.LogOutputMode to avoid type duplication.
 type LogOutputValue struct {
-	mode LogOutputMode
+	mode core.LogOutputMode
 	set  bool // whether the value was explicitly set in YAML
 }
 
@@ -42,9 +30,9 @@ func (l *LogOutputValue) UnmarshalYAML(data []byte) error {
 		value := strings.TrimSpace(strings.ToLower(v))
 		switch value {
 		case "separate", "":
-			l.mode = LogOutputSeparate
+			l.mode = core.LogOutputSeparate
 		case "merged":
-			l.mode = LogOutputMerged
+			l.mode = core.LogOutputMerged
 		default:
 			return fmt.Errorf("invalid logOutput value: %q (must be 'separate' or 'merged')", v)
 		}
@@ -65,10 +53,10 @@ func (l LogOutputValue) IsZero() bool {
 }
 
 // Mode returns the log output mode.
-// If the value was not set, it returns LogOutputSeparate as the default.
-func (l LogOutputValue) Mode() LogOutputMode {
+// If the value was not set, it returns core.LogOutputSeparate as the default.
+func (l LogOutputValue) Mode() core.LogOutputMode {
 	if !l.set {
-		return LogOutputSeparate
+		return core.LogOutputSeparate
 	}
 	return l.mode
 }
@@ -80,10 +68,10 @@ func (l LogOutputValue) String() string {
 
 // IsMerged returns true if the log output mode is merged.
 func (l LogOutputValue) IsMerged() bool {
-	return l.mode == LogOutputMerged
+	return l.mode == core.LogOutputMerged
 }
 
 // IsSeparate returns true if the log output mode is separate.
 func (l LogOutputValue) IsSeparate() bool {
-	return !l.set || l.mode == LogOutputSeparate
+	return !l.set || l.mode == core.LogOutputSeparate
 }

@@ -43,6 +43,22 @@ const (
 	LogOutputMerged LogOutputMode = "merged"
 )
 
+// EffectiveLogOutput returns the effective log output mode for a step.
+// It resolves the inheritance chain: step-level overrides DAG-level,
+// and if neither is set, returns the default (LogOutputSeparate).
+func EffectiveLogOutput(dag *DAG, step *Step) LogOutputMode {
+	// Step-level override takes precedence
+	if step != nil && step.LogOutput != "" {
+		return step.LogOutput
+	}
+	// Fall back to DAG-level setting
+	if dag != nil && dag.LogOutput != "" {
+		return dag.LogOutput
+	}
+	// Default to separate
+	return LogOutputSeparate
+}
+
 // DAG contains all information about a DAG.
 type DAG struct {
 	// WorkingDir is the working directory to run the DAG.

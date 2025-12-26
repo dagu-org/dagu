@@ -198,8 +198,20 @@ func (d *Data) Setup(ctx context.Context, logFile string, startedAt time.Time) e
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	d.inner.State.Stdout = logFile + ".out"
-	d.inner.State.Stderr = logFile + ".err"
+	// Determine effective log output mode using the DAG and step settings
+	rCtx := GetDAGContext(ctx)
+	logOutputMode := core.EffectiveLogOutput(rCtx.DAG, &d.inner.Step)
+
+	// Set log file paths based on the log output mode
+	if logOutputMode == core.LogOutputMerged {
+		// Merged mode: both stdout and stderr go to the same .log file
+		d.inner.State.Stdout = logFile + ".log"
+		d.inner.State.Stderr = logFile + ".log"
+	} else {
+		// Separate mode (default): stdout and stderr go to separate files
+		d.inner.State.Stdout = logFile + ".out"
+		d.inner.State.Stderr = logFile + ".err"
+	}
 	d.inner.State.StartedAt = startedAt
 
 	env := GetEnv(ctx)

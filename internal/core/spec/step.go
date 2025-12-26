@@ -263,8 +263,7 @@ func buildStepLogOutput(_ StepBuildContext, s *step) (core.LogOutputMode, error)
 		// Return empty string to indicate "inherit from DAG"
 		return "", nil
 	}
-	// Convert from types.LogOutputMode to core.LogOutputMode
-	return core.LogOutputMode(s.LogOutput.Mode()), nil
+	return s.LogOutput.Mode(), nil
 }
 
 func buildStepMailOnError(_ StepBuildContext, s *step) (bool, error) {

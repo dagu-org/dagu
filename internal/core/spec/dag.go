@@ -485,8 +485,7 @@ func buildLogOutput(_ BuildContext, d *dag) (core.LogOutputMode, error) {
 	if d.LogOutput.IsZero() {
 		return core.LogOutputSeparate, nil
 	}
-	// Convert from types.LogOutputMode to core.LogOutputMode
-	return core.LogOutputMode(d.LogOutput.Mode()), nil
+	return d.LogOutput.Mode(), nil
 }
 
 func buildMailOn(_ BuildContext, d *dag) (*core.MailOn, error) {
