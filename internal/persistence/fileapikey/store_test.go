@@ -7,9 +7,12 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStore_CRUD(t *testing.T) {
@@ -282,4 +285,101 @@ func TestStore_UpdateName(t *testing.T) {
 	if err != auth.ErrAPIKeyAlreadyExists {
 		t.Errorf("Update() to duplicate name error = %v, want %v", err, auth.ErrAPIKeyAlreadyExists)
 	}
+}
+
+func TestStore_RebuildIndexWithCorruptedFile(t *testing.T) {
+	// Create temp directory
+	tmpDir, err := os.MkdirTemp("", "fileapikey-corrupt-test-*")
+	require.NoError(t, err)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	// Create a store first to initialize the directory
+	store, err := New(tmpDir)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	// Create a valid key
+	validKey := auth.NewAPIKey("valid-key", "Valid key", auth.RoleViewer, "hash123", "dagu_val", "admin")
+	err = store.Create(ctx, validKey)
+	require.NoError(t, err)
+
+	// Write a corrupted JSON file directly to the directory
+	corruptedFilePath := filepath.Join(tmpDir, "corrupted-key.json")
+	err = os.WriteFile(corruptedFilePath, []byte("{ invalid json content"), 0600)
+	require.NoError(t, err)
+
+	// Create a new store instance to trigger rebuildIndex
+	store2, err := New(tmpDir)
+	require.NoError(t, err, "Store should be created even with corrupted files")
+
+	// The valid key should still be accessible
+	keys, err := store2.List(ctx)
+	require.NoError(t, err)
+	assert.Len(t, keys, 1, "Should have 1 valid key despite corrupted file")
+	assert.Equal(t, "valid-key", keys[0].Name)
+}
+
+func TestStore_ConcurrentOperations(t *testing.T) {
+	// Create temp directory
+	tmpDir, err := os.MkdirTemp("", "fileapikey-concurrent-test-*")
+	require.NoError(t, err)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	store, err := New(tmpDir)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	const numGoroutines = 10
+
+	var wg sync.WaitGroup
+	errors := make(chan error, numGoroutines*3) // Create, List, Delete operations
+
+	// Concurrent creates
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			key := auth.NewAPIKey(
+				"concurrent-key-"+string(rune('a'+idx)),
+				"Concurrent key",
+				auth.RoleViewer,
+				"hash"+string(rune('a'+idx)),
+				"dagu_"+string(rune('a'+idx)),
+				"admin",
+			)
+			if err := store.Create(ctx, key); err != nil {
+				errors <- err
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Concurrent reads
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := store.List(ctx); err != nil {
+				errors <- err
+			}
+		}()
+	}
+
+	wg.Wait()
+	close(errors)
+
+	// Check for errors
+	var errs []error
+	for err := range errors {
+		errs = append(errs, err)
+	}
+	assert.Empty(t, errs, "No errors should occur during concurrent operations")
+
+	// Verify all keys were created
+	keys, err := store.List(ctx)
+	require.NoError(t, err)
+	assert.Len(t, keys, numGoroutines)
 }

@@ -363,3 +363,48 @@ func TestAPIKeys_PartialUpdate(t *testing.T) {
 	assert.Equal(t, "Original description", *updateResult.ApiKey.Description)
 	assert.Equal(t, api.UserRoleViewer, updateResult.ApiKey.Role)
 }
+
+// TestAPIKeys_LastUsedAtUpdated tests that the last_used_at timestamp is updated when API key is used
+func TestAPIKeys_LastUsedAtUpdated(t *testing.T) {
+	t.Parallel()
+	server := setupBuiltinAuthServer(t)
+	token := getAdminToken(t, server)
+
+	// Create an API key
+	createResp := server.Client().Post("/api/v2/api-keys", api.CreateAPIKeyRequest{
+		Name: "lastused-test-key",
+		Role: api.UserRoleManager,
+	}).WithBearerToken(token).ExpectStatus(http.StatusCreated).Send(t)
+
+	var createResult api.CreateAPIKeyResponse
+	createResp.Unmarshal(t, &createResult)
+
+	keyID := createResult.ApiKey.Id
+	apiKey := createResult.Key
+
+	// Verify last_used_at is nil initially
+	getResp := server.Client().Get("/api/v2/api-keys/" + keyID).
+		WithBearerToken(token).
+		ExpectStatus(http.StatusOK).Send(t)
+
+	var getResult api.APIKeyResponse
+	getResp.Unmarshal(t, &getResult)
+	assert.Nil(t, getResult.ApiKey.LastUsedAt, "last_used_at should be nil initially")
+
+	// Use the API key to make a request
+	server.Client().Get("/api/v2/dag-runs").
+		WithBearerToken(apiKey).
+		ExpectStatus(http.StatusOK).Send(t)
+
+	// Wait a moment for async update to complete
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify last_used_at is now populated
+	getResp2 := server.Client().Get("/api/v2/api-keys/" + keyID).
+		WithBearerToken(token).
+		ExpectStatus(http.StatusOK).Send(t)
+
+	var getResult2 api.APIKeyResponse
+	getResp2.Unmarshal(t, &getResult2)
+	require.NotNil(t, getResult2.ApiKey.LastUsedAt, "last_used_at should be populated after API key usage")
+}

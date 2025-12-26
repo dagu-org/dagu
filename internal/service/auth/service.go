@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -30,6 +31,7 @@ var (
 	ErrCannotDeleteSelf    = errors.New("cannot delete your own account")
 	ErrInvalidAPIKey       = errors.New("invalid API key")
 	ErrAPIKeyNotConfigured = errors.New("API key management is not configured")
+	ErrInvalidCreatorID    = errors.New("creator ID is required")
 )
 
 const (
@@ -448,6 +450,10 @@ func (s *Service) CreateAPIKey(ctx context.Context, input CreateAPIKeyInput, cre
 		return nil, fmt.Errorf("invalid role: %s", input.Role)
 	}
 
+	if creatorID == "" {
+		return nil, ErrInvalidCreatorID
+	}
+
 	// Generate API key
 	keyParts, err := generateAPIKey(s.config.BcryptCost)
 	if err != nil {
@@ -592,7 +598,9 @@ func (s *Service) ValidateAPIKey(ctx context.Context, keySecret string) (*auth.A
 		if err := bcrypt.CompareHashAndPassword([]byte(key.KeyHash), []byte(keySecret)); err == nil {
 			// Update last used timestamp asynchronously
 			go func(keyID string) {
-				_ = s.apiKeyStore.UpdateLastUsed(context.Background(), keyID)
+				if err := s.apiKeyStore.UpdateLastUsed(context.Background(), keyID); err != nil {
+					slog.Error("failed to update API key last used timestamp", "keyID", keyID, "error", err)
+				}
 			}(key.ID)
 			return key, nil
 		}

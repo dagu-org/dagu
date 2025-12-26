@@ -913,3 +913,80 @@ func TestService_HasAPIKeyStore(t *testing.T) {
 
 	assert.False(t, svcWithoutStore.HasAPIKeyStore(), "HasAPIKeyStore() should return false when not configured")
 }
+
+func TestService_CreateAPIKey_EmptyCreatorID(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name: "test-key",
+		Role: auth.RoleViewer,
+	}, "") // Empty creator ID
+	require.ErrorIs(t, err, ErrInvalidCreatorID)
+}
+
+func TestService_ValidateAPIKey_UpdatesLastUsed(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create an API key
+	result, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name: "lastused-key",
+		Role: auth.RoleViewer,
+	}, "creator-id")
+	require.NoError(t, err)
+
+	// Verify LastUsedAt is nil initially
+	apiKey, err := svc.GetAPIKey(ctx, result.APIKey.ID)
+	require.NoError(t, err)
+	assert.Nil(t, apiKey.LastUsedAt, "LastUsedAt should be nil initially")
+
+	// Validate the API key (this should update LastUsedAt asynchronously)
+	_, err = svc.ValidateAPIKey(ctx, result.FullKey)
+	require.NoError(t, err)
+
+	// Wait for async update to complete
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify LastUsedAt is now populated
+	apiKey2, err := svc.GetAPIKey(ctx, result.APIKey.ID)
+	require.NoError(t, err)
+	require.NotNil(t, apiKey2.LastUsedAt, "LastUsedAt should be populated after validation")
+}
+
+func TestGenerateAPIKey(t *testing.T) {
+	// Test API key generation
+	keyParts, err := generateAPIKey(4) // Low cost for fast tests
+	require.NoError(t, err)
+
+	// Verify full key has correct prefix
+	assert.True(t, strings.HasPrefix(keyParts.fullKey, "dagu_"), "Full key should start with 'dagu_'")
+
+	// Verify key prefix is correct length
+	assert.Len(t, keyParts.keyPrefix, apiKeyPrefixLength, "Key prefix should be %d characters", apiKeyPrefixLength)
+
+	// Verify key prefix matches start of full key
+	assert.Equal(t, keyParts.fullKey[:apiKeyPrefixLength], keyParts.keyPrefix, "Key prefix should match start of full key")
+
+	// Verify hash is valid bcrypt hash
+	assert.NotEmpty(t, keyParts.keyHash, "Key hash should not be empty")
+	assert.True(t, strings.HasPrefix(keyParts.keyHash, "$2"), "Key hash should be bcrypt format")
+
+	// Verify full key is long enough (should be at least 40 chars: 5 prefix + 32 bytes base58)
+	assert.GreaterOrEqual(t, len(keyParts.fullKey), 40, "Full key should be at least 40 characters")
+}
+
+func TestGenerateAPIKey_UniqueKeys(t *testing.T) {
+	// Generate multiple keys and verify they are unique
+	keys := make(map[string]bool)
+	for i := 0; i < 100; i++ {
+		keyParts, err := generateAPIKey(4)
+		require.NoError(t, err)
+		assert.False(t, keys[keyParts.fullKey], "Generated key should be unique")
+		keys[keyParts.fullKey] = true
+	}
+}
