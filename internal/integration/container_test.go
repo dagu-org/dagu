@@ -32,6 +32,8 @@ type dockerExecutorTest struct {
 }
 
 func TestDockerExecutor(t *testing.T) {
+	t.Parallel()
+
 	tests := []dockerExecutorTest{
 		{
 			name: "BasicExecution",
@@ -90,6 +92,8 @@ type containerTest struct {
 }
 
 func TestDAGLevelContainer(t *testing.T) {
+	t.Parallel()
+
 	tests := []containerTest{
 		{
 			name: "VolumeBindMounts",
@@ -237,8 +241,6 @@ steps:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			tempDir, err := os.MkdirTemp("", fmt.Sprintf("%s-%s-*", containerPrefix, tt.name))
 			require.NoError(t, err, "failed to create temporary directory")
 			t.Cleanup(func() { _ = os.RemoveAll(tempDir) })

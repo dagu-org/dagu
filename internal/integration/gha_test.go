@@ -6,6 +6,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/test"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGitHubActionsExecutor(t *testing.T) {
@@ -28,11 +29,13 @@ steps:
       sparse-checkout: README.md
 `)
 
+		// Verify git is available
+		_, err := exec.LookPath("git")
+		require.NoError(t, err, "git is required for this test but not found in PATH")
+
 		// Initialize git repo in the temp dir to satisfy act requirements
 		cmd := exec.Command("git", "init", dag.WorkingDir)
-		if err := cmd.Run(); err != nil {
-			t.Fatalf("failed to init git repo: %v", err)
-		}
+		require.NoError(t, cmd.Run(), "failed to init git repo")
 
 		agent := dag.Agent()
 
