@@ -3,7 +3,6 @@ package cmdutil
 import (
 	"context"
 	"os"
-	"reflect"
 	"strconv"
 	"testing"
 
@@ -85,13 +84,12 @@ func TestEvalStringFields(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			got, err := EvalStringFields(ctx, tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("EvalStringFields() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err)
 				return
 			}
-			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("EvalStringFields() = %+v, want %+v", got, tt.want)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -110,9 +108,7 @@ func TestEvalStringFields_AnonymousStruct(t *testing.T) {
 func TestEvalStringFields_NonStruct(t *testing.T) {
 	ctx := context.Background()
 	_, err := EvalStringFields(ctx, "not a struct")
-	if err == nil {
-		t.Error("EvalStringFields() should return error for non-struct input")
-	}
+	assert.Error(t, err)
 }
 
 func TestEvalStringFields_NestedStructs(t *testing.T) {
@@ -160,13 +156,8 @@ func TestEvalStringFields_NestedStructs(t *testing.T) {
 
 	ctx := context.Background()
 	got, err := EvalStringFields(ctx, input)
-	if err != nil {
-		t.Fatalf("EvalStringFields() error = %v", err)
-	}
-
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("EvalStringFields() = %+v, want %+v", got, want)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
 }
 
 func TestEvalStringFields_EmptyStruct(t *testing.T) {
@@ -175,13 +166,8 @@ func TestEvalStringFields_EmptyStruct(t *testing.T) {
 	input := Empty{}
 	ctx := context.Background()
 	got, err := EvalStringFields(ctx, input)
-	if err != nil {
-		t.Fatalf("EvalStringFields() error = %v", err)
-	}
-
-	if !reflect.DeepEqual(got, input) {
-		t.Errorf("EvalStringFields() = %+v, want %+v", got, input)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, input, got)
 }
 
 func TestEvalStringFields_PointerFields(t *testing.T) {
