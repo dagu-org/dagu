@@ -516,6 +516,207 @@ func TestService_ResetPassword_WeakPassword(t *testing.T) {
 	}
 }
 
+func TestService_UpdateUser_WithPassword(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create user
+	user, err := svc.CreateUser(ctx, CreateUserInput{
+		Username: "testuser",
+		Password: "oldpassword1",
+		Role:     auth.RoleViewer,
+	})
+	require.NoError(t, err)
+
+	// Update user with new password via Password field
+	newPassword := "newpassword1"
+	_, err = svc.UpdateUser(ctx, user.ID, UpdateUserInput{
+		Password: &newPassword,
+	})
+	require.NoError(t, err)
+
+	// Verify old password no longer works
+	_, err = svc.Authenticate(ctx, "testuser", "oldpassword1")
+	assert.ErrorIs(t, err, ErrInvalidCredentials, "old password should not work")
+
+	// Verify new password works
+	_, err = svc.Authenticate(ctx, "testuser", "newpassword1")
+	assert.NoError(t, err, "new password should work")
+}
+
+func TestService_UpdateUser_WeakPassword(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create user
+	user, err := svc.CreateUser(ctx, CreateUserInput{
+		Username: "testuser",
+		Password: "password123",
+		Role:     auth.RoleViewer,
+	})
+	require.NoError(t, err)
+
+	// Try to update with weak password
+	weakPassword := "weak"
+	_, err = svc.UpdateUser(ctx, user.ID, UpdateUserInput{
+		Password: &weakPassword,
+	})
+	assert.Error(t, err, "UpdateUser() with weak password should return error")
+}
+
+func TestService_UpdateUser_InvalidRole(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create user
+	user, err := svc.CreateUser(ctx, CreateUserInput{
+		Username: "testuser",
+		Password: "password123",
+		Role:     auth.RoleViewer,
+	})
+	require.NoError(t, err)
+
+	// Try to update with invalid role
+	invalidRole := auth.Role("invalid-role")
+	_, err = svc.UpdateUser(ctx, user.ID, UpdateUserInput{
+		Role: &invalidRole,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid role")
+}
+
+func TestService_GetUserFromToken_UserDeleted(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create user
+	user, err := svc.CreateUser(ctx, CreateUserInput{
+		Username: "testuser",
+		Password: "password123",
+		Role:     auth.RoleViewer,
+	})
+	require.NoError(t, err)
+
+	// Generate token for user
+	tokenResult, err := svc.GenerateToken(user)
+	require.NoError(t, err)
+
+	// Delete the user
+	err = svc.DeleteUser(ctx, user.ID, "other-user-id")
+	require.NoError(t, err)
+
+	// Try to get user from token - should return ErrInvalidToken since user was deleted
+	_, err = svc.GetUserFromToken(ctx, tokenResult.Token)
+	assert.ErrorIs(t, err, ErrInvalidToken, "GetUserFromToken should return ErrInvalidToken when user is deleted")
+}
+
+func TestService_ValidateToken_MalformedToken(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	tests := []struct {
+		name  string
+		token string
+	}{
+		{"empty token", ""},
+		{"random string", "not-a-jwt-token"},
+		{"invalid base64", "header.payload.signature"},
+		{"missing parts", "onlyonepart"},
+		{"jwt-like but invalid", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.invalid.signature"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := svc.ValidateToken(tt.token)
+			assert.ErrorIs(t, err, ErrInvalidToken)
+		})
+	}
+}
+
+func TestService_ValidateToken_WrongSecret(t *testing.T) {
+	// Create service with one secret
+	tmpDir, err := os.MkdirTemp("", "auth-service-test-*")
+	require.NoError(t, err)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	store, err := fileuser.New(tmpDir)
+	require.NoError(t, err)
+
+	config1 := Config{
+		TokenSecret: "secret-one",
+		TokenTTL:    time.Hour,
+		BcryptCost:  4,
+	}
+	svc1 := New(store, config1)
+
+	// Create user and generate token with svc1
+	ctx := context.Background()
+	user, err := svc1.CreateUser(ctx, CreateUserInput{
+		Username: "testuser",
+		Password: "password123",
+		Role:     auth.RoleViewer,
+	})
+	require.NoError(t, err)
+
+	tokenResult, err := svc1.GenerateToken(user)
+	require.NoError(t, err)
+
+	// Create service with different secret
+	config2 := Config{
+		TokenSecret: "secret-two",
+		TokenTTL:    time.Hour,
+		BcryptCost:  4,
+	}
+	svc2 := New(store, config2)
+
+	// Try to validate token with wrong secret
+	_, err = svc2.ValidateToken(tokenResult.Token)
+	assert.ErrorIs(t, err, ErrInvalidToken, "ValidateToken should reject token signed with different secret")
+}
+
+func TestService_ValidateToken_MissingSecret(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "auth-service-test-*")
+	require.NoError(t, err)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	store, err := fileuser.New(tmpDir)
+	require.NoError(t, err)
+
+	// Create service without secret
+	config := Config{
+		TokenSecret: "",
+		TokenTTL:    time.Hour,
+		BcryptCost:  4,
+	}
+	svc := New(store, config)
+
+	_, err = svc.ValidateToken("some-token")
+	assert.ErrorIs(t, err, ErrMissingSecret)
+}
+
+func TestService_CreateUser_InvalidRole(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := svc.CreateUser(ctx, CreateUserInput{
+		Username: "testuser",
+		Password: "password123",
+		Role:     auth.Role("invalid-role"),
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid role")
+}
+
 // ============================================================================
 // API Key Tests
 // ============================================================================
