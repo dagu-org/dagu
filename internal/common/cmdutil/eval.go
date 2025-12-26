@@ -312,9 +312,16 @@ func processStructFields(ctx context.Context, v reflect.Value, opts *EvalOptions
 			field.Set(processed)
 
 		case reflect.Slice, reflect.Array:
-			if err := processSliceWithOpts(ctx, field, opts); err != nil {
+			if field.IsNil() {
+				continue
+			}
+			// Create a new slice with new backing array to avoid mutating original
+			newSlice := reflect.MakeSlice(field.Type(), field.Len(), field.Cap())
+			reflect.Copy(newSlice, field)
+			if err := processSliceWithOpts(ctx, newSlice, opts); err != nil {
 				return err
 			}
+			field.Set(newSlice)
 		}
 	}
 	return nil
@@ -341,12 +348,20 @@ func processPointerField(ctx context.Context, field reflect.Value, opts *EvalOpt
 		if opts.ExpandEnv {
 			value = os.ExpandEnv(value)
 		}
-		elem.SetString(value)
+		// Create a new string and update the pointer to point to it
+		// This avoids mutating the original value
+		newStr := reflect.New(elem.Type())
+		newStr.Elem().SetString(value)
+		field.Set(newStr)
 
 	case reflect.Struct:
-		if err := processStructFields(ctx, elem, opts); err != nil {
+		// Create a copy of the struct to avoid mutating the original
+		newStruct := reflect.New(elem.Type())
+		newStruct.Elem().Set(elem)
+		if err := processStructFields(ctx, newStruct.Elem(), opts); err != nil {
 			return err
 		}
+		field.Set(newStruct)
 
 	case reflect.Map:
 		if elem.IsNil() {
@@ -356,12 +371,25 @@ func processPointerField(ctx context.Context, field reflect.Value, opts *EvalOpt
 		if err != nil {
 			return err
 		}
-		elem.Set(processed)
+		// Create a new pointer to the processed map
+		newMap := reflect.New(elem.Type())
+		newMap.Elem().Set(processed)
+		field.Set(newMap)
 
 	case reflect.Slice, reflect.Array:
-		if err := processSliceWithOpts(ctx, elem, opts); err != nil {
+		if elem.IsNil() {
+			return nil
+		}
+		// Create a new slice with new backing array to avoid mutating original
+		newSlice := reflect.MakeSlice(elem.Type(), elem.Len(), elem.Cap())
+		reflect.Copy(newSlice, elem)
+		if err := processSliceWithOpts(ctx, newSlice, opts); err != nil {
 			return err
 		}
+		// Create new pointer to the new slice
+		newPtr := reflect.New(elem.Type())
+		newPtr.Elem().Set(newSlice)
+		field.Set(newPtr)
 	}
 
 	return nil

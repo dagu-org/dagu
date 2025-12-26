@@ -527,6 +527,96 @@ func TestEvalStringFields_SliceWithNilPointers(t *testing.T) {
 	})
 }
 
+func TestEvalStringFields_PointerMutation(t *testing.T) {
+	t.Setenv("MUT_VAR", "expanded")
+
+	t.Run("PointerToString", func(t *testing.T) {
+		type S struct {
+			Token *string
+		}
+
+		original := "$MUT_VAR"
+		input := S{Token: &original}
+
+		result, err := EvalStringFields(context.Background(), input)
+		require.NoError(t, err)
+
+		// Check result is correct
+		assert.Equal(t, "expanded", *result.Token)
+
+		// Check original was NOT mutated
+		assert.Equal(t, "$MUT_VAR", original, "BUG: original variable was mutated")
+		assert.Equal(t, "$MUT_VAR", *input.Token, "BUG: input struct's pointer target was mutated")
+	})
+
+	t.Run("SliceOfStringPointers", func(t *testing.T) {
+		type S struct {
+			Items []*string
+		}
+
+		val1 := "$MUT_VAR"
+		val2 := "${MUT_VAR}"
+		input := S{Items: []*string{&val1, &val2}}
+
+		result, err := EvalStringFields(context.Background(), input)
+		require.NoError(t, err)
+
+		// Check result is correct
+		require.Len(t, result.Items, 2)
+		assert.Equal(t, "expanded", *result.Items[0])
+		assert.Equal(t, "expanded", *result.Items[1])
+
+		// Check originals were NOT mutated
+		assert.Equal(t, "$MUT_VAR", val1, "BUG: val1 was mutated")
+		assert.Equal(t, "${MUT_VAR}", val2, "BUG: val2 was mutated")
+		assert.Equal(t, "$MUT_VAR", *input.Items[0], "BUG: input.Items[0] target was mutated")
+		assert.Equal(t, "${MUT_VAR}", *input.Items[1], "BUG: input.Items[1] target was mutated")
+	})
+
+	t.Run("PointerToStruct", func(t *testing.T) {
+		type Nested struct {
+			Value string
+		}
+		type S struct {
+			Nested *Nested
+		}
+
+		input := S{Nested: &Nested{Value: "$MUT_VAR"}}
+		originalValue := input.Nested.Value
+
+		result, err := EvalStringFields(context.Background(), input)
+		require.NoError(t, err)
+
+		// Check result is correct
+		assert.Equal(t, "expanded", result.Nested.Value)
+
+		// Check original was NOT mutated
+		assert.Equal(t, "$MUT_VAR", originalValue, "BUG: original nested value was mutated")
+		assert.Equal(t, "$MUT_VAR", input.Nested.Value, "BUG: input.Nested.Value was mutated")
+	})
+
+	t.Run("PointerToSlice", func(t *testing.T) {
+		type S struct {
+			Items *[]string
+		}
+
+		items := []string{"$MUT_VAR", "${MUT_VAR}"}
+		input := S{Items: &items}
+
+		result, err := EvalStringFields(context.Background(), input)
+		require.NoError(t, err)
+
+		// Check result is correct
+		require.NotNil(t, result.Items)
+		assert.Equal(t, "expanded", (*result.Items)[0])
+		assert.Equal(t, "expanded", (*result.Items)[1])
+
+		// Check original was NOT mutated
+		assert.Equal(t, "$MUT_VAR", items[0], "BUG: items[0] was mutated")
+		assert.Equal(t, "${MUT_VAR}", items[1], "BUG: items[1] was mutated")
+	})
+}
+
 func TestEvalStringFields_PointerFieldErrors(t *testing.T) {
 	type Nested struct {
 		Command string
