@@ -643,10 +643,18 @@ func buildMultipleCommands(val []any, result *core.Step) error {
 	var commands []core.CommandEntry
 
 	for i, v := range val {
-		strVal, ok := v.(string)
-		if !ok {
-			// If the value is not a string, convert it to a string.
-			strVal = fmt.Sprintf("%v", v)
+		var strVal string
+		switch tv := v.(type) {
+		case string:
+			strVal = tv
+		case int, int64, uint64, float64, bool:
+			strVal = fmt.Sprintf("%v", tv)
+		default:
+			return core.NewValidationError(
+				fmt.Sprintf("command[%d]", i),
+				v,
+				fmt.Errorf("command array elements must be strings or primitive types, got %T", v),
+			)
 		}
 		strVal = strings.TrimSpace(strVal)
 

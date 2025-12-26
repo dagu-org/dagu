@@ -1123,6 +1123,26 @@ func TestBuildMultipleCommands(t *testing.T) {
 				{Command: "valid", Args: []string{"command"}, CmdWithArgs: "valid command"},
 			},
 		},
+		{
+			name:     "RejectsMapType",
+			commands: []any{"echo hello", map[string]any{"key": "value"}},
+			wantErr:  true,
+		},
+		{
+			name:     "RejectsNestedArray",
+			commands: []any{"echo hello", []string{"nested"}},
+			wantErr:  true,
+		},
+		{
+			name:     "AcceptsPrimitiveTypes",
+			commands: []any{"echo", 123, true, 45.6},
+			expectedCommands: []core.CommandEntry{
+				{Command: "echo", CmdWithArgs: "echo"},
+				{Command: "123", CmdWithArgs: "123"},
+				{Command: "true", CmdWithArgs: "true"},
+				{Command: "45.6", CmdWithArgs: "45.6"},
+			},
+		},
 	}
 
 	for _, tt := range tests {
