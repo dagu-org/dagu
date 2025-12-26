@@ -6,12 +6,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/goccy/go-yaml"
-	"github.com/kballard/go-shellquote"
 )
 
 // ExecOptions captures the inline configuration for building an ad-hoc DAG.
@@ -55,9 +55,8 @@ func buildExecDAG(ctx *Context, opts ExecOptions) (*core.DAG, string, error) {
 		return nil, "", fmt.Errorf("invalid DAG name: %w", err)
 	}
 
-	// Join command args into a single properly quoted string
-	// This ensures the command is treated as a single command, not multiple commands
-	commandStr := shellquote.Join(opts.CommandArgs...)
+	// Build command string from args
+	commandStr := cmdutil.BuildCommandEscapedString(opts.CommandArgs[0], opts.CommandArgs[1:])
 
 	specDoc := execSpec{
 		Name:           name,

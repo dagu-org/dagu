@@ -1137,10 +1137,10 @@ func TestBuildMultipleCommands(t *testing.T) {
 			name:     "AcceptsPrimitiveTypes",
 			commands: []any{"echo", 123, true, 45.6},
 			expectedCommands: []core.CommandEntry{
-				{Command: "echo", CmdWithArgs: "echo"},
-				{Command: "123", CmdWithArgs: "123"},
-				{Command: "true", CmdWithArgs: "true"},
-				{Command: "45.6", CmdWithArgs: "45.6"},
+				{Command: "echo", Args: []string{}, CmdWithArgs: "echo"},
+				{Command: "123", Args: []string{}, CmdWithArgs: "123"},
+				{Command: "true", Args: []string{}, CmdWithArgs: "true"},
+				{Command: "45.6", Args: []string{}, CmdWithArgs: "45.6"},
 			},
 		},
 	}
