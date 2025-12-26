@@ -86,11 +86,11 @@ func TestEvalStringFields(t *testing.T) {
 			ctx := context.Background()
 			got, err := EvalStringFields(ctx, tt.input)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("SubstituteStringFields() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("EvalStringFields() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("SubstituteStringFields() = %+v, want %+v", got, tt.want)
+				t.Errorf("EvalStringFields() = %+v, want %+v", got, tt.want)
 			}
 		})
 	}
@@ -107,11 +107,11 @@ func TestEvalStringFields_AnonymousStruct(t *testing.T) {
 	require.Equal(t, "hello", obj.Field)
 }
 
-func TestSubstituteStringFields_NonStruct(t *testing.T) {
+func TestEvalStringFields_NonStruct(t *testing.T) {
 	ctx := context.Background()
 	_, err := EvalStringFields(ctx, "not a struct")
 	if err == nil {
-		t.Error("SubstituteStringFields() should return error for non-struct input")
+		t.Error("EvalStringFields() should return error for non-struct input")
 	}
 }
 
@@ -161,11 +161,11 @@ func TestEvalStringFields_NestedStructs(t *testing.T) {
 	ctx := context.Background()
 	got, err := EvalStringFields(ctx, input)
 	if err != nil {
-		t.Fatalf("SubstituteStringFields() error = %v", err)
+		t.Fatalf("EvalStringFields() error = %v", err)
 	}
 
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("SubstituteStringFields() = %+v, want %+v", got, want)
+		t.Errorf("EvalStringFields() = %+v, want %+v", got, want)
 	}
 }
 
@@ -176,11 +176,11 @@ func TestEvalStringFields_EmptyStruct(t *testing.T) {
 	ctx := context.Background()
 	got, err := EvalStringFields(ctx, input)
 	if err != nil {
-		t.Fatalf("SubstituteStringFields() error = %v", err)
+		t.Fatalf("EvalStringFields() error = %v", err)
 	}
 
 	if !reflect.DeepEqual(got, input) {
-		t.Errorf("SubstituteStringFields() = %+v, want %+v", got, input)
+		t.Errorf("EvalStringFields() = %+v, want %+v", got, input)
 	}
 }
 
