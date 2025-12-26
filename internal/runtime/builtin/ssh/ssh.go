@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
@@ -33,6 +34,7 @@ func getSSHClientFromContext(ctx context.Context) *Client {
 }
 
 type sshExecutor struct {
+	mu      sync.Mutex
 	step    core.Step
 	client  *Client
 	stdout  io.Writer
@@ -76,8 +78,12 @@ func (e *sshExecutor) SetStderr(out io.Writer) {
 }
 
 func (e *sshExecutor) Kill(_ os.Signal) error {
-	if e.session != nil {
-		return e.session.Close()
+	e.mu.Lock()
+	session := e.session
+	e.mu.Unlock()
+
+	if session != nil {
+		return session.Close()
 	}
 	return nil
 }
@@ -98,28 +104,59 @@ func (e *sshExecutor) Run(ctx context.Context) error {
 		default:
 		}
 
-		session, err := e.client.NewSession()
-		if err != nil {
-			return fmt.Errorf("command %d: failed to create session: %w", i+1, err)
+		if err := e.runCommand(ctx, i, cmdEntry); err != nil {
+			return err
 		}
-		e.session = session
+	}
 
-		session.Stdout = e.stdout
-		session.Stderr = e.stderr
+	return nil
+}
 
-		command := cmdutil.ShellQuote(cmdEntry.Command)
-		if len(cmdEntry.Args) > 0 {
-			command += " " + cmdutil.ShellQuoteArgs(cmdEntry.Args)
-		}
+// runCommand executes a single command with context cancellation support.
+// Since session.Run() blocks without context awareness, we run it in a goroutine
+// and select on both completion and context cancellation for responsiveness.
+func (e *sshExecutor) runCommand(ctx context.Context, index int, cmdEntry core.CommandEntry) error {
+	session, err := e.client.NewSession()
+	if err != nil {
+		return fmt.Errorf("command %d: failed to create session: %w", index+1, err)
+	}
 
-		err = session.Run(command)
+	e.mu.Lock()
+	e.session = session
+	e.mu.Unlock()
+
+	session.Stdout = e.stdout
+	session.Stderr = e.stderr
+
+	command := cmdutil.ShellQuote(cmdEntry.Command)
+	if len(cmdEntry.Args) > 0 {
+		command += " " + cmdutil.ShellQuoteArgs(cmdEntry.Args)
+	}
+
+	// Run command in goroutine to enable context cancellation
+	done := make(chan error, 1)
+	go func() {
+		done <- session.Run(command)
+	}()
+
+	// Wait for either command completion or context cancellation
+	select {
+	case err = <-done:
+		// Command completed (success or failure)
+	case <-ctx.Done():
+		// Context cancelled - close session to terminate the command
 		if closeErr := session.Close(); closeErr != nil {
-			logger.Warn(ctx, "SSH session close error", tag.Error(closeErr))
+			logger.Warn(ctx, "SSH session close error during cancellation", tag.Error(closeErr))
 		}
+		return ctx.Err()
+	}
 
-		if err != nil {
-			return fmt.Errorf("command %d failed: %w", i+1, err)
-		}
+	if closeErr := session.Close(); closeErr != nil {
+		logger.Warn(ctx, "SSH session close error", tag.Error(closeErr))
+	}
+
+	if err != nil {
+		return fmt.Errorf("command %d failed: %w", index+1, err)
 	}
 
 	return nil
