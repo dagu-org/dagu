@@ -184,6 +184,42 @@ func TestEvalStringFields_EmptyStruct(t *testing.T) {
 	}
 }
 
+func TestEvalStringFields_PointerFields(t *testing.T) {
+	_ = os.Setenv("PTR_VAR", "pointer_value")
+	defer func() {
+		_ = os.Unsetenv("PTR_VAR")
+	}()
+
+	type PointerNested struct {
+		Value string
+	}
+
+	type PointerStruct struct {
+		Token  *string
+		Nested *PointerNested
+		Items  []*PointerNested
+	}
+
+	ctx := context.Background()
+	token := "$PTR_VAR"
+	input := PointerStruct{
+		Token:  &token,
+		Nested: &PointerNested{Value: "${PTR_VAR}"},
+		Items: []*PointerNested{{
+			Value: "$PTR_VAR",
+		}},
+	}
+
+	result, err := EvalStringFields(ctx, input)
+	require.NoError(t, err)
+	require.NotNil(t, result.Token)
+	assert.Equal(t, "pointer_value", *result.Token)
+	require.NotNil(t, result.Nested)
+	assert.Equal(t, "pointer_value", result.Nested.Value)
+	require.Len(t, result.Items, 1)
+	assert.Equal(t, "pointer_value", result.Items[0].Value)
+}
+
 func TestReplaceVars(t *testing.T) {
 	tests := []struct {
 		name     string

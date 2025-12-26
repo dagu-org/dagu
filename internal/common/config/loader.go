@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/adrg/xdg"
+	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/spf13/viper"
 )
@@ -171,6 +173,12 @@ func (l *ConfigLoader) Load() (*Config, error) {
 	if err := l.v.Unmarshal(&def); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
+
+	expandedDef, err := cmdutil.EvalStringFields(context.Background(), def, cmdutil.WithoutSubstitute())
+	if err != nil {
+		return nil, fmt.Errorf("failed to expand config variables: %w", err)
+	}
+	def = expandedDef
 
 	// Build the final Config from the definition (including legacy fields and validations).
 	cfg, err := l.buildConfig(def)

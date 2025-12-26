@@ -266,6 +266,14 @@ func processStructFields(ctx context.Context, v reflect.Value, opts *EvalOptions
 
 		// nolint:exhaustive
 		switch field.Kind() {
+		case reflect.Ptr:
+			if field.IsNil() {
+				continue
+			}
+			if err := processPointerField(ctx, field, opts); err != nil {
+				return err
+			}
+
 		case reflect.String:
 			value := field.String()
 
@@ -302,6 +310,109 @@ func processStructFields(ctx context.Context, v reflect.Value, opts *EvalOptions
 			}
 
 			field.Set(processed)
+
+		case reflect.Slice, reflect.Array:
+			if err := processSliceWithOpts(ctx, field, opts); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func processPointerField(ctx context.Context, field reflect.Value, opts *EvalOptions) error {
+	elem := field.Elem()
+	if !elem.CanSet() {
+		return nil
+	}
+
+	// nolint:exhaustive
+	switch elem.Kind() {
+	case reflect.String:
+		value := elem.String()
+		value = expandVariables(ctx, value, opts)
+		if opts.Substitute {
+			var err error
+			value, err = substituteCommands(value)
+			if err != nil {
+				return err
+			}
+		}
+		if opts.ExpandEnv {
+			value = os.ExpandEnv(value)
+		}
+		elem.SetString(value)
+
+	case reflect.Struct:
+		if err := processStructFields(ctx, elem, opts); err != nil {
+			return err
+		}
+
+	case reflect.Map:
+		if elem.IsNil() {
+			return nil
+		}
+		processed, err := processMapWithOpts(ctx, elem, opts)
+		if err != nil {
+			return err
+		}
+		elem.Set(processed)
+
+	case reflect.Slice, reflect.Array:
+		if err := processSliceWithOpts(ctx, elem, opts); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func processSliceWithOpts(ctx context.Context, v reflect.Value, opts *EvalOptions) error {
+	for i := 0; i < v.Len(); i++ {
+		elem := v.Index(i)
+		if !elem.CanSet() {
+			continue
+		}
+
+		// nolint:exhaustive
+		switch elem.Kind() {
+		case reflect.String:
+			value := elem.String()
+			value = expandVariables(ctx, value, opts)
+			if opts.Substitute {
+				var err error
+				value, err = substituteCommands(value)
+				if err != nil {
+					return err
+				}
+			}
+			if opts.ExpandEnv {
+				value = os.ExpandEnv(value)
+			}
+			elem.SetString(value)
+
+		case reflect.Struct:
+			if err := processStructFields(ctx, elem, opts); err != nil {
+				return err
+			}
+
+		case reflect.Map:
+			if elem.IsNil() {
+				continue
+			}
+			processed, err := processMapWithOpts(ctx, elem, opts)
+			if err != nil {
+				return err
+			}
+			elem.Set(processed)
+
+		case reflect.Ptr:
+			if elem.IsNil() {
+				continue
+			}
+			if err := processPointerField(ctx, elem, opts); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
