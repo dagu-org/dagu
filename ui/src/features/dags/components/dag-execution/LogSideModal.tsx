@@ -1,4 +1,6 @@
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { useUserPreferences } from '@/contexts/UserPreference';
 import { ExternalLink, Maximize2, Minimize2, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 
@@ -29,9 +31,11 @@ const LogSideModal: React.FC<LogSideModalProps> = ({
   stepName = '',
   logType = 'execution',
 }) => {
+  const { preferences, updatePreference } = useUserPreferences();
+
   // State to track whether the modal is expanded
   const [isExpanded, setIsExpanded] = useState(false);
-  
+
   // State to track if we're on mobile
   const [isMobile, setIsMobile] = useState(false);
 
@@ -133,35 +137,45 @@ const LogSideModal: React.FC<LogSideModalProps> = ({
       >
         <div className={`flex justify-between items-center ${isMobile ? 'p-3' : 'p-4'} border-b`}>
           <h2 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}>{title}</h2>
-          <div className="flex gap-1">
-            {/* Hide expand/minimize button on mobile since it's always full screen */}
-            {!isMobile && (
+          <div className="flex items-center gap-2">
+            {/* Wrap toggle */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Wrap</span>
+              <Switch
+                checked={preferences.logWrap}
+                onCheckedChange={(checked) => updatePreference('logWrap', checked)}
+              />
+            </div>
+            <div className="flex gap-1">
+              {/* Hide expand/minimize button on mobile since it's always full screen */}
+              {!isMobile && (
+                <Button
+                  size="icon"
+                  onClick={toggleExpand}
+                  title={isExpanded ? 'Minimize' : 'Expand'}
+                >
+                  {isExpanded ? (
+                    <Minimize2 className="h-4 w-4" />
+                  ) : (
+                    <Maximize2 className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
               <Button
                 size="icon"
-                onClick={toggleExpand}
-                title={isExpanded ? 'Minimize' : 'Expand'}
+                onClick={openInNewTab}
+                title="Open in new tab"
               >
-                {isExpanded ? (
-                  <Minimize2 className="h-4 w-4" />
-                ) : (
-                  <Maximize2 className="h-4 w-4" />
-                )}
+                <ExternalLink className="h-4 w-4" />
               </Button>
-            )}
-            <Button
-              size="icon"
-              onClick={openInNewTab}
-              title="Open in new tab"
-            >
-              <ExternalLink className="h-4 w-4" />
-            </Button>
-            <Button
-              size="icon"
-              onClick={onClose}
-              title="Close (Esc)"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+              <Button
+                size="icon"
+                onClick={onClose}
+                title="Close (Esc)"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
         <div className={`flex-1 overflow-auto ${isMobile ? 'p-2' : 'p-4'}`}>{children}</div>

@@ -10,6 +10,7 @@ export type DAGRunsViewMode = 'list' | 'grouped';
 export type UserPreferences = {
   pageLimit: number;
   dagRunsViewMode: DAGRunsViewMode;
+  logWrap: boolean;
 };
 
 const UserPreferencesContext = createContext<{
@@ -31,6 +32,7 @@ export function UserPreferencesProvider({
       const defaultPrefs: UserPreferences = {
         pageLimit: 50,
         dagRunsViewMode: 'list', // Default to list view
+        logWrap: true, // Default to wrapped text
       };
       return saved ? { ...defaultPrefs, ...JSON.parse(saved) } : defaultPrefs;
     } catch {
@@ -38,6 +40,7 @@ export function UserPreferencesProvider({
       return {
         pageLimit: 50,
         dagRunsViewMode: 'list' as DAGRunsViewMode,
+        logWrap: true,
       };
     }
   });

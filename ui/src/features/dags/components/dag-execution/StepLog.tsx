@@ -8,7 +8,9 @@ import { components, NodeStatus } from '../../../../api/v2/schema';
 import { Button } from '../../../../components/ui/button';
 import { Input } from '../../../../components/ui/input';
 import { ReloadButton } from '../../../../components/ui/reload-button';
+import { Switch } from '../../../../components/ui/switch';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { useUserPreferences } from '../../../../contexts/UserPreference';
 import { useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 
@@ -66,6 +68,7 @@ function StepLog({
   node,
 }: Props) {
   const appBarContext = React.useContext(AppBarContext);
+  const { preferences, updatePreference } = useUserPreferences();
   const [viewMode, setViewMode] = useState<'tail' | 'head' | 'page'>('tail');
   const [pageSize, setPageSize] = useState(1000);
   const [currentPage, setCurrentPage] = useState(1);
@@ -347,8 +350,17 @@ function StepLog({
             <option value="5000">5000 lines</option>
           </select>
 
-          {/* Live mode toggle and reload button */}
+          {/* Wrap toggle, Live mode toggle and reload button */}
           <div className="flex items-center gap-2 ml-auto">
+            {/* Wrap toggle */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Wrap</span>
+              <Switch
+                checked={preferences.logWrap}
+                onCheckedChange={(checked) => updatePreference('logWrap', checked)}
+              />
+            </div>
+
             {/* Reload button */}
             <ReloadButton
               onReload={async () => {
@@ -451,7 +463,7 @@ function StepLog({
       {/* Log content with overlay loading indicator when navigating */}
       <div
         ref={logContainerRef}
-        className="flex-1 overflow-auto rounded-lg bg-slate-800 p-4 relative"
+        className={`flex-1 rounded-lg bg-slate-800 pt-4 pr-4 pb-4 relative ${preferences.logWrap ? 'overflow-auto' : 'overflow-x-auto overflow-y-auto'}`}
       >
         {isNavigating && (
           <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-10 pointer-events-none">
@@ -460,16 +472,16 @@ function StepLog({
             </div>
           </div>
         )}
-        <pre className="h-full font-mono text-sm text-slate-100 log-content">
+        <pre className={`h-full font-mono text-sm text-slate-100 log-content ${preferences.logWrap ? '' : 'min-w-max'}`}>
           {lines.map((line, index) => (
-            <div key={index} className="flex px-2 py-0.5">
+            <div key={index} className="flex pr-2 py-0.5">
               <span
-                className="text-slate-500 mr-4 select-none w-8 text-right flex-shrink-0 self-start"
+                className="text-slate-500 mr-4 select-none w-14 text-right flex-shrink-0 self-start sticky left-0 bg-slate-800 pl-4 pr-2 z-10"
                 data-line-number={getLineNumber(index)}
               >
                 {getLineNumber(index)}
               </span>
-              <span className="whitespace-pre-wrap break-all flex-grow select-text cursor-text">
+              <span className={`flex-grow select-text cursor-text ${preferences.logWrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'}`}>
                 {line || ' '}
               </span>
             </div>
