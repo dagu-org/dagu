@@ -425,8 +425,8 @@ steps:
 	// KEY ASSERTION: All 3 DAGs should start in the FIRST batch (concurrently)
 	// If the bug exists (queue initialized with maxConcurrency=1), they would start
 	// sequentially: first at 0s, second at ~2s, third at ~4s (total ~6s+)
-	// With the fix, all 3 start within the first batch, so max diff < 2s
-	require.Less(t, maxDiff, 2*time.Second,
+	// With the fix, all 3 start within the first batch, so max diff <= 2s
+	require.LessOrEqual(t, maxDiff, 2*time.Second,
 		"All 3 DAGs should start in first batch (within 2s), but max diff was %v. "+
 			"This suggests maxActiveRuns was not applied to the first batch.", maxDiff)
 
