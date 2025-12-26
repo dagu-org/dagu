@@ -2,6 +2,7 @@ package spec
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -11,6 +12,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestMain(m *testing.M) {
+	// Register single-command-only executor capabilities for testing.
+	// In production, this is done by runtime/builtin init functions.
+	// Default is MultipleCommands: true, so we only register the exceptions.
+	for _, t := range []string{"jq", "http", "archive", "github_action", "github-action", "gha", "mail", "dag", "subworkflow", "parallel"} {
+		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{})
+	}
+	os.Exit(m.Run())
+}
 
 // testStepBuildContext creates a StepBuildContext for testing
 func testStepBuildContext() StepBuildContext {

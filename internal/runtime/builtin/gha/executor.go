@@ -545,7 +545,8 @@ func newGitHubAction(ctx context.Context, step core.Step) (executor.Executor, er
 }
 
 func init() {
-	executor.RegisterExecutor("github_action", newGitHubAction, nil)
-	executor.RegisterExecutor("github-action", newGitHubAction, nil)
-	executor.RegisterExecutor("gha", newGitHubAction, nil)
+	caps := core.ExecutorCapabilities{}
+	executor.RegisterExecutor("github_action", newGitHubAction, nil, caps)
+	executor.RegisterExecutor("github-action", newGitHubAction, nil, caps)
+	executor.RegisterExecutor("gha", newGitHubAction, nil, caps)
 }

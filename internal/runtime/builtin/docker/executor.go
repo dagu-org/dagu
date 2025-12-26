@@ -483,6 +483,7 @@ func evalStringSlice(ctx context.Context, ss []string) ([]string, error) {
 }
 
 func init() {
-	executor.RegisterExecutor("docker", newDocker, nil)
-	executor.RegisterExecutor("container", newDocker, nil)
+	caps := core.ExecutorCapabilities{MultipleCommands: true}
+	executor.RegisterExecutor("docker", newDocker, nil, caps)
+	executor.RegisterExecutor("container", newDocker, nil, caps)
 }

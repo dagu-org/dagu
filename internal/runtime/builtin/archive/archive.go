@@ -29,7 +29,7 @@ var (
 )
 
 func init() {
-	executor.RegisterExecutor(executorType, newExecutor, validateStep)
+	executor.RegisterExecutor(executorType, newExecutor, validateStep, core.ExecutorCapabilities{})
 }
 
 func validateStep(step core.Step) error {
