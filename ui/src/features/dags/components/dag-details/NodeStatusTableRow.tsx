@@ -606,10 +606,9 @@ function NodeStatusTableRow({
           {/* Combined Command & Args */}
           <TableCell>
             <div className="space-y-1.5">
-              {((node.step.command && node.step.command.length > 0) || node.step.cmdWithArgs) && (
+              {node.step.commands && node.step.commands.length > 0 && (
                 <CommandDisplay
-                  command={(node.step.command && node.step.command.length > 0) ? node.step.command : node.step.cmdWithArgs}
-                  args={(node.step.command && node.step.command.length > 0) ? node.step.args : undefined}
+                  commands={node.step.commands}
                   icon="code"
                   maxLength={50}
                 />
@@ -953,38 +952,30 @@ function NodeStatusTableRow({
       {/* Command section */}
       <div className="mb-3">
         <div className="text-xs font-medium text-foreground/90 mb-1">
-          Command:
+          {node.step.commands && node.step.commands.length > 1 ? 'Commands:' : 'Command:'}
         </div>
         <div className="space-y-1.5">
-          {(!node.step.command || node.step.command.length === 0) && node.step.cmdWithArgs ? (
-            <div className="flex items-center gap-1.5 text-xs font-medium">
-              <Code className="h-4 w-4 text-primary" />
-              <span className="bg-muted rounded-md px-1.5 py-0.5 text-foreground/90 break-all whitespace-pre-wrap">
-                {node.step.cmdWithArgs}
-              </span>
-            </div>
-          ) : null}
-
-          {node.step.command && node.step.command.length > 0 && (
-            <div className="space-y-1">
-              {node.step.command.map((cmd, idx) => (
-                <div key={idx} className="flex items-center gap-1.5 text-xs font-medium">
-                  <Code className="h-4 w-4 text-primary" />
-                  <span className="bg-muted rounded-md px-1.5 py-0.5 text-foreground/90 break-all whitespace-pre-wrap">
-                    {cmd}
-                  </span>
-                </div>
-              ))}
-
-              {node.step.args && (
-                <div className="pl-5 text-xs font-medium text-muted-foreground leading-tight">
-                  <span className="break-all whitespace-pre-wrap">
-                    {Array.isArray(node.step.args)
-                      ? node.step.args.join(' ')
-                      : node.step.args}
-                  </span>
-                </div>
-              )}
+          {node.step.commands && node.step.commands.length > 0 && (
+            <div className="space-y-1.5">
+              {node.step.commands.map((entry, idx) => {
+                const fullCmd = entry.args && entry.args.length > 0
+                  ? `${entry.command} ${entry.args.join(' ')}`
+                  : entry.command;
+                return (
+                  <div key={idx} className="flex items-start gap-1.5 text-xs">
+                    {node.step.commands && node.step.commands.length > 1 ? (
+                      <span className="text-muted-foreground font-mono w-4 text-right flex-shrink-0 mt-1">
+                        {idx + 1}.
+                      </span>
+                    ) : (
+                      <Code className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                    )}
+                    <code className="bg-muted rounded-md px-2 py-1 text-foreground/90 break-all whitespace-pre-wrap font-mono text-xs flex-1">
+                      {fullCmd}
+                    </code>
+                  </div>
+                );
+              })}
             </div>
           )}
 

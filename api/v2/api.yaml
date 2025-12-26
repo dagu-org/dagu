@@ -2862,14 +2862,11 @@ components:
         dir:
           type: string
           description: "Working directory for executing the step's command"
-        cmdWithArgs:
-          type: string
-          description: "Complete command string including arguments to execute"
-        command:
+        commands:
           type: array
           description: "List of commands to execute sequentially"
           items:
-            type: string
+            $ref: '#/components/schemas/CommandEntry'
         script:
           type: string
           description: "Script content if the step executes a script file"
@@ -2882,11 +2879,6 @@ components:
         output:
           type: string
           description: "Variable name to store the step's output"
-        args:
-          type: array
-          description: "List of arguments to pass to the command"
-          items:
-            type: string
         call:
           type: string
           description: "The name of the DAG to execute as a sub DAG-run"
@@ -3066,6 +3058,21 @@ components:
           description: "List of exit codes that trigger repeat behavior"
           items:
             type: integer
+
+    CommandEntry:
+      type: object
+      description: "A command with its arguments"
+      properties:
+        command:
+          type: string
+          description: "The command to execute"
+        args:
+          type: array
+          description: "Arguments for the command"
+          items:
+            type: string
+      required:
+        - command
 
     ListTagResponse:
       type: object

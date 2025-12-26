@@ -82,10 +82,9 @@ function DAGStepTableRow({ step, index }: Props) {
       <TableCell>
         <div className="space-y-1.5">
           {/* Command & Args */}
-          {((step.command && step.command.length > 0) || step.cmdWithArgs) && (
+          {step.commands && step.commands.length > 0 && (
             <CommandDisplay
-              command={(step.command && step.command.length > 0) ? step.command : step.cmdWithArgs}
-              args={(step.command && step.command.length > 0) ? step.args : undefined}
+              commands={step.commands}
               icon="terminal"
               maxLength={50}
             />

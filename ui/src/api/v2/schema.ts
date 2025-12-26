@@ -1225,10 +1225,8 @@ export interface components {
             description?: string;
             /** @description Working directory for executing the step's command */
             dir?: string;
-            /** @description Complete command string including arguments to execute */
-            cmdWithArgs?: string;
             /** @description List of commands to execute sequentially */
-            command?: string[];
+            commands?: components["schemas"]["CommandEntry"][];
             /** @description Script content if the step executes a script file */
             script?: string;
             /** @description File path for capturing standard output */
@@ -1237,8 +1235,6 @@ export interface components {
             stderr?: string;
             /** @description Variable name to store the step's output */
             output?: string;
-            /** @description List of arguments to pass to the command */
-            args?: string[];
             /** @description The name of the DAG to execute as a sub DAG-run */
             call?: string;
             /** @description Parameters to pass to the sub DAG-run in JSON format */
@@ -1328,6 +1324,13 @@ export interface components {
             condition?: components["schemas"]["Condition"];
             /** @description List of exit codes that trigger repeat behavior */
             exitCode?: number[];
+        };
+        /** @description A command with its arguments */
+        CommandEntry: {
+            /** @description The command to execute */
+            command: string;
+            /** @description Arguments for the command */
+            args?: string[];
         };
         /** @description Response object for listing all tags */
         ListTagResponse: {

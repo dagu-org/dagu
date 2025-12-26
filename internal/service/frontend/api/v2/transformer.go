@@ -46,26 +46,20 @@ func toStep(obj core.Step) api.Step {
 		repeatPolicy.Condition = ptrOf(toPrecondition(obj.RepeatPolicy.Condition))
 	}
 
-	// Extract command info from Commands field
-	var commands []string
-	var cmdWithArgs string
-	var args []string
+	// Convert Commands to API format
+	var commands []api.CommandEntry
 	for _, cmd := range obj.Commands {
-		commands = append(commands, cmd.Command)
-		// Use first command's args and cmdWithArgs for backward compatibility
-		if len(args) == 0 {
-			args = cmd.Args
-			cmdWithArgs = cmd.CmdWithArgs
-		}
+		commands = append(commands, api.CommandEntry{
+			Command: cmd.Command,
+			Args:    ptrOf(cmd.Args),
+		})
 	}
 
 	step := api.Step{
 		Name:          obj.Name,
 		Id:            ptrOf(obj.ID),
 		Description:   ptrOf(obj.Description),
-		Args:          ptrOf(args),
-		CmdWithArgs:   ptrOf(cmdWithArgs),
-		Command:       ptrOf(commands),
+		Commands:      ptrOf(commands),
 		Depends:       ptrOf(obj.Depends),
 		Dir:           ptrOf(obj.Dir),
 		MailOnError:   ptrOf(obj.MailOnError),
