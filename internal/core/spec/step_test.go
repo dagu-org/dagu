@@ -17,33 +17,35 @@ func TestMain(m *testing.M) {
 	// Register executor capabilities for testing.
 	// In production, this is done by runtime/builtin init functions.
 
-	// Executors that support multiple commands, script, shell
+	// Command executors: support command, multiple commands, script, shell
 	for _, t := range []string{"", "shell", "command"} {
 		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{
-			MultipleCommands: true, Script: true, Shell: true,
+			Command: true, MultipleCommands: true, Script: true, Shell: true,
 		})
 	}
-	// Docker supports all including container
+	// Docker: supports all including container
 	for _, t := range []string{"docker", "container"} {
 		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{
-			MultipleCommands: true, Script: true, Shell: true, Container: true,
+			Command: true, MultipleCommands: true, Script: true, Shell: true, Container: true,
 		})
 	}
-	// SSH supports multiple commands and shell, but not script
+	// SSH: supports command, multiple commands, shell, but not script
 	core.RegisterExecutorCapabilities("ssh", core.ExecutorCapabilities{
-		MultipleCommands: true, Shell: true,
+		Command: true, MultipleCommands: true, Shell: true,
 	})
-	// jq and http support script (as input data)
-	core.RegisterExecutorCapabilities("jq", core.ExecutorCapabilities{Script: true})
-	core.RegisterExecutorCapabilities("http", core.ExecutorCapabilities{Script: true})
-	// dag/subworkflow/parallel support SubDAG
+	// jq and http: support command and script
+	core.RegisterExecutorCapabilities("jq", core.ExecutorCapabilities{Command: true, Script: true})
+	core.RegisterExecutorCapabilities("http", core.ExecutorCapabilities{Command: true, Script: true})
+	// archive and gha: support command only
+	for _, t := range []string{"archive", "github_action", "github-action", "gha"} {
+		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{Command: true})
+	}
+	// dag/subworkflow/parallel: support SubDAG only (no command)
 	for _, t := range []string{"dag", "subworkflow", "parallel"} {
 		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{SubDAG: true})
 	}
-	// Others have no special capabilities
-	for _, t := range []string{"archive", "github_action", "github-action", "gha", "mail"} {
-		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{})
-	}
+	// mail: no command support
+	core.RegisterExecutorCapabilities("mail", core.ExecutorCapabilities{})
 
 	os.Exit(m.Run())
 }
@@ -2403,6 +2405,126 @@ func TestValidateSubDAG(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), "does not support sub-DAG execution")
+				assert.Contains(t, err.Error(), tt.executorType)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateCommand(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		executorType string
+		commands     []core.CommandEntry
+		wantErr      bool
+	}{
+		// Executors that support command
+		{
+			name:         "CommandWithDefaultExecutor",
+			executorType: "",
+			commands:     []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
+			wantErr:      false,
+		},
+		{
+			name:         "CommandWithShellExecutor",
+			executorType: "shell",
+			commands:     []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
+			wantErr:      false,
+		},
+		{
+			name:         "CommandWithCommandExecutor",
+			executorType: "command",
+			commands:     []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
+			wantErr:      false,
+		},
+		{
+			name:         "CommandWithDockerExecutor",
+			executorType: "docker",
+			commands:     []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
+			wantErr:      false,
+		},
+		{
+			name:         "CommandWithSSHExecutor",
+			executorType: "ssh",
+			commands:     []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
+			wantErr:      false,
+		},
+		{
+			name:         "CommandWithJQExecutor",
+			executorType: "jq",
+			commands:     []core.CommandEntry{{Command: ".foo"}},
+			wantErr:      false,
+		},
+		{
+			name:         "CommandWithHTTPExecutor",
+			executorType: "http",
+			commands:     []core.CommandEntry{{Command: "GET", Args: []string{"https://example.com"}}},
+			wantErr:      false,
+		},
+		{
+			name:         "CommandWithArchiveExecutor",
+			executorType: "archive",
+			commands:     []core.CommandEntry{{Command: "extract"}},
+			wantErr:      false,
+		},
+		// Executors that do not support command
+		{
+			name:         "CommandWithDAGExecutor",
+			executorType: "dag",
+			commands:     []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
+			wantErr:      true,
+		},
+		{
+			name:         "CommandWithSubworkflowExecutor",
+			executorType: "subworkflow",
+			commands:     []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
+			wantErr:      true,
+		},
+		{
+			name:         "CommandWithParallelExecutor",
+			executorType: "parallel",
+			commands:     []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
+			wantErr:      true,
+		},
+		{
+			name:         "CommandWithMailExecutor",
+			executorType: "mail",
+			commands:     []core.CommandEntry{{Command: "send"}},
+			wantErr:      true,
+		},
+		// Empty commands - should always pass
+		{
+			name:         "NoCommandsWithDAGExecutor",
+			executorType: "dag",
+			commands:     nil,
+			wantErr:      false,
+		},
+		{
+			name:         "EmptyCommandsWithMailExecutor",
+			executorType: "mail",
+			commands:     []core.CommandEntry{},
+			wantErr:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := &core.Step{
+				Commands: tt.commands,
+				ExecutorConfig: core.ExecutorConfig{
+					Type: tt.executorType,
+				},
+			}
+			err := validateCommand(result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "does not support command field")
 				assert.Contains(t, err.Error(), tt.executorType)
 			} else {
 				assert.NoError(t, err)

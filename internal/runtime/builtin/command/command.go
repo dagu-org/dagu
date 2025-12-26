@@ -326,6 +326,7 @@ func NewCommandConfig(ctx context.Context, step core.Step) (*commandConfig, erro
 // framework, associating each with NewCommand and validateCommandStep.
 func init() {
 	caps := core.ExecutorCapabilities{
+		Command:          true,
 		MultipleCommands: true,
 		Script:           true,
 		Shell:            true,

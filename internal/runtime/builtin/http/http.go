@@ -206,5 +206,5 @@ func decodeHTTPConfigFromString(_ context.Context, source string, target *httpCo
 }
 
 func init() {
-	executor.RegisterExecutor("http", newHTTP, nil, core.ExecutorCapabilities{Script: true})
+	executor.RegisterExecutor("http", newHTTP, nil, core.ExecutorCapabilities{Command: true, Script: true})
 }

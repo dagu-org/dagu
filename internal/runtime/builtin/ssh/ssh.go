@@ -123,6 +123,7 @@ func (e *sshExecutor) Run(ctx context.Context) error {
 
 func init() {
 	caps := core.ExecutorCapabilities{
+		Command:          true,
 		MultipleCommands: true,
 		Shell:            true,
 	}

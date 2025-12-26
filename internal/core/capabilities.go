@@ -2,6 +2,8 @@ package core
 
 // ExecutorCapabilities defines what an executor can do.
 type ExecutorCapabilities struct {
+	// Command indicates whether the executor supports the command field.
+	Command bool
 	// MultipleCommands indicates whether the executor supports multiple commands.
 	MultipleCommands bool
 	// Script indicates whether the executor supports the script field.
@@ -29,18 +31,23 @@ func (r *executorCapabilitiesRegistry) Register(executorType string, caps Execut
 }
 
 // Get returns capabilities for an executor type.
-// Returns default capabilities (MultipleCommands: true) if not registered.
+// Returns default capabilities if not registered.
 func (r *executorCapabilitiesRegistry) Get(executorType string) ExecutorCapabilities {
 	if caps, ok := r.caps[executorType]; ok {
 		return caps
 	}
-	// Default: allow multiple commands (shell, command, docker, ssh)
-	return ExecutorCapabilities{MultipleCommands: true}
+	// Default: support command and multiple commands (shell, command, docker, ssh)
+	return ExecutorCapabilities{Command: true, MultipleCommands: true}
 }
 
 // RegisterExecutorCapabilities registers capabilities for an executor type.
 func RegisterExecutorCapabilities(executorType string, caps ExecutorCapabilities) {
 	executorCapabilities.Register(executorType, caps)
+}
+
+// SupportsCommand returns whether the executor type supports the command field.
+func SupportsCommand(executorType string) bool {
+	return executorCapabilities.Get(executorType).Command
 }
 
 // SupportsMultipleCommands returns whether the executor type supports multiple commands.

@@ -484,6 +484,7 @@ func evalStringSlice(ctx context.Context, ss []string) ([]string, error) {
 
 func init() {
 	caps := core.ExecutorCapabilities{
+		Command:          true,
 		MultipleCommands: true,
 		Script:           true,
 		Shell:            true,

@@ -205,6 +205,9 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	if err := buildStepCommand(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("command", err))
 	}
+	if err := validateCommand(result); err != nil {
+		errs = append(errs, wrapTransformError("command", err))
+	}
 	if err := validateMultipleCommands(result); err != nil {
 		errs = append(errs, wrapTransformError("command", err))
 	}
@@ -697,6 +700,21 @@ func buildMultipleCommands(val []any, result *core.Step) error {
 
 	result.Commands = commands
 
+	return nil
+}
+
+// validateCommand checks if the executor type supports the command field.
+func validateCommand(result *core.Step) error {
+	if len(result.Commands) == 0 {
+		return nil
+	}
+	if !core.SupportsCommand(result.ExecutorConfig.Type) {
+		return core.NewValidationError(
+			"command",
+			result.Commands,
+			fmt.Errorf("executor type %q does not support command field", result.ExecutorConfig.Type),
+		)
+	}
 	return nil
 }
 

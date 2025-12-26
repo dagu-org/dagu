@@ -145,5 +145,5 @@ func decodeJqConfig(dat map[string]any, cfg *jqConfig) error {
 }
 
 func init() {
-	executor.RegisterExecutor("jq", newJQ, nil, core.ExecutorCapabilities{Script: true})
+	executor.RegisterExecutor("jq", newJQ, nil, core.ExecutorCapabilities{Command: true, Script: true})
 }
