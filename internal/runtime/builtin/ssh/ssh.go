@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
-	"golang.org/x/crypto/ssh"
-
+	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
+	"golang.org/x/crypto/ssh"
 )
 
 var _ executor.Executor = (*sshExecutor)(nil)
@@ -106,9 +105,10 @@ func (e *sshExecutor) Run(ctx context.Context) error {
 		session.Stdout = e.stdout
 		session.Stderr = e.stderr
 
-		command := strings.Join(
-			append([]string{cmdEntry.Command}, cmdEntry.Args...), " ",
-		)
+		command := cmdutil.ShellQuote(cmdEntry.Command)
+		if len(cmdEntry.Args) > 0 {
+			command += " " + cmdutil.ShellQuoteArgs(cmdEntry.Args)
+		}
 
 		err = session.Run(command)
 		_ = session.Close()
