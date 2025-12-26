@@ -33,13 +33,13 @@ func (r *executorCapabilitiesRegistry) Register(executorType string, caps Execut
 }
 
 // Get returns capabilities for an executor type.
-// Returns default capabilities if not registered.
+// Returns an empty ExecutorCapabilities if not registered.
 func (r *executorCapabilitiesRegistry) Get(executorType string) ExecutorCapabilities {
 	if caps, ok := r.caps[executorType]; ok {
 		return caps
 	}
-	// Default: support command and multiple commands (shell, command, docker, ssh)
-	return ExecutorCapabilities{Command: true, MultipleCommands: true}
+	// Default: return all false (strict mode)
+	return ExecutorCapabilities{}
 }
 
 // RegisterExecutorCapabilities registers capabilities for an executor type.

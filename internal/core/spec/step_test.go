@@ -3,6 +3,7 @@ package spec
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -2650,4 +2651,24 @@ func TestValidateConflicts(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUnregisteredExecutorValidation(t *testing.T) {
+	t.Parallel()
+
+	yaml := `
+steps:
+  - name: invalid-step
+    executor:
+      type: non-existent
+    command: echo hello
+`
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "test.yaml")
+	err := os.WriteFile(tmpFile, []byte(yaml), 0644)
+	assert.NoError(t, err)
+
+	_, err = Load(context.Background(), tmpFile)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "executor type \"non-existent\" does not support command field")
 }
