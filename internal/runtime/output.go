@@ -268,6 +268,9 @@ func (oc *OutputCoordinator) setupWriters(_ context.Context, data NodeData) erro
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
+	// Check if stdout and stderr should be merged (same file path)
+	isMerged := data.State.Stdout == data.State.Stderr
+
 	// stdout
 	var err error
 	oc.stdoutFile, err = fileutil.OpenOrCreateFile(data.State.Stdout)
@@ -282,18 +285,26 @@ func (oc *OutputCoordinator) setupWriters(_ context.Context, data NodeData) erro
 	oc.stdoutWriter = newSafeBufferedWriter(stdoutWriter)
 	oc.stdoutFileName = data.State.Stdout
 
-	// stderr
-	oc.stderrFile, err = fileutil.OpenOrCreateFile(data.State.Stderr)
-	if err != nil {
-		return fmt.Errorf("failed to open stderr file: %w", err)
+	// stderr - if merged, reuse the same file and writer
+	if isMerged {
+		// Merged mode: reuse stdout file and writer for stderr
+		oc.stderrFile = nil // Don't open a separate file
+		oc.stderrWriter = oc.stdoutWriter
+		oc.stderrFileName = data.State.Stderr
+	} else {
+		// Separate mode: open a separate file for stderr
+		oc.stderrFile, err = fileutil.OpenOrCreateFile(data.State.Stderr)
+		if err != nil {
+			return fmt.Errorf("failed to open stderr file: %w", err)
+		}
+		// Wrap with MaskingWriter if masker is available
+		var stderrWriter io.Writer = oc.stderrFile
+		if oc.masker != nil {
+			stderrWriter = masking.NewMaskingWriter(oc.stderrFile, oc.masker)
+		}
+		oc.stderrWriter = newSafeBufferedWriter(stderrWriter)
+		oc.stderrFileName = data.State.Stderr
 	}
-	// Wrap with MaskingWriter if masker is available
-	var stderrWriter io.Writer = oc.stderrFile
-	if oc.masker != nil {
-		stderrWriter = masking.NewMaskingWriter(oc.stderrFile, oc.masker)
-	}
-	oc.stderrWriter = newSafeBufferedWriter(stderrWriter)
-	oc.stderrFileName = data.State.Stderr
 
 	return nil
 }

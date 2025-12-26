@@ -1756,6 +1756,72 @@ func TestBuildHandlers(t *testing.T) {
 	})
 }
 
+func TestBuildLogOutput(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		yaml        string
+		expected    core.LogOutputMode
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:     "Default_Separate",
+			yaml:     "",
+			expected: core.LogOutputSeparate,
+		},
+		{
+			name:     "ExplicitSeparate",
+			yaml:     "logoutput: separate",
+			expected: core.LogOutputSeparate,
+		},
+		{
+			name:     "Merged",
+			yaml:     "logoutput: merged",
+			expected: core.LogOutputMerged,
+		},
+		{
+			name:     "MergedUppercase",
+			yaml:     "logoutput: MERGED",
+			expected: core.LogOutputMerged,
+		},
+		{
+			name:        "InvalidValue",
+			yaml:        "logoutput: invalid",
+			wantErr:     true,
+			errContains: "invalid logOutput value",
+		},
+		{
+			name:        "InvalidValue_Both",
+			yaml:        "logoutput: both",
+			wantErr:     true,
+			errContains: "invalid logOutput value",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var d dag
+			if tt.yaml != "" {
+				err := yaml.Unmarshal([]byte(tt.yaml), &d)
+				if tt.wantErr {
+					require.Error(t, err)
+					assert.Contains(t, err.Error(), tt.errContains)
+					return
+				}
+				require.NoError(t, err)
+			}
+
+			result, err := buildLogOutput(testBuildContext(), &d)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 // Helper functions
 
 func intPtr(i int) *int {

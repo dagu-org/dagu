@@ -2672,3 +2672,167 @@ steps:
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "executor type \"non-existent\" does not support command field")
 }
+
+func TestBuildStepLogOutput(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		yaml        string
+		expected    core.LogOutputMode
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:     "Default_InheritFromDAG",
+			yaml:     "",
+			expected: "", // Empty means inherit from DAG
+		},
+		{
+			name:     "ExplicitSeparate",
+			yaml:     "logOutput: separate",
+			expected: core.LogOutputSeparate,
+		},
+		{
+			name:     "Merged",
+			yaml:     "logOutput: merged",
+			expected: core.LogOutputMerged,
+		},
+		{
+			name:     "MergedUppercase",
+			yaml:     "logOutput: MERGED",
+			expected: core.LogOutputMerged,
+		},
+		{
+			name:        "InvalidValue",
+			yaml:        "logOutput: invalid",
+			wantErr:     true,
+			errContains: "invalid logOutput value",
+		},
+		{
+			name:        "InvalidValue_Both",
+			yaml:        "logOutput: both",
+			wantErr:     true,
+			errContains: "invalid logOutput value",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var s step
+			if tt.yaml != "" {
+				err := yaml.Unmarshal([]byte(tt.yaml), &s)
+				if tt.wantErr {
+					require.Error(t, err)
+					assert.Contains(t, err.Error(), tt.errContains)
+					return
+				}
+				require.NoError(t, err)
+			}
+
+			result, err := buildStepLogOutput(testStepBuildContext(), &s)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestValidateStdoutStderr(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		stdout      string
+		stderr      string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:    "BothEmpty_Valid",
+			stdout:  "",
+			stderr:  "",
+			wantErr: false,
+		},
+		{
+			name:    "OnlyStdout_Valid",
+			stdout:  "/tmp/output.log",
+			stderr:  "",
+			wantErr: false,
+		},
+		{
+			name:    "OnlyStderr_Valid",
+			stdout:  "",
+			stderr:  "/tmp/error.log",
+			wantErr: false,
+		},
+		{
+			name:    "DifferentFiles_Valid",
+			stdout:  "/tmp/output.log",
+			stderr:  "/tmp/error.log",
+			wantErr: false,
+		},
+		{
+			name:        "SameFile_Error",
+			stdout:      "/tmp/combined.log",
+			stderr:      "/tmp/combined.log",
+			wantErr:     true,
+			errContains: "stdout and stderr cannot point to the same file",
+		},
+		{
+			name:        "SameFile_Error_ContainsFilename",
+			stdout:      "/var/log/app.log",
+			stderr:      "/var/log/app.log",
+			wantErr:     true,
+			errContains: "/var/log/app.log",
+		},
+		{
+			name:        "SameFile_Error_SuggestsMerged",
+			stdout:      "output.log",
+			stderr:      "output.log",
+			wantErr:     true,
+			errContains: "logOutput: merged",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			step := &core.Step{
+				Stdout: tt.stdout,
+				Stderr: tt.stderr,
+			}
+
+			err := validateStdoutStderr(step)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestBuildStep_StdoutStderrSameFile_Error(t *testing.T) {
+	t.Parallel()
+
+	data := []byte(`
+name: test-step
+command: echo hello
+stdout: /tmp/combined.log
+stderr: /tmp/combined.log
+`)
+
+	var s step
+	err := yaml.Unmarshal(data, &s)
+	require.NoError(t, err)
+
+	_, err = s.build(testStepBuildContext())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "stdout and stderr cannot point to the same file")
+	assert.Contains(t, err.Error(), "logOutput: merged")
+}

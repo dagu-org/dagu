@@ -1342,3 +1342,238 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		assert.Contains(t, string(content), "nested output")
 	})
 }
+
+func TestLogOutputMode(t *testing.T) {
+	t.Parallel()
+
+	t.Run("SeparateMode_DefaultBehavior", func(t *testing.T) {
+		t.Parallel()
+
+		tempDir := t.TempDir()
+
+		step := core.Step{
+			Name: "test-separate",
+			Commands: []core.CommandEntry{{
+				Command: "sh",
+				Args:    []string{"-c", "echo stdout && echo stderr >&2"},
+			}},
+		}
+
+		node := runtime.NewNode(step, runtime.NodeState{})
+		node.Init()
+
+		// Setup context with DAG using default (separate) log output mode
+		ctx := context.Background()
+		dag := &core.DAG{
+			LogOutput: core.LogOutputSeparate,
+		}
+		ctx = runtime.NewContext(ctx, dag, "test-run", "test.log")
+
+		// Setup and execute node
+		err := node.Prepare(ctx, tempDir, "test-run")
+		require.NoError(t, err)
+
+		err = node.Execute(ctx)
+		require.NoError(t, err)
+
+		err = node.Teardown()
+		require.NoError(t, err)
+
+		// Verify separate .out and .err files were created
+		state := node.State()
+		assert.True(t, strings.HasSuffix(state.Stdout, ".out"), "stdout should have .out extension")
+		assert.True(t, strings.HasSuffix(state.Stderr, ".err"), "stderr should have .err extension")
+		assert.NotEqual(t, state.Stdout, state.Stderr, "stdout and stderr should be different files")
+
+		// Verify stdout file exists and contains stdout content
+		stdoutContent, err := os.ReadFile(state.Stdout)
+		require.NoError(t, err)
+		assert.Contains(t, string(stdoutContent), "stdout")
+
+		// Verify stderr file exists and contains stderr content
+		stderrContent, err := os.ReadFile(state.Stderr)
+		require.NoError(t, err)
+		assert.Contains(t, string(stderrContent), "stderr")
+	})
+
+	t.Run("MergedMode_DAGLevel", func(t *testing.T) {
+		t.Parallel()
+
+		tempDir := t.TempDir()
+
+		step := core.Step{
+			Name: "test-merged",
+			Commands: []core.CommandEntry{{
+				Command: "sh",
+				Args:    []string{"-c", "echo stdout && echo stderr >&2"},
+			}},
+		}
+
+		node := runtime.NewNode(step, runtime.NodeState{})
+		node.Init()
+
+		// Setup context with DAG using merged log output mode
+		ctx := context.Background()
+		dag := &core.DAG{
+			LogOutput: core.LogOutputMerged,
+		}
+		ctx = runtime.NewContext(ctx, dag, "test-run", "test.log")
+
+		// Setup and execute node
+		err := node.Prepare(ctx, tempDir, "test-run")
+		require.NoError(t, err)
+
+		err = node.Execute(ctx)
+		require.NoError(t, err)
+
+		err = node.Teardown()
+		require.NoError(t, err)
+
+		// Verify single .log file was created
+		state := node.State()
+		assert.True(t, strings.HasSuffix(state.Stdout, ".log"), "stdout should have .log extension")
+		assert.True(t, strings.HasSuffix(state.Stderr, ".log"), "stderr should have .log extension")
+		assert.Equal(t, state.Stdout, state.Stderr, "stdout and stderr should be the same file in merged mode")
+
+		// Verify the merged log file contains both stdout and stderr content
+		logContent, err := os.ReadFile(state.Stdout)
+		require.NoError(t, err)
+		assert.Contains(t, string(logContent), "stdout")
+		assert.Contains(t, string(logContent), "stderr")
+	})
+
+	t.Run("MergedMode_StepLevelOverride", func(t *testing.T) {
+		t.Parallel()
+
+		tempDir := t.TempDir()
+
+		// Step explicitly sets merged mode, overriding DAG's separate mode
+		step := core.Step{
+			Name: "test-step-override",
+			Commands: []core.CommandEntry{{
+				Command: "sh",
+				Args:    []string{"-c", "echo stdout && echo stderr >&2"},
+			}},
+			LogOutput: core.LogOutputMerged,
+		}
+
+		node := runtime.NewNode(step, runtime.NodeState{})
+		node.Init()
+
+		// Setup context with DAG using separate mode (will be overridden by step)
+		ctx := context.Background()
+		dag := &core.DAG{
+			LogOutput: core.LogOutputSeparate,
+		}
+		ctx = runtime.NewContext(ctx, dag, "test-run", "test.log")
+
+		// Setup and execute node
+		err := node.Prepare(ctx, tempDir, "test-run")
+		require.NoError(t, err)
+
+		err = node.Execute(ctx)
+		require.NoError(t, err)
+
+		err = node.Teardown()
+		require.NoError(t, err)
+
+		// Verify step-level override to merged mode was applied
+		state := node.State()
+		assert.True(t, strings.HasSuffix(state.Stdout, ".log"), "step override should use .log extension")
+		assert.Equal(t, state.Stdout, state.Stderr, "stdout and stderr should be the same file")
+
+		// Verify the merged log file contains both outputs
+		logContent, err := os.ReadFile(state.Stdout)
+		require.NoError(t, err)
+		assert.Contains(t, string(logContent), "stdout")
+		assert.Contains(t, string(logContent), "stderr")
+	})
+
+	t.Run("SeparateMode_StepLevelOverride", func(t *testing.T) {
+		t.Parallel()
+
+		tempDir := t.TempDir()
+
+		// Step explicitly sets separate mode, overriding DAG's merged mode
+		step := core.Step{
+			Name: "test-step-separate-override",
+			Commands: []core.CommandEntry{{
+				Command: "sh",
+				Args:    []string{"-c", "echo stdout && echo stderr >&2"},
+			}},
+			LogOutput: core.LogOutputSeparate,
+		}
+
+		node := runtime.NewNode(step, runtime.NodeState{})
+		node.Init()
+
+		// Setup context with DAG using merged mode (will be overridden by step)
+		ctx := context.Background()
+		dag := &core.DAG{
+			LogOutput: core.LogOutputMerged,
+		}
+		ctx = runtime.NewContext(ctx, dag, "test-run", "test.log")
+
+		// Setup and execute node
+		err := node.Prepare(ctx, tempDir, "test-run")
+		require.NoError(t, err)
+
+		err = node.Execute(ctx)
+		require.NoError(t, err)
+
+		err = node.Teardown()
+		require.NoError(t, err)
+
+		// Verify step-level override to separate mode was applied
+		state := node.State()
+		assert.True(t, strings.HasSuffix(state.Stdout, ".out"), "step override should use .out extension")
+		assert.True(t, strings.HasSuffix(state.Stderr, ".err"), "step override should use .err extension")
+		assert.NotEqual(t, state.Stdout, state.Stderr, "stdout and stderr should be different files")
+	})
+
+	t.Run("MergedMode_InterleavedOutput", func(t *testing.T) {
+		t.Parallel()
+
+		tempDir := t.TempDir()
+
+		// Command that interleaves stdout and stderr
+		step := core.Step{
+			Name: "test-interleaved",
+			Commands: []core.CommandEntry{{
+				Command: "sh",
+				Args:    []string{"-c", "echo 'line1-stdout' && echo 'line2-stderr' >&2 && echo 'line3-stdout' && echo 'line4-stderr' >&2"},
+			}},
+		}
+
+		node := runtime.NewNode(step, runtime.NodeState{})
+		node.Init()
+
+		// Setup context with DAG using merged log output mode
+		ctx := context.Background()
+		dag := &core.DAG{
+			LogOutput: core.LogOutputMerged,
+		}
+		ctx = runtime.NewContext(ctx, dag, "test-run", "test.log")
+
+		// Setup and execute node
+		err := node.Prepare(ctx, tempDir, "test-run")
+		require.NoError(t, err)
+
+		err = node.Execute(ctx)
+		require.NoError(t, err)
+
+		err = node.Teardown()
+		require.NoError(t, err)
+
+		// Verify all output is in the same file
+		state := node.State()
+		logContent, err := os.ReadFile(state.Stdout)
+		require.NoError(t, err)
+
+		content := string(logContent)
+		assert.Contains(t, content, "line1-stdout")
+		assert.Contains(t, content, "line2-stderr")
+		assert.Contains(t, content, "line3-stdout")
+		assert.Contains(t, content, "line4-stderr")
+	})
+}

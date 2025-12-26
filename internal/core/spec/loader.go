@@ -579,6 +579,10 @@ func TypedUnionDecodeHook() mapstructure.DecodeHookFunc {
 		if to == reflect.TypeOf(types.PortValue{}) {
 			return decodeViaYAML[types.PortValue](data)
 		}
+		// Handle types.LogOutputValue
+		if to == reflect.TypeOf(types.LogOutputValue{}) {
+			return decodeViaYAML[types.LogOutputValue](data)
+		}
 		return data, nil
 	}
 }

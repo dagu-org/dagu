@@ -347,3 +347,91 @@ func TestDAGRegistryAuths(t *testing.T) {
 		assert.Equal(t, "github-user", ghcrAuth.Username)
 	})
 }
+
+func TestEffectiveLogOutput(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		dagLogOutput  core.LogOutputMode
+		stepLogOutput core.LogOutputMode
+		expected      core.LogOutputMode
+	}{
+		{
+			name:          "BothEmpty_ReturnsSeparate",
+			dagLogOutput:  "",
+			stepLogOutput: "",
+			expected:      core.LogOutputSeparate,
+		},
+		{
+			name:          "DAGSeparate_StepEmpty_ReturnsSeparate",
+			dagLogOutput:  core.LogOutputSeparate,
+			stepLogOutput: "",
+			expected:      core.LogOutputSeparate,
+		},
+		{
+			name:          "DAGMerged_StepEmpty_ReturnsMerged",
+			dagLogOutput:  core.LogOutputMerged,
+			stepLogOutput: "",
+			expected:      core.LogOutputMerged,
+		},
+		{
+			name:          "DAGEmpty_StepSeparate_ReturnsSeparate",
+			dagLogOutput:  "",
+			stepLogOutput: core.LogOutputSeparate,
+			expected:      core.LogOutputSeparate,
+		},
+		{
+			name:          "DAGEmpty_StepMerged_ReturnsMerged",
+			dagLogOutput:  "",
+			stepLogOutput: core.LogOutputMerged,
+			expected:      core.LogOutputMerged,
+		},
+		{
+			name:          "DAGSeparate_StepMerged_StepOverrides",
+			dagLogOutput:  core.LogOutputSeparate,
+			stepLogOutput: core.LogOutputMerged,
+			expected:      core.LogOutputMerged,
+		},
+		{
+			name:          "DAGMerged_StepSeparate_StepOverrides",
+			dagLogOutput:  core.LogOutputMerged,
+			stepLogOutput: core.LogOutputSeparate,
+			expected:      core.LogOutputSeparate,
+		},
+		{
+			name:          "NilDAG_StepMerged_ReturnsMerged",
+			dagLogOutput:  "", // Will use nil DAG
+			stepLogOutput: core.LogOutputMerged,
+			expected:      core.LogOutputMerged,
+		},
+		{
+			name:          "NilStep_DAGMerged_ReturnsMerged",
+			dagLogOutput:  core.LogOutputMerged,
+			stepLogOutput: "", // Will use nil Step
+			expected:      core.LogOutputMerged,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var dag *core.DAG
+			var step *core.Step
+
+			// Setup DAG
+			if tt.name != "NilDAG_StepMerged_ReturnsMerged" {
+				dag = &core.DAG{LogOutput: tt.dagLogOutput}
+			}
+
+			// Setup Step
+			if tt.name != "NilStep_DAGMerged_ReturnsMerged" {
+				step = &core.Step{LogOutput: tt.stepLogOutput}
+			}
+
+			result := core.EffectiveLogOutput(dag, step)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

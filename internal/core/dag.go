@@ -29,6 +29,36 @@ const (
 	TypeAgent = "agent"
 )
 
+// LogOutputMode represents the mode for log output handling.
+// It determines how stdout and stderr are written to log files.
+type LogOutputMode string
+
+const (
+	// LogOutputSeparate keeps stdout and stderr in separate files (.out and .err).
+	// This is the default behavior for backward compatibility.
+	LogOutputSeparate LogOutputMode = "separate"
+
+	// LogOutputMerged combines stdout and stderr into a single log file (.log).
+	// Both streams are interleaved in the order they are written.
+	LogOutputMerged LogOutputMode = "merged"
+)
+
+// EffectiveLogOutput returns the effective log output mode for a step.
+// It resolves the inheritance chain: step-level overrides DAG-level,
+// and if neither is set, returns the default (LogOutputSeparate).
+func EffectiveLogOutput(dag *DAG, step *Step) LogOutputMode {
+	// Step-level override takes precedence
+	if step != nil && step.LogOutput != "" {
+		return step.LogOutput
+	}
+	// Fall back to DAG-level setting
+	if dag != nil && dag.LogOutput != "" {
+		return dag.LogOutput
+	}
+	// Default to separate
+	return LogOutputSeparate
+}
+
 // DAG contains all information about a DAG.
 type DAG struct {
 	// WorkingDir is the working directory to run the DAG.
@@ -71,6 +101,10 @@ type DAG struct {
 	Env []string `json:"env,omitempty"`
 	// LogDir is the directory where the logs are stored.
 	LogDir string `json:"logDir,omitempty"`
+	// LogOutput specifies how stdout and stderr are handled in log files.
+	// Can be "separate" (default) for separate .out and .err files,
+	// or "merged" for a single combined .log file.
+	LogOutput LogOutputMode `json:"logOutput,omitempty"`
 	// DefaultParams contains the default parameters to be passed to the DAG.
 	DefaultParams string `json:"defaultParams,omitempty"`
 	// Params contains the list of parameters to be passed to the DAG.

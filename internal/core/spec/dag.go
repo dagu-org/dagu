@@ -44,8 +44,12 @@ type dag struct {
 	// SkipIfSuccessful is the flag to skip the DAG on schedule when it is
 	// executed manually before the schedule.
 	SkipIfSuccessful bool
-	// LogFile is the file to write the log.
+	// LogDir is the directory where the logs are stored.
 	LogDir string
+	// LogOutput specifies how stdout and stderr are handled in log files.
+	// Can be "separate" (default) for separate .out and .err files,
+	// or "merged" for a single combined .log file.
+	LogOutput types.LogOutputValue
 	// Env is the environment variables setting.
 	Env types.EnvValue
 	// HandlerOn is the handler configuration.
@@ -279,6 +283,7 @@ var metadataTransformers = []transform{
 // fullTransformers are only run when building the full DAG (not metadata-only)
 var fullTransformers = []transform{
 	{"logDir", newTransformer("LogDir", buildLogDir)},
+	{"logOutput", newTransformer("LogOutput", buildLogOutput)},
 	{"mailOn", newTransformer("MailOn", buildMailOn)},
 	{"runConfig", newTransformer("RunConfig", buildRunConfig)},
 	{"histRetentionDays", newTransformer("HistRetentionDays", buildHistRetentionDays)},
@@ -474,6 +479,13 @@ func buildSkipIfSuccessful(_ BuildContext, d *dag) (bool, error) {
 
 func buildLogDir(_ BuildContext, d *dag) (string, error) {
 	return d.LogDir, nil
+}
+
+func buildLogOutput(_ BuildContext, d *dag) (core.LogOutputMode, error) {
+	if d.LogOutput.IsZero() {
+		return core.LogOutputSeparate, nil
+	}
+	return d.LogOutput.Mode(), nil
 }
 
 func buildMailOn(_ BuildContext, d *dag) (*core.MailOn, error) {

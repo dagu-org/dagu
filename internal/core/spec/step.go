@@ -44,6 +44,11 @@ type step struct {
 	Stdout string `yaml:"stdout,omitempty"`
 	// Stderr is the file to write the stderr.
 	Stderr string `yaml:"stderr,omitempty"`
+	// LogOutput specifies how stdout and stderr are handled in log files for this step.
+	// Overrides the DAG-level logOutput setting.
+	// Can be "separate" (default) for separate .out and .err files,
+	// or "merged" for a single combined .log file.
+	LogOutput types.LogOutputValue `yaml:"logOutput,omitempty"`
 	// Output is the variable name to store the output.
 	Output string `yaml:"output,omitempty"`
 	// Depends is the list of steps to depend on.
@@ -152,6 +157,7 @@ var stepTransformers = []stepTransform{
 	{"script", newStepTransformer("Script", buildStepScript)},
 	{"stdout", newStepTransformer("Stdout", buildStepStdout)},
 	{"stderr", newStepTransformer("Stderr", buildStepStderr)},
+	{"logOutput", newStepTransformer("LogOutput", buildStepLogOutput)},
 	{"mailOnError", newStepTransformer("MailOnError", buildStepMailOnError)},
 	{"workerSelector", newStepTransformer("WorkerSelector", buildStepWorkerSelector)},
 	{"workingDir", newStepTransformer("Dir", buildStepWorkingDir)},
@@ -240,11 +246,25 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 		errs = append(errs, wrapTransformError("workerSelector", err))
 	}
 
+	// Validate that stdout and stderr don't point to the same file
+	if err := validateStdoutStderr(result); err != nil {
+		errs = append(errs, err)
+	}
+
 	if len(errs) > 0 {
 		return nil, errs
 	}
 
 	return result, nil
+}
+
+// validateStdoutStderr checks that stdout and stderr don't point to the same file.
+// If both are specified and point to the same file, use logOutput: merged instead.
+func validateStdoutStderr(s *core.Step) error {
+	if s.Stdout != "" && s.Stderr != "" && s.Stdout == s.Stderr {
+		return fmt.Errorf("stdout and stderr cannot point to the same file %q; use 'logOutput: merged' instead", s.Stdout)
+	}
+	return nil
 }
 
 // Simple field builders
@@ -275,6 +295,14 @@ func buildStepStdout(_ StepBuildContext, s *step) (string, error) {
 
 func buildStepStderr(_ StepBuildContext, s *step) (string, error) {
 	return strings.TrimSpace(s.Stderr), nil
+}
+
+func buildStepLogOutput(_ StepBuildContext, s *step) (core.LogOutputMode, error) {
+	if s.LogOutput.IsZero() {
+		// Return empty string to indicate "inherit from DAG"
+		return "", nil
+	}
+	return s.LogOutput.Mode(), nil
 }
 
 func buildStepMailOnError(_ StepBuildContext, s *step) (bool, error) {
