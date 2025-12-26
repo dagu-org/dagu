@@ -1352,9 +1352,11 @@ func TestLogOutputMode(t *testing.T) {
 		tempDir := t.TempDir()
 
 		step := core.Step{
-			Name:    "test-separate",
-			Command: "sh",
-			Args:    []string{"-c", "echo stdout && echo stderr >&2"},
+			Name: "test-separate",
+			Commands: []core.CommandEntry{{
+				Command: "sh",
+				Args:    []string{"-c", "echo stdout && echo stderr >&2"},
+			}},
 		}
 
 		node := runtime.NewNode(step, runtime.NodeState{})
@@ -1400,9 +1402,11 @@ func TestLogOutputMode(t *testing.T) {
 		tempDir := t.TempDir()
 
 		step := core.Step{
-			Name:    "test-merged",
-			Command: "sh",
-			Args:    []string{"-c", "echo stdout && echo stderr >&2"},
+			Name: "test-merged",
+			Commands: []core.CommandEntry{{
+				Command: "sh",
+				Args:    []string{"-c", "echo stdout && echo stderr >&2"},
+			}},
 		}
 
 		node := runtime.NewNode(step, runtime.NodeState{})
@@ -1445,9 +1449,11 @@ func TestLogOutputMode(t *testing.T) {
 
 		// Step explicitly sets merged mode, overriding DAG's separate mode
 		step := core.Step{
-			Name:      "test-step-override",
-			Command:   "sh",
-			Args:      []string{"-c", "echo stdout && echo stderr >&2"},
+			Name: "test-step-override",
+			Commands: []core.CommandEntry{{
+				Command: "sh",
+				Args:    []string{"-c", "echo stdout && echo stderr >&2"},
+			}},
 			LogOutput: core.LogOutputMerged,
 		}
 
@@ -1490,9 +1496,11 @@ func TestLogOutputMode(t *testing.T) {
 
 		// Step explicitly sets separate mode, overriding DAG's merged mode
 		step := core.Step{
-			Name:      "test-step-separate-override",
-			Command:   "sh",
-			Args:      []string{"-c", "echo stdout && echo stderr >&2"},
+			Name: "test-step-separate-override",
+			Commands: []core.CommandEntry{{
+				Command: "sh",
+				Args:    []string{"-c", "echo stdout && echo stderr >&2"},
+			}},
 			LogOutput: core.LogOutputSeparate,
 		}
 
@@ -1530,9 +1538,11 @@ func TestLogOutputMode(t *testing.T) {
 
 		// Command that interleaves stdout and stderr
 		step := core.Step{
-			Name:    "test-interleaved",
-			Command: "sh",
-			Args:    []string{"-c", "echo 'line1-stdout' && echo 'line2-stderr' >&2 && echo 'line3-stdout' && echo 'line4-stderr' >&2"},
+			Name: "test-interleaved",
+			Commands: []core.CommandEntry{{
+				Command: "sh",
+				Args:    []string{"-c", "echo 'line1-stdout' && echo 'line2-stderr' >&2 && echo 'line3-stdout' && echo 'line4-stderr' >&2"},
+			}},
 		}
 
 		node := runtime.NewNode(step, runtime.NodeState{})
