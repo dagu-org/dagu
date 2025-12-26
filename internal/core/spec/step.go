@@ -221,11 +221,25 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 		errs = append(errs, wrapTransformError("subDAG", err))
 	}
 
+	// Validate that stdout and stderr don't point to the same file
+	if err := validateStdoutStderr(result); err != nil {
+		errs = append(errs, err)
+	}
+
 	if len(errs) > 0 {
 		return nil, errs
 	}
 
 	return result, nil
+}
+
+// validateStdoutStderr checks that stdout and stderr don't point to the same file.
+// If both are specified and point to the same file, use logOutput: merged instead.
+func validateStdoutStderr(s *core.Step) error {
+	if s.Stdout != "" && s.Stderr != "" && s.Stdout == s.Stderr {
+		return fmt.Errorf("stdout and stderr cannot point to the same file %q; use 'logOutput: merged' instead", s.Stdout)
+	}
+	return nil
 }
 
 // Simple field builders
