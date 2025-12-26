@@ -3,8 +3,15 @@ package core
 // ExecutorCapabilities defines what an executor can do.
 type ExecutorCapabilities struct {
 	// MultipleCommands indicates whether the executor supports multiple commands.
-	// If false, validation will reject steps with more than one command.
 	MultipleCommands bool
+	// Script indicates whether the executor supports the script field.
+	Script bool
+	// Shell indicates whether the executor uses shell/shellArgs/shellPackages.
+	Shell bool
+	// Container indicates whether the executor supports step-level container config.
+	Container bool
+	// SubDAG indicates whether the executor can execute sub-DAGs.
+	SubDAG bool
 }
 
 // executorCapabilitiesRegistry is a typed registry of executor capabilities.
@@ -31,11 +38,6 @@ func (r *executorCapabilitiesRegistry) Get(executorType string) ExecutorCapabili
 	return ExecutorCapabilities{MultipleCommands: true}
 }
 
-// SupportsMultipleCommands returns whether the executor type supports multiple commands.
-func (r *executorCapabilitiesRegistry) SupportsMultipleCommands(executorType string) bool {
-	return r.Get(executorType).MultipleCommands
-}
-
 // RegisterExecutorCapabilities registers capabilities for an executor type.
 func RegisterExecutorCapabilities(executorType string, caps ExecutorCapabilities) {
 	executorCapabilities.Register(executorType, caps)
@@ -43,5 +45,25 @@ func RegisterExecutorCapabilities(executorType string, caps ExecutorCapabilities
 
 // SupportsMultipleCommands returns whether the executor type supports multiple commands.
 func SupportsMultipleCommands(executorType string) bool {
-	return executorCapabilities.SupportsMultipleCommands(executorType)
+	return executorCapabilities.Get(executorType).MultipleCommands
+}
+
+// SupportsScript returns whether the executor type supports the script field.
+func SupportsScript(executorType string) bool {
+	return executorCapabilities.Get(executorType).Script
+}
+
+// SupportsShell returns whether the executor type uses shell configuration.
+func SupportsShell(executorType string) bool {
+	return executorCapabilities.Get(executorType).Shell
+}
+
+// SupportsContainer returns whether the executor type supports step-level container config.
+func SupportsContainer(executorType string) bool {
+	return executorCapabilities.Get(executorType).Container
+}
+
+// SupportsSubDAG returns whether the executor type can execute sub-DAGs.
+func SupportsSubDAG(executorType string) bool {
+	return executorCapabilities.Get(executorType).SubDAG
 }

@@ -14,12 +14,37 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	// Register single-command-only executor capabilities for testing.
+	// Register executor capabilities for testing.
 	// In production, this is done by runtime/builtin init functions.
-	// Default is MultipleCommands: true, so we only register the exceptions.
-	for _, t := range []string{"jq", "http", "archive", "github_action", "github-action", "gha", "mail", "dag", "subworkflow", "parallel"} {
+
+	// Executors that support multiple commands, script, shell
+	for _, t := range []string{"", "shell", "command"} {
+		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{
+			MultipleCommands: true, Script: true, Shell: true,
+		})
+	}
+	// Docker supports all including container
+	for _, t := range []string{"docker", "container"} {
+		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{
+			MultipleCommands: true, Script: true, Shell: true, Container: true,
+		})
+	}
+	// SSH supports multiple commands and shell, but not script
+	core.RegisterExecutorCapabilities("ssh", core.ExecutorCapabilities{
+		MultipleCommands: true, Shell: true,
+	})
+	// jq and http support script (as input data)
+	core.RegisterExecutorCapabilities("jq", core.ExecutorCapabilities{Script: true})
+	core.RegisterExecutorCapabilities("http", core.ExecutorCapabilities{Script: true})
+	// dag/subworkflow/parallel support SubDAG
+	for _, t := range []string{"dag", "subworkflow", "parallel"} {
+		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{SubDAG: true})
+	}
+	// Others have no special capabilities
+	for _, t := range []string{"archive", "github_action", "github-action", "gha", "mail"} {
 		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{})
 	}
+
 	os.Exit(m.Run())
 }
 

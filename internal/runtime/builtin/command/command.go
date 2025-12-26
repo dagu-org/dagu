@@ -325,7 +325,11 @@ func NewCommandConfig(ctx context.Context, step core.Step) (*commandConfig, erro
 // init registers command executors ("", "shell", "command") with the executor
 // framework, associating each with NewCommand and validateCommandStep.
 func init() {
-	caps := core.ExecutorCapabilities{MultipleCommands: true}
+	caps := core.ExecutorCapabilities{
+		MultipleCommands: true,
+		Script:           true,
+		Shell:            true,
+	}
 	executor.RegisterExecutor("", NewCommand, validateCommandStep, caps)
 	executor.RegisterExecutor("shell", NewCommand, validateCommandStep, caps)
 	executor.RegisterExecutor("command", NewCommand, validateCommandStep, caps)

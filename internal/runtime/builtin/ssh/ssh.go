@@ -146,5 +146,9 @@ func validateSSHStep(step core.Step) error {
 }
 
 func init() {
-	executor.RegisterExecutor("ssh", NewSSHExecutor, validateSSHStep, core.ExecutorCapabilities{MultipleCommands: true})
+	caps := core.ExecutorCapabilities{
+		MultipleCommands: true,
+		Shell:            true,
+	}
+	executor.RegisterExecutor("ssh", NewSSHExecutor, validateSSHStep, caps)
 }
