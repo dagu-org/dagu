@@ -280,9 +280,12 @@ func TestNewEnvForStep_BasicFields(t *testing.T) {
 	ctx := runtime.WithDAGContext(context.Background(), dagCtx)
 
 	step := core.Step{
-		Name:    "test-step",
-		Command: "echo hello",
-		Args:    []string{"arg1", "arg2"},
+		Name: "test-step",
+		Commands: []core.CommandEntry{{
+			Command:     "echo",
+			Args:        []string{"hello", "arg1", "arg2"},
+			CmdWithArgs: "echo hello",
+		}},
 	}
 
 	env := runtime.NewEnv(ctx, step)

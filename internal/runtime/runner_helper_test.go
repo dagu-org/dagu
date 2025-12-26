@@ -133,15 +133,18 @@ func withMaxActiveRuns(n int) runnerOption {
 	}
 }
 
-func withOnExit(step core.Step) runnerOption {
-	return func(cfg *runtime.Config) {
-		cfg.OnExit = &step
-	}
-}
-
-func withOnCancel(step core.Step) runnerOption {
-	return func(cfg *runtime.Config) {
-		cfg.OnCancel = &step
+func newHandlerStep(t *testing.T, name, id, command string) core.Step {
+	t.Helper()
+	cmd, args, err := cmdutil.SplitCommand(command)
+	require.NoError(t, err)
+	return core.Step{
+		Name: name,
+		ID:   id,
+		Commands: []core.CommandEntry{{
+			Command:     cmd,
+			Args:        args,
+			CmdWithArgs: command,
+		}},
 	}
 }
 
@@ -154,6 +157,18 @@ func withOnSuccess(step core.Step) runnerOption {
 func withOnFailure(step core.Step) runnerOption {
 	return func(cfg *runtime.Config) {
 		cfg.OnFailure = &step
+	}
+}
+
+func withOnExit(step core.Step) runnerOption {
+	return func(cfg *runtime.Config) {
+		cfg.OnExit = &step
+	}
+}
+
+func withOnCancel(step core.Step) runnerOption {
+	return func(cfg *runtime.Config) {
+		cfg.OnCancel = &step
 	}
 }
 

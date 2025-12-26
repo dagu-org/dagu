@@ -673,9 +673,11 @@ func TestNodeSetupAndTeardown(t *testing.T) {
 	tempDir := t.TempDir()
 
 	step := core.Step{
-		Name:    "test-step",
-		Command: "echo",
-		Args:    []string{"hello"},
+		Name: "test-step",
+		Commands: []core.CommandEntry{{
+			Command: "echo",
+			Args:    []string{"hello"},
+		}},
 	}
 
 	node := runtime.NewNode(step, runtime.NodeState{})
@@ -731,9 +733,11 @@ func TestNodeInit(t *testing.T) {
 
 func TestNodeCancel(t *testing.T) {
 	step := core.Step{
-		Name:    "test-step",
-		Command: "sleep",
-		Args:    []string{"10"},
+		Name: "test-step",
+		Commands: []core.CommandEntry{{
+			Command: "sleep",
+			Args:    []string{"10"},
+		}},
 	}
 
 	node := runtime.NewNode(step, runtime.NodeState{})
@@ -877,10 +881,12 @@ func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {
 
 				// Create a node with output capture
 				step := core.Step{
-					Name:    "test-size-config",
-					Command: "echo",
-					Args:    []string{"test"},
-					Output:  "TEST_VAR",
+					Name: "test-size-config",
+					Commands: []core.CommandEntry{{
+						Command: "echo",
+						Args:    []string{"test"},
+					}},
+					Output: "TEST_VAR",
 				}
 
 				node := runtime.NewNode(step, runtime.NodeState{})
@@ -1052,7 +1058,10 @@ func withNodeCmdArgs(cmdWithArgs string) nodeOption {
 
 func withNodeCommand(command string) nodeOption {
 	return func(data *runtime.NodeData) {
-		data.Step.Commands = []core.CommandEntry{{Command: command}}
+		data.Step.Commands = []core.CommandEntry{{
+			Command:     command,
+			CmdWithArgs: command,
+		}}
 	}
 }
 
@@ -1159,10 +1168,12 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		stdoutPath := filepath.Join(tempDir, "output.log")
 
 		step := core.Step{
-			Name:    "test-absolute-path",
-			Command: "echo",
-			Args:    []string{"hello world"},
-			Stdout:  stdoutPath,
+			Name: "test-absolute-path",
+			Commands: []core.CommandEntry{{
+				Command: "echo",
+				Args:    []string{"hello world"},
+			}},
+			Stdout: stdoutPath,
 		}
 
 		node := runtime.NewNode(step, runtime.NodeState{})
@@ -1199,10 +1210,12 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		stdoutPath := "output.log"
 
 		step := core.Step{
-			Name:    "test-relative-path",
-			Command: "echo",
-			Args:    []string{"hello from working dir"},
-			Stdout:  stdoutPath,
+			Name: "test-relative-path",
+			Commands: []core.CommandEntry{{
+				Command: "echo",
+				Args:    []string{"hello from working dir"},
+			}},
+			Stdout: stdoutPath,
 		}
 
 		node := runtime.NewNode(step, runtime.NodeState{})
@@ -1244,10 +1257,12 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		stderrPath := "error.log"
 
 		step := core.Step{
-			Name:    "test-stderr-path",
-			Command: "sh",
-			Args:    []string{"-c", "echo 'error message' >&2"},
-			Stderr:  stderrPath,
+			Name: "test-stderr-path",
+			Commands: []core.CommandEntry{{
+				Command: "sh",
+				Args:    []string{"-c", "echo 'error message' >&2"},
+			}},
+			Stderr: stderrPath,
 		}
 
 		node := runtime.NewNode(step, runtime.NodeState{})
@@ -1290,10 +1305,12 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 		stdoutPath := "logs/output.log"
 
 		step := core.Step{
-			Name:    "test-nested-path",
-			Command: "echo",
-			Args:    []string{"nested output"},
-			Stdout:  stdoutPath,
+			Name: "test-nested-path",
+			Commands: []core.CommandEntry{{
+				Command: "echo",
+				Args:    []string{"nested output"},
+			}},
+			Stdout: stdoutPath,
 		}
 
 		node := runtime.NewNode(step, runtime.NodeState{})

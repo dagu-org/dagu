@@ -2259,9 +2259,9 @@ func TestRunner_StepRetryExecution(t *testing.T) {
 		// A -> B -> C, all successful
 		dag := &core.DAG{
 			Steps: []core.Step{
-				{Name: "A", Command: "echo A"},
-				{Name: "B", Command: "echo B", Depends: []string{"A"}},
-				{Name: "C", Command: "echo C", Depends: []string{"B"}},
+				{Name: "A", Commands: []core.CommandEntry{{Command: "echo", Args: []string{"A"}}}},
+				{Name: "B", Commands: []core.CommandEntry{{Command: "echo", Args: []string{"B"}}}, Depends: []string{"A"}},
+				{Name: "C", Commands: []core.CommandEntry{{Command: "echo", Args: []string{"C"}}}, Depends: []string{"B"}},
 			},
 		}
 
@@ -2407,11 +2407,8 @@ func TestRunner_StepIDAccess(t *testing.T) {
 func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 	t.Run("OnSuccessHandlerWithStepReferences", func(t *testing.T) {
 		r := setupRunner(t,
-			withOnSuccess(core.Step{
-				Name:    "success_handler",
-				ID:      "on_success",
-				Command: "echo 'Main output: ${main.stdout}, Worker result: ${worker.exit_code}'",
-			}),
+			withOnSuccess(newHandlerStep(t, "success_handler", "on_success",
+				"echo 'Main output: ${main.stdout}, Worker result: ${worker.exit_code}'")),
 		)
 
 		plan := r.newPlan(t,
@@ -2450,11 +2447,8 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 
 	t.Run("OnFailureHandlerWithStepReferences", func(t *testing.T) {
 		r := setupRunner(t,
-			withOnFailure(core.Step{
-				Name:    "failure_handler",
-				ID:      "on_fail",
-				Command: "echo 'Failed step stderr: ${failing.stderr}, exit code: ${failing.exit_code}'",
-			}),
+			withOnFailure(newHandlerStep(t, "failure_handler", "on_fail",
+				"echo 'Failed step stderr: ${failing.stderr}, exit code: ${failing.exit_code}'")),
 		)
 
 		plan := r.newPlan(t,
@@ -2493,11 +2487,8 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 
 	t.Run("OnExitHandlerWithMultipleStepReferences", func(t *testing.T) {
 		r := setupRunner(t,
-			withOnExit(core.Step{
-				Name:    "exit_handler",
-				ID:      "on_exit",
-				Command: "echo 'Step1: ${step1.stdout}, Step2: ${step2.exit_code}, Step3: ${step3.stderr}'",
-			}),
+			withOnExit(newHandlerStep(t, "exit_handler", "on_exit",
+				"echo 'Step1: ${step1.stdout}, Step2: ${step2.exit_code}, Step3: ${step3.stderr}'")),
 		)
 
 		plan := r.newPlan(t,
@@ -2544,11 +2535,7 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 
 	t.Run("HandlerWithoutIDCannotBeReferenced", func(t *testing.T) {
 		r := setupRunner(t,
-			withOnExit(core.Step{
-				Name: "exit_handler_no_id",
-				// No ID field set
-				Command: "echo 'Handler executed'",
-			}),
+			withOnExit(newHandlerStep(t, "exit_handler_no_id", "", "echo 'Handler executed'")),
 		)
 
 		plan := r.newPlan(t,
@@ -2573,16 +2560,10 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 		// Test that handlers can reference main steps but not other handlers
 		// This is because handlers execute after all main steps are complete
 		r := setupRunner(t,
-			withOnSuccess(core.Step{
-				Name:    "first_handler",
-				ID:      "handler1",
-				Command: "echo 'SUCCESS: Main returned ${main.exit_code}'",
-			}),
-			withOnExit(core.Step{
-				Name:    "final_handler",
-				ID:      "handler2",
-				Command: "echo 'FINAL: Main step output at ${main.stdout}, trying handler ref: ${handler1.stdout}'",
-			}),
+			withOnSuccess(newHandlerStep(t, "first_handler", "handler1",
+				"echo 'SUCCESS: Main returned ${main.exit_code}'")),
+			withOnExit(newHandlerStep(t, "final_handler", "handler2",
+				"echo 'FINAL: Main step output at ${main.stdout}, trying handler ref: ${handler1.stdout}'")),
 		)
 
 		plan := r.newPlan(t,
@@ -2621,10 +2602,7 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 
 func TestRunner_DAGRunStatusHandlerEnv(t *testing.T) {
 	r := setupRunner(t,
-		withOnExit(core.Step{
-			Name:    "exit_handler",
-			Command: "echo status=${DAG_RUN_STATUS}",
-		}),
+		withOnExit(newHandlerStep(t, "exit_handler", "", "echo status=${DAG_RUN_STATUS}")),
 	)
 
 	plan := r.newPlan(t, successStep("main"))

@@ -151,15 +151,13 @@ func (s *Step) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	// Migrate legacy command/args to Commands field
-	if s.Command != "" {
-		s.Commands = []CommandEntry{
-			{
-				Command:     s.Command,
-				Args:        s.Args,
-				CmdWithArgs: s.CmdWithArgs,
-			},
-		}
+	// Migrate legacy fields to Commands field
+	s.Commands = []CommandEntry{
+		{
+			Command:     s.Command,
+			Args:        s.Args,
+			CmdWithArgs: s.CmdWithArgs,
+		},
 	}
 
 	return nil

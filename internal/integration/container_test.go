@@ -518,6 +518,8 @@ func waitForContainerStop(t *testing.T, th test.Helper, dockerClient *client.Cli
 // which allows specifying a container field directly on a step instead of
 // using the executor syntax.
 func TestStepLevelContainer(t *testing.T) {
+	t.Parallel()
+
 	tests := []containerTest{
 		{
 			name: "BasicStepContainer",
@@ -723,8 +725,6 @@ steps:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			tempDir, err := os.MkdirTemp("", fmt.Sprintf("%s-step-%s-*", containerPrefix, tt.name))
 			require.NoError(t, err, "failed to create temporary directory")
 			t.Cleanup(func() { _ = os.RemoveAll(tempDir) })

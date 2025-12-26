@@ -2292,3 +2292,118 @@ func TestReadFirstLine_LongLine(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to read file")
 }
+
+func TestMultiCommandExecutor(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping test on Windows")
+	}
+
+	t.Run("MultipleCommandsExecuteSequentially", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		outputFile := filepath.Join(tmpDir, "output.txt")
+
+		step := core.Step{
+			Name: "test",
+			Commands: []core.CommandEntry{
+				{Command: "sh", Args: []string{"-c", "echo first >> " + outputFile}},
+				{Command: "sh", Args: []string{"-c", "echo second >> " + outputFile}},
+				{Command: "sh", Args: []string{"-c", "echo third >> " + outputFile}},
+			},
+		}
+
+		ctx := runtime.NewContext(context.Background(), &core.DAG{Name: "test"}, "test-run", "test.log")
+		exec, err := NewCommand(ctx, step)
+		require.NoError(t, err)
+
+		err = exec.Run(ctx)
+		require.NoError(t, err)
+
+		// Verify all commands executed in order
+		content, err := os.ReadFile(outputFile)
+		require.NoError(t, err)
+		assert.Equal(t, "first\nsecond\nthird\n", string(content))
+	})
+
+	t.Run("StopsOnFirstFailure", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		outputFile := filepath.Join(tmpDir, "output.txt")
+
+		step := core.Step{
+			Name: "test",
+			Commands: []core.CommandEntry{
+				{Command: "sh", Args: []string{"-c", "echo first >> " + outputFile}},
+				{Command: "sh", Args: []string{"-c", "exit 1"}},
+				{Command: "sh", Args: []string{"-c", "echo third >> " + outputFile}},
+			},
+		}
+
+		ctx := runtime.NewContext(context.Background(), &core.DAG{Name: "test"}, "test-run", "test.log")
+		exec, err := NewCommand(ctx, step)
+		require.NoError(t, err)
+
+		err = exec.Run(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "command 2 failed")
+
+		// Verify only the first command was executed
+		content, err := os.ReadFile(outputFile)
+		require.NoError(t, err)
+		assert.Equal(t, "first\n", string(content))
+	})
+
+	t.Run("SingleCommandUsesSingleExecutor", func(t *testing.T) {
+		step := core.Step{
+			Name: "test",
+			Commands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello"}},
+			},
+		}
+
+		ctx := runtime.NewContext(context.Background(), &core.DAG{Name: "test"}, "test-run", "test.log")
+		exec, err := NewCommand(ctx, step)
+		require.NoError(t, err)
+
+		// Should return commandExecutor, not multiCommandExecutor
+		_, isMulti := exec.(*multiCommandExecutor)
+		assert.False(t, isMulti, "single command should not use multiCommandExecutor")
+	})
+
+	t.Run("MultipleCommandsUseMultiExecutor", func(t *testing.T) {
+		step := core.Step{
+			Name: "test",
+			Commands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"first"}},
+				{Command: "echo", Args: []string{"second"}},
+			},
+		}
+
+		ctx := runtime.NewContext(context.Background(), &core.DAG{Name: "test"}, "test-run", "test.log")
+		exec, err := NewCommand(ctx, step)
+		require.NoError(t, err)
+
+		// Should return multiCommandExecutor
+		_, isMulti := exec.(*multiCommandExecutor)
+		assert.True(t, isMulti, "multiple commands should use multiCommandExecutor")
+	})
+
+	t.Run("ExitCodeFromFailedCommand", func(t *testing.T) {
+		step := core.Step{
+			Name: "test",
+			Commands: []core.CommandEntry{
+				{Command: "sh", Args: []string{"-c", "exit 0"}},
+				{Command: "sh", Args: []string{"-c", "exit 42"}},
+			},
+		}
+
+		ctx := runtime.NewContext(context.Background(), &core.DAG{Name: "test"}, "test-run", "test.log")
+		exec, err := NewCommand(ctx, step)
+		require.NoError(t, err)
+
+		err = exec.Run(ctx)
+		require.Error(t, err)
+
+		exitCoder, ok := exec.(executor.ExitCoder)
+		require.True(t, ok)
+		assert.Equal(t, 42, exitCoder.ExitCode())
+	})
+}

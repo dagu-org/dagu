@@ -22,7 +22,7 @@ func TestStatusSerialization(t *testing.T) {
 		Steps: []core.Step{
 			{
 				Name: "1", Description: "",
-				Dir: "dir", Command: "echo 1", Args: []string{},
+				Dir: "dir", Commands: []core.CommandEntry{{Command: "echo", Args: []string{"1"}}},
 				Depends: []string{}, ContinueOn: core.ContinueOn{},
 				RetryPolicy: core.RetryPolicy{}, MailOnError: false,
 				RepeatPolicy: core.RepeatPolicy{}, Preconditions: []*core.Condition{},
@@ -57,8 +57,8 @@ func TestStatusBuilder(t *testing.T) {
 			Cancel:  &core.Step{Name: "cancel-handler"},
 		},
 		Steps: []core.Step{
-			{Name: "step1", Command: "echo hello"},
-			{Name: "step2", Command: "echo world"},
+			{Name: "step1", Commands: []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}}},
+			{Name: "step2", Commands: []core.CommandEntry{{Command: "echo", Args: []string{"world"}}}},
 		},
 		Params: []string{"param1", "param2"},
 		Preconditions: []*core.Condition{
@@ -306,12 +306,12 @@ func TestNewNodesFromSteps(t *testing.T) {
 	steps := []core.Step{
 		{
 			Name:        "step1",
-			Command:     "echo hello",
+			Commands:    []core.CommandEntry{{Command: "echo", Args: []string{"hello"}}},
 			Description: "First step",
 		},
 		{
 			Name:        "step2",
-			Command:     "echo world",
+			Commands:    []core.CommandEntry{{Command: "echo", Args: []string{"world"}}},
 			Description: "Second step",
 		},
 	}
