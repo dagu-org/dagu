@@ -43,6 +43,9 @@ type Step struct {
 	Stdout string `json:"stdout,omitempty"`
 	// Stderr is the file to store the standard error.
 	Stderr string `json:"stderr,omitempty"`
+	// LogOutput specifies how stdout and stderr are handled in log files for this step.
+	// Overrides the DAG-level LogOutput setting. Empty string means inherit from DAG.
+	LogOutput LogOutputMode `json:"logOutput,omitempty"`
 	// Output is the variable name to store the output.
 	Output string `json:"output,omitempty"`
 	// Depends contains the list of step names to depend on.

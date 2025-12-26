@@ -1585,3 +1585,59 @@ func TestBuildStepContainer(t *testing.T) {
 		assert.Contains(t, err.Error(), "cannot use 'script' field with 'container' field")
 	})
 }
+
+func TestBuildStepLogOutput(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		yaml     string
+		expected core.LogOutputMode
+	}{
+		{
+			name:     "Default_InheritFromDAG",
+			yaml:     "",
+			expected: "", // Empty means inherit from DAG
+		},
+		{
+			name:     "ExplicitSeparate",
+			yaml:     "logOutput: separate",
+			expected: core.LogOutputSeparate,
+		},
+		{
+			name:     "Merged",
+			yaml:     "logOutput: merged",
+			expected: core.LogOutputMerged,
+		},
+		{
+			name:     "MergedUppercase",
+			yaml:     "logOutput: MERGED",
+			expected: core.LogOutputMerged,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var s step
+			if tt.yaml != "" {
+				require.NoError(t, yaml.Unmarshal([]byte(tt.yaml), &s))
+			}
+
+			result, err := buildStepLogOutput(testStepBuildContext(), &s)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestBuildStepLogOutput_InvalidValue(t *testing.T) {
+	t.Parallel()
+
+	yamlData := "logOutput: invalid"
+	var s step
+	err := yaml.Unmarshal([]byte(yamlData), &s)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid logOutput value")
+}
