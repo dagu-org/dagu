@@ -486,8 +486,6 @@ func init() {
 	caps := core.ExecutorCapabilities{
 		Command:          true,
 		MultipleCommands: true,
-		Script:           true,
-		Shell:            true,
 		Container:        true,
 	}
 	executor.RegisterExecutor("docker", newDocker, nil, caps)

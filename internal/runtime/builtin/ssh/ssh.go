@@ -129,7 +129,6 @@ func init() {
 	caps := core.ExecutorCapabilities{
 		Command:          true,
 		MultipleCommands: true,
-		Shell:            true,
 	}
 	executor.RegisterExecutor("ssh", NewSSHExecutor, nil, caps)
 }

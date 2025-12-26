@@ -24,15 +24,15 @@ func TestMain(m *testing.M) {
 			Command: true, MultipleCommands: true, Script: true, Shell: true,
 		})
 	}
-	// Docker: supports all including container
+	// Docker: supports command, multiple commands, and container
 	for _, t := range []string{"docker", "container"} {
 		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{
-			Command: true, MultipleCommands: true, Script: true, Shell: true, Container: true,
+			Command: true, MultipleCommands: true, Container: true,
 		})
 	}
-	// SSH: supports command, multiple commands, shell, but not script
+	// SSH: supports command and multiple commands only
 	core.RegisterExecutorCapabilities("ssh", core.ExecutorCapabilities{
-		Command: true, MultipleCommands: true, Shell: true,
+		Command: true, MultipleCommands: true,
 	})
 	// jq and http: support command and script
 	core.RegisterExecutorCapabilities("jq", core.ExecutorCapabilities{Command: true, Script: true})
@@ -2081,7 +2081,7 @@ func TestValidateScript(t *testing.T) {
 			name:         "ScriptWithDockerExecutor",
 			executorType: "docker",
 			script:       "echo hello",
-			wantErr:      false,
+			wantErr:      true, // Docker doesn't use step.Script field
 		},
 		{
 			name:         "ScriptWithJQExecutor",
@@ -2171,13 +2171,13 @@ func TestValidateShell(t *testing.T) {
 			name:         "ShellWithDockerExecutor",
 			executorType: "docker",
 			shell:        "/bin/sh",
-			wantErr:      false,
+			wantErr:      true, // Docker doesn't use step.Shell field
 		},
 		{
 			name:         "ShellWithSSHExecutor",
 			executorType: "ssh",
 			shell:        "/bin/bash",
-			wantErr:      false,
+			wantErr:      true, // SSH doesn't use step.Shell field
 		},
 		// Executors that do not support shell
 		{
