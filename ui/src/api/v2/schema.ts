@@ -156,6 +156,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all API keys
+         * @description Returns a list of all API keys. Requires admin role.
+         */
+        get: operations["listAPIKeys"];
+        put?: never;
+        /**
+         * Create a new API key
+         * @description Creates a new API key. The full key is returned ONLY in this response. Requires admin role.
+         */
+        post: operations["createAPIKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api-keys/{keyId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get API key by ID
+         * @description Returns a specific API key by its ID. Requires admin role.
+         */
+        get: operations["getAPIKey"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete API key
+         * @description Deletes (revokes) an API key. Requires admin role.
+         */
+        delete: operations["deleteAPIKey"];
+        options?: never;
+        head?: never;
+        /**
+         * Update API key
+         * @description Updates an API key's information. Requires admin role.
+         */
+        patch: operations["updateAPIKey"];
+        trace?: never;
+    };
     "/workers": {
         parameters: {
             query?: never;
@@ -1509,6 +1561,65 @@ export interface components {
         UsersListResponse: {
             users: components["schemas"]["User"][];
         };
+        /** @description API key information */
+        APIKey: {
+            /** @description Unique API key identifier */
+            id: string;
+            /** @description Human-readable name for the API key */
+            name: string;
+            /** @description Optional description of the API key's purpose */
+            description?: string;
+            role: components["schemas"]["UserRole"];
+            /** @description First 8 characters of the key for identification */
+            keyPrefix: string;
+            /**
+             * Format: date-time
+             * @description Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description Last update timestamp
+             */
+            updatedAt: string;
+            /** @description User ID of the admin who created the key */
+            createdBy: string;
+            /**
+             * Format: date-time
+             * @description Timestamp when the key was last used for authentication
+             */
+            lastUsedAt?: string | null;
+        };
+        /** @description Response containing API key information */
+        APIKeyResponse: {
+            apiKey: components["schemas"]["APIKey"];
+        };
+        /** @description Response containing list of API keys */
+        APIKeysListResponse: {
+            apiKeys: components["schemas"]["APIKey"][];
+        };
+        /** @description Request to create a new API key */
+        CreateAPIKeyRequest: {
+            /** @description Human-readable name for the API key */
+            name: string;
+            /** @description Optional description of the API key's purpose */
+            description?: string;
+            role: components["schemas"]["UserRole"];
+        };
+        /** @description Response from creating an API key. Contains the full key which is only returned once. */
+        CreateAPIKeyResponse: {
+            apiKey: components["schemas"]["APIKey"];
+            /** @description The full API key secret. This is only returned once at creation time. */
+            key: string;
+        };
+        /** @description Request to update an API key */
+        UpdateAPIKeyRequest: {
+            /** @description New name for the API key */
+            name?: string;
+            /** @description New description for the API key */
+            description?: string;
+            role?: components["schemas"]["UserRole"];
+        };
         /** @description Generic success response */
         SuccessResponse: {
             /** @description Success message */
@@ -1521,6 +1632,8 @@ export interface components {
         Page: number;
         /** @description unique identifier of the user */
         UserId: string;
+        /** @description unique identifier of the API key */
+        APIKeyId: string;
         /** @description number of items per page (default is 30, max is 100) */
         PerPage: number;
         /** @description the name of the DAG file */
@@ -2085,6 +2198,319 @@ export interface operations {
             };
             /** @description User not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listAPIKeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of API keys */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIKeysListResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden - requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createAPIKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAPIKeyRequest"];
+            };
+        };
+        responses: {
+            /** @description API key created successfully. The full key is returned only once. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateAPIKeyResponse"];
+                };
+            };
+            /** @description Invalid request (e.g., invalid role) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden - requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict - API key name already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getAPIKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description unique identifier of the API key */
+                keyId: components["parameters"]["APIKeyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description API key details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIKeyResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden - requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description API key not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteAPIKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description unique identifier of the API key */
+                keyId: components["parameters"]["APIKeyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description API key deleted successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden - requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description API key not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateAPIKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description unique identifier of the API key */
+                keyId: components["parameters"]["APIKeyId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAPIKeyRequest"];
+            };
+        };
+        responses: {
+            /** @description API key updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIKeyResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden - requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description API key not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict - API key name already exists */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

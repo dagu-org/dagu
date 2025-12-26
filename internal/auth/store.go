@@ -21,6 +21,19 @@ var (
 	ErrInvalidUserID = errors.New("invalid user ID")
 )
 
+// Common errors for API key store operations.
+var (
+	// ErrAPIKeyNotFound is returned when an API key cannot be found.
+	ErrAPIKeyNotFound = errors.New("API key not found")
+	// ErrAPIKeyAlreadyExists is returned when attempting to create an API key
+	// with a name that already exists.
+	ErrAPIKeyAlreadyExists = errors.New("API key already exists")
+	// ErrInvalidAPIKeyName is returned when the API key name is invalid.
+	ErrInvalidAPIKeyName = errors.New("invalid API key name")
+	// ErrInvalidAPIKeyID is returned when the API key ID is invalid.
+	ErrInvalidAPIKeyID = errors.New("invalid API key ID")
+)
+
 // UserStore defines the interface for user persistence operations.
 // Implementations must be safe for concurrent use.
 type UserStore interface {
@@ -49,4 +62,31 @@ type UserStore interface {
 
 	// Count returns the total number of users.
 	Count(ctx context.Context) (int64, error)
+}
+
+// APIKeyStore defines the interface for API key persistence operations.
+// Implementations must be safe for concurrent use.
+type APIKeyStore interface {
+	// Create stores a new API key.
+	// Returns ErrAPIKeyAlreadyExists if an API key with the same name exists.
+	Create(ctx context.Context, key *APIKey) error
+
+	// GetByID retrieves an API key by its unique ID.
+	// Returns ErrAPIKeyNotFound if the API key does not exist.
+	GetByID(ctx context.Context, id string) (*APIKey, error)
+
+	// List returns all API keys in the store.
+	List(ctx context.Context) ([]*APIKey, error)
+
+	// Update modifies an existing API key.
+	// Returns ErrAPIKeyNotFound if the API key does not exist.
+	Update(ctx context.Context, key *APIKey) error
+
+	// Delete removes an API key by its ID.
+	// Returns ErrAPIKeyNotFound if the API key does not exist.
+	Delete(ctx context.Context, id string) error
+
+	// UpdateLastUsed updates the LastUsedAt timestamp for an API key.
+	// This is called when the API key is used for authentication.
+	UpdateLastUsed(ctx context.Context, id string) error
 }

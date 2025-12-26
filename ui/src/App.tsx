@@ -21,6 +21,7 @@ import DAGRunDetails from './pages/dag-runs/dag-run';
 import Queues from './pages/queues';
 import LoginPage from './pages/login';
 import UsersPage from './pages/users';
+import APIKeysPage from './pages/api-keys';
 
 type Props = {
   config: Config;
@@ -134,12 +135,20 @@ function App({ config }: Props) {
                                   path="/dag-runs/:name/:dagRunId"
                                   element={<DAGRunDetails />}
                                 />
-                                {/* Admin-only route */}
+                                {/* Admin-only routes */}
                                 <Route
                                   path="/users"
                                   element={
                                     <ProtectedRoute requiredRole="admin">
                                       <UsersPage />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/api-keys"
+                                  element={
+                                    <ProtectedRoute requiredRole="admin">
+                                      <APIKeysPage />
                                     </ProtectedRoute>
                                   }
                                 />

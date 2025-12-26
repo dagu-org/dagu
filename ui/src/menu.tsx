@@ -14,6 +14,7 @@ import {
   Globe,
   History,
   Inbox,
+  KeyRound,
   Network,
   PanelLeft,
   Search,
@@ -252,6 +253,13 @@ export const mainListItems = React.forwardRef<
               to="/users"
               text="User Management"
               icon={<Users size={16} />}
+              isOpen={isOpen}
+              onClick={onNavItemClick}
+            />
+            <NavItem
+              to="/api-keys"
+              text="API Keys"
+              icon={<KeyRound size={16} />}
               isOpen={isOpen}
               onClick={onNavItemClick}
             />

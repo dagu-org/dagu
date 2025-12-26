@@ -201,6 +201,7 @@ type PathsConfig struct {
 	ProcDir            string
 	ServiceRegistryDir string // Directory for service registry files
 	UsersDir           string // Directory for user data (builtin auth)
+	APIKeysDir         string // Directory for API key data (builtin auth)
 	ConfigFileUsed     string // Path to the configuration file used to load settings
 }
 

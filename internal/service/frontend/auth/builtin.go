@@ -18,6 +18,12 @@ type TokenValidator interface {
 	GetUserFromToken(ctx context.Context, token string) (*auth.User, error)
 }
 
+// APIKeyValidator defines the interface for validating standalone API keys.
+// API keys have their own role assignment and are used for programmatic access.
+type APIKeyValidator interface {
+	ValidateAPIKey(ctx context.Context, keySecret string) (*auth.APIKey, error)
+}
+
 // BuiltinAuthMiddleware creates middleware that validates JWT tokens
 // and injects the authenticated user into the request context.
 // BuiltinAuthMiddleware returns an HTTP middleware that enforces authentication for requests
