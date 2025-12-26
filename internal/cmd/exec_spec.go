@@ -11,6 +11,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/goccy/go-yaml"
+	"github.com/kballard/go-shellquote"
 )
 
 // ExecOptions captures the inline configuration for building an ad-hoc DAG.
@@ -36,9 +37,9 @@ type execSpec struct {
 }
 
 type execStep struct {
-	Name    string   `yaml:"name"`
-	Command []string `yaml:"command,omitempty"`
-	Shell   string   `yaml:"shell,omitempty"`
+	Name    string `yaml:"name"`
+	Command string `yaml:"command,omitempty"`
+	Shell   string `yaml:"shell,omitempty"`
 }
 
 func buildExecDAG(ctx *Context, opts ExecOptions) (*core.DAG, string, error) {
@@ -54,6 +55,10 @@ func buildExecDAG(ctx *Context, opts ExecOptions) (*core.DAG, string, error) {
 		return nil, "", fmt.Errorf("invalid DAG name: %w", err)
 	}
 
+	// Join command args into a single properly quoted string
+	// This ensures the command is treated as a single command, not multiple commands
+	commandStr := shellquote.Join(opts.CommandArgs...)
+
 	specDoc := execSpec{
 		Name:           name,
 		Type:           core.TypeChain,
@@ -64,7 +69,7 @@ func buildExecDAG(ctx *Context, opts ExecOptions) (*core.DAG, string, error) {
 		Steps: []execStep{
 			{
 				Name:    defaultStepName,
-				Command: opts.CommandArgs,
+				Command: commandStr,
 				Shell:   opts.ShellOverride,
 			},
 		},

@@ -689,6 +689,7 @@ var singleCommandOnlyExecutors = map[string]bool{
 	"archive":       true,
 	"github_action": true,
 	"github-action": true,
+	"gha":           true,
 	"mail":          true,
 	"dag":           true,
 	"parallel":      true,
