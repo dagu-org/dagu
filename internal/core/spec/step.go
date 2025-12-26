@@ -192,12 +192,20 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	// Run the transformer pipeline
 	errs := runStepTransformers(ctx, s, result)
 
-	// Complex transformations that need access to result or set multiple fields
-	// Note: buildStepContainer must be called before buildStepExecutor because
-	// buildStepExecutor checks result.Container to determine if the step should
-	// use the docker executor.
+	// validateConflicts checks for mutual exclusivity between step fields.
+	if err := validateConflicts(s); err != nil {
+		errs = append(errs, err)
+	}
+
+	// Action-defining transformations
 	if err := buildStepContainer(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("container", err))
+	}
+	if err := buildStepParallel(ctx, s, result); err != nil {
+		errs = append(errs, wrapTransformError("parallel", err))
+	}
+	if err := buildStepSubDAG(ctx, s, result); err != nil {
+		errs = append(errs, wrapTransformError("subDAG", err))
 	}
 	if err := buildStepExecutor(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("executor", err))
@@ -205,6 +213,11 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	if err := buildStepCommand(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("command", err))
 	}
+	if err := buildStepParamsField(ctx, s, result); err != nil {
+		errs = append(errs, wrapTransformError("params", err))
+	}
+
+	// Final validators run after the executor type is determined
 	if err := validateCommand(result); err != nil {
 		errs = append(errs, wrapTransformError("command", err))
 	}
@@ -225,15 +238,6 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	}
 	if err := validateWorkerSelector(result); err != nil {
 		errs = append(errs, wrapTransformError("workerSelector", err))
-	}
-	if err := buildStepParamsField(ctx, s, result); err != nil {
-		errs = append(errs, wrapTransformError("params", err))
-	}
-	if err := buildStepParallel(ctx, s, result); err != nil {
-		errs = append(errs, wrapTransformError("parallel", err))
-	}
-	if err := buildStepSubDAG(ctx, s, result); err != nil {
-		errs = append(errs, wrapTransformError("subDAG", err))
 	}
 
 	if len(errs) > 0 {
@@ -812,6 +816,39 @@ func validateWorkerSelector(result *core.Step) error {
 	return nil
 }
 
+// validateConflicts checks for mutual exclusivity between step fields.
+func validateConflicts(s *step) error {
+	hasSubDAG := strings.TrimSpace(s.Call) != "" || strings.TrimSpace(s.Run) != "" || s.Parallel != nil
+	hasExecutor := s.Executor != nil
+	hasCommand := s.Command != nil
+	hasScript := s.Script != ""
+	hasContainer := s.Container != nil
+
+	if hasSubDAG {
+		if hasExecutor {
+			return core.NewValidationError("executor", s.Executor, ErrSubDAGAndExecutorConflict)
+		}
+		if hasCommand {
+			return core.NewValidationError("command", s.Command, ErrSubDAGAndCommandConflict)
+		}
+		if hasScript {
+			return core.NewValidationError("script", s.Script, ErrSubDAGAndScriptConflict)
+		}
+		if hasContainer {
+			return core.NewValidationError("container", s.Container, fmt.Errorf("cannot use 'container' field with sub-DAG execution"))
+		}
+	}
+
+	if hasContainer && hasExecutor {
+		return core.NewValidationError("executor", s.Executor, ErrContainerAndExecutorConflict)
+	}
+	if hasContainer && hasScript {
+		return core.NewValidationError("script", s.Script, ErrContainerAndScriptConflict)
+	}
+
+	return nil
+}
+
 func buildStepParamsField(ctx StepBuildContext, s *step, result *core.Step) error {
 	if s.Params == nil {
 		return nil
@@ -841,16 +878,6 @@ func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 	)
 
 	executor := s.Executor
-
-	// Validate that container field and executor field are not both set
-	// The container field already specifies the execution method, so setting executor is redundant/conflicting
-	if result.Container != nil && executor != nil {
-		return core.NewValidationError(
-			"executor",
-			nil,
-			ErrContainerAndExecutorConflict,
-		)
-	}
 
 	// Case 1: executor is nil - determine executor from container/SSH config
 	if executor == nil {
@@ -982,16 +1009,6 @@ func buildStepParallel(_ StepBuildContext, s *step, result *core.Step) error {
 func buildStepContainer(ctx StepBuildContext, s *step, result *core.Step) error {
 	if s.Container == nil {
 		return nil
-	}
-
-	// Validate that script field is not used with container
-	// Scripts are not supported in container execution
-	if s.Script != "" {
-		return core.NewValidationError(
-			"script",
-			nil,
-			ErrContainerAndScriptConflict,
-		)
 	}
 
 	ct, err := buildContainerFromSpec(ctx.BuildContext, s.Container)

@@ -1328,45 +1328,6 @@ func TestBuildStepExecutor(t *testing.T) {
 		},
 	}
 
-	// Test for container and executor conflict - any executor type is invalid when container is set
-	t.Run("ContainerAndExecutorConflict_StringExecutor", func(t *testing.T) {
-		s := &step{Executor: "docker"}
-		result := &core.Step{
-			Container:      &core.Container{Image: "alpine:latest"},
-			ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)},
-		}
-		err := buildStepExecutor(testStepBuildContext(), s, result)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot use both 'container' field and 'executor' field")
-	})
-
-	t.Run("ContainerAndExecutorConflict_MapExecutor", func(t *testing.T) {
-		s := &step{
-			Executor: map[string]any{
-				"type": "http",
-			},
-		}
-		result := &core.Step{
-			Container:      &core.Container{Image: "alpine:latest"},
-			ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)},
-		}
-		err := buildStepExecutor(testStepBuildContext(), s, result)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot use both 'container' field and 'executor' field")
-	})
-
-	t.Run("ContainerAndExecutorConflict_AnyExecutorType", func(t *testing.T) {
-		// Even non-docker executors should conflict with container field
-		s := &step{Executor: "ssh"}
-		result := &core.Step{
-			Container:      &core.Container{Image: "alpine:latest"},
-			ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)},
-		}
-		err := buildStepExecutor(testStepBuildContext(), s, result)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot use both 'container' field and 'executor' field")
-	})
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := &core.Step{ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)}}
@@ -1904,16 +1865,6 @@ func TestBuildStepContainer(t *testing.T) {
 		})
 	}
 
-	t.Run("ContainerAndScriptConflict", func(t *testing.T) {
-		s := &step{
-			Container: &container{Image: "alpine:latest"},
-			Script:    "echo hello\necho world",
-		}
-		result := &core.Step{}
-		err := buildStepContainer(testStepBuildContext(), s, result)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot use 'script' field with 'container' field")
-	})
 }
 
 func TestValidateMultipleCommands(t *testing.T) {
@@ -2618,6 +2569,82 @@ func TestValidateWorkerSelector(t *testing.T) {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), "does not support workerSelector field")
 				assert.Contains(t, err.Error(), tt.executorType)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateConflicts(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		step    step
+		wantErr error
+	}{
+		{
+			name: "CallAndExecutorConflict",
+			step: step{
+				Call:     "sub-dag",
+				Executor: "shell",
+			},
+			wantErr: ErrSubDAGAndExecutorConflict,
+		},
+		{
+			name: "RunAndCommandConflict",
+			step: step{
+				Run:     "sub-dag",
+				Command: "echo hello",
+			},
+			wantErr: ErrSubDAGAndCommandConflict,
+		},
+		{
+			name: "ParallelAndScriptConflict",
+			step: step{
+				Parallel: []any{1, 2, 3},
+				Script:   "echo hello",
+			},
+			wantErr: ErrSubDAGAndScriptConflict,
+		},
+		{
+			name: "ContainerAndExecutorConflict",
+			step: step{
+				Container: &container{Image: "alpine"},
+				Executor:  "shell",
+			},
+			wantErr: ErrContainerAndExecutorConflict,
+		},
+		{
+			name: "ContainerAndScriptConflict",
+			step: step{
+				Container: &container{Image: "alpine"},
+				Script:    "echo hello",
+			},
+			wantErr: ErrContainerAndScriptConflict,
+		},
+		{
+			name: "NoConflictSubDAG",
+			step: step{
+				Call: "sub-dag",
+			},
+			wantErr: nil,
+		},
+		{
+			name: "NoConflictShell",
+			step: step{
+				Command: "echo hello",
+			},
+			wantErr: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateConflicts(&tt.step)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
 			} else {
 				assert.NoError(t, err)
 			}
