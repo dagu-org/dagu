@@ -7,10 +7,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/persistence/fileapikey"
 	"github.com/dagu-org/dagu/internal/persistence/fileuser"
 )
 
@@ -508,5 +511,521 @@ func TestService_ResetPassword_WeakPassword(t *testing.T) {
 	err = svc.ResetPassword(ctx, user.ID, "weak")
 	if err == nil {
 		t.Error("ResetPassword() with weak password should return error")
+	}
+}
+
+// ============================================================================
+// API Key Tests
+// ============================================================================
+
+func setupTestServiceWithAPIKeys(t *testing.T) (*Service, func()) {
+	t.Helper()
+
+	tmpDir, err := os.MkdirTemp("", "auth-service-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+
+	userStore, err := fileuser.New(tmpDir)
+	if err != nil {
+		_ = os.RemoveAll(tmpDir)
+		t.Fatalf("failed to create user store: %v", err)
+	}
+
+	apiKeyDir := filepath.Join(tmpDir, "apikeys")
+	apiKeyStore, err := fileapikey.New(apiKeyDir)
+	if err != nil {
+		_ = os.RemoveAll(tmpDir)
+		t.Fatalf("failed to create API key store: %v", err)
+	}
+
+	config := Config{
+		TokenSecret: "test-secret-key-for-jwt-signing",
+		TokenTTL:    time.Hour,
+		BcryptCost:  4, // Low cost for faster tests
+	}
+
+	svc := New(userStore, config, WithAPIKeyStore(apiKeyStore))
+	cleanup := func() {
+		_ = os.RemoveAll(tmpDir)
+	}
+
+	return svc, cleanup
+}
+
+func TestService_CreateAPIKey(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	result, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name:        "test-key",
+		Description: "Test API key",
+		Role:        auth.RoleManager,
+	}, "creator-id")
+	if err != nil {
+		t.Fatalf("CreateAPIKey() error = %v", err)
+	}
+
+	if result.APIKey == nil {
+		t.Fatal("CreateAPIKey() returned nil APIKey")
+	}
+	if result.APIKey.Name != "test-key" {
+		t.Errorf("CreateAPIKey() name = %v, want %v", result.APIKey.Name, "test-key")
+	}
+	if result.APIKey.Description != "Test API key" {
+		t.Errorf("CreateAPIKey() description = %v, want %v", result.APIKey.Description, "Test API key")
+	}
+	if result.APIKey.Role != auth.RoleManager {
+		t.Errorf("CreateAPIKey() role = %v, want %v", result.APIKey.Role, auth.RoleManager)
+	}
+	if result.APIKey.CreatedBy != "creator-id" {
+		t.Errorf("CreateAPIKey() createdBy = %v, want %v", result.APIKey.CreatedBy, "creator-id")
+	}
+	if result.FullKey == "" {
+		t.Error("CreateAPIKey() should return full key")
+	}
+	if !strings.HasPrefix(result.FullKey, "dagu_") {
+		t.Errorf("CreateAPIKey() full key should start with 'dagu_', got %v", result.FullKey)
+	}
+	if result.APIKey.KeyPrefix == "" {
+		t.Error("CreateAPIKey() should set key prefix")
+	}
+	if result.APIKey.KeyHash == "" {
+		t.Error("CreateAPIKey() should set key hash")
+	}
+}
+
+func TestService_CreateAPIKey_EmptyName(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name: "",
+		Role: auth.RoleViewer,
+	}, "creator-id")
+	if err != auth.ErrInvalidAPIKeyName {
+		t.Errorf("CreateAPIKey() with empty name error = %v, want %v", err, auth.ErrInvalidAPIKeyName)
+	}
+}
+
+func TestService_CreateAPIKey_InvalidRole(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name: "test-key",
+		Role: auth.Role("invalid"),
+	}, "creator-id")
+	if err == nil {
+		t.Error("CreateAPIKey() with invalid role should return error")
+	}
+}
+
+func TestService_CreateAPIKey_NotConfigured(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name: "test-key",
+		Role: auth.RoleViewer,
+	}, "creator-id")
+	if err != ErrAPIKeyNotConfigured {
+		t.Errorf("CreateAPIKey() without API key store error = %v, want %v", err, ErrAPIKeyNotConfigured)
+	}
+}
+
+func TestService_GetAPIKey(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create an API key
+	result, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name:        "test-key",
+		Description: "Test API key",
+		Role:        auth.RoleManager,
+	}, "creator-id")
+	if err != nil {
+		t.Fatalf("CreateAPIKey() error = %v", err)
+	}
+
+	// Get the API key
+	apiKey, err := svc.GetAPIKey(ctx, result.APIKey.ID)
+	if err != nil {
+		t.Fatalf("GetAPIKey() error = %v", err)
+	}
+
+	if apiKey.ID != result.APIKey.ID {
+		t.Errorf("GetAPIKey() ID = %v, want %v", apiKey.ID, result.APIKey.ID)
+	}
+	if apiKey.Name != "test-key" {
+		t.Errorf("GetAPIKey() name = %v, want %v", apiKey.Name, "test-key")
+	}
+}
+
+func TestService_GetAPIKey_NotFound(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := svc.GetAPIKey(ctx, "non-existent-id")
+	if err != auth.ErrAPIKeyNotFound {
+		t.Errorf("GetAPIKey() for non-existent key error = %v, want %v", err, auth.ErrAPIKeyNotFound)
+	}
+}
+
+func TestService_GetAPIKey_NotConfigured(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := svc.GetAPIKey(ctx, "some-id")
+	if err != ErrAPIKeyNotConfigured {
+		t.Errorf("GetAPIKey() without API key store error = %v, want %v", err, ErrAPIKeyNotConfigured)
+	}
+}
+
+func TestService_ListAPIKeys(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create multiple API keys
+	for i := 0; i < 3; i++ {
+		_, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+			Name: fmt.Sprintf("key-%d", i),
+			Role: auth.RoleViewer,
+		}, "creator-id")
+		if err != nil {
+			t.Fatalf("CreateAPIKey() error = %v", err)
+		}
+	}
+
+	// List API keys
+	keys, err := svc.ListAPIKeys(ctx)
+	if err != nil {
+		t.Fatalf("ListAPIKeys() error = %v", err)
+	}
+	if len(keys) != 3 {
+		t.Errorf("ListAPIKeys() returned %d keys, want 3", len(keys))
+	}
+}
+
+func TestService_ListAPIKeys_Empty(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	keys, err := svc.ListAPIKeys(ctx)
+	if err != nil {
+		t.Fatalf("ListAPIKeys() error = %v", err)
+	}
+	if len(keys) != 0 {
+		t.Errorf("ListAPIKeys() returned %d keys, want 0", len(keys))
+	}
+}
+
+func TestService_ListAPIKeys_NotConfigured(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := svc.ListAPIKeys(ctx)
+	if err != ErrAPIKeyNotConfigured {
+		t.Errorf("ListAPIKeys() without API key store error = %v, want %v", err, ErrAPIKeyNotConfigured)
+	}
+}
+
+func TestService_UpdateAPIKey(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create an API key
+	result, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name:        "original-name",
+		Description: "Original description",
+		Role:        auth.RoleViewer,
+	}, "creator-id")
+	if err != nil {
+		t.Fatalf("CreateAPIKey() error = %v", err)
+	}
+
+	// Update the API key
+	newName := "updated-name"
+	newDesc := "Updated description"
+	newRole := auth.RoleAdmin
+	updated, err := svc.UpdateAPIKey(ctx, result.APIKey.ID, UpdateAPIKeyInput{
+		Name:        &newName,
+		Description: &newDesc,
+		Role:        &newRole,
+	})
+	if err != nil {
+		t.Fatalf("UpdateAPIKey() error = %v", err)
+	}
+
+	if updated.Name != "updated-name" {
+		t.Errorf("UpdateAPIKey() name = %v, want %v", updated.Name, "updated-name")
+	}
+	if updated.Description != "Updated description" {
+		t.Errorf("UpdateAPIKey() description = %v, want %v", updated.Description, "Updated description")
+	}
+	if updated.Role != auth.RoleAdmin {
+		t.Errorf("UpdateAPIKey() role = %v, want %v", updated.Role, auth.RoleAdmin)
+	}
+}
+
+func TestService_UpdateAPIKey_PartialUpdate(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create an API key
+	result, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name:        "original-name",
+		Description: "Original description",
+		Role:        auth.RoleViewer,
+	}, "creator-id")
+	if err != nil {
+		t.Fatalf("CreateAPIKey() error = %v", err)
+	}
+
+	// Update only the name
+	newName := "updated-name"
+	updated, err := svc.UpdateAPIKey(ctx, result.APIKey.ID, UpdateAPIKeyInput{
+		Name: &newName,
+	})
+	if err != nil {
+		t.Fatalf("UpdateAPIKey() error = %v", err)
+	}
+
+	if updated.Name != "updated-name" {
+		t.Errorf("UpdateAPIKey() name = %v, want %v", updated.Name, "updated-name")
+	}
+	// Other fields should remain unchanged
+	if updated.Description != "Original description" {
+		t.Errorf("UpdateAPIKey() description = %v, want %v", updated.Description, "Original description")
+	}
+	if updated.Role != auth.RoleViewer {
+		t.Errorf("UpdateAPIKey() role = %v, want %v", updated.Role, auth.RoleViewer)
+	}
+}
+
+func TestService_UpdateAPIKey_InvalidRole(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create an API key
+	result, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name: "test-key",
+		Role: auth.RoleViewer,
+	}, "creator-id")
+	if err != nil {
+		t.Fatalf("CreateAPIKey() error = %v", err)
+	}
+
+	// Try to update with invalid role
+	invalidRole := auth.Role("invalid")
+	_, err = svc.UpdateAPIKey(ctx, result.APIKey.ID, UpdateAPIKeyInput{
+		Role: &invalidRole,
+	})
+	if err == nil {
+		t.Error("UpdateAPIKey() with invalid role should return error")
+	}
+}
+
+func TestService_UpdateAPIKey_NotFound(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	newName := "updated-name"
+	_, err := svc.UpdateAPIKey(ctx, "non-existent-id", UpdateAPIKeyInput{
+		Name: &newName,
+	})
+	if err != auth.ErrAPIKeyNotFound {
+		t.Errorf("UpdateAPIKey() for non-existent key error = %v, want %v", err, auth.ErrAPIKeyNotFound)
+	}
+}
+
+func TestService_UpdateAPIKey_NotConfigured(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	newName := "updated-name"
+	_, err := svc.UpdateAPIKey(ctx, "some-id", UpdateAPIKeyInput{
+		Name: &newName,
+	})
+	if err != ErrAPIKeyNotConfigured {
+		t.Errorf("UpdateAPIKey() without API key store error = %v, want %v", err, ErrAPIKeyNotConfigured)
+	}
+}
+
+func TestService_DeleteAPIKey(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create an API key
+	result, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name: "test-key",
+		Role: auth.RoleViewer,
+	}, "creator-id")
+	if err != nil {
+		t.Fatalf("CreateAPIKey() error = %v", err)
+	}
+
+	// Delete the API key
+	err = svc.DeleteAPIKey(ctx, result.APIKey.ID)
+	if err != nil {
+		t.Fatalf("DeleteAPIKey() error = %v", err)
+	}
+
+	// Verify it's deleted
+	_, err = svc.GetAPIKey(ctx, result.APIKey.ID)
+	if err != auth.ErrAPIKeyNotFound {
+		t.Errorf("GetAPIKey() after delete error = %v, want %v", err, auth.ErrAPIKeyNotFound)
+	}
+}
+
+func TestService_DeleteAPIKey_NotFound(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	err := svc.DeleteAPIKey(ctx, "non-existent-id")
+	if err != auth.ErrAPIKeyNotFound {
+		t.Errorf("DeleteAPIKey() for non-existent key error = %v, want %v", err, auth.ErrAPIKeyNotFound)
+	}
+}
+
+func TestService_DeleteAPIKey_NotConfigured(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	err := svc.DeleteAPIKey(ctx, "some-id")
+	if err != ErrAPIKeyNotConfigured {
+		t.Errorf("DeleteAPIKey() without API key store error = %v, want %v", err, ErrAPIKeyNotConfigured)
+	}
+}
+
+func TestService_ValidateAPIKey(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create an API key
+	result, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name: "test-key",
+		Role: auth.RoleManager,
+	}, "creator-id")
+	if err != nil {
+		t.Fatalf("CreateAPIKey() error = %v", err)
+	}
+
+	// Validate the API key
+	apiKey, err := svc.ValidateAPIKey(ctx, result.FullKey)
+	if err != nil {
+		t.Fatalf("ValidateAPIKey() error = %v", err)
+	}
+
+	if apiKey.ID != result.APIKey.ID {
+		t.Errorf("ValidateAPIKey() ID = %v, want %v", apiKey.ID, result.APIKey.ID)
+	}
+	if apiKey.Name != "test-key" {
+		t.Errorf("ValidateAPIKey() name = %v, want %v", apiKey.Name, "test-key")
+	}
+	if apiKey.Role != auth.RoleManager {
+		t.Errorf("ValidateAPIKey() role = %v, want %v", apiKey.Role, auth.RoleManager)
+	}
+}
+
+func TestService_ValidateAPIKey_InvalidPrefix(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := svc.ValidateAPIKey(ctx, "invalid_prefix_key")
+	if err != ErrInvalidAPIKey {
+		t.Errorf("ValidateAPIKey() with invalid prefix error = %v, want %v", err, ErrInvalidAPIKey)
+	}
+}
+
+func TestService_ValidateAPIKey_WrongKey(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create an API key
+	_, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name: "test-key",
+		Role: auth.RoleViewer,
+	}, "creator-id")
+	if err != nil {
+		t.Fatalf("CreateAPIKey() error = %v", err)
+	}
+
+	// Try to validate with wrong key (correct prefix but wrong value)
+	_, err = svc.ValidateAPIKey(ctx, "dagu_wrongkeywrongkeywrongkeywrongkey")
+	if err != ErrInvalidAPIKey {
+		t.Errorf("ValidateAPIKey() with wrong key error = %v, want %v", err, ErrInvalidAPIKey)
+	}
+}
+
+func TestService_ValidateAPIKey_NotConfigured(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := svc.ValidateAPIKey(ctx, "dagu_somekey")
+	if err != ErrAPIKeyNotConfigured {
+		t.Errorf("ValidateAPIKey() without API key store error = %v, want %v", err, ErrAPIKeyNotConfigured)
+	}
+}
+
+func TestService_HasAPIKeyStore(t *testing.T) {
+	// Test with API key store
+	svcWithStore, cleanup1 := setupTestServiceWithAPIKeys(t)
+	defer cleanup1()
+
+	if !svcWithStore.HasAPIKeyStore() {
+		t.Error("HasAPIKeyStore() = false, want true")
+	}
+
+	// Test without API key store
+	svcWithoutStore, cleanup2 := setupTestService(t)
+	defer cleanup2()
+
+	if svcWithoutStore.HasAPIKeyStore() {
+		t.Error("HasAPIKeyStore() = true, want false")
 	}
 }

@@ -147,6 +147,16 @@ func (c *APIClient) Delete(path string) *Request {
 	}
 }
 
+// Patch prepares a PATCH request with the given body
+func (c *APIClient) Patch(path string, body any) *Request {
+	return &Request{
+		client: c,
+		method: http.MethodPatch,
+		path:   path,
+		body:   body,
+	}
+}
+
 // ExpectStatus sets the expected HTTP status code
 func (r *Request) ExpectStatus(code int) *Request {
 	r.expectedStatus = code
@@ -204,6 +214,14 @@ func (r *Request) Send(t *testing.T) *Response {
 			SetBody(jsonBody).
 			SetHeader("Content-Type", "application/json").
 			Post(url)
+	case http.MethodPatch:
+		jsonBody, jsonErr := json.Marshal(r.body)
+		require.NoError(t, jsonErr, "failed to marshal request body")
+
+		res, err = req.
+			SetBody(jsonBody).
+			SetHeader("Content-Type", "application/json").
+			Patch(url)
 	case http.MethodDelete:
 		res, err = req.Delete(url)
 	default:
