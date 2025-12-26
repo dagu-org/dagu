@@ -7,6 +7,8 @@ import (
 	"os"
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"golang.org/x/crypto/ssh"
@@ -111,7 +113,9 @@ func (e *sshExecutor) Run(ctx context.Context) error {
 		}
 
 		err = session.Run(command)
-		_ = session.Close()
+		if closeErr := session.Close(); closeErr != nil {
+			logger.Warn(ctx, "SSH session close error", tag.Error(closeErr))
+		}
 
 		if err != nil {
 			return fmt.Errorf("command %d failed: %w", i+1, err)
