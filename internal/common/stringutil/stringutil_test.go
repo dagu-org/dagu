@@ -141,6 +141,33 @@ func TestKebabToCamel(t *testing.T) {
 	})
 }
 
+func TestScreamingSnakeToCamel(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"TOTAL_COUNT", "totalCount"},
+		{"MY_VAR", "myVar"},
+		{"FOO", "foo"},
+		{"FOO_BAR_BAZ", "fooBarBaz"},
+		{"", ""},
+		{"_LEADING", "leading"},
+		{"TRAILING_", "trailing"},
+		{"DOUBLE__UNDERSCORE", "doubleUnderscore"},
+		{"already_lower", "alreadyLower"},
+		{"MiXeD_CaSe", "mixedCase"},
+		{"A", "a"},
+		{"A_B_C", "aBC"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := stringutil.ScreamingSnakeToCamel(tt.input)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func TestIsMultiLine(t *testing.T) {
 	tests := []struct {
 		name     string

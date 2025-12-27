@@ -150,6 +150,12 @@ type DAGRunAttempt interface {
 	Hide(ctx context.Context) error
 	// Hidden returns true if the attempt is hidden from normal operations.
 	Hidden() bool
+	// WriteOutputs writes the collected step outputs for the dag-run.
+	// Does nothing if outputs is empty.
+	WriteOutputs(ctx context.Context, outputs map[string]string) error
+	// ReadOutputs reads the collected step outputs for the dag-run.
+	// Returns nil if no outputs file exists.
+	ReadOutputs(ctx context.Context) (map[string]string, error)
 }
 
 // Errors for RunRef parsing

@@ -556,6 +556,13 @@ func (a *Agent) Run(ctx context.Context) error {
 		logger.Error(ctx, "Status write failed", tag.Error(err))
 	}
 
+	// Collect and write step outputs
+	if outputs := a.collectOutputs(ctx); len(outputs) > 0 {
+		if err := attempt.WriteOutputs(ctx, outputs); err != nil {
+			logger.Error(ctx, "Failed to write outputs", tag.Error(err))
+		}
+	}
+
 	// Send the execution report if necessary.
 	a.lastErr = lastErr
 	if err := a.reporter.send(ctx, a.dag, finishedStatus, lastErr); err != nil {
@@ -595,6 +602,65 @@ func (a *Agent) nodeToModelNode(nodeData runtime.NodeData) *execution.Node {
 		SubRuns:         subRuns,
 		OutputVariables: nodeData.State.OutputVariables,
 	}
+}
+
+// collectOutputs gathers all step outputs into a map for the outputs.json file.
+// It iterates through nodes in execution order and collects output values.
+// Steps with OutputOmit=true are skipped. Last value wins for key conflicts.
+func (a *Agent) collectOutputs(ctx context.Context) map[string]string {
+	outputs := make(map[string]string)
+
+	// Get nodes from the plan in execution order
+	nodes := a.plan.Nodes()
+
+	for _, node := range nodes {
+		nodeData := node.NodeData()
+		step := nodeData.Step
+
+		// Skip if no output defined or omit is set
+		if step.Output == "" || step.OutputOmit {
+			continue
+		}
+
+		// Skip if no output variables captured
+		if nodeData.State.OutputVariables == nil {
+			continue
+		}
+
+		// Get the output value from captured variables
+		rawValue, ok := nodeData.State.OutputVariables.Load(step.Output)
+		if !ok {
+			continue
+		}
+
+		// Parse the KeyValue format (KEY=VALUE)
+		kv := stringutil.KeyValue(rawValue.(string))
+		value := kv.Value()
+
+		// Determine the key: use OutputKey if set, otherwise convert from UPPER_CASE
+		key := step.OutputKey
+		if key == "" {
+			key = stringutil.ScreamingSnakeToCamel(step.Output)
+		}
+
+		// Store the output (last one wins for conflicts)
+		outputs[key] = value
+	}
+
+	// Warn if total size exceeds 1MB
+	if len(outputs) > 0 {
+		totalSize := 0
+		for k, v := range outputs {
+			totalSize += len(k) + len(v)
+		}
+		if totalSize > 1024*1024 {
+			logger.Warn(ctx, "Outputs size exceeds 1MB",
+				slog.Int("size", totalSize),
+			)
+		}
+	}
+
+	return outputs
 }
 
 func (a *Agent) PrintSummary(ctx context.Context) {

@@ -50,7 +50,8 @@ type step struct {
 	// or "merged" for a single combined .log file.
 	LogOutput types.LogOutputValue `yaml:"logOutput,omitempty"`
 	// Output is the variable name to store the output.
-	Output string `yaml:"output,omitempty"`
+	// Can be a string or an object with name, key, and omit fields.
+	Output any `yaml:"output,omitempty"`
 	// Depends is the list of steps to depend on.
 	Depends types.StringOrArray `yaml:"depends,omitempty"`
 	// ContinueOn is the condition to continue on.
@@ -171,6 +172,8 @@ var stepTransformers = []stepTransform{
 	{"repeatPolicy", newStepTransformer("RepeatPolicy", buildStepRepeatPolicy)},
 	{"signalOnStop", newStepTransformer("SignalOnStop", buildStepSignalOnStop)},
 	{"output", newStepTransformer("Output", buildStepOutput)},
+	{"outputKey", newStepTransformer("OutputKey", buildStepOutputKey)},
+	{"outputOmit", newStepTransformer("OutputOmit", buildStepOutputOmit)},
 	{"env", newStepTransformer("Env", buildStepEnvs)},
 	{"preconditions", newStepTransformer("Preconditions", buildStepPreconditions)},
 }
@@ -593,16 +596,85 @@ func buildStepSignalOnStop(_ StepBuildContext, s *step) (string, error) {
 	return sigOnStop, nil
 }
 
+// outputConfig holds the parsed output configuration
+type outputConfig struct {
+	Name string
+	Key  string
+	Omit bool
+}
+
+// parseOutputConfig parses the output field which can be string or object
+func parseOutputConfig(output any) (*outputConfig, error) {
+	if output == nil {
+		return nil, nil
+	}
+
+	switch v := output.(type) {
+	case string:
+		if v == "" {
+			return nil, nil
+		}
+		name := strings.TrimSpace(v)
+		if strings.HasPrefix(name, "$") {
+			name = strings.TrimPrefix(name, "$")
+		}
+		return &outputConfig{Name: name}, nil
+
+	case map[string]any:
+		cfg := &outputConfig{}
+		if name, ok := v["name"].(string); ok {
+			cfg.Name = strings.TrimSpace(name)
+			if strings.HasPrefix(cfg.Name, "$") {
+				cfg.Name = strings.TrimPrefix(cfg.Name, "$")
+			}
+		}
+		if key, ok := v["key"].(string); ok {
+			cfg.Key = strings.TrimSpace(key)
+		}
+		if omit, ok := v["omit"].(bool); ok {
+			cfg.Omit = omit
+		}
+		if cfg.Name == "" {
+			return nil, fmt.Errorf("output.name is required when using object form")
+		}
+		return cfg, nil
+
+	default:
+		return nil, fmt.Errorf("output must be a string or object, got %T", output)
+	}
+}
+
 func buildStepOutput(_ StepBuildContext, s *step) (string, error) {
-	if s.Output == "" {
+	cfg, err := parseOutputConfig(s.Output)
+	if err != nil {
+		return "", err
+	}
+	if cfg == nil {
 		return "", nil
 	}
+	return cfg.Name, nil
+}
 
-	if strings.HasPrefix(s.Output, "$") {
-		return strings.TrimPrefix(s.Output, "$"), nil
+func buildStepOutputKey(_ StepBuildContext, s *step) (string, error) {
+	cfg, err := parseOutputConfig(s.Output)
+	if err != nil {
+		return "", nil // Error already reported in buildStepOutput
 	}
+	if cfg == nil {
+		return "", nil
+	}
+	return cfg.Key, nil
+}
 
-	return strings.TrimSpace(s.Output), nil
+func buildStepOutputOmit(_ StepBuildContext, s *step) (bool, error) {
+	cfg, err := parseOutputConfig(s.Output)
+	if err != nil {
+		return false, nil // Error already reported in buildStepOutput
+	}
+	if cfg == nil {
+		return false, nil
+	}
+	return cfg.Omit, nil
 }
 
 func buildStepEnvs(_ StepBuildContext, s *step) ([]string, error) {

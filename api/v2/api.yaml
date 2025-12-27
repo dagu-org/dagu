@@ -1806,6 +1806,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dag-runs/{name}/{dagRunId}/outputs:
+    get:
+      summary: "Retrieve collected outputs from a DAG-run"
+      description: "Fetches the outputs.json file containing all step outputs collected during the DAG-run execution. Returns the outputs as a JSON object where keys are the output names (converted from UPPER_CASE to camelCase by default, or custom key if specified) and values are the captured output strings."
+      operationId: "getDAGRunOutputs"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DAGRunOutputs"
+        "404":
+          description: "Outputs file not found (DAG may not have captured any outputs)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dag-runs/{name}/{dagRunId}/retry:
     post:
       summary: "Retry DAG-run execution"
@@ -2985,6 +3016,16 @@ components:
                 $ref: "#/components/schemas/Condition"
           required:
             - nodes
+
+    DAGRunOutputs:
+      type: object
+      description: "Collected outputs from step executions in a DAG-run. Keys are output names (UPPER_CASE converted to camelCase by default, or custom key if specified) and values are the captured output strings."
+      additionalProperties:
+        type: string
+      example:
+        totalCount: "42"
+        resultFile: "/path/to/result.txt"
+        config: '{"key": "value"}'
 
     Node:
       type: object

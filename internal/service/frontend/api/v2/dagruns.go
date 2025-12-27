@@ -318,6 +318,35 @@ func (a *API) GetDAGRunLog(ctx context.Context, request api.GetDAGRunLogRequestO
 	}, nil
 }
 
+// GetDAGRunOutputs implements api.StrictServerInterface.
+func (a *API) GetDAGRunOutputs(ctx context.Context, request api.GetDAGRunOutputsRequestObject) (api.GetDAGRunOutputsResponseObject, error) {
+	dagName := request.Name
+	dagRunId := request.DagRunId
+
+	ref := execution.NewDAGRunRef(dagName, dagRunId)
+	attempt, err := a.dagRunStore.FindAttempt(ctx, ref)
+	if err != nil {
+		return api.GetDAGRunOutputs404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
+		}, nil
+	}
+
+	outputs, err := attempt.ReadOutputs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error reading outputs: %w", err)
+	}
+
+	if outputs == nil {
+		return api.GetDAGRunOutputs404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: "no outputs file found for this DAG-run (DAG may not have captured any outputs)",
+		}, nil
+	}
+
+	return api.GetDAGRunOutputs200JSONResponse(outputs), nil
+}
+
 func (a *API) GetDAGRunStepLog(ctx context.Context, request api.GetDAGRunStepLogRequestObject) (api.GetDAGRunStepLogResponseObject, error) {
 	dagName := request.Name
 	dagRunId := request.DagRunId

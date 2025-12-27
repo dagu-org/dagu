@@ -35,6 +35,9 @@ var (
 // DAGDefinition is the name of the file where the DAG definition is stored.
 const DAGDefinition = "dag.json"
 
+// OutputsFile is the name of the file where collected step outputs are stored.
+const OutputsFile = "outputs.json"
+
 // CancelRequestedFlag is a special flag used to indicate that a cancel request has been made.
 const CancelRequestedFlag = "CANCEL_REQUESTED"
 
@@ -523,4 +526,48 @@ func readLineFrom(f *os.File, offset int64) ([]byte, int64, error) {
 	}
 
 	return line, newOffset, err
+}
+
+// WriteOutputs writes the collected step outputs to outputs.json.
+// If outputs is nil or empty, no file is created.
+func (att *Attempt) WriteOutputs(_ context.Context, outputs map[string]string) error {
+	if len(outputs) == 0 {
+		return nil
+	}
+
+	dir := filepath.Dir(att.file)
+	outputsFile := filepath.Join(dir, OutputsFile)
+
+	data, err := json.MarshalIndent(outputs, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal outputs: %w", err)
+	}
+
+	if err := os.WriteFile(outputsFile, data, 0600); err != nil {
+		return fmt.Errorf("failed to write outputs file: %w", err)
+	}
+
+	return nil
+}
+
+// ReadOutputs reads the collected step outputs from outputs.json.
+// Returns nil if the file does not exist.
+func (att *Attempt) ReadOutputs(_ context.Context) (map[string]string, error) {
+	dir := filepath.Dir(att.file)
+	outputsFile := filepath.Join(dir, OutputsFile)
+
+	data, err := os.ReadFile(outputsFile) //nolint:gosec
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read outputs file: %w", err)
+	}
+
+	var outputs map[string]string
+	if err := json.Unmarshal(data, &outputs); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal outputs: %w", err)
+	}
+
+	return outputs, nil
 }

@@ -525,3 +525,16 @@ func (m *mockDAGRunAttempt) Hidden() bool {
 	args := m.Called()
 	return args.Bool(0)
 }
+
+func (m *mockDAGRunAttempt) WriteOutputs(ctx context.Context, outputs map[string]string) error {
+	args := m.Called(ctx, outputs)
+	return args.Error(0)
+}
+
+func (m *mockDAGRunAttempt) ReadOutputs(ctx context.Context) (map[string]string, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[string]string), args.Error(1)
+}
