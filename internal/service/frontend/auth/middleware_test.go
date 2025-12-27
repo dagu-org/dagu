@@ -93,7 +93,7 @@ func TestMiddleware_APIKeyValidation(t *testing.T) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	require.NotNil(t, handler.user)
@@ -123,7 +123,7 @@ func TestMiddleware_APIKeyValidation_InvalidKey(t *testing.T) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
@@ -153,7 +153,7 @@ func TestMiddleware_APIKeyValidation_WrongPrefix(t *testing.T) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Should fail since no other auth method is configured
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -186,7 +186,7 @@ func TestMiddleware_APIKeyValidation_WithJWTFallback(t *testing.T) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	require.NotNil(t, handler.user)
@@ -222,7 +222,7 @@ func TestMiddleware_APIKeyValidation_APIKeyPrioritizedOverStaticToken(t *testing
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	require.NotNil(t, handler.user)
@@ -268,7 +268,7 @@ func TestMiddleware_APIKeyValidation_RolesPreserved(t *testing.T) {
 			client := &http.Client{}
 			resp, err := client.Do(req)
 			require.NoError(t, err)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
 			require.NotNil(t, handler.user)
@@ -298,7 +298,7 @@ func TestMiddleware_PublicPaths(t *testing.T) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -308,7 +308,7 @@ func TestMiddleware_PublicPaths(t *testing.T) {
 
 	resp, err = client.Do(req)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
@@ -328,7 +328,7 @@ func TestMiddleware_NoAuthEnabled(t *testing.T) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
