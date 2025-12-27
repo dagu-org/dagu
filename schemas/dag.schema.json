@@ -169,6 +169,12 @@
       "type": "string",
       "description": "Base directory for storing logs. Defaults to ${HOME}/.local/share/logs if not specified."
     },
+    "logOutput": {
+      "type": "string",
+      "enum": ["separate", "merged"],
+      "default": "separate",
+      "description": "Controls how stdout and stderr are logged. 'separate' writes stdout to .out and stderr to .err files. 'merged' writes both to a single .log file with interleaved output."
+    },
     "handlerOn": {
       "type": "object",
       "properties": {
@@ -636,6 +642,11 @@
         "stderr": {
           "type": "string",
           "description": "File path where the step's standard error (stderr) will be written."
+        },
+        "logOutput": {
+          "type": "string",
+          "enum": ["separate", "merged"],
+          "description": "Override DAG-level log output mode. 'separate' writes stdout to .out and stderr to .err files. 'merged' writes both to a single .log file."
         },
         "output": {
           "type": "string",
