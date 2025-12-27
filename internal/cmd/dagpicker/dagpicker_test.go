@@ -167,6 +167,8 @@ func TestModel(t *testing.T) {
 	})
 }
 
+var _ execution.DAGStore = (*mockDAGStore)(nil)
+
 // mockDAGStore is a mock implementation of models.DAGStore
 type mockDAGStore struct {
 	mock.Mock

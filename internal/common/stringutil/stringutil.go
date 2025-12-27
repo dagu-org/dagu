@@ -68,6 +68,38 @@ func RemoveQuotes(s string) string {
 	return s
 }
 
+// ScreamingSnakeToCamel converts a SCREAMING_SNAKE_CASE string to camelCase.
+// Example: TOTAL_COUNT -> totalCount, MY_VAR -> myVar, FOO -> foo
+func ScreamingSnakeToCamel(s string) string {
+	parts := strings.Split(s, "_")
+	if len(parts) == 0 {
+		return ""
+	}
+
+	var result strings.Builder
+	isFirst := true
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		lower := strings.ToLower(part)
+		if isFirst {
+			result.WriteString(lower)
+			isFirst = false
+		} else {
+			// Capitalize first letter of subsequent parts
+			if len(lower) > 0 {
+				result.WriteString(strings.ToUpper(lower[:1]))
+				if len(lower) > 1 {
+					result.WriteString(lower[1:])
+				}
+			}
+		}
+	}
+
+	return result.String()
+}
+
 // KebabToCamel converts a kebab-case string to camelCase.
 func KebabToCamel(s string) string {
 	parts := strings.Split(s, "-")

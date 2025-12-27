@@ -17,6 +17,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var _ execution.DAGStore = (*mockDAGStore)(nil)
+
 // mockDAGStore implements models.DAGStore for testing
 type mockDAGStore struct {
 	dags map[string]*core.DAG

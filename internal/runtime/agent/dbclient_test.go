@@ -31,7 +31,6 @@ func TestDBClient_GetSubDAGRunStatus(t *testing.T) {
 		outputs := &collections.SyncMap{}
 		outputs.Store("key1", "result=success")
 		outputs.Store("key2", "count=42")
-		mockAttempt.outputs = outputs
 
 		// Setup expectations
 		mockDAGRunStore.On("FindSubAttempt", ctx, rootRef, subRunID).Return(mockAttempt, nil)
@@ -160,6 +159,8 @@ func TestDBClient_IsSubDAGRunCompleted(t *testing.T) {
 		mockDAGRunStore.AssertExpectations(t)
 	})
 }
+
+var _ execution.DAGStore = (*mockDAGStore)(nil)
 
 // mockDAGStore implements models.DAGStore
 type mockDAGStore struct {
@@ -310,11 +311,12 @@ func (m *mockDAGRunStore) RenameDAGRuns(ctx context.Context, oldName, newName st
 	return args.Error(0)
 }
 
+var _ execution.DAGRunAttempt = (*mockDAGRunAttempt)(nil)
+
 // mockDAGRunAttempt implements the needed methods from models.DAGRunAttempt
 type mockDAGRunAttempt struct {
 	mock.Mock
-	status  *execution.DAGRunStatus
-	outputs *collections.SyncMap
+	status *execution.DAGRunStatus
 }
 
 func (m *mockDAGRunAttempt) ID() string {
@@ -362,13 +364,6 @@ func (m *mockDAGRunAttempt) IsAborting(ctx context.Context) (bool, error) {
 	return args.Bool(0), args.Error(1)
 }
 
-func (m *mockDAGRunAttempt) GetOutputs() *collections.SyncMap {
-	if m.outputs == nil {
-		m.outputs = &collections.SyncMap{}
-	}
-	return m.outputs
-}
-
 func (m *mockDAGRunAttempt) Hide(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
@@ -377,4 +372,17 @@ func (m *mockDAGRunAttempt) Hide(ctx context.Context) error {
 func (m *mockDAGRunAttempt) Hidden() bool {
 	args := m.Called()
 	return args.Bool(0)
+}
+
+func (m *mockDAGRunAttempt) WriteOutputs(ctx context.Context, outputs *execution.DAGRunOutputs) error {
+	args := m.Called(ctx, outputs)
+	return args.Error(0)
+}
+
+func (m *mockDAGRunAttempt) ReadOutputs(ctx context.Context) (*execution.DAGRunOutputs, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*execution.DAGRunOutputs), args.Error(1)
 }

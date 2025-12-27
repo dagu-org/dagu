@@ -355,6 +355,8 @@ func TestZombieDetector_concurrency(t *testing.T) {
 	dagRunStore.AssertExpectations(t)
 }
 
+var _ execution.DAGRunStore = (*mockDAGRunStore)(nil)
+
 // Mock DAGRunStore
 type mockDAGRunStore struct {
 	mock.Mock
@@ -471,6 +473,8 @@ func (m *mockProcStore) ListAllAlive(ctx context.Context) (map[string][]executio
 	return args.Get(0).(map[string][]execution.DAGRunRef), args.Error(1)
 }
 
+var _ execution.DAGRunAttempt = (*mockDAGRunAttempt)(nil)
+
 // Mock DAGRunAttempt
 type mockDAGRunAttempt struct {
 	mock.Mock
@@ -524,4 +528,17 @@ func (m *mockDAGRunAttempt) Hide(ctx context.Context) error {
 func (m *mockDAGRunAttempt) Hidden() bool {
 	args := m.Called()
 	return args.Bool(0)
+}
+
+func (m *mockDAGRunAttempt) WriteOutputs(ctx context.Context, outputs *execution.DAGRunOutputs) error {
+	args := m.Called(ctx, outputs)
+	return args.Error(0)
+}
+
+func (m *mockDAGRunAttempt) ReadOutputs(ctx context.Context) (*execution.DAGRunOutputs, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*execution.DAGRunOutputs), args.Error(1)
 }

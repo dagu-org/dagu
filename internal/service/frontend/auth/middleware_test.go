@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var _ APIKeyValidator = (*mockAPIKeyValidator)(nil)
+
 // mockAPIKeyValidator is a mock implementation of APIKeyValidator for testing.
 type mockAPIKeyValidator struct {
 	keys map[string]*auth.APIKey
@@ -35,6 +37,8 @@ func (m *mockAPIKeyValidator) ValidateAPIKey(_ context.Context, keySecret string
 	}
 	return nil, auth.ErrAPIKeyNotFound
 }
+
+var _ TokenValidator = (*mockTokenValidator)(nil)
 
 // mockTokenValidator is a mock implementation of TokenValidator for testing.
 type mockTokenValidator struct {

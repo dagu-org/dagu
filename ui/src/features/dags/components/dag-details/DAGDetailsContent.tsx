@@ -1,5 +1,10 @@
 import { Tabs } from '@/components/ui/tabs';
-import { ActivitySquare, FileCode, History, ScrollText } from 'lucide-react';
+import {
+  FileCode,
+  History,
+  PlayCircle,
+  ScrollText,
+} from 'lucide-react';
 import React, { useState } from 'react';
 import { components } from '../../../../api/v2/schema';
 import { DAGStatus } from '../../components';
@@ -27,7 +32,7 @@ type DAGDetailsContentProps = {
   stepName?: string | null;
   isModal?: boolean;
   navigateToStatusTab?: () => void;
-  skipHeader?: boolean; // Add this prop to optionally skip rendering the header
+  skipHeader?: boolean;
 };
 
 type LogViewerState = {
@@ -101,24 +106,24 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             navigateToStatusTab={navigateToStatusTab}
           />
         )}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 lg:gap-0 mb-4">
+        <div className="flex flex-col lg:flex-row justify-between items-center gap-3 lg:gap-0 mb-4 min-h-[40px]">
           {/* Desktop Tabs (lg and up) */}
           <div className="hidden lg:block overflow-x-auto">
             <Tabs className="whitespace-nowrap">
               {isModal ? (
                 <ModalLinkTab
-                  label="Status"
+                  label="Latest Run"
                   value="status"
                   isActive={activeTab === 'status'}
-                  icon={ActivitySquare}
+                  icon={PlayCircle}
                   onClick={() => handleTabClick('status')}
                 />
               ) : (
                 <LinkTab
-                  label="Status"
+                  label="Latest Run"
                   value={`${baseUrl}`}
                   isActive={activeTab === 'status'}
-                  icon={ActivitySquare}
+                  icon={PlayCircle}
                 />
               )}
 
@@ -184,7 +189,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   label=""
                   value="status"
                   isActive={activeTab === 'status'}
-                  icon={ActivitySquare}
+                  icon={PlayCircle}
                   onClick={() => handleTabClick('status')}
                   className="flex-1 justify-center"
                 />
@@ -193,7 +198,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   label=""
                   value={`${baseUrl}`}
                   isActive={activeTab === 'status'}
-                  icon={ActivitySquare}
+                  icon={PlayCircle}
                   className="flex-1 justify-center"
                 />
               )}
@@ -258,9 +263,9 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             </div>
           </div>
 
-          {activeTab === 'spec' ? (
+          <div className={activeTab === 'spec' ? 'visible' : 'invisible'}>
             <DAGEditButtons fileName={fileName || ''} />
-          ) : null}
+          </div>
         </div>
         <div className="flex-1 flex flex-col min-h-0">
           {activeTab === 'status' ? (

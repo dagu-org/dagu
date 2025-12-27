@@ -512,6 +512,8 @@ func TestWorkerConnectionFailure(t *testing.T) {
 	})
 }
 
+var _ worker.TaskHandler = (*mockHandler)(nil)
+
 type mockHandler struct {
 	ExecuteFunc   func(context.Context, *coordinatorv1.Task) error
 	ExecutionTime time.Duration

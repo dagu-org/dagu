@@ -481,3 +481,197 @@ func writeJSONToFile(t *testing.T, file string, obj any) {
 	err = os.WriteFile(file, append(data, '\n'), 0600)
 	require.NoError(t, err)
 }
+
+func TestAttempt_WriteOutputs(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("WriteValidOutputs", func(t *testing.T) {
+		dir := createTempDir(t)
+		statusFile := filepath.Join(dir, "status.dat")
+		att, err := NewAttempt(statusFile, nil)
+		require.NoError(t, err)
+
+		outputs := &execution.DAGRunOutputs{
+			Metadata: execution.OutputsMetadata{
+				DAGName:     "test-dag",
+				DAGRunID:    "run-123",
+				AttemptID:   "attempt-1",
+				Status:      "succeeded",
+				CompletedAt: "2024-12-28T15:30:45Z",
+				Params:      `["key=value"]`,
+			},
+			Outputs: map[string]string{
+				"totalCount": "42",
+				"resultFile": "/path/to/result.txt",
+			},
+		}
+
+		err = att.WriteOutputs(ctx, outputs)
+		require.NoError(t, err)
+
+		// Verify file was created
+		outputsFile := filepath.Join(dir, OutputsFile)
+		assert.FileExists(t, outputsFile)
+
+		// Verify content
+		data, err := os.ReadFile(outputsFile)
+		require.NoError(t, err)
+
+		var readOutputs execution.DAGRunOutputs
+		err = json.Unmarshal(data, &readOutputs)
+		require.NoError(t, err)
+
+		assert.Equal(t, outputs.Metadata, readOutputs.Metadata)
+		assert.Equal(t, outputs.Outputs, readOutputs.Outputs)
+	})
+
+	t.Run("WriteEmptyOutputs_NoFileCreated", func(t *testing.T) {
+		dir := createTempDir(t)
+		statusFile := filepath.Join(dir, "status.dat")
+		att, err := NewAttempt(statusFile, nil)
+		require.NoError(t, err)
+
+		outputs := &execution.DAGRunOutputs{
+			Metadata: execution.OutputsMetadata{},
+			Outputs:  map[string]string{},
+		}
+
+		err = att.WriteOutputs(ctx, outputs)
+		require.NoError(t, err)
+
+		// Verify file was NOT created (per implementation spec)
+		outputsFile := filepath.Join(dir, OutputsFile)
+		assert.NoFileExists(t, outputsFile)
+	})
+
+	t.Run("WriteNilOutputs_NoFileCreated", func(t *testing.T) {
+		dir := createTempDir(t)
+		statusFile := filepath.Join(dir, "status.dat")
+		att, err := NewAttempt(statusFile, nil)
+		require.NoError(t, err)
+
+		err = att.WriteOutputs(ctx, nil)
+		require.NoError(t, err)
+
+		// Verify file was NOT created (per implementation spec)
+		outputsFile := filepath.Join(dir, OutputsFile)
+		assert.NoFileExists(t, outputsFile)
+	})
+
+	t.Run("OverwriteExistingOutputs", func(t *testing.T) {
+		dir := createTempDir(t)
+		statusFile := filepath.Join(dir, "status.dat")
+		att, err := NewAttempt(statusFile, nil)
+		require.NoError(t, err)
+
+		// Write first outputs
+		outputs1 := &execution.DAGRunOutputs{
+			Metadata: execution.OutputsMetadata{DAGName: "dag1", DAGRunID: "run-1"},
+			Outputs:  map[string]string{"key1": "value1"},
+		}
+		err = att.WriteOutputs(ctx, outputs1)
+		require.NoError(t, err)
+
+		// Write second outputs (overwrites first)
+		outputs2 := &execution.DAGRunOutputs{
+			Metadata: execution.OutputsMetadata{DAGName: "dag2", DAGRunID: "run-2"},
+			Outputs:  map[string]string{"key2": "value2"},
+		}
+		err = att.WriteOutputs(ctx, outputs2)
+		require.NoError(t, err)
+
+		// Verify second version overwrites first
+		readOutputs, err := att.ReadOutputs(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, readOutputs)
+		assert.Equal(t, outputs2.Outputs, readOutputs.Outputs)
+		assert.Equal(t, outputs2.Metadata.DAGName, readOutputs.Metadata.DAGName)
+	})
+}
+
+func TestAttempt_ReadOutputs(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("ReadExistingOutputs", func(t *testing.T) {
+		dir := createTempDir(t)
+		statusFile := filepath.Join(dir, "status.dat")
+		att, err := NewAttempt(statusFile, nil)
+		require.NoError(t, err)
+
+		// Create outputs file with metadata
+		outputs := &execution.DAGRunOutputs{
+			Metadata: execution.OutputsMetadata{
+				DAGName:     "test-dag",
+				DAGRunID:    "run-123",
+				AttemptID:   "attempt-1",
+				Status:      "succeeded",
+				CompletedAt: "2024-12-28T15:30:45Z",
+			},
+			Outputs: map[string]string{
+				"totalCount": "42",
+				"resultFile": "/path/to/result.txt",
+			},
+		}
+		err = att.WriteOutputs(ctx, outputs)
+		require.NoError(t, err)
+
+		// Read outputs
+		readOutputs, err := att.ReadOutputs(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, readOutputs)
+		assert.Equal(t, outputs.Metadata, readOutputs.Metadata)
+		assert.Equal(t, outputs.Outputs, readOutputs.Outputs)
+	})
+
+	t.Run("ReadNonExistentOutputs", func(t *testing.T) {
+		dir := createTempDir(t)
+		statusFile := filepath.Join(dir, "status.dat")
+		att, err := NewAttempt(statusFile, nil)
+		require.NoError(t, err)
+
+		// Read outputs without creating file
+		readOutputs, err := att.ReadOutputs(ctx)
+		require.NoError(t, err)
+		assert.Nil(t, readOutputs)
+	})
+
+	t.Run("ReadCorruptedOutputs", func(t *testing.T) {
+		dir := createTempDir(t)
+		statusFile := filepath.Join(dir, "status.dat")
+		att, err := NewAttempt(statusFile, nil)
+		require.NoError(t, err)
+
+		// Create corrupted outputs file
+		outputsFile := filepath.Join(dir, OutputsFile)
+		err = os.WriteFile(outputsFile, []byte("not valid json"), 0600)
+		require.NoError(t, err)
+
+		// Read should return error
+		_, err = att.ReadOutputs(ctx)
+		assert.Error(t, err)
+	})
+
+	t.Run("ReadOutputsWithSpecialCharacters", func(t *testing.T) {
+		dir := createTempDir(t)
+		statusFile := filepath.Join(dir, "status.dat")
+		att, err := NewAttempt(statusFile, nil)
+		require.NoError(t, err)
+
+		outputs := &execution.DAGRunOutputs{
+			Metadata: execution.OutputsMetadata{DAGName: "test", DAGRunID: "run-123"},
+			Outputs: map[string]string{
+				"path":     "/path/with/slashes",
+				"message":  "hello \"world\"",
+				"unicode":  "日本語",
+				"newlines": "line1\nline2",
+			},
+		}
+		err = att.WriteOutputs(ctx, outputs)
+		require.NoError(t, err)
+
+		readOutputs, err := att.ReadOutputs(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, readOutputs)
+		assert.Equal(t, outputs.Outputs, readOutputs.Outputs)
+	})
+}
