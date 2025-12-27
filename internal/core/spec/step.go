@@ -614,10 +614,7 @@ func parseOutputConfig(output any) (*outputConfig, error) {
 		if v == "" {
 			return nil, nil
 		}
-		name := strings.TrimSpace(v)
-		if strings.HasPrefix(name, "$") {
-			name = strings.TrimPrefix(name, "$")
-		}
+		name := strings.TrimPrefix(strings.TrimSpace(v), "$")
 		// Check for empty name after trimming and removing $ prefix
 		if name == "" {
 			return nil, nil
@@ -627,10 +624,7 @@ func parseOutputConfig(output any) (*outputConfig, error) {
 	case map[string]any:
 		cfg := &outputConfig{}
 		if name, ok := v["name"].(string); ok {
-			cfg.Name = strings.TrimSpace(name)
-			if strings.HasPrefix(cfg.Name, "$") {
-				cfg.Name = strings.TrimPrefix(cfg.Name, "$")
-			}
+			cfg.Name = strings.TrimPrefix(strings.TrimSpace(name), "$")
 		}
 		if key, ok := v["key"].(string); ok {
 			cfg.Key = strings.TrimSpace(key)

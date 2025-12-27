@@ -370,7 +370,7 @@ func readOutputsFile(t *testing.T, th test.Helper, dag *core.DAG, dagRunID strin
 }
 
 // readFullOutputsFile reads the full outputs.json file including metadata
-func readFullOutputsFile(t *testing.T, th test.Helper, dag *core.DAG, dagRunID string) *execution.DAGRunOutputs {
+func readFullOutputsFile(t *testing.T, th test.Helper, dag *core.DAG, _ string) *execution.DAGRunOutputs {
 	t.Helper()
 
 	// Find the attempt directory
