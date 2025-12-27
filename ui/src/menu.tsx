@@ -14,6 +14,7 @@ import {
   Globe,
   History,
   Inbox,
+  KeyRound,
   Network,
   PanelLeft,
   Search,
@@ -118,12 +119,8 @@ export const mainListItems = React.forwardRef<
         {/* Remote Node Selector */}
         <AppBarContext.Consumer>
           {(context) => {
-            // Hide remote node selector when builtin auth is enabled or no remote nodes
-            if (
-              config.authMode === 'builtin' ||
-              !context.remoteNodes ||
-              context.remoteNodes.length === 0
-            ) {
+            // Hide remote node selector when no remote nodes are configured
+            if (!context.remoteNodes || context.remoteNodes.length === 0) {
               return null;
             }
 
@@ -252,6 +249,13 @@ export const mainListItems = React.forwardRef<
               to="/users"
               text="User Management"
               icon={<Users size={16} />}
+              isOpen={isOpen}
+              onClick={onNavItemClick}
+            />
+            <NavItem
+              to="/api-keys"
+              text="API Keys"
+              icon={<KeyRound size={16} />}
               isOpen={isOpen}
               onClick={onNavItemClick}
             />

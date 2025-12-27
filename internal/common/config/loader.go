@@ -298,6 +298,7 @@ func (l *ConfigLoader) loadPathsConfig(cfg *Config, def Definition) {
 		cfg.Paths.ProcDir = fileutil.ResolvePathOrBlank(def.Paths.ProcDir)
 		cfg.Paths.ServiceRegistryDir = fileutil.ResolvePathOrBlank(def.Paths.ServiceRegistryDir)
 		cfg.Paths.UsersDir = fileutil.ResolvePathOrBlank(def.Paths.UsersDir)
+		cfg.Paths.APIKeysDir = fileutil.ResolvePathOrBlank(def.Paths.APIKeysDir)
 	}
 }
 
@@ -627,6 +628,9 @@ func (l *ConfigLoader) finalizePaths(cfg *Config) {
 	}
 	if cfg.Paths.UsersDir == "" {
 		cfg.Paths.UsersDir = filepath.Join(cfg.Paths.DataDir, "users")
+	}
+	if cfg.Paths.APIKeysDir == "" {
+		cfg.Paths.APIKeysDir = filepath.Join(cfg.Paths.DataDir, "apikeys")
 	}
 
 	if cfg.Paths.Executable == "" {

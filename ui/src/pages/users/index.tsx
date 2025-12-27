@@ -18,7 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { UserPlus, MoreHorizontal, Pencil, Trash2, Key, Shield } from 'lucide-react';
+import { UserPlus, MoreHorizontal, Pencil, Trash2, Key } from 'lucide-react';
 import { UserFormModal } from './UserFormModal';
 import { ResetPasswordModal } from './ResetPasswordModal';
 import ConfirmModal from '@/ui/ConfirmModal';
@@ -104,21 +104,6 @@ export default function UsersPage() {
     }
   };
 
-  const getRoleBadgeColor = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return 'bg-error/20 text-error';
-      case 'manager':
-        return 'bg-primary/100/20 text-primary';
-      case 'operator':
-        return 'bg-success/20 text-success';
-      case 'viewer':
-        return 'bg-muted-foreground/20 text-muted-foreground';
-      default:
-        return 'bg-muted-foreground/20 text-muted-foreground';
-    }
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -176,14 +161,9 @@ export default function UsersPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1.5">
-                      <Shield className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span
-                        className={`text-xs px-1.5 py-0.5 rounded-full capitalize ${getRoleBadgeColor(user.role)}`}
-                      >
-                        {user.role}
-                      </span>
-                    </div>
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize">
+                      {user.role}
+                    </span>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {dayjs(user.createdAt).format('MMM D, YYYY HH:mm')}

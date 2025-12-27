@@ -15,11 +15,14 @@ import (
 	"syscall"
 	"time"
 
+	authmodel "github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/persistence/fileapikey"
 	"github.com/dagu-org/dagu/internal/persistence/fileuser"
 	"github.com/dagu-org/dagu/internal/runtime"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
@@ -112,12 +115,20 @@ func initBuiltinAuthService(cfg *config.Config) (*authservice.Service, error) {
 		return nil, fmt.Errorf("failed to create user store: %w", err)
 	}
 
+	// Create file-based API key store with cache
+	apiKeyCache := fileutil.NewCache[*authmodel.APIKey](0, time.Minute*15)
+	apiKeyCache.StartEviction(ctx)
+	apiKeyStore, err := fileapikey.New(cfg.Paths.APIKeysDir, fileapikey.WithFileCache(apiKeyCache))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create API key store: %w", err)
+	}
+
 	// Create auth service with configuration
 	authConfig := authservice.Config{
 		TokenSecret: cfg.Server.Auth.Builtin.Token.Secret,
 		TokenTTL:    cfg.Server.Auth.Builtin.Token.TTL,
 	}
-	authSvc := authservice.New(userStore, authConfig)
+	authSvc := authservice.New(userStore, authConfig, authservice.WithAPIKeyStore(apiKeyStore))
 
 	// Ensure admin user exists
 	password, created, err := authSvc.EnsureAdminUser(

@@ -7,11 +7,16 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/persistence/fileapikey"
 	"github.com/dagu-org/dagu/internal/persistence/fileuser"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func setupTestService(t *testing.T) (*Service, func()) {
@@ -508,5 +513,678 @@ func TestService_ResetPassword_WeakPassword(t *testing.T) {
 	err = svc.ResetPassword(ctx, user.ID, "weak")
 	if err == nil {
 		t.Error("ResetPassword() with weak password should return error")
+	}
+}
+
+func TestService_UpdateUser_WithPassword(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create user
+	user, err := svc.CreateUser(ctx, CreateUserInput{
+		Username: "testuser",
+		Password: "oldpassword1",
+		Role:     auth.RoleViewer,
+	})
+	require.NoError(t, err)
+
+	// Update user with new password via Password field
+	newPassword := "newpassword1"
+	_, err = svc.UpdateUser(ctx, user.ID, UpdateUserInput{
+		Password: &newPassword,
+	})
+	require.NoError(t, err)
+
+	// Verify old password no longer works
+	_, err = svc.Authenticate(ctx, "testuser", "oldpassword1")
+	assert.ErrorIs(t, err, ErrInvalidCredentials, "old password should not work")
+
+	// Verify new password works
+	_, err = svc.Authenticate(ctx, "testuser", "newpassword1")
+	assert.NoError(t, err, "new password should work")
+}
+
+func TestService_UpdateUser_WeakPassword(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create user
+	user, err := svc.CreateUser(ctx, CreateUserInput{
+		Username: "testuser",
+		Password: "password123",
+		Role:     auth.RoleViewer,
+	})
+	require.NoError(t, err)
+
+	// Try to update with weak password
+	weakPassword := "weak"
+	_, err = svc.UpdateUser(ctx, user.ID, UpdateUserInput{
+		Password: &weakPassword,
+	})
+	assert.Error(t, err, "UpdateUser() with weak password should return error")
+}
+
+func TestService_UpdateUser_InvalidRole(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create user
+	user, err := svc.CreateUser(ctx, CreateUserInput{
+		Username: "testuser",
+		Password: "password123",
+		Role:     auth.RoleViewer,
+	})
+	require.NoError(t, err)
+
+	// Try to update with invalid role
+	invalidRole := auth.Role("invalid-role")
+	_, err = svc.UpdateUser(ctx, user.ID, UpdateUserInput{
+		Role: &invalidRole,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid role")
+}
+
+func TestService_GetUserFromToken_UserDeleted(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create user
+	user, err := svc.CreateUser(ctx, CreateUserInput{
+		Username: "testuser",
+		Password: "password123",
+		Role:     auth.RoleViewer,
+	})
+	require.NoError(t, err)
+
+	// Generate token for user
+	tokenResult, err := svc.GenerateToken(user)
+	require.NoError(t, err)
+
+	// Delete the user
+	err = svc.DeleteUser(ctx, user.ID, "other-user-id")
+	require.NoError(t, err)
+
+	// Try to get user from token - should return ErrInvalidToken since user was deleted
+	_, err = svc.GetUserFromToken(ctx, tokenResult.Token)
+	assert.ErrorIs(t, err, ErrInvalidToken, "GetUserFromToken should return ErrInvalidToken when user is deleted")
+}
+
+func TestService_ValidateToken_MalformedToken(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	tests := []struct {
+		name  string
+		token string
+	}{
+		{"empty token", ""},
+		{"random string", "not-a-jwt-token"},
+		{"invalid base64", "header.payload.signature"},
+		{"missing parts", "onlyonepart"},
+		{"jwt-like but invalid", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.invalid.signature"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := svc.ValidateToken(tt.token)
+			assert.ErrorIs(t, err, ErrInvalidToken)
+		})
+	}
+}
+
+func TestService_ValidateToken_WrongSecret(t *testing.T) {
+	// Create service with one secret
+	tmpDir, err := os.MkdirTemp("", "auth-service-test-*")
+	require.NoError(t, err)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	store, err := fileuser.New(tmpDir)
+	require.NoError(t, err)
+
+	config1 := Config{
+		TokenSecret: "secret-one",
+		TokenTTL:    time.Hour,
+		BcryptCost:  4,
+	}
+	svc1 := New(store, config1)
+
+	// Create user and generate token with svc1
+	ctx := context.Background()
+	user, err := svc1.CreateUser(ctx, CreateUserInput{
+		Username: "testuser",
+		Password: "password123",
+		Role:     auth.RoleViewer,
+	})
+	require.NoError(t, err)
+
+	tokenResult, err := svc1.GenerateToken(user)
+	require.NoError(t, err)
+
+	// Create service with different secret
+	config2 := Config{
+		TokenSecret: "secret-two",
+		TokenTTL:    time.Hour,
+		BcryptCost:  4,
+	}
+	svc2 := New(store, config2)
+
+	// Try to validate token with wrong secret
+	_, err = svc2.ValidateToken(tokenResult.Token)
+	assert.ErrorIs(t, err, ErrInvalidToken, "ValidateToken should reject token signed with different secret")
+}
+
+func TestService_ValidateToken_MissingSecret(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "auth-service-test-*")
+	require.NoError(t, err)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	store, err := fileuser.New(tmpDir)
+	require.NoError(t, err)
+
+	// Create service without secret
+	config := Config{
+		TokenSecret: "",
+		TokenTTL:    time.Hour,
+		BcryptCost:  4,
+	}
+	svc := New(store, config)
+
+	_, err = svc.ValidateToken("some-token")
+	assert.ErrorIs(t, err, ErrMissingSecret)
+}
+
+func TestService_CreateUser_InvalidRole(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := svc.CreateUser(ctx, CreateUserInput{
+		Username: "testuser",
+		Password: "password123",
+		Role:     auth.Role("invalid-role"),
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid role")
+}
+
+// ============================================================================
+// API Key Tests
+// ============================================================================
+
+func setupTestServiceWithAPIKeys(t *testing.T) (*Service, func()) {
+	t.Helper()
+
+	tmpDir, err := os.MkdirTemp("", "auth-service-test-*")
+	require.NoError(t, err, "failed to create temp dir")
+
+	userStore, err := fileuser.New(tmpDir)
+	require.NoError(t, err, "failed to create user store")
+
+	apiKeyDir := filepath.Join(tmpDir, "apikeys")
+	apiKeyStore, err := fileapikey.New(apiKeyDir)
+	require.NoError(t, err, "failed to create API key store")
+
+	config := Config{
+		TokenSecret: "test-secret-key-for-jwt-signing",
+		TokenTTL:    time.Hour,
+		BcryptCost:  4, // Low cost for faster tests
+	}
+
+	svc := New(userStore, config, WithAPIKeyStore(apiKeyStore))
+	cleanup := func() {
+		_ = os.RemoveAll(tmpDir)
+	}
+
+	return svc, cleanup
+}
+
+func TestService_CreateAPIKey(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	result, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name:        "test-key",
+		Description: "Test API key",
+		Role:        auth.RoleManager,
+	}, "creator-id")
+	require.NoError(t, err)
+	require.NotNil(t, result.APIKey)
+
+	assert.Equal(t, "test-key", result.APIKey.Name)
+	assert.Equal(t, "Test API key", result.APIKey.Description)
+	assert.Equal(t, auth.RoleManager, result.APIKey.Role)
+	assert.Equal(t, "creator-id", result.APIKey.CreatedBy)
+	assert.NotEmpty(t, result.FullKey)
+	assert.True(t, strings.HasPrefix(result.FullKey, "dagu_"), "full key should start with 'dagu_'")
+	assert.NotEmpty(t, result.APIKey.KeyPrefix)
+	assert.NotEmpty(t, result.APIKey.KeyHash)
+}
+
+func TestService_CreateAPIKey_EmptyName(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name: "",
+		Role: auth.RoleViewer,
+	}, "creator-id")
+	require.ErrorIs(t, err, auth.ErrInvalidAPIKeyName)
+}
+
+func TestService_CreateAPIKey_InvalidRole(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name: "test-key",
+		Role: auth.Role("invalid"),
+	}, "creator-id")
+	require.Error(t, err, "CreateAPIKey() with invalid role should return error")
+}
+
+func TestService_CreateAPIKey_NotConfigured(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name: "test-key",
+		Role: auth.RoleViewer,
+	}, "creator-id")
+	require.ErrorIs(t, err, ErrAPIKeyNotConfigured)
+}
+
+func TestService_GetAPIKey(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create an API key
+	result, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name:        "test-key",
+		Description: "Test API key",
+		Role:        auth.RoleManager,
+	}, "creator-id")
+	require.NoError(t, err)
+
+	// Get the API key
+	apiKey, err := svc.GetAPIKey(ctx, result.APIKey.ID)
+	require.NoError(t, err)
+
+	assert.Equal(t, result.APIKey.ID, apiKey.ID)
+	assert.Equal(t, "test-key", apiKey.Name)
+}
+
+func TestService_GetAPIKey_NotFound(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := svc.GetAPIKey(ctx, "non-existent-id")
+	require.ErrorIs(t, err, auth.ErrAPIKeyNotFound)
+}
+
+func TestService_GetAPIKey_NotConfigured(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := svc.GetAPIKey(ctx, "some-id")
+	require.ErrorIs(t, err, ErrAPIKeyNotConfigured)
+}
+
+func TestService_ListAPIKeys(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create multiple API keys
+	for i := 0; i < 3; i++ {
+		_, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+			Name: fmt.Sprintf("key-%d", i),
+			Role: auth.RoleViewer,
+		}, "creator-id")
+		require.NoError(t, err)
+	}
+
+	// List API keys
+	keys, err := svc.ListAPIKeys(ctx)
+	require.NoError(t, err)
+	assert.Len(t, keys, 3)
+}
+
+func TestService_ListAPIKeys_Empty(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	keys, err := svc.ListAPIKeys(ctx)
+	require.NoError(t, err)
+	assert.Empty(t, keys)
+}
+
+func TestService_ListAPIKeys_NotConfigured(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := svc.ListAPIKeys(ctx)
+	require.ErrorIs(t, err, ErrAPIKeyNotConfigured)
+}
+
+func TestService_UpdateAPIKey(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create an API key
+	result, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name:        "original-name",
+		Description: "Original description",
+		Role:        auth.RoleViewer,
+	}, "creator-id")
+	require.NoError(t, err)
+
+	// Update the API key
+	newName := "updated-name"
+	newDesc := "Updated description"
+	newRole := auth.RoleAdmin
+	updated, err := svc.UpdateAPIKey(ctx, result.APIKey.ID, UpdateAPIKeyInput{
+		Name:        &newName,
+		Description: &newDesc,
+		Role:        &newRole,
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, "updated-name", updated.Name)
+	assert.Equal(t, "Updated description", updated.Description)
+	assert.Equal(t, auth.RoleAdmin, updated.Role)
+}
+
+func TestService_UpdateAPIKey_PartialUpdate(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create an API key
+	result, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name:        "original-name",
+		Description: "Original description",
+		Role:        auth.RoleViewer,
+	}, "creator-id")
+	require.NoError(t, err)
+
+	// Update only the name
+	newName := "updated-name"
+	updated, err := svc.UpdateAPIKey(ctx, result.APIKey.ID, UpdateAPIKeyInput{
+		Name: &newName,
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, "updated-name", updated.Name)
+	// Other fields should remain unchanged
+	assert.Equal(t, "Original description", updated.Description)
+	assert.Equal(t, auth.RoleViewer, updated.Role)
+}
+
+func TestService_UpdateAPIKey_InvalidRole(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create an API key
+	result, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name: "test-key",
+		Role: auth.RoleViewer,
+	}, "creator-id")
+	require.NoError(t, err)
+
+	// Try to update with invalid role
+	invalidRole := auth.Role("invalid")
+	_, err = svc.UpdateAPIKey(ctx, result.APIKey.ID, UpdateAPIKeyInput{
+		Role: &invalidRole,
+	})
+	require.Error(t, err, "UpdateAPIKey() with invalid role should return error")
+}
+
+func TestService_UpdateAPIKey_NotFound(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	newName := "updated-name"
+	_, err := svc.UpdateAPIKey(ctx, "non-existent-id", UpdateAPIKeyInput{
+		Name: &newName,
+	})
+	require.ErrorIs(t, err, auth.ErrAPIKeyNotFound)
+}
+
+func TestService_UpdateAPIKey_NotConfigured(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	newName := "updated-name"
+	_, err := svc.UpdateAPIKey(ctx, "some-id", UpdateAPIKeyInput{
+		Name: &newName,
+	})
+	require.ErrorIs(t, err, ErrAPIKeyNotConfigured)
+}
+
+func TestService_DeleteAPIKey(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create an API key
+	result, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name: "test-key",
+		Role: auth.RoleViewer,
+	}, "creator-id")
+	require.NoError(t, err)
+
+	// Delete the API key
+	err = svc.DeleteAPIKey(ctx, result.APIKey.ID)
+	require.NoError(t, err)
+
+	// Verify it's deleted
+	_, err = svc.GetAPIKey(ctx, result.APIKey.ID)
+	require.ErrorIs(t, err, auth.ErrAPIKeyNotFound)
+}
+
+func TestService_DeleteAPIKey_NotFound(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	err := svc.DeleteAPIKey(ctx, "non-existent-id")
+	require.ErrorIs(t, err, auth.ErrAPIKeyNotFound)
+}
+
+func TestService_DeleteAPIKey_NotConfigured(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	err := svc.DeleteAPIKey(ctx, "some-id")
+	require.ErrorIs(t, err, ErrAPIKeyNotConfigured)
+}
+
+func TestService_ValidateAPIKey(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create an API key
+	result, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name: "test-key",
+		Role: auth.RoleManager,
+	}, "creator-id")
+	require.NoError(t, err)
+
+	// Validate the API key
+	apiKey, err := svc.ValidateAPIKey(ctx, result.FullKey)
+	require.NoError(t, err)
+
+	assert.Equal(t, result.APIKey.ID, apiKey.ID)
+	assert.Equal(t, "test-key", apiKey.Name)
+	assert.Equal(t, auth.RoleManager, apiKey.Role)
+}
+
+func TestService_ValidateAPIKey_InvalidPrefix(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := svc.ValidateAPIKey(ctx, "invalid_prefix_key")
+	require.ErrorIs(t, err, ErrInvalidAPIKey)
+}
+
+func TestService_ValidateAPIKey_WrongKey(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create an API key
+	_, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name: "test-key",
+		Role: auth.RoleViewer,
+	}, "creator-id")
+	require.NoError(t, err)
+
+	// Try to validate with wrong key (correct prefix but wrong value)
+	_, err = svc.ValidateAPIKey(ctx, "dagu_wrongkeywrongkeywrongkeywrongkey")
+	require.ErrorIs(t, err, ErrInvalidAPIKey)
+}
+
+func TestService_ValidateAPIKey_NotConfigured(t *testing.T) {
+	svc, cleanup := setupTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := svc.ValidateAPIKey(ctx, "dagu_somekey")
+	require.ErrorIs(t, err, ErrAPIKeyNotConfigured)
+}
+
+func TestService_HasAPIKeyStore(t *testing.T) {
+	// Test with API key store
+	svcWithStore, cleanup1 := setupTestServiceWithAPIKeys(t)
+	defer cleanup1()
+
+	assert.True(t, svcWithStore.HasAPIKeyStore(), "HasAPIKeyStore() should return true when configured")
+
+	// Test without API key store
+	svcWithoutStore, cleanup2 := setupTestService(t)
+	defer cleanup2()
+
+	assert.False(t, svcWithoutStore.HasAPIKeyStore(), "HasAPIKeyStore() should return false when not configured")
+}
+
+func TestService_CreateAPIKey_EmptyCreatorID(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name: "test-key",
+		Role: auth.RoleViewer,
+	}, "") // Empty creator ID
+	require.ErrorIs(t, err, ErrInvalidCreatorID)
+}
+
+func TestService_ValidateAPIKey_UpdatesLastUsed(t *testing.T) {
+	svc, cleanup := setupTestServiceWithAPIKeys(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create an API key
+	result, err := svc.CreateAPIKey(ctx, CreateAPIKeyInput{
+		Name: "lastused-key",
+		Role: auth.RoleViewer,
+	}, "creator-id")
+	require.NoError(t, err)
+
+	// Verify LastUsedAt is nil initially
+	apiKey, err := svc.GetAPIKey(ctx, result.APIKey.ID)
+	require.NoError(t, err)
+	assert.Nil(t, apiKey.LastUsedAt, "LastUsedAt should be nil initially")
+
+	// Validate the API key (this updates LastUsedAt synchronously)
+	_, err = svc.ValidateAPIKey(ctx, result.FullKey)
+	require.NoError(t, err)
+
+	// Verify LastUsedAt is now populated
+	apiKey2, err := svc.GetAPIKey(ctx, result.APIKey.ID)
+	require.NoError(t, err)
+	require.NotNil(t, apiKey2.LastUsedAt, "LastUsedAt should be populated after validation")
+}
+
+func TestGenerateAPIKey(t *testing.T) {
+	// Test API key generation
+	keyParts, err := generateAPIKey(4) // Low cost for fast tests
+	require.NoError(t, err)
+
+	// Verify full key has correct prefix
+	assert.True(t, strings.HasPrefix(keyParts.fullKey, "dagu_"), "Full key should start with 'dagu_'")
+
+	// Verify key prefix is correct length
+	assert.Len(t, keyParts.keyPrefix, apiKeyPrefixLength, "Key prefix should be %d characters", apiKeyPrefixLength)
+
+	// Verify key prefix matches start of full key
+	assert.Equal(t, keyParts.fullKey[:apiKeyPrefixLength], keyParts.keyPrefix, "Key prefix should match start of full key")
+
+	// Verify hash is valid bcrypt hash
+	assert.NotEmpty(t, keyParts.keyHash, "Key hash should not be empty")
+	assert.True(t, strings.HasPrefix(keyParts.keyHash, "$2"), "Key hash should be bcrypt format")
+
+	// Verify full key is long enough (should be at least 40 chars: 5 prefix + 32 bytes base58)
+	assert.GreaterOrEqual(t, len(keyParts.fullKey), 40, "Full key should be at least 40 characters")
+}
+
+func TestGenerateAPIKey_UniqueKeys(t *testing.T) {
+	// Generate multiple keys and verify they are unique
+	keys := make(map[string]bool)
+	for i := 0; i < 100; i++ {
+		keyParts, err := generateAPIKey(4)
+		require.NoError(t, err)
+		assert.False(t, keys[keyParts.fullKey], "Generated key should be unique")
+		keys[keyParts.fullKey] = true
 	}
 }

@@ -200,7 +200,8 @@ func TestLoad_Env(t *testing.T) {
 			ProcDir:            filepath.Join(testPaths, "proc"),
 			QueueDir:           filepath.Join(testPaths, "queue"),
 			ServiceRegistryDir: filepath.Join(testPaths, "service-registry"),
-			UsersDir:           filepath.Join(testPaths, "data", "users"), // Derived from DataDir
+			UsersDir:           filepath.Join(testPaths, "data", "users"),   // Derived from DataDir
+			APIKeysDir:         filepath.Join(testPaths, "data", "apikeys"), // Derived from DataDir
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
@@ -432,6 +433,7 @@ scheduler:
 			QueueDir:           "/var/dagu/data/queue",
 			ServiceRegistryDir: "/var/dagu/data/service-registry",
 			UsersDir:           "/var/dagu/data/users",
+			APIKeysDir:         "/var/dagu/data/apikeys",
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",

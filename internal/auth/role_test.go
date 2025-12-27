@@ -134,3 +134,25 @@ func TestAllRoles(t *testing.T) {
 		t.Error("AllRoles() returned a reference to internal state")
 	}
 }
+
+func TestRole_String(t *testing.T) {
+	tests := []struct {
+		role Role
+		want string
+	}{
+		{RoleAdmin, "admin"},
+		{RoleManager, "manager"},
+		{RoleOperator, "operator"},
+		{RoleViewer, "viewer"},
+		{Role("custom"), "custom"},
+		{Role(""), ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			if got := tt.role.String(); got != tt.want {
+				t.Errorf("Role(%q).String() = %v, want %v", tt.role, got, tt.want)
+			}
+		})
+	}
+}

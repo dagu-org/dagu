@@ -28,6 +28,9 @@ type Options struct {
 	// JWTValidator validates JWT tokens for builtin auth mode.
 	// When set, JWT Bearer tokens are accepted as an authentication method.
 	JWTValidator TokenValidator
+	// APIKeyValidator validates standalone API keys with roles.
+	// When set, API keys with the "dagu_" prefix are accepted as an authentication method.
+	APIKeyValidator APIKeyValidator
 }
 
 // DefaultOptions provides sensible defaults for the middleware.
@@ -54,7 +57,8 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 	}
 
 	jwtEnabled := opts.JWTValidator != nil
-	anyAuthEnabled := opts.BasicAuthEnabled || opts.APITokenEnabled || opts.OIDCAuthEnabled || jwtEnabled
+	apiKeyEnabled := opts.APIKeyValidator != nil
+	anyAuthEnabled := opts.BasicAuthEnabled || opts.APITokenEnabled || opts.OIDCAuthEnabled || jwtEnabled || apiKeyEnabled
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -84,7 +88,27 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 				}
 			}
 
-			// Try API token authentication if enabled
+			// Try standalone API key authentication if enabled
+			// API keys have the "dagu_" prefix and have their own role assignment
+			if apiKeyEnabled {
+				if token := extractBearerToken(r); token != "" && strings.HasPrefix(token, "dagu_") {
+					apiKey, err := opts.APIKeyValidator.ValidateAPIKey(r.Context(), token)
+					if err == nil {
+						// API key valid - create synthetic user with the key's role
+						syntheticUser := &auth.User{
+							ID:       "apikey:" + apiKey.ID,
+							Username: "apikey:" + apiKey.Name,
+							Role:     apiKey.Role,
+						}
+						ctx := auth.WithUser(r.Context(), syntheticUser)
+						next.ServeHTTP(w, r.WithContext(ctx))
+						return
+					}
+					// API key validation failed, continue to try other methods
+				}
+			}
+
+			// Try static API token authentication if enabled
 			if opts.APITokenEnabled && checkAPIToken(r, opts.APIToken) {
 				// API token grants full admin access
 				// Inject a synthetic admin user so that permission checks (requireWrite,

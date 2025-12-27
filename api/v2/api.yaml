@@ -37,6 +37,8 @@ tags:
     description: "Authentication operations (login, logout, token management)"
   - name: "users"
     description: "User management operations (CRUD, password management)"
+  - name: "api-keys"
+    description: "API key management operations (admin only)"
 
 paths:
   /health:
@@ -430,6 +432,225 @@ paths:
                 $ref: "#/components/schemas/Error"
         default:
           description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # API Key Management (Admin only)
+  /api-keys:
+    get:
+      summary: "List all API keys"
+      description: "Returns all API keys. Requires admin role."
+      operationId: "listAPIKeys"
+      tags:
+        - "api-keys"
+      responses:
+        "200":
+          description: "List of API keys"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIKeysListResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Create API key"
+      description: "Full key returned only in this response"
+      operationId: "createAPIKey"
+      tags:
+        - "api-keys"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAPIKeyRequest"
+      responses:
+        "201":
+          description: "Created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateAPIKeyResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Name already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api-keys/{keyId}:
+    get:
+      summary: "Get API key"
+      description: "Returns API key by ID. Requires admin role."
+      operationId: "getAPIKey"
+      tags:
+        - "api-keys"
+      parameters:
+        - $ref: "#/components/parameters/APIKeyId"
+      responses:
+        "200":
+          description: "API key details"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIKeyResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    patch:
+      summary: "Update API key"
+      description: "Updates API key info. Requires admin role."
+      operationId: "updateAPIKey"
+      tags:
+        - "api-keys"
+      parameters:
+        - $ref: "#/components/parameters/APIKeyId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAPIKeyRequest"
+      responses:
+        "200":
+          description: "Updated API key"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIKeyResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Name already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Delete API key"
+      description: "Revokes an API key. Requires admin role."
+      operationId: "deleteAPIKey"
+      tags:
+        - "api-keys"
+      parameters:
+        - $ref: "#/components/parameters/APIKeyId"
+      responses:
+        "204":
+          description: "API key deleted"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
           content:
             application/json:
               schema:
@@ -2081,6 +2302,15 @@ components:
         type: string
         minLength: 1
 
+    APIKeyId:
+      name: keyId
+      in: path
+      description: unique identifier of the API key
+      required: true
+      schema:
+        type: string
+        minLength: 1
+
     PerPage:
       name: perPage
       in: query
@@ -3442,6 +3672,118 @@ components:
             $ref: "#/components/schemas/User"
       required:
         - users
+
+    # ============================================================================
+    APIKey:
+      type: object
+      description: "API key information"
+      properties:
+        id:
+          type: string
+          description: "Unique identifier"
+        name:
+          type: string
+          description: "Human-readable name"
+        description:
+          type: string
+          description: "Purpose description"
+        role:
+          $ref: "#/components/schemas/UserRole"
+        keyPrefix:
+          type: string
+          description: "First 8 characters for identification"
+        createdAt:
+          type: string
+          format: date-time
+          description: "Creation timestamp"
+        updatedAt:
+          type: string
+          format: date-time
+          description: "Last update timestamp"
+        createdBy:
+          type: string
+          description: "Creator user ID"
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: "Last authentication timestamp"
+      required:
+        - id
+        - name
+        - role
+        - keyPrefix
+        - createdAt
+        - updatedAt
+        - createdBy
+
+    APIKeyResponse:
+      type: object
+      description: "API key response"
+      properties:
+        apiKey:
+          $ref: "#/components/schemas/APIKey"
+      required:
+        - apiKey
+
+    APIKeysListResponse:
+      type: object
+      description: "List of API keys"
+      properties:
+        apiKeys:
+          type: array
+          items:
+            $ref: "#/components/schemas/APIKey"
+      required:
+        - apiKeys
+
+    CreateAPIKeyRequest:
+      type: object
+      description: "Create API key request"
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: "Human-readable name"
+        description:
+          type: string
+          maxLength: 500
+          description: "Purpose description"
+        role:
+          $ref: "#/components/schemas/UserRole"
+      required:
+        - name
+        - role
+
+    CreateAPIKeyResponse:
+      type: object
+      description: "Create API key response"
+      properties:
+        apiKey:
+          $ref: "#/components/schemas/APIKey"
+        key:
+          type: string
+          description: "Full key secret, only returned once"
+      required:
+        - apiKey
+        - key
+
+    UpdateAPIKeyRequest:
+      type: object
+      description: "Update API key request"
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: "New name"
+        description:
+          type: string
+          maxLength: 500
+          description: "New description"
+        role:
+          $ref: "#/components/schemas/UserRole"
 
     SuccessResponse:
       type: object

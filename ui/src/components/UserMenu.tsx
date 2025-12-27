@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { User, LogOut, Key, Shield } from 'lucide-react';
+import { User, LogOut, Key } from 'lucide-react';
 import { ChangePasswordModal } from './ChangePasswordModal';
 
 type UserMenuProps = {
@@ -41,21 +41,6 @@ export function UserMenu({ isCollapsed = false }: UserMenuProps) {
     navigate('/login');
   };
 
-  const getRoleBadgeColor = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return 'bg-error/20 text-error';
-      case 'manager':
-        return 'bg-primary/100/20 text-primary';
-      case 'operator':
-        return 'bg-success/20 text-success';
-      case 'viewer':
-        return 'bg-muted-foreground/20 text-muted-foreground';
-      default:
-        return 'bg-muted-foreground/20 text-muted-foreground';
-    }
-  };
-
   return (
     <>
       <DropdownMenu>
@@ -81,14 +66,9 @@ export function UserMenu({ isCollapsed = false }: UserMenuProps) {
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-1">
               <p className="text-sm font-medium">{user.username}</p>
-              <div className="flex items-center gap-1.5">
-                <Shield className="h-3 w-3 text-muted-foreground" />
-                <span
-                  className={`text-xs px-1.5 py-0.5 rounded-full capitalize ${getRoleBadgeColor(user.role)}`}
-                >
-                  {user.role}
-                </span>
-              </div>
+              <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize w-fit">
+                {user.role}
+              </span>
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />

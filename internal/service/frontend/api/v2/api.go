@@ -63,6 +63,14 @@ type AuthService interface {
 	DeleteUser(ctx context.Context, id string, currentUserID string) error
 	ChangePassword(ctx context.Context, userID, oldPassword, newPassword string) error
 	ResetPassword(ctx context.Context, userID, newPassword string) error
+	// API Key management
+	CreateAPIKey(ctx context.Context, input authservice.CreateAPIKeyInput, creatorID string) (*authservice.CreateAPIKeyResult, error)
+	GetAPIKey(ctx context.Context, id string) (*auth.APIKey, error)
+	ListAPIKeys(ctx context.Context) ([]*auth.APIKey, error)
+	UpdateAPIKey(ctx context.Context, id string, input authservice.UpdateAPIKeyInput) (*auth.APIKey, error)
+	DeleteAPIKey(ctx context.Context, id string) error
+	ValidateAPIKey(ctx context.Context, keySecret string) (*auth.APIKey, error)
+	HasAPIKeyStore() bool
 }
 
 // APIOption is a functional option for configuring the API.
@@ -224,6 +232,10 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 		}
 		// Add JWT as an additional auth method for builtin mode
 		authOptions.JWTValidator = a.authService
+		// Add API key validation for builtin mode (if API key store is configured)
+		if a.authService.HasAPIKeyStore() {
+			authOptions.APIKeyValidator = a.authService
+		}
 	}
 
 	r.Group(func(r chi.Router) {

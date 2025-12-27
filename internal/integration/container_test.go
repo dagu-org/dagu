@@ -684,24 +684,26 @@ steps:
 				// Test that step.env is merged with container.env
 				// container.env takes precedence for shared keys
 				// Use printenv to show actual environment in container
+				// Note: SEMIC_ prefix is an abbreviation of the test name (StepEnvMergedIntoContainerEnv)
+				// to avoid environment variable collisions between tests
 				return fmt.Sprintf(`
 steps:
   - name: check-merged-env
     env:
-      - STEP_VAR=from_step
-      - SHARED_VAR=step_value
+      - SEMIC_STEP_VAR=from_step
+      - SEMIC_SHARED_VAR=step_value
     container:
       image: %s
       env:
-        - CONTAINER_VAR=from_container
-        - SHARED_VAR=container_value
-    command: printenv SHARED_VAR
-    output: MERGED_ENV_OUT
+        - SEMIC_CONTAINER_VAR=from_container
+        - SEMIC_SHARED_VAR=container_value
+    command: printenv SEMIC_SHARED_VAR
+    output: SEMIC_MERGED_ENV_OUT
 `, testImage)
 			},
 			expectedOutputs: map[string]any{
-				// SHARED_VAR should be container_value (container.env takes precedence)
-				"MERGED_ENV_OUT": "container_value",
+				// SEMIC_SHARED_VAR should be container_value (container.env takes precedence)
+				"SEMIC_MERGED_ENV_OUT": "container_value",
 			},
 		},
 		{

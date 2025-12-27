@@ -10,22 +10,28 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
 // Service errors.
 var (
-	ErrInvalidCredentials = errors.New("invalid username or password")
-	ErrInvalidToken       = errors.New("invalid or expired token")
-	ErrTokenExpired       = errors.New("token has expired")
-	ErrMissingSecret      = errors.New("token secret is not configured")
-	ErrPasswordMismatch   = errors.New("current password is incorrect")
-	ErrWeakPassword       = errors.New("password does not meet requirements")
-	ErrCannotDeleteSelf   = errors.New("cannot delete your own account")
+	ErrInvalidCredentials  = errors.New("invalid username or password")
+	ErrInvalidToken        = errors.New("invalid or expired token")
+	ErrTokenExpired        = errors.New("token has expired")
+	ErrMissingSecret       = errors.New("token secret is not configured")
+	ErrPasswordMismatch    = errors.New("current password is incorrect")
+	ErrWeakPassword        = errors.New("password does not meet requirements")
+	ErrCannotDeleteSelf    = errors.New("cannot delete your own account")
+	ErrInvalidAPIKey       = errors.New("invalid API key")
+	ErrAPIKeyNotConfigured = errors.New("API key management is not configured")
+	ErrInvalidCreatorID    = errors.New("creator ID is required")
 )
 
 const (
@@ -35,6 +41,12 @@ const (
 	minPasswordLength = 8
 	// defaultTokenTTL is the default token time-to-live.
 	defaultTokenTTL = 24 * time.Hour
+	// apiKeyPrefix is the prefix for all API keys.
+	apiKeyPrefix = "dagu_"
+	// apiKeyRandomBytes is the number of random bytes for API key generation.
+	apiKeyRandomBytes = 32
+	// apiKeyPrefixLength is the length of the key prefix stored for identification.
+	apiKeyPrefixLength = 8
 )
 
 // Config holds the configuration for the auth service.
@@ -57,23 +69,38 @@ type Claims struct {
 
 // Service provides authentication and user management functionality.
 type Service struct {
-	store  auth.UserStore
-	config Config
+	store       auth.UserStore
+	apiKeyStore auth.APIKeyStore
+	config      Config
+}
+
+// Option is a functional option for configuring the Service.
+type Option func(*Service)
+
+// WithAPIKeyStore sets the API key store for the service.
+func WithAPIKeyStore(store auth.APIKeyStore) Option {
+	return func(s *Service) {
+		s.apiKeyStore = store
+	}
 }
 
 // New creates a new auth service using the provided user store and configuration.
 // If TokenTTL or BcryptCost are not set (<= 0) they are replaced with package defaults.
-func New(store auth.UserStore, config Config) *Service {
+func New(store auth.UserStore, config Config, opts ...Option) *Service {
 	if config.TokenTTL <= 0 {
 		config.TokenTTL = defaultTokenTTL
 	}
 	if config.BcryptCost <= 0 {
 		config.BcryptCost = defaultBcryptCost
 	}
-	return &Service{
+	svc := &Service{
 		store:  store,
 		config: config,
 	}
+	for _, opt := range opts {
+		opt(svc)
+	}
+	return svc
 }
 
 // dummyHash is a valid bcrypt hash used for timing attack prevention.
@@ -85,10 +112,11 @@ var dummyHash = []byte("$2a$12$K8gHXqrFdFvMwJBG0VlJGuAGz3FwBmTm8xnNQblN2tCxrQgPL
 func (s *Service) Authenticate(ctx context.Context, username, password string) (*auth.User, error) {
 	user, err := s.store.GetByUsername(ctx, username)
 	if err != nil {
+		// Always perform a bcrypt comparison to prevent timing attacks.
+		// This ensures consistent response times regardless of error type.
+		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
+
 		if errors.Is(err, auth.ErrUserNotFound) || errors.Is(err, auth.ErrInvalidUsername) {
-			// Use constant-time comparison to prevent timing attacks.
-			// Compare against a valid bcrypt hash to ensure similar timing.
-			_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
 			return nil, ErrInvalidCredentials
 		}
 		return nil, fmt.Errorf("failed to get user: %w", err)
@@ -385,9 +413,209 @@ func (s *Service) validatePassword(password string) error {
 // built from cryptographically secure random bytes. It returns an error if a secure random
 // source cannot be read.
 func generateSecurePassword(length int) (string, error) {
-	bytes := make([]byte, length)
+	// Calculate required bytes to produce at least 'length' base64 characters.
+	// Base64 encodes 3 bytes to 4 characters, so we need ceil(length * 3 / 4) bytes.
+	requiredBytes := (length*3 + 3) / 4
+	bytes := make([]byte, requiredBytes)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", err
 	}
-	return base64.URLEncoding.EncodeToString(bytes)[:length], nil
+	// Use RawURLEncoding (no padding) and take exactly 'length' characters.
+	encoded := base64.RawURLEncoding.EncodeToString(bytes)
+	return encoded[:length], nil
+}
+
+// ============================================================================
+// API Key Management
+// ============================================================================
+
+// CreateAPIKeyInput contains the input for creating an API key.
+type CreateAPIKeyInput struct {
+	Name        string
+	Description string
+	Role        auth.Role
+}
+
+// CreateAPIKeyResult contains the result of creating an API key.
+type CreateAPIKeyResult struct {
+	APIKey  *auth.APIKey
+	FullKey string // Only returned once at creation
+}
+
+// CreateAPIKey creates a new API key.
+func (s *Service) CreateAPIKey(ctx context.Context, input CreateAPIKeyInput, creatorID string) (*CreateAPIKeyResult, error) {
+	if s.apiKeyStore == nil {
+		return nil, ErrAPIKeyNotConfigured
+	}
+
+	if input.Name == "" {
+		return nil, auth.ErrInvalidAPIKeyName
+	}
+
+	if !input.Role.Valid() {
+		return nil, fmt.Errorf("invalid role: %s", input.Role)
+	}
+
+	if creatorID == "" {
+		return nil, ErrInvalidCreatorID
+	}
+
+	// Generate API key
+	keyParts, err := generateAPIKey(s.config.BcryptCost)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate API key: %w", err)
+	}
+
+	apiKey, err := auth.NewAPIKey(input.Name, input.Description, input.Role, keyParts.keyHash, keyParts.keyPrefix, creatorID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.apiKeyStore.Create(ctx, apiKey); err != nil {
+		return nil, err
+	}
+
+	return &CreateAPIKeyResult{
+		APIKey:  apiKey,
+		FullKey: keyParts.fullKey,
+	}, nil
+}
+
+// apiKeyParts holds the components of a generated API key.
+type apiKeyParts struct {
+	fullKey   string
+	keyPrefix string
+	keyHash   string
+}
+
+// generateAPIKey generates a new API key with prefix, hash, and prefix for display.
+func generateAPIKey(bcryptCost int) (*apiKeyParts, error) {
+	randomBytes := make([]byte, apiKeyRandomBytes)
+	if _, err := rand.Read(randomBytes); err != nil {
+		return nil, fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+
+	encoded := stringutil.Base58Encode(randomBytes)
+	fullKey := apiKeyPrefix + encoded
+
+	// Store first N characters as prefix for identification
+	var keyPrefix string
+	if len(fullKey) >= apiKeyPrefixLength {
+		keyPrefix = fullKey[:apiKeyPrefixLength]
+	} else {
+		keyPrefix = fullKey
+	}
+
+	// Hash the full key
+	hashBytes, err := bcrypt.GenerateFromPassword([]byte(fullKey), bcryptCost)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash API key: %w", err)
+	}
+
+	return &apiKeyParts{
+		fullKey:   fullKey,
+		keyPrefix: keyPrefix,
+		keyHash:   string(hashBytes),
+	}, nil
+}
+
+// GetAPIKey retrieves an API key by ID.
+func (s *Service) GetAPIKey(ctx context.Context, id string) (*auth.APIKey, error) {
+	if s.apiKeyStore == nil {
+		return nil, ErrAPIKeyNotConfigured
+	}
+	return s.apiKeyStore.GetByID(ctx, id)
+}
+
+// ListAPIKeys returns all API keys.
+func (s *Service) ListAPIKeys(ctx context.Context) ([]*auth.APIKey, error) {
+	if s.apiKeyStore == nil {
+		return nil, ErrAPIKeyNotConfigured
+	}
+	return s.apiKeyStore.List(ctx)
+}
+
+// UpdateAPIKeyInput contains the input for updating an API key.
+type UpdateAPIKeyInput struct {
+	Name        *string
+	Description *string
+	Role        *auth.Role
+}
+
+// UpdateAPIKey updates an existing API key.
+func (s *Service) UpdateAPIKey(ctx context.Context, id string, input UpdateAPIKeyInput) (*auth.APIKey, error) {
+	if s.apiKeyStore == nil {
+		return nil, ErrAPIKeyNotConfigured
+	}
+
+	apiKey, err := s.apiKeyStore.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if input.Name != nil && *input.Name != "" {
+		apiKey.Name = *input.Name
+	}
+
+	if input.Description != nil {
+		apiKey.Description = *input.Description
+	}
+
+	if input.Role != nil {
+		if !input.Role.Valid() {
+			return nil, fmt.Errorf("invalid role: %s", *input.Role)
+		}
+		apiKey.Role = *input.Role
+	}
+
+	apiKey.UpdatedAt = time.Now().UTC()
+
+	if err := s.apiKeyStore.Update(ctx, apiKey); err != nil {
+		return nil, err
+	}
+
+	return apiKey, nil
+}
+
+// DeleteAPIKey deletes an API key by ID.
+func (s *Service) DeleteAPIKey(ctx context.Context, id string) error {
+	if s.apiKeyStore == nil {
+		return ErrAPIKeyNotConfigured
+	}
+	return s.apiKeyStore.Delete(ctx, id)
+}
+
+// ValidateAPIKey validates an API key and returns the associated APIKey if valid.
+// Note: O(n) bcrypt comparisons (~100ms each). Fine for <100 keys.
+func (s *Service) ValidateAPIKey(ctx context.Context, keySecret string) (*auth.APIKey, error) {
+	if s.apiKeyStore == nil {
+		return nil, ErrAPIKeyNotConfigured
+	}
+
+	// Check for correct prefix
+	if !strings.HasPrefix(keySecret, apiKeyPrefix) {
+		return nil, ErrInvalidAPIKey
+	}
+
+	keys, err := s.apiKeyStore.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list API keys: %w", err)
+	}
+
+	for _, key := range keys {
+		if err := bcrypt.CompareHashAndPassword([]byte(key.KeyHash), []byte(keySecret)); err == nil {
+			// Update last used timestamp synchronously.
+			// This avoids goroutine leaks and race conditions with Delete.
+			if err := s.apiKeyStore.UpdateLastUsed(ctx, key.ID); err != nil {
+				slog.Error("failed to update API key last used timestamp", "keyID", key.ID, "error", err)
+			}
+			return key, nil
+		}
+	}
+
+	return nil, ErrInvalidAPIKey
+}
+
+// HasAPIKeyStore returns true if API key management is configured.
+func (s *Service) HasAPIKeyStore() bool {
+	return s.apiKeyStore != nil
 }
