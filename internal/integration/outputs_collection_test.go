@@ -347,7 +347,7 @@ steps:
 	require.NotNil(t, fullOutputs)
 
 	// Validate metadata
-	assert.Equal(t, dag.DAG.Name, fullOutputs.Metadata.DAGName)
+	assert.Equal(t, dag.Name, fullOutputs.Metadata.DAGName)
 	assert.Equal(t, status.DAGRunID, fullOutputs.Metadata.DAGRunID)
 	assert.NotEmpty(t, fullOutputs.Metadata.AttemptID)
 	assert.Equal(t, "succeeded", fullOutputs.Metadata.Status)
