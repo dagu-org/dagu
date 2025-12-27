@@ -201,13 +201,15 @@ func (s *Store) GetByID(_ context.Context, id string) (*auth.APIKey, error) {
 
 	s.mu.RLock()
 	filePath, exists := s.byID[id]
-	s.mu.RUnlock()
-
 	if !exists {
+		s.mu.RUnlock()
 		return nil, auth.ErrAPIKeyNotFound
 	}
-
+	// Load file while still holding the read lock to prevent TOCTOU race
+	// where a concurrent Delete could remove the file between index lookup and file read.
 	key, err := s.loadAPIKeyFromFile(filePath)
+	s.mu.RUnlock()
+
 	if err != nil {
 		// File might have been deleted externally
 		if errors.Is(err, os.ErrNotExist) {
@@ -270,23 +272,24 @@ func (s *Store) Update(_ context.Context, key *auth.APIKey) error {
 		return fmt.Errorf("fileapikey: failed to load existing API key: %w", err)
 	}
 
-	// If name changed, check for conflicts and update index
+	// If name changed, check for conflicts (but don't update index yet)
 	if existingKey.Name != key.Name {
 		if existingID, taken := s.byName[key.Name]; taken && existingID != key.ID {
 			return auth.ErrAPIKeyAlreadyExists
 		}
-		delete(s.byName, existingKey.Name)
-		s.byName[key.Name] = key.ID
 	}
 
-	// Write updated API key
+	// Write updated API key FIRST, before updating index.
+	// This ensures index is only updated on successful write,
+	// avoiding corruption if write fails.
 	if err := s.writeAPIKeyToFile(filePath, key); err != nil {
-		// Rollback index change on failure
-		if existingKey.Name != key.Name {
-			delete(s.byName, key.Name)
-			s.byName[existingKey.Name] = key.ID
-		}
 		return err
+	}
+
+	// Update index AFTER successful file write
+	if existingKey.Name != key.Name {
+		delete(s.byName, existingKey.Name)
+		s.byName[key.Name] = key.ID
 	}
 
 	return nil
@@ -322,12 +325,18 @@ func (s *Store) Delete(_ context.Context, id string) error {
 	if key != nil {
 		delete(s.byName, key.Name)
 	} else {
-		// File was already gone; remove any name entry that still points to this ID.
+		// File was already gone; find name entry that still points to this ID.
+		// Note: We must find the key first, then delete after the loop
+		// to avoid undefined behavior from modifying a map during iteration.
+		var nameToDelete string
 		for name, keyID := range s.byName {
 			if keyID == id {
-				delete(s.byName, name)
+				nameToDelete = name
 				break
 			}
+		}
+		if nameToDelete != "" {
+			delete(s.byName, nameToDelete)
 		}
 	}
 

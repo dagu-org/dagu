@@ -112,10 +112,11 @@ var dummyHash = []byte("$2a$12$K8gHXqrFdFvMwJBG0VlJGuAGz3FwBmTm8xnNQblN2tCxrQgPL
 func (s *Service) Authenticate(ctx context.Context, username, password string) (*auth.User, error) {
 	user, err := s.store.GetByUsername(ctx, username)
 	if err != nil {
+		// Always perform a bcrypt comparison to prevent timing attacks.
+		// This ensures consistent response times regardless of error type.
+		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
+
 		if errors.Is(err, auth.ErrUserNotFound) || errors.Is(err, auth.ErrInvalidUsername) {
-			// Use constant-time comparison to prevent timing attacks.
-			// Compare against a valid bcrypt hash to ensure similar timing.
-			_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
 			return nil, ErrInvalidCredentials
 		}
 		return nil, fmt.Errorf("failed to get user: %w", err)
@@ -412,11 +413,16 @@ func (s *Service) validatePassword(password string) error {
 // built from cryptographically secure random bytes. It returns an error if a secure random
 // source cannot be read.
 func generateSecurePassword(length int) (string, error) {
-	bytes := make([]byte, length)
+	// Calculate required bytes to produce at least 'length' base64 characters.
+	// Base64 encodes 3 bytes to 4 characters, so we need ceil(length * 3 / 4) bytes.
+	requiredBytes := (length*3 + 3) / 4
+	bytes := make([]byte, requiredBytes)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", err
 	}
-	return base64.URLEncoding.EncodeToString(bytes)[:length], nil
+	// Use RawURLEncoding (no padding) and take exactly 'length' characters.
+	encoded := base64.RawURLEncoding.EncodeToString(bytes)
+	return encoded[:length], nil
 }
 
 // ============================================================================
@@ -588,7 +594,7 @@ func (s *Service) ValidateAPIKey(ctx context.Context, keySecret string) (*auth.A
 
 	// List all keys and find matching one
 	// Note: This is O(n) but acceptable for typical API key counts.
-	// For high-scale scenarios, consider adding a hash-based lookup.
+	// For high-scale scenarios, consider adding caching at the persistence layer.
 	keys, err := s.apiKeyStore.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list API keys: %w", err)
@@ -596,12 +602,11 @@ func (s *Service) ValidateAPIKey(ctx context.Context, keySecret string) (*auth.A
 
 	for _, key := range keys {
 		if err := bcrypt.CompareHashAndPassword([]byte(key.KeyHash), []byte(keySecret)); err == nil {
-			// Update last used timestamp asynchronously
-			go func(keyID string) {
-				if err := s.apiKeyStore.UpdateLastUsed(context.Background(), keyID); err != nil {
-					slog.Error("failed to update API key last used timestamp", "keyID", keyID, "error", err)
-				}
-			}(key.ID)
+			// Update last used timestamp synchronously.
+			// This avoids goroutine leaks and race conditions with Delete.
+			if err := s.apiKeyStore.UpdateLastUsed(ctx, key.ID); err != nil {
+				slog.Error("failed to update API key last used timestamp", "keyID", key.ID, "error", err)
+			}
 			return key, nil
 		}
 	}

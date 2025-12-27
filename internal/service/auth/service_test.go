@@ -1146,12 +1146,9 @@ func TestService_ValidateAPIKey_UpdatesLastUsed(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, apiKey.LastUsedAt, "LastUsedAt should be nil initially")
 
-	// Validate the API key (this should update LastUsedAt asynchronously)
+	// Validate the API key (this updates LastUsedAt synchronously)
 	_, err = svc.ValidateAPIKey(ctx, result.FullKey)
 	require.NoError(t, err)
-
-	// Wait for async update to complete
-	time.Sleep(100 * time.Millisecond)
 
 	// Verify LastUsedAt is now populated
 	apiKey2, err := svc.GetAPIKey(ctx, result.APIKey.ID)
