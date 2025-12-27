@@ -232,6 +232,8 @@ func testRenderTable(t *testing.T, _ *reporter, _ *mockSender, _ *core.DAG, node
 	require.Contains(t, summary, nodes[0].Step.Commands[0].Args[0])
 }
 
+var _ Sender = (*mockSender)(nil)
+
 type mockSender struct {
 	from    string
 	to      []string

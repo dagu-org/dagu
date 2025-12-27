@@ -16,6 +16,8 @@ import (
 	"github.com/dagu-org/dagu/internal/core/spec"
 )
 
+var _ execution.DAGStore = (*mockDAGStore)(nil)
+
 // Mock implementations
 type mockDAGStore struct {
 	mock.Mock
@@ -220,6 +222,8 @@ func (m *mockQueueStore) All(ctx context.Context) ([]execution.QueuedItemData, e
 	}
 	return args.Get(0).([]execution.QueuedItemData), args.Error(1)
 }
+
+var _ execution.ServiceRegistry = (*mockServiceRegistry)(nil)
 
 type mockServiceRegistry struct {
 	mock.Mock

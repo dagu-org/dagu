@@ -344,6 +344,8 @@ func TestPollerWithLabels(t *testing.T) {
 	})
 }
 
+var _ coordinator.Client = (*mockCoordinatorCli)(nil)
+
 // mockCoordinatorCli is a mock implementation of coordinator.Client
 type mockCoordinatorCli struct {
 	PollFunc     func(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error)
