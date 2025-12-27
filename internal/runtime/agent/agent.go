@@ -687,7 +687,6 @@ func (a *Agent) buildOutputs(ctx context.Context, finalStatus core.Status) *exec
 	}
 
 	return &execution.DAGRunOutputs{
-		Version: execution.OutputsSchemaVersion,
 		Metadata: execution.OutputsMetadata{
 			DAGName:     a.dag.Name,
 			DAGRunID:    a.dagRunID,

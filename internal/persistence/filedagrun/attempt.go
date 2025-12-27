@@ -551,7 +551,7 @@ func (att *Attempt) WriteOutputs(_ context.Context, outputs *execution.DAGRunOut
 }
 
 // ReadOutputs reads the collected step outputs from outputs.json.
-// Returns nil if the file does not exist or if the file is in v1 format (no version field).
+// Returns nil if the file does not exist or if the file is in old format (no metadata field).
 func (att *Attempt) ReadOutputs(_ context.Context) (*execution.DAGRunOutputs, error) {
 	dir := filepath.Dir(att.file)
 	outputsFile := filepath.Join(dir, OutputsFile)
@@ -569,8 +569,8 @@ func (att *Attempt) ReadOutputs(_ context.Context) (*execution.DAGRunOutputs, er
 		return nil, fmt.Errorf("failed to unmarshal outputs: %w", err)
 	}
 
-	// Ignore old format (v1) - returns nil
-	if outputs.Version < execution.OutputsSchemaVersion {
+	// Ignore old format (no metadata) - returns nil
+	if outputs.Metadata.DAGRunID == "" {
 		return nil, nil
 	}
 

@@ -58,10 +58,6 @@ paths:
         default:
           description: "Unexpected error"
 
-  # ============================================================================
-  # Authentication Endpoints
-  # ============================================================================
-
   /auth/login:
     post:
       summary: "Authenticate user and obtain JWT token"
@@ -3021,14 +3017,9 @@ components:
       type: object
       description: "Collected outputs from step executions in a DAG-run, including execution metadata."
       required:
-        - version
         - metadata
         - outputs
       properties:
-        version:
-          type: integer
-          description: "Schema version (currently 2)"
-          example: 2
         metadata:
           $ref: "#/components/schemas/OutputsMetadata"
         outputs:
@@ -3052,18 +3043,14 @@ components:
         - completedAt
       properties:
         dagName:
-          type: string
-          description: "Name of the DAG"
+          $ref: "#/components/schemas/DAGName"
         dagRunId:
-          type: string
-          description: "Unique DAG run identifier"
+          $ref: "#/components/schemas/DAGRunId"
         attemptId:
           type: string
           description: "Attempt identifier within the run"
         status:
-          type: string
-          description: "Final execution status"
-          enum: [succeeded, failed, aborted, partially_succeeded]
+          $ref: "#/components/schemas/StatusLabel"
         completedAt:
           type: string
           format: date-time
@@ -3182,7 +3169,7 @@ components:
           type: array
           description: "List of commands to execute sequentially"
           items:
-            $ref: '#/components/schemas/CommandEntry'
+            $ref: "#/components/schemas/CommandEntry"
         script:
           type: string
           description: "Script content if the step executes a script file"

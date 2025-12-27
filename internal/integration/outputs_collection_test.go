@@ -346,9 +346,6 @@ steps:
 	fullOutputs := readFullOutputsFile(t, th, dag.DAG, status.DAGRunID)
 	require.NotNil(t, fullOutputs)
 
-	// Validate version
-	assert.Equal(t, execution.OutputsSchemaVersion, fullOutputs.Version)
-
 	// Validate metadata
 	assert.Equal(t, dag.DAG.Name, fullOutputs.Metadata.DAGName)
 	assert.Equal(t, status.DAGRunID, fullOutputs.Metadata.DAGRunID)
@@ -407,8 +404,8 @@ func readFullOutputsFile(t *testing.T, th test.Helper, dag *core.DAG, dagRunID s
 		t.Fatalf("failed to unmarshal outputs.json: %v", err)
 	}
 
-	// Return nil if old format (version < 2)
-	if outputs.Version < execution.OutputsSchemaVersion {
+	// Return nil if old format (no metadata)
+	if outputs.Metadata.DAGRunID == "" {
 		return nil
 	}
 

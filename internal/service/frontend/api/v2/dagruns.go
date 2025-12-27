@@ -345,7 +345,6 @@ func (a *API) GetDAGRunOutputs(ctx context.Context, request api.GetDAGRunOutputs
 	// Return empty structure if no outputs (DAG-run exists but captured no outputs)
 	if outputs == nil {
 		outputs = &execution.DAGRunOutputs{
-			Version:  execution.OutputsSchemaVersion,
 			Metadata: execution.OutputsMetadata{},
 			Outputs:  make(map[string]string),
 		}
@@ -360,12 +359,11 @@ func (a *API) GetDAGRunOutputs(ctx context.Context, request api.GetDAGRunOutputs
 	}
 
 	return api.GetDAGRunOutputs200JSONResponse{
-		Version: outputs.Version,
 		Metadata: api.OutputsMetadata{
 			DagName:     outputs.Metadata.DAGName,
 			DagRunId:    outputs.Metadata.DAGRunID,
 			AttemptId:   outputs.Metadata.AttemptID,
-			Status:      api.OutputsMetadataStatus(outputs.Metadata.Status),
+			Status:      api.StatusLabel(outputs.Metadata.Status),
 			CompletedAt: completedAt,
 			Params:      ptrOf(outputs.Metadata.Params),
 		},
