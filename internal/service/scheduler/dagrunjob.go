@@ -93,7 +93,7 @@ func (j *DAGRunJob) Ready(ctx context.Context, latestStatus execution.DAGRunStat
 	}
 
 	// Skip if the last successful run time is on or after the next scheduled time.
-	latestStartedAt = latestStartedAt.Truncate(time.Minute)
+	latestStartedAt = latestStartedAt.Truncate(time.Second)
 	if latestStartedAt.After(j.Next) || j.Next.Equal(latestStartedAt) {
 		return ErrJobFinished
 	}

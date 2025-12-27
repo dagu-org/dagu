@@ -81,7 +81,7 @@ func TestScheduler(t *testing.T) {
 }
 
 func TestJobReady(t *testing.T) {
-	cronParser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	cronParser := cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 
 	tests := []struct {
 		name           string
@@ -192,7 +192,7 @@ func TestPrevExecTime(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cronParser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+			cronParser := cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 			schedule, err := cronParser.Parse(tt.schedule)
 			require.NoError(t, err)
 
