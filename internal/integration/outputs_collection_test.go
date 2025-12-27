@@ -246,7 +246,7 @@ steps:
 			tt.validateFunc(t, status)
 
 			// Read outputs.json if it exists
-			outputs := readOutputsFile(t, th, dag.DAG, status.DAGRunID)
+			outputs := readOutputsFile(t, th, dag.DAG)
 			tt.validateOutputs(t, outputs)
 		})
 	}
@@ -280,7 +280,7 @@ steps:
 	require.Equal(t, core.Failed, status.Status)
 
 	// Outputs from successful steps should still be collected
-	outputs := readOutputsFile(t, th, dag.DAG, status.DAGRunID)
+	outputs := readOutputsFile(t, th, dag.DAG)
 	require.NotNil(t, outputs)
 	assert.Equal(t, "BEFORE_FAIL=collected", outputs["beforeFail"])
 	_, hasAfterFail := outputs["afterFail"]
@@ -315,10 +315,7 @@ steps:
 			agent := dag.Agent()
 			agent.RunSuccess(t)
 
-			status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
-			require.NoError(t, err)
-
-			outputs := readOutputsFile(t, th, dag.DAG, status.DAGRunID)
+			outputs := readOutputsFile(t, th, dag.DAG)
 			require.NotNil(t, outputs)
 			// Value includes the KEY= prefix from the original output
 			assert.Equal(t, tt.expectedValue, outputs[tt.expectedKey])
@@ -343,7 +340,7 @@ steps:
 	require.NoError(t, err)
 
 	// Read full outputs including metadata
-	fullOutputs := readFullOutputsFile(t, th, dag.DAG, status.DAGRunID)
+	fullOutputs := readFullOutputsFile(t, th, dag.DAG)
 	require.NotNil(t, fullOutputs)
 
 	// Validate metadata
@@ -359,10 +356,10 @@ steps:
 
 // readOutputsFile reads the outputs.json file for a given DAG run
 // Returns just the outputs map for backward compatibility with existing tests
-func readOutputsFile(t *testing.T, th test.Helper, dag *core.DAG, dagRunID string) map[string]string {
+func readOutputsFile(t *testing.T, th test.Helper, dag *core.DAG) map[string]string {
 	t.Helper()
 
-	fullOutputs := readFullOutputsFile(t, th, dag, dagRunID)
+	fullOutputs := readFullOutputsFile(t, th, dag)
 	if fullOutputs == nil {
 		return nil
 	}
@@ -370,7 +367,7 @@ func readOutputsFile(t *testing.T, th test.Helper, dag *core.DAG, dagRunID strin
 }
 
 // readFullOutputsFile reads the full outputs.json file including metadata
-func readFullOutputsFile(t *testing.T, th test.Helper, dag *core.DAG, _ string) *execution.DAGRunOutputs {
+func readFullOutputsFile(t *testing.T, th test.Helper, dag *core.DAG) *execution.DAGRunOutputs {
 	t.Helper()
 
 	// Find the attempt directory
@@ -379,10 +376,8 @@ func readFullOutputsFile(t *testing.T, th test.Helper, dag *core.DAG, _ string) 
 
 	// Walk to find the outputs.json file
 	var outputsPath string
-	err := filepath.Walk(dagRunDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
+	_ = filepath.Walk(dagRunDir, func(path string, info os.FileInfo, err error) error {
+		require.NoError(t, err)
 		if info.Name() == filedagrun.OutputsFile {
 			outputsPath = path
 			return filepath.SkipAll
@@ -390,24 +385,17 @@ func readFullOutputsFile(t *testing.T, th test.Helper, dag *core.DAG, _ string) 
 		return nil
 	})
 
-	if err != nil || outputsPath == "" {
+	if outputsPath == "" {
 		return nil
 	}
 
 	data, err := os.ReadFile(outputsPath)
-	if err != nil {
-		return nil
-	}
+	require.NoError(t, err)
 
 	var outputs execution.DAGRunOutputs
-	if err := json.Unmarshal(data, &outputs); err != nil {
-		t.Fatalf("failed to unmarshal outputs.json: %v", err)
-	}
+	require.NoError(t, json.Unmarshal(data, &outputs))
 
 	// Return nil if old format (no metadata)
-	if outputs.Metadata.DAGRunID == "" {
-		return nil
-	}
-
+	require.NotEmpty(t, outputs.Metadata.DAGRunID)
 	return &outputs
 }
