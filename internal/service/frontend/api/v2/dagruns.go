@@ -334,14 +334,17 @@ func (a *API) GetDAGRunOutputs(ctx context.Context, request api.GetDAGRunOutputs
 
 	outputs, err := attempt.ReadOutputs(ctx)
 	if err != nil {
+		logger.Error(ctx, "Failed to read outputs",
+			tag.Error(err),
+			slog.String("dag", dagName),
+			slog.String("dagRunId", dagRunId),
+		)
 		return nil, fmt.Errorf("error reading outputs: %w", err)
 	}
 
+	// Return empty object if no outputs (DAG-run exists but captured no outputs)
 	if outputs == nil {
-		return api.GetDAGRunOutputs404JSONResponse{
-			Code:    api.ErrorCodeNotFound,
-			Message: "no outputs file found for this DAG-run (DAG may not have captured any outputs)",
-		}, nil
+		outputs = make(map[string]string)
 	}
 
 	return api.GetDAGRunOutputs200JSONResponse(outputs), nil

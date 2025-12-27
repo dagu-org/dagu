@@ -552,15 +552,16 @@ func (a *Agent) Run(ctx context.Context) error {
 		slog.String("finished-at", finishedStatus.FinishedAt),
 	)
 
-	if err := attempt.Write(ctx, a.Status(ctx)); err != nil {
-		logger.Error(ctx, "Status write failed", tag.Error(err))
-	}
-
-	// Collect and write step outputs
+	// Collect and write step outputs BEFORE finalizing status (per spec)
 	if outputs := a.collectOutputs(ctx); len(outputs) > 0 {
 		if err := attempt.WriteOutputs(ctx, outputs); err != nil {
 			logger.Error(ctx, "Failed to write outputs", tag.Error(err))
 		}
+	}
+
+	// Finalize status (after outputs are written)
+	if err := attempt.Write(ctx, a.Status(ctx)); err != nil {
+		logger.Error(ctx, "Status write failed", tag.Error(err))
 	}
 
 	// Send the execution report if necessary.
@@ -634,7 +635,16 @@ func (a *Agent) collectOutputs(ctx context.Context) map[string]string {
 		}
 
 		// Parse the KeyValue format (KEY=VALUE)
-		kv := stringutil.KeyValue(rawValue.(string))
+		strValue, ok := rawValue.(string)
+		if !ok {
+			logger.Warn(ctx, "Output variable is not a string, skipping",
+				slog.String("step", step.Name),
+				slog.String("output", step.Output),
+				slog.String("type", fmt.Sprintf("%T", rawValue)),
+			)
+			continue
+		}
+		kv := stringutil.KeyValue(strValue)
 		value := kv.Value()
 
 		// Determine the key: use OutputKey if set, otherwise convert from UPPER_CASE
@@ -655,7 +665,10 @@ func (a *Agent) collectOutputs(ctx context.Context) map[string]string {
 		}
 		if totalSize > 1024*1024 {
 			logger.Warn(ctx, "Outputs size exceeds 1MB",
+				slog.String("dag", a.dag.Name),
+				slog.String("dagRunId", a.dagRunID),
 				slog.Int("size", totalSize),
+				slog.Int("count", len(outputs)),
 			)
 		}
 	}

@@ -481,3 +481,178 @@ func writeJSONToFile(t *testing.T, file string, obj any) {
 	err = os.WriteFile(file, append(data, '\n'), 0600)
 	require.NoError(t, err)
 }
+
+func TestAttempt_WriteOutputs(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("WriteValidOutputs", func(t *testing.T) {
+		dir := createTempDir(t)
+		statusFile := filepath.Join(dir, "status.dat")
+		att, err := NewAttempt(statusFile, nil)
+		require.NoError(t, err)
+
+		outputs := map[string]string{
+			"totalCount": "42",
+			"resultFile": "/path/to/result.txt",
+		}
+
+		err = att.WriteOutputs(ctx, outputs)
+		require.NoError(t, err)
+
+		// Verify file was created
+		outputsFile := filepath.Join(dir, OutputsFile)
+		assert.FileExists(t, outputsFile)
+
+		// Verify content
+		data, err := os.ReadFile(outputsFile)
+		require.NoError(t, err)
+
+		var readOutputs map[string]string
+		err = json.Unmarshal(data, &readOutputs)
+		require.NoError(t, err)
+
+		assert.Equal(t, outputs, readOutputs)
+	})
+
+	t.Run("WriteEmptyOutputs_NoFileCreated", func(t *testing.T) {
+		dir := createTempDir(t)
+		statusFile := filepath.Join(dir, "status.dat")
+		att, err := NewAttempt(statusFile, nil)
+		require.NoError(t, err)
+
+		outputs := map[string]string{}
+
+		err = att.WriteOutputs(ctx, outputs)
+		require.NoError(t, err)
+
+		// Verify file was NOT created (per implementation spec)
+		outputsFile := filepath.Join(dir, OutputsFile)
+		assert.NoFileExists(t, outputsFile)
+	})
+
+	t.Run("WriteNilOutputs_NoFileCreated", func(t *testing.T) {
+		dir := createTempDir(t)
+		statusFile := filepath.Join(dir, "status.dat")
+		att, err := NewAttempt(statusFile, nil)
+		require.NoError(t, err)
+
+		err = att.WriteOutputs(ctx, nil)
+		require.NoError(t, err)
+
+		// Verify file was NOT created (per implementation spec)
+		outputsFile := filepath.Join(dir, OutputsFile)
+		assert.NoFileExists(t, outputsFile)
+	})
+
+	t.Run("OverwriteExistingOutputs", func(t *testing.T) {
+		dir := createTempDir(t)
+		statusFile := filepath.Join(dir, "status.dat")
+		att, err := NewAttempt(statusFile, nil)
+		require.NoError(t, err)
+
+		// Write first version
+		outputs1 := map[string]string{"key1": "value1"}
+		err = att.WriteOutputs(ctx, outputs1)
+		require.NoError(t, err)
+
+		// Write second version
+		outputs2 := map[string]string{"key2": "value2"}
+		err = att.WriteOutputs(ctx, outputs2)
+		require.NoError(t, err)
+
+		// Verify second version overwrites first
+		readOutputs, err := att.ReadOutputs(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, outputs2, readOutputs)
+	})
+}
+
+func TestAttempt_ReadOutputs(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("ReadExistingOutputs", func(t *testing.T) {
+		dir := createTempDir(t)
+		statusFile := filepath.Join(dir, "status.dat")
+		att, err := NewAttempt(statusFile, nil)
+		require.NoError(t, err)
+
+		// Create outputs file
+		outputs := map[string]string{
+			"totalCount": "42",
+			"resultFile": "/path/to/result.txt",
+		}
+		err = att.WriteOutputs(ctx, outputs)
+		require.NoError(t, err)
+
+		// Read outputs
+		readOutputs, err := att.ReadOutputs(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, outputs, readOutputs)
+	})
+
+	t.Run("ReadNonExistentOutputs", func(t *testing.T) {
+		dir := createTempDir(t)
+		statusFile := filepath.Join(dir, "status.dat")
+		att, err := NewAttempt(statusFile, nil)
+		require.NoError(t, err)
+
+		// Read outputs without creating file
+		readOutputs, err := att.ReadOutputs(ctx)
+		require.NoError(t, err)
+		assert.Nil(t, readOutputs)
+	})
+
+	t.Run("ReadCorruptedOutputs", func(t *testing.T) {
+		dir := createTempDir(t)
+		statusFile := filepath.Join(dir, "status.dat")
+		att, err := NewAttempt(statusFile, nil)
+		require.NoError(t, err)
+
+		// Create corrupted outputs file
+		outputsFile := filepath.Join(dir, OutputsFile)
+		err = os.WriteFile(outputsFile, []byte("not valid json"), 0600)
+		require.NoError(t, err)
+
+		// Read should return error
+		_, err = att.ReadOutputs(ctx)
+		assert.Error(t, err)
+	})
+
+	t.Run("ReadEmptyJsonObject", func(t *testing.T) {
+		dir := createTempDir(t)
+		statusFile := filepath.Join(dir, "status.dat")
+		att, err := NewAttempt(statusFile, nil)
+		require.NoError(t, err)
+
+		// Manually create file with empty JSON object
+		outputsFile := filepath.Join(dir, OutputsFile)
+		err = os.WriteFile(outputsFile, []byte("{}"), 0600)
+		require.NoError(t, err)
+
+		// Read should return empty map (not nil)
+		readOutputs, err := att.ReadOutputs(ctx)
+		require.NoError(t, err)
+		assert.NotNil(t, readOutputs)
+		assert.Empty(t, readOutputs)
+	})
+
+	t.Run("ReadOutputsWithSpecialCharacters", func(t *testing.T) {
+		dir := createTempDir(t)
+		statusFile := filepath.Join(dir, "status.dat")
+		att, err := NewAttempt(statusFile, nil)
+		require.NoError(t, err)
+
+		outputs := map[string]string{
+			"path":     "/path/with/slashes",
+			"message":  "hello \"world\"",
+			"unicode":  "日本語",
+			"newlines": "line1\nline2",
+		}
+		err = att.WriteOutputs(ctx, outputs)
+		require.NoError(t, err)
+
+		readOutputs, err := att.ReadOutputs(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, outputs, readOutputs)
+	})
+}

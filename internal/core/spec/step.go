@@ -618,6 +618,10 @@ func parseOutputConfig(output any) (*outputConfig, error) {
 		if strings.HasPrefix(name, "$") {
 			name = strings.TrimPrefix(name, "$")
 		}
+		// Check for empty name after trimming and removing $ prefix
+		if name == "" {
+			return nil, nil
+		}
 		return &outputConfig{Name: name}, nil
 
 	case map[string]any:

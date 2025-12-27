@@ -2836,3 +2836,259 @@ stderr: /tmp/combined.log
 	assert.Contains(t, err.Error(), "stdout and stderr cannot point to the same file")
 	assert.Contains(t, err.Error(), "logOutput: merged")
 }
+
+func TestParseOutputConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    any
+		expected *outputConfig
+		wantErr  bool
+	}{
+		{
+			name:     "NilInput",
+			input:    nil,
+			expected: nil,
+		},
+		{
+			name:     "EmptyString",
+			input:    "",
+			expected: nil,
+		},
+		{
+			name:     "SimpleString",
+			input:    "MY_OUTPUT",
+			expected: &outputConfig{Name: "MY_OUTPUT"},
+		},
+		{
+			name:     "StringWithDollarPrefix",
+			input:    "$MY_OUTPUT",
+			expected: &outputConfig{Name: "MY_OUTPUT"},
+		},
+		{
+			name:     "StringWithSpaces",
+			input:    "  MY_OUTPUT  ",
+			expected: &outputConfig{Name: "MY_OUTPUT"},
+		},
+		{
+			name:     "StringWithDollarAndSpaces",
+			input:    "  $MY_OUTPUT  ",
+			expected: &outputConfig{Name: "MY_OUTPUT"},
+		},
+		{
+			name:     "OnlyDollarSign",
+			input:    "$",
+			expected: nil, // After trimming $ prefix, name is empty
+		},
+		{
+			name:     "OnlySpaces",
+			input:    "   ",
+			expected: nil,
+		},
+		{
+			name:  "ObjectWithNameOnly",
+			input: map[string]any{"name": "MY_OUTPUT"},
+			expected: &outputConfig{
+				Name: "MY_OUTPUT",
+			},
+		},
+		{
+			name: "ObjectWithAllFields",
+			input: map[string]any{
+				"name": "MY_OUTPUT",
+				"key":  "customKey",
+				"omit": true,
+			},
+			expected: &outputConfig{
+				Name: "MY_OUTPUT",
+				Key:  "customKey",
+				Omit: true,
+			},
+		},
+		{
+			name: "ObjectWithNameAndKey",
+			input: map[string]any{
+				"name": "$RESULT",
+				"key":  "resultValue",
+			},
+			expected: &outputConfig{
+				Name: "RESULT",
+				Key:  "resultValue",
+			},
+		},
+		{
+			name: "ObjectWithOmitFalse",
+			input: map[string]any{
+				"name": "OUTPUT",
+				"omit": false,
+			},
+			expected: &outputConfig{
+				Name: "OUTPUT",
+				Omit: false,
+			},
+		},
+		{
+			name:    "ObjectWithEmptyName",
+			input:   map[string]any{"name": ""},
+			wantErr: true,
+		},
+		{
+			name:    "ObjectWithMissingName",
+			input:   map[string]any{"key": "customKey"},
+			wantErr: true,
+		},
+		{
+			name: "ObjectWithSpacesInName",
+			input: map[string]any{
+				"name": "  $MY_OUTPUT  ",
+				"key":  "  myKey  ",
+			},
+			expected: &outputConfig{
+				Name: "MY_OUTPUT",
+				Key:  "myKey",
+			},
+		},
+		{
+			name:    "InvalidTypeInteger",
+			input:   123,
+			wantErr: true,
+		},
+		{
+			name:    "InvalidTypeArray",
+			input:   []string{"a", "b"},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := parseOutputConfig(tt.input)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestBuildStepOutputKey(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		output   any
+		expected string
+	}{
+		{
+			name:     "NilOutput",
+			output:   nil,
+			expected: "",
+		},
+		{
+			name:     "StringOutput_NoKey",
+			output:   "MY_OUTPUT",
+			expected: "",
+		},
+		{
+			name: "ObjectWithKey",
+			output: map[string]any{
+				"name": "MY_OUTPUT",
+				"key":  "customKey",
+			},
+			expected: "customKey",
+		},
+		{
+			name: "ObjectWithoutKey",
+			output: map[string]any{
+				"name": "MY_OUTPUT",
+			},
+			expected: "",
+		},
+		{
+			name: "ObjectWithEmptyKey",
+			output: map[string]any{
+				"name": "MY_OUTPUT",
+				"key":  "",
+			},
+			expected: "",
+		},
+		{
+			name: "ObjectWithKeyAndSpaces",
+			output: map[string]any{
+				"name": "OUTPUT",
+				"key":  "  myCustomKey  ",
+			},
+			expected: "myCustomKey",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s := &step{Output: tt.output}
+			result, err := buildStepOutputKey(testStepBuildContext(), s)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestBuildStepOutputOmit(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		output   any
+		expected bool
+	}{
+		{
+			name:     "NilOutput",
+			output:   nil,
+			expected: false,
+		},
+		{
+			name:     "StringOutput_NoOmit",
+			output:   "MY_OUTPUT",
+			expected: false,
+		},
+		{
+			name: "ObjectWithOmitTrue",
+			output: map[string]any{
+				"name": "MY_OUTPUT",
+				"omit": true,
+			},
+			expected: true,
+		},
+		{
+			name: "ObjectWithOmitFalse",
+			output: map[string]any{
+				"name": "MY_OUTPUT",
+				"omit": false,
+			},
+			expected: false,
+		},
+		{
+			name: "ObjectWithoutOmit",
+			output: map[string]any{
+				"name": "MY_OUTPUT",
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s := &step{Output: tt.output}
+			result, err := buildStepOutputOmit(testStepBuildContext(), s)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
