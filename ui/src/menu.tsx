@@ -119,12 +119,8 @@ export const mainListItems = React.forwardRef<
         {/* Remote Node Selector */}
         <AppBarContext.Consumer>
           {(context) => {
-            // Hide remote node selector when builtin auth is enabled or no remote nodes
-            if (
-              config.authMode === 'builtin' ||
-              !context.remoteNodes ||
-              context.remoteNodes.length === 0
-            ) {
+            // Hide remote node selector when no remote nodes are configured
+            if (!context.remoteNodes || context.remoteNodes.length === 0) {
               return null;
             }
 
