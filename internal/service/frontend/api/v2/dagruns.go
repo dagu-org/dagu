@@ -365,7 +365,7 @@ func (a *API) GetDAGRunOutputs(ctx context.Context, request api.GetDAGRunOutputs
 			AttemptId:   outputs.Metadata.AttemptID,
 			Status:      api.StatusLabel(outputs.Metadata.Status),
 			CompletedAt: completedAt,
-			Params:      ptrOf(outputs.Metadata.Params),
+			Params:      &outputs.Metadata.Params,
 		},
 		Outputs: outputs.Outputs,
 	}, nil

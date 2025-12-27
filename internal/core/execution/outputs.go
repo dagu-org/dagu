@@ -13,5 +13,5 @@ type OutputsMetadata struct {
 	AttemptID   string `json:"attemptId"`
 	Status      string `json:"status"`
 	CompletedAt string `json:"completedAt"`
-	Params      string `json:"params,omitempty"`
+	Params      string `json:"params,omitempty"` // JSON-serialized parameters
 }

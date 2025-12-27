@@ -3057,7 +3057,7 @@ components:
           description: "RFC3339 timestamp when execution completed"
         params:
           type: string
-          description: "Parameters passed to the DAG"
+          description: "JSON-serialized parameters passed to the DAG"
 
     Node:
       type: object

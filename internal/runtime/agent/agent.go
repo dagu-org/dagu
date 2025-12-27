@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/debug"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -686,6 +685,14 @@ func (a *Agent) buildOutputs(ctx context.Context, finalStatus core.Status) *exec
 		return nil
 	}
 
+	// Serialize params to JSON
+	var paramsJSON string
+	if len(a.dag.Params) > 0 {
+		if data, err := json.Marshal(a.dag.Params); err == nil {
+			paramsJSON = string(data)
+		}
+	}
+
 	return &execution.DAGRunOutputs{
 		Metadata: execution.OutputsMetadata{
 			DAGName:     a.dag.Name,
@@ -693,7 +700,7 @@ func (a *Agent) buildOutputs(ctx context.Context, finalStatus core.Status) *exec
 			AttemptID:   a.dagRunAttemptID,
 			Status:      finalStatus.String(),
 			CompletedAt: stringutil.FormatTime(time.Now()),
-			Params:      strings.Join(a.dag.Params, " "),
+			Params:      paramsJSON,
 		},
 		Outputs: outputs,
 	}

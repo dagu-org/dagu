@@ -498,7 +498,7 @@ func TestAttempt_WriteOutputs(t *testing.T) {
 				AttemptID:   "attempt-1",
 				Status:      "succeeded",
 				CompletedAt: "2024-12-28T15:30:45Z",
-				Params:      "key=value",
+				Params:      `["key=value"]`,
 			},
 			Outputs: map[string]string{
 				"totalCount": "42",
