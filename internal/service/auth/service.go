@@ -585,6 +585,7 @@ func (s *Service) DeleteAPIKey(ctx context.Context, id string) error {
 }
 
 // ValidateAPIKey validates an API key and returns the associated APIKey if valid.
+// Note: O(n) bcrypt comparisons (~100ms each). Fine for <100 keys.
 func (s *Service) ValidateAPIKey(ctx context.Context, keySecret string) (*auth.APIKey, error) {
 	if s.apiKeyStore == nil {
 		return nil, ErrAPIKeyNotConfigured
@@ -595,9 +596,6 @@ func (s *Service) ValidateAPIKey(ctx context.Context, keySecret string) (*auth.A
 		return nil, ErrInvalidAPIKey
 	}
 
-	// List all keys and find matching one
-	// Note: This is O(n) but acceptable for typical API key counts.
-	// For high-scale scenarios, consider adding caching at the persistence layer.
 	keys, err := s.apiKeyStore.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list API keys: %w", err)
