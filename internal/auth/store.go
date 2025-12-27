@@ -32,6 +32,10 @@ var (
 	ErrInvalidAPIKeyName = errors.New("invalid API key name")
 	// ErrInvalidAPIKeyID is returned when the API key ID is invalid.
 	ErrInvalidAPIKeyID = errors.New("invalid API key ID")
+	// ErrInvalidAPIKeyHash is returned when the API key hash is empty.
+	ErrInvalidAPIKeyHash = errors.New("invalid API key hash")
+	// ErrInvalidRole is returned when the role is not a valid role.
+	ErrInvalidRole = errors.New("invalid role")
 )
 
 // UserStore defines the interface for user persistence operations.

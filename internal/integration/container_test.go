@@ -684,6 +684,8 @@ steps:
 				// Test that step.env is merged with container.env
 				// container.env takes precedence for shared keys
 				// Use printenv to show actual environment in container
+				// Note: SEMIC_ prefix is an abbreviation of the test name (StepEnvMergedIntoContainerEnv)
+				// to avoid environment variable collisions between tests
 				return fmt.Sprintf(`
 steps:
   - name: check-merged-env

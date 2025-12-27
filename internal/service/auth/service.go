@@ -466,7 +466,10 @@ func (s *Service) CreateAPIKey(ctx context.Context, input CreateAPIKeyInput, cre
 		return nil, fmt.Errorf("failed to generate API key: %w", err)
 	}
 
-	apiKey := auth.NewAPIKey(input.Name, input.Description, input.Role, keyParts.keyHash, keyParts.keyPrefix, creatorID)
+	apiKey, err := auth.NewAPIKey(input.Name, input.Description, input.Role, keyParts.keyHash, keyParts.keyPrefix, creatorID)
+	if err != nil {
+		return nil, err
+	}
 	if err := s.apiKeyStore.Create(ctx, apiKey); err != nil {
 		return nil, err
 	}

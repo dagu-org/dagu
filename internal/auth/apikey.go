@@ -37,7 +37,18 @@ type APIKey struct {
 }
 
 // NewAPIKey creates an APIKey with a new UUID and sets CreatedAt and UpdatedAt to the current UTC time.
-func NewAPIKey(name, description string, role Role, keyHash, keyPrefix, createdBy string) *APIKey {
+// It validates that required fields are not empty and the role is valid.
+// Returns an error if validation fails.
+func NewAPIKey(name, description string, role Role, keyHash, keyPrefix, createdBy string) (*APIKey, error) {
+	if name == "" {
+		return nil, ErrInvalidAPIKeyName
+	}
+	if keyHash == "" {
+		return nil, ErrInvalidAPIKeyHash
+	}
+	if !role.Valid() {
+		return nil, ErrInvalidRole
+	}
 	now := time.Now().UTC()
 	return &APIKey{
 		ID:          uuid.New().String(),
@@ -49,7 +60,7 @@ func NewAPIKey(name, description string, role Role, keyHash, keyPrefix, createdB
 		CreatedAt:   now,
 		UpdatedAt:   now,
 		CreatedBy:   createdBy,
-	}
+	}, nil
 }
 
 // APIKeyForStorage is used for JSON serialization to persistent storage.
@@ -68,6 +79,8 @@ type APIKeyForStorage struct {
 }
 
 // ToStorage converts an APIKey to APIKeyForStorage for persistence.
+// NOTE: When adding new fields to APIKey or APIKeyForStorage, ensure both
+// ToStorage and ToAPIKey are updated to maintain field synchronization.
 func (k *APIKey) ToStorage() *APIKeyForStorage {
 	return &APIKeyForStorage{
 		ID:          k.ID,
@@ -84,6 +97,8 @@ func (k *APIKey) ToStorage() *APIKeyForStorage {
 }
 
 // ToAPIKey converts APIKeyForStorage back to APIKey.
+// NOTE: When adding new fields to APIKey or APIKeyForStorage, ensure both
+// ToStorage and ToAPIKey are updated to maintain field synchronization.
 func (s *APIKeyForStorage) ToAPIKey() *APIKey {
 	return &APIKey{
 		ID:          s.ID,

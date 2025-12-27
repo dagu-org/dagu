@@ -218,9 +218,9 @@ func (a *API) DeleteAPIKey(ctx context.Context, request api.DeleteAPIKeyRequestO
 func (a *API) requireAPIKeyManagement() error {
 	if a.authService == nil || !a.authService.HasAPIKeyStore() {
 		return &Error{
-			Code:       api.ErrorCodeUnauthorized,
-			Message:    "API key management is not enabled",
-			HTTPStatus: http.StatusUnauthorized,
+			Code:       api.ErrorCodeForbidden,
+			Message:    "API key management is not available",
+			HTTPStatus: http.StatusForbidden,
 		}
 	}
 	return nil

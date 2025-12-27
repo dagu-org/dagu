@@ -18,7 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { KeyRound, MoreHorizontal, Pencil, Trash2, Shield, Plus } from 'lucide-react';
+import { KeyRound, MoreHorizontal, Pencil, Trash2, Plus } from 'lucide-react';
 import { APIKeyFormModal } from './APIKeyFormModal';
 import ConfirmModal from '@/ui/ConfirmModal';
 import dayjs from '@/lib/dayjs';
@@ -94,21 +94,6 @@ export default function APIKeysPage() {
     }
   };
 
-  const getRoleBadgeColor = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return 'bg-error/20 text-error';
-      case 'manager':
-        return 'bg-primary/100/20 text-primary';
-      case 'operator':
-        return 'bg-success/20 text-success';
-      case 'viewer':
-        return 'bg-muted-foreground/20 text-muted-foreground';
-      default:
-        return 'bg-muted-foreground/20 text-muted-foreground';
-    }
-  };
-
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -180,14 +165,9 @@ export default function APIKeysPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1.5">
-                      <Shield className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span
-                        className={`text-xs px-1.5 py-0.5 rounded-full capitalize ${getRoleBadgeColor(key.role)}`}
-                      >
-                        {key.role}
-                      </span>
-                    </div>
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize">
+                      {key.role}
+                    </span>
                   </TableCell>
                   <TableCell>
                     <code className="text-xs bg-muted px-1.5 py-0.5 rounded">

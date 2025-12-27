@@ -14,9 +14,10 @@ import (
 
 func TestNewAPIKey(t *testing.T) {
 	before := time.Now().UTC()
-	key := NewAPIKey("test-key", "Test description", RoleManager, "hash123", "dagu_tes", "creator-id")
+	key, err := NewAPIKey("test-key", "Test description", RoleManager, "hash123", "dagu_tes", "creator-id")
 	after := time.Now().UTC()
 
+	require.NoError(t, err)
 	assert.NotEmpty(t, key.ID, "ID should be generated")
 	assert.Equal(t, "test-key", key.Name)
 	assert.Equal(t, "Test description", key.Description)
@@ -30,6 +31,73 @@ func TestNewAPIKey(t *testing.T) {
 	assert.True(t, !key.CreatedAt.Before(before), "CreatedAt should be >= before")
 	assert.True(t, !key.CreatedAt.After(after), "CreatedAt should be <= after")
 	assert.Equal(t, key.CreatedAt, key.UpdatedAt, "CreatedAt and UpdatedAt should be equal initially")
+}
+
+func TestNewAPIKey_Validation(t *testing.T) {
+	tests := []struct {
+		name        string
+		keyName     string
+		description string
+		role        Role
+		keyHash     string
+		keyPrefix   string
+		createdBy   string
+		wantErr     error
+	}{
+		{
+			name:        "empty name returns error",
+			keyName:     "",
+			description: "desc",
+			role:        RoleViewer,
+			keyHash:     "hash",
+			keyPrefix:   "prefix",
+			createdBy:   "creator",
+			wantErr:     ErrInvalidAPIKeyName,
+		},
+		{
+			name:        "empty key hash returns error",
+			keyName:     "test-key",
+			description: "desc",
+			role:        RoleViewer,
+			keyHash:     "",
+			keyPrefix:   "prefix",
+			createdBy:   "creator",
+			wantErr:     ErrInvalidAPIKeyHash,
+		},
+		{
+			name:        "invalid role returns error",
+			keyName:     "test-key",
+			description: "desc",
+			role:        Role("invalid"),
+			keyHash:     "hash",
+			keyPrefix:   "prefix",
+			createdBy:   "creator",
+			wantErr:     ErrInvalidRole,
+		},
+		{
+			name:        "valid input returns no error",
+			keyName:     "test-key",
+			description: "desc",
+			role:        RoleViewer,
+			keyHash:     "hash",
+			keyPrefix:   "prefix",
+			createdBy:   "creator",
+			wantErr:     nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key, err := NewAPIKey(tt.keyName, tt.description, tt.role, tt.keyHash, tt.keyPrefix, tt.createdBy)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, key)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, key)
+			}
+		})
+	}
 }
 
 func TestAPIKey_ToStorage(t *testing.T) {
@@ -218,7 +286,8 @@ func TestAPIKey_NilLastUsedAt(t *testing.T) {
 func TestNewAPIKey_GeneratesUniqueIDs(t *testing.T) {
 	ids := make(map[string]bool)
 	for i := 0; i < 100; i++ {
-		key := NewAPIKey("test", "", RoleViewer, "hash", "prefix", "creator")
+		key, err := NewAPIKey("test", "", RoleViewer, "hash", "prefix", "creator")
+		require.NoError(t, err)
 		assert.False(t, ids[key.ID], "ID should be unique")
 		ids[key.ID] = true
 	}
