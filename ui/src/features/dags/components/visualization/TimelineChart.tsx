@@ -17,7 +17,6 @@ import {
 import dayjs from '@/lib/dayjs';
 import React, { useMemo } from 'react';
 import { components, NodeStatus } from '../../../../api/v2/schema';
-import { nodeStatusColorMapping } from '../../../../consts';
 
 /**
  * Props for the TimelineChart component
@@ -76,17 +75,23 @@ function calculateDuration(startMs: number, endMs: number): string {
 }
 
 /**
+ * Status colors matching the Graph component (sepia theme)
+ */
+const statusColors: Record<NodeStatus, { bg: string; border: string }> = {
+  [NodeStatus.NotStarted]: { bg: '#c8bfb0', border: '#c8bfb0' },
+  [NodeStatus.Running]: { bg: '#7da87d', border: '#7da87d' },
+  [NodeStatus.Failed]: { bg: '#c4726a', border: '#c4726a' },
+  [NodeStatus.Aborted]: { bg: '#d4a574', border: '#d4a574' },
+  [NodeStatus.Success]: { bg: '#7da87d', border: '#7da87d' },
+  [NodeStatus.Skipped]: { bg: '#6b635a', border: '#6b635a' },
+  [NodeStatus.PartialSuccess]: { bg: '#c4956a', border: '#c4956a' },
+};
+
+/**
  * Get color for a node status
  */
 function getStatusColor(status: NodeStatus): { bg: string; border: string } {
-  const mapping = nodeStatusColorMapping[status];
-  if (mapping && mapping.backgroundColor) {
-    return {
-      bg: mapping.backgroundColor as string,
-      border: mapping.backgroundColor as string,
-    };
-  }
-  return { bg: '#6b7280', border: '#6b7280' };
+  return statusColors[status] || { bg: '#6b7280', border: '#6b7280' };
 }
 
 type TimelineItem = {
