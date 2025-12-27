@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
 )
 
 const (
@@ -39,10 +40,20 @@ type Store struct {
 	byID map[string]string
 	// byName maps API key name to key ID
 	byName map[string]string
+
+	// fileCache caches API key objects to avoid repeated file reads
+	fileCache *fileutil.Cache[*auth.APIKey]
 }
 
 // Option is a functional option for configuring the Store.
 type Option func(*Store)
+
+// WithFileCache sets the file cache for API key objects.
+func WithFileCache(cache *fileutil.Cache[*auth.APIKey]) Option {
+	return func(s *Store) {
+		s.fileCache = cache
+	}
+}
 
 // New creates a new file-based API key store.
 // The baseDir must be non-empty; provided Option functions are applied to the store.
@@ -205,9 +216,20 @@ func (s *Store) GetByID(_ context.Context, id string) (*auth.APIKey, error) {
 		s.mu.RUnlock()
 		return nil, auth.ErrAPIKeyNotFound
 	}
-	// Load file while still holding the read lock to prevent TOCTOU race
-	// where a concurrent Delete could remove the file between index lookup and file read.
-	key, err := s.loadAPIKeyFromFile(filePath)
+
+	var key *auth.APIKey
+	var err error
+
+	// Use cache if available, otherwise load directly
+	if s.fileCache != nil {
+		key, err = s.fileCache.LoadLatest(filePath, func() (*auth.APIKey, error) {
+			return s.loadAPIKeyFromFile(filePath)
+		})
+	} else {
+		// Load file while still holding the read lock to prevent TOCTOU race
+		// where a concurrent Delete could remove the file between index lookup and file read.
+		key, err = s.loadAPIKeyFromFile(filePath)
+	}
 	s.mu.RUnlock()
 
 	if err != nil {
@@ -286,6 +308,11 @@ func (s *Store) Update(_ context.Context, key *auth.APIKey) error {
 		return err
 	}
 
+	// Invalidate cache after successful write
+	if s.fileCache != nil {
+		s.fileCache.Invalidate(filePath)
+	}
+
 	// Update index AFTER successful file write
 	if existingKey.Name != key.Name {
 		delete(s.byName, existingKey.Name)
@@ -318,6 +345,11 @@ func (s *Store) Delete(_ context.Context, id string) error {
 	// Remove file
 	if err := os.Remove(filePath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("fileapikey: failed to delete API key file: %w", err)
+	}
+
+	// Invalidate cache after file removal
+	if s.fileCache != nil {
+		s.fileCache.Invalidate(filePath)
 	}
 
 	// Update index
@@ -371,5 +403,14 @@ func (s *Store) UpdateLastUsed(_ context.Context, id string) error {
 	key.LastUsedAt = &now
 
 	// Write updated key
-	return s.writeAPIKeyToFile(filePath, key)
+	if err := s.writeAPIKeyToFile(filePath, key); err != nil {
+		return err
+	}
+
+	// Invalidate cache after successful write
+	if s.fileCache != nil {
+		s.fileCache.Invalidate(filePath)
+	}
+
+	return nil
 }
