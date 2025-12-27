@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useConfig } from '@/contexts/ConfigContext';
 import { TOKEN_KEY } from '@/contexts/AuthContext';
+import { AppBarContext } from '@/contexts/AppBarContext';
 import { components, UserRole } from '@/api/v2/schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +33,7 @@ interface APIKeyFormModalProps {
 
 export function APIKeyFormModal({ open, apiKey, onClose, onSuccess }: APIKeyFormModalProps) {
   const config = useConfig();
+  const appBarContext = useContext(AppBarContext);
   const isEditing = !!apiKey;
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -65,9 +67,10 @@ export function APIKeyFormModal({ open, apiKey, onClose, onSuccess }: APIKeyForm
 
     try {
       const token = localStorage.getItem(TOKEN_KEY);
+      const remoteNode = appBarContext.selectedRemoteNode || 'local';
       const url = isEditing
-        ? `${config.apiURL}/api-keys/${apiKey.id}`
-        : `${config.apiURL}/api-keys`;
+        ? `${config.apiURL}/api-keys/${apiKey.id}?remoteNode=${remoteNode}`
+        : `${config.apiURL}/api-keys?remoteNode=${remoteNode}`;
 
       const response = await fetch(url, {
         method: isEditing ? 'PATCH' : 'POST',

@@ -46,7 +46,8 @@ export default function APIKeysPage() {
   const fetchAPIKeys = useCallback(async () => {
     try {
       const token = localStorage.getItem(TOKEN_KEY);
-      const response = await fetch(`${config.apiURL}/api-keys`, {
+      const remoteNode = appBarContext.selectedRemoteNode || 'local';
+      const response = await fetch(`${config.apiURL}/api-keys?remoteNode=${remoteNode}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -63,7 +64,7 @@ export default function APIKeysPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [config.apiURL]);
+  }, [config.apiURL, appBarContext.selectedRemoteNode]);
 
   useEffect(() => {
     fetchAPIKeys();
@@ -74,7 +75,8 @@ export default function APIKeysPage() {
 
     try {
       const token = localStorage.getItem(TOKEN_KEY);
-      const response = await fetch(`${config.apiURL}/api-keys/${deletingKey.id}`, {
+      const remoteNode = appBarContext.selectedRemoteNode || 'local';
+      const response = await fetch(`${config.apiURL}/api-keys/${deletingKey.id}?remoteNode=${remoteNode}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
