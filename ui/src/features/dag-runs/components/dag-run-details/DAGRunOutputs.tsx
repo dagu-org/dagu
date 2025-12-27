@@ -135,6 +135,15 @@ function DAGRunOutputs({
   const { metadata, outputs } = data;
   const outputCount = Object.keys(outputs).length;
 
+  // Show simple message when no outputs
+  if (outputCount === 0) {
+    return (
+      <div className="text-sm text-muted-foreground p-4">
+        No outputs collected
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* Metadata Header */}
@@ -160,10 +169,12 @@ function DAGRunOutputs({
               {dayjs(metadata.completedAt).format('YYYY-MM-DD HH:mm:ss')}
             </span>
           </div>
-          <div>
-            <span className="text-muted-foreground">Attempt: </span>
-            <span className="font-mono">{metadata.attemptId}</span>
-          </div>
+          {metadata.attemptId && (
+            <div>
+              <span className="text-muted-foreground">Attempt: </span>
+              <span className="font-mono">{metadata.attemptId}</span>
+            </div>
+          )}
           {metadata.params && (
             <div>
               <span className="text-muted-foreground">Params: </span>
@@ -217,9 +228,7 @@ function DAGRunOutputs({
                   colSpan={3}
                   className="text-center text-muted-foreground py-8"
                 >
-                  {filter
-                    ? 'No outputs match your filter'
-                    : 'No outputs collected'}
+                  No outputs match your filter
                 </TableCell>
               </TableRow>
             ) : (
