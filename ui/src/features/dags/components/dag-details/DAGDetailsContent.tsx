@@ -66,9 +66,11 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   });
 
   // Check if outputs exist for conditional tab display
+  // Use actual dagRunId from currentDAGRun, not the URL param which may be "latest"
+  const actualDagRunId = currentDAGRun.dagRunId;
   const hasOutputs = useHasOutputs(
     dag?.name || '',
-    dagRunId,
+    actualDagRunId,
     currentDAGRun.status
   );
 
@@ -322,7 +324,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             <DAGStatus dagRun={currentDAGRun} fileName={fileName || ''} />
           ) : null}
           {activeTab === 'outputs' ? (
-            <DAGRunOutputs dagName={dag?.name || ''} dagRunId={dagRunId} />
+            <DAGRunOutputs dagName={dag?.name || ''} dagRunId={actualDagRunId} />
           ) : null}
           {activeTab === 'spec' ? <DAGSpec fileName={fileName} /> : null}
           {activeTab === 'history' ? (
