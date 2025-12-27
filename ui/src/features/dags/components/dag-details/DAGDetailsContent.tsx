@@ -1,15 +1,12 @@
 import { Tabs } from '@/components/ui/tabs';
 import {
-  ActivitySquare,
   FileCode,
   History,
-  Package,
+  PlayCircle,
   ScrollText,
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { components } from '../../../../api/v2/schema';
-import { DAGRunOutputs } from '../../../dag-runs/components/dag-run-details';
-import { useHasOutputs } from '../../../dag-runs/hooks/useHasOutputs';
 import { DAGStatus } from '../../components';
 import { DAGContext } from '../../contexts/DAGContext';
 import { LinkTab } from '../common';
@@ -35,7 +32,7 @@ type DAGDetailsContentProps = {
   stepName?: string | null;
   isModal?: boolean;
   navigateToStatusTab?: () => void;
-  skipHeader?: boolean; // Add this prop to optionally skip rendering the header
+  skipHeader?: boolean;
 };
 
 type LogViewerState = {
@@ -64,15 +61,6 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
     logType: 'execution',
     stepName: undefined,
   });
-
-  // Check if outputs exist for conditional tab display
-  // Use actual dagRunId from currentDAGRun, not the URL param which may be "latest"
-  const actualDagRunId = currentDAGRun.dagRunId;
-  const hasOutputs = useHasOutputs(
-    dag?.name || '',
-    actualDagRunId,
-    currentDAGRun.status
-  );
 
   const handleTabClick = (tab: string) => {
     if (onTabChange) {
@@ -118,45 +106,26 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             navigateToStatusTab={navigateToStatusTab}
           />
         )}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 lg:gap-0 mb-4">
+        <div className="flex flex-col lg:flex-row justify-between items-center gap-3 lg:gap-0 mb-4 min-h-[40px]">
           {/* Desktop Tabs (lg and up) */}
           <div className="hidden lg:block overflow-x-auto">
             <Tabs className="whitespace-nowrap">
               {isModal ? (
                 <ModalLinkTab
-                  label="Status"
+                  label="Latest Run"
                   value="status"
                   isActive={activeTab === 'status'}
-                  icon={ActivitySquare}
+                  icon={PlayCircle}
                   onClick={() => handleTabClick('status')}
                 />
               ) : (
                 <LinkTab
-                  label="Status"
+                  label="Latest Run"
                   value={`${baseUrl}`}
                   isActive={activeTab === 'status'}
-                  icon={ActivitySquare}
+                  icon={PlayCircle}
                 />
               )}
-
-              {/* Outputs Tab - Only show when outputs exist */}
-              {hasOutputs &&
-                (isModal ? (
-                  <ModalLinkTab
-                    label="Outputs"
-                    value="outputs"
-                    isActive={activeTab === 'outputs'}
-                    icon={Package}
-                    onClick={() => handleTabClick('outputs')}
-                  />
-                ) : (
-                  <LinkTab
-                    label="Outputs"
-                    value={`${baseUrl}/outputs`}
-                    isActive={activeTab === 'outputs'}
-                    icon={Package}
-                  />
-                ))}
 
               {isModal ? (
                 <ModalLinkTab
@@ -220,7 +189,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   label=""
                   value="status"
                   isActive={activeTab === 'status'}
-                  icon={ActivitySquare}
+                  icon={PlayCircle}
                   onClick={() => handleTabClick('status')}
                   className="flex-1 justify-center"
                 />
@@ -229,31 +198,10 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   label=""
                   value={`${baseUrl}`}
                   isActive={activeTab === 'status'}
-                  icon={ActivitySquare}
+                  icon={PlayCircle}
                   className="flex-1 justify-center"
                 />
               )}
-
-              {/* Outputs Tab - Only show when outputs exist */}
-              {hasOutputs &&
-                (isModal ? (
-                  <ModalLinkTab
-                    label=""
-                    value="outputs"
-                    isActive={activeTab === 'outputs'}
-                    icon={Package}
-                    onClick={() => handleTabClick('outputs')}
-                    className="flex-1 justify-center"
-                  />
-                ) : (
-                  <LinkTab
-                    label=""
-                    value={`${baseUrl}/outputs`}
-                    isActive={activeTab === 'outputs'}
-                    icon={Package}
-                    className="flex-1 justify-center"
-                  />
-                ))}
 
               {isModal ? (
                 <ModalLinkTab
@@ -315,16 +263,13 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             </div>
           </div>
 
-          {activeTab === 'spec' ? (
+          <div className={activeTab === 'spec' ? 'visible' : 'invisible'}>
             <DAGEditButtons fileName={fileName || ''} />
-          ) : null}
+          </div>
         </div>
         <div className="flex-1 flex flex-col min-h-0">
           {activeTab === 'status' ? (
             <DAGStatus dagRun={currentDAGRun} fileName={fileName || ''} />
-          ) : null}
-          {activeTab === 'outputs' ? (
-            <DAGRunOutputs dagName={dag?.name || ''} dagRunId={actualDagRunId} />
           ) : null}
           {activeTab === 'spec' ? <DAGSpec fileName={fileName} /> : null}
           {activeTab === 'history' ? (

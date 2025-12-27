@@ -240,9 +240,6 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
                   dagRun={displayData}
                   refreshFn={refreshFn}
                   dagRunId={displayDagRunId}
-                  isSubDAGRun={!!subDAGRunId}
-                  parentName={parentName}
-                  parentDagRunId={parentDAGRunId || undefined}
                 />
               ) : null}
             </div>

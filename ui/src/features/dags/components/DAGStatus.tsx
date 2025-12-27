@@ -1,10 +1,25 @@
+import { Tab, Tabs } from '@/components/ui/tabs';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  ActivitySquare,
+  GanttChart,
+  MousePointerClick,
+  Package,
+} from 'lucide-react';
 import React, { useState } from 'react';
+import { useCookies } from 'react-cookie';
 import { useNavigate } from 'react-router-dom';
 import { components, NodeStatus, Status } from '../../../api/v2/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { useConfig } from '../../../contexts/ConfigContext';
 import { useClient } from '../../../hooks/api';
 import { toMermaidNodeId } from '../../../lib/utils';
+import BorderedBox from '../../../ui/BorderedBox';
+import { DAGRunOutputs } from '../../dag-runs/components/dag-run-details';
 import { DAGContext } from '../contexts/DAGContext';
 import { getEventHandlers } from '../lib/getEventHandlers';
 import { DAGStatusOverview, NodeStatusTable } from './dag-details';
@@ -13,18 +28,27 @@ import {
   ParallelExecutionModal,
   StatusUpdateModal,
 } from './dag-execution';
-import { DAGGraph } from './visualization';
+import { FlowchartType, Graph, TimelineChart } from './visualization';
 
 type Props = {
   dagRun: components['schemas']['DAGRunDetails'];
   fileName: string;
 };
 
+type StatusTab = 'status' | 'timeline' | 'outputs';
+
 function DAGStatus({ dagRun, fileName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
   const navigate = useNavigate();
   const [modal, setModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<StatusTab>('status');
+
+  // Flowchart direction preference stored in cookies
+  const [cookie, setCookie] = useCookies(['flowchart']);
+  const [flowchart, setFlowchart] = useState<FlowchartType>(cookie['flowchart']);
+
+
   const [selectedStep, setSelectedStep] = useState<
     components['schemas']['Step'] | undefined
   >(undefined);
@@ -52,6 +76,18 @@ function DAGStatus({ dagRun, fileName }: Props) {
   });
   const client = useClient();
   const dismissModal = () => setModal(false);
+
+  /**
+   * Handle flowchart direction change and save preference to cookie
+   */
+  const onChangeFlowchart = (value: FlowchartType) => {
+    if (!value) {
+      return;
+    }
+    setCookie('flowchart', value, { path: '/' });
+    setFlowchart(value);
+  };
+
   const onUpdateStatus = async (
     step: components['schemas']['Step'],
     status: NodeStatus
@@ -226,59 +262,141 @@ function DAGStatus({ dagRun, fileName }: Props) {
     });
   };
 
-  return (
-    <div className="space-y-6">
-      {/* DAG Visualization */}
-      {dagRun.nodes && dagRun.nodes.length > 0 && (
-        <DAGGraph
-          dagRun={dagRun}
-          onSelectStep={onSelectStepOnGraph}
-          onRightClickStep={onRightClickStepOnGraph}
-        />
-      )}
+  // Check if timeline should be shown (only for completed runs)
+  const showTimeline =
+    dagRun.status !== Status.NotStarted && dagRun.status !== Status.Running;
 
-      <DAGContext.Consumer>
-        {(props) => (
-          <>
-            <div className="grid grid-cols-1 gap-6">
-              {/* Status Overview */}
-              <div className="bg-surface border border-border rounded-lg p-4">
-                <DAGStatusOverview
-                  status={dagRun}
-                  fileName={fileName}
-                  onViewLog={(dagRunId) => {
-                    setLogViewer({
-                      isOpen: true,
-                      logType: 'execution',
-                      stepName: '',
-                      dagRunId,
-                      stream: 'stdout',
-                    });
-                  }}
+  return (
+    <div className="space-y-4">
+      {/* Status Detail Tabs */}
+      <Tabs className="whitespace-nowrap">
+        <Tab
+          isActive={activeTab === 'status'}
+          onClick={() => setActiveTab('status')}
+          className="flex items-center gap-2 cursor-pointer"
+        >
+          <ActivitySquare className="h-4 w-4" />
+          Status
+        </Tab>
+        {showTimeline && (
+          <Tab
+            isActive={activeTab === 'timeline'}
+            onClick={() => setActiveTab('timeline')}
+            className="flex items-center gap-2 cursor-pointer"
+          >
+            <GanttChart className="h-4 w-4" />
+            Timeline
+          </Tab>
+        )}
+        <Tab
+          isActive={activeTab === 'outputs'}
+          onClick={() => setActiveTab('outputs')}
+          className="flex items-center gap-2 cursor-pointer"
+        >
+          <Package className="h-4 w-4" />
+          Outputs
+        </Tab>
+      </Tabs>
+
+      {/* Status Tab Content */}
+      {activeTab === 'status' && (
+        <div className="space-y-6">
+          {/* DAG Graph Visualization */}
+          {dagRun.nodes && dagRun.nodes.length > 0 && (
+            <BorderedBox className="py-4 px-4 flex flex-col overflow-x-auto">
+              <div className="flex justify-end mb-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center text-xs text-muted-foreground bg-muted px-2 py-1 rounded cursor-help">
+                      <MousePointerClick className="h-3 w-3 mr-1" />
+                      {config.permissions.runDags
+                        ? 'Double-click to navigate / Right-click to change status'
+                        : 'Double-click to navigate'}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="space-y-1">
+                      <p>Double-click: Navigate to sub dagRun</p>
+                      {config.permissions.runDags && (
+                        <p>Right-click: Update node status</p>
+                      )}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <div className="overflow-x-auto">
+                <Graph
+                  steps={dagRun.nodes}
+                  type="status"
+                  flowchart={flowchart}
+                  onChangeFlowchart={onChangeFlowchart}
+                  onClickNode={onSelectStepOnGraph}
+                  onRightClickNode={
+                    config.permissions.runDags ? onRightClickStepOnGraph : undefined
+                  }
+                  showIcons={dagRun.status > Status.NotStarted}
+                  animate={dagRun.status == Status.Running}
                 />
               </div>
+            </BorderedBox>
+          )}
 
-              {/* Steps Table */}
-              <NodeStatusTable
-                nodes={dagRun.nodes}
-                status={dagRun}
-                {...props}
-                onViewLog={handleViewLog}
-              />
-            </div>
+          <DAGContext.Consumer>
+            {(props) => (
+              <>
+                <div className="grid grid-cols-1 gap-6">
+                  {/* Status Overview */}
+                  <div className="bg-surface border border-border rounded-lg p-4">
+                    <DAGStatusOverview
+                      status={dagRun}
+                      fileName={fileName}
+                      onViewLog={(dagRunId) => {
+                        setLogViewer({
+                          isOpen: true,
+                          logType: 'execution',
+                          stepName: '',
+                          dagRunId,
+                          stream: 'stdout',
+                        });
+                      }}
+                    />
+                  </div>
 
-            {/* Lifecycle Hooks */}
-            {handlers?.length ? (
-              <NodeStatusTable
-                nodes={handlers}
-                status={dagRun}
-                {...props}
-                onViewLog={handleViewLog}
-              />
-            ) : null}
-          </>
-        )}
-      </DAGContext.Consumer>
+                  {/* Steps Table */}
+                  <NodeStatusTable
+                    nodes={dagRun.nodes}
+                    status={dagRun}
+                    {...props}
+                    onViewLog={handleViewLog}
+                  />
+                </div>
+
+                {/* Lifecycle Hooks */}
+                {handlers?.length ? (
+                  <NodeStatusTable
+                    nodes={handlers}
+                    status={dagRun}
+                    {...props}
+                    onViewLog={handleViewLog}
+                  />
+                ) : null}
+              </>
+            )}
+          </DAGContext.Consumer>
+        </div>
+      )}
+
+      {/* Timeline Tab Content */}
+      {activeTab === 'timeline' && showTimeline && (
+        <BorderedBox className="py-4 px-4 overflow-x-auto">
+          <TimelineChart status={dagRun} />
+        </BorderedBox>
+      )}
+
+      {/* Outputs Tab Content */}
+      {activeTab === 'outputs' && (
+        <DAGRunOutputs dagName={dagRun.name} dagRunId={dagRun.dagRunId} />
+      )}
 
       <StatusUpdateModal
         visible={modal}

@@ -111,9 +111,6 @@ function DAGRunDetailsPage() {
           dagRun={dagRunDetails}
           refreshFn={refreshFn}
           dagRunId={displayDAGRunId}
-          isSubDAGRun={!!subDAGRunId}
-          parentName={parentName || undefined}
-          parentDagRunId={parentDAGRunId || undefined}
         />
       </DAGRunContext.Provider>
     </div>
