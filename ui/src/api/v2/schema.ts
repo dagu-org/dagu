@@ -1244,11 +1244,11 @@ export interface components {
             /** @description List of preconditions that must be met before the DAG-run can start */
             preconditions?: components["schemas"]["Condition"][];
         };
-        /** @description Collected outputs from step executions in a DAG-run, including execution metadata. */
+        /** @description Collected outputs from step executions in a DAG-run, including execution metadata. If the DAG-run completed but no outputs were captured, the outputs object will be empty and metadata fields may be empty strings. */
         DAGRunOutputs: {
             metadata: components["schemas"]["OutputsMetadata"];
             /**
-             * @description Collected step outputs as key-value pairs. Keys are output names (UPPER_CASE converted to camelCase by default, or custom key if specified) and values are the captured output strings.
+             * @description Collected step outputs as key-value pairs. Keys are output names (UPPER_CASE converted to camelCase by default, or custom key if specified) and values are the captured output strings. Empty object if no outputs were captured.
              * @example {
              *       "totalCount": "42",
              *       "resultFile": "/path/to/result.txt",
@@ -1271,7 +1271,7 @@ export interface components {
              * @description RFC3339 timestamp when execution completed
              */
             completedAt: string;
-            /** @description Parameters passed to the DAG */
+            /** @description JSON-serialized parameters passed to the DAG */
             params?: string;
         };
         /** @description Status of an individual step within a DAG-run */
@@ -3890,7 +3890,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description A successful response */
+            /** @description Successfully retrieved outputs. Returns the collected outputs with metadata. If the DAG-run completed but captured no outputs, returns an empty outputs object. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3899,7 +3899,7 @@ export interface operations {
                     "application/json": components["schemas"]["DAGRunOutputs"];
                 };
             };
-            /** @description Outputs file not found (DAG may not have captured any outputs) */
+            /** @description DAG-run not found */
             404: {
                 headers: {
                     [name: string]: unknown;

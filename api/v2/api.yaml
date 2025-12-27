@@ -1815,13 +1815,13 @@ paths:
         - $ref: "#/components/parameters/DAGRunId"
       responses:
         "200":
-          description: "A successful response"
+          description: "Successfully retrieved outputs. Returns the collected outputs with metadata. If the DAG-run completed but captured no outputs, returns an empty outputs object."
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/DAGRunOutputs"
         "404":
-          description: "Outputs file not found (DAG may not have captured any outputs)"
+          description: "DAG-run not found"
           content:
             application/json:
               schema:
@@ -3015,7 +3015,7 @@ components:
 
     DAGRunOutputs:
       type: object
-      description: "Collected outputs from step executions in a DAG-run, including execution metadata."
+      description: "Collected outputs from step executions in a DAG-run, including execution metadata. If the DAG-run completed but no outputs were captured, the outputs object will be empty and metadata fields may be empty strings."
       required:
         - metadata
         - outputs
@@ -3024,7 +3024,7 @@ components:
           $ref: "#/components/schemas/OutputsMetadata"
         outputs:
           type: object
-          description: "Collected step outputs as key-value pairs. Keys are output names (UPPER_CASE converted to camelCase by default, or custom key if specified) and values are the captured output strings."
+          description: "Collected step outputs as key-value pairs. Keys are output names (UPPER_CASE converted to camelCase by default, or custom key if specified) and values are the captured output strings. Empty object if no outputs were captured."
           additionalProperties:
             type: string
           example:
