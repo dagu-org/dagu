@@ -1,7 +1,15 @@
 import { Tabs } from '@/components/ui/tabs';
-import { ActivitySquare, FileCode, History, ScrollText } from 'lucide-react';
+import {
+  ActivitySquare,
+  FileCode,
+  History,
+  Package,
+  ScrollText,
+} from 'lucide-react';
 import React, { useState } from 'react';
 import { components } from '../../../../api/v2/schema';
+import { DAGRunOutputs } from '../../../dag-runs/components/dag-run-details';
+import { useHasOutputs } from '../../../dag-runs/hooks/useHasOutputs';
 import { DAGStatus } from '../../components';
 import { DAGContext } from '../../contexts/DAGContext';
 import { LinkTab } from '../common';
@@ -56,6 +64,13 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
     logType: 'execution',
     stepName: undefined,
   });
+
+  // Check if outputs exist for conditional tab display
+  const hasOutputs = useHasOutputs(
+    dag?.name || '',
+    dagRunId,
+    currentDAGRun.status
+  );
 
   const handleTabClick = (tab: string) => {
     if (onTabChange) {
@@ -121,6 +136,25 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   icon={ActivitySquare}
                 />
               )}
+
+              {/* Outputs Tab - Only show when outputs exist */}
+              {hasOutputs &&
+                (isModal ? (
+                  <ModalLinkTab
+                    label="Outputs"
+                    value="outputs"
+                    isActive={activeTab === 'outputs'}
+                    icon={Package}
+                    onClick={() => handleTabClick('outputs')}
+                  />
+                ) : (
+                  <LinkTab
+                    label="Outputs"
+                    value={`${baseUrl}/outputs`}
+                    isActive={activeTab === 'outputs'}
+                    icon={Package}
+                  />
+                ))}
 
               {isModal ? (
                 <ModalLinkTab
@@ -198,6 +232,27 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                 />
               )}
 
+              {/* Outputs Tab - Only show when outputs exist */}
+              {hasOutputs &&
+                (isModal ? (
+                  <ModalLinkTab
+                    label=""
+                    value="outputs"
+                    isActive={activeTab === 'outputs'}
+                    icon={Package}
+                    onClick={() => handleTabClick('outputs')}
+                    className="flex-1 justify-center"
+                  />
+                ) : (
+                  <LinkTab
+                    label=""
+                    value={`${baseUrl}/outputs`}
+                    isActive={activeTab === 'outputs'}
+                    icon={Package}
+                    className="flex-1 justify-center"
+                  />
+                ))}
+
               {isModal ? (
                 <ModalLinkTab
                   label=""
@@ -265,6 +320,9 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
         <div className="flex-1 flex flex-col min-h-0">
           {activeTab === 'status' ? (
             <DAGStatus dagRun={currentDAGRun} fileName={fileName || ''} />
+          ) : null}
+          {activeTab === 'outputs' ? (
+            <DAGRunOutputs dagName={dag?.name || ''} dagRunId={dagRunId} />
           ) : null}
           {activeTab === 'spec' ? <DAGSpec fileName={fileName} /> : null}
           {activeTab === 'history' ? (
