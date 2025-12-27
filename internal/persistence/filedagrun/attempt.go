@@ -529,9 +529,9 @@ func readLineFrom(f *os.File, offset int64) ([]byte, int64, error) {
 }
 
 // WriteOutputs writes the collected step outputs to outputs.json.
-// If outputs is nil or empty, no file is created.
-func (att *Attempt) WriteOutputs(_ context.Context, outputs map[string]string) error {
-	if len(outputs) == 0 {
+// If outputs is nil or has no output entries, no file is created.
+func (att *Attempt) WriteOutputs(_ context.Context, outputs *execution.DAGRunOutputs) error {
+	if outputs == nil || len(outputs.Outputs) == 0 {
 		return nil
 	}
 
@@ -551,8 +551,8 @@ func (att *Attempt) WriteOutputs(_ context.Context, outputs map[string]string) e
 }
 
 // ReadOutputs reads the collected step outputs from outputs.json.
-// Returns nil if the file does not exist.
-func (att *Attempt) ReadOutputs(_ context.Context) (map[string]string, error) {
+// Returns nil if the file does not exist or if the file is in v1 format (no version field).
+func (att *Attempt) ReadOutputs(_ context.Context) (*execution.DAGRunOutputs, error) {
 	dir := filepath.Dir(att.file)
 	outputsFile := filepath.Join(dir, OutputsFile)
 
@@ -564,10 +564,15 @@ func (att *Attempt) ReadOutputs(_ context.Context) (map[string]string, error) {
 		return nil, fmt.Errorf("failed to read outputs file: %w", err)
 	}
 
-	var outputs map[string]string
+	var outputs execution.DAGRunOutputs
 	if err := json.Unmarshal(data, &outputs); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal outputs: %w", err)
 	}
 
-	return outputs, nil
+	// Ignore old format (v1) - returns nil
+	if outputs.Version < execution.OutputsSchemaVersion {
+		return nil, nil
+	}
+
+	return &outputs, nil
 }

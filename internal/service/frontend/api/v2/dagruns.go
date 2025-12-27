@@ -342,12 +342,35 @@ func (a *API) GetDAGRunOutputs(ctx context.Context, request api.GetDAGRunOutputs
 		return nil, fmt.Errorf("error reading outputs: %w", err)
 	}
 
-	// Return empty object if no outputs (DAG-run exists but captured no outputs)
+	// Return empty structure if no outputs (DAG-run exists but captured no outputs)
 	if outputs == nil {
-		outputs = make(map[string]string)
+		outputs = &execution.DAGRunOutputs{
+			Version:  execution.OutputsSchemaVersion,
+			Metadata: execution.OutputsMetadata{},
+			Outputs:  make(map[string]string),
+		}
 	}
 
-	return api.GetDAGRunOutputs200JSONResponse(outputs), nil
+	// Parse CompletedAt from RFC3339 string to time.Time
+	var completedAt time.Time
+	if outputs.Metadata.CompletedAt != "" {
+		if t, err := time.Parse(time.RFC3339, outputs.Metadata.CompletedAt); err == nil {
+			completedAt = t
+		}
+	}
+
+	return api.GetDAGRunOutputs200JSONResponse{
+		Version: outputs.Version,
+		Metadata: api.OutputsMetadata{
+			DagName:     outputs.Metadata.DAGName,
+			DagRunId:    outputs.Metadata.DAGRunID,
+			AttemptId:   outputs.Metadata.AttemptID,
+			Status:      api.OutputsMetadataStatus(outputs.Metadata.Status),
+			CompletedAt: completedAt,
+			Params:      ptrOf(outputs.Metadata.Params),
+		},
+		Outputs: outputs.Outputs,
+	}, nil
 }
 
 func (a *API) GetDAGRunStepLog(ctx context.Context, request api.GetDAGRunStepLogRequestObject) (api.GetDAGRunStepLogResponseObject, error) {

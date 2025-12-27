@@ -326,8 +326,54 @@ steps:
 	}
 }
 
+func TestOutputsCollection_MetadataIncluded(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+	dag := th.DAG(t, `
+steps:
+  - name: step1
+    command: echo "RESULT=42"
+    output: RESULT
+`)
+	agent := dag.Agent()
+	agent.RunSuccess(t)
+
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+
+	// Read full outputs including metadata
+	fullOutputs := readFullOutputsFile(t, th, dag.DAG, status.DAGRunID)
+	require.NotNil(t, fullOutputs)
+
+	// Validate version
+	assert.Equal(t, execution.OutputsSchemaVersion, fullOutputs.Version)
+
+	// Validate metadata
+	assert.Equal(t, dag.DAG.Name, fullOutputs.Metadata.DAGName)
+	assert.Equal(t, status.DAGRunID, fullOutputs.Metadata.DAGRunID)
+	assert.NotEmpty(t, fullOutputs.Metadata.AttemptID)
+	assert.Equal(t, "succeeded", fullOutputs.Metadata.Status)
+	assert.NotEmpty(t, fullOutputs.Metadata.CompletedAt)
+
+	// Validate outputs are still present
+	assert.Equal(t, "RESULT=42", fullOutputs.Outputs["result"])
+}
+
 // readOutputsFile reads the outputs.json file for a given DAG run
+// Returns just the outputs map for backward compatibility with existing tests
 func readOutputsFile(t *testing.T, th test.Helper, dag *core.DAG, dagRunID string) map[string]string {
+	t.Helper()
+
+	fullOutputs := readFullOutputsFile(t, th, dag, dagRunID)
+	if fullOutputs == nil {
+		return nil
+	}
+	return fullOutputs.Outputs
+}
+
+// readFullOutputsFile reads the full outputs.json file including metadata
+func readFullOutputsFile(t *testing.T, th test.Helper, dag *core.DAG, dagRunID string) *execution.DAGRunOutputs {
 	t.Helper()
 
 	// Find the attempt directory
@@ -356,10 +402,15 @@ func readOutputsFile(t *testing.T, th test.Helper, dag *core.DAG, dagRunID strin
 		return nil
 	}
 
-	var outputs map[string]string
+	var outputs execution.DAGRunOutputs
 	if err := json.Unmarshal(data, &outputs); err != nil {
 		t.Fatalf("failed to unmarshal outputs.json: %v", err)
 	}
 
-	return outputs
+	// Return nil if old format (version < 2)
+	if outputs.Version < execution.OutputsSchemaVersion {
+		return nil
+	}
+
+	return &outputs
 }

@@ -491,9 +491,20 @@ func TestAttempt_WriteOutputs(t *testing.T) {
 		att, err := NewAttempt(statusFile, nil)
 		require.NoError(t, err)
 
-		outputs := map[string]string{
-			"totalCount": "42",
-			"resultFile": "/path/to/result.txt",
+		outputs := &execution.DAGRunOutputs{
+			Version: execution.OutputsSchemaVersion,
+			Metadata: execution.OutputsMetadata{
+				DAGName:     "test-dag",
+				DAGRunID:    "run-123",
+				AttemptID:   "attempt-1",
+				Status:      "succeeded",
+				CompletedAt: "2024-12-28T15:30:45Z",
+				Params:      "key=value",
+			},
+			Outputs: map[string]string{
+				"totalCount": "42",
+				"resultFile": "/path/to/result.txt",
+			},
 		}
 
 		err = att.WriteOutputs(ctx, outputs)
@@ -507,11 +518,13 @@ func TestAttempt_WriteOutputs(t *testing.T) {
 		data, err := os.ReadFile(outputsFile)
 		require.NoError(t, err)
 
-		var readOutputs map[string]string
+		var readOutputs execution.DAGRunOutputs
 		err = json.Unmarshal(data, &readOutputs)
 		require.NoError(t, err)
 
-		assert.Equal(t, outputs, readOutputs)
+		assert.Equal(t, outputs.Version, readOutputs.Version)
+		assert.Equal(t, outputs.Metadata, readOutputs.Metadata)
+		assert.Equal(t, outputs.Outputs, readOutputs.Outputs)
 	})
 
 	t.Run("WriteEmptyOutputs_NoFileCreated", func(t *testing.T) {
@@ -520,7 +533,11 @@ func TestAttempt_WriteOutputs(t *testing.T) {
 		att, err := NewAttempt(statusFile, nil)
 		require.NoError(t, err)
 
-		outputs := map[string]string{}
+		outputs := &execution.DAGRunOutputs{
+			Version:  execution.OutputsSchemaVersion,
+			Metadata: execution.OutputsMetadata{},
+			Outputs:  map[string]string{},
+		}
 
 		err = att.WriteOutputs(ctx, outputs)
 		require.NoError(t, err)
@@ -551,19 +568,29 @@ func TestAttempt_WriteOutputs(t *testing.T) {
 		require.NoError(t, err)
 
 		// Write first version
-		outputs1 := map[string]string{"key1": "value1"}
+		outputs1 := &execution.DAGRunOutputs{
+			Version:  execution.OutputsSchemaVersion,
+			Metadata: execution.OutputsMetadata{DAGName: "dag1"},
+			Outputs:  map[string]string{"key1": "value1"},
+		}
 		err = att.WriteOutputs(ctx, outputs1)
 		require.NoError(t, err)
 
 		// Write second version
-		outputs2 := map[string]string{"key2": "value2"}
+		outputs2 := &execution.DAGRunOutputs{
+			Version:  execution.OutputsSchemaVersion,
+			Metadata: execution.OutputsMetadata{DAGName: "dag2"},
+			Outputs:  map[string]string{"key2": "value2"},
+		}
 		err = att.WriteOutputs(ctx, outputs2)
 		require.NoError(t, err)
 
 		// Verify second version overwrites first
 		readOutputs, err := att.ReadOutputs(ctx)
 		require.NoError(t, err)
-		assert.Equal(t, outputs2, readOutputs)
+		require.NotNil(t, readOutputs)
+		assert.Equal(t, outputs2.Outputs, readOutputs.Outputs)
+		assert.Equal(t, outputs2.Metadata.DAGName, readOutputs.Metadata.DAGName)
 	})
 }
 
@@ -576,10 +603,20 @@ func TestAttempt_ReadOutputs(t *testing.T) {
 		att, err := NewAttempt(statusFile, nil)
 		require.NoError(t, err)
 
-		// Create outputs file
-		outputs := map[string]string{
-			"totalCount": "42",
-			"resultFile": "/path/to/result.txt",
+		// Create outputs file with v2 format
+		outputs := &execution.DAGRunOutputs{
+			Version: execution.OutputsSchemaVersion,
+			Metadata: execution.OutputsMetadata{
+				DAGName:     "test-dag",
+				DAGRunID:    "run-123",
+				AttemptID:   "attempt-1",
+				Status:      "succeeded",
+				CompletedAt: "2024-12-28T15:30:45Z",
+			},
+			Outputs: map[string]string{
+				"totalCount": "42",
+				"resultFile": "/path/to/result.txt",
+			},
 		}
 		err = att.WriteOutputs(ctx, outputs)
 		require.NoError(t, err)
@@ -587,7 +624,10 @@ func TestAttempt_ReadOutputs(t *testing.T) {
 		// Read outputs
 		readOutputs, err := att.ReadOutputs(ctx)
 		require.NoError(t, err)
-		assert.Equal(t, outputs, readOutputs)
+		require.NotNil(t, readOutputs)
+		assert.Equal(t, outputs.Version, readOutputs.Version)
+		assert.Equal(t, outputs.Metadata, readOutputs.Metadata)
+		assert.Equal(t, outputs.Outputs, readOutputs.Outputs)
 	})
 
 	t.Run("ReadNonExistentOutputs", func(t *testing.T) {
@@ -618,22 +658,21 @@ func TestAttempt_ReadOutputs(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("ReadEmptyJsonObject", func(t *testing.T) {
+	t.Run("ReadV1FormatReturnsNil", func(t *testing.T) {
 		dir := createTempDir(t)
 		statusFile := filepath.Join(dir, "status.dat")
 		att, err := NewAttempt(statusFile, nil)
 		require.NoError(t, err)
 
-		// Manually create file with empty JSON object
+		// Manually create file with old v1 format (flat map, no version)
 		outputsFile := filepath.Join(dir, OutputsFile)
-		err = os.WriteFile(outputsFile, []byte("{}"), 0600)
+		err = os.WriteFile(outputsFile, []byte(`{"key": "value"}`), 0600)
 		require.NoError(t, err)
 
-		// Read should return empty map (not nil)
+		// Read should return nil (old format is ignored per spec)
 		readOutputs, err := att.ReadOutputs(ctx)
 		require.NoError(t, err)
-		assert.NotNil(t, readOutputs)
-		assert.Empty(t, readOutputs)
+		assert.Nil(t, readOutputs)
 	})
 
 	t.Run("ReadOutputsWithSpecialCharacters", func(t *testing.T) {
@@ -642,17 +681,22 @@ func TestAttempt_ReadOutputs(t *testing.T) {
 		att, err := NewAttempt(statusFile, nil)
 		require.NoError(t, err)
 
-		outputs := map[string]string{
-			"path":     "/path/with/slashes",
-			"message":  "hello \"world\"",
-			"unicode":  "日本語",
-			"newlines": "line1\nline2",
+		outputs := &execution.DAGRunOutputs{
+			Version:  execution.OutputsSchemaVersion,
+			Metadata: execution.OutputsMetadata{DAGName: "test"},
+			Outputs: map[string]string{
+				"path":     "/path/with/slashes",
+				"message":  "hello \"world\"",
+				"unicode":  "日本語",
+				"newlines": "line1\nline2",
+			},
 		}
 		err = att.WriteOutputs(ctx, outputs)
 		require.NoError(t, err)
 
 		readOutputs, err := att.ReadOutputs(ctx)
 		require.NoError(t, err)
-		assert.Equal(t, outputs, readOutputs)
+		require.NotNil(t, readOutputs)
+		assert.Equal(t, outputs.Outputs, readOutputs.Outputs)
 	})
 }

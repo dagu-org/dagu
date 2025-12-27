@@ -3019,13 +3019,58 @@ components:
 
     DAGRunOutputs:
       type: object
-      description: "Collected outputs from step executions in a DAG-run. Keys are output names (UPPER_CASE converted to camelCase by default, or custom key if specified) and values are the captured output strings."
-      additionalProperties:
-        type: string
-      example:
-        totalCount: "42"
-        resultFile: "/path/to/result.txt"
-        config: '{"key": "value"}'
+      description: "Collected outputs from step executions in a DAG-run, including execution metadata."
+      required:
+        - version
+        - metadata
+        - outputs
+      properties:
+        version:
+          type: integer
+          description: "Schema version (currently 2)"
+          example: 2
+        metadata:
+          $ref: "#/components/schemas/OutputsMetadata"
+        outputs:
+          type: object
+          description: "Collected step outputs as key-value pairs. Keys are output names (UPPER_CASE converted to camelCase by default, or custom key if specified) and values are the captured output strings."
+          additionalProperties:
+            type: string
+          example:
+            totalCount: "42"
+            resultFile: "/path/to/result.txt"
+            config: '{"key": "value"}'
+
+    OutputsMetadata:
+      type: object
+      description: "Execution context metadata for the outputs"
+      required:
+        - dagName
+        - dagRunId
+        - attemptId
+        - status
+        - completedAt
+      properties:
+        dagName:
+          type: string
+          description: "Name of the DAG"
+        dagRunId:
+          type: string
+          description: "Unique DAG run identifier"
+        attemptId:
+          type: string
+          description: "Attempt identifier within the run"
+        status:
+          type: string
+          description: "Final execution status"
+          enum: [succeeded, failed, aborted, partially_succeeded]
+        completedAt:
+          type: string
+          format: date-time
+          description: "RFC3339 timestamp when execution completed"
+        params:
+          type: string
+          description: "Parameters passed to the DAG"
 
     Node:
       type: object

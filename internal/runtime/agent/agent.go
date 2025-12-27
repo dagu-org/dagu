@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -553,8 +554,8 @@ func (a *Agent) Run(ctx context.Context) error {
 	)
 
 	// Collect and write step outputs BEFORE finalizing status (per spec)
-	if outputs := a.collectOutputs(ctx); len(outputs) > 0 {
-		if err := attempt.WriteOutputs(ctx, outputs); err != nil {
+	if dagOutputs := a.buildOutputs(ctx, finishedStatus.Status); dagOutputs != nil {
+		if err := attempt.WriteOutputs(ctx, dagOutputs); err != nil {
 			logger.Error(ctx, "Failed to write outputs", tag.Error(err))
 		}
 	}
@@ -674,6 +675,29 @@ func (a *Agent) collectOutputs(ctx context.Context) map[string]string {
 	}
 
 	return outputs
+}
+
+// buildOutputs creates the full DAGRunOutputs structure with metadata.
+// Returns nil if no outputs were collected.
+func (a *Agent) buildOutputs(ctx context.Context, finalStatus core.Status) *execution.DAGRunOutputs {
+	outputs := a.collectOutputs(ctx)
+
+	if len(outputs) == 0 {
+		return nil
+	}
+
+	return &execution.DAGRunOutputs{
+		Version: execution.OutputsSchemaVersion,
+		Metadata: execution.OutputsMetadata{
+			DAGName:     a.dag.Name,
+			DAGRunID:    a.dagRunID,
+			AttemptID:   a.dagRunAttemptID,
+			Status:      finalStatus.String(),
+			CompletedAt: stringutil.FormatTime(time.Now()),
+			Params:      strings.Join(a.dag.Params, " "),
+		},
+		Outputs: outputs,
+	}
 }
 
 func (a *Agent) PrintSummary(ctx context.Context) {
