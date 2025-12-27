@@ -10,7 +10,7 @@ import {
   MousePointerClick,
   Package,
 } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCookies } from 'react-cookie';
 import { useNavigate } from 'react-router-dom';
 import { components, NodeStatus, Status } from '../../../api/v2/schema';
@@ -262,9 +262,15 @@ function DAGStatus({ dagRun, fileName }: Props) {
     });
   };
 
-  // Check if timeline should be shown (only for completed runs)
-  const showTimeline =
-    dagRun.status !== Status.NotStarted && dagRun.status !== Status.Running;
+  // Check if timeline should be shown (any status except not started)
+  const showTimeline = dagRun.status !== Status.NotStarted;
+
+  // Reset to status tab if timeline tab is selected but not available
+  useEffect(() => {
+    if (activeTab === 'timeline' && !showTimeline) {
+      setActiveTab('status');
+    }
+  }, [showTimeline, activeTab]);
 
   return (
     <div className="space-y-4">
@@ -388,9 +394,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
 
       {/* Timeline Tab Content */}
       {activeTab === 'timeline' && showTimeline && (
-        <BorderedBox className="py-4 px-4 overflow-x-auto">
-          <TimelineChart status={dagRun} />
-        </BorderedBox>
+        <TimelineChart status={dagRun} />
       )}
 
       {/* Outputs Tab Content */}
