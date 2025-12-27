@@ -323,6 +323,44 @@ steps:
 	}
 }
 
+func TestOutputsCollection_SecretsMasked(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	// Create a temporary secret file
+	secretValue := "super-secret-api-token-xyz123"
+	secretFile := th.TempFile(t, "secret.txt", []byte(secretValue))
+
+	dag := th.DAG(t, `
+secrets:
+  - name: API_TOKEN
+    provider: file
+    key: `+secretFile+`
+
+steps:
+  - name: output-secret
+    command: echo "TOKEN=${API_TOKEN}"
+    output: TOKEN
+`)
+	agent := dag.Agent()
+	agent.RunSuccess(t)
+
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.Equal(t, core.Succeeded, status.Status)
+
+	// Read outputs.json
+	outputs := readOutputsFile(t, th, dag.DAG)
+	require.NotNil(t, outputs)
+
+	// The output value should contain the masked secret, not the actual value
+	tokenOutput := outputs["token"]
+	require.NotEmpty(t, tokenOutput)
+	assert.NotContains(t, tokenOutput, secretValue, "secret value should be masked in outputs")
+	assert.Contains(t, tokenOutput, "*******", "masked placeholder should appear in outputs")
+}
+
 func TestOutputsCollection_MetadataIncluded(t *testing.T) {
 	t.Parallel()
 

@@ -21,6 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/mailer"
+	"github.com/dagu-org/dagu/internal/common/masking"
 	"github.com/dagu-org/dagu/internal/common/secrets"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/common/sock"
@@ -683,6 +684,24 @@ func (a *Agent) buildOutputs(ctx context.Context, finalStatus core.Status) *exec
 
 	if len(outputs) == 0 {
 		return nil
+	}
+
+	// Mask any secrets in output values to prevent exposing sensitive data
+	rCtx := runtime.GetDAGContext(ctx)
+	if len(rCtx.SecretEnvs) > 0 {
+		// Convert secret envs map to the format expected by masker
+		var secretEnvs []string
+		for k, v := range rCtx.SecretEnvs {
+			secretEnvs = append(secretEnvs, k+"="+v)
+		}
+		masker := masking.NewMasker(masking.SourcedEnvVars{
+			Secrets: secretEnvs,
+		})
+
+		// Mask each output value
+		for key, value := range outputs {
+			outputs[key] = masker.MaskString(value)
+		}
 	}
 
 	// Serialize params to JSON
