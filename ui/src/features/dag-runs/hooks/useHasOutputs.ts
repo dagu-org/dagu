@@ -6,7 +6,10 @@ import { AppBarContext } from '../../../contexts/AppBarContext';
 export function useHasOutputs(
   dagName: string,
   dagRunId: string,
-  status: Status
+  status: Status,
+  isSubDAGRun: boolean = false,
+  _parentName?: string,
+  _parentDagRunId?: string
 ): boolean {
   const appBarContext = React.useContext(AppBarContext);
 
@@ -15,7 +18,8 @@ export function useHasOutputs(
     status === Status.Failed ||
     status === Status.Aborted;
 
-  const shouldFetch = isCompleted && !!dagName && !!dagRunId;
+  // Sub-DAG runs don't have outputs endpoint yet, so skip fetching
+  const shouldFetch = !isSubDAGRun && isCompleted && !!dagName && !!dagRunId;
 
   const { data, error } = useQuery(
     '/dag-runs/{name}/{dagRunId}/outputs',
