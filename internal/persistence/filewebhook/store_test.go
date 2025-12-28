@@ -373,6 +373,11 @@ func TestStore_ExternalFileDeletion(t *testing.T) {
 }
 
 func TestStore_WriteError(t *testing.T) {
+	// Skip if running as root since permission-based write failures cannot be reliably tested
+	if os.Getuid() == 0 {
+		t.Skip("cannot test permission errors as root")
+	}
+
 	t.Parallel()
 	ctx := context.Background()
 

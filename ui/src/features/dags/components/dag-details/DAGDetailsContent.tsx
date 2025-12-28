@@ -211,6 +211,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   icon={PlayCircle}
                   onClick={() => handleTabClick('status')}
                   className="flex-1 justify-center"
+                  aria-label="Latest Run"
                 />
               ) : (
                 <LinkTab
@@ -219,6 +220,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   isActive={activeTab === 'status'}
                   icon={PlayCircle}
                   className="flex-1 justify-center"
+                  aria-label="Latest Run"
                 />
               )}
 
@@ -230,6 +232,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   icon={FileCode}
                   onClick={() => handleTabClick('spec')}
                   className="flex-1 justify-center"
+                  aria-label="Spec"
                 />
               ) : (
                 <LinkTab
@@ -238,6 +241,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   isActive={activeTab === 'spec'}
                   icon={FileCode}
                   className="flex-1 justify-center"
+                  aria-label="Spec"
                 />
               )}
 
@@ -249,6 +253,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   icon={Webhook}
                   onClick={() => handleTabClick('webhook')}
                   className="flex-1 justify-center"
+                  aria-label="Webhook"
                 />
               ) : (
                 <LinkTab
@@ -257,6 +262,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   isActive={activeTab === 'webhook'}
                   icon={Webhook}
                   className="flex-1 justify-center"
+                  aria-label="Webhook"
                 />
               )}
 
@@ -268,6 +274,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   icon={History}
                   onClick={() => handleTabClick('history')}
                   className="flex-1 justify-center"
+                  aria-label="History"
                 />
               ) : (
                 <LinkTab
@@ -276,6 +283,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   isActive={activeTab === 'history'}
                   icon={History}
                   className="flex-1 justify-center"
+                  aria-label="History"
                 />
               )}
 
@@ -288,6 +296,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                     icon={ScrollText}
                     onClick={() => {}}
                     className="flex-1 justify-center"
+                    aria-label="Log"
                   />
                 ) : (
                   <LinkTab
@@ -296,6 +305,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                     isActive={true}
                     icon={ScrollText}
                     className="flex-1 justify-center"
+                    aria-label="Log"
                   />
                 ))}
             </div>

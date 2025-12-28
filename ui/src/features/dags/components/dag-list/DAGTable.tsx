@@ -43,7 +43,8 @@ function formatMs(ms: number): string {
   if (days > 0) parts.push(`${days}d`);
   if (hours > 0) parts.push(`${hours}h`);
   if (minutes > 0) parts.push(`${minutes}m`);
-  parts.push(`${secs}s`);
+  // Only show seconds if no larger units or if seconds > 0
+  if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
   return parts.join(' ');
 }
 
@@ -324,7 +325,15 @@ const defaultColumns = [
     id: 'Expand',
     header: ({ table }) => (
       <div
+        role="button"
+        tabIndex={0}
         onClick={table.getToggleAllRowsExpandedHandler()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            table.toggleAllRowsExpanded();
+          }
+        }}
         className="flex items-center justify-center text-muted-foreground cursor-pointer h-6 w-6"
       >
         {table.getIsAllRowsExpanded() ? (
@@ -345,9 +354,18 @@ const defaultColumns = [
         return (
           <div
             className="flex items-center justify-center min-h-[2.5rem] text-muted-foreground cursor-pointer"
+            role="button"
+            tabIndex={0}
             onClick={(e) => {
               e.stopPropagation();
               row.toggleExpanded();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation();
+                e.preventDefault();
+                row.toggleExpanded();
+              }
             }}
           >
             {row.getIsExpanded() ? (
@@ -527,24 +545,9 @@ const defaultColumns = [
           const durationMs = end.diff(start);
 
           if (durationMs > 0) {
-            // Format duration manually without using the custom format function
-            const duration = dayjs.duration(durationMs);
-            const days = Math.floor(duration.asDays());
-            const hours = duration.hours();
-            const minutes = duration.minutes();
-            const seconds = duration.seconds();
-
-            const parts: string[] = [];
-            if (days > 0) parts.push(`${days}d`);
-            if (hours > 0) parts.push(`${hours}h`);
-            if (minutes > 0) parts.push(`${minutes}m`);
-            if (seconds > 0 && parts.length === 0) parts.push(`${seconds}s`);
-
-            const formattedDuration = parts.join(' ');
-
             durationContent = (
               <div className="text-[10px] text-muted-foreground">
-                {formattedDuration}
+                {formatMs(durationMs)}
               </div>
             );
           }
@@ -1197,11 +1200,12 @@ function DAGTable({
                             clientSort={clientSort}
                             clientOrder={clientOrder}
                             onClientSort={handleClientSort}
-                            children={flexRender(
+                          >
+                            {flexRender(
                               header.column.columnDef.header,
                               header.getContext()
                             )}
-                          />
+                          </SortableHeader>
                         ) : (
                           flexRender(
                             header.column.columnDef.header,
@@ -1226,7 +1230,7 @@ function DAGTable({
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && 'selected'}
-                    className={
+                    className={`text-[0.8125rem] ${
                       row.original?.kind === ItemKind.Group
                         ? 'bg-muted/50 font-semibold cursor-pointer hover:bg-muted/70 border-l-4 border-transparent' // Make group rows clickable
                         : isDAGRow &&
@@ -1235,8 +1239,7 @@ function DAGTable({
                               (row.original as DAGRow).dag.fileName
                           ? 'cursor-pointer bg-primary/10 hover:bg-primary/15 border-l-4 border-primary' // Highlight selected DAG
                           : 'cursor-pointer hover:bg-muted/50 border-l-4 border-transparent'
-                    }
-                    style={{ fontSize: '0.8125rem' }} // Smaller font size for more density
+                    }`}
                     onClick={(e) => {
                       // Handle group row clicks - toggle expanded state
                       if ((row.original as Data)?.kind === ItemKind.Group) {

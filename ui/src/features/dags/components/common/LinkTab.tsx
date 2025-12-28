@@ -10,6 +10,7 @@ export interface LinkTabProps {
   isActive?: boolean;
   className?: string;
   icon?: LucideIcon;
+  'aria-label'?: string;
 }
 
 const LinkTab: React.FC<LinkTabProps> = ({
@@ -18,9 +19,14 @@ const LinkTab: React.FC<LinkTabProps> = ({
   isActive,
   className,
   icon: Icon,
+  'aria-label': ariaLabel,
   ...props
 }) => (
-  <Link to={value} className="focus:outline-none cursor-pointer">
+  <Link
+    to={value}
+    className="focus:outline-none cursor-pointer"
+    aria-label={!label ? ariaLabel : undefined}
+  >
     <Tab
       isActive={isActive}
       className={cn(
@@ -29,7 +35,7 @@ const LinkTab: React.FC<LinkTabProps> = ({
       )}
       {...props}
     >
-      {Icon && <Icon className="h-4 w-4" />}
+      {Icon && <Icon className="h-4 w-4" aria-hidden="true" />}
       {label}
     </Tab>
   </Link>

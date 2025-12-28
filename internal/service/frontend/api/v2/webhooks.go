@@ -25,8 +25,9 @@ const (
 )
 
 // ListWebhooks returns all webhooks across all DAGs.
+// Requires admin role.
 func (a *API) ListWebhooks(ctx context.Context, _ api.ListWebhooksRequestObject) (api.ListWebhooksResponseObject, error) {
-	if err := a.requireWebhookManagement(); err != nil {
+	if err := a.requireWebhookManagement(ctx); err != nil {
 		return nil, err
 	}
 
@@ -49,8 +50,9 @@ func (a *API) ListWebhooks(ctx context.Context, _ api.ListWebhooksRequestObject)
 }
 
 // GetDAGWebhook returns the webhook configuration for a specific DAG.
+// Requires admin role.
 func (a *API) GetDAGWebhook(ctx context.Context, request api.GetDAGWebhookRequestObject) (api.GetDAGWebhookResponseObject, error) {
-	if err := a.requireWebhookManagement(); err != nil {
+	if err := a.requireWebhookManagement(ctx); err != nil {
 		return nil, err
 	}
 
@@ -75,8 +77,9 @@ func (a *API) GetDAGWebhook(ctx context.Context, request api.GetDAGWebhookReques
 }
 
 // CreateDAGWebhook creates a new webhook for a DAG.
+// Requires admin role.
 func (a *API) CreateDAGWebhook(ctx context.Context, request api.CreateDAGWebhookRequestObject) (api.CreateDAGWebhookResponseObject, error) {
-	if err := a.requireWebhookManagement(); err != nil {
+	if err := a.requireWebhookManagement(ctx); err != nil {
 		return nil, err
 	}
 
@@ -121,8 +124,9 @@ func (a *API) CreateDAGWebhook(ctx context.Context, request api.CreateDAGWebhook
 }
 
 // DeleteDAGWebhook removes the webhook for a DAG.
+// Requires admin role.
 func (a *API) DeleteDAGWebhook(ctx context.Context, request api.DeleteDAGWebhookRequestObject) (api.DeleteDAGWebhookResponseObject, error) {
-	if err := a.requireWebhookManagement(); err != nil {
+	if err := a.requireWebhookManagement(ctx); err != nil {
 		return nil, err
 	}
 
@@ -149,8 +153,9 @@ func (a *API) DeleteDAGWebhook(ctx context.Context, request api.DeleteDAGWebhook
 }
 
 // RegenerateDAGWebhookToken generates a new token for an existing webhook.
+// Requires admin role.
 func (a *API) RegenerateDAGWebhookToken(ctx context.Context, request api.RegenerateDAGWebhookTokenRequestObject) (api.RegenerateDAGWebhookTokenResponseObject, error) {
-	if err := a.requireWebhookManagement(); err != nil {
+	if err := a.requireWebhookManagement(ctx); err != nil {
 		return nil, err
 	}
 
@@ -180,8 +185,9 @@ func (a *API) RegenerateDAGWebhookToken(ctx context.Context, request api.Regener
 }
 
 // ToggleDAGWebhook enables or disables a webhook.
+// Requires admin role.
 func (a *API) ToggleDAGWebhook(ctx context.Context, request api.ToggleDAGWebhookRequestObject) (api.ToggleDAGWebhookResponseObject, error) {
-	if err := a.requireWebhookManagement(); err != nil {
+	if err := a.requireWebhookManagement(ctx); err != nil {
 		return nil, err
 	}
 
@@ -213,6 +219,15 @@ func (a *API) ToggleDAGWebhook(ctx context.Context, request api.ToggleDAGWebhook
 // TriggerWebhook triggers a DAG execution via webhook.
 // Authentication is performed using a bearer token specific to the webhook.
 func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequestObject) (api.TriggerWebhookResponseObject, error) {
+	// Ensure webhook triggering is configured on this server
+	if a.authService == nil || !a.authService.HasWebhookStore() {
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    "webhook triggering is not configured on this server",
+		}
+	}
+
 	// Validate the token via auth service
 	token := extractWebhookToken(request.Params.Authorization)
 	if token == "" {
@@ -361,8 +376,9 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 	}, nil
 }
 
-// requireWebhookManagement checks if webhook management is enabled.
-func (a *API) requireWebhookManagement() error {
+// requireWebhookManagement checks if webhook management is enabled and
+// enforces admin role for all webhook management operations.
+func (a *API) requireWebhookManagement(ctx context.Context) error {
 	if a.authService == nil || !a.authService.HasWebhookStore() {
 		return &Error{
 			Code:       api.ErrorCodeUnauthorized,
@@ -370,7 +386,8 @@ func (a *API) requireWebhookManagement() error {
 			HTTPStatus: http.StatusUnauthorized,
 		}
 	}
-	return nil
+	// Enforce admin role when auth is enabled
+	return a.requireAdmin(ctx)
 }
 
 // extractWebhookToken extracts the token from the Authorization header.

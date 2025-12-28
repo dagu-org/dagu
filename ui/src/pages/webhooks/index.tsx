@@ -178,10 +178,13 @@ export default function WebhooksPage() {
   };
 
   const handleCopyToken = async () => {
-    if (newToken) {
+    if (!newToken) return;
+    try {
       await navigator.clipboard.writeText(newToken);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard API may be unavailable in some contexts (e.g., HTTP, permissions)
     }
   };
 

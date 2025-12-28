@@ -2383,6 +2383,8 @@ paths:
       operationId: "listWebhooks"
       tags:
         - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
       responses:
         "200":
           description: "List of webhooks"
@@ -2405,6 +2407,7 @@ paths:
       tags:
         - "webhooks"
       parameters:
+        - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
@@ -2435,6 +2438,7 @@ paths:
       tags:
         - "webhooks"
       parameters:
+        - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "201":
@@ -2463,6 +2467,7 @@ paths:
       tags:
         - "webhooks"
       parameters:
+        - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "204":
@@ -2490,6 +2495,7 @@ paths:
       tags:
         - "webhooks"
       parameters:
+        - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
@@ -2519,6 +2525,7 @@ paths:
       tags:
         - "webhooks"
       parameters:
+        - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true

@@ -40,7 +40,6 @@ interface WebhookTabProps {
 }
 
 interface CopyButtonProps {
-  text: string;
   copied: boolean;
   onCopy: () => void;
   label?: string;
@@ -405,7 +404,6 @@ function WebhookTab({ fileName }: WebhookTabProps) {
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs text-muted-foreground">Endpoint</span>
               <CopyButton
-                text={webhookUrl}
                 copied={copiedUrl}
                 onCopy={() => handleCopy(webhookUrl, setCopiedUrl)}
               />
@@ -480,7 +478,6 @@ function WebhookTab({ fileName }: WebhookTabProps) {
               <CardTitle className="text-sm">Example Request</CardTitle>
             </div>
             <CopyButton
-              text={curlExample}
               copied={copiedCurl}
               onCopy={() => handleCopy(curlExample, setCopiedCurl)}
               label="Copy"

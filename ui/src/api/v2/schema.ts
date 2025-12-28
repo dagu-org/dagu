@@ -4757,7 +4757,10 @@ export interface operations {
     };
     listWebhooks: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4786,7 +4789,10 @@ export interface operations {
     };
     getDAGWebhook: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path: {
                 /** @description the name of the DAG file */
@@ -4827,7 +4833,10 @@ export interface operations {
     };
     createDAGWebhook: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path: {
                 /** @description the name of the DAG file */
@@ -4868,7 +4877,10 @@ export interface operations {
     };
     deleteDAGWebhook: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path: {
                 /** @description the name of the DAG file */
@@ -4907,7 +4919,10 @@ export interface operations {
     };
     regenerateDAGWebhookToken: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path: {
                 /** @description the name of the DAG file */
@@ -4948,7 +4963,10 @@ export interface operations {
     };
     toggleDAGWebhook: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path: {
                 /** @description the name of the DAG file */
