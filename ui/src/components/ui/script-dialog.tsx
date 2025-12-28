@@ -57,8 +57,8 @@ export function ScriptDialog({
             {stepName ? `Script: ${stepName}` : 'Script Content'}
           </DialogTitle>
         </DialogHeader>
-        <div className="flex-1 overflow-auto min-h-0">
-          <div className="bg-code-bg min-h-full">
+        <div className="flex-1 overflow-auto min-h-0 rounded-b-lg">
+          <div className="bg-code-bg min-h-full rounded-b-lg">
             <pre className="font-mono text-[12px] text-code-text p-3">
               {lines.map((line, index) => (
                 <div key={index} className="flex hover:bg-code-bg/80 px-1">
