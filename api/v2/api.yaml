@@ -39,6 +39,8 @@ tags:
     description: "User management operations (CRUD, password management)"
   - name: "api-keys"
     description: "API key management operations (admin only)"
+  - name: "webhooks"
+    description: "Webhook endpoints for triggering DAG execution"
 
 paths:
   /health:
@@ -157,10 +159,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-
-  # ============================================================================
-  # User Management Endpoints (Admin only)
-  # ============================================================================
 
   /users:
     get:
@@ -2299,6 +2297,80 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /webhooks/{fileName}:
+    post:
+      summary: "Trigger DAG execution via webhook"
+      description: |
+        Triggers a DAG execution via webhook. The DAG must have webhook enabled
+        in its configuration. Authentication is performed using a bearer token
+        specific to the DAG's webhook configuration.
+
+        The request body is passed to the DAG as the WEBHOOK_PAYLOAD environment
+        variable. The DAG run is enqueued and the endpoint returns immediately
+        with the dag-run ID.
+      operationId: "triggerWebhook"
+      tags:
+        - "webhooks"
+      security: []
+      parameters:
+        - name: fileName
+          in: path
+          required: true
+          schema:
+            type: string
+          description: "DAG file name without extension"
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+          description: "Bearer token for webhook authentication (e.g., 'Bearer <token>')"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: "Arbitrary JSON payload to pass to the DAG as WEBHOOK_PAYLOAD"
+      responses:
+        "200":
+          description: "DAG run triggered successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookResponse"
+        "400":
+          description: "Invalid request body"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Unauthorized - missing or invalid token"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - webhook not enabled for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   securitySchemes:
     basicAuth:
@@ -2509,6 +2581,16 @@ components:
         - "auth.unauthorized"
         - "auth.token_invalid"
         - "auth.forbidden"
+
+    WebhookResponse:
+      type: object
+      description: "Response from webhook trigger endpoint"
+      required:
+        - dagRunId
+      properties:
+        dagRunId:
+          type: string
+          description: "The ID of the triggered dag-run"
 
     Stream:
       type: string
@@ -3586,10 +3668,6 @@ components:
         - timestamp
         - value
 
-    # ============================================================================
-    # Authentication & User Management Schemas
-    # ============================================================================
-
     UserRole:
       type: string
       description: "User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution, operator: DAG execution only, viewer: read-only"
@@ -3739,7 +3817,6 @@ components:
       required:
         - users
 
-    # ============================================================================
     APIKey:
       type: object
       description: "API key information"
