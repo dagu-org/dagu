@@ -24,7 +24,7 @@ type Options struct {
 	OIDCConfig       *oauth2.Config
 	OIDCWhitelist    []string
 	Creds            map[string]string
-	PublicPaths []string
+	PublicPaths      []string
 	// PublicPathPrefixes are path prefixes that bypass authentication.
 	// Any path starting with one of these prefixes will be allowed without auth.
 	PublicPathPrefixes []string
