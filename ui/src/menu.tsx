@@ -19,6 +19,7 @@ import {
   PanelLeft,
   Search,
   Users,
+  Webhook,
 } from 'lucide-react';
 import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -256,6 +257,13 @@ export const mainListItems = React.forwardRef<
               to="/api-keys"
               text="API Keys"
               icon={<KeyRound size={16} />}
+              isOpen={isOpen}
+              onClick={onNavItemClick}
+            />
+            <NavItem
+              to="/webhooks"
+              text="Webhooks"
+              icon={<Webhook size={16} />}
               isOpen={isOpen}
               onClick={onNavItemClick}
             />

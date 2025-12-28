@@ -567,9 +567,10 @@ func TestStore_ConcurrentSameDAG(t *testing.T) {
 			wh := newWebhook(t, "same-dag")
 			err := store.Create(ctx, wh)
 			mu.Lock()
-			if err == nil {
+			switch err {
+			case nil:
 				successCount++
-			} else if err == auth.ErrWebhookAlreadyExists {
+			case auth.ErrWebhookAlreadyExists:
 				dupCount++
 			}
 			mu.Unlock()
