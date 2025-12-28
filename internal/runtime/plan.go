@@ -381,4 +381,3 @@ func stepsByName(dag *core.DAG) map[string]core.Step {
 	}
 	return m
 }
-

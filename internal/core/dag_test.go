@@ -843,7 +843,7 @@ func TestDAG_NextRun_Extended(t *testing.T) {
 
 		dag := &core.DAG{
 			Schedule: []core.Schedule{
-				{Expression: "invalid", Parsed: nil},          // nil Parsed should be skipped
+				{Expression: "invalid", Parsed: nil},      // nil Parsed should be skipped
 				{Expression: "0 * * * *", Parsed: parsed}, // valid
 			},
 		}
