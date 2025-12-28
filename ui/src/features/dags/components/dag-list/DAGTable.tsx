@@ -323,11 +323,9 @@ const defaultColumns = [
   columnHelper.accessor('name', {
     id: 'Expand',
     header: ({ table }) => (
-      <Button
-        variant="ghost"
-        size="icon"
+      <div
         onClick={table.getToggleAllRowsExpandedHandler()}
-        className="text-muted-foreground cursor-pointer" // Use Tailwind for color
+        className="flex items-center justify-center text-muted-foreground cursor-pointer h-6 w-6"
       >
         {table.getIsAllRowsExpanded() ? (
           <>
@@ -340,32 +338,31 @@ const defaultColumns = [
             <ChevronDown className="h-4 w-4" />
           </>
         )}
-      </Button>
+      </div>
     ),
     cell: ({ row }) => {
       if (row.getCanExpand()) {
         return (
-          <div className="flex items-center min-h-[2.5rem]">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={row.getToggleExpandedHandler()}
-              className="text-muted-foreground cursor-pointer"
-            >
-              {row.getIsExpanded() ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
-            </Button>
+          <div
+            className="flex items-center justify-center min-h-[2.5rem] text-muted-foreground cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              row.toggleExpanded();
+            }}
+          >
+            {row.getIsExpanded() ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
           </div>
         );
       }
-      return null; // Return null instead of empty string for clarity
+      return null;
     },
-    size: 40,
-    minSize: 40,
-    maxSize: 40,
+    size: 32,
+    minSize: 32,
+    maxSize: 32,
   }),
   columnHelper.accessor('name', {
     id: 'Name',
@@ -1176,15 +1173,15 @@ function DAGTable({
           className={`w-full text-xs ${isLoading ? 'opacity-70' : ''}`}
           style={{ tableLayout: 'fixed' }}
         >
-{/* Column widths: Expand 5%, Name 37%, Status 10%, LastRun 18%, Schedule 20%, Actions 10% */}
-          <colgroup><col style={{ width: '5%' }} /><col style={{ width: '37%' }} /><col style={{ width: '10%' }} /><col style={{ width: '18%' }} /><col style={{ width: '20%' }} /><col style={{ width: '10%' }} /></colgroup>
+{/* Column widths: Expand 32px fixed, Name auto, Status 10%, LastRun 18%, Schedule 20%, Actions 10% */}
+          <colgroup><col style={{ width: '32px' }} /><col /><col style={{ width: '10%' }} /><col style={{ width: '18%' }} /><col style={{ width: '20%' }} /><col style={{ width: '10%' }} /></colgroup>
           <TableHeader>
             {instance.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
+                {headerGroup.headers.map((header, index) => (
                   <TableHead
                     key={header.id}
-                    className="py-1 px-2 text-muted-foreground text-xs overflow-hidden"
+                    className={`py-1 text-muted-foreground text-xs overflow-hidden ${index === 0 ? 'px-0' : 'px-2'}`}
                   >
                     {header.isPlaceholder ? null : (
                       <div>
@@ -1261,10 +1258,10 @@ function DAGTable({
                       }
                     }}
                   >
-                    {row.getVisibleCells().map((cell) => (
+                    {row.getVisibleCells().map((cell, index) => (
                       <TableCell
                         key={cell.id}
-                        className="py-1 px-2 overflow-hidden align-middle truncate"
+                        className={`py-1 overflow-hidden align-middle truncate ${index === 0 ? 'px-0' : 'px-2'}`}
                       >
                         {flexRender(
                           cell.column.columnDef.cell,
