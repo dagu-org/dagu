@@ -2607,9 +2607,13 @@ components:
       description: "Response from webhook trigger endpoint"
       required:
         - dagRunId
+        - dagName
       properties:
         dagRunId:
           $ref: "#/components/schemas/DAGRunId"
+        dagName:
+          type: string
+          description: "Name of the triggered DAG"
 
     Stream:
       type: string

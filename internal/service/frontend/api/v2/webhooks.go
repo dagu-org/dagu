@@ -153,6 +153,7 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 
 	return api.TriggerWebhook200JSONResponse{
 		DagRunId: dagRunID,
+		DagName:  dag.Name,
 	}, nil
 }
 
