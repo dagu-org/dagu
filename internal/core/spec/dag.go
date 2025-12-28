@@ -1159,8 +1159,8 @@ func buildMailConfigInternal(def mailConfig) (*core.MailConfig, error) {
 		}
 	}
 
-	// Return nil if no valid configuration
-	if def.From == "" && len(toAddresses) == 0 {
+	// Return nil if no valid configuration (all fields are empty/default)
+	if def.From == "" && len(toAddresses) == 0 && def.Prefix == "" && !def.AttachLogs {
 		return nil, nil
 	}
 

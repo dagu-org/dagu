@@ -157,6 +157,49 @@ steps:
 		assert.False(t, dag.MailOn.Failure)
 		assert.True(t, dag.MailOn.Success)
 	})
+	t.Run("OverrideErrorMailPrefixOnly", func(t *testing.T) {
+		t.Parallel()
+
+		// Base config has errorMail with all fields set
+		base := createTempYAMLFile(t, `errorMail:
+  from: "base@example.com"
+  to: "error@example.com"
+  prefix: "[BASE-ERROR]"
+  attachLogs: true
+infoMail:
+  from: "base@example.com"
+  to: "info@example.com"
+  prefix: "[BASE-INFO]"
+`)
+		// Child DAG only overrides prefix - this should work without
+		// requiring other fields to be specified (GitHub issue #1512)
+		testDAG := createTempYAMLFile(t, `errorMail:
+  prefix: "[OVERRIDE-ERROR]"
+infoMail:
+  prefix: "[OVERRIDE-INFO]"
+
+steps:
+  - name: "1"
+    command: "true"
+`)
+		dag, err := spec.Load(context.Background(), testDAG, spec.WithBaseConfig(base))
+		require.NoError(t, err)
+
+		// Check if errorMail prefix is overridden
+		require.NotNil(t, dag.ErrorMail)
+		assert.Equal(t, "[OVERRIDE-ERROR]", dag.ErrorMail.Prefix, "errorMail prefix should be overridden")
+		// Other fields should be inherited from base
+		assert.Equal(t, "base@example.com", dag.ErrorMail.From, "errorMail from should be inherited from base")
+		assert.Equal(t, []string{"error@example.com"}, dag.ErrorMail.To, "errorMail to should be inherited from base")
+		assert.True(t, dag.ErrorMail.AttachLogs, "errorMail attachLogs should be inherited from base")
+
+		// Check if infoMail prefix is overridden
+		require.NotNil(t, dag.InfoMail)
+		assert.Equal(t, "[OVERRIDE-INFO]", dag.InfoMail.Prefix, "infoMail prefix should be overridden")
+		// Other fields should be inherited from base
+		assert.Equal(t, "base@example.com", dag.InfoMail.From, "infoMail from should be inherited from base")
+		assert.Equal(t, []string{"info@example.com"}, dag.InfoMail.To, "infoMail to should be inherited from base")
+	})
 }
 
 func TestLoadBaseConfig(t *testing.T) {
