@@ -111,12 +111,17 @@ function DAGRunOutputs({
   };
 
   const handleCopy = async (key: string, value: string) => {
-    await navigator.clipboard.writeText(value);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2000);
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2000);
+    } catch {
+      // Clipboard access denied or unavailable
+    }
   };
 
-  if (isLoading) {
+  // Only show loading on initial load when no data exists
+  if (isLoading && !data) {
     return (
       <div className="text-sm text-muted-foreground p-4">
         Loading outputs...
