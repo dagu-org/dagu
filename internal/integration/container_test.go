@@ -32,8 +32,6 @@ type dockerExecutorTest struct {
 }
 
 func TestDockerExecutor(t *testing.T) {
-	t.Parallel()
-
 	tests := []dockerExecutorTest{
 		{
 			name: "BasicExecution",
@@ -259,8 +257,6 @@ steps:
 }
 
 func TestContainerPullPolicy(t *testing.T) {
-	t.Parallel()
-
 	th := test.Setup(t)
 
 	pullPolicyTestDAG := fmt.Sprintf(`
@@ -293,8 +289,6 @@ steps:
 }
 
 func TestContainerStartup_Entrypoint_WithHealthyFallback(t *testing.T) {
-	t.Parallel()
-
 	th := test.Setup(t)
 
 	// Use nginx which stays up by default; most tags have no healthcheck,
@@ -341,8 +335,6 @@ steps:
 }
 
 func TestDockerExecutor_ExecInExistingContainer(t *testing.T) {
-	t.Parallel()
-
 	th := test.Setup(t)
 	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	require.NoError(t, err, "failed to create docker client")
@@ -373,8 +365,6 @@ steps:
 }
 
 func TestDockerExecutor_ErrorIncludesRecentStderr(t *testing.T) {
-	t.Parallel()
-
 	th := test.Setup(t)
 
 	dagConfig := fmt.Sprintf(`
@@ -400,8 +390,6 @@ steps:
 
 // Helper functions
 func createLongRunningContainer(t *testing.T, th test.Helper, dockerClient *client.Client, containerName string) string {
-	t.Helper()
-
 	info, err := dockerClient.Info(th.Context)
 	if err != nil {
 		t.Fatalf("failed to get docker info: %v", err)
