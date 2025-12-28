@@ -544,7 +544,7 @@ func (d *DAG) ReadOutputs(t *testing.T) map[string]string {
 		return nil
 	}
 
-	data, err := os.ReadFile(outputsPath)
+	data, err := os.ReadFile(outputsPath) //nolint:gosec // path is constructed from test config
 	require.NoError(t, err)
 
 	var outputs execution.DAGRunOutputs

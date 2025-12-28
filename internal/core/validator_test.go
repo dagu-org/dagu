@@ -453,7 +453,7 @@ func TestRegisterStepValidator(t *testing.T) {
 		defer delete(stepValidators, "test-executor")
 
 		validatorCalled := false
-		validator := func(step Step) error {
+		validator := func(_ Step) error {
 			validatorCalled = true
 			return nil
 		}
@@ -479,7 +479,7 @@ func TestRegisterStepValidator(t *testing.T) {
 		defer delete(stepValidators, "error-executor")
 
 		expectedErr := errors.New("validation failed")
-		validator := func(step Step) error {
+		validator := func(_ Step) error {
 			return expectedErr
 		}
 
@@ -505,11 +505,11 @@ func TestRegisterStepValidator(t *testing.T) {
 		firstCalled := false
 		secondCalled := false
 
-		first := func(step Step) error {
+		first := func(_ Step) error {
 			firstCalled = true
 			return nil
 		}
-		second := func(step Step) error {
+		second := func(_ Step) error {
 			secondCalled = true
 			return nil
 		}
@@ -689,7 +689,7 @@ func TestValidateStepWithValidator(t *testing.T) {
 		defer delete(stepValidators, "wrap-error-type")
 
 		customErr := errors.New("custom validation error")
-		stepValidators["wrap-error-type"] = func(step Step) error {
+		stepValidators["wrap-error-type"] = func(_ Step) error {
 			return customErr
 		}
 
