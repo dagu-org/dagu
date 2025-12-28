@@ -248,7 +248,7 @@ function DAGRunOutputs({
                   <TableCell className="font-mono text-sm font-medium">
                     {key}
                   </TableCell>
-                  <TableCell className="font-mono text-sm text-muted-foreground break-all">
+                  <TableCell className="font-mono text-sm text-muted-foreground whitespace-normal break-words">
                     {value}
                   </TableCell>
                   <TableCell>
