@@ -948,8 +948,9 @@ paths:
                   type: string
                   description: "Parameters to pass to the DAG-run in JSON format"
                 dagRunId:
-                  type: string
-                  description: "Optional ID for the DAG-run, if not provided a new one will be generated"
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "Optional ID for the DAG-run, if not provided a new one will be generated"
                 dagName:
                   type: string
                   description: "Optional DAG name override to use for the created dag-run"
@@ -966,8 +967,7 @@ paths:
                 type: object
                 properties:
                   dagRunId:
-                    type: string
-                    description: "ID of the created DAG-run"
+                    $ref: "#/components/schemas/DAGRunId"
                 required:
                   - dagRunId
         "409":
@@ -1004,8 +1004,9 @@ paths:
                   type: string
                   description: "Parameters to pass to the DAG-run in JSON format"
                 dagRunId:
-                  type: string
-                  description: "Optional ID for the DAG-run, if not provided a new one will be generated"
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "Optional ID for the DAG-run, if not provided a new one will be generated"
                 dagName:
                   type: string
                   description: "Optional DAG name override to use for the queued dag-run"
@@ -1025,8 +1026,7 @@ paths:
                 type: object
                 properties:
                   dagRunId:
-                    type: string
-                    description: "ID of the created DAG-run"
+                    $ref: "#/components/schemas/DAGRunId"
                 required:
                   - dagRunId
         "409":
@@ -1448,8 +1448,9 @@ paths:
                   type: string
                   description: "Parameters to pass to the DAG-run in JSON format"
                 dagRunId:
-                  type: string
-                  description: "Optional ID for the DAG-run; if omitted, a new one is generated"
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "Optional ID for the DAG-run; if omitted, a new one is generated"
                 singleton:
                   type: boolean
                   description: "If true, prevent starting if a DAG with the same name is already running (returns 409)"
@@ -1465,8 +1466,7 @@ paths:
                 type: object
                 properties:
                   dagRunId:
-                    type: string
-                    description: "ID of the created DAG-run"
+                    $ref: "#/components/schemas/DAGRunId"
                 required:
                   - dagRunId
         "400":
@@ -1518,8 +1518,9 @@ paths:
                   type: string
                   description: "Parameters to persist with the queued DAG-run in JSON format"
                 dagRunId:
-                  type: string
-                  description: "Optional ID for the DAG-run; if omitted a new one will be generated"
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "Optional ID for the DAG-run; if omitted a new one will be generated"
                 queue:
                   type: string
                   description: "Override the queue to use for this DAG-run"
@@ -1534,8 +1535,7 @@ paths:
                 type: object
                 properties:
                   dagRunId:
-                    type: string
-                    description: "ID of the queued DAG-run"
+                    $ref: "#/components/schemas/DAGRunId"
                 required:
                   - dagRunId
         "400":
@@ -1647,8 +1647,9 @@ paths:
               type: object
               properties:
                 dagRunId:
-                  type: string
-                  description: "Explicit run ID for the new DAG-run; if omitted a new ID is generated."
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "Explicit run ID for the new DAG-run; if omitted a new ID is generated."
                 dagName:
                   type: string
                   description: "Optional DAG name override for the new run."
@@ -1661,8 +1662,7 @@ paths:
                 type: object
                 properties:
                   dagRunId:
-                    type: string
-                    description: "ID of the newly created DAG-run."
+                    $ref: "#/components/schemas/DAGRunId"
                   queued:
                     type: boolean
                     description: "Indicates whether the run was queued instead of starting immediately."
@@ -1850,8 +1850,9 @@ paths:
               type: object
               properties:
                 dagRunId:
-                  type: string
-                  description: "ID of the DAG-run to retry"
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "ID of the DAG-run to retry"
                 stepName:
                   type: string
                   description: "Optional. If provided, only this step will be retried."
@@ -2330,9 +2331,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              additionalProperties: true
-              description: "Arbitrary JSON payload to pass to the DAG as WEBHOOK_PAYLOAD"
+              $ref: "#/components/schemas/WebhookRequest"
       responses:
         "200":
           description: "DAG run triggered successfully"
@@ -2360,6 +2359,12 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404":
           description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Conflict - DAG run with the specified dagRunId already exists"
           content:
             application/json:
               schema:
@@ -2582,6 +2587,21 @@ components:
         - "auth.token_invalid"
         - "auth.forbidden"
 
+    WebhookRequest:
+      type: object
+      description: "Request body for webhook trigger endpoint"
+      properties:
+        dagRunId:
+          allOf:
+            - $ref: "#/components/schemas/DAGRunId"
+            - description: |
+                Optional idempotency key. If provided and a DAG run with this ID already exists,
+                the endpoint returns 409 Conflict. If not provided, a new UUID is generated.
+        payload:
+          type: object
+          additionalProperties: true
+          description: "Arbitrary JSON payload to pass to the DAG as WEBHOOK_PAYLOAD"
+
     WebhookResponse:
       type: object
       description: "Response from webhook trigger endpoint"
@@ -2589,8 +2609,7 @@ components:
         - dagRunId
       properties:
         dagRunId:
-          type: string
-          description: "The ID of the triggered dag-run"
+          $ref: "#/components/schemas/DAGRunId"
 
     Stream:
       type: string
@@ -3024,14 +3043,16 @@ components:
           type: string
           description: "Name of the root DAG-run"
         rootDAGRunId:
-          type: string
-          description: "ID of the root DAG-run"
+          allOf:
+            - $ref: "#/components/schemas/DAGRunId"
+            - description: "ID of the root DAG-run"
         parentDAGRunName:
           type: string
           description: "Name of the parent DAG-run"
         parentDAGRunId:
-          type: string
-          description: "ID of the parent DAG-run"
+          allOf:
+            - $ref: "#/components/schemas/DAGRunId"
+            - description: "ID of the parent DAG-run"
         dagRunId:
           $ref: "#/components/schemas/DAGRunId"
         name:

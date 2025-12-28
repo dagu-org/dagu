@@ -956,6 +956,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/webhooks/{fileName}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Trigger DAG execution via webhook
+         * @description Triggers a DAG execution via webhook. The DAG must have webhook enabled
+         *     in its configuration. Authentication is performed using a bearer token
+         *     specific to the DAG's webhook configuration.
+         *
+         *     The request body is passed to the DAG as the WEBHOOK_PAYLOAD environment
+         *     variable. The DAG run is enqueued and the endpoint returns immediately
+         *     with the dag-run ID.
+         *
+         */
+        post: operations["triggerWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -973,6 +1000,22 @@ export interface components {
          * @enum {string}
          */
         ErrorCode: ErrorCode;
+        /** @description Request body for webhook trigger endpoint */
+        WebhookRequest: {
+            /** @description Optional idempotency key. If provided and a DAG run with this ID already exists,
+             *     the endpoint returns 409 Conflict. If not provided, a new UUID is generated.
+             *      */
+            dagRunId?: string;
+            /** @description Arbitrary JSON payload to pass to the DAG as WEBHOOK_PAYLOAD */
+            payload?: {
+                [key: string]: unknown;
+            };
+        };
+        /** @description Response from webhook trigger endpoint */
+        WebhookResponse: {
+            /** @description The ID of the triggered dag-run */
+            dagRunId: string;
+        };
         /**
          * Format: string
          * @enum {string}
@@ -4495,6 +4538,90 @@ export interface operations {
                 };
             };
             /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    triggerWebhook: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Bearer token for webhook authentication (e.g., 'Bearer <token>') */
+                Authorization: string;
+            };
+            path: {
+                /** @description DAG file name without extension */
+                fileName: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["WebhookRequest"];
+            };
+        };
+        responses: {
+            /** @description DAG run triggered successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized - missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden - webhook not enabled for this DAG */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description DAG not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict - DAG run with the specified dagRunId already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
             default: {
                 headers: {
                     [name: string]: unknown;
