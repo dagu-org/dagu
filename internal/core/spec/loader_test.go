@@ -200,6 +200,35 @@ steps:
 		assert.Equal(t, "base@example.com", dag.InfoMail.From, "infoMail from should be inherited from base")
 		assert.Equal(t, []string{"info@example.com"}, dag.InfoMail.To, "infoMail to should be inherited from base")
 	})
+	t.Run("OverrideSMTPCredentialsOnly", func(t *testing.T) {
+		t.Parallel()
+
+		// Base config has smtp with host and port set
+		base := createTempYAMLFile(t, `smtp:
+  host: "smtp.base.com"
+  port: "587"
+`)
+		// Child DAG only overrides username and password
+		// This should work and inherit host/port from base
+		testDAG := createTempYAMLFile(t, `smtp:
+  username: "override-user"
+  password: "override-pass"
+
+steps:
+  - name: "1"
+    command: "true"
+`)
+		dag, err := spec.Load(context.Background(), testDAG, spec.WithBaseConfig(base))
+		require.NoError(t, err)
+
+		// Check if SMTP username and password are set (from child)
+		require.NotNil(t, dag.SMTP)
+		assert.Equal(t, "override-user", dag.SMTP.Username, "smtp username should be set")
+		assert.Equal(t, "override-pass", dag.SMTP.Password, "smtp password should be set")
+		// Host and port should be inherited from base
+		assert.Equal(t, "smtp.base.com", dag.SMTP.Host, "smtp host should be inherited from base")
+		assert.Equal(t, "587", dag.SMTP.Port, "smtp port should be inherited from base")
+	})
 }
 
 func TestLoadBaseConfig(t *testing.T) {

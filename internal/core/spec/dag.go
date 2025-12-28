@@ -983,7 +983,8 @@ func buildHandlers(ctx BuildContext, d *dag, result *core.DAG) (core.HandlerOn, 
 func buildSMTPConfig(_ BuildContext, d *dag) (*core.SMTPConfig, error) {
 	portStr := d.SMTP.Port.String()
 
-	if d.SMTP.Host == "" && portStr == "" {
+	// Return nil only if ALL fields are empty/default
+	if d.SMTP.Host == "" && portStr == "" && d.SMTP.Username == "" && d.SMTP.Password == "" {
 		return nil, nil
 	}
 
