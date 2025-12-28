@@ -717,10 +717,6 @@ func TestService_CreateUser_InvalidRole(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid role")
 }
 
-// ============================================================================
-// API Key Tests
-// ============================================================================
-
 func setupTestServiceWithAPIKeys(t *testing.T) (*Service, func()) {
 	t.Helper()
 

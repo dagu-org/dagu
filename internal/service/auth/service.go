@@ -425,10 +425,6 @@ func generateSecurePassword(length int) (string, error) {
 	return encoded[:length], nil
 }
 
-// ============================================================================
-// API Key Management
-// ============================================================================
-
 // CreateAPIKeyInput contains the input for creating an API key.
 type CreateAPIKeyInput struct {
 	Name        string

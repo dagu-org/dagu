@@ -340,10 +340,6 @@ func TestStore_ConcurrentOperations(t *testing.T) {
 	assert.Len(t, keys, numGoroutines)
 }
 
-// ============================================================================
-// Input Validation Tests
-// ============================================================================
-
 func TestStore_InputValidation(t *testing.T) {
 	t.Run("Create", func(t *testing.T) {
 		t.Run("NilKey", func(t *testing.T) {
@@ -453,10 +449,6 @@ func TestStore_InputValidation(t *testing.T) {
 		})
 	})
 }
-
-// ============================================================================
-// FileCache Tests
-// ============================================================================
 
 func TestStore_FileCache(t *testing.T) {
 	t.Run("CacheHit", func(t *testing.T) {
@@ -601,10 +593,6 @@ func TestStore_FileCache(t *testing.T) {
 	})
 }
 
-// ============================================================================
-// FileSystem Edge Cases Tests
-// ============================================================================
-
 func TestStore_FileSystemEdgeCases(t *testing.T) {
 	t.Run("FilePermissions", func(t *testing.T) {
 		store, tmpDir := setupTestStore(t)
@@ -728,10 +716,6 @@ func TestStore_FileSystemEdgeCases(t *testing.T) {
 		assert.Empty(t, keys)
 	})
 }
-
-// ============================================================================
-// Concurrent Edge Cases Tests
-// ============================================================================
 
 func TestStore_ConcurrentEdgeCases(t *testing.T) {
 	t.Run("UpdateSameKey", func(t *testing.T) {
@@ -908,10 +892,6 @@ func TestStore_ConcurrentEdgeCases(t *testing.T) {
 	})
 }
 
-// ============================================================================
-// List Edge Cases Tests
-// ============================================================================
-
 func TestStore_ListEdgeCases(t *testing.T) {
 	t.Run("EmptyStore", func(t *testing.T) {
 		store, _ := setupTestStore(t)
@@ -983,10 +963,6 @@ func TestStore_ListEdgeCases(t *testing.T) {
 		assert.Len(t, keys, numKeys)
 	})
 }
-
-// ============================================================================
-// Miscellaneous Tests
-// ============================================================================
 
 func TestStore_UpdateLastUsedPreservesFields(t *testing.T) {
 	store, _ := setupTestStore(t)
