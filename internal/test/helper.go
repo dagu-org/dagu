@@ -3,6 +3,7 @@ package test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -518,6 +519,38 @@ func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]any) {
 			t.Errorf("expected output %q not found", key)
 		}
 	}
+}
+
+// ReadOutputs reads the collected outputs from the outputs.json file.
+func (d *DAG) ReadOutputs(t *testing.T) map[string]string {
+	t.Helper()
+
+	dagRunsDir := d.Config.Paths.DAGRunsDir
+	dagRunDir := filepath.Join(dagRunsDir, d.Name, "dag-runs")
+
+	var outputsPath string
+	_ = filepath.Walk(dagRunDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.Name() == filedagrun.OutputsFile {
+			outputsPath = path
+			return filepath.SkipAll
+		}
+		return nil
+	})
+
+	if outputsPath == "" {
+		return nil
+	}
+
+	data, err := os.ReadFile(outputsPath)
+	require.NoError(t, err)
+
+	var outputs execution.DAGRunOutputs
+	require.NoError(t, json.Unmarshal(data, &outputs))
+
+	return outputs.Outputs
 }
 
 type NotEmpty struct{}

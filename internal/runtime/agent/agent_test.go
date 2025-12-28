@@ -494,3 +494,124 @@ func (h *mockResponseWriter) Write(body []byte) (int, error) {
 func (h *mockResponseWriter) WriteHeader(statusCode int) {
 	h.status = statusCode
 }
+
+func TestAgent_OutputCollection(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		dag      string
+		expected map[string]string
+	}{
+		{
+			name: "SimpleOutput",
+			dag: `steps:
+  - name: step1
+    command: echo "hello"
+    output: RESULT`,
+			expected: map[string]string{"result": "hello"},
+		},
+		{
+			name: "CamelCaseConversion",
+			dag: `steps:
+  - name: step1
+    command: echo "value"
+    output: MY_OUTPUT_VAR`,
+			expected: map[string]string{"myOutputVar": "value"},
+		},
+		{
+			name: "CustomOutputKey",
+			dag: `steps:
+  - name: step1
+    command: echo "value"
+    output:
+      name: RESULT
+      key: customKey`,
+			expected: map[string]string{"customKey": "value"},
+		},
+		{
+			name: "OmitExcludesFromOutputs",
+			dag: `steps:
+  - name: step1
+    command: echo "visible"
+    output: VISIBLE
+  - name: step2
+    command: echo "hidden"
+    output:
+      name: HIDDEN
+      omit: true`,
+			expected: map[string]string{"visible": "visible"},
+		},
+		{
+			name: "MultipleSteps",
+			dag: `steps:
+  - name: step1
+    command: echo "one"
+    output: OUTPUT_ONE
+  - name: step2
+    command: echo "two"
+    output: OUTPUT_TWO`,
+			expected: map[string]string{"outputOne": "one", "outputTwo": "two"},
+		},
+		{
+			name: "LastOneWins",
+			dag: `steps:
+  - name: step1
+    command: echo "first"
+    output: RESULT
+  - name: step2
+    command: echo "second"
+    output: RESULT
+    depends: [step1]`,
+			expected: map[string]string{"result": "second"},
+		},
+		{
+			name: "NoOutputs",
+			dag: `steps:
+  - name: step1
+    command: "true"`,
+			expected: map[string]string{},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			th := test.Setup(t)
+			dag := th.DAG(t, tc.dag)
+			dagAgent := dag.Agent()
+			dagAgent.RunSuccess(t)
+
+			outputs := dag.ReadOutputs(t)
+			for k, v := range tc.expected {
+				require.Equal(t, v, outputs[k], "output %s mismatch", k)
+			}
+			require.Len(t, outputs, len(tc.expected))
+		})
+	}
+}
+
+func TestAgent_OutputSecretMasking(t *testing.T) {
+	t.Parallel()
+	th := test.Setup(t)
+
+	secretValue := "super-secret-token-xyz123"
+	secretFile := th.TempFile(t, "secret.txt", []byte(secretValue))
+
+	dag := th.DAG(t, `
+secrets:
+  - name: API_TOKEN
+    provider: file
+    key: `+secretFile+`
+steps:
+  - name: step1
+    command: echo "Token is ${API_TOKEN}"
+    output: RESPONSE`)
+
+	dagAgent := dag.Agent()
+	dagAgent.RunSuccess(t)
+
+	outputs := dag.ReadOutputs(t)
+	require.NotContains(t, outputs["response"], secretValue, "secret should be masked")
+	require.Contains(t, outputs["response"], "*******", "masked placeholder expected")
+}
