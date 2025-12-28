@@ -381,3 +381,24 @@ func stepsByName(dag *core.DAG) map[string]core.Step {
 	}
 	return m
 }
+
+// NewPlanWithNodes creates a Plan from pre-existing nodes.
+// This is primarily intended for testing scenarios where nodes need
+// pre-populated state (e.g., OutputVariables).
+// Note: Does not build dependency edges - use only for testing isolated functions.
+func NewPlanWithNodes(nodes ...*Node) *Plan {
+	p := &Plan{
+		nodeByID:      make(map[int]*Node),
+		nodeByName:    make(map[string]*Node),
+		DependencyMap: make(map[int][]int),
+		DependantMap:  make(map[int][]int),
+		nodes:         make([]*Node, 0, len(nodes)),
+	}
+
+	for i, node := range nodes {
+		node.id = i
+		p.addNode(node)
+	}
+
+	return p
+}
