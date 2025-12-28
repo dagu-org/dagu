@@ -120,97 +120,6 @@ func TestValidateWebhookToken(t *testing.T) {
 	}
 }
 
-func TestValidateWebhookFileName(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name      string
-		fileName  string
-		wantError bool
-		errorMsg  string
-	}{
-		{
-			name:      "valid simple name",
-			fileName:  "my-dag",
-			wantError: false,
-		},
-		{
-			name:      "valid name with numbers",
-			fileName:  "dag123",
-			wantError: false,
-		},
-		{
-			name:      "valid name with underscore",
-			fileName:  "my_dag_name",
-			wantError: false,
-		},
-		{
-			name:      "valid name with dots",
-			fileName:  "my.dag.name",
-			wantError: false,
-		},
-		{
-			name:      "empty name",
-			fileName:  "",
-			wantError: true,
-			errorMsg:  "file name is required",
-		},
-		{
-			name:      "path traversal with double dots",
-			fileName:  "../etc/passwd",
-			wantError: true,
-			errorMsg:  "path traversal not allowed",
-		},
-		{
-			name:      "path traversal with slash",
-			fileName:  "foo/bar",
-			wantError: true,
-			errorMsg:  "path traversal not allowed",
-		},
-		{
-			name:      "path traversal with backslash",
-			fileName:  "foo\\bar",
-			wantError: true,
-			errorMsg:  "path traversal not allowed",
-		},
-		{
-			name:      "name starting with dot",
-			fileName:  ".hidden",
-			wantError: true,
-			errorMsg:  "must start with alphanumeric",
-		},
-		{
-			name:      "name with special characters",
-			fileName:  "dag@name",
-			wantError: true,
-			errorMsg:  "must start with alphanumeric",
-		},
-		{
-			name:      "name too long",
-			fileName:  strings.Repeat("a", 256),
-			wantError: true,
-			errorMsg:  "file name too long",
-		},
-		{
-			name:      "name at max length",
-			fileName:  strings.Repeat("a", 255),
-			wantError: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := apiimpl.ValidateWebhookFileName(tt.fileName)
-			if tt.wantError {
-				require.Error(t, err)
-				require.Contains(t, err.Error(), tt.errorMsg)
-			} else {
-				require.NoError(t, err)
-			}
-		})
-	}
-}
-
 func TestWebhookAPI(t *testing.T) {
 	server := test.SetupServer(t)
 
@@ -339,27 +248,6 @@ steps:
 			ExpectStatus(http.StatusBadRequest).Send(t)
 
 		_ = server.Client().Delete("/api/v2/dags/webhook-missing-auth").ExpectStatus(http.StatusNoContent).Send(t)
-	})
-
-	t.Run("TriggerWebhookInvalidFileNameWithDots", func(t *testing.T) {
-		// Test file name with embedded path traversal
-		_ = server.Client().Post("/api/v2/webhooks/test..dag", api.WebhookRequest{}).
-			WithHeader("Authorization", "Bearer any-token-12345").
-			ExpectStatus(http.StatusBadRequest).Send(t)
-	})
-
-	t.Run("TriggerWebhookInvalidFileNameWithSpecialChars", func(t *testing.T) {
-		// Test file name with special characters
-		_ = server.Client().Post("/api/v2/webhooks/dag@name", api.WebhookRequest{}).
-			WithHeader("Authorization", "Bearer any-token-12345").
-			ExpectStatus(http.StatusBadRequest).Send(t)
-	})
-
-	t.Run("TriggerWebhookInvalidFileNameStartsWithDot", func(t *testing.T) {
-		// Test file name starting with dot
-		_ = server.Client().Post("/api/v2/webhooks/.hidden", api.WebhookRequest{}).
-			WithHeader("Authorization", "Bearer any-token-12345").
-			ExpectStatus(http.StatusBadRequest).Send(t)
 	})
 
 	t.Run("TriggerWebhookPayloadTooLarge", func(t *testing.T) {

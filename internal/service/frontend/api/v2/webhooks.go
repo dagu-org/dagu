@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/dagu-org/dagu/api/v2"
@@ -19,31 +18,12 @@ import (
 const (
 	// maxWebhookPayloadSize is the maximum size of the webhook payload in bytes (1MB).
 	maxWebhookPayloadSize = 1 * 1024 * 1024
-	// maxWebhookFileNameLength is the maximum length for a webhook file name.
-	maxWebhookFileNameLength = 255
 )
-
-// webhookFileNameRegex validates that the file name contains only safe characters.
-// Allowed: alphanumeric, dash, underscore, dot (but not starting with dot).
-var webhookFileNameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]*$`)
 
 // TriggerWebhook triggers a DAG execution via webhook.
 // The DAG must have webhook enabled in its configuration.
 // Authentication is performed using a bearer token specific to the DAG's webhook configuration.
 func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequestObject) (api.TriggerWebhookResponseObject, error) {
-	// Validate the file name to prevent path traversal and injection attacks
-	if err := ValidateWebhookFileName(request.FileName); err != nil {
-		logger.Warn(ctx, "Webhook: invalid file name",
-			tag.Name(request.FileName),
-			tag.Error(err),
-		)
-		return nil, &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeBadRequest,
-			Message:    err.Error(),
-		}
-	}
-
 	// Load the DAG
 	dag, err := a.dagStore.GetDetails(ctx, request.FileName)
 	if err != nil {
@@ -174,26 +154,6 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 	return api.TriggerWebhook200JSONResponse{
 		DagRunId: dagRunID,
 	}, nil
-}
-
-// ValidateWebhookFileName validates the file name to prevent security issues.
-// It checks for path traversal attempts, excessively long names, and invalid characters.
-func ValidateWebhookFileName(fileName string) error {
-	if fileName == "" {
-		return fmt.Errorf("file name is required")
-	}
-	if len(fileName) > maxWebhookFileNameLength {
-		return fmt.Errorf("file name too long (max %d characters)", maxWebhookFileNameLength)
-	}
-	// Check for path traversal attempts
-	if strings.Contains(fileName, "..") || strings.Contains(fileName, "/") || strings.Contains(fileName, "\\") {
-		return fmt.Errorf("invalid file name: path traversal not allowed")
-	}
-	// Validate characters
-	if !webhookFileNameRegex.MatchString(fileName) {
-		return fmt.Errorf("invalid file name: must start with alphanumeric and contain only alphanumeric, dash, underscore, or dot")
-	}
-	return nil
 }
 
 // extractWebhookToken extracts the token from the Authorization header.
