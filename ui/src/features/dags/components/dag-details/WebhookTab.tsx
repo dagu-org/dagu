@@ -76,8 +76,11 @@ function WebhookTab({ fileName }: WebhookTabProps) {
   const [copiedToken, setCopiedToken] = useState(false);
   const [copiedCurl, setCopiedCurl] = useState(false);
 
-  // Construct webhook URL
-  const webhookUrl = `${window.location.origin}/api/v2/webhooks/${encodeURIComponent(fileName)}`;
+  // Construct webhook URL (include remoteNode if not local)
+  const remoteNode = appBarContext.selectedRemoteNode;
+  const webhookUrl = remoteNode && remoteNode !== 'local'
+    ? `${window.location.origin}/api/v2/webhooks/${encodeURIComponent(fileName)}?remoteNode=${encodeURIComponent(remoteNode)}`
+    : `${window.location.origin}/api/v2/webhooks/${encodeURIComponent(fileName)}`;
 
   // API helpers
   const getAuthHeaders = useCallback(() => {

@@ -93,8 +93,8 @@ interface DAGCardProps {
 function DAGCard({ dag, isSelected, onSelect, onTagClick, refreshFn, className = '' }: DAGCardProps) {
   const fileName = dag.fileName;
   const title = dag.dag.name;
-  const status = dag.latestDAGRun.status;
-  const statusLabel = dag.latestDAGRun.statusLabel;
+  const status = dag.latestDAGRun?.status;
+  const statusLabel = dag.latestDAGRun?.statusLabel;
   const tags = dag.dag.tags || [];
   const description = dag.dag.description;
   const schedules = dag.dag.schedule || [];
@@ -334,7 +334,7 @@ const defaultColumns = [
             table.toggleAllRowsExpanded();
           }
         }}
-        className="flex items-center justify-center text-muted-foreground cursor-pointer h-6 w-6"
+        className="flex items-center justify-center text-muted-foreground cursor-pointer h-6 w-6 focus:outline-none focus:ring-1 focus:ring-primary rounded"
       >
         {table.getIsAllRowsExpanded() ? (
           <>
@@ -353,7 +353,7 @@ const defaultColumns = [
       if (row.getCanExpand()) {
         return (
           <div
-            className="flex items-center justify-center min-h-[2.5rem] text-muted-foreground cursor-pointer"
+            className="flex items-center justify-center min-h-[2.5rem] text-muted-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary rounded"
             role="button"
             tabIndex={0}
             onClick={(e) => {
@@ -1318,9 +1318,9 @@ function DAGTable({
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="flex-shrink-0">
                         {isExpanded ? (
-                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                        ) : (
                           <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
                         )}
                       </div>
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate">
