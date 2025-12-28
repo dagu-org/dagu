@@ -323,13 +323,26 @@ func (a *API) GetDAGRunOutputs(ctx context.Context, request api.GetDAGRunOutputs
 	dagName := request.Name
 	dagRunId := request.DagRunId
 
-	ref := execution.NewDAGRunRef(dagName, dagRunId)
-	attempt, err := a.dagRunStore.FindAttempt(ctx, ref)
-	if err != nil {
-		return api.GetDAGRunOutputs404JSONResponse{
-			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
-		}, nil
+	var attempt execution.DAGRunAttempt
+	var err error
+
+	if dagRunId == "latest" {
+		attempt, err = a.dagRunStore.LatestAttempt(ctx, dagName)
+		if err != nil {
+			return api.GetDAGRunOutputs404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("no dag-runs found for DAG %s", dagName),
+			}, nil
+		}
+	} else {
+		ref := execution.NewDAGRunRef(dagName, dagRunId)
+		attempt, err = a.dagRunStore.FindAttempt(ctx, ref)
+		if err != nil {
+			return api.GetDAGRunOutputs404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
+			}, nil
+		}
 	}
 
 	outputs, err := attempt.ReadOutputs(ctx)

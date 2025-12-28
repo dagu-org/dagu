@@ -656,7 +656,7 @@ func buildStepOutput(_ StepBuildContext, s *step) (string, error) {
 func buildStepOutputKey(_ StepBuildContext, s *step) (string, error) {
 	cfg, err := parseOutputConfig(s.Output)
 	if err != nil {
-		return "", nil // Error already reported in buildStepOutput
+		return "", err
 	}
 	if cfg == nil {
 		return "", nil
@@ -667,7 +667,7 @@ func buildStepOutputKey(_ StepBuildContext, s *step) (string, error) {
 func buildStepOutputOmit(_ StepBuildContext, s *step) (bool, error) {
 	cfg, err := parseOutputConfig(s.Output)
 	if err != nil {
-		return false, nil // Error already reported in buildStepOutput
+		return false, err
 	}
 	if cfg == nil {
 		return false, nil
