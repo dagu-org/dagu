@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/dagu-org/dagu/api/v2"
@@ -119,6 +120,97 @@ func TestValidateWebhookToken(t *testing.T) {
 	}
 }
 
+func TestValidateWebhookFileName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		fileName  string
+		wantError bool
+		errorMsg  string
+	}{
+		{
+			name:      "valid simple name",
+			fileName:  "my-dag",
+			wantError: false,
+		},
+		{
+			name:      "valid name with numbers",
+			fileName:  "dag123",
+			wantError: false,
+		},
+		{
+			name:      "valid name with underscore",
+			fileName:  "my_dag_name",
+			wantError: false,
+		},
+		{
+			name:      "valid name with dots",
+			fileName:  "my.dag.name",
+			wantError: false,
+		},
+		{
+			name:      "empty name",
+			fileName:  "",
+			wantError: true,
+			errorMsg:  "file name is required",
+		},
+		{
+			name:      "path traversal with double dots",
+			fileName:  "../etc/passwd",
+			wantError: true,
+			errorMsg:  "path traversal not allowed",
+		},
+		{
+			name:      "path traversal with slash",
+			fileName:  "foo/bar",
+			wantError: true,
+			errorMsg:  "path traversal not allowed",
+		},
+		{
+			name:      "path traversal with backslash",
+			fileName:  "foo\\bar",
+			wantError: true,
+			errorMsg:  "path traversal not allowed",
+		},
+		{
+			name:      "name starting with dot",
+			fileName:  ".hidden",
+			wantError: true,
+			errorMsg:  "must start with alphanumeric",
+		},
+		{
+			name:      "name with special characters",
+			fileName:  "dag@name",
+			wantError: true,
+			errorMsg:  "must start with alphanumeric",
+		},
+		{
+			name:      "name too long",
+			fileName:  strings.Repeat("a", 256),
+			wantError: true,
+			errorMsg:  "file name too long",
+		},
+		{
+			name:      "name at max length",
+			fileName:  strings.Repeat("a", 255),
+			wantError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := apiimpl.ValidateWebhookFileName(tt.fileName)
+			if tt.wantError {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.errorMsg)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestWebhookAPI(t *testing.T) {
 	server := test.SetupServer(t)
 
@@ -126,7 +218,7 @@ func TestWebhookAPI(t *testing.T) {
 		spec := `
 webhook:
   enabled: true
-  token: my-secret-token
+  token: my-secret-token-1234
 steps:
   - name: test
     command: echo "hello"
@@ -138,7 +230,7 @@ steps:
 
 		resp := server.Client().Post("/api/v2/webhooks/webhook-test-dag", api.WebhookRequest{
 			Payload: &map[string]any{"event": "test"},
-		}).WithHeader("Authorization", "Bearer my-secret-token").
+		}).WithHeader("Authorization", "Bearer my-secret-token-1234").
 			ExpectStatus(http.StatusOK).Send(t)
 
 		var webhookResp api.WebhookResponse
@@ -152,7 +244,7 @@ steps:
 		spec := `
 webhook:
   enabled: true
-  token: correct-token
+  token: correct-token-12345
 steps:
   - name: test
     command: echo "hello"
@@ -163,7 +255,7 @@ steps:
 		}).ExpectStatus(http.StatusCreated).Send(t)
 
 		_ = server.Client().Post("/api/v2/webhooks/webhook-invalid-token", api.WebhookRequest{}).
-			WithHeader("Authorization", "Bearer wrong-token").
+			WithHeader("Authorization", "Bearer wrong-token-12345").
 			ExpectStatus(http.StatusUnauthorized).Send(t)
 
 		_ = server.Client().Delete("/api/v2/dags/webhook-invalid-token").ExpectStatus(http.StatusNoContent).Send(t)
@@ -197,7 +289,7 @@ steps:
 		spec := `
 webhook:
   enabled: true
-  token: idempotency-token
+  token: idempotency-token-1
 steps:
   - name: test
     command: echo "hello"
@@ -211,7 +303,7 @@ steps:
 		resp := server.Client().Post("/api/v2/webhooks/webhook-idempotency", api.WebhookRequest{
 			DagRunId: &dagRunID,
 			Payload:  &map[string]any{"event": "first"},
-		}).WithHeader("Authorization", "Bearer idempotency-token").
+		}).WithHeader("Authorization", "Bearer idempotency-token-1").
 			ExpectStatus(http.StatusOK).Send(t)
 
 		var webhookResp api.WebhookResponse
@@ -222,7 +314,7 @@ steps:
 		_ = server.Client().Post("/api/v2/webhooks/webhook-idempotency", api.WebhookRequest{
 			DagRunId: &dagRunID,
 			Payload:  &map[string]any{"event": "second"},
-		}).WithHeader("Authorization", "Bearer idempotency-token").
+		}).WithHeader("Authorization", "Bearer idempotency-token-1").
 			ExpectStatus(http.StatusConflict).Send(t)
 
 		_ = server.Client().Delete("/api/v2/dags/webhook-idempotency").ExpectStatus(http.StatusNoContent).Send(t)
@@ -232,7 +324,7 @@ steps:
 		spec := `
 webhook:
   enabled: true
-  token: auth-token
+  token: auth-token-123456
 steps:
   - name: test
     command: echo "hello"
@@ -247,5 +339,50 @@ steps:
 			ExpectStatus(http.StatusBadRequest).Send(t)
 
 		_ = server.Client().Delete("/api/v2/dags/webhook-missing-auth").ExpectStatus(http.StatusNoContent).Send(t)
+	})
+
+	t.Run("TriggerWebhookInvalidFileNameWithDots", func(t *testing.T) {
+		// Test file name with embedded path traversal
+		_ = server.Client().Post("/api/v2/webhooks/test..dag", api.WebhookRequest{}).
+			WithHeader("Authorization", "Bearer any-token-12345").
+			ExpectStatus(http.StatusBadRequest).Send(t)
+	})
+
+	t.Run("TriggerWebhookInvalidFileNameWithSpecialChars", func(t *testing.T) {
+		// Test file name with special characters
+		_ = server.Client().Post("/api/v2/webhooks/dag@name", api.WebhookRequest{}).
+			WithHeader("Authorization", "Bearer any-token-12345").
+			ExpectStatus(http.StatusBadRequest).Send(t)
+	})
+
+	t.Run("TriggerWebhookInvalidFileNameStartsWithDot", func(t *testing.T) {
+		// Test file name starting with dot
+		_ = server.Client().Post("/api/v2/webhooks/.hidden", api.WebhookRequest{}).
+			WithHeader("Authorization", "Bearer any-token-12345").
+			ExpectStatus(http.StatusBadRequest).Send(t)
+	})
+
+	t.Run("TriggerWebhookPayloadTooLarge", func(t *testing.T) {
+		spec := `
+webhook:
+  enabled: true
+  token: large-payload-token1
+steps:
+  - name: test
+    command: echo "hello"
+`
+		_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+			Name: "webhook-large-payload",
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		// Create a payload larger than 1MB
+		largeData := strings.Repeat("x", 1024*1024+1)
+		_ = server.Client().Post("/api/v2/webhooks/webhook-large-payload", api.WebhookRequest{
+			Payload: &map[string]any{"data": largeData},
+		}).WithHeader("Authorization", "Bearer large-payload-token1").
+			ExpectStatus(http.StatusRequestEntityTooLarge).Send(t)
+
+		_ = server.Client().Delete("/api/v2/dags/webhook-large-payload").ExpectStatus(http.StatusNoContent).Send(t)
 	})
 }

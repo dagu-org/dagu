@@ -18,7 +18,7 @@ func TestWebhookConfig(t *testing.T) {
 name: webhook-test
 webhook:
   enabled: true
-  token: my-secret-token
+  token: my-secret-token-1234
 
 steps:
   - name: test
@@ -28,13 +28,13 @@ steps:
 		// Verify the webhook config was parsed correctly
 		require.NotNil(t, dag.Webhook)
 		require.True(t, dag.Webhook.Enabled)
-		require.Equal(t, "my-secret-token", dag.Webhook.Token)
+		require.Equal(t, "my-secret-token-1234", dag.Webhook.Token)
 	})
 
 	t.Run("ParseWebhookConfigWithEnvVar", func(t *testing.T) {
 		// Test that environment variables in the token are expanded
 		// Note: t.Setenv requires non-parallel test
-		t.Setenv("MY_WEBHOOK_TOKEN", "expanded-secret")
+		t.Setenv("MY_WEBHOOK_TOKEN", "expanded-secret-12345")
 
 		th := test.Setup(t)
 
@@ -53,7 +53,7 @@ steps:
 		// Verify the webhook config was parsed correctly with env expansion
 		require.NotNil(t, dag.Webhook)
 		require.True(t, dag.Webhook.Enabled)
-		require.Equal(t, "expanded-secret", dag.Webhook.Token)
+		require.Equal(t, "expanded-secret-12345", dag.Webhook.Token)
 	})
 
 	t.Run("ParseWebhookDisabled", func(t *testing.T) {
@@ -65,7 +65,7 @@ steps:
 name: webhook-disabled-test
 webhook:
   enabled: false
-  token: some-token
+  token: some-token-12345678
 
 steps:
   - name: test
@@ -167,7 +167,7 @@ func TestWebhookSpecValidation(t *testing.T) {
 name: valid-webhook
 webhook:
   enabled: true
-  token: test-token
+  token: test-token-12345678
 
 steps:
   - name: test
@@ -179,6 +179,94 @@ steps:
 		require.NotNil(t, dag)
 		require.NotNil(t, dag.Webhook)
 		require.True(t, dag.Webhook.Enabled)
-		require.Equal(t, "test-token", dag.Webhook.Token)
+		require.Equal(t, "test-token-12345678", dag.Webhook.Token)
+	})
+
+	t.Run("WebhookEnabledWithMissingToken", func(t *testing.T) {
+		t.Parallel()
+		th := test.Setup(t)
+
+		// Webhook enabled but token missing should fail
+		content := []byte(`
+name: webhook-missing-token
+webhook:
+  enabled: true
+
+steps:
+  - name: test
+    command: echo "test"
+`)
+
+		_, err := spec.LoadYAML(th.Context, content, spec.WithName("webhook-missing-token"))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "token is required when webhook is enabled")
+	})
+
+	t.Run("WebhookTokenTooShort", func(t *testing.T) {
+		t.Parallel()
+		th := test.Setup(t)
+
+		// Token with less than 16 characters should fail
+		content := []byte(`
+name: webhook-short-token
+webhook:
+  enabled: true
+  token: short-token
+
+steps:
+  - name: test
+    command: echo "test"
+`)
+
+		_, err := spec.LoadYAML(th.Context, content, spec.WithName("webhook-short-token"))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "token must be at least 16 characters")
+	})
+
+	t.Run("WebhookTokenExactlyMinLength", func(t *testing.T) {
+		t.Parallel()
+		th := test.Setup(t)
+
+		// Token with exactly 16 characters should succeed
+		content := []byte(`
+name: webhook-min-token
+webhook:
+  enabled: true
+  token: "1234567890abcdef"
+
+steps:
+  - name: test
+    command: echo "test"
+`)
+
+		dag, err := spec.LoadYAML(th.Context, content, spec.WithName("webhook-min-token"))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+		require.NotNil(t, dag.Webhook)
+		require.True(t, dag.Webhook.Enabled)
+		require.Equal(t, "1234567890abcdef", dag.Webhook.Token)
+	})
+
+	t.Run("WebhookDisabledWithShortToken", func(t *testing.T) {
+		t.Parallel()
+		th := test.Setup(t)
+
+		// When webhook is disabled, short token should be allowed (no validation)
+		content := []byte(`
+name: webhook-disabled-short-token
+webhook:
+  enabled: false
+  token: short
+
+steps:
+  - name: test
+    command: echo "test"
+`)
+
+		dag, err := spec.LoadYAML(th.Context, content, spec.WithName("webhook-disabled-short-token"))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+		require.NotNil(t, dag.Webhook)
+		require.False(t, dag.Webhook.Enabled)
 	})
 }
