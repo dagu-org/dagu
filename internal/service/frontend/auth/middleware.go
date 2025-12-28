@@ -24,7 +24,10 @@ type Options struct {
 	OIDCConfig       *oauth2.Config
 	OIDCWhitelist    []string
 	Creds            map[string]string
-	PublicPaths      []string
+	PublicPaths []string
+	// PublicPathPrefixes are path prefixes that bypass authentication.
+	// Any path starting with one of these prefixes will be allowed without auth.
+	PublicPathPrefixes []string
 	// JWTValidator validates JWT tokens for builtin auth mode.
 	// When set, JWT Bearer tokens are accepted as an authentication method.
 	JWTValidator TokenValidator
@@ -56,16 +59,32 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 		publicPaths[pathutil.NormalizePath(p)] = struct{}{}
 	}
 
+	// Normalize public path prefixes
+	publicPrefixes := make([]string, 0, len(opts.PublicPathPrefixes))
+	for _, p := range opts.PublicPathPrefixes {
+		publicPrefixes = append(publicPrefixes, pathutil.NormalizePath(p))
+	}
+
 	jwtEnabled := opts.JWTValidator != nil
 	apiKeyEnabled := opts.APIKeyValidator != nil
 	anyAuthEnabled := opts.BasicAuthEnabled || opts.APITokenEnabled || opts.OIDCAuthEnabled || jwtEnabled || apiKeyEnabled
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			normalizedPath := pathutil.NormalizePath(r.URL.Path)
+
 			// Allow unauthenticated access to explicitly configured public paths.
-			if _, ok := publicPaths[pathutil.NormalizePath(r.URL.Path)]; ok {
+			if _, ok := publicPaths[normalizedPath]; ok {
 				next.ServeHTTP(w, r)
 				return
+			}
+
+			// Allow unauthenticated access to paths matching public prefixes.
+			for _, prefix := range publicPrefixes {
+				if strings.HasPrefix(normalizedPath, prefix) {
+					next.ServeHTTP(w, r)
+					return
+				}
 			}
 
 			// If no auth is enabled, skip authentication

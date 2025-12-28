@@ -317,6 +317,52 @@ func TestMiddleware_PublicPaths(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
 
+func TestMiddleware_PublicPathPrefixes(t *testing.T) {
+	apiKeyValidator := newMockAPIKeyValidator()
+	// No keys added
+
+	opts := Options{
+		APIKeyValidator:    apiKeyValidator,
+		PublicPathPrefixes: []string{"/api/v2/webhooks/"},
+	}
+	middleware := Middleware(opts)
+
+	handler := &testHandler{}
+	server := httptest.NewServer(middleware(handler))
+	defer server.Close()
+
+	// Test public path prefix - should succeed without auth
+	req, err := http.NewRequest(http.MethodPost, server.URL+"/api/v2/webhooks/my-dag", nil)
+	require.NoError(t, err)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Test another path with the same prefix
+	req, err = http.NewRequest(http.MethodPost, server.URL+"/api/v2/webhooks/another-dag", nil)
+	require.NoError(t, err)
+
+	resp, err = client.Do(req)
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Test non-matching path - should fail without auth
+	req, err = http.NewRequest(http.MethodGet, server.URL+"/api/v2/dags", nil)
+	require.NoError(t, err)
+
+	resp, err = client.Do(req)
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+}
+
 func TestMiddleware_NoAuthEnabled(t *testing.T) {
 	opts := DefaultOptions()
 	middleware := Middleware(opts)

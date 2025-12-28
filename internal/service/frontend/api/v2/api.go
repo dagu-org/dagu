@@ -208,6 +208,10 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 			pathutil.BuildPublicEndpointPath(basePath, "api/v2/metrics"),
 			pathutil.BuildPublicEndpointPath(basePath, "api/v2/auth/login"),
 		},
+		// Webhooks use their own authentication (DAG-specific token)
+		PublicPathPrefixes: []string{
+			pathutil.BuildPublicEndpointPath(basePath, "api/v2/webhooks/"),
+		},
 	}
 
 	// Initialize OIDC if enabled
