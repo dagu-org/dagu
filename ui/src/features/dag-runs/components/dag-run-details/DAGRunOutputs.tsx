@@ -85,17 +85,19 @@ function DAGRunOutputs({
     // Filter
     if (filter) {
       const lowerFilter = filter.toLowerCase();
-      entries = entries.filter(
-        ([key, value]) =>
+      entries = entries.filter(([key, value]) => {
+        const valStr = typeof value === 'string' ? value : String(value);
+        return (
           key.toLowerCase().includes(lowerFilter) ||
-          value.toLowerCase().includes(lowerFilter)
-      );
+          valStr.toLowerCase().includes(lowerFilter)
+        );
+      });
     }
 
     // Sort
     entries.sort((a, b) => {
-      const aVal = sortConfig.key === 'name' ? a[0] : a[1];
-      const bVal = sortConfig.key === 'name' ? b[0] : b[1];
+      const aVal = sortConfig.key === 'name' ? a[0] : String(a[1]);
+      const bVal = sortConfig.key === 'name' ? b[0] : String(b[1]);
       const cmp = aVal.localeCompare(bVal);
       return sortConfig.direction === 'asc' ? cmp : -cmp;
     });
@@ -205,23 +207,27 @@ function DAGRunOutputs({
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead
-                className="w-[200px] cursor-pointer select-none"
-                onClick={() => handleSort('name')}
-              >
-                <div className="flex items-center gap-1">
+              <TableHead className="w-[200px]">
+                <button
+                  type="button"
+                  onClick={() => handleSort('name')}
+                  className="flex items-center gap-1 cursor-pointer select-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 rounded"
+                  aria-label="Sort by key"
+                >
                   Key
                   <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
-                </div>
+                </button>
               </TableHead>
-              <TableHead
-                className="cursor-pointer select-none"
-                onClick={() => handleSort('value')}
-              >
-                <div className="flex items-center gap-1">
+              <TableHead>
+                <button
+                  type="button"
+                  onClick={() => handleSort('value')}
+                  className="flex items-center gap-1 cursor-pointer select-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 rounded"
+                  aria-label="Sort by value"
+                >
                   Value
                   <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
-                </div>
+                </button>
               </TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
@@ -247,9 +253,11 @@ function DAGRunOutputs({
                   </TableCell>
                   <TableCell>
                     <button
+                      type="button"
                       onClick={() => handleCopy(key, value)}
-                      className="p-1 hover:bg-accent rounded"
+                      className="p-1 hover:bg-accent rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
                       title="Copy value"
+                      aria-label={`Copy value for ${key}`}
                     >
                       {copiedKey === key ? (
                         <Check className="h-3.5 w-3.5 text-success" />
