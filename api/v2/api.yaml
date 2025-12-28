@@ -2302,9 +2302,9 @@ paths:
     post:
       summary: "Trigger DAG execution via webhook"
       description: |
-        Triggers a DAG execution via webhook. The DAG must have webhook enabled
-        in its configuration. Authentication is performed using a bearer token
-        specific to the DAG's webhook configuration.
+        Triggers a DAG execution via webhook. The DAG must have a webhook configured
+        and enabled. Authentication is performed using a bearer token generated when
+        the webhook was created (format: 'dagu_wh_...').
 
         The request body is passed to the DAG as the WEBHOOK_PAYLOAD environment
         variable. The DAG run is enqueued and the endpoint returns immediately
@@ -2325,7 +2325,7 @@ paths:
           required: true
           schema:
             type: string
-          description: "Bearer token for webhook authentication (e.g., 'Bearer <token>')"
+          description: "Bearer token for webhook authentication (e.g., 'Bearer dagu_wh_...')"
       requestBody:
         required: false
         content:
@@ -2352,19 +2352,189 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "403":
-          description: "Forbidden - webhook not enabled for this DAG"
+          description: "Forbidden - webhook disabled or not configured"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "404":
-          description: "DAG not found"
+          description: "DAG or webhook not found"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
           description: "Conflict - DAG run with the specified dagRunId already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /webhooks:
+    get:
+      summary: "List all webhooks"
+      description: "Returns a list of all webhooks across all DAGs. Admin only."
+      operationId: "listWebhooks"
+      tags:
+        - "webhooks"
+      responses:
+        "200":
+          description: "List of webhooks"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookListResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/webhook:
+    get:
+      summary: "Get webhook for DAG"
+      description: "Returns the webhook configuration for a specific DAG, if one exists."
+      operationId: "getDAGWebhook"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "Webhook configuration"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDetails"
+        "404":
+          description: "No webhook configured for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Create webhook for DAG"
+      description: |
+        Creates a new webhook for the specified DAG. Returns the full webhook token,
+        which is only shown once. Store it securely.
+      operationId: "createDAGWebhook"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "201":
+          description: "Webhook created successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookCreateResponse"
+        "409":
+          description: "Webhook already exists for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Delete webhook for DAG"
+      description: "Removes the webhook configuration for the specified DAG."
+      operationId: "deleteDAGWebhook"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "204":
+          description: "Webhook deleted successfully"
+        "404":
+          description: "No webhook configured for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/webhook/regenerate:
+    post:
+      summary: "Regenerate webhook token"
+      description: |
+        Generates a new token for the existing webhook. The old token becomes
+        invalid immediately. Returns the new token, which is only shown once.
+      operationId: "regenerateDAGWebhookToken"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "Token regenerated successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookCreateResponse"
+        "404":
+          description: "No webhook configured for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/webhook/toggle:
+    post:
+      summary: "Toggle webhook enabled state"
+      description: "Enables or disables the webhook without changing the token."
+      operationId: "toggleDAGWebhook"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookToggleRequest"
+      responses:
+        "200":
+          description: "Webhook toggled successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDetails"
+        "404":
+          description: "No webhook configured for this DAG"
           content:
             application/json:
               schema:
@@ -2614,6 +2784,80 @@ components:
         dagName:
           type: string
           description: "Name of the triggered DAG"
+
+    WebhookDetails:
+      type: object
+      description: "Webhook configuration details (token not included)"
+      required:
+        - id
+        - dagName
+        - tokenPrefix
+        - enabled
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: "Unique identifier for the webhook"
+        dagName:
+          type: string
+          description: "Name of the DAG this webhook triggers"
+        tokenPrefix:
+          type: string
+          description: "First 8 characters of the token for identification"
+        enabled:
+          type: boolean
+          description: "Whether the webhook is active"
+        createdAt:
+          type: string
+          format: date-time
+          description: "When the webhook was created"
+        updatedAt:
+          type: string
+          format: date-time
+          description: "When the webhook was last modified"
+        createdBy:
+          type: string
+          description: "User ID who created the webhook"
+        lastUsedAt:
+          type: string
+          format: date-time
+          description: "When the webhook was last triggered"
+
+    WebhookCreateResponse:
+      type: object
+      description: "Response when creating or regenerating a webhook (includes full token)"
+      required:
+        - webhook
+        - token
+      properties:
+        webhook:
+          $ref: "#/components/schemas/WebhookDetails"
+        token:
+          type: string
+          description: "Full webhook token (only shown once, store securely!)"
+
+    WebhookListResponse:
+      type: object
+      description: "List of all webhooks"
+      required:
+        - webhooks
+      properties:
+        webhooks:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookDetails"
+
+    WebhookToggleRequest:
+      type: object
+      description: "Request to toggle webhook enabled state"
+      required:
+        - enabled
+      properties:
+        enabled:
+          type: boolean
+          description: "Whether to enable or disable the webhook"
 
     Stream:
       type: string
@@ -2990,8 +3234,6 @@ components:
             type: string
         runConfig:
           $ref: "#/components/schemas/RunConfig"
-        webhook:
-          $ref: "#/components/schemas/WebhookConfig"
       required:
         - name
 
@@ -3010,20 +3252,6 @@ components:
       required:
         - disableParamEdit
         - disableRunIdEdit
-
-    WebhookConfig:
-      type: object
-      description: "Configuration for triggering the DAG via HTTP webhook"
-      properties:
-        enabled:
-          type: boolean
-          description: "Whether the webhook is enabled for this DAG"
-          default: false
-        token:
-          type: string
-          description: "The bearer token for webhook authentication"
-      required:
-        - enabled
 
     LocalDag:
       type: object

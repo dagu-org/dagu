@@ -967,9 +967,9 @@ export interface paths {
         put?: never;
         /**
          * Trigger DAG execution via webhook
-         * @description Triggers a DAG execution via webhook. The DAG must have webhook enabled
-         *     in its configuration. Authentication is performed using a bearer token
-         *     specific to the DAG's webhook configuration.
+         * @description Triggers a DAG execution via webhook. The DAG must have a webhook configured
+         *     and enabled. Authentication is performed using a bearer token generated when
+         *     the webhook was created (format: 'dagu_wh_...').
          *
          *     The request body is passed to the DAG as the WEBHOOK_PAYLOAD environment
          *     variable. The DAG run is enqueued and the endpoint returns immediately
@@ -977,6 +977,98 @@ export interface paths {
          *
          */
         post: operations["triggerWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/webhooks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all webhooks
+         * @description Returns a list of all webhooks across all DAGs. Admin only.
+         */
+        get: operations["listWebhooks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dags/{fileName}/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get webhook for DAG
+         * @description Returns the webhook configuration for a specific DAG, if one exists.
+         */
+        get: operations["getDAGWebhook"];
+        put?: never;
+        /**
+         * Create webhook for DAG
+         * @description Creates a new webhook for the specified DAG. Returns the full webhook token,
+         *     which is only shown once. Store it securely.
+         *
+         */
+        post: operations["createDAGWebhook"];
+        /**
+         * Delete webhook for DAG
+         * @description Removes the webhook configuration for the specified DAG.
+         */
+        delete: operations["deleteDAGWebhook"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dags/{fileName}/webhook/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Regenerate webhook token
+         * @description Generates a new token for the existing webhook. The old token becomes
+         *     invalid immediately. Returns the new token, which is only shown once.
+         *
+         */
+        post: operations["regenerateDAGWebhookToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dags/{fileName}/webhook/toggle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Toggle webhook enabled state
+         * @description Enables or disables the webhook without changing the token.
+         */
+        post: operations["toggleDAGWebhook"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1011,6 +1103,54 @@ export interface components {
         /** @description Response from webhook trigger endpoint */
         WebhookResponse: {
             dagRunId: components["schemas"]["DAGRunId"];
+            /** @description Name of the triggered DAG */
+            dagName: string;
+        };
+        /** @description Webhook configuration details (token not included) */
+        WebhookDetails: {
+            /**
+             * Format: uuid
+             * @description Unique identifier for the webhook
+             */
+            id: string;
+            /** @description Name of the DAG this webhook triggers */
+            dagName: string;
+            /** @description First 8 characters of the token for identification */
+            tokenPrefix: string;
+            /** @description Whether the webhook is active */
+            enabled: boolean;
+            /**
+             * Format: date-time
+             * @description When the webhook was created
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description When the webhook was last modified
+             */
+            updatedAt: string;
+            /** @description User ID who created the webhook */
+            createdBy?: string;
+            /**
+             * Format: date-time
+             * @description When the webhook was last triggered
+             */
+            lastUsedAt?: string;
+        };
+        /** @description Response when creating or regenerating a webhook (includes full token) */
+        WebhookCreateResponse: {
+            webhook: components["schemas"]["WebhookDetails"];
+            /** @description Full webhook token (only shown once, store securely!) */
+            token: string;
+        };
+        /** @description List of all webhooks */
+        WebhookListResponse: {
+            webhooks: components["schemas"]["WebhookDetails"][];
+        };
+        /** @description Request to toggle webhook enabled state */
+        WebhookToggleRequest: {
+            /** @description Whether to enable or disable the webhook */
+            enabled: boolean;
         };
         /**
          * Format: string
@@ -1219,7 +1359,6 @@ export interface components {
             /** @description List of tags for categorizing and filtering DAGs */
             tags?: string[];
             runConfig?: components["schemas"]["RunConfig"];
-            webhook?: components["schemas"]["WebhookConfig"];
         };
         /** @description Configuration for controlling user interactions when starting DAG runs */
         RunConfig: {
@@ -1233,16 +1372,6 @@ export interface components {
              * @default false
              */
             disableRunIdEdit: boolean;
-        };
-        /** @description Configuration for triggering the DAG via HTTP webhook */
-        WebhookConfig: {
-            /**
-             * @description Whether the webhook is enabled for this DAG
-             * @default false
-             */
-            enabled: boolean;
-            /** @description The bearer token for webhook authentication */
-            token?: string;
         };
         LocalDag: {
             /** @description Name of the local DAG */
@@ -4546,7 +4675,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /** @description Bearer token for webhook authentication (e.g., 'Bearer <token>') */
+                /** @description Bearer token for webhook authentication (e.g., 'Bearer dagu_wh_...') */
                 Authorization: string;
             };
             path: {
@@ -4588,7 +4717,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Forbidden - webhook not enabled for this DAG */
+            /** @description Forbidden - webhook disabled or not configured */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -4597,7 +4726,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description DAG not found */
+            /** @description DAG or webhook not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -4608,6 +4737,242 @@ export interface operations {
             };
             /** @description Conflict - DAG run with the specified dagRunId already exists */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listWebhooks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of webhooks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookListResponse"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getDAGWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Webhook configuration */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookDetails"];
+                };
+            };
+            /** @description No webhook configured for this DAG */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createDAGWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Webhook created successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookCreateResponse"];
+                };
+            };
+            /** @description Webhook already exists for this DAG */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteDAGWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Webhook deleted successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No webhook configured for this DAG */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    regenerateDAGWebhookToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Token regenerated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookCreateResponse"];
+                };
+            };
+            /** @description No webhook configured for this DAG */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    toggleDAGWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebhookToggleRequest"];
+            };
+        };
+        responses: {
+            /** @description Webhook toggled successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookDetails"];
+                };
+            };
+            /** @description No webhook configured for this DAG */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

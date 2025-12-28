@@ -258,15 +258,6 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 		}
 	}
 
-	var webhookConfig *api.WebhookConfig = nil
-
-	if dag.Webhook != nil {
-		webhookConfig = &api.WebhookConfig{
-			Enabled: dag.Webhook.Enabled,
-			Token:   ptrOf(dag.Webhook.Token),
-		}
-	}
-
 	ret := &api.DAGDetails{
 		Name:              dag.Name,
 		Description:       ptrOf(dag.Description),
@@ -285,7 +276,6 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 		Steps:             ptrOf(steps),
 		Tags:              ptrOf(dag.Tags),
 		RunConfig:         runConfig,
-		Webhook:           webhookConfig,
 	}
 
 	return ret

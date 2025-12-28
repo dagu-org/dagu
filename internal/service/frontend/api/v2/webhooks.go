@@ -2,18 +2,21 @@ package api
 
 import (
 	"context"
-	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/dagu-org/dagu/api/v2"
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/google/uuid"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 const (
@@ -21,11 +24,244 @@ const (
 	maxWebhookPayloadSize = 1 * 1024 * 1024
 )
 
+// ListWebhooks returns all webhooks across all DAGs.
+func (a *API) ListWebhooks(ctx context.Context, _ api.ListWebhooksRequestObject) (api.ListWebhooksResponseObject, error) {
+	if err := a.requireWebhookManagement(); err != nil {
+		return nil, err
+	}
+
+	webhooks, err := a.authService.ListWebhooks(ctx)
+	if err != nil {
+		logger.Error(ctx, "Failed to list webhooks", tag.Error(err))
+		return nil, &Error{
+			HTTPStatus: http.StatusInternalServerError,
+			Code:       api.ErrorCodeInternalError,
+			Message:    "failed to list webhooks",
+		}
+	}
+
+	response := make([]api.WebhookDetails, 0, len(webhooks))
+	for _, wh := range webhooks {
+		response = append(response, toWebhookDetails(wh))
+	}
+
+	return api.ListWebhooks200JSONResponse{Webhooks: response}, nil
+}
+
+// GetDAGWebhook returns the webhook configuration for a specific DAG.
+func (a *API) GetDAGWebhook(ctx context.Context, request api.GetDAGWebhookRequestObject) (api.GetDAGWebhookResponseObject, error) {
+	if err := a.requireWebhookManagement(); err != nil {
+		return nil, err
+	}
+
+	webhook, err := a.authService.GetWebhookByDAGName(ctx, request.FileName)
+	if err != nil {
+		if errors.Is(err, auth.ErrWebhookNotFound) {
+			return nil, &Error{
+				HTTPStatus: http.StatusNotFound,
+				Code:       api.ErrorCodeNotFound,
+				Message:    fmt.Sprintf("no webhook configured for DAG %s", request.FileName),
+			}
+		}
+		logger.Error(ctx, "Failed to get webhook", tag.Name(request.FileName), tag.Error(err))
+		return nil, &Error{
+			HTTPStatus: http.StatusInternalServerError,
+			Code:       api.ErrorCodeInternalError,
+			Message:    "failed to get webhook",
+		}
+	}
+
+	return api.GetDAGWebhook200JSONResponse(toWebhookDetails(webhook)), nil
+}
+
+// CreateDAGWebhook creates a new webhook for a DAG.
+func (a *API) CreateDAGWebhook(ctx context.Context, request api.CreateDAGWebhookRequestObject) (api.CreateDAGWebhookResponseObject, error) {
+	if err := a.requireWebhookManagement(); err != nil {
+		return nil, err
+	}
+
+	// Check if DAG exists
+	if _, err := a.dagStore.GetDetails(ctx, request.FileName); err != nil {
+		if errors.Is(err, execution.ErrDAGNotFound) {
+			return nil, &Error{
+				HTTPStatus: http.StatusNotFound,
+				Code:       api.ErrorCodeNotFound,
+				Message:    fmt.Sprintf("DAG %s not found", request.FileName),
+			}
+		}
+		return nil, err
+	}
+
+	// Get creator ID from context
+	creatorID := getCreatorID(ctx)
+
+	result, err := a.authService.CreateWebhook(ctx, request.FileName, creatorID)
+	if err != nil {
+		if errors.Is(err, auth.ErrWebhookAlreadyExists) {
+			return nil, &Error{
+				HTTPStatus: http.StatusConflict,
+				Code:       api.ErrorCodeAlreadyExists,
+				Message:    fmt.Sprintf("webhook already exists for DAG %s", request.FileName),
+			}
+		}
+		logger.Error(ctx, "Failed to create webhook", tag.Name(request.FileName), tag.Error(err))
+		return nil, &Error{
+			HTTPStatus: http.StatusInternalServerError,
+			Code:       api.ErrorCodeInternalError,
+			Message:    "failed to create webhook",
+		}
+	}
+
+	logger.Info(ctx, "Webhook created", tag.Name(request.FileName))
+
+	return api.CreateDAGWebhook201JSONResponse{
+		Webhook: toWebhookDetails(result.Webhook),
+		Token:   result.FullToken,
+	}, nil
+}
+
+// DeleteDAGWebhook removes the webhook for a DAG.
+func (a *API) DeleteDAGWebhook(ctx context.Context, request api.DeleteDAGWebhookRequestObject) (api.DeleteDAGWebhookResponseObject, error) {
+	if err := a.requireWebhookManagement(); err != nil {
+		return nil, err
+	}
+
+	err := a.authService.DeleteWebhook(ctx, request.FileName)
+	if err != nil {
+		if errors.Is(err, auth.ErrWebhookNotFound) {
+			return nil, &Error{
+				HTTPStatus: http.StatusNotFound,
+				Code:       api.ErrorCodeNotFound,
+				Message:    fmt.Sprintf("no webhook configured for DAG %s", request.FileName),
+			}
+		}
+		logger.Error(ctx, "Failed to delete webhook", tag.Name(request.FileName), tag.Error(err))
+		return nil, &Error{
+			HTTPStatus: http.StatusInternalServerError,
+			Code:       api.ErrorCodeInternalError,
+			Message:    "failed to delete webhook",
+		}
+	}
+
+	logger.Info(ctx, "Webhook deleted", tag.Name(request.FileName))
+
+	return api.DeleteDAGWebhook204Response{}, nil
+}
+
+// RegenerateDAGWebhookToken generates a new token for an existing webhook.
+func (a *API) RegenerateDAGWebhookToken(ctx context.Context, request api.RegenerateDAGWebhookTokenRequestObject) (api.RegenerateDAGWebhookTokenResponseObject, error) {
+	if err := a.requireWebhookManagement(); err != nil {
+		return nil, err
+	}
+
+	result, err := a.authService.RegenerateWebhookToken(ctx, request.FileName)
+	if err != nil {
+		if errors.Is(err, auth.ErrWebhookNotFound) {
+			return nil, &Error{
+				HTTPStatus: http.StatusNotFound,
+				Code:       api.ErrorCodeNotFound,
+				Message:    fmt.Sprintf("no webhook configured for DAG %s", request.FileName),
+			}
+		}
+		logger.Error(ctx, "Failed to regenerate webhook token", tag.Name(request.FileName), tag.Error(err))
+		return nil, &Error{
+			HTTPStatus: http.StatusInternalServerError,
+			Code:       api.ErrorCodeInternalError,
+			Message:    "failed to regenerate webhook token",
+		}
+	}
+
+	logger.Info(ctx, "Webhook token regenerated", tag.Name(request.FileName))
+
+	return api.RegenerateDAGWebhookToken200JSONResponse{
+		Webhook: toWebhookDetails(result.Webhook),
+		Token:   result.FullToken,
+	}, nil
+}
+
+// ToggleDAGWebhook enables or disables a webhook.
+func (a *API) ToggleDAGWebhook(ctx context.Context, request api.ToggleDAGWebhookRequestObject) (api.ToggleDAGWebhookResponseObject, error) {
+	if err := a.requireWebhookManagement(); err != nil {
+		return nil, err
+	}
+
+	webhook, err := a.authService.ToggleWebhook(ctx, request.FileName, request.Body.Enabled)
+	if err != nil {
+		if errors.Is(err, auth.ErrWebhookNotFound) {
+			return nil, &Error{
+				HTTPStatus: http.StatusNotFound,
+				Code:       api.ErrorCodeNotFound,
+				Message:    fmt.Sprintf("no webhook configured for DAG %s", request.FileName),
+			}
+		}
+		logger.Error(ctx, "Failed to toggle webhook", tag.Name(request.FileName), tag.Error(err))
+		return nil, &Error{
+			HTTPStatus: http.StatusInternalServerError,
+			Code:       api.ErrorCodeInternalError,
+			Message:    "failed to toggle webhook",
+		}
+	}
+
+	logger.Info(ctx, "Webhook toggled",
+		tag.Name(request.FileName),
+		tag.Key("enabled"), tag.Value(request.Body.Enabled),
+	)
+
+	return api.ToggleDAGWebhook200JSONResponse(toWebhookDetails(webhook)), nil
+}
+
 // TriggerWebhook triggers a DAG execution via webhook.
-// The DAG must have webhook enabled in its configuration.
-// Authentication is performed using a bearer token specific to the DAG's webhook configuration.
+// Authentication is performed using a bearer token specific to the webhook.
 func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequestObject) (api.TriggerWebhookResponseObject, error) {
-	// Load the DAG
+	// Validate the token via auth service
+	token := extractWebhookToken(request.Params.Authorization)
+	if token == "" {
+		logger.Warn(ctx, "Webhook: missing or invalid authorization header",
+			tag.Name(request.FileName),
+		)
+		return nil, &Error{
+			HTTPStatus: http.StatusUnauthorized,
+			Code:       api.ErrorCodeUnauthorized,
+			Message:    "missing or invalid authorization header",
+		}
+	}
+
+	// Validate token and check if webhook is enabled
+	webhook, err := a.authService.ValidateWebhookToken(ctx, request.FileName, token)
+	if err != nil {
+		if errors.Is(err, authservice.ErrInvalidWebhookToken) {
+			logger.Warn(ctx, "Webhook: invalid token", tag.Name(request.FileName))
+			return nil, &Error{
+				HTTPStatus: http.StatusUnauthorized,
+				Code:       api.ErrorCodeUnauthorized,
+				Message:    "invalid webhook token",
+			}
+		}
+		if errors.Is(err, authservice.ErrWebhookDisabled) {
+			logger.Warn(ctx, "Webhook: disabled", tag.Name(request.FileName))
+			return nil, &Error{
+				HTTPStatus: http.StatusForbidden,
+				Code:       api.ErrorCodeForbidden,
+				Message:    "webhook is disabled",
+			}
+		}
+		if errors.Is(err, authservice.ErrWebhookNotConfigured) {
+			logger.Warn(ctx, "Webhook: not configured", tag.Name(request.FileName))
+			return nil, &Error{
+				HTTPStatus: http.StatusNotFound,
+				Code:       api.ErrorCodeNotFound,
+				Message:    "no webhook configured for this DAG",
+			}
+		}
+		logger.Error(ctx, "Webhook: validation failed", tag.Name(request.FileName), tag.Error(err))
+		return nil, &Error{
+			HTTPStatus: http.StatusInternalServerError,
+			Code:       api.ErrorCodeInternalError,
+			Message:    "webhook validation failed",
+		}
+	}
+
+	// Load the DAG (we need it for enqueuing)
 	dag, err := a.dagStore.GetDetails(ctx, request.FileName)
 	if err != nil {
 		logger.Warn(ctx, "Webhook: DAG not found",
@@ -36,43 +272,6 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 			HTTPStatus: http.StatusNotFound,
 			Code:       api.ErrorCodeNotFound,
 			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
-		}
-	}
-
-	// Check if webhook is enabled
-	if dag.Webhook == nil || !dag.Webhook.Enabled {
-		logger.Warn(ctx, "Webhook: not enabled for DAG",
-			tag.Name(dag.Name),
-		)
-		return nil, &Error{
-			HTTPStatus: http.StatusForbidden,
-			Code:       api.ErrorCodeForbidden,
-			Message:    "webhook not enabled for this DAG",
-		}
-	}
-
-	// Validate the token
-	token := extractWebhookToken(request.Params.Authorization)
-	if token == "" {
-		logger.Warn(ctx, "Webhook: missing or invalid authorization header",
-			tag.Name(dag.Name),
-		)
-		return nil, &Error{
-			HTTPStatus: http.StatusUnauthorized,
-			Code:       api.ErrorCodeUnauthorized,
-			Message:    "missing or invalid authorization header",
-		}
-	}
-
-	// Use constant-time comparison to prevent timing attacks
-	if !validateWebhookToken(token, dag.Webhook.Token) {
-		logger.Warn(ctx, "Webhook: invalid token",
-			tag.Name(dag.Name),
-		)
-		return nil, &Error{
-			HTTPStatus: http.StatusUnauthorized,
-			Code:       api.ErrorCodeUnauthorized,
-			Message:    "invalid webhook token",
 		}
 	}
 
@@ -153,12 +352,25 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 	logger.Info(ctx, "Webhook: DAG run enqueued",
 		tag.Name(dag.Name),
 		tag.Key("dagRunID"), tag.Value(dagRunID),
+		tag.Key("webhookID"), tag.Value(webhook.ID),
 	)
 
 	return api.TriggerWebhook200JSONResponse{
 		DagRunId: dagRunID,
 		DagName:  dag.Name,
 	}, nil
+}
+
+// requireWebhookManagement checks if webhook management is enabled.
+func (a *API) requireWebhookManagement() error {
+	if a.authService == nil || !a.authService.HasWebhookStore() {
+		return &Error{
+			Code:       api.ErrorCodeUnauthorized,
+			Message:    "Webhook management is not enabled",
+			HTTPStatus: http.StatusUnauthorized,
+		}
+	}
+	return nil
 }
 
 // extractWebhookToken extracts the token from the Authorization header.
@@ -171,10 +383,34 @@ func extractWebhookToken(authHeader string) string {
 	return strings.TrimPrefix(authHeader, bearerPrefix)
 }
 
-// validateWebhookToken validates the token using constant-time comparison.
-func validateWebhookToken(provided, expected string) bool {
-	if provided == "" || expected == "" {
-		return false
+// toWebhookDetails converts an auth.Webhook to an api.WebhookDetails.
+func toWebhookDetails(wh *auth.Webhook) api.WebhookDetails {
+	// Parse UUID - if invalid (shouldn't happen as we generate it), use nil UUID
+	parsedID, err := uuid.Parse(wh.ID)
+	if err != nil {
+		parsedID = uuid.Nil
 	}
-	return subtle.ConstantTimeCompare([]byte(provided), []byte(expected)) == 1
+
+	details := api.WebhookDetails{
+		Id:          openapi_types.UUID(parsedID),
+		DagName:     wh.DAGName,
+		TokenPrefix: wh.TokenPrefix,
+		Enabled:     wh.Enabled,
+		CreatedAt:   wh.CreatedAt,
+		UpdatedAt:   wh.UpdatedAt,
+		CreatedBy:   ptrOf(wh.CreatedBy),
+	}
+	if wh.LastUsedAt != nil {
+		details.LastUsedAt = wh.LastUsedAt
+	}
+	return details
+}
+
+// getCreatorID extracts the user ID from context or returns a default value.
+func getCreatorID(ctx context.Context) string {
+	user, ok := auth.UserFromContext(ctx)
+	if ok && user != nil {
+		return user.ID
+	}
+	return "system"
 }
