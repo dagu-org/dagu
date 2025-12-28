@@ -16,7 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/execution"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/google/uuid"
-	openapi_types "github.com/oapi-codegen/runtime/types"
+	openapitypes "github.com/oapi-codegen/runtime/types"
 )
 
 const (
@@ -392,7 +392,7 @@ func toWebhookDetails(wh *auth.Webhook) api.WebhookDetails {
 	}
 
 	details := api.WebhookDetails{
-		Id:          openapi_types.UUID(parsedID),
+		Id:          openapitypes.UUID(parsedID),
 		DagName:     wh.DAGName,
 		TokenPrefix: wh.TokenPrefix,
 		Enabled:     wh.Enabled,

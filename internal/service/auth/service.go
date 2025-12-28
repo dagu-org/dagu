@@ -22,19 +22,19 @@ import (
 
 // Service errors.
 var (
-	ErrInvalidCredentials  = errors.New("invalid username or password")
-	ErrInvalidToken        = errors.New("invalid or expired token")
-	ErrTokenExpired        = errors.New("token has expired")
-	ErrMissingSecret       = errors.New("token secret is not configured")
-	ErrPasswordMismatch    = errors.New("current password is incorrect")
-	ErrWeakPassword        = errors.New("password does not meet requirements")
-	ErrCannotDeleteSelf    = errors.New("cannot delete your own account")
-	ErrInvalidAPIKey          = errors.New("invalid API key")
-	ErrAPIKeyNotConfigured    = errors.New("API key management is not configured")
-	ErrInvalidCreatorID       = errors.New("creator ID is required")
-	ErrInvalidWebhookToken    = errors.New("invalid webhook token")
-	ErrWebhookNotConfigured   = errors.New("webhook management is not configured")
-	ErrWebhookDisabled        = errors.New("webhook is disabled")
+	ErrInvalidCredentials   = errors.New("invalid username or password")
+	ErrInvalidToken         = errors.New("invalid or expired token")
+	ErrTokenExpired         = errors.New("token has expired")
+	ErrMissingSecret        = errors.New("token secret is not configured")
+	ErrPasswordMismatch     = errors.New("current password is incorrect")
+	ErrWeakPassword         = errors.New("password does not meet requirements")
+	ErrCannotDeleteSelf     = errors.New("cannot delete your own account")
+	ErrInvalidAPIKey        = errors.New("invalid API key")
+	ErrAPIKeyNotConfigured  = errors.New("API key management is not configured")
+	ErrInvalidCreatorID     = errors.New("creator ID is required")
+	ErrInvalidWebhookToken  = errors.New("invalid webhook token")
+	ErrWebhookNotConfigured = errors.New("webhook management is not configured")
+	ErrWebhookDisabled      = errors.New("webhook is disabled")
 )
 
 const (
@@ -51,7 +51,7 @@ const (
 	// apiKeyPrefixLength is the length of the key prefix stored for identification.
 	apiKeyPrefixLength = 8
 	// webhookTokenPrefix is the prefix for all webhook tokens.
-	webhookTokenPrefix = "dagu_wh_"
+	webhookTokenPrefix = "dagu_wh_" //nolint:gosec // Not a credential, just a token prefix
 	// webhookTokenRandomBytes is the number of random bytes for webhook token generation.
 	webhookTokenRandomBytes = 32
 	// webhookTokenPrefixLength is the length of the token prefix stored for identification.
