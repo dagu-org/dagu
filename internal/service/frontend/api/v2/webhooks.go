@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/dagu-org/dagu/api/v2"
@@ -109,7 +110,10 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 	}
 
 	// Create the params string with WEBHOOK_PAYLOAD
-	params := fmt.Sprintf("WEBHOOK_PAYLOAD=%s", payload)
+	// Use strconv.Quote to properly escape the JSON payload.
+	// The parameter parser regex splits on whitespace for unquoted values,
+	// so we need to quote the value to preserve spaces in JSON.
+	params := fmt.Sprintf("WEBHOOK_PAYLOAD=%s", strconv.Quote(payload))
 
 	// Determine the dag-run ID (use provided one for idempotency, or generate new)
 	var dagRunID string
