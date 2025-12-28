@@ -182,12 +182,6 @@ function DAGRunOutputs({
               <span className="font-mono">{metadata.attemptId}</span>
             </div>
           )}
-          {metadata.params && (
-            <div>
-              <span className="text-muted-foreground">Params: </span>
-              <span className="font-mono">{metadata.params}</span>
-            </div>
-          )}
         </div>
       </div>
 
