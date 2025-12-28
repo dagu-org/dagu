@@ -307,16 +307,23 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
         </div>
         <div className="flex-1 flex flex-col min-h-0">
           {activeTab === 'status' ? (
-            <DAGStatus dagRun={currentDAGRun} fileName={fileName || ''} />
+            <>
+              <DAGStatus dagRun={currentDAGRun} fileName={fileName || ''} />
+              <div className="h-6 flex-shrink-0" />
+            </>
           ) : null}
           {activeTab === 'spec' ? <DAGSpec fileName={fileName} /> : null}
           {activeTab === 'history' ? (
-            <div data-tab="history">
+            <>
               <DAGExecutionHistory fileName={fileName || ''} />
-            </div>
+              <div className="h-6 flex-shrink-0" />
+            </>
           ) : null}
           {activeTab === 'webhook' ? (
-            <WebhookTab fileName={fileName || ''} />
+            <>
+              <WebhookTab fileName={fileName || ''} />
+              <div className="h-6 flex-shrink-0" />
+            </>
           ) : null}
           {activeTab === 'dagRun-log' ? (
             <ExecutionLog
