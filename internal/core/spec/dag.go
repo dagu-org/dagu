@@ -127,12 +127,22 @@ type smtpConfig struct {
 	Password string          // SMTP password
 }
 
+// IsZero returns true if all fields are empty/default.
+func (s smtpConfig) IsZero() bool {
+	return s == smtpConfig{}
+}
+
 // mailConfig defines the mail configuration.
 type mailConfig struct {
 	From       string              // Sender email address
 	To         types.StringOrArray // Recipient email address(es) - can be string or []string
 	Prefix     string              // Prefix for the email subject
 	AttachLogs bool                // Flag to attach logs to the email
+}
+
+// IsZero returns true if all fields are empty/default.
+func (m mailConfig) IsZero() bool {
+	return reflect.DeepEqual(m, mailConfig{})
 }
 
 // mailOn defines the conditions to send mail.
@@ -981,15 +991,13 @@ func buildHandlers(ctx BuildContext, d *dag, result *core.DAG) (core.HandlerOn, 
 }
 
 func buildSMTPConfig(_ BuildContext, d *dag) (*core.SMTPConfig, error) {
-	portStr := d.SMTP.Port.String()
-
-	if d.SMTP.Host == "" && portStr == "" {
+	if d.SMTP.IsZero() {
 		return nil, nil
 	}
 
 	return &core.SMTPConfig{
 		Host:     d.SMTP.Host,
-		Port:     portStr,
+		Port:     d.SMTP.Port.String(),
 		Username: d.SMTP.Username,
 		Password: d.SMTP.Password,
 	}, nil
@@ -1147,6 +1155,10 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 
 // buildMailConfigInternal builds a core.MailConfig from the mail configuration.
 func buildMailConfigInternal(def mailConfig) (*core.MailConfig, error) {
+	if def.IsZero() {
+		return nil, nil
+	}
+
 	// StringOrArray already parsed during YAML unmarshal
 	rawAddresses := def.To.Values()
 
@@ -1157,11 +1169,6 @@ func buildMailConfigInternal(def mailConfig) (*core.MailConfig, error) {
 		if trimmed != "" {
 			toAddresses = append(toAddresses, trimmed)
 		}
-	}
-
-	// Return nil if no valid configuration
-	if def.From == "" && len(toAddresses) == 0 {
-		return nil, nil
 	}
 
 	return &core.MailConfig{

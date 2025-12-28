@@ -9,6 +9,8 @@ type fsNotifyWatcher struct {
 	*fsnotify.Watcher
 }
 
+var _ FileWatcher = (*fsNotifyWatcher)(nil)
+
 // Events returns the fsnotify event channel receiver
 func (w *fsNotifyWatcher) Events() <-chan fsnotify.Event {
 	return w.Watcher.Events

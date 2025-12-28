@@ -11,6 +11,8 @@ import (
 // cmdShell handles Windows cmd.exe.
 type cmdShell struct{}
 
+var _ Shell = (*cmdShell)(nil)
+
 func (s *cmdShell) Match(name string) bool {
 	switch name {
 	case "cmd.exe", "cmd":

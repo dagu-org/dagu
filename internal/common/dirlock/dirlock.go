@@ -80,6 +80,8 @@ type dirLock struct {
 	mu        sync.Mutex
 }
 
+var _ DirLock = (*dirLock)(nil)
+
 // New creates a new directory lock instance
 func New(directory string, opts *LockOptions) DirLock {
 	// Set default options if not provided

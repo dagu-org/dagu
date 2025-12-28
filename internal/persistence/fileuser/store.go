@@ -40,6 +40,8 @@ type Store struct {
 	byUsername map[string]string
 }
 
+var _ auth.UserStore = (*Store)(nil)
+
 // Option is a functional option for configuring the Store.
 type Option func(*Store)
 

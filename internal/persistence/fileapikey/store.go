@@ -45,6 +45,8 @@ type Store struct {
 	fileCache *fileutil.Cache[*auth.APIKey]
 }
 
+var _ auth.APIKeyStore = (*Store)(nil)
+
 // Option is a functional option for configuring the Store.
 type Option func(*Store)
 
