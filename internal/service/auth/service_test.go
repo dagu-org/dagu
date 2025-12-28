@@ -1,6 +1,3 @@
-// Copyright (C) 2024 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package auth
 
 import (
@@ -716,10 +713,6 @@ func TestService_CreateUser_InvalidRole(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid role")
 }
-
-// ============================================================================
-// API Key Tests
-// ============================================================================
 
 func setupTestServiceWithAPIKeys(t *testing.T) (*Service, func()) {
 	t.Helper()

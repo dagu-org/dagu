@@ -133,7 +133,7 @@ function DAGStatusOverview({
             Parameters
           </span>
         </div>
-        <div className="p-2 bg-accent rounded-md text-xs font-mono h-[40px] overflow-y-auto w-full border">
+        <div className="flex items-center p-2 bg-accent rounded-md text-xs font-mono h-[40px] overflow-y-auto w-full border">
           {status.params ? (
             <span className="font-medium text-foreground">{status.params}</span>
           ) : (

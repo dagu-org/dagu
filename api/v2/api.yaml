@@ -39,6 +39,8 @@ tags:
     description: "User management operations (CRUD, password management)"
   - name: "api-keys"
     description: "API key management operations (admin only)"
+  - name: "webhooks"
+    description: "Webhook endpoints for triggering DAG execution"
 
 paths:
   /health:
@@ -157,10 +159,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-
-  # ============================================================================
-  # User Management Endpoints (Admin only)
-  # ============================================================================
 
   /users:
     get:
@@ -950,8 +948,9 @@ paths:
                   type: string
                   description: "Parameters to pass to the DAG-run in JSON format"
                 dagRunId:
-                  type: string
-                  description: "Optional ID for the DAG-run, if not provided a new one will be generated"
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "Optional ID for the DAG-run, if not provided a new one will be generated"
                 dagName:
                   type: string
                   description: "Optional DAG name override to use for the created dag-run"
@@ -968,8 +967,7 @@ paths:
                 type: object
                 properties:
                   dagRunId:
-                    type: string
-                    description: "ID of the created DAG-run"
+                    $ref: "#/components/schemas/DAGRunId"
                 required:
                   - dagRunId
         "409":
@@ -1006,8 +1004,9 @@ paths:
                   type: string
                   description: "Parameters to pass to the DAG-run in JSON format"
                 dagRunId:
-                  type: string
-                  description: "Optional ID for the DAG-run, if not provided a new one will be generated"
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "Optional ID for the DAG-run, if not provided a new one will be generated"
                 dagName:
                   type: string
                   description: "Optional DAG name override to use for the queued dag-run"
@@ -1027,8 +1026,7 @@ paths:
                 type: object
                 properties:
                   dagRunId:
-                    type: string
-                    description: "ID of the created DAG-run"
+                    $ref: "#/components/schemas/DAGRunId"
                 required:
                   - dagRunId
         "409":
@@ -1450,8 +1448,9 @@ paths:
                   type: string
                   description: "Parameters to pass to the DAG-run in JSON format"
                 dagRunId:
-                  type: string
-                  description: "Optional ID for the DAG-run; if omitted, a new one is generated"
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "Optional ID for the DAG-run; if omitted, a new one is generated"
                 singleton:
                   type: boolean
                   description: "If true, prevent starting if a DAG with the same name is already running (returns 409)"
@@ -1467,8 +1466,7 @@ paths:
                 type: object
                 properties:
                   dagRunId:
-                    type: string
-                    description: "ID of the created DAG-run"
+                    $ref: "#/components/schemas/DAGRunId"
                 required:
                   - dagRunId
         "400":
@@ -1520,8 +1518,9 @@ paths:
                   type: string
                   description: "Parameters to persist with the queued DAG-run in JSON format"
                 dagRunId:
-                  type: string
-                  description: "Optional ID for the DAG-run; if omitted a new one will be generated"
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "Optional ID for the DAG-run; if omitted a new one will be generated"
                 queue:
                   type: string
                   description: "Override the queue to use for this DAG-run"
@@ -1536,8 +1535,7 @@ paths:
                 type: object
                 properties:
                   dagRunId:
-                    type: string
-                    description: "ID of the queued DAG-run"
+                    $ref: "#/components/schemas/DAGRunId"
                 required:
                   - dagRunId
         "400":
@@ -1649,8 +1647,9 @@ paths:
               type: object
               properties:
                 dagRunId:
-                  type: string
-                  description: "Explicit run ID for the new DAG-run; if omitted a new ID is generated."
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "Explicit run ID for the new DAG-run; if omitted a new ID is generated."
                 dagName:
                   type: string
                   description: "Optional DAG name override for the new run."
@@ -1663,8 +1662,7 @@ paths:
                 type: object
                 properties:
                   dagRunId:
-                    type: string
-                    description: "ID of the newly created DAG-run."
+                    $ref: "#/components/schemas/DAGRunId"
                   queued:
                     type: boolean
                     description: "Indicates whether the run was queued instead of starting immediately."
@@ -1852,8 +1850,9 @@ paths:
               type: object
               properties:
                 dagRunId:
-                  type: string
-                  description: "ID of the DAG-run to retry"
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "ID of the DAG-run to retry"
                 stepName:
                   type: string
                   description: "Optional. If provided, only this step will be retried."
@@ -2299,6 +2298,257 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /webhooks/{fileName}:
+    post:
+      summary: "Trigger DAG execution via webhook"
+      description: |
+        Triggers a DAG execution via webhook. The DAG must have a webhook configured
+        and enabled. Authentication is performed using a bearer token generated when
+        the webhook was created (format: 'dagu_wh_...').
+
+        The request body is passed to the DAG as the WEBHOOK_PAYLOAD environment
+        variable. The DAG run is enqueued and the endpoint returns immediately
+        with the dag-run ID.
+      operationId: "triggerWebhook"
+      tags:
+        - "webhooks"
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/DAGFileName"
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: Authorization
+          in: header
+          required: false
+          schema:
+            type: string
+          description: "Bearer token for webhook authentication (e.g., 'Bearer dagu_wh_...'). Required for authentication but marked optional in schema so the handler can return proper 401 responses."
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookRequest"
+      responses:
+        "200":
+          description: "DAG run triggered successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookResponse"
+        "400":
+          description: "Invalid request body"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Unauthorized - missing or invalid token"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - webhook disabled or not configured"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "DAG or webhook not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Conflict - DAG run with the specified dagRunId already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /webhooks:
+    get:
+      summary: "List all webhooks"
+      description: "Returns a list of all webhooks across all DAGs. Admin only."
+      operationId: "listWebhooks"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "List of webhooks"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookListResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/webhook:
+    get:
+      summary: "Get webhook for DAG"
+      description: "Returns the webhook configuration for a specific DAG, if one exists."
+      operationId: "getDAGWebhook"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "Webhook configuration"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDetails"
+        "404":
+          description: "No webhook configured for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Create webhook for DAG"
+      description: |
+        Creates a new webhook for the specified DAG. Returns the full webhook token,
+        which is only shown once. Store it securely.
+      operationId: "createDAGWebhook"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "201":
+          description: "Webhook created successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookCreateResponse"
+        "409":
+          description: "Webhook already exists for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Delete webhook for DAG"
+      description: "Removes the webhook configuration for the specified DAG."
+      operationId: "deleteDAGWebhook"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "204":
+          description: "Webhook deleted successfully"
+        "404":
+          description: "No webhook configured for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/webhook/regenerate:
+    post:
+      summary: "Regenerate webhook token"
+      description: |
+        Generates a new token for the existing webhook. The old token becomes
+        invalid immediately. Returns the new token, which is only shown once.
+      operationId: "regenerateDAGWebhookToken"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "Token regenerated successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookCreateResponse"
+        "404":
+          description: "No webhook configured for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/webhook/toggle:
+    post:
+      summary: "Toggle webhook enabled state"
+      description: "Enables or disables the webhook without changing the token."
+      operationId: "toggleDAGWebhook"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookToggleRequest"
+      responses:
+        "200":
+          description: "Webhook toggled successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDetails"
+        "404":
+          description: "No webhook configured for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   securitySchemes:
     basicAuth:
@@ -2509,6 +2759,108 @@ components:
         - "auth.unauthorized"
         - "auth.token_invalid"
         - "auth.forbidden"
+
+    WebhookRequest:
+      type: object
+      description: "Request body for webhook trigger endpoint"
+      properties:
+        dagRunId:
+          allOf:
+            - $ref: "#/components/schemas/DAGRunId"
+            - description: |
+                Optional idempotency key. If provided and a DAG run with this ID already exists,
+                the endpoint returns 409 Conflict. If not provided, a new UUID is generated.
+        payload:
+          type: object
+          additionalProperties: true
+          description: "Arbitrary JSON payload to pass to the DAG as WEBHOOK_PAYLOAD"
+
+    WebhookResponse:
+      type: object
+      description: "Response from webhook trigger endpoint"
+      required:
+        - dagRunId
+        - dagName
+      properties:
+        dagRunId:
+          $ref: "#/components/schemas/DAGRunId"
+        dagName:
+          type: string
+          description: "Name of the triggered DAG"
+
+    WebhookDetails:
+      type: object
+      description: "Webhook configuration details (token not included)"
+      required:
+        - id
+        - dagName
+        - tokenPrefix
+        - enabled
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: "Unique identifier for the webhook"
+        dagName:
+          type: string
+          description: "Name of the DAG this webhook triggers"
+        tokenPrefix:
+          type: string
+          description: "First 8 characters of the token for identification"
+        enabled:
+          type: boolean
+          description: "Whether the webhook is active"
+        createdAt:
+          type: string
+          format: date-time
+          description: "When the webhook was created"
+        updatedAt:
+          type: string
+          format: date-time
+          description: "When the webhook was last modified"
+        createdBy:
+          type: string
+          description: "User ID who created the webhook"
+        lastUsedAt:
+          type: string
+          format: date-time
+          description: "When the webhook was last triggered"
+
+    WebhookCreateResponse:
+      type: object
+      description: "Response when creating or regenerating a webhook (includes full token)"
+      required:
+        - webhook
+        - token
+      properties:
+        webhook:
+          $ref: "#/components/schemas/WebhookDetails"
+        token:
+          type: string
+          description: "Full webhook token (only shown once, store securely!)"
+
+    WebhookListResponse:
+      type: object
+      description: "List of all webhooks"
+      required:
+        - webhooks
+      properties:
+        webhooks:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookDetails"
+
+    WebhookToggleRequest:
+      type: object
+      description: "Request to toggle webhook enabled state"
+      required:
+        - enabled
+      properties:
+        enabled:
+          type: boolean
+          description: "Whether to enable or disable the webhook"
 
     Stream:
       type: string
@@ -2942,14 +3294,16 @@ components:
           type: string
           description: "Name of the root DAG-run"
         rootDAGRunId:
-          type: string
-          description: "ID of the root DAG-run"
+          allOf:
+            - $ref: "#/components/schemas/DAGRunId"
+            - description: "ID of the root DAG-run"
         parentDAGRunName:
           type: string
           description: "Name of the parent DAG-run"
         parentDAGRunId:
-          type: string
-          description: "ID of the parent DAG-run"
+          allOf:
+            - $ref: "#/components/schemas/DAGRunId"
+            - description: "ID of the parent DAG-run"
         dagRunId:
           $ref: "#/components/schemas/DAGRunId"
         name:
@@ -3586,10 +3940,6 @@ components:
         - timestamp
         - value
 
-    # ============================================================================
-    # Authentication & User Management Schemas
-    # ============================================================================
-
     UserRole:
       type: string
       description: "User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution, operator: DAG execution only, viewer: read-only"
@@ -3739,7 +4089,6 @@ components:
       required:
         - users
 
-    # ============================================================================
     APIKey:
       type: object
       description: "API key information"

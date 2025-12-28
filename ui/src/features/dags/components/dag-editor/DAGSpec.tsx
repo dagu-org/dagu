@@ -127,7 +127,10 @@ function DAGSpec({ fileName }: Props) {
 
   // Track unsaved changes
   useEffect(() => {
-    if (typeof currentValue === 'undefined' || typeof data?.spec === 'undefined') {
+    if (
+      typeof currentValue === 'undefined' ||
+      typeof data?.spec === 'undefined'
+    ) {
       setHasUnsavedChanges(false);
       return;
     }
@@ -328,7 +331,7 @@ function DAGSpec({ fileName }: Props) {
           data?.dag && (
             <React.Fragment>
               <div
-                className="flex flex-col flex-1 h-full min-h-[500px] space-y-6"
+                className="flex flex-col flex-1 h-full min-h-[500px] space-y-6 mb-6"
                 ref={containerRef}
               >
                 {hasLocalDags && (

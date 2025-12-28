@@ -1,6 +1,3 @@
-// Copyright (C) 2024 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package auth
 
 import (
@@ -36,6 +33,21 @@ var (
 	ErrInvalidAPIKeyHash = errors.New("invalid API key hash")
 	// ErrInvalidRole is returned when the role is not a valid role.
 	ErrInvalidRole = errors.New("invalid role")
+)
+
+// Common errors for webhook store operations.
+var (
+	// ErrWebhookNotFound is returned when a webhook cannot be found.
+	ErrWebhookNotFound = errors.New("webhook not found")
+	// ErrWebhookAlreadyExists is returned when attempting to create a webhook
+	// for a DAG that already has one.
+	ErrWebhookAlreadyExists = errors.New("webhook already exists for this DAG")
+	// ErrInvalidWebhookDAGName is returned when the DAG name is invalid.
+	ErrInvalidWebhookDAGName = errors.New("invalid webhook DAG name")
+	// ErrInvalidWebhookID is returned when the webhook ID is invalid.
+	ErrInvalidWebhookID = errors.New("invalid webhook ID")
+	// ErrInvalidWebhookTokenHash is returned when the webhook token hash is empty.
+	ErrInvalidWebhookTokenHash = errors.New("invalid webhook token hash")
 )
 
 // UserStore defines the interface for user persistence operations.
@@ -92,5 +104,41 @@ type APIKeyStore interface {
 
 	// UpdateLastUsed updates the LastUsedAt timestamp for an API key.
 	// This is called when the API key is used for authentication.
+	UpdateLastUsed(ctx context.Context, id string) error
+}
+
+// WebhookStore defines the interface for webhook persistence operations.
+// Implementations must be safe for concurrent use.
+// Each DAG can have at most one webhook (1:1 relationship).
+type WebhookStore interface {
+	// Create stores a new webhook.
+	// Returns ErrWebhookAlreadyExists if a webhook for the DAG already exists.
+	Create(ctx context.Context, webhook *Webhook) error
+
+	// GetByID retrieves a webhook by its unique ID.
+	// Returns ErrWebhookNotFound if the webhook does not exist.
+	GetByID(ctx context.Context, id string) (*Webhook, error)
+
+	// GetByDAGName retrieves the webhook for a specific DAG.
+	// Returns ErrWebhookNotFound if no webhook exists for the DAG.
+	GetByDAGName(ctx context.Context, dagName string) (*Webhook, error)
+
+	// List returns all webhooks in the store.
+	List(ctx context.Context) ([]*Webhook, error)
+
+	// Update modifies an existing webhook.
+	// Returns ErrWebhookNotFound if the webhook does not exist.
+	Update(ctx context.Context, webhook *Webhook) error
+
+	// Delete removes a webhook by its ID.
+	// Returns ErrWebhookNotFound if the webhook does not exist.
+	Delete(ctx context.Context, id string) error
+
+	// DeleteByDAGName removes a webhook by its DAG name.
+	// Returns ErrWebhookNotFound if no webhook exists for the DAG.
+	DeleteByDAGName(ctx context.Context, dagName string) error
+
+	// UpdateLastUsed updates the LastUsedAt timestamp for a webhook.
+	// This is called when the webhook is triggered.
 	UpdateLastUsed(ctx context.Context, id string) error
 }

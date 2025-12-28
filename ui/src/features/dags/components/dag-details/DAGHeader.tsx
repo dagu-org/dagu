@@ -233,11 +233,11 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
       <div className="mt-4 border-t border-border pt-4">
         <div className="flex items-center gap-2 mb-2">
           <Terminal className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-semibold text-foreground/90">
+          <span className="text-xs font-semibold text-foreground/90">
             Parameters
           </span>
         </div>
-        <div className="bg-accent rounded-md px-3 py-2 font-mono text-sm min-h-[36px] max-h-[100px] overflow-y-auto border">
+        <div className="flex items-center bg-accent rounded-md px-3 py-1.5 font-mono text-xs min-h-[36px] max-h-[100px] overflow-y-auto border">
           {dagRunToDisplay.params ? (
             <span className="text-foreground">{dagRunToDisplay.params}</span>
           ) : (

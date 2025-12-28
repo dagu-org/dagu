@@ -299,6 +299,7 @@ func (l *ConfigLoader) loadPathsConfig(cfg *Config, def Definition) {
 		cfg.Paths.ServiceRegistryDir = fileutil.ResolvePathOrBlank(def.Paths.ServiceRegistryDir)
 		cfg.Paths.UsersDir = fileutil.ResolvePathOrBlank(def.Paths.UsersDir)
 		cfg.Paths.APIKeysDir = fileutil.ResolvePathOrBlank(def.Paths.APIKeysDir)
+		cfg.Paths.WebhooksDir = fileutil.ResolvePathOrBlank(def.Paths.WebhooksDir)
 	}
 }
 
@@ -631,6 +632,9 @@ func (l *ConfigLoader) finalizePaths(cfg *Config) {
 	}
 	if cfg.Paths.APIKeysDir == "" {
 		cfg.Paths.APIKeysDir = filepath.Join(cfg.Paths.DataDir, "apikeys")
+	}
+	if cfg.Paths.WebhooksDir == "" {
+		cfg.Paths.WebhooksDir = filepath.Join(cfg.Paths.DataDir, "webhooks")
 	}
 
 	if cfg.Paths.Executable == "" {

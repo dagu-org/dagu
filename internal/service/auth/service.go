@@ -1,7 +1,3 @@
-// Copyright (C) 2024 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-
-// Package auth provides authentication and user management services.
 package auth
 
 import (
@@ -22,16 +18,19 @@ import (
 
 // Service errors.
 var (
-	ErrInvalidCredentials  = errors.New("invalid username or password")
-	ErrInvalidToken        = errors.New("invalid or expired token")
-	ErrTokenExpired        = errors.New("token has expired")
-	ErrMissingSecret       = errors.New("token secret is not configured")
-	ErrPasswordMismatch    = errors.New("current password is incorrect")
-	ErrWeakPassword        = errors.New("password does not meet requirements")
-	ErrCannotDeleteSelf    = errors.New("cannot delete your own account")
-	ErrInvalidAPIKey       = errors.New("invalid API key")
-	ErrAPIKeyNotConfigured = errors.New("API key management is not configured")
-	ErrInvalidCreatorID    = errors.New("creator ID is required")
+	ErrInvalidCredentials   = errors.New("invalid username or password")
+	ErrInvalidToken         = errors.New("invalid or expired token")
+	ErrTokenExpired         = errors.New("token has expired")
+	ErrMissingSecret        = errors.New("token secret is not configured")
+	ErrPasswordMismatch     = errors.New("current password is incorrect")
+	ErrWeakPassword         = errors.New("password does not meet requirements")
+	ErrCannotDeleteSelf     = errors.New("cannot delete your own account")
+	ErrInvalidAPIKey        = errors.New("invalid API key")
+	ErrAPIKeyNotConfigured  = errors.New("API key management is not configured")
+	ErrInvalidCreatorID     = errors.New("creator ID is required")
+	ErrInvalidWebhookToken  = errors.New("invalid webhook token")
+	ErrWebhookNotConfigured = errors.New("webhook management is not configured")
+	ErrWebhookDisabled      = errors.New("webhook is disabled")
 )
 
 const (
@@ -47,6 +46,13 @@ const (
 	apiKeyRandomBytes = 32
 	// apiKeyPrefixLength is the length of the key prefix stored for identification.
 	apiKeyPrefixLength = 8
+	// webhookTokenPrefix is the fixed prefix for all webhook tokens.
+	webhookTokenPrefix = "dagu_wh_" //nolint:gosec // Not a credential, just a token prefix
+	// webhookTokenRandomBytes is the number of random bytes for webhook token generation.
+	webhookTokenRandomBytes = 32
+	// webhookTokenPrefixLength is how many characters of the full token we persist.
+	// Must be > len(webhookTokenPrefix) so the stored prefix includes random characters.
+	webhookTokenPrefixLength = 12
 )
 
 // Config holds the configuration for the auth service.
@@ -69,9 +75,10 @@ type Claims struct {
 
 // Service provides authentication and user management functionality.
 type Service struct {
-	store       auth.UserStore
-	apiKeyStore auth.APIKeyStore
-	config      Config
+	store        auth.UserStore
+	apiKeyStore  auth.APIKeyStore
+	webhookStore auth.WebhookStore
+	config       Config
 }
 
 // Option is a functional option for configuring the Service.
@@ -81,6 +88,13 @@ type Option func(*Service)
 func WithAPIKeyStore(store auth.APIKeyStore) Option {
 	return func(s *Service) {
 		s.apiKeyStore = store
+	}
+}
+
+// WithWebhookStore sets the webhook store for the service.
+func WithWebhookStore(store auth.WebhookStore) Option {
+	return func(s *Service) {
+		s.webhookStore = store
 	}
 }
 
@@ -425,10 +439,6 @@ func generateSecurePassword(length int) (string, error) {
 	return encoded[:length], nil
 }
 
-// ============================================================================
-// API Key Management
-// ============================================================================
-
 // CreateAPIKeyInput contains the input for creating an API key.
 type CreateAPIKeyInput struct {
 	Name        string
@@ -618,4 +628,204 @@ func (s *Service) ValidateAPIKey(ctx context.Context, keySecret string) (*auth.A
 // HasAPIKeyStore returns true if API key management is configured.
 func (s *Service) HasAPIKeyStore() bool {
 	return s.apiKeyStore != nil
+}
+
+// HasWebhookStore returns true if webhook management is configured.
+func (s *Service) HasWebhookStore() bool {
+	return s.webhookStore != nil
+}
+
+// CreateWebhookResult contains the result of creating a webhook.
+type CreateWebhookResult struct {
+	Webhook   *auth.Webhook
+	FullToken string // Only returned once at creation
+}
+
+// CreateWebhook creates a new webhook for a DAG.
+func (s *Service) CreateWebhook(ctx context.Context, dagName, creatorID string) (*CreateWebhookResult, error) {
+	if s.webhookStore == nil {
+		return nil, ErrWebhookNotConfigured
+	}
+
+	if dagName == "" {
+		return nil, auth.ErrInvalidWebhookDAGName
+	}
+
+	if creatorID == "" {
+		return nil, ErrInvalidCreatorID
+	}
+
+	// Generate webhook token
+	tokenParts, err := generateWebhookToken(s.config.BcryptCost)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate webhook token: %w", err)
+	}
+
+	webhook, err := auth.NewWebhook(dagName, tokenParts.tokenHash, tokenParts.tokenPrefix, creatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.webhookStore.Create(ctx, webhook); err != nil {
+		return nil, err
+	}
+
+	return &CreateWebhookResult{
+		Webhook:   webhook,
+		FullToken: tokenParts.fullToken,
+	}, nil
+}
+
+// webhookTokenParts holds the components of a generated webhook token.
+type webhookTokenParts struct {
+	fullToken   string
+	tokenPrefix string
+	tokenHash   string
+}
+
+// generateWebhookToken generates a new webhook token with prefix, hash, and prefix for display.
+func generateWebhookToken(bcryptCost int) (*webhookTokenParts, error) {
+	randomBytes := make([]byte, webhookTokenRandomBytes)
+	if _, err := rand.Read(randomBytes); err != nil {
+		return nil, fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+
+	encoded := stringutil.Base58Encode(randomBytes)
+	fullToken := webhookTokenPrefix + encoded
+
+	// Store first N characters as prefix for identification
+	var tokenPrefix string
+	if len(fullToken) >= webhookTokenPrefixLength {
+		tokenPrefix = fullToken[:webhookTokenPrefixLength]
+	} else {
+		tokenPrefix = fullToken
+	}
+
+	// Hash the full token
+	hashBytes, err := bcrypt.GenerateFromPassword([]byte(fullToken), bcryptCost)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash webhook token: %w", err)
+	}
+
+	return &webhookTokenParts{
+		fullToken:   fullToken,
+		tokenPrefix: tokenPrefix,
+		tokenHash:   string(hashBytes),
+	}, nil
+}
+
+// GetWebhookByDAGName retrieves the webhook for a specific DAG.
+func (s *Service) GetWebhookByDAGName(ctx context.Context, dagName string) (*auth.Webhook, error) {
+	if s.webhookStore == nil {
+		return nil, ErrWebhookNotConfigured
+	}
+	return s.webhookStore.GetByDAGName(ctx, dagName)
+}
+
+// ListWebhooks returns all webhooks.
+func (s *Service) ListWebhooks(ctx context.Context) ([]*auth.Webhook, error) {
+	if s.webhookStore == nil {
+		return nil, ErrWebhookNotConfigured
+	}
+	return s.webhookStore.List(ctx)
+}
+
+// DeleteWebhook deletes a webhook by DAG name.
+func (s *Service) DeleteWebhook(ctx context.Context, dagName string) error {
+	if s.webhookStore == nil {
+		return ErrWebhookNotConfigured
+	}
+	return s.webhookStore.DeleteByDAGName(ctx, dagName)
+}
+
+// RegenerateWebhookToken generates a new token for an existing webhook.
+// The old token becomes invalid immediately.
+func (s *Service) RegenerateWebhookToken(ctx context.Context, dagName string) (*CreateWebhookResult, error) {
+	if s.webhookStore == nil {
+		return nil, ErrWebhookNotConfigured
+	}
+
+	webhook, err := s.webhookStore.GetByDAGName(ctx, dagName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Generate new token
+	tokenParts, err := generateWebhookToken(s.config.BcryptCost)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate webhook token: %w", err)
+	}
+
+	// Update webhook with new token
+	webhook.TokenHash = tokenParts.tokenHash
+	webhook.TokenPrefix = tokenParts.tokenPrefix
+	webhook.UpdatedAt = time.Now().UTC()
+
+	if err := s.webhookStore.Update(ctx, webhook); err != nil {
+		return nil, err
+	}
+
+	return &CreateWebhookResult{
+		Webhook:   webhook,
+		FullToken: tokenParts.fullToken,
+	}, nil
+}
+
+// ToggleWebhook enables or disables a webhook without changing the token.
+func (s *Service) ToggleWebhook(ctx context.Context, dagName string, enabled bool) (*auth.Webhook, error) {
+	if s.webhookStore == nil {
+		return nil, ErrWebhookNotConfigured
+	}
+
+	webhook, err := s.webhookStore.GetByDAGName(ctx, dagName)
+	if err != nil {
+		return nil, err
+	}
+
+	webhook.Enabled = enabled
+	webhook.UpdatedAt = time.Now().UTC()
+
+	if err := s.webhookStore.Update(ctx, webhook); err != nil {
+		return nil, err
+	}
+
+	return webhook, nil
+}
+
+// ValidateWebhookToken validates a webhook token for a specific DAG.
+// Returns the webhook if valid and enabled.
+func (s *Service) ValidateWebhookToken(ctx context.Context, dagName, token string) (*auth.Webhook, error) {
+	if s.webhookStore == nil {
+		return nil, ErrWebhookNotConfigured
+	}
+
+	// Check for correct prefix
+	if !strings.HasPrefix(token, webhookTokenPrefix) {
+		return nil, ErrInvalidWebhookToken
+	}
+
+	webhook, err := s.webhookStore.GetByDAGName(ctx, dagName)
+	if err != nil {
+		if errors.Is(err, auth.ErrWebhookNotFound) {
+			return nil, ErrInvalidWebhookToken
+		}
+		return nil, err
+	}
+
+	// Validate token hash
+	if err := bcrypt.CompareHashAndPassword([]byte(webhook.TokenHash), []byte(token)); err != nil {
+		return nil, ErrInvalidWebhookToken
+	}
+
+	// Check if webhook is enabled
+	if !webhook.Enabled {
+		return nil, ErrWebhookDisabled
+	}
+
+	// Update last used timestamp
+	if err := s.webhookStore.UpdateLastUsed(ctx, webhook.ID); err != nil {
+		slog.Error("failed to update webhook last used timestamp", "webhookID", webhook.ID, "error", err)
+	}
+
+	return webhook, nil
 }

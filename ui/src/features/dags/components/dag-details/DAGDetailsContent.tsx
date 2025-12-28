@@ -4,6 +4,7 @@ import {
   History,
   PlayCircle,
   ScrollText,
+  Webhook,
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { components } from '../../../../api/v2/schema';
@@ -19,10 +20,11 @@ import {
   StepLog,
 } from '../dag-execution';
 import { DAGHeader } from './';
+import WebhookTab from './WebhookTab';
 
 type DAGDetailsContentProps = {
   fileName: string;
-  dag: components['schemas']['DAG'];
+  dag: components['schemas']['DAGDetails'];
   currentDAGRun: components['schemas']['DAGRunDetails'];
   refreshFn: () => void;
   formatDuration: (startDate: string, endDate: string) => string;
@@ -146,6 +148,23 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
 
               {isModal ? (
                 <ModalLinkTab
+                  label="Webhook"
+                  value="webhook"
+                  isActive={activeTab === 'webhook'}
+                  icon={Webhook}
+                  onClick={() => handleTabClick('webhook')}
+                />
+              ) : (
+                <LinkTab
+                  label="Webhook"
+                  value={`${baseUrl}/webhook`}
+                  isActive={activeTab === 'webhook'}
+                  icon={Webhook}
+                />
+              )}
+
+              {isModal ? (
+                <ModalLinkTab
                   label="History"
                   value="history"
                   isActive={activeTab === 'history'}
@@ -192,6 +211,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   icon={PlayCircle}
                   onClick={() => handleTabClick('status')}
                   className="flex-1 justify-center"
+                  aria-label="Latest Run"
                 />
               ) : (
                 <LinkTab
@@ -200,6 +220,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   isActive={activeTab === 'status'}
                   icon={PlayCircle}
                   className="flex-1 justify-center"
+                  aria-label="Latest Run"
                 />
               )}
 
@@ -211,6 +232,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   icon={FileCode}
                   onClick={() => handleTabClick('spec')}
                   className="flex-1 justify-center"
+                  aria-label="Spec"
                 />
               ) : (
                 <LinkTab
@@ -219,6 +241,28 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   isActive={activeTab === 'spec'}
                   icon={FileCode}
                   className="flex-1 justify-center"
+                  aria-label="Spec"
+                />
+              )}
+
+              {isModal ? (
+                <ModalLinkTab
+                  label=""
+                  value="webhook"
+                  isActive={activeTab === 'webhook'}
+                  icon={Webhook}
+                  onClick={() => handleTabClick('webhook')}
+                  className="flex-1 justify-center"
+                  aria-label="Webhook"
+                />
+              ) : (
+                <LinkTab
+                  label=""
+                  value={`${baseUrl}/webhook`}
+                  isActive={activeTab === 'webhook'}
+                  icon={Webhook}
+                  className="flex-1 justify-center"
+                  aria-label="Webhook"
                 />
               )}
 
@@ -230,6 +274,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   icon={History}
                   onClick={() => handleTabClick('history')}
                   className="flex-1 justify-center"
+                  aria-label="History"
                 />
               ) : (
                 <LinkTab
@@ -238,6 +283,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   isActive={activeTab === 'history'}
                   icon={History}
                   className="flex-1 justify-center"
+                  aria-label="History"
                 />
               )}
 
@@ -250,6 +296,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                     icon={ScrollText}
                     onClick={() => {}}
                     className="flex-1 justify-center"
+                    aria-label="Log"
                   />
                 ) : (
                   <LinkTab
@@ -258,6 +305,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                     isActive={true}
                     icon={ScrollText}
                     className="flex-1 justify-center"
+                    aria-label="Log"
                   />
                 ))}
             </div>
@@ -269,13 +317,23 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
         </div>
         <div className="flex-1 flex flex-col min-h-0">
           {activeTab === 'status' ? (
-            <DAGStatus dagRun={currentDAGRun} fileName={fileName || ''} />
+            <>
+              <DAGStatus dagRun={currentDAGRun} fileName={fileName || ''} />
+              <div className="h-6 flex-shrink-0" />
+            </>
           ) : null}
           {activeTab === 'spec' ? <DAGSpec fileName={fileName} /> : null}
           {activeTab === 'history' ? (
-            <div data-tab="history">
+            <>
               <DAGExecutionHistory fileName={fileName || ''} />
-            </div>
+              <div className="h-6 flex-shrink-0" />
+            </>
+          ) : null}
+          {activeTab === 'webhook' ? (
+            <>
+              <WebhookTab fileName={fileName || ''} />
+              <div className="h-6 flex-shrink-0" />
+            </>
           ) : null}
           {activeTab === 'dagRun-log' ? (
             <ExecutionLog

@@ -1,6 +1,3 @@
-// Copyright (C) 2024 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package auth
 
 import (
@@ -27,10 +24,11 @@ type APIKeyValidator interface {
 // BuiltinAuthMiddleware creates middleware that validates JWT tokens
 // and injects the authenticated user into the request context.
 // BuiltinAuthMiddleware returns an HTTP middleware that enforces authentication for requests
-// whose paths are not listed in publicPaths. For non-public requests it extracts a Bearer token,
-// validates it via the provided TokenValidator, and on success injects the authenticated user into
-// the request context; on failure it writes a 401 JSON error response.
-func BuiltinAuthMiddleware(svc TokenValidator, publicPaths []string) func(http.Handler) http.Handler {
+// whose paths are not listed in publicPaths or do not start with a publicPathPrefix.
+// For non-public requests it extracts a Bearer token, validates it via the provided TokenValidator,
+// and on success injects the authenticated user into the request context;
+// on failure it writes a 401 JSON error response.
+func BuiltinAuthMiddleware(svc TokenValidator, publicPaths, publicPathPrefixes []string) func(http.Handler) http.Handler {
 	// Build a set for O(1) lookup
 	publicSet := make(map[string]struct{}, len(publicPaths))
 	for _, p := range publicPaths {
@@ -39,10 +37,18 @@ func BuiltinAuthMiddleware(svc TokenValidator, publicPaths []string) func(http.H
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Check if path is public
+			// Check if path is public (exact match)
 			if isPublicPath(r.URL.Path, publicSet) {
 				next.ServeHTTP(w, r)
 				return
+			}
+
+			// Check if path matches a public prefix
+			for _, prefix := range publicPathPrefixes {
+				if strings.HasPrefix(r.URL.Path, prefix) {
+					next.ServeHTTP(w, r)
+					return
+				}
 			}
 
 			token := extractBearerToken(r)

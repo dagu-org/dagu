@@ -22,6 +22,7 @@ import Queues from './pages/queues';
 import LoginPage from './pages/login';
 import UsersPage from './pages/users';
 import APIKeysPage from './pages/api-keys';
+import WebhooksPage from './pages/webhooks';
 
 type Props = {
   config: Config;
@@ -149,6 +150,14 @@ function App({ config }: Props) {
                                   element={
                                     <ProtectedRoute requiredRole="admin">
                                       <APIKeysPage />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/webhooks"
+                                  element={
+                                    <ProtectedRoute requiredRole="admin">
+                                      <WebhooksPage />
                                     </ProtectedRoute>
                                   }
                                 />

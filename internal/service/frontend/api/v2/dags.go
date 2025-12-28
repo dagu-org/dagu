@@ -11,7 +11,10 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
@@ -144,6 +147,20 @@ func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject)
 	if err := a.dagStore.Delete(ctx, request.FileName); err != nil {
 		return nil, fmt.Errorf("error deleting DAG: %w", err)
 	}
+
+	// Clean up associated webhook if exists (best effort - don't fail deletion if webhook cleanup fails)
+	if a.authService != nil && a.authService.HasWebhookStore() {
+		if err := a.authService.DeleteWebhook(ctx, request.FileName); err != nil {
+			// Only log if it's not a "not found" error (webhook may not exist)
+			if !errors.Is(err, auth.ErrWebhookNotFound) {
+				logger.Warn(ctx, "Failed to delete webhook for deleted DAG",
+					tag.Name(request.FileName),
+					tag.Error(err),
+				)
+			}
+		}
+	}
+
 	return &api.DeleteDAG204Response{}, nil
 }
 

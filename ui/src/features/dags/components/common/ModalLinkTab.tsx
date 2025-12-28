@@ -10,6 +10,7 @@ export interface ModalLinkTabProps {
   className?: string;
   icon?: LucideIcon;
   onClick?: () => void;
+  'aria-label'?: string;
 }
 
 const ModalLinkTab: React.FC<ModalLinkTabProps> = ({
@@ -18,9 +19,15 @@ const ModalLinkTab: React.FC<ModalLinkTabProps> = ({
   className,
   icon: Icon,
   onClick,
+  'aria-label': ariaLabel,
   ...props
 }) => (
-  <div className="focus:outline-none cursor-pointer" onClick={onClick}>
+  <button
+    type="button"
+    className="focus:outline-none cursor-pointer bg-transparent border-none p-0"
+    onClick={onClick}
+    aria-label={!label ? ariaLabel : undefined}
+  >
     <Tab
       isActive={isActive}
       className={cn(
@@ -29,10 +36,10 @@ const ModalLinkTab: React.FC<ModalLinkTabProps> = ({
       )}
       {...props}
     >
-      {Icon && <Icon className="h-4 w-4" />}
+      {Icon && <Icon className="h-4 w-4" aria-hidden="true" />}
       {label}
     </Tab>
-  </div>
+  </button>
 );
 
 export default ModalLinkTab;

@@ -24,6 +24,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/persistence/fileapikey"
 	"github.com/dagu-org/dagu/internal/persistence/fileuser"
+	"github.com/dagu-org/dagu/internal/persistence/filewebhook"
 	"github.com/dagu-org/dagu/internal/runtime"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
@@ -123,12 +124,23 @@ func initBuiltinAuthService(cfg *config.Config) (*authservice.Service, error) {
 		return nil, fmt.Errorf("failed to create API key store: %w", err)
 	}
 
+	// Create file-based webhook store with cache
+	webhookCache := fileutil.NewCache[*authmodel.Webhook](0, time.Minute*15)
+	webhookCache.StartEviction(ctx)
+	webhookStore, err := filewebhook.New(cfg.Paths.WebhooksDir, filewebhook.WithFileCache(webhookCache))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create webhook store: %w", err)
+	}
+
 	// Create auth service with configuration
 	authConfig := authservice.Config{
 		TokenSecret: cfg.Server.Auth.Builtin.Token.Secret,
 		TokenTTL:    cfg.Server.Auth.Builtin.Token.TTL,
 	}
-	authSvc := authservice.New(userStore, authConfig, authservice.WithAPIKeyStore(apiKeyStore))
+	authSvc := authservice.New(userStore, authConfig,
+		authservice.WithAPIKeyStore(apiKeyStore),
+		authservice.WithWebhookStore(webhookStore),
+	)
 
 	// Ensure admin user exists
 	password, created, err := authSvc.EnsureAdminUser(

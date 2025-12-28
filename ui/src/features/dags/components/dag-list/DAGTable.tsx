@@ -43,7 +43,8 @@ function formatMs(ms: number): string {
   if (days > 0) parts.push(`${days}d`);
   if (hours > 0) parts.push(`${hours}h`);
   if (minutes > 0) parts.push(`${minutes}m`);
-  parts.push(`${secs}s`);
+  // Only show seconds if no larger units or if seconds > 0
+  if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
   return parts.join(' ');
 }
 
@@ -92,8 +93,8 @@ interface DAGCardProps {
 function DAGCard({ dag, isSelected, onSelect, onTagClick, refreshFn, className = '' }: DAGCardProps) {
   const fileName = dag.fileName;
   const title = dag.dag.name;
-  const status = dag.latestDAGRun.status;
-  const statusLabel = dag.latestDAGRun.statusLabel;
+  const status = dag.latestDAGRun?.status;
+  const statusLabel = dag.latestDAGRun?.statusLabel;
   const tags = dag.dag.tags || [];
   const description = dag.dag.description;
   const schedules = dag.dag.schedule || [];
@@ -323,11 +324,17 @@ const defaultColumns = [
   columnHelper.accessor('name', {
     id: 'Expand',
     header: ({ table }) => (
-      <Button
-        variant="ghost"
-        size="icon"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={table.getToggleAllRowsExpandedHandler()}
-        className="text-muted-foreground cursor-pointer" // Use Tailwind for color
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            table.toggleAllRowsExpanded();
+          }
+        }}
+        className="flex items-center justify-center text-muted-foreground cursor-pointer h-6 w-6 focus:outline-none focus:ring-1 focus:ring-primary rounded"
       >
         {table.getIsAllRowsExpanded() ? (
           <>
@@ -340,32 +347,40 @@ const defaultColumns = [
             <ChevronDown className="h-4 w-4" />
           </>
         )}
-      </Button>
+      </div>
     ),
     cell: ({ row }) => {
       if (row.getCanExpand()) {
         return (
-          <div className="flex items-center min-h-[2.5rem]">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={row.getToggleExpandedHandler()}
-              className="text-muted-foreground cursor-pointer"
-            >
-              {row.getIsExpanded() ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
-            </Button>
+          <div
+            className="flex items-center justify-center min-h-[2.5rem] text-muted-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary rounded"
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
+              e.stopPropagation();
+              row.toggleExpanded();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation();
+                e.preventDefault();
+                row.toggleExpanded();
+              }
+            }}
+          >
+            {row.getIsExpanded() ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
           </div>
         );
       }
-      return null; // Return null instead of empty string for clarity
+      return null;
     },
-    size: 40,
-    minSize: 40,
-    maxSize: 40,
+    size: 32,
+    minSize: 32,
+    maxSize: 32,
   }),
   columnHelper.accessor('name', {
     id: 'Name',
@@ -530,24 +545,9 @@ const defaultColumns = [
           const durationMs = end.diff(start);
 
           if (durationMs > 0) {
-            // Format duration manually without using the custom format function
-            const duration = dayjs.duration(durationMs);
-            const days = Math.floor(duration.asDays());
-            const hours = duration.hours();
-            const minutes = duration.minutes();
-            const seconds = duration.seconds();
-
-            const parts: string[] = [];
-            if (days > 0) parts.push(`${days}d`);
-            if (hours > 0) parts.push(`${hours}h`);
-            if (minutes > 0) parts.push(`${minutes}m`);
-            if (seconds > 0 && parts.length === 0) parts.push(`${seconds}s`);
-
-            const formattedDuration = parts.join(' ');
-
             durationContent = (
               <div className="text-[10px] text-muted-foreground">
-                {formattedDuration}
+                {formatMs(durationMs)}
               </div>
             );
           }
@@ -1176,15 +1176,15 @@ function DAGTable({
           className={`w-full text-xs ${isLoading ? 'opacity-70' : ''}`}
           style={{ tableLayout: 'fixed' }}
         >
-{/* Column widths: Expand 5%, Name 37%, Status 10%, LastRun 18%, Schedule 20%, Actions 10% */}
-          <colgroup><col style={{ width: '5%' }} /><col style={{ width: '37%' }} /><col style={{ width: '10%' }} /><col style={{ width: '18%' }} /><col style={{ width: '20%' }} /><col style={{ width: '10%' }} /></colgroup>
+{/* Column widths: Expand 32px fixed, Name auto, Status 10%, LastRun 18%, Schedule 20%, Actions 10% */}
+          <colgroup><col style={{ width: '32px' }} /><col /><col style={{ width: '10%' }} /><col style={{ width: '18%' }} /><col style={{ width: '20%' }} /><col style={{ width: '10%' }} /></colgroup>
           <TableHeader>
             {instance.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
+                {headerGroup.headers.map((header, index) => (
                   <TableHead
                     key={header.id}
-                    className="py-1 px-2 text-muted-foreground text-xs overflow-hidden"
+                    className={`py-1 text-muted-foreground text-xs overflow-hidden ${index === 0 ? 'px-0' : 'px-2'}`}
                   >
                     {header.isPlaceholder ? null : (
                       <div>
@@ -1200,11 +1200,12 @@ function DAGTable({
                             clientSort={clientSort}
                             clientOrder={clientOrder}
                             onClientSort={handleClientSort}
-                            children={flexRender(
+                          >
+                            {flexRender(
                               header.column.columnDef.header,
                               header.getContext()
                             )}
-                          />
+                          </SortableHeader>
                         ) : (
                           flexRender(
                             header.column.columnDef.header,
@@ -1229,7 +1230,7 @@ function DAGTable({
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && 'selected'}
-                    className={
+                    className={`text-[0.8125rem] ${
                       row.original?.kind === ItemKind.Group
                         ? 'bg-muted/50 font-semibold cursor-pointer hover:bg-muted/70 border-l-4 border-transparent' // Make group rows clickable
                         : isDAGRow &&
@@ -1238,8 +1239,7 @@ function DAGTable({
                               (row.original as DAGRow).dag.fileName
                           ? 'cursor-pointer bg-primary/10 hover:bg-primary/15 border-l-4 border-primary' // Highlight selected DAG
                           : 'cursor-pointer hover:bg-muted/50 border-l-4 border-transparent'
-                    }
-                    style={{ fontSize: '0.8125rem' }} // Smaller font size for more density
+                    }`}
                     onClick={(e) => {
                       // Handle group row clicks - toggle expanded state
                       if ((row.original as Data)?.kind === ItemKind.Group) {
@@ -1261,10 +1261,10 @@ function DAGTable({
                       }
                     }}
                   >
-                    {row.getVisibleCells().map((cell) => (
+                    {row.getVisibleCells().map((cell, index) => (
                       <TableCell
                         key={cell.id}
-                        className="py-1 px-2 overflow-hidden align-middle truncate"
+                        className={`py-1 overflow-hidden align-middle truncate ${index === 0 ? 'px-0' : 'px-2'}`}
                       >
                         {flexRender(
                           cell.column.columnDef.cell,
@@ -1318,9 +1318,9 @@ function DAGTable({
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="flex-shrink-0">
                         {isExpanded ? (
-                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                        ) : (
                           <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
                         )}
                       </div>
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate">

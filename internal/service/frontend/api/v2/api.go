@@ -71,6 +71,15 @@ type AuthService interface {
 	DeleteAPIKey(ctx context.Context, id string) error
 	ValidateAPIKey(ctx context.Context, keySecret string) (*auth.APIKey, error)
 	HasAPIKeyStore() bool
+	// Webhook management
+	CreateWebhook(ctx context.Context, dagName, creatorID string) (*authservice.CreateWebhookResult, error)
+	GetWebhookByDAGName(ctx context.Context, dagName string) (*auth.Webhook, error)
+	ListWebhooks(ctx context.Context) ([]*auth.Webhook, error)
+	DeleteWebhook(ctx context.Context, dagName string) error
+	RegenerateWebhookToken(ctx context.Context, dagName string) (*authservice.CreateWebhookResult, error)
+	ToggleWebhook(ctx context.Context, dagName string, enabled bool) (*auth.Webhook, error)
+	ValidateWebhookToken(ctx context.Context, dagName, token string) (*auth.Webhook, error)
+	HasWebhookStore() bool
 }
 
 // APIOption is a functional option for configuring the API.
@@ -207,6 +216,12 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 			pathutil.BuildPublicEndpointPath(basePath, "api/v2/health"),
 			pathutil.BuildPublicEndpointPath(basePath, "api/v2/metrics"),
 			pathutil.BuildPublicEndpointPath(basePath, "api/v2/auth/login"),
+		},
+		// Webhook trigger endpoints use their own authentication (DAG-specific token)
+		// Note: We must append "/" to ensure only /api/v2/webhooks/{fileName} is public,
+		// not /api/v2/webhooks itself (the list endpoint which requires admin auth)
+		PublicPathPrefixes: []string{
+			pathutil.BuildPublicEndpointPath(basePath, "api/v2/webhooks") + "/",
 		},
 	}
 
