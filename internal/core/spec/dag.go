@@ -107,8 +107,6 @@ type dag struct {
 	SSH *ssh
 	// Secrets contains references to external secrets.
 	Secrets []secretRef
-	// Webhook contains the webhook configuration for triggering the DAG.
-	Webhook *webhook
 }
 
 // handlerOn defines the steps to be executed on different events.
@@ -218,15 +216,6 @@ type secretRef struct {
 	Options map[string]string `yaml:"options,omitempty"`
 }
 
-// webhook defines the webhook configuration for triggering the DAG via HTTP.
-type webhook struct {
-	// Enabled indicates whether the webhook is enabled.
-	Enabled bool `yaml:"enabled,omitempty"`
-	// Token is the bearer token for authentication.
-	// Supports environment variable expansion (e.g., "${WEBHOOK_SECRET}").
-	Token string `yaml:"token,omitempty"`
-}
-
 // Transformer transforms a spec field into output field(s).
 // C is the context type, T is the input type.
 type Transformer[C any, T any] interface {
@@ -306,7 +295,6 @@ var fullTransformers = []transform{
 	{"registryAuths", newTransformer("RegistryAuths", buildRegistryAuths)},
 	{"ssh", newTransformer("SSH", buildSSH)},
 	{"secrets", newTransformer("Secrets", buildSecrets)},
-	{"webhook", newTransformer("Webhook", buildWebhook)},
 	{"dotenv", newTransformer("Dotenv", buildDotenv)},
 	{"smtpConfig", newTransformer("SMTP", buildSMTPConfig)},
 	{"errMailConfig", newTransformer("ErrorMail", buildErrMailConfig)},
@@ -929,38 +917,6 @@ func buildSecrets(_ BuildContext, d *dag) ([]core.SecretRef, error) {
 		return nil, nil
 	}
 	return parseSecretRefs(d.Secrets)
-}
-
-// minWebhookTokenLength is the minimum required length for webhook tokens.
-// This helps prevent brute force attacks on the webhook endpoint.
-const minWebhookTokenLength = 16
-
-func buildWebhook(ctx BuildContext, d *dag) (*core.WebhookConfig, error) {
-	if d.Webhook == nil {
-		return nil, nil
-	}
-
-	token := d.Webhook.Token
-	if !ctx.opts.Has(BuildFlagNoEval) {
-		token = os.ExpandEnv(token)
-	}
-
-	// Validate token when webhook is enabled
-	if d.Webhook.Enabled {
-		if token == "" {
-			return nil, core.NewValidationError("webhook.token", nil,
-				fmt.Errorf("token is required when webhook is enabled"))
-		}
-		if len(token) < minWebhookTokenLength {
-			return nil, core.NewValidationError("webhook.token", nil,
-				fmt.Errorf("token must be at least %d characters for security", minWebhookTokenLength))
-		}
-	}
-
-	return &core.WebhookConfig{
-		Enabled: d.Webhook.Enabled,
-		Token:   token,
-	}, nil
 }
 
 func buildDotenv(_ BuildContext, d *dag) ([]string, error) {

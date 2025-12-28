@@ -166,8 +166,6 @@ type DAG struct {
 	SSH *SSHConfig `json:"ssh,omitempty"`
 	// Secrets contains references to external secrets to be resolved at runtime.
 	Secrets []SecretRef `json:"secrets,omitempty"`
-	// Webhook contains the webhook configuration for triggering the DAG via HTTP.
-	Webhook *WebhookConfig `json:"webhook,omitempty"`
 }
 
 // SecretRef represents a reference to an external secret.
@@ -181,15 +179,6 @@ type SecretRef struct {
 	Key string `json:"key"`
 	// Options contains provider-specific configuration (optional).
 	Options map[string]string `json:"options,omitempty"`
-}
-
-// WebhookConfig contains configuration for triggering the DAG via HTTP webhook.
-type WebhookConfig struct {
-	// Enabled indicates whether the webhook is enabled for this DAG.
-	Enabled bool `json:"enabled,omitempty"`
-	// Token is the bearer token required for authentication.
-	// Supports environment variable expansion (e.g., "${WEBHOOK_SECRET}").
-	Token string `json:"token,omitempty"`
 }
 
 // HasTag checks if the DAG has the given tag.

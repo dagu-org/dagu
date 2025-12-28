@@ -28,6 +28,8 @@ const (
 	webhookFilePermissions = 0600
 )
 
+var _ auth.WebhookStore = (*Store)(nil)
+
 // Store implements auth.WebhookStore using the local filesystem.
 // Webhooks are stored as individual JSON files in the configured directory.
 // Thread-safe through internal locking.
