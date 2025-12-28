@@ -12,6 +12,8 @@ import (
 // This is the default fallback for any shell not explicitly handled.
 type unixShell struct{}
 
+var _ Shell = (*unixShell)(nil)
+
 func (s *unixShell) Match(_ string) bool {
 	// Matches everything as the default fallback
 	return true

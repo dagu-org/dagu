@@ -22,6 +22,8 @@ import (
 // because they require shell parsing.
 type directShell struct{}
 
+var _ Shell = (*directShell)(nil)
+
 func (s *directShell) Match(name string) bool {
 	return name == "direct"
 }

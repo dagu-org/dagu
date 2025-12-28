@@ -36,6 +36,8 @@ type registry struct {
 	heartbeatInterval time.Duration
 }
 
+var _ execution.ServiceRegistry = (*registry)(nil)
+
 // New creates a new file-based service registry
 func New(serviceRegistryDir string) *registry {
 	return &registry{

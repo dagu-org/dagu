@@ -40,6 +40,8 @@ type MemoryStore struct {
 	buffer *RingBuffer[dataPoint]
 }
 
+var _ Store = (*MemoryStore)(nil)
+
 // NewMemoryStore creates a MemoryStore configured for the given retention and sampling interval.
 // If interval is less than or equal to zero, it defaults to 10 seconds.
 // The ring buffer capacity is computed as int(retention/interval) + 10.

@@ -40,6 +40,8 @@ type filePoller struct {
 	closed bool
 }
 
+var _ FileWatcher = (*filePoller)(nil)
+
 // Add adds a filename to the list of watches
 // once added the file is polled for changes in a separate goroutine
 func (w *filePoller) Add(name string) error {

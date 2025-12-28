@@ -10,6 +10,8 @@ import (
 // nixShell handles nix-shell with package management support.
 type nixShell struct{}
 
+var _ Shell = (*nixShell)(nil)
+
 func (s *nixShell) Match(name string) bool {
 	return name == "nix-shell"
 }

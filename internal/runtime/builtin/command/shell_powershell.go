@@ -9,6 +9,8 @@ import (
 // powerShell handles both Windows PowerShell and PowerShell Core (pwsh).
 type powerShell struct{}
 
+var _ Shell = (*powerShell)(nil)
+
 func (s *powerShell) Match(name string) bool {
 	switch name {
 	case "powershell.exe", "powershell", "pwsh.exe", "pwsh":
