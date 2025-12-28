@@ -1786,8 +1786,8 @@ type TriggerWebhookParams struct {
 	// RemoteNode name of the remote node
 	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
 
-	// Authorization Bearer token for webhook authentication (e.g., 'Bearer dagu_wh_...')
-	Authorization string `json:"Authorization"`
+	// Authorization Bearer token for webhook authentication (e.g., 'Bearer dagu_wh_...'). Required for authentication but marked optional in schema so the handler can return proper 401 responses.
+	Authorization *string `json:"Authorization,omitempty"`
 }
 
 // GetWorkersParams defines parameters for GetWorkers.
@@ -5330,7 +5330,7 @@ func (siw *ServerInterfaceWrapper) TriggerWebhook(w http.ResponseWriter, r *http
 
 	headers := r.Header
 
-	// ------------- Required header parameter "Authorization" -------------
+	// ------------- Optional header parameter "Authorization" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("Authorization")]; found {
 		var Authorization string
 		n := len(valueList)
@@ -5339,18 +5339,14 @@ func (siw *ServerInterfaceWrapper) TriggerWebhook(w http.ResponseWriter, r *http
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "Authorization", valueList[0], &Authorization, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		err = runtime.BindStyledParameterWithOptions("simple", "Authorization", valueList[0], &Authorization, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Authorization", Err: err})
 			return
 		}
 
-		params.Authorization = Authorization
+		params.Authorization = &Authorization
 
-	} else {
-		err := fmt.Errorf("Header parameter Authorization is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Authorization", Err: err})
-		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -10630,15 +10626,16 @@ var swaggerSpec = []string{
 	"CEecWs+pjvE3LqPb6KDkJbrkiUC5qVMGKSqE9lZBE8AcuI0+KF3hr+ZATYEa72+NyzTTT8yzYR/9oF2L",
 	"ruaft7e3f3iqK+SclYnp0YSlSz0tFgLSIK8GwsaZ++PLv715//4fn48P/vn2/cEhAnpJOKMLoPKcXmJO",
 	"1ErK1etsHMKmsYTUFOedAwKa5oxQiVyijCBq4pz6qow2cQk6OoxFRtiDuKmL+IqJhztN6H8LD2XKuD8E",
-	"XD1Re139YNtXDsPZ1eeATdFWa1hXSMF4maR7xVpvd+bJHggq9+Cz3sWFHKZJgxCbYsJQxHRvosgHii2e",
-	"QIq20IIIYZOOOpuJCft4CAHFEYMNC0kVVEpmKPngvYbNB+T5oC88h7aRIrQuyc7mPf4gKTiRy9H+b58q",
-	"QRCG9NpvxI7Ll/GLHvcD68rZdE5JiWJ2k0LfgGYchVXUgG2vr9DBL6Jo/mjn31hRzMDXJ4q1uqf8dB/k",
-	"/iLiRVdQXxFwQ51II+gTdZGpIr4CmpgQzP3fPilhYIIFSdQ9bX9Q+GBiHQwm1XgQnhXo4PioDN0peDba",
-	"H30xK/u6v7PzZc6E/LqDc7Jz+eNoPHKSlUauuRdLnXOdrnOjf67vxRsmpE0SZ8u9mTm/xr305lLmQVF4",
-	"+6f6n6ZWtS67O83cby4KxgTJYIpnzr3a1H+2ARfV0p3OeVANGksoVxnUeiSqkeqOlGqajM1EUJem5EPV",
-	"iYxXcKTMvvHDZLWFlNE+uuy8W1cz/srOYLGmOf4tI4vs8IEjfO9+VQ4hGLzuNx3UEjZ/RwoSV+XYYJOe",
-	"ZGxG6FjtPivk2MrAempQz4Kn5ehKQomMrXUIZYfK4C9OPhyOS/1fdFjny9WA+fgIXcCybWjs3+ghiDnZ",
-	"uoBlbLiPPsDPvF1s9Ly5+Bx2h5Un7JDl2/jT1/8XAAD//++H15cugAEA",
+	"XD1Re139YNtXD8NJM8bVudZzUki0wPwC0jL5DTFx4QuMhDmoOaZpBlqlZXcWmQBr9Hx3zxsMdVSiNuHP",
+	"AZv6sNaGr/CP8TIfeE8ZuTtzkg9koHtwh+9icA6JpcG1TbGOKDq9NynnA8UWLyBFW2hBhLD5TJ05xkSU",
+	"PITs4+jMRpykCioljpQs9l4j8gPKf9DHo0PbSH1bl79n896VkBScyOVo/7dPlfgKQ3rtl23Hvc74RY9n",
+	"g/USbfq9pEQxu0mhL1czjsIqasC2N2PoOxjRYX+082+slGfg65PyWj1ffroPcn8RcdArqC82uKH+qRH0",
+	"iXrfVBFfAU1MdOf+b5+UnDHBgiTqXrY/KHwwYRQGk2o8CM8KdHB8VEYFFTwb7Y++mJV93d/Z+TJnQn7d",
+	"wTnZufxxNB45oU0j19xLvM5vT5fQ0T/X9+INE9Lmn7OV5MycX+MOgHMp86DevP1T/U9Tq1qX3Z1mWjkX",
+	"YGPibzDFM+e5bUpL21iOalVQ55eoBo3lqqsMap0d1Uh1H001TcZmIih5U/Kh6kTG4ThSwd+4eLLaQspA",
+	"Il3R3q2rGdplZ7BY0xz/lkFLdvjAx753vyqHEAxed8kOyhSbvyO1jquCbrBJTzI2I3Ssdp8VcmzFaz01",
+	"qBfH03J0JaFExtbqibJDZfAXJx8Ox6VqMTqscxNrwHx8hC5g2TY09s//EMScbF3AMjbcRx87aJ5FNjDf",
+	"XHwOu8OiFnbI8tn96ev/CwAA///aQ7WaiYABAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

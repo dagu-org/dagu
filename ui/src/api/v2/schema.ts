@@ -4677,9 +4677,9 @@ export interface operations {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
             };
-            header: {
-                /** @description Bearer token for webhook authentication (e.g., 'Bearer dagu_wh_...') */
-                Authorization: string;
+            header?: {
+                /** @description Bearer token for webhook authentication (e.g., 'Bearer dagu_wh_...'). Required for authentication but marked optional in schema so the handler can return proper 401 responses. */
+                Authorization?: string;
             };
             path: {
                 /** @description the name of the DAG file */

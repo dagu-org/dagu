@@ -229,7 +229,11 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 	}
 
 	// Validate the token via auth service
-	token := extractWebhookToken(request.Params.Authorization)
+	authHeader := ""
+	if request.Params.Authorization != nil {
+		authHeader = *request.Params.Authorization
+	}
+	token := extractWebhookToken(authHeader)
 	if token == "" {
 		logger.Warn(ctx, "Webhook: missing or invalid authorization header",
 			tag.Name(request.FileName),

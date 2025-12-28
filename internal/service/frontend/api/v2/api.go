@@ -217,9 +217,11 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 			pathutil.BuildPublicEndpointPath(basePath, "api/v2/metrics"),
 			pathutil.BuildPublicEndpointPath(basePath, "api/v2/auth/login"),
 		},
-		// Webhooks use their own authentication (DAG-specific token)
+		// Webhook trigger endpoints use their own authentication (DAG-specific token)
+		// Note: We must append "/" to ensure only /api/v2/webhooks/{fileName} is public,
+		// not /api/v2/webhooks itself (the list endpoint which requires admin auth)
 		PublicPathPrefixes: []string{
-			pathutil.BuildPublicEndpointPath(basePath, "api/v2/webhooks/"),
+			pathutil.BuildPublicEndpointPath(basePath, "api/v2/webhooks") + "/",
 		},
 	}
 
