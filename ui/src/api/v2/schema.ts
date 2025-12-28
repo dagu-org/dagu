@@ -1002,10 +1002,7 @@ export interface components {
         ErrorCode: ErrorCode;
         /** @description Request body for webhook trigger endpoint */
         WebhookRequest: {
-            /** @description Optional idempotency key. If provided and a DAG run with this ID already exists,
-             *     the endpoint returns 409 Conflict. If not provided, a new UUID is generated.
-             *      */
-            dagRunId?: string;
+            dagRunId?: components["schemas"]["DAGRunId"] & unknown;
             /** @description Arbitrary JSON payload to pass to the DAG as WEBHOOK_PAYLOAD */
             payload?: {
                 [key: string]: unknown;
@@ -1013,8 +1010,7 @@ export interface components {
         };
         /** @description Response from webhook trigger endpoint */
         WebhookResponse: {
-            /** @description The ID of the triggered dag-run */
-            dagRunId: string;
+            dagRunId: components["schemas"]["DAGRunId"];
         };
         /**
          * Format: string
@@ -1223,6 +1219,7 @@ export interface components {
             /** @description List of tags for categorizing and filtering DAGs */
             tags?: string[];
             runConfig?: components["schemas"]["RunConfig"];
+            webhook?: components["schemas"]["WebhookConfig"];
         };
         /** @description Configuration for controlling user interactions when starting DAG runs */
         RunConfig: {
@@ -1236,6 +1233,16 @@ export interface components {
              * @default false
              */
             disableRunIdEdit: boolean;
+        };
+        /** @description Configuration for triggering the DAG via HTTP webhook */
+        WebhookConfig: {
+            /**
+             * @description Whether the webhook is enabled for this DAG
+             * @default false
+             */
+            enabled: boolean;
+            /** @description The bearer token for webhook authentication */
+            token?: string;
         };
         LocalDag: {
             /** @description Name of the local DAG */
@@ -1255,12 +1262,10 @@ export interface components {
         DAGRunSummary: {
             /** @description Name of the root DAG-run */
             rootDAGRunName: string;
-            /** @description ID of the root DAG-run */
-            rootDAGRunId: string;
+            rootDAGRunId: components["schemas"]["DAGRunId"] & unknown;
             /** @description Name of the parent DAG-run */
             parentDAGRunName?: string;
-            /** @description ID of the parent DAG-run */
-            parentDAGRunId?: string;
+            parentDAGRunId?: components["schemas"]["DAGRunId"] & unknown;
             dagRunId: components["schemas"]["DAGRunId"];
             name: components["schemas"]["DAGName"];
             status: components["schemas"]["Status"];
@@ -2912,8 +2917,7 @@ export interface operations {
                 "application/json": {
                     /** @description Parameters to pass to the DAG-run in JSON format */
                     params?: string;
-                    /** @description Optional ID for the DAG-run, if not provided a new one will be generated */
-                    dagRunId?: string;
+                    dagRunId?: components["schemas"]["DAGRunId"] & unknown;
                     /** @description Optional DAG name override to use for the created dag-run */
                     dagName?: string;
                     /**
@@ -2932,8 +2936,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        /** @description ID of the created DAG-run */
-                        dagRunId: string;
+                        dagRunId: components["schemas"]["DAGRunId"];
                     };
                 };
             };
@@ -2975,8 +2978,7 @@ export interface operations {
                 "application/json": {
                     /** @description Parameters to pass to the DAG-run in JSON format */
                     params?: string;
-                    /** @description Optional ID for the DAG-run, if not provided a new one will be generated */
-                    dagRunId?: string;
+                    dagRunId?: components["schemas"]["DAGRunId"] & unknown;
                     /** @description Optional DAG name override to use for the queued dag-run */
                     dagName?: string;
                     /** @description Override the DAG-level queue definition */
@@ -2997,8 +2999,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        /** @description ID of the created DAG-run */
-                        dagRunId: string;
+                        dagRunId: components["schemas"]["DAGRunId"];
                     };
                 };
             };
@@ -3476,8 +3477,7 @@ export interface operations {
                     name?: string;
                     /** @description Parameters to pass to the DAG-run in JSON format */
                     params?: string;
-                    /** @description Optional ID for the DAG-run; if omitted, a new one is generated */
-                    dagRunId?: string;
+                    dagRunId?: components["schemas"]["DAGRunId"] & unknown;
                     /**
                      * @description If true, prevent starting if a DAG with the same name is already running (returns 409)
                      * @default false
@@ -3494,8 +3494,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        /** @description ID of the created DAG-run */
-                        dagRunId: string;
+                        dagRunId: components["schemas"]["DAGRunId"];
                     };
                 };
             };
@@ -3547,8 +3546,7 @@ export interface operations {
                     name?: string;
                     /** @description Parameters to persist with the queued DAG-run in JSON format */
                     params?: string;
-                    /** @description Optional ID for the DAG-run; if omitted a new one will be generated */
-                    dagRunId?: string;
+                    dagRunId?: components["schemas"]["DAGRunId"] & unknown;
                     /** @description Override the queue to use for this DAG-run */
                     queue?: string;
                 };
@@ -3562,8 +3560,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        /** @description ID of the queued DAG-run */
-                        dagRunId: string;
+                        dagRunId: components["schemas"]["DAGRunId"];
                     };
                 };
             };
@@ -3708,8 +3705,7 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
-                    /** @description Explicit run ID for the new DAG-run; if omitted a new ID is generated. */
-                    dagRunId?: string;
+                    dagRunId?: components["schemas"]["DAGRunId"] & unknown;
                     /** @description Optional DAG name override for the new run. */
                     dagName?: string;
                 };
@@ -3723,8 +3719,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        /** @description ID of the newly created DAG-run. */
-                        dagRunId: string;
+                        dagRunId: components["schemas"]["DAGRunId"];
                         /** @description Indicates whether the run was queued instead of starting immediately. */
                         queued: boolean;
                     };
@@ -3980,8 +3975,7 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description ID of the DAG-run to retry */
-                    dagRunId: string;
+                    dagRunId: components["schemas"]["DAGRunId"] & unknown;
                     /** @description Optional. If provided, only this step will be retried. */
                     stepName?: string;
                 };

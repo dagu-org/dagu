@@ -4,6 +4,7 @@ import {
   History,
   PlayCircle,
   ScrollText,
+  Webhook,
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { components } from '../../../../api/v2/schema';
@@ -19,10 +20,11 @@ import {
   StepLog,
 } from '../dag-execution';
 import { DAGHeader } from './';
+import WebhookTab from './WebhookTab';
 
 type DAGDetailsContentProps = {
   fileName: string;
-  dag: components['schemas']['DAG'];
+  dag: components['schemas']['DAGDetails'];
   currentDAGRun: components['schemas']['DAGRunDetails'];
   refreshFn: () => void;
   formatDuration: (startDate: string, endDate: string) => string;
@@ -161,6 +163,23 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                 />
               )}
 
+              {isModal ? (
+                <ModalLinkTab
+                  label="Webhook"
+                  value="webhook"
+                  isActive={activeTab === 'webhook'}
+                  icon={Webhook}
+                  onClick={() => handleTabClick('webhook')}
+                />
+              ) : (
+                <LinkTab
+                  label="Webhook"
+                  value={`${baseUrl}/webhook`}
+                  isActive={activeTab === 'webhook'}
+                  icon={Webhook}
+                />
+              )}
+
               {(activeTab === 'log' || activeTab === 'dagRun-log') &&
                 (isModal ? (
                   <ModalLinkTab
@@ -241,6 +260,25 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                 />
               )}
 
+              {isModal ? (
+                <ModalLinkTab
+                  label=""
+                  value="webhook"
+                  isActive={activeTab === 'webhook'}
+                  icon={Webhook}
+                  onClick={() => handleTabClick('webhook')}
+                  className="flex-1 justify-center"
+                />
+              ) : (
+                <LinkTab
+                  label=""
+                  value={`${baseUrl}/webhook`}
+                  isActive={activeTab === 'webhook'}
+                  icon={Webhook}
+                  className="flex-1 justify-center"
+                />
+              )}
+
               {(activeTab === 'log' || activeTab === 'dagRun-log') &&
                 (isModal ? (
                   <ModalLinkTab
@@ -276,6 +314,9 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             <div data-tab="history">
               <DAGExecutionHistory fileName={fileName || ''} />
             </div>
+          ) : null}
+          {activeTab === 'webhook' ? (
+            <WebhookTab fileName={fileName || ''} webhook={dag?.webhook} />
           ) : null}
           {activeTab === 'dagRun-log' ? (
             <ExecutionLog

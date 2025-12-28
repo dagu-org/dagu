@@ -2986,6 +2986,8 @@ components:
             type: string
         runConfig:
           $ref: "#/components/schemas/RunConfig"
+        webhook:
+          $ref: "#/components/schemas/WebhookConfig"
       required:
         - name
 
@@ -3004,6 +3006,20 @@ components:
       required:
         - disableParamEdit
         - disableRunIdEdit
+
+    WebhookConfig:
+      type: object
+      description: "Configuration for triggering the DAG via HTTP webhook"
+      properties:
+        enabled:
+          type: boolean
+          description: "Whether the webhook is enabled for this DAG"
+          default: false
+        token:
+          type: string
+          description: "The bearer token for webhook authentication"
+      required:
+        - enabled
 
     LocalDag:
       type: object
