@@ -148,23 +148,6 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
 
               {isModal ? (
                 <ModalLinkTab
-                  label="History"
-                  value="history"
-                  isActive={activeTab === 'history'}
-                  icon={History}
-                  onClick={() => handleTabClick('history')}
-                />
-              ) : (
-                <LinkTab
-                  label="History"
-                  value={`${baseUrl}/history`}
-                  isActive={activeTab === 'history'}
-                  icon={History}
-                />
-              )}
-
-              {isModal ? (
-                <ModalLinkTab
                   label="Webhook"
                   value="webhook"
                   isActive={activeTab === 'webhook'}
@@ -177,6 +160,23 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   value={`${baseUrl}/webhook`}
                   isActive={activeTab === 'webhook'}
                   icon={Webhook}
+                />
+              )}
+
+              {isModal ? (
+                <ModalLinkTab
+                  label="History"
+                  value="history"
+                  isActive={activeTab === 'history'}
+                  icon={History}
+                  onClick={() => handleTabClick('history')}
+                />
+              ) : (
+                <LinkTab
+                  label="History"
+                  value={`${baseUrl}/history`}
+                  isActive={activeTab === 'history'}
+                  icon={History}
                 />
               )}
 
@@ -244,25 +244,6 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
               {isModal ? (
                 <ModalLinkTab
                   label=""
-                  value="history"
-                  isActive={activeTab === 'history'}
-                  icon={History}
-                  onClick={() => handleTabClick('history')}
-                  className="flex-1 justify-center"
-                />
-              ) : (
-                <LinkTab
-                  label=""
-                  value={`${baseUrl}/history`}
-                  isActive={activeTab === 'history'}
-                  icon={History}
-                  className="flex-1 justify-center"
-                />
-              )}
-
-              {isModal ? (
-                <ModalLinkTab
-                  label=""
                   value="webhook"
                   isActive={activeTab === 'webhook'}
                   icon={Webhook}
@@ -275,6 +256,25 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
                   value={`${baseUrl}/webhook`}
                   isActive={activeTab === 'webhook'}
                   icon={Webhook}
+                  className="flex-1 justify-center"
+                />
+              )}
+
+              {isModal ? (
+                <ModalLinkTab
+                  label=""
+                  value="history"
+                  isActive={activeTab === 'history'}
+                  icon={History}
+                  onClick={() => handleTabClick('history')}
+                  className="flex-1 justify-center"
+                />
+              ) : (
+                <LinkTab
+                  label=""
+                  value={`${baseUrl}/history`}
+                  isActive={activeTab === 'history'}
+                  icon={History}
                   className="flex-1 justify-center"
                 />
               )}
