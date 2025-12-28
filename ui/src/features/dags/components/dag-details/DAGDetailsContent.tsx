@@ -316,7 +316,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             </div>
           ) : null}
           {activeTab === 'webhook' ? (
-            <WebhookTab fileName={fileName || ''} webhook={dag?.webhook} />
+            <WebhookTab fileName={fileName || ''} />
           ) : null}
           {activeTab === 'dagRun-log' ? (
             <ExecutionLog
