@@ -123,7 +123,7 @@ func TestValidateWebhookToken(t *testing.T) {
 func TestWebhookAPI(t *testing.T) {
 	server := test.SetupServer(t)
 
-	t.Run("TriggerWebhookSuccess", func(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
 		spec := `
 webhook:
   enabled: true
@@ -149,7 +149,7 @@ steps:
 		_ = server.Client().Delete("/api/v2/dags/webhook-test-dag").ExpectStatus(http.StatusNoContent).Send(t)
 	})
 
-	t.Run("TriggerWebhookInvalidToken", func(t *testing.T) {
+	t.Run("InvalidToken", func(t *testing.T) {
 		spec := `
 webhook:
   enabled: true
@@ -170,7 +170,7 @@ steps:
 		_ = server.Client().Delete("/api/v2/dags/webhook-invalid-token").ExpectStatus(http.StatusNoContent).Send(t)
 	})
 
-	t.Run("TriggerWebhookNotEnabled", func(t *testing.T) {
+	t.Run("NotEnabled", func(t *testing.T) {
 		spec := `
 steps:
   - name: test
@@ -188,13 +188,13 @@ steps:
 		_ = server.Client().Delete("/api/v2/dags/webhook-not-enabled").ExpectStatus(http.StatusNoContent).Send(t)
 	})
 
-	t.Run("TriggerWebhookNotFound", func(t *testing.T) {
+	t.Run("NotFound", func(t *testing.T) {
 		_ = server.Client().Post("/api/v2/webhooks/non-existent-dag", api.WebhookRequest{}).
 			WithHeader("Authorization", "Bearer any-token").
 			ExpectStatus(http.StatusNotFound).Send(t)
 	})
 
-	t.Run("TriggerWebhookIdempotency", func(t *testing.T) {
+	t.Run("Idempotency", func(t *testing.T) {
 		spec := `
 webhook:
   enabled: true
@@ -229,7 +229,7 @@ steps:
 		_ = server.Client().Delete("/api/v2/dags/webhook-idempotency").ExpectStatus(http.StatusNoContent).Send(t)
 	})
 
-	t.Run("TriggerWebhookMissingAuth", func(t *testing.T) {
+	t.Run("MissingAuth", func(t *testing.T) {
 		spec := `
 webhook:
   enabled: true
@@ -250,7 +250,7 @@ steps:
 		_ = server.Client().Delete("/api/v2/dags/webhook-missing-auth").ExpectStatus(http.StatusNoContent).Send(t)
 	})
 
-	t.Run("TriggerWebhookPayloadTooLarge", func(t *testing.T) {
+	t.Run("PayloadTooLarge", func(t *testing.T) {
 		spec := `
 webhook:
   enabled: true

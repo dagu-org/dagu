@@ -9,7 +9,7 @@ import (
 )
 
 func TestWebhookConfig(t *testing.T) {
-	t.Run("ParseWebhookConfig", func(t *testing.T) {
+	t.Run("Basic", func(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
 
@@ -31,7 +31,7 @@ steps:
 		require.Equal(t, "my-secret-token-1234", dag.Webhook.Token)
 	})
 
-	t.Run("ParseWebhookConfigWithEnvVar", func(t *testing.T) {
+	t.Run("WithEnvVar", func(t *testing.T) {
 		// Test that environment variables in the token are expanded
 		// Note: t.Setenv requires non-parallel test
 		t.Setenv("MY_WEBHOOK_TOKEN", "expanded-secret-12345")
@@ -56,7 +56,7 @@ steps:
 		require.Equal(t, "expanded-secret-12345", dag.Webhook.Token)
 	})
 
-	t.Run("ParseWebhookDisabled", func(t *testing.T) {
+	t.Run("Disabled", func(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
 
@@ -77,7 +77,7 @@ steps:
 		require.False(t, dag.Webhook.Enabled)
 	})
 
-	t.Run("ParseWebhookNotConfigured", func(t *testing.T) {
+	t.Run("NotConfigured", func(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
 
@@ -98,7 +98,7 @@ steps:
 func TestWebhookPayloadEnv(t *testing.T) {
 	t.Parallel()
 
-	t.Run("WebhookPayloadAsEnvVar", func(t *testing.T) {
+	t.Run("AsEnvVar", func(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
 
@@ -124,7 +124,7 @@ steps:
 		})
 	})
 
-	t.Run("WebhookPayloadWithJsonContent", func(t *testing.T) {
+	t.Run("WithJsonContent", func(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
 
@@ -158,7 +158,7 @@ steps:
 func TestWebhookSpecValidation(t *testing.T) {
 	t.Parallel()
 
-	t.Run("ValidWebhookSpec", func(t *testing.T) {
+	t.Run("Valid", func(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
 
@@ -182,7 +182,7 @@ steps:
 		require.Equal(t, "test-token-12345678", dag.Webhook.Token)
 	})
 
-	t.Run("WebhookEnabledWithMissingToken", func(t *testing.T) {
+	t.Run("MissingToken", func(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
 
@@ -202,7 +202,7 @@ steps:
 		require.Contains(t, err.Error(), "token is required when webhook is enabled")
 	})
 
-	t.Run("WebhookTokenTooShort", func(t *testing.T) {
+	t.Run("TokenTooShort", func(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
 
@@ -223,7 +223,7 @@ steps:
 		require.Contains(t, err.Error(), "token must be at least 16 characters")
 	})
 
-	t.Run("WebhookTokenExactlyMinLength", func(t *testing.T) {
+	t.Run("TokenMinLength", func(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
 
@@ -247,7 +247,7 @@ steps:
 		require.Equal(t, "1234567890abcdef", dag.Webhook.Token)
 	})
 
-	t.Run("WebhookDisabledWithShortToken", func(t *testing.T) {
+	t.Run("DisabledWithShortToken", func(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
 
