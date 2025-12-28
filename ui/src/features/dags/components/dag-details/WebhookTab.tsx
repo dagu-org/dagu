@@ -3,16 +3,48 @@
  *
  * @module features/dags/components/dag-details
  */
-import { Check, Copy, Link, Terminal, Webhook, WebhookOff } from 'lucide-react';
+import { Check, Copy, Terminal, Webhook, WebhookOff } from 'lucide-react';
 import React, { useState } from 'react';
 import { components } from '../../../../api/v2/schema';
 import { Button } from '../../../../components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '../../../../components/ui/card';
 
 type WebhookConfig = components['schemas']['WebhookConfig'];
 
 interface WebhookTabProps {
   fileName: string;
   webhook?: WebhookConfig;
+}
+
+interface CopyButtonProps {
+  text: string;
+  copied: boolean;
+  onCopy: () => void;
+  label?: string;
+}
+
+function CopyButton({ copied, onCopy, label }: CopyButtonProps) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="h-6 px-2 text-muted-foreground hover:text-foreground"
+      onClick={onCopy}
+    >
+      {copied ? (
+        <Check className="h-3 w-3" />
+      ) : (
+        <Copy className="h-3 w-3" />
+      )}
+      {label && <span className="ml-1 text-xs">{label}</span>}
+    </Button>
+  );
 }
 
 function WebhookTab({ fileName, webhook }: WebhookTabProps) {
@@ -39,163 +71,133 @@ function WebhookTab({ fileName, webhook }: WebhookTabProps) {
   const curlExample = `curl -X POST "${webhookUrl}" \\
   -H "Authorization: Bearer ${tokenForCurl}" \\
   -H "Content-Type: application/json" \\
-  -d '{"key": "value"}'`;
+  -d '{"dagRunId": "my-unique-id", "payload": {"key": "value"}}'`;
 
   // No webhook configured
   if (!webhook) {
     return (
-      <div className="flex flex-col items-center justify-center py-8">
-        <WebhookOff className="h-8 w-8 text-muted-foreground mb-3" />
-        <p className="text-sm text-muted-foreground mb-2">
-          Webhook is not configured for this DAG
-        </p>
-        <p className="text-xs text-muted-foreground mb-3">
-          Add a{' '}
-          <code className="bg-muted px-1 py-0.5 rounded text-xs border">
-            webhook
-          </code>{' '}
-          section to your DAG spec to enable webhooks:
-        </p>
-        <pre className="p-2 bg-muted rounded text-xs text-left font-mono border">
-          {`webhook:
+      <Card className="max-w-xl gap-0 py-0">
+        <CardHeader className="pb-2 px-4 pt-3">
+          <div className="flex items-center gap-2">
+            <WebhookOff className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm">Webhook Not Configured</CardTitle>
+          </div>
+          <CardDescription className="text-xs">
+            Add a webhook section to your DAG spec to enable HTTP triggers
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-4 pb-3 pt-0">
+          <pre className="px-3 py-2 bg-accent rounded-md text-xs font-mono border">
+            {`webhook:
   enabled: true
   token: "\${WEBHOOK_SECRET}"`}
-        </pre>
-      </div>
+          </pre>
+        </CardContent>
+      </Card>
     );
   }
 
   // Webhook disabled
   if (!webhook.enabled) {
     return (
-      <div className="flex flex-col items-center justify-center py-8">
-        <WebhookOff className="h-8 w-8 text-muted-foreground mb-3" />
-        <p className="text-sm text-muted-foreground mb-2">
-          Webhook is configured but disabled
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Set{' '}
-          <code className="bg-muted px-1 py-0.5 rounded text-xs border">
-            enabled: true
-          </code>{' '}
-          in your webhook configuration to enable it.
-        </p>
-      </div>
+      <Card className="max-w-xl gap-0 py-0">
+        <CardHeader className="px-4 py-3">
+          <div className="flex items-center gap-2">
+            <WebhookOff className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm">Webhook Disabled</CardTitle>
+          </div>
+          <CardDescription className="text-xs">
+            Set <code className="bg-muted px-1 rounded">enabled: true</code> to
+            activate
+          </CardDescription>
+        </CardHeader>
+      </Card>
     );
   }
 
   // Webhook enabled
   return (
-    <div className="space-y-4 py-2">
-      {/* Status */}
-      <div className="flex items-center gap-2">
-        <div className="p-1.5 rounded bg-[rgba(107,168,107,0.15)] border border-[#6ba86b]">
-          <Webhook className="h-4 w-4 text-[#5a8a5a]" />
-        </div>
-        <span className="text-sm font-medium text-[#5a8a5a]">
-          Webhook Enabled
-        </span>
-        <span className="text-xs text-muted-foreground">
-          This DAG can be triggered via HTTP
-        </span>
-      </div>
-
-      {/* Endpoint URL */}
-      <div>
-        <div className="flex items-center mb-1.5">
-          <Link className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
-          <span className="text-xs font-semibold text-foreground/90">
-            Endpoint
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex-1 p-2 bg-muted rounded border text-xs font-mono overflow-x-auto">
-            <span className="text-muted-foreground">POST</span>{' '}
-            <span className="text-foreground">{webhookUrl}</span>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0 shrink-0"
-            onClick={() => handleCopy(webhookUrl, setCopiedUrl)}
-          >
-            {copiedUrl ? (
-              <Check className="h-3.5 w-3.5" />
-            ) : (
-              <Copy className="h-3.5 w-3.5" />
-            )}
-          </Button>
-        </div>
-      </div>
-
-      {/* Token */}
-      {webhook.token && (
-        <div>
-          <div className="flex items-center mb-1.5">
-            <Terminal className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
-            <span className="text-xs font-semibold text-foreground/90">
-              Bearer Token
-            </span>
-          </div>
+    <div className="space-y-3 max-w-2xl">
+      {/* Status Card */}
+      <Card className="gap-0 py-0">
+        <CardHeader className="pb-0 px-4 pt-3">
           <div className="flex items-center gap-2">
-            <div className="flex-1 p-2 bg-muted rounded border text-xs font-mono overflow-x-auto">
-              <span className="text-foreground">{webhook.token}</span>
+            <Webhook className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm">Webhook</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="px-4 pb-3 pt-2 space-y-3">
+          {/* Endpoint */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-muted-foreground">Endpoint</span>
+              <CopyButton
+                text={webhookUrl}
+                copied={copiedUrl}
+                onCopy={() => handleCopy(webhookUrl, setCopiedUrl)}
+              />
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 w-8 p-0 shrink-0"
-              onClick={() => handleCopy(webhook.token!, setCopiedToken)}
-            >
-              {copiedToken ? (
-                <Check className="h-3.5 w-3.5" />
-              ) : (
-                <Copy className="h-3.5 w-3.5" />
-              )}
-            </Button>
+            <div className="px-3 py-2 bg-accent rounded-md text-xs font-mono border overflow-x-auto">
+              <span className="text-muted-foreground">POST</span>{' '}
+              <span>{webhookUrl}</span>
+            </div>
           </div>
-        </div>
-      )}
 
-      {/* Example cURL */}
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <div className="flex items-center">
-            <Terminal className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
-            <span className="text-xs font-semibold text-foreground/90">
-              Example Request
-            </span>
+          {/* Token */}
+          {webhook.token && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-muted-foreground">
+                  Bearer Token
+                </span>
+                <CopyButton
+                  text={webhook.token}
+                  copied={copiedToken}
+                  onCopy={() => handleCopy(webhook.token!, setCopiedToken)}
+                />
+              </div>
+              <div className="px-3 py-2 bg-accent rounded-md text-xs font-mono border overflow-x-auto">
+                {webhook.token}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Example Card */}
+      <Card className="gap-0 py-0">
+        <CardHeader className="pb-0 px-4 pt-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
+              <CardTitle className="text-sm">Example Request</CardTitle>
+            </div>
+            <CopyButton
+              text={curlExample}
+              copied={copiedCurl}
+              onCopy={() => handleCopy(curlExample, setCopiedCurl)}
+              label="Copy"
+            />
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-6 px-2"
-            onClick={() => handleCopy(curlExample, setCopiedCurl)}
-          >
-            {copiedCurl ? (
-              <Check className="h-3 w-3 mr-1" />
-            ) : (
-              <Copy className="h-3 w-3 mr-1" />
-            )}
-            <span className="text-xs">Copy</span>
-          </Button>
-        </div>
-        <pre className="p-2 bg-muted rounded border text-xs font-mono overflow-x-auto whitespace-pre-wrap text-foreground">
-          {curlExample}
-        </pre>
-      </div>
-
-      {/* Info */}
-      <div className="flex items-start gap-2 p-2 bg-muted/50 rounded border text-xs text-muted-foreground">
-        <span className="font-medium text-foreground/90">Note:</span>
-        <span>
-          The request body is passed to the DAG as the{' '}
-          <code className="bg-muted px-1 py-0.5 rounded border text-foreground">
-            WEBHOOK_PAYLOAD
-          </code>{' '}
-          environment variable.
-        </span>
-      </div>
+        </CardHeader>
+        <CardContent className="px-4 pb-3 pt-2">
+          <pre className="px-3 py-2 bg-accent rounded-md text-xs font-mono border overflow-x-auto whitespace-pre-wrap">
+            {curlExample}
+          </pre>
+          <ul className="mt-2 text-xs text-muted-foreground space-y-1">
+            <li>
+              <code className="bg-accent px-1 rounded-md border">payload</code>{' '}
+              is available as{' '}
+              <code className="bg-accent px-1 rounded-md border">WEBHOOK_PAYLOAD</code>{' '}
+              env var.
+            </li>
+            <li>
+              <code className="bg-accent px-1 rounded-md border">dagRunId</code>{' '}
+              (optional) can be used as an idempotency key.
+            </li>
+          </ul>
+        </CardContent>
+      </Card>
     </div>
   );
 }
