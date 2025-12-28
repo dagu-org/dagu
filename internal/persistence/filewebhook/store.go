@@ -1,7 +1,3 @@
-// Copyright (C) 2024 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-
-// Package filewebhook provides a file-based implementation of the WebhookStore interface.
 package filewebhook
 
 import (

@@ -1,7 +1,3 @@
-// Copyright (C) 2024 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-
-// Package fileapikey provides a file-based implementation of the APIKeyStore interface.
 package fileapikey
 
 import (
