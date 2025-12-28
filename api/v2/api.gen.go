@@ -1783,6 +1783,9 @@ type ListWebhooksParams struct {
 
 // TriggerWebhookParams defines parameters for TriggerWebhook.
 type TriggerWebhookParams struct {
+	// RemoteNode name of the remote node
+	RemoteNode *RemoteNode `form:"remoteNode,omitempty" json:"remoteNode,omitempty"`
+
 	// Authorization Bearer token for webhook authentication (e.g., 'Bearer dagu_wh_...')
 	Authorization string `json:"Authorization"`
 }
@@ -2167,7 +2170,7 @@ type ServerInterface interface {
 	ListWebhooks(w http.ResponseWriter, r *http.Request, params ListWebhooksParams)
 	// Trigger DAG execution via webhook
 	// (POST /webhooks/{fileName})
-	TriggerWebhook(w http.ResponseWriter, r *http.Request, fileName string, params TriggerWebhookParams)
+	TriggerWebhook(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TriggerWebhookParams)
 	// List distributed workers
 	// (GET /workers)
 	GetWorkers(w http.ResponseWriter, r *http.Request, params GetWorkersParams)
@@ -2539,7 +2542,7 @@ func (_ Unimplemented) ListWebhooks(w http.ResponseWriter, r *http.Request, para
 
 // Trigger DAG execution via webhook
 // (POST /webhooks/{fileName})
-func (_ Unimplemented) TriggerWebhook(w http.ResponseWriter, r *http.Request, fileName string, params TriggerWebhookParams) {
+func (_ Unimplemented) TriggerWebhook(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TriggerWebhookParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -5306,7 +5309,7 @@ func (siw *ServerInterfaceWrapper) TriggerWebhook(w http.ResponseWriter, r *http
 	var err error
 
 	// ------------- Path parameter "fileName" -------------
-	var fileName string
+	var fileName DAGFileName
 
 	err = runtime.BindStyledParameterWithOptions("simple", "fileName", chi.URLParam(r, "fileName"), &fileName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -5316,6 +5319,14 @@ func (siw *ServerInterfaceWrapper) TriggerWebhook(w http.ResponseWriter, r *http
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params TriggerWebhookParams
+
+	// ------------- Optional query parameter "remoteNode" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "remoteNode", r.URL.Query(), &params.RemoteNode)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "remoteNode", Err: err})
+		return
+	}
 
 	headers := r.Header
 
@@ -8256,7 +8267,7 @@ func (response ListWebhooksdefaultJSONResponse) VisitListWebhooksResponse(w http
 }
 
 type TriggerWebhookRequestObject struct {
-	FileName string `json:"fileName"`
+	FileName DAGFileName `json:"fileName"`
 	Params   TriggerWebhookParams
 	Body     *TriggerWebhookJSONRequestBody
 }
@@ -10332,7 +10343,7 @@ func (sh *strictHandler) ListWebhooks(w http.ResponseWriter, r *http.Request, pa
 }
 
 // TriggerWebhook operation middleware
-func (sh *strictHandler) TriggerWebhook(w http.ResponseWriter, r *http.Request, fileName string, params TriggerWebhookParams) {
+func (sh *strictHandler) TriggerWebhook(w http.ResponseWriter, r *http.Request, fileName DAGFileName, params TriggerWebhookParams) {
 	var request TriggerWebhookRequestObject
 
 	request.FileName = fileName
@@ -10618,16 +10629,16 @@ var swaggerSpec = []string{
 	"wWi2jCvDP7oJN9UuYgEcqk73G7iJ+uSrcrNbnDHdn7UiDi3x8pzMZsBd3YbSCeGS4GqUgPq8KIREc3wJ",
 	"CEecWs+pjvE3LqPb6KDkJbrkiUC5qVMGKSqE9lZBE8AcuI0+KF3hr+ZATYEa72+NyzTTT8yzYR/9oF2L",
 	"ruaft7e3f3iqK+SclYnp0YSlSz0tFgLSIK8GwsaZ++PLv715//4fn48P/vn2/cEhAnpJOKMLoPKcXmJO",
-	"1ErK1etsHMKmsYTUFOedAwKa5oxQiVyijCBq4pz6qow2cQk6OoxFRtiDaHURbwbMltn1nDM6XEsTmxqv",
-	"6u3QYdWS3tWp/xYe2ZRxf0S4et72MvvBtq8clYNvDtiUdLUQKpRhvEzhvWIluDvzcw/EmHvwaO/iUQ4P",
-	"pUGXTTFwKFK7N0HlA8UWTyBFW2hBhLApSZ1FxQSFPIT44ojBBo2kCiolUZRc8l6D6gPyfND3n0PbSIla",
-	"l4Jn856GkBScyOVo/7dPlRAJQ3rt92XH1cz4RY9zgnX0bLqupEQxu0mh70czjsIqasC2l1vo/hdRQ3+0",
-	"82+soGbg6xPUWp1XfroPcn8R8bErqK8XuKEuphH0iTrQVBFfAU1MgOb+b5+UMDDBgiTqnrY/KHwwkRBR",
-	"OQXPCnRwfFQG9hQ8G+2PvpiVfd3f2fkyZ0J+3cE52bn8cTQeOblLI9fcC63O9U5XwdE/1/fiDRPSppCz",
-	"xeDMnF/jPnxzKfOgZLz9U/1PU6tal92dZmY4FyNjQmgwxTPnfG2qQ9twjGphT+daqAaNpZurDGr9FdVI",
-	"dTdLNU3GZiKoWlPyoepExmc4UoTfeGmy2kLKWCBdlN6tqxmdZWewWNMc/5ZxR3b4wE2+d78qhxAMXveq",
-	"DioNm78j5YqrcmywSU8yNiN0rHafFXJsZWA9NahHw9NydCWhRMbWGoayQ2XwFycfDseldjA6rPP0asB8",
-	"fIQuYNk2NPYv+BDEnGxdwDI23Ecf/mdeNja23lx8DrvDuhR2yPLl/Onr/wsAAP//zg0fR0yAAQA=",
+	"1ErK1etsHMKmsYTUFOedAwKa5oxQiVyijCBq4pz6qow2cQk6OoxFRtiDuKmL+IqJhztN6H8LD2XKuD8E",
+	"XD1Re139YNtXDsPZ1eeATdFWa1hXSMF4maR7xVpvd+bJHggq9+Cz3sWFHKZJgxCbYsJQxHRvosgHii2e",
+	"QIq20IIIYZOOOpuJCft4CAHFEYMNC0kVVEpmKPngvYbNB+T5oC88h7aRIrQuyc7mPf4gKTiRy9H+b58q",
+	"QRCG9NpvxI7Ll/GLHvcD68rZdE5JiWJ2k0LfgGYchVXUgG2vr9DBL6Jo/mjn31hRzMDXJ4q1uqf8dB/k",
+	"/iLiRVdQXxFwQ51II+gTdZGpIr4CmpgQzP3fPilhYIIFSdQ9bX9Q+GBiHQwm1XgQnhXo4PioDN0peDba",
+	"H30xK/u6v7PzZc6E/LqDc7Jz+eNoPHKSlUauuRdLnXOdrnOjf67vxRsmpE0SZ8u9mTm/xr305lLmQVF4",
+	"+6f6n6ZWtS67O83cby4KxgTJYIpnzr3a1H+2ARfV0p3OeVANGksoVxnUeiSqkeqOlGqajM1EUJem5EPV",
+	"iYxXcKTMvvHDZLWFlNE+uuy8W1cz/srOYLGmOf4tI4vs8IEjfO9+VQ4hGLzuNx3UEjZ/RwoSV+XYYJOe",
+	"ZGxG6FjtPivk2MrAempQz4Kn5ehKQomMrXUIZYfK4C9OPhyOS/1fdFjny9WA+fgIXcCybWjs3+ghiDnZ",
+	"uoBlbLiPPsDPvF1s9Ly5+Bx2h5Un7JDl2/jT1/8XAAD//++H15cugAEA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

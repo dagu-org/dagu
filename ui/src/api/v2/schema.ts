@@ -4673,14 +4673,17 @@ export interface operations {
     };
     triggerWebhook: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header: {
                 /** @description Bearer token for webhook authentication (e.g., 'Bearer dagu_wh_...') */
                 Authorization: string;
             };
             path: {
-                /** @description DAG file name without extension */
-                fileName: string;
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
             };
             cookie?: never;
         };

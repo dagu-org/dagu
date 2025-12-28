@@ -2314,12 +2314,8 @@ paths:
         - "webhooks"
       security: []
       parameters:
-        - name: fileName
-          in: path
-          required: true
-          schema:
-            type: string
-          description: "DAG file name without extension"
+        - $ref: "#/components/parameters/DAGFileName"
+        - $ref: "#/components/parameters/RemoteNode"
         - name: Authorization
           in: header
           required: true
