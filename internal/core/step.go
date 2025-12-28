@@ -56,6 +56,11 @@ type Step struct {
 	LogOutput LogOutputMode `json:"logOutput,omitempty"`
 	// Output is the variable name to store the output.
 	Output string `json:"output,omitempty"`
+	// OutputKey is the custom key for the output in outputs.json.
+	// If empty, the Output name is converted from UPPER_CASE to camelCase.
+	OutputKey string `json:"outputKey,omitempty"`
+	// OutputOmit excludes this output from outputs.json when true.
+	OutputOmit bool `json:"outputOmit,omitempty"`
 	// Depends contains the list of step names to depend on.
 	Depends []string `json:"depends,omitempty"`
 	// ExplicitlyNoDeps indicates the depends field was explicitly set to empty

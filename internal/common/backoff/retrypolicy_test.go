@@ -224,6 +224,8 @@ func TestRetrier_Next(t *testing.T) {
 	})
 }
 
+var _ RetryPolicy = (*mockRetryPolicy)(nil)
+
 // mockRetryPolicy is a test helper that returns predefined intervals
 type mockRetryPolicy struct {
 	intervals []time.Duration

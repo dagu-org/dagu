@@ -58,10 +58,6 @@ paths:
         default:
           description: "Unexpected error"
 
-  # ============================================================================
-  # Authentication Endpoints
-  # ============================================================================
-
   /auth/login:
     post:
       summary: "Authenticate user and obtain JWT token"
@@ -1806,6 +1802,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dag-runs/{name}/{dagRunId}/outputs:
+    get:
+      summary: "Retrieve collected outputs from a DAG-run"
+      description: "Fetches the outputs.json file containing all step outputs collected during the DAG-run execution. Returns the outputs as a JSON object where keys are the output names (converted from UPPER_CASE to camelCase by default, or custom key if specified) and values are the captured output strings."
+      operationId: "getDAGRunOutputs"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+      responses:
+        "200":
+          description: "Successfully retrieved outputs. Returns the collected outputs with metadata. If the DAG-run completed but captured no outputs, returns an empty outputs object."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DAGRunOutputs"
+        "404":
+          description: "DAG-run not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dag-runs/{name}/{dagRunId}/retry:
     post:
       summary: "Retry DAG-run execution"
@@ -2986,6 +3013,52 @@ components:
           required:
             - nodes
 
+    DAGRunOutputs:
+      type: object
+      description: "Collected outputs from step executions in a DAG-run, including execution metadata. If the DAG-run completed but no outputs were captured, the outputs object will be empty and metadata fields may be empty strings."
+      required:
+        - metadata
+        - outputs
+      properties:
+        metadata:
+          $ref: "#/components/schemas/OutputsMetadata"
+        outputs:
+          type: object
+          description: "Collected step outputs as key-value pairs. Keys are output names (UPPER_CASE converted to camelCase by default, or custom key if specified) and values are the captured output strings. Empty object if no outputs were captured."
+          additionalProperties:
+            type: string
+          example:
+            totalCount: "42"
+            resultFile: "/path/to/result.txt"
+            config: '{"key": "value"}'
+
+    OutputsMetadata:
+      type: object
+      description: "Execution context metadata for the outputs"
+      required:
+        - dagName
+        - dagRunId
+        - attemptId
+        - status
+        - completedAt
+      properties:
+        dagName:
+          $ref: "#/components/schemas/DAGName"
+        dagRunId:
+          $ref: "#/components/schemas/DAGRunId"
+        attemptId:
+          type: string
+          description: "Attempt identifier within the run"
+        status:
+          $ref: "#/components/schemas/StatusLabel"
+        completedAt:
+          type: string
+          format: date-time
+          description: "RFC3339 timestamp when execution completed"
+        params:
+          type: string
+          description: "JSON-serialized parameters passed to the DAG"
+
     Node:
       type: object
       description: "Status of an individual step within a DAG-run"
@@ -3055,8 +3128,7 @@ components:
       description: "Detailed information for a sub DAG-run including timing and status"
       properties:
         dagRunId:
-          type: string
-          description: "Unique identifier for the sub DAG-run"
+          $ref: "#/components/schemas/DAGRunId"
         params:
           type: string
           description: "Parameters passed to the sub DAG-run in JSON format"
@@ -3096,7 +3168,7 @@ components:
           type: array
           description: "List of commands to execute sequentially"
           items:
-            $ref: '#/components/schemas/CommandEntry'
+            $ref: "#/components/schemas/CommandEntry"
         script:
           type: string
           description: "Script content if the step executes a script file"
@@ -3382,26 +3454,20 @@ components:
       description: "Information about a task currently being executed"
       properties:
         dagRunId:
-          type: string
-          description: "ID of the DAG run being executed"
+          $ref: "#/components/schemas/DAGRunId"
         dagName:
-          type: string
-          description: "Name of the DAG being executed"
+          $ref: "#/components/schemas/DAGName"
         startedAt:
           type: string
           description: "RFC3339 timestamp when the task started"
         rootDagRunName:
-          type: string
-          description: "Name of the root DAG run"
+          $ref: "#/components/schemas/DAGName"
         rootDagRunId:
-          type: string
-          description: "ID of the root DAG run"
+          $ref: "#/components/schemas/DAGRunId"
         parentDagRunName:
-          type: string
-          description: "Name of the parent DAG run"
+          $ref: "#/components/schemas/DAGName"
         parentDagRunId:
-          type: string
-          description: "ID of the parent DAG run"
+          $ref: "#/components/schemas/DAGRunId"
       required:
         - dagRunId
         - dagName

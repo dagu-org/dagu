@@ -345,6 +345,8 @@ func TestClientDispatcherInterface(t *testing.T) {
 
 // Mock implementations
 
+var _ execution.ServiceRegistry = (*mockServiceMonitor)(nil)
+
 type mockServiceMonitor struct {
 	members   []execution.HostInfo
 	err       error
@@ -372,6 +374,8 @@ func (m *mockServiceMonitor) Unregister(_ context.Context) {
 func (m *mockServiceMonitor) UpdateStatus(_ context.Context, _ execution.ServiceName, _ execution.ServiceStatus) error {
 	return nil
 }
+
+var _ coordinatorv1.CoordinatorServiceServer = (*mockCoordinatorService)(nil)
 
 type mockCoordinatorService struct {
 	coordinatorv1.UnimplementedCoordinatorServiceServer

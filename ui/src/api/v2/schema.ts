@@ -676,6 +676,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dag-runs/{name}/{dagRunId}/outputs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve collected outputs from a DAG-run
+         * @description Fetches the outputs.json file containing all step outputs collected during the DAG-run execution. Returns the outputs as a JSON object where keys are the output names (converted from UPPER_CASE to camelCase by default, or custom key if specified) and values are the captured output strings.
+         */
+        get: operations["getDAGRunOutputs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dag-runs/{name}/{dagRunId}/retry": {
         parameters: {
             query?: never;
@@ -1224,6 +1244,36 @@ export interface components {
             /** @description List of preconditions that must be met before the DAG-run can start */
             preconditions?: components["schemas"]["Condition"][];
         };
+        /** @description Collected outputs from step executions in a DAG-run, including execution metadata. If the DAG-run completed but no outputs were captured, the outputs object will be empty and metadata fields may be empty strings. */
+        DAGRunOutputs: {
+            metadata: components["schemas"]["OutputsMetadata"];
+            /**
+             * @description Collected step outputs as key-value pairs. Keys are output names (UPPER_CASE converted to camelCase by default, or custom key if specified) and values are the captured output strings. Empty object if no outputs were captured.
+             * @example {
+             *       "totalCount": "42",
+             *       "resultFile": "/path/to/result.txt",
+             *       "config": "{\"key\": \"value\"}"
+             *     }
+             */
+            outputs: {
+                [key: string]: string;
+            };
+        };
+        /** @description Execution context metadata for the outputs */
+        OutputsMetadata: {
+            dagName: components["schemas"]["DAGName"];
+            dagRunId: components["schemas"]["DAGRunId"];
+            /** @description Attempt identifier within the run */
+            attemptId: string;
+            status: components["schemas"]["StatusLabel"];
+            /**
+             * Format: date-time
+             * @description RFC3339 timestamp when execution completed
+             */
+            completedAt: string;
+            /** @description JSON-serialized parameters passed to the DAG */
+            params?: string;
+        };
         /** @description Status of an individual step within a DAG-run */
         Node: {
             step: components["schemas"]["Step"];
@@ -1256,8 +1306,7 @@ export interface components {
         };
         /** @description Detailed information for a sub DAG-run including timing and status */
         SubDAGRunDetail: {
-            /** @description Unique identifier for the sub DAG-run */
-            dagRunId: string;
+            dagRunId: components["schemas"]["DAGRunId"];
             /** @description Parameters passed to the sub DAG-run in JSON format */
             params?: string;
             status: components["schemas"]["Status"];
@@ -1418,20 +1467,14 @@ export interface components {
         };
         /** @description Information about a task currently being executed */
         RunningTask: {
-            /** @description ID of the DAG run being executed */
-            dagRunId: string;
-            /** @description Name of the DAG being executed */
-            dagName: string;
+            dagRunId: components["schemas"]["DAGRunId"];
+            dagName: components["schemas"]["DAGName"];
             /** @description RFC3339 timestamp when the task started */
             startedAt: string;
-            /** @description Name of the root DAG run */
-            rootDagRunName?: string;
-            /** @description ID of the root DAG run */
-            rootDagRunId?: string;
-            /** @description Name of the parent DAG run */
-            parentDagRunName?: string;
-            /** @description ID of the parent DAG run */
-            parentDagRunId?: string;
+            rootDagRunName?: components["schemas"]["DAGName"];
+            rootDagRunId?: components["schemas"]["DAGRunId"];
+            parentDagRunName?: components["schemas"]["DAGName"];
+            parentDagRunId?: components["schemas"]["DAGRunId"];
         };
         /** @description Response containing all queues with their active DAG-runs */
         QueuesResponse: {
@@ -3811,6 +3854,52 @@ export interface operations {
                 };
             };
             /** @description Log file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getDAGRunOutputs: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successfully retrieved outputs. Returns the collected outputs with metadata. If the DAG-run completed but captured no outputs, returns an empty outputs object. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DAGRunOutputs"];
+                };
+            };
+            /** @description DAG-run not found */
             404: {
                 headers: {
                     [name: string]: unknown;

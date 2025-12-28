@@ -221,6 +221,8 @@ func TestRegistry_Providers(t *testing.T) {
 	assert.Contains(t, providers, "custom")
 }
 
+var _ Resolver = (*mockResolver)(nil)
+
 // mockResolver is a test double for the Resolver interface
 type mockResolver struct {
 	mockName        string

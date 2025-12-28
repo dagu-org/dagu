@@ -318,6 +318,72 @@ func (a *API) GetDAGRunLog(ctx context.Context, request api.GetDAGRunLogRequestO
 	}, nil
 }
 
+// GetDAGRunOutputs implements api.StrictServerInterface.
+func (a *API) GetDAGRunOutputs(ctx context.Context, request api.GetDAGRunOutputsRequestObject) (api.GetDAGRunOutputsResponseObject, error) {
+	dagName := request.Name
+	dagRunId := request.DagRunId
+
+	var attempt execution.DAGRunAttempt
+	var err error
+
+	if dagRunId == "latest" {
+		attempt, err = a.dagRunStore.LatestAttempt(ctx, dagName)
+		if err != nil {
+			return api.GetDAGRunOutputs404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("no dag-runs found for DAG %s", dagName),
+			}, nil
+		}
+	} else {
+		ref := execution.NewDAGRunRef(dagName, dagRunId)
+		attempt, err = a.dagRunStore.FindAttempt(ctx, ref)
+		if err != nil {
+			return api.GetDAGRunOutputs404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
+			}, nil
+		}
+	}
+
+	outputs, err := attempt.ReadOutputs(ctx)
+	if err != nil {
+		logger.Error(ctx, "Failed to read outputs",
+			tag.Error(err),
+			slog.String("dag", dagName),
+			slog.String("dagRunId", dagRunId),
+		)
+		return nil, fmt.Errorf("error reading outputs: %w", err)
+	}
+
+	// Return empty structure if no outputs (DAG-run exists but captured no outputs)
+	if outputs == nil {
+		outputs = &execution.DAGRunOutputs{
+			Metadata: execution.OutputsMetadata{},
+			Outputs:  make(map[string]string),
+		}
+	}
+
+	// Parse CompletedAt from RFC3339 string to time.Time
+	var completedAt time.Time
+	if outputs.Metadata.CompletedAt != "" {
+		if t, err := time.Parse(time.RFC3339, outputs.Metadata.CompletedAt); err == nil {
+			completedAt = t
+		}
+	}
+
+	return api.GetDAGRunOutputs200JSONResponse{
+		Metadata: api.OutputsMetadata{
+			DagName:     outputs.Metadata.DAGName,
+			DagRunId:    outputs.Metadata.DAGRunID,
+			AttemptId:   outputs.Metadata.AttemptID,
+			Status:      api.StatusLabel(outputs.Metadata.Status),
+			CompletedAt: completedAt,
+			Params:      &outputs.Metadata.Params,
+		},
+		Outputs: outputs.Outputs,
+	}, nil
+}
+
 func (a *API) GetDAGRunStepLog(ctx context.Context, request api.GetDAGRunStepLogRequestObject) (api.GetDAGRunStepLogResponseObject, error) {
 	dagName := request.Name
 	dagRunId := request.DagRunId

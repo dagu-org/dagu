@@ -649,8 +649,33 @@
           "description": "Override DAG-level log output mode. 'separate' writes stdout to .out and stderr to .err files. 'merged' writes both to a single .log file."
         },
         "output": {
-          "type": "string",
-          "description": "Variable name to capture the command's stdout. This output can be referenced in subsequent steps."
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Variable name to capture the command's stdout."
+            },
+            {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Variable name to capture the command's stdout (required)."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "Custom key for this output in outputs.json. If not specified, the variable name is converted to camelCase."
+                },
+                "omit": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "When true, excludes this output from outputs.json."
+                }
+              },
+              "required": ["name"],
+              "additionalProperties": false
+            }
+          ],
+          "description": "Variable name to capture the command's stdout. Can be a string or an object with name, key, and omit fields. This output can be referenced in subsequent steps."
         },
         "depends": {
           "oneOf": [

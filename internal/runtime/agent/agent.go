@@ -21,6 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/mailer"
+	"github.com/dagu-org/dagu/internal/common/masking"
 	"github.com/dagu-org/dagu/internal/common/secrets"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/common/sock"
@@ -552,6 +553,14 @@ func (a *Agent) Run(ctx context.Context) error {
 		slog.String("finished-at", finishedStatus.FinishedAt),
 	)
 
+	// Collect and write step outputs BEFORE finalizing status (per spec)
+	if dagOutputs := a.buildOutputs(ctx, finishedStatus.Status); dagOutputs != nil {
+		if err := attempt.WriteOutputs(ctx, dagOutputs); err != nil {
+			logger.Error(ctx, "Failed to write outputs", tag.Error(err))
+		}
+	}
+
+	// Finalize status (after outputs are written)
 	if err := attempt.Write(ctx, a.Status(ctx)); err != nil {
 		logger.Error(ctx, "Status write failed", tag.Error(err))
 	}
@@ -594,6 +603,125 @@ func (a *Agent) nodeToModelNode(nodeData runtime.NodeData) *execution.Node {
 		Error:           errText,
 		SubRuns:         subRuns,
 		OutputVariables: nodeData.State.OutputVariables,
+	}
+}
+
+// collectOutputs gathers all step outputs into a map for the outputs.json file.
+// It iterates through nodes in execution order and collects output values.
+// Steps with OutputOmit=true are skipped. Last value wins for key conflicts.
+func (a *Agent) collectOutputs(ctx context.Context) map[string]string {
+	outputs := make(map[string]string)
+
+	// Get nodes from the plan in execution order
+	nodes := a.plan.Nodes()
+
+	for _, node := range nodes {
+		nodeData := node.NodeData()
+		step := nodeData.Step
+
+		// Skip if no output defined or omit is set
+		if step.Output == "" || step.OutputOmit {
+			continue
+		}
+
+		// Skip if no output variables captured
+		if nodeData.State.OutputVariables == nil {
+			continue
+		}
+
+		// Get the output value from captured variables
+		rawValue, ok := nodeData.State.OutputVariables.Load(step.Output)
+		if !ok {
+			continue
+		}
+
+		// Parse the KeyValue format (KEY=VALUE)
+		strValue, ok := rawValue.(string)
+		if !ok {
+			logger.Warn(ctx, "Output variable is not a string, skipping",
+				slog.String("step", step.Name),
+				slog.String("output", step.Output),
+				slog.String("type", fmt.Sprintf("%T", rawValue)),
+			)
+			continue
+		}
+		kv := stringutil.KeyValue(strValue)
+		value := kv.Value()
+
+		// Determine the key: use OutputKey if set, otherwise convert from UPPER_CASE
+		key := step.OutputKey
+		if key == "" {
+			key = stringutil.ScreamingSnakeToCamel(step.Output)
+		}
+
+		// Store the output (last one wins for conflicts)
+		outputs[key] = value
+	}
+
+	// Warn if total size exceeds 1MB
+	if len(outputs) > 0 {
+		totalSize := 0
+		for k, v := range outputs {
+			totalSize += len(k) + len(v)
+		}
+		if totalSize > 1024*1024 {
+			logger.Warn(ctx, "Outputs size exceeds 1MB",
+				slog.String("dag", a.dag.Name),
+				slog.String("dagRunId", a.dagRunID),
+				slog.Int("size", totalSize),
+				slog.Int("count", len(outputs)),
+			)
+		}
+	}
+
+	return outputs
+}
+
+// buildOutputs creates the full DAGRunOutputs structure with metadata.
+// Returns nil if no outputs were collected.
+func (a *Agent) buildOutputs(ctx context.Context, finalStatus core.Status) *execution.DAGRunOutputs {
+	outputs := a.collectOutputs(ctx)
+
+	if len(outputs) == 0 {
+		return nil
+	}
+
+	// Mask any secrets in output values to prevent exposing sensitive data
+	rCtx := runtime.GetDAGContext(ctx)
+	if len(rCtx.SecretEnvs) > 0 {
+		// Convert secret envs map to the format expected by masker
+		var secretEnvs []string
+		for k, v := range rCtx.SecretEnvs {
+			secretEnvs = append(secretEnvs, k+"="+v)
+		}
+		masker := masking.NewMasker(masking.SourcedEnvVars{
+			Secrets: secretEnvs,
+		})
+
+		// Mask each output value
+		for key, value := range outputs {
+			outputs[key] = masker.MaskString(value)
+		}
+	}
+
+	// Serialize params to JSON
+	var paramsJSON string
+	if len(a.dag.Params) > 0 {
+		if data, err := json.Marshal(a.dag.Params); err == nil {
+			paramsJSON = string(data)
+		}
+	}
+
+	return &execution.DAGRunOutputs{
+		Metadata: execution.OutputsMetadata{
+			DAGName:     a.dag.Name,
+			DAGRunID:    a.dagRunID,
+			AttemptID:   a.dagRunAttemptID,
+			Status:      finalStatus.String(),
+			CompletedAt: stringutil.FormatTime(time.Now()),
+			Params:      paramsJSON,
+		},
+		Outputs: outputs,
 	}
 }
 
