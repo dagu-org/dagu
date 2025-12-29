@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os"
@@ -12,7 +11,6 @@ import (
 	"time"
 
 	"github.com/adrg/xdg"
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/spf13/viper"
 )
@@ -173,12 +171,6 @@ func (l *ConfigLoader) Load() (*Config, error) {
 	if err := l.v.Unmarshal(&def); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
-
-	expandedDef, err := cmdutil.EvalStringFields(context.Background(), def, cmdutil.WithoutSubstitute())
-	if err != nil {
-		return nil, fmt.Errorf("failed to expand config variables: %w", err)
-	}
-	def = expandedDef
 
 	// Build the final Config from the definition (including legacy fields and validations).
 	cfg, err := l.buildConfig(def)
@@ -355,8 +347,15 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 	// Process authentication settings.
 	var explicitAuthMode bool
 	if def.Auth != nil && def.Auth.Mode != nil {
-		cfg.Server.Auth.Mode = AuthMode(*def.Auth.Mode)
-		explicitAuthMode = true
+		mode := AuthMode(*def.Auth.Mode)
+		switch mode {
+		case AuthModeNone, AuthModeBuiltin, AuthModeOIDC:
+			cfg.Server.Auth.Mode = mode
+			explicitAuthMode = true
+		default:
+			l.warnings = append(l.warnings, fmt.Sprintf("Invalid auth.mode value: %q, defaulting to 'none'", *def.Auth.Mode))
+			cfg.Server.Auth.Mode = AuthModeNone
+		}
 	} else {
 		cfg.Server.Auth.Mode = AuthModeNone
 	}

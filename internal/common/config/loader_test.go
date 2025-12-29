@@ -933,6 +933,18 @@ auth:
 		cfg := loadFromYAML(t, "# empty")
 		assert.Equal(t, AuthModeNone, cfg.Server.Auth.Mode)
 	})
+
+	t.Run("AuthModeInvalid", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: "invalid_mode"
+`)
+		// Invalid mode should default to none with a warning
+		assert.Equal(t, AuthModeNone, cfg.Server.Auth.Mode)
+		require.Len(t, cfg.Warnings, 1)
+		assert.Contains(t, cfg.Warnings[0], "Invalid auth.mode value")
+		assert.Contains(t, cfg.Warnings[0], "invalid_mode")
+	})
 }
 
 func TestLoad_AuthBuiltin(t *testing.T) {
@@ -999,20 +1011,4 @@ auth:
 		// TTL defaults to 24 hours when not specified
 		assert.Equal(t, 24*time.Hour, cfg.Server.Auth.Builtin.Token.TTL)
 	})
-}
-
-func TestLoad_AuthTokenEnvExpansion(t *testing.T) {
-	t.Parallel()
-	unsetEnv(t, "DAGU_AUTH_TOKEN")
-	unsetEnv(t, "DAGU_AUTHTOKEN")
-
-	cfg := loadWithEnv(t, `
-auth:
-  token:
-    value: "${AUTH_TOKEN}"
-`, map[string]string{
-		"AUTH_TOKEN": "env-token",
-	})
-
-	assert.Equal(t, "env-token", cfg.Server.Auth.Token.Value)
 }
