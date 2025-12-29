@@ -195,27 +195,42 @@ func (n *Node) setupContextWithTimeout(ctx context.Context) (context.Context, co
 	return ctx, cancel, 0
 }
 
+// flusherControl manages the output flusher goroutine lifecycle.
+type flusherControl struct {
+	done     chan struct{} // Signal to stop the flusher
+	finished chan struct{} // Signals when the flusher goroutine has exited
+}
+
 // startOutputFlusher starts a goroutine that periodically flushes output buffers.
-func (n *Node) startOutputFlusher() chan struct{} {
-	flushDone := make(chan struct{})
+// It returns a flusherControl that must be passed to stopOutputFlusher to ensure
+// proper synchronization when stopping.
+func (n *Node) startOutputFlusher() *flusherControl {
+	ctrl := &flusherControl{
+		done:     make(chan struct{}),
+		finished: make(chan struct{}),
+	}
 	go func() {
+		defer close(ctrl.finished) // Signal when goroutine exits
 		ticker := time.NewTicker(500 * time.Millisecond)
 		defer ticker.Stop()
 		for {
 			select {
-			case <-flushDone:
+			case <-ctrl.done:
 				return
 			case <-ticker.C:
 				_ = n.outputs.flushWriters()
 			}
 		}
 	}()
-	return flushDone
+	return ctrl
 }
 
 // stopOutputFlusher stops the output flushing goroutine and performs a final flush.
-func (n *Node) stopOutputFlusher(flushDone chan struct{}) {
-	close(flushDone)
+// It waits for the goroutine to exit before performing the final flush to prevent
+// race conditions with file closing.
+func (n *Node) stopOutputFlusher(ctrl *flusherControl) {
+	close(ctrl.done)
+	<-ctrl.finished // Wait for goroutine to exit
 	_ = n.outputs.flushWriters()
 }
 
@@ -546,10 +561,12 @@ func (n *Node) Prepare(ctx context.Context, logDir string, dagRunID string) erro
 }
 
 func (n *Node) Teardown() error {
-	if n.done.Load() {
+	// Atomic check-and-set to prevent concurrent teardown.
+	// This prevents race conditions where two goroutines could both
+	// pass the check before either sets the flag.
+	if !n.done.CompareAndSwap(false, true) {
 		return nil
 	}
-	n.done.Store(true)
 
 	var lastErr error
 	if err := n.outputs.closeResources(); err != nil {
