@@ -157,9 +157,9 @@ func (n *Node) Execute(ctx context.Context) error {
 		return err
 	}
 
-	flushDone := n.startOutputFlusher()
+	flusher := n.startOutputFlusher()
 	defer func() {
-		n.stopOutputFlusher(flushDone)
+		n.stopOutputFlusher(flusher)
 	}()
 
 	exitCode, err := n.runCommand(ctx, cmd, stepTimeout)
@@ -195,27 +195,41 @@ func (n *Node) setupContextWithTimeout(ctx context.Context) (context.Context, co
 	return ctx, cancel, 0
 }
 
+// flusherControl coordinates shutdown of the output flusher goroutine.
+type flusherControl struct {
+	done     chan struct{} // Signals the flusher to stop
+	finished chan struct{} // Closed when the flusher exits
+}
+
 // startOutputFlusher starts a goroutine that periodically flushes output buffers.
-func (n *Node) startOutputFlusher() chan struct{} {
-	flushDone := make(chan struct{})
+// It returns a flusherControl that must be passed to stopOutputFlusher to ensure
+// proper synchronization when stopping.
+func (n *Node) startOutputFlusher() *flusherControl {
+	ctrl := &flusherControl{
+		done:     make(chan struct{}),
+		finished: make(chan struct{}),
+	}
 	go func() {
+		defer close(ctrl.finished) // Signal when goroutine exits
 		ticker := time.NewTicker(500 * time.Millisecond)
 		defer ticker.Stop()
 		for {
 			select {
-			case <-flushDone:
+			case <-ctrl.done:
 				return
 			case <-ticker.C:
 				_ = n.outputs.flushWriters()
 			}
 		}
 	}()
-	return flushDone
+	return ctrl
 }
 
-// stopOutputFlusher stops the output flushing goroutine and performs a final flush.
-func (n *Node) stopOutputFlusher(flushDone chan struct{}) {
-	close(flushDone)
+// stopOutputFlusher stops the flusher goroutine, waits for it to exit,
+// then performs a final flush.
+func (n *Node) stopOutputFlusher(ctrl *flusherControl) {
+	close(ctrl.done)
+	<-ctrl.finished
 	_ = n.outputs.flushWriters()
 }
 
@@ -546,10 +560,10 @@ func (n *Node) Prepare(ctx context.Context, logDir string, dagRunID string) erro
 }
 
 func (n *Node) Teardown() error {
-	if n.done.Load() {
+	// Atomically mark as done to prevent concurrent teardown
+	if !n.done.CompareAndSwap(false, true) {
 		return nil
 	}
-	n.done.Store(true)
 
 	var lastErr error
 	if err := n.outputs.closeResources(); err != nil {

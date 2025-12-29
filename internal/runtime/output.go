@@ -19,7 +19,8 @@ import (
 )
 
 type OutputCoordinator struct {
-	mu sync.Mutex
+	mu     sync.Mutex
+	closed bool // Set when resources are closed
 
 	stdoutFileName string
 	stdoutFile     *os.File
@@ -164,6 +165,10 @@ func (oc *OutputCoordinator) flushWriters() error {
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
+	if oc.closed {
+		return nil
+	}
+
 	var lastErr error
 	for _, w := range []io.Writer{oc.stdoutWriter, oc.stderrWriter, oc.stdoutRedirectWriter, oc.stderrRedirectWriter} {
 		if w == nil {
@@ -184,11 +189,15 @@ func (oc *OutputCoordinator) flushWriters() error {
 }
 
 func (oc *OutputCoordinator) closeResources() error {
-	// First flush all writers
 	_ = oc.flushWriters()
 
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
+
+	if oc.closed {
+		return nil
+	}
+	oc.closed = true
 
 	var lastErr error
 
