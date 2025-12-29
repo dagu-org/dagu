@@ -347,8 +347,15 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 	// Process authentication settings.
 	var explicitAuthMode bool
 	if def.Auth != nil && def.Auth.Mode != nil {
-		cfg.Server.Auth.Mode = AuthMode(*def.Auth.Mode)
-		explicitAuthMode = true
+		mode := AuthMode(*def.Auth.Mode)
+		switch mode {
+		case AuthModeNone, AuthModeBuiltin, AuthModeOIDC:
+			cfg.Server.Auth.Mode = mode
+			explicitAuthMode = true
+		default:
+			l.warnings = append(l.warnings, fmt.Sprintf("Invalid auth.mode value: %q, defaulting to 'none'", *def.Auth.Mode))
+			cfg.Server.Auth.Mode = AuthModeNone
+		}
 	} else {
 		cfg.Server.Auth.Mode = AuthModeNone
 	}
