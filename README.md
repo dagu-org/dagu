@@ -29,6 +29,9 @@ Built for developers who want powerful workflow orchestration without the operat
 ### CLI Preview
 ![Demo CLI](./assets/images/demo-cli.webp)
 
+### Try It Live
+Explore Dagu without installing: [Live Demo](https://dagu-1-22-1-dev.onrender.com/) (credentials: `demouser` / `demouser`)
+
 ## Why Dagu?
 
 Many workflow orchestrators already exist, and Apache Airflow is a well known example. In Airflow, DAGs are loaded from Python source files, so defining workflows typically means writing and maintaining Python code. In real deployments, Airflow commonly involves multiple running components (for example, scheduler, webserver, metadata database, and workers) and DAG files often need to be synchronized across them, which can increase operational complexity. 
