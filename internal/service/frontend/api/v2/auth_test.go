@@ -287,3 +287,215 @@ func TestAuth_PublicPaths(t *testing.T) {
 	// But other endpoints should require auth
 	server.Client().Get("/api/v2/dag-runs").ExpectStatus(http.StatusUnauthorized).Send(t)
 }
+
+// =============================================================================
+// Auth Mode + Configuration Combination Tests
+// =============================================================================
+// These tests verify that all combinations of auth mode and auth configuration
+// behave correctly. This is important because auth mode should take precedence
+// over individual auth configurations.
+
+// TestAuth_ModeNoneWithToken tests that when auth mode is "none",
+// requests are allowed even if an API token is configured.
+// This was a bug where token auth was enabled regardless of auth mode.
+func TestAuth_ModeNoneWithToken(t *testing.T) {
+	t.Parallel()
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Server.Auth.Mode = config.AuthModeNone
+		cfg.Server.Auth.Token.Value = "configured-but-should-be-ignored"
+	}))
+
+	// With mode=none, requests should succeed without any auth
+	server.Client().Get("/api/v2/dag-runs").ExpectStatus(http.StatusOK).Send(t)
+
+	// Token should also work (but not be required)
+	server.Client().Get("/api/v2/dag-runs").
+		WithBearerToken("configured-but-should-be-ignored").
+		ExpectStatus(http.StatusOK).Send(t)
+
+	// Wrong token should also work because auth is disabled
+	server.Client().Get("/api/v2/dag-runs").
+		WithBearerToken("wrong-token").
+		ExpectStatus(http.StatusOK).Send(t)
+}
+
+// TestAuth_ModeNoneWithBasicAuth tests that when auth mode is "none",
+// requests are allowed even if basic auth credentials are configured.
+func TestAuth_ModeNoneWithBasicAuth(t *testing.T) {
+	t.Parallel()
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Server.Auth.Mode = config.AuthModeNone
+		cfg.Server.Auth.Basic.Username = "admin"
+		cfg.Server.Auth.Basic.Password = "secret"
+	}))
+
+	// With mode=none, requests should succeed without any auth
+	server.Client().Get("/api/v2/dag-runs").ExpectStatus(http.StatusOK).Send(t)
+
+	// Basic auth should also work (but not be required)
+	server.Client().Get("/api/v2/dag-runs").
+		WithBasicAuth("admin", "secret").
+		ExpectStatus(http.StatusOK).Send(t)
+
+	// Wrong credentials should also work because auth is disabled
+	server.Client().Get("/api/v2/dag-runs").
+		WithBasicAuth("wrong", "wrong").
+		ExpectStatus(http.StatusOK).Send(t)
+}
+
+// TestAuth_ModeNoneWithTokenAndBasicAuth tests that when auth mode is "none",
+// requests are allowed even if both token and basic auth are configured.
+func TestAuth_ModeNoneWithTokenAndBasicAuth(t *testing.T) {
+	t.Parallel()
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Server.Auth.Mode = config.AuthModeNone
+		cfg.Server.Auth.Token.Value = "my-token"
+		cfg.Server.Auth.Basic.Username = "admin"
+		cfg.Server.Auth.Basic.Password = "secret"
+	}))
+
+	// With mode=none, requests should succeed without any auth
+	server.Client().Get("/api/v2/dag-runs").ExpectStatus(http.StatusOK).Send(t)
+
+	// All auth methods should work but none should be required
+	server.Client().Get("/api/v2/dag-runs").
+		WithBearerToken("my-token").
+		ExpectStatus(http.StatusOK).Send(t)
+
+	server.Client().Get("/api/v2/dag-runs").
+		WithBasicAuth("admin", "secret").
+		ExpectStatus(http.StatusOK).Send(t)
+
+	// Wrong credentials should also work because auth is disabled
+	server.Client().Get("/api/v2/dag-runs").
+		WithBearerToken("wrong").
+		ExpectStatus(http.StatusOK).Send(t)
+
+	server.Client().Get("/api/v2/dag-runs").
+		WithBasicAuth("wrong", "wrong").
+		ExpectStatus(http.StatusOK).Send(t)
+}
+
+// TestAuth_DefaultModeWithToken tests that when auth mode is not explicitly set
+// (empty/default), token auth is enabled if a token is configured.
+func TestAuth_DefaultModeWithToken(t *testing.T) {
+	t.Parallel()
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		// Don't set auth mode explicitly (empty string)
+		cfg.Server.Auth.Token.Value = "my-secret-token"
+	}))
+
+	// Without auth - should fail because token is configured
+	server.Client().Get("/api/v2/dag-runs").ExpectStatus(http.StatusUnauthorized).Send(t)
+
+	// With correct token - should succeed
+	server.Client().Get("/api/v2/dag-runs").
+		WithBearerToken("my-secret-token").
+		ExpectStatus(http.StatusOK).Send(t)
+
+	// With wrong token - should fail
+	server.Client().Get("/api/v2/dag-runs").
+		WithBearerToken("wrong-token").
+		ExpectStatus(http.StatusUnauthorized).Send(t)
+}
+
+// TestAuth_DefaultModeWithBasicAuth tests that when auth mode is not explicitly set,
+// basic auth is enabled if credentials are configured.
+func TestAuth_DefaultModeWithBasicAuth(t *testing.T) {
+	t.Parallel()
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		// Don't set auth mode explicitly
+		cfg.Server.Auth.Basic.Username = "admin"
+		cfg.Server.Auth.Basic.Password = "secret"
+	}))
+
+	// Without auth - should fail
+	server.Client().Get("/api/v2/dag-runs").ExpectStatus(http.StatusUnauthorized).Send(t)
+
+	// With correct credentials - should succeed
+	server.Client().Get("/api/v2/dag-runs").
+		WithBasicAuth("admin", "secret").
+		ExpectStatus(http.StatusOK).Send(t)
+
+	// With wrong credentials - should fail
+	server.Client().Get("/api/v2/dag-runs").
+		WithBasicAuth("wrong", "wrong").
+		ExpectStatus(http.StatusUnauthorized).Send(t)
+}
+
+// TestAuth_DefaultModeWithTokenAndBasicAuth tests that when auth mode is not explicitly set,
+// both token and basic auth work if both are configured.
+func TestAuth_DefaultModeWithTokenAndBasicAuth(t *testing.T) {
+	t.Parallel()
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		// Don't set auth mode explicitly
+		cfg.Server.Auth.Token.Value = "my-token"
+		cfg.Server.Auth.Basic.Username = "admin"
+		cfg.Server.Auth.Basic.Password = "secret"
+	}))
+
+	// Without auth - should fail
+	server.Client().Get("/api/v2/dag-runs").ExpectStatus(http.StatusUnauthorized).Send(t)
+
+	// With token - should succeed
+	server.Client().Get("/api/v2/dag-runs").
+		WithBearerToken("my-token").
+		ExpectStatus(http.StatusOK).Send(t)
+
+	// With basic auth - should succeed
+	server.Client().Get("/api/v2/dag-runs").
+		WithBasicAuth("admin", "secret").
+		ExpectStatus(http.StatusOK).Send(t)
+
+	// With wrong credentials - should fail
+	server.Client().Get("/api/v2/dag-runs").
+		WithBearerToken("wrong").
+		ExpectStatus(http.StatusUnauthorized).Send(t)
+
+	server.Client().Get("/api/v2/dag-runs").
+		WithBasicAuth("wrong", "wrong").
+		ExpectStatus(http.StatusUnauthorized).Send(t)
+}
+
+// TestAuth_BuiltinModeWithTokenAndBasicAuth tests that in builtin mode,
+// token auth works but basic auth is ignored (users should use builtin login).
+func TestAuth_BuiltinModeWithTokenAndBasicAuth(t *testing.T) {
+	t.Parallel()
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Server.Auth.Mode = config.AuthModeBuiltin
+		cfg.Server.Auth.Builtin.Admin.Username = "admin"
+		cfg.Server.Auth.Builtin.Admin.Password = "adminpass"
+		cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
+		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
+		// Configure both token and basic auth
+		cfg.Server.Auth.Token.Value = "my-api-token"
+		cfg.Server.Auth.Basic.Username = "basicuser"
+		cfg.Server.Auth.Basic.Password = "basicpass"
+	}))
+
+	// Without auth - should fail
+	server.Client().Get("/api/v2/dag-runs").ExpectStatus(http.StatusUnauthorized).Send(t)
+
+	// With API token - should succeed
+	server.Client().Get("/api/v2/dag-runs").
+		WithBearerToken("my-api-token").
+		ExpectStatus(http.StatusOK).Send(t)
+
+	// With basic auth - should fail (basic auth is ignored in builtin mode)
+	server.Client().Get("/api/v2/dag-runs").
+		WithBasicAuth("basicuser", "basicpass").
+		ExpectStatus(http.StatusUnauthorized).Send(t)
+
+	// With JWT from login - should succeed
+	loginResp := server.Client().Post("/api/v2/auth/login", api.LoginRequest{
+		Username: "admin",
+		Password: "adminpass",
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	var loginResult api.LoginResponse
+	loginResp.Unmarshal(t, &loginResult)
+
+	server.Client().Get("/api/v2/dag-runs").
+		WithBearerToken(loginResult.Token).
+		ExpectStatus(http.StatusOK).Send(t)
+}
