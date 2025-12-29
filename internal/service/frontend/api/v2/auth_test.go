@@ -17,10 +17,10 @@ func TestAuth_Combinations(t *testing.T) {
 	t.Parallel()
 
 	type authConfig struct {
-		mode       config.AuthMode
-		token      string
-		basicUser  string
-		basicPass  string
+		mode      config.AuthMode
+		token     string
+		basicUser string
+		basicPass string
 	}
 
 	type request struct {
@@ -200,10 +200,10 @@ func TestAuth_BuiltinMode(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		token      string // API token (not JWT)
-		basicUser  string
-		basicPass  string
+		name      string
+		token     string // API token (not JWT)
+		basicUser string
+		basicPass string
 	}{
 		{name: "jwt_only"},
 		{name: "jwt_with_token", token: "api-token"},
