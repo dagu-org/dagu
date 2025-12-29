@@ -157,9 +157,9 @@ func (n *Node) Execute(ctx context.Context) error {
 		return err
 	}
 
-	flushDone := n.startOutputFlusher()
+	flusher := n.startOutputFlusher()
 	defer func() {
-		n.stopOutputFlusher(flushDone)
+		n.stopOutputFlusher(flusher)
 	}()
 
 	exitCode, err := n.runCommand(ctx, cmd, stepTimeout)
