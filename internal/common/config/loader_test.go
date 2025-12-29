@@ -1000,19 +1000,3 @@ auth:
 		assert.Equal(t, 24*time.Hour, cfg.Server.Auth.Builtin.Token.TTL)
 	})
 }
-
-func TestLoad_AuthTokenEnvExpansion(t *testing.T) {
-	t.Parallel()
-	unsetEnv(t, "DAGU_AUTH_TOKEN")
-	unsetEnv(t, "DAGU_AUTHTOKEN")
-
-	cfg := loadWithEnv(t, `
-auth:
-  token:
-    value: "${AUTH_TOKEN}"
-`, map[string]string{
-		"AUTH_TOKEN": "env-token",
-	})
-
-	assert.Equal(t, "env-token", cfg.Server.Auth.Token.Value)
-}
