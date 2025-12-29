@@ -739,6 +739,8 @@ func (c *Client) attachAndWait(ctx context.Context, cli *client.Client, containe
 
 	var wg sync.WaitGroup
 	wg.Add(1)
+	defer wg.Wait() // Ensure log copying completes before returning
+
 	go func() {
 		defer wg.Done()
 		logger.Debug(ctx, "Docker: attachAndWait stdcopy goroutine started")
@@ -769,11 +771,6 @@ func (c *Client) attachAndWait(ctx context.Context, cli *client.Client, containe
 		}
 		return int(status.StatusCode), nil
 	}
-
-	// Wait for log copying to complete
-	logger.Debug(ctx, "Docker: attachAndWait waiting for log copy to complete")
-	wg.Wait()
-	logger.Debug(ctx, "Docker: attachAndWait log copy completed")
 
 	return 0, nil
 }
