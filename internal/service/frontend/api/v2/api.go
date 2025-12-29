@@ -207,11 +207,8 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 	// Basic auth works independently if credentials are configured
 	basicAuthEnabled := authConfig.Basic.Username != "" &&
 		authConfig.Basic.Password != ""
-	// Auth is required unless mode is explicitly set to "none"
-	authRequired := authConfig.Mode != config.AuthModeNone
-	if basicAuthEnabled || authConfig.Token.Value != "" {
-		authRequired = true
-	}
+	// Auth is required unless mode is explicitly set to "none" and no credentials are configured
+	authRequired := authConfig.Mode != config.AuthModeNone || basicAuthEnabled || authConfig.Token.Value != ""
 	authOptions := frontendauth.Options{
 		Realm:            "restricted",
 		APITokenEnabled:  authConfig.Token.Value != "",
