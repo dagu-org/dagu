@@ -109,6 +109,7 @@ func TestMiddleware_APIKeyValidation_InvalidKey(t *testing.T) {
 
 	opts := Options{
 		APIKeyValidator: apiKeyValidator,
+		AuthRequired:    true,
 	}
 	middleware := Middleware(opts)
 
@@ -139,6 +140,7 @@ func TestMiddleware_APIKeyValidation_WrongPrefix(t *testing.T) {
 
 	opts := Options{
 		APIKeyValidator: apiKeyValidator,
+		AuthRequired:    true,
 	}
 	middleware := Middleware(opts)
 
@@ -285,6 +287,7 @@ func TestMiddleware_PublicPaths(t *testing.T) {
 	opts := Options{
 		APIKeyValidator: apiKeyValidator,
 		PublicPaths:     []string{"/public", "/api/health"},
+		AuthRequired:    true,
 	}
 	middleware := Middleware(opts)
 
@@ -321,6 +324,7 @@ func TestMiddleware_PublicPathPrefixes(t *testing.T) {
 	opts := Options{
 		APIKeyValidator:    apiKeyValidator,
 		PublicPathPrefixes: []string{"/api/v2/webhooks/"},
+		AuthRequired:       true,
 	}
 	middleware := Middleware(opts)
 
