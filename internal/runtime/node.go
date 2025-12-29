@@ -195,10 +195,10 @@ func (n *Node) setupContextWithTimeout(ctx context.Context) (context.Context, co
 	return ctx, cancel, 0
 }
 
-// flusherControl manages the output flusher goroutine lifecycle.
+// flusherControl coordinates shutdown of the output flusher goroutine.
 type flusherControl struct {
-	done     chan struct{} // Signal to stop the flusher
-	finished chan struct{} // Signals when the flusher goroutine has exited
+	done     chan struct{} // Signals the flusher to stop
+	finished chan struct{} // Closed when the flusher exits
 }
 
 // startOutputFlusher starts a goroutine that periodically flushes output buffers.
@@ -225,12 +225,11 @@ func (n *Node) startOutputFlusher() *flusherControl {
 	return ctrl
 }
 
-// stopOutputFlusher stops the output flushing goroutine and performs a final flush.
-// It waits for the goroutine to exit before performing the final flush to prevent
-// race conditions with file closing.
+// stopOutputFlusher stops the flusher goroutine, waits for it to exit,
+// then performs a final flush.
 func (n *Node) stopOutputFlusher(ctrl *flusherControl) {
 	close(ctrl.done)
-	<-ctrl.finished // Wait for goroutine to exit
+	<-ctrl.finished
 	_ = n.outputs.flushWriters()
 }
 
@@ -561,9 +560,7 @@ func (n *Node) Prepare(ctx context.Context, logDir string, dagRunID string) erro
 }
 
 func (n *Node) Teardown() error {
-	// Atomic check-and-set to prevent concurrent teardown.
-	// This prevents race conditions where two goroutines could both
-	// pass the check before either sets the flag.
+	// Atomically mark as done to prevent concurrent teardown
 	if !n.done.CompareAndSwap(false, true) {
 		return nil
 	}

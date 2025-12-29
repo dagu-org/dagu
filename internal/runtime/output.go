@@ -20,7 +20,7 @@ import (
 
 type OutputCoordinator struct {
 	mu     sync.Mutex
-	closed bool // Indicates resources have been closed; prevents operations after close
+	closed bool // Set when resources are closed
 
 	stdoutFileName string
 	stdoutFile     *os.File
@@ -165,7 +165,6 @@ func (oc *OutputCoordinator) flushWriters() error {
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
-	// Skip flush if resources are already closed (defense in depth)
 	if oc.closed {
 		return nil
 	}
@@ -190,13 +189,11 @@ func (oc *OutputCoordinator) flushWriters() error {
 }
 
 func (oc *OutputCoordinator) closeResources() error {
-	// First flush all writers
 	_ = oc.flushWriters()
 
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
-	// Prevent double-close (defense in depth)
 	if oc.closed {
 		return nil
 	}
