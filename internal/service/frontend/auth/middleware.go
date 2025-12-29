@@ -34,6 +34,10 @@ type Options struct {
 	// APIKeyValidator validates standalone API keys with roles.
 	// When set, API keys with the "dagu_" prefix are accepted as an authentication method.
 	APIKeyValidator APIKeyValidator
+	// AuthRequired indicates whether authentication is required.
+	// When false (e.g., auth mode "none"), credentials are validated if provided
+	// but unauthenticated requests are allowed through.
+	AuthRequired bool
 }
 
 // DefaultOptions provides sensible defaults for the middleware.
@@ -153,10 +157,14 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 			// Try Basic Auth if enabled
 			if opts.BasicAuthEnabled {
 				if user, pass, ok := r.BasicAuth(); ok {
+					// Credentials were provided - must validate
 					if checkBasicAuth(user, pass, opts.Creds) {
 						next.ServeHTTP(w, r)
 						return
 					}
+					// Invalid credentials - always reject
+					requireBasicAuth(w, opts.Realm)
+					return
 				}
 			}
 
@@ -166,11 +174,19 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 				return
 			}
 
-			// No valid authentication found - send appropriate challenge
+			// No credentials provided
+			// If auth is not required (e.g., mode "none"), allow the request through
+			if !opts.AuthRequired {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Auth is required - send appropriate challenge
 			if opts.BasicAuthEnabled {
 				requireBasicAuth(w, opts.Realm)
 				return
 			}
+
 			requireBearerAuth(w, opts.Realm)
 		})
 	}

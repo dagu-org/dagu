@@ -204,18 +204,20 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 
 	// Initialize auth configuration
 	authConfig := a.config.Server.Auth
-	// Basic auth is disabled when:
-	// - auth mode is "none" (no authentication required)
-	// - auth mode is "builtin" (users should use builtin auth instead)
-	basicAuthEnabled := authConfig.Mode != config.AuthModeNone &&
-		authConfig.Mode != config.AuthModeBuiltin &&
-		authConfig.Basic.Username != "" &&
+	// Basic auth works independently if credentials are configured
+	basicAuthEnabled := authConfig.Basic.Username != "" &&
 		authConfig.Basic.Password != ""
+	// Auth is required unless mode is explicitly set to "none"
+	authRequired := authConfig.Mode != config.AuthModeNone
+	if basicAuthEnabled || authConfig.Token.Value != "" {
+		authRequired = true
+	}
 	authOptions := frontendauth.Options{
 		Realm:            "restricted",
-		APITokenEnabled:  authConfig.Mode != config.AuthModeNone && authConfig.Token.Value != "",
+		APITokenEnabled:  authConfig.Token.Value != "",
 		APIToken:         authConfig.Token.Value,
 		BasicAuthEnabled: basicAuthEnabled,
+		AuthRequired:     authRequired,
 		Creds:            map[string]string{authConfig.Basic.Username: authConfig.Basic.Password},
 		PublicPaths: []string{
 			pathutil.BuildPublicEndpointPath(basePath, "api/v2/health"),
