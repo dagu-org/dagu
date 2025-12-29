@@ -933,6 +933,18 @@ auth:
 		cfg := loadFromYAML(t, "# empty")
 		assert.Equal(t, AuthModeNone, cfg.Server.Auth.Mode)
 	})
+
+	t.Run("AuthModeInvalid", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+auth:
+  mode: "invalid_mode"
+`)
+		// Invalid mode should default to none with a warning
+		assert.Equal(t, AuthModeNone, cfg.Server.Auth.Mode)
+		require.Len(t, cfg.Warnings, 1)
+		assert.Contains(t, cfg.Warnings[0], "Invalid auth.mode value")
+		assert.Contains(t, cfg.Warnings[0], "invalid_mode")
+	})
 }
 
 func TestLoad_AuthBuiltin(t *testing.T) {
