@@ -499,3 +499,102 @@ func TestAuth_BuiltinModeWithTokenAndBasicAuth(t *testing.T) {
 		WithBearerToken(loginResult.Token).
 		ExpectStatus(http.StatusOK).Send(t)
 }
+
+// TestAuth_ModeNone tests that when auth mode is explicitly set to "none",
+// no authentication is required regardless of any other configuration.
+func TestAuth_ModeNone(t *testing.T) {
+	t.Parallel()
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Server.Auth.Mode = config.AuthModeNone
+		// No token or basic auth configured
+	}))
+
+	// With mode=none explicitly set, requests should succeed without any auth
+	server.Client().Get("/api/v2/dag-runs").ExpectStatus(http.StatusOK).Send(t)
+}
+
+// TestAuth_BuiltinModeNoToken tests that builtin mode works with only JWT login
+// (no API token configured).
+func TestAuth_BuiltinModeNoToken(t *testing.T) {
+	t.Parallel()
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Server.Auth.Mode = config.AuthModeBuiltin
+		cfg.Server.Auth.Builtin.Admin.Username = "admin"
+		cfg.Server.Auth.Builtin.Admin.Password = "adminpass"
+		cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
+		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
+		// No API token configured
+	}))
+
+	// Without auth - should fail
+	server.Client().Get("/api/v2/dag-runs").ExpectStatus(http.StatusUnauthorized).Send(t)
+
+	// Login to get JWT token
+	loginResp := server.Client().Post("/api/v2/auth/login", api.LoginRequest{
+		Username: "admin",
+		Password: "adminpass",
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	var loginResult api.LoginResponse
+	loginResp.Unmarshal(t, &loginResult)
+
+	// With JWT token - should succeed
+	server.Client().Get("/api/v2/dag-runs").
+		WithBearerToken(loginResult.Token).
+		ExpectStatus(http.StatusOK).Send(t)
+
+	// Random bearer token should fail (no API token configured)
+	server.Client().Get("/api/v2/dag-runs").
+		WithBearerToken("random-token").
+		ExpectStatus(http.StatusUnauthorized).Send(t)
+}
+
+// TestAuth_BuiltinModeWithBasicAuthOnly tests that in builtin mode,
+// basic auth alone is ignored (users must use JWT login).
+func TestAuth_BuiltinModeWithBasicAuthOnly(t *testing.T) {
+	t.Parallel()
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Server.Auth.Mode = config.AuthModeBuiltin
+		cfg.Server.Auth.Builtin.Admin.Username = "admin"
+		cfg.Server.Auth.Builtin.Admin.Password = "adminpass"
+		cfg.Server.Auth.Builtin.Token.Secret = "jwt-secret-key"
+		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
+		// Only basic auth configured (no API token)
+		cfg.Server.Auth.Basic.Username = "basicuser"
+		cfg.Server.Auth.Basic.Password = "basicpass"
+	}))
+
+	// Without auth - should fail
+	server.Client().Get("/api/v2/dag-runs").ExpectStatus(http.StatusUnauthorized).Send(t)
+
+	// With basic auth - should fail (basic auth is ignored in builtin mode)
+	server.Client().Get("/api/v2/dag-runs").
+		WithBasicAuth("basicuser", "basicpass").
+		ExpectStatus(http.StatusUnauthorized).Send(t)
+
+	// Must use JWT login
+	loginResp := server.Client().Post("/api/v2/auth/login", api.LoginRequest{
+		Username: "admin",
+		Password: "adminpass",
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	var loginResult api.LoginResponse
+	loginResp.Unmarshal(t, &loginResult)
+
+	server.Client().Get("/api/v2/dag-runs").
+		WithBearerToken(loginResult.Token).
+		ExpectStatus(http.StatusOK).Send(t)
+}
+
+// TestAuth_DefaultModeNoAuthConfigured tests that when no auth mode is set
+// and no auth is configured, requests are allowed (backwards compatibility).
+func TestAuth_DefaultModeNoAuthConfigured(t *testing.T) {
+	t.Parallel()
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		// Don't set auth mode, don't configure any auth
+		// This is the backwards-compatible behavior
+	}))
+
+	// Should work without any auth
+	server.Client().Get("/api/v2/dag-runs").ExpectStatus(http.StatusOK).Send(t)
+}
