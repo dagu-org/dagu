@@ -572,6 +572,9 @@ Changelog of recent updates can be found in the [Changelog](https://docs.dagu.cl
   <a href="https://github.com/jayjoshi64">
     <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fjayjoshi64.png&w=128&h=128&fit=cover&mask=circle" width="50" height="50" alt="@jayjoshi64" style="margin: 5px;">
   </a>
+  <a href="https://github.com/alangrafu">
+    <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Falangrafu.png&w=128&h=128&fit=cover&mask=circle" width="50" height="50" alt="@alangrafu" style="margin: 5px;">
+  </a>
 
   <br/><br/>
   
