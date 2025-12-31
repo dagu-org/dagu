@@ -446,18 +446,18 @@ function DAGSpec({ fileName }: Props) {
                 })()}
 
                 <div className="flex-1 flex flex-col bg-surface border border-border rounded-lg overflow-hidden min-h-[400px]">
-                  {editable && (
-                    <div className="flex-shrink-0 flex justify-between items-center p-2 border-b border-border">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={toggleSidebar}
-                        title="Toggle Schema Documentation (Ctrl+Shift+D)"
-                        className="h-7 px-2 text-xs"
-                      >
-                        <BookOpen className="h-4 w-4 mr-1" />
-                        Docs
-                      </Button>
+                  <div className="flex-shrink-0 flex justify-between items-center p-2 border-b border-border">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleSidebar}
+                      title="Toggle Schema Documentation (Ctrl+Shift+D)"
+                      className="h-7 px-2 text-xs"
+                    >
+                      <BookOpen className="h-4 w-4 mr-1" />
+                      Docs
+                    </Button>
+                    {editable && (
                       <Button
                         id="save-config"
                         title="Save changes (Ctrl+S / Cmd+S)"
@@ -470,8 +470,8 @@ function DAGSpec({ fileName }: Props) {
                         <Save className="h-4 w-4" />
                         Save
                       </Button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                   <div className="flex-1 flex min-h-0">
                     <div className="flex-1 min-w-0">
                       <DAGEditor

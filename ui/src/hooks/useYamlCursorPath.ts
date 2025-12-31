@@ -318,8 +318,10 @@ export function useYamlCursorPath(
   }, [content, lineNumber, column]);
 
   const pathInfo = useMemo(() => {
-    return getYamlPathAtOffset(content, offset);
-  }, [content, offset]);
+    const result = getYamlPathAtOffset(content, offset);
+    console.log('useYamlCursorPath - line:', lineNumber, 'col:', column, 'offset:', offset, 'path:', result.path);
+    return result;
+  }, [content, offset, lineNumber, column]);
 
   return pathInfo;
 }

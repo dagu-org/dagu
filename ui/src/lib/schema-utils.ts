@@ -56,11 +56,15 @@ export function getSchemaAtPath(
     return schema;
   }
 
+  console.log('getSchemaAtPath - starting with path:', path);
+  console.log('getSchemaAtPath - schema has properties:', Object.keys(schema.properties || {}));
+
   let current: JSONSchema | null = schema;
   let currentRequired: string[] = schema.required || [];
 
   for (let i = 0; i < path.length; i++) {
     const segment = path[i];
+    console.log('getSchemaAtPath - processing segment:', segment, 'at index:', i);
 
     if (!current || !segment) {
       return null;
@@ -68,15 +72,22 @@ export function getSchemaAtPath(
 
     // Handle array index access
     if (/^\d+$/.test(segment)) {
+      console.log('getSchemaAtPath - array index, current schema:', current);
+      console.log('getSchemaAtPath - current.items:', current.items);
+      console.log('getSchemaAtPath - current.type:', current.type);
       current = resolveArrayItems(current);
-      if (current) {
-        currentRequired = current.required || [];
+      console.log('getSchemaAtPath - after resolveArrayItems:', current);
+      if (!current) {
+        console.log('getSchemaAtPath - resolveArrayItems returned null, returning null');
+        return null;
       }
+      currentRequired = current.required || [];
       continue;
     }
 
     // Try to resolve from properties
     const prop: JSONSchema | undefined = current.properties?.[segment];
+    console.log('getSchemaAtPath - looking for property:', segment, 'found:', !!prop, 'available:', Object.keys(current.properties || {}));
     if (prop) {
       currentRequired = current.required || [];
       current = prop;
@@ -111,9 +122,11 @@ export function getSchemaAtPath(
     }
 
     // Not found
+    console.log('getSchemaAtPath - segment not found:', segment);
     return null;
   }
 
+  console.log('getSchemaAtPath - returning:', current?.type || current?.properties ? 'schema found' : 'null');
   return current;
 }
 
@@ -121,15 +134,52 @@ export function getSchemaAtPath(
  * Resolves array items schema, handling oneOf arrays
  */
 function resolveArrayItems(schema: JSONSchema): JSONSchema | null {
-  if (!schema.items) {
-    return null;
+  // Direct items property
+  if (schema.items) {
+    if (Array.isArray(schema.items)) {
+      return schema.items[0] || null;
+    }
+    return schema.items;
   }
 
-  if (Array.isArray(schema.items)) {
-    return schema.items[0] || null;
+  // Check oneOf for array type
+  if (schema.oneOf) {
+    for (const variant of schema.oneOf) {
+      if (variant.type === 'array' && variant.items) {
+        if (Array.isArray(variant.items)) {
+          return variant.items[0] || null;
+        }
+        return variant.items;
+      }
+      // Also check if variant itself has items (implicit array)
+      if (variant.items) {
+        if (Array.isArray(variant.items)) {
+          return variant.items[0] || null;
+        }
+        return variant.items;
+      }
+    }
   }
 
-  return schema.items;
+  // Check anyOf for array type
+  if (schema.anyOf) {
+    for (const variant of schema.anyOf) {
+      if (variant.type === 'array' && variant.items) {
+        if (Array.isArray(variant.items)) {
+          return variant.items[0] || null;
+        }
+        return variant.items;
+      }
+      if (variant.items) {
+        if (Array.isArray(variant.items)) {
+          return variant.items[0] || null;
+        }
+        return variant.items;
+      }
+    }
+  }
+
+  return null;
 }
 
 /**

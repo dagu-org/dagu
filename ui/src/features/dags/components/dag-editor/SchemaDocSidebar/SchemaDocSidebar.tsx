@@ -25,6 +25,11 @@ export function SchemaDocSidebar({
   const { schema, loading: schemaLoading, error: schemaError, reload } = useSchema();
   const { propertyInfo, siblingProperties, loading, error } = useSchemaLookup(path);
 
+  // Debug logging
+  console.log('SchemaDocSidebar - path:', path);
+  console.log('SchemaDocSidebar - propertyInfo:', propertyInfo);
+  console.log('SchemaDocSidebar - schema properties:', schema ? Object.keys(schema.properties || {}) : 'no schema');
+
   if (!isOpen) {
     return null;
   }
@@ -148,7 +153,7 @@ export function SchemaDocSidebar({
                     .map((prop) => (
                       <span
                         key={prop}
-                        className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-muted-foreground"
+                        className="text-[10px] bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-200"
                       >
                         {prop}
                       </span>
