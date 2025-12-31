@@ -94,6 +94,12 @@ type step struct {
 	// If set, the step runs in its own container instead of the DAG-level container.
 	// Can be a string (existing container name to exec into) or an object (container configuration).
 	Container any `yaml:"container,omitempty"`
+
+	// Type specifies the executor type (ssh, http, jq, mail, docker, gha, archive).
+	Type string `yaml:"type,omitempty"`
+
+	// Config contains executor-specific configuration.
+	Config map[string]any `yaml:"config,omitempty"`
 }
 
 // repeatPolicy defines the repeat policy for a step.
@@ -916,6 +922,19 @@ func validateWorkerSelector(result *core.Step) error {
 
 // validateConflicts checks for mutual exclusivity between step fields.
 func validateConflicts(s *step) error {
+	// Check for new format vs legacy format conflict
+	hasNewFormat := s.Type != "" || len(s.Config) > 0
+	hasLegacyFormat := s.Executor != nil
+
+	if hasNewFormat && hasLegacyFormat {
+		if s.Type != "" {
+			return core.NewValidationError("type", s.Type,
+				fmt.Errorf("cannot use both 'type' and 'executor' fields; use 'type' + 'config' instead"))
+		}
+		return core.NewValidationError("config", s.Config,
+			fmt.Errorf("cannot use both 'config' and 'executor' fields; use 'type' + 'config' instead"))
+	}
+
 	hasSubDAG := strings.TrimSpace(s.Call) != "" || strings.TrimSpace(s.Run) != "" || s.Parallel != nil
 	hasExecutor := s.Executor != nil
 	hasCommand := s.Command != nil
@@ -968,60 +987,70 @@ func buildStepParamsField(ctx StepBuildContext, s *step, result *core.Step) erro
 	return nil
 }
 
-// buildStepExecutor parses the executor field in the step definition.
+// buildStepExecutor parses the executor configuration from step fields.
 func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
-	const (
-		executorKeyType   = "type"
-		executorKeyConfig = "config"
-	)
+	// Step-level type and config fields (highest priority)
+	if s.Type != "" {
+		result.ExecutorConfig.Type = strings.TrimSpace(s.Type)
+	}
+	for k, v := range s.Config {
+		result.ExecutorConfig.Config[k] = v
+	}
 
-	executor := s.Executor
+	// Legacy executor field (backward compatibility)
+	if s.Executor != nil {
+		if err := parseLegacyExecutor(s.Executor, result); err != nil {
+			return err
+		}
+	}
 
-	// Case 1: executor is nil - determine executor from container/SSH config
-	if executor == nil {
-		// Priority 1: Step-level container takes precedence
-		// This is the new intuitive syntax for running steps in containers
-		if result.Container != nil {
-			result.ExecutorConfig.Type = "docker"
-			return nil
-		}
-		// Priority 2: DAG-level container
-		if ctx.dag != nil && ctx.dag.Container != nil {
-			// Translate the container configuration to executor config
-			result.ExecutorConfig.Type = "container"
-			return nil
-		}
-		// Priority 3: DAG-level SSH
-		if ctx.dag != nil && ctx.dag.SSH != nil {
-			result.ExecutorConfig.Type = "ssh"
-			return nil
-		}
+	// Infer type from container field
+	if result.ExecutorConfig.Type == "" && result.Container != nil {
+		result.ExecutorConfig.Type = "docker"
 		return nil
 	}
 
+	// Infer type from DAG-level configuration
+	if result.ExecutorConfig.Type == "" && ctx.dag != nil {
+		if ctx.dag.Container != nil {
+			result.ExecutorConfig.Type = "container"
+		} else if ctx.dag.SSH != nil {
+			result.ExecutorConfig.Type = "ssh"
+		}
+	}
+
+	return nil
+}
+
+// parseLegacyExecutor parses the legacy executor field format.
+func parseLegacyExecutor(executor any, result *core.Step) error {
 	switch val := executor.(type) {
 	case string:
-		// Case 2: executor is a string
-		result.ExecutorConfig.Type = strings.TrimSpace(val)
+		if result.ExecutorConfig.Type == "" {
+			result.ExecutorConfig.Type = strings.TrimSpace(val)
+		}
 
 	case map[string]any:
-		// Case 3: executor is a struct
 		for key, v := range val {
 			switch key {
-			case executorKeyType:
+			case "type":
 				typ, ok := v.(string)
 				if !ok {
 					return core.NewValidationError("executor.type", v, ErrExecutorTypeMustBeString)
 				}
-				result.ExecutorConfig.Type = strings.TrimSpace(typ)
+				if result.ExecutorConfig.Type == "" {
+					result.ExecutorConfig.Type = strings.TrimSpace(typ)
+				}
 
-			case executorKeyConfig:
-				executorConfig, ok := v.(map[string]any)
+			case "config":
+				cfg, ok := v.(map[string]any)
 				if !ok {
 					return core.NewValidationError("executor.config", v, ErrExecutorConfigValueMustBeMap)
 				}
-				for configKey, cv := range executorConfig {
-					result.ExecutorConfig.Config[configKey] = cv
+				for k, cv := range cfg {
+					if result.ExecutorConfig.Config[k] == nil {
+						result.ExecutorConfig.Config[k] = cv
+					}
 				}
 
 			default:

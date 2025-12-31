@@ -3092,3 +3092,266 @@ func TestBuildStepOutputOmit(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildStepExecutorNewFormat(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		step     *step
+		ctx      StepBuildContext
+		expected core.ExecutorConfig
+		wantErr  bool
+	}{
+		{
+			name: "NewFormat_TypeOnly",
+			step: &step{Type: "http"},
+			ctx:  testStepBuildContext(),
+			expected: core.ExecutorConfig{
+				Type:   "http",
+				Config: make(map[string]any),
+			},
+		},
+		{
+			name: "NewFormat_TypeAndConfig",
+			step: &step{
+				Type: "ssh",
+				Config: map[string]any{
+					"host": "server.com",
+					"user": "ubuntu",
+				},
+			},
+			ctx: testStepBuildContext(),
+			expected: core.ExecutorConfig{
+				Type: "ssh",
+				Config: map[string]any{
+					"host": "server.com",
+					"user": "ubuntu",
+				},
+			},
+		},
+		{
+			name: "NewFormat_ConfigOnly",
+			step: &step{
+				Config: map[string]any{
+					"timeout": 30,
+				},
+			},
+			ctx: testStepBuildContext(),
+			expected: core.ExecutorConfig{
+				Type: "",
+				Config: map[string]any{
+					"timeout": 30,
+				},
+			},
+		},
+		{
+			name: "NewFormat_TakesPrecedenceOverContainerInference",
+			step: &step{
+				Type: "http",
+			},
+			ctx: StepBuildContext{
+				BuildContext: testBuildContext(),
+				dag:          &core.DAG{Container: &core.Container{Image: "alpine"}},
+			},
+			expected: core.ExecutorConfig{
+				Type:   "http",
+				Config: make(map[string]any),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := &core.Step{ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)}}
+			err := buildStepExecutor(tt.ctx, tt.step, result)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected.Type, result.ExecutorConfig.Type)
+			assert.Equal(t, tt.expected.Config, result.ExecutorConfig.Config)
+		})
+	}
+}
+
+func TestValidateConflicts_NewVsLegacyFormat(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		step        *step
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:    "NewFormatOnly_Valid",
+			step:    &step{Type: "ssh", Config: map[string]any{"host": "server.com"}},
+			wantErr: false,
+		},
+		{
+			name:    "LegacyFormatOnly_Valid",
+			step:    &step{Executor: map[string]any{"type": "ssh"}},
+			wantErr: false,
+		},
+		{
+			name:        "TypeAndExecutor_Conflict",
+			step:        &step{Type: "ssh", Executor: "http"},
+			wantErr:     true,
+			errContains: "cannot use both 'type' and 'executor' fields",
+		},
+		{
+			name:        "ConfigAndExecutor_Conflict",
+			step:        &step{Config: map[string]any{"host": "server.com"}, Executor: "ssh"},
+			wantErr:     true,
+			errContains: "cannot use both 'config' and 'executor' fields",
+		},
+		{
+			name: "TypeConfigAndExecutor_Conflict",
+			step: &step{
+				Type:     "http",
+				Config:   map[string]any{"timeout": 30},
+				Executor: "ssh",
+			},
+			wantErr:     true,
+			errContains: "cannot use both 'type' and 'executor' fields",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateConflicts(tt.step)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestStepExecutorNewFormat_Integration(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		yaml        string
+		wantType    string
+		wantConfig  map[string]any
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name: "NewFormat_SSH",
+			yaml: `steps:
+  - name: deploy
+    type: ssh
+    config:
+      host: prod.example.com
+      user: deploy
+      port: 22
+    command: uptime
+`,
+			wantType: "ssh",
+			wantConfig: map[string]any{
+				"host": "prod.example.com",
+				"user": "deploy",
+				"port": uint64(22),
+			},
+		},
+		{
+			name: "NewFormat_HTTP",
+			yaml: `steps:
+  - name: webhook
+    type: http
+    config:
+      timeout: 30
+      headers:
+        Authorization: Bearer token123
+    command: POST https://api.example.com
+`,
+			wantType: "http",
+			wantConfig: map[string]any{
+				"timeout": uint64(30),
+				"headers": map[string]any{
+					"Authorization": "Bearer token123",
+				},
+			},
+		},
+		{
+			name: "NewFormat_JQ",
+			yaml: `steps:
+  - name: parse
+    type: jq
+    config:
+      raw: true
+    command: .name
+`,
+			wantType: "jq",
+			wantConfig: map[string]any{
+				"raw": true,
+			},
+		},
+		{
+			name: "LegacyFormat_StillWorks",
+			yaml: `steps:
+  - name: legacy
+    executor:
+      type: ssh
+      config:
+        host: legacy.example.com
+    command: uptime
+`,
+			wantType: "ssh",
+			wantConfig: map[string]any{
+				"host": "legacy.example.com",
+			},
+		},
+		{
+			name: "Conflict_Error",
+			yaml: `steps:
+  - name: conflict
+    type: http
+    executor:
+      type: ssh
+    command: test
+`,
+			wantErr:     true,
+			errContains: "cannot use both 'type' and 'executor' fields",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tmpDir := t.TempDir()
+			tmpFile := filepath.Join(tmpDir, "test.yaml")
+			err := os.WriteFile(tmpFile, []byte(tt.yaml), 0644)
+			require.NoError(t, err)
+
+			dag, err := Load(context.Background(), tmpFile)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Len(t, dag.Steps, 1)
+
+			step := dag.Steps[0]
+			assert.Equal(t, tt.wantType, step.ExecutorConfig.Type)
+			for k, v := range tt.wantConfig {
+				assert.Equal(t, v, step.ExecutorConfig.Config[k], "config key %q mismatch", k)
+			}
+		})
+	}
+}
