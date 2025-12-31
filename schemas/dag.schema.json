@@ -1139,7 +1139,7 @@
       "oneOf": [
         {
           "type": "string",
-          "description": "Name of an existing running container to exec into. The container must be running when the DAG starts."
+          "description": "Name of an existing running container to exec into. Dagu waits up to 120 seconds for the container to be in running state; fails if not running within timeout."
         },
         {
           "$ref": "#/definitions/containerConfig"
@@ -1177,7 +1177,7 @@
       "properties": {
         "exec": {
           "type": "string",
-          "description": "Name of an existing running container to exec into. Mutually exclusive with 'image'. When used, only 'user', 'workingDir', and 'env' are applicable."
+          "description": "Name of an existing running container to exec into. Dagu waits up to 120 seconds for the container to be running; fails if not running within timeout. Mutually exclusive with 'image'. When used, only 'user', 'workingDir', and 'env' are applicable."
         },
         "name": {
           "type": "string",
