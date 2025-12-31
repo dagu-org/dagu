@@ -391,9 +391,10 @@ func isCompletedStatus(s core.Status) bool {
 	switch s {
 	case core.Succeeded, core.Failed, core.Aborted, core.PartiallySucceeded:
 		return true
-	default:
+	case core.NotStarted, core.Running, core.Queued:
 		return false
 	}
+	return false
 }
 
 // calculateDuration computes the duration in seconds between two RFC3339 time strings
