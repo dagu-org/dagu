@@ -205,7 +205,7 @@ func TestEvalContainerFields(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := tt.setup(context.Background())
 
-			result, err := evalContainerFields(ctx, tt.input)
+			result, err := EvalContainerFields(ctx, tt.input)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})

@@ -30,7 +30,7 @@
           "description": "List of paths to .env files to load environment variables from. Files can be specified as absolute paths, or relative to: DAG file directory, base config directory, or user's home directory."
         }
       ],
-      "description": "Specifies .env files to load environment variables from. Defaults to [\".env\"] if not specified. Set to empty array [] to disable .env loading. Files are loaded relative to the DAG's workingDir."
+      "description": "Specifies .env files to load environment variables from. By default, '.env' is loaded. When files are specified, '.env' is automatically prepended to the list. All files are loaded sequentially with later files overriding earlier values. Set to empty array [] to disable all .env loading. Files are loaded relative to the DAG's workingDir."
     },
     "workingDir": {
       "type": "string",
@@ -1136,6 +1136,18 @@
       "description": "OpenTelemetry configuration for distributed tracing. Enables detailed execution traces for DAGs and steps, providing visibility into workflow performance and debugging."
     },
     "container": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Name of an existing running container to exec into. Dagu waits up to 120 seconds for the container to be in running state; fails if not running within timeout."
+        },
+        {
+          "$ref": "#/definitions/containerConfig"
+        }
+      ],
+      "description": "Container configuration. Can be either a string (name of existing container to exec into) or an object (container configuration with image or exec field)."
+    },
+    "containerConfig": {
       "type": "object",
       "additionalProperties": false,
       "allOf": [
@@ -1152,14 +1164,28 @@
           }
         }
       ],
+      "oneOf": [
+        {
+          "required": ["exec"],
+          "not": { "required": ["image"] }
+        },
+        {
+          "required": ["image"],
+          "not": { "required": ["exec"] }
+        }
+      ],
       "properties": {
+        "exec": {
+          "type": "string",
+          "description": "Name of an existing running container to exec into. Dagu waits up to 120 seconds for the container to be running; fails if not running within timeout. Mutually exclusive with 'image'. When used, only 'user', 'workingDir', and 'env' are applicable."
+        },
         "name": {
           "type": "string",
-          "description": "Custom container name. If empty, Docker generates a random name. Must be unique - if a container with this name already exists (running or stopped), the DAG will fail."
+          "description": "Custom container name. If empty, Docker generates a random name. Must be unique - if a container with this name already exists (running or stopped), the DAG will fail. Not applicable in exec mode."
         },
         "image": {
           "type": "string",
-          "description": "Container image to use (e.g., 'python:3.11', 'node:20'). Required when using container configuration."
+          "description": "Container image to use (e.g., 'python:3.11', 'node:20'). Mutually exclusive with 'exec'."
         },
         "pullPolicy": {
           "oneOf": [
@@ -1174,7 +1200,7 @@
             }
           ],
           "default": "missing",
-          "description": "Image pull policy. Accepts boolean (true='always', false='never') or string ('always', 'never', 'missing'). Default is 'missing'."
+          "description": "Image pull policy. Accepts boolean (true='always', false='never') or string ('always', 'never', 'missing'). Default is 'missing'. Not applicable in exec mode."
         },
         "env": {
           "oneOf": [
@@ -1205,7 +1231,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Volume mounts for the container. Format: 'host_path:container_path[:mode]' where mode is 'ro' for read-only or 'rw' (default) for read-write. Relative paths (starting with './' or '.') are resolved relative to the DAG's workingDir."
+          "description": "Volume mounts for the container. Format: 'host_path:container_path[:mode]' where mode is 'ro' for read-only or 'rw' (default) for read-write. Relative paths (starting with './' or '.') are resolved relative to the DAG's workingDir. Not applicable in exec mode."
         },
         "user": {
           "type": "string",
@@ -1221,52 +1247,51 @@
         },
         "platform": {
           "type": "string",
-          "description": "Platform for the container (e.g., 'linux/amd64', 'linux/arm64'). Useful for ensuring compatibility on different architectures."
+          "description": "Platform for the container (e.g., 'linux/amd64', 'linux/arm64'). Useful for ensuring compatibility on different architectures. Not applicable in exec mode."
         },
         "ports": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "Ports to expose from the container. Format: 'host_port:container_port' or just 'container_port'."
+          "description": "Ports to expose from the container. Format: 'host_port:container_port' or just 'container_port'. Not applicable in exec mode."
         },
         "network": {
           "type": "string",
-          "description": "Network mode for the container (e.g., 'host', 'bridge', 'none', or a custom network name)."
+          "description": "Network mode for the container (e.g., 'host', 'bridge', 'none', or a custom network name). Not applicable in exec mode."
         },
         "startup": {
           "type": "string",
           "enum": ["keepalive", "entrypoint", "command"],
           "default": "keepalive",
-          "description": "Startup mode for the DAG-level container: 'keepalive' uses an internal keepalive/sleep, 'entrypoint' honors the image's ENTRYPOINT/CMD, 'command' runs the provided command array."
+          "description": "Startup mode for the DAG-level container: 'keepalive' uses an internal keepalive/sleep, 'entrypoint' honors the image's ENTRYPOINT/CMD, 'command' runs the provided command array. Not applicable in exec mode."
         },
         "command": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "Command to execute when startup is 'command'. Must be a non-empty array."
+          "description": "Command to execute when startup is 'command'. Must be a non-empty array. Not applicable in exec mode."
         },
         "waitFor": {
           "type": "string",
           "enum": ["running", "healthy"],
           "default": "running",
-          "description": "Readiness condition before steps execute: 'running' waits for container to run; 'healthy' waits for Docker healthcheck to report healthy."
+          "description": "Readiness condition before steps execute: 'running' waits for container to run; 'healthy' waits for Docker healthcheck to report healthy. Not applicable in exec mode."
         },
         "logPattern": {
           "type": "string",
-          "description": "Optional regex; if set, waits for this pattern to appear in container logs before steps run."
+          "description": "Optional regex; if set, waits for this pattern to appear in container logs before steps run. Not applicable in exec mode."
         },
         "restartPolicy": {
           "type": "string",
-          "description": "Docker restart policy for the container: 'no', 'always', or 'unless-stopped'."
+          "description": "Docker restart policy for the container: 'no', 'always', or 'unless-stopped'. Not applicable in exec mode."
         },
         "keepContainer": {
           "type": "boolean",
           "default": false,
-          "description": "Keep the container running after the step completes. Useful for debugging or when running services that need to persist between steps."
+          "description": "Keep the container running after the step completes. Useful for debugging or when running services that need to persist between steps. Not applicable in exec mode."
         }
       },
-      "required": ["image"],
-      "description": "Container configuration that can be specified at DAG or step level. When used, automatically sets the executor to docker."
+      "description": "Container configuration object. Either 'exec' (to run in an existing container) or 'image' (to create a new container) must be specified, but not both."
     },
     "sshConfig": {
       "type": "object",

@@ -92,8 +92,8 @@ type step struct {
 	TimeoutSec int `yaml:"timeoutSec,omitempty"`
 	// Container specifies the container configuration for this step.
 	// If set, the step runs in its own container instead of the DAG-level container.
-	// This uses the same configuration format as the DAG-level container field.
-	Container *container `yaml:"container,omitempty"`
+	// Can be a string (existing container name to exec into) or an object (container configuration).
+	Container any `yaml:"container,omitempty"`
 }
 
 // repeatPolicy defines the repeat policy for a step.
@@ -1109,7 +1109,7 @@ func buildStepContainer(ctx StepBuildContext, s *step, result *core.Step) error 
 		return nil
 	}
 
-	ct, err := buildContainerFromSpec(ctx.BuildContext, s.Container)
+	ct, err := buildContainerField(ctx.BuildContext, s.Container)
 	if err != nil {
 		return err
 	}

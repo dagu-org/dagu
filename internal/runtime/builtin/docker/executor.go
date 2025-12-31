@@ -352,7 +352,7 @@ func newDocker(ctx context.Context, step core.Step) (executor.Executor, error) {
 	if step.Container != nil {
 		// Expand environment variables in container fields at execution time
 		env := runtime.GetEnv(ctx)
-		expanded, err := evalContainerFields(ctx, *step.Container)
+		expanded, err := EvalContainerFields(ctx, *step.Container)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate container config: %w", err)
 		}
@@ -365,7 +365,12 @@ func newDocker(ctx context.Context, step core.Step) (executor.Executor, error) {
 		c.ShouldStart = true
 		// Merge step-level env into container env
 		// Step env comes first, container env comes last (higher priority)
-		c.Container.Env = mergeEnvVars(step.Env, c.Container.Env)
+		// In exec mode, Container is nil - use ExecOptions.Env instead
+		if c.Container != nil {
+			c.Container.Env = mergeEnvVars(step.Env, c.Container.Env)
+		} else if c.ExecOptions != nil {
+			c.ExecOptions.Env = mergeEnvVars(step.Env, c.ExecOptions.Env)
+		}
 		cfg = c
 	} else if len(execCfg.Config) > 0 {
 		// Priority 2: Executor config map (legacy syntax: executor.config)
@@ -423,14 +428,19 @@ func mergeEnvVars(base, override []string) []string {
 	return result
 }
 
-// evalContainerFields evaluates environment variables in container fields at runtime.
+// EvalContainerFields evaluates environment variables in container fields at runtime.
 // Only fields that commonly use variables are evaluated:
-// - Image, Name, User, WorkingDir, Network (string fields)
+// - Exec, Image, Name, User, WorkingDir, Network (string fields)
 // - Volumes, Ports, Env, Command (slice fields)
 // Fields like PullPolicy, Startup, WaitFor, KeepContainer are NOT evaluated
 // as they have specific enum/boolean values.
-func evalContainerFields(ctx context.Context, ct core.Container) (core.Container, error) {
+func EvalContainerFields(ctx context.Context, ct core.Container) (core.Container, error) {
 	var err error
+
+	// Evaluate exec field (for exec-into-existing-container mode)
+	if ct.Exec, err = runtime.EvalString(ctx, ct.Exec); err != nil {
+		return ct, fmt.Errorf("failed to evaluate exec: %w", err)
+	}
 
 	// Evaluate string fields
 	if ct.Image, err = runtime.EvalString(ctx, ct.Image); err != nil {

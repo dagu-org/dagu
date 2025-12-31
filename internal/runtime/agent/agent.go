@@ -111,6 +111,9 @@ type Agent struct {
 	// finished is true if the dag-run is finished.
 	finished atomic.Bool
 
+	// initFailed is true if initialization failed before the runner could start.
+	initFailed atomic.Bool
+
 	// lastErr is the last error occurred during the dag-run.
 	lastErr error
 
@@ -342,7 +345,8 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	defer func() {
 		if initErr != nil {
-			logger.Error(ctx, "Failed to initialize DAG execution", tag.Error(err))
+			a.initFailed.Store(true)
+			logger.Error(ctx, "Failed to initialize DAG execution", tag.Error(initErr))
 			st := a.Status(ctx)
 			st.Status = core.Failed
 			if err := attempt.Write(ctx, st); err != nil {
@@ -385,7 +389,13 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create a new container if the DAG has a container configuration.
 	if a.dag.Container != nil {
-		ctCfg, err := docker.LoadConfig(a.dag.WorkingDir, *a.dag.Container, a.dag.RegistryAuths)
+		// Expand environment variables in container fields
+		expandedContainer, err := docker.EvalContainerFields(ctx, *a.dag.Container)
+		if err != nil {
+			initErr = fmt.Errorf("failed to evaluate container config: %w", err)
+			return initErr
+		}
+		ctCfg, err := docker.LoadConfig(a.dag.WorkingDir, expandedContainer, a.dag.RegistryAuths)
 		if err != nil {
 			initErr = fmt.Errorf("failed to load container config: %w", err)
 			return initErr
@@ -395,16 +405,23 @@ func (a *Agent) Run(ctx context.Context) error {
 			initErr = fmt.Errorf("failed to initialize container client: %w", err)
 			return initErr
 		}
-		if err := ctCli.CreateContainerKeepAlive(ctx); err != nil {
-			initErr = fmt.Errorf("failed to create keepalive container: %w", err)
-			return initErr
+		// In exec mode, we use an existing container - don't create a new one
+		isExecMode := expandedContainer.IsExecMode()
+		if !isExecMode {
+			if err := ctCli.CreateContainerKeepAlive(ctx); err != nil {
+				initErr = fmt.Errorf("failed to create keepalive container: %w", err)
+				return initErr
+			}
 		}
 
 		// Set the container client in the context for the execution.
 		ctx = docker.WithContainerClient(ctx, ctCli)
 
 		defer func() {
-			ctCli.StopContainerKeepAlive(ctx)
+			// Only stop the container if we created it (non-exec mode)
+			if !isExecMode {
+				ctCli.StopContainerKeepAlive(ctx)
+			}
 			ctCli.Close(ctx)
 		}()
 	}
@@ -742,7 +759,9 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 	defer a.lock.RUnlock()
 
 	runnerStatus := a.runner.Status(ctx, a.plan)
-	if runnerStatus == core.NotStarted && a.plan.IsStarted() {
+	if a.initFailed.Load() {
+		runnerStatus = core.Failed
+	} else if runnerStatus == core.NotStarted && a.plan.IsStarted() {
 		// Match the status to the execution plan.
 		runnerStatus = core.Running
 	}
