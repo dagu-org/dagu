@@ -33,7 +33,13 @@ Examples:
 	)
 }
 
-var retryFlags = []commandLineFlag{dagRunIDFlagRetry, stepNameForRetry, workerIDFlag}
+var retryFlags = []commandLineFlag{dagRunIDFlagRetry, stepNameForRetry, retryWorkerIDFlag}
+
+// retryWorkerIDFlag identifies which worker executes this DAG run retry (for distributed execution tracking)
+var retryWorkerIDFlag = commandLineFlag{
+	name:  "worker-id",
+	usage: "Worker ID executing this DAG run (auto-set in distributed mode, defaults to 'local')",
+}
 
 func runRetry(ctx *Context, args []string) error {
 	// Extract retry details

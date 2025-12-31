@@ -57,11 +57,17 @@ This command parses the DAG definition, resolves parameters, and initiates the D
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, defaultWorkingDirFlag, workerIDFlag}
+var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, defaultWorkingDirFlag, startWorkerIDFlag}
 
 var fromRunIDFlag = commandLineFlag{
 	name:  "from-run-id",
 	usage: "Historic dag-run ID to use as the template for a new run",
+}
+
+// startWorkerIDFlag identifies which worker executes this DAG run (for distributed execution tracking)
+var startWorkerIDFlag = commandLineFlag{
+	name:  "worker-id",
+	usage: "Worker ID executing this DAG run (auto-set in distributed mode, defaults to 'local')",
 }
 
 // runStart handles the execution of the start command
@@ -72,11 +78,8 @@ func runStart(ctx *Context, args []string) error {
 	}
 
 	// Get worker-id for tracking which worker executes this DAG run
-	workerID, err := ctx.StringParam("worker-id")
-	if err != nil {
-		return fmt.Errorf("failed to get worker-id: %w", err)
-	}
-	// Default to "local" for non-distributed execution
+	// Default to "local" for non-distributed execution or if flag is not defined
+	workerID, _ := ctx.StringParam("worker-id")
 	if workerID == "" {
 		workerID = "local"
 	}
