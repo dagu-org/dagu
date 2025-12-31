@@ -296,6 +296,12 @@ function DAGRunTable({
                   )}
                 </span>
               </div>
+              {dagRun.workerId && (
+                <div className="text-left">
+                  <span className="text-muted-foreground">Worker: </span>
+                  {dagRun.workerId}
+                </div>
+              )}
             </div>
 
             {/* Timezone info */}
@@ -337,6 +343,9 @@ function DAGRunTable({
             </TableHead>
             <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
               Duration
+            </TableHead>
+            <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+              Worker
             </TableHead>
           </TableRow>
         </TableHeader>
@@ -402,6 +411,9 @@ function DAGRunTable({
                     <span className="inline-block w-2 h-2 rounded-full bg-success animate-pulse" />
                   )}
                 </div>
+              </TableCell>
+              <TableCell className="py-1 px-2 text-muted-foreground">
+                {dagRun.workerId || '-'}
               </TableCell>
             </TableRow>
           ))}
