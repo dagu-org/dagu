@@ -9,7 +9,7 @@ on:
 jobs:
   # Build and push ubuntu-based latest image
   docker-latest:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       contents: read
       packages: write
@@ -52,7 +52,7 @@ jobs:
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}
   # Build and push alpine-based dev image
   docker-dev:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       contents: read
       packages: write
@@ -95,7 +95,7 @@ jobs:
             ghcr.io/${{ github.repository }}:${{ env.VERSION }}-dev
   # Build and push ubuntu-based dev image
   docker-alpine:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       contents: read
       packages: write
