@@ -365,6 +365,9 @@ func (c *Collector) collectQueueMetrics(ctx context.Context, ch chan<- prometheu
 	// Aggregate per-DAG queue counts
 	perDAGQueue := make(map[string]float64)
 	for _, item := range items {
+		if item == nil {
+			continue
+		}
 		data, err := item.Data()
 		if err != nil || data == nil {
 			continue
