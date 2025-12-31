@@ -27,6 +27,14 @@ configureMonacoYaml(monaco, {
 loader.config({ monaco });
 
 /**
+ * Cursor position information
+ */
+export interface CursorPosition {
+  lineNumber: number;
+  column: number;
+}
+
+/**
  * Props for the DAGEditor component
  */
 type Props = {
@@ -42,6 +50,8 @@ type Props = {
   highlightLine?: number;
   /** Additional class name */
   className?: string;
+  /** Callback when cursor position changes */
+  onCursorPositionChange?: (position: CursorPosition) => void;
 };
 
 /**
@@ -54,6 +64,7 @@ function DAGEditor({
   readOnly = false,
   lineNumbers = true,
   className,
+  onCursorPositionChange,
 }: Omit<Props, 'highlightLine'>) {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
 
@@ -120,6 +131,26 @@ function DAGEditor({
         e.stopPropagation();
       }
     });
+
+    // Listen for cursor position changes
+    if (onCursorPositionChange) {
+      // Initial position
+      const position = editor.getPosition();
+      if (position) {
+        onCursorPositionChange({
+          lineNumber: position.lineNumber,
+          column: position.column,
+        });
+      }
+
+      // Subscribe to cursor changes
+      editor.onDidChangeCursorPosition((e) => {
+        onCursorPositionChange({
+          lineNumber: e.position.lineNumber,
+          column: e.position.column,
+        });
+      });
+    }
   };
 
   // Detect dark mode
