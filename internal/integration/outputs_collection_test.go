@@ -273,10 +273,10 @@ steps:
 `)
 	agent := dag.Agent()
 
-	_ = agent.Run(agent.Context)
+	err := agent.Run(agent.Context)
+	require.Error(t, err)
 
-	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
-	require.NoError(t, err)
+	status := agent.Status(agent.Context)
 	require.Equal(t, core.Failed, status.Status)
 
 	// Outputs from successful steps should still be collected
