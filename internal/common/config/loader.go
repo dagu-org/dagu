@@ -220,6 +220,9 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		l.loadMonitoringConfig(&cfg, def)
 	}
 
+	// Cache config is always loaded (used by all services)
+	l.loadCacheConfig(&cfg, def)
+
 	// Incorporate legacy field values and environment variable overrides
 	l.LoadLegacyFields(&cfg, def)
 	l.loadLegacyEnv(&cfg)
@@ -623,6 +626,21 @@ func (l *ConfigLoader) loadMonitoringConfig(cfg *Config, def Definition) {
 	}
 }
 
+// loadCacheConfig loads the cache configuration.
+func (l *ConfigLoader) loadCacheConfig(cfg *Config, def Definition) {
+	if def.Cache != nil {
+		mode := CacheMode(*def.Cache)
+		if mode.IsValid() {
+			cfg.Cache = mode
+		} else {
+			l.warnings = append(l.warnings, fmt.Sprintf("Invalid cache mode: %q, using 'normal'", *def.Cache))
+			cfg.Cache = CacheModeNormal
+		}
+	} else {
+		cfg.Cache = CacheModeNormal
+	}
+}
+
 // finalizePaths sets up derived paths and ensures required paths are set.
 func (l *ConfigLoader) finalizePaths(cfg *Config) {
 	if cfg.Paths.DAGRunsDir == "" {
@@ -822,6 +840,7 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("apiBasePath", "/api/v2")
 	l.v.SetDefault("latestStatusToday", false)
 	l.v.SetDefault("metrics", "private")
+	l.v.SetDefault("cache", "normal")
 
 	// Coordinator settings
 	l.v.SetDefault("coordinator.host", "127.0.0.1")
@@ -877,6 +896,7 @@ var envBindings = []envBinding{
 	{key: "headless", env: "HEADLESS"},
 	{key: "latestStatusToday", env: "LATEST_STATUS_TODAY"},
 	{key: "metrics", env: "SERVER_METRICS"},
+	{key: "cache", env: "CACHE"},
 
 	// Core configurations
 	{key: "workDir", env: "WORK_DIR", isPath: true},

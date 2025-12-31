@@ -36,6 +36,9 @@ type Config struct {
 
 	// Monitoring contains configuration for system monitoring.
 	Monitoring MonitoringConfig
+
+	// Cache defines the cache mode preset (low, normal, high).
+	Cache CacheMode
 }
 
 // MonitoringConfig holds the configuration for system monitoring.

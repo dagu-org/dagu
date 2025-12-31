@@ -236,6 +236,7 @@ func TestLoad_Env(t *testing.T) {
 			Interval:  5 * time.Second,
 		},
 		Warnings: []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://auth.example.com)"},
+		Cache:    CacheModeNormal,
 	}
 
 	assert.Equal(t, expected, cfg)
@@ -479,6 +480,7 @@ scheduler:
 			Interval:  5 * time.Second,
 		},
 		Warnings: []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://accounts.example.com)"},
+		Cache:    CacheModeNormal,
 	}
 
 	assert.Equal(t, expected, cfg)
@@ -1050,5 +1052,50 @@ metrics: "invalid_value"
 		require.Len(t, cfg.Warnings, 1)
 		assert.Contains(t, cfg.Warnings[0], "Invalid server.metrics value")
 		assert.Contains(t, cfg.Warnings[0], "invalid_value")
+	})
+}
+
+func TestLoad_CacheConfig(t *testing.T) {
+	t.Run("DefaultCacheMode", func(t *testing.T) {
+		cfg := loadFromYAML(t, ``)
+		assert.Equal(t, CacheModeNormal, cfg.Cache)
+	})
+
+	t.Run("CacheModeLow", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+cache: low
+`)
+		assert.Equal(t, CacheModeLow, cfg.Cache)
+	})
+
+	t.Run("CacheModeNormal", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+cache: normal
+`)
+		assert.Equal(t, CacheModeNormal, cfg.Cache)
+	})
+
+	t.Run("CacheModeHigh", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+cache: high
+`)
+		assert.Equal(t, CacheModeHigh, cfg.Cache)
+	})
+
+	t.Run("CacheModeInvalid", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+cache: invalid
+`)
+		// Invalid mode defaults to normal
+		assert.Equal(t, CacheModeNormal, cfg.Cache)
+		require.Len(t, cfg.Warnings, 1)
+		assert.Contains(t, cfg.Warnings[0], "Invalid cache mode")
+	})
+
+	t.Run("CacheModeFromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, ``, map[string]string{
+			"DAGU_CACHE": "low",
+		})
+		assert.Equal(t, CacheModeLow, cfg.Cache)
 	})
 }
