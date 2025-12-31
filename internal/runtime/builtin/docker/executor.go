@@ -425,7 +425,7 @@ func mergeEnvVars(base, override []string) []string {
 
 // evalContainerFields evaluates environment variables in container fields at runtime.
 // Only fields that commonly use variables are evaluated:
-// - Image, Name, User, WorkingDir, Network (string fields)
+// - Exec, Image, Name, User, WorkingDir, Network (string fields)
 // - Volumes, Ports, Env, Command (slice fields)
 // Fields like PullPolicy, Startup, WaitFor, KeepContainer are NOT evaluated
 // as they have specific enum/boolean values.
