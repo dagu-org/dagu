@@ -19,7 +19,7 @@ permissions:
 jobs:
   # First, publish all platform-specific packages
   publish-platform-packages:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     strategy:
       fail-fast: false
       matrix:
@@ -154,7 +154,7 @@ jobs:
   publish-main-package:
     needs: publish-platform-packages
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -228,7 +228,7 @@ jobs:
             test-install: 'npm install -g @dagu-org/dagu'
           - os: macos-latest
             test-install: 'npm install -g @dagu-org/dagu'
-          - os: windows-latest
+          - os: blacksmith-4vcpu-windows-2025
             test-install: 'npm install -g @dagu-org/dagu'
 
     steps:
