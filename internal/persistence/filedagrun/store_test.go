@@ -458,9 +458,10 @@ func TestListStatuses(t *testing.T) {
 	t.Run("SortByCreatedAt", func(t *testing.T) {
 		th := setupTestStore(t)
 
+		// Use different timestamps to ensure deterministic sort order
 		ts1 := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
-		ts2 := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
-		ts3 := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+		ts2 := time.Date(2021, 1, 1, 0, 0, 1, 0, time.UTC) // 1 second later
+		ts3 := time.Date(2021, 1, 1, 0, 0, 2, 0, time.UTC) // 2 seconds later
 
 		th.CreateAttempt(t, ts1, "dagrun-id-1", core.Succeeded)
 		th.CreateAttempt(t, ts2, "dagrun-id-2", core.Succeeded)
@@ -474,7 +475,7 @@ func TestListStatuses(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, statuses, 3)
 
-		// Verify they are sorted by StartedAt in descending order
+		// Verify they are sorted by StartedAt in descending order (newest first)
 		assert.Equal(t, "dagrun-id-3", statuses[0].DAGRunID)
 		assert.Equal(t, "dagrun-id-2", statuses[1].DAGRunID)
 		assert.Equal(t, "dagrun-id-1", statuses[2].DAGRunID)
