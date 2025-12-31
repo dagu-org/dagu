@@ -652,7 +652,7 @@ func (a *Agent) RunCheckErr(t *testing.T, expectedErr string) {
 	require.Error(t, err, "expected error %q, got nil", expectedErr)
 	require.Contains(t, err.Error(), expectedErr)
 	st := a.Status(a.Context)
-	require.Equal(t, core.Aborted.String(), st.Status.String())
+	require.Equal(t, core.Failed.String(), st.Status.String())
 }
 
 func (a *Agent) RunSuccess(t *testing.T) {
