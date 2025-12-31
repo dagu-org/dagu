@@ -686,7 +686,8 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 		}
 
 		cfg := Config{}
-		loader.LoadLegacyFields(&cfg, def)
+		err := loader.LoadLegacyFields(&cfg, def)
+		require.NoError(t, err)
 
 		// Auth
 		assert.Equal(t, "user", cfg.Server.Auth.Basic.Username)
@@ -721,7 +722,8 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 			DAGsDir: filepath.Join(tempDir, "new", "dags"),
 		}
 		cfg := Config{}
-		loader.LoadLegacyFields(&cfg, def)
+		err := loader.LoadLegacyFields(&cfg, def)
+		require.NoError(t, err)
 		assert.Equal(t, filepath.Join(tempDir, "new", "dags"), cfg.Paths.DAGsDir)
 
 		// Test that DAGs is used when DAGsDir is not set
@@ -729,7 +731,8 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 			DAGs: filepath.Join(tempDir, "legacy", "dags"),
 		}
 		cfg2 := Config{}
-		loader.LoadLegacyFields(&cfg2, def2)
+		err = loader.LoadLegacyFields(&cfg2, def2)
+		require.NoError(t, err)
 		assert.Equal(t, filepath.Join(tempDir, "legacy", "dags"), cfg2.Paths.DAGsDir)
 	})
 }

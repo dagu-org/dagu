@@ -204,7 +204,9 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	if err := l.loadCoreConfig(&cfg, def); err != nil {
 		return nil, err
 	}
-	l.loadPathsConfig(&cfg, def)
+	if err := l.loadPathsConfig(&cfg, def); err != nil {
+		return nil, err
+	}
 
 	// Load service-specific configuration based on requirements
 	if l.requires(SectionServer) {
@@ -230,7 +232,9 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	}
 
 	// Incorporate legacy field values and environment variable overrides
-	l.LoadLegacyFields(&cfg, def)
+	if err := l.LoadLegacyFields(&cfg, def); err != nil {
+		return nil, err
+	}
 	l.loadLegacyEnv(&cfg)
 
 	// Finalize paths (set derived paths based on DataDir)
@@ -285,23 +289,65 @@ func (l *ConfigLoader) loadCoreConfig(cfg *Config, def Definition) error {
 }
 
 // loadPathsConfig loads the file system paths configuration.
-func (l *ConfigLoader) loadPathsConfig(cfg *Config, def Definition) {
-	if def.Paths != nil {
-		cfg.Paths.DAGsDir = fileutil.ResolvePathOrBlank(def.Paths.DAGsDir)
-		cfg.Paths.SuspendFlagsDir = fileutil.ResolvePathOrBlank(def.Paths.SuspendFlagsDir)
-		cfg.Paths.DataDir = fileutil.ResolvePathOrBlank(def.Paths.DataDir)
-		cfg.Paths.LogDir = fileutil.ResolvePathOrBlank(def.Paths.LogDir)
-		cfg.Paths.AdminLogsDir = fileutil.ResolvePathOrBlank(def.Paths.AdminLogsDir)
-		cfg.Paths.BaseConfig = fileutil.ResolvePathOrBlank(def.Paths.BaseConfig)
-		cfg.Paths.Executable = fileutil.ResolvePathOrBlank(def.Paths.Executable)
-		cfg.Paths.DAGRunsDir = fileutil.ResolvePathOrBlank(def.Paths.DAGRunsDir)
-		cfg.Paths.QueueDir = fileutil.ResolvePathOrBlank(def.Paths.QueueDir)
-		cfg.Paths.ProcDir = fileutil.ResolvePathOrBlank(def.Paths.ProcDir)
-		cfg.Paths.ServiceRegistryDir = fileutil.ResolvePathOrBlank(def.Paths.ServiceRegistryDir)
-		cfg.Paths.UsersDir = fileutil.ResolvePathOrBlank(def.Paths.UsersDir)
-		cfg.Paths.APIKeysDir = fileutil.ResolvePathOrBlank(def.Paths.APIKeysDir)
-		cfg.Paths.WebhooksDir = fileutil.ResolvePathOrBlank(def.Paths.WebhooksDir)
+// All paths are resolved to absolute paths. Returns an error if any path resolution fails.
+func (l *ConfigLoader) loadPathsConfig(cfg *Config, def Definition) error {
+	if def.Paths == nil {
+		return nil
 	}
+
+	resolvePath := func(name, path string) (string, error) {
+		resolved, err := fileutil.ResolvePath(path)
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve %s path %q: %w", name, path, err)
+		}
+		return resolved, nil
+	}
+
+	var err error
+	if cfg.Paths.DAGsDir, err = resolvePath("DAGsDir", def.Paths.DAGsDir); err != nil {
+		return err
+	}
+	if cfg.Paths.SuspendFlagsDir, err = resolvePath("SuspendFlagsDir", def.Paths.SuspendFlagsDir); err != nil {
+		return err
+	}
+	if cfg.Paths.DataDir, err = resolvePath("DataDir", def.Paths.DataDir); err != nil {
+		return err
+	}
+	if cfg.Paths.LogDir, err = resolvePath("LogDir", def.Paths.LogDir); err != nil {
+		return err
+	}
+	if cfg.Paths.AdminLogsDir, err = resolvePath("AdminLogsDir", def.Paths.AdminLogsDir); err != nil {
+		return err
+	}
+	if cfg.Paths.BaseConfig, err = resolvePath("BaseConfig", def.Paths.BaseConfig); err != nil {
+		return err
+	}
+	if cfg.Paths.Executable, err = resolvePath("Executable", def.Paths.Executable); err != nil {
+		return err
+	}
+	if cfg.Paths.DAGRunsDir, err = resolvePath("DAGRunsDir", def.Paths.DAGRunsDir); err != nil {
+		return err
+	}
+	if cfg.Paths.QueueDir, err = resolvePath("QueueDir", def.Paths.QueueDir); err != nil {
+		return err
+	}
+	if cfg.Paths.ProcDir, err = resolvePath("ProcDir", def.Paths.ProcDir); err != nil {
+		return err
+	}
+	if cfg.Paths.ServiceRegistryDir, err = resolvePath("ServiceRegistryDir", def.Paths.ServiceRegistryDir); err != nil {
+		return err
+	}
+	if cfg.Paths.UsersDir, err = resolvePath("UsersDir", def.Paths.UsersDir); err != nil {
+		return err
+	}
+	if cfg.Paths.APIKeysDir, err = resolvePath("APIKeysDir", def.Paths.APIKeysDir); err != nil {
+		return err
+	}
+	if cfg.Paths.WebhooksDir, err = resolvePath("WebhooksDir", def.Paths.WebhooksDir); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // loadServerConfig loads the server configuration.
@@ -655,7 +701,8 @@ func (l *ConfigLoader) finalizePaths(cfg *Config) {
 // LoadLegacyFields copies values from legacy configuration fields into the current Config structure.
 // Legacy fields are only applied if they are non-empty or non-zero, and may override the new settings.
 // It respects the service requirements to only apply relevant legacy fields.
-func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) {
+// Returns an error if any path resolution fails.
+func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) error {
 	// Server-related legacy fields
 	if l.requires(SectionServer) {
 		if def.BasicAuthUsername != "" {
@@ -673,29 +720,54 @@ func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) {
 	}
 
 	// Path-related legacy fields (always applied)
+	resolvePath := func(name, path string) (string, error) {
+		resolved, err := fileutil.ResolvePath(path)
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve legacy %s path %q: %w", name, path, err)
+		}
+		return resolved, nil
+	}
+
+	var err error
 	if def.DAGs != "" {
-		cfg.Paths.DAGsDir = fileutil.ResolvePathOrBlank(def.DAGs)
+		if cfg.Paths.DAGsDir, err = resolvePath("DAGs", def.DAGs); err != nil {
+			return err
+		}
 	}
 	if def.DAGsDir != "" {
-		cfg.Paths.DAGsDir = fileutil.ResolvePathOrBlank(def.DAGsDir)
+		if cfg.Paths.DAGsDir, err = resolvePath("DAGsDir", def.DAGsDir); err != nil {
+			return err
+		}
 	}
 	if def.Executable != "" {
-		cfg.Paths.Executable = fileutil.ResolvePathOrBlank(def.Executable)
+		if cfg.Paths.Executable, err = resolvePath("Executable", def.Executable); err != nil {
+			return err
+		}
 	}
 	if def.LogDir != "" {
-		cfg.Paths.LogDir = fileutil.ResolvePathOrBlank(def.LogDir)
+		if cfg.Paths.LogDir, err = resolvePath("LogDir", def.LogDir); err != nil {
+			return err
+		}
 	}
 	if def.DataDir != "" {
-		cfg.Paths.DataDir = fileutil.ResolvePathOrBlank(def.DataDir)
+		if cfg.Paths.DataDir, err = resolvePath("DataDir", def.DataDir); err != nil {
+			return err
+		}
 	}
 	if def.SuspendFlagsDir != "" {
-		cfg.Paths.SuspendFlagsDir = fileutil.ResolvePathOrBlank(def.SuspendFlagsDir)
+		if cfg.Paths.SuspendFlagsDir, err = resolvePath("SuspendFlagsDir", def.SuspendFlagsDir); err != nil {
+			return err
+		}
 	}
 	if def.AdminLogsDir != "" {
-		cfg.Paths.AdminLogsDir = fileutil.ResolvePathOrBlank(def.AdminLogsDir)
+		if cfg.Paths.AdminLogsDir, err = resolvePath("AdminLogsDir", def.AdminLogsDir); err != nil {
+			return err
+		}
 	}
 	if def.BaseConfig != "" {
-		cfg.Paths.BaseConfig = fileutil.ResolvePathOrBlank(def.BaseConfig)
+		if cfg.Paths.BaseConfig, err = resolvePath("BaseConfig", def.BaseConfig); err != nil {
+			return err
+		}
 	}
 
 	// UI-related legacy fields
@@ -713,6 +785,8 @@ func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) {
 			cfg.UI.MaxDashboardPageLimit = def.MaxDashboardPageLimit
 		}
 	}
+
+	return nil
 }
 
 // loadLegacyEnv maps legacy environment variables to their new counterparts in the configuration.
