@@ -1046,7 +1046,6 @@ metrics: "private"
 		cfg := loadFromYAML(t, `
 metrics: "invalid_value"
 `)
-		// Invalid value should default to private with a warning
 		assert.Equal(t, MetricsAccessPrivate, cfg.Server.Metrics)
 		require.Len(t, cfg.Warnings, 1)
 		assert.Contains(t, cfg.Warnings[0], "Invalid server.metrics value")

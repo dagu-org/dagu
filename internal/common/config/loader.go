@@ -426,10 +426,8 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 	cfg.Server.Metrics = MetricsAccessPrivate
 	if def.Metrics != nil {
 		switch MetricsAccess(*def.Metrics) {
-		case MetricsAccessPublic:
-			cfg.Server.Metrics = MetricsAccessPublic
-		case MetricsAccessPrivate:
-			cfg.Server.Metrics = MetricsAccessPrivate
+		case MetricsAccessPublic, MetricsAccessPrivate:
+			cfg.Server.Metrics = MetricsAccess(*def.Metrics)
 		default:
 			l.warnings = append(l.warnings, fmt.Sprintf("Invalid server.metrics value: %q, defaulting to 'private'", *def.Metrics))
 		}
