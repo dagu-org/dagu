@@ -2219,6 +2219,96 @@ steps:
 		})
 	}
 
+	// Exec mode tests (container as string or object with exec field)
+	t.Run("ContainerStringForm", func(t *testing.T) {
+		t.Parallel()
+		yaml := `
+container: my-running-container
+steps:
+  - name: step1
+    command: echo test
+`
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag.Container)
+		assert.Equal(t, "my-running-container", dag.Container.Exec)
+		assert.Empty(t, dag.Container.Image)
+		assert.True(t, dag.Container.IsExecMode())
+	})
+
+	t.Run("ContainerStringFormTrimmed", func(t *testing.T) {
+		t.Parallel()
+		yaml := `
+container: "  my-container  "
+steps:
+  - name: step1
+    command: echo test
+`
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag.Container)
+		assert.Equal(t, "my-container", dag.Container.Exec)
+	})
+
+	t.Run("ContainerObjectExecForm", func(t *testing.T) {
+		t.Parallel()
+		yaml := `
+container:
+  exec: my-container
+  user: root
+  workingDir: /app
+  env:
+    - MY_VAR: value
+steps:
+  - name: step1
+    command: echo test
+`
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag.Container)
+		assert.Equal(t, "my-container", dag.Container.Exec)
+		assert.Empty(t, dag.Container.Image)
+		assert.Equal(t, "root", dag.Container.User)
+		assert.Equal(t, "/app", dag.Container.WorkingDir)
+		assert.Contains(t, dag.Container.Env, "MY_VAR=value")
+		assert.True(t, dag.Container.IsExecMode())
+	})
+
+	t.Run("StepContainerStringForm", func(t *testing.T) {
+		t.Parallel()
+		yaml := `
+steps:
+  - name: step1
+    container: my-step-container
+    command: echo test
+`
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag.Steps[0].Container)
+		assert.Equal(t, "my-step-container", dag.Steps[0].Container.Exec)
+		assert.True(t, dag.Steps[0].Container.IsExecMode())
+	})
+
+	t.Run("StepContainerObjectExecForm", func(t *testing.T) {
+		t.Parallel()
+		yaml := `
+steps:
+  - name: step1
+    container:
+      exec: my-step-container
+      user: nobody
+      workingDir: /tmp
+    command: echo test
+`
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag.Steps[0].Container)
+		assert.Equal(t, "my-step-container", dag.Steps[0].Container.Exec)
+		assert.Equal(t, "nobody", dag.Steps[0].Container.User)
+		assert.Equal(t, "/tmp", dag.Steps[0].Container.WorkingDir)
+		assert.True(t, dag.Steps[0].Container.IsExecMode())
+	})
+
 	// Error tests
 	errorTests := []struct {
 		name        string
@@ -2248,7 +2338,91 @@ steps:
   - name: step1
     command: echo test
 `,
-			errContains: "image is required when container is specified",
+			errContains: "either 'exec' or 'image' must be specified",
+		},
+		{
+			name: "ContainerExecAndImageMutualExclusive",
+			yaml: `
+container:
+  exec: my-container
+  image: alpine:latest
+steps:
+  - name: step1
+    command: echo test
+`,
+			errContains: "'exec' and 'image' are mutually exclusive",
+		},
+		{
+			name: "ContainerExecWithInvalidVolumes",
+			yaml: `
+container:
+  exec: my-container
+  volumes:
+    - /data:/data
+steps:
+  - name: step1
+    command: echo test
+`,
+			errContains: "cannot be used with 'exec'",
+		},
+		{
+			name: "ContainerExecWithInvalidPorts",
+			yaml: `
+container:
+  exec: my-container
+  ports:
+    - "8080:80"
+steps:
+  - name: step1
+    command: echo test
+`,
+			errContains: "cannot be used with 'exec'",
+		},
+		{
+			name: "ContainerExecWithInvalidNetwork",
+			yaml: `
+container:
+  exec: my-container
+  network: bridge
+steps:
+  - name: step1
+    command: echo test
+`,
+			errContains: "cannot be used with 'exec'",
+		},
+		{
+			name: "ContainerExecWithInvalidPullPolicy",
+			yaml: `
+container:
+  exec: my-container
+  pullPolicy: always
+steps:
+  - name: step1
+    command: echo test
+`,
+			errContains: "cannot be used with 'exec'",
+		},
+		{
+			name: "ContainerStringFormEmpty",
+			yaml: `
+container: "   "
+steps:
+  - name: step1
+    command: echo test
+`,
+			errContains: "container name cannot be empty",
+		},
+		{
+			name: "StepContainerExecAndImageMutualExclusive",
+			yaml: `
+steps:
+  - name: step1
+    container:
+      exec: my-container
+      image: alpine:latest
+    command: echo test
+`,
+			errContains: "'exec' and 'image' are mutually exclusive",
 		},
 	}
 

@@ -97,7 +97,8 @@ type dag struct {
 	// WorkerSelector specifies required worker labels for execution.
 	WorkerSelector map[string]string
 	// Container is the container definition for the DAG.
-	Container *container
+	// Can be a string (existing container name to exec into) or an object (container configuration).
+	Container any
 	// RunConfig contains configuration for controlling user interactions during DAG runs.
 	RunConfig *runConfig
 	// RegistryAuths maps registry hostnames to authentication configs.
@@ -153,6 +154,9 @@ type mailOn struct {
 
 // container defines the container configuration for the DAG.
 type container struct {
+	// Exec specifies an existing container to exec into.
+	// Mutually exclusive with Image.
+	Exec string `yaml:"exec,omitempty"`
 	// Name is the container name to use. If empty, Docker generates a random name.
 	Name string `yaml:"name,omitempty"`
 	// Image is the container image to use.
@@ -767,20 +771,147 @@ func buildWorkingDir(ctx BuildContext, d *dag) (string, error) {
 }
 
 func buildContainer(ctx BuildContext, d *dag) (*core.Container, error) {
-	if d.Container == nil {
+	return buildContainerField(ctx, d.Container)
+}
+
+// buildContainerField handles both string and object forms of container field.
+// String form: "container-name" -> exec into existing container
+// Object form: {image: "...", ...} or {exec: "...", ...} -> create new or exec into existing
+func buildContainerField(ctx BuildContext, raw any) (*core.Container, error) {
+	if raw == nil {
 		return nil, nil
 	}
-	return buildContainerFromSpec(ctx, d.Container)
+
+	switch v := raw.(type) {
+	case string:
+		// String mode: exec into existing container with defaults
+		name := strings.TrimSpace(v)
+		if name == "" {
+			return nil, core.NewValidationError("container", nil,
+				fmt.Errorf("container name cannot be empty"))
+		}
+		return &core.Container{
+			Exec: name,
+		}, nil
+
+	case map[string]any:
+		// Object mode: decode and validate
+		var c container
+		decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+			Result:           &c,
+			WeaklyTypedInput: true,
+		})
+		if err != nil {
+			return nil, core.NewValidationError("container", nil,
+				fmt.Errorf("failed to create decoder: %w", err))
+		}
+		if err := decoder.Decode(v); err != nil {
+			return nil, core.NewValidationError("container", nil,
+				fmt.Errorf("failed to decode container: %w", err))
+		}
+		return buildContainerFromSpec(ctx, &c)
+
+	case *container:
+		// Already decoded container struct (for backward compatibility)
+		if v == nil {
+			return nil, nil
+		}
+		return buildContainerFromSpec(ctx, v)
+
+	default:
+		return nil, core.NewValidationError("container", nil,
+			fmt.Errorf("container must be a string or object, got %T", raw))
+	}
 }
 
 // buildContainerFromSpec is a shared function that builds a core.Container from a container spec.
 // It is used by both DAG-level and step-level container configuration.
 func buildContainerFromSpec(ctx BuildContext, c *container) (*core.Container, error) {
-	// If container is specified but image is empty, return an error
-	if c.Image == "" {
-		return nil, core.NewValidationError("container.image", c.Image, fmt.Errorf("image is required when container is specified"))
+	// Validate mutual exclusivity
+	if c.Exec != "" && c.Image != "" {
+		return nil, core.NewValidationError("container", nil,
+			fmt.Errorf("'exec' and 'image' are mutually exclusive"))
 	}
 
+	// Require one of exec or image
+	if c.Exec == "" && c.Image == "" {
+		return nil, core.NewValidationError("container", nil,
+			fmt.Errorf("either 'exec' or 'image' must be specified"))
+	}
+
+	// Handle exec mode
+	if c.Exec != "" {
+		// Validate no incompatible fields in exec mode
+		var invalidFields []string
+		if c.Name != "" {
+			invalidFields = append(invalidFields, "name")
+		}
+		if c.PullPolicy != nil {
+			invalidFields = append(invalidFields, "pullPolicy")
+		}
+		if len(c.Volumes) > 0 {
+			invalidFields = append(invalidFields, "volumes")
+		}
+		if len(c.Ports) > 0 {
+			invalidFields = append(invalidFields, "ports")
+		}
+		if c.Network != "" {
+			invalidFields = append(invalidFields, "network")
+		}
+		if c.Platform != "" {
+			invalidFields = append(invalidFields, "platform")
+		}
+		if c.Startup != "" {
+			invalidFields = append(invalidFields, "startup")
+		}
+		if len(c.Command) > 0 {
+			invalidFields = append(invalidFields, "command")
+		}
+		if c.WaitFor != "" {
+			invalidFields = append(invalidFields, "waitFor")
+		}
+		if c.LogPattern != "" {
+			invalidFields = append(invalidFields, "logPattern")
+		}
+		if c.RestartPolicy != "" {
+			invalidFields = append(invalidFields, "restartPolicy")
+		}
+		if c.KeepContainer {
+			invalidFields = append(invalidFields, "keepContainer")
+		}
+
+		if len(invalidFields) > 0 {
+			return nil, core.NewValidationError("container", nil,
+				fmt.Errorf("fields %v cannot be used with 'exec'", invalidFields))
+		}
+
+		// Parse env for exec mode
+		vars, err := loadVariables(ctx, c.Env)
+		if err != nil {
+			return nil, core.NewValidationError("container.env", c.Env, err)
+		}
+
+		var envs []string
+		for k, v := range vars {
+			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+		}
+
+		// Determine working dir
+		workingDir := c.WorkingDir
+		if c.WorkDir != "" {
+			workingDir = c.WorkDir
+		}
+
+		// Build exec-mode container
+		return &core.Container{
+			Exec:       strings.TrimSpace(c.Exec),
+			User:       c.User,
+			WorkingDir: workingDir,
+			Env:        envs,
+		}, nil
+	}
+
+	// Handle image mode (existing behavior)
 	pullPolicy, err := core.ParsePullPolicy(c.PullPolicy)
 	if err != nil {
 		return nil, core.NewValidationError("container.pullPolicy", c.PullPolicy, err)

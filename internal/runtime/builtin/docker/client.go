@@ -120,16 +120,35 @@ func InitializeClient(ctx context.Context, cfg *Config) (*Client, error) {
 	var ctID string
 	var name = strings.TrimSpace(cfg.ContainerName)
 	if name != "" {
-		info, inspectErr := dockerCli.ContainerInspect(ctx, name)
-		isContainerRunning, err := isContainerRunning(info, inspectErr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to check if container %q is running: %w", name, err)
-		}
-		if info.ContainerJSONBase != nil {
+		if cfg.Image == "" {
+			// Exec mode: wait for container to be running with timeout
+			waitCtx, cancel := context.WithTimeout(ctx, defaultReadinessTimeout)
+			defer cancel()
+
+			if err := waitForContainerRunning(waitCtx, dockerCli, name); err != nil {
+				return nil, fmt.Errorf("container %q: %w", name, err)
+			}
+
+			// Get container ID after it's running
+			info, err := dockerCli.ContainerInspect(ctx, name)
+			if err != nil {
+				return nil, fmt.Errorf("failed to inspect container %q: %w", name, err)
+			}
 			ctID = info.ID
-		}
-		if cfg.Image == "" && !isContainerRunning {
-			return nil, fmt.Errorf("container %q is not running", name)
+		} else {
+			// Image mode with name: check existing container
+			info, inspectErr := dockerCli.ContainerInspect(ctx, name)
+			isRunning, err := isContainerRunning(info, inspectErr)
+			if err != nil {
+				return nil, fmt.Errorf("failed to check if container %q is running: %w", name, err)
+			}
+			if info.ContainerJSONBase != nil {
+				ctID = info.ID
+			}
+			if !isRunning {
+				// Container doesn't exist or not running - will be created
+				ctID = ""
+			}
 		}
 	}
 
@@ -143,6 +162,30 @@ func InitializeClient(ctx context.Context, cfg *Config) (*Client, error) {
 		platform:    platform,
 		authManager: cfg.AuthManager,
 	}, nil
+}
+
+// waitForContainerRunning waits for a container to be in running state with timeout
+func waitForContainerRunning(ctx context.Context, cli *client.Client, name string) error {
+	ticker := time.NewTicker(defaultPollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timed out waiting for container to be running")
+		case <-ticker.C:
+			info, err := cli.ContainerInspect(ctx, name)
+			if err != nil {
+				if errdefs.IsNotFound(err) {
+					continue // Container doesn't exist yet, keep waiting
+				}
+				return fmt.Errorf("failed to inspect container: %w", err)
+			}
+			if info.State != nil && info.State.Running {
+				return nil
+			}
+		}
+	}
 }
 
 // Close closes the container client and cleans up resources

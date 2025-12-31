@@ -733,3 +733,165 @@ steps:
 		})
 	}
 }
+
+// TestContainerExecMode tests the new exec mode syntax for executing
+// commands in existing running containers.
+func TestContainerExecMode(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	require.NoError(t, err, "failed to create docker client")
+	defer func() { _ = dockerClient.Close() }()
+
+	// Create a long-running container for exec tests
+	containerName := fmt.Sprintf("dagu-exec-mode-%d", time.Now().UnixNano())
+	containerID := createLongRunningContainer(t, th, dockerClient, containerName)
+	defer removeContainer(t, th, dockerClient, containerID)
+
+	tests := []struct {
+		name            string
+		dagConfig       string
+		expectedOutputs map[string]any
+	}{
+		{
+			name: "StringForm_DAGLevel",
+			dagConfig: fmt.Sprintf(`
+container: %s
+steps:
+  - command: echo "hello from string form"
+    output: STRING_FORM_OUT
+`, containerName),
+			expectedOutputs: map[string]any{
+				"STRING_FORM_OUT": "hello from string form",
+			},
+		},
+		{
+			name: "StringForm_StepLevel",
+			dagConfig: fmt.Sprintf(`
+steps:
+  - name: exec-string
+    container: %s
+    command: echo "step string form"
+    output: STEP_STRING_OUT
+`, containerName),
+			expectedOutputs: map[string]any{
+				"STEP_STRING_OUT": "step string form",
+			},
+		},
+		{
+			name: "ObjectExecForm_DAGLevel",
+			dagConfig: fmt.Sprintf(`
+container:
+  exec: %s
+steps:
+  - command: echo "hello from exec form"
+    output: EXEC_FORM_OUT
+`, containerName),
+			expectedOutputs: map[string]any{
+				"EXEC_FORM_OUT": "hello from exec form",
+			},
+		},
+		{
+			name: "ObjectExecForm_WithUser",
+			dagConfig: fmt.Sprintf(`
+container:
+  exec: %s
+  user: root
+steps:
+  - command: whoami
+    output: EXEC_USER_OUT
+`, containerName),
+			expectedOutputs: map[string]any{
+				"EXEC_USER_OUT": "root",
+			},
+		},
+		{
+			name: "ObjectExecForm_WithWorkingDir",
+			dagConfig: fmt.Sprintf(`
+container:
+  exec: %s
+  workingDir: /tmp
+steps:
+  - command: pwd
+    output: EXEC_WORKDIR_OUT
+`, containerName),
+			expectedOutputs: map[string]any{
+				"EXEC_WORKDIR_OUT": "/tmp",
+			},
+		},
+		{
+			name: "ObjectExecForm_WithEnv",
+			dagConfig: fmt.Sprintf(`
+container:
+  exec: %s
+  env:
+    - EXEC_TEST_VAR=exec_env_value
+steps:
+  - command: printenv EXEC_TEST_VAR
+    output: EXEC_ENV_OUT
+`, containerName),
+			expectedOutputs: map[string]any{
+				"EXEC_ENV_OUT": "exec_env_value",
+			},
+		},
+		{
+			name: "ObjectExecForm_StepLevel",
+			dagConfig: fmt.Sprintf(`
+steps:
+  - name: step-exec
+    container:
+      exec: %s
+      user: root
+    command: whoami
+    output: STEP_EXEC_OUT
+`, containerName),
+			expectedOutputs: map[string]any{
+				"STEP_EXEC_OUT": "root",
+			},
+		},
+		{
+			name: "MultipleCommands_ExecMode",
+			dagConfig: fmt.Sprintf(`
+container:
+  exec: %s
+steps:
+  - command: echo "first command"
+    output: MULTI_OUT_1
+  - command: echo "second command"
+    output: MULTI_OUT_2
+`, containerName),
+			expectedOutputs: map[string]any{
+				"MULTI_OUT_1": "first command",
+				"MULTI_OUT_2": "second command",
+			},
+		},
+		{
+			name: "ExecMode_WithAllOverrides",
+			dagConfig: fmt.Sprintf(`
+container:
+  exec: %s
+  user: root
+  workingDir: /tmp
+  env:
+    - CUSTOM_VAR=test123
+steps:
+  - command: sh -c "echo user=$(whoami) dir=$(pwd) var=$CUSTOM_VAR"
+    output: ALL_OVERRIDES_OUT
+`, containerName),
+			expectedOutputs: map[string]any{
+				"ALL_OVERRIDES_OUT": "user=root dir=/tmp var=test123",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			th := test.Setup(t)
+			dag := th.DAG(t, tt.dagConfig)
+			dag.Agent().RunSuccess(t)
+			dag.AssertLatestStatus(t, core.Succeeded)
+			dag.AssertOutputs(t, tt.expectedOutputs)
+		})
+	}
+}
