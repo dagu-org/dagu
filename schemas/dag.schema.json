@@ -555,15 +555,7 @@
         "executor": {
           "oneOf": [
             {
-              "type": "string",
-              "enum": [
-                "command", "shell",
-                "docker", "container",
-                "http", "mail", "ssh", "jq",
-                "gha", "github_action", "github-action",
-                "dag", "subworkflow",
-                "parallel", "archive"
-              ],
+              "$ref": "#/definitions/executorType",
               "description": "Executor type as string. For simple cases where no config is needed."
             },
             {
@@ -1028,6 +1020,14 @@
         "container": {
           "$ref": "#/definitions/container",
           "description": "Container configuration for this step. When specified, the step runs in its own container instead of the DAG-level container. Uses the same configuration format as the DAG-level container field. Note: Cannot be used together with 'executor'."
+        },
+        "type": {
+          "$ref": "#/definitions/executorType",
+          "description": "Executor type for this step. This is the new format replacing executor.type. Cannot be used together with 'executor' field."
+        },
+        "config": {
+          "$ref": "#/definitions/executorConfig",
+          "description": "Executor-specific configuration. This is the new format replacing executor.config. Cannot be used together with 'executor' field."
         }
       }
     },
@@ -1689,25 +1689,32 @@
       },
       "description": "Configuration for archive operations (create, extract, list)."
     },
+    "executorType": {
+      "type": "string",
+      "enum": [
+        "command", "shell",
+        "docker", "container",
+        "http", "mail", "ssh", "jq",
+        "gha", "github_action", "github-action",
+        "dag", "subworkflow",
+        "parallel", "archive"
+      ],
+      "description": "Type of executor to use for this step."
+    },
+    "executorConfig": {
+      "type": "object",
+      "description": "Executor-specific configuration. Schema depends on executor type.",
+      "additionalProperties": true
+    },
     "executorObject": {
       "type": "object",
       "required": ["type"],
       "properties": {
         "type": {
-          "type": "string",
-          "enum": [
-            "command", "shell",
-            "docker", "container",
-            "http", "mail", "ssh", "jq",
-            "gha", "github_action", "github-action",
-            "dag", "subworkflow",
-            "parallel", "archive"
-          ],
-          "description": "Type of executor to use for this step."
+          "$ref": "#/definitions/executorType"
         },
         "config": {
-          "type": "object",
-          "description": "Executor-specific configuration. Schema depends on executor type."
+          "$ref": "#/definitions/executorConfig"
         }
       },
       "allOf": [
