@@ -37,7 +37,6 @@ type Cache[T any] struct {
 	capacity int
 	ttl      time.Duration
 	items    atomic.Int32
-	stopCh   chan struct{}
 }
 
 // Ensure Cache implements CacheMetrics
@@ -49,7 +48,6 @@ func NewCache[T any](name string, cap int, ttl time.Duration) *Cache[T] {
 		name:     name,
 		capacity: cap,
 		ttl:      ttl,
-		stopCh:   make(chan struct{}),
 	}
 }
 
@@ -63,15 +61,11 @@ func (c *Cache[T]) Name() string {
 	return c.name
 }
 
-// Stop halts the cache eviction process
-func (c *Cache[T]) Stop() {
-	close(c.stopCh)
-}
-
 // StartEviction begins the background process of removing expired items
 func (c *Cache[T]) StartEviction(ctx context.Context) {
 	go func() {
 		timer := time.NewTimer(time.Minute)
+		defer timer.Stop()
 		for {
 			select {
 			case <-ctx.Done():
@@ -79,8 +73,6 @@ func (c *Cache[T]) StartEviction(ctx context.Context) {
 			case <-timer.C:
 				timer.Reset(time.Minute)
 				c.evict()
-			case <-c.stopCh:
-				return
 			}
 		}
 	}()
@@ -103,11 +95,6 @@ func (c *Cache[T]) evict() {
 			return int(c.items.Load()) > c.capacity
 		})
 	}
-}
-
-// StopEviction signals the eviction goroutine to stop
-func (c *Cache[T]) StopEviction() {
-	c.stopCh <- struct{}{}
 }
 
 // Store adds or updates an item in the cache with metadata from the file
