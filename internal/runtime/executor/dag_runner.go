@@ -136,6 +136,7 @@ func (e *SubDAGExecutor) buildCommand(ctx context.Context, runParams RunParams, 
 
 	cmd := exec.CommandContext(ctx, executable, args...) // nolint:gosec
 	cmd.Dir = workDir
+	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, rCtx.AllEnvs()...)
 
 	// Inject OpenTelemetry trace context into environment variables
