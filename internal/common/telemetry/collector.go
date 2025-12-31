@@ -9,8 +9,18 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
+)
+
+// Histogram bucket definitions
+var (
+	// dagRunDurationBuckets defines buckets for DAG run duration (workflow-appropriate timescales)
+	dagRunDurationBuckets = []float64{1, 5, 15, 30, 60, 120, 300, 600, 1800, 3600}
+
+	// queueWaitBuckets defines buckets for queue wait time (shorter timescales)
+	queueWaitBuckets = []float64{1, 5, 10, 30, 60, 120, 300, 600}
 )
 
 // Collector implements prometheus.Collector interface
@@ -22,7 +32,7 @@ type Collector struct {
 	queueStore      execution.QueueStore
 	serviceRegistry execution.ServiceRegistry
 
-	// Metric descriptors
+	// Metric descriptors (aggregate - backward compatible)
 	infoDesc             *prometheus.Desc
 	uptimeDesc           *prometheus.Desc
 	dagRunsCurrentlyDesc *prometheus.Desc
@@ -30,6 +40,13 @@ type Collector struct {
 	dagRunsTotalDesc     *prometheus.Desc
 	dagsTotalDesc        *prometheus.Desc
 	schedulerRunningDesc *prometheus.Desc
+
+	// Metric descriptors (per-DAG)
+	dagRunsCurrentlyByDAGDesc *prometheus.Desc
+	dagRunsQueuedByDAGDesc    *prometheus.Desc
+	dagRunsTotalByDAGDesc     *prometheus.Desc
+	dagRunDurationDesc        *prometheus.Desc
+	queueWaitTimeDesc         *prometheus.Desc
 
 	mu sync.RWMutex
 }
@@ -93,11 +110,44 @@ func NewCollector(
 			nil,
 			nil,
 		),
+
+		// Per-DAG metric descriptors
+		dagRunsCurrentlyByDAGDesc: prometheus.NewDesc(
+			"dagu_dag_runs_currently_running_by_dag",
+			"Number of currently running DAG runs per DAG",
+			[]string{"dag"},
+			nil,
+		),
+		dagRunsQueuedByDAGDesc: prometheus.NewDesc(
+			"dagu_dag_runs_queued_by_dag",
+			"Number of queued DAG runs per DAG",
+			[]string{"dag"},
+			nil,
+		),
+		dagRunsTotalByDAGDesc: prometheus.NewDesc(
+			"dagu_dag_runs_total_by_dag",
+			"Total number of DAG runs by DAG and status (last 24 hours)",
+			[]string{"dag", "status"},
+			nil,
+		),
+		dagRunDurationDesc: prometheus.NewDesc(
+			"dagu_dag_run_duration_seconds",
+			"Duration of completed DAG runs in seconds",
+			[]string{"dag"},
+			nil,
+		),
+		queueWaitTimeDesc: prometheus.NewDesc(
+			"dagu_queue_wait_seconds",
+			"Time spent waiting in queue before execution starts",
+			[]string{"dag"},
+			nil,
+		),
 	}
 }
 
 // Describe implements prometheus.Collector
 func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
+	// Aggregate metrics (backward compatible)
 	ch <- c.infoDesc
 	ch <- c.uptimeDesc
 	ch <- c.dagRunsCurrentlyDesc
@@ -105,6 +155,13 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.dagRunsTotalDesc
 	ch <- c.dagsTotalDesc
 	ch <- c.schedulerRunningDesc
+
+	// Per-DAG metrics
+	ch <- c.dagRunsCurrentlyByDAGDesc
+	ch <- c.dagRunsQueuedByDAGDesc
+	ch <- c.dagRunsTotalByDAGDesc
+	ch <- c.dagRunDurationDesc
+	ch <- c.queueWaitTimeDesc
 }
 
 // Collect implements prometheus.Collector
@@ -163,52 +220,64 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 func (c *Collector) collectDAGRunMetrics(ctx context.Context, ch chan<- prometheus.Metric) {
 	// Get all DAG run statuses
 	// NOTE: ListStatuses by default returns only the last 24 hours of data
-	// This means metrics only reflect recent DAG runs, not the entire history
 	statuses, err := c.dagRunStore.ListStatuses(ctx)
 	if err != nil {
-		// Log error but don't fail collection
 		return
 	}
 
-	// Count runs by status
+	// Aggregate metrics (backward compatible)
 	statusCounts := make(map[string]float64)
-	currentlyRunning := float64(0)
+	var currentlyRunning float64
+
+	// Per-DAG aggregations
+	type dagMetrics struct {
+		running      float64
+		statusCounts map[string]float64
+		durations    []float64
+		queueWaits   []float64
+	}
+	perDAG := make(map[string]*dagMetrics)
 
 	for _, st := range statuses {
-		if st.Status == core.Running {
-			currentlyRunning++
+		dagName := st.Name
+		if _, ok := perDAG[dagName]; !ok {
+			perDAG[dagName] = &dagMetrics{
+				statusCounts: make(map[string]float64),
+			}
 		}
+		dm := perDAG[dagName]
 
-		// Use the canonical status string from String() method
 		statusLabel := st.Status.String()
 		statusCounts[statusLabel]++
+		dm.statusCounts[statusLabel]++
+
+		if st.Status == core.Running {
+			currentlyRunning++
+			dm.running++
+		}
+
+		// Collect duration for completed runs
+		if isCompletedStatus(st.Status) {
+			if duration := calculateDuration(st.StartedAt, st.FinishedAt); duration > 0 {
+				dm.durations = append(dm.durations, duration)
+			}
+		}
+
+		// Collect queue wait time
+		if st.QueuedAt != "" && st.StartedAt != "" {
+			if waitTime := calculateDuration(st.QueuedAt, st.StartedAt); waitTime > 0 {
+				dm.queueWaits = append(dm.queueWaits, waitTime)
+			}
+		}
 	}
 
-	// Currently running DAGs
+	// Emit aggregate metrics (backward compatible)
 	ch <- prometheus.MustNewConstMetric(
 		c.dagRunsCurrentlyDesc,
 		prometheus.GaugeValue,
 		currentlyRunning,
 	)
 
-	// Queue length
-	// NOTE: This counts all queued items across all DAGs
-	// Future enhancement: Add queue name (DAG name) as a label for per-DAG queue metrics
-	queuedCount := float64(0)
-	if c.queueStore != nil {
-		items, err := c.queueStore.All(ctx)
-		if err == nil {
-			queuedCount = float64(len(items))
-		}
-	}
-
-	ch <- prometheus.MustNewConstMetric(
-		c.dagRunsQueuedDesc,
-		prometheus.GaugeValue,
-		queuedCount,
-	)
-
-	// DAG runs by status
 	for status, count := range statusCounts {
 		ch <- prometheus.MustNewConstMetric(
 			c.dagRunsTotalDesc,
@@ -217,13 +286,43 @@ func (c *Collector) collectDAGRunMetrics(ctx context.Context, ch chan<- promethe
 			status,
 		)
 	}
+
+	// Emit per-DAG metrics
+	for dagName, dm := range perDAG {
+		// Currently running per DAG
+		ch <- prometheus.MustNewConstMetric(
+			c.dagRunsCurrentlyByDAGDesc,
+			prometheus.GaugeValue,
+			dm.running,
+			dagName,
+		)
+
+		// Status counts per DAG
+		for status, count := range dm.statusCounts {
+			ch <- prometheus.MustNewConstMetric(
+				c.dagRunsTotalByDAGDesc,
+				prometheus.CounterValue,
+				count,
+				dagName,
+				status,
+			)
+		}
+
+		// Duration histogram per DAG
+		emitHistogram(ch, c.dagRunDurationDesc, dm.durations, dagRunDurationBuckets, dagName)
+
+		// Queue wait time histogram per DAG
+		emitHistogram(ch, c.queueWaitTimeDesc, dm.queueWaits, queueWaitBuckets, dagName)
+	}
+
+	// Collect queue metrics
+	c.collectQueueMetrics(ctx, ch)
 }
 
 func (c *Collector) collectDAGMetrics(ctx context.Context, ch chan<- prometheus.Metric) {
 	// Get all DAGs using List with empty options to get all
 	result, _, err := c.dagStore.List(ctx, execution.ListDAGsOptions{})
 	if err != nil {
-		// Log error but don't fail collection
 		return
 	}
 
@@ -233,6 +332,121 @@ func (c *Collector) collectDAGMetrics(ctx context.Context, ch chan<- prometheus.
 		c.dagsTotalDesc,
 		prometheus.GaugeValue,
 		totalDAGs,
+	)
+}
+
+func (c *Collector) collectQueueMetrics(ctx context.Context, ch chan<- prometheus.Metric) {
+	if c.queueStore == nil {
+		ch <- prometheus.MustNewConstMetric(
+			c.dagRunsQueuedDesc,
+			prometheus.GaugeValue,
+			0,
+		)
+		return
+	}
+
+	items, err := c.queueStore.All(ctx)
+	if err != nil {
+		ch <- prometheus.MustNewConstMetric(
+			c.dagRunsQueuedDesc,
+			prometheus.GaugeValue,
+			0,
+		)
+		return
+	}
+
+	// Emit aggregate queue count (backward compatible)
+	ch <- prometheus.MustNewConstMetric(
+		c.dagRunsQueuedDesc,
+		prometheus.GaugeValue,
+		float64(len(items)),
+	)
+
+	// Aggregate per-DAG queue counts
+	perDAGQueue := make(map[string]float64)
+	for _, item := range items {
+		data, err := item.Data()
+		if err != nil || data == nil {
+			continue
+		}
+		perDAGQueue[data.Name]++
+	}
+
+	// Emit per-DAG queue metrics
+	for dagName, count := range perDAGQueue {
+		ch <- prometheus.MustNewConstMetric(
+			c.dagRunsQueuedByDAGDesc,
+			prometheus.GaugeValue,
+			count,
+			dagName,
+		)
+	}
+}
+
+// isCompletedStatus returns true if the status represents a terminal state
+func isCompletedStatus(s core.Status) bool {
+	switch s {
+	case core.Succeeded, core.Failed, core.Aborted, core.PartiallySucceeded:
+		return true
+	default:
+		return false
+	}
+}
+
+// calculateDuration computes the duration in seconds between two RFC3339 time strings
+func calculateDuration(start, end string) float64 {
+	if start == "" || end == "" {
+		return 0
+	}
+	startTime, err := stringutil.ParseTime(start)
+	if err != nil || startTime.IsZero() {
+		return 0
+	}
+	endTime, err := stringutil.ParseTime(end)
+	if err != nil || endTime.IsZero() {
+		return 0
+	}
+	duration := endTime.Sub(startTime).Seconds()
+	if duration < 0 {
+		return 0
+	}
+	return duration
+}
+
+// emitHistogram creates and sends a histogram metric from observed values
+func emitHistogram(
+	ch chan<- prometheus.Metric,
+	desc *prometheus.Desc,
+	observations []float64,
+	buckets []float64,
+	labelValues ...string,
+) {
+	if len(observations) == 0 {
+		return
+	}
+
+	// Build bucket counts
+	bucketCounts := make(map[float64]uint64)
+	for _, bucket := range buckets {
+		bucketCounts[bucket] = 0
+	}
+
+	var sum float64
+	for _, obs := range observations {
+		sum += obs
+		for _, bucket := range buckets {
+			if obs <= bucket {
+				bucketCounts[bucket]++
+			}
+		}
+	}
+
+	ch <- prometheus.MustNewConstHistogram(
+		desc,
+		uint64(len(observations)),
+		sum,
+		bucketCounts,
+		labelValues...,
 	)
 }
 
