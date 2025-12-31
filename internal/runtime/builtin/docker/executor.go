@@ -365,7 +365,12 @@ func newDocker(ctx context.Context, step core.Step) (executor.Executor, error) {
 		c.ShouldStart = true
 		// Merge step-level env into container env
 		// Step env comes first, container env comes last (higher priority)
-		c.Container.Env = mergeEnvVars(step.Env, c.Container.Env)
+		// In exec mode, Container is nil - use ExecOptions.Env instead
+		if c.Container != nil {
+			c.Container.Env = mergeEnvVars(step.Env, c.Container.Env)
+		} else if c.ExecOptions != nil {
+			c.ExecOptions.Env = mergeEnvVars(step.Env, c.ExecOptions.Env)
+		}
 		cfg = c
 	} else if len(execCfg.Config) > 0 {
 		// Priority 2: Executor config map (legacy syntax: executor.config)

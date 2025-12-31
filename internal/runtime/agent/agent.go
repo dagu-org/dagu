@@ -395,9 +395,12 @@ func (a *Agent) Run(ctx context.Context) error {
 			initErr = fmt.Errorf("failed to initialize container client: %w", err)
 			return initErr
 		}
-		if err := ctCli.CreateContainerKeepAlive(ctx); err != nil {
-			initErr = fmt.Errorf("failed to create keepalive container: %w", err)
-			return initErr
+		// In exec mode, we use an existing container - don't create a new one
+		if !a.dag.Container.IsExecMode() {
+			if err := ctCli.CreateContainerKeepAlive(ctx); err != nil {
+				initErr = fmt.Errorf("failed to create keepalive container: %w", err)
+				return initErr
+			}
 		}
 
 		// Set the container client in the context for the execution.
