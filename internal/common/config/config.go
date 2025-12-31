@@ -118,6 +118,10 @@ type Server struct {
 
 	// StrictValidation enables strict validation of API requests.
 	StrictValidation bool
+
+	// Metrics controls access to the /api/v2/metrics endpoint.
+	// "private" (default) requires authentication, "public" allows unauthenticated access.
+	Metrics MetricsAccess
 }
 
 // Permission represents a permission string used in the application.
@@ -138,6 +142,16 @@ const (
 	AuthModeBuiltin AuthMode = "builtin"
 	// AuthModeOIDC enables OIDC authentication.
 	AuthModeOIDC AuthMode = "oidc"
+)
+
+// MetricsAccess represents the access mode for the metrics endpoint.
+type MetricsAccess string
+
+const (
+	// MetricsAccessPrivate requires authentication to access the metrics endpoint.
+	MetricsAccessPrivate MetricsAccess = "private"
+	// MetricsAccessPublic allows unauthenticated access to the metrics endpoint.
+	MetricsAccessPublic MetricsAccess = "public"
 )
 
 // Auth represents the authentication configuration

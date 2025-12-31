@@ -135,6 +135,10 @@ type Definition struct {
 
 	// Monitoring contains configuration for system monitoring.
 	Monitoring *MonitoringDef `mapstructure:"monitoring"`
+
+	// Metrics controls access to the /api/v2/metrics endpoint.
+	// Valid values: "public", "private" (default: "private")
+	Metrics *string `mapstructure:"metrics"`
 }
 
 // PeerDef holds the certificate and TLS configuration for peer connections over gRPC.

@@ -421,6 +421,19 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 
 	// Normalize the BasePath value for proper URL construction.
 	cfg.Server.BasePath = cleanServerBasePath(cfg.Server.BasePath)
+
+	// Set metrics access mode (default: private)
+	cfg.Server.Metrics = MetricsAccessPrivate
+	if def.Metrics != nil {
+		switch MetricsAccess(*def.Metrics) {
+		case MetricsAccessPublic:
+			cfg.Server.Metrics = MetricsAccessPublic
+		case MetricsAccessPrivate:
+			cfg.Server.Metrics = MetricsAccessPrivate
+		default:
+			l.warnings = append(l.warnings, fmt.Sprintf("Invalid server.metrics value: %q, defaulting to 'private'", *def.Metrics))
+		}
+	}
 }
 
 // validateServerConfig validates the server configuration.
@@ -810,6 +823,7 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("basePath", "")
 	l.v.SetDefault("apiBasePath", "/api/v2")
 	l.v.SetDefault("latestStatusToday", false)
+	l.v.SetDefault("metrics", "private")
 
 	// Coordinator settings
 	l.v.SetDefault("coordinator.host", "127.0.0.1")
@@ -864,6 +878,7 @@ var envBindings = []envBinding{
 	{key: "debug", env: "DEBUG"},
 	{key: "headless", env: "HEADLESS"},
 	{key: "latestStatusToday", env: "LATEST_STATUS_TODAY"},
+	{key: "metrics", env: "SERVER_METRICS"},
 
 	// Core configurations
 	{key: "workDir", env: "WORK_DIR", isPath: true},

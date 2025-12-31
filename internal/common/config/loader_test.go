@@ -187,6 +187,7 @@ func TestLoad_Env(t *testing.T) {
 			Permissions:       map[Permission]bool{PermissionWriteDAGs: true, PermissionRunDAGs: true},
 			LatestStatusToday: true,
 			StrictValidation:  false,
+			Metrics:           MetricsAccessPrivate,
 		},
 		Paths: PathsConfig{
 			DAGsDir:            filepath.Join(testPaths, "dags"),
@@ -420,6 +421,7 @@ scheduler:
 				PermissionWriteDAGs: false,
 				PermissionRunDAGs:   false,
 			},
+			Metrics: MetricsAccessPrivate,
 		},
 		Paths: PathsConfig{
 			DAGsDir:            "/var/dagu/dags",
@@ -1010,5 +1012,44 @@ auth:
 `)
 		// TTL defaults to 24 hours when not specified
 		assert.Equal(t, 24*time.Hour, cfg.Server.Auth.Builtin.Token.TTL)
+	})
+}
+
+func TestLoad_MetricsAccess(t *testing.T) {
+	t.Run("MetricsAccessPublic", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+metrics: "public"
+`)
+		assert.Equal(t, MetricsAccessPublic, cfg.Server.Metrics)
+	})
+
+	t.Run("MetricsAccessPrivate", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+metrics: "private"
+`)
+		assert.Equal(t, MetricsAccessPrivate, cfg.Server.Metrics)
+	})
+
+	t.Run("MetricsAccessDefault", func(t *testing.T) {
+		cfg := loadFromYAML(t, "# empty")
+		assert.Equal(t, MetricsAccessPrivate, cfg.Server.Metrics)
+	})
+
+	t.Run("MetricsAccessFromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_SERVER_METRICS": "public",
+		})
+		assert.Equal(t, MetricsAccessPublic, cfg.Server.Metrics)
+	})
+
+	t.Run("MetricsAccessInvalid", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+metrics: "invalid_value"
+`)
+		// Invalid value should default to private with a warning
+		assert.Equal(t, MetricsAccessPrivate, cfg.Server.Metrics)
+		require.Len(t, cfg.Warnings, 1)
+		assert.Contains(t, cfg.Warnings[0], "Invalid server.metrics value")
+		assert.Contains(t, cfg.Warnings[0], "invalid_value")
 	})
 }
