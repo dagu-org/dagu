@@ -406,7 +406,7 @@ func TestCache_MixedExpirationAndCapacity(t *testing.T) {
 	assert.LessOrEqual(t, cache.Size(), 3)
 
 	// Verify no expired entries remain
-	cache.entries.Range(func(key, value any) bool {
+	cache.entries.Range(func(_, value any) bool {
 		entry := value.(Entry[string])
 		assert.True(t, time.Now().Before(entry.ExpiresAt), "Found expired entry after eviction")
 		return true
