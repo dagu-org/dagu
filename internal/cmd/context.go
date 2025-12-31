@@ -146,7 +146,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	switch cmd.Name() {
 	case "server", "scheduler", "start-all":
 		// For long-running process, we setup file cache for better performance
-		hc := fileutil.NewCache[*execution.DAGRunStatus]("dag_run_status", 10000, time.Hour*12)
+		hc := fileutil.NewCache[*execution.DAGRunStatus]("dag_run_status", 1000, time.Hour*12)
 		hc.StartEviction(ctx)
 		hrOpts = append(hrOpts, filedagrun.WithHistoryFileCache(hc))
 	}
