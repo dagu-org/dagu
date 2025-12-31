@@ -7,6 +7,7 @@ import { ToastProvider } from './components/ui/simple-toast';
 import { AppBarContext } from './contexts/AppBarContext';
 import { Config, ConfigContext } from './contexts/ConfigContext';
 import { SearchStateProvider } from './contexts/SearchStateContext';
+import { SchemaProvider } from './contexts/SchemaContext';
 import { UserPreferencesProvider } from './contexts/UserPreference';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -108,6 +109,7 @@ function App({ config }: Props) {
           <UserPreferencesProvider>
             <AuthProvider>
               <SearchStateProvider>
+                <SchemaProvider>
                 <ToastProvider>
                   <BrowserRouter basename={config.basePath}>
                     <Routes>
@@ -169,6 +171,7 @@ function App({ config }: Props) {
                     </Routes>
                   </BrowserRouter>
                 </ToastProvider>
+                </SchemaProvider>
               </SearchStateProvider>
             </AuthProvider>
           </UserPreferencesProvider>

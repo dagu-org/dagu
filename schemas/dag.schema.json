@@ -555,39 +555,19 @@
         "executor": {
           "oneOf": [
             {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "command", "shell",
+                "docker", "container",
+                "http", "mail", "ssh", "jq",
+                "gha", "github_action", "github-action",
+                "dag", "subworkflow",
+                "parallel", "archive"
+              ],
+              "description": "Executor type as string. For simple cases where no config is needed."
             },
             {
-              "type": "object",
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "command",
-                    "shell",
-                    "docker",
-                    "container",
-                    "http",
-                    "mail",
-                    "ssh",
-                    "jq",
-                    "gha",
-                    "github_action",
-                    "github-action",
-                    "dag",
-                    "subworkflow",
-                    "parallel",
-                    "archive"
-                  ],
-                  "description": "Type of executor to use for this step. 'command' is the default shell command executor. 'dag' is for sub-DAG execution. 'parallel' is for parallel step execution."
-                },
-                "config": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "description": "Executor-specific configuration options."
-                }
-              },
-              "required": ["type"]
+              "$ref": "#/definitions/executorObject"
             }
           ],
           "description": "Specialized executor configuration for running the step (e.g., docker for containerized execution, http for API calls, mail for sending emails, gha for running GitHub Actions locally)."
@@ -1333,6 +1313,421 @@
       },
       "required": ["user", "host"],
       "description": "SSH configuration for remote command execution. Can be specified at DAG level for reuse across steps, or at step level for specific overrides. Password authentication is supported but key-based auth is recommended."
+    },
+    "httpExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeout": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Request timeout in seconds. If exceeded, the request is cancelled."
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "HTTP headers to include in the request. Key-value pairs where values are strings."
+        },
+        "query": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Query parameters to append to the URL. Key-value pairs where values are strings."
+        },
+        "body": {
+          "type": "string",
+          "description": "Request body content. Can be JSON, XML, or plain text depending on Content-Type header."
+        },
+        "silent": {
+          "type": "boolean",
+          "description": "When true, suppresses response headers and status in output on success."
+        },
+        "debug": {
+          "type": "boolean",
+          "description": "Enable debug mode to log detailed request/response information."
+        },
+        "json": {
+          "type": "boolean",
+          "description": "When true, formats output as JSON including status_code, headers, and parsed body."
+        },
+        "skipTLSVerify": {
+          "type": "boolean",
+          "description": "Skip TLS certificate verification. WARNING: Only use for testing with self-signed certificates."
+        }
+      },
+      "description": "Configuration options for HTTP executor requests."
+    },
+    "sshExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user": {
+          "type": "string",
+          "description": "SSH username for authentication. Required."
+        },
+        "host": {
+          "type": "string",
+          "description": "Hostname or IP address of the SSH server. Required."
+        },
+        "ip": {
+          "type": "string",
+          "description": "Alias for 'host'. IP address of the SSH server."
+        },
+        "port": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "integer" }
+          ],
+          "default": "22",
+          "description": "SSH port number. Defaults to 22."
+        },
+        "key": {
+          "type": "string",
+          "description": "Path to SSH private key file. If not specified, defaults are tried: ~/.ssh/id_rsa, ~/.ssh/id_ecdsa, ~/.ssh/id_ed25519, ~/.ssh/id_dsa."
+        },
+        "password": {
+          "type": "string",
+          "description": "SSH password for authentication. Not recommended; prefer key-based authentication."
+        },
+        "strictHostKey": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable strict host key checking. When true (default), verifies server's host key against known_hosts."
+        },
+        "knownHostFile": {
+          "type": "string",
+          "default": "~/.ssh/known_hosts",
+          "description": "Path to known_hosts file for host key verification."
+        }
+      },
+      "description": "SSH executor configuration for remote command execution."
+    },
+    "dockerExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "Docker image to use for creating a new container (e.g., 'python:3.11', 'alpine:latest')."
+        },
+        "containerName": {
+          "type": "string",
+          "description": "Name or ID of an existing container to exec into. Use this instead of image to run commands in an existing container."
+        },
+        "platform": {
+          "type": "string",
+          "description": "Target platform for the container (e.g., 'linux/amd64', 'linux/arm64')."
+        },
+        "pull": {
+          "oneOf": [
+            { "type": "boolean", "description": "Boolean shorthand: true = 'always', false = 'never'" },
+            { "type": "string", "enum": ["always", "never", "missing"], "description": "Pull policy string" }
+          ],
+          "default": "missing",
+          "description": "Image pull policy. 'always' pulls every time, 'never' uses only local, 'missing' pulls if not present."
+        },
+        "autoRemove": {
+          "oneOf": [
+            { "type": "boolean" },
+            { "type": "string" }
+          ],
+          "description": "Automatically remove the container after it exits."
+        },
+        "workingDir": {
+          "type": "string",
+          "description": "Working directory inside the container. Shortcut that maps to container.WorkingDir."
+        },
+        "volumes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Volume mounts. Format: 'host_path:container_path[:mode]'. Shortcut that maps to host.Binds."
+        },
+        "container": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Docker container configuration (docker/api/types/container.Config). See Docker API documentation."
+        },
+        "host": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Docker host configuration (docker/api/types/container.HostConfig). See Docker API documentation."
+        },
+        "network": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Docker network configuration (docker/api/types/network.NetworkingConfig). See Docker API documentation."
+        },
+        "exec": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Docker exec options (docker/api/types/container.ExecOptions). Only valid with containerName."
+        }
+      },
+      "description": "Docker executor configuration for running commands in containers."
+    },
+    "mailExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "subject", "message"],
+      "properties": {
+        "from": {
+          "type": "string",
+          "description": "Sender email address. Required."
+        },
+        "to": {
+          "oneOf": [
+            { "type": "string", "description": "Single recipient email address" },
+            { "type": "array", "items": { "type": "string" }, "description": "List of recipient email addresses" }
+          ],
+          "description": "Recipient email address(es). Required."
+        },
+        "subject": {
+          "type": "string",
+          "description": "Email subject line. Required."
+        },
+        "message": {
+          "type": "string",
+          "description": "Email body content. Required."
+        },
+        "attachments": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of file paths to attach to the email."
+        }
+      },
+      "description": "Configuration for sending emails via the mail executor."
+    },
+    "jqExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "raw": {
+          "type": "boolean",
+          "description": "When true, outputs values without JSON formatting. Strings are printed without quotes, nulls print empty lines."
+        }
+      },
+      "description": "Configuration for JQ JSON query executor."
+    },
+    "ghaExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "runner": {
+          "type": "string",
+          "default": "node:24-bookworm",
+          "description": "Docker image to use as the runner for executing the GitHub Action."
+        },
+        "autoRemove": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically remove containers after execution."
+        },
+        "network": {
+          "type": "string",
+          "description": "Docker network mode (e.g., 'host', 'bridge', or custom network name)."
+        },
+        "githubInstance": {
+          "type": "string",
+          "default": "github.com",
+          "description": "GitHub instance hostname for action resolution. Use for GitHub Enterprise."
+        },
+        "dockerSocket": {
+          "type": "string",
+          "description": "Custom Docker socket path. Leave empty for default."
+        },
+        "artifacts": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Path for artifact server storage."
+            },
+            "port": {
+              "type": "string",
+              "description": "Port for artifact server."
+            }
+          },
+          "description": "Artifact server configuration for GitHub Actions."
+        },
+        "reuseContainers": {
+          "type": "boolean",
+          "default": false,
+          "description": "Reuse containers between runs for faster execution."
+        },
+        "forceRebuild": {
+          "type": "boolean",
+          "default": false,
+          "description": "Force rebuild of action images."
+        },
+        "containerOptions": {
+          "type": "string",
+          "description": "Additional Docker run options as a string."
+        },
+        "privileged": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run containers in privileged mode. WARNING: Security risk, avoid in production."
+        },
+        "capabilities": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "add": {
+              "oneOf": [
+                { "type": "string" },
+                { "type": "array", "items": { "type": "string" } }
+              ],
+              "description": "Linux capabilities to add to the container."
+            },
+            "drop": {
+              "oneOf": [
+                { "type": "string" },
+                { "type": "array", "items": { "type": "string" } }
+              ],
+              "description": "Linux capabilities to drop from the container."
+            }
+          },
+          "description": "Linux capabilities configuration for container security."
+        }
+      },
+      "description": "Configuration for running GitHub Actions locally using nektos/act."
+    },
+    "archiveExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Source path for archive operations. Required for all operations."
+        },
+        "destination": {
+          "type": "string",
+          "description": "Destination path for archive operations. Required for 'create' operation (unless dryRun)."
+        },
+        "format": {
+          "type": "string",
+          "description": "Archive format (auto-detected from extension if not specified). Supports: tar, tar.gz, tar.bz2, zip, etc."
+        },
+        "compressionLevel": {
+          "type": "integer",
+          "default": -1,
+          "description": "Compression level. -1 for default, 0 for no compression, 1-9 for gzip/bzip2 levels."
+        },
+        "password": {
+          "type": "string",
+          "description": "Password for encrypted archives. Only supported for extract/list operations."
+        },
+        "overwrite": {
+          "type": "boolean",
+          "description": "Overwrite existing files during extraction."
+        },
+        "preservePaths": {
+          "type": "boolean",
+          "default": true,
+          "description": "Preserve directory structure in archive."
+        },
+        "stripComponents": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of leading path components to strip during extraction."
+        },
+        "include": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Glob patterns for files to include. If specified, only matching files are processed."
+        },
+        "exclude": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Glob patterns for files to exclude."
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Simulate the operation without making changes."
+        },
+        "verbose": {
+          "type": "boolean",
+          "description": "Enable verbose output showing processed files."
+        },
+        "followSymlinks": {
+          "type": "boolean",
+          "description": "Follow symbolic links when creating archives."
+        },
+        "verifyIntegrity": {
+          "type": "boolean",
+          "description": "Verify archive integrity after creation."
+        },
+        "continueOnError": {
+          "type": "boolean",
+          "description": "Continue processing even if individual files fail."
+        }
+      },
+      "description": "Configuration for archive operations (create, extract, list)."
+    },
+    "executorObject": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "command", "shell",
+            "docker", "container",
+            "http", "mail", "ssh", "jq",
+            "gha", "github_action", "github-action",
+            "dag", "subworkflow",
+            "parallel", "archive"
+          ],
+          "description": "Type of executor to use for this step."
+        },
+        "config": {
+          "type": "object",
+          "description": "Executor-specific configuration. Schema depends on executor type."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "http" } } },
+          "then": { "properties": { "config": { "$ref": "#/definitions/httpExecutorConfig" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "ssh" } } },
+          "then": { "properties": { "config": { "$ref": "#/definitions/sshExecutorConfig" } } }
+        },
+        {
+          "if": { "properties": { "type": { "enum": ["docker", "container"] } } },
+          "then": { "properties": { "config": { "$ref": "#/definitions/dockerExecutorConfig" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "mail" } } },
+          "then": { "properties": { "config": { "$ref": "#/definitions/mailExecutorConfig" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "jq" } } },
+          "then": { "properties": { "config": { "$ref": "#/definitions/jqExecutorConfig" } } }
+        },
+        {
+          "if": { "properties": { "type": { "enum": ["gha", "github_action", "github-action"] } } },
+          "then": { "properties": { "config": { "$ref": "#/definitions/ghaExecutorConfig" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "archive" } } },
+          "then": { "properties": { "config": { "$ref": "#/definitions/archiveExecutorConfig" } } }
+        },
+        {
+          "if": { "properties": { "type": { "enum": ["command", "shell"] } } },
+          "then": { "properties": { "config": { "type": "object", "additionalProperties": false, "description": "Command/shell executors do not use executor.config. Configure at step level." } } }
+        },
+        {
+          "if": { "properties": { "type": { "enum": ["dag", "subworkflow"] } } },
+          "then": { "properties": { "config": { "type": "object", "additionalProperties": false, "description": "DAG/subworkflow executors do not use executor.config. Use step.call or step.run field." } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "parallel" } } },
+          "then": { "properties": { "config": { "type": "object", "additionalProperties": false, "description": "Parallel executor does not use executor.config. Use step.parallel field." } } }
+        }
+      ],
+      "description": "Executor configuration object with type-specific config validation."
     }
   }
 }

@@ -11,6 +11,17 @@ module.exports = merge(common, {
   devServer: {
     historyApiFallback: true,
     port: 8081,
+    client: {
+      overlay: {
+        runtimeErrors: (error) => {
+          // Ignore ResizeObserver errors - they're benign and common with Monaco Editor
+          if (error.message?.includes('ResizeObserver loop')) {
+            return false;
+          }
+          return true;
+        },
+      },
+    },
   },
   module: {
     rules: [
