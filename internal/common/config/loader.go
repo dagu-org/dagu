@@ -119,6 +119,20 @@ func (l *ConfigLoader) requires(section ConfigSection) bool {
 	return req&section != 0
 }
 
+// resolvePath resolves a path to an absolute path with a descriptive error message.
+// Returns the resolved path, or an error if resolution fails.
+// Empty paths are returned as-is without error.
+func (l *ConfigLoader) resolvePath(fieldName, path string) (string, error) {
+	if path == "" {
+		return "", nil
+	}
+	resolved, err := fileutil.ResolvePath(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve %s path %q: %w", fieldName, path, err)
+	}
+	return resolved, nil
+}
+
 // NewConfigLoader creates a new ConfigLoader instance with an isolated viper instance
 // ConfigLoaderOption values (for example: service, config file path, or app home directory).
 func NewConfigLoader(viper *viper.Viper, options ...ConfigLoaderOption) *ConfigLoader {
@@ -156,15 +170,9 @@ func (l *ConfigLoader) Load() (*Config, error) {
 			return nil, fmt.Errorf("failed to read config: %w", err)
 		}
 	}
-	configFileUsed := l.v.ConfigFileUsed()
-
-	// Resolve to absolute path if a config file was used
-	if configFileUsed != "" {
-		resolvedPath, err := fileutil.ResolvePath(configFileUsed)
-		if err != nil {
-			return nil, fmt.Errorf("failed to resolve config file path %q: %w", configFileUsed, err)
-		}
-		configFileUsed = resolvedPath
+	configFileUsed, err := l.resolvePath("config file", l.v.ConfigFileUsed())
+	if err != nil {
+		return nil, err
 	}
 
 	// For backward compatibility, try merging in the "admin.yaml" config.
@@ -295,55 +303,47 @@ func (l *ConfigLoader) loadPathsConfig(cfg *Config, def Definition) error {
 		return nil
 	}
 
-	resolvePath := func(name, path string) (string, error) {
-		resolved, err := fileutil.ResolvePath(path)
-		if err != nil {
-			return "", fmt.Errorf("failed to resolve %s path %q: %w", name, path, err)
-		}
-		return resolved, nil
-	}
-
 	var err error
-	if cfg.Paths.DAGsDir, err = resolvePath("DAGsDir", def.Paths.DAGsDir); err != nil {
+	if cfg.Paths.DAGsDir, err = l.resolvePath("DAGsDir", def.Paths.DAGsDir); err != nil {
 		return err
 	}
-	if cfg.Paths.SuspendFlagsDir, err = resolvePath("SuspendFlagsDir", def.Paths.SuspendFlagsDir); err != nil {
+	if cfg.Paths.SuspendFlagsDir, err = l.resolvePath("SuspendFlagsDir", def.Paths.SuspendFlagsDir); err != nil {
 		return err
 	}
-	if cfg.Paths.DataDir, err = resolvePath("DataDir", def.Paths.DataDir); err != nil {
+	if cfg.Paths.DataDir, err = l.resolvePath("DataDir", def.Paths.DataDir); err != nil {
 		return err
 	}
-	if cfg.Paths.LogDir, err = resolvePath("LogDir", def.Paths.LogDir); err != nil {
+	if cfg.Paths.LogDir, err = l.resolvePath("LogDir", def.Paths.LogDir); err != nil {
 		return err
 	}
-	if cfg.Paths.AdminLogsDir, err = resolvePath("AdminLogsDir", def.Paths.AdminLogsDir); err != nil {
+	if cfg.Paths.AdminLogsDir, err = l.resolvePath("AdminLogsDir", def.Paths.AdminLogsDir); err != nil {
 		return err
 	}
-	if cfg.Paths.BaseConfig, err = resolvePath("BaseConfig", def.Paths.BaseConfig); err != nil {
+	if cfg.Paths.BaseConfig, err = l.resolvePath("BaseConfig", def.Paths.BaseConfig); err != nil {
 		return err
 	}
-	if cfg.Paths.Executable, err = resolvePath("Executable", def.Paths.Executable); err != nil {
+	if cfg.Paths.Executable, err = l.resolvePath("Executable", def.Paths.Executable); err != nil {
 		return err
 	}
-	if cfg.Paths.DAGRunsDir, err = resolvePath("DAGRunsDir", def.Paths.DAGRunsDir); err != nil {
+	if cfg.Paths.DAGRunsDir, err = l.resolvePath("DAGRunsDir", def.Paths.DAGRunsDir); err != nil {
 		return err
 	}
-	if cfg.Paths.QueueDir, err = resolvePath("QueueDir", def.Paths.QueueDir); err != nil {
+	if cfg.Paths.QueueDir, err = l.resolvePath("QueueDir", def.Paths.QueueDir); err != nil {
 		return err
 	}
-	if cfg.Paths.ProcDir, err = resolvePath("ProcDir", def.Paths.ProcDir); err != nil {
+	if cfg.Paths.ProcDir, err = l.resolvePath("ProcDir", def.Paths.ProcDir); err != nil {
 		return err
 	}
-	if cfg.Paths.ServiceRegistryDir, err = resolvePath("ServiceRegistryDir", def.Paths.ServiceRegistryDir); err != nil {
+	if cfg.Paths.ServiceRegistryDir, err = l.resolvePath("ServiceRegistryDir", def.Paths.ServiceRegistryDir); err != nil {
 		return err
 	}
-	if cfg.Paths.UsersDir, err = resolvePath("UsersDir", def.Paths.UsersDir); err != nil {
+	if cfg.Paths.UsersDir, err = l.resolvePath("UsersDir", def.Paths.UsersDir); err != nil {
 		return err
 	}
-	if cfg.Paths.APIKeysDir, err = resolvePath("APIKeysDir", def.Paths.APIKeysDir); err != nil {
+	if cfg.Paths.APIKeysDir, err = l.resolvePath("APIKeysDir", def.Paths.APIKeysDir); err != nil {
 		return err
 	}
-	if cfg.Paths.WebhooksDir, err = resolvePath("WebhooksDir", def.Paths.WebhooksDir); err != nil {
+	if cfg.Paths.WebhooksDir, err = l.resolvePath("WebhooksDir", def.Paths.WebhooksDir); err != nil {
 		return err
 	}
 
@@ -720,52 +720,44 @@ func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) error {
 	}
 
 	// Path-related legacy fields (always applied)
-	resolvePath := func(name, path string) (string, error) {
-		resolved, err := fileutil.ResolvePath(path)
-		if err != nil {
-			return "", fmt.Errorf("failed to resolve legacy %s path %q: %w", name, path, err)
-		}
-		return resolved, nil
-	}
-
 	var err error
 	if def.DAGs != "" {
-		if cfg.Paths.DAGsDir, err = resolvePath("DAGs", def.DAGs); err != nil {
+		if cfg.Paths.DAGsDir, err = l.resolvePath("legacy DAGs", def.DAGs); err != nil {
 			return err
 		}
 	}
 	if def.DAGsDir != "" {
-		if cfg.Paths.DAGsDir, err = resolvePath("DAGsDir", def.DAGsDir); err != nil {
+		if cfg.Paths.DAGsDir, err = l.resolvePath("legacy DAGsDir", def.DAGsDir); err != nil {
 			return err
 		}
 	}
 	if def.Executable != "" {
-		if cfg.Paths.Executable, err = resolvePath("Executable", def.Executable); err != nil {
+		if cfg.Paths.Executable, err = l.resolvePath("legacy Executable", def.Executable); err != nil {
 			return err
 		}
 	}
 	if def.LogDir != "" {
-		if cfg.Paths.LogDir, err = resolvePath("LogDir", def.LogDir); err != nil {
+		if cfg.Paths.LogDir, err = l.resolvePath("legacy LogDir", def.LogDir); err != nil {
 			return err
 		}
 	}
 	if def.DataDir != "" {
-		if cfg.Paths.DataDir, err = resolvePath("DataDir", def.DataDir); err != nil {
+		if cfg.Paths.DataDir, err = l.resolvePath("legacy DataDir", def.DataDir); err != nil {
 			return err
 		}
 	}
 	if def.SuspendFlagsDir != "" {
-		if cfg.Paths.SuspendFlagsDir, err = resolvePath("SuspendFlagsDir", def.SuspendFlagsDir); err != nil {
+		if cfg.Paths.SuspendFlagsDir, err = l.resolvePath("legacy SuspendFlagsDir", def.SuspendFlagsDir); err != nil {
 			return err
 		}
 	}
 	if def.AdminLogsDir != "" {
-		if cfg.Paths.AdminLogsDir, err = resolvePath("AdminLogsDir", def.AdminLogsDir); err != nil {
+		if cfg.Paths.AdminLogsDir, err = l.resolvePath("legacy AdminLogsDir", def.AdminLogsDir); err != nil {
 			return err
 		}
 	}
 	if def.BaseConfig != "" {
-		if cfg.Paths.BaseConfig, err = resolvePath("BaseConfig", def.BaseConfig); err != nil {
+		if cfg.Paths.BaseConfig, err = l.resolvePath("legacy BaseConfig", def.BaseConfig); err != nil {
 			return err
 		}
 	}
