@@ -11,6 +11,14 @@ import (
 	"time"
 )
 
+// CacheMetrics provides observability into cache state
+type CacheMetrics interface {
+	// Size returns the current number of entries in the cache
+	Size() int
+	// Name returns a human-readable name for the cache
+	Name() string
+}
+
 // Entry represents a single cached item with metadata and expiration information
 type Entry[T any] struct {
 	Data         T
@@ -24,6 +32,7 @@ type Entry[T any] struct {
 // TODO: Consider replacing this with hashicorp/golang-lru for better performance
 // https://github.com/hashicorp/golang-lru
 type Cache[T any] struct {
+	name     string
 	entries  sync.Map
 	capacity int
 	ttl      time.Duration
@@ -31,13 +40,27 @@ type Cache[T any] struct {
 	stopCh   chan struct{}
 }
 
+// Ensure Cache implements CacheMetrics
+var _ CacheMetrics = (*Cache[any])(nil)
+
 // NewCache creates a new cache with the specified capacity and time-to-live duration
-func NewCache[T any](cap int, ttl time.Duration) *Cache[T] {
+func NewCache[T any](name string, cap int, ttl time.Duration) *Cache[T] {
 	return &Cache[T]{
+		name:     name,
 		capacity: cap,
 		ttl:      ttl,
 		stopCh:   make(chan struct{}),
 	}
+}
+
+// Size returns the current number of entries in the cache
+func (c *Cache[T]) Size() int {
+	return int(c.items.Load())
+}
+
+// Name returns the cache name for metrics
+func (c *Cache[T]) Name() string {
+	return c.name
 }
 
 // Stop halts the cache eviction process

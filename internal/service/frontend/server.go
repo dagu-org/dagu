@@ -21,6 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
+	"github.com/dagu-org/dagu/internal/common/telemetry"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/persistence/fileapikey"
 	"github.com/dagu-org/dagu/internal/persistence/fileuser"
@@ -58,7 +59,7 @@ type Server struct {
 // cfg.Server.Auth.Mode is set to builtin.
 // Returns the constructed *Server, or an error if initialization fails (for example,
 // when the configured builtin auth service fails to initialize).
-func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunStore, qs execution.QueueStore, ps execution.ProcStore, drm runtime.Manager, cc coordinator.Client, sr execution.ServiceRegistry, mr *prometheus.Registry, rs *resource.Service) (*Server, error) {
+func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunStore, qs execution.QueueStore, ps execution.ProcStore, drm runtime.Manager, cc coordinator.Client, sr execution.ServiceRegistry, mr *prometheus.Registry, collector *telemetry.Collector, rs *resource.Service) (*Server, error) {
 	var remoteNodes []string
 	for _, n := range cfg.Server.RemoteNodes {
 		remoteNodes = append(remoteNodes, n.Name)
@@ -69,7 +70,7 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 
 	// Initialize auth service if builtin mode is enabled
 	if cfg.Server.Auth.Mode == config.AuthModeBuiltin {
-		authSvc, err := initBuiltinAuthService(cfg)
+		authSvc, err := initBuiltinAuthService(cfg, collector)
 		if err != nil {
 			// Fail fast: if auth is configured but fails to initialize, return error
 			// to prevent server from running without expected authentication
@@ -102,7 +103,7 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 // authentication service, and ensures a default admin user exists.
 // If the admin password is auto-generated, the password is printed to stdout.
 // It returns the initialized auth service or an error if any step fails.
-func initBuiltinAuthService(cfg *config.Config) (*authservice.Service, error) {
+func initBuiltinAuthService(cfg *config.Config, collector *telemetry.Collector) (*authservice.Service, error) {
 	ctx := context.Background()
 
 	// Validate token secret is configured
@@ -117,16 +118,22 @@ func initBuiltinAuthService(cfg *config.Config) (*authservice.Service, error) {
 	}
 
 	// Create file-based API key store with cache
-	apiKeyCache := fileutil.NewCache[*authmodel.APIKey](0, time.Minute*15)
+	apiKeyCache := fileutil.NewCache[*authmodel.APIKey]("api_key", 0, time.Minute*15)
 	apiKeyCache.StartEviction(ctx)
+	if collector != nil {
+		collector.RegisterCache(apiKeyCache)
+	}
 	apiKeyStore, err := fileapikey.New(cfg.Paths.APIKeysDir, fileapikey.WithFileCache(apiKeyCache))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create API key store: %w", err)
 	}
 
 	// Create file-based webhook store with cache
-	webhookCache := fileutil.NewCache[*authmodel.Webhook](0, time.Minute*15)
+	webhookCache := fileutil.NewCache[*authmodel.Webhook]("webhook", 0, time.Minute*15)
 	webhookCache.StartEviction(ctx)
+	if collector != nil {
+		collector.RegisterCache(webhookCache)
+	}
 	webhookStore, err := filewebhook.New(cfg.Paths.WebhooksDir, filewebhook.WithFileCache(webhookCache))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create webhook store: %w", err)

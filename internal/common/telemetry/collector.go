@@ -9,6 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 
+	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
@@ -31,6 +32,7 @@ type Collector struct {
 	dagRunStore     execution.DAGRunStore
 	queueStore      execution.QueueStore
 	serviceRegistry execution.ServiceRegistry
+	caches          []fileutil.CacheMetrics
 
 	// Metric descriptors (aggregate - backward compatible)
 	infoDesc             *prometheus.Desc
@@ -47,6 +49,9 @@ type Collector struct {
 	dagRunsTotalByDAGDesc     *prometheus.Desc
 	dagRunDurationDesc        *prometheus.Desc
 	queueWaitTimeDesc         *prometheus.Desc
+
+	// Cache metrics
+	cacheEntriesDesc *prometheus.Desc
 
 	mu sync.RWMutex
 }
@@ -94,7 +99,7 @@ func NewCollector(
 		),
 		dagRunsTotalDesc: prometheus.NewDesc(
 			"dagu_dag_runs_total",
-			"Total number of DAG runs by status (last 24 hours)",
+			"Total number of DAG runs by status (today)",
 			[]string{"status"},
 			nil,
 		),
@@ -126,7 +131,7 @@ func NewCollector(
 		),
 		dagRunsTotalByDAGDesc: prometheus.NewDesc(
 			"dagu_dag_runs_total_by_dag",
-			"Total number of DAG runs by DAG and status (last 24 hours)",
+			"Total number of DAG runs by DAG and status (today)",
 			[]string{"dag", "status"},
 			nil,
 		),
@@ -142,7 +147,22 @@ func NewCollector(
 			[]string{"dag"},
 			nil,
 		),
+
+		// Cache metrics
+		cacheEntriesDesc: prometheus.NewDesc(
+			"dagu_cache_entries_total",
+			"Number of entries in cache",
+			[]string{"cache"},
+			nil,
+		),
 	}
+}
+
+// RegisterCache adds a cache to be monitored for metrics
+func (c *Collector) RegisterCache(cache fileutil.CacheMetrics) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.caches = append(c.caches, cache)
 }
 
 // Describe implements prometheus.Collector
@@ -162,6 +182,9 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.dagRunsTotalByDAGDesc
 	ch <- c.dagRunDurationDesc
 	ch <- c.queueWaitTimeDesc
+
+	// Cache metrics
+	ch <- c.cacheEntriesDesc
 }
 
 // Collect implements prometheus.Collector
@@ -215,11 +238,25 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 		prometheus.GaugeValue,
 		schedulerRunning,
 	)
+
+	// Collect cache metrics
+	c.collectCacheMetrics(ch)
+}
+
+func (c *Collector) collectCacheMetrics(ch chan<- prometheus.Metric) {
+	for _, cache := range c.caches {
+		ch <- prometheus.MustNewConstMetric(
+			c.cacheEntriesDesc,
+			prometheus.GaugeValue,
+			float64(cache.Size()),
+			cache.Name(),
+		)
+	}
 }
 
 func (c *Collector) collectDAGRunMetrics(ctx context.Context, ch chan<- prometheus.Metric) {
 	// Get all DAG run statuses
-	// NOTE: ListStatuses by default returns only the last 24 hours of data
+	// NOTE: ListStatuses by default returns only today's data (from midnight)
 	statuses, err := c.dagRunStore.ListStatuses(ctx)
 	if err != nil {
 		return
