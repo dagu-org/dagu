@@ -118,7 +118,7 @@ func initBuiltinAuthService(cfg *config.Config, collector *telemetry.Collector) 
 	}
 
 	// Create file-based API key store with cache
-	apiKeyCache := fileutil.NewCache[*authmodel.APIKey]("api_key", 0, time.Minute*15)
+	apiKeyCache := fileutil.NewCache[*authmodel.APIKey]("api_key", 500, time.Minute*15)
 	apiKeyCache.StartEviction(ctx)
 	if collector != nil {
 		collector.RegisterCache(apiKeyCache)
@@ -129,7 +129,7 @@ func initBuiltinAuthService(cfg *config.Config, collector *telemetry.Collector) 
 	}
 
 	// Create file-based webhook store with cache
-	webhookCache := fileutil.NewCache[*authmodel.Webhook]("webhook", 0, time.Minute*15)
+	webhookCache := fileutil.NewCache[*authmodel.Webhook]("webhook", 500, time.Minute*15)
 	webhookCache.StartEviction(ctx)
 	if collector != nil {
 		collector.RegisterCache(webhookCache)

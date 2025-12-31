@@ -146,7 +146,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	switch cmd.Name() {
 	case "server", "scheduler", "start-all":
 		// For long-running process, we setup file cache for better performance
-		hc := fileutil.NewCache[*execution.DAGRunStatus]("dag_run_status", 0, time.Hour*12)
+		hc := fileutil.NewCache[*execution.DAGRunStatus]("dag_run_status", 10000, time.Hour*12)
 		hc.StartEviction(ctx)
 		hrOpts = append(hrOpts, filedagrun.WithHistoryFileCache(hc))
 	}
@@ -208,7 +208,7 @@ func serviceForCommand(cmdName string) config.Service {
 // NewServer creates and returns a new web UI NewServer.
 // It initializes in-memory caches for DAGs and runstore, and uses them in the client.
 func (c *Context) NewServer(rs *resource.Service) (*frontend.Server, error) {
-	dc := fileutil.NewCache[*core.DAG]("dag_definition", 0, time.Hour*12)
+	dc := fileutil.NewCache[*core.DAG]("dag_definition", 1000, time.Hour*12)
 	dc.StartEviction(c)
 
 	dr, err := c.dagStore(dc, nil)
@@ -254,7 +254,7 @@ func (c *Context) NewCoordinatorClient() coordinator.Client {
 // NewScheduler creates a new NewScheduler instance using the default client.
 // It builds a DAG job manager to handle scheduled executions.
 func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
-	cache := fileutil.NewCache[*core.DAG]("dag_definition", 0, time.Hour*12)
+	cache := fileutil.NewCache[*core.DAG]("dag_definition", 1000, time.Hour*12)
 	cache.StartEviction(c)
 
 	dr, err := c.dagStore(cache, nil)
