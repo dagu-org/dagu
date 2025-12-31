@@ -62,8 +62,9 @@ steps:
 	t.Run("DotEnv", func(t *testing.T) {
 		t.Parallel()
 
-		// Create dotenv files
-		// It should load the first found dot env file only
+		// dotenv1 contains: ENV1=123, ENV2=456
+		// dotenv2 contains: ENV2=abc
+		// All dotenv files are loaded in order, later files override earlier ones
 		dotenv1Path := test.TestdataPath(t, "integration/dotenv1")
 		dotenv2Path := test.TestdataPath(t, "integration/dotenv2")
 
@@ -72,12 +73,13 @@ steps:
   - `+dotenv2Path+`
 steps:
   - command: echo "${ENV1} ${ENV2}"
-    output: OUT1 #123 456
+    output: OUT1
 `)
 		agent := dag.Agent()
 		agent.RunSuccess(t)
+		// ENV1=123 from dotenv1, ENV2=abc from dotenv2 (overrides dotenv1's ENV2=456)
 		dag.AssertOutputs(t, map[string]any{
-			"OUT1": "123 456",
+			"OUT1": "123 abc",
 		})
 	})
 
