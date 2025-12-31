@@ -11,7 +11,7 @@ on:
 jobs:
   docker-default:
     name: Build and push default image
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -61,7 +61,7 @@ jobs:
 
   docker-dev:
     name: Build and push dev image
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -112,7 +112,7 @@ jobs:
 
   docker-alpine:
     name: Build and push alpine image
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
