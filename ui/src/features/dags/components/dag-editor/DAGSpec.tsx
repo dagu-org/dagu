@@ -448,13 +448,12 @@ function DAGSpec({ fileName }: Props) {
                 <div className="flex-1 flex flex-col bg-surface border border-border rounded-lg overflow-hidden min-h-[400px]">
                   <div className="flex-shrink-0 flex justify-between items-center p-2 border-b border-border">
                     <Button
-                      variant="ghost"
-                      size="sm"
+                      variant="secondary"
+                      size="xs"
                       onClick={toggleSidebar}
                       title="Toggle Schema Documentation (Ctrl+Shift+D)"
-                      className="h-7 px-2 text-xs"
                     >
-                      <BookOpen className="h-4 w-4 mr-1" />
+                      <BookOpen className="h-3.5 w-3.5" />
                       Docs
                     </Button>
                     {editable && (

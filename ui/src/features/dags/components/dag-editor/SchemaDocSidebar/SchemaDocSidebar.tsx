@@ -40,11 +40,11 @@ export function SchemaDocSidebar({
       <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30">
         <div className="flex items-center gap-1.5">
           <BookOpen className="w-4 h-4 text-muted-foreground" />
-          <span className="text-xs font-medium">Schema Docs</span>
+          <span className="text-xs font-medium text-foreground">Schema Docs</span>
         </div>
         <button
           onClick={onClose}
-          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
           title="Close (Ctrl+Shift+D)"
         >
           <X className="w-4 h-4" />
@@ -94,7 +94,7 @@ export function SchemaDocSidebar({
                 <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-2">
                   Root Properties
                 </h4>
-                <div className="border border-slate-200 dark:border-slate-700 rounded p-1">
+                <div className="border border-border rounded p-1">
                   <NestedPropertiesTree
                     properties={Object.fromEntries(
                       Object.entries(schema.properties).map(([key, value]) => [
@@ -148,7 +148,7 @@ export function SchemaDocSidebar({
                     .map((prop) => (
                       <span
                         key={prop}
-                        className="text-[10px] bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-200"
+                        className="text-[10px] bg-muted text-foreground px-1.5 py-0.5 rounded"
                       >
                         {prop}
                       </span>
@@ -168,9 +168,9 @@ export function SchemaDocSidebar({
       {/* Footer */}
       <div className="px-3 py-1.5 border-t border-border bg-muted/20">
         <span className="text-[10px] text-muted-foreground">
-          Press <kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">Ctrl</kbd>
-          +<kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">Shift</kbd>
-          +<kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">D</kbd> to toggle
+          Press <kbd className="px-1 py-0.5 bg-muted text-foreground rounded text-[9px]">Ctrl</kbd>
+          +<kbd className="px-1 py-0.5 bg-muted text-foreground rounded text-[9px]">Shift</kbd>
+          +<kbd className="px-1 py-0.5 bg-muted text-foreground rounded text-[9px]">D</kbd> to toggle
         </span>
       </div>
     </div>

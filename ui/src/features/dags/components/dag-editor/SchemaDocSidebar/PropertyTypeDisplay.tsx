@@ -1,4 +1,3 @@
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 interface PropertyTypeDisplayProps {
@@ -7,16 +6,17 @@ interface PropertyTypeDisplayProps {
   className?: string;
 }
 
+// Sepia-compatible, muted color palette matching existing StatusChip patterns
 const typeColors: Record<string, string> = {
-  string: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  number: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-  integer: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-  boolean: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-  array: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-  object: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-  enum: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200',
-  null: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
-  unknown: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
+  string: 'bg-[rgba(107,168,107,0.12)] text-[#5a8a5a]',
+  number: 'bg-[rgba(138,159,196,0.12)] text-[#6a7fa4]',
+  integer: 'bg-[rgba(138,159,196,0.12)] text-[#6a7fa4]',
+  boolean: 'bg-[rgba(154,122,196,0.12)] text-[#7a5aa4]',
+  array: 'bg-[rgba(196,158,106,0.12)] text-[#9a7a4a]',
+  object: 'bg-[rgba(107,168,147,0.12)] text-[#5a8a7a]',
+  enum: 'bg-[rgba(196,122,156,0.12)] text-[#a45a7a]',
+  null: 'bg-muted text-muted-foreground',
+  unknown: 'bg-muted text-muted-foreground',
 };
 
 export function PropertyTypeDisplay({
@@ -29,24 +29,20 @@ export function PropertyTypeDisplay({
   return (
     <div className={cn('flex flex-wrap items-center gap-1', className)}>
       {types.map((t, i) => (
-        <Badge
+        <span
           key={i}
-          variant="outline"
           className={cn(
-            'text-[10px] px-1.5 py-0 h-4 font-mono border-0',
+            'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium',
             typeColors[t] || typeColors.unknown
           )}
         >
           {t}
-        </Badge>
+        </span>
       ))}
       {required && (
-        <Badge
-          variant="outline"
-          className="text-[10px] px-1.5 py-0 h-4 bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200 border-0"
-        >
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[rgba(196,114,106,0.12)] text-[#b05a52]">
           required
-        </Badge>
+        </span>
       )}
     </div>
   );

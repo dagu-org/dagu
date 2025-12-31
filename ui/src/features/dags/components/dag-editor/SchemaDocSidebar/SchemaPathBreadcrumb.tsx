@@ -33,10 +33,10 @@ export function SchemaPathBreadcrumb({
           )}
           <span
             className={cn(
-              'px-1 py-0.5 rounded',
+              'px-1 py-0.5 rounded text-foreground',
               segment.isArrayIndex
-                ? 'font-mono bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                ? 'font-mono bg-[rgba(196,158,106,0.15)] text-[#9a7a4a]'
+                : 'bg-muted'
             )}
           >
             {segment.isArrayIndex ? `[${segment.key}]` : segment.key}

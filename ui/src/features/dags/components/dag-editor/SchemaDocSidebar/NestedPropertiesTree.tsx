@@ -60,7 +60,7 @@ function PropertyItem({
     <div className="text-xs">
       <div
         className={cn(
-          'flex items-center gap-1 py-0.5 px-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800',
+          'flex items-center gap-1 py-0.5 px-1 rounded hover:bg-muted/50',
           canExpand && 'cursor-pointer'
         )}
         onClick={() => canExpand && setIsExpanded(!isExpanded)}
@@ -95,7 +95,7 @@ function PropertyItem({
         </div>
       )}
       {isExpanded && hasNestedProperties && (
-        <div className="pl-3 border-l border-slate-200 dark:border-slate-700 ml-1.5 mt-0.5">
+        <div className="pl-3 border-l border-border ml-1.5 mt-0.5">
           <NestedPropertiesTree
             properties={property.properties!}
             maxDepth={maxDepth}
