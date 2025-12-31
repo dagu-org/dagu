@@ -3327,6 +3327,9 @@ components:
         params:
           type: string
           description: "Runtime parameters passed to the DAG-run in JSON format"
+        workerId:
+          type: string
+          description: "ID of the worker that executed this DAG-run ('local' for local execution)"
       required:
         - rootDAGRunName
         - rootDAGRunId

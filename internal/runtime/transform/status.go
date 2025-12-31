@@ -136,6 +136,13 @@ func WithPreconditions(conditions []*core.Condition) StatusOption {
 	}
 }
 
+// WithWorkerID returns a StatusOption that sets the worker ID
+func WithWorkerID(workerID string) StatusOption {
+	return func(s *execution.DAGRunStatus) {
+		s.WorkerID = workerID
+	}
+}
+
 // Create builds a Status object for a dag-run with the specified parameters
 func (f *StatusBuilder) Create(
 	dagRunID string,

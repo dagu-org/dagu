@@ -39,6 +39,7 @@ type DAGRunStatus struct {
 	DAGRunID      string            `json:"dagRunId"`
 	AttemptID     string            `json:"attemptId"`
 	Status        core.Status       `json:"status"`
+	WorkerID      string            `json:"workerId,omitempty"`
 	PID           PID               `json:"pid,omitempty"`
 	Nodes         []*Node           `json:"nodes,omitempty"`
 	OnInit        *Node             `json:"onInit,omitempty"`

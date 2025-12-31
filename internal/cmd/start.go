@@ -57,11 +57,17 @@ This command parses the DAG definition, resolves parameters, and initiates the D
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, defaultWorkingDirFlag}
+var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, defaultWorkingDirFlag, startWorkerIDFlag}
 
 var fromRunIDFlag = commandLineFlag{
 	name:  "from-run-id",
 	usage: "Historic dag-run ID to use as the template for a new run",
+}
+
+// startWorkerIDFlag identifies which worker executes this DAG run (for distributed execution tracking)
+var startWorkerIDFlag = commandLineFlag{
+	name:  "worker-id",
+	usage: "Worker ID executing this DAG run (auto-set in distributed mode, defaults to 'local')",
 }
 
 // runStart handles the execution of the start command
@@ -69,6 +75,13 @@ func runStart(ctx *Context, args []string) error {
 	fromRunID, err := ctx.StringParam("from-run-id")
 	if err != nil {
 		return fmt.Errorf("failed to get from-run-id: %w", err)
+	}
+
+	// Get worker-id for tracking which worker executes this DAG run
+	// Default to "local" for non-distributed execution or if flag is not defined
+	workerID, _ := ctx.StringParam("worker-id")
+	if workerID == "" {
+		workerID = "local"
 	}
 
 	// Get dag-run ID and references
@@ -152,7 +165,7 @@ func runStart(ctx *Context, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to parse parent dag-run reference: %w", err)
 		}
-		return handleSubDAGRun(ctx, dag, dagRunID, params, root, parent)
+		return handleSubDAGRun(ctx, dag, dagRunID, params, root, parent, workerID)
 	}
 
 	// Check if the DAG run-id is unique
@@ -172,7 +185,7 @@ func runStart(ctx *Context, args []string) error {
 		logger.Info(ctx, "Executing root dag-run", slog.String("params", params))
 	}
 
-	return tryExecuteDAG(ctx, dag, dagRunID, root)
+	return tryExecuteDAG(ctx, dag, dagRunID, root, workerID)
 }
 
 var (
@@ -180,7 +193,7 @@ var (
 )
 
 // tryExecuteDAG tries to run the DAG.
-func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root execution.DAGRunRef) error {
+func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root execution.DAGRunRef, workerID string) error {
 	if err := ctx.ProcStore.Lock(ctx, dag.ProcGroup()); err != nil {
 		logger.Debug(ctx, "Failed to lock process group", tag.Error(err))
 		_ = ctx.RecordEarlyFailure(dag, dagRunID, err)
@@ -204,7 +217,7 @@ func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root execution.
 	// to allow other instances of the same DAG to start.
 	ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 
-	return executeDAGRun(ctx, dag, execution.DAGRunRef{}, dagRunID, root)
+	return executeDAGRun(ctx, dag, execution.DAGRunRef{}, dagRunID, root, workerID)
 }
 
 // getDAGRunInfo extracts and validates dag-run ID and references from command flags
@@ -360,7 +373,7 @@ func determineRootDAGRun(isSubDAGRun bool, rootDAGRun string, dag *core.DAG, dag
 }
 
 // handleSubDAGRun processes a sub dag-run, checking for previous runs
-func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string, root execution.DAGRunRef, parent execution.DAGRunRef) error {
+func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string, root execution.DAGRunRef, parent execution.DAGRunRef, workerID string) error {
 	// Log sub dag-run execution
 	logger.Info(ctx, "Executing sub dag-run",
 		slog.String("params", params),
@@ -380,7 +393,7 @@ func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string
 	subAttempt, err := ctx.DAGRunStore.FindSubAttempt(ctx, root, dagRunID)
 	if errors.Is(err, execution.ErrDAGRunIDNotFound) {
 		// If the dag-run ID is not found, proceed with new execution
-		return executeDAGRun(ctx, dag, parent, dagRunID, root)
+		return executeDAGRun(ctx, dag, parent, dagRunID, root, workerID)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to find the record for dag-run ID %s: %w", dagRunID, err)
@@ -393,7 +406,7 @@ func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string
 	}
 
 	// Execute as a retry of the previous run
-	return executeRetry(ctx, dag, status, root, "")
+	return executeRetry(ctx, dag, status, root, "", workerID)
 }
 
 // executeDAGRun initializes execution state for a DAG run, constructs an agent configured
@@ -406,7 +419,7 @@ func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string
 //
 // It returns an error if log file initialization, DAG store setup, agent creation, or
 // execution fails.
-func executeDAGRun(ctx *Context, d *core.DAG, parent execution.DAGRunRef, dagRunID string, root execution.DAGRunRef) error {
+func executeDAGRun(ctx *Context, d *core.DAG, parent execution.DAGRunRef, dagRunID string, root execution.DAGRunRef, workerID string) error {
 	// Open the log file for the scheduler. The log file will be used for future
 	// execution for the same DAG/dag-run ID between attempts.
 	logFile, err := ctx.OpenLogFile(d, dagRunID)
@@ -440,6 +453,7 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent execution.DAGRunRef, dagRun
 		agent.Options{
 			ParentDAGRun:    parent,
 			ProgressDisplay: shouldEnableProgress(ctx),
+			WorkerID:        workerID,
 		},
 	)
 

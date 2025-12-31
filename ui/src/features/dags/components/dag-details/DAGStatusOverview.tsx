@@ -11,6 +11,7 @@ import {
   Info,
   Layers,
   PlayCircle,
+  Server,
   StopCircle,
   Terminal,
   Timer,
@@ -257,6 +258,17 @@ function DAGStatusOverview({
               </span>
             </LabeledItem>
           </div>
+
+          {status.workerId && (
+            <div className="flex items-center">
+              <Server className="w-3.5 mr-1 text-muted-foreground" />
+              <LabeledItem label="Worker">
+                <span className="font-medium text-foreground/90 text-xs">
+                  {status.workerId}
+                </span>
+              </LabeledItem>
+            </div>
+          )}
         </div>
       </div>
 

@@ -127,6 +127,9 @@ type Agent struct {
 	// stepRetry is the name of the step to retry, if specified.
 	stepRetry string
 
+	// workerID is the identifier of the worker executing this DAG run.
+	workerID string
+
 	// tracer is the OpenTelemetry tracer for the agent.
 	tracer *telemetry.Tracer
 }
@@ -148,6 +151,10 @@ type Options struct {
 	ProgressDisplay bool
 	// StepRetry is the name of the step to retry, if specified.
 	StepRetry string
+	// WorkerID is the identifier of the worker executing this DAG run.
+	// For distributed execution, this is set to the worker's ID.
+	// For local execution, this defaults to "local".
+	WorkerID string
 }
 
 // New creates a new Agent.
@@ -179,6 +186,7 @@ func New(
 		registry:     reg,
 		stepRetry:    opts.StepRetry,
 		peerConfig:   peerConfig,
+		workerID:     opts.WorkerID,
 	}
 
 	// Initialize progress display if enabled
@@ -778,6 +786,7 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 		transform.WithAttemptID(a.dagRunAttemptID),
 		transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
 		transform.WithPreconditions(a.dag.Preconditions),
+		transform.WithWorkerID(a.workerID),
 	}
 
 	// If the current execution is a retry, we need to copy some data

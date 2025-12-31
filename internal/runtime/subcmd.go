@@ -172,6 +172,11 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 
 	args = append(args, fmt.Sprintf("--run-id=%s", task.DagRunId))
 
+	// Pass worker ID for tracking which worker executes this DAG run
+	if task.WorkerId != "" {
+		args = append(args, fmt.Sprintf("--worker-id=%s", task.WorkerId))
+	}
+
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
 	}
@@ -195,6 +200,12 @@ func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task) CmdSpec {
 	if task.Step != "" {
 		args = append(args, fmt.Sprintf("--step=%s", task.Step))
 	}
+
+	// Pass worker ID for tracking which worker executes this DAG run
+	if task.WorkerId != "" {
+		args = append(args, fmt.Sprintf("--worker-id=%s", task.WorkerId))
+	}
+
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
 	}

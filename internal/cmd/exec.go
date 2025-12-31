@@ -204,7 +204,8 @@ func runExec(ctx *Context, args []string) error {
 		tag.RunID(runID),
 	)
 
-	return tryExecuteDAG(ctx, dag, runID, dagRunRef)
+	// exec command is always local execution
+	return tryExecuteDAG(ctx, dag, runID, dagRunRef, "local")
 }
 
 var (
