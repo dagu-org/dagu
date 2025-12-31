@@ -14,7 +14,7 @@ env:
 
 jobs:
   test-workflow-syntax:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -76,7 +76,7 @@ jobs:
           cat package.json
 
   test-platform-matrix:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
