@@ -21,6 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -175,26 +176,86 @@ func waitForContainerRunning(ctx context.Context, cli *client.Client, name strin
 		return fmt.Errorf("failed to inspect container: %w", err)
 	}
 
+	// Log that we're waiting for the container
+	lastStatus := getContainerStatus(info, err)
+	logger.Info(ctx, "Waiting for container to be running",
+		slog.String("container", name),
+		slog.String("currentStatus", lastStatus),
+		slog.Duration("timeout", defaultReadinessTimeout),
+	)
+
 	ticker := time.NewTicker(defaultPollInterval)
 	defer ticker.Stop()
+
+	// Log progress every 10 seconds
+	logInterval := 10 * time.Second
+	lastLogTime := time.Now()
 
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("timed out waiting for container to be running")
+			// Get final state for better error message
+			finalInfo, finalErr := cli.ContainerInspect(context.Background(), name)
+			finalStatus := getContainerStatus(finalInfo, finalErr)
+			return fmt.Errorf("timed out waiting for container to be running (current status: %s)", finalStatus)
 		case <-ticker.C:
 			info, err := cli.ContainerInspect(ctx, name)
 			if err != nil {
 				if errdefs.IsNotFound(err) {
+					// Log progress periodically
+					if time.Since(lastLogTime) >= logInterval {
+						logger.Info(ctx, "Container not found, still waiting...",
+							slog.String("container", name),
+						)
+						lastLogTime = time.Now()
+					}
 					continue // Container doesn't exist yet, keep waiting
 				}
 				return fmt.Errorf("failed to inspect container: %w", err)
 			}
 			if info.State != nil && info.State.Running {
+				logger.Info(ctx, "Container is now running",
+					slog.String("container", name),
+				)
 				return nil
+			}
+			// Log progress periodically with current status
+			if time.Since(lastLogTime) >= logInterval {
+				status := "unknown"
+				if info.State != nil {
+					status = info.State.Status
+				}
+				logger.Info(ctx, "Container not running yet, still waiting...",
+					slog.String("container", name),
+					slog.String("status", status),
+				)
+				lastLogTime = time.Now()
 			}
 		}
 	}
+}
+
+// getContainerStatus returns a human-readable status string for the container
+func getContainerStatus(info types.ContainerJSON, err error) string {
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return "not found"
+		}
+		return fmt.Sprintf("error: %v", err)
+	}
+	if info.State == nil {
+		return "unknown"
+	}
+	if info.State.Running {
+		return "running"
+	}
+	if info.State.Status != "" {
+		if info.State.ExitCode != 0 {
+			return fmt.Sprintf("%s (exit code: %d)", info.State.Status, info.State.ExitCode)
+		}
+		return info.State.Status
+	}
+	return "not running"
 }
 
 // Close closes the container client and cleans up resources
