@@ -407,7 +407,10 @@ func (a *Agent) Run(ctx context.Context) error {
 		ctx = docker.WithContainerClient(ctx, ctCli)
 
 		defer func() {
-			ctCli.StopContainerKeepAlive(ctx)
+			// Only stop the container if we created it (non-exec mode)
+			if !a.dag.Container.IsExecMode() {
+				ctCli.StopContainerKeepAlive(ctx)
+			}
 			ctCli.Close(ctx)
 		}()
 	}
