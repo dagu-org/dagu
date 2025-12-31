@@ -342,7 +342,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	defer func() {
 		if initErr != nil {
-			logger.Error(ctx, "Failed to initialize DAG execution", tag.Error(err))
+			logger.Error(ctx, "Failed to initialize DAG execution", tag.Error(initErr))
 			st := a.Status(ctx)
 			st.Status = core.Failed
 			if err := attempt.Write(ctx, st); err != nil {
