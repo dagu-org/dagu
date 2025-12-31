@@ -385,7 +385,13 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create a new container if the DAG has a container configuration.
 	if a.dag.Container != nil {
-		ctCfg, err := docker.LoadConfig(a.dag.WorkingDir, *a.dag.Container, a.dag.RegistryAuths)
+		// Expand environment variables in container fields
+		expandedContainer, err := docker.EvalContainerFields(ctx, *a.dag.Container)
+		if err != nil {
+			initErr = fmt.Errorf("failed to evaluate container config: %w", err)
+			return initErr
+		}
+		ctCfg, err := docker.LoadConfig(a.dag.WorkingDir, expandedContainer, a.dag.RegistryAuths)
 		if err != nil {
 			initErr = fmt.Errorf("failed to load container config: %w", err)
 			return initErr
@@ -396,7 +402,8 @@ func (a *Agent) Run(ctx context.Context) error {
 			return initErr
 		}
 		// In exec mode, we use an existing container - don't create a new one
-		if !a.dag.Container.IsExecMode() {
+		isExecMode := expandedContainer.IsExecMode()
+		if !isExecMode {
 			if err := ctCli.CreateContainerKeepAlive(ctx); err != nil {
 				initErr = fmt.Errorf("failed to create keepalive container: %w", err)
 				return initErr
@@ -408,7 +415,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 		defer func() {
 			// Only stop the container if we created it (non-exec mode)
-			if !a.dag.Container.IsExecMode() {
+			if !isExecMode {
 				ctCli.StopContainerKeepAlive(ctx)
 			}
 			ctCli.Close(ctx)

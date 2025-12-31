@@ -352,7 +352,7 @@ func newDocker(ctx context.Context, step core.Step) (executor.Executor, error) {
 	if step.Container != nil {
 		// Expand environment variables in container fields at execution time
 		env := runtime.GetEnv(ctx)
-		expanded, err := evalContainerFields(ctx, *step.Container)
+		expanded, err := EvalContainerFields(ctx, *step.Container)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate container config: %w", err)
 		}
@@ -428,13 +428,13 @@ func mergeEnvVars(base, override []string) []string {
 	return result
 }
 
-// evalContainerFields evaluates environment variables in container fields at runtime.
+// EvalContainerFields evaluates environment variables in container fields at runtime.
 // Only fields that commonly use variables are evaluated:
 // - Exec, Image, Name, User, WorkingDir, Network (string fields)
 // - Volumes, Ports, Env, Command (slice fields)
 // Fields like PullPolicy, Startup, WaitFor, KeepContainer are NOT evaluated
 // as they have specific enum/boolean values.
-func evalContainerFields(ctx context.Context, ct core.Container) (core.Container, error) {
+func EvalContainerFields(ctx context.Context, ct core.Container) (core.Container, error) {
 	var err error
 
 	// Evaluate exec field (for exec-into-existing-container mode)
