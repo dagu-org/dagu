@@ -158,6 +158,15 @@ func (l *ConfigLoader) Load() (*Config, error) {
 	}
 	configFileUsed := l.v.ConfigFileUsed()
 
+	// Resolve to absolute path if a config file was used
+	if configFileUsed != "" {
+		resolvedPath, err := fileutil.ResolvePath(configFileUsed)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve config file path %q: %w", configFileUsed, err)
+		}
+		configFileUsed = resolvedPath
+	}
+
 	// For backward compatibility, try merging in the "admin.yaml" config.
 	l.v.SetConfigName("admin")
 	if err := l.v.MergeInConfig(); err != nil {

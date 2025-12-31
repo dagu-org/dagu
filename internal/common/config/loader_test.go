@@ -798,6 +798,38 @@ func TestLoad_ConfigFileUsed(t *testing.T) {
 	assert.Equal(t, configFile, cfg.Paths.ConfigFileUsed)
 }
 
+func TestLoad_ConfigFileUsed_RelativePath(t *testing.T) {
+	// Create a temp config file
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	err := os.WriteFile(configFile, []byte("host: 127.0.0.1"), 0600)
+	require.NoError(t, err)
+
+	// Change to temp directory and use relative path
+	origDir, err := os.Getwd()
+	require.NoError(t, err)
+	defer func() {
+		_ = os.Chdir(origDir)
+	}()
+
+	err = os.Chdir(tempDir)
+	require.NoError(t, err)
+
+	// Load with relative path
+	cfg := testLoad(t, WithConfigFile("config.yaml"))
+
+	// Verify ConfigFileUsed is resolved to absolute path
+	assert.True(t, filepath.IsAbs(cfg.Paths.ConfigFileUsed),
+		"ConfigFileUsed should be absolute, got: %s", cfg.Paths.ConfigFileUsed)
+
+	// Compare using EvalSymlinks to handle macOS /var -> /private/var symlink
+	expectedPath, err := filepath.EvalSymlinks(configFile)
+	require.NoError(t, err)
+	actualPath, err := filepath.EvalSymlinks(cfg.Paths.ConfigFileUsed)
+	require.NoError(t, err)
+	assert.Equal(t, expectedPath, actualPath)
+}
+
 func TestBindEnv_AsPath(t *testing.T) {
 	tests := []struct {
 		name     string
