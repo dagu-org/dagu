@@ -50,12 +50,14 @@ function DAGSpec({ fileName }: Props) {
   const [scrollPosition, setScrollPosition] = React.useState(0);
   const [activeTab, setActiveTab] = React.useState('parent');
 
-  // Schema documentation sidebar state
+  // Schema documentation sidebar state (default open, remembers user preference)
   const [sidebarOpen, setSidebarOpen] = React.useState(() => {
     try {
-      return localStorage.getItem('schema-sidebar-open') === 'true';
+      const saved = localStorage.getItem('schema-sidebar-open');
+      // Default to open if no preference saved
+      return saved === null ? true : saved === 'true';
     } catch {
-      return false;
+      return true;
     }
   });
   const [cursorPosition, setCursorPosition] = React.useState<CursorPosition>({
