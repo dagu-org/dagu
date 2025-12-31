@@ -187,6 +187,7 @@ func TestLoad_Env(t *testing.T) {
 			Permissions:       map[Permission]bool{PermissionWriteDAGs: true, PermissionRunDAGs: true},
 			LatestStatusToday: true,
 			StrictValidation:  false,
+			Metrics:           MetricsAccessPrivate,
 		},
 		Paths: PathsConfig{
 			DAGsDir:            filepath.Join(testPaths, "dags"),
@@ -235,6 +236,7 @@ func TestLoad_Env(t *testing.T) {
 			Interval:  5 * time.Second,
 		},
 		Warnings: []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://auth.example.com)"},
+		Cache:    CacheModeNormal,
 	}
 
 	assert.Equal(t, expected, cfg)
@@ -420,6 +422,7 @@ scheduler:
 				PermissionWriteDAGs: false,
 				PermissionRunDAGs:   false,
 			},
+			Metrics: MetricsAccessPrivate,
 		},
 		Paths: PathsConfig{
 			DAGsDir:            "/var/dagu/dags",
@@ -477,6 +480,7 @@ scheduler:
 			Interval:  5 * time.Second,
 		},
 		Warnings: []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://accounts.example.com)"},
+		Cache:    CacheModeNormal,
 	}
 
 	assert.Equal(t, expected, cfg)
@@ -1010,5 +1014,88 @@ auth:
 `)
 		// TTL defaults to 24 hours when not specified
 		assert.Equal(t, 24*time.Hour, cfg.Server.Auth.Builtin.Token.TTL)
+	})
+}
+
+func TestLoad_MetricsAccess(t *testing.T) {
+	t.Run("MetricsAccessPublic", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+metrics: "public"
+`)
+		assert.Equal(t, MetricsAccessPublic, cfg.Server.Metrics)
+	})
+
+	t.Run("MetricsAccessPrivate", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+metrics: "private"
+`)
+		assert.Equal(t, MetricsAccessPrivate, cfg.Server.Metrics)
+	})
+
+	t.Run("MetricsAccessDefault", func(t *testing.T) {
+		cfg := loadFromYAML(t, "# empty")
+		assert.Equal(t, MetricsAccessPrivate, cfg.Server.Metrics)
+	})
+
+	t.Run("MetricsAccessFromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_SERVER_METRICS": "public",
+		})
+		assert.Equal(t, MetricsAccessPublic, cfg.Server.Metrics)
+	})
+
+	t.Run("MetricsAccessInvalid", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+metrics: "invalid_value"
+`)
+		assert.Equal(t, MetricsAccessPrivate, cfg.Server.Metrics)
+		require.Len(t, cfg.Warnings, 1)
+		assert.Contains(t, cfg.Warnings[0], "Invalid server.metrics value")
+		assert.Contains(t, cfg.Warnings[0], "invalid_value")
+	})
+}
+
+func TestLoad_CacheConfig(t *testing.T) {
+	t.Run("DefaultCacheMode", func(t *testing.T) {
+		cfg := loadFromYAML(t, ``)
+		assert.Equal(t, CacheModeNormal, cfg.Cache)
+	})
+
+	t.Run("CacheModeLow", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+cache: low
+`)
+		assert.Equal(t, CacheModeLow, cfg.Cache)
+	})
+
+	t.Run("CacheModeNormal", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+cache: normal
+`)
+		assert.Equal(t, CacheModeNormal, cfg.Cache)
+	})
+
+	t.Run("CacheModeHigh", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+cache: high
+`)
+		assert.Equal(t, CacheModeHigh, cfg.Cache)
+	})
+
+	t.Run("CacheModeInvalid", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+cache: invalid
+`)
+		// Invalid mode defaults to normal
+		assert.Equal(t, CacheModeNormal, cfg.Cache)
+		require.Len(t, cfg.Warnings, 1)
+		assert.Contains(t, cfg.Warnings[0], "Invalid cache mode")
+	})
+
+	t.Run("CacheModeFromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, ``, map[string]string{
+			"DAGU_CACHE": "low",
+		})
+		assert.Equal(t, CacheModeLow, cfg.Cache)
 	})
 }

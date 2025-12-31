@@ -208,6 +208,15 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 	basicAuthEnabled := authConfig.Basic.Username != "" && authConfig.Basic.Password != ""
 	// Auth is required unless mode is explicitly set to "none" and no credentials are configured
 	authRequired := authConfig.Mode != config.AuthModeNone || basicAuthEnabled || authConfig.Token.Value != ""
+	// Build public paths list - metrics is only public if explicitly configured
+	publicPaths := []string{
+		pathutil.BuildPublicEndpointPath(basePath, "api/v2/health"),
+		pathutil.BuildPublicEndpointPath(basePath, "api/v2/auth/login"),
+	}
+	if a.config.Server.Metrics == config.MetricsAccessPublic {
+		publicPaths = append(publicPaths, pathutil.BuildPublicEndpointPath(basePath, "api/v2/metrics"))
+	}
+
 	authOptions := frontendauth.Options{
 		Realm:            "restricted",
 		APITokenEnabled:  authConfig.Token.Value != "",
@@ -215,11 +224,7 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 		BasicAuthEnabled: basicAuthEnabled,
 		AuthRequired:     authRequired,
 		Creds:            map[string]string{authConfig.Basic.Username: authConfig.Basic.Password},
-		PublicPaths: []string{
-			pathutil.BuildPublicEndpointPath(basePath, "api/v2/health"),
-			pathutil.BuildPublicEndpointPath(basePath, "api/v2/metrics"),
-			pathutil.BuildPublicEndpointPath(basePath, "api/v2/auth/login"),
-		},
+		PublicPaths:      publicPaths,
 		// Webhook trigger endpoints use their own authentication (DAG-specific token)
 		// Note: We must append "/" to ensure only /api/v2/webhooks/{fileName} is public,
 		// not /api/v2/webhooks itself (the list endpoint which requires admin auth)

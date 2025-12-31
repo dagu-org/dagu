@@ -278,18 +278,17 @@ func TestCollector_Describe(t *testing.T) {
 		nil,
 	)
 
-	ch := make(chan *prometheus.Desc, 10)
+	ch := make(chan *prometheus.Desc, 20)
 	collector.Describe(ch)
 	close(ch)
 
-	// Count the number of metrics described
 	count := 0
 	for range ch {
 		count++
 	}
 
-	// We should have 7 metrics described
-	assert.Equal(t, 7, count)
+	// 7 aggregate + 5 per-DAG + 1 cache metrics
+	assert.Equal(t, 13, count)
 }
 
 func TestCollector_Collect_BasicMetrics(t *testing.T) {
@@ -297,7 +296,6 @@ func TestCollector_Collect_BasicMetrics(t *testing.T) {
 	dagRunStore := &mockDAGRunStore{}
 	queueStore := &mockQueueStore{}
 
-	// Setup mocks to return empty data
 	dagStore.On("List", mock.Anything, mock.Anything).Return(
 		execution.PaginatedResult[*core.DAG]{},
 		[]string{},
@@ -317,12 +315,10 @@ func TestCollector_Collect_BasicMetrics(t *testing.T) {
 		serviceRegistry,
 	)
 
-	// Test uptime metric (should be > 0)
-	ch := make(chan prometheus.Metric, 10)
+	ch := make(chan prometheus.Metric, 100)
 	collector.Collect(ch)
 	close(ch)
 
-	// Should have at least the basic metrics
 	metricsCount := 0
 	for range ch {
 		metricsCount++
@@ -434,7 +430,6 @@ func TestCollector_Collect_WithErrors(t *testing.T) {
 	dagRunStore := &mockDAGRunStore{}
 	queueStore := &mockQueueStore{}
 
-	// Mock errors
 	dagStore.On("List", mock.Anything, mock.Anything).Return(
 		execution.PaginatedResult[*core.DAG]{},
 		[]string{},
@@ -451,16 +446,15 @@ func TestCollector_Collect_WithErrors(t *testing.T) {
 		nil,
 	)
 
-	ch := make(chan prometheus.Metric, 10)
+	ch := make(chan prometheus.Metric, 100)
 	collector.Collect(ch)
 	close(ch)
 
-	// Should still collect basic metrics even with errors
 	metricsCount := 0
 	for range ch {
 		metricsCount++
 	}
-	assert.Greater(t, metricsCount, 0) // At least info, uptime, scheduler
+	assert.Greater(t, metricsCount, 0)
 }
 
 func TestNewRegistry(t *testing.T) {

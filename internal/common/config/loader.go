@@ -220,6 +220,9 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		l.loadMonitoringConfig(&cfg, def)
 	}
 
+	// Cache config is always loaded (used by all services)
+	l.loadCacheConfig(&cfg, def)
+
 	// Incorporate legacy field values and environment variable overrides
 	l.LoadLegacyFields(&cfg, def)
 	l.loadLegacyEnv(&cfg)
@@ -421,6 +424,17 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 
 	// Normalize the BasePath value for proper URL construction.
 	cfg.Server.BasePath = cleanServerBasePath(cfg.Server.BasePath)
+
+	// Set metrics access mode (default: private)
+	cfg.Server.Metrics = MetricsAccessPrivate
+	if def.Metrics != nil {
+		switch MetricsAccess(*def.Metrics) {
+		case MetricsAccessPublic, MetricsAccessPrivate:
+			cfg.Server.Metrics = MetricsAccess(*def.Metrics)
+		default:
+			l.warnings = append(l.warnings, fmt.Sprintf("Invalid server.metrics value: %q, defaulting to 'private'", *def.Metrics))
+		}
+	}
 }
 
 // validateServerConfig validates the server configuration.
@@ -609,6 +623,21 @@ func (l *ConfigLoader) loadMonitoringConfig(cfg *Config, def Definition) {
 	}
 	if cfg.Monitoring.Interval <= 0 {
 		cfg.Monitoring.Interval = 5 * time.Second
+	}
+}
+
+// loadCacheConfig loads the cache configuration.
+func (l *ConfigLoader) loadCacheConfig(cfg *Config, def Definition) {
+	if def.Cache != nil {
+		mode := CacheMode(*def.Cache)
+		if mode.IsValid() {
+			cfg.Cache = mode
+		} else {
+			l.warnings = append(l.warnings, fmt.Sprintf("Invalid cache mode: %q, using 'normal'", *def.Cache))
+			cfg.Cache = CacheModeNormal
+		}
+	} else {
+		cfg.Cache = CacheModeNormal
 	}
 }
 
@@ -810,6 +839,8 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("basePath", "")
 	l.v.SetDefault("apiBasePath", "/api/v2")
 	l.v.SetDefault("latestStatusToday", false)
+	l.v.SetDefault("metrics", "private")
+	l.v.SetDefault("cache", "normal")
 
 	// Coordinator settings
 	l.v.SetDefault("coordinator.host", "127.0.0.1")
@@ -864,6 +895,8 @@ var envBindings = []envBinding{
 	{key: "debug", env: "DEBUG"},
 	{key: "headless", env: "HEADLESS"},
 	{key: "latestStatusToday", env: "LATEST_STATUS_TODAY"},
+	{key: "metrics", env: "SERVER_METRICS"},
+	{key: "cache", env: "CACHE"},
 
 	// Core configurations
 	{key: "workDir", env: "WORK_DIR", isPath: true},

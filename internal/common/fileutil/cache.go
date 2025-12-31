@@ -11,6 +11,14 @@ import (
 	"time"
 )
 
+// CacheMetrics provides observability into cache state
+type CacheMetrics interface {
+	// Size returns the current number of entries in the cache
+	Size() int
+	// Name returns a human-readable name for the cache
+	Name() string
+}
+
 // Entry represents a single cached item with metadata and expiration information
 type Entry[T any] struct {
 	Data         T
@@ -24,31 +32,40 @@ type Entry[T any] struct {
 // TODO: Consider replacing this with hashicorp/golang-lru for better performance
 // https://github.com/hashicorp/golang-lru
 type Cache[T any] struct {
+	name     string
 	entries  sync.Map
 	capacity int
 	ttl      time.Duration
 	items    atomic.Int32
-	stopCh   chan struct{}
 }
 
+// Ensure Cache implements CacheMetrics
+var _ CacheMetrics = (*Cache[any])(nil)
+
 // NewCache creates a new cache with the specified capacity and time-to-live duration
-func NewCache[T any](cap int, ttl time.Duration) *Cache[T] {
+func NewCache[T any](name string, cap int, ttl time.Duration) *Cache[T] {
 	return &Cache[T]{
+		name:     name,
 		capacity: cap,
 		ttl:      ttl,
-		stopCh:   make(chan struct{}),
 	}
 }
 
-// Stop halts the cache eviction process
-func (c *Cache[T]) Stop() {
-	close(c.stopCh)
+// Size returns the current number of entries in the cache
+func (c *Cache[T]) Size() int {
+	return int(c.items.Load())
+}
+
+// Name returns the cache name for metrics
+func (c *Cache[T]) Name() string {
+	return c.name
 }
 
 // StartEviction begins the background process of removing expired items
 func (c *Cache[T]) StartEviction(ctx context.Context) {
 	go func() {
 		timer := time.NewTimer(time.Minute)
+		defer timer.Stop()
 		for {
 			select {
 			case <-ctx.Done():
@@ -56,8 +73,6 @@ func (c *Cache[T]) StartEviction(ctx context.Context) {
 			case <-timer.C:
 				timer.Reset(time.Minute)
 				c.evict()
-			case <-c.stopCh:
-				return
 			}
 		}
 	}()
@@ -82,22 +97,21 @@ func (c *Cache[T]) evict() {
 	}
 }
 
-// StopEviction signals the eviction goroutine to stop
-func (c *Cache[T]) StopEviction() {
-	c.stopCh <- struct{}{}
-}
-
 // Store adds or updates an item in the cache with metadata from the file
 func (c *Cache[T]) Store(fileName string, data T, fi os.FileInfo) {
-	c.items.Add(1)
-	c.entries.Store(
-		fileName, newEntry(data, fi.Size(), fi.ModTime().Unix(), c.ttl))
+	entry := newEntry(data, fi.Size(), fi.ModTime().Unix(), c.ttl)
+	_, existed := c.entries.Swap(fileName, entry)
+	if !existed {
+		c.items.Add(1)
+	}
 }
 
 // Invalidate removes an item from the cache
 func (c *Cache[T]) Invalidate(fileName string) {
-	c.items.Add(-1)
-	c.entries.Delete(fileName)
+	_, existed := c.entries.LoadAndDelete(fileName)
+	if existed {
+		c.items.Add(-1)
+	}
 }
 
 // LoadLatest gets the latest version of an item, loading it if stale or missing

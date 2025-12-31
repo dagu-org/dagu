@@ -27,7 +27,7 @@ func setupTestStore(t *testing.T) (*Store, string) {
 func setupTestStoreWithCache(t *testing.T) (*Store, string, *fileutil.Cache[*auth.APIKey]) {
 	t.Helper()
 	tmpDir := t.TempDir()
-	cache := fileutil.NewCache[*auth.APIKey](100, time.Hour)
+	cache := fileutil.NewCache[*auth.APIKey]("api_key_test", 100, time.Hour)
 	store, err := New(tmpDir, WithFileCache(cache))
 	require.NoError(t, err)
 	return store, tmpDir, cache
