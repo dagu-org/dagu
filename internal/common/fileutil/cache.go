@@ -112,15 +112,19 @@ func (c *Cache[T]) StopEviction() {
 
 // Store adds or updates an item in the cache with metadata from the file
 func (c *Cache[T]) Store(fileName string, data T, fi os.FileInfo) {
-	c.items.Add(1)
-	c.entries.Store(
-		fileName, newEntry(data, fi.Size(), fi.ModTime().Unix(), c.ttl))
+	entry := newEntry(data, fi.Size(), fi.ModTime().Unix(), c.ttl)
+	_, existed := c.entries.Swap(fileName, entry)
+	if !existed {
+		c.items.Add(1)
+	}
 }
 
 // Invalidate removes an item from the cache
 func (c *Cache[T]) Invalidate(fileName string) {
-	c.items.Add(-1)
-	c.entries.Delete(fileName)
+	_, existed := c.entries.LoadAndDelete(fileName)
+	if existed {
+		c.items.Add(-1)
+	}
 }
 
 // LoadLatest gets the latest version of an item, loading it if stale or missing
