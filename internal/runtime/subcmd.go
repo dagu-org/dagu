@@ -134,7 +134,7 @@ func (b *SubCmdBuilder) Restart(dag *core.DAG, opts RestartOptions) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        b.baseEnv.AsSlice(),
+		Env:        os.Environ(),
 	}
 }
 
@@ -154,7 +154,7 @@ func (b *SubCmdBuilder) Retry(dag *core.DAG, dagRunID string, stepName string) C
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        b.baseEnv.AsSlice(),
+		Env:        os.Environ(),
 	}
 }
 

@@ -184,10 +184,14 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 		select {
 		case node := <-activeReadyCh:
 			logger.Debug(ctx, "Processing ready node", tag.Step(node.Name()))
-			// Double check status
+			// Double check status - must be NotStarted to proceed
 			if node.State().Status != core.NodeNotStarted {
 				continue
 			}
+
+			// Immediately mark as running to prevent duplicate execution
+			// when multiple parents complete simultaneously
+			node.SetStatus(core.NodeRunning)
 
 			running++
 			wg.Add(1)
@@ -214,7 +218,8 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 					return
 				}
 
-				n.SetStatus(core.NodeRunning)
+				// Status already set to Running before goroutine spawn
+				// Send progress notification after successful preparation
 				if progressCh != nil {
 					progressCh <- n
 				}

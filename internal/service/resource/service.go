@@ -119,7 +119,7 @@ func (s *Service) collect(ctx context.Context) {
 
 	// Disk Usage (for data directory)
 	if diskStat, err := disk.UsageWithContext(ctx, s.config.Paths.DataDir); err != nil {
-		logger.Error(ctx, "Failed to get disk usage", tag.Error(err))
+		logger.Error(ctx, "Failed to get disk usage", tag.Error(err), tag.Path(s.config.Paths.DataDir))
 	} else {
 		diskVal = diskStat.UsedPercent
 	}
