@@ -3146,18 +3146,6 @@ func TestBuildStepExecutorNewFormat(t *testing.T) {
 			},
 		},
 		{
-			name: "NewFormat_TakesPrecedenceOverLegacy",
-			step: &step{
-				Type: "http",
-				// Legacy format should not be used together
-			},
-			ctx: testStepBuildContext(),
-			expected: core.ExecutorConfig{
-				Type:   "http",
-				Config: make(map[string]any),
-			},
-		},
-		{
 			name: "NewFormat_TakesPrecedenceOverContainerInference",
 			step: &step{
 				Type: "http",

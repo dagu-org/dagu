@@ -96,11 +96,9 @@ type step struct {
 	Container any `yaml:"container,omitempty"`
 
 	// Type specifies the executor type (ssh, http, jq, mail, docker, gha, archive).
-	// This is the new format replacing executor.type.
 	Type string `yaml:"type,omitempty"`
 
 	// Config contains executor-specific configuration.
-	// This is the new format replacing executor.config.
 	Config map[string]any `yaml:"config,omitempty"`
 }
 
@@ -989,69 +987,53 @@ func buildStepParamsField(ctx StepBuildContext, s *step, result *core.Step) erro
 	return nil
 }
 
-// buildStepExecutor parses the executor field in the step definition.
+// buildStepExecutor parses the executor configuration from step fields.
 func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
-	// Priority 1: New step-level type field (highest priority)
+	// Step-level type and config fields (highest priority)
 	if s.Type != "" {
 		result.ExecutorConfig.Type = strings.TrimSpace(s.Type)
 	}
-
-	// Priority 1: New step-level config field
-	if len(s.Config) > 0 {
-		for k, v := range s.Config {
-			result.ExecutorConfig.Config[k] = v
-		}
+	for k, v := range s.Config {
+		result.ExecutorConfig.Config[k] = v
 	}
 
-	// Priority 2: Legacy executor field (backward compatibility)
+	// Legacy executor field (backward compatibility)
 	if s.Executor != nil {
 		if err := parseLegacyExecutor(s.Executor, result); err != nil {
 			return err
 		}
 	}
 
-	// Priority 3: Infer type from step-level container field
-	if result.ExecutorConfig.Type == "" {
-		if result.Container != nil {
-			result.ExecutorConfig.Type = "docker"
-			return nil
-		}
+	// Infer type from container field
+	if result.ExecutorConfig.Type == "" && result.Container != nil {
+		result.ExecutorConfig.Type = "docker"
+		return nil
 	}
 
-	// Priority 4: Infer type from DAG-level configuration
-	if result.ExecutorConfig.Type == "" {
-		if ctx.dag != nil && ctx.dag.Container != nil {
+	// Infer type from DAG-level configuration
+	if result.ExecutorConfig.Type == "" && ctx.dag != nil {
+		if ctx.dag.Container != nil {
 			result.ExecutorConfig.Type = "container"
-			return nil
-		}
-		if ctx.dag != nil && ctx.dag.SSH != nil {
+		} else if ctx.dag.SSH != nil {
 			result.ExecutorConfig.Type = "ssh"
-			return nil
 		}
 	}
 
 	return nil
 }
 
-// parseLegacyExecutor handles the legacy executor field format for backward compatibility.
+// parseLegacyExecutor parses the legacy executor field format.
 func parseLegacyExecutor(executor any, result *core.Step) error {
-	const (
-		executorKeyType   = "type"
-		executorKeyConfig = "config"
-	)
-
 	switch val := executor.(type) {
 	case string:
-		// executor: "ssh" (string shorthand)
 		if result.ExecutorConfig.Type == "" {
 			result.ExecutorConfig.Type = strings.TrimSpace(val)
 		}
 
 	case map[string]any:
-		// executor: {type: ssh, config: {...}}
 		for key, v := range val {
 			switch key {
-			case executorKeyType:
+			case "type":
 				typ, ok := v.(string)
 				if !ok {
 					return core.NewValidationError("executor.type", v, ErrExecutorTypeMustBeString)
@@ -1060,15 +1042,14 @@ func parseLegacyExecutor(executor any, result *core.Step) error {
 					result.ExecutorConfig.Type = strings.TrimSpace(typ)
 				}
 
-			case executorKeyConfig:
-				executorConfig, ok := v.(map[string]any)
+			case "config":
+				cfg, ok := v.(map[string]any)
 				if !ok {
 					return core.NewValidationError("executor.config", v, ErrExecutorConfigValueMustBeMap)
 				}
-				for configKey, cv := range executorConfig {
-					// Only set if not already set by new format
-					if result.ExecutorConfig.Config[configKey] == nil {
-						result.ExecutorConfig.Config[configKey] = cv
+				for k, cv := range cfg {
+					if result.ExecutorConfig.Config[k] == nil {
+						result.ExecutorConfig.Config[k] = cv
 					}
 				}
 
