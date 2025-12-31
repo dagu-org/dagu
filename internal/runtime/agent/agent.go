@@ -111,6 +111,9 @@ type Agent struct {
 	// finished is true if the dag-run is finished.
 	finished atomic.Bool
 
+	// initFailed is true if initialization failed before the runner could start.
+	initFailed atomic.Bool
+
 	// lastErr is the last error occurred during the dag-run.
 	lastErr error
 
@@ -342,6 +345,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	defer func() {
 		if initErr != nil {
+			a.initFailed.Store(true)
 			logger.Error(ctx, "Failed to initialize DAG execution", tag.Error(initErr))
 			st := a.Status(ctx)
 			st.Status = core.Failed
@@ -755,7 +759,9 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 	defer a.lock.RUnlock()
 
 	runnerStatus := a.runner.Status(ctx, a.plan)
-	if runnerStatus == core.NotStarted && a.plan.IsStarted() {
+	if a.initFailed.Load() {
+		runnerStatus = core.Failed
+	} else if runnerStatus == core.NotStarted && a.plan.IsStarted() {
 		// Match the status to the execution plan.
 		runnerStatus = core.Running
 	}
