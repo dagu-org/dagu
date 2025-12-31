@@ -1917,7 +1917,8 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 50)
+			// Wait long enough for at least 2 iterations (interval is 20ms, but CI can be slow)
+			time.Sleep(time.Millisecond * 200)
 			f, _ := os.Create(counterFile)
 			_ = f.Close()
 		}()
@@ -1926,7 +1927,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
 		node := result.nodeByName(t, "1")
-		// Should have run at least twice (first: file not found, second: file created)
+		// Should have run at least twice (condition checked before each iteration)
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 
