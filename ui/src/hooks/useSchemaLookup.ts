@@ -21,12 +21,8 @@ export interface SchemaLookupResult {
 export function useSchemaLookup(path: string[]): SchemaLookupResult {
   const { schema, loading, error } = useSchema();
 
-  console.log('useSchemaLookup - called with path:', path, 'schema exists:', !!schema);
-
   const result = useMemo(() => {
-    console.log('useSchemaLookup useMemo - path:', path, 'path.length:', path.length, 'schema:', !!schema);
     if (!schema || path.length === 0) {
-      console.log('useSchemaLookup - early return, no schema or empty path');
       return {
         propertyInfo: null,
         siblingProperties: [],
@@ -34,7 +30,6 @@ export function useSchemaLookup(path: string[]): SchemaLookupResult {
     }
 
     const schemaAtPath = getSchemaAtPath(schema, path);
-    console.log('useSchemaLookup - schemaAtPath:', schemaAtPath);
     const parentRequired = getParentRequired(schema, path);
     const currentKey = path[path.length - 1] ?? '';
     const propertyInfo = toPropertyInfo(schemaAtPath, currentKey, path, parentRequired);

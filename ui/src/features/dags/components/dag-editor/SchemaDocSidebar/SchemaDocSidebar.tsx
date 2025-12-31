@@ -25,11 +25,6 @@ export function SchemaDocSidebar({
   const { schema, loading: schemaLoading, error: schemaError, reload } = useSchema();
   const { propertyInfo, siblingProperties, loading, error } = useSchemaLookup(path);
 
-  // Debug logging
-  console.log('SchemaDocSidebar - path:', path);
-  console.log('SchemaDocSidebar - propertyInfo:', propertyInfo);
-  console.log('SchemaDocSidebar - schema properties:', schema ? Object.keys(schema.properties || {}) : 'no schema');
-
   if (!isOpen) {
     return null;
   }

@@ -56,15 +56,11 @@ export function getSchemaAtPath(
     return schema;
   }
 
-  console.log('getSchemaAtPath - starting with path:', path);
-  console.log('getSchemaAtPath - schema has properties:', Object.keys(schema.properties || {}));
-
   let current: JSONSchema | null = schema;
   let currentRequired: string[] = schema.required || [];
 
   for (let i = 0; i < path.length; i++) {
     const segment = path[i];
-    console.log('getSchemaAtPath - processing segment:', segment, 'at index:', i);
 
     if (!current || !segment) {
       return null;
@@ -72,13 +68,8 @@ export function getSchemaAtPath(
 
     // Handle array index access
     if (/^\d+$/.test(segment)) {
-      console.log('getSchemaAtPath - array index, current schema:', current);
-      console.log('getSchemaAtPath - current.items:', current.items);
-      console.log('getSchemaAtPath - current.type:', current.type);
       current = resolveArrayItems(current);
-      console.log('getSchemaAtPath - after resolveArrayItems:', current);
       if (!current) {
-        console.log('getSchemaAtPath - resolveArrayItems returned null, returning null');
         return null;
       }
       currentRequired = current.required || [];
@@ -87,7 +78,6 @@ export function getSchemaAtPath(
 
     // Try to resolve from properties
     const prop: JSONSchema | undefined = current.properties?.[segment];
-    console.log('getSchemaAtPath - looking for property:', segment, 'found:', !!prop, 'available:', Object.keys(current.properties || {}));
     if (prop) {
       currentRequired = current.required || [];
       current = prop;
@@ -122,11 +112,9 @@ export function getSchemaAtPath(
     }
 
     // Not found
-    console.log('getSchemaAtPath - segment not found:', segment);
     return null;
   }
 
-  console.log('getSchemaAtPath - returning:', current?.type || current?.properties ? 'schema found' : 'null');
   return current;
 }
 
