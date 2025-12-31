@@ -166,6 +166,15 @@ func InitializeClient(ctx context.Context, cfg *Config) (*Client, error) {
 
 // waitForContainerRunning waits for a container to be in running state with timeout
 func waitForContainerRunning(ctx context.Context, cli *client.Client, name string) error {
+	// Check immediately before starting the polling loop
+	info, err := cli.ContainerInspect(ctx, name)
+	if err == nil && info.State != nil && info.State.Running {
+		return nil
+	}
+	if err != nil && !errdefs.IsNotFound(err) {
+		return fmt.Errorf("failed to inspect container: %w", err)
+	}
+
 	ticker := time.NewTicker(defaultPollInterval)
 	defer ticker.Stop()
 
