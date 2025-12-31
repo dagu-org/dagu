@@ -10,6 +10,7 @@ import (
 )
 
 func TestMetrics_PublicMode(t *testing.T) {
+	t.Parallel()
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Server.Auth.Basic.Username = "admin"
 		cfg.Server.Auth.Basic.Password = "secret"
@@ -24,6 +25,7 @@ func TestMetrics_PublicMode(t *testing.T) {
 }
 
 func TestMetrics_PrivateMode_Unauthorized(t *testing.T) {
+	t.Parallel()
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Server.Auth.Basic.Username = "admin"
 		cfg.Server.Auth.Basic.Password = "secret"
@@ -34,6 +36,7 @@ func TestMetrics_PrivateMode_Unauthorized(t *testing.T) {
 }
 
 func TestMetrics_PrivateMode_WithBasicAuth(t *testing.T) {
+	t.Parallel()
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Server.Auth.Basic.Username = "admin"
 		cfg.Server.Auth.Basic.Password = "secret"
@@ -48,6 +51,7 @@ func TestMetrics_PrivateMode_WithBasicAuth(t *testing.T) {
 }
 
 func TestMetrics_PrivateMode_WithAPIToken(t *testing.T) {
+	t.Parallel()
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Server.Auth.Token.Value = "test-api-token"
 		cfg.Server.Metrics = config.MetricsAccessPrivate
@@ -61,6 +65,7 @@ func TestMetrics_PrivateMode_WithAPIToken(t *testing.T) {
 }
 
 func TestMetrics_DefaultsToPrivate(t *testing.T) {
+	t.Parallel()
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Server.Auth.Basic.Username = "admin"
 		cfg.Server.Auth.Basic.Password = "secret"
