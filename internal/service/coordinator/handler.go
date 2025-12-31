@@ -65,6 +65,11 @@ func (h *Handler) Poll(ctx context.Context, req *coordinatorv1.PollRequest) (*co
 		delete(h.waitingPollers, req.PollerId)
 		h.mu.Unlock()
 
+		// Inject the worker ID into the task so it can be tracked
+		if task != nil {
+			task.WorkerId = req.WorkerId
+		}
+
 		return &coordinatorv1.PollResponse{Task: task}, nil
 
 	case <-ctx.Done():

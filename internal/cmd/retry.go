@@ -33,12 +33,19 @@ Examples:
 	)
 }
 
-var retryFlags = []commandLineFlag{dagRunIDFlagRetry, stepNameForRetry}
+var retryFlags = []commandLineFlag{dagRunIDFlagRetry, stepNameForRetry, workerIDFlag}
 
 func runRetry(ctx *Context, args []string) error {
 	// Extract retry details
 	dagRunID, _ := ctx.StringParam("run-id")
 	stepName, _ := ctx.StringParam("step")
+
+	// Get worker-id for tracking which worker executes this DAG run
+	workerID, _ := ctx.StringParam("worker-id")
+	// Default to "local" for non-distributed execution
+	if workerID == "" {
+		workerID = "local"
+	}
 
 	name, err := extractDAGName(ctx, args[0])
 	if err != nil {
@@ -88,7 +95,7 @@ func runRetry(ctx *Context, args []string) error {
 	ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 
 	// The retry command is currently only supported for root DAGs.
-	if err := executeRetry(ctx, dag, status, status.DAGRun(), stepName); err != nil {
+	if err := executeRetry(ctx, dag, status, status.DAGRun(), stepName, workerID); err != nil {
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
 
@@ -99,7 +106,7 @@ func runRetry(ctx *Context, args []string) error {
 // loading the DAG environment, initializing the DAG store, creating an agent configured
 // for retry (including step-level retry if provided), and invoking the shared agent executor.
 // It returns an error if any setup step fails or if the agent execution fails.
-func executeRetry(ctx *Context, dag *core.DAG, status *execution.DAGRunStatus, rootRun execution.DAGRunRef, stepName string) error {
+func executeRetry(ctx *Context, dag *core.DAG, status *execution.DAGRunStatus, rootRun execution.DAGRunRef, stepName string, workerID string) error {
 	// Set step context if specified
 	if stepName != "" {
 		ctx.Context = logger.WithValues(ctx.Context, tag.Step(stepName))
@@ -141,6 +148,7 @@ func executeRetry(ctx *Context, dag *core.DAG, status *execution.DAGRunStatus, r
 			ParentDAGRun:    status.Parent,
 			ProgressDisplay: shouldEnableProgress(ctx),
 			StepRetry:       stepName,
+			WorkerID:        workerID,
 		},
 	)
 
