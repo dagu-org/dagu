@@ -9,6 +9,10 @@ import * as monaco from 'monaco-editor';
 import { configureMonacoYaml } from 'monaco-yaml';
 import { useEffect, useRef } from 'react';
 
+// Get schema URL from config (getConfig() is available at module load time)
+declare function getConfig(): { basePath: string };
+const schemaUrl = `${getConfig().basePath}/assets/dag.schema.json`;
+
 // Configure schema at module level (before editor initialization)
 configureMonacoYaml(monaco, {
   enableSchemaRequest: true,
@@ -18,7 +22,7 @@ configureMonacoYaml(monaco, {
   format: true,
   schemas: [
     {
-      uri: 'https://raw.githubusercontent.com/dagu-org/dagu/main/schemas/dag.schema.json',
+      uri: schemaUrl,
       fileMatch: ['*'], // Match all YAML files
     },
   ],

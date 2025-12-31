@@ -7,8 +7,9 @@ import React, {
 } from 'react';
 import type { JSONSchema } from '@/lib/schema-utils';
 
-const SCHEMA_URL =
-  'https://raw.githubusercontent.com/dagu-org/dagu/main/schemas/dag.schema.json';
+// Get schema URL from config (getConfig() is available at module load time)
+declare function getConfig(): { basePath: string };
+const SCHEMA_URL = `${getConfig().basePath}/assets/dag.schema.json`;
 
 interface SchemaContextValue {
   schema: JSONSchema | null;
