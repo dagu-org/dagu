@@ -616,6 +616,11 @@ func (c *Client) Stop(sig os.Signal) error {
 		return nil
 	}
 
+	// Only stop containers that were started by this client
+	if !c.started.Load() {
+		return nil
+	}
+
 	info, err := c.cli.ContainerInspect(context.Background(), c.containerID)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
