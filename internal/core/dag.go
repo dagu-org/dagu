@@ -281,7 +281,20 @@ func (d *DAG) NextRun(now time.Time) time.Time {
 	return next
 }
 
-// loadDotEnv loads dotenv file
+// deduplicateStrings removes duplicate strings while preserving order.
+func deduplicateStrings(input []string) []string {
+	seen := make(map[string]bool)
+	result := make([]string, 0, len(input))
+	for _, s := range input {
+		if !seen[s] {
+			seen[s] = true
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
+// LoadDotEnv loads all dotenv files in order, with later files overriding earlier ones.
 func (d *DAG) LoadDotEnv(ctx context.Context) {
 	if len(d.Dotenv) == 0 {
 		return
@@ -294,7 +307,7 @@ func (d *DAG) LoadDotEnv(ctx context.Context) {
 	}
 
 	resolver := fileutil.NewFileResolver(relativeTos)
-	candidates := append([]string{".env"}, d.Dotenv...)
+	candidates := deduplicateStrings(append([]string{".env"}, d.Dotenv...))
 
 	for _, filePath := range candidates {
 		if strings.TrimSpace(filePath) == "" {
@@ -338,10 +351,7 @@ func (d *DAG) LoadDotEnv(ctx context.Context) {
 				)
 			}
 		}
-		logger.Info(ctx, "Loaded .env file", tag.File(resolvedPath))
-
-		// Load the first found one
-		return
+		logger.Info(ctx, "Loaded dotenv file", tag.File(resolvedPath))
 	}
 }
 
