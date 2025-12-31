@@ -432,6 +432,11 @@ func mergeEnvVars(base, override []string) []string {
 func evalContainerFields(ctx context.Context, ct core.Container) (core.Container, error) {
 	var err error
 
+	// Evaluate exec field (for exec-into-existing-container mode)
+	if ct.Exec, err = runtime.EvalString(ctx, ct.Exec); err != nil {
+		return ct, fmt.Errorf("failed to evaluate exec: %w", err)
+	}
+
 	// Evaluate string fields
 	if ct.Image, err = runtime.EvalString(ctx, ct.Image); err != nil {
 		return ct, fmt.Errorf("failed to evaluate image: %w", err)

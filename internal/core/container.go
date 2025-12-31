@@ -7,6 +7,9 @@ import (
 
 // Container defines the container configuration for the DAG.
 type Container struct {
+	// Exec specifies an existing container name to exec into.
+	// Mutually exclusive with Image.
+	Exec string `yaml:"exec,omitempty"`
 	// Name is the container name to use. If empty, Docker generates a random name.
 	Name string `yaml:"name,omitempty"`
 	// Image is the container image to use.
@@ -68,6 +71,11 @@ func (ct Container) GetWorkingDir() string {
 		return ct.WorkDir
 	}
 	return ct.WorkingDir
+}
+
+// IsExecMode returns true if this container is configured to exec into an existing container
+func (ct Container) IsExecMode() bool {
+	return ct.Exec != ""
 }
 
 // PullPolicy defines image pull policy for a container execution

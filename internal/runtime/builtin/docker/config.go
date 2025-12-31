@@ -165,7 +165,20 @@ func LoadConfigFromMap(data map[string]any, registryAuths map[string]*core.AuthC
 
 // NewFromContainerConfigWithAuth parses core.Container into Container struct with registry auth
 func LoadConfig(workDir string, ct core.Container, registryAuths map[string]*core.AuthConfig) (*Config, error) {
-	// Validate required fields
+	// Handle exec mode (exec into existing container)
+	if ct.IsExecMode() {
+		execOpts := &container.ExecOptions{
+			User:       ct.User,
+			WorkingDir: ct.GetWorkingDir(),
+			Env:        ct.Env,
+		}
+		return loadDefaults(&Config{
+			ContainerName: ct.Exec,
+			ExecOptions:   execOpts,
+		}), nil
+	}
+
+	// Validate required fields for image mode
 	if ct.Image == "" {
 		return nil, ErrImageRequired
 	}

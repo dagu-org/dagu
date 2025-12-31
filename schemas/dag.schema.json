@@ -1136,6 +1136,18 @@
       "description": "OpenTelemetry configuration for distributed tracing. Enables detailed execution traces for DAGs and steps, providing visibility into workflow performance and debugging."
     },
     "container": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Name of an existing running container to exec into. The container must be running when the DAG starts."
+        },
+        {
+          "$ref": "#/definitions/containerConfig"
+        }
+      ],
+      "description": "Container configuration. Can be either a string (name of existing container to exec into) or an object (container configuration with image or exec field)."
+    },
+    "containerConfig": {
       "type": "object",
       "additionalProperties": false,
       "allOf": [
@@ -1152,14 +1164,28 @@
           }
         }
       ],
+      "oneOf": [
+        {
+          "required": ["exec"],
+          "not": { "required": ["image"] }
+        },
+        {
+          "required": ["image"],
+          "not": { "required": ["exec"] }
+        }
+      ],
       "properties": {
+        "exec": {
+          "type": "string",
+          "description": "Name of an existing running container to exec into. Mutually exclusive with 'image'. When used, only 'user', 'workingDir', and 'env' are applicable."
+        },
         "name": {
           "type": "string",
-          "description": "Custom container name. If empty, Docker generates a random name. Must be unique - if a container with this name already exists (running or stopped), the DAG will fail."
+          "description": "Custom container name. If empty, Docker generates a random name. Must be unique - if a container with this name already exists (running or stopped), the DAG will fail. Cannot be used with 'exec'."
         },
         "image": {
           "type": "string",
-          "description": "Container image to use (e.g., 'python:3.11', 'node:20'). Required when using container configuration."
+          "description": "Container image to use (e.g., 'python:3.11', 'node:20'). Mutually exclusive with 'exec'."
         },
         "pullPolicy": {
           "oneOf": [
@@ -1262,11 +1288,10 @@
         "keepContainer": {
           "type": "boolean",
           "default": false,
-          "description": "Keep the container running after the step completes. Useful for debugging or when running services that need to persist between steps."
+          "description": "Keep the container running after the step completes. Useful for debugging or when running services that need to persist between steps. Cannot be used with 'exec'."
         }
       },
-      "required": ["image"],
-      "description": "Container configuration that can be specified at DAG or step level. When used, automatically sets the executor to docker."
+      "description": "Container configuration object. Either 'exec' (to run in an existing container) or 'image' (to create a new container) must be specified, but not both."
     },
     "sshConfig": {
       "type": "object",
