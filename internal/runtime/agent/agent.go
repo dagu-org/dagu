@@ -16,6 +16,10 @@ import (
 	"syscall"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+	"golang.org/x/term"
+
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
@@ -31,13 +35,10 @@ import (
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/output"
 	"github.com/dagu-org/dagu/internal/runtime"
-	runtime1 "github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/docker"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/ssh"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 
 	_ "github.com/dagu-org/dagu/internal/runtime/builtin"
 )
@@ -71,7 +72,7 @@ type Agent struct {
 	peerConfig config.Peer
 
 	// dagRunMgr is the runstore dagRunMgr to communicate with the history.
-	dagRunMgr runtime1.Manager
+	dagRunMgr runtime.Manager
 
 	// runner is the runner instance to run the DAG.
 	runner *runtime.Runner
@@ -164,7 +165,7 @@ func New(
 	dag *core.DAG,
 	logDir string,
 	logFile string,
-	drm runtime1.Manager,
+	drm runtime.Manager,
 	ds execution.DAGStore,
 	drs execution.DAGRunStore,
 	reg execution.ServiceRegistry,
@@ -760,20 +761,11 @@ func (a *Agent) PrintSummary(ctx context.Context) {
 
 	// Enable colors if stdout is a terminal
 	config := output.DefaultConfig()
-	config.ColorEnabled = isStdoutTerminal()
+	config.ColorEnabled = term.IsTerminal(int(os.Stdout.Fd()))
 
 	renderer := output.NewRenderer(config)
 	summary := renderer.RenderDAGStatus(dag, &status)
 	println(summary)
-}
-
-// isStdoutTerminal returns true if stdout is a terminal
-func isStdoutTerminal() bool {
-	fi, err := os.Stdout.Stat()
-	if err != nil {
-		return false
-	}
-	return (fi.Mode() & os.ModeCharDevice) != 0
 }
 
 // Status collects the current running status of the DAG and returns it.

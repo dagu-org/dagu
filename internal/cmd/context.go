@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/term"
+
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
@@ -129,7 +131,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	}
 	// For agent commands running in a terminal, suppress console output early
 	// to avoid debug logs cluttering the progress display or tree output
-	if !quiet && isAgentCommand(cmd.Name()) && isStderrTerminal() && os.Getenv("DISABLE_PROGRESS") == "" {
+	if !quiet && isAgentCommand(cmd.Name()) && term.IsTerminal(int(os.Stderr.Fd())) && os.Getenv("DISABLE_PROGRESS") == "" {
 		opts = append(opts, logger.WithQuiet())
 	}
 	if cfg.Core.LogFormat != "" {
@@ -220,15 +222,6 @@ func isAgentCommand(cmdName string) bool {
 	default:
 		return false
 	}
-}
-
-// isStderrTerminal returns true if stderr is a terminal.
-func isStderrTerminal() bool {
-	fi, err := os.Stderr.Stat()
-	if err != nil {
-		return false
-	}
-	return (fi.Mode() & os.ModeCharDevice) != 0
 }
 
 // NewServer creates and returns a new web UI NewServer.

@@ -47,34 +47,6 @@ func TestRenderDAGStatus_BasicSuccess(t *testing.T) {
 	}
 }
 
-func TestRenderDAGStatus_BasicSuccessWithColors(t *testing.T) {
-	dag := &core.DAG{Name: "test-dag"}
-	status := &execution.DAGRunStatus{
-		Status:     core.Succeeded,
-		StartedAt:  "2024-01-15 10:00:00",
-		FinishedAt: "2024-01-15 10:01:00",
-		Nodes: []*execution.Node{
-			{
-				Step:       core.Step{Name: "step1", Command: "echo", Args: []string{"hello"}},
-				Status:     core.NodeSucceeded,
-				StartedAt:  "2024-01-15 10:00:00",
-				FinishedAt: "2024-01-15 10:00:30",
-			},
-		},
-	}
-
-	config := DefaultConfig()
-	config.ColorEnabled = true
-
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	// Verify output is generated with colors (contains ANSI escape codes)
-	if !strings.Contains(output, "test-dag") {
-		t.Error("Output should contain DAG name")
-	}
-}
-
 func TestRenderDAGStatus_FailedStep(t *testing.T) {
 	dag := &core.DAG{Name: "failed-dag"}
 	status := &execution.DAGRunStatus{
@@ -105,30 +77,6 @@ func TestRenderDAGStatus_FailedStep(t *testing.T) {
 	}
 	if !strings.Contains(output, "Result: Failed") {
 		t.Error("Output should contain failed result")
-	}
-}
-
-func TestRenderDAGStatus_FailedStepWithColors(t *testing.T) {
-	dag := &core.DAG{Name: "failed-dag"}
-	status := &execution.DAGRunStatus{
-		Status: core.Failed,
-		Nodes: []*execution.Node{
-			{
-				Step:   core.Step{Name: "failing-step"},
-				Status: core.NodeFailed,
-				Error:  "command exited with code 1",
-			},
-		},
-	}
-
-	config := DefaultConfig()
-	config.ColorEnabled = true
-
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	if !strings.Contains(output, "error:") {
-		t.Error("Output should contain error label")
 	}
 }
 
@@ -193,27 +141,6 @@ func TestRenderDAGStatus_RunningStatus(t *testing.T) {
 	}
 }
 
-func TestRenderDAGStatus_RunningStatusWithColors(t *testing.T) {
-	dag := &core.DAG{Name: "running-dag"}
-	status := &execution.DAGRunStatus{
-		Status:    core.Running,
-		StartedAt: "2024-01-15 10:00:00",
-		Nodes: []*execution.Node{
-			{Step: core.Step{Name: "running-step"}, Status: core.NodeRunning},
-		},
-	}
-
-	config := DefaultConfig()
-	config.ColorEnabled = true
-
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	if !strings.Contains(output, "Running") {
-		t.Error("Output should contain Running status")
-	}
-}
-
 func TestRenderDAGStatus_AbortedStatus(t *testing.T) {
 	dag := &core.DAG{Name: "aborted-dag"}
 	status := &execution.DAGRunStatus{
@@ -234,26 +161,6 @@ func TestRenderDAGStatus_AbortedStatus(t *testing.T) {
 	if !strings.Contains(output, "[canceled]") {
 		t.Error("Output should contain canceled label")
 	}
-	if !strings.Contains(output, "Canceled") {
-		t.Error("Output should contain Canceled result")
-	}
-}
-
-func TestRenderDAGStatus_AbortedStatusWithColors(t *testing.T) {
-	dag := &core.DAG{Name: "aborted-dag"}
-	status := &execution.DAGRunStatus{
-		Status: core.Aborted,
-		Nodes: []*execution.Node{
-			{Step: core.Step{Name: "aborted-step"}, Status: core.NodeAborted},
-		},
-	}
-
-	config := DefaultConfig()
-	config.ColorEnabled = true
-
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
 	if !strings.Contains(output, "Canceled") {
 		t.Error("Output should contain Canceled result")
 	}
@@ -284,26 +191,6 @@ func TestRenderDAGStatus_PartiallySucceededStatus(t *testing.T) {
 	}
 }
 
-func TestRenderDAGStatus_PartiallySucceededStatusWithColors(t *testing.T) {
-	dag := &core.DAG{Name: "partial-dag"}
-	status := &execution.DAGRunStatus{
-		Status: core.PartiallySucceeded,
-		Nodes: []*execution.Node{
-			{Step: core.Step{Name: "partial-step"}, Status: core.NodePartiallySucceeded},
-		},
-	}
-
-	config := DefaultConfig()
-	config.ColorEnabled = true
-
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	if !strings.Contains(output, "Partial") {
-		t.Error("Output should contain Partial result")
-	}
-}
-
 func TestRenderDAGStatus_QueuedStatus(t *testing.T) {
 	dag := &core.DAG{Name: "queued-dag"}
 	status := &execution.DAGRunStatus{
@@ -313,24 +200,6 @@ func TestRenderDAGStatus_QueuedStatus(t *testing.T) {
 
 	config := DefaultConfig()
 	config.ColorEnabled = false
-
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	if !strings.Contains(output, "Queued") {
-		t.Error("Output should contain Queued status")
-	}
-}
-
-func TestRenderDAGStatus_QueuedStatusWithColors(t *testing.T) {
-	dag := &core.DAG{Name: "queued-dag"}
-	status := &execution.DAGRunStatus{
-		Status: core.Queued,
-		Nodes:  []*execution.Node{},
-	}
-
-	config := DefaultConfig()
-	config.ColorEnabled = true
 
 	renderer := NewRenderer(config)
 	output := renderer.RenderDAGStatus(dag, status)
@@ -360,26 +229,6 @@ func TestRenderDAGStatus_NotStartedStatus(t *testing.T) {
 	}
 }
 
-func TestRenderDAGStatus_NotStartedStatusWithColors(t *testing.T) {
-	dag := &core.DAG{Name: "not-started-dag"}
-	status := &execution.DAGRunStatus{
-		Status: core.NotStarted,
-		Nodes: []*execution.Node{
-			{Step: core.Step{Name: "not-started-step"}, Status: core.NodeNotStarted},
-		},
-	}
-
-	config := DefaultConfig()
-	config.ColorEnabled = true
-
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	if !strings.Contains(output, "Not Started") {
-		t.Error("Output should contain Not Started status")
-	}
-}
-
 func TestRenderDAGStatus_SkippedStep(t *testing.T) {
 	dag := &core.DAG{Name: "skipped-dag"}
 	status := &execution.DAGRunStatus{
@@ -397,26 +246,6 @@ func TestRenderDAGStatus_SkippedStep(t *testing.T) {
 
 	if !strings.Contains(output, "[skipped]") {
 		t.Error("Output should contain skipped label")
-	}
-}
-
-func TestRenderDAGStatus_SkippedStepWithColors(t *testing.T) {
-	dag := &core.DAG{Name: "skipped-dag"}
-	status := &execution.DAGRunStatus{
-		Status: core.Succeeded,
-		Nodes: []*execution.Node{
-			{Step: core.Step{Name: "skipped-step"}, Status: core.NodeSkipped},
-		},
-	}
-
-	config := DefaultConfig()
-	config.ColorEnabled = true
-
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	if !strings.Contains(output, "skipped-step") {
-		t.Error("Output should contain step name")
 	}
 }
 
@@ -474,33 +303,6 @@ func TestRenderDAGStatus_WithSubRunsNoParams(t *testing.T) {
 	output := renderer.RenderDAGStatus(dag, status)
 
 	if !strings.Contains(output, "sub-run-456") {
-		t.Error("Output should contain sub-run ID")
-	}
-}
-
-func TestRenderDAGStatus_WithSubRunsColored(t *testing.T) {
-	dag := &core.DAG{Name: "parent-dag"}
-	status := &execution.DAGRunStatus{
-		Status: core.Succeeded,
-		Nodes: []*execution.Node{
-			{
-				Step:   core.Step{Name: "sub-step"},
-				Status: core.NodeSucceeded,
-				SubRuns: []execution.SubDAGRun{
-					{DAGRunID: "sub-run-123", Params: "param1=value1"},
-					{DAGRunID: "sub-run-456"},
-				},
-			},
-		},
-	}
-
-	config := DefaultConfig()
-	config.ColorEnabled = true
-
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	if !strings.Contains(output, "sub-run-123") {
 		t.Error("Output should contain sub-run ID")
 	}
 }
@@ -584,39 +386,6 @@ func TestRenderDAGStatus_WithActualLogFiles(t *testing.T) {
 	}
 }
 
-func TestRenderDAGStatus_WithActualLogFilesColored(t *testing.T) {
-	// Create temporary log files with content
-	stderrFile, err := os.CreateTemp("", "stderr-*.log")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(stderrFile.Name())
-	_, _ = stderrFile.WriteString("Warning: something happened\n")
-	stderrFile.Close()
-
-	dag := &core.DAG{Name: "test-dag"}
-	status := &execution.DAGRunStatus{
-		Status: core.Succeeded,
-		Nodes: []*execution.Node{
-			{
-				Step:   core.Step{Name: "step1", Command: "echo"},
-				Status: core.NodeSucceeded,
-				Stderr: stderrFile.Name(),
-			},
-		},
-	}
-
-	config := DefaultConfig()
-	config.ColorEnabled = true
-
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	if !strings.Contains(output, "Warning") {
-		t.Error("Output should contain stderr content")
-	}
-}
-
 func TestRenderDAGStatus_WithTruncatedOutput(t *testing.T) {
 	// Create temporary log file with many lines
 	stdoutFile, err := os.CreateTemp("", "stdout-*.log")
@@ -653,42 +422,6 @@ func TestRenderDAGStatus_WithTruncatedOutput(t *testing.T) {
 	}
 	if !strings.Contains(output, "Line 91") {
 		t.Error("Output should contain tail lines starting from Line 91")
-	}
-}
-
-func TestRenderDAGStatus_WithTruncatedOutputColored(t *testing.T) {
-	// Create temporary log file with many lines
-	stdoutFile, err := os.CreateTemp("", "stdout-*.log")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(stdoutFile.Name())
-	for i := 1; i <= 100; i++ {
-		_, _ = stdoutFile.WriteString(fmt.Sprintf("Line %d\n", i))
-	}
-	stdoutFile.Close()
-
-	dag := &core.DAG{Name: "test-dag"}
-	status := &execution.DAGRunStatus{
-		Status: core.Succeeded,
-		Nodes: []*execution.Node{
-			{
-				Step:   core.Step{Name: "step1"},
-				Status: core.NodeSucceeded,
-				Stdout: stdoutFile.Name(),
-			},
-		},
-	}
-
-	config := DefaultConfig()
-	config.ColorEnabled = true
-	config.MaxOutputLines = 10
-
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	if !strings.Contains(output, "90 more lines") {
-		t.Error("Output should contain truncation indicator")
 	}
 }
 

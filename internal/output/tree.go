@@ -62,11 +62,6 @@ type Renderer struct {
 	config Config
 }
 
-// treeLine returns a tree drawing character (white/default color).
-func (r *Renderer) treeLine(s string) string {
-	return s
-}
-
 // text returns text with sepia color if colors are enabled.
 // Uses 256-color palette color 136 (dark khaki - sepia tone).
 func (r *Renderer) text(s string) string {
@@ -177,7 +172,7 @@ func (r *Renderer) renderStep(node *execution.Node, isLast bool, prefix string) 
 		textPart += " " + statusLabel
 	}
 
-	buf.WriteString(prefix + r.treeLine(branch) + r.text(textPart))
+	buf.WriteString(prefix + branch + r.text(textPart))
 	buf.WriteString("\n")
 
 	// For skipped/aborted/not-started steps, don't show details
@@ -337,7 +332,7 @@ func (r *Renderer) renderCommandLine(cmdStr string, isLast bool, prefix string) 
 	}
 
 	// Tree lines faint, text sepia
-	return prefix + r.treeLine(branch) + r.text(cmdStr) + "\n"
+	return prefix + branch + r.text(cmdStr) + "\n"
 }
 
 // renderWrappedLine renders a line with word wrapping.
@@ -353,16 +348,16 @@ func (r *Renderer) renderWrappedLine(text string, branch string, isLast bool, pr
 	// Calculate continuation prefix (tree lines faint)
 	contPrefix := prefix
 	if isLast {
-		contPrefix += r.treeLine(TreeSpace)
+		contPrefix += TreeSpace
 	} else {
-		contPrefix += r.treeLine(TreePipe)
+		contPrefix += TreePipe
 	}
 
 	lines := wrapText(text, maxContentWidth)
 	for i, line := range lines {
 		if i == 0 {
 			// First line: tree branch faint, text sepia
-			buf.WriteString(prefix + r.treeLine(branch) + r.text(line) + "\n")
+			buf.WriteString(prefix + branch + r.text(line) + "\n")
 		} else {
 			// Continuation lines: indented, text sepia
 			buf.WriteString(contPrefix + "  " + r.text(line) + "\n")
@@ -466,9 +461,9 @@ func (r *Renderer) renderOutput(label string, filePath string, isLast bool, pref
 	// Calculate content prefix for multi-line output
 	contentPrefix := prefix
 	if isLast {
-		contentPrefix += r.treeLine(TreeSpace)
+		contentPrefix += TreeSpace
 	} else {
-		contentPrefix += r.treeLine(TreePipe)
+		contentPrefix += TreePipe
 	}
 
 	// Calculate max width for content wrapping
@@ -498,7 +493,7 @@ func (r *Renderer) renderOutput(label string, filePath string, isLast bool, pref
 	// Show truncation indicator first if lines were omitted
 	if truncated > 0 {
 		truncMsg := fmt.Sprintf("... (%d more lines)", truncated)
-		buf.WriteString(prefix + r.treeLine(branch) + r.text(label+": "+truncMsg) + "\n")
+		buf.WriteString(prefix + branch + r.text(label+": "+truncMsg) + "\n")
 
 		for _, line := range lines {
 			writeContentLine(line)
@@ -508,14 +503,14 @@ func (r *Renderer) renderOutput(label string, filePath string, isLast bool, pref
 		trimmed := strings.TrimSpace(lines[0])
 		labelLine := label + ": " + trimmed
 		if len(labelLine) <= maxContentWidth {
-			buf.WriteString(prefix + r.treeLine(branch) + r.text(labelLine) + "\n")
+			buf.WriteString(prefix + branch + r.text(labelLine) + "\n")
 		} else {
-			buf.WriteString(prefix + r.treeLine(branch) + r.text(label+":") + "\n")
+			buf.WriteString(prefix + branch + r.text(label+":") + "\n")
 			writeContentLine(trimmed)
 		}
 	} else {
 		// Multiple lines - show label on its own line, then content
-		buf.WriteString(prefix + r.treeLine(branch) + r.text(label+":") + "\n")
+		buf.WriteString(prefix + branch + r.text(label+":") + "\n")
 		for _, line := range lines {
 			writeContentLine(line)
 		}
@@ -541,7 +536,7 @@ func (r *Renderer) renderSubRuns(subRuns []execution.SubDAGRun, isLastSection bo
 		}
 
 		// Tree lines faint, text sepia
-		buf.WriteString(prefix + r.treeLine(branch) + r.text(subInfo) + "\n")
+		buf.WriteString(prefix + branch + r.text(subInfo) + "\n")
 	}
 
 	return buf.String()
@@ -563,7 +558,7 @@ func (r *Renderer) renderError(errMsg string, prefix string) string {
 	}
 
 	if len(errStr) <= maxWidth {
-		return prefix + r.treeLine(TreeLastBranch) + r.text(errStr) + "\n"
+		return prefix + TreeLastBranch + r.text(errStr) + "\n"
 	}
 
 	// Wrap long error messages
@@ -571,7 +566,7 @@ func (r *Renderer) renderError(errMsg string, prefix string) string {
 	wrapped := wrapText(errStr, maxWidth)
 	for i, line := range wrapped {
 		if i == 0 {
-			buf.WriteString(prefix + r.treeLine(TreeLastBranch) + r.text(line) + "\n")
+			buf.WriteString(prefix + TreeLastBranch + r.text(line) + "\n")
 		} else {
 			// 4 spaces to match width of "└─"
 			buf.WriteString(prefix + "    " + r.text(line) + "\n")
@@ -614,15 +609,6 @@ func (r *Renderer) renderFinalStatus(status *execution.DAGRunStatus) string {
 	}
 
 	return "\n" + result + "\n"
-}
-
-// formatNodeStatus formats a node status with its icon symbol.
-func (r *Renderer) formatNodeStatus(status core.NodeStatus) string {
-	symbol := NodeStatusSymbol(status)
-	if r.config.ColorEnabled {
-		return NodeStatusColorize(symbol, status)
-	}
-	return symbol
 }
 
 // calculateDuration calculates the duration string between start and finish times.
