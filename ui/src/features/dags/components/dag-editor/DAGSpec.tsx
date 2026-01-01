@@ -447,7 +447,7 @@ function DAGSpec({ fileName }: Props) {
                   );
                 })()}
 
-                <div className="flex-1 flex flex-col bg-surface border border-border rounded-lg overflow-hidden min-h-[400px]">
+                <div className="flex flex-col bg-surface border border-border rounded-lg overflow-hidden h-[calc(100vh-200px)] min-h-[400px]">
                   <div className="flex-shrink-0 flex justify-between items-center p-2 border-b border-border">
                     <Button
                       variant="secondary"
@@ -473,7 +473,7 @@ function DAGSpec({ fileName }: Props) {
                       </Button>
                     )}
                   </div>
-                  <div className="flex-1 flex min-h-0 h-full">
+                  <div className="flex-1 flex min-h-0">
                     <div className="flex-1 min-w-0">
                       <DAGEditor
                         value={editable ? (currentValue ?? data.spec) : data.spec}
