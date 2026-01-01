@@ -432,12 +432,18 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 	var evalOptions []cmdutil.EvalOption
 
 	env := GetEnv(ctx)
-	shellCommand := env.Shell(ctx)
-	if n.Step().ExecutorConfig.IsCommand() {
+
+	switch n.Step().ExecutorConfig.Type {
+	case "command", "":
+		shellCommand := env.Shell(ctx)
 		if len(shellCommand) > 0 {
 			// Command executor run commands on shell, so we don't need to expand env vars
 			evalOptions = append(evalOptions, cmdutil.WithoutExpandEnv())
 		}
+	case "ssh":
+		evalOptions = append(evalOptions, cmdutil.WithoutExpandShell())
+	case "docker", "container":
+		evalOptions = append(evalOptions, cmdutil.WithoutExpandEnv())
 	}
 
 	step := n.Step()
