@@ -182,6 +182,22 @@ export function getSchemaAtPath(
     const prop: JSONSchema | undefined = current.properties?.[segment];
     if (prop) {
       currentRequired = current.required || [];
+
+      // Check if current schema has allOf with if-then that overrides this property
+      if (current.allOf) {
+        const parentPath = path.slice(0, i + 1);
+        const parentValue = document ? getValueAtPath(document, parentPath.slice(0, -1)) : undefined;
+
+        const allOfOverride = findInAllOfWithContext(current.allOf, segment, parentValue);
+        if (allOfOverride) {
+          const overrideProp = allOfOverride.properties?.[segment];
+          if (overrideProp) {
+            current = overrideProp;
+            continue;
+          }
+        }
+      }
+
       current = prop;
       continue;
     }
