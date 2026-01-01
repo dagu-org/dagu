@@ -195,13 +195,21 @@ func init() {
 		Command:          true,
 		MultipleCommands: true,
 		Shell:            true, // Supports step.Shell as fallback when ssh.shell not set
-		GetEvalOptions: func(_ context.Context, step core.Step) []cmdutil.EvalOption {
-			// Skip shell expansion if no shell is configured for remote execution
-			configShell, _ := step.ExecutorConfig.Config["shell"].(string)
-			if step.Shell == "" && configShell == "" {
-				return []cmdutil.EvalOption{cmdutil.WithoutExpandShell()}
+		GetEvalOptions: func(ctx context.Context, step core.Step) []cmdutil.EvalOption {
+			// Check if any shell is configured (step.Shell, step-level SSH config, or DAG-level SSH config)
+			if step.Shell != "" {
+				return nil
 			}
-			return nil
+			configShell, _ := step.ExecutorConfig.Config["shell"].(string)
+			if configShell != "" {
+				return nil
+			}
+			// Check DAG-level SSH config from context
+			if cli := getSSHClientFromContext(ctx); cli != nil && cli.Shell != "" {
+				return nil
+			}
+			// No shell configured - skip shell expansion for remote execution
+			return []cmdutil.EvalOption{cmdutil.WithoutExpandShell()}
 		},
 	}
 	executor.RegisterExecutor("ssh", NewSSHExecutor, nil, caps)
