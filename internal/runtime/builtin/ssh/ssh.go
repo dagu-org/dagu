@@ -196,15 +196,23 @@ func init() {
 		MultipleCommands: true,
 		Shell:            true, // Supports step.Shell as fallback when ssh.shell not set
 		GetEvalOptions: func(ctx context.Context, step core.Step) []cmdutil.EvalOption {
-			// Check if any shell is configured (step.Shell, step-level SSH config, or DAG-level SSH config)
+			// Mirror the shell resolution logic in NewSSHExecutor:
+			// 1. step.Shell is final fallback (checked first for early exit)
+			// 2. If step has SSH config, only check that config's shell
+			// 3. Otherwise check DAG-level SSH config
 			if step.Shell != "" {
 				return nil
 			}
-			configShell, _ := step.ExecutorConfig.Config["shell"].(string)
-			if configShell != "" {
-				return nil
+			if len(step.ExecutorConfig.Config) > 0 {
+				// Step has SSH config - only check that config's shell
+				configShell, _ := step.ExecutorConfig.Config["shell"].(string)
+				if configShell != "" {
+					return nil
+				}
+				// Step-level SSH config exists but has no shell
+				return []cmdutil.EvalOption{cmdutil.WithoutExpandShell()}
 			}
-			// Check DAG-level SSH config from context
+			// No step-level SSH config - check DAG-level SSH config
 			if cli := getSSHClientFromContext(ctx); cli != nil && cli.Shell != "" {
 				return nil
 			}

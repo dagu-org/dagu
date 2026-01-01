@@ -333,3 +333,40 @@ func TestSSHExecutor_SSHConfigShellTakesPriorityOverStepShell(t *testing.T) {
 	// SSH config shell takes priority over step.Shell
 	assert.Equal(t, "/bin/zsh", sshExec.shell)
 }
+
+func TestSSHExecutor_StepSSHConfigWithoutShellIgnoresDAGShell(t *testing.T) {
+	t.Parallel()
+
+	// DAG-level SSH config has a shell
+	mockClient := &Client{
+		hostPort: "localhost:22",
+		Shell:    "/bin/zsh", // DAG-level shell
+	}
+
+	ctx := WithSSHClient(context.Background(), mockClient)
+
+	// Step has its own SSH config WITHOUT shell
+	// This should override DAG-level config entirely (including shell)
+	step := core.Step{
+		Name: "ssh-step",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "ssh",
+			Config: map[string]any{
+				"user":     "stepuser",
+				"ip":       "step-host",
+				"port":     22,
+				"password": "steppassword",
+				// No shell specified - should NOT inherit from DAG-level
+			},
+		},
+	}
+
+	exec, err := NewSSHExecutor(ctx, step)
+	require.NoError(t, err)
+
+	sshExec, ok := exec.(*sshExecutor)
+	require.True(t, ok)
+	// Step-level SSH config takes priority, and it has no shell
+	// DAG-level shell should NOT be inherited
+	assert.Equal(t, "", sshExec.shell)
+}
