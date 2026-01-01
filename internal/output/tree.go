@@ -71,6 +71,15 @@ func (r *Renderer) text(s string) string {
 	return "\033[38;5;110m" + s + "\033[0m"
 }
 
+// gray returns text in gray color for secondary information like duration.
+func (r *Renderer) gray(s string) string {
+	if !r.config.ColorEnabled {
+		return s
+	}
+	// Use ANSI 256 color 245 - a medium gray
+	return "\033[38;5;245m" + s + "\033[0m"
+}
+
 // NewRenderer creates a new tree renderer with the given configuration.
 func NewRenderer(config Config) *Renderer {
 	return &Renderer{config: config}
@@ -138,7 +147,7 @@ func (r *Renderer) renderDAGLine(dag *core.DAG, status *execution.DAGRunStatus) 
 	duration := r.calculateDuration(status.StartedAt, status.FinishedAt, status.Status)
 
 	if duration != "" {
-		return fmt.Sprintf("dag: %s (%s)", dag.Name, duration)
+		return fmt.Sprintf("dag: %s %s", dag.Name, r.gray("("+duration+")"))
 	}
 	return fmt.Sprintf("dag: %s", dag.Name)
 }
@@ -153,25 +162,26 @@ func (r *Renderer) renderStep(node *execution.Node, isLast bool, prefix string) 
 		branch = TreeLastBranch
 	}
 
-	// Build step line
-	textPart := node.Step.Name
+	// Build step line with separate coloring for name and duration
+	var lineParts []string
+	lineParts = append(lineParts, r.text(node.Step.Name))
 
-	// Add duration for steps that ran
+	// Add duration for steps that ran (in gray)
 	if node.Status == core.NodeSucceeded || node.Status == core.NodeFailed ||
 		node.Status == core.NodeRunning || node.Status == core.NodePartiallySucceeded {
 		duration := r.calculateNodeDuration(node)
 		if duration != "" {
-			textPart += fmt.Sprintf(" (%s)", duration)
+			lineParts = append(lineParts, r.gray("("+duration+")"))
 		}
 	}
 
 	// Add status label
 	statusLabel := r.getStatusLabel(node.Status)
 	if statusLabel != "" {
-		textPart += " " + statusLabel
+		lineParts = append(lineParts, r.text(statusLabel))
 	}
 
-	buf.WriteString(prefix + branch + r.text(textPart))
+	buf.WriteString(prefix + branch + strings.Join(lineParts, " "))
 	buf.WriteString("\n")
 
 	// For skipped/aborted/not-started steps, don't show details
