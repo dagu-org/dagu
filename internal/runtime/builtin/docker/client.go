@@ -194,10 +194,7 @@ func waitForContainerRunning(ctx context.Context, cli *client.Client, name strin
 	for {
 		select {
 		case <-ctx.Done():
-			// Get final state for better error message
-			finalInfo, finalErr := cli.ContainerInspect(context.Background(), name)
-			finalStatus := getContainerStatus(finalInfo, finalErr)
-			return fmt.Errorf("timed out waiting for container to be running (current status: %s)", finalStatus)
+			return newContainerWaitTimeoutError(cli, name)
 		case <-ticker.C:
 			info, err := cli.ContainerInspect(ctx, name)
 			if err != nil {
@@ -210,6 +207,10 @@ func waitForContainerRunning(ctx context.Context, cli *client.Client, name strin
 						lastLogTime = time.Now()
 					}
 					continue // Container doesn't exist yet, keep waiting
+				}
+				// If the context has already expired while inspecting, treat it as timeout
+				if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) || ctx.Err() != nil {
+					return newContainerWaitTimeoutError(cli, name)
 				}
 				return fmt.Errorf("failed to inspect container: %w", err)
 			}
@@ -233,6 +234,13 @@ func waitForContainerRunning(ctx context.Context, cli *client.Client, name strin
 			}
 		}
 	}
+}
+
+func newContainerWaitTimeoutError(cli *client.Client, name string) error {
+	// Get final state for better error message
+	finalInfo, finalErr := cli.ContainerInspect(context.Background(), name)
+	finalStatus := getContainerStatus(finalInfo, finalErr)
+	return fmt.Errorf("timed out waiting for container to be running (current status: %s)", finalStatus)
 }
 
 // getContainerStatus returns a human-readable status string for the container
