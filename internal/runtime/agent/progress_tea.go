@@ -63,15 +63,14 @@ type ProgressModel struct {
 	showChildDetails bool
 
 	// Styles
-	accentColor      lipgloss.Color
-	headerStyle      lipgloss.Style
-	progressBarStyle lipgloss.Style
-	sectionStyle     lipgloss.Style
-	errorStyle       lipgloss.Style
-	successStyle     lipgloss.Style
-	runningStyle     lipgloss.Style
-	faintStyle       lipgloss.Style
-	boldStyle        lipgloss.Style
+	accentColor  lipgloss.Color
+	headerStyle  lipgloss.Style
+	sectionStyle lipgloss.Style
+	errorStyle   lipgloss.Style
+	successStyle lipgloss.Style
+	runningStyle lipgloss.Style
+	faintStyle   lipgloss.Style
+	boldStyle    lipgloss.Style
 }
 
 // NewProgressModel creates a new progress model for Bubble Tea

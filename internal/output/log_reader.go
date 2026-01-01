@@ -149,13 +149,6 @@ func readAllLines(scanner *bufio.Scanner) ([]string, int, error) {
 	return allLines, 0, nil
 }
 
-// ReadLogFileAll reads all content from a log file.
-// This is a convenience wrapper around ReadLogFileTail with no line limit.
-func ReadLogFileAll(path string) ([]string, error) {
-	lines, _, err := ReadLogFileTail(path, 0)
-	return lines, err
-}
-
 // trimTrailingEmptyLines removes empty lines from the end of a slice.
 func trimTrailingEmptyLines(lines []string) []string {
 	for len(lines) > 0 && lines[len(lines)-1] == "" {

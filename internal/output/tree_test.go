@@ -684,34 +684,31 @@ func TestReadLogFileTail_BinaryContent(t *testing.T) {
 	}
 }
 
-func TestReadLogFileAll(t *testing.T) {
+func TestReadLogFileTail_LargeFile(t *testing.T) {
 	t.Parallel()
-	tmpfile, err := os.CreateTemp("", "test-log-*.txt")
+	tmpfile, err := os.CreateTemp("", "test-large-*.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmpfile.Name())
 
-	_, _ = tmpfile.WriteString("Line 1\nLine 2\nLine 3\n")
+	// Write more than 10MB
+	data := make([]byte, 11*1024*1024)
+	for i := range data {
+		data[i] = 'x'
+	}
+	_, _ = tmpfile.Write(data)
 	tmpfile.Close()
 
-	lines, err := ReadLogFileAll(tmpfile.Name())
+	lines, truncated, err := ReadLogFileTail(tmpfile.Name(), 10)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if len(lines) != 3 {
-		t.Errorf("Expected 3 lines, got %d", len(lines))
+	if truncated != 0 {
+		t.Errorf("Expected truncated=0, got %d", truncated)
 	}
-}
-
-func TestReadLogFileAll_EmptyPath(t *testing.T) {
-	t.Parallel()
-	lines, err := ReadLogFileAll("")
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if lines != nil {
-		t.Error("Should return nil for empty path")
+	if len(lines) != 1 || lines[0] != "(file too large, >10MB)" {
+		t.Errorf("Expected file too large message, got %v", lines)
 	}
 }
 
