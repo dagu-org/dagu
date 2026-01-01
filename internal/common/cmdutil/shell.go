@@ -2,6 +2,7 @@ package cmdutil
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -134,7 +135,7 @@ func BuildShellCommandString(shell string, args []string, command string) string
 
 	// Add command flag if not already present
 	flag := ShellCommandFlag(shell)
-	if flag != "" && !sliceContains(args, flag) {
+	if flag != "" && !slices.Contains(args, flag) {
 		parts = append(parts, flag)
 	}
 
@@ -142,14 +143,4 @@ func BuildShellCommandString(shell string, args []string, command string) string
 	parts = append(parts, ShellQuote(command))
 
 	return strings.Join(parts, " ")
-}
-
-// sliceContains checks if a slice contains a string (case-sensitive).
-func sliceContains(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-	}
-	return false
 }

@@ -484,25 +484,3 @@ func TestBuildShellCommandString(t *testing.T) {
 		})
 	}
 }
-
-func TestSliceContains(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name     string
-		slice    []string
-		s        string
-		expected bool
-	}{
-		{"Found", []string{"a", "b", "c"}, "b", true},
-		{"NotFound", []string{"a", "b", "c"}, "d", false},
-		{"EmptySlice", []string{}, "a", false},
-		{"EmptyString", []string{"a", "b", ""}, "", true},
-		{"CaseSensitive", []string{"A", "B", "C"}, "a", false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, sliceContains(tt.slice, tt.s))
-		})
-	}
-}
