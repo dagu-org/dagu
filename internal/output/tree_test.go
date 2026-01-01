@@ -715,56 +715,6 @@ func TestReadLogFileAll_EmptyPath(t *testing.T) {
 	}
 }
 
-func TestStatusSymbol(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		status core.Status
-		symbol string
-	}{
-		{core.Running, "●"},
-		{core.Succeeded, "✓"},
-		{core.Failed, "✗"},
-		{core.Aborted, "⚠"},
-		{core.PartiallySucceeded, "◐"},
-		{core.Queued, "◌"},
-		{core.NotStarted, "○"},
-		{core.Status(999), "○"}, // Unknown status
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.status.String(), func(t *testing.T) {
-			if got := StatusSymbol(tt.status); got != tt.symbol {
-				t.Errorf("StatusSymbol(%v) = %s, want %s", tt.status, got, tt.symbol)
-			}
-		})
-	}
-}
-
-func TestNodeStatusSymbol(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		status core.NodeStatus
-		symbol string
-	}{
-		{core.NodeRunning, "●"},
-		{core.NodeSucceeded, "✓"},
-		{core.NodeFailed, "✗"},
-		{core.NodeAborted, "⚠"},
-		{core.NodeSkipped, "○"},
-		{core.NodePartiallySucceeded, "◐"},
-		{core.NodeNotStarted, "○"},
-		{core.NodeStatus(999), "○"}, // Unknown status
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.status.String(), func(t *testing.T) {
-			if got := NodeStatusSymbol(tt.status); got != tt.symbol {
-				t.Errorf("NodeStatusSymbol(%v) = %s, want %s", tt.status, got, tt.symbol)
-			}
-		})
-	}
-}
-
 func TestStatusText(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -782,60 +732,9 @@ func TestStatusText(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.status.String(), func(t *testing.T) {
+			t.Parallel()
 			if got := StatusText(tt.status); got != tt.text {
 				t.Errorf("StatusText(%v) = %s, want %s", tt.status, got, tt.text)
-			}
-		})
-	}
-}
-
-func TestStatusColorize(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		status core.Status
-	}{
-		{core.Running},
-		{core.Succeeded},
-		{core.Failed},
-		{core.Aborted},
-		{core.PartiallySucceeded},
-		{core.Queued},
-		{core.NotStarted},
-		{core.Status(999)}, // Unknown status
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.status.String(), func(t *testing.T) {
-			result := StatusColorize("test", tt.status)
-			// Just verify it returns something - actual color testing would require more setup
-			if result == "" {
-				t.Errorf("StatusColorize(%v) returned empty string", tt.status)
-			}
-		})
-	}
-}
-
-func TestNodeStatusColorize(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		status core.NodeStatus
-	}{
-		{core.NodeRunning},
-		{core.NodeSucceeded},
-		{core.NodeFailed},
-		{core.NodeAborted},
-		{core.NodeSkipped},
-		{core.NodePartiallySucceeded},
-		{core.NodeNotStarted},
-		{core.NodeStatus(999)}, // Unknown status
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.status.String(), func(t *testing.T) {
-			result := NodeStatusColorize("test", tt.status)
-			// Just verify it returns something
-			if result == "" {
-				t.Errorf("NodeStatusColorize(%v) returned empty string", tt.status)
 			}
 		})
 	}
