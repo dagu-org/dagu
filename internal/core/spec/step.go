@@ -100,6 +100,9 @@ type step struct {
 
 	// Config contains executor-specific configuration.
 	Config map[string]any `yaml:"config,omitempty"`
+
+	// LLM contains the configuration for LLM (Large Language Model) execution.
+	LLM *llmConfig `yaml:"llm,omitempty"`
 }
 
 // repeatPolicy defines the repeat policy for a step.
@@ -121,6 +124,40 @@ type retryPolicy struct {
 	ExitCode       []int `yaml:"exitCode,omitempty"`
 	Backoff        any   `yaml:"backoff,omitempty"` // Accepts bool or float
 	MaxIntervalSec int   `yaml:"maxIntervalSec,omitempty"`
+}
+
+// llmConfig defines the LLM configuration for a step.
+type llmConfig struct {
+	// Provider is the LLM provider (openai, anthropic, gemini, openrouter, local).
+	Provider string `yaml:"provider,omitempty"`
+	// Model is the model to use (e.g., gpt-4o, claude-sonnet-4-20250514).
+	Model string `yaml:"model,omitempty"`
+	// Messages is the list of messages to send to the LLM.
+	Messages []llmMessage `yaml:"messages,omitempty"`
+	// Temperature controls randomness (0.0-2.0).
+	Temperature *float64 `yaml:"temperature,omitempty"`
+	// MaxTokens is the maximum number of tokens to generate.
+	MaxTokens *int `yaml:"maxTokens,omitempty"`
+	// TopP is the nucleus sampling parameter.
+	TopP *float64 `yaml:"topP,omitempty"`
+	// BaseURL is a custom API endpoint.
+	BaseURL string `yaml:"baseURL,omitempty"`
+	// APIKey overrides the default environment variable for the API key.
+	APIKey string `yaml:"apiKey,omitempty"`
+	// History enables or disables history loading from dependent steps.
+	// Default is true.
+	History *bool `yaml:"history,omitempty"`
+	// Stream enables or disables streaming output.
+	// Default is true.
+	Stream *bool `yaml:"stream,omitempty"`
+}
+
+// llmMessage defines a message in the LLM conversation.
+type llmMessage struct {
+	// Role is the message role (system, user, assistant).
+	Role string `yaml:"role,omitempty"`
+	// Content is the message content. Supports variable substitution with ${VAR}.
+	Content string `yaml:"content,omitempty"`
 }
 
 // stepTransformer is a generic implementation for step field transformations
@@ -221,6 +258,9 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	}
 	if err := buildStepSubDAG(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("subDAG", err))
+	}
+	if err := buildStepLLM(ctx, s, result); err != nil {
+		errs = append(errs, wrapTransformError("llm", err))
 	}
 	if err := buildStepExecutor(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("executor", err))
@@ -963,6 +1003,26 @@ func validateConflicts(s *step) error {
 		return core.NewValidationError("script", s.Script, ErrContainerAndScriptConflict)
 	}
 
+	// LLM conflicts with other execution types
+	hasLLM := s.LLM != nil
+	if hasLLM {
+		if hasSubDAG {
+			return core.NewValidationError("llm", s.LLM, fmt.Errorf("cannot use 'llm' field with sub-DAG execution"))
+		}
+		if hasExecutor {
+			return core.NewValidationError("llm", s.LLM, fmt.Errorf("cannot use 'llm' field with 'executor' field"))
+		}
+		if hasCommand {
+			return core.NewValidationError("llm", s.LLM, fmt.Errorf("cannot use 'llm' field with 'command' field"))
+		}
+		if hasScript {
+			return core.NewValidationError("llm", s.LLM, fmt.Errorf("cannot use 'llm' field with 'script' field"))
+		}
+		if hasContainer {
+			return core.NewValidationError("llm", s.LLM, fmt.Errorf("cannot use 'llm' field with 'container' field"))
+		}
+	}
+
 	return nil
 }
 
@@ -1144,6 +1204,79 @@ func buildStepContainer(ctx StepBuildContext, s *step, result *core.Step) error 
 	}
 
 	result.Container = ct
+	return nil
+}
+
+// buildStepLLM parses the LLM configuration in the step definition.
+func buildStepLLM(_ StepBuildContext, s *step, result *core.Step) error {
+	if s.LLM == nil {
+		return nil
+	}
+
+	cfg := s.LLM
+
+	// Validate provider if specified
+	if cfg.Provider != "" {
+		validProviders := map[string]bool{
+			"openai": true, "anthropic": true, "gemini": true,
+			"openrouter": true, "local": true,
+		}
+		if !validProviders[cfg.Provider] {
+			return core.NewValidationError("llm.provider", cfg.Provider,
+				fmt.Errorf("invalid provider: must be one of openai, anthropic, gemini, openrouter, local"))
+		}
+	}
+
+	// Validate messages
+	if len(cfg.Messages) == 0 {
+		return core.NewValidationError("llm.messages", cfg.Messages,
+			fmt.Errorf("at least one message is required"))
+	}
+
+	validRoles := map[string]bool{"system": true, "user": true, "assistant": true}
+	for i, msg := range cfg.Messages {
+		if msg.Role == "" {
+			return core.NewValidationError(
+				fmt.Sprintf("llm.messages[%d].role", i), msg.Role,
+				fmt.Errorf("role is required"))
+		}
+		if !validRoles[msg.Role] {
+			return core.NewValidationError(
+				fmt.Sprintf("llm.messages[%d].role", i), msg.Role,
+				fmt.Errorf("invalid role: must be one of system, user, assistant"))
+		}
+		if msg.Content == "" {
+			return core.NewValidationError(
+				fmt.Sprintf("llm.messages[%d].content", i), msg.Content,
+				fmt.Errorf("content is required"))
+		}
+	}
+
+	// Build core.LLMConfig
+	messages := make([]core.LLMMessage, len(cfg.Messages))
+	for i, msg := range cfg.Messages {
+		messages[i] = core.LLMMessage{
+			Role:    msg.Role,
+			Content: msg.Content,
+		}
+	}
+
+	result.LLM = &core.LLMConfig{
+		Provider:    cfg.Provider,
+		Model:       cfg.Model,
+		Messages:    messages,
+		Temperature: cfg.Temperature,
+		MaxTokens:   cfg.MaxTokens,
+		TopP:        cfg.TopP,
+		BaseURL:     cfg.BaseURL,
+		APIKey:      cfg.APIKey,
+		History:     cfg.History,
+		Stream:      cfg.Stream,
+	}
+
+	// Set executor type to llm
+	result.ExecutorConfig.Type = core.ExecutorTypeLLM
+
 	return nil
 }
 
