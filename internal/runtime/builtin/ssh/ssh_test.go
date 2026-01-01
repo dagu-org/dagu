@@ -125,8 +125,8 @@ func TestSSHExecutor_BuildCommand(t *testing.T) {
 				shell: tt.shell,
 			}
 			result := e.buildCommand(core.CommandEntry{
-				Command:    tt.command,
-				Args:       tt.args,
+				Command:     tt.command,
+				Args:        tt.args,
 				CmdWithArgs: buildCmdWithArgs(tt.command, tt.args),
 			})
 			assert.Equal(t, tt.expected, result)

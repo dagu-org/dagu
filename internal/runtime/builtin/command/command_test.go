@@ -1156,7 +1156,6 @@ func TestValidateCommandStep(t *testing.T) {
 	}
 }
 
-
 // TestExitCodeFromError tests exit code extraction from errors
 func TestExitCodeFromError(t *testing.T) {
 	tests := []struct {
