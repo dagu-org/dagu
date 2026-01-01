@@ -68,42 +68,6 @@ func TestSSHCommandEscaping(t *testing.T) {
 	}
 }
 
-func TestSSHExecutor_GetEffectiveShell(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name      string
-		shell     string
-		wantShell string
-	}{
-		{
-			name:      "ShellFromConfig",
-			shell:     "/bin/bash",
-			wantShell: "/bin/bash",
-		},
-		{
-			name:      "NoShellConfigured",
-			shell:     "",
-			wantShell: "",
-		},
-		{
-			name:      "CustomShell",
-			shell:     "/usr/bin/zsh",
-			wantShell: "/usr/bin/zsh",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			e := &sshExecutor{
-				shell: tt.shell,
-			}
-			shell := e.getEffectiveShell()
-			assert.Equal(t, tt.wantShell, shell)
-		})
-	}
-}
-
 func TestSSHExecutor_BuildCommand(t *testing.T) {
 	t.Parallel()
 

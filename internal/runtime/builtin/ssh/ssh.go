@@ -40,7 +40,7 @@ type sshExecutor struct {
 	stdout  io.Writer
 	stderr  io.Writer
 	session *ssh.Session
-	shell   string // Shell for remote command execution (from SSH config only)
+	shell   string
 }
 
 func NewSSHExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
@@ -124,10 +124,6 @@ func (e *sshExecutor) Run(ctx context.Context) error {
 	return nil
 }
 
-// getEffectiveShell returns the shell to use for command execution.
-// Shell is only taken from SSH configuration (DAG-level or step-level config.shell).
-// DAG-level shell field is NOT inherited because the local user's default shell
-// may not be available on the remote server.
 func (e *sshExecutor) getEffectiveShell() string {
 	return e.shell
 }
