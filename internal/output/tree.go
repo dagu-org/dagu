@@ -68,11 +68,11 @@ func (r *Renderer) treeLine(s string) string {
 }
 
 // text returns text with sepia color if colors are enabled.
-// Uses 256-color palette color 180 (wheat/tan - true sepia tone).
+// Uses 256-color palette color 136 (dark khaki - sepia tone).
 func (r *Renderer) text(s string) string {
 	if r.config.ColorEnabled {
-		// 38;5;180 = foreground 256-color mode, color 180 (wheat/tan sepia)
-		return fmt.Sprintf("\033[38;5;180m%s\033[0m", s)
+		// 38;5;136 = foreground 256-color mode, color 136 (dark khaki)
+		return fmt.Sprintf("\033[38;5;136m%s\033[0m", s)
 	}
 	return s
 }
@@ -569,13 +569,12 @@ func (r *Renderer) renderError(errMsg string, prefix string) string {
 	// Wrap long error messages
 	var buf strings.Builder
 	wrapped := wrapText(errStr, maxWidth)
-	// Continuation aligns with text after "└─" (2 spaces to match branch width)
-	contPrefix := prefix + "  "
 	for i, line := range wrapped {
 		if i == 0 {
 			buf.WriteString(prefix + r.treeLine(TreeLastBranch) + r.text(line) + "\n")
 		} else {
-			buf.WriteString(contPrefix + r.text(line) + "\n")
+			// 3 spaces to align with text after "└─" (accounts for box-char width)
+			buf.WriteString(prefix + "   " + r.text(line) + "\n")
 		}
 	}
 	return buf.String()
