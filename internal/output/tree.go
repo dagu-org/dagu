@@ -62,14 +62,13 @@ type Renderer struct {
 	config Config
 }
 
-// text returns text with sepia color if colors are enabled.
-// Uses 256-color palette color 136 (dark khaki - sepia tone).
+// text returns text with a soft light blue color for visual distinction.
 func (r *Renderer) text(s string) string {
-	if r.config.ColorEnabled {
-		// 38;5;136 = foreground 256-color mode, color 136 (dark khaki)
-		return fmt.Sprintf("\033[38;5;136m%s\033[0m", s)
+	if !r.config.ColorEnabled {
+		return s
 	}
-	return s
+	// Use ANSI 256 color 110 - a soft, muted light blue
+	return "\033[38;5;110m" + s + "\033[0m"
 }
 
 // NewRenderer creates a new tree renderer with the given configuration.
