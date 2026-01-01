@@ -13,6 +13,8 @@ interface SchemaDocSidebarProps {
   path: string[];
   segments: YamlPathSegment[];
   className?: string;
+  /** YAML content for context-aware schema resolution */
+  yamlContent?: string;
 }
 
 export function SchemaDocSidebar({
@@ -21,9 +23,10 @@ export function SchemaDocSidebar({
   path,
   segments,
   className,
+  yamlContent,
 }: SchemaDocSidebarProps) {
   const { schema, loading: schemaLoading, error: schemaError, reload } = useSchema();
-  const { propertyInfo, siblingProperties, loading, error } = useSchemaLookup(path);
+  const { propertyInfo, siblingProperties, loading, error } = useSchemaLookup(path, yamlContent);
 
   if (!isOpen) {
     return null;

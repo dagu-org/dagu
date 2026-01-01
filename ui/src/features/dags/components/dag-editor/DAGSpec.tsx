@@ -494,6 +494,7 @@ function DAGSpec({ fileName }: Props) {
                       onClose={toggleSidebar}
                       path={yamlPathInfo.path}
                       segments={yamlPathInfo.segments}
+                      yamlContent={currentValue}
                     />
                   </div>
                 </div>

@@ -1,15 +1,15 @@
+import type { JSONSchema } from '@/lib/schema-utils';
 import React, {
   createContext,
   useContext,
   useEffect,
-  useState,
   useMemo,
+  useState,
 } from 'react';
-import type { JSONSchema } from '@/lib/schema-utils';
 
 // Get schema URL from config (getConfig() is available at module load time)
-declare function getConfig(): { basePath: string };
-const SCHEMA_URL = `${getConfig().basePath}/assets/dag.schema.json`;
+declare function getConfig(): { basePath: string; version: string };
+const SCHEMA_URL = `${getConfig().basePath}/assets/dag.schema.json?v=${getConfig().version}`;
 
 interface SchemaContextValue {
   schema: JSONSchema | null;
