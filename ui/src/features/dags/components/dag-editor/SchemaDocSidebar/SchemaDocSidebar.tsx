@@ -63,16 +63,36 @@ export function SchemaDocSidebar({
 
         {/* Error State */}
         {(error || schemaError) && !loading && !schemaLoading && (
-          <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-            <AlertCircle className="w-5 h-5 text-destructive mb-2" />
-            <span className="text-xs text-center mb-2">
-              Failed to load schema
-            </span>
+          <div className="flex flex-col items-center justify-center h-full py-8 px-4">
+            {/* Icon container */}
+            <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+              <BookOpen className="w-5 h-5 text-muted-foreground/60" />
+            </div>
+
+            {/* Message */}
+            <p className="text-sm font-medium text-foreground mb-1">
+              Schema unavailable
+            </p>
+            <p className="text-xs text-muted-foreground text-center mb-4 max-w-[200px]">
+              Documentation couldn't be loaded. The editor still works normally.
+            </p>
+
+            {/* Retry button */}
             <button
               onClick={reload}
-              className="text-xs text-primary hover:underline"
+              className="
+                inline-flex items-center gap-1.5
+                px-3 py-1.5
+                text-xs font-medium
+                bg-muted hover:bg-muted/80
+                text-foreground
+                rounded-md
+                border border-border
+                transition-colors
+              "
             >
-              Retry
+              <RefreshCw className="w-3 h-3" />
+              Try again
             </button>
           </div>
         )}
