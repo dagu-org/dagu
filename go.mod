@@ -36,7 +36,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/rhysd/changelog-from-release/v3 v3.9.0
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/samber/slog-multi v1.4.1
+	github.com/samber/slog-multi v1.6.0
 	github.com/segmentio/golines v0.12.2
 	github.com/shirou/gopsutil/v4 v4.25.11
 	github.com/spf13/cobra v1.10.1
@@ -378,7 +378,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.19 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/samber/lo v1.51.0
+	github.com/samber/lo v1.52.0
 	golang.org/x/crypto v0.42.0
 	golang.org/x/net v0.44.0 // indirect
 	golang.org/x/sys v0.38.0
