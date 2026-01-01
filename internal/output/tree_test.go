@@ -40,8 +40,8 @@ func TestRenderDAGStatus_BasicSuccess(t *testing.T) {
 	if !strings.Contains(output, "step1") {
 		t.Error("Output should contain step name")
 	}
-	if !strings.Contains(output, "[passed]") {
-		t.Error("Output should contain passed label")
+	if !strings.Contains(output, "[succeeded]") {
+		t.Error("Output should contain succeeded label")
 	}
 	if !strings.Contains(output, "Result: Succeeded") {
 		t.Error("Output should contain succeeded result")
@@ -163,8 +163,8 @@ func TestRenderDAGStatus_AbortedStatus(t *testing.T) {
 	renderer := NewRenderer(config)
 	output := renderer.RenderDAGStatus(dag, status)
 
-	if !strings.Contains(output, "[canceled]") {
-		t.Error("Output should contain canceled label")
+	if !strings.Contains(output, "[aborted]") {
+		t.Error("Output should contain aborted label")
 	}
 	if !strings.Contains(output, "Result: Aborted") {
 		t.Error("Output should contain Aborted result")
@@ -189,11 +189,11 @@ func TestRenderDAGStatus_PartiallySucceededStatus(t *testing.T) {
 	renderer := NewRenderer(config)
 	output := renderer.RenderDAGStatus(dag, status)
 
-	if !strings.Contains(output, "[partial]") {
+	if !strings.Contains(output, "[partially_succeeded]") {
 		t.Error("Output should contain partial label")
 	}
-	if !strings.Contains(output, "Result: Partial") {
-		t.Error("Output should contain Partial result")
+	if !strings.Contains(output, "Result: Partially Succeeded") {
+		t.Error("Output should contain Partially Succeeded result")
 	}
 }
 

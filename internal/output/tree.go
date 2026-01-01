@@ -286,22 +286,10 @@ func (r *Renderer) renderStep(node *execution.Node, isLast bool, prefix string) 
 // getStatusLabel returns a text label for the node status.
 // All labels are plain text - no colors.
 func (r *Renderer) getStatusLabel(status core.NodeStatus) string {
-	switch status {
-	case core.NodeSucceeded:
-		return "[passed]"
-	case core.NodeFailed:
-		return "[failed]"
-	case core.NodeAborted:
-		return "[canceled]"
-	case core.NodeSkipped:
-		return "[skipped]"
-	case core.NodeRunning:
-		return "[running]"
-	case core.NodePartiallySucceeded:
-		return "[partial]"
-	default:
+	if status == core.NodeNotStarted {
 		return ""
 	}
+	return "[" + status.String() + "]"
 }
 
 // hasOutput checks if the node has any stdout or stderr content.
