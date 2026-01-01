@@ -42,7 +42,7 @@
     "@dagu-org/dagu-linux-ia32": "0.0.0-development",
     "@dagu-org/dagu-linux-armv7": "0.0.0-development",
     "@dagu-org/dagu-linux-armv6": "0.0.0-development",
-    "@dagu-org/dagu-win32-ia32": "0.0.0-development",
+    "@dagu-org/dagu-win32-ia32": "1.29.2",
     "@dagu-org/dagu-freebsd-x64": "0.0.0-development"
   },
   "engines": {
