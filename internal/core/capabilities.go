@@ -91,12 +91,12 @@ func SupportsWorkerSelector(executorType string) bool {
 	return executorCapabilities.Get(executorType).WorkerSelector
 }
 
-// EvalOptions returns eval options for the given step's executor type.
+// EvalOptions returns eval options for this step's executor type.
 // Returns nil if no special eval options are needed.
-func EvalOptions(ctx context.Context, step Step) []cmdutil.EvalOption {
-	caps := executorCapabilities.Get(step.ExecutorConfig.Type)
+func (s Step) EvalOptions(ctx context.Context) []cmdutil.EvalOption {
+	caps := executorCapabilities.Get(s.ExecutorConfig.Type)
 	if caps.GetEvalOptions != nil {
-		return caps.GetEvalOptions(ctx, step)
+		return caps.GetEvalOptions(ctx, s)
 	}
 	return nil
 }

@@ -430,7 +430,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 	}
 
 	// Get eval options from executor capabilities
-	evalOptions := core.EvalOptions(ctx, n.Step())
+	evalOptions := n.Step().EvalOptions(ctx)
 
 	step := n.Step()
 

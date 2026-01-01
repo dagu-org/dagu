@@ -402,7 +402,7 @@ func TestSSHExecutor_GetEvalOptions(t *testing.T) {
 				ctx = WithSSHClient(ctx, &Client{Shell: tt.dagShell})
 			}
 
-			opts := core.EvalOptions(ctx, tt.step)
+			opts := tt.step.EvalOptions(ctx)
 
 			if tt.expectSkipShell {
 				require.Len(t, opts, 1, "expected WithoutExpandShell option")
