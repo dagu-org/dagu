@@ -1334,6 +1334,10 @@
           "type": "string",
           "default": "~/.ssh/known_hosts",
           "description": "Path to the known_hosts file for host key verification. Defaults to ~/.ssh/known_hosts."
+        },
+        "shell": {
+          "type": "string",
+          "description": "Shell for remote command execution (e.g., '/bin/bash'). When specified, commands are wrapped as: shell -c 'command'. Enables shell features like variable expansion, pipes, and command chaining on the remote server."
         }
       },
       "required": ["user", "host"],
@@ -1422,6 +1426,10 @@
           "type": "string",
           "default": "~/.ssh/known_hosts",
           "description": "Path to known_hosts file for host key verification."
+        },
+        "shell": {
+          "type": "string",
+          "description": "Shell for remote command execution (e.g., '/bin/bash'). When specified, commands are wrapped as: shell -c 'command'. Enables shell features like variable expansion, pipes, and command chaining on the remote server."
         }
       },
       "description": "SSH executor configuration for remote command execution."
