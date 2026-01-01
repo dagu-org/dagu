@@ -115,7 +115,7 @@ export function SchemaDocSidebar({
               // Root level - show all top-level properties
               <div>
                 <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                  Root Properties
+                  DAG Properties
                 </h4>
                 <div className="border border-border rounded p-1">
                   <NestedPropertiesTree
