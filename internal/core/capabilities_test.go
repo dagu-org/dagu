@@ -49,7 +49,7 @@ func TestStep_EvalOptions(t *testing.T) {
 		// Register executor with GetEvalOptions callback
 		RegisterExecutorCapabilities("eval-opts-test", ExecutorCapabilities{
 			Command: true,
-			GetEvalOptions: func(ctx context.Context, step Step) []cmdutil.EvalOption {
+			GetEvalOptions: func(_ context.Context, _ Step) []cmdutil.EvalOption {
 				return []cmdutil.EvalOption{cmdutil.WithoutExpandShell()}
 			},
 		})
