@@ -12,7 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/core"
@@ -498,10 +497,8 @@ func init() {
 		Command:          true,
 		MultipleCommands: true,
 		Container:        true,
-		GetEvalOptions: func(_ context.Context, _ core.Step) []cmdutil.EvalOption {
-			// Container has its own env, skip local expansion
-			return []cmdutil.EvalOption{cmdutil.WithoutExpandEnv()}
-		},
+		// Docker expands env vars locally before passing to container
+		// No special eval options needed (use default behavior)
 	}
 	executor.RegisterExecutor("docker", newDocker, nil, caps)
 	executor.RegisterExecutor("container", newDocker, nil, caps)

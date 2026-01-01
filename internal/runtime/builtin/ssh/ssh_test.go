@@ -234,7 +234,6 @@ func TestSSHExecutor_DAGLevelShell(t *testing.T) {
 	sshExec, ok := exec.(*sshExecutor)
 	require.True(t, ok)
 	assert.Equal(t, "/bin/bash", sshExec.shell)
-	assert.Equal(t, "/bin/bash", sshExec.getEffectiveShell())
 }
 
 func TestSSHExecutor_StepLevelShellOverridesDAGLevel(t *testing.T) {

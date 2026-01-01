@@ -124,14 +124,10 @@ func (e *sshExecutor) Run(ctx context.Context) error {
 	return nil
 }
 
-func (e *sshExecutor) getEffectiveShell() string {
-	return e.shell
-}
-
 // buildCommand constructs the command string for SSH execution.
 // Uses shared cmdutil functions for shell command building.
 func (e *sshExecutor) buildCommand(cmdEntry core.CommandEntry) string {
-	shell := e.getEffectiveShell()
+	shell := e.shell
 
 	if shell == "" {
 		// No shell - direct execution, quote command and args for SSH transport

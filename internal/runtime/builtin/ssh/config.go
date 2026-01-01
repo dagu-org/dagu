@@ -19,7 +19,7 @@ type Config struct {
 	Shell         string // Shell for remote command execution (e.g., "/bin/bash")
 }
 
-func FromMapConfig(ctx context.Context, mapCfg map[string]any) (*Client, error) {
+func FromMapConfig(_ context.Context, mapCfg map[string]any) (*Client, error) {
 	def := new(struct {
 		User          string
 		IP            string
