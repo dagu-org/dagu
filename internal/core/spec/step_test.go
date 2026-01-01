@@ -30,9 +30,9 @@ func TestMain(m *testing.M) {
 			Command: true, MultipleCommands: true, Container: true,
 		})
 	}
-	// SSH: supports command and multiple commands only
+	// SSH: supports command, multiple commands, and shell
 	core.RegisterExecutorCapabilities("ssh", core.ExecutorCapabilities{
-		Command: true, MultipleCommands: true,
+		Command: true, MultipleCommands: true, Shell: true,
 	})
 	// jq and http: support command and script
 	core.RegisterExecutorCapabilities("jq", core.ExecutorCapabilities{Command: true, Script: true})
@@ -2177,7 +2177,7 @@ func TestValidateShell(t *testing.T) {
 			name:         "ShellWithSSHExecutor",
 			executorType: "ssh",
 			shell:        "/bin/bash",
-			wantErr:      true, // SSH doesn't use step.Shell field
+			wantErr:      false, // SSH now supports step.Shell field
 		},
 		// Executors that do not support shell
 		{

@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
-	"path/filepath"
 	"slices"
+
+	"github.com/dagu-org/dagu/internal/common/cmdutil"
 )
 
 // unixShell handles standard Unix shells (sh, bash, zsh, etc.).
@@ -40,7 +41,7 @@ func (s *unixShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.Cm
 		args := cloneArgs(b.Shell[1:])
 		args = append(args, b.Args...)
 		// Add errexit flag for Unix-like shells (unless user specified shell)
-		if !b.UserSpecifiedShell && isUnixLikeShell(cmd) && !slices.Contains(args, "-e") {
+		if !b.UserSpecifiedShell && cmdutil.IsUnixLikeShell(cmd) && !slices.Contains(args, "-e") {
 			args = append(args, "-e")
 		}
 		args = append(args, b.Script)
@@ -51,7 +52,7 @@ func (s *unixShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.Cm
 	args := cloneArgs(b.Shell[1:])
 
 	// Add errexit flag for Unix-like shells (unless user specified shell)
-	if !b.UserSpecifiedShell && isUnixLikeShell(cmd) && !slices.Contains(args, "-e") {
+	if !b.UserSpecifiedShell && cmdutil.IsUnixLikeShell(cmd) && !slices.Contains(args, "-e") {
 		args = append(args, "-e")
 	}
 
@@ -65,25 +66,6 @@ func (s *unixShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.Cm
 	args = append(args, b.ShellCommandArgs)
 
 	return exec.CommandContext(ctx, cmd, args...), nil // nolint: gosec
-}
-
-// isUnixLikeShell reports whether the named shell is known to support the -e (errexit) flag.
-// It returns true for "sh", "bash", "zsh", "ksh", "ash", and "dash"; returns false for "fish", an empty string, or any unrecognized shell.
-func isUnixLikeShell(shell string) bool {
-	if shell == "" {
-		return false
-	}
-
-	name := filepath.Base(shell)
-	switch name {
-	case "sh", "bash", "zsh", "ksh", "ash", "dash":
-		return true
-	case "fish":
-		// Fish shell doesn't support -e flag
-		return false
-	default:
-		return false
-	}
 }
 
 // cloneArgs returns a shallow copy of the provided args slice so callers can modify the result without mutating the original.

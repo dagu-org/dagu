@@ -16,6 +16,7 @@ type Config struct {
 	Password      string
 	StrictHostKey bool   // Enable strict host key checking (defaults to true)
 	KnownHostFile string // Path to known_hosts file (defaults to ~/.ssh/known_hosts)
+	Shell         string // Shell for remote command execution (e.g., "/bin/bash")
 }
 
 func FromMapConfig(ctx context.Context, mapCfg map[string]any) (*Client, error) {
@@ -28,6 +29,7 @@ func FromMapConfig(ctx context.Context, mapCfg map[string]any) (*Client, error) 
 		Password      string
 		StrictHostKey bool
 		KnownHostFile string
+		Shell         string
 	})
 	md, err := mapstructure.NewDecoder(
 		&mapstructure.DecoderConfig{Result: def, WeaklyTypedInput: true},
@@ -56,6 +58,7 @@ func FromMapConfig(ctx context.Context, mapCfg map[string]any) (*Client, error) 
 		Password:      def.Password,
 		StrictHostKey: def.StrictHostKey,
 		KnownHostFile: def.KnownHostFile,
+		Shell:         def.Shell,
 	}
 
 	return NewClient(cfg)

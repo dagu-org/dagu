@@ -34,19 +34,26 @@ func getSSHClientFromContext(ctx context.Context) *Client {
 }
 
 type sshExecutor struct {
-	mu      sync.Mutex
-	step    core.Step
-	client  *Client
-	stdout  io.Writer
-	stderr  io.Writer
-	session *ssh.Session
+	mu          sync.Mutex
+	step        core.Step
+	client      *Client
+	stdout      io.Writer
+	stderr      io.Writer
+	session     *ssh.Session
+	configShell string // Shell from SSH executor config
 }
 
 func NewSSHExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
 	var client *Client
+	var configShell string
 
 	// Prefer step-level SSH configuration if present
 	if len(step.ExecutorConfig.Config) > 0 {
+		// Extract shell from config before creating client
+		if shell, ok := step.ExecutorConfig.Config["shell"].(string); ok {
+			configShell = shell
+		}
+
 		c, err := FromMapConfig(ctx, step.ExecutorConfig.Config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to setup ssh executor")
@@ -62,10 +69,11 @@ func NewSSHExecutor(ctx context.Context, step core.Step) (executor.Executor, err
 	}
 
 	return &sshExecutor{
-		step:   step,
-		client: client,
-		stdout: os.Stdout,
-		stderr: os.Stderr,
+		step:        step,
+		client:      client,
+		configShell: configShell,
+		stdout:      os.Stdout,
+		stderr:      os.Stderr,
 	}, nil
 }
 
@@ -112,6 +120,39 @@ func (e *sshExecutor) Run(ctx context.Context) error {
 	return nil
 }
 
+// getEffectiveShell returns the shell and args to use for command execution.
+// Priority: step.Shell > config.shell > empty (direct execution)
+func (e *sshExecutor) getEffectiveShell() (string, []string) {
+	// Step-level shell takes highest priority
+	if e.step.Shell != "" {
+		return e.step.Shell, e.step.ShellArgs
+	}
+	// Config-level shell
+	if e.configShell != "" {
+		return e.configShell, nil
+	}
+	// No shell - direct execution
+	return "", nil
+}
+
+// buildCommand constructs the command string for SSH execution.
+// Uses shared cmdutil functions for shell command building.
+func (e *sshExecutor) buildCommand(cmdEntry core.CommandEntry) string {
+	// Build base command with proper quoting
+	baseCommand := cmdutil.ShellQuote(cmdEntry.Command)
+	if len(cmdEntry.Args) > 0 {
+		baseCommand += " " + cmdutil.ShellQuoteArgs(cmdEntry.Args)
+	}
+
+	shell, shellArgs := e.getEffectiveShell()
+	if shell == "" {
+		return baseCommand
+	}
+
+	// Use shared utility for shell command building
+	return cmdutil.BuildShellCommandString(shell, shellArgs, baseCommand)
+}
+
 // runCommand executes a single command with context cancellation support.
 // Since session.Run() blocks without context awareness, we run it in a goroutine
 // and select on both completion and context cancellation for responsiveness.
@@ -128,10 +169,8 @@ func (e *sshExecutor) runCommand(ctx context.Context, index int, cmdEntry core.C
 	session.Stdout = e.stdout
 	session.Stderr = e.stderr
 
-	command := cmdutil.ShellQuote(cmdEntry.Command)
-	if len(cmdEntry.Args) > 0 {
-		command += " " + cmdutil.ShellQuoteArgs(cmdEntry.Args)
-	}
+	// Build command with shell wrapping if configured
+	command := e.buildCommand(cmdEntry)
 
 	// Run command in goroutine to enable context cancellation
 	done := make(chan error, 1)
@@ -166,6 +205,7 @@ func init() {
 	caps := core.ExecutorCapabilities{
 		Command:          true,
 		MultipleCommands: true,
+		Shell:            true,
 	}
 	executor.RegisterExecutor("ssh", NewSSHExecutor, nil, caps)
 }

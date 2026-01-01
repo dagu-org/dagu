@@ -441,7 +441,13 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 			evalOptions = append(evalOptions, cmdutil.WithoutExpandEnv())
 		}
 	case "ssh":
-		evalOptions = append(evalOptions, cmdutil.WithoutExpandShell())
+		// Only disable shell expansion if no shell is configured
+		// This allows environment variables to be expanded by the remote shell
+		step := n.Step()
+		configShell, _ := step.ExecutorConfig.Config["shell"].(string)
+		if step.Shell == "" && configShell == "" {
+			evalOptions = append(evalOptions, cmdutil.WithoutExpandShell())
+		}
 	case "docker", "container":
 		evalOptions = append(evalOptions, cmdutil.WithoutExpandEnv())
 	}

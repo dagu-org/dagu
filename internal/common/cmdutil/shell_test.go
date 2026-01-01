@@ -263,3 +263,244 @@ func TestShellQuote_RoundTrip(t *testing.T) {
 		assert.True(t, len(quoted) >= len(chars))
 	}
 }
+
+func TestIsUnixLikeShell(t *testing.T) {
+	tests := []struct {
+		shell    string
+		expected bool
+	}{
+		{"/bin/bash", true},
+		{"/bin/sh", true},
+		{"/usr/bin/zsh", true},
+		{"bash", true},
+		{"sh", true},
+		{"zsh", true},
+		{"ksh", true},
+		{"ash", true},
+		{"dash", true},
+		{"/bin/fish", false},
+		{"fish", false},
+		{"powershell", false},
+		{"powershell.exe", false},
+		{"pwsh", false},
+		{"cmd.exe", false},
+		{"cmd", false},
+		{"nix-shell", false},
+		{"", false},
+		{"/usr/local/bin/bash", true},
+		{"C:\\Program Files\\Git\\bin\\bash.exe", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.shell, func(t *testing.T) {
+			assert.Equal(t, tt.expected, IsUnixLikeShell(tt.shell))
+		})
+	}
+}
+
+func TestIsPowerShell(t *testing.T) {
+	tests := []struct {
+		shell    string
+		expected bool
+	}{
+		{"powershell", true},
+		{"powershell.exe", true},
+		{"pwsh", true},
+		{"pwsh.exe", true},
+		{"/usr/bin/pwsh", true},
+		{"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", true},
+		{"bash", false},
+		{"sh", false},
+		{"cmd.exe", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.shell, func(t *testing.T) {
+			assert.Equal(t, tt.expected, IsPowerShell(tt.shell))
+		})
+	}
+}
+
+func TestIsCmdShell(t *testing.T) {
+	tests := []struct {
+		shell    string
+		expected bool
+	}{
+		{"cmd", true},
+		{"cmd.exe", true},
+		{"C:\\Windows\\System32\\cmd.exe", true},
+		{"bash", false},
+		{"powershell", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.shell, func(t *testing.T) {
+			assert.Equal(t, tt.expected, IsCmdShell(tt.shell))
+		})
+	}
+}
+
+func TestIsNixShell(t *testing.T) {
+	tests := []struct {
+		shell    string
+		expected bool
+	}{
+		{"nix-shell", true},
+		{"/run/current-system/sw/bin/nix-shell", true},
+		{"bash", false},
+		{"sh", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.shell, func(t *testing.T) {
+			assert.Equal(t, tt.expected, IsNixShell(tt.shell))
+		})
+	}
+}
+
+func TestShellCommandFlag(t *testing.T) {
+	tests := []struct {
+		shell    string
+		expected string
+	}{
+		{"/bin/bash", "-c"},
+		{"/bin/sh", "-c"},
+		{"bash", "-c"},
+		{"zsh", "-c"},
+		{"powershell", "-Command"},
+		{"powershell.exe", "-Command"},
+		{"pwsh", "-Command"},
+		{"cmd.exe", "/c"},
+		{"cmd", "/c"},
+		{"nix-shell", "--run"},
+		{"unknown-shell", "-c"}, // Default to Unix-style
+		{"", "-c"},
+		{"fish", "-c"}, // fish falls through to default
+	}
+	for _, tt := range tests {
+		t.Run(tt.shell, func(t *testing.T) {
+			assert.Equal(t, tt.expected, ShellCommandFlag(tt.shell))
+		})
+	}
+}
+
+func TestBuildShellCommandString(t *testing.T) {
+	tests := []struct {
+		name     string
+		shell    string
+		args     []string
+		command  string
+		expected string
+	}{
+		{
+			name:     "BashNoArgs",
+			shell:    "/bin/bash",
+			args:     nil,
+			command:  "echo hello",
+			expected: "/bin/bash -c 'echo hello'",
+		},
+		{
+			name:     "BashWithArgs",
+			shell:    "/bin/bash",
+			args:     []string{"-e"},
+			command:  "echo hello",
+			expected: "/bin/bash -e -c 'echo hello'",
+		},
+		{
+			name:     "BashWithCFlagAlreadyPresent",
+			shell:    "/bin/bash",
+			args:     []string{"-c"},
+			command:  "echo hello",
+			expected: "/bin/bash -c 'echo hello'",
+		},
+		{
+			name:     "PowerShell",
+			shell:    "powershell",
+			args:     nil,
+			command:  "Write-Host hello",
+			expected: "powershell -Command 'Write-Host hello'",
+		},
+		{
+			name:     "CmdExe",
+			shell:    "cmd.exe",
+			args:     nil,
+			command:  "echo hello",
+			expected: "cmd.exe /c 'echo hello'",
+		},
+		{
+			name:     "NixShell",
+			shell:    "nix-shell",
+			args:     nil,
+			command:  "echo hello",
+			expected: "nix-shell --run 'echo hello'",
+		},
+		{
+			name:     "CommandWithQuotes",
+			shell:    "/bin/bash",
+			args:     nil,
+			command:  "echo 'hello world'",
+			expected: "/bin/bash -c 'echo '\\''hello world'\\'''",
+		},
+		{
+			name:     "EmptyShell",
+			shell:    "",
+			args:     nil,
+			command:  "echo hello",
+			expected: "echo hello",
+		},
+		{
+			name:     "SimpleCommand",
+			shell:    "/bin/sh",
+			args:     nil,
+			command:  "ls",
+			expected: "/bin/sh -c ls",
+		},
+		{
+			name:     "ShellWithMultipleArgs",
+			shell:    "/bin/bash",
+			args:     []string{"-e", "-x"},
+			command:  "echo test",
+			expected: "/bin/bash -e -x -c 'echo test'",
+		},
+		{
+			name:     "CommandWithPipe",
+			shell:    "/bin/bash",
+			args:     nil,
+			command:  "echo hello | grep h",
+			expected: "/bin/bash -c 'echo hello | grep h'",
+		},
+		{
+			name:     "CommandWithDollarVar",
+			shell:    "/bin/sh",
+			args:     nil,
+			command:  "echo $HOME",
+			expected: "/bin/sh -c 'echo $HOME'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := BuildShellCommandString(tt.shell, tt.args, tt.command)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestSliceContains(t *testing.T) {
+	tests := []struct {
+		name     string
+		slice    []string
+		s        string
+		expected bool
+	}{
+		{"Found", []string{"a", "b", "c"}, "b", true},
+		{"NotFound", []string{"a", "b", "c"}, "d", false},
+		{"EmptySlice", []string{}, "a", false},
+		{"EmptyString", []string{"a", "b", ""}, "", true},
+		{"CaseSensitive", []string{"A", "B", "C"}, "a", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, sliceContains(tt.slice, tt.s))
+		})
+	}
+}
