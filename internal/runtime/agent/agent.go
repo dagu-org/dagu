@@ -765,7 +765,11 @@ func (a *Agent) PrintSummary(ctx context.Context) {
 
 	renderer := output.NewRenderer(config)
 	summary := renderer.RenderDAGStatus(dag, &status)
-	println(summary)
+
+	// Write to stdout and sync to ensure output is flushed before program exit
+	_, _ = os.Stdout.WriteString(summary)
+	_, _ = os.Stdout.WriteString("\n")
+	_ = os.Stdout.Sync()
 }
 
 // Status collects the current running status of the DAG and returns it.
