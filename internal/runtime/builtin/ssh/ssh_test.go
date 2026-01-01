@@ -322,15 +322,15 @@ func TestSSHExecutor_GetEvalOptions(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name           string
-		step           core.Step
-		dagShell       string
+		name            string
+		step            core.Step
+		dagShell        string
 		expectSkipShell bool
 	}{
 		{
 			name: "StepShellSet",
 			step: core.Step{
-				Shell: "/bin/bash",
+				Shell:          "/bin/bash",
 				ExecutorConfig: core.ExecutorConfig{Type: "ssh"},
 			},
 			expectSkipShell: false,
