@@ -39,11 +39,11 @@ func TestRenderDAGStatus_BasicSuccess(t *testing.T) {
 	if !strings.Contains(output, "step1") {
 		t.Error("Output should contain step name")
 	}
-	if !strings.Contains(output, "✓") {
-		t.Error("Output should contain success symbol")
+	if !strings.Contains(output, "[passed]") {
+		t.Error("Output should contain passed label")
 	}
-	if !strings.Contains(output, "Result: Success") {
-		t.Error("Output should contain success result")
+	if !strings.Contains(output, "Result: Passed") {
+		t.Error("Output should contain passed result")
 	}
 }
 
@@ -94,8 +94,8 @@ func TestRenderDAGStatus_FailedStep(t *testing.T) {
 	renderer := NewRenderer(config)
 	output := renderer.RenderDAGStatus(dag, status)
 
-	if !strings.Contains(output, "✗") {
-		t.Error("Output should contain failure symbol")
+	if !strings.Contains(output, "[failed]") {
+		t.Error("Output should contain failed label")
 	}
 	if !strings.Contains(output, "error:") {
 		t.Error("Output should contain error label")
@@ -185,8 +185,8 @@ func TestRenderDAGStatus_RunningStatus(t *testing.T) {
 	renderer := NewRenderer(config)
 	output := renderer.RenderDAGStatus(dag, status)
 
-	if !strings.Contains(output, "●") {
-		t.Error("Output should contain running symbol")
+	if !strings.Contains(output, "[running]") {
+		t.Error("Output should contain running label")
 	}
 	if !strings.Contains(output, "Running") {
 		t.Error("Output should contain Running status")
@@ -231,11 +231,11 @@ func TestRenderDAGStatus_AbortedStatus(t *testing.T) {
 	renderer := NewRenderer(config)
 	output := renderer.RenderDAGStatus(dag, status)
 
-	if !strings.Contains(output, "⚠") {
-		t.Error("Output should contain aborted symbol")
+	if !strings.Contains(output, "[canceled]") {
+		t.Error("Output should contain canceled label")
 	}
-	if !strings.Contains(output, "Aborted") {
-		t.Error("Output should contain Aborted status")
+	if !strings.Contains(output, "Canceled") {
+		t.Error("Output should contain Canceled result")
 	}
 }
 
@@ -254,8 +254,8 @@ func TestRenderDAGStatus_AbortedStatusWithColors(t *testing.T) {
 	renderer := NewRenderer(config)
 	output := renderer.RenderDAGStatus(dag, status)
 
-	if !strings.Contains(output, "Aborted") {
-		t.Error("Output should contain Aborted status")
+	if !strings.Contains(output, "Canceled") {
+		t.Error("Output should contain Canceled result")
 	}
 }
 
@@ -276,11 +276,11 @@ func TestRenderDAGStatus_PartiallySucceededStatus(t *testing.T) {
 	renderer := NewRenderer(config)
 	output := renderer.RenderDAGStatus(dag, status)
 
-	if !strings.Contains(output, "◐") {
-		t.Error("Output should contain partial success symbol")
+	if !strings.Contains(output, "[partial]") {
+		t.Error("Output should contain partial label")
 	}
-	if !strings.Contains(output, "Partially Succeeded") {
-		t.Error("Output should contain Partially Succeeded status")
+	if !strings.Contains(output, "Result: Partial") {
+		t.Error("Output should contain Partial result")
 	}
 }
 
@@ -299,8 +299,8 @@ func TestRenderDAGStatus_PartiallySucceededStatusWithColors(t *testing.T) {
 	renderer := NewRenderer(config)
 	output := renderer.RenderDAGStatus(dag, status)
 
-	if !strings.Contains(output, "Partially Succeeded") {
-		t.Error("Output should contain Partially Succeeded status")
+	if !strings.Contains(output, "Partial") {
+		t.Error("Output should contain Partial result")
 	}
 }
 
@@ -395,8 +395,8 @@ func TestRenderDAGStatus_SkippedStep(t *testing.T) {
 	renderer := NewRenderer(config)
 	output := renderer.RenderDAGStatus(dag, status)
 
-	if !strings.Contains(output, "○") {
-		t.Error("Output should contain skipped symbol")
+	if !strings.Contains(output, "[skipped]") {
+		t.Error("Output should contain skipped label")
 	}
 }
 
@@ -1099,8 +1099,8 @@ func TestRenderDAGStatus_TreeStructure(t *testing.T) {
 	status := &execution.DAGRunStatus{
 		Status: core.Succeeded,
 		Nodes: []*execution.Node{
-			{Step: core.Step{Name: "first"}, Status: core.NodeSucceeded},
-			{Step: core.Step{Name: "last"}, Status: core.NodeSucceeded},
+			{Step: core.Step{Name: "first_step"}, Status: core.NodeSucceeded},
+			{Step: core.Step{Name: "last_step"}, Status: core.NodeSucceeded},
 		},
 	}
 
@@ -1112,28 +1112,12 @@ func TestRenderDAGStatus_TreeStructure(t *testing.T) {
 	renderer := NewRenderer(config)
 	output := renderer.RenderDAGStatus(dag, status)
 
-	lines := strings.Split(output, "\n")
-
-	// Find step lines
-	var stepLines []string
-	for _, line := range lines {
-		if strings.Contains(line, "step:") {
-			stepLines = append(stepLines, line)
-		}
+	// Check that tree structure is correct
+	if !strings.Contains(output, "├─first_step") {
+		t.Errorf("First step should use branch character '├─', got output:\n%s", output)
 	}
-
-	if len(stepLines) != 2 {
-		t.Fatalf("Expected 2 step lines, got %d", len(stepLines))
-	}
-
-	// First step should use ├─
-	if !strings.Contains(stepLines[0], "├─") {
-		t.Errorf("First step should use branch character '├─', got: %s", stepLines[0])
-	}
-
-	// Last step should use └─
-	if !strings.Contains(stepLines[1], "└─") {
-		t.Errorf("Last step should use last branch character '└─', got: %s", stepLines[1])
+	if !strings.Contains(output, "└─last_step") {
+		t.Errorf("Last step should use last branch character '└─', got output:\n%s", output)
 	}
 }
 
@@ -1566,5 +1550,161 @@ func TestRenderDAGStatus_RunningNodeCalculatesDuration(t *testing.T) {
 	// Duration should be present
 	if !strings.Contains(output, "(") {
 		t.Error("Output should contain duration for running step")
+	}
+}
+
+func TestCleanLogLine_CarriageReturn(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{
+			name:     "no carriage return",
+			input:    "hello world",
+			expected: []string{"hello world"},
+		},
+		{
+			name:     "single carriage return",
+			input:    "first\rsecond",
+			expected: []string{"second"},
+		},
+		{
+			name:     "multiple carriage returns",
+			input:    "a\rb\rc\rd",
+			expected: []string{"d"},
+		},
+		{
+			name:     "curl progress bar",
+			input:    "  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r100   123  100   123    0     0   1000      0 --:--:-- --:--:-- --:--:--  1000",
+			expected: []string{"100   123  100   123    0     0   1000      0 --:--:-- --:--:-- --:--:--  1000"},
+		},
+		{
+			name:     "empty after carriage return",
+			input:    "something\r",
+			expected: []string{"something"},
+		},
+		{
+			name:     "all empty segments",
+			input:    "\r\r\r",
+			expected: nil,
+		},
+		{
+			name:     "empty line",
+			input:    "",
+			expected: nil,
+		},
+		{
+			name:     "whitespace only",
+			input:    "   ",
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := cleanLogLine(tt.input)
+			if len(got) != len(tt.expected) {
+				t.Errorf("cleanLogLine(%q) len = %d, want %d", tt.input, len(got), len(tt.expected))
+				return
+			}
+			for i := range got {
+				if got[i] != tt.expected[i] {
+					t.Errorf("cleanLogLine(%q)[%d] = %q, want %q", tt.input, i, got[i], tt.expected[i])
+				}
+			}
+		})
+	}
+}
+
+func TestCleanControlChars(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"normal text", "hello world", "hello world"},
+		{"with tab", "hello\tworld", "hello\tworld"},
+		{"with bell char", "hello\x07world", "helloworld"},
+		{"with escape", "hello\x1bworld", "helloworld"},
+		{"with backspace", "hello\x08world", "helloworld"},
+		{"empty", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := cleanControlChars(tt.input)
+			if got != tt.expected {
+				t.Errorf("cleanControlChars(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestCleanErrorMessage(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "no stderr tail",
+			input:    "command failed: exit status 1",
+			expected: "command failed: exit status 1",
+		},
+		{
+			name:     "with stderr tail newline prefix",
+			input:    "command failed: exit status 1\nrecent stderr (tail):\nsome error output",
+			expected: "command failed: exit status 1",
+		},
+		{
+			name:     "with stderr tail no newline prefix",
+			input:    "failed to execute: exit status 56recent stderr (tail):\nerror details",
+			expected: "failed to execute: exit status 56",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := cleanErrorMessage(tt.input)
+			if got != tt.expected {
+				t.Errorf("cleanErrorMessage() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestReadLogFileTail_WithCarriageReturns(t *testing.T) {
+	// Create a temporary file with curl-like progress output
+	tmpfile, err := os.CreateTemp("", "test-curl-*.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpfile.Name())
+
+	// Write curl-like progress output
+	_, _ = tmpfile.WriteString("  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r100   123  100   123    0     0   1000      0 --:--:-- --:--:-- --:--:--  1000\n")
+	_, _ = tmpfile.WriteString("Downloaded file.txt\n")
+	tmpfile.Close()
+
+	lines, truncated, err := ReadLogFileTail(tmpfile.Name(), 0)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if truncated != 0 {
+		t.Errorf("Expected 0 truncated, got %d", truncated)
+	}
+	// Should have cleaned up the progress line
+	if len(lines) != 2 {
+		t.Errorf("Expected 2 lines, got %d: %v", len(lines), lines)
+	}
+	// First line should be the final progress state (after \r)
+	if len(lines) > 0 && !strings.Contains(lines[0], "100") {
+		t.Errorf("First line should contain '100' (final progress), got: %s", lines[0])
 	}
 }

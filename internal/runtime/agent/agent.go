@@ -29,6 +29,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/telemetry"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/output"
 	"github.com/dagu-org/dagu/internal/runtime"
 	runtime1 "github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/docker"
@@ -753,8 +754,26 @@ func (a *Agent) buildOutputs(ctx context.Context, finalStatus core.Status) *exec
 func (a *Agent) PrintSummary(ctx context.Context) {
 	// Always print tree-structured summary after execution
 	status := a.Status(ctx)
-	summary := a.reporter.getSummary(ctx, status, a.lastErr)
+
+	// Create a minimal DAG object for the tree renderer
+	dag := &core.DAG{Name: status.Name}
+
+	// Enable colors if stdout is a terminal
+	config := output.DefaultConfig()
+	config.ColorEnabled = isStdoutTerminal()
+
+	renderer := output.NewRenderer(config)
+	summary := renderer.RenderDAGStatus(dag, &status)
 	println(summary)
+}
+
+// isStdoutTerminal returns true if stdout is a terminal
+func isStdoutTerminal() bool {
+	fi, err := os.Stdout.Stat()
+	if err != nil {
+		return false
+	}
+	return (fi.Mode() & os.ModeCharDevice) != 0
 }
 
 // Status collects the current running status of the DAG and returns it.

@@ -8,7 +8,6 @@ import (
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/fatih/color"
 )
 
 // Tree drawing characters using Unicode box-drawing characters.
@@ -22,6 +21,9 @@ const (
 // DefaultMaxOutputLines is the default number of lines to show for stdout/stderr.
 // Only the last N lines are shown (tail) when output exceeds this limit.
 const DefaultMaxOutputLines = 50
+
+// DefaultMaxWidth is the maximum line width before wrapping.
+const DefaultMaxWidth = 80
 
 // Config holds configuration for tree rendering.
 type Config struct {
@@ -38,6 +40,10 @@ type Config struct {
 	// MaxOutputLines limits stdout/stderr to last N lines (tail).
 	// Set to 0 for unlimited output.
 	MaxOutputLines int
+
+	// MaxWidth is the maximum line width before wrapping.
+	// Set to 0 for no wrapping.
+	MaxWidth int
 }
 
 // DefaultConfig returns the default configuration with sensible defaults.
@@ -47,12 +53,28 @@ func DefaultConfig() Config {
 		ShowStdout:     true,
 		ShowStderr:     true,
 		MaxOutputLines: DefaultMaxOutputLines,
+		MaxWidth:       DefaultMaxWidth,
 	}
 }
 
 // Renderer renders DAG execution status as a tree structure.
 type Renderer struct {
 	config Config
+}
+
+// treeLine returns a tree drawing character (white/default color).
+func (r *Renderer) treeLine(s string) string {
+	return s
+}
+
+// text returns text with sepia color if colors are enabled.
+// Uses 256-color palette color 180 (wheat/tan - true sepia tone).
+func (r *Renderer) text(s string) string {
+	if r.config.ColorEnabled {
+		// 38;5;180 = foreground 256-color mode, color 180 (wheat/tan sepia)
+		return fmt.Sprintf("\033[38;5;180m%s\033[0m", s)
+	}
+	return s
 }
 
 // NewRenderer creates a new tree renderer with the given configuration.
@@ -79,16 +101,17 @@ func (r *Renderer) RenderDAGStatus(dag *core.DAG, status *execution.DAGRunStatus
 
 	// Header line: ● Running - 2024-01-15 16:52:58
 	buf.WriteString(r.renderHeader(status))
-	buf.WriteString("\n")
+	buf.WriteString("\n\n")
 
 	// DAG line: dag: my_dag (6s 619ms)
 	buf.WriteString(r.renderDAGLine(dag, status))
-	buf.WriteString("\n")
+	buf.WriteString("\n\n")
 
 	// Render each step as a tree branch
 	for i, node := range status.Nodes {
 		isLast := i == len(status.Nodes)-1
 		buf.WriteString(r.renderStep(node, isLast, ""))
+		buf.WriteString("\n") // Vertical spacing between steps
 	}
 
 	// Final status line
@@ -97,9 +120,9 @@ func (r *Renderer) RenderDAGStatus(dag *core.DAG, status *execution.DAGRunStatus
 	return buf.String()
 }
 
-// renderHeader renders the status header line with symbol, status text, and timestamp.
+// renderHeader renders the status header line with status text and timestamp.
+// White color (default).
 func (r *Renderer) renderHeader(status *execution.DAGRunStatus) string {
-	symbol := StatusSymbol(status.Status)
 	statusText := StatusText(status.Status)
 
 	// Parse start time, fallback to current time if not set
@@ -108,28 +131,18 @@ func (r *Renderer) renderHeader(status *execution.DAGRunStatus) string {
 		startTime = time.Now().Format("2006-01-02 15:04:05")
 	}
 
-	if r.config.ColorEnabled {
-		return fmt.Sprintf("%s %s - %s",
-			StatusColorize(symbol, status.Status),
-			StatusColorize(statusText, status.Status),
-			startTime)
-	}
-	return fmt.Sprintf("%s %s - %s", symbol, statusText, startTime)
+	return fmt.Sprintf("%s - %s", statusText, startTime)
 }
 
 // renderDAGLine renders the DAG name with total duration.
+// White color (default) - root of the tree.
 func (r *Renderer) renderDAGLine(dag *core.DAG, status *execution.DAGRunStatus) string {
 	duration := r.calculateDuration(status.StartedAt, status.FinishedAt, status.Status)
 
-	dagName := dag.Name
-	if r.config.ColorEnabled {
-		dagName = color.CyanString(dag.Name)
-	}
-
 	if duration != "" {
-		return fmt.Sprintf("dag: %s (%s)", dagName, duration)
+		return fmt.Sprintf("dag: %s (%s)", dag.Name, duration)
 	}
-	return fmt.Sprintf("dag: %s", dagName)
+	return fmt.Sprintf("dag: %s", dag.Name)
 }
 
 // renderStep renders a single step with its commands and output content.
@@ -142,42 +155,44 @@ func (r *Renderer) renderStep(node *execution.Node, isLast bool, prefix string) 
 		branch = TreeLastBranch
 	}
 
-	// Calculate step duration
-	duration := r.calculateNodeDuration(node)
+	// Build step line: tree chars faint, text sepia
+	textPart := node.Step.Name
 
-	// Format step name with optional styling
-	stepName := node.Step.Name
-	if r.config.ColorEnabled {
-		stepName = color.New(color.Bold).Sprint(stepName)
-	}
-
-	// Build step line: ├─step: build_files (4s 619ms)
-	stepLine := fmt.Sprintf("%s%sstep: %s", prefix, branch, stepName)
-	if duration != "" {
-		durationStr := duration
-		if r.config.ColorEnabled {
-			durationStr = color.New(color.Faint).Sprintf("(%s)", duration)
-		} else {
-			durationStr = fmt.Sprintf("(%s)", duration)
+	// Add duration for steps that ran
+	if node.Status == core.NodeSucceeded || node.Status == core.NodeFailed ||
+		node.Status == core.NodeRunning || node.Status == core.NodePartiallySucceeded {
+		duration := r.calculateNodeDuration(node)
+		if duration != "" {
+			textPart += fmt.Sprintf(" (%s)", duration)
 		}
-		stepLine += " " + durationStr
 	}
 
-	// Add status icon for completed steps
-	if node.Status != core.NodeRunning && node.Status != core.NodeNotStarted {
-		stepLine += " " + r.formatNodeStatus(node.Status)
+	// Add status label
+	statusLabel := r.getStatusLabel(node.Status)
+	if statusLabel != "" {
+		textPart += " " + statusLabel
 	}
 
-	buf.WriteString(stepLine)
+	buf.WriteString(prefix + r.treeLine(branch) + r.text(textPart))
 	buf.WriteString("\n")
 
-	// Calculate prefix for child elements
+	// For skipped/aborted/not-started steps, don't show details
+	if node.Status == core.NodeSkipped || node.Status == core.NodeAborted || node.Status == core.NodeNotStarted {
+		return buf.String()
+	}
+
+	// Calculate prefix for child elements (tree lines colored)
 	childPrefix := prefix
 	if isLast {
-		childPrefix += TreeSpace
+		childPrefix += r.treeLine(TreeSpace)
 	} else {
-		childPrefix += TreePipe
+		childPrefix += r.treeLine(TreePipe)
 	}
+
+	// Check what child elements we have
+	hasOutput := r.hasOutput(node)
+	hasError := node.Error != "" && node.Status == core.NodeFailed
+	hasSubRuns := len(node.SubRuns) > 0
 
 	// Render commands
 	commands := node.Step.Commands
@@ -187,30 +202,158 @@ func (r *Renderer) renderStep(node *execution.Node, isLast bool, prefix string) 
 		// Handle legacy single command format
 		cmdStr := r.getLegacyCommand(node)
 		if cmdStr != "" {
-			buf.WriteString(r.renderCommand(cmdStr, node, true, childPrefix))
-		} else {
-			// No command, just show stdout/stderr directly under step
-			buf.WriteString(r.renderOutputs(node, childPrefix))
+			isLastChild := !hasOutput && !hasError && !hasSubRuns
+			buf.WriteString(r.renderCommandLine(cmdStr, isLastChild, childPrefix))
 		}
 	} else {
 		// Modern multi-command format
 		for i, cmd := range commands {
-			isLastCmd := i == len(commands)-1
-			buf.WriteString(r.renderCommand(cmd.String(), node, isLastCmd, childPrefix))
+			isLastCmd := i == len(commands)-1 && !hasOutput && !hasError && !hasSubRuns
+			buf.WriteString(r.renderCommandLine(cmd.String(), isLastCmd, childPrefix))
 		}
 	}
 
+	// Render stdout/stderr
+	if hasOutput {
+		isLastOutput := !hasError && !hasSubRuns
+		buf.WriteString(r.renderOutputs(node, isLastOutput, childPrefix))
+	}
+
 	// Render sub-DAG runs if present
-	if len(node.SubRuns) > 0 {
-		buf.WriteString(r.renderSubRuns(node.SubRuns, childPrefix))
+	if hasSubRuns {
+		isLastSubRuns := !hasError
+		buf.WriteString(r.renderSubRuns(node.SubRuns, isLastSubRuns, childPrefix))
 	}
 
 	// Render error message if step failed
-	if node.Error != "" && node.Status == core.NodeFailed {
+	if hasError {
 		buf.WriteString(r.renderError(node.Error, childPrefix))
 	}
 
 	return buf.String()
+}
+
+// getStatusLabel returns a text label for the node status.
+// All labels are plain text - no colors.
+func (r *Renderer) getStatusLabel(status core.NodeStatus) string {
+	switch status {
+	case core.NodeSucceeded:
+		return "[passed]"
+	case core.NodeFailed:
+		return "[failed]"
+	case core.NodeAborted:
+		return "[canceled]"
+	case core.NodeSkipped:
+		return "[skipped]"
+	case core.NodeRunning:
+		return "[running]"
+	case core.NodePartiallySucceeded:
+		return "[partial]"
+	default:
+		return ""
+	}
+}
+
+// hasOutput checks if the node has any stdout or stderr content.
+func (r *Renderer) hasOutput(node *execution.Node) bool {
+	if !r.config.ShowStdout && !r.config.ShowStderr {
+		return false
+	}
+	if r.config.ShowStdout && node.Stdout != "" {
+		lines, _, _ := ReadLogFileTail(node.Stdout, 1)
+		if len(lines) > 0 {
+			return true
+		}
+	}
+	if r.config.ShowStderr && node.Stderr != "" {
+		lines, _, _ := ReadLogFileTail(node.Stderr, 1)
+		if len(lines) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// renderCommandLine renders a single command line with optional wrapping.
+func (r *Renderer) renderCommandLine(cmdStr string, isLast bool, prefix string) string {
+	branch := TreeBranch
+	if isLast {
+		branch = TreeLastBranch
+	}
+
+	// Apply wrapping if configured
+	if r.config.MaxWidth > 0 {
+		prefixLen := len(prefix) + len(branch)
+		maxContentWidth := r.config.MaxWidth - prefixLen
+		if maxContentWidth > 20 && len(cmdStr) > maxContentWidth {
+			return r.renderWrappedLine(cmdStr, branch, isLast, prefix)
+		}
+	}
+
+	// Tree lines faint, text sepia
+	return prefix + r.treeLine(branch) + r.text(cmdStr) + "\n"
+}
+
+// renderWrappedLine renders a line with word wrapping.
+func (r *Renderer) renderWrappedLine(text string, branch string, isLast bool, prefix string) string {
+	var buf strings.Builder
+
+	prefixLen := len(prefix) + len(branch)
+	maxContentWidth := r.config.MaxWidth - prefixLen
+	if maxContentWidth < 20 {
+		maxContentWidth = 20
+	}
+
+	// Calculate continuation prefix (tree lines faint)
+	contPrefix := prefix
+	if isLast {
+		contPrefix += r.treeLine(TreeSpace)
+	} else {
+		contPrefix += r.treeLine(TreePipe)
+	}
+
+	lines := wrapText(text, maxContentWidth)
+	for i, line := range lines {
+		if i == 0 {
+			// First line: tree branch faint, text sepia
+			buf.WriteString(prefix + r.treeLine(branch) + r.text(line) + "\n")
+		} else {
+			// Continuation lines: indented, text sepia
+			buf.WriteString(contPrefix + "  " + r.text(line) + "\n")
+		}
+	}
+
+	return buf.String()
+}
+
+// wrapText wraps text at word boundaries to fit within maxWidth.
+func wrapText(text string, maxWidth int) []string {
+	if len(text) <= maxWidth {
+		return []string{text}
+	}
+
+	var lines []string
+	words := strings.Fields(text)
+	var currentLine strings.Builder
+
+	for _, word := range words {
+		if currentLine.Len() == 0 {
+			currentLine.WriteString(word)
+		} else if currentLine.Len()+1+len(word) <= maxWidth {
+			currentLine.WriteString(" ")
+			currentLine.WriteString(word)
+		} else {
+			lines = append(lines, currentLine.String())
+			currentLine.Reset()
+			currentLine.WriteString(word)
+		}
+	}
+
+	if currentLine.Len() > 0 {
+		lines = append(lines, currentLine.String())
+	}
+
+	return lines
 }
 
 // getLegacyCommand extracts command string from legacy step format.
@@ -228,49 +371,30 @@ func (r *Renderer) getLegacyCommand(node *execution.Node) string {
 	return ""
 }
 
-// renderCommand renders a command line with its stdout/stderr output.
-func (r *Renderer) renderCommand(cmdStr string, node *execution.Node, isLast bool, prefix string) string {
-	var buf strings.Builder
-
-	// Determine if this is the last element (affects branch character)
-	hasOutputs := r.config.ShowStdout || r.config.ShowStderr
-	branch := TreeBranch
-	if isLast && !hasOutputs {
-		branch = TreeLastBranch
-	}
-
-	// Format command string
-	formattedCmd := cmdStr
-	if r.config.ColorEnabled {
-		formattedCmd = color.New(color.FgHiWhite).Sprint(cmdStr)
-	}
-	buf.WriteString(fmt.Sprintf("%s%s%s\n", prefix, branch, formattedCmd))
-
-	// Calculate prefix for output content
-	outputPrefix := prefix
-	if isLast {
-		outputPrefix += TreeSpace
-	} else {
-		outputPrefix += TreePipe
-	}
-
-	// Render stdout and stderr
-	buf.WriteString(r.renderOutputs(node, outputPrefix))
-
-	return buf.String()
-}
-
 // renderOutputs renders stdout and stderr for a node.
-func (r *Renderer) renderOutputs(node *execution.Node, prefix string) string {
+func (r *Renderer) renderOutputs(node *execution.Node, isLast bool, prefix string) string {
 	var buf strings.Builder
 
-	if r.config.ShowStdout {
-		hasStderr := r.config.ShowStderr
-		buf.WriteString(r.renderOutput("stdout", node.Stdout, !hasStderr, prefix))
+	// Check which outputs have content
+	hasStdoutContent := false
+	hasStderrContent := false
+
+	if r.config.ShowStdout && node.Stdout != "" {
+		lines, _, _ := ReadLogFileTail(node.Stdout, 1)
+		hasStdoutContent = len(lines) > 0
+	}
+	if r.config.ShowStderr && node.Stderr != "" {
+		lines, _, _ := ReadLogFileTail(node.Stderr, 1)
+		hasStderrContent = len(lines) > 0
 	}
 
-	if r.config.ShowStderr {
-		buf.WriteString(r.renderOutput("stderr", node.Stderr, true, prefix))
+	if hasStdoutContent {
+		isLastOutput := isLast && !hasStderrContent
+		buf.WriteString(r.renderOutput("stdout", node.Stdout, isLastOutput, prefix))
+	}
+
+	if hasStderrContent {
+		buf.WriteString(r.renderOutput("stderr", node.Stderr, isLast, prefix))
 	}
 
 	return buf.String()
@@ -278,6 +402,14 @@ func (r *Renderer) renderOutputs(node *execution.Node, prefix string) string {
 
 // renderOutput renders a single output stream (stdout or stderr) with content.
 func (r *Renderer) renderOutput(label string, filePath string, isLast bool, prefix string) string {
+	// Read log content with tail limit
+	lines, truncated, err := ReadLogFileTail(filePath, r.config.MaxOutputLines)
+
+	// Skip empty output entirely - don't show empty labels
+	if err != nil || len(lines) == 0 {
+		return ""
+	}
+
 	var buf strings.Builder
 
 	branch := TreeBranch
@@ -285,63 +417,75 @@ func (r *Renderer) renderOutput(label string, filePath string, isLast bool, pref
 		branch = TreeLastBranch
 	}
 
-	// Read log content with tail limit
-	lines, truncated, err := ReadLogFileTail(filePath, r.config.MaxOutputLines)
-
-	// Format label with appropriate color
-	labelStr := label
-	if r.config.ColorEnabled {
-		if label == "stderr" && len(lines) > 0 {
-			labelStr = color.YellowString(label)
-		} else {
-			labelStr = color.New(color.Faint).Sprint(label)
-		}
-	}
-
-	// Handle empty or unreadable output
-	if err != nil || len(lines) == 0 {
-		buf.WriteString(fmt.Sprintf("%s%s%s:\n", prefix, branch, labelStr))
-		return buf.String()
-	}
-
 	// Calculate content prefix for multi-line output
 	contentPrefix := prefix
 	if isLast {
-		contentPrefix += TreeSpace
+		contentPrefix += r.treeLine(TreeSpace)
 	} else {
-		contentPrefix += TreePipe
+		contentPrefix += r.treeLine(TreePipe)
 	}
 
-	// First line with label
-	firstLine := lines[0]
-	buf.WriteString(fmt.Sprintf("%s%s%s: %s\n", prefix, branch, labelStr, firstLine))
+	// Calculate max width for content wrapping
+	contentIndent := len(contentPrefix) + 2 // "  " indent
+	maxContentWidth := r.config.MaxWidth - contentIndent
+	if maxContentWidth < 20 {
+		maxContentWidth = 20
+	}
 
-	// Show truncation indicator if lines were omitted
+	// Helper to write wrapped content lines
+	writeContentLine := func(line string) {
+		trimmedLine := strings.TrimSpace(line)
+		if trimmedLine == "" {
+			return
+		}
+		if len(trimmedLine) > maxContentWidth {
+			// Wrap long lines
+			wrapped := wrapText(trimmedLine, maxContentWidth)
+			for _, wl := range wrapped {
+				buf.WriteString(contentPrefix + "  " + r.text(wl) + "\n")
+			}
+		} else {
+			buf.WriteString(contentPrefix + "  " + r.text(trimmedLine) + "\n")
+		}
+	}
+
+	// Show truncation indicator first if lines were omitted
 	if truncated > 0 {
 		truncMsg := fmt.Sprintf("... (%d more lines)", truncated)
-		if r.config.ColorEnabled {
-			truncMsg = color.New(color.Faint).Sprint(truncMsg)
-		}
-		buf.WriteString(fmt.Sprintf("%s%s\n", contentPrefix, truncMsg))
-	}
+		buf.WriteString(prefix + r.treeLine(branch) + r.text(label+": "+truncMsg) + "\n")
 
-	// Remaining lines with proper indentation to align with first line content
-	labelPadding := strings.Repeat(" ", len(label)+2) // +2 for ": "
-	for i := 1; i < len(lines); i++ {
-		buf.WriteString(fmt.Sprintf("%s%s%s\n", contentPrefix, labelPadding, lines[i]))
+		for _, line := range lines {
+			writeContentLine(line)
+		}
+	} else if len(lines) == 1 {
+		// Single line - show inline with label if short enough
+		trimmed := strings.TrimSpace(lines[0])
+		labelLine := label + ": " + trimmed
+		if len(labelLine) <= maxContentWidth {
+			buf.WriteString(prefix + r.treeLine(branch) + r.text(labelLine) + "\n")
+		} else {
+			buf.WriteString(prefix + r.treeLine(branch) + r.text(label+":") + "\n")
+			writeContentLine(trimmed)
+		}
+	} else {
+		// Multiple lines - show label on its own line, then content
+		buf.WriteString(prefix + r.treeLine(branch) + r.text(label+":") + "\n")
+		for _, line := range lines {
+			writeContentLine(line)
+		}
 	}
 
 	return buf.String()
 }
 
 // renderSubRuns renders references to sub-DAG runs.
-func (r *Renderer) renderSubRuns(subRuns []execution.SubDAGRun, prefix string) string {
+func (r *Renderer) renderSubRuns(subRuns []execution.SubDAGRun, isLastSection bool, prefix string) string {
 	var buf strings.Builder
 
 	for i, sub := range subRuns {
-		isLast := i == len(subRuns)-1
+		isLastItem := i == len(subRuns)-1
 		branch := TreeBranch
-		if isLast {
+		if isLastItem && isLastSection {
 			branch = TreeLastBranch
 		}
 
@@ -350,65 +494,76 @@ func (r *Renderer) renderSubRuns(subRuns []execution.SubDAGRun, prefix string) s
 			subInfo += fmt.Sprintf(" [%s]", sub.Params)
 		}
 
-		if r.config.ColorEnabled {
-			subInfo = color.New(color.Faint).Sprint(subInfo)
-		}
-
-		buf.WriteString(fmt.Sprintf("%s%s%s\n", prefix, branch, subInfo))
+		// Tree lines faint, text sepia
+		buf.WriteString(prefix + r.treeLine(branch) + r.text(subInfo) + "\n")
 	}
 
 	return buf.String()
 }
 
-// renderError renders an error message in red.
+// renderError renders an error message with wrapping.
 func (r *Renderer) renderError(errMsg string, prefix string) string {
-	errStr := fmt.Sprintf("error: %s", errMsg)
-	if r.config.ColorEnabled {
-		errStr = color.RedString(errStr)
+	// Clean the error message - remove "recent stderr (tail):" section
+	// since we already display stderr separately in the tree
+	cleanedErr := cleanErrorMessage(errMsg)
+
+	errStr := fmt.Sprintf("error: %s", cleanedErr)
+
+	// Calculate max width for wrapping
+	prefixLen := len(prefix) + len(TreeLastBranch)
+	maxWidth := r.config.MaxWidth - prefixLen
+	if maxWidth < 20 {
+		maxWidth = 20
 	}
-	return fmt.Sprintf("%s%s%s\n", prefix, TreeLastBranch, errStr)
+
+	if len(errStr) <= maxWidth {
+		return prefix + r.treeLine(TreeLastBranch) + r.text(errStr) + "\n"
+	}
+
+	// Wrap long error messages
+	var buf strings.Builder
+	wrapped := wrapText(errStr, maxWidth)
+	// Continuation aligns with text after "└─" (add spaces to match visual width)
+	contPrefix := prefix + "   "
+	for i, line := range wrapped {
+		if i == 0 {
+			buf.WriteString(prefix + r.treeLine(TreeLastBranch) + r.text(line) + "\n")
+		} else {
+			buf.WriteString(contPrefix + r.text(line) + "\n")
+		}
+	}
+	return buf.String()
+}
+
+// cleanErrorMessage removes the "recent stderr (tail):" section from error messages
+// since stderr is already displayed separately in the tree output.
+func cleanErrorMessage(errMsg string) string {
+	// Find and remove the "recent stderr (tail):" section
+	if idx := strings.Index(errMsg, "\nrecent stderr (tail):"); idx != -1 {
+		return strings.TrimSpace(errMsg[:idx])
+	}
+	if idx := strings.Index(errMsg, "recent stderr (tail):"); idx != -1 {
+		return strings.TrimSpace(errMsg[:idx])
+	}
+	return errMsg
 }
 
 // renderFinalStatus renders the final result line at the bottom of the tree.
+// White color (default).
 func (r *Renderer) renderFinalStatus(status *execution.DAGRunStatus) string {
 	var result string
 
 	switch status.Status {
 	case core.Succeeded:
-		result = "Result: Success"
-		if r.config.ColorEnabled {
-			result = color.GreenString("✓ ") + color.GreenString(result)
-		} else {
-			result = "✓ " + result
-		}
+		result = "Result: Passed"
 	case core.Failed:
 		result = "Result: Failed"
-		if r.config.ColorEnabled {
-			result = color.RedString("✗ ") + color.RedString(result)
-		} else {
-			result = "✗ " + result
-		}
 	case core.Running:
-		result = "Status: Running..."
-		if r.config.ColorEnabled {
-			result = color.New(color.FgHiGreen).Sprint("● ") + result
-		} else {
-			result = "● " + result
-		}
+		result = "Status: Running"
 	case core.Aborted:
-		result = "Result: Aborted"
-		if r.config.ColorEnabled {
-			result = color.YellowString("⚠ ") + color.YellowString(result)
-		} else {
-			result = "⚠ " + result
-		}
+		result = "Result: Canceled"
 	case core.PartiallySucceeded:
-		result = "Result: Partially Succeeded"
-		if r.config.ColorEnabled {
-			result = color.YellowString("◐ ") + color.YellowString(result)
-		} else {
-			result = "◐ " + result
-		}
+		result = "Result: Partial"
 	default:
 		result = fmt.Sprintf("Status: %s", status.Status.String())
 	}

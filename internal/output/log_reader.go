@@ -3,6 +3,8 @@ package output
 import (
 	"bufio"
 	"os"
+	"strings"
+	"unicode"
 )
 
 // maxScannerBuffer is the maximum buffer size for reading log lines.
@@ -43,9 +45,21 @@ func ReadLogFileTail(path string, maxLines int) ([]string, int, error) {
 	buf := make([]byte, maxScannerBuffer)
 	scanner.Buffer(buf, maxScannerBuffer)
 
+	isFirstLine := true
 	for scanner.Scan() {
 		line := scanner.Text()
-		allLines = append(allLines, line)
+
+		// Check for binary content in first line BEFORE cleaning
+		if isFirstLine {
+			if isBinaryContent([]byte(line)) {
+				return []string{"(binary data)"}, 0, nil
+			}
+			isFirstLine = false
+		}
+
+		// Clean control characters and handle carriage returns (progress bars)
+		cleanedLines := cleanLogLine(line)
+		allLines = append(allLines, cleanedLines...)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -58,11 +72,6 @@ func ReadLogFileTail(path string, maxLines int) ([]string, int, error) {
 	// Handle empty file
 	if len(allLines) == 0 {
 		return nil, 0, nil
-	}
-
-	// Check for binary content in first line
-	if isBinaryContent([]byte(allLines[0])) {
-		return []string{"(binary data)"}, 0, nil
 	}
 
 	// Return all lines if no limit or fewer lines than limit
@@ -88,6 +97,50 @@ func trimTrailingEmptyLines(lines []string) []string {
 		lines = lines[:len(lines)-1]
 	}
 	return lines
+}
+
+// cleanLogLine processes a log line to handle control characters.
+// It handles:
+//   - Carriage returns (progress bars): splits into multiple lines, keeping last segment
+//   - Other control characters: removed
+//   - Trailing whitespace: trimmed
+func cleanLogLine(line string) []string {
+	// Handle carriage returns (common in progress bars like curl)
+	// Only keep the final segment after the last \r
+	if strings.Contains(line, "\r") {
+		segments := strings.Split(line, "\r")
+		// Get the last non-empty segment (the final state of the line)
+		for i := len(segments) - 1; i >= 0; i-- {
+			segment := strings.TrimRightFunc(segments[i], unicode.IsSpace)
+			if segment != "" {
+				return []string{cleanControlChars(segment)}
+			}
+		}
+		return nil
+	}
+
+	// Clean other control characters and trim
+	cleaned := cleanControlChars(line)
+	cleaned = strings.TrimRightFunc(cleaned, unicode.IsSpace)
+	if cleaned == "" {
+		return nil
+	}
+	return []string{cleaned}
+}
+
+// cleanControlChars removes non-printable control characters from a string,
+// preserving tabs and spaces.
+func cleanControlChars(s string) string {
+	var result strings.Builder
+	result.Grow(len(s))
+
+	for _, r := range s {
+		// Keep printable characters, tabs, and spaces
+		if r >= 32 || r == '\t' {
+			result.WriteRune(r)
+		}
+	}
+	return result.String()
 }
 
 // isBinaryContent checks if the content appears to be binary data.

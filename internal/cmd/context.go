@@ -127,6 +127,11 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	if quiet {
 		opts = append(opts, logger.WithQuiet())
 	}
+	// For agent commands running in a terminal, suppress console output early
+	// to avoid debug logs cluttering the progress display or tree output
+	if !quiet && isAgentCommand(cmd.Name()) && isStderrTerminal() && os.Getenv("DISABLE_PROGRESS") == "" {
+		opts = append(opts, logger.WithQuiet())
+	}
 	if cfg.Core.LogFormat != "" {
 		opts = append(opts, logger.WithFormat(cfg.Core.LogFormat))
 	}
@@ -204,6 +209,26 @@ func serviceForCommand(cmdName string) config.Service {
 		// For all other commands (status, stop, validate, etc.), load all config
 		return config.ServiceNone
 	}
+}
+
+// isAgentCommand returns true if the command name is an agent command
+// that displays progress or tree output.
+func isAgentCommand(cmdName string) bool {
+	switch cmdName {
+	case "start", "restart", "retry", "dry":
+		return true
+	default:
+		return false
+	}
+}
+
+// isStderrTerminal returns true if stderr is a terminal.
+func isStderrTerminal() bool {
+	fi, err := os.Stderr.Stat()
+	if err != nil {
+		return false
+	}
+	return (fi.Mode() & os.ModeCharDevice) != 0
 }
 
 // NewServer creates and returns a new web UI NewServer.
