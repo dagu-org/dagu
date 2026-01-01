@@ -11,6 +11,10 @@ import (
 // This allows reading lines up to 1MB in length.
 const maxScannerBuffer = 1024 * 1024
 
+// maxLogFileSize is the maximum log file size we'll read (10MB).
+// Larger files are skipped to prevent memory exhaustion.
+const maxLogFileSize = 10 * 1024 * 1024
+
 // ReadLogFileTail reads the last N lines from a log file.
 // It returns:
 //   - lines: the actual log lines (tail portion if truncated)
@@ -20,6 +24,7 @@ const maxScannerBuffer = 1024 * 1024
 // If maxLines is 0 or negative, all lines are returned.
 // If the file doesn't exist or is empty, returns nil, 0, nil.
 // Binary files are detected and return ["(binary data)"], 0, nil.
+// Files larger than 10MB are skipped to prevent memory exhaustion.
 func ReadLogFileTail(path string, maxLines int) ([]string, int, error) {
 	if path == "" {
 		return nil, 0, nil
@@ -37,19 +42,41 @@ func ReadLogFileTail(path string, maxLines int) ([]string, int, error) {
 		_ = file.Close()
 	}()
 
-	// Read all lines into memory
-	var allLines []string
+	// Check file size to prevent memory exhaustion
+	stat, err := file.Stat()
+	if err != nil {
+		return nil, 0, err
+	}
+	if stat.Size() > maxLogFileSize {
+		return []string{"(file too large, >10MB)"}, 0, nil
+	}
+
 	scanner := bufio.NewScanner(file)
 
 	// Increase buffer size for long lines
 	buf := make([]byte, maxScannerBuffer)
 	scanner.Buffer(buf, maxScannerBuffer)
 
+	// Use ring buffer for tail when maxLines > 0 to limit memory usage
+	if maxLines > 0 {
+		return readTailWithRingBuffer(scanner, maxLines)
+	}
+
+	// Read all lines (no limit)
+	return readAllLines(scanner)
+}
+
+// readTailWithRingBuffer reads lines using a ring buffer to keep only the last N lines in memory.
+func readTailWithRingBuffer(scanner *bufio.Scanner, maxLines int) ([]string, int, error) {
+	ring := make([]string, maxLines)
+	ringPos := 0
+	totalLines := 0
 	isFirstLine := true
+
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		// Check for binary content in first line BEFORE cleaning
+		// Check for binary content in first line
 		if isFirstLine {
 			if isBinaryContent([]byte(line)) {
 				return []string{"(binary data)"}, 0, nil
@@ -57,7 +84,59 @@ func ReadLogFileTail(path string, maxLines int) ([]string, int, error) {
 			isFirstLine = false
 		}
 
-		// Clean control characters and handle carriage returns (progress bars)
+		// Clean and add lines to ring buffer
+		cleanedLines := cleanLogLine(line)
+		for _, cleaned := range cleanedLines {
+			ring[ringPos%maxLines] = cleaned
+			ringPos++
+			totalLines++
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	if totalLines == 0 {
+		return nil, 0, nil
+	}
+
+	// Extract lines from ring buffer in correct order
+	var result []string
+	if totalLines <= maxLines {
+		result = ring[:totalLines]
+	} else {
+		result = make([]string, maxLines)
+		start := ringPos % maxLines
+		for i := 0; i < maxLines; i++ {
+			result[i] = ring[(start+i)%maxLines]
+		}
+	}
+
+	result = trimTrailingEmptyLines(result)
+	truncated := 0
+	if totalLines > maxLines {
+		truncated = totalLines - maxLines
+	}
+	return result, truncated, nil
+}
+
+// readAllLines reads all lines from a scanner (used when no limit is set).
+func readAllLines(scanner *bufio.Scanner) ([]string, int, error) {
+	var allLines []string
+	isFirstLine := true
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Check for binary content in first line
+		if isFirstLine {
+			if isBinaryContent([]byte(line)) {
+				return []string{"(binary data)"}, 0, nil
+			}
+			isFirstLine = false
+		}
+
 		cleanedLines := cleanLogLine(line)
 		allLines = append(allLines, cleanedLines...)
 	}
@@ -66,22 +145,8 @@ func ReadLogFileTail(path string, maxLines int) ([]string, int, error) {
 		return nil, 0, err
 	}
 
-	// Remove trailing empty lines for cleaner output
 	allLines = trimTrailingEmptyLines(allLines)
-
-	// Handle empty file
-	if len(allLines) == 0 {
-		return nil, 0, nil
-	}
-
-	// Return all lines if no limit or fewer lines than limit
-	if maxLines <= 0 || len(allLines) <= maxLines {
-		return allLines, 0, nil
-	}
-
-	// Return last N lines (tail)
-	truncated := len(allLines) - maxLines
-	return allLines[truncated:], truncated, nil
+	return allLines, 0, nil
 }
 
 // ReadLogFileAll reads all content from a log file.
