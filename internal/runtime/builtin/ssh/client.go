@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"golang.org/x/crypto/ssh"
@@ -12,8 +13,10 @@ import (
 )
 
 type Client struct {
-	hostPort string
-	cfg      *ssh.ClientConfig
+	hostPort  string
+	cfg       *ssh.ClientConfig
+	Shell     string   // Shell for remote command execution
+	ShellArgs []string // Shell arguments for remote command execution
 }
 
 func NewClient(cfg *Config) (*Client, error) {
@@ -40,8 +43,10 @@ func NewClient(cfg *Config) (*Client, error) {
 	}
 
 	return &Client{
-		hostPort: net.JoinHostPort(cfg.Host, port),
-		cfg:      clientConfig,
+		hostPort:  net.JoinHostPort(cfg.Host, port),
+		cfg:       clientConfig,
+		Shell:     cfg.Shell,
+		ShellArgs: slices.Clone(cfg.ShellArgs),
 	}, nil
 }
 

@@ -429,14 +429,8 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		return nil
 	}
 
-	var evalOptions []cmdutil.EvalOption
-
-	env := GetEnv(ctx)
-	shellCommand := env.Shell(ctx)
-	if n.Step().ExecutorConfig.IsCommand() && len(shellCommand) > 0 {
-		// Command executor run commands on shell, so we don't need to expand env vars
-		evalOptions = append(evalOptions, cmdutil.WithoutExpandEnv())
-	}
+	// Get eval options from executor capabilities
+	evalOptions := n.Step().EvalOptions(ctx)
 
 	step := n.Step()
 

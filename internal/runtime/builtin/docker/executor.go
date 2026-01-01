@@ -497,6 +497,7 @@ func init() {
 		Command:          true,
 		MultipleCommands: true,
 		Container:        true,
+		// Env vars are expanded on host before passing to container (default behavior)
 	}
 	executor.RegisterExecutor("docker", newDocker, nil, caps)
 	executor.RegisterExecutor("container", newDocker, nil, caps)

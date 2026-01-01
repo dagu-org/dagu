@@ -1156,36 +1156,6 @@ func TestValidateCommandStep(t *testing.T) {
 	}
 }
 
-// TestIsUnixLikeShell tests Unix shell detection
-func TestIsUnixLikeShell(t *testing.T) {
-	tests := []struct {
-		shell    string
-		expected bool
-	}{
-		{"/bin/sh", true},
-		{"/bin/bash", true},
-		{"/bin/zsh", true},
-		{"/bin/ksh", true},
-		{"/bin/ash", true},
-		{"/bin/dash", true},
-		{"/bin/fish", false},
-		{"powershell", false},
-		{"cmd.exe", false},
-		{"nix-shell", false},
-		{"", false},
-		{"/usr/local/bin/bash", true},
-		{"bash", true},
-		{"sh", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.shell, func(t *testing.T) {
-			result := isUnixLikeShell(tt.shell)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 // TestExitCodeFromError tests exit code extraction from errors
 func TestExitCodeFromError(t *testing.T) {
 	tests := []struct {

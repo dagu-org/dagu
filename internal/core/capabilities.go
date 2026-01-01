@@ -1,5 +1,11 @@
 package core
 
+import (
+	"context"
+
+	"github.com/dagu-org/dagu/internal/common/cmdutil"
+)
+
 // ExecutorCapabilities defines what an executor can do.
 type ExecutorCapabilities struct {
 	// Command indicates whether the executor supports the command field.
@@ -16,6 +22,9 @@ type ExecutorCapabilities struct {
 	SubDAG bool
 	// WorkerSelector indicates whether the executor supports worker selection.
 	WorkerSelector bool
+	// GetEvalOptions returns eval options for command argument evaluation.
+	// If nil, default evaluation is used.
+	GetEvalOptions func(ctx context.Context, step Step) []cmdutil.EvalOption
 }
 
 // executorCapabilitiesRegistry is a typed registry of executor capabilities.
@@ -80,4 +89,14 @@ func SupportsSubDAG(executorType string) bool {
 // SupportsWorkerSelector returns whether the executor type supports worker selection.
 func SupportsWorkerSelector(executorType string) bool {
 	return executorCapabilities.Get(executorType).WorkerSelector
+}
+
+// EvalOptions returns eval options for this step's executor type.
+// Returns nil if no special eval options are needed.
+func (s Step) EvalOptions(ctx context.Context) []cmdutil.EvalOption {
+	caps := executorCapabilities.Get(s.ExecutorConfig.Type)
+	if caps.GetEvalOptions != nil {
+		return caps.GetEvalOptions(ctx, s)
+	}
+	return nil
 }

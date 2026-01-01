@@ -476,24 +476,35 @@ steps:
 		errCh <- schedulerInstance.Start(ctx)
 	}()
 
-	// Wait for two minutes plus buffer for two cron ticks
-	time.Sleep(2*time.Minute + 10*time.Second)
+	// Load DAG for status checking
+	dag, err := spec.Load(th.Context, dagFile)
+	require.NoError(t, err)
+
+	// Poll until we have at least 2 runs or timeout after 2.5 minutes. Using
+	// require.Eventually keeps polling consistent with other tests in this file.
+	require.Eventually(
+		t,
+		func() bool {
+			runs := th.DAGRunMgr.ListRecentStatus(th.Context, dag.Name, 10)
+			return len(runs) >= 2
+		},
+		2*time.Minute+30*time.Second,
+		5*time.Second,
+		"expected at least 2 DAG runs within 2.5 minutes",
+	)
 
 	// Stop the scheduler
 	schedulerInstance.Stop(ctx)
 	cancel()
 
 	select {
-	case err := <-errCh:
+	case err = <-errCh:
 		require.NoError(t, err)
 	case <-time.After(5 * time.Second):
 		// Timeout is acceptable for cleanup
 	}
 
-	// Verify the DAG ran at least twice
-	dag, err := spec.Load(th.Context, dagFile)
-	require.NoError(t, err)
-
+	// Verify the DAG ran at least twice (re-check after cleanup in case more runs completed)
 	runs := th.DAGRunMgr.ListRecentStatus(th.Context, dag.Name, 10)
 	require.GreaterOrEqual(t, len(runs), 2, "expected at least 2 DAG runs, got %d", len(runs))
 }
