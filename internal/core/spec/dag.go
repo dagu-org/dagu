@@ -216,6 +216,9 @@ type ssh struct {
 	StrictHostKey *bool `yaml:"strictHostKey,omitempty"`
 	// KnownHostFile is the path to the known_hosts file. Defaults to ~/.ssh/known_hosts.
 	KnownHostFile string `yaml:"knownHostFile,omitempty"`
+	// Shell is the shell to use for remote command execution.
+	// If not specified, commands are executed directly without shell wrapping.
+	Shell string `yaml:"shell,omitempty"`
 }
 
 // secretRef defines a reference to an external secret.
@@ -1050,6 +1053,7 @@ func buildSSH(_ BuildContext, d *dag) (*core.SSHConfig, error) {
 		Password:      d.SSH.Password,
 		StrictHostKey: strictHostKey,
 		KnownHostFile: d.SSH.KnownHostFile,
+		Shell:         d.SSH.Shell,
 	}, nil
 }
 

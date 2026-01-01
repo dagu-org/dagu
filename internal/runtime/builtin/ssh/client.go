@@ -14,6 +14,7 @@ import (
 type Client struct {
 	hostPort string
 	cfg      *ssh.ClientConfig
+	Shell    string // Shell for remote command execution
 }
 
 func NewClient(cfg *Config) (*Client, error) {
@@ -42,6 +43,7 @@ func NewClient(cfg *Config) (*Client, error) {
 	return &Client{
 		hostPort: net.JoinHostPort(cfg.Host, port),
 		cfg:      clientConfig,
+		Shell:    cfg.Shell,
 	}, nil
 }
 

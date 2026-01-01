@@ -11,7 +11,6 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"golang.org/x/crypto/ssh"
 )
@@ -35,48 +34,50 @@ func getSSHClientFromContext(ctx context.Context) *Client {
 }
 
 type sshExecutor struct {
-	mu          sync.Mutex
-	ctx         context.Context // Store context for DAG-level shell access
-	step        core.Step
-	client      *Client
-	stdout      io.Writer
-	stderr      io.Writer
-	session     *ssh.Session
-	configShell string // Shell from SSH executor config
+	mu      sync.Mutex
+	step    core.Step
+	client  *Client
+	stdout  io.Writer
+	stderr  io.Writer
+	session *ssh.Session
+	shell   string // Shell for remote command execution (from SSH config only)
 }
 
 func NewSSHExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
 	var client *Client
-	var configShell string
+	var shell string
 
 	// Prefer step-level SSH configuration if present
 	if len(step.ExecutorConfig.Config) > 0 {
-		// Extract shell from config before creating client
-		if shell, ok := step.ExecutorConfig.Config["shell"].(string); ok {
-			configShell = shell
-		}
-
 		c, err := FromMapConfig(ctx, step.ExecutorConfig.Config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to setup ssh executor")
 		}
 		client = c
+		// Step-level SSH config shell takes priority
+		shell = client.Shell
 	} else if c := getSSHClientFromContext(ctx); c != nil {
 		// Fall back to DAG-level SSH client from context
 		client = c
+		// Use DAG-level SSH config shell
+		shell = client.Shell
 	}
 
 	if client == nil {
 		return nil, fmt.Errorf("ssh configuration is not found")
 	}
 
+	// If no shell from SSH config, fall back to step.Shell for better UX
+	if shell == "" && step.Shell != "" {
+		shell = step.Shell
+	}
+
 	return &sshExecutor{
-		ctx:         ctx,
-		step:        step,
-		client:      client,
-		configShell: configShell,
-		stdout:      os.Stdout,
-		stderr:      os.Stderr,
+		step:   step,
+		client: client,
+		shell:  shell,
+		stdout: os.Stdout,
+		stderr: os.Stderr,
 	}, nil
 }
 
@@ -123,32 +124,18 @@ func (e *sshExecutor) Run(ctx context.Context) error {
 	return nil
 }
 
-// getEffectiveShell returns the shell and args to use for command execution.
-// Priority: step.Shell > config.shell > DAG.Shell > empty (direct execution)
-func (e *sshExecutor) getEffectiveShell() (string, []string) {
-	// Step-level shell takes highest priority
-	if e.step.Shell != "" {
-		return e.step.Shell, e.step.ShellArgs
-	}
-	// Config-level shell (SSH executor config)
-	if e.configShell != "" {
-		return e.configShell, nil
-	}
-	// DAG-level shell from context (if context is available)
-	if e.ctx != nil {
-		env := runtime.GetEnv(e.ctx)
-		if env.DAG.Shell != "" {
-			return env.DAG.Shell, env.DAG.ShellArgs
-		}
-	}
-	// No shell - direct execution
-	return "", nil
+// getEffectiveShell returns the shell to use for command execution.
+// Shell is only taken from SSH configuration (DAG-level or step-level config.shell).
+// DAG-level shell field is NOT inherited because the local user's default shell
+// may not be available on the remote server.
+func (e *sshExecutor) getEffectiveShell() string {
+	return e.shell
 }
 
 // buildCommand constructs the command string for SSH execution.
 // Uses shared cmdutil functions for shell command building.
 func (e *sshExecutor) buildCommand(cmdEntry core.CommandEntry) string {
-	shell, shellArgs := e.getEffectiveShell()
+	shell := e.getEffectiveShell()
 
 	if shell == "" {
 		// No shell - direct execution, quote command and args for SSH transport
@@ -159,7 +146,8 @@ func (e *sshExecutor) buildCommand(cmdEntry core.CommandEntry) string {
 		return baseCommand
 	}
 
-	return cmdutil.BuildShellCommandString(shell, shellArgs, cmdEntry.CmdWithArgs)
+	// With shell - use BuildShellCommandString which handles proper quoting
+	return cmdutil.BuildShellCommandString(shell, nil, cmdEntry.CmdWithArgs)
 }
 
 // runCommand executes a single command with context cancellation support.
@@ -214,7 +202,7 @@ func init() {
 	caps := core.ExecutorCapabilities{
 		Command:          true,
 		MultipleCommands: true,
-		Shell:            true,
+		Shell:            true, // Supports step.Shell as fallback when ssh.shell not set
 	}
 	executor.RegisterExecutor("ssh", NewSSHExecutor, nil, caps)
 }
