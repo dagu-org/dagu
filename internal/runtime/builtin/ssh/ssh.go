@@ -44,7 +44,6 @@ type sshExecutor struct {
 
 func NewSSHExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
 	var client *Client
-	var shell string
 
 	// Prefer step-level SSH configuration if present
 	if len(step.ExecutorConfig.Config) > 0 {
@@ -53,28 +52,19 @@ func NewSSHExecutor(ctx context.Context, step core.Step) (executor.Executor, err
 			return nil, fmt.Errorf("failed to setup ssh executor: %w", err)
 		}
 		client = c
-		// Step-level SSH config shell takes priority
-		shell = client.Shell
 	} else if c := getSSHClientFromContext(ctx); c != nil {
 		// Fall back to DAG-level SSH client from context
 		client = c
-		// Use DAG-level SSH config shell
-		shell = client.Shell
 	}
 
 	if client == nil {
 		return nil, fmt.Errorf("ssh configuration is not found")
 	}
 
-	// Fall back to step.Shell if no shell specified in SSH config
-	if shell == "" && step.Shell != "" {
-		shell = step.Shell
-	}
-
 	return &sshExecutor{
 		step:   step,
 		client: client,
-		shell:  shell,
+		shell:  resolveShell(ctx, step),
 		stdout: os.Stdout,
 		stderr: os.Stderr,
 	}, nil
@@ -126,9 +116,7 @@ func (e *sshExecutor) Run(ctx context.Context) error {
 // buildCommand constructs the command string for SSH execution.
 // Uses shared cmdutil functions for shell command building.
 func (e *sshExecutor) buildCommand(cmdEntry core.CommandEntry) string {
-	shell := e.shell
-
-	if shell == "" {
+	if e.shell == "" {
 		// No shell - direct execution, quote command and args for SSH transport
 		baseCommand := cmdutil.ShellQuote(cmdEntry.Command)
 		if len(cmdEntry.Args) > 0 {
@@ -138,7 +126,25 @@ func (e *sshExecutor) buildCommand(cmdEntry core.CommandEntry) string {
 	}
 
 	// With shell - use BuildShellCommandString which handles proper quoting
-	return cmdutil.BuildShellCommandString(shell, nil, cmdEntry.CmdWithArgs)
+	return cmdutil.BuildShellCommandString(e.shell, nil, cmdEntry.CmdWithArgs)
+}
+
+// resolveShell determines the shell to use for a step based on priority:
+// 1. Shell specified in step-level SSH configuration.
+// 2. Shell specified in DAG-level SSH configuration.
+// 3. Shell specified in the step's Shell field (fallback).
+func resolveShell(ctx context.Context, step core.Step) string {
+	var shell string
+	if len(step.ExecutorConfig.Config) > 0 {
+		shell, _ = step.ExecutorConfig.Config["shell"].(string)
+	} else if cli := getSSHClientFromContext(ctx); cli != nil {
+		shell = cli.Shell
+	}
+
+	if shell == "" {
+		shell = step.Shell
+	}
+	return shell
 }
 
 // runCommand executes a single command with context cancellation support.
@@ -195,24 +201,8 @@ func init() {
 		MultipleCommands: true,
 		Shell:            true,
 		GetEvalOptions: func(ctx context.Context, step core.Step) []cmdutil.EvalOption {
-			// Mirror the shell resolution logic in NewSSHExecutor:
-			// 1. step.Shell is final fallback (checked first for early exit)
-			// 2. If step has SSH config, only check that config's shell
-			// 3. Otherwise check DAG-level SSH config
-			if step.Shell != "" {
-				return nil
-			}
-			if len(step.ExecutorConfig.Config) > 0 {
-				// Step has SSH config - only check that config's shell
-				configShell, _ := step.ExecutorConfig.Config["shell"].(string)
-				if configShell != "" {
-					return nil
-				}
-				// Step-level SSH config exists but has no shell
-				return []cmdutil.EvalOption{cmdutil.WithoutExpandShell()}
-			}
-			// No step-level SSH config - check DAG-level SSH config
-			if cli := getSSHClientFromContext(ctx); cli != nil && cli.Shell != "" {
+			if resolveShell(ctx, step) != "" {
+				// Shell is configured, shell features (expansion, pipes, etc.) are supported
 				return nil
 			}
 			// No shell configured - skip shell expansion for remote execution
