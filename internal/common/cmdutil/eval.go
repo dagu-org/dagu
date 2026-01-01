@@ -24,7 +24,7 @@ type EvalOptions struct {
 	Substitute  bool
 	Variables   []map[string]string
 	StepMap     map[string]StepInfo
-	ExpandShell bool // Avoid shell expansion for now
+	ExpandShell bool // When false, skip shell-based variable expansion (e.g., for SSH commands)
 }
 
 func NewEvalOptions() *EvalOptions {

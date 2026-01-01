@@ -51,7 +51,7 @@ func NewSSHExecutor(ctx context.Context, step core.Step) (executor.Executor, err
 	if len(step.ExecutorConfig.Config) > 0 {
 		c, err := FromMapConfig(ctx, step.ExecutorConfig.Config)
 		if err != nil {
-			return nil, fmt.Errorf("failed to setup ssh executor")
+			return nil, fmt.Errorf("failed to setup ssh executor: %w", err)
 		}
 		client = c
 		// Step-level SSH config shell takes priority
