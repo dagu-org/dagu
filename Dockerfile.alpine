@@ -23,7 +23,7 @@ COPY --from=ui-builder /app/dist/ ./internal/service/frontend/assets/
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags="${LDFLAGS}" -o ./bin/dagu ./cmd
 
 # Stage 3: Final Image
-FROM --platform=$TARGETPLATFORM alpine:3.22.1
+FROM --platform=$TARGETPLATFORM alpine:3.23.2
 ARG USER="dagu"
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
