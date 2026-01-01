@@ -780,7 +780,9 @@ func (p *ProgressTeaDisplay) Stop() {
 		p.program.Send(FinalizeMsg{})
 		// Wait for the program to exit
 		<-p.done
-		// UI stays visible in alternate screen buffer
+		// Exit alternate screen buffer so tree summary can be shown
+		fmt.Print("\033[?1049l") // Exit alternate screen
+		fmt.Print("\033[?25h")   // Show cursor
 	}
 }
 

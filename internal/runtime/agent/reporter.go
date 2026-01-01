@@ -8,6 +8,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/output"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/jedib0t/go-pretty/v6/table"
 )
@@ -55,16 +56,18 @@ func (r *reporter) reportStep(
 	return nil
 }
 
-// report is a function that reports the status of the runner.
-func (r *reporter) getSummary(_ context.Context, dagStatus execution.DAGRunStatus, err error) string {
-	var buf bytes.Buffer
-	_, _ = buf.Write([]byte("\n"))
-	_, _ = buf.Write([]byte("Summary ->\n"))
-	_, _ = buf.Write([]byte(renderDAGSummary(dagStatus, err)))
-	_, _ = buf.Write([]byte("\n"))
-	_, _ = buf.Write([]byte("Details ->\n"))
-	_, _ = buf.Write([]byte(renderStepSummary(dagStatus.Nodes)))
-	return buf.String()
+// getSummary returns a tree-structured summary of the DAG execution.
+func (r *reporter) getSummary(_ context.Context, dagStatus execution.DAGRunStatus, _ error) string {
+	// Create a minimal DAG object for the tree renderer
+	dag := &core.DAG{Name: dagStatus.Name}
+
+	// Configure tree output - disable colors for summary output
+	// as it may be redirected to files or logs
+	config := output.DefaultConfig()
+	config.ColorEnabled = false
+
+	renderer := output.NewRenderer(config)
+	return renderer.RenderDAGStatus(dag, &dagStatus)
 }
 
 // send is a function that sends a report mail.

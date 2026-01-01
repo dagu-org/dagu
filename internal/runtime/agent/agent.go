@@ -751,10 +751,7 @@ func (a *Agent) buildOutputs(ctx context.Context, finalStatus core.Status) *exec
 }
 
 func (a *Agent) PrintSummary(ctx context.Context) {
-	// Don't print summary if progress display was shown
-	if a.progressDisplay != nil {
-		return
-	}
+	// Always print tree-structured summary after execution
 	status := a.Status(ctx)
 	summary := a.reporter.getSummary(ctx, status, a.lastErr)
 	println(summary)
