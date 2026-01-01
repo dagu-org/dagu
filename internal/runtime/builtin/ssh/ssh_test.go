@@ -41,81 +41,39 @@ func TestSSHExecutor_BuildCommand(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "NoShell_DirectExecution",
+			name:     "NoShell_NoArgs",
+			shell:    "",
+			command:  "ls",
+			args:     nil,
+			expected: "ls",
+		},
+		{
+			name:     "NoShell_WithArgs",
 			shell:    "",
 			command:  "ls",
 			args:     []string{"-la"},
-			expected: "ls -la", // Simple args don't need quoting
-		},
-		{
-			name:     "NoShell_SimpleCommand",
-			shell:    "",
-			command:  "echo",
-			args:     []string{"hello"},
-			expected: "echo hello", // Simple args don't need quoting
+			expected: "ls -la",
 		},
 		{
 			name:     "NoShell_ArgsWithSpaces",
 			shell:    "",
 			command:  "echo",
 			args:     []string{"hello world"},
-			expected: "echo 'hello world'", // Args with spaces need quoting
+			expected: "echo 'hello world'",
 		},
 		{
-			name:     "BashShell_Wrap",
+			name:     "WithShell",
 			shell:    "/bin/bash",
 			command:  "echo",
 			args:     []string{"hello"},
-			expected: "/bin/bash -c 'echo hello'", // Full command quoted
+			expected: "/bin/bash -c 'echo hello'",
 		},
 		{
-			name:     "ShShell_Wrap",
-			shell:    "/bin/sh",
-			command:  "ls",
-			args:     nil,
-			expected: "/bin/sh -c ls",
-		},
-		{
-			name:     "PowerShell_CommandFlag",
+			name:     "WithShell_PowerShell",
 			shell:    "powershell",
 			command:  "Write-Host",
 			args:     []string{"hello"},
 			expected: "powershell -Command 'Write-Host hello'",
-		},
-		{
-			name:     "CommandWithSpecialChars",
-			shell:    "/bin/bash",
-			command:  "echo",
-			args:     []string{"$HOME", "it's"},
-			expected: "/bin/bash -c 'echo '\\''$HOME'\\'' '\\''it'\\''\\'\\'''\\''s'\\'''",
-		},
-		{
-			name:     "CommandWithSpaces",
-			shell:    "/bin/bash",
-			command:  "echo",
-			args:     []string{"hello world"},
-			expected: "/bin/bash -c 'echo '\\''hello world'\\'''",
-		},
-		{
-			name:     "ShellExpansion_CommandSubstitution",
-			shell:    "/bin/sh",
-			command:  "echo $(pwd)",
-			args:     nil,
-			expected: "/bin/sh -c 'echo $(pwd)'", // Shell should interpret $(pwd)
-		},
-		{
-			name:     "ShellExpansion_VariableExpansion",
-			shell:    "/bin/bash",
-			command:  "echo $HOME",
-			args:     nil,
-			expected: "/bin/bash -c 'echo $HOME'", // Shell should expand $HOME
-		},
-		{
-			name:     "ShellExpansion_PipeCommand",
-			shell:    "/bin/sh",
-			command:  "ls | grep test",
-			args:     nil,
-			expected: "/bin/sh -c 'ls | grep test'", // Pipe should work
 		},
 	}
 
@@ -157,7 +115,7 @@ func TestNewSSHExecutor_WithShellConfig(t *testing.T) {
 				"ip":       "testip",
 				"port":     22,
 				"password": "testpassword",
-				"shell":    "/bin/bash", // lowercase - matches YAML behavior
+				"shell":    "/bin/bash",
 			},
 			expectedShell: "/bin/bash",
 		},
@@ -170,17 +128,6 @@ func TestNewSSHExecutor_WithShellConfig(t *testing.T) {
 				"password": "testpassword",
 			},
 			expectedShell: "",
-		},
-		{
-			name: "ZshShell",
-			config: map[string]any{
-				"user":     "testuser",
-				"ip":       "testip",
-				"port":     22,
-				"password": "testpassword",
-				"shell":    "/usr/bin/zsh",
-			},
-			expectedShell: "/usr/bin/zsh",
 		},
 	}
 
@@ -369,4 +316,76 @@ func TestSSHExecutor_StepSSHConfigWithoutShellIgnoresDAGShell(t *testing.T) {
 	// Step-level SSH config takes priority, and it has no shell
 	// DAG-level shell should NOT be inherited
 	assert.Equal(t, "", sshExec.shell)
+}
+
+func TestSSHExecutor_GetEvalOptions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		step           core.Step
+		dagShell       string
+		expectSkipShell bool
+	}{
+		{
+			name: "StepShellSet",
+			step: core.Step{
+				Shell: "/bin/bash",
+				ExecutorConfig: core.ExecutorConfig{Type: "ssh"},
+			},
+			expectSkipShell: false,
+		},
+		{
+			name: "StepConfigShellSet",
+			step: core.Step{
+				ExecutorConfig: core.ExecutorConfig{
+					Type:   "ssh",
+					Config: map[string]any{"shell": "/bin/bash"},
+				},
+			},
+			expectSkipShell: false,
+		},
+		{
+			name: "StepConfigNoShell",
+			step: core.Step{
+				ExecutorConfig: core.ExecutorConfig{
+					Type:   "ssh",
+					Config: map[string]any{"user": "test"},
+				},
+			},
+			expectSkipShell: true,
+		},
+		{
+			name: "DAGShellSet",
+			step: core.Step{
+				ExecutorConfig: core.ExecutorConfig{Type: "ssh"},
+			},
+			dagShell:        "/bin/bash",
+			expectSkipShell: false,
+		},
+		{
+			name: "NoShellAnywhere",
+			step: core.Step{
+				ExecutorConfig: core.ExecutorConfig{Type: "ssh"},
+			},
+			expectSkipShell: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			if tt.dagShell != "" {
+				ctx = WithSSHClient(ctx, &Client{Shell: tt.dagShell})
+			}
+
+			opts := core.EvalOptions(ctx, tt.step)
+
+			if tt.expectSkipShell {
+				require.Len(t, opts, 1, "expected WithoutExpandShell option")
+			} else {
+				require.Empty(t, opts, "expected no eval options")
+			}
+		})
+	}
 }

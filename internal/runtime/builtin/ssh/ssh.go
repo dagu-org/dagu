@@ -26,7 +26,6 @@ func WithSSHClient(ctx context.Context, cli *Client) context.Context {
 
 // getSSHClientFromContext retrieves the Client from the context.
 func getSSHClientFromContext(ctx context.Context) *Client {
-	// Retrieve the SSH client stored in context by WithSSHClient
 	if cli, ok := ctx.Value(sshClientCtxKey{}).(*Client); ok {
 		return cli
 	}
@@ -67,7 +66,7 @@ func NewSSHExecutor(ctx context.Context, step core.Step) (executor.Executor, err
 		return nil, fmt.Errorf("ssh configuration is not found")
 	}
 
-	// If no shell from SSH config, fall back to step.Shell for better UX
+	// Fall back to step.Shell if no shell specified in SSH config
 	if shell == "" && step.Shell != "" {
 		shell = step.Shell
 	}
@@ -194,7 +193,7 @@ func init() {
 	caps := core.ExecutorCapabilities{
 		Command:          true,
 		MultipleCommands: true,
-		Shell:            true, // Supports step.Shell as fallback when ssh.shell not set
+		Shell:            true,
 		GetEvalOptions: func(ctx context.Context, step core.Step) []cmdutil.EvalOption {
 			// Mirror the shell resolution logic in NewSSHExecutor:
 			// 1. step.Shell is final fallback (checked first for early exit)
