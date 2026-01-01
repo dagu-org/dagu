@@ -573,8 +573,8 @@ func (r *Renderer) renderError(errMsg string, prefix string) string {
 		if i == 0 {
 			buf.WriteString(prefix + r.treeLine(TreeLastBranch) + r.text(line) + "\n")
 		} else {
-			// 3 spaces to align with text after "└─" (accounts for box-char width)
-			buf.WriteString(prefix + "   " + r.text(line) + "\n")
+			// 4 spaces to match width of "└─"
+			buf.WriteString(prefix + "    " + r.text(line) + "\n")
 		}
 	}
 	return buf.String()
