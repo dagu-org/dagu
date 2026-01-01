@@ -3,7 +3,10 @@ package ssh
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 
+	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/go-viper/mapstructure/v2"
 )
 
@@ -14,9 +17,10 @@ type Config struct {
 	Port          string
 	Key           string
 	Password      string
-	StrictHostKey bool   // Enable strict host key checking (defaults to true)
-	KnownHostFile string // Path to known_hosts file (defaults to ~/.ssh/known_hosts)
-	Shell         string // Shell for remote command execution (e.g., "/bin/bash")
+	StrictHostKey bool     // Enable strict host key checking (defaults to true)
+	KnownHostFile string   // Path to known_hosts file (defaults to ~/.ssh/known_hosts)
+	Shell         string   // Shell for remote command execution (e.g., "/bin/bash")
+	ShellArgs     []string // Additional shell arguments (e.g., -e, -o pipefail)
 }
 
 func FromMapConfig(_ context.Context, mapCfg map[string]any) (*Client, error) {
@@ -30,6 +34,7 @@ func FromMapConfig(_ context.Context, mapCfg map[string]any) (*Client, error) {
 		StrictHostKey bool
 		KnownHostFile string
 		Shell         string
+		ShellArgs     []string
 	})
 	md, err := mapstructure.NewDecoder(
 		&mapstructure.DecoderConfig{Result: def, WeaklyTypedInput: true},
@@ -50,6 +55,11 @@ func FromMapConfig(_ context.Context, mapCfg map[string]any) (*Client, error) {
 		host = def.IP
 	}
 
+	shell, shellArgs, err := parseShellConfig(def.Shell, def.ShellArgs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse shell config: %w", err)
+	}
+
 	cfg := &Config{
 		User:          def.User,
 		Host:          host,
@@ -58,8 +68,27 @@ func FromMapConfig(_ context.Context, mapCfg map[string]any) (*Client, error) {
 		Password:      def.Password,
 		StrictHostKey: def.StrictHostKey,
 		KnownHostFile: def.KnownHostFile,
-		Shell:         def.Shell,
+		Shell:         shell,
+		ShellArgs:     shellArgs,
 	}
 
 	return NewClient(cfg)
+}
+
+func parseShellConfig(shell string, args []string) (string, []string, error) {
+	shell = strings.TrimSpace(shell)
+	resultArgs := slices.Clone(args)
+	if shell == "" {
+		return "", resultArgs, nil
+	}
+
+	parsedShell, parsedArgs, err := cmdutil.SplitCommand(shell)
+	if err != nil {
+		return "", nil, err
+	}
+	parsedShell = strings.TrimSpace(parsedShell)
+	if len(parsedArgs) > 0 {
+		resultArgs = append(parsedArgs, resultArgs...)
+	}
+	return parsedShell, resultArgs, nil
 }

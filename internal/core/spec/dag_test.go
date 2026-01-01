@@ -548,9 +548,10 @@ func TestBuildSSH(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		input    *ssh
-		expected *core.SSHConfig
+		name      string
+		input     *ssh
+		expected  *core.SSHConfig
+		expectErr bool
 	}{
 		{
 			name:     "Nil",
@@ -600,12 +601,48 @@ func TestBuildSSH(t *testing.T) {
 				StrictHostKey: false,
 			},
 		},
+		{
+			name: "ShellStringWithArgs",
+			input: &ssh{
+				User:  "admin",
+				Host:  "server.example.com",
+				Shell: shellValue("/bin/bash -e"),
+			},
+			expected: &core.SSHConfig{
+				User:          "admin",
+				Host:          "server.example.com",
+				Port:          "22",
+				StrictHostKey: true,
+				Shell:         "/bin/bash",
+				ShellArgs:     []string{"-e"},
+			},
+		},
+		{
+			name: "ShellArrayWithArgs",
+			input: &ssh{
+				User:  "admin",
+				Host:  "server.example.com",
+				Shell: shellValueArray([]string{"/bin/bash", "-e", "-o", "pipefail"}),
+			},
+			expected: &core.SSHConfig{
+				User:          "admin",
+				Host:          "server.example.com",
+				Port:          "22",
+				StrictHostKey: true,
+				Shell:         "/bin/bash",
+				ShellArgs:     []string{"-e", "-o", "pipefail"},
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			d := &dag{SSH: tt.input}
 			result, err := buildSSH(testBuildContext(), d)
+			if tt.expectErr {
+				require.Error(t, err)
+				return
+			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})

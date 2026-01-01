@@ -217,8 +217,9 @@ type ssh struct {
 	// KnownHostFile is the path to the known_hosts file. Defaults to ~/.ssh/known_hosts.
 	KnownHostFile string `yaml:"knownHostFile,omitempty"`
 	// Shell is the shell to use for remote command execution.
+	// Supports string or array syntax (e.g., "bash -e" or ["bash", "-e"]).
 	// If not specified, commands are executed directly without shell wrapping.
-	Shell string `yaml:"shell,omitempty"`
+	Shell types.ShellValue `yaml:"shell,omitempty"`
 }
 
 // secretRef defines a reference to an external secret.
@@ -1045,6 +1046,25 @@ func buildSSH(_ BuildContext, d *dag) (*core.SSHConfig, error) {
 		strictHostKey = *d.SSH.StrictHostKey
 	}
 
+	var shell string
+	var shellArgs []string
+	if !d.SSH.Shell.IsZero() {
+		command := strings.TrimSpace(d.SSH.Shell.Command())
+		if command != "" {
+			if d.SSH.Shell.IsArray() {
+				shell = command
+				shellArgs = append(shellArgs, d.SSH.Shell.Arguments()...)
+			} else {
+				parsed, args, err := cmdutil.SplitCommand(command)
+				if err != nil {
+					return nil, core.NewValidationError("ssh.shell", d.SSH.Shell.Value(), fmt.Errorf("failed to parse shell command: %w", err))
+				}
+				shell = strings.TrimSpace(parsed)
+				shellArgs = append(shellArgs, args...)
+			}
+		}
+	}
+
 	return &core.SSHConfig{
 		User:          d.SSH.User,
 		Host:          d.SSH.Host,
@@ -1053,7 +1073,8 @@ func buildSSH(_ BuildContext, d *dag) (*core.SSHConfig, error) {
 		Password:      d.SSH.Password,
 		StrictHostKey: strictHostKey,
 		KnownHostFile: d.SSH.KnownHostFile,
-		Shell:         d.SSH.Shell,
+		Shell:         shell,
+		ShellArgs:     shellArgs,
 	}, nil
 }
 

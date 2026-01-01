@@ -1336,8 +1336,20 @@
           "description": "Path to the known_hosts file for host key verification. Defaults to ~/.ssh/known_hosts."
         },
         "shell": {
-          "type": "string",
-          "description": "Shell for remote command execution (e.g., '/bin/bash'). When specified, commands are wrapped as: shell -c 'command'. Enables shell features like variable expansion, pipes, and command chaining on the remote server."
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Shell command with optional arguments (e.g., '/bin/bash -e')."
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Shell command expressed as an array for explicit argument separation (e.g., ['/bin/bash', '-e', '-o', 'pipefail'])."
+            }
+          ],
+          "description": "Shell for remote command execution. Commands are wrapped as: shell -c 'command'. Providing arguments (via string or array form) enables shell features like variable expansion, pipes, and command chaining on the remote server."
         }
       },
       "required": ["user", "host"],
@@ -1428,8 +1440,20 @@
           "description": "Path to known_hosts file for host key verification."
         },
         "shell": {
-          "type": "string",
-          "description": "Shell for remote command execution (e.g., '/bin/bash'). When specified, commands are wrapped as: shell -c 'command'. Enables shell features like variable expansion, pipes, and command chaining on the remote server."
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Shell command with optional arguments (e.g., '/bin/bash -e')."
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Shell command expressed as an array for explicit argument separation (e.g., ['/bin/bash', '-e', '-o', 'pipefail'])."
+            }
+          ],
+          "description": "Shell for remote command execution. Commands are wrapped as: shell -c 'command'. Providing arguments (via string or array form) enables shell features like variable expansion, pipes, and command chaining on the remote server."
         }
       },
       "description": "SSH executor configuration for remote command execution."

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
+	"strings"
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
@@ -33,13 +35,14 @@ func getSSHClientFromContext(ctx context.Context) *Client {
 }
 
 type sshExecutor struct {
-	mu      sync.Mutex
-	step    core.Step
-	client  *Client
-	stdout  io.Writer
-	stderr  io.Writer
-	session *ssh.Session
-	shell   string
+	mu        sync.Mutex
+	step      core.Step
+	client    *Client
+	stdout    io.Writer
+	stderr    io.Writer
+	session   *ssh.Session
+	shell     string
+	shellArgs []string
 }
 
 func NewSSHExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
@@ -61,12 +64,15 @@ func NewSSHExecutor(ctx context.Context, step core.Step) (executor.Executor, err
 		return nil, fmt.Errorf("ssh configuration is not found")
 	}
 
+	shell, shellArgs := resolveShell(step, client)
+
 	return &sshExecutor{
-		step:   step,
-		client: client,
-		shell:  resolveShell(ctx, step),
-		stdout: os.Stdout,
-		stderr: os.Stderr,
+		step:      step,
+		client:    client,
+		shell:     shell,
+		shellArgs: shellArgs,
+		stdout:    os.Stdout,
+		stderr:    os.Stderr,
 	}, nil
 }
 
@@ -126,25 +132,22 @@ func (e *sshExecutor) buildCommand(cmdEntry core.CommandEntry) string {
 	}
 
 	// With shell - use BuildShellCommandString which handles proper quoting
-	return cmdutil.BuildShellCommandString(e.shell, nil, cmdEntry.CmdWithArgs)
+	command := cmdutil.BuildCommandEscapedString(cmdEntry.Command, cmdEntry.Args)
+	return cmdutil.BuildShellCommandString(e.shell, e.shellArgs, command)
 }
 
 // resolveShell determines the shell to use for a step based on priority:
 // 1. Shell specified in step-level SSH configuration.
 // 2. Shell specified in DAG-level SSH configuration.
 // 3. Shell specified in the step's Shell field (fallback).
-func resolveShell(ctx context.Context, step core.Step) string {
-	var shell string
-	if len(step.ExecutorConfig.Config) > 0 {
-		shell, _ = step.ExecutorConfig.Config["shell"].(string)
-	} else if cli := getSSHClientFromContext(ctx); cli != nil {
-		shell = cli.Shell
+func resolveShell(step core.Step, client *Client) (string, []string) {
+	if client != nil && client.Shell != "" {
+		return client.Shell, slices.Clone(client.ShellArgs)
 	}
-
-	if shell == "" {
-		shell = step.Shell
+	if step.Shell != "" {
+		return step.Shell, slices.Clone(step.ShellArgs)
 	}
-	return shell
+	return "", nil
 }
 
 // runCommand executes a single command with context cancellation support.
@@ -201,7 +204,7 @@ func init() {
 		MultipleCommands: true,
 		Shell:            true,
 		GetEvalOptions: func(ctx context.Context, step core.Step) []cmdutil.EvalOption {
-			if resolveShell(ctx, step) != "" {
+			if hasShellConfigured(ctx, step) {
 				// Shell is configured, shell features (expansion, pipes, etc.) are supported
 				return nil
 			}
@@ -210,4 +213,26 @@ func init() {
 		},
 	}
 	executor.RegisterExecutor("ssh", NewSSHExecutor, nil, caps)
+}
+
+func hasShellConfigured(ctx context.Context, step core.Step) bool {
+	if len(step.ExecutorConfig.Config) > 0 {
+		if shellValue, ok := step.ExecutorConfig.Config["shell"]; ok {
+			switch v := shellValue.(type) {
+			case string:
+				return strings.TrimSpace(v) != ""
+			case []any:
+				return len(v) > 0
+			case []string:
+				return len(v) > 0
+			}
+		}
+		return false
+	}
+
+	if cli := getSSHClientFromContext(ctx); cli != nil && cli.Shell != "" {
+		return true
+	}
+
+	return step.Shell != ""
 }

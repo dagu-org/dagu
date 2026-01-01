@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,11 +33,12 @@ func TestSSHExecutor_BuildCommand(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		shell    string
-		command  string
-		args     []string
-		expected string
+		name      string
+		shell     string
+		shellArgs []string
+		command   string
+		args      []string
+		expected  string
 	}{
 		{
 			name:     "NoShell_NoArgs",
@@ -69,6 +69,14 @@ func TestSSHExecutor_BuildCommand(t *testing.T) {
 			expected: "/bin/bash -c 'echo hello'",
 		},
 		{
+			name:      "WithShellAndArgs",
+			shell:     "/bin/bash",
+			shellArgs: []string{"-e"},
+			command:   "echo",
+			args:      []string{"hello"},
+			expected:  "/bin/bash -e -c 'echo hello'",
+		},
+		{
 			name:     "WithShell_PowerShell",
 			shell:    "powershell",
 			command:  "Write-Host",
@@ -80,24 +88,16 @@ func TestSSHExecutor_BuildCommand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e := &sshExecutor{
-				shell: tt.shell,
+				shell:     tt.shell,
+				shellArgs: tt.shellArgs,
 			}
 			result := e.buildCommand(core.CommandEntry{
-				Command:     tt.command,
-				Args:        tt.args,
-				CmdWithArgs: buildCmdWithArgs(tt.command, tt.args),
+				Command: tt.command,
+				Args:    tt.args,
 			})
 			assert.Equal(t, tt.expected, result)
 		})
 	}
-}
-
-// buildCmdWithArgs constructs the CmdWithArgs field for testing
-func buildCmdWithArgs(cmd string, args []string) string {
-	if len(args) == 0 {
-		return cmd
-	}
-	return cmd + " " + cmdutil.ShellQuoteArgs(args)
 }
 
 func TestNewSSHExecutor_WithShellConfig(t *testing.T) {
@@ -107,6 +107,7 @@ func TestNewSSHExecutor_WithShellConfig(t *testing.T) {
 		name          string
 		config        map[string]any
 		expectedShell string
+		expectedArgs  []string
 	}{
 		{
 			name: "ShellFromConfig",
@@ -118,6 +119,18 @@ func TestNewSSHExecutor_WithShellConfig(t *testing.T) {
 				"shell":    "/bin/bash",
 			},
 			expectedShell: "/bin/bash",
+		},
+		{
+			name: "ShellFromConfigWithArgs",
+			config: map[string]any{
+				"user":     "testuser",
+				"ip":       "testip",
+				"port":     22,
+				"password": "testpassword",
+				"shell":    "/bin/bash -e",
+			},
+			expectedShell: "/bin/bash",
+			expectedArgs:  []string{"-e"},
 		},
 		{
 			name: "NoShellInConfig",
@@ -147,6 +160,7 @@ func TestNewSSHExecutor_WithShellConfig(t *testing.T) {
 			sshExec, ok := exec.(*sshExecutor)
 			require.True(t, ok)
 			assert.Equal(t, tt.expectedShell, sshExec.shell)
+			assert.Equal(t, tt.expectedArgs, sshExec.shellArgs)
 		})
 	}
 }
@@ -159,8 +173,9 @@ func TestSSHExecutor_DAGLevelShell(t *testing.T) {
 
 	// Create a mock client with shell set
 	mockClient := &Client{
-		hostPort: "localhost:22",
-		Shell:    "/bin/bash",
+		hostPort:  "localhost:22",
+		Shell:     "/bin/bash",
+		ShellArgs: []string{"-e"},
 	}
 
 	// Create context with the mock client
@@ -181,6 +196,7 @@ func TestSSHExecutor_DAGLevelShell(t *testing.T) {
 	sshExec, ok := exec.(*sshExecutor)
 	require.True(t, ok)
 	assert.Equal(t, "/bin/bash", sshExec.shell)
+	assert.Equal(t, []string{"-e"}, sshExec.shellArgs)
 }
 
 func TestSSHExecutor_StepLevelShellOverridesDAGLevel(t *testing.T) {
@@ -188,8 +204,9 @@ func TestSSHExecutor_StepLevelShellOverridesDAGLevel(t *testing.T) {
 
 	// Create a mock client with DAG-level shell
 	mockClient := &Client{
-		hostPort: "localhost:22",
-		Shell:    "/bin/sh", // DAG-level shell
+		hostPort:  "localhost:22",
+		Shell:     "/bin/sh", // DAG-level shell
+		ShellArgs: []string{"-e"},
 	}
 
 	// Create context with the mock client
@@ -205,7 +222,7 @@ func TestSSHExecutor_StepLevelShellOverridesDAGLevel(t *testing.T) {
 				"ip":       "testip",
 				"port":     22,
 				"password": "testpassword",
-				"shell":    "/bin/zsh", // Step-level shell overrides DAG-level
+				"shell":    "/bin/zsh -o pipefail", // Step-level shell overrides DAG-level
 			},
 		},
 	}
@@ -217,6 +234,7 @@ func TestSSHExecutor_StepLevelShellOverridesDAGLevel(t *testing.T) {
 	require.True(t, ok)
 	// Step-level SSH config should take priority
 	assert.Equal(t, "/bin/zsh", sshExec.shell)
+	assert.Equal(t, []string{"-o", "pipefail"}, sshExec.shellArgs)
 }
 
 func TestSSHExecutor_StepShellFallback(t *testing.T) {
@@ -233,8 +251,9 @@ func TestSSHExecutor_StepShellFallback(t *testing.T) {
 
 	// Create executor with step.Shell set (fallback for UX)
 	step := core.Step{
-		Name:  "ssh-step",
-		Shell: "/bin/bash", // Step-level shell as fallback
+		Name:      "ssh-step",
+		Shell:     "/bin/bash", // Step-level shell as fallback
+		ShellArgs: []string{"-e"},
 		ExecutorConfig: core.ExecutorConfig{
 			Type:   "ssh",
 			Config: nil, // No step-level SSH config
@@ -248,6 +267,7 @@ func TestSSHExecutor_StepShellFallback(t *testing.T) {
 	require.True(t, ok)
 	// step.Shell should be used as fallback
 	assert.Equal(t, "/bin/bash", sshExec.shell)
+	assert.Equal(t, []string{"-e"}, sshExec.shellArgs)
 }
 
 func TestSSHExecutor_SSHConfigShellTakesPriorityOverStepShell(t *testing.T) {
@@ -255,8 +275,9 @@ func TestSSHExecutor_SSHConfigShellTakesPriorityOverStepShell(t *testing.T) {
 
 	// Create a mock client with shell set
 	mockClient := &Client{
-		hostPort: "localhost:22",
-		Shell:    "/bin/zsh", // SSH config shell
+		hostPort:  "localhost:22",
+		Shell:     "/bin/zsh", // SSH config shell
+		ShellArgs: []string{"-e"},
 	}
 
 	// Create context with the mock client
@@ -264,8 +285,9 @@ func TestSSHExecutor_SSHConfigShellTakesPriorityOverStepShell(t *testing.T) {
 
 	// Create executor with both step.Shell and SSH config shell
 	step := core.Step{
-		Name:  "ssh-step",
-		Shell: "/bin/bash", // Step-level shell (should be ignored)
+		Name:      "ssh-step",
+		Shell:     "/bin/bash", // Step-level shell (should be ignored)
+		ShellArgs: []string{"-o", "pipefail"},
 		ExecutorConfig: core.ExecutorConfig{
 			Type:   "ssh",
 			Config: nil, // No step-level SSH config, uses DAG-level
@@ -279,6 +301,7 @@ func TestSSHExecutor_SSHConfigShellTakesPriorityOverStepShell(t *testing.T) {
 	require.True(t, ok)
 	// SSH config shell takes priority over step.Shell
 	assert.Equal(t, "/bin/zsh", sshExec.shell)
+	assert.Equal(t, []string{"-e"}, sshExec.shellArgs)
 }
 
 func TestSSHExecutor_StepSSHConfigWithoutShellIgnoresDAGShell(t *testing.T) {

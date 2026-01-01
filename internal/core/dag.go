@@ -470,6 +470,8 @@ type SSHConfig struct {
 	// Shell is the shell to use for remote command execution.
 	// If not specified, commands are executed directly without shell wrapping.
 	Shell string `json:"shell,omitempty"`
+	// ShellArgs contains additional arguments that should be passed to the shell executable.
+	ShellArgs []string `json:"shellArgs,omitempty"`
 }
 
 // Schedule contains the cron expression and the parsed cron schedule.
