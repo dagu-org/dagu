@@ -486,6 +486,8 @@ func TestBuildShellCommandString(t *testing.T) {
 }
 
 func TestSliceContains(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		slice    []string

@@ -480,25 +480,18 @@ steps:
 	dag, err := spec.Load(th.Context, dagFile)
 	require.NoError(t, err)
 
-	// Poll until we have at least 2 runs or timeout after 2.5 minutes
-	// This is more reliable than sleeping a fixed duration since it doesn't
-	// depend on when the test starts relative to the minute boundary.
-	timeout := time.After(2*time.Minute + 30*time.Second)
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-
-waitLoop:
-	for {
-		select {
-		case <-timeout:
-			break waitLoop
-		case <-ticker.C:
+	// Poll until we have at least 2 runs or timeout after 2.5 minutes. Using
+	// require.Eventually keeps polling consistent with other tests in this file.
+	require.Eventually(
+		t,
+		func() bool {
 			runs := th.DAGRunMgr.ListRecentStatus(th.Context, dag.Name, 10)
-			if len(runs) >= 2 {
-				break waitLoop
-			}
-		}
-	}
+			return len(runs) >= 2
+		},
+		2*time.Minute+30*time.Second,
+		5*time.Second,
+		"expected at least 2 DAG runs within 2.5 minutes",
+	)
 
 	// Stop the scheduler
 	schedulerInstance.Stop(ctx)
