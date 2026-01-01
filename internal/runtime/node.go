@@ -429,28 +429,8 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		return nil
 	}
 
-	var evalOptions []cmdutil.EvalOption
-
-	env := GetEnv(ctx)
-
-	switch n.Step().ExecutorConfig.Type {
-	case "command", "":
-		shellCommand := env.Shell(ctx)
-		if len(shellCommand) > 0 {
-			// Command executor run commands on shell, so we don't need to expand env vars
-			evalOptions = append(evalOptions, cmdutil.WithoutExpandEnv())
-		}
-	case "ssh":
-		// Only disable shell expansion if no shell is configured
-		// This allows environment variables to be expanded by the remote shell
-		step := n.Step()
-		configShell, _ := step.ExecutorConfig.Config["shell"].(string)
-		if step.Shell == "" && configShell == "" {
-			evalOptions = append(evalOptions, cmdutil.WithoutExpandShell())
-		}
-	case "docker", "container":
-		evalOptions = append(evalOptions, cmdutil.WithoutExpandEnv())
-	}
+	// Get eval options from executor capabilities
+	evalOptions := core.EvalOptions(ctx, n.Step())
 
 	step := n.Step()
 

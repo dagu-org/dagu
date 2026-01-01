@@ -330,6 +330,14 @@ func init() {
 		MultipleCommands: true,
 		Script:           true,
 		Shell:            true,
+		GetEvalOptions: func(ctx context.Context, step core.Step) []cmdutil.EvalOption {
+			env := runtime.GetEnv(ctx)
+			if len(env.Shell(ctx)) > 0 {
+				// Shell will handle env expansion
+				return []cmdutil.EvalOption{cmdutil.WithoutExpandEnv()}
+			}
+			return nil
+		},
 	}
 	executor.RegisterExecutor("", NewCommand, validateCommandStep, caps)
 	executor.RegisterExecutor("shell", NewCommand, validateCommandStep, caps)
