@@ -12,7 +12,7 @@ type MetricPoint = components['schemas']['MetricPoint'];
 interface MiniResourceChartProps {
   title: string;
   data: MetricPoint[] | undefined;
-  color: string;
+  color?: string;
   unit?: string;
   isLoading?: boolean;
   error?: string;
@@ -21,11 +21,13 @@ interface MiniResourceChartProps {
 const MiniResourceChart: React.FC<MiniResourceChartProps> = ({
   title,
   data,
-  color,
   unit = '%',
   isLoading,
   error,
 }) => {
+  // Monochrome color - uses CSS variable
+  const strokeColor = 'hsl(var(--foreground) / 0.5)';
+  const fillColor = 'hsl(var(--foreground) / 0.08)';
   const formattedData =
     data?.map((point) => ({
       time: point.timestamp
@@ -36,7 +38,6 @@ const MiniResourceChart: React.FC<MiniResourceChartProps> = ({
 
   const lastPoint = formattedData[formattedData.length - 1];
   const currentValue = lastPoint ? lastPoint.value : 0;
-  const gradientId = `mini-gradient-${title.replace(/\s+/g, '-')}`;
 
   if (error) {
     return (
@@ -68,7 +69,7 @@ const MiniResourceChart: React.FC<MiniResourceChartProps> = ({
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between mb-1">
         <span className="text-xs text-muted-foreground">{title}</span>
-        <span className="text-sm font-semibold" style={{ color }}>
+        <span className="text-sm font-light tabular-nums text-foreground">
           {currentValue.toFixed(0)}{unit}
         </span>
       </div>
@@ -78,12 +79,6 @@ const MiniResourceChart: React.FC<MiniResourceChartProps> = ({
             data={formattedData}
             margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
           >
-            <defs>
-              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={color} stopOpacity={0.3} />
-                <stop offset="100%" stopColor={color} stopOpacity={0.05} />
-              </linearGradient>
-            </defs>
             <Tooltip
               contentStyle={{
                 backgroundColor: 'hsl(var(--background))',
@@ -98,9 +93,9 @@ const MiniResourceChart: React.FC<MiniResourceChartProps> = ({
             <Area
               type="monotone"
               dataKey="value"
-              stroke={color}
-              strokeWidth={1.5}
-              fill={`url(#${gradientId})`}
+              stroke={strokeColor}
+              strokeWidth={1}
+              fill={fillColor}
             />
           </AreaChart>
         </ResponsiveContainer>

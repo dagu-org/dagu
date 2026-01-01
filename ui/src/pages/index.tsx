@@ -460,28 +460,24 @@ function Dashboard(): React.ReactElement | null {
             <MiniResourceChart
               title="CPU"
               data={resourceData?.cpu}
-              color="#c4956a"
               isLoading={!resourceData && !resourceError}
               error={resourceError ? String(resourceError) : undefined}
             />
             <MiniResourceChart
               title="Memory"
               data={resourceData?.memory}
-              color="#8a9fc4"
               isLoading={!resourceData && !resourceError}
               error={resourceError ? String(resourceError) : undefined}
             />
             <MiniResourceChart
               title="Disk"
               data={resourceData?.disk}
-              color="#7da87d"
               isLoading={!resourceData && !resourceError}
               error={resourceError ? String(resourceError) : undefined}
             />
             <MiniResourceChart
               title="Load"
               data={resourceData?.load}
-              color="#d4a574"
               unit=""
               isLoading={!resourceData && !resourceError}
               error={resourceError ? String(resourceError) : undefined}
