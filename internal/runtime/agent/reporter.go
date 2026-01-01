@@ -55,18 +55,6 @@ func (r *reporter) reportStep(
 	return nil
 }
 
-// report is a function that reports the status of the runner.
-func (r *reporter) getSummary(_ context.Context, dagStatus execution.DAGRunStatus, err error) string {
-	var buf bytes.Buffer
-	_, _ = buf.Write([]byte("\n"))
-	_, _ = buf.Write([]byte("Summary ->\n"))
-	_, _ = buf.Write([]byte(renderDAGSummary(dagStatus, err)))
-	_, _ = buf.Write([]byte("\n"))
-	_, _ = buf.Write([]byte("Details ->\n"))
-	_, _ = buf.Write([]byte(renderStepSummary(dagStatus.Nodes)))
-	return buf.String()
-}
-
 // send is a function that sends a report mail.
 func (r *reporter) send(ctx context.Context, dag *core.DAG, dagStatus execution.DAGRunStatus, err error) error {
 	if err != nil || dagStatus.Status == core.Failed {

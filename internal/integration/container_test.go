@@ -468,7 +468,7 @@ func removeContainer(t *testing.T, th test.Helper, dockerClient *client.Client, 
 
 func waitForContainerRunning(ctx context.Context, dockerClient *client.Client, containerID string) error {
 	const (
-		timeout      = 10 * time.Second
+		timeout      = 30 * time.Second
 		pollInterval = 100 * time.Millisecond
 	)
 

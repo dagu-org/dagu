@@ -16,6 +16,10 @@ import (
 	"syscall"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+	"golang.org/x/term"
+
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
@@ -29,14 +33,12 @@ import (
 	"github.com/dagu-org/dagu/internal/common/telemetry"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/output"
 	"github.com/dagu-org/dagu/internal/runtime"
-	runtime1 "github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/docker"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/ssh"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 
 	_ "github.com/dagu-org/dagu/internal/runtime/builtin"
 )
@@ -70,7 +72,7 @@ type Agent struct {
 	peerConfig config.Peer
 
 	// dagRunMgr is the runstore dagRunMgr to communicate with the history.
-	dagRunMgr runtime1.Manager
+	dagRunMgr runtime.Manager
 
 	// runner is the runner instance to run the DAG.
 	runner *runtime.Runner
@@ -163,7 +165,7 @@ func New(
 	dag *core.DAG,
 	logDir string,
 	logFile string,
-	drm runtime1.Manager,
+	drm runtime.Manager,
 	ds execution.DAGStore,
 	drs execution.DAGRunStore,
 	reg execution.ServiceRegistry,
@@ -751,13 +753,23 @@ func (a *Agent) buildOutputs(ctx context.Context, finalStatus core.Status) *exec
 }
 
 func (a *Agent) PrintSummary(ctx context.Context) {
-	// Don't print summary if progress display was shown
-	if a.progressDisplay != nil {
-		return
-	}
+	// Always print tree-structured summary after execution
 	status := a.Status(ctx)
-	summary := a.reporter.getSummary(ctx, status, a.lastErr)
-	println(summary)
+
+	// Create a minimal DAG object for the tree renderer
+	dag := &core.DAG{Name: status.Name}
+
+	// Enable colors if stdout is a terminal
+	config := output.DefaultConfig()
+	config.ColorEnabled = term.IsTerminal(int(os.Stdout.Fd()))
+
+	renderer := output.NewRenderer(config)
+	summary := renderer.RenderDAGStatus(dag, &status)
+
+	// Write to stdout and sync to ensure output is flushed before program exit
+	_, _ = os.Stdout.WriteString(summary)
+	_, _ = os.Stdout.WriteString("\n")
+	_ = os.Stdout.Sync()
 }
 
 // Status collects the current running status of the DAG and returns it.

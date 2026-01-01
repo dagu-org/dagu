@@ -59,18 +59,18 @@ type ProgressModel struct {
 	width            int
 	height           int
 	finalized        bool
+	waitingForKey    bool
 	showChildDetails bool
 
 	// Styles
-	accentColor      lipgloss.Color
-	headerStyle      lipgloss.Style
-	progressBarStyle lipgloss.Style
-	sectionStyle     lipgloss.Style
-	errorStyle       lipgloss.Style
-	successStyle     lipgloss.Style
-	runningStyle     lipgloss.Style
-	faintStyle       lipgloss.Style
-	boldStyle        lipgloss.Style
+	accentColor  lipgloss.Color
+	headerStyle  lipgloss.Style
+	sectionStyle lipgloss.Style
+	errorStyle   lipgloss.Style
+	successStyle lipgloss.Style
+	runningStyle lipgloss.Style
+	faintStyle   lipgloss.Style
+	boldStyle    lipgloss.Style
 }
 
 // NewProgressModel creates a new progress model for Bubble Tea
@@ -157,10 +157,9 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case FinalizeMsg:
 		m.finalized = true
 		m.finishTime = time.Now()
-		// Quit after a short delay to ensure final render
-		return m, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
-			return tea.Quit()
-		})
+		m.waitingForKey = true
+		// Don't quit - wait for key press
+		return m, nil
 
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -168,6 +167,10 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case tea.KeyMsg:
+		if m.waitingForKey {
+			// Any key press exits when waiting
+			return m, tea.Quit
+		}
 		switch msg.String() {
 		case "ctrl+c", "q":
 			m.finalized = true
@@ -561,6 +564,21 @@ func (m ProgressModel) renderSubDAGs() string {
 }
 
 func (m ProgressModel) renderFooter() string {
+	if m.waitingForKey {
+		st := m.getOverallStatus()
+		var statusLine string
+		switch st {
+		case core.Succeeded:
+			statusLine = m.successStyle.Render("✓ Execution completed successfully")
+		case core.Failed:
+			statusLine = m.errorStyle.Render("✗ Execution failed")
+		case core.Aborted:
+			statusLine = lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("⚠ Execution aborted")
+		default:
+			statusLine = m.boldStyle.Render("Execution finished")
+		}
+		return statusLine + "\n\n" + m.faintStyle.Render("Press any key to show details...")
+	}
 	if m.finalized {
 		st := m.getOverallStatus()
 		switch st {
@@ -780,7 +798,9 @@ func (p *ProgressTeaDisplay) Stop() {
 		p.program.Send(FinalizeMsg{})
 		// Wait for the program to exit
 		<-p.done
-		// UI stays visible in alternate screen buffer
+		// Exit alternate screen buffer so tree summary can be shown
+		fmt.Print("\033[?1049l") // Exit alternate screen
+		fmt.Print("\033[?25h")   // Show cursor
 	}
 }
 

@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/term"
+
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
@@ -127,6 +129,11 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	if quiet {
 		opts = append(opts, logger.WithQuiet())
 	}
+	// For agent commands running in a terminal, suppress console output early
+	// to avoid debug logs cluttering the progress display or tree output
+	if !quiet && isAgentCommand(cmd.Name()) && term.IsTerminal(int(os.Stderr.Fd())) && os.Getenv("DISABLE_PROGRESS") == "" {
+		opts = append(opts, logger.WithQuiet())
+	}
 	if cfg.Core.LogFormat != "" {
 		opts = append(opts, logger.WithFormat(cfg.Core.LogFormat))
 	}
@@ -203,6 +210,17 @@ func serviceForCommand(cmdName string) config.Service {
 	default:
 		// For all other commands (status, stop, validate, etc.), load all config
 		return config.ServiceNone
+	}
+}
+
+// isAgentCommand returns true if the command name is an agent command
+// that displays progress or tree output.
+func isAgentCommand(cmdName string) bool {
+	switch cmdName {
+	case "start", "restart", "retry", "dry", "exec":
+		return true
+	default:
+		return false
 	}
 }
 
