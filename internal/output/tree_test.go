@@ -11,6 +11,7 @@ import (
 )
 
 func TestRenderDAGStatus_BasicSuccess(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "test-dag"}
 	status := &execution.DAGRunStatus{
 		Status:     core.Succeeded,
@@ -48,6 +49,7 @@ func TestRenderDAGStatus_BasicSuccess(t *testing.T) {
 }
 
 func TestRenderDAGStatus_FailedStep(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "failed-dag"}
 	status := &execution.DAGRunStatus{
 		Status: core.Failed,
@@ -81,6 +83,7 @@ func TestRenderDAGStatus_FailedStep(t *testing.T) {
 }
 
 func TestRenderDAGStatus_MultipleSteps(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "multi-step-dag"}
 	status := &execution.DAGRunStatus{
 		Status: core.Succeeded,
@@ -118,6 +121,7 @@ func TestRenderDAGStatus_MultipleSteps(t *testing.T) {
 }
 
 func TestRenderDAGStatus_RunningStatus(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "running-dag"}
 	status := &execution.DAGRunStatus{
 		Status:    core.Running,
@@ -142,6 +146,7 @@ func TestRenderDAGStatus_RunningStatus(t *testing.T) {
 }
 
 func TestRenderDAGStatus_AbortedStatus(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "aborted-dag"}
 	status := &execution.DAGRunStatus{
 		Status:     core.Aborted,
@@ -167,6 +172,7 @@ func TestRenderDAGStatus_AbortedStatus(t *testing.T) {
 }
 
 func TestRenderDAGStatus_PartiallySucceededStatus(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "partial-dag"}
 	status := &execution.DAGRunStatus{
 		Status:     core.PartiallySucceeded,
@@ -192,6 +198,7 @@ func TestRenderDAGStatus_PartiallySucceededStatus(t *testing.T) {
 }
 
 func TestRenderDAGStatus_QueuedStatus(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "queued-dag"}
 	status := &execution.DAGRunStatus{
 		Status: core.Queued,
@@ -210,6 +217,7 @@ func TestRenderDAGStatus_QueuedStatus(t *testing.T) {
 }
 
 func TestRenderDAGStatus_NotStartedStatus(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "not-started-dag"}
 	status := &execution.DAGRunStatus{
 		Status: core.NotStarted,
@@ -230,6 +238,7 @@ func TestRenderDAGStatus_NotStartedStatus(t *testing.T) {
 }
 
 func TestRenderDAGStatus_SkippedStep(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "skipped-dag"}
 	status := &execution.DAGRunStatus{
 		Status: core.Succeeded,
@@ -250,6 +259,7 @@ func TestRenderDAGStatus_SkippedStep(t *testing.T) {
 }
 
 func TestRenderDAGStatus_WithSubRuns(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "parent-dag"}
 	status := &execution.DAGRunStatus{
 		Status: core.Succeeded,
@@ -282,6 +292,7 @@ func TestRenderDAGStatus_WithSubRuns(t *testing.T) {
 }
 
 func TestRenderDAGStatus_WithSubRunsNoParams(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "parent-dag"}
 	status := &execution.DAGRunStatus{
 		Status: core.Succeeded,
@@ -308,6 +319,7 @@ func TestRenderDAGStatus_WithSubRunsNoParams(t *testing.T) {
 }
 
 func TestRenderDAGStatus_DisabledOutputs(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "test-dag"}
 	status := &execution.DAGRunStatus{
 		Status: core.Succeeded,
@@ -338,6 +350,7 @@ func TestRenderDAGStatus_DisabledOutputs(t *testing.T) {
 }
 
 func TestRenderDAGStatus_WithActualLogFiles(t *testing.T) {
+	t.Parallel()
 	// Create temporary log files
 	stdoutFile, err := os.CreateTemp("", "stdout-*.log")
 	if err != nil {
@@ -387,6 +400,7 @@ func TestRenderDAGStatus_WithActualLogFiles(t *testing.T) {
 }
 
 func TestRenderDAGStatus_WithTruncatedOutput(t *testing.T) {
+	t.Parallel()
 	// Create temporary log file with many lines
 	stdoutFile, err := os.CreateTemp("", "stdout-*.log")
 	if err != nil {
@@ -426,6 +440,7 @@ func TestRenderDAGStatus_WithTruncatedOutput(t *testing.T) {
 }
 
 func TestRenderDAGStatus_EmptyStartTime(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "test-dag"}
 	status := &execution.DAGRunStatus{
 		Status:    core.NotStarted,
@@ -446,6 +461,7 @@ func TestRenderDAGStatus_EmptyStartTime(t *testing.T) {
 }
 
 func TestRenderDAGStatus_DashStartTime(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "test-dag"}
 	status := &execution.DAGRunStatus{
 		Status:    core.NotStarted,
@@ -465,6 +481,7 @@ func TestRenderDAGStatus_DashStartTime(t *testing.T) {
 }
 
 func TestRenderDAGStatus_NoDuration(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "test-dag"}
 	status := &execution.DAGRunStatus{
 		Status:    core.NotStarted,
@@ -485,6 +502,7 @@ func TestRenderDAGStatus_NoDuration(t *testing.T) {
 }
 
 func TestRenderDAGStatus_InvalidTimeFormat(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "test-dag"}
 	status := &execution.DAGRunStatus{
 		Status:     core.Succeeded,
@@ -506,6 +524,7 @@ func TestRenderDAGStatus_InvalidTimeFormat(t *testing.T) {
 }
 
 func TestReadLogFileTail_AllLines(t *testing.T) {
+	t.Parallel()
 	// Create a temporary file
 	tmpfile, err := os.CreateTemp("", "test-log-*.txt")
 	if err != nil {
@@ -533,6 +552,7 @@ func TestReadLogFileTail_AllLines(t *testing.T) {
 }
 
 func TestReadLogFileTail_WithLimit(t *testing.T) {
+	t.Parallel()
 	// Create a temporary file
 	tmpfile, err := os.CreateTemp("", "test-log-*.txt")
 	if err != nil {
@@ -566,6 +586,7 @@ func TestReadLogFileTail_WithLimit(t *testing.T) {
 }
 
 func TestReadLogFileTail_NegativeLimit(t *testing.T) {
+	t.Parallel()
 	tmpfile, err := os.CreateTemp("", "test-log-*.txt")
 	if err != nil {
 		t.Fatal(err)
@@ -589,6 +610,7 @@ func TestReadLogFileTail_NegativeLimit(t *testing.T) {
 }
 
 func TestReadLogFileTail_EmptyFile(t *testing.T) {
+	t.Parallel()
 	// Create an empty temporary file
 	tmpfile, err := os.CreateTemp("", "test-log-*.txt")
 	if err != nil {
@@ -610,6 +632,7 @@ func TestReadLogFileTail_EmptyFile(t *testing.T) {
 }
 
 func TestReadLogFileTail_NonexistentFile(t *testing.T) {
+	t.Parallel()
 	lines, truncated, err := ReadLogFileTail("/nonexistent/path/file.log", 10)
 	if err != nil {
 		t.Fatalf("Should not return error for nonexistent file, got: %v", err)
@@ -623,6 +646,7 @@ func TestReadLogFileTail_NonexistentFile(t *testing.T) {
 }
 
 func TestReadLogFileTail_EmptyPath(t *testing.T) {
+	t.Parallel()
 	lines, truncated, err := ReadLogFileTail("", 10)
 	if err != nil {
 		t.Fatalf("Should not return error for empty path, got: %v", err)
@@ -636,6 +660,7 @@ func TestReadLogFileTail_EmptyPath(t *testing.T) {
 }
 
 func TestReadLogFileTail_BinaryContent(t *testing.T) {
+	t.Parallel()
 	// Create a temporary file with binary content
 	tmpfile, err := os.CreateTemp("", "test-log-*.bin")
 	if err != nil {
@@ -660,6 +685,7 @@ func TestReadLogFileTail_BinaryContent(t *testing.T) {
 }
 
 func TestReadLogFileAll(t *testing.T) {
+	t.Parallel()
 	tmpfile, err := os.CreateTemp("", "test-log-*.txt")
 	if err != nil {
 		t.Fatal(err)
@@ -679,6 +705,7 @@ func TestReadLogFileAll(t *testing.T) {
 }
 
 func TestReadLogFileAll_EmptyPath(t *testing.T) {
+	t.Parallel()
 	lines, err := ReadLogFileAll("")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -689,6 +716,7 @@ func TestReadLogFileAll_EmptyPath(t *testing.T) {
 }
 
 func TestStatusSymbol(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		status core.Status
 		symbol string
@@ -713,6 +741,7 @@ func TestStatusSymbol(t *testing.T) {
 }
 
 func TestNodeStatusSymbol(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		status core.NodeStatus
 		symbol string
@@ -737,6 +766,7 @@ func TestNodeStatusSymbol(t *testing.T) {
 }
 
 func TestStatusText(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		status core.Status
 		text   string
@@ -760,6 +790,7 @@ func TestStatusText(t *testing.T) {
 }
 
 func TestStatusColorize(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		status core.Status
 	}{
@@ -785,6 +816,7 @@ func TestStatusColorize(t *testing.T) {
 }
 
 func TestNodeStatusColorize(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		status core.NodeStatus
 	}{
@@ -810,6 +842,7 @@ func TestNodeStatusColorize(t *testing.T) {
 }
 
 func TestDefaultConfig(t *testing.T) {
+	t.Parallel()
 	config := DefaultConfig()
 
 	if !config.ColorEnabled {
@@ -828,6 +861,7 @@ func TestDefaultConfig(t *testing.T) {
 }
 
 func TestRenderDAGStatus_TreeStructure(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "tree-test"}
 	status := &execution.DAGRunStatus{
 		Status: core.Succeeded,
@@ -855,6 +889,7 @@ func TestRenderDAGStatus_TreeStructure(t *testing.T) {
 }
 
 func TestIsBinaryContent(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		data     []byte
@@ -877,6 +912,7 @@ func TestIsBinaryContent(t *testing.T) {
 }
 
 func TestRenderDAGStatus_WithMultipleCommands(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "multi-cmd-dag"}
 	status := &execution.DAGRunStatus{
 		Status: core.Succeeded,
@@ -911,6 +947,7 @@ func TestRenderDAGStatus_WithMultipleCommands(t *testing.T) {
 }
 
 func TestRenderDAGStatus_WithLegacyCommand(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "legacy-cmd-dag"}
 	status := &execution.DAGRunStatus{
 		Status: core.Succeeded,
@@ -937,6 +974,7 @@ func TestRenderDAGStatus_WithLegacyCommand(t *testing.T) {
 }
 
 func TestRenderDAGStatus_WithLegacyCommandAndArgs(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "legacy-cmd-dag"}
 	status := &execution.DAGRunStatus{
 		Status: core.Succeeded,
@@ -964,6 +1002,7 @@ func TestRenderDAGStatus_WithLegacyCommandAndArgs(t *testing.T) {
 }
 
 func TestRenderDAGStatus_NoCommand(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "no-cmd-dag"}
 	status := &execution.DAGRunStatus{
 		Status: core.Succeeded,
@@ -987,6 +1026,7 @@ func TestRenderDAGStatus_NoCommand(t *testing.T) {
 }
 
 func TestTrimTrailingEmptyLines(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    []string
@@ -1016,6 +1056,7 @@ func TestTrimTrailingEmptyLines(t *testing.T) {
 }
 
 func TestNodeStatusToStatus(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		nodeStatus core.NodeStatus
 		expected   core.Status
@@ -1040,6 +1081,7 @@ func TestNodeStatusToStatus(t *testing.T) {
 }
 
 func TestRenderDAGStatus_UnknownStatus(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "unknown-dag"}
 	status := &execution.DAGRunStatus{
 		Status: core.Status(999), // Unknown status
@@ -1059,6 +1101,7 @@ func TestRenderDAGStatus_UnknownStatus(t *testing.T) {
 }
 
 func TestRenderDAGStatus_OnlyStdout(t *testing.T) {
+	t.Parallel()
 	stdoutFile, err := os.CreateTemp("", "stdout-*.log")
 	if err != nil {
 		t.Fatal(err)
@@ -1096,6 +1139,7 @@ func TestRenderDAGStatus_OnlyStdout(t *testing.T) {
 }
 
 func TestRenderDAGStatus_OnlyStderr(t *testing.T) {
+	t.Parallel()
 	stderrFile, err := os.CreateTemp("", "stderr-*.log")
 	if err != nil {
 		t.Fatal(err)
@@ -1133,6 +1177,7 @@ func TestRenderDAGStatus_OnlyStderr(t *testing.T) {
 }
 
 func TestReadLogFileTail_PermissionDenied(t *testing.T) {
+	t.Parallel()
 	// Create a temporary file
 	tmpfile, err := os.CreateTemp("", "test-perm-*.txt")
 	if err != nil {
@@ -1164,6 +1209,7 @@ func TestReadLogFileTail_PermissionDenied(t *testing.T) {
 }
 
 func TestCalculateDuration_InvalidFinishedAt(t *testing.T) {
+	t.Parallel()
 	// Test when finishedAt is an invalid time string
 	dag := &core.DAG{Name: "test-dag"}
 	status := &execution.DAGRunStatus{
@@ -1186,6 +1232,7 @@ func TestCalculateDuration_InvalidFinishedAt(t *testing.T) {
 }
 
 func TestCalculateDuration_NotRunningWithDashFinishedAt(t *testing.T) {
+	t.Parallel()
 	// Test when status is not Running and finishedAt is "-"
 	dag := &core.DAG{Name: "test-dag"}
 	status := &execution.DAGRunStatus{
@@ -1209,6 +1256,7 @@ func TestCalculateDuration_NotRunningWithDashFinishedAt(t *testing.T) {
 }
 
 func TestCalculateDuration_NotRunningWithEmptyFinishedAt(t *testing.T) {
+	t.Parallel()
 	// Test when status is not Running and finishedAt is empty
 	dag := &core.DAG{Name: "test-dag"}
 	status := &execution.DAGRunStatus{
@@ -1231,6 +1279,7 @@ func TestCalculateDuration_NotRunningWithEmptyFinishedAt(t *testing.T) {
 }
 
 func TestRenderDAGStatus_NodeDurationWithInvalidTime(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "test-dag"}
 	status := &execution.DAGRunStatus{
 		Status: core.Succeeded,
@@ -1257,6 +1306,7 @@ func TestRenderDAGStatus_NodeDurationWithInvalidTime(t *testing.T) {
 }
 
 func TestRenderDAGStatus_RunningNodeCalculatesDuration(t *testing.T) {
+	t.Parallel()
 	dag := &core.DAG{Name: "test-dag"}
 	status := &execution.DAGRunStatus{
 		Status:    core.Running,
@@ -1287,6 +1337,7 @@ func TestRenderDAGStatus_RunningNodeCalculatesDuration(t *testing.T) {
 }
 
 func TestCleanLogLine_CarriageReturn(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -1351,6 +1402,7 @@ func TestCleanLogLine_CarriageReturn(t *testing.T) {
 }
 
 func TestCleanControlChars(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -1375,6 +1427,7 @@ func TestCleanControlChars(t *testing.T) {
 }
 
 func TestCleanErrorMessage(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -1413,6 +1466,7 @@ func TestCleanErrorMessage(t *testing.T) {
 }
 
 func TestReadLogFileTail_WithCarriageReturns(t *testing.T) {
+	t.Parallel()
 	// Create a temporary file with curl-like progress output
 	tmpfile, err := os.CreateTemp("", "test-curl-*.txt")
 	if err != nil {
