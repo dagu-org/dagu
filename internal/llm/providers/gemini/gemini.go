@@ -143,6 +143,14 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest) ([]byte, error) {
 				Role:  "model", // Gemini uses "model" instead of "assistant"
 				Parts: []part{{Text: m.Content}},
 			})
+
+		case llm.RoleTool:
+			// Gemini uses "function" role for function/tool results.
+			// For basic chat, we include tool results as user messages.
+			contents = append(contents, content{
+				Role:  "user",
+				Parts: []part{{Text: m.Content}},
+			})
 		}
 	}
 

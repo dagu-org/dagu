@@ -125,6 +125,13 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 				Role:    string(m.Role),
 				Content: m.Content,
 			})
+		case llm.RoleTool:
+			// Tool results in Anthropic are sent as user messages with tool_result content blocks.
+			// For basic chat, we include tool results as user messages.
+			messages = append(messages, message{
+				Role:    "user",
+				Content: m.Content,
+			})
 		}
 	}
 

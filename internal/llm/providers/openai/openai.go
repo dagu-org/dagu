@@ -112,6 +112,9 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 		if m.Name != "" {
 			messages[i].Name = m.Name
 		}
+		if m.ToolCallID != "" {
+			messages[i].ToolCallID = m.ToolCallID
+		}
 	}
 
 	chatReq := chatCompletionRequest{
@@ -269,9 +272,10 @@ func (p *Provider) streamResponse(ctx context.Context, body io.ReadCloser, event
 // API request/response types
 
 type message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-	Name    string `json:"name,omitempty"`
+	Role       string `json:"role"`
+	Content    string `json:"content"`
+	Name       string `json:"name,omitempty"`
+	ToolCallID string `json:"tool_call_id,omitempty"`
 }
 
 type streamOptions struct {

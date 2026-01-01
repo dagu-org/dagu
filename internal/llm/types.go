@@ -14,6 +14,8 @@ const (
 	RoleUser Role = "user"
 	// RoleAssistant represents a message from the AI assistant.
 	RoleAssistant Role = "assistant"
+	// RoleTool represents a tool/function call result.
+	RoleTool Role = "tool"
 )
 
 // ParseRole converts a string to a Role, with support for common aliases.
@@ -25,6 +27,8 @@ func ParseRole(s string) Role {
 		return RoleUser
 	case "assistant", "ai", "bot":
 		return RoleAssistant
+	case "tool", "function":
+		return RoleTool
 	default:
 		return Role(s)
 	}
@@ -32,13 +36,16 @@ func ParseRole(s string) Role {
 
 // Message represents a single message in a conversation.
 type Message struct {
-	// Role identifies who sent the message (system, user, or assistant).
+	// Role identifies who sent the message (system, user, assistant, or tool).
 	Role Role `json:"role"`
 	// Content is the text content of the message.
 	Content string `json:"content"`
 	// Name is an optional identifier for the message sender.
-	// Useful in multi-agent scenarios.
+	// Useful in multi-agent scenarios or for tool messages.
 	Name string `json:"name,omitempty"`
+	// ToolCallID is the ID of the tool call this message is responding to.
+	// Required when Role is "tool".
+	ToolCallID string `json:"tool_call_id,omitempty"`
 }
 
 // Usage contains token usage information from an LLM API call.
