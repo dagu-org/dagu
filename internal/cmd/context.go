@@ -217,7 +217,7 @@ func serviceForCommand(cmdName string) config.Service {
 // that displays progress or tree output.
 func isAgentCommand(cmdName string) bool {
 	switch cmdName {
-	case "start", "restart", "retry", "dry":
+	case "start", "restart", "retry", "dry", "exec":
 		return true
 	default:
 		return false
