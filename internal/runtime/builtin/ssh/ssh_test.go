@@ -6,6 +6,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -125,6 +126,87 @@ func TestSSHExecutor_GetEffectiveShell(t *testing.T) {
 	}
 }
 
+func TestSSHExecutor_GetEffectiveShell_DAGLevel(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		dagShell      string
+		dagShellArgs  []string
+		stepShell     string
+		stepShellArgs []string
+		configShell   string
+		wantShell     string
+		wantArgs      []string
+	}{
+		{
+			name:      "DAGShellFallback",
+			dagShell:  "/bin/bash",
+			wantShell: "/bin/bash",
+			wantArgs:  nil,
+		},
+		{
+			name:         "DAGShellWithArgs",
+			dagShell:     "/bin/zsh",
+			dagShellArgs: []string{"-e", "-x"},
+			wantShell:    "/bin/zsh",
+			wantArgs:     []string{"-e", "-x"},
+		},
+		{
+			name:        "StepShellOverridesDAGShell",
+			dagShell:    "/bin/sh",
+			stepShell:   "/bin/bash",
+			wantShell:   "/bin/bash",
+			wantArgs:    nil,
+		},
+		{
+			name:        "ConfigShellOverridesDAGShell",
+			dagShell:    "/bin/sh",
+			configShell: "/bin/zsh",
+			wantShell:   "/bin/zsh",
+			wantArgs:    nil,
+		},
+		{
+			name:          "StepShellTakesPriorityOverAll",
+			dagShell:      "/bin/sh",
+			configShell:   "/bin/zsh",
+			stepShell:     "/bin/bash",
+			stepShellArgs: []string{"-e"},
+			wantShell:     "/bin/bash",
+			wantArgs:      []string{"-e"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create DAG with shell configuration
+			dag := &core.DAG{
+				Name:      "test-dag",
+				Shell:     tt.dagShell,
+				ShellArgs: tt.dagShellArgs,
+			}
+
+			// Create context with DAG
+			ctx := runtime.NewContextForTest(context.Background(), dag, "test-run-id", "")
+			// Create Env and store it in context
+			env := runtime.NewEnv(ctx, core.Step{})
+			ctx = runtime.WithEnv(ctx, env)
+
+			e := &sshExecutor{
+				ctx: ctx,
+				step: core.Step{
+					Shell:     tt.stepShell,
+					ShellArgs: tt.stepShellArgs,
+				},
+				configShell: tt.configShell,
+			}
+			shell, args := e.getEffectiveShell()
+			assert.Equal(t, tt.wantShell, shell)
+			assert.Equal(t, tt.wantArgs, args)
+		})
+	}
+}
+
 func TestSSHExecutor_BuildCommand(t *testing.T) {
 	t.Parallel()
 
@@ -198,6 +280,27 @@ func TestSSHExecutor_BuildCommand(t *testing.T) {
 			command:     "echo",
 			args:        []string{"hello world"},
 			expected:    "/bin/bash -c 'echo '\\''hello world'\\'''",
+		},
+		{
+			name:        "ShellExpansion_CommandSubstitution",
+			configShell: "/bin/sh",
+			command:     "echo $(pwd)",
+			args:        nil,
+			expected:    "/bin/sh -c 'echo $(pwd)'", // Shell should interpret $(pwd)
+		},
+		{
+			name:        "ShellExpansion_VariableExpansion",
+			configShell: "/bin/bash",
+			command:     "echo $HOME",
+			args:        nil,
+			expected:    "/bin/bash -c 'echo $HOME'", // Shell should expand $HOME
+		},
+		{
+			name:        "ShellExpansion_PipeCommand",
+			configShell: "/bin/sh",
+			command:     "ls | grep test",
+			args:        nil,
+			expected:    "/bin/sh -c 'ls | grep test'", // Pipe should work
 		},
 	}
 

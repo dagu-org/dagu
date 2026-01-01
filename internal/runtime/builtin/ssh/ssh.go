@@ -11,6 +11,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"golang.org/x/crypto/ssh"
 )
@@ -35,6 +36,7 @@ func getSSHClientFromContext(ctx context.Context) *Client {
 
 type sshExecutor struct {
 	mu          sync.Mutex
+	ctx         context.Context // Store context for DAG-level shell access
 	step        core.Step
 	client      *Client
 	stdout      io.Writer
@@ -69,6 +71,7 @@ func NewSSHExecutor(ctx context.Context, step core.Step) (executor.Executor, err
 	}
 
 	return &sshExecutor{
+		ctx:         ctx,
 		step:        step,
 		client:      client,
 		configShell: configShell,
@@ -121,15 +124,22 @@ func (e *sshExecutor) Run(ctx context.Context) error {
 }
 
 // getEffectiveShell returns the shell and args to use for command execution.
-// Priority: step.Shell > config.shell > empty (direct execution)
+// Priority: step.Shell > config.shell > DAG.Shell > empty (direct execution)
 func (e *sshExecutor) getEffectiveShell() (string, []string) {
 	// Step-level shell takes highest priority
 	if e.step.Shell != "" {
 		return e.step.Shell, e.step.ShellArgs
 	}
-	// Config-level shell
+	// Config-level shell (SSH executor config)
 	if e.configShell != "" {
 		return e.configShell, nil
+	}
+	// DAG-level shell from context (if context is available)
+	if e.ctx != nil {
+		env := runtime.GetEnv(e.ctx)
+		if env.DAG.Shell != "" {
+			return env.DAG.Shell, env.DAG.ShellArgs
+		}
 	}
 	// No shell - direct execution
 	return "", nil
@@ -138,19 +148,18 @@ func (e *sshExecutor) getEffectiveShell() (string, []string) {
 // buildCommand constructs the command string for SSH execution.
 // Uses shared cmdutil functions for shell command building.
 func (e *sshExecutor) buildCommand(cmdEntry core.CommandEntry) string {
-	// Build base command with proper quoting
-	baseCommand := cmdutil.ShellQuote(cmdEntry.Command)
-	if len(cmdEntry.Args) > 0 {
-		baseCommand += " " + cmdutil.ShellQuoteArgs(cmdEntry.Args)
-	}
-
 	shell, shellArgs := e.getEffectiveShell()
+
 	if shell == "" {
+		// No shell - direct execution, quote command and args for SSH transport
+		baseCommand := cmdutil.ShellQuote(cmdEntry.Command)
+		if len(cmdEntry.Args) > 0 {
+			baseCommand += " " + cmdutil.ShellQuoteArgs(cmdEntry.Args)
+		}
 		return baseCommand
 	}
 
-	// Use shared utility for shell command building
-	return cmdutil.BuildShellCommandString(shell, shellArgs, baseCommand)
+	return cmdutil.BuildShellCommandString(shell, shellArgs, cmdEntry.CmdWithArgs)
 }
 
 // runCommand executes a single command with context cancellation support.
