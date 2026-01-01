@@ -433,9 +433,11 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 
 	env := GetEnv(ctx)
 	shellCommand := env.Shell(ctx)
-	if n.Step().ExecutorConfig.IsCommand() && len(shellCommand) > 0 {
-		// Command executor run commands on shell, so we don't need to expand env vars
-		evalOptions = append(evalOptions, cmdutil.WithoutExpandEnv())
+	if n.Step().ExecutorConfig.IsCommand() {
+		if len(shellCommand) > 0 {
+			// Command executor run commands on shell, so we don't need to expand env vars
+			evalOptions = append(evalOptions, cmdutil.WithoutExpandEnv())
+		}
 	}
 
 	step := n.Step()

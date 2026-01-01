@@ -20,16 +20,18 @@ import (
 )
 
 type EvalOptions struct {
-	ExpandEnv  bool
-	Substitute bool
-	Variables  []map[string]string
-	StepMap    map[string]StepInfo
+	ExpandEnv   bool
+	Substitute  bool
+	Variables   []map[string]string
+	StepMap     map[string]StepInfo
+	ExpandShell bool // Avoid shell expansion for now
 }
 
 func NewEvalOptions() *EvalOptions {
 	return &EvalOptions{
-		ExpandEnv:  true,
-		Substitute: true,
+		ExpandEnv:   true,
+		ExpandShell: true,
+		Substitute:  true,
 	}
 }
 
@@ -50,6 +52,12 @@ func WithStepMap(stepMap map[string]StepInfo) EvalOption {
 func WithoutExpandEnv() EvalOption {
 	return func(opts *EvalOptions) {
 		opts.ExpandEnv = false
+	}
+}
+
+func WithoutExpandShell() EvalOption {
+	return func(opts *EvalOptions) {
+		opts.ExpandShell = false
 	}
 }
 
@@ -209,6 +217,7 @@ func EvalIntString(ctx context.Context, input string, opts ...EvalOption) (int, 
 			value = expanded
 		}
 	}
+
 	value, err := substituteCommands(value)
 	if err != nil {
 		return 0, err
@@ -689,6 +698,13 @@ func replaceVars(template string, vars map[string]string) string {
 }
 
 func expandWithShell(input string, opts *EvalOptions) (string, error) {
+	if !opts.ExpandShell {
+		if !opts.ExpandEnv {
+			return input, nil
+		}
+		return os.ExpandEnv(input), nil
+	}
+
 	parser := syntax.NewParser()
 	word, err := parser.Document(strings.NewReader(input))
 	if err != nil {
