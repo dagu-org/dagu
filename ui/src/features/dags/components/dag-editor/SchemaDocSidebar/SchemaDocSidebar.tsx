@@ -35,7 +35,7 @@ export function SchemaDocSidebar({
   return (
     <div
       className={cn(
-        'w-80 border-l border-border bg-background flex flex-col shrink-0 h-full',
+        'w-80 border-l border-border bg-background flex flex-col shrink-0',
         className
       )}
     >
