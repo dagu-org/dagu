@@ -49,7 +49,7 @@ require (
 	golang.org/x/text v0.29.0
 	google.golang.org/grpc v1.74.2
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.5.1
-	gotest.tools/gotestsum v1.12.3
+	gotest.tools/gotestsum v1.13.0
 	mvdan.cc/sh/v3 v3.12.0
 )
 
