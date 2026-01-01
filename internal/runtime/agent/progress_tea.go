@@ -59,6 +59,7 @@ type ProgressModel struct {
 	width            int
 	height           int
 	finalized        bool
+	waitingForKey    bool
 	showChildDetails bool
 
 	// Styles
@@ -157,10 +158,9 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case FinalizeMsg:
 		m.finalized = true
 		m.finishTime = time.Now()
-		// Quit after a short delay to ensure final render
-		return m, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
-			return tea.Quit()
-		})
+		m.waitingForKey = true
+		// Don't quit - wait for key press
+		return m, nil
 
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -168,6 +168,10 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case tea.KeyMsg:
+		if m.waitingForKey {
+			// Any key press exits when waiting
+			return m, tea.Quit
+		}
 		switch msg.String() {
 		case "ctrl+c", "q":
 			m.finalized = true
@@ -561,6 +565,21 @@ func (m ProgressModel) renderSubDAGs() string {
 }
 
 func (m ProgressModel) renderFooter() string {
+	if m.waitingForKey {
+		st := m.getOverallStatus()
+		var statusLine string
+		switch st {
+		case core.Succeeded:
+			statusLine = m.successStyle.Render("✓ Execution completed successfully")
+		case core.Failed:
+			statusLine = m.errorStyle.Render("✗ Execution failed")
+		case core.Aborted:
+			statusLine = lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("⚠ Execution aborted")
+		default:
+			statusLine = m.boldStyle.Render("Execution finished")
+		}
+		return statusLine + "\n\n" + m.faintStyle.Render("Press any key to show details...")
+	}
 	if m.finalized {
 		st := m.getOverallStatus()
 		switch st {
