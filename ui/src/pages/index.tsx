@@ -405,51 +405,40 @@ function Dashboard(): React.ReactElement | null {
           <RefreshButton onRefresh={handleRefreshAll} />
         </div>
 
-        {/* Status Bar - macOS style */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-3 text-[11px] text-muted-foreground flex-shrink-0">
-          {/* Left: Activity Status */}
-          <div className="flex items-center gap-1 flex-wrap">
-            {hasRunning ? (
-              <>
-                <span className="relative flex h-[6px] w-[6px]">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-foreground/40 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-[6px] w-[6px] bg-foreground/70" />
-                </span>
-                <span className="ml-1 tabular-nums">{metrics[Status.Running]} active</span>
-              </>
-            ) : (
-              <>
-                <span className="h-[6px] w-[6px] rounded-full bg-muted-foreground/30" />
-                <span className="ml-1">Idle</span>
-              </>
-            )}
-            {metrics[Status.Queued] > 0 && (
-              <span className="ml-3 tabular-nums">{metrics[Status.Queued]} pending</span>
-            )}
-            {hasFailures && (
-              <span className="ml-3 text-red-600 dark:text-red-400 tabular-nums">
-                {metrics[Status.Failed]} failed
-              </span>
-            )}
+        {/* Stats Row */}
+        <div className="flex items-baseline gap-6 text-sm text-muted-foreground flex-shrink-0">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-xl font-light tabular-nums text-foreground">{totalDAGRuns}</span>
+            <span className="text-xs">runs</span>
           </div>
-
-          {/* Right: Summary */}
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-            <span className="tabular-nums">{totalDAGRuns} runs</span>
-            <span className="text-muted-foreground/50 hidden sm:inline">·</span>
-            <span className="tabular-nums">{metrics[Status.Success]} succeeded</span>
-            <span className="text-muted-foreground/50 hidden sm:inline">·</span>
-            {servicesHealthy ? (
-              <span className="flex items-center gap-1">
-                <span className="h-[5px] w-[5px] rounded-full bg-emerald-500/70" />
-                <span className="hidden sm:inline">Healthy</span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-xl font-light tabular-nums text-foreground">{metrics[Status.Success]}</span>
+            <span className="text-xs">succeeded</span>
+          </div>
+          <div className="flex items-baseline gap-1.5">
+            <span className={`text-xl font-light tabular-nums ${hasFailures ? 'text-foreground' : 'text-muted-foreground/50'}`}>{metrics[Status.Failed]}</span>
+            <span className="text-xs">failed</span>
+          </div>
+          {hasRunning && (
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-xl font-light tabular-nums text-foreground">{metrics[Status.Running]}</span>
+              <span className="text-xs">active</span>
+              <span className="relative flex h-1.5 w-1.5 self-center ml-0.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-foreground/40 opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-foreground/70" />
               </span>
-            ) : (
-              <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                <span className="h-[5px] w-[5px] rounded-full bg-amber-500" />
-                <span className="hidden sm:inline">Degraded</span>
-              </span>
-            )}
+            </div>
+          )}
+          {metrics[Status.Queued] > 0 && (
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-xl font-light tabular-nums text-foreground">{metrics[Status.Queued]}</span>
+              <span className="text-xs">queued</span>
+            </div>
+          )}
+          <div className="flex-1" />
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className={`h-1.5 w-1.5 rounded-full ${servicesHealthy ? 'bg-foreground/50' : 'bg-foreground'}`} />
+            <span>{servicesHealthy ? 'Healthy' : 'Degraded'}</span>
           </div>
         </div>
 
