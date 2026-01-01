@@ -381,7 +381,7 @@ function Dashboard(): React.ReactElement | null {
                 : date.endOf('day');
               handleDateChange(startOfDay.unix(), endOfDay.unix());
             }}
-            className="h-9 w-[140px]"
+            className="h-9 w-[150px]"
           />
           <Button
             variant="outline"
@@ -406,40 +406,31 @@ function Dashboard(): React.ReactElement | null {
         </div>
 
         {/* Stats Row */}
-        <div className="flex items-baseline gap-6 text-sm text-muted-foreground flex-shrink-0">
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-xl font-light tabular-nums text-foreground">{totalDAGRuns}</span>
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 sm:gap-x-6 text-sm text-muted-foreground flex-shrink-0">
+          <div className="flex items-baseline gap-1">
+            <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">{totalDAGRuns}</span>
             <span className="text-xs">runs</span>
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-xl font-light tabular-nums text-foreground">{metrics[Status.Success]}</span>
-            <span className="text-xs">succeeded</span>
+          <div className="flex items-baseline gap-1">
+            <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">{metrics[Status.Success]}</span>
+            <span className="text-xs">ok</span>
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className={`text-xl font-light tabular-nums ${hasFailures ? 'text-foreground' : 'text-muted-foreground/50'}`}>{metrics[Status.Failed]}</span>
+          <div className="flex items-baseline gap-1">
+            <span className={`text-lg sm:text-xl font-light tabular-nums ${hasFailures ? 'text-foreground' : 'text-muted-foreground/50'}`}>{metrics[Status.Failed]}</span>
             <span className="text-xs">failed</span>
           </div>
           {hasRunning && (
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-xl font-light tabular-nums text-foreground">{metrics[Status.Running]}</span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">{metrics[Status.Running]}</span>
               <span className="text-xs">active</span>
-              <span className="relative flex h-1.5 w-1.5 self-center ml-0.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-foreground/40 opacity-75" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-foreground/70" />
-              </span>
             </div>
           )}
           {metrics[Status.Queued] > 0 && (
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-xl font-light tabular-nums text-foreground">{metrics[Status.Queued]}</span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">{metrics[Status.Queued]}</span>
               <span className="text-xs">queued</span>
             </div>
           )}
-          <div className="flex-1" />
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className={`h-1.5 w-1.5 rounded-full ${servicesHealthy ? 'bg-foreground/50' : 'bg-foreground'}`} />
-            <span>{servicesHealthy ? 'Healthy' : 'Degraded'}</span>
-          </div>
         </div>
 
         {/* Timeline Visualization - Hero */}
