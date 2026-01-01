@@ -99,19 +99,23 @@ func NewRenderer(config Config) *Renderer {
 func (r *Renderer) RenderDAGStatus(dag *core.DAG, status *execution.DAGRunStatus) string {
 	var buf strings.Builder
 
-	// Header line: ● Running - 2024-01-15 16:52:58
+	// Header line
 	buf.WriteString(r.renderHeader(status))
 	buf.WriteString("\n\n")
 
-	// DAG line: dag: my_dag (6s 619ms)
+	// DAG line
 	buf.WriteString(r.renderDAGLine(dag, status))
-	buf.WriteString("\n\n")
+	buf.WriteString("\n")
+
+	// Tree continuation after DAG line (if there are steps)
+	if len(status.Nodes) > 0 {
+		buf.WriteString("│\n")
+	}
 
 	// Render each step as a tree branch
 	for i, node := range status.Nodes {
 		isLast := i == len(status.Nodes)-1
 		buf.WriteString(r.renderStep(node, isLast, ""))
-		buf.WriteString("\n") // Vertical spacing between steps
 	}
 
 	// Final status line
@@ -155,7 +159,7 @@ func (r *Renderer) renderStep(node *execution.Node, isLast bool, prefix string) 
 		branch = TreeLastBranch
 	}
 
-	// Build step line: tree chars faint, text sepia
+	// Build step line
 	textPart := node.Step.Name
 
 	// Add duration for steps that ran
@@ -178,21 +182,50 @@ func (r *Renderer) renderStep(node *execution.Node, isLast bool, prefix string) 
 
 	// For skipped/aborted/not-started steps, don't show details
 	if node.Status == core.NodeSkipped || node.Status == core.NodeAborted || node.Status == core.NodeNotStarted {
+		// Add spacing after step (with tree continuation if not last)
+		if !isLast {
+			buf.WriteString(prefix + TreePipe + "\n")
+		}
 		return buf.String()
 	}
 
-	// Calculate prefix for child elements (tree lines colored)
+	// Calculate prefix for child elements
 	childPrefix := prefix
 	if isLast {
-		childPrefix += r.treeLine(TreeSpace)
+		childPrefix += TreeSpace
 	} else {
-		childPrefix += r.treeLine(TreePipe)
+		childPrefix += TreePipe
 	}
 
 	// Check what child elements we have
 	hasOutput := r.hasOutput(node)
 	hasError := node.Error != "" && node.Status == core.NodeFailed
 	hasSubRuns := len(node.SubRuns) > 0
+
+	// Count remaining fields for proper spacing
+	fieldCount := 0
+	if hasOutput {
+		fieldCount++
+	}
+	if hasSubRuns {
+		fieldCount++
+	}
+	if hasError {
+		fieldCount++
+	}
+
+	// Track if we've written any field (for spacing)
+	wroteField := false
+	remainingFields := fieldCount
+
+	// Helper to add vertical spacing between fields with tree continuation
+	addFieldSpacing := func() {
+		if wroteField && remainingFields > 0 {
+			// Show tree continuation: childPrefix + "│" for connected look
+			buf.WriteString(childPrefix + "│\n")
+		}
+		wroteField = true
+	}
 
 	// Render commands
 	commands := node.Step.Commands
@@ -204,6 +237,7 @@ func (r *Renderer) renderStep(node *execution.Node, isLast bool, prefix string) 
 		if cmdStr != "" {
 			isLastChild := !hasOutput && !hasError && !hasSubRuns
 			buf.WriteString(r.renderCommandLine(cmdStr, isLastChild, childPrefix))
+			wroteField = true
 		}
 	} else {
 		// Modern multi-command format
@@ -211,23 +245,35 @@ func (r *Renderer) renderStep(node *execution.Node, isLast bool, prefix string) 
 			isLastCmd := i == len(commands)-1 && !hasOutput && !hasError && !hasSubRuns
 			buf.WriteString(r.renderCommandLine(cmd.String(), isLastCmd, childPrefix))
 		}
+		wroteField = true
 	}
 
 	// Render stdout/stderr
 	if hasOutput {
+		addFieldSpacing()
+		remainingFields--
 		isLastOutput := !hasError && !hasSubRuns
 		buf.WriteString(r.renderOutputs(node, isLastOutput, childPrefix))
 	}
 
 	// Render sub-DAG runs if present
 	if hasSubRuns {
+		addFieldSpacing()
+		remainingFields--
 		isLastSubRuns := !hasError
 		buf.WriteString(r.renderSubRuns(node.SubRuns, isLastSubRuns, childPrefix))
 	}
 
 	// Render error message if step failed
 	if hasError {
+		addFieldSpacing()
+		remainingFields--
 		buf.WriteString(r.renderError(node.Error, childPrefix))
+	}
+
+	// Add spacing after step (with tree continuation if not last step)
+	if !isLast {
+		buf.WriteString(prefix + TreePipe + "\n")
 	}
 
 	return buf.String()
@@ -523,8 +569,8 @@ func (r *Renderer) renderError(errMsg string, prefix string) string {
 	// Wrap long error messages
 	var buf strings.Builder
 	wrapped := wrapText(errStr, maxWidth)
-	// Continuation aligns with text after "└─" (add spaces to match visual width)
-	contPrefix := prefix + "   "
+	// Continuation aligns with text after "└─" (2 spaces to match branch width)
+	contPrefix := prefix + "  "
 	for i, line := range wrapped {
 		if i == 0 {
 			buf.WriteString(prefix + r.treeLine(TreeLastBranch) + r.text(line) + "\n")
