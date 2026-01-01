@@ -48,26 +48,26 @@ function NodeStatusTable({ nodes, status, fileName, onViewLog }: Props) {
           <Table className="w-full">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[5%] py-3 text-sm font-semibold text-foreground/90 text-center">
+                <TableHead className="w-[5%] py-2 text-xs font-medium text-muted-foreground text-center">
                   No
                 </TableHead>
-                <TableHead className="w-[20%] py-3 text-sm font-semibold text-foreground/90">
+                <TableHead className="w-[20%] py-2 text-xs font-medium text-muted-foreground">
                   Step Name
                 </TableHead>
-                <TableHead className="w-[15%] py-3 text-sm font-semibold text-foreground/90">
+                <TableHead className="w-[15%] py-2 text-xs font-medium text-muted-foreground">
                   Command
                 </TableHead>
-                <TableHead className="w-[15%] py-3 text-sm font-semibold text-foreground/90">
+                <TableHead className="w-[15%] py-2 text-xs font-medium text-muted-foreground">
                   Last Run
                 </TableHead>
-                <TableHead className="w-[10%] py-3 text-center text-sm font-semibold text-foreground/90">
+                <TableHead className="w-[10%] py-2 text-center text-xs font-medium text-muted-foreground">
                   Status
                 </TableHead>
-                <TableHead className="w-[35%] py-3 text-sm font-semibold text-foreground/90 min-w-[150px]">
+                <TableHead className="w-[35%] py-2 text-xs font-medium text-muted-foreground min-w-[150px]">
                   Error / Logs
                 </TableHead>
                 {status?.dagRunId && (
-                  <TableHead className="w-[8%] py-3 text-sm font-semibold text-foreground/90 text-center">
+                  <TableHead className="w-[8%] py-2 text-xs font-medium text-muted-foreground text-center">
                     Actions
                   </TableHead>
                 )}

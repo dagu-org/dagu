@@ -479,11 +479,11 @@
 }
 
 /* =============================================================================
-   3D SEPIA BUTTON SYSTEM
-   Clean, tactile buttons using border-based depth (no shadows)
+   CLASSIC 3D BUTTON SYSTEM
+   Tactile, raised buttons with refined depth - classic desktop feel
    ============================================================================= */
 
-/* Primary Button - Sepia/Tan with thick bottom border */
+/* Primary Button - Warm sepia with classic 3D depth */
 .btn-3d-primary {
   background: linear-gradient(
     180deg,
@@ -492,7 +492,8 @@
   );
   color: white;
   border: none;
-  border-bottom: 4px solid rgb(var(--btn-primary-platform));
+  border-bottom: 3px solid rgb(var(--btn-primary-platform));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
   transition: all 0.1s ease;
 }
 
@@ -503,24 +504,26 @@
     rgb(var(--btn-primary-hover-bottom)) 100%
   );
   transform: translateY(-1px);
-  border-bottom-width: 5px;
+  border-bottom-width: 4px;
 }
 
 .btn-3d-primary:active {
   transform: translateY(2px);
-  border-bottom-width: 2px;
+  border-bottom-width: 1px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
-/* Secondary/Default Button - Cream with bottom border */
+/* Secondary/Default Button - Cream with refined 3D */
 .btn-3d-secondary {
   background: linear-gradient(
     180deg,
     rgb(var(--btn-secondary-top)) 0%,
     rgb(var(--btn-secondary-bottom)) 100%
   );
-  color: #3d3833;
+  color: rgb(var(--text));
   border: 1px solid rgb(var(--btn-secondary-border));
-  border-bottom: 4px solid rgb(var(--btn-secondary-platform));
+  border-bottom: 3px solid rgb(var(--btn-secondary-platform));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
   transition: all 0.1s ease;
 }
 
@@ -531,15 +534,16 @@
     rgb(var(--btn-secondary-hover-bottom)) 100%
   );
   transform: translateY(-1px);
-  border-bottom-width: 5px;
+  border-bottom-width: 4px;
 }
 
 .btn-3d-secondary:active {
   transform: translateY(2px);
-  border-bottom-width: 2px;
+  border-bottom-width: 1px;
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.08);
 }
 
-/* Outline Button - Same as secondary */
+/* Outline Button - Same style as secondary */
 .btn-3d-outline {
   background: linear-gradient(
     180deg,
@@ -549,6 +553,7 @@
   color: rgb(var(--text));
   border: 1px solid rgb(var(--btn-secondary-border));
   border-bottom: 3px solid rgb(var(--btn-secondary-platform));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
   transition: all 0.1s ease;
 }
 
@@ -563,11 +568,12 @@
 }
 
 .btn-3d-outline:active {
-  transform: translateY(1px);
-  border-bottom-width: 2px;
+  transform: translateY(2px);
+  border-bottom-width: 1px;
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.08);
 }
 
-/* Ghost Button - Minimal, appears on hover */
+/* Ghost Button - Subtle, appears on hover */
 .btn-3d-ghost {
   background: transparent;
   color: rgb(var(--text));
@@ -577,17 +583,18 @@
 }
 
 .btn-3d-ghost:hover {
-  background: rgb(var(--btn-secondary-top));
-  border-bottom: 3px solid rgb(var(--btn-secondary-platform));
-  transform: translateY(-1px);
+  background: rgba(var(--btn-secondary-top), 0.8);
+  border: 1px solid rgba(var(--btn-secondary-border), 0.5);
+  border-bottom: 2px solid rgba(var(--btn-secondary-platform), 0.5);
 }
 
 .btn-3d-ghost:active {
   transform: translateY(1px);
   border-bottom-width: 1px;
+  background: rgba(var(--btn-secondary-bottom), 0.9);
 }
 
-/* Destructive Button - Soft red with depth */
+/* Destructive Button - Soft red with 3D depth */
 .btn-3d-destructive {
   background: linear-gradient(
     180deg,
@@ -596,7 +603,8 @@
   );
   color: #5c1a1a;
   border: 1px solid rgb(var(--btn-destructive-border));
-  border-bottom: 4px solid rgb(var(--btn-destructive-platform));
+  border-bottom: 3px solid rgb(var(--btn-destructive-platform));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
   transition: all 0.1s ease;
 }
 
@@ -607,21 +615,22 @@
     rgb(var(--btn-destructive-top)) 100%
   );
   transform: translateY(-1px);
-  border-bottom-width: 5px;
+  border-bottom-width: 4px;
 }
 
 .btn-3d-destructive:active {
   transform: translateY(2px);
-  border-bottom-width: 2px;
+  border-bottom-width: 1px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.12);
 }
 
-/* Link variant - no 3D, just text */
+/* Link variant - text only */
 .btn-3d-link {
   background: transparent;
   color: rgb(var(--link));
   border: none;
   text-decoration: underline;
-  text-underline-offset: 4px;
+  text-underline-offset: 3px;
 }
 
 .btn-3d-link:hover {
@@ -646,6 +655,6 @@
 .btn-3d-outline:focus-visible,
 .btn-3d-ghost:focus-visible,
 .btn-3d-destructive:focus-visible {
-  outline: 2px solid rgb(var(--ring));
+  outline: 2px solid rgba(var(--primary), 0.5);
   outline-offset: 2px;
 }

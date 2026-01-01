@@ -17,8 +17,10 @@ export interface SchemaLookupResult {
 
 /**
  * Hook to look up schema information for a given YAML path
+ * @param path The YAML path to look up
+ * @param yamlContent Optional YAML content for context-aware resolution of if-then conditionals
  */
-export function useSchemaLookup(path: string[]): SchemaLookupResult {
+export function useSchemaLookup(path: string[], yamlContent?: string): SchemaLookupResult {
   const { schema, loading, error } = useSchema();
 
   const result = useMemo(() => {
@@ -29,17 +31,17 @@ export function useSchemaLookup(path: string[]): SchemaLookupResult {
       };
     }
 
-    const schemaAtPath = getSchemaAtPath(schema, path);
-    const parentRequired = getParentRequired(schema, path);
+    const schemaAtPath = getSchemaAtPath(schema, path, yamlContent);
+    const parentRequired = getParentRequired(schema, path, yamlContent);
     const currentKey = path[path.length - 1] ?? '';
     const propertyInfo = toPropertyInfo(schemaAtPath, currentKey, path, parentRequired);
-    const siblingProperties = getSiblingProperties(schema, path);
+    const siblingProperties = getSiblingProperties(schema, path, yamlContent);
 
     return {
       propertyInfo,
       siblingProperties,
     };
-  }, [schema, path]);
+  }, [schema, path, yamlContent]);
 
   return {
     ...result,

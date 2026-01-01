@@ -2,6 +2,18 @@
  * Utilities for navigating and resolving JSON Schema paths
  */
 
+import { parse as parseYaml } from 'yaml';
+
+/**
+ * Context for schema resolution with YAML document values
+ */
+export interface SchemaContext {
+  /** Parsed YAML document */
+  document?: unknown;
+  /** Current path being resolved */
+  currentPath?: string[];
+}
+
 export interface JSONSchema {
   $ref?: string;
   type?: string | string[];
@@ -25,6 +37,11 @@ export interface JSONSchema {
   maxLength?: number;
   pattern?: string;
   format?: string;
+  // JSON Schema Draft 7 conditional keywords
+  if?: JSONSchema;
+  then?: JSONSchema;
+  else?: JSONSchema;
+  const?: unknown;
 }
 
 export interface SchemaPropertyInfo {
@@ -46,14 +63,99 @@ export interface SchemaPropertyInfo {
 }
 
 /**
+ * Gets a value from a parsed YAML document at the specified path
+ */
+function getValueAtPath(document: unknown, path: string[]): unknown {
+  let current: unknown = document;
+  for (const segment of path) {
+    if (current === null || current === undefined) {
+      return undefined;
+    }
+    if (typeof current !== 'object') {
+      return undefined;
+    }
+    if (Array.isArray(current)) {
+      const index = parseInt(segment, 10);
+      if (isNaN(index)) {
+        return undefined;
+      }
+      current = current[index];
+    } else {
+      current = (current as Record<string, unknown>)[segment];
+    }
+  }
+  return current;
+}
+
+/**
+ * Evaluates if a JSON Schema condition matches against a value
+ */
+function evaluateCondition(condition: JSONSchema, value: unknown): boolean {
+  // Check properties conditions (e.g., { properties: { type: { const: "docker" } } })
+  if (condition.properties && typeof value === 'object' && value !== null) {
+    const obj = value as Record<string, unknown>;
+    for (const [propName, propCondition] of Object.entries(condition.properties)) {
+      const propValue = obj[propName];
+      if (!evaluateCondition(propCondition, propValue)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // Check const condition
+  if (condition.const !== undefined) {
+    return value === condition.const;
+  }
+
+  // Check enum condition
+  if (condition.enum !== undefined) {
+    return condition.enum.includes(value);
+  }
+
+  // Check type condition
+  if (condition.type !== undefined) {
+    const types = Array.isArray(condition.type) ? condition.type : [condition.type];
+    const actualType = typeof value;
+    if (value === null) {
+      return types.includes('null');
+    }
+    if (Array.isArray(value)) {
+      return types.includes('array');
+    }
+    if (actualType === 'number') {
+      return types.includes('number') || types.includes('integer');
+    }
+    return types.includes(actualType);
+  }
+
+  // Default: condition passes
+  return true;
+}
+
+/**
  * Resolves a schema at a given YAML path
+ * @param schema The root JSON schema
+ * @param path The path to resolve
+ * @param yamlContent Optional YAML content for context-aware resolution of if-then conditionals
  */
 export function getSchemaAtPath(
   schema: JSONSchema,
-  path: string[]
+  path: string[],
+  yamlContent?: string
 ): JSONSchema | null {
   if (!schema || path.length === 0) {
     return schema;
+  }
+
+  // Parse YAML content once if provided
+  let document: unknown = undefined;
+  if (yamlContent) {
+    try {
+      document = parseYaml(yamlContent);
+    } catch {
+      // Ignore parse errors, proceed without context
+    }
   }
 
   let current: JSONSchema | null = schema;
@@ -80,6 +182,22 @@ export function getSchemaAtPath(
     const prop: JSONSchema | undefined = current.properties?.[segment];
     if (prop) {
       currentRequired = current.required || [];
+
+      // Check if current schema has allOf with if-then that overrides this property
+      if (current.allOf) {
+        const parentPath = path.slice(0, i + 1);
+        const parentValue = document ? getValueAtPath(document, parentPath.slice(0, -1)) : undefined;
+
+        const allOfOverride = findInAllOfWithContext(current.allOf, segment, parentValue);
+        if (allOfOverride) {
+          const overrideProp = allOfOverride.properties?.[segment];
+          if (overrideProp) {
+            current = overrideProp;
+            continue;
+          }
+        }
+      }
+
       current = prop;
       continue;
     }
@@ -88,14 +206,33 @@ export function getSchemaAtPath(
     const unionMatch = findInUnionTypes(current, segment);
     if (unionMatch) {
       currentRequired = unionMatch.required || [];
-      const unionProp = unionMatch.properties?.[segment];
+      let unionProp = unionMatch.properties?.[segment];
+
+      // Check if the matched union variant has allOf with if-then that overrides this property
+      if (unionMatch.allOf && unionProp) {
+        // Get the parent object value for context-aware condition evaluation
+        const parentPath = path.slice(0, i);
+        const parentValue = document ? getValueAtPath(document, parentPath) : undefined;
+
+        const allOfOverride = findInAllOfWithContext(unionMatch.allOf, segment, parentValue);
+        if (allOfOverride) {
+          const overrideProp = allOfOverride.properties?.[segment];
+          if (overrideProp) {
+            unionProp = overrideProp;
+          }
+        }
+      }
+
       current = unionProp || unionMatch;
       continue;
     }
 
     // Try allOf - merge all schemas and look for property
     if (current.allOf) {
-      const allOfMatch = findInAllOf(current.allOf, segment);
+      const parentPath = path.slice(0, i);
+      const parentValue = document ? getValueAtPath(document, parentPath) : undefined;
+
+      const allOfMatch = findInAllOfWithContext(current.allOf, segment, parentValue);
       if (allOfMatch) {
         currentRequired = allOfMatch.required || [];
         const allOfProp = allOfMatch.properties?.[segment];
@@ -191,14 +328,102 @@ function findInUnionTypes(schema: JSONSchema, propertyName: string): JSONSchema 
 }
 
 /**
- * Searches allOf schemas for a property
+ * Searches allOf schemas for a property with context-aware if-then evaluation
+ * @param allOf Array of schemas in allOf
+ * @param propertyName Property to search for
+ * @param contextValue The actual value from YAML document for condition evaluation
+ */
+function findInAllOfWithContext(
+  allOf: JSONSchema[],
+  propertyName: string,
+  contextValue: unknown
+): JSONSchema | null {
+  // First pass: try to find a matching if-then conditional
+  if (contextValue !== undefined) {
+    for (const schema of allOf) {
+      // Check if-then-else conditionals with actual value evaluation
+      if (schema.if !== undefined) {
+        const conditionMatches = evaluateCondition(schema.if, contextValue);
+
+        if (conditionMatches && schema.then) {
+          // Condition matches, check 'then' branch
+          if (schema.then.properties?.[propertyName]) {
+            return schema.then;
+          }
+          // Check nested structures in 'then'
+          if (schema.then.oneOf || schema.then.anyOf) {
+            const nested = findInUnionTypes(schema.then, propertyName);
+            if (nested) return nested;
+          }
+          if (schema.then.allOf) {
+            const nested = findInAllOfWithContext(schema.then.allOf, propertyName, contextValue);
+            if (nested) return nested;
+          }
+        } else if (!conditionMatches && schema.else) {
+          // Condition doesn't match, check 'else' branch
+          if (schema.else.properties?.[propertyName]) {
+            return schema.else;
+          }
+          if (schema.else.oneOf || schema.else.anyOf) {
+            const nested = findInUnionTypes(schema.else, propertyName);
+            if (nested) return nested;
+          }
+          if (schema.else.allOf) {
+            const nested = findInAllOfWithContext(schema.else.allOf, propertyName, contextValue);
+            if (nested) return nested;
+          }
+        }
+      }
+    }
+  }
+
+  // Second pass: fall back to non-contextual search
+  return findInAllOf(allOf, propertyName);
+}
+
+/**
+ * Searches allOf schemas for a property (fallback without context)
  */
 function findInAllOf(allOf: JSONSchema[], propertyName: string): JSONSchema | null {
   for (const schema of allOf) {
     if (schema.properties?.[propertyName]) {
       return schema;
     }
-    // Check nested structures
+
+    // Check if-then-else conditionals (JSON Schema Draft 7) - returns first match
+    if (schema.if !== undefined) {
+      // Check 'then' branch
+      if (schema.then?.properties?.[propertyName]) {
+        return schema.then;
+      }
+      if (schema.then) {
+        if (schema.then.oneOf || schema.then.anyOf) {
+          const nested = findInUnionTypes(schema.then, propertyName);
+          if (nested) return nested;
+        }
+        if (schema.then.allOf) {
+          const nested = findInAllOf(schema.then.allOf, propertyName);
+          if (nested) return nested;
+        }
+      }
+
+      // Check 'else' branch
+      if (schema.else?.properties?.[propertyName]) {
+        return schema.else;
+      }
+      if (schema.else) {
+        if (schema.else.oneOf || schema.else.anyOf) {
+          const nested = findInUnionTypes(schema.else, propertyName);
+          if (nested) return nested;
+        }
+        if (schema.else.allOf) {
+          const nested = findInAllOf(schema.else.allOf, propertyName);
+          if (nested) return nested;
+        }
+      }
+    }
+
+    // Check nested union types (oneOf/anyOf)
     if (schema.oneOf || schema.anyOf) {
       const nested = findInUnionTypes(schema, propertyName);
       if (nested) return nested;
@@ -315,14 +540,15 @@ function resolveType(schema: JSONSchema): string | string[] {
  */
 export function getSiblingProperties(
   schema: JSONSchema,
-  path: string[]
+  path: string[],
+  yamlContent?: string
 ): string[] {
   if (path.length === 0) {
     return Object.keys(schema.properties || {});
   }
 
   const parentPath = path.slice(0, -1);
-  const parentSchema = getSchemaAtPath(schema, parentPath);
+  const parentSchema = getSchemaAtPath(schema, parentPath, yamlContent);
 
   if (!parentSchema?.properties) {
     return [];
@@ -336,14 +562,15 @@ export function getSiblingProperties(
  */
 export function getParentRequired(
   schema: JSONSchema,
-  path: string[]
+  path: string[],
+  yamlContent?: string
 ): string[] {
   if (path.length === 0) {
     return schema.required || [];
   }
 
   const parentPath = path.slice(0, -1);
-  const parentSchema = getSchemaAtPath(schema, parentPath);
+  const parentSchema = getSchemaAtPath(schema, parentPath, yamlContent);
 
   return parentSchema?.required || [];
 }

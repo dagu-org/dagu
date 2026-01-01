@@ -1029,7 +1029,37 @@
           "$ref": "#/definitions/executorConfig",
           "description": "Executor-specific configuration. This is the new format replacing executor.config. Cannot be used together with 'executor' field."
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "http" } } },
+          "then": { "properties": { "config": { "$ref": "#/definitions/httpExecutorConfig" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "ssh" } } },
+          "then": { "properties": { "config": { "$ref": "#/definitions/sshExecutorConfig" } } }
+        },
+        {
+          "if": { "properties": { "type": { "enum": ["docker", "container"] } } },
+          "then": { "properties": { "config": { "$ref": "#/definitions/dockerExecutorConfig" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "mail" } } },
+          "then": { "properties": { "config": { "$ref": "#/definitions/mailExecutorConfig" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "jq" } } },
+          "then": { "properties": { "config": { "$ref": "#/definitions/jqExecutorConfig" } } }
+        },
+        {
+          "if": { "properties": { "type": { "enum": ["gha", "github_action", "github-action"] } } },
+          "then": { "properties": { "config": { "$ref": "#/definitions/ghaExecutorConfig" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "archive" } } },
+          "then": { "properties": { "config": { "$ref": "#/definitions/archiveExecutorConfig" } } }
+        }
+      ]
     },
     "condition": {
       "type": "object",

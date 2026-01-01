@@ -207,13 +207,27 @@ function parseByLineAnalysis(content: string, offset: number): YamlCursorInfo {
   // Find which line the offset is on
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (!line) continue;
-    const lineLength = line.length + 1; // +1 for newline
+    const lineLength = (line?.length ?? 0) + 1; // +1 for newline
     if (currentOffset + lineLength > offset) {
       targetLine = i;
       break;
     }
     currentOffset += lineLength;
+  }
+
+  // Check if cursor is on an empty line at root level (indent 0)
+  const targetLineContent = lines[targetLine] ?? '';
+  const targetTrimmed = targetLineContent.trimStart();
+  const targetIndent = targetLineContent.length - targetTrimmed.length;
+
+  // If cursor is on empty/whitespace-only line at root level, return empty path
+  if (!targetTrimmed && targetIndent === 0) {
+    return {
+      path: [],
+      segments: [],
+      currentKey: null,
+      isInValue: false,
+    };
   }
 
   const path: string[] = [];

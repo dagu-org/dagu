@@ -8,18 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Calendar,
-  CheckCircle,
-  Clock,
-  Filter,
-  ListChecks,
-  Loader2,
-  Play,
-  Server,
-  StopCircle,
-  XCircle,
-} from 'lucide-react';
+import { Filter } from 'lucide-react';
 import React from 'react';
 import type { components } from '../api/v2/schema';
 import { Status } from '../api/v2/schema';
@@ -29,7 +18,6 @@ import { useSearchState } from '../contexts/SearchStateContext';
 import { DAGRunDetailsModal } from '../features/dag-runs/components/dag-run-details';
 import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
 import MiniResourceChart from '../features/dashboard/components/MiniResourceChart';
-import MiniServiceCard from '../features/dashboard/components/MiniServiceCard';
 import WorkersSummary from '../features/dashboard/components/WorkersSummary';
 import PathsCard from '../features/system-status/components/PathsCard';
 import { useQuery } from '../hooks/api';
@@ -37,8 +25,6 @@ import dayjs from '../lib/dayjs';
 import Title from '../ui/Title';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
-type SchedulerInstance = components['schemas']['SchedulerInstance'];
-type CoordinatorInstance = components['schemas']['CoordinatorInstance'];
 
 type Metrics = Record<Status, number>;
 
@@ -342,150 +328,106 @@ function Dashboard(): React.ReactElement | null {
     }
   });
 
-  const metricCards = [
-    {
-      title: 'Total',
-      value: totalDAGRuns,
-      icon: <ListChecks className="h-3.5 w-3.5 text-muted-foreground" />,
-    },
-    {
-      title: 'Running',
-      value: metrics[Status.Running],
-      icon: <Play className="h-3.5 w-3.5 text-success" />,
-    },
-    {
-      title: 'Queued',
-      value: metrics[Status.Queued],
-      icon: <Clock className="h-3.5 w-3.5 text-[purple]" />,
-    },
-    {
-      title: 'Success',
-      value: metrics[Status.Success],
-      icon: <CheckCircle className="h-3.5 w-3.5 text-success" />,
-    },
-    {
-      title: 'Partial',
-      value: metrics[Status.PartialSuccess],
-      icon: <CheckCircle className="h-3.5 w-3.5 text-warning" />,
-    },
-    {
-      title: 'Failed',
-      value: metrics[Status.Failed],
-      icon: <XCircle className="h-3.5 w-3.5 text-error" />,
-    },
-    {
-      title: 'Aborted',
-      value: metrics[Status.Aborted],
-      icon: <StopCircle className="h-3.5 w-3.5 text-[deeppink]" />,
-    },
-  ];
+  // Compute health indicators
+  const hasFailures = metrics[Status.Failed] > 0;
+  const hasRunning = metrics[Status.Running] > 0;
 
   return (
-    <div className="flex flex-col gap-2 w-full h-full overflow-auto">
+    <div className="flex flex-col w-full h-full overflow-hidden">
       <Title>Dashboard</Title>
-      {/* Header: Filters + Actions + Metrics */}
-      <div className="border rounded bg-card flex-shrink-0">
-        <div className="flex flex-wrap items-center justify-between gap-2 p-2">
-          {/* Left: Filters */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5">
-              <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-              <Select
-                value={selectedDAGRun}
-                onValueChange={handleDAGRunChange}
-                disabled={isLoading}
-              >
-                <SelectTrigger className="h-7 w-[160px] text-xs">
-                  <SelectValue
-                    placeholder={isLoading ? 'Loading...' : 'All DAGs'}
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-xs">
-                    All DAGs
-                  </SelectItem>
-                  {uniqueDAGRunNames.map((name) => (
-                    <SelectItem key={name} value={name} className="text-xs">
-                      {name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="relative">
-                <Input
-                  type="date"
-                  value={dayjs.unix(dateRange.startDate).format('YYYY-MM-DD')}
-                  onChange={(e) => {
-                    const newDate = e.target.value;
-                    if (!newDate) return;
-                    const date = dayjs(newDate);
-                    if (!date.isValid()) return;
-                    const startOfDay =
-                      config.tzOffsetInSec !== undefined
-                        ? date
-                            .utcOffset(config.tzOffsetInSec / 60)
-                            .startOf('day')
-                        : date.startOf('day');
-                    const endOfDay =
-                      config.tzOffsetInSec !== undefined
-                        ? date.utcOffset(config.tzOffsetInSec / 60).endOf('day')
-                        : date.endOf('day');
-                    handleDateChange(startOfDay.unix(), endOfDay.unix());
-                  }}
-                  className="h-7 w-[130px] text-xs"
-                />
-                {isLoading && (
-                  <Loader2 className="absolute right-2 top-1.5 h-4 w-4 animate-spin text-muted-foreground" />
-                )}
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  const now = dayjs();
-                  const startOfDay =
-                    config.tzOffsetInSec !== undefined
-                      ? now.utcOffset(config.tzOffsetInSec / 60).startOf('day')
-                      : now.startOf('day');
-                  const endOfDay =
-                    config.tzOffsetInSec !== undefined
-                      ? now.utcOffset(config.tzOffsetInSec / 60).endOf('day')
-                      : now.endOf('day');
-                  handleDateChange(startOfDay.unix(), endOfDay.unix());
-                }}
-                className="h-7 text-xs px-2"
-              >
-                Today
-              </Button>
-            </div>
-          </div>
 
-          {/* Right: Actions */}
-          <div className="flex items-center gap-1.5">
-            <PathsCard />
-            <RefreshButton onRefresh={handleRefreshAll} />
-          </div>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-h-0 gap-3 p-1">
+
+        {/* Toolbar - Top */}
+        <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+          <Select
+            value={selectedDAGRun}
+            onValueChange={handleDAGRunChange}
+            disabled={isLoading}
+          >
+            <SelectTrigger className="h-9 w-[140px]">
+              <Filter className="h-4 w-4 mr-1.5 text-muted-foreground" />
+              <SelectValue placeholder={isLoading ? 'Loading...' : 'All DAGs'} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All DAGs</SelectItem>
+              {uniqueDAGRunNames.map((name) => (
+                <SelectItem key={name} value={name}>{name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Input
+            type="date"
+            value={dayjs.unix(dateRange.startDate).format('YYYY-MM-DD')}
+            onChange={(e) => {
+              const newDate = e.target.value;
+              if (!newDate) return;
+              const date = dayjs(newDate);
+              if (!date.isValid()) return;
+              const startOfDay = config.tzOffsetInSec !== undefined
+                ? date.utcOffset(config.tzOffsetInSec / 60).startOf('day')
+                : date.startOf('day');
+              const endOfDay = config.tzOffsetInSec !== undefined
+                ? date.utcOffset(config.tzOffsetInSec / 60).endOf('day')
+                : date.endOf('day');
+              handleDateChange(startOfDay.unix(), endOfDay.unix());
+            }}
+            className="h-9 w-[150px]"
+          />
+          <Button
+            variant="outline"
+            onClick={() => {
+              const now = dayjs();
+              const startOfDay = config.tzOffsetInSec !== undefined
+                ? now.utcOffset(config.tzOffsetInSec / 60).startOf('day')
+                : now.startOf('day');
+              const endOfDay = config.tzOffsetInSec !== undefined
+                ? now.utcOffset(config.tzOffsetInSec / 60).endOf('day')
+                : now.endOf('day');
+              handleDateChange(startOfDay.unix(), endOfDay.unix());
+            }}
+          >
+            Today
+          </Button>
+
+          <div className="flex-1" />
+
+          <PathsCard />
+          <RefreshButton onRefresh={handleRefreshAll} />
         </div>
 
-        {/* Metrics Row */}
-        <div className="flex flex-wrap items-center border-t px-2 py-1.5 gap-x-4 gap-y-1">
-          {metricCards.map((card) => (
-            <div key={card.title} className="flex items-center gap-1.5">
-              {card.icon}
-              <span className="text-xs text-muted-foreground">
-                {card.title}
-              </span>
-              <span className="text-sm font-semibold">{card.value}</span>
+        {/* Stats Row */}
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 sm:gap-x-6 text-sm text-muted-foreground flex-shrink-0">
+          <div className="flex items-baseline gap-1">
+            <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">{totalDAGRuns}</span>
+            <span className="text-xs">runs</span>
+          </div>
+          <div className="flex items-baseline gap-1">
+            <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">{metrics[Status.Success]}</span>
+            <span className="text-xs">ok</span>
+          </div>
+          <div className="flex items-baseline gap-1">
+            <span className={`text-lg sm:text-xl font-light tabular-nums ${hasFailures ? 'text-foreground' : 'text-muted-foreground/50'}`}>{metrics[Status.Failed]}</span>
+            <span className="text-xs">failed</span>
+          </div>
+          {hasRunning && (
+            <div className="flex items-baseline gap-1">
+              <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">{metrics[Status.Running]}</span>
+              <span className="text-xs">active</span>
             </div>
-          ))}
+          )}
+          {metrics[Status.Queued] > 0 && (
+            <div className="flex items-baseline gap-1">
+              <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">{metrics[Status.Queued]}</span>
+              <span className="text-xs">queued</span>
+            </div>
+          )}
         </div>
-      </div>
 
-      {/* Timeline Chart - fixed height */}
-      <div className="border rounded bg-card flex-shrink-0">
-        <div className="h-64">
+        {/* Timeline Visualization - Hero */}
+        <div className="flex-[2] min-h-[250px] rounded-xl border border-border bg-surface overflow-hidden">
           <DashboardTimeChart
             data={dagRunsList}
             selectedDate={{
@@ -494,99 +436,45 @@ function Dashboard(): React.ReactElement | null {
             }}
           />
         </div>
-      </div>
 
-      {/* Workers */}
-      <div className="border rounded bg-card h-48 flex-shrink-0 flex flex-col min-h-0">
-        <WorkersSummary
-          workers={workersData?.workers || []}
-          isLoading={workersLoading && !workersData}
-          errors={workersData?.errors}
-          onTaskClick={handleTaskClick}
-        />
-      </div>
-
-      {/* System Status: Services + Resources */}
-      <div className="border rounded bg-card flex-shrink-0">
-        <div className="flex items-center gap-2 px-3 py-2 border-b">
-          <Server className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-sm font-medium">System</span>
+        {/* Live Workers */}
+        <div className="flex-1 min-h-[120px] rounded-xl border border-border bg-surface overflow-hidden">
+          <WorkersSummary
+            workers={workersData?.workers || []}
+            isLoading={workersLoading && !workersData}
+            errors={workersData?.errors}
+            onTaskClick={handleTaskClick}
+          />
         </div>
-        <div className="flex flex-wrap items-stretch">
-          {/* Services */}
-          <div className="flex items-center gap-4 px-3 py-2 border-r">
-            <MiniServiceCard
-              title="Scheduler"
-              instances={
-                schedulerData?.schedulers?.map((s: SchedulerInstance) => ({
-                  instanceId: s.instanceId,
-                  host: s.host,
-                  status: s.status,
-                  startedAt: s.startedAt,
-                })) || []
-              }
-              icon={<Calendar className="h-3.5 w-3.5" />}
-              isLoading={!schedulerData && !schedulerError}
-              error={schedulerError ? String(schedulerError) : undefined}
-            />
-            <MiniServiceCard
-              title="Coordinator"
-              instances={
-                coordinatorData?.coordinators?.map(
-                  (c: CoordinatorInstance) => ({
-                    instanceId: c.instanceId,
-                    host: c.host,
-                    port: c.port,
-                    status: c.status,
-                    startedAt: c.startedAt,
-                  })
-                ) || []
-              }
-              icon={<Server className="h-3.5 w-3.5" />}
-              isLoading={!coordinatorData && !coordinatorError}
-              error={coordinatorError ? String(coordinatorError) : undefined}
-            />
-          </div>
 
-          {/* Resource Charts */}
-          <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-3 px-3 py-2">
-            <div className="h-12">
-              <MiniResourceChart
-                title="CPU"
-                data={resourceData?.cpu}
-                color="#c4956a"
-                isLoading={!resourceData && !resourceError}
-                error={resourceError ? String(resourceError) : undefined}
-              />
-            </div>
-            <div className="h-12">
-              <MiniResourceChart
-                title="Memory"
-                data={resourceData?.memory}
-                color="#8a9fc4"
-                isLoading={!resourceData && !resourceError}
-                error={resourceError ? String(resourceError) : undefined}
-              />
-            </div>
-            <div className="h-12">
-              <MiniResourceChart
-                title="Disk"
-                data={resourceData?.disk}
-                color="#7da87d"
-                isLoading={!resourceData && !resourceError}
-                error={resourceError ? String(resourceError) : undefined}
-              />
-            </div>
-            <div className="h-12">
-              <MiniResourceChart
-                title="Load"
-                data={resourceData?.load}
-                color="#d4a574"
-                unit=""
-                isLoading={!resourceData && !resourceError}
-                error={resourceError ? String(resourceError) : undefined}
-              />
-            </div>
+        {/* System Resources - Full Width Row */}
+        <div className="h-24 flex-shrink-0 rounded-xl border border-border bg-surface p-3">
+          <div className="grid grid-cols-4 gap-4 h-full">
+            <MiniResourceChart
+              title="CPU"
+              data={resourceData?.cpu}
+              isLoading={!resourceData && !resourceError}
+              error={resourceError ? String(resourceError) : undefined}
+            />
+            <MiniResourceChart
+              title="Memory"
+              data={resourceData?.memory}
+              isLoading={!resourceData && !resourceError}
+              error={resourceError ? String(resourceError) : undefined}
+            />
+            <MiniResourceChart
+              title="Disk"
+              data={resourceData?.disk}
+              isLoading={!resourceData && !resourceError}
+              error={resourceError ? String(resourceError) : undefined}
+            />
+            <MiniResourceChart
+              title="Load"
+              data={resourceData?.load}
+              unit=""
+              isLoading={!resourceData && !resourceError}
+              error={resourceError ? String(resourceError) : undefined}
+            />
           </div>
         </div>
       </div>

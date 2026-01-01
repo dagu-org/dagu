@@ -390,7 +390,7 @@ function DAGSpec({ fileName }: Props) {
           data?.dag && (
             <React.Fragment>
               <div
-                className="flex flex-col flex-1 h-full min-h-[500px] space-y-6 mb-6"
+                className="flex flex-col flex-1 min-h-0 space-y-6 mb-6"
                 ref={containerRef}
               >
                 {hasLocalDags && (
@@ -447,7 +447,7 @@ function DAGSpec({ fileName }: Props) {
                   );
                 })()}
 
-                <div className="flex-1 flex flex-col bg-surface border border-border rounded-lg overflow-hidden min-h-[400px]">
+                <div className="flex flex-col bg-surface border border-border rounded-lg overflow-hidden min-h-[400px] max-h-[70vh]">
                   <div className="flex-shrink-0 flex justify-between items-center p-2 border-b border-border">
                     <Button
                       variant="secondary"
@@ -494,6 +494,7 @@ function DAGSpec({ fileName }: Props) {
                       onClose={toggleSidebar}
                       path={yamlPathInfo.path}
                       segments={yamlPathInfo.segments}
+                      yamlContent={currentValue}
                     />
                   </div>
                 </div>

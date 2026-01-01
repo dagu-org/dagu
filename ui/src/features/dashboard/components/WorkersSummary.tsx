@@ -1,5 +1,5 @@
 import React from 'react';
-import { Server, Activity, Zap, Gauge, ChevronDown, ChevronRight, Clock } from 'lucide-react';
+import { Activity, ChevronDown, ChevronRight, Clock } from 'lucide-react';
 import type { components } from '../../../api/v2/schema';
 import { cn } from '../../../lib/utils';
 import WorkerHealth from '../../workers/components/WorkerHealth';
@@ -55,38 +55,23 @@ function WorkersSummary({ workers, isLoading, errors, onTaskClick }: WorkersSumm
           <Activity className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-medium">Workers</span>
         </div>
-        <div className="flex items-center gap-4 text-sm">
-          <div className="flex items-center gap-1.5">
-            <Server className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-muted-foreground">Workers:</span>
-            <span className="font-medium">{metrics.totalWorkers}</span>
-            <span className="text-muted-foreground">({metrics.healthyWorkers} healthy)</span>
+        <div className="flex items-center gap-5 text-xs text-muted-foreground">
+          <div className="flex items-baseline gap-1">
+            <span className="text-sm font-light tabular-nums text-foreground">{metrics.totalWorkers}</span>
+            <span>workers</span>
+            <span className="text-muted-foreground/60">({metrics.healthyWorkers} up)</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <Activity className="h-3.5 w-3.5 text-primary" />
-            <span className="text-muted-foreground">Pollers:</span>
-            <span className={cn("font-medium", metrics.busyPollers > 0 && "text-primary")}>
-              {metrics.busyPollers}/{metrics.totalPollers}
-            </span>
+          <div className="flex items-baseline gap-1">
+            <span className="text-sm font-light tabular-nums text-foreground">{metrics.busyPollers}/{metrics.totalPollers}</span>
+            <span>pollers</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <Zap className="h-3.5 w-3.5 text-success" />
-            <span className="text-muted-foreground">Tasks:</span>
-            <span className={cn("font-medium", metrics.totalTasks > 0 && "text-success")}>
-              {metrics.totalTasks}
-            </span>
+          <div className="flex items-baseline gap-1">
+            <span className="text-sm font-light tabular-nums text-foreground">{metrics.totalTasks}</span>
+            <span>tasks</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <Gauge className="h-3.5 w-3.5 text-warning" />
-            <span className="text-muted-foreground">Util:</span>
-            <span className={cn(
-              "font-medium",
-              metrics.utilization >= 90 ? "text-error" :
-              metrics.utilization >= 70 ? "text-warning" :
-              metrics.utilization > 0 ? "text-success" : ""
-            )}>
-              {metrics.utilization}%
-            </span>
+          <div className="flex items-baseline gap-1">
+            <span className="text-sm font-light tabular-nums text-foreground">{metrics.utilization}%</span>
+            <span>util</span>
           </div>
         </div>
       </div>
@@ -156,18 +141,13 @@ function WorkersSummary({ workers, isLoading, errors, onTaskClick }: WorkersSumm
                     </div>
 
                     <div className="w-20 flex items-center gap-1">
-                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
                         <div
-                          className={cn(
-                            "h-full transition-all",
-                            utilization >= 90 ? "bg-error" :
-                            utilization >= 70 ? "bg-warning" :
-                            utilization > 0 ? "bg-success" : "bg-muted"
-                          )}
+                          className="h-full transition-all bg-foreground/40"
                           style={{ width: `${utilization}%` }}
                         />
                       </div>
-                      <span className="text-xs text-muted-foreground w-8 text-right">
+                      <span className="text-xs text-muted-foreground w-8 text-right tabular-nums">
                         {utilization}%
                       </span>
                     </div>
