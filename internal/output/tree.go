@@ -600,24 +600,11 @@ func cleanErrorMessage(errMsg string) string {
 // renderFinalStatus renders the final result line at the bottom of the tree.
 // White color (default).
 func (r *Renderer) renderFinalStatus(status *execution.DAGRunStatus) string {
-	var result string
-
-	switch status.Status {
-	case core.Succeeded:
-		result = "Result: Passed"
-	case core.Failed:
-		result = "Result: Failed"
-	case core.Running:
-		result = "Status: Running"
-	case core.Aborted:
-		result = "Result: Canceled"
-	case core.PartiallySucceeded:
-		result = "Result: Partial"
-	default:
-		result = fmt.Sprintf("Status: %s", status.Status.String())
+	prefix := "Result"
+	if status.Status == core.Running {
+		prefix = "Status"
 	}
-
-	return "\n" + result + "\n"
+	return fmt.Sprintf("\n%s: %s\n", prefix, StatusText(status.Status))
 }
 
 // calculateDuration calculates the duration string between start and finish times.

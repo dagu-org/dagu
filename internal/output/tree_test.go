@@ -43,8 +43,8 @@ func TestRenderDAGStatus_BasicSuccess(t *testing.T) {
 	if !strings.Contains(output, "[passed]") {
 		t.Error("Output should contain passed label")
 	}
-	if !strings.Contains(output, "Result: Passed") {
-		t.Error("Output should contain passed result")
+	if !strings.Contains(output, "Result: Succeeded") {
+		t.Error("Output should contain succeeded result")
 	}
 }
 
@@ -166,8 +166,8 @@ func TestRenderDAGStatus_AbortedStatus(t *testing.T) {
 	if !strings.Contains(output, "[canceled]") {
 		t.Error("Output should contain canceled label")
 	}
-	if !strings.Contains(output, "Canceled") {
-		t.Error("Output should contain Canceled result")
+	if !strings.Contains(output, "Result: Aborted") {
+		t.Error("Output should contain Aborted result")
 	}
 }
 
@@ -994,8 +994,8 @@ func TestRenderDAGStatus_UnknownStatus(t *testing.T) {
 	output := renderer.RenderDAGStatus(dag, status)
 
 	// Should handle unknown status gracefully
-	if !strings.Contains(output, "Status:") {
-		t.Error("Output should contain status line")
+	if !strings.Contains(output, "Result:") {
+		t.Error("Output should contain result line")
 	}
 }
 
