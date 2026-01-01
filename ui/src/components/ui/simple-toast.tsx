@@ -8,6 +8,9 @@ interface SimpleToastProps {
   onClose?: () => void;
 }
 
+// Minimum duration to ensure animations complete properly
+const MIN_DURATION = 500;
+
 export const SimpleToast: React.FC<SimpleToastProps> = ({
   message,
   duration = 1800,
@@ -16,6 +19,9 @@ export const SimpleToast: React.FC<SimpleToastProps> = ({
   const [isVisible, setIsVisible] = useState(true);
   const [animationState, setAnimationState] = useState<'entering' | 'visible' | 'exiting'>('entering');
   const [checkAnimated, setCheckAnimated] = useState(false);
+
+  // Ensure duration is at least MIN_DURATION
+  const safeDuration = Math.max(duration, MIN_DURATION);
 
   useEffect(() => {
     // Enter animation
@@ -28,16 +34,16 @@ export const SimpleToast: React.FC<SimpleToastProps> = ({
       setCheckAnimated(true);
     }, 150);
 
-    // Start exit animation
+    // Start exit animation (at least 350ms before end)
     const exitTimer = setTimeout(() => {
       setAnimationState('exiting');
-    }, duration - 350);
+    }, safeDuration - 350);
 
     // Remove from DOM
     const removeTimer = setTimeout(() => {
       setIsVisible(false);
       if (onClose) onClose();
-    }, duration);
+    }, safeDuration);
 
     return () => {
       clearTimeout(enterTimer);
@@ -45,7 +51,7 @@ export const SimpleToast: React.FC<SimpleToastProps> = ({
       clearTimeout(exitTimer);
       clearTimeout(removeTimer);
     };
-  }, [duration, onClose]);
+  }, [safeDuration, onClose]);
 
   if (!isVisible) return null;
 

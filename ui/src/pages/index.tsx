@@ -25,8 +25,6 @@ import dayjs from '../lib/dayjs';
 import Title from '../ui/Title';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
-type SchedulerInstance = components['schemas']['SchedulerInstance'];
-type CoordinatorInstance = components['schemas']['CoordinatorInstance'];
 
 type Metrics = Record<Status, number>;
 
@@ -333,11 +331,6 @@ function Dashboard(): React.ReactElement | null {
   // Compute health indicators
   const hasFailures = metrics[Status.Failed] > 0;
   const hasRunning = metrics[Status.Running] > 0;
-
-  // Service health
-  const schedulerActive = schedulerData?.schedulers?.some((s: SchedulerInstance) => s.status === 'active');
-  const coordinatorActive = coordinatorData?.coordinators?.some((c: CoordinatorInstance) => c.status === 'active');
-  const servicesHealthy = schedulerActive && coordinatorActive;
 
   return (
     <div className="flex flex-col w-full h-full overflow-hidden">
