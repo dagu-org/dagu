@@ -356,17 +356,17 @@ func TestRenderDAGStatus_WithActualLogFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(stdoutFile.Name())
+	defer func() { _ = os.Remove(stdoutFile.Name()) }()
 	_, _ = stdoutFile.WriteString("Hello from stdout\nLine 2\n")
-	stdoutFile.Close()
+	_ = stdoutFile.Close()
 
 	stderrFile, err := os.CreateTemp("", "stderr-*.log")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(stderrFile.Name())
+	defer func() { _ = os.Remove(stderrFile.Name()) }()
 	_, _ = stderrFile.WriteString("Warning: something happened\n")
-	stderrFile.Close()
+	_ = stderrFile.Close()
 
 	dag := &core.DAG{Name: "test-dag"}
 	status := &execution.DAGRunStatus{
@@ -406,11 +406,11 @@ func TestRenderDAGStatus_WithTruncatedOutput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(stdoutFile.Name())
+	defer func() { _ = os.Remove(stdoutFile.Name()) }()
 	for i := 1; i <= 100; i++ {
-		_, _ = stdoutFile.WriteString(fmt.Sprintf("Line %d\n", i))
+		_, _ = fmt.Fprintf(stdoutFile, "Line %d\n", i)
 	}
-	stdoutFile.Close()
+	_ = stdoutFile.Close()
 
 	dag := &core.DAG{Name: "test-dag"}
 	status := &execution.DAGRunStatus{
@@ -530,13 +530,13 @@ func TestReadLogFileTail_AllLines(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
 	// Write 10 lines
 	for i := 1; i <= 10; i++ {
-		_, _ = tmpfile.WriteString(fmt.Sprintf("Line %d\n", i))
+		_, _ = fmt.Fprintf(tmpfile, "Line %d\n", i)
 	}
-	tmpfile.Close()
+	_ = tmpfile.Close()
 
 	// Test reading all lines (no limit)
 	lines, truncated, err := ReadLogFileTail(tmpfile.Name(), 0)
@@ -558,13 +558,13 @@ func TestReadLogFileTail_WithLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
 	// Write 100 lines
 	for i := 1; i <= 100; i++ {
-		_, _ = tmpfile.WriteString(fmt.Sprintf("Line %d\n", i))
+		_, _ = fmt.Fprintf(tmpfile, "Line %d\n", i)
 	}
-	tmpfile.Close()
+	_ = tmpfile.Close()
 
 	// Test reading last 10 lines
 	lines, truncated, err := ReadLogFileTail(tmpfile.Name(), 10)
@@ -591,10 +591,10 @@ func TestReadLogFileTail_NegativeLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
 	_, _ = tmpfile.WriteString("Line 1\nLine 2\n")
-	tmpfile.Close()
+	_ = tmpfile.Close()
 
 	// Negative limit should return all lines
 	lines, truncated, err := ReadLogFileTail(tmpfile.Name(), -5)
@@ -616,8 +616,8 @@ func TestReadLogFileTail_EmptyFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpfile.Name())
-	tmpfile.Close()
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
+	_ = tmpfile.Close()
 
 	lines, truncated, err := ReadLogFileTail(tmpfile.Name(), 10)
 	if err != nil {
@@ -666,11 +666,11 @@ func TestReadLogFileTail_BinaryContent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
 	// Write binary content with null bytes
 	_, _ = tmpfile.Write([]byte{0x00, 0x01, 0x02, 0xFF, 0xFE})
-	tmpfile.Close()
+	_ = tmpfile.Close()
 
 	lines, _, err := ReadLogFileTail(tmpfile.Name(), 10)
 	if err != nil {
@@ -690,7 +690,7 @@ func TestReadLogFileTail_LargeFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
 	// Write more than 10MB
 	data := make([]byte, 11*1024*1024)
@@ -698,7 +698,7 @@ func TestReadLogFileTail_LargeFile(t *testing.T) {
 		data[i] = 'x'
 	}
 	_, _ = tmpfile.Write(data)
-	tmpfile.Close()
+	_ = tmpfile.Close()
 
 	lines, truncated, err := ReadLogFileTail(tmpfile.Name(), 10)
 	if err != nil {
@@ -1002,9 +1002,9 @@ func TestRenderDAGStatus_OnlyStdout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(stdoutFile.Name())
+	defer func() { _ = os.Remove(stdoutFile.Name()) }()
 	_, _ = stdoutFile.WriteString("Hello stdout\n")
-	stdoutFile.Close()
+	_ = stdoutFile.Close()
 
 	dag := &core.DAG{Name: "test-dag"}
 	status := &execution.DAGRunStatus{
@@ -1040,9 +1040,9 @@ func TestRenderDAGStatus_OnlyStderr(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(stderrFile.Name())
+	defer func() { _ = os.Remove(stderrFile.Name()) }()
 	_, _ = stderrFile.WriteString("Hello stderr\n")
-	stderrFile.Close()
+	_ = stderrFile.Close()
 
 	dag := &core.DAG{Name: "test-dag"}
 	status := &execution.DAGRunStatus{
@@ -1081,14 +1081,14 @@ func TestReadLogFileTail_PermissionDenied(t *testing.T) {
 	}
 	tmpfileName := tmpfile.Name()
 	_, _ = tmpfile.WriteString("test content\n")
-	tmpfile.Close()
-	defer os.Remove(tmpfileName)
+	_ = tmpfile.Close()
+	defer func() { _ = os.Remove(tmpfileName) }()
 
 	// Remove read permissions
 	if err := os.Chmod(tmpfileName, 0o000); err != nil {
 		t.Skip("Cannot change permissions on this system")
 	}
-	defer os.Chmod(tmpfileName, 0o644)
+	defer func() { _ = os.Chmod(tmpfileName, 0o644) }()
 
 	lines, truncated, err := ReadLogFileTail(tmpfileName, 10)
 	// Should return an error for permission denied
@@ -1368,12 +1368,12 @@ func TestReadLogFileTail_WithCarriageReturns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
 	// Write curl-like progress output
 	_, _ = tmpfile.WriteString("  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r100   123  100   123    0     0   1000      0 --:--:-- --:--:-- --:--:--  1000\n")
 	_, _ = tmpfile.WriteString("Downloaded file.txt\n")
-	tmpfile.Close()
+	_ = tmpfile.Close()
 
 	lines, truncated, err := ReadLogFileTail(tmpfile.Name(), 0)
 	if err != nil {

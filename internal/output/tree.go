@@ -640,7 +640,10 @@ func nodeStatusToStatus(ns core.NodeStatus) core.Status {
 		return core.Aborted
 	case core.NodePartiallySucceeded:
 		return core.PartiallySucceeded
-	default:
+	case core.NodeNotStarted:
+		return core.NotStarted
+	case core.NodeSkipped:
 		return core.NotStarted
 	}
+	return core.NotStarted
 }
