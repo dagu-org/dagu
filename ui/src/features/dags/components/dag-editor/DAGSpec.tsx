@@ -390,7 +390,7 @@ function DAGSpec({ fileName }: Props) {
           data?.dag && (
             <React.Fragment>
               <div
-                className="flex flex-col flex-1 h-full min-h-[500px] space-y-6 mb-6"
+                className="flex flex-col flex-1 min-h-0 space-y-6 mb-6"
                 ref={containerRef}
               >
                 {hasLocalDags && (

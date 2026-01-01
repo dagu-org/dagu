@@ -96,7 +96,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
         name: dag?.name || '',
       }}
     >
-      <div className="w-full h-full flex flex-col">
+      <div className="w-full flex flex-col">
         {/* Only render the header if skipHeader is not true */}
         {!skipHeader && (
           <DAGHeader
