@@ -487,7 +487,6 @@ steps:
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
-	var runCount int
 waitLoop:
 	for {
 		select {
@@ -495,8 +494,7 @@ waitLoop:
 			break waitLoop
 		case <-ticker.C:
 			runs := th.DAGRunMgr.ListRecentStatus(th.Context, dag.Name, 10)
-			runCount = len(runs)
-			if runCount >= 2 {
+			if len(runs) >= 2 {
 				break waitLoop
 			}
 		}
