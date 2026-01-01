@@ -473,7 +473,7 @@ function DAGSpec({ fileName }: Props) {
                       </Button>
                     )}
                   </div>
-                  <div className="flex-1 flex min-h-0">
+                  <div className="flex-1 flex min-h-0 h-full">
                     <div className="flex-1 min-w-0">
                       <DAGEditor
                         value={editable ? (currentValue ?? data.spec) : data.spec}
