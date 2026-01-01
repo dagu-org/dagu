@@ -17,7 +17,7 @@ jobs:
       packages: write
     steps:
       - name: Check out code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           ref: ${{ inputs.ref }}
 
@@ -67,7 +67,7 @@ jobs:
       packages: write
     steps:
       - name: Check out code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           ref: ${{ inputs.ref }}
 
@@ -118,7 +118,7 @@ jobs:
       packages: write
     steps:
       - name: Check out code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           ref: ${{ inputs.ref }}
 
