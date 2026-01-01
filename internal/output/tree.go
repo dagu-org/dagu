@@ -375,6 +375,21 @@ func wrapText(text string, maxWidth int) []string {
 	var currentLine strings.Builder
 
 	for _, word := range words {
+		if len(word) > maxWidth {
+			if currentLine.Len() > 0 {
+				lines = append(lines, currentLine.String())
+				currentLine.Reset()
+			}
+			for len(word) > maxWidth {
+				lines = append(lines, word[:maxWidth])
+				word = word[maxWidth:]
+			}
+			if len(word) > 0 {
+				currentLine.WriteString(word)
+			}
+			continue
+		}
+
 		if currentLine.Len() == 0 {
 			currentLine.WriteString(word)
 		} else if currentLine.Len()+1+len(word) <= maxWidth {
@@ -565,7 +580,7 @@ func (r *Renderer) renderError(errMsg string, prefix string) string {
 		if i == 0 {
 			buf.WriteString(prefix + TreeLastBranch + r.text(line) + "\n")
 		} else {
-			// 4 spaces to match width of "└─"
+			// 4 spaces to match width of "└─" + indent (2 spaces)
 			buf.WriteString(prefix + "    " + r.text(line) + "\n")
 		}
 	}
