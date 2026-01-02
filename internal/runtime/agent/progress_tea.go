@@ -59,7 +59,6 @@ type ProgressModel struct {
 	width            int
 	height           int
 	finalized        bool
-	waitingForKey    bool
 	showChildDetails bool
 
 	// Styles
@@ -157,9 +156,7 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case FinalizeMsg:
 		m.finalized = true
 		m.finishTime = time.Now()
-		m.waitingForKey = true
-		// Don't quit - wait for key press
-		return m, nil
+		return m, tea.Quit
 
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -167,10 +164,6 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case tea.KeyMsg:
-		if m.waitingForKey {
-			// Any key press exits when waiting
-			return m, tea.Quit
-		}
 		switch msg.String() {
 		case "ctrl+c", "q":
 			m.finalized = true
@@ -564,21 +557,6 @@ func (m ProgressModel) renderSubDAGs() string {
 }
 
 func (m ProgressModel) renderFooter() string {
-	if m.waitingForKey {
-		st := m.getOverallStatus()
-		var statusLine string
-		switch st {
-		case core.Succeeded:
-			statusLine = m.successStyle.Render("✓ Execution completed successfully")
-		case core.Failed:
-			statusLine = m.errorStyle.Render("✗ Execution failed")
-		case core.Aborted:
-			statusLine = lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("⚠ Execution aborted")
-		default:
-			statusLine = m.boldStyle.Render("Execution finished")
-		}
-		return statusLine + "\n\n" + m.faintStyle.Render("Press any key to show details...")
-	}
 	if m.finalized {
 		st := m.getOverallStatus()
 		switch st {
@@ -747,48 +725,27 @@ func sortNodesByName(nodes []*nodeProgress) {
 
 // ProgressTeaDisplay wraps the Bubble Tea program for the progress display
 type ProgressTeaDisplay struct {
-	program      *tea.Program
-	model        ProgressModel
-	useAltScreen bool
-	done         chan struct{}
-	finalOutput  string
+	program *tea.Program
+	model   ProgressModel
+	done    chan struct{}
 }
 
 // NewProgressTeaDisplay creates a new Bubble Tea-based progress display
 func NewProgressTeaDisplay(dag *core.DAG) *ProgressTeaDisplay {
 	model := NewProgressModel(dag)
 	return &ProgressTeaDisplay{
-		model:        model,
-		useAltScreen: true,
-		done:         make(chan struct{}),
+		model: model,
+		done:  make(chan struct{}),
 	}
 }
 
 // Start initializes and runs the Bubble Tea program
 func (p *ProgressTeaDisplay) Start() {
-	// Manually manage alternate screen to keep it after exit
-	p.program = tea.NewProgram(p.model)
+	// Use bubbletea's alternate screen mode for proper terminal handling
+	p.program = tea.NewProgram(p.model, tea.WithAltScreen())
 	go func() {
-		defer func() {
-			// Ensure cursor is visible and mouse tracking is disabled if program crashes
-			fmt.Print("\033[?25h")   // Show cursor
-			fmt.Print("\033[?1000l") // Disable mouse tracking
-			fmt.Print("\033[?1002l") // Disable mouse cell motion tracking
-			fmt.Print("\033[?1003l") // Disable all mouse tracking
-			fmt.Print("\033[?1006l") // Disable SGR mouse mode
-			// DON'T exit alternate screen - keep the UI visible
-			// Signal that the program has exited
-			close(p.done)
-		}()
-
-		// Enter alternate screen manually
-		fmt.Print("\033[?1049h") // Enter alternate screen
-		fmt.Print("\033[2J")     // Clear screen
-		fmt.Print("\033[H")      // Move cursor to home
-
+		defer close(p.done)
 		_, _ = p.program.Run()
-
-		// Don't exit alternate screen - stay in it!
 	}()
 }
 
@@ -796,22 +753,7 @@ func (p *ProgressTeaDisplay) Start() {
 func (p *ProgressTeaDisplay) Stop() {
 	if p.program != nil {
 		p.program.Send(FinalizeMsg{})
-		// Wait for the program to exit
 		<-p.done
-		// Comprehensive terminal reset before exiting alternate screen
-		// Disable all mouse tracking modes
-		fmt.Print("\033[?1000l") // Disable X10 mouse tracking
-		fmt.Print("\033[?1002l") // Disable button event tracking
-		fmt.Print("\033[?1003l") // Disable any event tracking
-		fmt.Print("\033[?1006l") // Disable SGR extended mouse mode
-		fmt.Print("\033[?1015l") // Disable urxvt mouse mode
-		// Disable bracketed paste mode
-		fmt.Print("\033[?2004l")
-		// Exit alternate screen buffer so tree summary can be shown
-		fmt.Print("\033[?1049l")
-		// Reset character attributes and show cursor
-		fmt.Print("\033[0m")   // Reset all attributes
-		fmt.Print("\033[?25h") // Show cursor
 	}
 }
 

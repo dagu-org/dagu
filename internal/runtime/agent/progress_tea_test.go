@@ -115,13 +115,12 @@ func TestProgressModel_Finalize(t *testing.T) {
 	dag := &core.DAG{Name: "test-dag"}
 	model := NewProgressModel(dag)
 
-	// Test finalize - now waits for keypress instead of immediate quit
+	// Finalize should quit immediately
 	updatedModel, cmd := model.Update(FinalizeMsg{})
 	m := updatedModel.(ProgressModel)
 
 	assert.True(t, m.finalized)
-	assert.True(t, m.waitingForKey)
-	assert.Nil(t, cmd) // No command - waiting for keypress
+	assert.NotNil(t, cmd) // Quit command returned
 }
 
 func TestProgressModel_ProgressCalculation(t *testing.T) {
