@@ -89,12 +89,18 @@ steps:
 	})
 
 	t.Run("ExecuteDAGWithJSONParams", func(t *testing.T) {
+		// Case 1: DAG with named params defined - JSON keys map to those params.
 		// Verifies that JSON parameters are parsed as named key-value pairs,
 		// not tokenized by whitespace (regression test for JSON params bug).
 		spec := `
+params:
+  - name: key1
+    default: default1
+  - name: key2
+    default: default2
 steps:
   - name: echo_params
-    command: echo params received
+    command: echo "key1=$key1 key2=$key2"
 `
 		dagName := "test_json_params"
 
@@ -125,6 +131,47 @@ steps:
 		require.Contains(t, params, "key1=test1")
 		require.Contains(t, params, "key2=test2")
 		require.NotContains(t, params, "1={", "JSON should not be tokenized")
+
+		_ = server.Client().Delete("/api/v2/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
+	})
+
+	t.Run("ExecuteDAGWithJSONPositionalArg", func(t *testing.T) {
+		// Case 2: No named params defined - JSON passed as positional arg.
+		// The entire JSON is stored as $1 and accessible via JSON path syntax ${1.key}.
+		spec := `
+steps:
+  - name: show_json
+    command: echo "key1=${1.key1} key2=${1.key2}"
+`
+		dagName := "test_json_positional"
+
+		_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+			Name: dagName,
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		// Pass JSON as a single positional argument using array syntax
+		jsonParams := `["{\"key1\": \"val1\", \"key2\": \"val2\"}"]`
+		resp := server.Client().Post("/api/v2/dags/"+dagName+"/start", api.ExecuteDAGJSONRequestBody{
+			Params: &jsonParams,
+		}).ExpectStatus(http.StatusOK).Send(t)
+
+		var execResp api.ExecuteDAG200JSONResponse
+		resp.Unmarshal(t, &execResp)
+		require.NotEmpty(t, execResp.DagRunId)
+
+		var dagRunDetails api.GetDAGDAGRunDetails200JSONResponse
+		require.Eventually(t, func() bool {
+			url := fmt.Sprintf("/api/v2/dags/%s/dag-runs/%s", dagName, execResp.DagRunId)
+			statusResp := server.Client().Get(url).ExpectStatus(http.StatusOK).Send(t)
+			statusResp.Unmarshal(t, &dagRunDetails)
+			return dagRunDetails.DagRun.Status == api.Status(core.Succeeded)
+		}, 10*time.Second, 500*time.Millisecond, "DAG should complete")
+
+		require.NotNil(t, dagRunDetails.DagRun.Params)
+		params := *dagRunDetails.DagRun.Params
+		// Positional arg $1 should contain the full JSON string
+		require.Contains(t, params, `1={"key1": "val1", "key2": "val2"}`)
 
 		_ = server.Client().Delete("/api/v2/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
 	})
