@@ -1,4 +1,4 @@
-package test
+package mocks
 
 import (
 	"context"
@@ -8,36 +8,36 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-var _ execution.DAGRunAttempt = (*MockDAGRunAttempt)(nil)
+var _ execution.DAGRunAttempt = (*DAGRunAttempt)(nil)
 
-// MockDAGRunAttempt is a shared mock implementation of execution.DAGRunAttempt for testing.
-type MockDAGRunAttempt struct {
+// DAGRunAttempt is a shared mock implementation of execution.DAGRunAttempt for testing.
+type DAGRunAttempt struct {
 	mock.Mock
 	// Status can be set for tests that need to return a specific status without mock setup
 	Status *execution.DAGRunStatus
 }
 
-func (m *MockDAGRunAttempt) ID() string {
+func (m *DAGRunAttempt) ID() string {
 	args := m.Called()
 	return args.String(0)
 }
 
-func (m *MockDAGRunAttempt) Open(ctx context.Context) error {
+func (m *DAGRunAttempt) Open(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
 }
 
-func (m *MockDAGRunAttempt) Write(ctx context.Context, status execution.DAGRunStatus) error {
+func (m *DAGRunAttempt) Write(ctx context.Context, status execution.DAGRunStatus) error {
 	args := m.Called(ctx, status)
 	return args.Error(0)
 }
 
-func (m *MockDAGRunAttempt) Close(ctx context.Context) error {
+func (m *DAGRunAttempt) Close(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
 }
 
-func (m *MockDAGRunAttempt) ReadStatus(ctx context.Context) (*execution.DAGRunStatus, error) {
+func (m *DAGRunAttempt) ReadStatus(ctx context.Context) (*execution.DAGRunStatus, error) {
 	// If Status is set, return it directly without mock expectations
 	if m.Status != nil {
 		return m.Status, nil
@@ -49,7 +49,7 @@ func (m *MockDAGRunAttempt) ReadStatus(ctx context.Context) (*execution.DAGRunSt
 	return args.Get(0).(*execution.DAGRunStatus), args.Error(1)
 }
 
-func (m *MockDAGRunAttempt) ReadDAG(ctx context.Context) (*core.DAG, error) {
+func (m *DAGRunAttempt) ReadDAG(ctx context.Context) (*core.DAG, error) {
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -57,32 +57,32 @@ func (m *MockDAGRunAttempt) ReadDAG(ctx context.Context) (*core.DAG, error) {
 	return args.Get(0).(*core.DAG), args.Error(1)
 }
 
-func (m *MockDAGRunAttempt) Abort(ctx context.Context) error {
+func (m *DAGRunAttempt) Abort(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
 }
 
-func (m *MockDAGRunAttempt) IsAborting(ctx context.Context) (bool, error) {
+func (m *DAGRunAttempt) IsAborting(ctx context.Context) (bool, error) {
 	args := m.Called(ctx)
 	return args.Bool(0), args.Error(1)
 }
 
-func (m *MockDAGRunAttempt) Hide(ctx context.Context) error {
+func (m *DAGRunAttempt) Hide(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
 }
 
-func (m *MockDAGRunAttempt) Hidden() bool {
+func (m *DAGRunAttempt) Hidden() bool {
 	args := m.Called()
 	return args.Bool(0)
 }
 
-func (m *MockDAGRunAttempt) WriteOutputs(ctx context.Context, outputs *execution.DAGRunOutputs) error {
+func (m *DAGRunAttempt) WriteOutputs(ctx context.Context, outputs *execution.DAGRunOutputs) error {
 	args := m.Called(ctx, outputs)
 	return args.Error(0)
 }
 
-func (m *MockDAGRunAttempt) ReadOutputs(ctx context.Context) (*execution.DAGRunOutputs, error) {
+func (m *DAGRunAttempt) ReadOutputs(ctx context.Context) (*execution.DAGRunOutputs, error) {
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -90,12 +90,12 @@ func (m *MockDAGRunAttempt) ReadOutputs(ctx context.Context) (*execution.DAGRunO
 	return args.Get(0).(*execution.DAGRunOutputs), args.Error(1)
 }
 
-func (m *MockDAGRunAttempt) WriteMessages(ctx context.Context, messages *execution.LLMMessages) error {
+func (m *DAGRunAttempt) WriteMessages(ctx context.Context, messages *execution.LLMMessages) error {
 	args := m.Called(ctx, messages)
 	return args.Error(0)
 }
 
-func (m *MockDAGRunAttempt) ReadMessages(ctx context.Context) (*execution.LLMMessages, error) {
+func (m *DAGRunAttempt) ReadMessages(ctx context.Context) (*execution.LLMMessages, error) {
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

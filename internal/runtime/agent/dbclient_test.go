@@ -10,6 +10,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
+	"github.com/dagu-org/dagu/internal/core/execution/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -22,7 +23,7 @@ func TestDBClient_GetSubDAGRunStatus(t *testing.T) {
 		// Setup mocks
 		mockDAGStore := new(mockDAGStore)
 		mockDAGRunStore := new(mockDAGRunStore)
-		mockAttempt := new(mockDAGRunAttempt)
+		mockAttempt := new(mocks.DAGRunAttempt)
 
 		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-123")
 		subRunID := "child-run-123"
@@ -90,7 +91,7 @@ func TestDBClient_IsSubDAGRunCompleted(t *testing.T) {
 
 		mockDAGStore := new(mockDAGStore)
 		mockDAGRunStore := new(mockDAGRunStore)
-		mockAttempt := new(mockDAGRunAttempt)
+		mockAttempt := new(mocks.DAGRunAttempt)
 
 		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-completed")
 		subRunID := "child-completed-success"
@@ -117,7 +118,7 @@ func TestDBClient_IsSubDAGRunCompleted(t *testing.T) {
 
 		mockDAGStore := new(mockDAGStore)
 		mockDAGRunStore := new(mockDAGRunStore)
-		mockAttempt := new(mockDAGRunAttempt)
+		mockAttempt := new(mocks.DAGRunAttempt)
 
 		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-error")
 		subRunID := "child-completed-error"
@@ -309,93 +310,4 @@ func (m *mockDAGRunStore) RemoveOldDAGRuns(ctx context.Context, name string, ret
 func (m *mockDAGRunStore) RenameDAGRuns(ctx context.Context, oldName, newName string) error {
 	args := m.Called(ctx, oldName, newName)
 	return args.Error(0)
-}
-
-var _ execution.DAGRunAttempt = (*mockDAGRunAttempt)(nil)
-
-// mockDAGRunAttempt implements the needed methods from models.DAGRunAttempt
-type mockDAGRunAttempt struct {
-	mock.Mock
-	status *execution.DAGRunStatus
-}
-
-func (m *mockDAGRunAttempt) ID() string {
-	return "mock-attempt-id"
-}
-
-func (m *mockDAGRunAttempt) Open(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *mockDAGRunAttempt) Write(ctx context.Context, status execution.DAGRunStatus) error {
-	args := m.Called(ctx, status)
-	return args.Error(0)
-}
-
-func (m *mockDAGRunAttempt) Close(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *mockDAGRunAttempt) ReadStatus(ctx context.Context) (*execution.DAGRunStatus, error) {
-	args := m.Called(ctx)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*execution.DAGRunStatus), args.Error(1)
-}
-
-func (m *mockDAGRunAttempt) ReadDAG(ctx context.Context) (*core.DAG, error) {
-	args := m.Called(ctx)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*core.DAG), args.Error(1)
-}
-
-func (m *mockDAGRunAttempt) Abort(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *mockDAGRunAttempt) IsAborting(ctx context.Context) (bool, error) {
-	args := m.Called(ctx)
-	return args.Bool(0), args.Error(1)
-}
-
-func (m *mockDAGRunAttempt) Hide(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *mockDAGRunAttempt) Hidden() bool {
-	args := m.Called()
-	return args.Bool(0)
-}
-
-func (m *mockDAGRunAttempt) WriteOutputs(ctx context.Context, outputs *execution.DAGRunOutputs) error {
-	args := m.Called(ctx, outputs)
-	return args.Error(0)
-}
-
-func (m *mockDAGRunAttempt) ReadOutputs(ctx context.Context) (*execution.DAGRunOutputs, error) {
-	args := m.Called(ctx)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*execution.DAGRunOutputs), args.Error(1)
-}
-
-func (m *mockDAGRunAttempt) WriteMessages(ctx context.Context, messages *execution.LLMMessages) error {
-	args := m.Called(ctx, messages)
-	return args.Error(0)
-}
-
-func (m *mockDAGRunAttempt) ReadMessages(ctx context.Context) (*execution.LLMMessages, error) {
-	args := m.Called(ctx)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*execution.LLMMessages), args.Error(1)
 }
