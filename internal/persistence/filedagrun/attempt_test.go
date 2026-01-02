@@ -784,4 +784,52 @@ func TestAttempt_WriteMessages(t *testing.T) {
 		assert.Len(t, readMsgs.Steps["step1"], 2)
 		assert.Len(t, readMsgs.Steps["step2"], 1)
 	})
+
+	t.Run("MessagesSharedAcrossRetryAttempts", func(t *testing.T) {
+		th := setupTestStore(t)
+		dag := th.DAG("test-retry-messages")
+		dagRunID := "retry-run-1"
+
+		// First attempt writes messages
+		att1, err := th.Store.CreateAttempt(ctx, dag.DAG, time.Now(), dagRunID, execution.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+
+		messages := &execution.LLMMessages{
+			Steps: map[string][]execution.LLMMessage{
+				"step1": {
+					{Role: "user", Content: "hello"},
+					{Role: "assistant", Content: "hi there"},
+				},
+			},
+		}
+		err = att1.WriteMessages(ctx, messages)
+		require.NoError(t, err)
+
+		// Second attempt (retry) should be able to read the same messages
+		att2, err := th.Store.CreateAttempt(ctx, dag.DAG, time.Now().Add(time.Second), dagRunID, execution.NewDAGRunAttemptOptions{Retry: true})
+		require.NoError(t, err)
+
+		readMsgs, err := att2.ReadMessages(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, readMsgs, "retry attempt should be able to read messages from first attempt")
+		require.Len(t, readMsgs.Steps["step1"], 2)
+		assert.Equal(t, "hello", readMsgs.Steps["step1"][0].Content)
+		assert.Equal(t, "hi there", readMsgs.Steps["step1"][1].Content)
+
+		// Retry attempt can also update messages
+		readMsgs.Steps["step2"] = []execution.LLMMessage{
+			{Role: "user", Content: "follow up"},
+			{Role: "assistant", Content: "response"},
+		}
+		err = att2.WriteMessages(ctx, readMsgs)
+		require.NoError(t, err)
+
+		// Both attempts should see the updated messages
+		finalMsgs, err := att1.ReadMessages(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, finalMsgs)
+		assert.Len(t, finalMsgs.Steps, 2)
+		assert.Len(t, finalMsgs.Steps["step1"], 2)
+		assert.Len(t, finalMsgs.Steps["step2"], 2)
+	})
 }

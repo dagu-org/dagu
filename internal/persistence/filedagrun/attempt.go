@@ -581,13 +581,15 @@ func (att *Attempt) ReadOutputs(_ context.Context) (*execution.DAGRunOutputs, er
 }
 
 // WriteMessages writes the LLM conversation messages to messages.json.
+// Messages are stored at the dag-run level (not attempt level) so they persist across retry attempts.
 func (att *Attempt) WriteMessages(_ context.Context, messages *execution.LLMMessages) error {
 	if messages == nil || len(messages.Steps) == 0 {
 		return nil
 	}
 
-	dir := filepath.Dir(att.file)
-	messagesFile := filepath.Join(dir, MessagesFile)
+	// Store at dag-run level (parent of attempt directory) for retry persistence
+	dagRunDir := filepath.Dir(filepath.Dir(att.file))
+	messagesFile := filepath.Join(dagRunDir, MessagesFile)
 
 	data, err := json.MarshalIndent(messages, "", "  ")
 	if err != nil {
@@ -602,10 +604,12 @@ func (att *Attempt) WriteMessages(_ context.Context, messages *execution.LLMMess
 }
 
 // ReadMessages reads the LLM conversation messages from messages.json.
+// Messages are stored at the dag-run level (not attempt level) so they persist across retry attempts.
 // Returns nil if the file does not exist.
 func (att *Attempt) ReadMessages(_ context.Context) (*execution.LLMMessages, error) {
-	dir := filepath.Dir(att.file)
-	messagesFile := filepath.Join(dir, MessagesFile)
+	// Read from dag-run level (parent of attempt directory) for retry persistence
+	dagRunDir := filepath.Dir(filepath.Dir(att.file))
+	messagesFile := filepath.Join(dagRunDir, MessagesFile)
 
 	data, err := os.ReadFile(messagesFile) //nolint:gosec
 	if err != nil {
