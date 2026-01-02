@@ -526,7 +526,13 @@ func (a *API) ApproveDAGRunStep(ctx context.Context, request api.ApproveDAGRunSt
 		}, nil
 	}
 
-	// TODO: Validate required inputs from wait step config
+	// Validate required inputs from wait step config
+	if err := validateRequiredInputs(dagStatus.Nodes[stepIdx].Step, request.Body); err != nil {
+		return &api.ApproveDAGRunStep400JSONResponse{
+			Code:    api.ErrorCodeBadRequest,
+			Message: err.Error(),
+		}, nil
+	}
 
 	// Update the node status to Succeeded
 	dagStatus.Nodes[stepIdx].Status = core.NodeSucceeded
@@ -1147,4 +1153,54 @@ func (a *API) getSubDAGRunDetail(ctx context.Context, parentRef execution.DAGRun
 	}
 
 	return detail, nil
+}
+
+// validateRequiredInputs checks that all required inputs from a wait step config are provided.
+func validateRequiredInputs(step core.Step, body *api.ApproveStepRequest) error {
+	if step.ExecutorConfig.Config == nil {
+		return nil
+	}
+
+	// Extract required fields from step config
+	requiredFields, ok := step.ExecutorConfig.Config["required"]
+	if !ok {
+		return nil
+	}
+
+	required, ok := requiredFields.([]any)
+	if !ok {
+		return nil
+	}
+
+	if len(required) == 0 {
+		return nil
+	}
+
+	// Get provided inputs
+	var providedInputs map[string]string
+	if body != nil && body.Inputs != nil {
+		providedInputs = *body.Inputs
+	}
+
+	// Check each required field
+	var missing []string
+	for _, r := range required {
+		fieldName, ok := r.(string)
+		if !ok {
+			continue
+		}
+		if providedInputs == nil {
+			missing = append(missing, fieldName)
+			continue
+		}
+		if _, exists := providedInputs[fieldName]; !exists {
+			missing = append(missing, fieldName)
+		}
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required inputs: %v", missing)
+	}
+
+	return nil
 }

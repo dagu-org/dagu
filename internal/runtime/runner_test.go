@@ -2980,3 +2980,84 @@ func TestRunner_ChatMessagesHandler(t *testing.T) {
 		assert.Equal(t, 0, handler.writeCalls)
 	})
 }
+
+func TestWaitStep(t *testing.T) {
+	t.Run("WaitStepResultsInWaitStatus", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t)
+
+		// 1 -> wait -> 3
+		// When wait step completes, DAG should be in Wait status
+		plan := r.newPlan(t,
+			successStep("1"),
+			waitStep("wait", "1"),
+			successStep("3", "wait"),
+		)
+
+		result := plan.assertRun(t, core.Wait)
+
+		result.assertNodeStatus(t, "1", core.NodeSucceeded)
+		result.assertNodeStatus(t, "wait", core.NodeWaiting)
+		result.assertNodeStatus(t, "3", core.NodeNotStarted)
+	})
+
+	t.Run("WaitStepBlocksDependentNodes", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t)
+
+		// 1 -> wait -> 2 -> 3
+		plan := r.newPlan(t,
+			successStep("1"),
+			waitStep("wait", "1"),
+			successStep("2", "wait"),
+			successStep("3", "2"),
+		)
+
+		result := plan.assertRun(t, core.Wait)
+
+		// Node 1 should succeed, wait should be waiting, 2 and 3 should not start
+		result.assertNodeStatus(t, "1", core.NodeSucceeded)
+		result.assertNodeStatus(t, "wait", core.NodeWaiting)
+		result.assertNodeStatus(t, "2", core.NodeNotStarted)
+		result.assertNodeStatus(t, "3", core.NodeNotStarted)
+	})
+
+	t.Run("ParallelBranchWithWaitStep", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t)
+
+		// Two parallel branches: 1 -> 2 (normal), wait -> 3 (wait)
+		plan := r.newPlan(t,
+			successStep("1"),
+			successStep("2", "1"),
+			waitStep("wait"),
+			successStep("3", "wait"),
+		)
+
+		result := plan.assertRun(t, core.Wait)
+
+		// Normal branch completes, wait branch blocks
+		result.assertNodeStatus(t, "1", core.NodeSucceeded)
+		result.assertNodeStatus(t, "2", core.NodeSucceeded)
+		result.assertNodeStatus(t, "wait", core.NodeWaiting)
+		result.assertNodeStatus(t, "3", core.NodeNotStarted)
+	})
+
+	t.Run("WaitStepAtStart", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t)
+
+		// wait -> 1 -> 2
+		plan := r.newPlan(t,
+			waitStep("wait"),
+			successStep("1", "wait"),
+			successStep("2", "1"),
+		)
+
+		result := plan.assertRun(t, core.Wait)
+
+		result.assertNodeStatus(t, "wait", core.NodeWaiting)
+		result.assertNodeStatus(t, "1", core.NodeNotStarted)
+		result.assertNodeStatus(t, "2", core.NodeNotStarted)
+	})
+}
