@@ -161,7 +161,7 @@ func (e *Executor) Run(ctx context.Context) error {
 	allMessages = append(allMessages, e.messages...)
 
 	// Deduplicate system messages (keep only the first one)
-	allMessages = deduplicateSystemMessages(allMessages)
+	allMessages = toLLMMessages(execution.DeduplicateSystemMessages(toExecutionMessages(allMessages)))
 
 	// Build chat request
 	req := &llmpkg.ChatRequest{
@@ -211,28 +211,6 @@ func (e *Executor) Run(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-// deduplicateSystemMessages keeps only the first system message.
-func deduplicateSystemMessages(messages []llmpkg.Message) []llmpkg.Message {
-	if len(messages) == 0 {
-		return nil
-	}
-
-	result := make([]llmpkg.Message, 0, len(messages))
-	seenSystem := false
-
-	for _, msg := range messages {
-		if msg.Role == llmpkg.RoleSystem {
-			if seenSystem {
-				continue
-			}
-			seenSystem = true
-		}
-		result = append(result, msg)
-	}
-
-	return result
 }
 
 func init() {

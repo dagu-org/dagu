@@ -52,11 +52,11 @@ func (m *LLMMessages) MergeFromDependencies(depends []string) []LLMMessage {
 		}
 	}
 
-	return deduplicateSystemMessages(merged)
+	return DeduplicateSystemMessages(merged)
 }
 
-// deduplicateSystemMessages keeps only the first system message.
-func deduplicateSystemMessages(messages []LLMMessage) []LLMMessage {
+// DeduplicateSystemMessages keeps only the first system message.
+func DeduplicateSystemMessages(messages []LLMMessage) []LLMMessage {
 	if len(messages) == 0 {
 		return nil
 	}

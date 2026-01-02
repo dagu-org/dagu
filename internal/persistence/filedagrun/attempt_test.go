@@ -675,3 +675,113 @@ func TestAttempt_ReadOutputs(t *testing.T) {
 		assert.Equal(t, outputs.Outputs, readOutputs.Outputs)
 	})
 }
+
+func TestAttempt_WriteMessages(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("WriteAndReadMessages", func(t *testing.T) {
+		th := setupTestStore(t)
+		dag := th.DAG("test-messages")
+
+		att, err := th.Store.CreateAttempt(ctx, dag.DAG, time.Now(), "run-1", execution.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+
+		messages := &execution.LLMMessages{
+			Steps: map[string][]execution.LLMMessage{
+				"step1": {
+					{Role: "system", Content: "be helpful"},
+					{Role: "user", Content: "hello"},
+					{Role: "assistant", Content: "hi there"},
+				},
+			},
+		}
+
+		err = att.WriteMessages(ctx, messages)
+		require.NoError(t, err)
+
+		readMsgs, err := att.ReadMessages(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, readMsgs)
+		require.Len(t, readMsgs.Steps["step1"], 3)
+		assert.Equal(t, "system", readMsgs.Steps["step1"][0].Role)
+		assert.Equal(t, "be helpful", readMsgs.Steps["step1"][0].Content)
+	})
+
+	t.Run("WriteNilMessages", func(t *testing.T) {
+		th := setupTestStore(t)
+		dag := th.DAG("test-nil-messages")
+
+		att, err := th.Store.CreateAttempt(ctx, dag.DAG, time.Now(), "run-1", execution.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+
+		err = att.WriteMessages(ctx, nil)
+		require.NoError(t, err)
+
+		// File should not exist
+		readMsgs, err := att.ReadMessages(ctx)
+		require.NoError(t, err)
+		assert.Nil(t, readMsgs)
+	})
+
+	t.Run("WriteEmptyMessages", func(t *testing.T) {
+		th := setupTestStore(t)
+		dag := th.DAG("test-empty-messages")
+
+		att, err := th.Store.CreateAttempt(ctx, dag.DAG, time.Now(), "run-1", execution.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+
+		err = att.WriteMessages(ctx, &execution.LLMMessages{Steps: map[string][]execution.LLMMessage{}})
+		require.NoError(t, err)
+
+		// File should not exist for empty messages
+		readMsgs, err := att.ReadMessages(ctx)
+		require.NoError(t, err)
+		assert.Nil(t, readMsgs)
+	})
+
+	t.Run("ReadNonExistentMessages", func(t *testing.T) {
+		th := setupTestStore(t)
+		dag := th.DAG("test-nonexistent-messages")
+
+		att, err := th.Store.CreateAttempt(ctx, dag.DAG, time.Now(), "run-1", execution.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+
+		readMsgs, err := att.ReadMessages(ctx)
+		require.NoError(t, err)
+		assert.Nil(t, readMsgs)
+	})
+
+	t.Run("UpdateMessages", func(t *testing.T) {
+		th := setupTestStore(t)
+		dag := th.DAG("test-update-messages")
+
+		att, err := th.Store.CreateAttempt(ctx, dag.DAG, time.Now(), "run-1", execution.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+
+		// Write initial messages
+		messages1 := &execution.LLMMessages{
+			Steps: map[string][]execution.LLMMessage{
+				"step1": {{Role: "user", Content: "first"}},
+			},
+		}
+		err = att.WriteMessages(ctx, messages1)
+		require.NoError(t, err)
+
+		// Update with more messages
+		messages2 := &execution.LLMMessages{
+			Steps: map[string][]execution.LLMMessage{
+				"step1": {{Role: "user", Content: "first"}, {Role: "assistant", Content: "response"}},
+				"step2": {{Role: "user", Content: "second"}},
+			},
+		}
+		err = att.WriteMessages(ctx, messages2)
+		require.NoError(t, err)
+
+		readMsgs, err := att.ReadMessages(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, readMsgs)
+		assert.Len(t, readMsgs.Steps, 2)
+		assert.Len(t, readMsgs.Steps["step1"], 2)
+		assert.Len(t, readMsgs.Steps["step2"], 1)
+	})
+}
