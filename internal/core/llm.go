@@ -26,9 +26,6 @@ type LLMConfig struct {
 	BaseURL string `json:"baseURL,omitempty"`
 	// APIKey overrides the default environment variable for the API key.
 	APIKey string `json:"apiKey,omitempty"`
-	// History enables or disables history loading from dependent steps.
-	// Default is true.
-	History *bool `json:"history,omitempty"`
 	// Stream enables or disables streaming output.
 	// Default is true.
 	Stream *bool `json:"stream,omitempty"`
@@ -40,15 +37,6 @@ type LLMMessage struct {
 	Role string `json:"role,omitempty"`
 	// Content is the message content. Supports variable substitution with ${VAR}.
 	Content string `json:"content,omitempty"`
-}
-
-// HistoryEnabled returns true if history loading is enabled.
-// Default is true if History is nil.
-func (c *LLMConfig) HistoryEnabled() bool {
-	if c.History == nil {
-		return true
-	}
-	return *c.History
 }
 
 // StreamEnabled returns true if streaming is enabled.

@@ -11,16 +11,14 @@ import (
 func TestExecutor_MessageSaving(t *testing.T) {
 	t.Parallel()
 
-	t.Run("HistoryEnabled_SavesAllMessages", func(t *testing.T) {
+	t.Run("SavesAllMessagesWithInherited", func(t *testing.T) {
 		t.Parallel()
 
-		historyEnabled := true
 		executor := &Executor{
 			step: core.Step{
 				LLM: &core.LLMConfig{
 					Provider: "openai",
 					Model:    "gpt-4o",
-					History:  &historyEnabled,
 				},
 			},
 			messages: []execution.LLMMessage{
@@ -54,56 +52,6 @@ func TestExecutor_MessageSaving(t *testing.T) {
 		assert.Equal(t, execution.RoleAssistant, saved[4].Role)
 		assert.NotNil(t, saved[4].Metadata)
 		assert.Equal(t, 15, saved[4].Metadata.TotalTokens)
-	})
-
-	t.Run("HistoryDisabled_SavesOnlyStepMessages", func(t *testing.T) {
-		t.Parallel()
-
-		historyDisabled := false
-		executor := &Executor{
-			step: core.Step{
-				LLM: &core.LLMConfig{
-					Provider: "anthropic",
-					Model:    "claude-sonnet-4-20250514",
-					History:  &historyDisabled,
-				},
-			},
-			messages: []execution.LLMMessage{
-				{Role: execution.RoleSystem, Content: "New system prompt"},
-				{Role: execution.RoleUser, Content: "New question"},
-			},
-			inheritedMessages: []execution.LLMMessage{
-				{Role: execution.RoleSystem, Content: "Old system prompt"},
-				{Role: execution.RoleUser, Content: "Old question"},
-				{Role: execution.RoleAssistant, Content: "Old answer"},
-			},
-		}
-
-		// Simulate what happens after Run() with history disabled
-		// Should NOT include inherited messages
-		metadata := &execution.LLMMessageMetadata{
-			Provider:         "anthropic",
-			Model:            "claude-sonnet-4-20250514",
-			PromptTokens:     20,
-			CompletionTokens: 10,
-			TotalTokens:      30,
-		}
-		executor.savedMessages = append(executor.messages, execution.LLMMessage{
-			Role:     execution.RoleAssistant,
-			Content:  "New answer",
-			Metadata: metadata,
-		})
-
-		saved := executor.GetMessages()
-		assert.Len(t, saved, 3) // 2 step messages + 1 assistant (NO inherited)
-		assert.Equal(t, execution.RoleSystem, saved[0].Role)
-		assert.Equal(t, "New system prompt", saved[0].Content)
-		assert.Equal(t, execution.RoleUser, saved[1].Role)
-		assert.Equal(t, "New question", saved[1].Content)
-		assert.Equal(t, execution.RoleAssistant, saved[2].Role)
-		assert.NotNil(t, saved[2].Metadata)
-		assert.Equal(t, "anthropic", saved[2].Metadata.Provider)
-		assert.Equal(t, 30, saved[2].Metadata.TotalTokens)
 	})
 
 	t.Run("MetadataAlwaysSaved", func(t *testing.T) {

@@ -156,15 +156,9 @@ func (e *Executor) Run(ctx context.Context) error {
 		return err
 	}
 
-	// Build complete message list using execution.LLMMessage
+	// Build complete message list: inherited messages + this step's messages
 	var allMessages []execution.LLMMessage
-
-	// Add inherited messages if history is enabled
-	if cfg.HistoryEnabled() && len(e.inheritedMessages) > 0 {
-		allMessages = append(allMessages, e.inheritedMessages...)
-	}
-
-	// Append this step's evaluated messages
+	allMessages = append(allMessages, e.inheritedMessages...)
 	allMessages = append(allMessages, evaluatedMessages...)
 
 	// Deduplicate system messages (keep only the first one)
@@ -226,23 +220,12 @@ func (e *Executor) Run(ctx context.Context) error {
 		metadata.TotalTokens = usage.TotalTokens
 	}
 
-	// Save messages for persistence
-	// When history is enabled, save full conversation (inherited + step messages + response)
-	// When history is disabled, save only this step's messages + response
-	if cfg.HistoryEnabled() {
-		e.savedMessages = append(allMessages, execution.LLMMessage{
-			Role:     execution.RoleAssistant,
-			Content:  responseContent,
-			Metadata: metadata,
-		})
-	} else {
-		// Save only this step's messages (without inherited) + response
-		e.savedMessages = append(evaluatedMessages, execution.LLMMessage{
-			Role:     execution.RoleAssistant,
-			Content:  responseContent,
-			Metadata: metadata,
-		})
-	}
+	// Save full conversation (inherited + step messages + response)
+	e.savedMessages = append(allMessages, execution.LLMMessage{
+		Role:     execution.RoleAssistant,
+		Content:  responseContent,
+		Metadata: metadata,
+	})
 
 	return nil
 }

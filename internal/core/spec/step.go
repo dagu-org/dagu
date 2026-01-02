@@ -144,9 +144,6 @@ type llmConfig struct {
 	BaseURL string `yaml:"baseURL,omitempty"`
 	// APIKey overrides the default environment variable for the API key.
 	APIKey string `yaml:"apiKey,omitempty"`
-	// History enables or disables history loading from dependent steps.
-	// Default is true.
-	History *bool `yaml:"history,omitempty"`
 	// Stream enables or disables streaming output.
 	// Default is true.
 	Stream *bool `yaml:"stream,omitempty"`
@@ -1278,7 +1275,6 @@ func buildStepLLM(_ StepBuildContext, s *step, result *core.Step) error {
 		TopP:        cfg.TopP,
 		BaseURL:     cfg.BaseURL,
 		APIKey:      cfg.APIKey,
-		History:     cfg.History,
 		Stream:      cfg.Stream,
 	}
 
