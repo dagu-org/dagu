@@ -165,8 +165,10 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 
 	// Check if any sub DAGs failed or are waiting (even if they completed without execution errors)
 	e.lock.Lock()
-	failedCount := 0
-	waitingCount := 0
+	var (
+		failedCount  int
+		waitingCount int
+	)
 	for _, result := range e.results {
 		if result.Status == core.Wait {
 			waitingCount++
@@ -212,8 +214,10 @@ func (e *parallelExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 
 	// Check if all sub DAGs succeeded or if any had partial success or waiting
 	// For error cases, we return an error status with error message
-	var partialSuccess bool
-	var hasWaiting bool
+	var (
+		partialSuccess bool
+		hasWaiting     bool
+	)
 	for _, result := range e.results {
 		switch result.Status {
 		case core.Succeeded:

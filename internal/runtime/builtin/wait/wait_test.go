@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestWaitExecutor_Run(t *testing.T) {
+func TestWaitExecutorRun(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -21,18 +21,18 @@ func TestWaitExecutor_Run(t *testing.T) {
 		expectRequired bool
 	}{
 		{
-			name:   "basic wait step",
+			name:   "Basic",
 			config: nil,
 		},
 		{
-			name: "wait with prompt",
+			name: "WithPrompt",
 			config: map[string]any{
 				"prompt": "Please approve this deployment",
 			},
 			expectPrompt: "Please approve this deployment",
 		},
 		{
-			name: "wait with inputs",
+			name: "WithInputs",
 			config: map[string]any{
 				"prompt":   "Enter approval details",
 				"input":    []string{"reason", "approver"},
@@ -81,7 +81,7 @@ func TestWaitExecutor_Run(t *testing.T) {
 	}
 }
 
-func TestWaitExecutor_DetermineNodeStatus(t *testing.T) {
+func TestWaitExecutorDetermineNodeStatus(t *testing.T) {
 	t.Parallel()
 
 	step := core.Step{
@@ -104,7 +104,7 @@ func TestWaitExecutor_DetermineNodeStatus(t *testing.T) {
 	assert.Equal(t, core.NodeWaiting, status)
 }
 
-func TestValidateConfig(t *testing.T) {
+func TestWaitValidateConfig(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -113,22 +113,22 @@ func TestValidateConfig(t *testing.T) {
 		expectErr bool
 	}{
 		{
-			name:   "nil config is valid",
+			name:   "Nil",
 			config: nil,
 		},
 		{
-			name:   "empty config is valid",
+			name:   "Empty",
 			config: map[string]any{},
 		},
 		{
-			name: "required fields in input list is valid",
+			name: "ValidRequired",
 			config: map[string]any{
 				"input":    []string{"reason", "approver"},
 				"required": []string{"reason"},
 			},
 		},
 		{
-			name: "required field not in input list is invalid",
+			name: "InvalidRequired",
 			config: map[string]any{
 				"input":    []string{"reason"},
 				"required": []string{"approver"},

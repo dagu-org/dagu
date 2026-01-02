@@ -878,7 +878,7 @@ func TestDAG_GetName(t *testing.T) {
 	})
 }
 
-func TestDAG_HasWaitSteps(t *testing.T) {
+func TestDAGHasWaitSteps(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -887,12 +887,12 @@ func TestDAG_HasWaitSteps(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "empty steps returns false",
+			name:     "Empty",
 			steps:    []core.Step{},
 			expected: false,
 		},
 		{
-			name: "no wait steps returns false",
+			name: "NoWait",
 			steps: []core.Step{
 				{Name: "step1", ExecutorConfig: core.ExecutorConfig{Type: "command"}},
 				{Name: "step2", ExecutorConfig: core.ExecutorConfig{Type: "dag"}},
@@ -900,7 +900,7 @@ func TestDAG_HasWaitSteps(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "has wait step returns true",
+			name: "HasWait",
 			steps: []core.Step{
 				{Name: "step1", ExecutorConfig: core.ExecutorConfig{Type: "command"}},
 				{Name: "step2", ExecutorConfig: core.ExecutorConfig{Type: "wait"}},
@@ -908,14 +908,14 @@ func TestDAG_HasWaitSteps(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "only wait step returns true",
+			name: "OnlyWait",
 			steps: []core.Step{
 				{Name: "step1", ExecutorConfig: core.ExecutorConfig{Type: "wait"}},
 			},
 			expected: true,
 		},
 		{
-			name: "empty executor type is not wait",
+			name: "EmptyType",
 			steps: []core.Step{
 				{Name: "step1", ExecutorConfig: core.ExecutorConfig{Type: ""}},
 			},

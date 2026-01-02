@@ -1950,7 +1950,7 @@ func TestBuildLogOutput(t *testing.T) {
 	}
 }
 
-func TestBuild_WorkerSelectorWithWaitSteps(t *testing.T) {
+func TestBuildWaitStepsValidation(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -1960,7 +1960,7 @@ func TestBuild_WorkerSelectorWithWaitSteps(t *testing.T) {
 		errContains string
 	}{
 		{
-			name: "workerSelector_without_wait_steps_passes",
+			name: "NoWaitSteps",
 			dag: &dag{
 				Name:           "test-dag",
 				WorkerSelector: map[string]string{"region": "us-west"},
@@ -1971,7 +1971,7 @@ func TestBuild_WorkerSelectorWithWaitSteps(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name: "wait_step_without_workerSelector_passes",
+			name: "NoWorkerSelector",
 			dag: &dag{
 				Name: "test-dag",
 				Steps: []any{
@@ -1981,7 +1981,7 @@ func TestBuild_WorkerSelectorWithWaitSteps(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name: "workerSelector_with_wait_step_fails",
+			name: "Conflict",
 			dag: &dag{
 				Name:           "test-dag",
 				WorkerSelector: map[string]string{"region": "us-west"},
@@ -1993,7 +1993,7 @@ func TestBuild_WorkerSelectorWithWaitSteps(t *testing.T) {
 			errContains: "DAG with wait steps cannot be dispatched to workers",
 		},
 		{
-			name: "workerSelector_with_multiple_steps_including_wait_fails",
+			name: "ConflictMultipleSteps",
 			dag: &dag{
 				Name:           "test-dag",
 				WorkerSelector: map[string]string{"region": "us-west"},
