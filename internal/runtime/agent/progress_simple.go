@@ -123,7 +123,7 @@ func (p *SimpleProgressDisplay) printHeader() {
 		runID = "..."
 	}
 
-	fmt.Fprintf(os.Stderr, "Running %s (run id = %s)\n", dagName, runID)
+	fmt.Fprintf(os.Stderr, "▶ %s %s\n", dagName, gray("("+runID+")"))
 }
 
 // gray returns text in gray color (ANSI 256 color 245).
