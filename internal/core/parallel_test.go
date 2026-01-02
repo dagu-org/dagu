@@ -118,7 +118,7 @@ steps:
     parallel: ${ITEMS}
 `,
 			wantErr:    true,
-			wantErrMsg: "cannot use sub-DAG field",
+			wantErrMsg: "parallel execution is only supported for child-DAGs",
 		},
 		{
 			name: "ErrorParallelWithoutCommandOrRun",

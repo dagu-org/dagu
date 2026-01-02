@@ -16,10 +16,10 @@ import (
 )
 
 const (
-	providerName         = "openai"
-	defaultChatEndpoint  = "/chat/completions"
-	streamPrefix         = "data: "
-	streamDoneMarker     = "[DONE]"
+	providerName        = "openai"
+	defaultChatEndpoint = "/chat/completions"
+	streamPrefix        = "data: "
+	streamDoneMarker    = "[DONE]"
 )
 
 func init() {

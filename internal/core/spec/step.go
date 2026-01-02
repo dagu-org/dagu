@@ -154,7 +154,7 @@ type llmConfig struct {
 
 // llmMessage defines a message in the LLM conversation.
 type llmMessage struct {
-	// Role is the message role (system, user, assistant).
+	// Role is the message role (system, user, assistant, tool).
 	Role string `yaml:"role,omitempty"`
 	// Content is the message content. Supports variable substitution with ${VAR}.
 	Content string `yaml:"content,omitempty"`

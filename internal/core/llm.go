@@ -28,7 +28,7 @@ type LLMConfig struct {
 
 // LLMMessage represents a message in the LLM conversation.
 type LLMMessage struct {
-	// Role is the message role (system, user, assistant).
+	// Role is the message role (system, user, assistant, tool).
 	Role string `json:"role,omitempty"`
 	// Content is the message content. Supports variable substitution with ${VAR}.
 	Content string `json:"content,omitempty"`
