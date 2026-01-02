@@ -9,6 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"golang.org/x/term"
 )
 
 var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
@@ -26,6 +27,7 @@ type SimpleProgressDisplay struct {
 	status         core.Status
 	spinnerIndex   int
 	startTime      time.Time
+	colorEnabled   bool
 
 	stopOnce sync.Once
 	stopCh   chan struct{}
@@ -42,6 +44,7 @@ func NewSimpleProgressDisplay(dag *core.DAG) *SimpleProgressDisplay {
 		dag:            dag,
 		total:          total,
 		completedNodes: make(map[string]bool),
+		colorEnabled:   term.IsTerminal(int(os.Stderr.Fd())),
 		stopCh:         make(chan struct{}),
 		done:           make(chan struct{}),
 	}
@@ -130,14 +133,17 @@ func (p *SimpleProgressDisplay) printHeader() {
 	}
 
 	if p.params != "" {
-		fmt.Fprintf(os.Stderr, "▶ %s %s %s\n", dagName, gray("("+runID+")"), gray("["+p.params+"]"))
+		fmt.Fprintf(os.Stderr, "▶ %s %s %s\n", dagName, p.gray("("+runID+")"), p.gray("["+p.params+"]"))
 	} else {
-		fmt.Fprintf(os.Stderr, "▶ %s %s\n", dagName, gray("("+runID+")"))
+		fmt.Fprintf(os.Stderr, "▶ %s %s\n", dagName, p.gray("("+runID+")"))
 	}
 }
 
-// gray returns text in gray color (ANSI 256 color 245).
-func gray(s string) string {
+// gray returns text in gray color if color is enabled.
+func (p *SimpleProgressDisplay) gray(s string) string {
+	if !p.colorEnabled {
+		return s
+	}
 	return "\033[38;5;245m" + s + "\033[0m"
 }
 
@@ -156,7 +162,7 @@ func (p *SimpleProgressDisplay) render() {
 	elapsed := stringutil.FormatDuration(time.Since(p.startTime))
 
 	// Use \r to overwrite the line, pad with spaces to clear previous content
-	fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps) %s   ", spinner, percent, p.completed, p.total, gray(elapsed))
+	fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps) %s   ", spinner, percent, p.completed, p.total, p.gray(elapsed))
 }
 
 func (p *SimpleProgressDisplay) printFinal() {
@@ -176,5 +182,5 @@ func (p *SimpleProgressDisplay) printFinal() {
 	elapsed := stringutil.FormatDuration(time.Since(p.startTime))
 
 	// Clear line and print final status
-	fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps) %s   \n", icon, percent, p.completed, p.total, gray(elapsed))
+	fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps) %s   \n", icon, percent, p.completed, p.total, p.gray(elapsed))
 }
