@@ -219,20 +219,29 @@ func (e *Executor) Run(ctx context.Context) error {
 		_, _ = fmt.Fprintln(e.stdout, responseContent)
 	}
 
-	// Save messages (including assistant response) for persistence
-	if cfg.HistoryEnabled() {
-		// Build metadata for the assistant response
-		metadata := &execution.LLMMessageMetadata{
-			Provider: cfg.Provider,
-			Model:    cfg.Model,
-		}
-		if usage != nil {
-			metadata.PromptTokens = usage.PromptTokens
-			metadata.CompletionTokens = usage.CompletionTokens
-			metadata.TotalTokens = usage.TotalTokens
-		}
+	// Build metadata for the assistant response
+	metadata := &execution.LLMMessageMetadata{
+		Provider: cfg.Provider,
+		Model:    cfg.Model,
+	}
+	if usage != nil {
+		metadata.PromptTokens = usage.PromptTokens
+		metadata.CompletionTokens = usage.CompletionTokens
+		metadata.TotalTokens = usage.TotalTokens
+	}
 
+	// Save messages for persistence
+	// When history is enabled, save full conversation (inherited + step messages + response)
+	// When history is disabled, save only this step's messages + response
+	if cfg.HistoryEnabled() {
 		e.savedMessages = append(allMessages, execution.LLMMessage{
+			Role:     "assistant",
+			Content:  responseContent,
+			Metadata: metadata,
+		})
+	} else {
+		// Save only this step's messages (without inherited) + response
+		e.savedMessages = append(evaluatedMessages, execution.LLMMessage{
 			Role:     "assistant",
 			Content:  responseContent,
 			Metadata: metadata,
