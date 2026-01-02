@@ -1028,6 +1028,10 @@
         "config": {
           "$ref": "#/definitions/executorConfig",
           "description": "Executor-specific configuration. This is the new format replacing executor.config. Cannot be used together with 'executor' field."
+        },
+        "llm": {
+          "$ref": "#/definitions/llmConfig",
+          "description": "LLM (Large Language Model) configuration for AI-powered steps. Required when type is 'llm'."
         }
       },
       "allOf": [
@@ -1751,6 +1755,82 @@
       },
       "description": "Configuration for archive operations (create, extract, list)."
     },
+    "llmConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "model"],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": ["openai", "anthropic", "gemini", "openrouter", "local"],
+          "description": "LLM provider to use. Required."
+        },
+        "model": {
+          "type": "string",
+          "description": "Model identifier (e.g., 'gpt-4o', 'claude-sonnet-4-20250514', 'gemini-pro'). Required."
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/llmMessage"
+          },
+          "description": "List of messages to send to the LLM. Supports variable substitution with ${VAR}."
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Controls randomness in responses (0.0-2.0). Lower values are more deterministic."
+        },
+        "maxTokens": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of tokens to generate in the response."
+        },
+        "topP": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Nucleus sampling parameter (0.0-1.0). Alternative to temperature for controlling randomness."
+        },
+        "baseURL": {
+          "type": "string",
+          "description": "Custom API endpoint URL. Overrides the default endpoint for the provider."
+        },
+        "apiKey": {
+          "type": "string",
+          "description": "API key for authentication. Overrides the default environment variable (e.g., OPENAI_API_KEY)."
+        },
+        "history": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable conversation history from dependent steps. When true (default), messages from steps in 'depends' are included."
+        },
+        "stream": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable streaming output. When true (default), response tokens are streamed to stdout as they arrive."
+        }
+      },
+      "description": "Configuration for LLM (Large Language Model) executor. Supports OpenAI, Anthropic, Google Gemini, OpenRouter, and local models (Ollama/vLLM)."
+    },
+    "llmMessage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "content"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": ["system", "user", "assistant"],
+          "description": "Message role. 'system' for instructions, 'user' for prompts, 'assistant' for model responses."
+        },
+        "content": {
+          "type": "string",
+          "description": "Message content. Supports variable substitution with ${VAR} syntax."
+        }
+      },
+      "description": "A single message in an LLM conversation."
+    },
     "executorType": {
       "type": "string",
       "enum": [
@@ -1759,7 +1839,8 @@
         "http", "mail", "ssh", "jq",
         "gha", "github_action", "github-action",
         "dag", "subworkflow",
-        "parallel", "archive"
+        "parallel", "archive",
+        "llm"
       ],
       "description": "Type of executor to use for this step."
     },
