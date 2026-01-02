@@ -982,7 +982,7 @@ func (r *Runner) isPartialSuccess(ctx context.Context, p *Plan) bool {
 			// Partial success at node level contributes to overall partial success
 			hasFailuresWithContinueOn = true
 			hasSuccessfulNodes = true
-		case core.NodeNotStarted, core.NodeRunning, core.NodeAborted, core.NodeSkipped:
+		case core.NodeNotStarted, core.NodeRunning, core.NodeAborted, core.NodeSkipped, core.NodeWaiting:
 			// These statuses don't affect partial success determination, but are needed for linter
 		}
 	}
@@ -1102,6 +1102,8 @@ func (r *Runner) finishNode(node *Node, wg *sync.WaitGroup) {
 		r.metrics.canceledNodes++
 	case core.NodePartiallySucceeded:
 		r.metrics.completedNodes++ // Count partial success as completed
+	case core.NodeWaiting:
+		// Waiting nodes are counted when they complete after approval
 	case core.NodeNotStarted, core.NodeRunning:
 		// Should not happen at this point
 	}

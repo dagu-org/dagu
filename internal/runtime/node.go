@@ -113,6 +113,9 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 		fallthrough
 
 	case core.NodeRunning:
+		fallthrough
+
+	case core.NodeWaiting:
 		// Unexpected state
 		logger.Error(ctx, "Unexpected node status",
 			tag.Status(s.String()),

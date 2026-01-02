@@ -659,6 +659,8 @@ func nodeStatusToStatus(ns core.NodeStatus) core.Status {
 		return core.NotStarted
 	case core.NodeSkipped:
 		return core.NotStarted
+	case core.NodeWaiting:
+		return core.Wait
 	}
 	return core.NotStarted
 }
