@@ -21,6 +21,12 @@ func testBuildContext() BuildContext {
 	}
 }
 
+func testBuildContextWithOpts(opts BuildOpts) BuildContext {
+	ctx := testBuildContext()
+	ctx.opts = opts
+	return ctx
+}
+
 // Helper to create PortValue from string
 func portValue(s string) types.PortValue {
 	var p types.PortValue
@@ -41,6 +47,58 @@ func stringOrArrayList(ss []string) types.StringOrArray {
 	data, _ := yaml.Marshal(ss)
 	_ = yaml.Unmarshal(data, &v)
 	return v
+}
+
+func TestBuildParamsJSON(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		ctx  BuildContext
+		dag  *dag
+		want string
+	}{
+		{
+			name: "DefaultsOnly",
+			ctx:  testBuildContext(),
+			dag:  &dag{Params: "FOO=bar BAZ=qux"},
+			want: `{"FOO":"bar","BAZ":"qux"}`,
+		},
+		{
+			name: "OverridesMergedAndSerialized",
+			ctx:  testBuildContextWithOpts(BuildOpts{Parameters: "FOO=baz EXTRA=qux"}),
+			dag:  &dag{Params: "FOO=bar COUNT=1"},
+			want: `{"FOO":"baz","COUNT":"1","EXTRA":"qux"}`,
+		},
+		{
+			name: "PreservesRawJSONInput",
+			ctx:  testBuildContextWithOpts(BuildOpts{Parameters: `{"alpha":"one","beta":2}`}),
+			dag:  &dag{},
+			want: `{"alpha":"one","beta":2}`,
+		},
+		{
+			name: "NoParamsProducesEmptyString",
+			ctx:  testBuildContext(),
+			dag:  &dag{},
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := buildParamsJSON(tt.ctx, tt.dag)
+			require.NoError(t, err)
+
+			if tt.want == "" {
+				assert.Empty(t, result)
+				return
+			}
+
+			assert.JSONEq(t, tt.want, result)
+		})
+	}
 }
 
 func TestBuildType(t *testing.T) {

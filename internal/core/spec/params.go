@@ -57,7 +57,7 @@ func validateParams(paramPairs []paramPair, schema *jsonschema.Resolved) ([]para
 }
 
 func overrideParams(paramPairs *[]paramPair, override []paramPair) {
-	// Override the default parameters with the command line parameters (and satisfy linter :P)
+	// Override the default parameters with the command line parameters
 	pairsIndex := make(map[string]int)
 	for i, paramPair := range *paramPairs {
 		if paramPair.Name != "" {
@@ -244,7 +244,53 @@ var paramRegex = regexp.MustCompile(
 	`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|` + "`(" + `?:\\"|[^"]*)` + "`" + `|[^"\s]+)`,
 )
 
+// tryParseJSONParams attempts to parse the input as JSON and convert it to paramPairs.
+// Returns an error if the input is not valid JSON.
+func tryParseJSONParams(ctx BuildContext, input string) ([]paramPair, error) {
+	// Try parsing as JSON object first
+	var jsonObj map[string]any
+	if err := json.Unmarshal([]byte(input), &jsonObj); err == nil {
+		return parseMapParams(ctx, []any{jsonObj})
+	}
+
+	// Try parsing as JSON array
+	var jsonArr []any
+	if err := json.Unmarshal([]byte(input), &jsonArr); err == nil {
+		var params []paramPair
+		for _, item := range jsonArr {
+			switch v := item.(type) {
+			case string:
+				params = append(params, paramPair{Name: "", Value: v})
+			case map[string]any:
+				mapParams, err := parseMapParams(ctx, []any{v})
+				if err != nil {
+					return nil, err
+				}
+				params = append(params, mapParams...)
+			default:
+				// Convert other types (numbers, booleans) to string
+				params = append(params, paramPair{Name: "", Value: fmt.Sprintf("%v", v)})
+			}
+		}
+		return params, nil
+	}
+
+	return nil, fmt.Errorf("not valid JSON")
+}
+
 func parseStringParams(ctx BuildContext, input string) ([]paramPair, error) {
+	input = strings.TrimSpace(input)
+
+	// Check if input looks like a JSON object or array
+	if (strings.HasPrefix(input, "{") && strings.HasSuffix(input, "}")) ||
+		(strings.HasPrefix(input, "[") && strings.HasSuffix(input, "]")) {
+		params, err := tryParseJSONParams(ctx, input)
+		if err == nil {
+			return params, nil
+		}
+		// If JSON parsing fails, fall through to regex parsing
+	}
+
 	matches := paramRegex.FindAllStringSubmatch(input, -1)
 
 	var params []paramPair

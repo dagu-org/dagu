@@ -159,6 +159,61 @@ func TestParseStringParams(t *testing.T) {
 	}
 }
 
+func TestParseStringParamsWithJSON(t *testing.T) {
+	t.Parallel()
+
+	ctx := BuildContext{
+		ctx:  context.Background(),
+		opts: BuildOpts{Flags: BuildFlagNoEval},
+	}
+
+	tests := []struct {
+		name     string
+		input    string
+		expected []paramPair
+	}{
+		{
+			name:  "JSONObject",
+			input: `{"key1": "test1", "key2": "test2"}`,
+			expected: []paramPair{
+				{Name: "key1", Value: "test1"},
+				{Name: "key2", Value: "test2"},
+			},
+		},
+		{
+			name:  "JSONArray",
+			input: `["val1", "val2", "val3"]`,
+			expected: []paramPair{
+				{Name: "", Value: "val1"},
+				{Name: "", Value: "val2"},
+				{Name: "", Value: "val3"},
+			},
+		},
+		{
+			name:  "JSONWithNonStringValues",
+			input: `{"count": 42, "enabled": true}`,
+			expected: []paramPair{
+				{Name: "count", Value: "42"},
+				{Name: "enabled", Value: "true"},
+			},
+		},
+		{
+			name:     "InvalidJSONFallsBackToRegex",
+			input:    `{invalid json`,
+			expected: []paramPair{{Name: "", Value: "{invalid"}, {Name: "", Value: "json"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := parseStringParams(ctx, tt.input)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func TestParseStringParamsWithEval(t *testing.T) {
 	t.Run("BacktickCommandSubstitution", func(t *testing.T) {
 		ctx := BuildContext{

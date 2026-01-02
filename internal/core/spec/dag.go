@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -287,6 +288,7 @@ var metadataTransformers = []transform{
 	{"restartSchedule", newTransformer("RestartSchedule", buildRestartSchedule)},
 	{"params", newTransformer("Params", buildParams)},
 	{"defaultParams", newTransformer("DefaultParams", buildDefaultParams)},
+	{"paramsJSON", newTransformer("ParamsJSON", buildParamsJSON)},
 	{"workerSelector", newTransformer("WorkerSelector", buildWorkerSelector)},
 	{"timeout", newTransformer("Timeout", buildTimeout)},
 	{"delay", newTransformer("Delay", buildDelay)},
@@ -578,6 +580,7 @@ func buildRestartSchedule(_ BuildContext, d *dag) ([]core.Schedule, error) {
 type paramsResult struct {
 	Params        []string
 	DefaultParams string
+	ParamsJSON    string // JSON representation of resolved params (original payload when provided as JSON)
 }
 
 func buildParams(ctx BuildContext, d *dag) ([]string, error) {
@@ -594,6 +597,63 @@ func buildDefaultParams(ctx BuildContext, d *dag) (string, error) {
 		return "", err
 	}
 	return result.DefaultParams, nil
+}
+
+func buildParamsJSON(ctx BuildContext, d *dag) (string, error) {
+	result, err := parseParamsInternal(ctx, d)
+	if err != nil {
+		return "", err
+	}
+	return result.ParamsJSON, nil
+}
+
+// detectJSONParams checks if the input string is valid JSON and returns it if so.
+// Returns empty string if the input is not JSON.
+func detectJSONParams(input string) string {
+	input = strings.TrimSpace(input)
+	if (strings.HasPrefix(input, "{") && strings.HasSuffix(input, "}")) ||
+		(strings.HasPrefix(input, "[") && strings.HasSuffix(input, "]")) {
+		var js json.RawMessage
+		if json.Unmarshal([]byte(input), &js) == nil {
+			return input
+		}
+	}
+	return ""
+}
+
+// buildResolvedParamsJSON returns a JSON representation of the resolved params.
+// If the raw input was JSON, the original payload is returned to preserve structure.
+func buildResolvedParamsJSON(paramPairs []paramPair, rawInput string) (string, error) {
+	if rawJSON := detectJSONParams(rawInput); rawJSON != "" {
+		return rawJSON, nil
+	}
+	return marshalParamPairs(paramPairs)
+}
+
+// marshalParamPairs converts the final param pairs into a JSON object string.
+// Returns an empty string when there are no params to serialize.
+func marshalParamPairs(paramPairs []paramPair) (string, error) {
+	if len(paramPairs) == 0 {
+		return "", nil
+	}
+
+	payload := make(map[string]string, len(paramPairs))
+	for _, pair := range paramPairs {
+		if pair.Name == "" {
+			continue
+		}
+		payload[pair.Name] = pair.Value
+	}
+
+	if len(payload) == 0 {
+		return "", nil
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal params to JSON: %w", err)
+	}
+	return string(data), nil
 }
 
 func parseParamsInternal(ctx BuildContext, d *dag) (*paramsResult, error) {
@@ -653,6 +713,11 @@ func parseParamsInternal(ctx BuildContext, d *dag) (*paramsResult, error) {
 		params = append(params, paramPair.String())
 	}
 
+	paramsJSON, err := buildResolvedParamsJSON(paramPairs, ctx.opts.Parameters)
+	if err != nil {
+		return nil, err
+	}
+
 	// Note: envs from params are handled separately - they should be appended to Env
 	// This is a limitation of the current transformer design; we may need to handle this specially
 	_ = envs
@@ -660,6 +725,7 @@ func parseParamsInternal(ctx BuildContext, d *dag) (*paramsResult, error) {
 	return &paramsResult{
 		Params:        params,
 		DefaultParams: defaultParams,
+		ParamsJSON:    paramsJSON,
 	}, nil
 }
 
