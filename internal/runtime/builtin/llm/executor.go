@@ -13,6 +13,7 @@ import (
 	llmpkg "github.com/dagu-org/dagu/internal/llm"
 	// Import all providers to register them
 	_ "github.com/dagu-org/dagu/internal/llm/allproviders"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
@@ -133,9 +134,31 @@ func toLLMMessages(msgs []execution.LLMMessage) []llmpkg.Message {
 	return result
 }
 
+// evalMessages evaluates variable substitution in message content.
+func evalMessages(ctx context.Context, msgs []execution.LLMMessage) ([]execution.LLMMessage, error) {
+	result := make([]execution.LLMMessage, len(msgs))
+	for i, msg := range msgs {
+		content, err := runtime.EvalString(ctx, msg.Content)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate message content: %w", err)
+		}
+		result[i] = execution.LLMMessage{
+			Role:    msg.Role,
+			Content: content,
+		}
+	}
+	return result, nil
+}
+
 // Run executes the LLM request.
 func (e *Executor) Run(ctx context.Context) error {
 	cfg := e.step.LLM
+
+	// Evaluate variable substitution in this step's messages
+	evaluatedMessages, err := evalMessages(ctx, e.messages)
+	if err != nil {
+		return err
+	}
 
 	// Build complete message list using execution.LLMMessage
 	var allMessages []execution.LLMMessage
@@ -145,8 +168,8 @@ func (e *Executor) Run(ctx context.Context) error {
 		allMessages = append(allMessages, e.inheritedMessages...)
 	}
 
-	// Append this step's messages
-	allMessages = append(allMessages, e.messages...)
+	// Append this step's evaluated messages
+	allMessages = append(allMessages, evaluatedMessages...)
 
 	// Deduplicate system messages (keep only the first one)
 	allMessages = execution.DeduplicateSystemMessages(allMessages)
