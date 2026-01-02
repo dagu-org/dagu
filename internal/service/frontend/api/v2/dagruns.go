@@ -517,6 +517,24 @@ func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetails
 	}, nil
 }
 
+// GetDAGRunSpec implements api.StrictServerInterface.
+func (a *API) GetDAGRunSpec(ctx context.Context, request api.GetDAGRunSpecRequestObject) (api.GetDAGRunSpecResponseObject, error) {
+	dagName := request.Name
+
+	// Fetch the DAG spec using the DAG name
+	yamlSpec, err := a.dagStore.GetSpec(ctx, dagName)
+	if err != nil {
+		return &api.GetDAGRunSpec404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("DAG spec not found for %s", dagName),
+		}, nil
+	}
+
+	return &api.GetDAGRunSpec200JSONResponse{
+		Spec: yamlSpec,
+	}, nil
+}
+
 // GetSubDAGRunDetails implements api.StrictServerInterface.
 func (a *API) GetSubDAGRunDetails(ctx context.Context, request api.GetSubDAGRunDetailsRequestObject) (api.GetSubDAGRunDetailsResponseObject, error) {
 	root := execution.NewDAGRunRef(request.Name, request.DagRunId)

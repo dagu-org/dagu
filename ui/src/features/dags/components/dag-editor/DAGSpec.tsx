@@ -4,8 +4,8 @@
  * @module features/dags/components/dag-editor
  */
 import BorderedBox from '@/ui/BorderedBox';
-import { AlertTriangle, Save, BookOpen } from 'lucide-react';
-import React, { useEffect, useCallback } from 'react';
+import { AlertTriangle, Save } from 'lucide-react';
+import React, { useEffect } from 'react';
 import { useCookies } from 'react-cookie';
 import { components } from '../../../../api/v2/schema';
 import { Button } from '../../../../components/ui/button';
@@ -20,10 +20,7 @@ import { DAGContext } from '../../contexts/DAGContext';
 import { DAGStepTable } from '../dag-details';
 import { FlowchartType, Graph } from '../visualization';
 import DAGAttributes from './DAGAttributes';
-import DAGEditor, { type CursorPosition } from './DAGEditor';
-import { SchemaDocSidebar } from './SchemaDocSidebar';
-import { useDebouncedValue } from '../../../../hooks/useDebouncedValue';
-import { useYamlCursorPath, type YamlPathSegment } from '../../../../hooks/useYamlCursorPath';
+import DAGEditorWithDocs from './DAGEditorWithDocs';
 
 /**
  * Props for the DAGSpec component
@@ -49,31 +46,6 @@ function DAGSpec({ fileName }: Props) {
   const [currentValue, setCurrentValue] = React.useState<string | undefined>();
   const [scrollPosition, setScrollPosition] = React.useState(0);
   const [activeTab, setActiveTab] = React.useState('parent');
-
-  // Schema documentation sidebar state (default open, remembers user preference)
-  const [sidebarOpen, setSidebarOpen] = React.useState(() => {
-    try {
-      const saved = localStorage.getItem('schema-sidebar-open');
-      // Default to open if no preference saved
-      return saved === null ? true : saved === 'true';
-    } catch {
-      return true;
-    }
-  });
-  const [cursorPosition, setCursorPosition] = React.useState<CursorPosition>({
-    lineNumber: 1,
-    column: 1,
-  });
-
-  // Debounce cursor position to avoid too many re-renders
-  const debouncedCursorPosition = useDebouncedValue(cursorPosition, 150);
-
-  // Get YAML path from cursor position - uses currentValue which is initialized from data.spec
-  const yamlPathInfo = useYamlCursorPath(
-    currentValue ?? '',
-    debouncedCursorPosition.lineNumber,
-    debouncedCursorPosition.column
-  );
 
   // Flowchart direction preference stored in cookies
   const [cookie, setCookie] = useCookies(['flowchart']);
@@ -248,37 +220,6 @@ function DAGSpec({ fileName }: Props) {
     saveHandlerRef.current = handleSave;
   }, [handleSave]);
 
-  // Toggle sidebar and persist state
-  const toggleSidebar = useCallback(() => {
-    setSidebarOpen((prev) => {
-      const newValue = !prev;
-      try {
-        localStorage.setItem('schema-sidebar-open', String(newValue));
-      } catch {
-        // Ignore localStorage errors
-      }
-      return newValue;
-    });
-  }, []);
-
-  // Handle cursor position change from editor
-  const handleCursorPositionChange = useCallback((position: CursorPosition) => {
-    setCursorPosition(position);
-  }, []);
-
-  // Add keyboard shortcut for sidebar toggle (Ctrl+Shift+D)
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'd') {
-        event.preventDefault();
-        toggleSidebar();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [toggleSidebar]);
-
   // Add keyboard shortcut for saving (Ctrl+S / Cmd+S)
   useEffect(() => {
     if (!editable) {
@@ -447,18 +388,19 @@ function DAGSpec({ fileName }: Props) {
                   );
                 })()}
 
-                <div className="flex flex-col bg-surface border border-border rounded-lg overflow-hidden min-h-[400px] max-h-[70vh]">
-                  <div className="flex-shrink-0 flex justify-between items-center p-2 border-b border-border">
-                    <Button
-                      variant="secondary"
-                      size="xs"
-                      onClick={toggleSidebar}
-                      title="Toggle Schema Documentation (Ctrl+Shift+D)"
-                    >
-                      <BookOpen className="h-3.5 w-3.5" />
-                      Docs
-                    </Button>
-                    {editable && (
+                <DAGEditorWithDocs
+                  value={editable ? (currentValue ?? data.spec) : data.spec}
+                  readOnly={!editable}
+                  onChange={
+                    editable
+                      ? (newValue) => {
+                          setCurrentValue(newValue || '');
+                        }
+                      : undefined
+                  }
+                  className="min-h-[400px]"
+                  headerActions={
+                    editable ? (
                       <Button
                         id="save-config"
                         title="Save changes (Ctrl+S / Cmd+S)"
@@ -471,33 +413,9 @@ function DAGSpec({ fileName }: Props) {
                         <Save className="h-4 w-4" />
                         Save
                       </Button>
-                    )}
-                  </div>
-                  <div className="flex-1 flex min-h-0">
-                    <div className="flex-1 min-w-0">
-                      <DAGEditor
-                        value={editable ? (currentValue ?? data.spec) : data.spec}
-                        readOnly={!editable}
-                        lineNumbers={true}
-                        onChange={
-                          editable
-                            ? (newValue) => {
-                                setCurrentValue(newValue || '');
-                              }
-                            : undefined
-                        }
-                        onCursorPositionChange={handleCursorPositionChange}
-                      />
-                    </div>
-                    <SchemaDocSidebar
-                      isOpen={sidebarOpen}
-                      onClose={toggleSidebar}
-                      path={yamlPathInfo.path}
-                      segments={yamlPathInfo.segments}
-                      yamlContent={currentValue}
-                    />
-                  </div>
-                </div>
+                    ) : undefined
+                  }
+                />
               </div>
             </React.Fragment>
           )

@@ -596,6 +596,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dag-runs/{name}/{dagRunId}/spec": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve DAG specification for a DAG-run
+         * @description Fetches the YAML specification of the DAG definition associated with this DAG-run
+         */
+        get: operations["getDAGRunSpec"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dag-runs/{name}/{dagRunId}/reschedule": {
         parameters: {
             query?: never;
@@ -3799,6 +3819,55 @@ export interface operations {
                 };
             };
             /** @description DAGRun not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getDAGRunSpec: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The DAG spec in YAML format */
+                        spec: string;
+                    };
+                };
+            };
+            /** @description DAG-run or DAG not found */
             404: {
                 headers: {
                     [name: string]: unknown;

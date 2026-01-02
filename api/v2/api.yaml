@@ -1628,6 +1628,44 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/spec:
+    get:
+      summary: "Retrieve DAG specification for a DAG-run"
+      description: "Fetches the YAML specification of the DAG definition associated with this DAG-run"
+      operationId: "getDAGRunSpec"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  spec:
+                    type: string
+                    description: "The DAG spec in YAML format"
+                required:
+                  - spec
+        "404":
+          description: "DAG-run or DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dag-runs/{name}/{dagRunId}/reschedule:
     post:
       summary: "Reschedule DAG-run with a new run ID"
