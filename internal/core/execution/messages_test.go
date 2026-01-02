@@ -22,14 +22,14 @@ func TestLLMMessages_GetSetStepMessages(t *testing.T) {
 
 	// Set and get
 	messages := []LLMMessage{
-		{Role: "user", Content: "hello"},
-		{Role: "assistant", Content: "hi"},
+		{Role: RoleUser, Content: "hello"},
+		{Role: RoleAssistant, Content: "hi"},
 	}
 	msgs.SetStepMessages("step1", messages)
 
 	got := msgs.GetStepMessages("step1")
 	require.Len(t, got, 2)
-	assert.Equal(t, "user", got[0].Role)
+	assert.Equal(t, RoleUser, got[0].Role)
 	assert.Equal(t, "hello", got[0].Content)
 
 	// Get non-existent step
@@ -43,7 +43,7 @@ func TestLLMMessages_GetStepMessages_NilReceiver(t *testing.T) {
 
 func TestLLMMessages_SetStepMessages_NilSteps(t *testing.T) {
 	msgs := &LLMMessages{}
-	msgs.SetStepMessages("step1", []LLMMessage{{Role: "user", Content: "test"}})
+	msgs.SetStepMessages("step1", []LLMMessage{{Role: RoleUser, Content: "test"}})
 	assert.NotNil(t, msgs.Steps)
 	assert.Len(t, msgs.Steps["step1"], 1)
 }
@@ -72,7 +72,7 @@ func TestLLMMessages_MergeFromDependencies(t *testing.T) {
 			name: "empty depends",
 			msgs: &LLMMessages{
 				Steps: map[string][]LLMMessage{
-					"step1": {{Role: "user", Content: "hello"}},
+					"step1": {{Role: RoleUser, Content: "hello"}},
 				},
 			},
 			depends: []string{},
@@ -83,9 +83,9 @@ func TestLLMMessages_MergeFromDependencies(t *testing.T) {
 			msgs: &LLMMessages{
 				Steps: map[string][]LLMMessage{
 					"step1": {
-						{Role: "system", Content: "you are helpful"},
-						{Role: "user", Content: "hello"},
-						{Role: "assistant", Content: "hi"},
+						{Role: RoleSystem, Content: "you are helpful"},
+						{Role: RoleUser, Content: "hello"},
+						{Role: RoleAssistant, Content: "hi"},
 					},
 				},
 			},
@@ -97,12 +97,12 @@ func TestLLMMessages_MergeFromDependencies(t *testing.T) {
 			msgs: &LLMMessages{
 				Steps: map[string][]LLMMessage{
 					"step1": {
-						{Role: "user", Content: "q1"},
-						{Role: "assistant", Content: "a1"},
+						{Role: RoleUser, Content: "q1"},
+						{Role: RoleAssistant, Content: "a1"},
 					},
 					"step2": {
-						{Role: "user", Content: "q2"},
-						{Role: "assistant", Content: "a2"},
+						{Role: RoleUser, Content: "q2"},
+						{Role: RoleAssistant, Content: "a2"},
 					},
 				},
 			},
@@ -114,28 +114,28 @@ func TestLLMMessages_MergeFromDependencies(t *testing.T) {
 			msgs: &LLMMessages{
 				Steps: map[string][]LLMMessage{
 					"step1": {
-						{Role: "system", Content: "sys1"},
-						{Role: "user", Content: "q1"},
+						{Role: RoleSystem, Content: "sys1"},
+						{Role: RoleUser, Content: "q1"},
 					},
 					"step2": {
-						{Role: "system", Content: "sys2"},
-						{Role: "user", Content: "q2"},
+						{Role: RoleSystem, Content: "sys2"},
+						{Role: RoleUser, Content: "q2"},
 					},
 				},
 			},
 			depends: []string{"step1", "step2"},
 			wantLen: 3, // Only first system message kept
 			wantMsgs: []LLMMessage{
-				{Role: "system", Content: "sys1"},
-				{Role: "user", Content: "q1"},
-				{Role: "user", Content: "q2"},
+				{Role: RoleSystem, Content: "sys1"},
+				{Role: RoleUser, Content: "q1"},
+				{Role: RoleUser, Content: "q2"},
 			},
 		},
 		{
 			name: "missing dependency ignored",
 			msgs: &LLMMessages{
 				Steps: map[string][]LLMMessage{
-					"step1": {{Role: "user", Content: "hello"}},
+					"step1": {{Role: RoleUser, Content: "hello"}},
 				},
 			},
 			depends: []string{"step1", "step_missing"},
@@ -173,38 +173,38 @@ func TestDeduplicateSystemMessages(t *testing.T) {
 		{
 			name: "no system messages",
 			msgs: []LLMMessage{
-				{Role: "user", Content: "hello"},
-				{Role: "assistant", Content: "hi"},
+				{Role: RoleUser, Content: "hello"},
+				{Role: RoleAssistant, Content: "hi"},
 			},
 			want: []LLMMessage{
-				{Role: "user", Content: "hello"},
-				{Role: "assistant", Content: "hi"},
+				{Role: RoleUser, Content: "hello"},
+				{Role: RoleAssistant, Content: "hi"},
 			},
 		},
 		{
 			name: "single system message",
 			msgs: []LLMMessage{
-				{Role: "system", Content: "be helpful"},
-				{Role: "user", Content: "hello"},
+				{Role: RoleSystem, Content: "be helpful"},
+				{Role: RoleUser, Content: "hello"},
 			},
 			want: []LLMMessage{
-				{Role: "system", Content: "be helpful"},
-				{Role: "user", Content: "hello"},
+				{Role: RoleSystem, Content: "be helpful"},
+				{Role: RoleUser, Content: "hello"},
 			},
 		},
 		{
 			name: "multiple system messages - keep first",
 			msgs: []LLMMessage{
-				{Role: "system", Content: "first"},
-				{Role: "user", Content: "hello"},
-				{Role: "system", Content: "second"},
-				{Role: "assistant", Content: "hi"},
-				{Role: "system", Content: "third"},
+				{Role: RoleSystem, Content: "first"},
+				{Role: RoleUser, Content: "hello"},
+				{Role: RoleSystem, Content: "second"},
+				{Role: RoleAssistant, Content: "hi"},
+				{Role: RoleSystem, Content: "third"},
 			},
 			want: []LLMMessage{
-				{Role: "system", Content: "first"},
-				{Role: "user", Content: "hello"},
-				{Role: "assistant", Content: "hi"},
+				{Role: RoleSystem, Content: "first"},
+				{Role: RoleUser, Content: "hello"},
+				{Role: RoleAssistant, Content: "hi"},
 			},
 		},
 	}

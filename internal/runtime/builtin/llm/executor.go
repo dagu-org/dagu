@@ -235,14 +235,14 @@ func (e *Executor) Run(ctx context.Context) error {
 	// When history is disabled, save only this step's messages + response
 	if cfg.HistoryEnabled() {
 		e.savedMessages = append(allMessages, execution.LLMMessage{
-			Role:     "assistant",
+			Role:     execution.RoleAssistant,
 			Content:  responseContent,
 			Metadata: metadata,
 		})
 	} else {
 		// Save only this step's messages (without inherited) + response
 		e.savedMessages = append(evaluatedMessages, execution.LLMMessage{
-			Role:     "assistant",
+			Role:     execution.RoleAssistant,
 			Content:  responseContent,
 			Metadata: metadata,
 		})

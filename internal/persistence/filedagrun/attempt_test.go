@@ -689,9 +689,9 @@ func TestAttempt_WriteMessages(t *testing.T) {
 		messages := &execution.LLMMessages{
 			Steps: map[string][]execution.LLMMessage{
 				"step1": {
-					{Role: "system", Content: "be helpful"},
-					{Role: "user", Content: "hello"},
-					{Role: "assistant", Content: "hi there"},
+					{Role: execution.RoleSystem, Content: "be helpful"},
+					{Role: execution.RoleUser, Content: "hello"},
+					{Role: execution.RoleAssistant, Content: "hi there"},
 				},
 			},
 		}
@@ -703,7 +703,7 @@ func TestAttempt_WriteMessages(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, readMsgs)
 		require.Len(t, readMsgs.Steps["step1"], 3)
-		assert.Equal(t, "system", readMsgs.Steps["step1"][0].Role)
+		assert.Equal(t, execution.RoleSystem, readMsgs.Steps["step1"][0].Role)
 		assert.Equal(t, "be helpful", readMsgs.Steps["step1"][0].Content)
 	})
 
@@ -761,7 +761,7 @@ func TestAttempt_WriteMessages(t *testing.T) {
 		// Write initial messages
 		messages1 := &execution.LLMMessages{
 			Steps: map[string][]execution.LLMMessage{
-				"step1": {{Role: "user", Content: "first"}},
+				"step1": {{Role: execution.RoleUser, Content: "first"}},
 			},
 		}
 		err = att.WriteMessages(ctx, messages1)
@@ -770,8 +770,8 @@ func TestAttempt_WriteMessages(t *testing.T) {
 		// Update with more messages
 		messages2 := &execution.LLMMessages{
 			Steps: map[string][]execution.LLMMessage{
-				"step1": {{Role: "user", Content: "first"}, {Role: "assistant", Content: "response"}},
-				"step2": {{Role: "user", Content: "second"}},
+				"step1": {{Role: execution.RoleUser, Content: "first"}, {Role: execution.RoleAssistant, Content: "response"}},
+				"step2": {{Role: execution.RoleUser, Content: "second"}},
 			},
 		}
 		err = att.WriteMessages(ctx, messages2)
@@ -797,8 +797,8 @@ func TestAttempt_WriteMessages(t *testing.T) {
 		messages := &execution.LLMMessages{
 			Steps: map[string][]execution.LLMMessage{
 				"step1": {
-					{Role: "user", Content: "hello"},
-					{Role: "assistant", Content: "hi there"},
+					{Role: execution.RoleUser, Content: "hello"},
+					{Role: execution.RoleAssistant, Content: "hi there"},
 				},
 			},
 		}
@@ -818,8 +818,8 @@ func TestAttempt_WriteMessages(t *testing.T) {
 
 		// Retry attempt can also update messages
 		readMsgs.Steps["step2"] = []execution.LLMMessage{
-			{Role: "user", Content: "follow up"},
-			{Role: "assistant", Content: "response"},
+			{Role: execution.RoleUser, Content: "follow up"},
+			{Role: execution.RoleAssistant, Content: "response"},
 		}
 		err = att2.WriteMessages(ctx, readMsgs)
 		require.NoError(t, err)

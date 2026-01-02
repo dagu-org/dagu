@@ -1,5 +1,15 @@
 package execution
 
+import "github.com/dagu-org/dagu/internal/core"
+
+// LLM message role constants - aliases for core package constants.
+const (
+	RoleSystem    = core.LLMRoleSystem
+	RoleUser      = core.LLMRoleUser
+	RoleAssistant = core.LLMRoleAssistant
+	RoleTool      = core.LLMRoleTool
+)
+
 // LLMMessages stores conversation messages for all LLM steps in a DAG run.
 type LLMMessages struct {
 	// Steps maps step names to their conversation messages.
@@ -81,7 +91,7 @@ func DeduplicateSystemMessages(messages []LLMMessage) []LLMMessage {
 	seenSystem := false
 
 	for _, msg := range messages {
-		if msg.Role == "system" {
+		if msg.Role == RoleSystem {
 			if seenSystem {
 				continue
 			}

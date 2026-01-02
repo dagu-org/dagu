@@ -24,12 +24,12 @@ func TestExecutor_MessageSaving(t *testing.T) {
 				},
 			},
 			messages: []execution.LLMMessage{
-				{Role: "user", Content: "Hello"},
+				{Role: execution.RoleUser, Content: "Hello"},
 			},
 			inheritedMessages: []execution.LLMMessage{
-				{Role: "system", Content: "You are helpful"},
-				{Role: "user", Content: "Previous question"},
-				{Role: "assistant", Content: "Previous answer"},
+				{Role: execution.RoleSystem, Content: "You are helpful"},
+				{Role: execution.RoleUser, Content: "Previous question"},
+				{Role: execution.RoleAssistant, Content: "Previous answer"},
 			},
 		}
 
@@ -43,15 +43,15 @@ func TestExecutor_MessageSaving(t *testing.T) {
 			TotalTokens:      15,
 		}
 		executor.savedMessages = append(allMessages, execution.LLMMessage{
-			Role:     "assistant",
+			Role:     execution.RoleAssistant,
 			Content:  "Hello there!",
 			Metadata: metadata,
 		})
 
 		saved := executor.GetMessages()
 		assert.Len(t, saved, 5) // 3 inherited + 1 user + 1 assistant
-		assert.Equal(t, "system", saved[0].Role)
-		assert.Equal(t, "assistant", saved[4].Role)
+		assert.Equal(t, execution.RoleSystem, saved[0].Role)
+		assert.Equal(t, execution.RoleAssistant, saved[4].Role)
 		assert.NotNil(t, saved[4].Metadata)
 		assert.Equal(t, 15, saved[4].Metadata.TotalTokens)
 	})
@@ -69,13 +69,13 @@ func TestExecutor_MessageSaving(t *testing.T) {
 				},
 			},
 			messages: []execution.LLMMessage{
-				{Role: "system", Content: "New system prompt"},
-				{Role: "user", Content: "New question"},
+				{Role: execution.RoleSystem, Content: "New system prompt"},
+				{Role: execution.RoleUser, Content: "New question"},
 			},
 			inheritedMessages: []execution.LLMMessage{
-				{Role: "system", Content: "Old system prompt"},
-				{Role: "user", Content: "Old question"},
-				{Role: "assistant", Content: "Old answer"},
+				{Role: execution.RoleSystem, Content: "Old system prompt"},
+				{Role: execution.RoleUser, Content: "Old question"},
+				{Role: execution.RoleAssistant, Content: "Old answer"},
 			},
 		}
 
@@ -89,18 +89,18 @@ func TestExecutor_MessageSaving(t *testing.T) {
 			TotalTokens:      30,
 		}
 		executor.savedMessages = append(executor.messages, execution.LLMMessage{
-			Role:     "assistant",
+			Role:     execution.RoleAssistant,
 			Content:  "New answer",
 			Metadata: metadata,
 		})
 
 		saved := executor.GetMessages()
 		assert.Len(t, saved, 3) // 2 step messages + 1 assistant (NO inherited)
-		assert.Equal(t, "system", saved[0].Role)
+		assert.Equal(t, execution.RoleSystem, saved[0].Role)
 		assert.Equal(t, "New system prompt", saved[0].Content)
-		assert.Equal(t, "user", saved[1].Role)
+		assert.Equal(t, execution.RoleUser, saved[1].Role)
 		assert.Equal(t, "New question", saved[1].Content)
-		assert.Equal(t, "assistant", saved[2].Role)
+		assert.Equal(t, execution.RoleAssistant, saved[2].Role)
 		assert.NotNil(t, saved[2].Metadata)
 		assert.Equal(t, "anthropic", saved[2].Metadata.Provider)
 		assert.Equal(t, 30, saved[2].Metadata.TotalTokens)
@@ -117,7 +117,7 @@ func TestExecutor_MessageSaving(t *testing.T) {
 				},
 			},
 			messages: []execution.LLMMessage{
-				{Role: "user", Content: "Test"},
+				{Role: execution.RoleUser, Content: "Test"},
 			},
 		}
 
@@ -129,7 +129,7 @@ func TestExecutor_MessageSaving(t *testing.T) {
 			TotalTokens:      8,
 		}
 		executor.savedMessages = append(executor.messages, execution.LLMMessage{
-			Role:     "assistant",
+			Role:     execution.RoleAssistant,
 			Content:  "Response",
 			Metadata: metadata,
 		})
@@ -138,7 +138,7 @@ func TestExecutor_MessageSaving(t *testing.T) {
 		assert.Len(t, saved, 2)
 
 		assistantMsg := saved[1]
-		assert.Equal(t, "assistant", assistantMsg.Role)
+		assert.Equal(t, execution.RoleAssistant, assistantMsg.Role)
 		assert.NotNil(t, assistantMsg.Metadata)
 		assert.Equal(t, "gemini", assistantMsg.Metadata.Provider)
 		assert.Equal(t, "gemini-pro", assistantMsg.Metadata.Model)
@@ -154,9 +154,9 @@ func TestExecutor_SetInheritedMessages(t *testing.T) {
 	executor := &Executor{}
 
 	messages := []execution.LLMMessage{
-		{Role: "system", Content: "System prompt"},
-		{Role: "user", Content: "User message"},
-		{Role: "assistant", Content: "Assistant response"},
+		{Role: execution.RoleSystem, Content: "System prompt"},
+		{Role: execution.RoleUser, Content: "User message"},
+		{Role: execution.RoleAssistant, Content: "Assistant response"},
 	}
 
 	executor.SetInheritedMessages(messages)
@@ -179,14 +179,14 @@ func TestExecutor_GetMessages(t *testing.T) {
 
 		executor := &Executor{
 			savedMessages: []execution.LLMMessage{
-				{Role: "user", Content: "Hello"},
-				{Role: "assistant", Content: "Hi"},
+				{Role: execution.RoleUser, Content: "Hello"},
+				{Role: execution.RoleAssistant, Content: "Hi"},
 			},
 		}
 
 		saved := executor.GetMessages()
 		assert.Len(t, saved, 2)
-		assert.Equal(t, "user", saved[0].Role)
-		assert.Equal(t, "assistant", saved[1].Role)
+		assert.Equal(t, execution.RoleUser, saved[0].Role)
+		assert.Equal(t, execution.RoleAssistant, saved[1].Role)
 	})
 }

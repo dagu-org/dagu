@@ -1,5 +1,13 @@
 package core
 
+// LLM message role constants.
+const (
+	LLMRoleSystem    = "system"
+	LLMRoleUser      = "user"
+	LLMRoleAssistant = "assistant"
+	LLMRoleTool      = "tool"
+)
+
 // LLMConfig contains the configuration for an LLM step.
 type LLMConfig struct {
 	// Provider is the LLM provider (openai, anthropic, gemini, openrouter, local).

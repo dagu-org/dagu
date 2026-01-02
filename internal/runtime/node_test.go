@@ -1592,9 +1592,9 @@ func TestNodeLLMMessages(t *testing.T) {
 
 		// Set inherited messages
 		messages := []execution.LLMMessage{
-			{Role: "system", Content: "be helpful"},
-			{Role: "user", Content: "hello"},
-			{Role: "assistant", Content: "hi there"},
+			{Role: execution.RoleSystem, Content: "be helpful"},
+			{Role: execution.RoleUser, Content: "hello"},
+			{Role: execution.RoleAssistant, Content: "hi there"},
 		}
 		node.SetInheritedMessages(messages)
 
@@ -1636,7 +1636,7 @@ func TestNodeLLMMessages(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			go func(id int) {
 				messages := []execution.LLMMessage{
-					{Role: "user", Content: fmt.Sprintf("message %d", id)},
+					{Role: execution.RoleUser, Content: fmt.Sprintf("message %d", id)},
 				}
 				node.SetInheritedMessages(messages)
 				_ = node.GetSavedMessages()

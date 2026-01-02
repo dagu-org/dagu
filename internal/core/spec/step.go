@@ -1228,7 +1228,12 @@ func buildStepLLM(_ StepBuildContext, s *step, result *core.Step) error {
 			fmt.Errorf("at least one message is required"))
 	}
 
-	validRoles := map[string]bool{"system": true, "user": true, "assistant": true, "tool": true}
+	validRoles := map[string]bool{
+		core.LLMRoleSystem:    true,
+		core.LLMRoleUser:      true,
+		core.LLMRoleAssistant: true,
+		core.LLMRoleTool:      true,
+	}
 	for i, msg := range cfg.Messages {
 		if msg.Role == "" {
 			return core.NewValidationError(
