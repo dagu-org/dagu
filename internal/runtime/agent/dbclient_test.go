@@ -10,7 +10,6 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
-	"github.com/dagu-org/dagu/internal/core/execution/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -23,7 +22,7 @@ func TestDBClient_GetSubDAGRunStatus(t *testing.T) {
 		// Setup mocks
 		mockDAGStore := new(mockDAGStore)
 		mockDAGRunStore := new(mockDAGRunStore)
-		mockAttempt := new(mocks.DAGRunAttempt)
+		mockAttempt := new(execution.MockDAGRunAttempt)
 
 		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-123")
 		subRunID := "child-run-123"
@@ -91,7 +90,7 @@ func TestDBClient_IsSubDAGRunCompleted(t *testing.T) {
 
 		mockDAGStore := new(mockDAGStore)
 		mockDAGRunStore := new(mockDAGRunStore)
-		mockAttempt := new(mocks.DAGRunAttempt)
+		mockAttempt := new(execution.MockDAGRunAttempt)
 
 		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-completed")
 		subRunID := "child-completed-success"
@@ -118,7 +117,7 @@ func TestDBClient_IsSubDAGRunCompleted(t *testing.T) {
 
 		mockDAGStore := new(mockDAGStore)
 		mockDAGRunStore := new(mockDAGRunStore)
-		mockAttempt := new(mocks.DAGRunAttempt)
+		mockAttempt := new(execution.MockDAGRunAttempt)
 
 		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-error")
 		subRunID := "child-completed-error"

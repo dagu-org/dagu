@@ -119,50 +119,6 @@ func WithDryRun() RemoveOldDAGRunsOption {
 	}
 }
 
-// NewDAGRunAttemptOptions contains options for creating a new run record
-type NewDAGRunAttemptOptions struct {
-	// RootDAGRun is the root dag-run reference for this attempt.
-	RootDAGRun *DAGRunRef
-	// Retry indicates whether this is a retry of a previous run.
-	Retry bool
-}
-
-// DAGRunAttempt represents a single execution of a dag-run to record the status and execution details.
-type DAGRunAttempt interface {
-	// ID returns the identifier for the attempt that is unique within the dag-run.
-	ID() string
-	// Open prepares the attempt for writing status updates
-	Open(ctx context.Context) error
-	// Write updates the status of the attempt
-	Write(ctx context.Context, status DAGRunStatus) error
-	// Close finalizes writing to the attempt
-	Close(ctx context.Context) error
-	// ReadStatus retrieves the current status of the attempt
-	ReadStatus(ctx context.Context) (*DAGRunStatus, error)
-	// ReadDAG reads the DAG associated with this run attempt
-	ReadDAG(ctx context.Context) (*core.DAG, error)
-	// Abort requests aborting the attempt
-	Abort(ctx context.Context) error
-	// IsAborting checks if an abort has been requested for the attempt
-	IsAborting(ctx context.Context) (bool, error)
-	// Hide marks the attempt as hidden from normal operations.
-	// This is useful for preserving previous state visibility when dequeuing.
-	Hide(ctx context.Context) error
-	// Hidden returns true if the attempt is hidden from normal operations.
-	Hidden() bool
-	// WriteOutputs writes the collected step outputs for the dag-run.
-	// Does nothing if outputs is nil or has no output entries.
-	WriteOutputs(ctx context.Context, outputs *DAGRunOutputs) error
-	// ReadOutputs reads the collected step outputs for the dag-run.
-	// Returns nil if no outputs file exists or if the file is in v1 format.
-	ReadOutputs(ctx context.Context) (*DAGRunOutputs, error)
-	// WriteMessages writes the LLM conversation messages for the dag-run.
-	WriteMessages(ctx context.Context, messages *LLMMessages) error
-	// ReadMessages reads the LLM conversation messages for the dag-run.
-	// Returns nil if no messages exist.
-	ReadMessages(ctx context.Context) (*LLMMessages, error)
-}
-
 // Errors for RunRef parsing
 var (
 	ErrInvalidRunRefFormat = errors.New("invalid dag-run reference format")

@@ -9,7 +9,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/core/execution/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -68,7 +67,7 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 		dagRunStore.On("ListStatuses", ctx, mock.Anything).Return([]*execution.DAGRunStatus{runningStatus}, nil)
 
 		// Mock attempt
-		attempt := &mocks.DAGRunAttempt{}
+		attempt := &execution.MockDAGRunAttempt{}
 		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
 		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return(attempt, nil)
 
@@ -111,7 +110,7 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 		dagRunStore.On("ListStatuses", ctx, mock.Anything).Return([]*execution.DAGRunStatus{runningStatus}, nil)
 
 		// Mock attempt
-		attempt := &mocks.DAGRunAttempt{}
+		attempt := &execution.MockDAGRunAttempt{}
 		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
 		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return(attempt, nil)
 
@@ -208,7 +207,7 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 		}
 
 		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
-		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return((*mocks.DAGRunAttempt)(nil), errors.New("not found"))
+		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return((*execution.MockDAGRunAttempt)(nil), errors.New("not found"))
 
 		err := detector.checkAndCleanZombie(ctx, status)
 		assert.Error(t, err)
@@ -230,7 +229,7 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 			Status:   core.Running,
 		}
 
-		attempt := &mocks.DAGRunAttempt{}
+		attempt := &execution.MockDAGRunAttempt{}
 		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
 		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return(attempt, nil)
 		attempt.On("ReadDAG", mock.Anything).Return((*core.DAG)(nil), errors.New("read error"))
@@ -256,7 +255,7 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 			Status:   core.Running,
 		}
 
-		attempt := &mocks.DAGRunAttempt{}
+		attempt := &execution.MockDAGRunAttempt{}
 		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
 		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return(attempt, nil)
 
@@ -291,7 +290,7 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 			Status:   core.Running,
 		}
 
-		attempt := &mocks.DAGRunAttempt{}
+		attempt := &execution.MockDAGRunAttempt{}
 		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
 		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return(attempt, nil)
 
