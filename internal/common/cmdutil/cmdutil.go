@@ -346,8 +346,8 @@ func DetectShebang(script string) (string, []string, error) {
 	if err != nil && err != io.EOF {
 		return "", nil, fmt.Errorf("failed to read script for shebang: %w", err)
 	}
-	if n < 2 || buf[0] != '#' || buf[1] != '!' {
-		// No shebang
+	// Check for shebang prefix "#!"
+	if n < 2 || string(buf[:n]) != "#!" {
 		return "", nil, nil
 	}
 
