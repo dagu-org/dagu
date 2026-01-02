@@ -1577,3 +1577,76 @@ func TestLogOutputMode(t *testing.T) {
 		assert.Contains(t, content, "line4-stderr")
 	})
 }
+
+func TestNodeLLMMessages(t *testing.T) {
+	t.Parallel()
+
+	t.Run("SetAndGetInheritedMessages", func(t *testing.T) {
+		t.Parallel()
+
+		step := core.Step{Name: "test-llm-step"}
+		node := runtime.NewNode(step, runtime.NodeState{})
+
+		// Initially should be empty
+		assert.Empty(t, node.GetSavedMessages())
+
+		// Set inherited messages
+		messages := []execution.LLMMessage{
+			{Role: "system", Content: "be helpful"},
+			{Role: "user", Content: "hello"},
+			{Role: "assistant", Content: "hi there"},
+		}
+		node.SetInheritedMessages(messages)
+
+		// GetSavedMessages returns saved messages, not inherited
+		// Inherited messages are used internally during execution
+		assert.Empty(t, node.GetSavedMessages())
+	})
+
+	t.Run("EmptyMessages", func(t *testing.T) {
+		t.Parallel()
+
+		step := core.Step{Name: "test-empty-messages"}
+		node := runtime.NewNode(step, runtime.NodeState{})
+
+		// Set empty messages
+		node.SetInheritedMessages([]execution.LLMMessage{})
+		assert.Empty(t, node.GetSavedMessages())
+	})
+
+	t.Run("NilMessages", func(t *testing.T) {
+		t.Parallel()
+
+		step := core.Step{Name: "test-nil-messages"}
+		node := runtime.NewNode(step, runtime.NodeState{})
+
+		// Set nil messages
+		node.SetInheritedMessages(nil)
+		assert.Nil(t, node.GetSavedMessages())
+	})
+
+	t.Run("ConcurrentAccess", func(t *testing.T) {
+		t.Parallel()
+
+		step := core.Step{Name: "test-concurrent"}
+		node := runtime.NewNode(step, runtime.NodeState{})
+
+		// Test concurrent access to message methods
+		done := make(chan bool)
+		for i := 0; i < 10; i++ {
+			go func(id int) {
+				messages := []execution.LLMMessage{
+					{Role: "user", Content: fmt.Sprintf("message %d", id)},
+				}
+				node.SetInheritedMessages(messages)
+				_ = node.GetSavedMessages()
+				done <- true
+			}(i)
+		}
+
+		// Wait for all goroutines
+		for i := 0; i < 10; i++ {
+			<-done
+		}
+	})
+}

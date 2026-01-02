@@ -1,6 +1,7 @@
 package runtime_test
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"syscall"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
@@ -322,4 +324,40 @@ func (rr runResult) nodeByName(t *testing.T, stepName string) *runtime.Node {
 
 	t.Fatalf("step %s not found", stepName)
 	return nil
+}
+
+// mockMessagesHandler is a mock implementation of LLMMessagesHandler for testing.
+type mockMessagesHandler struct {
+	messages   *execution.LLMMessages
+	readErr    error
+	writeErr   error
+	writeCalls int
+}
+
+var _ runtime.LLMMessagesHandler = (*mockMessagesHandler)(nil)
+
+func newMockMessagesHandler() *mockMessagesHandler {
+	return &mockMessagesHandler{}
+}
+
+func (m *mockMessagesHandler) ReadMessages(_ context.Context) (*execution.LLMMessages, error) {
+	if m.readErr != nil {
+		return nil, m.readErr
+	}
+	return m.messages, nil
+}
+
+func (m *mockMessagesHandler) WriteMessages(_ context.Context, messages *execution.LLMMessages) error {
+	m.writeCalls++
+	if m.writeErr != nil {
+		return m.writeErr
+	}
+	m.messages = messages
+	return nil
+}
+
+func withMessagesHandler(handler runtime.LLMMessagesHandler) runnerOption {
+	return func(cfg *runtime.Config) {
+		cfg.MessagesHandler = handler
+	}
 }

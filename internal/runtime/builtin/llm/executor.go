@@ -24,9 +24,9 @@ type Executor struct {
 	stderr            io.Writer
 	step              core.Step
 	provider          llmpkg.Provider
-	messages          []llmpkg.Message
-	inheritedMessages []llmpkg.Message
-	savedMessages     []llmpkg.Message
+	messages          []execution.LLMMessage
+	inheritedMessages []execution.LLMMessage
+	savedMessages     []execution.LLMMessage
 }
 
 // newLLMExecutor creates a new LLM executor from a step configuration.
@@ -77,11 +77,11 @@ func newLLMExecutor(_ context.Context, step core.Step) (executor.Executor, error
 		return nil, fmt.Errorf("failed to create LLM provider: %w", err)
 	}
 
-	// Convert messages from core.LLMMessage to llmpkg.Message
-	messages := make([]llmpkg.Message, len(cfg.Messages))
+	// Convert messages from core.LLMMessage to execution.LLMMessage
+	messages := make([]execution.LLMMessage, len(cfg.Messages))
 	for i, msg := range cfg.Messages {
-		messages[i] = llmpkg.Message{
-			Role:    llmpkg.Role(msg.Role),
+		messages[i] = execution.LLMMessage{
+			Role:    msg.Role,
 			Content: msg.Content,
 		}
 	}
@@ -112,16 +112,16 @@ func (e *Executor) Kill(_ os.Signal) error {
 
 // SetInheritedMessages sets the messages inherited from dependent steps.
 func (e *Executor) SetInheritedMessages(messages []execution.LLMMessage) {
-	e.inheritedMessages = toLLMMessages(messages)
+	e.inheritedMessages = messages
 }
 
 // GetMessages returns the complete conversation messages after execution.
 // This includes inherited messages, step messages, and the assistant response.
 func (e *Executor) GetMessages() []execution.LLMMessage {
-	return toExecutionMessages(e.savedMessages)
+	return e.savedMessages
 }
 
-// toLLMMessages converts execution.LLMMessage to llmpkg.Message.
+// toLLMMessages converts execution.LLMMessage to llmpkg.Message for provider calls.
 func toLLMMessages(msgs []execution.LLMMessage) []llmpkg.Message {
 	result := make([]llmpkg.Message, len(msgs))
 	for i, msg := range msgs {
@@ -133,24 +133,12 @@ func toLLMMessages(msgs []execution.LLMMessage) []llmpkg.Message {
 	return result
 }
 
-// toExecutionMessages converts llmpkg.Message to execution.LLMMessage.
-func toExecutionMessages(msgs []llmpkg.Message) []execution.LLMMessage {
-	result := make([]execution.LLMMessage, len(msgs))
-	for i, msg := range msgs {
-		result[i] = execution.LLMMessage{
-			Role:    string(msg.Role),
-			Content: msg.Content,
-		}
-	}
-	return result
-}
-
 // Run executes the LLM request.
 func (e *Executor) Run(ctx context.Context) error {
 	cfg := e.step.LLM
 
-	// Build complete message list
-	var allMessages []llmpkg.Message
+	// Build complete message list using execution.LLMMessage
+	var allMessages []execution.LLMMessage
 
 	// Add inherited messages if history is enabled
 	if cfg.HistoryEnabled() && len(e.inheritedMessages) > 0 {
@@ -161,12 +149,12 @@ func (e *Executor) Run(ctx context.Context) error {
 	allMessages = append(allMessages, e.messages...)
 
 	// Deduplicate system messages (keep only the first one)
-	allMessages = toLLMMessages(execution.DeduplicateSystemMessages(toExecutionMessages(allMessages)))
+	allMessages = execution.DeduplicateSystemMessages(allMessages)
 
-	// Build chat request
+	// Build chat request - convert to provider format only at boundary
 	req := &llmpkg.ChatRequest{
 		Model:       cfg.Model,
-		Messages:    allMessages,
+		Messages:    toLLMMessages(allMessages),
 		Temperature: cfg.Temperature,
 		MaxTokens:   cfg.MaxTokens,
 		TopP:        cfg.TopP,
@@ -204,8 +192,8 @@ func (e *Executor) Run(ctx context.Context) error {
 
 	// Save messages (including assistant response) for persistence
 	if cfg.HistoryEnabled() {
-		e.savedMessages = append(allMessages, llmpkg.Message{
-			Role:    llmpkg.RoleAssistant,
+		e.savedMessages = append(allMessages, execution.LLMMessage{
+			Role:    "assistant",
 			Content: responseContent,
 		})
 	}
