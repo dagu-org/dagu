@@ -62,6 +62,49 @@ func TestGetDAGRunSpec(t *testing.T) {
 	).ExpectStatus(http.StatusNotFound).Send(t)
 }
 
+func TestGetDAGRunSpecInline(t *testing.T) {
+	server := test.SetupServer(t)
+
+	inlineSpec := `steps:
+  - name: inline_step
+    command: "echo inline_dag_test"`
+
+	name := "inline_spec_dag"
+
+	// Execute an inline DAG run
+	execResp := server.Client().Post("/api/v2/dag-runs", api.ExecuteDAGRunFromSpecJSONRequestBody{
+		Spec: inlineSpec,
+		Name: &name,
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	var execBody api.ExecuteDAGRunFromSpec200JSONResponse
+	execResp.Unmarshal(t, &execBody)
+	require.NotEmpty(t, execBody.DagRunId)
+
+	// Wait for the DAG run to complete
+	require.Eventually(t, func() bool {
+		url := fmt.Sprintf("/api/v2/dag-runs/%s/%s", name, execBody.DagRunId)
+		statusResp := server.Client().Get(url).Send(t)
+		if statusResp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
+
+		var dagRunStatus api.GetDAGRunDetails200JSONResponse
+		statusResp.Unmarshal(t, &dagRunStatus)
+		return dagRunStatus.DagRunDetails.Status == api.Status(core.Succeeded)
+	}, 10*time.Second, 200*time.Millisecond)
+
+	// Fetch the spec for the inline DAG run (should use YamlData from dag.json)
+	specResp := server.Client().Get(
+		fmt.Sprintf("/api/v2/dag-runs/%s/%s/spec", name, execBody.DagRunId),
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	var specBody api.GetDAGRunSpec200JSONResponse
+	specResp.Unmarshal(t, &specBody)
+	require.NotEmpty(t, specBody.Spec)
+	require.Contains(t, specBody.Spec, "echo inline_dag_test")
+}
+
 func TestRescheduleDAGRun(t *testing.T) {
 	server := test.SetupServer(t)
 
