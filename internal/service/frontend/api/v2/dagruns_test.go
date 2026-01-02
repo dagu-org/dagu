@@ -12,6 +12,56 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestGetDAGRunSpec(t *testing.T) {
+	server := test.SetupServer(t)
+
+	dagSpec := `steps:
+  - name: main
+    command: "echo spec_test"`
+
+	// Create a new DAG
+	_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+		Name: "spec_test_dag",
+		Spec: &dagSpec,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	// Start a DAG run
+	startResp := server.Client().Post("/api/v2/dags/spec_test_dag/start", api.ExecuteDAGJSONRequestBody{}).
+		ExpectStatus(http.StatusOK).Send(t)
+
+	var startBody api.ExecuteDAG200JSONResponse
+	startResp.Unmarshal(t, &startBody)
+	require.NotEmpty(t, startBody.DagRunId)
+
+	// Wait for the DAG run to complete
+	require.Eventually(t, func() bool {
+		url := fmt.Sprintf("/api/v2/dags/spec_test_dag/dag-runs/%s", startBody.DagRunId)
+		statusResp := server.Client().Get(url).Send(t)
+		if statusResp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
+
+		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
+		statusResp.Unmarshal(t, &dagRunStatus)
+		return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
+	}, 10*time.Second, 200*time.Millisecond)
+
+	// Fetch the DAG spec for the DAG run
+	specResp := server.Client().Get(
+		fmt.Sprintf("/api/v2/dag-runs/%s/%s/spec", "spec_test_dag", startBody.DagRunId),
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	var specBody api.GetDAGRunSpec200JSONResponse
+	specResp.Unmarshal(t, &specBody)
+	require.NotEmpty(t, specBody.Spec)
+	require.Contains(t, specBody.Spec, "echo spec_test")
+
+	// Test 404 for non-existent DAG
+	_ = server.Client().Get(
+		fmt.Sprintf("/api/v2/dag-runs/%s/%s/spec", "non_existent_dag", startBody.DagRunId),
+	).ExpectStatus(http.StatusNotFound).Send(t)
+}
+
 func TestRescheduleDAGRun(t *testing.T) {
 	server := test.SetupServer(t)
 
