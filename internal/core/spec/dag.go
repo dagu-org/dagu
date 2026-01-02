@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -287,6 +288,7 @@ var metadataTransformers = []transform{
 	{"restartSchedule", newTransformer("RestartSchedule", buildRestartSchedule)},
 	{"params", newTransformer("Params", buildParams)},
 	{"defaultParams", newTransformer("DefaultParams", buildDefaultParams)},
+	{"paramsJSON", newTransformer("ParamsJSON", buildParamsJSON)},
 	{"workerSelector", newTransformer("WorkerSelector", buildWorkerSelector)},
 	{"timeout", newTransformer("Timeout", buildTimeout)},
 	{"delay", newTransformer("Delay", buildDelay)},
@@ -578,6 +580,7 @@ func buildRestartSchedule(_ BuildContext, d *dag) ([]core.Schedule, error) {
 type paramsResult struct {
 	Params        []string
 	DefaultParams string
+	ParamsJSON    string // Original JSON string when params were passed as JSON
 }
 
 func buildParams(ctx BuildContext, d *dag) ([]string, error) {
@@ -596,10 +599,33 @@ func buildDefaultParams(ctx BuildContext, d *dag) (string, error) {
 	return result.DefaultParams, nil
 }
 
+func buildParamsJSON(ctx BuildContext, d *dag) (string, error) {
+	result, err := parseParamsInternal(ctx, d)
+	if err != nil {
+		return "", err
+	}
+	return result.ParamsJSON, nil
+}
+
+// detectJSONParams checks if the input string is valid JSON and returns it if so.
+// Returns empty string if the input is not JSON.
+func detectJSONParams(input string) string {
+	input = strings.TrimSpace(input)
+	if (strings.HasPrefix(input, "{") && strings.HasSuffix(input, "}")) ||
+		(strings.HasPrefix(input, "[") && strings.HasSuffix(input, "]")) {
+		var js json.RawMessage
+		if json.Unmarshal([]byte(input), &js) == nil {
+			return input
+		}
+	}
+	return ""
+}
+
 func parseParamsInternal(ctx BuildContext, d *dag) (*paramsResult, error) {
 	var (
 		paramPairs []paramPair
 		envs       []string
+		paramsJSON string
 	)
 
 	if err := parseParams(ctx, d.Params, &paramPairs, &envs); err != nil {
@@ -622,6 +648,9 @@ func parseParamsInternal(ctx BuildContext, d *dag) (*paramsResult, error) {
 			return nil, err
 		}
 		overrideParams(&paramPairs, overridePairs)
+
+		// Capture original JSON if params were passed as JSON
+		paramsJSON = detectJSONParams(ctx.opts.Parameters)
 	}
 
 	if len(ctx.opts.ParametersList) > 0 {
@@ -660,6 +689,7 @@ func parseParamsInternal(ctx BuildContext, d *dag) (*paramsResult, error) {
 	return &paramsResult{
 		Params:        params,
 		DefaultParams: defaultParams,
+		ParamsJSON:    paramsJSON,
 	}, nil
 }
 

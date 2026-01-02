@@ -77,6 +77,11 @@ func (e Context) AllEnvs() []string {
 		distinctEntries[k] = v
 	}
 
+	// Add DAGU_PARAMS_JSON if params were passed as JSON
+	if e.DAG.ParamsJSON != "" {
+		distinctEntries[EnvKeyDAGParamsJSON] = e.DAG.ParamsJSON
+	}
+
 	var envs []string
 	for k, v := range distinctEntries {
 		envs = append(envs, k+"="+v)
