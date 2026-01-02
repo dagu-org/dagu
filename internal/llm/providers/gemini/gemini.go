@@ -192,13 +192,7 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest) ([]byte, error) {
 }
 
 func (p *Provider) doRequest(ctx context.Context, endpoint string, body []byte) (io.ReadCloser, error) {
-	// Add API key to URL
 	url := p.config.BaseURL + endpoint
-	if strings.Contains(url, "?") {
-		url += "&key=" + p.config.APIKey
-	} else {
-		url += "?key=" + p.config.APIKey
-	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
@@ -206,6 +200,7 @@ func (p *Provider) doRequest(ctx context.Context, endpoint string, body []byte) 
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("x-goog-api-key", p.config.APIKey)
 
 	var resp *http.Response
 	var lastErr error
