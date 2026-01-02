@@ -580,7 +580,7 @@ func buildRestartSchedule(_ BuildContext, d *dag) ([]core.Schedule, error) {
 type paramsResult struct {
 	Params        []string
 	DefaultParams string
-	ParamsJSON    string // Original JSON string when params were passed as JSON
+	ParamsJSON    string // JSON representation of resolved params (original payload when provided as JSON)
 }
 
 func buildParams(ctx BuildContext, d *dag) ([]string, error) {
@@ -621,11 +621,45 @@ func detectJSONParams(input string) string {
 	return ""
 }
 
+// buildResolvedParamsJSON returns a JSON representation of the resolved params.
+// If the raw input was JSON, the original payload is returned to preserve structure.
+func buildResolvedParamsJSON(paramPairs []paramPair, rawInput string) (string, error) {
+	if rawJSON := detectJSONParams(rawInput); rawJSON != "" {
+		return rawJSON, nil
+	}
+	return marshalParamPairs(paramPairs)
+}
+
+// marshalParamPairs converts the final param pairs into a JSON object string.
+// Returns an empty string when there are no params to serialize.
+func marshalParamPairs(paramPairs []paramPair) (string, error) {
+	if len(paramPairs) == 0 {
+		return "", nil
+	}
+
+	payload := make(map[string]string, len(paramPairs))
+	for _, pair := range paramPairs {
+		if pair.Name == "" {
+			continue
+		}
+		payload[pair.Name] = pair.Value
+	}
+
+	if len(payload) == 0 {
+		return "", nil
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal params to JSON: %w", err)
+	}
+	return string(data), nil
+}
+
 func parseParamsInternal(ctx BuildContext, d *dag) (*paramsResult, error) {
 	var (
 		paramPairs []paramPair
 		envs       []string
-		paramsJSON string
 	)
 
 	if err := parseParams(ctx, d.Params, &paramPairs, &envs); err != nil {
@@ -648,9 +682,6 @@ func parseParamsInternal(ctx BuildContext, d *dag) (*paramsResult, error) {
 			return nil, err
 		}
 		overrideParams(&paramPairs, overridePairs)
-
-		// Capture original JSON if params were passed as JSON
-		paramsJSON = detectJSONParams(ctx.opts.Parameters)
 	}
 
 	if len(ctx.opts.ParametersList) > 0 {
@@ -680,6 +711,11 @@ func parseParamsInternal(ctx BuildContext, d *dag) (*paramsResult, error) {
 	var params []string
 	for _, paramPair := range paramPairs {
 		params = append(params, paramPair.String())
+	}
+
+	paramsJSON, err := buildResolvedParamsJSON(paramPairs, ctx.opts.Parameters)
+	if err != nil {
+		return nil, err
 	}
 
 	// Note: envs from params are handled separately - they should be appended to Env

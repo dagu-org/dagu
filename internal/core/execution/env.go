@@ -23,7 +23,7 @@ const (
 	// EnvKeyDAGRunStatus holds the current status of the DAG run (e.g., "running", "success", "failed").
 	EnvKeyDAGRunStatus = "DAG_RUN_STATUS"
 
-	// EnvKeyDAGParamsJSON holds the original JSON string when params are passed as JSON.
-	// This allows steps to access the full JSON payload in addition to individual parsed keys.
+	// EnvKeyDAGParamsJSON exposes the resolved parameters encoded as JSON.
+	// When params were provided as JSON, the original payload is preserved.
 	EnvKeyDAGParamsJSON = "DAGU_PARAMS_JSON"
 )

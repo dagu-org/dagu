@@ -109,8 +109,9 @@ type DAG struct {
 	DefaultParams string `json:"defaultParams,omitempty"`
 	// Params contains the list of parameters to be passed to the DAG.
 	Params []string `json:"params,omitempty"`
-	// ParamsJSON contains the original JSON string when params were passed as JSON.
-	// This allows steps to access the full JSON payload via DAGU_PARAMS_JSON env var.
+	// ParamsJSON contains the JSON representation of the resolved parameters.
+	// When params were supplied as JSON, the original payload is preserved.
+	// Steps can consume this via the DAGU_PARAMS_JSON environment variable.
 	ParamsJSON string `json:"paramsJSON,omitempty"`
 	// Steps contains the list of steps in the DAG.
 	Steps []Step `json:"steps,omitempty"`

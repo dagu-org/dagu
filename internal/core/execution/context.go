@@ -77,7 +77,7 @@ func (e Context) AllEnvs() []string {
 		distinctEntries[k] = v
 	}
 
-	// Add DAGU_PARAMS_JSON if params were passed as JSON
+	// Add DAGU_PARAMS_JSON with JSON encoded params when available
 	if e.DAG.ParamsJSON != "" {
 		distinctEntries[EnvKeyDAGParamsJSON] = e.DAG.ParamsJSON
 	}
