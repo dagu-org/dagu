@@ -5,9 +5,9 @@
  * @module features/dags/components/dag-editor
  */
 import React from 'react';
+import { cn } from '@/lib/utils';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
-import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import DAGEditorWithDocs from './DAGEditorWithDocs';
 
 /**
@@ -21,6 +21,32 @@ type DAGSpecReadOnlyProps = {
   /** Additional class name for the container */
   className?: string;
 };
+
+/**
+ * Skeleton placeholder for the editor while loading
+ */
+function EditorSkeleton({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        'flex flex-col bg-surface border border-border rounded-lg overflow-hidden min-h-[300px] max-h-[70vh]',
+        className
+      )}
+    >
+      <div className="flex-shrink-0 flex justify-between items-center p-2 border-b border-border">
+        <div className="h-6 w-16 bg-muted animate-pulse rounded" />
+      </div>
+      <div className="flex-1 p-4 space-y-2">
+        <div className="h-4 w-3/4 bg-muted animate-pulse rounded" />
+        <div className="h-4 w-1/2 bg-muted animate-pulse rounded" />
+        <div className="h-4 w-2/3 bg-muted animate-pulse rounded" />
+        <div className="h-4 w-1/3 bg-muted animate-pulse rounded" />
+        <div className="h-4 w-3/4 bg-muted animate-pulse rounded" />
+        <div className="h-4 w-1/2 bg-muted animate-pulse rounded" />
+      </div>
+    </div>
+  );
+}
 
 /**
  * DAGSpecReadOnly fetches and displays a DAG specification in readonly mode
@@ -43,7 +69,7 @@ function DAGSpecReadOnly({ dagName, dagRunId, className }: DAGSpecReadOnlyProps)
   });
 
   if (isLoading) {
-    return <LoadingIndicator />;
+    return <EditorSkeleton className={className} />;
   }
 
   if (error) {

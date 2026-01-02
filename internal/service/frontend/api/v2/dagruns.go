@@ -518,10 +518,13 @@ func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetails
 }
 
 // GetDAGRunSpec implements api.StrictServerInterface.
+// This endpoint returns the current YAML spec for a DAG associated with a DAG-run.
+// Note: For inline DAG runs (created via ExecuteDAGRunFromSpec), this returns 404
+// since the spec is stored in JSON format within the run attempt, not as YAML.
 func (a *API) GetDAGRunSpec(ctx context.Context, request api.GetDAGRunSpecRequestObject) (api.GetDAGRunSpecResponseObject, error) {
 	dagName := request.Name
 
-	// Fetch the DAG spec using the DAG name
+	// Fetch the DAG spec using the DAG name from the DAG store
 	yamlSpec, err := a.dagStore.GetSpec(ctx, dagName)
 	if err != nil {
 		return &api.GetDAGRunSpec404JSONResponse{
