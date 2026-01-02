@@ -2806,3 +2806,39 @@ func TestNewEnvWithStepInfo(t *testing.T) {
 	require.Equal(t, "0", env.StepMap["s2"].ExitCode)
 	require.NotContains(t, env.StepMap, "no-id")
 }
+
+func TestRunner_LLMMessagesHandler(t *testing.T) {
+	t.Run("HandlerNotCalledForNonLLMSteps", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		// Run non-LLM steps
+		plan := r.newPlan(t,
+			successStep("step1"),
+			successStep("step2", "step1"),
+		)
+
+		result := plan.assertRun(t, core.Succeeded)
+		result.assertNodeStatus(t, "step1", core.NodeSucceeded)
+		result.assertNodeStatus(t, "step2", core.NodeSucceeded)
+
+		// Handler should not have been called for writes since no LLM steps
+		assert.Equal(t, 0, handler.writeCalls)
+	})
+
+	t.Run("HandlerConfiguredCorrectly", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		// Verify handler is configured
+		assert.NotNil(t, r.cfg.MessagesHandler)
+
+		plan := r.newPlan(t, successStep("step1"))
+		result := plan.assertRun(t, core.Succeeded)
+		result.assertNodeStatus(t, "step1", core.NodeSucceeded)
+	})
+}
