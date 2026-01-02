@@ -158,11 +158,14 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 		return fmt.Errorf("parallel execution failed with %d errors: %v", len(e.errors), e.errors[0])
 	}
 
-	// Check if any sub DAGs failed (even if they completed without execution errors)
+	// Check if any sub DAGs failed or are waiting (even if they completed without execution errors)
 	e.lock.Lock()
 	failedCount := 0
+	waitingCount := 0
 	for _, result := range e.results {
-		if !result.Status.IsSuccess() {
+		if result.Status == core.Wait {
+			waitingCount++
+		} else if !result.Status.IsSuccess() {
 			failedCount++
 		}
 	}
@@ -171,6 +174,9 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	if failedCount > 0 {
 		return fmt.Errorf("parallel execution failed: %d sub dag(s) failed", failedCount)
 	}
+
+	// If any sub-DAG is waiting, don't treat it as an error
+	// The DetermineNodeStatus will handle setting the appropriate status
 
 	return nil
 }
@@ -199,18 +205,28 @@ func (e *parallelExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 		return core.NodeFailed, fmt.Errorf("no results available for node status determination")
 	}
 
-	// Check if all sub DAGs succeeded or if any had partial success
+	// Check if all sub DAGs succeeded or if any had partial success or waiting
 	// For error cases, we return an error status with error message
 	var partialSuccess bool
+	var hasWaiting bool
 	for _, result := range e.results {
 		switch result.Status {
 		case core.Succeeded:
 			// continue checking other results
 		case core.PartiallySucceeded:
 			partialSuccess = true
+		case core.Wait:
+			// Sub-DAG is waiting for human approval (HITL)
+			hasWaiting = true
 		default:
 			return core.NodeFailed, fmt.Errorf("sub DAG run %s is still in progress with status: %s", result.DAGRunID, result.Status)
 		}
+	}
+
+	// If any sub-DAG is waiting, propagate the waiting status to the parent
+	// This takes priority over partial success since we need human action
+	if hasWaiting {
+		return core.NodeWaiting, nil
 	}
 
 	// Check count of items equal to count of succeeded items
