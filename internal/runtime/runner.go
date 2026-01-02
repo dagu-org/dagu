@@ -189,7 +189,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 
 		// Check for Wait condition: if no nodes are running and we're waiting for approval,
 		// exit gracefully to allow the agent process to terminate.
-		if running == 0 && r.isWaitingForApproval(plan) {
+		if running == 0 && len(r.collectWaitingNodes(plan)) > 0 {
 			logger.Info(ctx, "DAG entering wait status - waiting for human approval")
 			break
 		}
@@ -296,7 +296,11 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 
 		if handlerNode != nil {
 			// Set DAG_WAITING_STEPS environment variable
-			waitingSteps := r.collectWaitingStepNames(plan)
+			var stepNames []string
+			for _, node := range r.collectWaitingNodes(plan) {
+				stepNames = append(stepNames, node.Name())
+			}
+			waitingSteps := strings.Join(stepNames, ",")
 			ctx = r.setupEnvironEventHandler(ctx, plan, handlerNode)
 			env := GetEnv(ctx).WithEnvVars("DAG_WAITING_STEPS", waitingSteps)
 			ctx = WithEnv(ctx, env)
@@ -723,7 +727,7 @@ func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
 
 	// Check for Wait condition before other terminal states.
 	// This occurs when all active work is done but nodes are waiting for approval.
-	if r.isWaitingForApproval(p) {
+	if len(r.collectWaitingNodes(p)) > 0 {
 		return core.Wait
 	}
 
@@ -738,48 +742,28 @@ func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
 	return core.Succeeded
 }
 
-// isWaitingForApproval checks if the DAG should enter Wait status.
-// Returns true when:
-// 1. There are no running nodes
-// 2. There are no pending (NotStarted) nodes that could run (i.e., all NotStarted nodes are blocked by waiting nodes)
-// 3. At least one node is in NodeWaiting status
-func (r *Runner) isWaitingForApproval(p *Plan) bool {
-	hasWaitingNode := false
+// collectWaitingNodes returns nodes in NodeWaiting status if the DAG should enter Wait state.
+// Returns nil if any node is running or if a NotStarted node could run.
+func (r *Runner) collectWaitingNodes(p *Plan) []*Node {
+	var waiting []*Node
 
 	for _, node := range p.Nodes() {
 		status := node.State().Status
 
-		// If any node is still running, not in wait state
 		if status == core.NodeRunning {
-			return false
+			return nil
 		}
 
-		// For NotStarted nodes, check if they're blocked by a waiting node
-		// If a NotStarted node could run (all dependencies satisfied and none waiting),
-		// then we're not in wait state
-		if status == core.NodeNotStarted {
-			if r.canNodeRun(p, node) {
-				return false
-			}
+		if status == core.NodeNotStarted && r.canNodeRun(p, node) {
+			return nil
 		}
 
 		if status == core.NodeWaiting {
-			hasWaitingNode = true
+			waiting = append(waiting, node)
 		}
 	}
 
-	return hasWaitingNode
-}
-
-// collectWaitingStepNames returns a comma-separated list of step names that are in NodeWaiting status.
-func (r *Runner) collectWaitingStepNames(p *Plan) string {
-	var names []string
-	for _, node := range p.Nodes() {
-		if node.Status() == core.NodeWaiting {
-			names = append(names, node.Name())
-		}
-	}
-	return strings.Join(names, ",")
+	return waiting
 }
 
 // canNodeRun checks if a NotStarted node could potentially run.

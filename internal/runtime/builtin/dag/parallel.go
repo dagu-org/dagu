@@ -163,16 +163,12 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 		return fmt.Errorf("parallel execution failed with %d errors: %v", len(e.errors), e.errors[0])
 	}
 
-	// Check if any sub DAGs failed or are waiting (even if they completed without execution errors)
+	// Check if any sub DAGs failed (even if they completed without execution errors)
+	// Wait status is not treated as failure - DetermineNodeStatus handles it
 	e.lock.Lock()
-	var (
-		failedCount  int
-		waitingCount int
-	)
+	failedCount := 0
 	for _, result := range e.results {
-		if result.Status == core.Wait {
-			waitingCount++
-		} else if !result.Status.IsSuccess() {
+		if !result.Status.IsSuccess() && result.Status != core.Wait {
 			failedCount++
 		}
 	}
@@ -181,9 +177,6 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	if failedCount > 0 {
 		return fmt.Errorf("parallel execution failed: %d sub dag(s) failed", failedCount)
 	}
-
-	// If any sub-DAG is waiting, don't treat it as an error
-	// The DetermineNodeStatus will handle setting the appropriate status
 
 	return nil
 }
