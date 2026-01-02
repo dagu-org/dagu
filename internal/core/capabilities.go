@@ -22,6 +22,8 @@ type ExecutorCapabilities struct {
 	SubDAG bool
 	// WorkerSelector indicates whether the executor supports worker selection.
 	WorkerSelector bool
+	// LLM indicates whether the executor supports the llm field.
+	LLM bool
 	// GetEvalOptions returns eval options for command argument evaluation.
 	// If nil, default evaluation is used.
 	GetEvalOptions func(ctx context.Context, step Step) []cmdutil.EvalOption
@@ -89,6 +91,11 @@ func SupportsSubDAG(executorType string) bool {
 // SupportsWorkerSelector returns whether the executor type supports worker selection.
 func SupportsWorkerSelector(executorType string) bool {
 	return executorCapabilities.Get(executorType).WorkerSelector
+}
+
+// SupportsLLM returns whether the executor type supports the llm field.
+func SupportsLLM(executorType string) bool {
+	return executorCapabilities.Get(executorType).LLM
 }
 
 // EvalOptions returns eval options for this step's executor type.

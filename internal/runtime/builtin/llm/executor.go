@@ -39,7 +39,11 @@ func newLLMExecutor(_ context.Context, step core.Step) (executor.Executor, error
 	// Determine provider type
 	providerType := llmpkg.ProviderOpenAI // Default
 	if cfg.Provider != "" {
-		providerType = llmpkg.ProviderType(cfg.Provider)
+		var err error
+		providerType, err = llmpkg.ParseProviderType(cfg.Provider)
+		if err != nil {
+			return nil, fmt.Errorf("invalid provider: %w", err)
+		}
 	}
 
 	// Build provider config
@@ -195,5 +199,8 @@ func (e *Executor) Run(ctx context.Context) error {
 }
 
 func init() {
-	executor.RegisterExecutor(core.ExecutorTypeLLM, newLLMExecutor, nil, core.ExecutorCapabilities{})
+	executor.RegisterExecutor(core.ExecutorTypeLLM, newLLMExecutor, nil, core.ExecutorCapabilities{
+		LLM: true,
+		// All others false - LLM doesn't support command, script, shell, container, subdag
+	})
 }

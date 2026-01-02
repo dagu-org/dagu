@@ -2580,77 +2580,109 @@ func TestValidateWorkerSelector(t *testing.T) {
 func TestValidateConflicts(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name    string
-		step    step
-		wantErr error
-	}{
-		{
-			name: "CallAndExecutorConflict",
-			step: step{
-				Call:     "sub-dag",
-				Executor: "shell",
+	// Test new-vs-legacy format conflicts (validateConflicts)
+	t.Run("NewVsLegacyFormatConflicts", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			step    step
+			wantErr bool
+		}{
+			{
+				name: "TypeAndExecutorConflict",
+				step: step{
+					Type:     "http",
+					Executor: "shell",
+				},
+				wantErr: true,
 			},
-			wantErr: ErrSubDAGAndExecutorConflict,
-		},
-		{
-			name: "RunAndCommandConflict",
-			step: step{
-				Run:     "sub-dag",
-				Command: "echo hello",
+			{
+				name: "NoConflict",
+				step: step{
+					Type: "http",
+				},
+				wantErr: false,
 			},
-			wantErr: ErrSubDAGAndCommandConflict,
-		},
-		{
-			name: "ParallelAndScriptConflict",
-			step: step{
-				Parallel: []any{1, 2, 3},
-				Script:   "echo hello",
-			},
-			wantErr: ErrSubDAGAndScriptConflict,
-		},
-		{
-			name: "ContainerAndExecutorConflict",
-			step: step{
-				Container: &container{Image: "alpine"},
-				Executor:  "shell",
-			},
-			wantErr: ErrContainerAndExecutorConflict,
-		},
-		{
-			name: "ContainerAndScriptConflict",
-			step: step{
-				Container: &container{Image: "alpine"},
-				Script:    "echo hello",
-			},
-			wantErr: ErrContainerAndScriptConflict,
-		},
-		{
-			name: "NoConflictSubDAG",
-			step: step{
-				Call: "sub-dag",
-			},
-			wantErr: nil,
-		},
-		{
-			name: "NoConflictShell",
-			step: step{
-				Command: "echo hello",
-			},
-			wantErr: nil,
-		},
-	}
+		}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := validateConflicts(&tt.step)
-			if tt.wantErr != nil {
-				assert.ErrorIs(t, err, tt.wantErr)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				err := validateConflicts(&tt.step)
+				if tt.wantErr {
+					assert.Error(t, err)
+				} else {
+					assert.NoError(t, err)
+				}
+			})
+		}
+	})
+
+	// Test execution type conflicts (validateExecutionType)
+	t.Run("ExecutionTypeConflicts", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			step    step
+			wantErr error
+		}{
+			{
+				name: "CallAndExecutorConflict",
+				step: step{
+					Call:     "sub-dag",
+					Executor: "shell",
+				},
+				wantErr: ErrSubDAGAndExecutorConflict,
+			},
+			{
+				name: "RunAndCommandConflict",
+				step: step{
+					Run:     "sub-dag",
+					Command: "echo hello",
+				},
+				wantErr: ErrSubDAGAndCommandConflict,
+			},
+			{
+				name: "ParallelAndScriptConflict",
+				step: step{
+					Parallel: []any{1, 2, 3},
+					Script:   "echo hello",
+				},
+				wantErr: ErrSubDAGAndCommandConflict, // script is in command group
+			},
+			{
+				name: "ContainerAndExecutorConflict",
+				step: step{
+					Container: &container{Image: "alpine"},
+					Executor:  "shell",
+				},
+				wantErr: ErrContainerAndExecutorConflict,
+			},
+			{
+				name: "NoConflictSubDAG",
+				step: step{
+					Call: "sub-dag",
+				},
+				wantErr: nil,
+			},
+			{
+				name: "NoConflictShell",
+				step: step{
+					Command: "echo hello",
+				},
+				wantErr: nil,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				result := &core.Step{}
+				err := validateExecutionType(&tt.step, result)
+				if tt.wantErr != nil {
+					assert.ErrorIs(t, err, tt.wantErr)
+				} else {
+					assert.NoError(t, err)
+				}
+			})
+		}
+	})
 }
 
 func TestUnregisteredExecutorValidation(t *testing.T) {

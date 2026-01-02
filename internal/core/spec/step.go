@@ -272,6 +272,11 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 		errs = append(errs, wrapTransformError("params", err))
 	}
 
+	// Validate execution type conflicts after all action-defining transformations
+	if err := validateExecutionType(s, result); err != nil {
+		errs = append(errs, wrapTransformError("executionType", err))
+	}
+
 	// Final validators run after the executor type is determined
 	if err := validateCommand(result); err != nil {
 		errs = append(errs, wrapTransformError("command", err))
@@ -293,6 +298,9 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	}
 	if err := validateWorkerSelector(result); err != nil {
 		errs = append(errs, wrapTransformError("workerSelector", err))
+	}
+	if err := validateLLM(result); err != nil {
+		errs = append(errs, wrapTransformError("llm", err))
 	}
 
 	// Validate that stdout and stderr don't point to the same file
@@ -960,7 +968,24 @@ func validateWorkerSelector(result *core.Step) error {
 	return nil
 }
 
+// validateLLM checks if the executor type supports the llm field.
+func validateLLM(result *core.Step) error {
+	if result.LLM == nil {
+		return nil
+	}
+	if !core.SupportsLLM(result.ExecutorConfig.Type) {
+		return core.NewValidationError(
+			"llm",
+			result.LLM,
+			fmt.Errorf("executor type %q does not support llm field", result.ExecutorConfig.Type),
+		)
+	}
+	return nil
+}
+
 // validateConflicts checks for mutual exclusivity between step fields.
+// This only checks new-vs-legacy format conflicts. Execution type conflicts
+// are handled by validateExecutionType() which runs after executor type is determined.
 func validateConflicts(s *step) error {
 	// Check for new format vs legacy format conflict
 	hasNewFormat := s.Type != "" || len(s.Config) > 0
@@ -975,51 +1000,63 @@ func validateConflicts(s *step) error {
 			fmt.Errorf("cannot use both 'config' and 'executor' fields; use 'type' + 'config' instead"))
 	}
 
-	hasSubDAG := strings.TrimSpace(s.Call) != "" || strings.TrimSpace(s.Run) != "" || s.Parallel != nil
-	hasExecutor := s.Executor != nil
-	hasCommand := s.Command != nil
-	hasScript := s.Script != ""
-	hasContainer := s.Container != nil
+	return nil
+}
 
-	if hasSubDAG {
-		if hasExecutor {
+// executionField represents a field that defines execution type.
+type executionField struct {
+	present bool
+	name    string
+	group   string // Grouping for conflict detection
+}
+
+// validateExecutionType validates conflicts between execution-defining fields.
+// This runs at the end of step building after executor type is determined.
+// Note: LLM conflicts are handled by the capabilities system (validateLLM, validateCommand, etc.)
+func validateExecutionType(s *step, _ *core.Step) error {
+	// Define execution-defining fields with their groups
+	// LLM is not included here - its conflicts are handled by capabilities
+	fields := []executionField{
+		{strings.TrimSpace(s.Call) != "" || strings.TrimSpace(s.Run) != "", "call", "subdag"},
+		{s.Parallel != nil, "parallel", "subdag"},
+		{s.Command != nil, "command", "command"},
+		{s.Script != "", "script", "command"},
+		{s.Container != nil, "container", "container"},
+		{s.Executor != nil, "executor", "executor"},
+		{s.Type != "", "type", "executor"},
+	}
+
+	// Collect active fields by group
+	activeGroups := make(map[string][]string) // group -> field names
+	for _, f := range fields {
+		if f.present {
+			activeGroups[f.group] = append(activeGroups[f.group], f.name)
+		}
+	}
+
+	// No execution type specified - that's OK, will default to command executor
+	if len(activeGroups) == 0 {
+		return nil
+	}
+
+	// SubDAG conflicts with command/script
+	if _, hasSubDAG := activeGroups["subdag"]; hasSubDAG {
+		if _, hasCmd := activeGroups["command"]; hasCmd {
+			return core.NewValidationError("call", s.Call, ErrSubDAGAndCommandConflict)
+		}
+		if _, hasContainer := activeGroups["container"]; hasContainer {
+			return core.NewValidationError("container", s.Container,
+				fmt.Errorf("cannot use 'container' field with sub-DAG execution"))
+		}
+		if _, hasExecutor := activeGroups["executor"]; hasExecutor {
 			return core.NewValidationError("executor", s.Executor, ErrSubDAGAndExecutorConflict)
 		}
-		if hasCommand {
-			return core.NewValidationError("command", s.Command, ErrSubDAGAndCommandConflict)
-		}
-		if hasScript {
-			return core.NewValidationError("script", s.Script, ErrSubDAGAndScriptConflict)
-		}
-		if hasContainer {
-			return core.NewValidationError("container", s.Container, fmt.Errorf("cannot use 'container' field with sub-DAG execution"))
-		}
 	}
 
-	if hasContainer && hasExecutor {
-		return core.NewValidationError("executor", s.Executor, ErrContainerAndExecutorConflict)
-	}
-	if hasContainer && hasScript {
-		return core.NewValidationError("script", s.Script, ErrContainerAndScriptConflict)
-	}
-
-	// LLM conflicts with other execution types
-	hasLLM := s.LLM != nil
-	if hasLLM {
-		if hasSubDAG {
-			return core.NewValidationError("llm", s.LLM, fmt.Errorf("cannot use 'llm' field with sub-DAG execution"))
-		}
-		if hasExecutor {
-			return core.NewValidationError("llm", s.LLM, fmt.Errorf("cannot use 'llm' field with 'executor' field"))
-		}
-		if hasCommand {
-			return core.NewValidationError("llm", s.LLM, fmt.Errorf("cannot use 'llm' field with 'command' field"))
-		}
-		if hasScript {
-			return core.NewValidationError("llm", s.LLM, fmt.Errorf("cannot use 'llm' field with 'script' field"))
-		}
-		if hasContainer {
-			return core.NewValidationError("llm", s.LLM, fmt.Errorf("cannot use 'llm' field with 'container' field"))
+	// Container conflicts with executor (but not with command/script - that's allowed)
+	if _, hasContainer := activeGroups["container"]; hasContainer {
+		if _, hasExecutor := activeGroups["executor"]; hasExecutor {
+			return core.NewValidationError("executor", s.Executor, ErrContainerAndExecutorConflict)
 		}
 	}
 
@@ -1227,6 +1264,28 @@ func buildStepLLM(_ StepBuildContext, s *step, result *core.Step) error {
 		}
 	}
 
+	// Validate model is specified
+	if cfg.Model == "" {
+		return core.NewValidationError("llm.model", cfg.Model,
+			fmt.Errorf("model is required"))
+	}
+
+	// Validate temperature range
+	if cfg.Temperature != nil {
+		if *cfg.Temperature < 0.0 || *cfg.Temperature > 2.0 {
+			return core.NewValidationError("llm.temperature", *cfg.Temperature,
+				fmt.Errorf("temperature must be between 0.0 and 2.0"))
+		}
+	}
+
+	// Validate topP range
+	if cfg.TopP != nil {
+		if *cfg.TopP < 0.0 || *cfg.TopP > 1.0 {
+			return core.NewValidationError("llm.topP", *cfg.TopP,
+				fmt.Errorf("topP must be between 0.0 and 1.0"))
+		}
+	}
+
 	// Validate messages
 	if len(cfg.Messages) == 0 {
 		return core.NewValidationError("llm.messages", cfg.Messages,
@@ -1243,7 +1302,7 @@ func buildStepLLM(_ StepBuildContext, s *step, result *core.Step) error {
 		if !validRoles[msg.Role] {
 			return core.NewValidationError(
 				fmt.Sprintf("llm.messages[%d].role", i), msg.Role,
-				fmt.Errorf("invalid role: must be one of system, user, assistant"))
+				fmt.Errorf("invalid role: must be one of system, user, assistant, tool"))
 		}
 		if msg.Content == "" {
 			return core.NewValidationError(

@@ -20,6 +20,7 @@ const (
 	// Endpoint format: /models/{model}:generateContent
 	generateContentPath = "/models/%s:generateContent"
 	streamContentPath   = "/models/%s:streamGenerateContent"
+	streamPrefix        = "data: "
 )
 
 func init() {
@@ -283,11 +284,11 @@ func (p *Provider) streamResponse(ctx context.Context, body io.ReadCloser, event
 		}
 
 		// Gemini streaming uses SSE format with "data: " prefix
-		if !strings.HasPrefix(line, "data: ") {
+		if !strings.HasPrefix(line, streamPrefix) {
 			continue
 		}
 
-		data := strings.TrimPrefix(line, "data: ")
+		data := strings.TrimPrefix(line, streamPrefix)
 
 		var chunk generateContentResponse
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
