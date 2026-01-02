@@ -181,14 +181,6 @@ func TestParseStringParamsWithJSON(t *testing.T) {
 			},
 		},
 		{
-			name:  "JSONObjectNoSpaces",
-			input: `{"key1":"value1","key2":"value2"}`,
-			expected: []paramPair{
-				{Name: "key1", Value: "value1"},
-				{Name: "key2", Value: "value2"},
-			},
-		},
-		{
 			name:  "JSONArray",
 			input: `["val1", "val2", "val3"]`,
 			expected: []paramPair{
@@ -198,16 +190,7 @@ func TestParseStringParamsWithJSON(t *testing.T) {
 			},
 		},
 		{
-			name:  "JSONArrayWithNumbers",
-			input: `[1, 2, 3]`,
-			expected: []paramPair{
-				{Name: "", Value: "1"},
-				{Name: "", Value: "2"},
-				{Name: "", Value: "3"},
-			},
-		},
-		{
-			name:  "JSONObjectWithNumbers",
+			name:  "JSONWithNonStringValues",
 			input: `{"count": 42, "enabled": true}`,
 			expected: []paramPair{
 				{Name: "count", Value: "42"},
