@@ -28,8 +28,9 @@ func init() {
 
 // Provider implements the llm.Provider interface for OpenAI.
 type Provider struct {
-	config     llm.Config
-	httpClient *http.Client
+	config           llm.Config
+	httpClient       *http.Client
+	streamHttpClient *http.Client
 }
 
 // New creates a new OpenAI provider.
@@ -40,9 +41,13 @@ func New(cfg llm.Config) (llm.Provider, error) {
 
 	return &Provider{
 		config: cfg,
+		// Regular client with timeout for non-streaming requests
 		httpClient: &http.Client{
 			Timeout: cfg.Timeout,
 		},
+		// Streaming client without timeout - relies on context cancellation
+		// to avoid premature termination of long-running streaming responses
+		streamHttpClient: &http.Client{},
 	}, nil
 }
 
@@ -58,7 +63,7 @@ func (p *Provider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.ChatRes
 		return nil, err
 	}
 
-	respBody, err := p.doRequest(ctx, body)
+	respBody, err := p.doRequest(ctx, body, false)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +96,7 @@ func (p *Provider) ChatStream(ctx context.Context, req *llm.ChatRequest) (<-chan
 		return nil, err
 	}
 
-	respBody, err := p.doRequest(ctx, body)
+	respBody, err := p.doRequest(ctx, body, true)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +149,7 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 	return json.Marshal(chatReq)
 }
 
-func (p *Provider) doRequest(ctx context.Context, body []byte) (io.ReadCloser, error) {
+func (p *Provider) doRequest(ctx context.Context, body []byte, streaming bool) (io.ReadCloser, error) {
 	url := p.config.BaseURL + defaultChatEndpoint
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
@@ -154,6 +159,13 @@ func (p *Provider) doRequest(ctx context.Context, body []byte) (io.ReadCloser, e
 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+p.config.APIKey)
+
+	// Use appropriate client based on request type
+	// Streaming uses client without timeout to avoid premature termination
+	client := p.httpClient
+	if streaming {
+		client = p.streamHttpClient
+	}
 
 	var resp *http.Response
 	var lastErr error
@@ -175,7 +187,7 @@ func (p *Provider) doRequest(ctx context.Context, body []byte) (io.ReadCloser, e
 			httpReq.Body = io.NopCloser(bytes.NewReader(body))
 		}
 
-		resp, lastErr = p.httpClient.Do(httpReq)
+		resp, lastErr = client.Do(httpReq)
 		if lastErr != nil {
 			continue
 		}

@@ -29,8 +29,9 @@ func init() {
 
 // Provider implements the llm.Provider interface for OpenRouter.
 type Provider struct {
-	config     llm.Config
-	httpClient *http.Client
+	config           llm.Config
+	httpClient       *http.Client
+	streamHttpClient *http.Client
 	// Optional metadata for OpenRouter
 	SiteURL  string
 	SiteName string
@@ -47,8 +48,9 @@ func New(cfg llm.Config) (llm.Provider, error) {
 		httpClient: &http.Client{
 			Timeout: cfg.Timeout,
 		},
-		SiteURL:  "https://github.com/dagu-org/dagu",
-		SiteName: "Dagu Workflow Engine",
+		streamHttpClient: &http.Client{},
+		SiteURL:          "https://github.com/dagu-org/dagu",
+		SiteName:         "Dagu Workflow Engine",
 	}, nil
 }
 
@@ -64,7 +66,7 @@ func (p *Provider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.ChatRes
 		return nil, err
 	}
 
-	respBody, err := p.doRequest(ctx, body)
+	respBody, err := p.doRequest(ctx, body, false)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +99,7 @@ func (p *Provider) ChatStream(ctx context.Context, req *llm.ChatRequest) (<-chan
 		return nil, err
 	}
 
-	respBody, err := p.doRequest(ctx, body)
+	respBody, err := p.doRequest(ctx, body, true)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +147,7 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 	return json.Marshal(chatReq)
 }
 
-func (p *Provider) doRequest(ctx context.Context, body []byte) (io.ReadCloser, error) {
+func (p *Provider) doRequest(ctx context.Context, body []byte, streaming bool) (io.ReadCloser, error) {
 	url := p.config.BaseURL + defaultChatEndpoint
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
@@ -162,6 +164,11 @@ func (p *Provider) doRequest(ctx context.Context, body []byte) (io.ReadCloser, e
 	}
 	if p.SiteName != "" {
 		httpReq.Header.Set("X-Title", p.SiteName)
+	}
+
+	client := p.httpClient
+	if streaming {
+		client = p.streamHttpClient
 	}
 
 	var resp *http.Response
@@ -184,7 +191,7 @@ func (p *Provider) doRequest(ctx context.Context, body []byte) (io.ReadCloser, e
 			httpReq.Body = io.NopCloser(bytes.NewReader(body))
 		}
 
-		resp, lastErr = p.httpClient.Do(httpReq)
+		resp, lastErr = client.Do(httpReq)
 		if lastErr != nil {
 			continue
 		}

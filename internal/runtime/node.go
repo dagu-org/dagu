@@ -175,10 +175,13 @@ func (n *Node) Execute(ctx context.Context) error {
 		return err
 	}
 
-	// Set inherited LLM messages if available
-	if len(n.inheritedMessages) > 0 {
+	// Set inherited LLM messages if available (thread-safe snapshot)
+	n.mu.RLock()
+	inherited := n.inheritedMessages
+	n.mu.RUnlock()
+	if len(inherited) > 0 {
 		if setter, ok := cmd.(interface{ SetInheritedMessages([]execution.LLMMessage) }); ok {
-			setter.SetInheritedMessages(n.inheritedMessages)
+			setter.SetInheritedMessages(inherited)
 		}
 	}
 

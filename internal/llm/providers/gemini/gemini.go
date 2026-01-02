@@ -29,8 +29,9 @@ func init() {
 
 // Provider implements the llm.Provider interface for Google Gemini.
 type Provider struct {
-	config     llm.Config
-	httpClient *http.Client
+	config           llm.Config
+	httpClient       *http.Client
+	streamHttpClient *http.Client
 }
 
 // New creates a new Gemini provider.
@@ -44,6 +45,7 @@ func New(cfg llm.Config) (llm.Provider, error) {
 		httpClient: &http.Client{
 			Timeout: cfg.Timeout,
 		},
+		streamHttpClient: &http.Client{},
 	}, nil
 }
 
@@ -60,7 +62,7 @@ func (p *Provider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.ChatRes
 	}
 
 	endpoint := fmt.Sprintf(generateContentPath, req.Model)
-	respBody, err := p.doRequest(ctx, endpoint, body)
+	respBody, err := p.doRequest(ctx, endpoint, body, false)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +111,7 @@ func (p *Provider) ChatStream(ctx context.Context, req *llm.ChatRequest) (<-chan
 	}
 
 	endpoint := fmt.Sprintf(streamContentPath, req.Model)
-	respBody, err := p.doRequest(ctx, endpoint+"?alt=sse", body)
+	respBody, err := p.doRequest(ctx, endpoint+"?alt=sse", body, true)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +193,7 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest) ([]byte, error) {
 	return json.Marshal(geminiReq)
 }
 
-func (p *Provider) doRequest(ctx context.Context, endpoint string, body []byte) (io.ReadCloser, error) {
+func (p *Provider) doRequest(ctx context.Context, endpoint string, body []byte, streaming bool) (io.ReadCloser, error) {
 	url := p.config.BaseURL + endpoint
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
@@ -201,6 +203,11 @@ func (p *Provider) doRequest(ctx context.Context, endpoint string, body []byte) 
 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("x-goog-api-key", p.config.APIKey)
+
+	client := p.httpClient
+	if streaming {
+		client = p.streamHttpClient
+	}
 
 	var resp *http.Response
 	var lastErr error
@@ -222,7 +229,7 @@ func (p *Provider) doRequest(ctx context.Context, endpoint string, body []byte) 
 			httpReq.Body = io.NopCloser(bytes.NewReader(body))
 		}
 
-		resp, lastErr = p.httpClient.Do(httpReq)
+		resp, lastErr = client.Do(httpReq)
 		if lastErr != nil {
 			continue
 		}
