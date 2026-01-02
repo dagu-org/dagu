@@ -23,4 +23,4 @@ type ProgressReporter interface {
 }
 
 // Ensure implementation satisfies the interface
-var _ ProgressReporter = (*ProgressTeaDisplay)(nil)
+var _ ProgressReporter = (*SimpleProgressDisplay)(nil)

@@ -8,7 +8,7 @@ import (
 
 // createProgressReporter creates the progress reporter
 func createProgressReporter(dag *core.DAG, dagRunID string, params []string) ProgressReporter {
-	display := NewProgressTeaDisplay(dag)
+	display := NewSimpleProgressDisplay(dag)
 	display.SetDAGRunInfo(dagRunID, strings.Join(params, " "))
 	return display
 }
