@@ -272,12 +272,8 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 		errs = append(errs, wrapTransformError("params", err))
 	}
 
-	// Validate execution type conflicts after all action-defining transformations
-	if err := validateExecutionType(s, result); err != nil {
-		errs = append(errs, wrapTransformError("executionType", err))
-	}
-
 	// Final validators run after the executor type is determined
+	// Capabilities-based validators handle all execution type conflicts
 	if err := validateCommand(result); err != nil {
 		errs = append(errs, wrapTransformError("command", err))
 	}
@@ -984,8 +980,8 @@ func validateLLM(result *core.Step) error {
 }
 
 // validateConflicts checks for mutual exclusivity between step fields.
-// This only checks new-vs-legacy format conflicts. Execution type conflicts
-// are handled by validateExecutionType() which runs after executor type is determined.
+// This only checks new-vs-legacy format conflicts (type/config vs executor).
+// Execution type conflicts are handled by capability-based validators.
 func validateConflicts(s *step) error {
 	// Check for new format vs legacy format conflict
 	hasNewFormat := s.Type != "" || len(s.Config) > 0
@@ -998,66 +994,6 @@ func validateConflicts(s *step) error {
 		}
 		return core.NewValidationError("config", s.Config,
 			fmt.Errorf("cannot use both 'config' and 'executor' fields; use 'type' + 'config' instead"))
-	}
-
-	return nil
-}
-
-// executionField represents a field that defines execution type.
-type executionField struct {
-	present bool
-	name    string
-	group   string // Grouping for conflict detection
-}
-
-// validateExecutionType validates conflicts between execution-defining fields.
-// This runs at the end of step building after executor type is determined.
-// Note: LLM conflicts are handled by the capabilities system (validateLLM, validateCommand, etc.)
-func validateExecutionType(s *step, _ *core.Step) error {
-	// Define execution-defining fields with their groups
-	// LLM is not included here - its conflicts are handled by capabilities
-	fields := []executionField{
-		{strings.TrimSpace(s.Call) != "" || strings.TrimSpace(s.Run) != "", "call", "subdag"},
-		{s.Parallel != nil, "parallel", "subdag"},
-		{s.Command != nil, "command", "command"},
-		{s.Script != "", "script", "command"},
-		{s.Container != nil, "container", "container"},
-		{s.Executor != nil, "executor", "executor"},
-		{s.Type != "", "type", "executor"},
-	}
-
-	// Collect active fields by group
-	activeGroups := make(map[string][]string) // group -> field names
-	for _, f := range fields {
-		if f.present {
-			activeGroups[f.group] = append(activeGroups[f.group], f.name)
-		}
-	}
-
-	// No execution type specified - that's OK, will default to command executor
-	if len(activeGroups) == 0 {
-		return nil
-	}
-
-	// SubDAG conflicts with command/script
-	if _, hasSubDAG := activeGroups["subdag"]; hasSubDAG {
-		if _, hasCmd := activeGroups["command"]; hasCmd {
-			return core.NewValidationError("call", s.Call, ErrSubDAGAndCommandConflict)
-		}
-		if _, hasContainer := activeGroups["container"]; hasContainer {
-			return core.NewValidationError("container", s.Container,
-				fmt.Errorf("cannot use 'container' field with sub-DAG execution"))
-		}
-		if _, hasExecutor := activeGroups["executor"]; hasExecutor {
-			return core.NewValidationError("executor", s.Executor, ErrSubDAGAndExecutorConflict)
-		}
-	}
-
-	// Container conflicts with executor (but not with command/script - that's allowed)
-	if _, hasContainer := activeGroups["container"]; hasContainer {
-		if _, hasExecutor := activeGroups["executor"]; hasExecutor {
-			return core.NewValidationError("executor", s.Executor, ErrContainerAndExecutorConflict)
-		}
 	}
 
 	return nil
