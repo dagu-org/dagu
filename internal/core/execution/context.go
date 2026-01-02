@@ -58,9 +58,8 @@ func (e Context) DAGRunRef() DAGRunRef {
 	return NewDAGRunRef(e.DAG.Name, e.DAGRunID)
 }
 
-// AllEnvs returns all environment variables as a slice of strings in "key=value" format.
-// Includes OS environment (BaseEnv). Use this for command executor and DAG runner.
-// Secrets have the highest priority and are appended last.
+// AllEnvs returns every environment variable as "key=value" with precedence:
+// BaseEnv < DAG.Env < e.Envs < SecretEnvs < runtime metadata (e.g., DAGU_PARAMS_JSON).
 func (e Context) AllEnvs() []string {
 	distinctEntries := make(map[string]string)
 
