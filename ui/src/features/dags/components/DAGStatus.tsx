@@ -6,6 +6,7 @@ import {
 } from '@/components/ui/tooltip';
 import {
   ActivitySquare,
+  FileCode,
   GanttChart,
   MousePointerClick,
   Package,
@@ -28,6 +29,7 @@ import {
   ParallelExecutionModal,
   StatusUpdateModal,
 } from './dag-execution';
+import { DAGSpecReadOnly } from './dag-editor';
 import { FlowchartType, Graph, TimelineChart } from './visualization';
 
 type Props = {
@@ -35,7 +37,7 @@ type Props = {
   fileName: string;
 };
 
-type StatusTab = 'status' | 'timeline' | 'outputs';
+type StatusTab = 'status' | 'timeline' | 'outputs' | 'spec';
 
 function DAGStatus({ dagRun, fileName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
@@ -302,6 +304,14 @@ function DAGStatus({ dagRun, fileName }: Props) {
           <Package className="h-4 w-4" />
           Outputs
         </Tab>
+        <Tab
+          isActive={activeTab === 'spec'}
+          onClick={() => setActiveTab('spec')}
+          className="flex items-center gap-2 cursor-pointer"
+        >
+          <FileCode className="h-4 w-4" />
+          Spec
+        </Tab>
       </Tabs>
 
       {/* Status Tab Content */}
@@ -400,6 +410,11 @@ function DAGStatus({ dagRun, fileName }: Props) {
       {/* Outputs Tab Content */}
       {activeTab === 'outputs' && (
         <DAGRunOutputs dagName={dagRun.name} dagRunId={dagRun.dagRunId} />
+      )}
+
+      {/* Spec Tab Content */}
+      {activeTab === 'spec' && (
+        <DAGSpecReadOnly dagName={dagRun.name} dagRunId={dagRun.dagRunId} />
       )}
 
       <StatusUpdateModal
