@@ -530,7 +530,7 @@ func (r *Runner) saveChatMessages(ctx context.Context, node *Node) {
 func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) context.Context {
 	env := NewPlanEnv(ctx, node.Step(), plan)
 
-	// Load output variables from predecessor nodes (dependencies)
+	// Load output variables and approval inputs from predecessor nodes (dependencies)
 	// This traverses backwards from the current node to find all nodes it depends on
 	curr := node.id
 	visited := make(map[int]struct{})
@@ -556,6 +556,16 @@ func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) con
 		predNode := plan.GetNode(predID)
 		if predNode != nil && predNode.inner.State.OutputVariables != nil {
 			env.LoadOutputVariables(predNode.inner.State.OutputVariables)
+		}
+
+		// Load approval inputs from approved wait steps
+		// These are available as environment variables in subsequent steps
+		if predNode != nil && predNode.inner.State.ApprovalInputs != nil {
+			approvalVars := &collections.SyncMap{}
+			for key, value := range predNode.inner.State.ApprovalInputs {
+				approvalVars.Store(key, key+"="+value)
+			}
+			env.LoadOutputVariables(approvalVars)
 		}
 	}
 
@@ -591,13 +601,20 @@ func (r *Runner) setupEnvironEventHandler(ctx context.Context, plan *Plan, node 
 	env := NewPlanEnv(ctx, node.Step(), plan)
 	env.Envs[execution.EnvKeyDAGRunStatus] = r.Status(ctx, plan).String()
 
-	// get all output variables
+	// get all output variables and approval inputs
 	for _, node := range plan.Nodes() {
-		if node.inner.State.OutputVariables == nil {
-			continue
+		if node.inner.State.OutputVariables != nil {
+			env.LoadOutputVariables(node.inner.State.OutputVariables)
 		}
 
-		env.LoadOutputVariables(node.inner.State.OutputVariables)
+		// Load approval inputs from approved wait steps
+		if node.inner.State.ApprovalInputs != nil {
+			approvalVars := &collections.SyncMap{}
+			for key, value := range node.inner.State.ApprovalInputs {
+				approvalVars.Store(key, key+"="+value)
+			}
+			env.LoadOutputVariables(approvalVars)
+		}
 	}
 
 	return WithEnv(ctx, env)

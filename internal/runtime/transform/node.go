@@ -39,6 +39,7 @@ func ToNode(n *execution.Node) *runtime.Node {
 		SubRuns:         children,
 		SubRunsRepeated: childrenRepeated,
 		OutputVariables: n.OutputVariables,
+		ApprovalInputs:  n.ApprovalInputs,
 	})
 }
 
@@ -71,5 +72,6 @@ func newNode(node runtime.NodeData) *execution.Node {
 		SubRuns:         children,
 		SubRunsRepeated: childrenRepeated,
 		OutputVariables: node.State.OutputVariables,
+		ApprovalInputs:  node.State.ApprovalInputs,
 	}
 }

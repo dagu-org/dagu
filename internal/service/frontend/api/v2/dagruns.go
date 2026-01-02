@@ -601,6 +601,122 @@ func (a *API) ApproveDAGRunStep(ctx context.Context, request api.ApproveDAGRunSt
 	}, nil
 }
 
+func (a *API) ApproveSubDAGRunStep(ctx context.Context, request api.ApproveSubDAGRunStepRequestObject) (api.ApproveSubDAGRunStepResponseObject, error) {
+	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
+
+	// Get the sub DAG run status
+	rootRef := execution.NewDAGRunRef(request.Name, request.DagRunId)
+	dagStatus, err := a.dagRunMgr.FindSubDAGRunStatus(ctx, rootRef, request.SubDAGRunId)
+	if err != nil {
+		return &api.ApproveSubDAGRunStep404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("sub DAG-run ID %s not found", request.SubDAGRunId),
+		}, nil
+	}
+
+	// Find the step to approve
+	stepIdx := -1
+	for idx, n := range dagStatus.Nodes {
+		if n.Step.Name == request.StepName {
+			stepIdx = idx
+			break
+		}
+	}
+	if stepIdx < 0 {
+		return &api.ApproveSubDAGRunStep404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("step %s not found in sub DAG-run %s", request.StepName, request.SubDAGRunId),
+		}, nil
+	}
+
+	// Verify the step is in Waiting status
+	if dagStatus.Nodes[stepIdx].Status != core.NodeWaiting {
+		return &api.ApproveSubDAGRunStep400JSONResponse{
+			Code:    api.ErrorCodeBadRequest,
+			Message: fmt.Sprintf("step %s is not waiting for approval (status: %s)", request.StepName, dagStatus.Nodes[stepIdx].Status),
+		}, nil
+	}
+
+	// Validate required inputs from wait step config
+	if err := validateRequiredInputs(dagStatus.Nodes[stepIdx].Step, request.Body); err != nil {
+		return &api.ApproveSubDAGRunStep400JSONResponse{
+			Code:    api.ErrorCodeBadRequest,
+			Message: err.Error(),
+		}, nil
+	}
+
+	// Update the node status to Succeeded
+	dagStatus.Nodes[stepIdx].Status = core.NodeSucceeded
+	dagStatus.Nodes[stepIdx].ApprovedAt = time.Now().Format(time.RFC3339)
+	if request.Body != nil && request.Body.Inputs != nil {
+		dagStatus.Nodes[stepIdx].ApprovalInputs = *request.Body.Inputs
+	}
+
+	// Save the updated status
+	if err := a.dagRunMgr.UpdateStatus(ctx, rootRef, *dagStatus); err != nil {
+		return nil, fmt.Errorf("error updating sub DAG-run status: %w", err)
+	}
+
+	// Check if sub DAG should be resumed (no more waiting steps blocking)
+	shouldResume := true
+	for _, n := range dagStatus.Nodes {
+		if n.Status == core.NodeWaiting {
+			shouldResume = false
+			break
+		}
+	}
+
+	if shouldResume {
+		// Re-enqueue the sub DAG run for execution
+		attempt, err := a.dagRunStore.FindSubAttempt(ctx, rootRef, request.SubDAGRunId)
+		if err != nil {
+			logger.Error(ctx, "Failed to find sub DAG attempt for resume", tag.Error(err))
+			return &api.ApproveSubDAGRunStep200JSONResponse{
+				DagRunId: request.SubDAGRunId,
+				StepName: request.StepName,
+				Resumed:  false,
+			}, nil
+		}
+
+		dag, err := attempt.ReadDAG(ctx)
+		if err != nil {
+			logger.Error(ctx, "Failed to read sub DAG for resume", tag.Error(err))
+			return &api.ApproveSubDAGRunStep200JSONResponse{
+				DagRunId: request.SubDAGRunId,
+				StepName: request.StepName,
+				Resumed:  false,
+			}, nil
+		}
+
+		// Use retry to resume the sub DAG from where it left off
+		retrySpec := a.subCmdBuilder.Retry(dag, request.SubDAGRunId, "")
+		if err := runtime.Start(ctx, retrySpec); err != nil {
+			logger.Error(ctx, "Failed to resume sub DAG", tag.Error(err))
+			return &api.ApproveSubDAGRunStep200JSONResponse{
+				DagRunId: request.SubDAGRunId,
+				StepName: request.StepName,
+				Resumed:  false,
+			}, nil
+		}
+
+		logger.Info(ctx, "Sub DAG resumed after approval",
+			slog.String("subDagRunId", request.SubDAGRunId),
+			slog.String("step", request.StepName),
+		)
+	}
+
+	return &api.ApproveSubDAGRunStep200JSONResponse{
+		DagRunId: request.SubDAGRunId,
+		StepName: request.StepName,
+		Resumed:  shouldResume,
+	}, nil
+}
+
 // GetDAGRunDetails implements api.StrictServerInterface.
 func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetailsRequestObject) (api.GetDAGRunDetailsResponseObject, error) {
 	dagName := request.Name

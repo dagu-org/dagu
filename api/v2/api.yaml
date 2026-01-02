@@ -2230,6 +2230,56 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/approve:
+    post:
+      summary: "Approve a waiting step in a sub DAG-run for HITL"
+      description: "Approves a step that is in Waiting status within a sub DAG-run, optionally providing input parameters that will be available as environment variables in subsequent steps"
+      operationId: "approveSubDAGRunStep"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run containing the step to approve"
+        - $ref: "#/components/parameters/StepName"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveStepRequest"
+      responses:
+        "200":
+          description: "Step approved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApproveStepResponse"
+        "400":
+          description: "Step is not in Waiting status or required inputs missing"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Sub DAG-run or step not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /queues:
     get:
       summary: "List all execution queues with active DAG-runs"
@@ -3694,6 +3744,17 @@ components:
           type: integer
           description: "Maximum execution time for the step in seconds. If set, this timeout takes precedence over the DAG-level timeout for this step."
           minimum: 0
+        executorConfig:
+          type: object
+          description: "Executor configuration for this step"
+          properties:
+            type:
+              type: string
+              description: "Type of executor (e.g., 'wait', 'http', 'docker', 'command')"
+            config:
+              type: object
+              description: "Executor-specific configuration"
+              additionalProperties: true
       required:
         - name
 

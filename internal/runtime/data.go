@@ -65,6 +65,9 @@ type NodeState struct {
 	OutputVariables *collections.SyncMap
 	// ChatMessages stores the chat conversation messages for message passing between steps.
 	ChatMessages []execution.LLMMessage
+	// ApprovalInputs stores key-value parameters provided during HITL approval.
+	// These are available as environment variables in subsequent steps.
+	ApprovalInputs map[string]string
 }
 
 // Parallel represents the evaluated parallel execution configuration for a node.

@@ -896,6 +896,26 @@ export interface paths {
         patch: operations["updateSubDAGRunStepStatus"];
         trace?: never;
     };
+    "/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a waiting step in a sub DAG-run for HITL
+         * @description Approves a step that is in Waiting status within a sub DAG-run, optionally providing input parameters that will be available as environment variables in subsequent steps
+         */
+        post: operations["approveSubDAGRunStep"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/queues": {
         parameters: {
             query?: never;
@@ -1593,6 +1613,15 @@ export interface components {
             preconditions?: components["schemas"]["Condition"][];
             /** @description Maximum execution time for the step in seconds. If set, this timeout takes precedence over the DAG-level timeout for this step. */
             timeoutSec?: number;
+            /** @description Executor configuration for this step */
+            executorConfig?: {
+                /** @description Type of executor (e.g., 'wait', 'http', 'docker', 'command') */
+                type?: string;
+                /** @description Executor-specific configuration */
+                config?: {
+                    [key: string]: unknown;
+                };
+            };
         };
         /** @description Individual search result item for a DAG */
         SearchResultItem: {
@@ -4663,6 +4692,69 @@ export interface operations {
                 };
             };
             /** @description DAGRun or step not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    approveSubDAGRunStep: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+                /** @description ID of the sub DAG-run containing the step to approve */
+                subDAGRunId: string;
+                /** @description name of the step */
+                stepName: components["parameters"]["StepName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ApproveStepRequest"];
+            };
+        };
+        responses: {
+            /** @description Step approved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApproveStepResponse"];
+                };
+            };
+            /** @description Step is not in Waiting status or required inputs missing */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Sub DAG-run or step not found */
             404: {
                 headers: {
                     [name: string]: unknown;

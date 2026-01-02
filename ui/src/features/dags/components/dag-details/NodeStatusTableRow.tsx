@@ -25,6 +25,7 @@ import {
 } from '@/ui/CustomDialog';
 import {
   AlertCircle,
+  Check,
   ChevronDown,
   ChevronRight,
   Code,
@@ -43,6 +44,7 @@ import {
 } from '../../../../api/v2/schema';
 import StyledTableRow from '../../../../ui/StyledTableRow';
 import { NodeStatusChip } from '../common';
+import { ApprovalModal } from '../dag-execution/ApprovalModal';
 import StatusUpdateModal from '../dag-execution/StatusUpdateModal';
 import { SubDAGRunsList } from './SubDAGRunsList';
 
@@ -255,6 +257,8 @@ function NodeStatusTableRow({
   );
   // State for status update modal
   const [showStatusModal, setShowStatusModal] = useState(false);
+  // State for approval modal
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
   // Check if this is a sub dagRun node
   // Include both regular and repeated sub runs
   const allSubRuns = [...(node.subRuns || []), ...(node.subRunsRepeated || [])];
@@ -457,6 +461,44 @@ function NodeStatusTableRow({
     }
 
     setShowStatusModal(false);
+  };
+
+  // Handle approval for wait steps
+  const handleApprove = async (inputs: Record<string, string>) => {
+    // Check if this is a sub DAG-run
+    const isSubDAGRun =
+      dagRun.rootDAGRunId &&
+      dagRun.rootDAGRunName &&
+      dagRun.rootDAGRunId !== dagRun.dagRunId;
+
+    // Define path parameters
+    const pathParams = {
+      name: isSubDAGRun ? dagRun.rootDAGRunName : dagName,
+      dagRunId: isSubDAGRun ? dagRun.rootDAGRunId : dagRunId || '',
+      stepName: node.step.name,
+      ...(isSubDAGRun ? { subDAGRunId: dagRun.dagRunId } : {}),
+    };
+
+    // Use the appropriate endpoint
+    const endpoint = isSubDAGRun
+      ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/approve'
+      : '/dag-runs/{name}/{dagRunId}/steps/{stepName}/approve';
+
+    const { error } = await client.POST(endpoint, {
+      params: {
+        path: pathParams,
+        query: {
+          remoteNode,
+        },
+      },
+      body: {
+        inputs: Object.keys(inputs).length > 0 ? inputs : undefined,
+      },
+    });
+
+    if (error) {
+      throw new Error(error.message || 'Failed to approve step');
+    }
   };
 
   // Determine if logs are available
@@ -736,18 +778,35 @@ function NodeStatusTableRow({
           </TableCell>
           {dagRunId && (
             <TableCell className="text-center">
-              <Button
-                size="icon-sm"
-                className="btn-3d-secondary"
-                title="Retry from this step"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowDialog(true);
-                }}
-                disabled={loading || dagRun.status === Status.Running}
-              >
-                <Play className="h-4 w-4 text-success" />
-              </Button>
+              <div className="flex items-center justify-center gap-1">
+                {/* Approve button for waiting steps */}
+                {node.status === NodeStatus.Waiting && (
+                  <Button
+                    size="icon-sm"
+                    className="btn-3d-secondary bg-warning/10 hover:bg-warning/20"
+                    title="Approve this step"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowApprovalModal(true);
+                    }}
+                  >
+                    <Check className="h-4 w-4 text-warning" />
+                  </Button>
+                )}
+                {/* Retry button */}
+                <Button
+                  size="icon-sm"
+                  className="btn-3d-secondary"
+                  title="Retry from this step"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDialog(true);
+                  }}
+                  disabled={loading || dagRun.status === Status.Running}
+                >
+                  <Play className="h-4 w-4 text-success" />
+                </Button>
+              </div>
               <Dialog open={showDialog} onOpenChange={setShowDialog}>
                 <DialogContent>
                   <DialogHeader>
@@ -871,6 +930,14 @@ function NodeStatusTableRow({
           dismissModal={() => setShowStatusModal(false)}
           step={node.step}
           onSubmit={handleStatusUpdate}
+        />
+
+        {/* Approval Modal for wait steps */}
+        <ApprovalModal
+          visible={showApprovalModal}
+          dismissModal={() => setShowApprovalModal(false)}
+          step={node.step}
+          onApprove={handleApprove}
         />
       </>
     );
@@ -1087,7 +1154,18 @@ function NodeStatusTableRow({
       )}
 
       {dagRunId && (
-        <div className="flex justify-end mt-4">
+        <div className="flex justify-end mt-4 gap-2">
+          {/* Approve button for waiting steps */}
+          {node.status === NodeStatus.Waiting && (
+            <button
+              className="p-2 rounded-full hover:bg-warning/20 bg-warning/10"
+              title="Approve this step"
+              onClick={() => setShowApprovalModal(true)}
+            >
+              <Check className="h-6 w-6 text-warning" />
+            </button>
+          )}
+          {/* Retry button */}
           <button
             className="p-2 rounded-full hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             title="Retry from this step"
@@ -1129,6 +1207,14 @@ function NodeStatusTableRow({
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          {/* Approval Modal for wait steps */}
+          <ApprovalModal
+            visible={showApprovalModal}
+            dismissModal={() => setShowApprovalModal(false)}
+            step={node.step}
+            onApprove={handleApprove}
+          />
         </div>
       )}
     </div>
