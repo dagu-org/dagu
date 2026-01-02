@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
@@ -17,12 +18,13 @@ type SimpleProgressDisplay struct {
 	dag      *core.DAG
 	dagRunID string
 
-	mu            sync.Mutex
-	total         int
-	completed     int
+	mu             sync.Mutex
+	total          int
+	completed      int
 	completedNodes map[string]bool // track which nodes are already counted
-	status        core.Status
-	spinnerIndex  int
+	status         core.Status
+	spinnerIndex   int
+	startTime      time.Time
 
 	stopCh chan struct{}
 	done   chan struct{}
@@ -86,6 +88,10 @@ func (p *SimpleProgressDisplay) SetDAGRunInfo(dagRunID, _ string) {
 func (p *SimpleProgressDisplay) run() {
 	defer close(p.done)
 
+	p.mu.Lock()
+	p.startTime = time.Now()
+	p.mu.Unlock()
+
 	// Print header
 	p.printHeader()
 
@@ -120,6 +126,11 @@ func (p *SimpleProgressDisplay) printHeader() {
 	fmt.Fprintf(os.Stderr, "Running %s (run id = %s)\n", dagName, runID)
 }
 
+// gray returns text in gray color (ANSI 256 color 245).
+func gray(s string) string {
+	return "\033[38;5;245m" + s + "\033[0m"
+}
+
 func (p *SimpleProgressDisplay) render() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -132,8 +143,10 @@ func (p *SimpleProgressDisplay) render() {
 		percent = (p.completed * 100) / p.total
 	}
 
+	elapsed := stringutil.FormatDuration(time.Since(p.startTime))
+
 	// Use \r to overwrite the line, pad with spaces to clear previous content
-	fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps)   ", spinner, percent, p.completed, p.total)
+	fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps) %s   ", spinner, percent, p.completed, p.total, gray(elapsed))
 }
 
 func (p *SimpleProgressDisplay) printFinal() {
@@ -150,6 +163,8 @@ func (p *SimpleProgressDisplay) printFinal() {
 		icon = "✗"
 	}
 
+	elapsed := stringutil.FormatDuration(time.Since(p.startTime))
+
 	// Clear line and print final status
-	fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps)   \n", icon, percent, p.completed, p.total)
+	fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps) %s   \n", icon, percent, p.completed, p.total, gray(elapsed))
 }
