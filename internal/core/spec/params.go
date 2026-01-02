@@ -57,7 +57,7 @@ func validateParams(paramPairs []paramPair, schema *jsonschema.Resolved) ([]para
 }
 
 func overrideParams(paramPairs *[]paramPair, override []paramPair) {
-	// Override the default parameters with the command line parameters (and satisfy linter :P)
+	// Override the default parameters with the command line parameters
 	pairsIndex := make(map[string]int)
 	for i, paramPair := range *paramPairs {
 		if paramPair.Name != "" {
