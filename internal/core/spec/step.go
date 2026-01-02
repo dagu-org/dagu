@@ -976,6 +976,14 @@ func validateLLM(result *core.Step) error {
 			fmt.Errorf("executor type %q does not support llm field", result.ExecutorConfig.Type),
 		)
 	}
+	// Provider is required
+	if result.LLM.Provider == "" {
+		return core.NewValidationError(
+			"llm.provider",
+			result.LLM.Provider,
+			fmt.Errorf("provider is required"),
+		)
+	}
 	return nil
 }
 

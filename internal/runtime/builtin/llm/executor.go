@@ -38,14 +38,10 @@ func newLLMExecutor(_ context.Context, step core.Step) (executor.Executor, error
 
 	cfg := step.LLM
 
-	// Determine provider type
-	providerType := llmpkg.ProviderOpenAI // Default
-	if cfg.Provider != "" {
-		var err error
-		providerType, err = llmpkg.ParseProviderType(cfg.Provider)
-		if err != nil {
-			return nil, fmt.Errorf("invalid provider: %w", err)
-		}
+	// Parse provider type (required field, validated in spec)
+	providerType, err := llmpkg.ParseProviderType(cfg.Provider)
+	if err != nil {
+		return nil, fmt.Errorf("invalid provider: %w", err)
 	}
 
 	// Build provider config
