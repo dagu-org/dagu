@@ -39,9 +39,10 @@ func (s Status) String() string {
 	}
 }
 
-// IsActive checks if the status is active.
+// IsActive checks if the status is active (not yet completed).
+// This includes Running, Queued, and Wait (waiting for human approval).
 func (s Status) IsActive() bool {
-	return s == Running || s == Queued
+	return s == Running || s == Queued || s == Wait
 }
 
 // IsSuccess checks if the status indicates a successful execution.
