@@ -30,19 +30,28 @@ var (
 	ErrDeadlockDetected = errors.New("deadlock detected: no runnable nodes but DAG not finished")
 )
 
+// LLMMessagesHandler handles LLM conversation messages for persistence.
+type LLMMessagesHandler interface {
+	// ReadMessages reads the LLM conversation messages.
+	ReadMessages(ctx context.Context) (*execution.LLMMessages, error)
+	// WriteMessages writes the LLM conversation messages.
+	WriteMessages(ctx context.Context, messages *execution.LLMMessages) error
+}
+
 // Runner runs a plan of steps.
 type Runner struct {
-	logDir        string
-	maxActiveRuns int
-	timeout       time.Duration
-	delay         time.Duration
-	dry           bool
-	onInit        *core.Step
-	onExit        *core.Step
-	onSuccess     *core.Step
-	onFailure     *core.Step
-	onCancel      *core.Step
-	dagRunID      string
+	logDir          string
+	maxActiveRuns   int
+	timeout         time.Duration
+	delay           time.Duration
+	dry             bool
+	onInit          *core.Step
+	onExit          *core.Step
+	onSuccess       *core.Step
+	onFailure       *core.Step
+	onCancel        *core.Step
+	dagRunID        string
+	messagesHandler LLMMessagesHandler
 
 	canceled  int32
 	mu        sync.RWMutex
@@ -65,33 +74,35 @@ type Runner struct {
 
 func New(cfg *Config) *Runner {
 	return &Runner{
-		logDir:        cfg.LogDir,
-		maxActiveRuns: cfg.MaxActiveSteps,
-		timeout:       cfg.Timeout,
-		delay:         cfg.Delay,
-		dry:           cfg.Dry,
-		onInit:        cfg.OnInit,
-		onExit:        cfg.OnExit,
-		onSuccess:     cfg.OnSuccess,
-		onFailure:     cfg.OnFailure,
-		onCancel:      cfg.OnCancel,
-		dagRunID:      cfg.DAGRunID,
-		pause:         time.Millisecond * 100,
+		logDir:          cfg.LogDir,
+		maxActiveRuns:   cfg.MaxActiveSteps,
+		timeout:         cfg.Timeout,
+		delay:           cfg.Delay,
+		dry:             cfg.Dry,
+		onInit:          cfg.OnInit,
+		onExit:          cfg.OnExit,
+		onSuccess:       cfg.OnSuccess,
+		onFailure:       cfg.OnFailure,
+		onCancel:        cfg.OnCancel,
+		dagRunID:        cfg.DAGRunID,
+		messagesHandler: cfg.MessagesHandler,
+		pause:           time.Millisecond * 100,
 	}
 }
 
 type Config struct {
-	LogDir         string
-	MaxActiveSteps int
-	Timeout        time.Duration
-	Delay          time.Duration
-	Dry            bool
-	OnInit         *core.Step
-	OnExit         *core.Step
-	OnSuccess      *core.Step
-	OnFailure      *core.Step
-	OnCancel       *core.Step
-	DAGRunID       string
+	LogDir          string
+	MaxActiveSteps  int
+	Timeout         time.Duration
+	Delay           time.Duration
+	Dry             bool
+	OnInit          *core.Step
+	OnExit          *core.Step
+	OnSuccess       *core.Step
+	OnFailure       *core.Step
+	OnCancel        *core.Step
+	DAGRunID        string
+	MessagesHandler LLMMessagesHandler
 }
 
 // Run runs the plan of steps.
@@ -376,6 +387,9 @@ func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, p
 
 	ctx = node.SetupEnv(ctx)
 
+	// Setup LLM messages from dependencies before execution
+	r.setupLLMMessages(ctx, plan, node)
+
 ExecRepeat: // repeat execution
 	for !r.isCanceled() {
 		logger.Debug(ctx, "Executing node loop")
@@ -409,6 +423,11 @@ ExecRepeat: // repeat execution
 		node.SetStatus(core.NodeSucceeded)
 	}
 
+	// Save LLM messages after successful execution
+	if node.State().Status == core.NodeSucceeded {
+		r.saveLLMMessages(ctx, node)
+	}
+
 	if err := r.teardownNode(node); err != nil {
 		r.setLastError(err)
 		node.SetStatus(core.NodeFailed)
@@ -438,6 +457,70 @@ func (r *Runner) teardownNode(node *Node) error {
 		return node.Teardown()
 	}
 	return nil
+}
+
+// setupLLMMessages loads and merges LLM messages from dependent steps.
+func (r *Runner) setupLLMMessages(ctx context.Context, plan *Plan, node *Node) {
+	if r.messagesHandler == nil {
+		return
+	}
+
+	step := node.Step()
+	if step.ExecutorConfig.Type != core.ExecutorTypeLLM {
+		return
+	}
+
+	// Read all messages from handler
+	messages, err := r.messagesHandler.ReadMessages(ctx)
+	if err != nil {
+		logger.Warn(ctx, "Failed to read LLM messages", tag.Error(err))
+		return
+	}
+
+	if messages == nil {
+		return
+	}
+
+	// Merge messages from dependencies
+	inherited := messages.MergeFromDependencies(step.Depends)
+	if len(inherited) > 0 {
+		node.SetInheritedMessages(inherited)
+	}
+}
+
+// saveLLMMessages saves the node's LLM messages to the handler.
+func (r *Runner) saveLLMMessages(ctx context.Context, node *Node) {
+	if r.messagesHandler == nil {
+		return
+	}
+
+	step := node.Step()
+	if step.ExecutorConfig.Type != core.ExecutorTypeLLM {
+		return
+	}
+
+	savedMsgs := node.GetSavedMessages()
+	if len(savedMsgs) == 0 {
+		return
+	}
+
+	// Read existing messages
+	messages, err := r.messagesHandler.ReadMessages(ctx)
+	if err != nil {
+		logger.Warn(ctx, "Failed to read LLM messages", tag.Error(err))
+		messages = execution.NewLLMMessages()
+	}
+	if messages == nil {
+		messages = execution.NewLLMMessages()
+	}
+
+	// Update with this step's messages
+	messages.SetStepMessages(step.Name, savedMsgs)
+
+	// Write back
+	if err := r.messagesHandler.WriteMessages(ctx, messages); err != nil {
+		logger.Warn(ctx, "Failed to write LLM messages", tag.Error(err))
+	}
 }
 
 func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) context.Context {

@@ -156,6 +156,11 @@ type DAGRunAttempt interface {
 	// ReadOutputs reads the collected step outputs for the dag-run.
 	// Returns nil if no outputs file exists or if the file is in v1 format.
 	ReadOutputs(ctx context.Context) (*DAGRunOutputs, error)
+	// WriteMessages writes the LLM conversation messages for the dag-run.
+	WriteMessages(ctx context.Context, messages *LLMMessages) error
+	// ReadMessages reads the LLM conversation messages for the dag-run.
+	// Returns nil if no messages exist.
+	ReadMessages(ctx context.Context) (*LLMMessages, error)
 }
 
 // Errors for RunRef parsing

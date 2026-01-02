@@ -38,6 +38,9 @@ const DAGDefinition = "dag.json"
 // OutputsFile is the name of the file where collected step outputs are stored.
 const OutputsFile = "outputs.json"
 
+// MessagesFile is the name of the file where LLM conversation messages are stored.
+const MessagesFile = "messages.json"
+
 // CancelRequestedFlag is a special flag used to indicate that a cancel request has been made.
 const CancelRequestedFlag = "CANCEL_REQUESTED"
 
@@ -575,4 +578,47 @@ func (att *Attempt) ReadOutputs(_ context.Context) (*execution.DAGRunOutputs, er
 	}
 
 	return &outputs, nil
+}
+
+// WriteMessages writes the LLM conversation messages to messages.json.
+func (att *Attempt) WriteMessages(_ context.Context, messages *execution.LLMMessages) error {
+	if messages == nil || len(messages.Steps) == 0 {
+		return nil
+	}
+
+	dir := filepath.Dir(att.file)
+	messagesFile := filepath.Join(dir, MessagesFile)
+
+	data, err := json.MarshalIndent(messages, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal messages: %w", err)
+	}
+
+	if err := os.WriteFile(messagesFile, data, 0600); err != nil {
+		return fmt.Errorf("failed to write messages file: %w", err)
+	}
+
+	return nil
+}
+
+// ReadMessages reads the LLM conversation messages from messages.json.
+// Returns nil if the file does not exist.
+func (att *Attempt) ReadMessages(_ context.Context) (*execution.LLMMessages, error) {
+	dir := filepath.Dir(att.file)
+	messagesFile := filepath.Join(dir, MessagesFile)
+
+	data, err := os.ReadFile(messagesFile) //nolint:gosec
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read messages file: %w", err)
+	}
+
+	var messages execution.LLMMessages
+	if err := json.Unmarshal(data, &messages); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal messages: %w", err)
+	}
+
+	return &messages, nil
 }

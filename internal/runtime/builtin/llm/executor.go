@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	llmpkg "github.com/dagu-org/dagu/internal/llm"
 	// Import all providers to register them
 	_ "github.com/dagu-org/dagu/internal/llm/allproviders"
@@ -19,13 +20,13 @@ var _ executor.Executor = (*Executor)(nil)
 
 // Executor implements the executor.Executor interface for LLM steps.
 type Executor struct {
-	stdout     io.Writer
-	stderr     io.Writer
-	step       core.Step
-	provider   llmpkg.Provider
-	messages   []llmpkg.Message
-	historyDir string
-	depends    []string
+	stdout            io.Writer
+	stderr            io.Writer
+	step              core.Step
+	provider          llmpkg.Provider
+	messages          []llmpkg.Message
+	inheritedMessages []llmpkg.Message
+	savedMessages     []llmpkg.Message
 }
 
 // newLLMExecutor creates a new LLM executor from a step configuration.
@@ -91,7 +92,6 @@ func newLLMExecutor(_ context.Context, step core.Step) (executor.Executor, error
 		step:     step,
 		provider: provider,
 		messages: messages,
-		depends:  step.Depends,
 	}, nil
 }
 
@@ -110,37 +110,58 @@ func (e *Executor) Kill(_ os.Signal) error {
 	return nil
 }
 
-// SetHistoryDir sets the directory for history files.
-func (e *Executor) SetHistoryDir(dir string) {
-	e.historyDir = dir
+// SetInheritedMessages sets the messages inherited from dependent steps.
+func (e *Executor) SetInheritedMessages(messages []execution.LLMMessage) {
+	e.inheritedMessages = toLLMMessages(messages)
+}
+
+// GetMessages returns the complete conversation messages after execution.
+// This includes inherited messages, step messages, and the assistant response.
+func (e *Executor) GetMessages() []execution.LLMMessage {
+	return toExecutionMessages(e.savedMessages)
+}
+
+// toLLMMessages converts execution.LLMMessage to llmpkg.Message.
+func toLLMMessages(msgs []execution.LLMMessage) []llmpkg.Message {
+	result := make([]llmpkg.Message, len(msgs))
+	for i, msg := range msgs {
+		result[i] = llmpkg.Message{
+			Role:    llmpkg.Role(msg.Role),
+			Content: msg.Content,
+		}
+	}
+	return result
+}
+
+// toExecutionMessages converts llmpkg.Message to execution.LLMMessage.
+func toExecutionMessages(msgs []llmpkg.Message) []execution.LLMMessage {
+	result := make([]execution.LLMMessage, len(msgs))
+	for i, msg := range msgs {
+		result[i] = execution.LLMMessage{
+			Role:    string(msg.Role),
+			Content: msg.Content,
+		}
+	}
+	return result
 }
 
 // Run executes the LLM request.
 func (e *Executor) Run(ctx context.Context) error {
 	cfg := e.step.LLM
 
-	// Start with messages from the step
-	allMessages := make([]llmpkg.Message, 0, len(e.messages))
+	// Build complete message list
+	var allMessages []llmpkg.Message
 
-	// Load history from dependent steps if enabled
-	if cfg.HistoryEnabled() && e.historyDir != "" && len(e.depends) > 0 {
-		// Load history from the first dependency that has history
-		// (dependencies are ordered, so we use the last one in the chain)
-		for i := len(e.depends) - 1; i >= 0; i-- {
-			depHistory, err := ReadDependentHistory(e.historyDir, e.depends[i])
-			if err != nil {
-				_, _ = fmt.Fprintf(e.stderr, "Warning: failed to read history from %s: %v\n", e.depends[i], err)
-				continue
-			}
-			if len(depHistory) > 0 {
-				allMessages = append(allMessages, depHistory...)
-				break
-			}
-		}
+	// Add inherited messages if history is enabled
+	if cfg.HistoryEnabled() && len(e.inheritedMessages) > 0 {
+		allMessages = append(allMessages, e.inheritedMessages...)
 	}
 
 	// Append this step's messages
 	allMessages = append(allMessages, e.messages...)
+
+	// Deduplicate system messages (keep only the first one)
+	allMessages = deduplicateSystemMessages(allMessages)
 
 	// Build chat request
 	req := &llmpkg.ChatRequest{
@@ -181,21 +202,37 @@ func (e *Executor) Run(ctx context.Context) error {
 		_, _ = fmt.Fprintln(e.stdout, responseContent)
 	}
 
-	// Save history if enabled
-	if cfg.HistoryEnabled() && e.historyDir != "" {
-		// Append assistant response to messages
-		allMessages = append(allMessages, llmpkg.Message{
+	// Save messages (including assistant response) for persistence
+	if cfg.HistoryEnabled() {
+		e.savedMessages = append(allMessages, llmpkg.Message{
 			Role:    llmpkg.RoleAssistant,
 			Content: responseContent,
 		})
-
-		hf := NewHistoryFile(e.historyDir, e.step.Name)
-		if err := hf.Write(allMessages); err != nil {
-			_, _ = fmt.Fprintf(e.stderr, "Warning: failed to save history: %v\n", err)
-		}
 	}
 
 	return nil
+}
+
+// deduplicateSystemMessages keeps only the first system message.
+func deduplicateSystemMessages(messages []llmpkg.Message) []llmpkg.Message {
+	if len(messages) == 0 {
+		return nil
+	}
+
+	result := make([]llmpkg.Message, 0, len(messages))
+	seenSystem := false
+
+	for _, msg := range messages {
+		if msg.Role == llmpkg.RoleSystem {
+			if seenSystem {
+				continue
+			}
+			seenSystem = true
+		}
+		result = append(result, msg)
+	}
+
+	return result
 }
 
 func init() {

@@ -386,3 +386,16 @@ func (m *mockDAGRunAttempt) ReadOutputs(ctx context.Context) (*execution.DAGRunO
 	}
 	return args.Get(0).(*execution.DAGRunOutputs), args.Error(1)
 }
+
+func (m *mockDAGRunAttempt) WriteMessages(ctx context.Context, messages *execution.LLMMessages) error {
+	args := m.Called(ctx, messages)
+	return args.Error(0)
+}
+
+func (m *mockDAGRunAttempt) ReadMessages(ctx context.Context) (*execution.LLMMessages, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*execution.LLMMessages), args.Error(1)
+}

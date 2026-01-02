@@ -40,6 +40,10 @@ type Node struct {
 	done         atomic.Bool
 	retryPolicy  RetryPolicy
 	cmdEvaluated atomic.Bool
+
+	// LLM messages support
+	inheritedMessages []execution.LLMMessage
+	savedMessages     []execution.LLMMessage
 }
 
 func NewNode(step core.Step, state NodeState) *Node {
@@ -69,6 +73,20 @@ func (n *Node) StdoutFile() string {
 	defer n.mu.RUnlock()
 
 	return n.outputs.StdoutFile()
+}
+
+// SetInheritedMessages sets the LLM messages inherited from dependent steps.
+func (n *Node) SetInheritedMessages(messages []execution.LLMMessage) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.inheritedMessages = messages
+}
+
+// GetSavedMessages returns the LLM messages saved after execution.
+func (n *Node) GetSavedMessages() []execution.LLMMessage {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.savedMessages
 }
 
 func (n *Node) ShouldMarkSuccess(ctx context.Context) bool {
@@ -157,6 +175,13 @@ func (n *Node) Execute(ctx context.Context) error {
 		return err
 	}
 
+	// Set inherited LLM messages if available
+	if len(n.inheritedMessages) > 0 {
+		if setter, ok := cmd.(interface{ SetInheritedMessages([]execution.LLMMessage) }); ok {
+			setter.SetInheritedMessages(n.inheritedMessages)
+		}
+	}
+
 	flusher := n.startOutputFlusher()
 	defer func() {
 		n.stopOutputFlusher(flusher)
@@ -165,6 +190,13 @@ func (n *Node) Execute(ctx context.Context) error {
 	exitCode, err := n.runCommand(ctx, cmd, stepTimeout)
 	n.SetError(err)
 	n.SetExitCode(exitCode)
+
+	// Capture LLM messages after execution
+	if getter, ok := cmd.(interface{ GetMessages() []execution.LLMMessage }); ok {
+		n.mu.Lock()
+		n.savedMessages = getter.GetMessages()
+		n.mu.Unlock()
+	}
 
 	if err := n.captureOutput(ctx); err != nil {
 		return err
