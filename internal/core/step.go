@@ -325,4 +325,7 @@ const (
 
 	// ExecutorTypeParallel is the executor type for parallel steps.
 	ExecutorTypeParallel = "parallel"
+
+	// ExecutorTypeWait is the executor type for wait (HITL) steps.
+	ExecutorTypeWait = "wait"
 )

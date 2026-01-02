@@ -198,6 +198,18 @@ func (d *DAG) HasTag(tag string) bool {
 	return false
 }
 
+// HasWaitSteps returns true if the DAG contains any wait executor steps.
+// DAGs with wait steps cannot be dispatched to workers because
+// wait steps require local storage access for approval.
+func (d *DAG) HasWaitSteps() bool {
+	for _, step := range d.Steps {
+		if step.ExecutorConfig.Type == ExecutorTypeWait {
+			return true
+		}
+	}
+	return false
+}
+
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
 func (d *DAG) SockAddr(dagRunID string) string {

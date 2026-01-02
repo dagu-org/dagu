@@ -877,3 +877,58 @@ func TestDAG_GetName(t *testing.T) {
 		assert.Equal(t, "", dag.GetName())
 	})
 }
+
+func TestDAG_HasWaitSteps(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		steps    []core.Step
+		expected bool
+	}{
+		{
+			name:     "empty steps returns false",
+			steps:    []core.Step{},
+			expected: false,
+		},
+		{
+			name: "no wait steps returns false",
+			steps: []core.Step{
+				{Name: "step1", ExecutorConfig: core.ExecutorConfig{Type: "command"}},
+				{Name: "step2", ExecutorConfig: core.ExecutorConfig{Type: "dag"}},
+			},
+			expected: false,
+		},
+		{
+			name: "has wait step returns true",
+			steps: []core.Step{
+				{Name: "step1", ExecutorConfig: core.ExecutorConfig{Type: "command"}},
+				{Name: "step2", ExecutorConfig: core.ExecutorConfig{Type: "wait"}},
+			},
+			expected: true,
+		},
+		{
+			name: "only wait step returns true",
+			steps: []core.Step{
+				{Name: "step1", ExecutorConfig: core.ExecutorConfig{Type: "wait"}},
+			},
+			expected: true,
+		},
+		{
+			name: "empty executor type is not wait",
+			steps: []core.Step{
+				{Name: "step1", ExecutorConfig: core.ExecutorConfig{Type: ""}},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dag := &core.DAG{Steps: tt.steps}
+			result := dag.HasWaitSteps()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

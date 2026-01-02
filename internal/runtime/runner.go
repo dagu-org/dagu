@@ -626,8 +626,18 @@ func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) con
 }
 
 func (r *Runner) setupEnvironEventHandler(ctx context.Context, plan *Plan, node *Node) context.Context {
+	// Preserve any extra env vars from the incoming context (e.g., DAG_WAITING_STEPS)
+	existingEnv := GetEnv(ctx)
+
 	env := NewPlanEnv(ctx, node.Step(), plan)
 	env.Envs[execution.EnvKeyDAGRunStatus] = r.Status(ctx, plan).String()
+
+	// Copy extra env vars from existing context that aren't standard step envs
+	for k, v := range existingEnv.Envs {
+		if _, exists := env.Envs[k]; !exists {
+			env.Envs[k] = v
+		}
+	}
 
 	// get all output variables and approval inputs
 	for _, node := range plan.Nodes() {
