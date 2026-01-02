@@ -77,6 +77,13 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
       textColorClass = 'text-[#f59e0b]';
       statusIcon = '◐'; // Half-filled circle
       break;
+    case NodeStatus.Waiting: // waiting for approval -> amber/yellow
+      bgColorClass = 'bg-[rgba(245,158,11,0.15)]';
+      borderColorClass = 'border-[#f59e0b]';
+      textColorClass = 'text-[#d97706]';
+      pulseAnimation = 'animate-pulse';
+      statusIcon = '⏸'; // Pause icon
+      break;
     default: // Fallback to gray
       bgColorClass =
         'bg-[rgba(128,128,128,0.1)],169,169,0.2)]';

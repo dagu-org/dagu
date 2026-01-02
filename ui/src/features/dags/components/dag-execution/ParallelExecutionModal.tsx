@@ -27,6 +27,7 @@ const STATUS_DISPLAY_LABELS: Record<StatusLabel, string> = {
   [StatusLabel.succeeded]: 'Succeeded',
   [StatusLabel.queued]: 'Queued',
   [StatusLabel.partially_succeeded]: 'Partial',
+  [StatusLabel.waiting]: 'Waiting',
 };
 
 type Props = {

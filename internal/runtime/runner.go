@@ -184,6 +184,13 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 			activeReadyCh = readyCh
 		}
 
+		// Check for Wait condition: if no nodes are running and we're waiting for approval,
+		// exit gracefully to allow the agent process to terminate.
+		if running == 0 && r.isWaitingForApproval(plan) {
+			logger.Info(ctx, "DAG entering wait status - waiting for human approval")
+			break
+		}
+
 		// Deadlock detection: if no nodes are running, no nodes are ready, and the graph is not finished,
 		// then we are stuck (nodes are waiting for dependencies that will never be satisfied).
 		if running == 0 && len(activeReadyCh) == 0 && !plan.CheckFinished() {
@@ -277,6 +284,11 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 
 	case core.Aborted:
 		eventHandlers = append(eventHandlers, core.HandlerOnCancel)
+
+	case core.Wait:
+		// Wait status - skip all handlers, DAG will resume after approval
+		logger.Info(ctx, "DAG waiting for approval, skipping event handlers")
+		return r.lastError
 
 	case core.NotStarted, core.Running, core.Queued:
 		// These states should not occur at this point
@@ -654,6 +666,12 @@ func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
 		return core.Running
 	}
 
+	// Check for Wait condition before other terminal states.
+	// This occurs when all active work is done but nodes are waiting for approval.
+	if r.isWaitingForApproval(p) {
+		return core.Wait
+	}
+
 	if r.isPartialSuccess(ctx, p) {
 		return core.PartiallySucceeded
 	}
@@ -663,6 +681,30 @@ func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
 	}
 
 	return core.Succeeded
+}
+
+// isWaitingForApproval checks if the DAG should enter Wait status.
+// Returns true when:
+// 1. There are no running nodes
+// 2. There are no pending (NotStarted) nodes that could run
+// 3. At least one node is in NodeWaiting status
+func (r *Runner) isWaitingForApproval(p *Plan) bool {
+	hasWaitingNode := false
+
+	for _, node := range p.Nodes() {
+		status := node.State().Status
+
+		// If any node is still running or could still start, not in wait state
+		if status == core.NodeRunning || status == core.NodeNotStarted {
+			return false
+		}
+
+		if status == core.NodeWaiting {
+			hasWaitingNode = true
+		}
+	}
+
+	return hasWaitingNode
 }
 
 func (r *Runner) isError() bool {
@@ -746,6 +788,14 @@ func isReady(ctx context.Context, plan *Plan, node *Node) bool {
 				tag.Step(node.Name()),
 				tag.Dependency(dep.Name()),
 				tag.Status(dep.State().Status.String()),
+			)
+			ready = false
+
+		case core.NodeWaiting:
+			// Dependency is waiting for human approval - block dependent nodes
+			logger.Debug(ctx, "Dependency waiting for approval",
+				tag.Step(node.Name()),
+				tag.Dependency(dep.Name()),
 			)
 			ready = false
 

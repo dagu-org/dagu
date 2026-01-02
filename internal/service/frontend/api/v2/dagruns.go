@@ -485,6 +485,116 @@ func (a *API) UpdateDAGRunStepStatus(ctx context.Context, request api.UpdateDAGR
 	return &api.UpdateDAGRunStepStatus200Response{}, nil
 }
 
+// ApproveDAGRunStep approves a waiting step for HITL (Human-in-the-Loop).
+func (a *API) ApproveDAGRunStep(ctx context.Context, request api.ApproveDAGRunStepRequestObject) (api.ApproveDAGRunStepResponseObject, error) {
+	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
+
+	ref := execution.NewDAGRunRef(request.Name, request.DagRunId)
+	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
+	if err != nil {
+		return &api.ApproveDAGRunStep404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
+		}, nil
+	}
+
+	// Find the step to approve
+	stepIdx := -1
+	for idx, n := range dagStatus.Nodes {
+		if n.Step.Name == request.StepName {
+			stepIdx = idx
+			break
+		}
+	}
+	if stepIdx < 0 {
+		return &api.ApproveDAGRunStep404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, request.Name),
+		}, nil
+	}
+
+	// Verify the step is in Waiting status
+	if dagStatus.Nodes[stepIdx].Status != core.NodeWaiting {
+		return &api.ApproveDAGRunStep400JSONResponse{
+			Code:    api.ErrorCodeBadRequest,
+			Message: fmt.Sprintf("step %s is not waiting for approval (status: %s)", request.StepName, dagStatus.Nodes[stepIdx].Status),
+		}, nil
+	}
+
+	// TODO: Validate required inputs from wait step config
+
+	// Update the node status to Succeeded
+	dagStatus.Nodes[stepIdx].Status = core.NodeSucceeded
+	dagStatus.Nodes[stepIdx].ApprovedAt = time.Now().Format(time.RFC3339)
+	if request.Body != nil && request.Body.Inputs != nil {
+		dagStatus.Nodes[stepIdx].ApprovalInputs = *request.Body.Inputs
+	}
+
+	// Save the updated status
+	if err := a.dagRunMgr.UpdateStatus(ctx, ref, *dagStatus); err != nil {
+		return nil, fmt.Errorf("error updating status: %w", err)
+	}
+
+	// Check if DAG should be resumed (no more waiting steps blocking)
+	shouldResume := true
+	for _, n := range dagStatus.Nodes {
+		if n.Status == core.NodeWaiting {
+			shouldResume = false
+			break
+		}
+	}
+
+	if shouldResume {
+		// Re-enqueue the DAG run for execution
+		attempt, err := a.dagRunStore.FindAttempt(ctx, ref)
+		if err != nil {
+			logger.Error(ctx, "Failed to find attempt for resume", tag.Error(err))
+			return &api.ApproveDAGRunStep200JSONResponse{
+				DagRunId: request.DagRunId,
+				StepName: request.StepName,
+				Resumed:  false,
+			}, nil
+		}
+
+		dag, err := attempt.ReadDAG(ctx)
+		if err != nil {
+			logger.Error(ctx, "Failed to read DAG for resume", tag.Error(err))
+			return &api.ApproveDAGRunStep200JSONResponse{
+				DagRunId: request.DagRunId,
+				StepName: request.StepName,
+				Resumed:  false,
+			}, nil
+		}
+
+		// Use retry to resume the DAG from where it left off
+		retrySpec := a.subCmdBuilder.Retry(dag, request.DagRunId, "")
+		if err := runtime.Start(ctx, retrySpec); err != nil {
+			logger.Error(ctx, "Failed to resume DAG", tag.Error(err))
+			return &api.ApproveDAGRunStep200JSONResponse{
+				DagRunId: request.DagRunId,
+				StepName: request.StepName,
+				Resumed:  false,
+			}, nil
+		}
+
+		logger.Info(ctx, "DAG resumed after approval",
+			slog.String("dagRunId", request.DagRunId),
+			slog.String("step", request.StepName),
+		)
+	}
+
+	return &api.ApproveDAGRunStep200JSONResponse{
+		DagRunId: request.DagRunId,
+		StepName: request.StepName,
+		Resumed:  shouldResume,
+	}, nil
+}
+
 // GetDAGRunDetails implements api.StrictServerInterface.
 func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetailsRequestObject) (api.GetDAGRunDetailsResponseObject, error) {
 	dagName := request.Name
@@ -724,6 +834,7 @@ var nodeStatusMapping = map[api.NodeStatus]core.NodeStatus{
 	api.NodeStatusAborted:    core.NodeAborted,
 	api.NodeStatusSuccess:    core.NodeSucceeded,
 	api.NodeStatusSkipped:    core.NodeSkipped,
+	api.NodeStatusWaiting:    core.NodeWaiting,
 }
 
 func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObject) (api.RetryDAGRunResponseObject, error) {

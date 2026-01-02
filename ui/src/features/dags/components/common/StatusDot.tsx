@@ -33,6 +33,10 @@ export function StatusDot({ status, statusLabel }: Props) {
     case Status.PartialSuccess:
       bgColor = 'bg-[#ea580c]';
       break;
+    case Status.Wait:
+      bgColor = 'bg-[#f59e0b]';
+      animation = 'animate-pulse';
+      break;
     default:
       bgColor = 'bg-[gray]';
   }

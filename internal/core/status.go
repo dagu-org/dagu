@@ -11,6 +11,7 @@ const (
 	Succeeded
 	Queued
 	PartiallySucceeded
+	Wait
 )
 
 // String returns the canonical lowercase token used across APIs, logs, and
@@ -31,6 +32,8 @@ func (s Status) String() string {
 		return "partially_succeeded"
 	case NotStarted:
 		return "not_started"
+	case Wait:
+		return "waiting"
 	default:
 		return "unknown"
 	}
@@ -46,6 +49,11 @@ func (s Status) IsSuccess() bool {
 	return s == Succeeded || s == PartiallySucceeded
 }
 
+// IsWaiting checks if the status is waiting for human approval.
+func (s Status) IsWaiting() bool {
+	return s == Wait
+}
+
 // NodeStatus represents the canonical lifecycle phases for an individual node.
 type NodeStatus int
 
@@ -57,11 +65,17 @@ const (
 	NodeSucceeded
 	NodeSkipped
 	NodePartiallySucceeded
+	NodeWaiting
 )
 
 // IsSuccess checks if the node status indicates a successful execution.
 func (s NodeStatus) IsSuccess() bool {
 	return s == NodeSucceeded || s == NodePartiallySucceeded
+}
+
+// IsWaiting checks if the node status is waiting for human approval.
+func (s NodeStatus) IsWaiting() bool {
+	return s == NodeWaiting
 }
 
 // String returns the canonical lowercase token for the node lifecycle phase.
@@ -81,6 +95,8 @@ func (s NodeStatus) String() string {
 		return "partially_succeeded"
 	case NodeNotStarted:
 		return "not_started"
+	case NodeWaiting:
+		return "waiting"
 	default:
 		return "unknown"
 	}

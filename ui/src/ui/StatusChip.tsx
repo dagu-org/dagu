@@ -49,6 +49,11 @@ function StatusChip({ status, children, size = 'md' }: Props) {
       borderColorClass = 'border-[#d4946a]';
       textColorClass = 'text-[#c47a4a]';
       break;
+    case Status.Wait: // waiting for approval -> amber/yellow (attention-grabbing)
+      bgColorClass = 'bg-[rgba(245,158,11,0.15)]';
+      borderColorClass = 'border-[#f59e0b]';
+      textColorClass = 'text-[#d97706]';
+      break;
     default: // Fallback to warm gray (sepia-compatible)
       bgColorClass = 'bg-[rgba(168,160,152,0.12)]';
       borderColorClass = 'border-[#a8a098]';

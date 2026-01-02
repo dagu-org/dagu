@@ -11,4 +11,5 @@ import (
 	_ "github.com/dagu-org/dagu/internal/runtime/builtin/jq"
 	_ "github.com/dagu-org/dagu/internal/runtime/builtin/mail"
 	_ "github.com/dagu-org/dagu/internal/runtime/builtin/ssh"
+	_ "github.com/dagu-org/dagu/internal/runtime/builtin/wait"
 )

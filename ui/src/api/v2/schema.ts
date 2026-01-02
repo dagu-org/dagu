@@ -796,6 +796,26 @@ export interface paths {
         patch: operations["updateDAGRunStepStatus"];
         trace?: never;
     };
+    "/dag-runs/{name}/{dagRunId}/steps/{stepName}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a waiting step for HITL
+         * @description Approves a step that is in Waiting status, optionally providing input parameters that will be available as environment variables in subsequent steps
+         */
+        post: operations["approveDAGRunStep"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}": {
         parameters: {
             query?: never;
@@ -1099,6 +1119,22 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description Request body for approving a waiting step */
+        ApproveStepRequest: {
+            /** @description Key-value parameters to provide. These will be available as environment variables in subsequent steps. */
+            inputs?: {
+                [key: string]: string;
+            };
+        };
+        /** @description Response after approving a waiting step */
+        ApproveStepResponse: {
+            /** @description The DAG run ID */
+            dagRunId: string;
+            /** @description The approved step name */
+            stepName: string;
+            /** @description Whether the DAG run was re-enqueued for execution */
+            resumed: boolean;
+        };
         /** @description Generic error response object */
         Error: {
             code: components["schemas"]["ErrorCode"];
@@ -1271,6 +1307,7 @@ export interface components {
          *     4: "Success"
          *     5: "Queued"
          *     6: "Partial Success"
+         *     7: "Waiting for approval"
          *
          * @enum {integer}
          */
@@ -1289,6 +1326,7 @@ export interface components {
          *     4: "Success"
          *     5: "Skipped"
          *     6: "Partial Success"
+         *     7: "Waiting for approval"
          *
          * @enum {integer}
          */
@@ -4354,6 +4392,67 @@ export interface operations {
             };
         };
     };
+    approveDAGRunStep: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+                /** @description name of the step */
+                stepName: components["parameters"]["StepName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ApproveStepRequest"];
+            };
+        };
+        responses: {
+            /** @description Step approved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApproveStepResponse"];
+                };
+            };
+            /** @description Step is not in Waiting status or required inputs missing */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description DAG-run or step not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getSubDAGRunDetails: {
         parameters: {
             query?: {
@@ -5122,7 +5221,8 @@ export enum Status {
     Aborted = 3,
     Success = 4,
     Queued = 5,
-    PartialSuccess = 6
+    PartialSuccess = 6,
+    Wait = 7
 }
 export enum StatusLabel {
     not_started = "not_started",
@@ -5131,7 +5231,8 @@ export enum StatusLabel {
     aborted = "aborted",
     succeeded = "succeeded",
     queued = "queued",
-    partially_succeeded = "partially_succeeded"
+    partially_succeeded = "partially_succeeded",
+    waiting = "waiting"
 }
 export enum NodeStatus {
     NotStarted = 0,
@@ -5140,7 +5241,8 @@ export enum NodeStatus {
     Aborted = 3,
     Success = 4,
     Skipped = 5,
-    PartialSuccess = 6
+    PartialSuccess = 6,
+    Waiting = 7
 }
 export enum NodeStatusLabel {
     not_started = "not_started",
@@ -5149,7 +5251,8 @@ export enum NodeStatusLabel {
     aborted = "aborted",
     succeeded = "succeeded",
     skipped = "skipped",
-    partially_succeeded = "partially_succeeded"
+    partially_succeeded = "partially_succeeded",
+    waiting = "waiting"
 }
 export enum SchedulerInstanceStatus {
     active = "active",

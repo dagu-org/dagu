@@ -85,6 +85,7 @@ const statusColors: Record<NodeStatus, { bg: string; border: string }> = {
   [NodeStatus.Success]: { bg: '#7da87d', border: '#7da87d' },
   [NodeStatus.Skipped]: { bg: '#6b635a', border: '#6b635a' },
   [NodeStatus.PartialSuccess]: { bg: '#c4956a', border: '#c4956a' },
+  [NodeStatus.Waiting]: { bg: '#f59e0b', border: '#f59e0b' },
 };
 
 /**
