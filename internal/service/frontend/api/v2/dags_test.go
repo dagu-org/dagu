@@ -89,9 +89,8 @@ steps:
 	})
 
 	t.Run("ExecuteDAGWithJSONParams", func(t *testing.T) {
-		// This test verifies that JSON parameters are correctly parsed
-		// Bug: JSON params like {"key1": "test1", "key2": "test2"} were being
-		// tokenized by whitespace, creating spurious positional arguments
+		// This test verifies that JSON parameters are correctly parsed as named
+		// key-value pairs rather than being tokenized by whitespace.
 		spec := `
 steps:
   - name: echo_params
