@@ -84,3 +84,34 @@ func TestSimpleProgressDisplay_Interface(t *testing.T) {
 	var reporter ProgressReporter = NewSimpleProgressDisplay(dag)
 	assert.NotNil(t, reporter)
 }
+
+func TestSimpleProgressDisplay_NoDuplicateCounting(t *testing.T) {
+	dag := &core.DAG{
+		Name: "test-dag",
+		Steps: []core.Step{
+			{Name: "step1"},
+			{Name: "step2"},
+		},
+	}
+
+	display := NewSimpleProgressDisplay(dag)
+
+	// Update same node multiple times - should only count once
+	display.UpdateNode(&execution.Node{
+		Step:   core.Step{Name: "step1"},
+		Status: core.NodeSucceeded,
+	})
+	assert.Equal(t, 1, display.completed)
+
+	display.UpdateNode(&execution.Node{
+		Step:   core.Step{Name: "step1"},
+		Status: core.NodeSucceeded,
+	})
+	assert.Equal(t, 1, display.completed) // Still 1, not 2
+
+	display.UpdateNode(&execution.Node{
+		Step:   core.Step{Name: "step1"},
+		Status: core.NodeSucceeded,
+	})
+	assert.Equal(t, 1, display.completed) // Still 1, not 3
+}

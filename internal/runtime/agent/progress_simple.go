@@ -17,11 +17,12 @@ type SimpleProgressDisplay struct {
 	dag      *core.DAG
 	dagRunID string
 
-	mu           sync.Mutex
-	total        int
-	completed    int
-	status       core.Status
-	spinnerIndex int
+	mu            sync.Mutex
+	total         int
+	completed     int
+	completedNodes map[string]bool // track which nodes are already counted
+	status        core.Status
+	spinnerIndex  int
 
 	stopCh chan struct{}
 	done   chan struct{}
@@ -34,10 +35,11 @@ func NewSimpleProgressDisplay(dag *core.DAG) *SimpleProgressDisplay {
 		total = len(dag.Steps)
 	}
 	return &SimpleProgressDisplay{
-		dag:    dag,
-		total:  total,
-		stopCh: make(chan struct{}),
-		done:   make(chan struct{}),
+		dag:            dag,
+		total:          total,
+		completedNodes: make(map[string]bool),
+		stopCh:         make(chan struct{}),
+		done:           make(chan struct{}),
 	}
 }
 
@@ -57,9 +59,13 @@ func (p *SimpleProgressDisplay) UpdateNode(node *execution.Node) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	// Only count completed nodes once
 	if node.Status == core.NodeSucceeded || node.Status == core.NodeFailed ||
 		node.Status == core.NodeSkipped || node.Status == core.NodeAborted {
-		p.completed++
+		if !p.completedNodes[node.Step.Name] {
+			p.completedNodes[node.Step.Name] = true
+			p.completed++
+		}
 	}
 }
 
