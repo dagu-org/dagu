@@ -12,6 +12,22 @@ type LLMMessage struct {
 	Role string `json:"role"`
 	// Content is the message content.
 	Content string `json:"content"`
+	// Metadata contains API call metadata (only set for assistant responses).
+	Metadata *LLMMessageMetadata `json:"metadata,omitempty"`
+}
+
+// LLMMessageMetadata contains metadata about an LLM API call.
+type LLMMessageMetadata struct {
+	// Provider is the LLM provider used (openai, anthropic, etc.).
+	Provider string `json:"provider,omitempty"`
+	// Model is the model identifier used.
+	Model string `json:"model,omitempty"`
+	// PromptTokens is the number of tokens in the prompt.
+	PromptTokens int `json:"promptTokens,omitempty"`
+	// CompletionTokens is the number of tokens in the completion.
+	CompletionTokens int `json:"completionTokens,omitempty"`
+	// TotalTokens is the sum of prompt and completion tokens.
+	TotalTokens int `json:"totalTokens,omitempty"`
 }
 
 // NewLLMMessages creates a new empty LLMMessages.

@@ -184,6 +184,7 @@ func (e *Executor) Run(ctx context.Context) error {
 	}
 
 	var responseContent string
+	var usage *llmpkg.Usage
 
 	// Execute request (streaming or non-streaming)
 	if cfg.StreamEnabled() {
@@ -201,6 +202,10 @@ func (e *Executor) Run(ctx context.Context) error {
 				responseContent += event.Delta
 				_, _ = e.stdout.Write([]byte(event.Delta))
 			}
+			// Capture usage from final event
+			if event.Usage != nil {
+				usage = event.Usage
+			}
 		}
 		// Add newline after streaming response
 		_, _ = e.stdout.Write([]byte("\n"))
@@ -210,14 +215,27 @@ func (e *Executor) Run(ctx context.Context) error {
 			return fmt.Errorf("LLM request failed: %w", err)
 		}
 		responseContent = resp.Content
+		usage = &resp.Usage
 		_, _ = fmt.Fprintln(e.stdout, responseContent)
 	}
 
 	// Save messages (including assistant response) for persistence
 	if cfg.HistoryEnabled() {
+		// Build metadata for the assistant response
+		metadata := &execution.LLMMessageMetadata{
+			Provider: cfg.Provider,
+			Model:    cfg.Model,
+		}
+		if usage != nil {
+			metadata.PromptTokens = usage.PromptTokens
+			metadata.CompletionTokens = usage.CompletionTokens
+			metadata.TotalTokens = usage.TotalTokens
+		}
+
 		e.savedMessages = append(allMessages, execution.LLMMessage{
-			Role:    "assistant",
-			Content: responseContent,
+			Role:     "assistant",
+			Content:  responseContent,
+			Metadata: metadata,
 		})
 	}
 
