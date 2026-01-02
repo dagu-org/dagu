@@ -798,9 +798,20 @@ func (p *ProgressTeaDisplay) Stop() {
 		p.program.Send(FinalizeMsg{})
 		// Wait for the program to exit
 		<-p.done
+		// Comprehensive terminal reset before exiting alternate screen
+		// Disable all mouse tracking modes
+		fmt.Print("\033[?1000l") // Disable X10 mouse tracking
+		fmt.Print("\033[?1002l") // Disable button event tracking
+		fmt.Print("\033[?1003l") // Disable any event tracking
+		fmt.Print("\033[?1006l") // Disable SGR extended mouse mode
+		fmt.Print("\033[?1015l") // Disable urxvt mouse mode
+		// Disable bracketed paste mode
+		fmt.Print("\033[?2004l")
 		// Exit alternate screen buffer so tree summary can be shown
-		fmt.Print("\033[?1049l") // Exit alternate screen
-		fmt.Print("\033[?25h")   // Show cursor
+		fmt.Print("\033[?1049l")
+		// Reset character attributes and show cursor
+		fmt.Print("\033[0m")   // Reset all attributes
+		fmt.Print("\033[?25h") // Show cursor
 	}
 }
 
