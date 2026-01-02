@@ -88,6 +88,57 @@ steps:
 		_ = server.Client().Delete("/api/v2/dags/test_singleton_dag").ExpectStatus(http.StatusNoContent).Send(t)
 	})
 
+	t.Run("ExecuteDAGWithJSONParams", func(t *testing.T) {
+		// This test verifies that JSON parameters are correctly parsed
+		// Bug: JSON params like {"key1": "test1", "key2": "test2"} were being
+		// tokenized by whitespace, creating spurious positional arguments
+		spec := `
+params:
+  - key1
+  - key2
+steps:
+  - name: echo_params
+    command: echo key1=$key1, key2=$key2
+`
+		dagName := "test_json_params"
+
+		// Create the DAG
+		_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+			Name: dagName,
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		// Execute with JSON params
+		jsonParams := `{"key1": "test1", "key2": "test2"}`
+		resp := server.Client().Post("/api/v2/dags/"+dagName+"/start", api.ExecuteDAGJSONRequestBody{
+			Params: &jsonParams,
+		}).ExpectStatus(http.StatusOK).Send(t)
+
+		var execResp api.ExecuteDAG200JSONResponse
+		resp.Unmarshal(t, &execResp)
+		require.NotEmpty(t, execResp.DagRunId, "expected a non-empty dag-run ID")
+
+		// Wait for completion and get details
+		var dagRunDetails api.GetDAGDAGRunDetails200JSONResponse
+		require.Eventually(t, func() bool {
+			url := fmt.Sprintf("/api/v2/dags/%s/dag-runs/%s", dagName, execResp.DagRunId)
+			statusResp := server.Client().Get(url).ExpectStatus(http.StatusOK).Send(t)
+			statusResp.Unmarshal(t, &dagRunDetails)
+			return dagRunDetails.DagRun.Status == api.Status(core.Succeeded)
+		}, 10*time.Second, 500*time.Millisecond, "expected DAG to complete")
+
+		// Verify params do NOT contain spurious positional arguments
+		// The bug caused params to include: 1={, 2=key1, 3=:, etc.
+		require.NotNil(t, dagRunDetails.DagRun.Params, "expected params to be set")
+		params := *dagRunDetails.DagRun.Params
+		require.NotContains(t, params, "1=", "params should not contain positional arg '1='")
+		require.NotContains(t, params, "2=", "params should not contain positional arg '2='")
+		require.NotContains(t, params, "={", "params should not contain '={'")
+
+		// Clean up
+		_ = server.Client().Delete("/api/v2/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
+	})
+
 	t.Run("EnqueueDAGRunFromSpec", func(t *testing.T) {
 		spec := `
 steps:
