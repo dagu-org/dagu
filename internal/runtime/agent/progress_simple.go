@@ -17,6 +17,7 @@ var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "�
 type SimpleProgressDisplay struct {
 	dag      *core.DAG
 	dagRunID string
+	params   string
 
 	mu             sync.Mutex
 	total          int
@@ -26,8 +27,9 @@ type SimpleProgressDisplay struct {
 	spinnerIndex   int
 	startTime      time.Time
 
-	stopCh chan struct{}
-	done   chan struct{}
+	stopOnce sync.Once
+	stopCh   chan struct{}
+	done     chan struct{}
 }
 
 // NewSimpleProgressDisplay creates a new simple progress display.
@@ -50,9 +52,11 @@ func (p *SimpleProgressDisplay) Start() {
 	go p.run()
 }
 
-// Stop stops the progress display.
+// Stop stops the progress display. Safe to call multiple times.
 func (p *SimpleProgressDisplay) Stop() {
-	close(p.stopCh)
+	p.stopOnce.Do(func() {
+		close(p.stopCh)
+	})
 	<-p.done
 }
 
@@ -63,7 +67,8 @@ func (p *SimpleProgressDisplay) UpdateNode(node *execution.Node) {
 
 	// Only count completed nodes once
 	if node.Status == core.NodeSucceeded || node.Status == core.NodeFailed ||
-		node.Status == core.NodeSkipped || node.Status == core.NodeAborted {
+		node.Status == core.NodeSkipped || node.Status == core.NodeAborted ||
+		node.Status == core.NodePartiallySucceeded {
 		if !p.completedNodes[node.Step.Name] {
 			p.completedNodes[node.Step.Name] = true
 			p.completed++
@@ -79,10 +84,11 @@ func (p *SimpleProgressDisplay) UpdateStatus(status *execution.DAGRunStatus) {
 }
 
 // SetDAGRunInfo sets the DAG run ID and parameters.
-func (p *SimpleProgressDisplay) SetDAGRunInfo(dagRunID, _ string) {
+func (p *SimpleProgressDisplay) SetDAGRunInfo(dagRunID, params string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.dagRunID = dagRunID
+	p.params = params
 }
 
 func (p *SimpleProgressDisplay) run() {
@@ -123,7 +129,11 @@ func (p *SimpleProgressDisplay) printHeader() {
 		runID = "..."
 	}
 
-	fmt.Fprintf(os.Stderr, "▶ %s %s\n", dagName, gray("("+runID+")"))
+	if p.params != "" {
+		fmt.Fprintf(os.Stderr, "▶ %s %s %s\n", dagName, gray("("+runID+")"), gray("["+p.params+"]"))
+	} else {
+		fmt.Fprintf(os.Stderr, "▶ %s %s\n", dagName, gray("("+runID+")"))
+	}
 }
 
 // gray returns text in gray color (ANSI 256 color 245).
