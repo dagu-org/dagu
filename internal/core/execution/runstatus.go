@@ -22,6 +22,7 @@ func InitialStatus(dag *core.DAG) DAGRunStatus {
 		OnSuccess:     NewNodeOrNil(dag.HandlerOn.Success),
 		OnFailure:     NewNodeOrNil(dag.HandlerOn.Failure),
 		OnCancel:      NewNodeOrNil(dag.HandlerOn.Cancel),
+		OnWait:        NewNodeOrNil(dag.HandlerOn.Wait),
 		Params:        strings.Join(dag.Params, " "),
 		ParamsList:    dag.Params,
 		CreatedAt:     time.Now().UnixMilli(),
@@ -47,6 +48,7 @@ type DAGRunStatus struct {
 	OnSuccess     *Node             `json:"onSuccess,omitempty"`
 	OnFailure     *Node             `json:"onFailure,omitempty"`
 	OnCancel      *Node             `json:"onCancel,omitempty"`
+	OnWait        *Node             `json:"onWait,omitempty"`
 	CreatedAt     int64             `json:"createdAt,omitempty"`
 	QueuedAt      string            `json:"queuedAt,omitempty"`
 	StartedAt     string            `json:"startedAt,omitempty"`
@@ -89,6 +91,9 @@ func (st *DAGRunStatus) Errors() []error {
 	if st.OnCancel != nil && st.OnCancel.Error != "" {
 		errs = append(errs, fmt.Errorf("onCancel: %s", st.OnCancel.Error))
 	}
+	if st.OnWait != nil && st.OnWait.Error != "" {
+		errs = append(errs, fmt.Errorf("onWait: %s", st.OnWait.Error))
+	}
 	return errs
 }
 
@@ -113,6 +118,9 @@ func (st *DAGRunStatus) NodeByName(name string) (*Node, error) {
 	}
 	if st.OnCancel != nil && st.OnCancel.Step.Name == name {
 		return st.OnCancel, nil
+	}
+	if st.OnWait != nil && st.OnWait.Step.Name == name {
+		return st.OnWait, nil
 	}
 	return nil, fmt.Errorf("node %s not found", name)
 }

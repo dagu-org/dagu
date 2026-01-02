@@ -52,6 +52,7 @@ type Runner struct {
 	onCancel        *core.Step
 	dagRunID        string
 	messagesHandler ChatMessagesHandler
+	onWait          *core.Step
 
 	canceled  int32
 	mu        sync.RWMutex
@@ -87,6 +88,7 @@ func New(cfg *Config) *Runner {
 		dagRunID:        cfg.DAGRunID,
 		messagesHandler: cfg.MessagesHandler,
 		pause:           time.Millisecond * 100,
+		onWait:          cfg.OnWait,
 	}
 }
 
@@ -103,6 +105,7 @@ type Config struct {
 	OnCancel        *core.Step
 	DAGRunID        string
 	MessagesHandler ChatMessagesHandler
+	OnWait          *core.Step
 }
 
 // Run runs the plan of steps.
@@ -286,8 +289,33 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 		eventHandlers = append(eventHandlers, core.HandlerOnCancel)
 
 	case core.Wait:
-		// Wait status - skip all handlers, DAG will resume after approval
-		logger.Info(ctx, "DAG waiting for approval, skipping event handlers")
+		// Execute onWait handler before terminating
+		r.handlerMu.RLock()
+		handlerNode := r.handlers[core.HandlerOnWait]
+		r.handlerMu.RUnlock()
+
+		if handlerNode != nil {
+			// Set DAG_WAITING_STEPS environment variable
+			waitingSteps := r.collectWaitingStepNames(plan)
+			ctx = r.setupEnvironEventHandler(ctx, plan, handlerNode)
+			env := GetEnv(ctx).WithEnvVars("DAG_WAITING_STEPS", waitingSteps)
+			ctx = WithEnv(ctx, env)
+
+			logger.Info(ctx, "Executing onWait handler",
+				slog.String("waitingSteps", waitingSteps),
+			)
+
+			if err := r.runEventHandler(ctx, plan, handlerNode); err != nil {
+				// Log error but don't fail - notification failure shouldn't block Wait status
+				logger.Error(ctx, "onWait handler failed", tag.Error(err))
+			}
+
+			if progressCh != nil {
+				progressCh <- handlerNode
+			}
+		}
+
+		logger.Info(ctx, "DAG waiting for approval")
 		return r.lastError
 
 	case core.NotStarted, core.Running, core.Queued:
@@ -733,6 +761,17 @@ func (r *Runner) isWaitingForApproval(p *Plan) bool {
 	return hasWaitingNode
 }
 
+// collectWaitingStepNames returns a comma-separated list of step names that are in NodeWaiting status.
+func (r *Runner) collectWaitingStepNames(p *Plan) string {
+	var names []string
+	for _, node := range p.Nodes() {
+		if node.Status() == core.NodeWaiting {
+			names = append(names, node.Name())
+		}
+	}
+	return strings.Join(names, ",")
+}
+
 // canNodeRun checks if a NotStarted node could potentially run.
 // Returns false if the node is blocked by a dependency in NodeWaiting status.
 func (r *Runner) canNodeRun(p *Plan, node *Node) bool {
@@ -930,6 +969,9 @@ func (r *Runner) setup(ctx context.Context) (err error) {
 	}
 	if r.onCancel != nil {
 		r.handlers[core.HandlerOnCancel] = &Node{Data: newSafeData(NodeData{Step: *r.onCancel})}
+	}
+	if r.onWait != nil {
+		r.handlers[core.HandlerOnWait] = &Node{Data: newSafeData(NodeData{Step: *r.onWait})}
 	}
 
 	// Initialize metrics

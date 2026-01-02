@@ -122,6 +122,7 @@ type handlerOn struct {
 	Abort   *step // Step to execute on abort (canonical field)
 	Cancel  *step // Step to execute on cancel (deprecated: use Abort instead)
 	Exit    *step // Step to execute on exit
+	Wait    *step // Step to execute when DAG enters wait status (HITL)
 }
 
 // smtpConfig defines the SMTP configuration.
@@ -1275,6 +1276,13 @@ func buildHandlers(ctx BuildContext, d *dag, result *core.DAG) (core.HandlerOn, 
 	if abortStep != nil {
 		abortStep.Name = core.HandlerOnCancel.String()
 		if handlerOn.Cancel, err = abortStep.build(buildCtx); err != nil {
+			return handlerOn, err
+		}
+	}
+
+	if d.HandlerOn.Wait != nil {
+		d.HandlerOn.Wait.Name = core.HandlerOnWait.String()
+		if handlerOn.Wait, err = d.HandlerOn.Wait.build(buildCtx); err != nil {
 			return handlerOn, err
 		}
 	}

@@ -540,6 +540,7 @@ type HandlerOn struct {
 	Success *Step `json:"success,omitempty"`
 	Cancel  *Step `json:"cancel,omitempty"`
 	Exit    *Step `json:"exit,omitempty"`
+	Wait    *Step `json:"wait,omitempty"`
 }
 
 // MailOn contains the conditions to send mail.
@@ -583,6 +584,7 @@ const (
 	HandlerOnFailure HandlerType = "onFailure"
 	HandlerOnCancel  HandlerType = "onCancel"
 	HandlerOnExit    HandlerType = "onExit"
+	HandlerOnWait    HandlerType = "onWait"
 )
 
 func (h HandlerType) String() string {
