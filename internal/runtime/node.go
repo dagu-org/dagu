@@ -109,13 +109,7 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 		// Partial success is treated like success for continue on
 		return true
 
-	case core.NodeNotStarted:
-		fallthrough
-
-	case core.NodeRunning:
-		fallthrough
-
-	case core.NodeWaiting:
+	case core.NodeNotStarted, core.NodeRunning, core.NodeWaiting:
 		// Unexpected state
 		logger.Error(ctx, "Unexpected node status",
 			tag.Status(s.String()),
