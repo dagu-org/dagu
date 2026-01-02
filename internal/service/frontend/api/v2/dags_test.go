@@ -93,9 +93,6 @@ steps:
 		// Bug: JSON params like {"key1": "test1", "key2": "test2"} were being
 		// tokenized by whitespace, creating spurious positional arguments
 		spec := `
-params:
-  - key1
-  - key2
 steps:
   - name: echo_params
     command: echo key1=$key1, key2=$key2
@@ -127,12 +124,14 @@ steps:
 			return dagRunDetails.DagRun.Status == api.Status(core.Succeeded)
 		}, 10*time.Second, 500*time.Millisecond, "expected DAG to complete")
 
-		// Verify params do NOT contain spurious positional arguments
-		// The bug caused params to include: 1={, 2=key1, 3=:, etc.
+		// Verify params contain the correct key-value pairs from JSON
 		require.NotNil(t, dagRunDetails.DagRun.Params, "expected params to be set")
 		params := *dagRunDetails.DagRun.Params
-		require.NotContains(t, params, "1=", "params should not contain positional arg '1='")
-		require.NotContains(t, params, "2=", "params should not contain positional arg '2='")
+		// Should contain the named params from JSON
+		require.Contains(t, params, "key1=test1", "params should contain key1=test1")
+		require.Contains(t, params, "key2=test2", "params should contain key2=test2")
+		// Should NOT contain spurious positional args from tokenizing JSON
+		require.NotContains(t, params, "1={", "params should not contain '1={'")
 		require.NotContains(t, params, "={", "params should not contain '={'")
 
 		// Clean up
