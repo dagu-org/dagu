@@ -388,7 +388,7 @@ func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, p
 	ctx = node.SetupEnv(ctx)
 
 	// Setup LLM messages from dependencies before execution
-	r.setupLLMMessages(ctx, plan, node)
+	r.setupLLMMessages(ctx, node)
 
 ExecRepeat: // repeat execution
 	for !r.isCanceled() {
@@ -460,7 +460,7 @@ func (r *Runner) teardownNode(node *Node) error {
 }
 
 // setupLLMMessages loads and merges LLM messages from dependent steps.
-func (r *Runner) setupLLMMessages(ctx context.Context, plan *Plan, node *Node) {
+func (r *Runner) setupLLMMessages(ctx context.Context, node *Node) {
 	if r.messagesHandler == nil {
 		return
 	}
