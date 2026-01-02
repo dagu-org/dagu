@@ -137,6 +137,57 @@ steps:
 		_ = server.Client().Delete("/api/v2/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
 	})
 
+	t.Run("ExecuteDAGWithComplexJSONParam", func(t *testing.T) {
+		// This test verifies that complex/nested JSON can be passed as a single
+		// parameter value by escaping it as a JSON string within the params object.
+		spec := `
+steps:
+  - name: echo_config
+    command: echo config=$config
+`
+		dagName := "test_complex_json_param"
+
+		// Create the DAG
+		_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+			Name: dagName,
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		// Execute with complex JSON as a single field value
+		// The nested JSON is passed as an escaped string value
+		jsonParams := `{"config": "{\"db\": \"postgres\", \"port\": 5432, \"options\": {\"ssl\": true}}"}`
+		resp := server.Client().Post("/api/v2/dags/"+dagName+"/start", api.ExecuteDAGJSONRequestBody{
+			Params: &jsonParams,
+		}).ExpectStatus(http.StatusOK).Send(t)
+
+		var execResp api.ExecuteDAG200JSONResponse
+		resp.Unmarshal(t, &execResp)
+		require.NotEmpty(t, execResp.DagRunId, "expected a non-empty dag-run ID")
+
+		// Wait for completion and get details
+		var dagRunDetails api.GetDAGDAGRunDetails200JSONResponse
+		require.Eventually(t, func() bool {
+			url := fmt.Sprintf("/api/v2/dags/%s/dag-runs/%s", dagName, execResp.DagRunId)
+			statusResp := server.Client().Get(url).ExpectStatus(http.StatusOK).Send(t)
+			statusResp.Unmarshal(t, &dagRunDetails)
+			return dagRunDetails.DagRun.Status == api.Status(core.Succeeded)
+		}, 10*time.Second, 500*time.Millisecond, "expected DAG to complete")
+
+		// Verify the complex JSON is preserved as a single param value
+		require.NotNil(t, dagRunDetails.DagRun.Params, "expected params to be set")
+		params := *dagRunDetails.DagRun.Params
+		// The config param should contain the full JSON string
+		require.Contains(t, params, "config=", "params should contain config=")
+		require.Contains(t, params, "postgres", "params should contain the nested db value")
+		require.Contains(t, params, "5432", "params should contain the nested port value")
+		// Should NOT be tokenized into multiple params
+		require.NotContains(t, params, "1=", "params should not contain positional args")
+		require.NotContains(t, params, "db=", "nested keys should not become separate params")
+
+		// Clean up
+		_ = server.Client().Delete("/api/v2/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
+	})
+
 	t.Run("EnqueueDAGRunFromSpec", func(t *testing.T) {
 		spec := `
 steps:
