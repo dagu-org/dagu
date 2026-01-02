@@ -32,10 +32,10 @@ var (
 
 // LLMMessagesHandler handles LLM conversation messages for persistence.
 type LLMMessagesHandler interface {
-	// ReadMessages reads the LLM conversation messages.
-	ReadMessages(ctx context.Context) (*execution.LLMMessages, error)
-	// WriteMessages writes the LLM conversation messages.
-	WriteMessages(ctx context.Context, messages *execution.LLMMessages) error
+	// WriteStepMessages writes messages for a single step.
+	WriteStepMessages(ctx context.Context, stepName string, messages []execution.LLMMessage) error
+	// ReadStepMessages reads messages for a single step.
+	ReadStepMessages(ctx context.Context, stepName string) ([]execution.LLMMessage, error)
 }
 
 // Runner runs a plan of steps.
@@ -470,19 +470,24 @@ func (r *Runner) setupLLMMessages(ctx context.Context, node *Node) {
 		return
 	}
 
-	// Read all messages from handler
-	messages, err := r.messagesHandler.ReadMessages(ctx)
-	if err != nil {
-		logger.Warn(ctx, "Failed to read LLM messages", tag.Error(err))
+	if len(step.Depends) == 0 {
 		return
 	}
 
-	if messages == nil {
-		return
+	// Read messages from each dependency step
+	var inherited []execution.LLMMessage
+	for _, dep := range step.Depends {
+		msgs, err := r.messagesHandler.ReadStepMessages(ctx, dep)
+		if err != nil {
+			logger.Warn(ctx, "Failed to read LLM messages for dependency",
+				tag.Step(dep), tag.Error(err))
+			continue
+		}
+		inherited = append(inherited, msgs...)
 	}
 
-	// Merge messages from dependencies
-	inherited := messages.MergeFromDependencies(step.Depends)
+	// Deduplicate system messages (keep only first)
+	inherited = execution.DeduplicateSystemMessages(inherited)
 	if len(inherited) > 0 {
 		node.SetInheritedMessages(inherited)
 	}
@@ -504,21 +509,8 @@ func (r *Runner) saveLLMMessages(ctx context.Context, node *Node) {
 		return
 	}
 
-	// Read existing messages
-	messages, err := r.messagesHandler.ReadMessages(ctx)
-	if err != nil {
-		logger.Warn(ctx, "Failed to read LLM messages", tag.Error(err))
-		messages = execution.NewLLMMessages()
-	}
-	if messages == nil {
-		messages = execution.NewLLMMessages()
-	}
-
-	// Update with this step's messages
-	messages.SetStepMessages(step.Name, savedMsgs)
-
-	// Write back
-	if err := r.messagesHandler.WriteMessages(ctx, messages); err != nil {
+	// Direct write - no read-modify-write cycle
+	if err := r.messagesHandler.WriteStepMessages(ctx, step.Name, savedMsgs); err != nil {
 		logger.Warn(ctx, "Failed to write LLM messages", tag.Error(err))
 	}
 }

@@ -328,7 +328,7 @@ func (rr runResult) nodeByName(t *testing.T, stepName string) *runtime.Node {
 
 // mockMessagesHandler is a mock implementation of LLMMessagesHandler for testing.
 type mockMessagesHandler struct {
-	messages   *execution.LLMMessages
+	messages   map[string][]execution.LLMMessage
 	readErr    error
 	writeErr   error
 	writeCalls int
@@ -337,22 +337,24 @@ type mockMessagesHandler struct {
 var _ runtime.LLMMessagesHandler = (*mockMessagesHandler)(nil)
 
 func newMockMessagesHandler() *mockMessagesHandler {
-	return &mockMessagesHandler{}
+	return &mockMessagesHandler{
+		messages: make(map[string][]execution.LLMMessage),
+	}
 }
 
-func (m *mockMessagesHandler) ReadMessages(_ context.Context) (*execution.LLMMessages, error) {
+func (m *mockMessagesHandler) ReadStepMessages(_ context.Context, stepName string) ([]execution.LLMMessage, error) {
 	if m.readErr != nil {
 		return nil, m.readErr
 	}
-	return m.messages, nil
+	return m.messages[stepName], nil
 }
 
-func (m *mockMessagesHandler) WriteMessages(_ context.Context, messages *execution.LLMMessages) error {
+func (m *mockMessagesHandler) WriteStepMessages(_ context.Context, stepName string, messages []execution.LLMMessage) error {
 	m.writeCalls++
 	if m.writeErr != nil {
 		return m.writeErr
 	}
-	m.messages = messages
+	m.messages[stepName] = messages
 	return nil
 }
 

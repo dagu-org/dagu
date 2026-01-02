@@ -44,11 +44,11 @@ type DAGRunAttempt interface {
 	// ReadOutputs reads the collected step outputs for the dag-run.
 	// Returns nil if no outputs file exists or if the file is in v1 format.
 	ReadOutputs(ctx context.Context) (*DAGRunOutputs, error)
-	// WriteMessages writes the LLM conversation messages for the dag-run.
-	WriteMessages(ctx context.Context, messages *LLMMessages) error
-	// ReadMessages reads the LLM conversation messages for the dag-run.
-	// Returns nil if no messages exist.
-	ReadMessages(ctx context.Context) (*LLMMessages, error)
+	// WriteStepMessages writes LLM messages for a single step.
+	WriteStepMessages(ctx context.Context, stepName string, messages []LLMMessage) error
+	// ReadStepMessages reads LLM messages for a single step.
+	// Returns nil if no messages exist for the step.
+	ReadStepMessages(ctx context.Context, stepName string) ([]LLMMessage, error)
 }
 
 var _ DAGRunAttempt = (*MockDAGRunAttempt)(nil)
@@ -132,15 +132,15 @@ func (m *MockDAGRunAttempt) ReadOutputs(ctx context.Context) (*DAGRunOutputs, er
 	return args.Get(0).(*DAGRunOutputs), args.Error(1)
 }
 
-func (m *MockDAGRunAttempt) WriteMessages(ctx context.Context, messages *LLMMessages) error {
-	args := m.Called(ctx, messages)
+func (m *MockDAGRunAttempt) WriteStepMessages(ctx context.Context, stepName string, messages []LLMMessage) error {
+	args := m.Called(ctx, stepName, messages)
 	return args.Error(0)
 }
 
-func (m *MockDAGRunAttempt) ReadMessages(ctx context.Context) (*LLMMessages, error) {
-	args := m.Called(ctx)
+func (m *MockDAGRunAttempt) ReadStepMessages(ctx context.Context, stepName string) ([]LLMMessage, error) {
+	args := m.Called(ctx, stepName)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*LLMMessages), args.Error(1)
+	return args.Get(0).([]LLMMessage), args.Error(1)
 }

@@ -38,8 +38,8 @@ const DAGDefinition = "dag.json"
 // OutputsFile is the name of the file where collected step outputs are stored.
 const OutputsFile = "outputs.json"
 
-// MessagesFile is the name of the file where LLM conversation messages are stored.
-const MessagesFile = "messages.json"
+// MessagesDir is the directory where per-step LLM messages are stored.
+const MessagesDir = "messages"
 
 // CancelRequestedFlag is a special flag used to indicate that a cancel request has been made.
 const CancelRequestedFlag = "CANCEL_REQUESTED"
@@ -580,38 +580,43 @@ func (att *Attempt) ReadOutputs(_ context.Context) (*execution.DAGRunOutputs, er
 	return &outputs, nil
 }
 
-// WriteMessages writes the LLM conversation messages to messages.json.
-// Messages are stored at the dag-run level (not attempt level) so they persist across retry attempts.
-func (att *Attempt) WriteMessages(_ context.Context, messages *execution.LLMMessages) error {
-	if messages == nil || len(messages.Steps) == 0 {
+// WriteStepMessages writes LLM messages for a single step.
+// Messages are stored at the dag-run level in a messages/ directory for retry persistence.
+func (att *Attempt) WriteStepMessages(_ context.Context, stepName string, messages []execution.LLMMessage) error {
+	if len(messages) == 0 {
 		return nil
 	}
 
 	// Store at dag-run level (parent of attempt directory) for retry persistence
 	dagRunDir := filepath.Dir(filepath.Dir(att.file))
-	messagesFile := filepath.Join(dagRunDir, MessagesFile)
+	messagesDir := filepath.Join(dagRunDir, MessagesDir)
 
+	if err := os.MkdirAll(messagesDir, 0750); err != nil {
+		return fmt.Errorf("failed to create messages directory: %w", err)
+	}
+
+	file := filepath.Join(messagesDir, stepName+".json")
 	data, err := json.MarshalIndent(messages, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal messages: %w", err)
 	}
 
-	if err := os.WriteFile(messagesFile, data, 0600); err != nil {
+	if err := os.WriteFile(file, data, 0600); err != nil {
 		return fmt.Errorf("failed to write messages file: %w", err)
 	}
 
 	return nil
 }
 
-// ReadMessages reads the LLM conversation messages from messages.json.
-// Messages are stored at the dag-run level (not attempt level) so they persist across retry attempts.
-// Returns nil if the file does not exist.
-func (att *Attempt) ReadMessages(_ context.Context) (*execution.LLMMessages, error) {
+// ReadStepMessages reads LLM messages for a single step.
+// Messages are stored at the dag-run level in a messages/ directory for retry persistence.
+// Returns nil if no messages exist for the step.
+func (att *Attempt) ReadStepMessages(_ context.Context, stepName string) ([]execution.LLMMessage, error) {
 	// Read from dag-run level (parent of attempt directory) for retry persistence
 	dagRunDir := filepath.Dir(filepath.Dir(att.file))
-	messagesFile := filepath.Join(dagRunDir, MessagesFile)
+	file := filepath.Join(dagRunDir, MessagesDir, stepName+".json")
 
-	data, err := os.ReadFile(messagesFile) //nolint:gosec
+	data, err := os.ReadFile(file) //nolint:gosec
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
@@ -619,10 +624,10 @@ func (att *Attempt) ReadMessages(_ context.Context) (*execution.LLMMessages, err
 		return nil, fmt.Errorf("failed to read messages file: %w", err)
 	}
 
-	var messages execution.LLMMessages
+	var messages []execution.LLMMessage
 	if err := json.Unmarshal(data, &messages); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal messages: %w", err)
 	}
 
-	return &messages, nil
+	return messages, nil
 }
