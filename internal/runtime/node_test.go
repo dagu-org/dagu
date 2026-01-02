@@ -1581,26 +1581,25 @@ func TestLogOutputMode(t *testing.T) {
 func TestNodeLLMMessages(t *testing.T) {
 	t.Parallel()
 
-	t.Run("SetAndGetInheritedMessages", func(t *testing.T) {
+	t.Run("SetAndGetMessages", func(t *testing.T) {
 		t.Parallel()
 
 		step := core.Step{Name: "test-llm-step"}
 		node := runtime.NewNode(step, runtime.NodeState{})
 
 		// Initially should be empty
-		assert.Empty(t, node.GetSavedMessages())
+		assert.Empty(t, node.GetLLMMessages())
 
-		// Set inherited messages
+		// Set messages
 		messages := []execution.LLMMessage{
 			{Role: execution.RoleSystem, Content: "be helpful"},
 			{Role: execution.RoleUser, Content: "hello"},
 			{Role: execution.RoleAssistant, Content: "hi there"},
 		}
-		node.SetInheritedMessages(messages)
+		node.SetLLMMessages(messages)
 
-		// GetSavedMessages returns saved messages, not inherited
-		// Inherited messages are used internally during execution
-		assert.Empty(t, node.GetSavedMessages())
+		// Should return the messages
+		assert.Equal(t, messages, node.GetLLMMessages())
 	})
 
 	t.Run("EmptyMessages", func(t *testing.T) {
@@ -1610,8 +1609,8 @@ func TestNodeLLMMessages(t *testing.T) {
 		node := runtime.NewNode(step, runtime.NodeState{})
 
 		// Set empty messages
-		node.SetInheritedMessages([]execution.LLMMessage{})
-		assert.Empty(t, node.GetSavedMessages())
+		node.SetLLMMessages([]execution.LLMMessage{})
+		assert.Empty(t, node.GetLLMMessages())
 	})
 
 	t.Run("NilMessages", func(t *testing.T) {
@@ -1621,8 +1620,8 @@ func TestNodeLLMMessages(t *testing.T) {
 		node := runtime.NewNode(step, runtime.NodeState{})
 
 		// Set nil messages
-		node.SetInheritedMessages(nil)
-		assert.Nil(t, node.GetSavedMessages())
+		node.SetLLMMessages(nil)
+		assert.Nil(t, node.GetLLMMessages())
 	})
 
 	t.Run("ConcurrentAccess", func(t *testing.T) {
@@ -1638,8 +1637,8 @@ func TestNodeLLMMessages(t *testing.T) {
 				messages := []execution.LLMMessage{
 					{Role: execution.RoleUser, Content: fmt.Sprintf("message %d", id)},
 				}
-				node.SetInheritedMessages(messages)
-				_ = node.GetSavedMessages()
+				node.SetLLMMessages(messages)
+				_ = node.GetLLMMessages()
 				done <- true
 			}(i)
 		}

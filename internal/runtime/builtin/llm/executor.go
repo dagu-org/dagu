@@ -18,6 +18,7 @@ import (
 )
 
 var _ executor.Executor = (*Executor)(nil)
+var _ executor.LLMMessageHandler = (*Executor)(nil)
 
 // Executor implements the executor.Executor interface for LLM steps.
 type Executor struct {

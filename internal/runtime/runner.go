@@ -489,7 +489,7 @@ func (r *Runner) setupLLMMessages(ctx context.Context, node *Node) {
 	// Deduplicate system messages (keep only first)
 	inherited = execution.DeduplicateSystemMessages(inherited)
 	if len(inherited) > 0 {
-		node.SetInheritedMessages(inherited)
+		node.SetLLMMessages(inherited)
 	}
 }
 
@@ -504,7 +504,7 @@ func (r *Runner) saveLLMMessages(ctx context.Context, node *Node) {
 		return
 	}
 
-	savedMsgs := node.GetSavedMessages()
+	savedMsgs := node.GetLLMMessages()
 	if len(savedMsgs) == 0 {
 		return
 	}
