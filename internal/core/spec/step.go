@@ -264,7 +264,7 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	if err := buildStepLLM(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("llm", err))
 	}
-	if err := buildStepMessages(ctx, s, result); err != nil {
+	if err := buildStepMessages(s, result); err != nil {
 		errs = append(errs, wrapTransformError("messages", err))
 	}
 	if err := buildStepExecutor(ctx, s, result); err != nil {
@@ -1287,7 +1287,7 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 }
 
 // buildStepMessages parses the messages field for chat steps.
-func buildStepMessages(ctx StepBuildContext, s *step, result *core.Step) error {
+func buildStepMessages(s *step, result *core.Step) error {
 	if len(s.Messages) == 0 {
 		return nil
 	}

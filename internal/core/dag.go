@@ -369,6 +369,11 @@ func (d *DAG) initializeDefaults() {
 		d.Type = TypeChain
 	}
 
+	// Set default log output mode to separate if not specified.
+	if d.LogOutput == "" {
+		d.LogOutput = LogOutputSeparate
+	}
+
 	// Set default history retention days to 30 if not specified.
 	if d.HistRetentionDays == 0 {
 		d.HistRetentionDays = 30

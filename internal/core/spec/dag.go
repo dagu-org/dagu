@@ -507,7 +507,9 @@ func buildLogDir(_ BuildContext, d *dag) (string, error) {
 
 func buildLogOutput(_ BuildContext, d *dag) (core.LogOutputMode, error) {
 	if d.LogOutput.IsZero() {
-		return core.LogOutputSeparate, nil
+		// Return empty to allow inheritance from base config.
+		// Default is applied in core.InitializeDefaults.
+		return "", nil
 	}
 	return d.LogOutput.Mode(), nil
 }
