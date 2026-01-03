@@ -24,7 +24,7 @@ func TestExecutor_MessageSaving(t *testing.T) {
 			messages: []execution.LLMMessage{
 				{Role: execution.RoleUser, Content: "Hello"},
 			},
-			inheritedMessages: []execution.LLMMessage{
+			contextMessages: []execution.LLMMessage{
 				{Role: execution.RoleSystem, Content: "You are helpful"},
 				{Role: execution.RoleUser, Content: "Previous question"},
 				{Role: execution.RoleAssistant, Content: "Previous answer"},
@@ -32,7 +32,7 @@ func TestExecutor_MessageSaving(t *testing.T) {
 		}
 
 		// Simulate what happens after Run() completes
-		allMessages := append(executor.inheritedMessages, executor.messages...)
+		allMessages := append(executor.contextMessages, executor.messages...)
 		metadata := &execution.LLMMessageMetadata{
 			Provider:         "openai",
 			Model:            "gpt-4o",
@@ -96,7 +96,7 @@ func TestExecutor_MessageSaving(t *testing.T) {
 	})
 }
 
-func TestExecutor_SetInheritedMessages(t *testing.T) {
+func TestExecutor_SetContext(t *testing.T) {
 	t.Parallel()
 
 	executor := &Executor{}
@@ -107,9 +107,9 @@ func TestExecutor_SetInheritedMessages(t *testing.T) {
 		{Role: execution.RoleAssistant, Content: "Assistant response"},
 	}
 
-	executor.SetInheritedMessages(messages)
+	executor.SetContext(messages)
 
-	assert.Equal(t, messages, executor.inheritedMessages)
+	assert.Equal(t, messages, executor.contextMessages)
 }
 
 func TestExecutor_GetMessages(t *testing.T) {

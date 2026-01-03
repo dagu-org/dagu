@@ -82,6 +82,6 @@ type RunParams struct {
 
 // LLMMessageHandler is an interface for executors that handle LLM conversation messages.
 type LLMMessageHandler interface {
-	SetInheritedMessages([]execution.LLMMessage)
+	SetContext([]execution.LLMMessage)
 	GetMessages() []execution.LLMMessage
 }

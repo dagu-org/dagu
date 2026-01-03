@@ -160,10 +160,10 @@ func (n *Node) Execute(ctx context.Context) error {
 	// Check if executor supports LLM message handling
 	llmHandler, _ := cmd.(executor.LLMMessageHandler)
 
-	// Set inherited LLM messages if executor supports it
+	// Set LLM context from prior steps
 	if llmHandler != nil {
 		if messages := n.GetLLMMessages(); len(messages) > 0 {
-			llmHandler.SetInheritedMessages(messages)
+			llmHandler.SetContext(messages)
 		}
 	}
 

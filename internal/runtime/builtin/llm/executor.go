@@ -22,13 +22,13 @@ var _ executor.LLMMessageHandler = (*Executor)(nil)
 
 // Executor implements the executor.Executor interface for LLM steps.
 type Executor struct {
-	stdout            io.Writer
-	stderr            io.Writer
-	step              core.Step
-	provider          llmpkg.Provider
-	messages          []execution.LLMMessage
-	inheritedMessages []execution.LLMMessage
-	savedMessages     []execution.LLMMessage
+	stdout          io.Writer
+	stderr          io.Writer
+	step            core.Step
+	provider        llmpkg.Provider
+	messages        []execution.LLMMessage
+	contextMessages []execution.LLMMessage
+	savedMessages   []execution.LLMMessage
 }
 
 // newLLMExecutor creates a new LLM executor from a step configuration.
@@ -108,9 +108,9 @@ func (e *Executor) Kill(_ os.Signal) error {
 	return nil
 }
 
-// SetInheritedMessages sets the messages inherited from dependent steps.
-func (e *Executor) SetInheritedMessages(messages []execution.LLMMessage) {
-	e.inheritedMessages = messages
+// SetContext sets the conversation context from prior steps.
+func (e *Executor) SetContext(messages []execution.LLMMessage) {
+	e.contextMessages = messages
 }
 
 // GetMessages returns the complete conversation messages after execution.
@@ -157,9 +157,9 @@ func (e *Executor) Run(ctx context.Context) error {
 		return err
 	}
 
-	// Build complete message list: inherited messages + this step's messages
+	// Build complete message list: context + this step's messages
 	var allMessages []execution.LLMMessage
-	allMessages = append(allMessages, e.inheritedMessages...)
+	allMessages = append(allMessages, e.contextMessages...)
 	allMessages = append(allMessages, evaluatedMessages...)
 
 	// Deduplicate system messages (keep only the first one)
