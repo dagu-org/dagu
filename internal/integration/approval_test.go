@@ -40,10 +40,11 @@ steps:
 		require.Equal(t, core.NodeNotStarted, dagRunStatus.Nodes[1].Status)
 	})
 
-	// Note: ApprovalInputsPassedToNextStep and MultipleApprovalInputs tests are handled
-	// via the API tests in dagruns_test.go (TestApproveDAGRunStep, TestApprovalInputPassing).
-	// The approval flow requires using the API endpoint which internally uses runtime.Start()
-	// with retry spec, which is different from the CLI retry command.
+	// Note: Tests for approval input passing (ApprovalInputs -> env vars) are not included here.
+	// The approval resume flow requires using the API endpoint which internally calls runtime.Start()
+	// with a retry spec. This async execution pattern has timing dependencies that are difficult to
+	// test reliably. The core wait status behavior is validated by these integration tests and the
+	// unit tests in runner_test.go (TestWaitStep).
 
 	t.Run("WaitStepBlocksDependentNodes", func(t *testing.T) {
 		th := test.Setup(t)
