@@ -1037,31 +1037,65 @@
       "allOf": [
         {
           "if": { "properties": { "type": { "const": "http" } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/httpExecutorConfig" } } }
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/httpExecutorConfig" }
+            }
+          }
         },
         {
           "if": { "properties": { "type": { "const": "ssh" } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/sshExecutorConfig" } } }
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/sshExecutorConfig" }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "enum": ["docker", "container"] } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/dockerExecutorConfig" } } }
+          "if": {
+            "properties": { "type": { "enum": ["docker", "container"] } }
+          },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/dockerExecutorConfig" }
+            }
+          }
         },
         {
           "if": { "properties": { "type": { "const": "mail" } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/mailExecutorConfig" } } }
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/mailExecutorConfig" }
+            }
+          }
         },
         {
           "if": { "properties": { "type": { "const": "jq" } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/jqExecutorConfig" } } }
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/jqExecutorConfig" }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "enum": ["gha", "github_action", "github-action"] } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/ghaExecutorConfig" } } }
+          "if": {
+            "properties": {
+              "type": { "enum": ["gha", "github_action", "github-action"] }
+            }
+          },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/ghaExecutorConfig" }
+            }
+          }
         },
         {
           "if": { "properties": { "type": { "const": "archive" } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/archiveExecutorConfig" } } }
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/archiveExecutorConfig" }
+            }
+          }
         }
       ]
     },
@@ -1448,10 +1482,7 @@
           "description": "Alias for 'host'. IP address of the SSH server."
         },
         "port": {
-          "oneOf": [
-            { "type": "string" },
-            { "type": "integer" }
-          ],
+          "oneOf": [{ "type": "string" }, { "type": "integer" }],
           "default": "22",
           "description": "SSH port number. Defaults to 22."
         },
@@ -1510,17 +1541,21 @@
         },
         "pull": {
           "oneOf": [
-            { "type": "boolean", "description": "Boolean shorthand: true = 'always', false = 'never'" },
-            { "type": "string", "enum": ["always", "never", "missing"], "description": "Pull policy string" }
+            {
+              "type": "boolean",
+              "description": "Boolean shorthand: true = 'always', false = 'never'"
+            },
+            {
+              "type": "string",
+              "enum": ["always", "never", "missing"],
+              "description": "Pull policy string"
+            }
           ],
           "default": "missing",
           "description": "Image pull policy. 'always' pulls every time, 'never' uses only local, 'missing' pulls if not present."
         },
         "autoRemove": {
-          "oneOf": [
-            { "type": "boolean" },
-            { "type": "string" }
-          ],
+          "oneOf": [{ "type": "boolean" }, { "type": "string" }],
           "description": "Automatically remove the container after it exits."
         },
         "workingDir": {
@@ -1566,8 +1601,15 @@
         },
         "to": {
           "oneOf": [
-            { "type": "string", "description": "Single recipient email address" },
-            { "type": "array", "items": { "type": "string" }, "description": "List of recipient email addresses" }
+            {
+              "type": "string",
+              "description": "Single recipient email address"
+            },
+            {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "List of recipient email addresses"
+            }
           ],
           "description": "Recipient email address(es). Required."
         },
@@ -1762,8 +1804,17 @@
       "properties": {
         "provider": {
           "type": "string",
-          "enum": ["openai", "anthropic", "gemini", "openrouter", "local"],
-          "description": "LLM provider to use. Required."
+          "enum": [
+            "openai",
+            "anthropic",
+            "gemini",
+            "openrouter",
+            "local",
+            "ollama",
+            "vllm",
+            "llama"
+          ],
+          "description": "LLM provider to use. Aliases 'ollama', 'vllm', 'llama' map to 'local'. Required."
         },
         "model": {
           "type": "string",
@@ -1834,12 +1885,21 @@
     "executorType": {
       "type": "string",
       "enum": [
-        "command", "shell",
-        "docker", "container",
-        "http", "mail", "ssh", "jq",
-        "gha", "github_action", "github-action",
-        "dag", "subworkflow",
-        "parallel", "archive",
+        "command",
+        "shell",
+        "docker",
+        "container",
+        "http",
+        "mail",
+        "ssh",
+        "jq",
+        "gha",
+        "github_action",
+        "github-action",
+        "dag",
+        "subworkflow",
+        "parallel",
+        "archive",
         "chat"
       ],
       "description": "Type of executor to use for this step."
@@ -1863,43 +1923,103 @@
       "allOf": [
         {
           "if": { "properties": { "type": { "const": "http" } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/httpExecutorConfig" } } }
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/httpExecutorConfig" }
+            }
+          }
         },
         {
           "if": { "properties": { "type": { "const": "ssh" } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/sshExecutorConfig" } } }
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/sshExecutorConfig" }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "enum": ["docker", "container"] } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/dockerExecutorConfig" } } }
+          "if": {
+            "properties": { "type": { "enum": ["docker", "container"] } }
+          },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/dockerExecutorConfig" }
+            }
+          }
         },
         {
           "if": { "properties": { "type": { "const": "mail" } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/mailExecutorConfig" } } }
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/mailExecutorConfig" }
+            }
+          }
         },
         {
           "if": { "properties": { "type": { "const": "jq" } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/jqExecutorConfig" } } }
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/jqExecutorConfig" }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "enum": ["gha", "github_action", "github-action"] } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/ghaExecutorConfig" } } }
+          "if": {
+            "properties": {
+              "type": { "enum": ["gha", "github_action", "github-action"] }
+            }
+          },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/ghaExecutorConfig" }
+            }
+          }
         },
         {
           "if": { "properties": { "type": { "const": "archive" } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/archiveExecutorConfig" } } }
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/archiveExecutorConfig" }
+            }
+          }
         },
         {
           "if": { "properties": { "type": { "enum": ["command", "shell"] } } },
-          "then": { "properties": { "config": { "type": "object", "additionalProperties": false, "description": "Command/shell executors do not use executor.config. Configure at step level." } } }
+          "then": {
+            "properties": {
+              "config": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "Command/shell executors do not use executor.config. Configure at step level."
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "enum": ["dag", "subworkflow"] } } },
-          "then": { "properties": { "config": { "type": "object", "additionalProperties": false, "description": "DAG/subworkflow executors do not use executor.config. Use step.call or step.run field." } } }
+          "if": {
+            "properties": { "type": { "enum": ["dag", "subworkflow"] } }
+          },
+          "then": {
+            "properties": {
+              "config": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "DAG/subworkflow executors do not use executor.config. Use step.call or step.run field."
+              }
+            }
+          }
         },
         {
           "if": { "properties": { "type": { "const": "parallel" } } },
-          "then": { "properties": { "config": { "type": "object", "additionalProperties": false, "description": "Parallel executor does not use executor.config. Use step.parallel field." } } }
+          "then": {
+            "properties": {
+              "config": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "Parallel executor does not use executor.config. Use step.parallel field."
+              }
+            }
+          }
         }
       ],
       "description": "Executor configuration object with type-specific config validation."

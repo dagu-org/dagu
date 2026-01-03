@@ -1198,10 +1198,12 @@ func buildStepChat(_ StepBuildContext, s *step, result *core.Step) error {
 		validProviders := map[string]bool{
 			"openai": true, "anthropic": true, "gemini": true,
 			"openrouter": true, "local": true,
+			// Aliases for local provider
+			"ollama": true, "vllm": true, "llama": true,
 		}
 		if !validProviders[cfg.Provider] {
 			return core.NewValidationError("chat.provider", cfg.Provider,
-				fmt.Errorf("invalid provider: must be one of openai, anthropic, gemini, openrouter, local"))
+				fmt.Errorf("invalid provider: must be one of openai, anthropic, gemini, openrouter, local (or aliases: ollama, vllm, llama)"))
 		}
 	}
 
