@@ -1185,19 +1185,10 @@ func buildLLM(_ BuildContext, d *dag) (*core.LLMConfig, error) {
 		}
 	}
 
-	// Convert messages if specified
-	var messages []core.LLMMessage
-	for _, msg := range cfg.Messages {
-		messages = append(messages, core.LLMMessage{
-			Role:    msg.Role,
-			Content: msg.Content,
-		})
-	}
-
 	return &core.LLMConfig{
 		Provider:    cfg.Provider,
 		Model:       cfg.Model,
-		Messages:    messages,
+		System:      cfg.System,
 		Temperature: cfg.Temperature,
 		MaxTokens:   cfg.MaxTokens,
 		TopP:        cfg.TopP,

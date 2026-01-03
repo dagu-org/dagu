@@ -104,6 +104,10 @@ type step struct {
 	// LLM contains the configuration for LLM-based executors (chat, agent, etc.).
 	// Requires explicit type: chat (or future type: agent).
 	LLM *llmConfig `yaml:"llm,omitempty"`
+
+	// Messages contains the conversation messages for chat steps.
+	// Only valid when type is "chat".
+	Messages []llmMessage `yaml:"messages,omitempty"`
 }
 
 // repeatPolicy defines the repeat policy for a step.
@@ -133,8 +137,8 @@ type llmConfig struct {
 	Provider string `yaml:"provider,omitempty"`
 	// Model is the model to use (e.g., gpt-4o, claude-sonnet-4-20250514).
 	Model string `yaml:"model,omitempty"`
-	// Messages is the list of messages to send to the LLM.
-	Messages []llmMessage `yaml:"messages,omitempty"`
+	// System is the default system prompt for conversations.
+	System string `yaml:"system,omitempty"`
 	// Temperature controls randomness (0.0-2.0).
 	Temperature *float64 `yaml:"temperature,omitempty"`
 	// MaxTokens is the maximum number of tokens to generate.
@@ -259,6 +263,9 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	}
 	if err := buildStepLLM(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("llm", err))
+	}
+	if err := buildStepMessages(ctx, s, result); err != nil {
+		errs = append(errs, wrapTransformError("messages", err))
 	}
 	if err := buildStepExecutor(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("executor", err))
@@ -990,11 +997,11 @@ func validateLLM(result *core.Step) error {
 			fmt.Errorf("model is required (set at DAG or step level)"),
 		)
 	}
-	// Messages are required
-	if len(result.LLM.Messages) == 0 {
+	// Messages are required (at step level)
+	if len(result.Messages) == 0 {
 		return core.NewValidationError(
-			"llm.messages",
-			result.LLM.Messages,
+			"messages",
+			result.Messages,
 			fmt.Errorf("at least one message is required"),
 		)
 	}
@@ -1256,49 +1263,10 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 		}
 	}
 
-	// Validate messages
-	if len(cfg.Messages) == 0 {
-		return core.NewValidationError("llm.messages", cfg.Messages,
-			fmt.Errorf("at least one message is required"))
-	}
-
-	validRoles := map[string]bool{
-		core.LLMRoleSystem:    true,
-		core.LLMRoleUser:      true,
-		core.LLMRoleAssistant: true,
-		core.LLMRoleTool:      true,
-	}
-	for i, msg := range cfg.Messages {
-		if msg.Role == "" {
-			return core.NewValidationError(
-				fmt.Sprintf("llm.messages[%d].role", i), msg.Role,
-				fmt.Errorf("role is required"))
-		}
-		if !validRoles[msg.Role] {
-			return core.NewValidationError(
-				fmt.Sprintf("llm.messages[%d].role", i), msg.Role,
-				fmt.Errorf("invalid role: must be one of system, user, assistant, tool"))
-		}
-		if msg.Content == "" {
-			return core.NewValidationError(
-				fmt.Sprintf("llm.messages[%d].content", i), msg.Content,
-				fmt.Errorf("content is required"))
-		}
-	}
-
-	// Build core.LLMConfig
-	messages := make([]core.LLMMessage, len(cfg.Messages))
-	for i, msg := range cfg.Messages {
-		messages[i] = core.LLMMessage{
-			Role:    msg.Role,
-			Content: msg.Content,
-		}
-	}
-
 	result.LLM = &core.LLMConfig{
 		Provider:    cfg.Provider,
 		Model:       cfg.Model,
-		Messages:    messages,
+		System:      cfg.System,
 		Temperature: cfg.Temperature,
 		MaxTokens:   cfg.MaxTokens,
 		TopP:        cfg.TopP,
@@ -1310,6 +1278,49 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 	// NOTE: Executor type is NOT set here - it must be specified explicitly
 	// via type: chat in the YAML. This allows the llm: config to be reused
 	// for future executor types like type: agent.
+
+	return nil
+}
+
+// buildStepMessages parses the messages field for chat steps.
+func buildStepMessages(ctx StepBuildContext, s *step, result *core.Step) error {
+	if len(s.Messages) == 0 {
+		return nil
+	}
+
+	// Validate each message
+	validRoles := map[string]bool{
+		core.LLMRoleSystem:    true,
+		core.LLMRoleUser:      true,
+		core.LLMRoleAssistant: true,
+		core.LLMRoleTool:      true,
+	}
+	for i, msg := range s.Messages {
+		if msg.Role == "" {
+			return core.NewValidationError(
+				fmt.Sprintf("messages[%d].role", i), msg.Role,
+				fmt.Errorf("role is required"))
+		}
+		if !validRoles[msg.Role] {
+			return core.NewValidationError(
+				fmt.Sprintf("messages[%d].role", i), msg.Role,
+				fmt.Errorf("invalid role: must be one of system, user, assistant, tool"))
+		}
+		if msg.Content == "" {
+			return core.NewValidationError(
+				fmt.Sprintf("messages[%d].content", i), msg.Content,
+				fmt.Errorf("content is required"))
+		}
+	}
+
+	// Build core.LLMMessage slice
+	result.Messages = make([]core.LLMMessage, len(s.Messages))
+	for i, msg := range s.Messages {
+		result.Messages[i] = core.LLMMessage{
+			Role:    msg.Role,
+			Content: msg.Content,
+		}
+	}
 
 	return nil
 }

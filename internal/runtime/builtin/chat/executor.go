@@ -76,12 +76,23 @@ func newChatExecutor(_ context.Context, step core.Step) (executor.Executor, erro
 	}
 
 	// Convert messages from core.LLMMessage to execution.LLMMessage
-	messages := make([]execution.LLMMessage, len(cfg.Messages))
-	for i, msg := range cfg.Messages {
-		messages[i] = execution.LLMMessage{
+	// Messages are now at step level, not inside LLM config
+	messages := make([]execution.LLMMessage, 0, len(step.Messages)+1)
+
+	// Add system message from config if specified
+	if cfg.System != "" {
+		messages = append(messages, execution.LLMMessage{
+			Role:    core.LLMRoleSystem,
+			Content: cfg.System,
+		})
+	}
+
+	// Add step-level messages
+	for _, msg := range step.Messages {
+		messages = append(messages, execution.LLMMessage{
 			Role:    msg.Role,
 			Content: msg.Content,
-		}
+		})
 	}
 
 	return &Executor{

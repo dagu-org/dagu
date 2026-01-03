@@ -14,8 +14,8 @@ type LLMConfig struct {
 	Provider string `json:"provider,omitempty"`
 	// Model is the model to use (e.g., gpt-4o, claude-sonnet-4-20250514).
 	Model string `json:"model,omitempty"`
-	// Messages is the list of messages to send to the LLM.
-	Messages []LLMMessage `json:"messages,omitempty"`
+	// System is the default system prompt for conversations.
+	System string `json:"system,omitempty"`
 	// Temperature controls randomness (0.0-2.0).
 	Temperature *float64 `json:"temperature,omitempty"`
 	// MaxTokens is the maximum number of tokens to generate.
