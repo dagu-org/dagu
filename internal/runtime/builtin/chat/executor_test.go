@@ -16,7 +16,7 @@ func TestExecutor_MessageSaving(t *testing.T) {
 
 		executor := &Executor{
 			step: core.Step{
-				Chat: &core.ChatConfig{
+				LLM: &core.LLMConfig{
 					Provider: "openai",
 					Model:    "gpt-4o",
 				},
@@ -59,7 +59,7 @@ func TestExecutor_MessageSaving(t *testing.T) {
 
 		executor := &Executor{
 			step: core.Step{
-				Chat: &core.ChatConfig{
+				LLM: &core.LLMConfig{
 					Provider: "gemini",
 					Model:    "gemini-pro",
 				},

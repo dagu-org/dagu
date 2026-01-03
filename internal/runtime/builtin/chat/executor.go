@@ -33,11 +33,11 @@ type Executor struct {
 
 // newChatExecutor creates a new chat executor from a step configuration.
 func newChatExecutor(_ context.Context, step core.Step) (executor.Executor, error) {
-	if step.Chat == nil {
-		return nil, fmt.Errorf("chat configuration is required")
+	if step.LLM == nil {
+		return nil, fmt.Errorf("llm configuration is required for chat executor")
 	}
 
-	cfg := step.Chat
+	cfg := step.LLM
 
 	// Parse provider type (required field, validated in spec)
 	providerType, err := llmpkg.ParseProviderType(cfg.Provider)
@@ -149,7 +149,7 @@ func evalMessages(ctx context.Context, msgs []execution.LLMMessage) ([]execution
 
 // Run executes the chat request.
 func (e *Executor) Run(ctx context.Context) error {
-	cfg := e.step.Chat
+	cfg := e.step.LLM
 
 	// Evaluate variable substitution in this step's messages
 	evaluatedMessages, err := evalMessages(ctx, e.messages)

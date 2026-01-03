@@ -1029,9 +1029,9 @@
           "$ref": "#/definitions/executorConfig",
           "description": "Executor-specific configuration. This is the new format replacing executor.config. Cannot be used together with 'executor' field."
         },
-        "chat": {
-          "$ref": "#/definitions/chatConfig",
-          "description": "Chat configuration for AI-powered steps using LLM providers. Required when type is 'chat'."
+        "llm": {
+          "$ref": "#/definitions/llmConfig",
+          "description": "LLM configuration for AI-powered steps. Required when type is 'chat' (or future type: agent)."
         }
       },
       "allOf": [
@@ -1797,7 +1797,7 @@
       },
       "description": "Configuration for archive operations (create, extract, list)."
     },
-    "chatConfig": {
+    "llmConfig": {
       "type": "object",
       "additionalProperties": false,
       "required": ["provider", "model"],
@@ -1823,7 +1823,7 @@
         "messages": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/chatMessage"
+            "$ref": "#/definitions/llmMessage"
           },
           "description": "List of messages to send to the LLM. Supports variable substitution with ${VAR}."
         },
@@ -1863,9 +1863,9 @@
           "description": "Enable streaming output. When true (default), response tokens are streamed to stdout as they arrive."
         }
       },
-      "description": "Configuration for chat executor. Supports OpenAI, Anthropic, Google Gemini, OpenRouter, and local models (Ollama/vLLM)."
+      "description": "LLM configuration for chat executor (and future agent executor). Supports OpenAI, Anthropic, Google Gemini, OpenRouter, and local models (Ollama/vLLM)."
     },
-    "chatMessage": {
+    "llmMessage": {
       "type": "object",
       "additionalProperties": false,
       "required": ["role", "content"],
