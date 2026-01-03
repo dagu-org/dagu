@@ -2807,14 +2807,14 @@ func TestNewEnvWithStepInfo(t *testing.T) {
 	require.NotContains(t, env.StepMap, "no-id")
 }
 
-func TestRunner_LLMMessagesHandler(t *testing.T) {
-	t.Run("HandlerNotCalledForNonLLMSteps", func(t *testing.T) {
+func TestRunner_ChatMessagesHandler(t *testing.T) {
+	t.Run("HandlerNotCalledForNonChatSteps", func(t *testing.T) {
 		t.Parallel()
 
 		handler := newMockMessagesHandler()
 		r := setupRunner(t, withMessagesHandler(handler))
 
-		// Run non-LLM steps
+		// Run non-chat steps
 		plan := r.newPlan(t,
 			successStep("step1"),
 			successStep("step2", "step1"),
@@ -2824,7 +2824,7 @@ func TestRunner_LLMMessagesHandler(t *testing.T) {
 		result.assertNodeStatus(t, "step1", core.NodeSucceeded)
 		result.assertNodeStatus(t, "step2", core.NodeSucceeded)
 
-		// Handler should not have been called for writes since no LLM steps
+		// Handler should not have been called for writes since no chat steps
 		assert.Equal(t, 0, handler.writeCalls)
 	})
 

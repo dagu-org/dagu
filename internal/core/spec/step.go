@@ -101,8 +101,8 @@ type step struct {
 	// Config contains executor-specific configuration.
 	Config map[string]any `yaml:"config,omitempty"`
 
-	// LLM contains the configuration for LLM (Large Language Model) execution.
-	LLM *llmConfig `yaml:"llm,omitempty"`
+	// Chat contains the configuration for chat executor (LLM-based conversation).
+	Chat *chatConfig `yaml:"chat,omitempty"`
 }
 
 // repeatPolicy defines the repeat policy for a step.
@@ -126,14 +126,14 @@ type retryPolicy struct {
 	MaxIntervalSec int   `yaml:"maxIntervalSec,omitempty"`
 }
 
-// llmConfig defines the LLM configuration for a step.
-type llmConfig struct {
+// chatConfig defines the chat configuration for a step.
+type chatConfig struct {
 	// Provider is the LLM provider (openai, anthropic, gemini, openrouter, local).
 	Provider string `yaml:"provider,omitempty"`
 	// Model is the model to use (e.g., gpt-4o, claude-sonnet-4-20250514).
 	Model string `yaml:"model,omitempty"`
 	// Messages is the list of messages to send to the LLM.
-	Messages []llmMessage `yaml:"messages,omitempty"`
+	Messages []chatMessage `yaml:"messages,omitempty"`
 	// Temperature controls randomness (0.0-2.0).
 	Temperature *float64 `yaml:"temperature,omitempty"`
 	// MaxTokens is the maximum number of tokens to generate.
@@ -149,8 +149,8 @@ type llmConfig struct {
 	Stream *bool `yaml:"stream,omitempty"`
 }
 
-// llmMessage defines a message in the LLM conversation.
-type llmMessage struct {
+// chatMessage defines a message in the chat conversation.
+type chatMessage struct {
 	// Role is the message role (system, user, assistant, tool).
 	Role string `yaml:"role,omitempty"`
 	// Content is the message content. Supports variable substitution with ${VAR}.
@@ -256,8 +256,8 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	if err := buildStepSubDAG(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("subDAG", err))
 	}
-	if err := buildStepLLM(ctx, s, result); err != nil {
-		errs = append(errs, wrapTransformError("llm", err))
+	if err := buildStepChat(ctx, s, result); err != nil {
+		errs = append(errs, wrapTransformError("chat", err))
 	}
 	if err := buildStepExecutor(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("executor", err))
@@ -292,8 +292,8 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	if err := validateWorkerSelector(result); err != nil {
 		errs = append(errs, wrapTransformError("workerSelector", err))
 	}
-	if err := validateLLM(result); err != nil {
-		errs = append(errs, wrapTransformError("llm", err))
+	if err := validateChat(result); err != nil {
+		errs = append(errs, wrapTransformError("chat", err))
 	}
 
 	// Validate that stdout and stderr don't point to the same file
@@ -961,23 +961,23 @@ func validateWorkerSelector(result *core.Step) error {
 	return nil
 }
 
-// validateLLM checks if the executor type supports the llm field.
-func validateLLM(result *core.Step) error {
-	if result.LLM == nil {
+// validateChat checks if the executor type supports the chat field.
+func validateChat(result *core.Step) error {
+	if result.Chat == nil {
 		return nil
 	}
-	if !core.SupportsLLM(result.ExecutorConfig.Type) {
+	if !core.SupportsChat(result.ExecutorConfig.Type) {
 		return core.NewValidationError(
-			"llm",
-			result.LLM,
-			fmt.Errorf("executor type %q does not support llm field", result.ExecutorConfig.Type),
+			"chat",
+			result.Chat,
+			fmt.Errorf("executor type %q does not support chat field", result.ExecutorConfig.Type),
 		)
 	}
 	// Provider is required
-	if result.LLM.Provider == "" {
+	if result.Chat.Provider == "" {
 		return core.NewValidationError(
-			"llm.provider",
-			result.LLM.Provider,
+			"chat.provider",
+			result.Chat.Provider,
 			fmt.Errorf("provider is required"),
 		)
 	}
@@ -1185,13 +1185,13 @@ func buildStepContainer(ctx StepBuildContext, s *step, result *core.Step) error 
 	return nil
 }
 
-// buildStepLLM parses the LLM configuration in the step definition.
-func buildStepLLM(_ StepBuildContext, s *step, result *core.Step) error {
-	if s.LLM == nil {
+// buildStepChat parses the chat configuration in the step definition.
+func buildStepChat(_ StepBuildContext, s *step, result *core.Step) error {
+	if s.Chat == nil {
 		return nil
 	}
 
-	cfg := s.LLM
+	cfg := s.Chat
 
 	// Validate provider if specified
 	if cfg.Provider != "" {
@@ -1200,21 +1200,21 @@ func buildStepLLM(_ StepBuildContext, s *step, result *core.Step) error {
 			"openrouter": true, "local": true,
 		}
 		if !validProviders[cfg.Provider] {
-			return core.NewValidationError("llm.provider", cfg.Provider,
+			return core.NewValidationError("chat.provider", cfg.Provider,
 				fmt.Errorf("invalid provider: must be one of openai, anthropic, gemini, openrouter, local"))
 		}
 	}
 
 	// Validate model is specified
 	if cfg.Model == "" {
-		return core.NewValidationError("llm.model", cfg.Model,
+		return core.NewValidationError("chat.model", cfg.Model,
 			fmt.Errorf("model is required"))
 	}
 
 	// Validate temperature range
 	if cfg.Temperature != nil {
 		if *cfg.Temperature < 0.0 || *cfg.Temperature > 2.0 {
-			return core.NewValidationError("llm.temperature", *cfg.Temperature,
+			return core.NewValidationError("chat.temperature", *cfg.Temperature,
 				fmt.Errorf("temperature must be between 0.0 and 2.0"))
 		}
 	}
@@ -1222,14 +1222,14 @@ func buildStepLLM(_ StepBuildContext, s *step, result *core.Step) error {
 	// Validate topP range
 	if cfg.TopP != nil {
 		if *cfg.TopP < 0.0 || *cfg.TopP > 1.0 {
-			return core.NewValidationError("llm.topP", *cfg.TopP,
+			return core.NewValidationError("chat.topP", *cfg.TopP,
 				fmt.Errorf("topP must be between 0.0 and 1.0"))
 		}
 	}
 
 	// Validate messages
 	if len(cfg.Messages) == 0 {
-		return core.NewValidationError("llm.messages", cfg.Messages,
+		return core.NewValidationError("chat.messages", cfg.Messages,
 			fmt.Errorf("at least one message is required"))
 	}
 
@@ -1242,22 +1242,22 @@ func buildStepLLM(_ StepBuildContext, s *step, result *core.Step) error {
 	for i, msg := range cfg.Messages {
 		if msg.Role == "" {
 			return core.NewValidationError(
-				fmt.Sprintf("llm.messages[%d].role", i), msg.Role,
+				fmt.Sprintf("chat.messages[%d].role", i), msg.Role,
 				fmt.Errorf("role is required"))
 		}
 		if !validRoles[msg.Role] {
 			return core.NewValidationError(
-				fmt.Sprintf("llm.messages[%d].role", i), msg.Role,
+				fmt.Sprintf("chat.messages[%d].role", i), msg.Role,
 				fmt.Errorf("invalid role: must be one of system, user, assistant, tool"))
 		}
 		if msg.Content == "" {
 			return core.NewValidationError(
-				fmt.Sprintf("llm.messages[%d].content", i), msg.Content,
+				fmt.Sprintf("chat.messages[%d].content", i), msg.Content,
 				fmt.Errorf("content is required"))
 		}
 	}
 
-	// Build core.LLMConfig
+	// Build core.ChatConfig
 	messages := make([]core.LLMMessage, len(cfg.Messages))
 	for i, msg := range cfg.Messages {
 		messages[i] = core.LLMMessage{
@@ -1266,7 +1266,7 @@ func buildStepLLM(_ StepBuildContext, s *step, result *core.Step) error {
 		}
 	}
 
-	result.LLM = &core.LLMConfig{
+	result.Chat = &core.ChatConfig{
 		Provider:    cfg.Provider,
 		Model:       cfg.Model,
 		Messages:    messages,
@@ -1278,8 +1278,8 @@ func buildStepLLM(_ StepBuildContext, s *step, result *core.Step) error {
 		Stream:      cfg.Stream,
 	}
 
-	// Set executor type to llm
-	result.ExecutorConfig.Type = core.ExecutorTypeLLM
+	// Set executor type to chat
+	result.ExecutorConfig.Type = core.ExecutorTypeChat
 
 	return nil
 }

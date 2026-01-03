@@ -326,7 +326,7 @@ func (rr runResult) nodeByName(t *testing.T, stepName string) *runtime.Node {
 	return nil
 }
 
-// mockMessagesHandler is a mock implementation of LLMMessagesHandler for testing.
+// mockMessagesHandler is a mock implementation of ChatMessagesHandler for testing.
 type mockMessagesHandler struct {
 	messages   map[string][]execution.LLMMessage
 	readErr    error
@@ -334,7 +334,7 @@ type mockMessagesHandler struct {
 	writeCalls int
 }
 
-var _ runtime.LLMMessagesHandler = (*mockMessagesHandler)(nil)
+var _ runtime.ChatMessagesHandler = (*mockMessagesHandler)(nil)
 
 func newMockMessagesHandler() *mockMessagesHandler {
 	return &mockMessagesHandler{
@@ -358,7 +358,7 @@ func (m *mockMessagesHandler) WriteStepMessages(_ context.Context, stepName stri
 	return nil
 }
 
-func withMessagesHandler(handler runtime.LLMMessagesHandler) runnerOption {
+func withMessagesHandler(handler runtime.ChatMessagesHandler) runnerOption {
 	return func(cfg *runtime.Config) {
 		cfg.MessagesHandler = handler
 	}

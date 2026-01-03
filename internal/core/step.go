@@ -94,9 +94,9 @@ type Step struct {
 	// If set, the step runs in its own container instead of the DAG-level container.
 	// This uses the same configuration format as the DAG-level container field.
 	Container *Container `json:"container,omitempty"`
-	// LLM contains the configuration for LLM (Large Language Model) execution.
-	// When set, the step executes an LLM request instead of a command.
-	LLM *LLMConfig `json:"llm,omitempty"`
+	// Chat contains the configuration for chat executor (LLM-based conversation).
+	// When set, the step executes a chat request instead of a command.
+	Chat *ChatConfig `json:"chat,omitempty"`
 }
 
 // String returns a formatted string representation of the step

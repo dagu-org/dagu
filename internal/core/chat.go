@@ -8,8 +8,8 @@ const (
 	LLMRoleTool      = "tool"
 )
 
-// LLMConfig contains the configuration for an LLM step.
-type LLMConfig struct {
+// ChatConfig contains the configuration for a chat executor step.
+type ChatConfig struct {
 	// Provider is the LLM provider (openai, anthropic, gemini, openrouter, local).
 	Provider string `json:"provider,omitempty"`
 	// Model is the model to use (e.g., gpt-4o, claude-sonnet-4-20250514).
@@ -41,12 +41,12 @@ type LLMMessage struct {
 
 // StreamEnabled returns true if streaming is enabled.
 // Default is true if Stream is nil.
-func (c *LLMConfig) StreamEnabled() bool {
+func (c *ChatConfig) StreamEnabled() bool {
 	if c.Stream == nil {
 		return true
 	}
 	return *c.Stream
 }
 
-// ExecutorTypeLLM is the executor type for LLM steps.
-const ExecutorTypeLLM = "llm"
+// ExecutorTypeChat is the executor type for chat steps.
+const ExecutorTypeChat = "chat"

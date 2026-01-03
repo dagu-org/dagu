@@ -1,5 +1,5 @@
-// Package llm provides an executor for LLM (Large Language Model) steps.
-package llm
+// Package chat provides an executor for chat (LLM-based conversation) steps.
+package chat
 
 import (
 	"context"
@@ -18,9 +18,9 @@ import (
 )
 
 var _ executor.Executor = (*Executor)(nil)
-var _ executor.LLMMessageHandler = (*Executor)(nil)
+var _ executor.ChatMessageHandler = (*Executor)(nil)
 
-// Executor implements the executor.Executor interface for LLM steps.
+// Executor implements the executor.Executor interface for chat steps.
 type Executor struct {
 	stdout          io.Writer
 	stderr          io.Writer
@@ -31,13 +31,13 @@ type Executor struct {
 	savedMessages   []execution.LLMMessage
 }
 
-// newLLMExecutor creates a new LLM executor from a step configuration.
-func newLLMExecutor(_ context.Context, step core.Step) (executor.Executor, error) {
-	if step.LLM == nil {
-		return nil, fmt.Errorf("LLM configuration is required")
+// newChatExecutor creates a new chat executor from a step configuration.
+func newChatExecutor(_ context.Context, step core.Step) (executor.Executor, error) {
+	if step.Chat == nil {
+		return nil, fmt.Errorf("chat configuration is required")
 	}
 
-	cfg := step.LLM
+	cfg := step.Chat
 
 	// Parse provider type (required field, validated in spec)
 	providerType, err := llmpkg.ParseProviderType(cfg.Provider)
@@ -103,7 +103,7 @@ func (e *Executor) SetStderr(out io.Writer) {
 	e.stderr = out
 }
 
-// Kill is a no-op for LLM executor (requests are context-cancelled).
+// Kill is a no-op for chat executor (requests are context-cancelled).
 func (e *Executor) Kill(_ os.Signal) error {
 	return nil
 }
@@ -147,9 +147,9 @@ func evalMessages(ctx context.Context, msgs []execution.LLMMessage) ([]execution
 	return result, nil
 }
 
-// Run executes the LLM request.
+// Run executes the chat request.
 func (e *Executor) Run(ctx context.Context) error {
-	cfg := e.step.LLM
+	cfg := e.step.Chat
 
 	// Evaluate variable substitution in this step's messages
 	evaluatedMessages, err := evalMessages(ctx, e.messages)
@@ -181,13 +181,13 @@ func (e *Executor) Run(ctx context.Context) error {
 	if cfg.StreamEnabled() {
 		events, err := e.provider.ChatStream(ctx, req)
 		if err != nil {
-			return fmt.Errorf("LLM stream request failed: %w", err)
+			return fmt.Errorf("chat stream request failed: %w", err)
 		}
 
 		// Collect response content while streaming to stdout
 		for event := range events {
 			if event.Error != nil {
-				return fmt.Errorf("LLM stream error: %w", event.Error)
+				return fmt.Errorf("chat stream error: %w", event.Error)
 			}
 			if event.Delta != "" {
 				responseContent += event.Delta
@@ -203,7 +203,7 @@ func (e *Executor) Run(ctx context.Context) error {
 	} else {
 		resp, err := e.provider.Chat(ctx, req)
 		if err != nil {
-			return fmt.Errorf("LLM request failed: %w", err)
+			return fmt.Errorf("chat request failed: %w", err)
 		}
 		responseContent = resp.Content
 		usage = &resp.Usage
@@ -232,8 +232,8 @@ func (e *Executor) Run(ctx context.Context) error {
 }
 
 func init() {
-	executor.RegisterExecutor(core.ExecutorTypeLLM, newLLMExecutor, nil, core.ExecutorCapabilities{
-		LLM: true,
-		// All others false - LLM doesn't support command, script, shell, container, subdag
+	executor.RegisterExecutor(core.ExecutorTypeChat, newChatExecutor, nil, core.ExecutorCapabilities{
+		Chat: true,
+		// All others false - chat doesn't support command, script, shell, container, subdag
 	})
 }

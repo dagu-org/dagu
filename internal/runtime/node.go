@@ -157,13 +157,13 @@ func (n *Node) Execute(ctx context.Context) error {
 		return err
 	}
 
-	// Check if executor supports LLM message handling
-	llmHandler, _ := cmd.(executor.LLMMessageHandler)
+	// Check if executor supports chat message handling
+	chatHandler, _ := cmd.(executor.ChatMessageHandler)
 
-	// Set LLM context from prior steps
-	if llmHandler != nil {
-		if messages := n.GetLLMMessages(); len(messages) > 0 {
-			llmHandler.SetContext(messages)
+	// Set chat context from prior steps
+	if chatHandler != nil {
+		if messages := n.GetChatMessages(); len(messages) > 0 {
+			chatHandler.SetContext(messages)
 		}
 	}
 
@@ -176,9 +176,9 @@ func (n *Node) Execute(ctx context.Context) error {
 	n.SetError(err)
 	n.SetExitCode(exitCode)
 
-	// Capture LLM messages after execution
-	if llmHandler != nil {
-		n.SetLLMMessages(llmHandler.GetMessages())
+	// Capture chat messages after execution
+	if chatHandler != nil {
+		n.SetChatMessages(chatHandler.GetMessages())
 	}
 
 	if err := n.captureOutput(ctx); err != nil {

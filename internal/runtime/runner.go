@@ -30,8 +30,8 @@ var (
 	ErrDeadlockDetected = errors.New("deadlock detected: no runnable nodes but DAG not finished")
 )
 
-// LLMMessagesHandler handles LLM conversation messages for persistence.
-type LLMMessagesHandler interface {
+// ChatMessagesHandler handles chat conversation messages for persistence.
+type ChatMessagesHandler interface {
 	// WriteStepMessages writes messages for a single step.
 	WriteStepMessages(ctx context.Context, stepName string, messages []execution.LLMMessage) error
 	// ReadStepMessages reads messages for a single step.
@@ -51,7 +51,7 @@ type Runner struct {
 	onFailure       *core.Step
 	onCancel        *core.Step
 	dagRunID        string
-	messagesHandler LLMMessagesHandler
+	messagesHandler ChatMessagesHandler
 
 	canceled  int32
 	mu        sync.RWMutex
@@ -102,7 +102,7 @@ type Config struct {
 	OnFailure       *core.Step
 	OnCancel        *core.Step
 	DAGRunID        string
-	MessagesHandler LLMMessagesHandler
+	MessagesHandler ChatMessagesHandler
 }
 
 // Run runs the plan of steps.
@@ -387,8 +387,8 @@ func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, p
 
 	ctx = node.SetupEnv(ctx)
 
-	// Setup LLM messages from dependencies before execution
-	r.setupLLMMessages(ctx, node)
+	// Setup chat messages from dependencies before execution
+	r.setupChatMessages(ctx, node)
 
 ExecRepeat: // repeat execution
 	for !r.isCanceled() {
@@ -423,9 +423,9 @@ ExecRepeat: // repeat execution
 		node.SetStatus(core.NodeSucceeded)
 	}
 
-	// Save LLM messages after successful execution
+	// Save chat messages after successful execution
 	if node.State().Status == core.NodeSucceeded {
-		r.saveLLMMessages(ctx, node)
+		r.saveChatMessages(ctx, node)
 	}
 
 	if err := r.teardownNode(node); err != nil {
@@ -459,14 +459,14 @@ func (r *Runner) teardownNode(node *Node) error {
 	return nil
 }
 
-// setupLLMMessages loads and merges LLM messages from dependent steps.
-func (r *Runner) setupLLMMessages(ctx context.Context, node *Node) {
+// setupChatMessages loads and merges chat messages from dependent steps.
+func (r *Runner) setupChatMessages(ctx context.Context, node *Node) {
 	if r.messagesHandler == nil {
 		return
 	}
 
 	step := node.Step()
-	if step.ExecutorConfig.Type != core.ExecutorTypeLLM {
+	if step.ExecutorConfig.Type != core.ExecutorTypeChat {
 		return
 	}
 
@@ -479,7 +479,7 @@ func (r *Runner) setupLLMMessages(ctx context.Context, node *Node) {
 	for _, dep := range step.Depends {
 		msgs, err := r.messagesHandler.ReadStepMessages(ctx, dep)
 		if err != nil {
-			logger.Warn(ctx, "Failed to read LLM messages for dependency",
+			logger.Warn(ctx, "Failed to read chat messages for dependency",
 				tag.Step(dep), tag.Error(err))
 			continue
 		}
@@ -489,29 +489,29 @@ func (r *Runner) setupLLMMessages(ctx context.Context, node *Node) {
 	// Deduplicate system messages (keep only first)
 	inherited = execution.DeduplicateSystemMessages(inherited)
 	if len(inherited) > 0 {
-		node.SetLLMMessages(inherited)
+		node.SetChatMessages(inherited)
 	}
 }
 
-// saveLLMMessages saves the node's LLM messages to the handler.
-func (r *Runner) saveLLMMessages(ctx context.Context, node *Node) {
+// saveChatMessages saves the node's chat messages to the handler.
+func (r *Runner) saveChatMessages(ctx context.Context, node *Node) {
 	if r.messagesHandler == nil {
 		return
 	}
 
 	step := node.Step()
-	if step.ExecutorConfig.Type != core.ExecutorTypeLLM {
+	if step.ExecutorConfig.Type != core.ExecutorTypeChat {
 		return
 	}
 
-	savedMsgs := node.GetLLMMessages()
+	savedMsgs := node.GetChatMessages()
 	if len(savedMsgs) == 0 {
 		return
 	}
 
 	// Direct write - no read-modify-write cycle
 	if err := r.messagesHandler.WriteStepMessages(ctx, step.Name, savedMsgs); err != nil {
-		logger.Warn(ctx, "Failed to write LLM messages", tag.Error(err))
+		logger.Warn(ctx, "Failed to write chat messages", tag.Error(err))
 	}
 }
 

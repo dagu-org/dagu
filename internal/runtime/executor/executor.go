@@ -80,8 +80,8 @@ type RunParams struct {
 	Params string
 }
 
-// LLMMessageHandler is an interface for executors that handle LLM conversation messages.
-type LLMMessageHandler interface {
+// ChatMessageHandler is an interface for executors that handle chat conversation messages.
+type ChatMessageHandler interface {
 	SetContext([]execution.LLMMessage)
 	GetMessages() []execution.LLMMessage
 }

@@ -925,7 +925,7 @@ func (a *Agent) newRunner(attempt execution.DAGRunAttempt) *runtime.Runner {
 		Delay:           a.dag.Delay,
 		Dry:             a.dry,
 		DAGRunID:        a.dagRunID,
-		MessagesHandler: attempt, // Attempt implements LLMMessagesHandler
+		MessagesHandler: attempt, // Attempt implements ChatMessagesHandler
 	}
 
 	if a.dag.HandlerOn.Init != nil {

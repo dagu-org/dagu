@@ -1578,17 +1578,17 @@ func TestLogOutputMode(t *testing.T) {
 	})
 }
 
-func TestNodeLLMMessages(t *testing.T) {
+func TestNodeChatMessages(t *testing.T) {
 	t.Parallel()
 
 	t.Run("SetAndGetMessages", func(t *testing.T) {
 		t.Parallel()
 
-		step := core.Step{Name: "test-llm-step"}
+		step := core.Step{Name: "test-chat-step"}
 		node := runtime.NewNode(step, runtime.NodeState{})
 
 		// Initially should be empty
-		assert.Empty(t, node.GetLLMMessages())
+		assert.Empty(t, node.GetChatMessages())
 
 		// Set messages
 		messages := []execution.LLMMessage{
@@ -1596,10 +1596,10 @@ func TestNodeLLMMessages(t *testing.T) {
 			{Role: execution.RoleUser, Content: "hello"},
 			{Role: execution.RoleAssistant, Content: "hi there"},
 		}
-		node.SetLLMMessages(messages)
+		node.SetChatMessages(messages)
 
 		// Should return the messages
-		assert.Equal(t, messages, node.GetLLMMessages())
+		assert.Equal(t, messages, node.GetChatMessages())
 	})
 
 	t.Run("EmptyMessages", func(t *testing.T) {
@@ -1609,8 +1609,8 @@ func TestNodeLLMMessages(t *testing.T) {
 		node := runtime.NewNode(step, runtime.NodeState{})
 
 		// Set empty messages
-		node.SetLLMMessages([]execution.LLMMessage{})
-		assert.Empty(t, node.GetLLMMessages())
+		node.SetChatMessages([]execution.LLMMessage{})
+		assert.Empty(t, node.GetChatMessages())
 	})
 
 	t.Run("NilMessages", func(t *testing.T) {
@@ -1620,8 +1620,8 @@ func TestNodeLLMMessages(t *testing.T) {
 		node := runtime.NewNode(step, runtime.NodeState{})
 
 		// Set nil messages
-		node.SetLLMMessages(nil)
-		assert.Nil(t, node.GetLLMMessages())
+		node.SetChatMessages(nil)
+		assert.Nil(t, node.GetChatMessages())
 	})
 
 	t.Run("ConcurrentAccess", func(t *testing.T) {
@@ -1637,8 +1637,8 @@ func TestNodeLLMMessages(t *testing.T) {
 				messages := []execution.LLMMessage{
 					{Role: execution.RoleUser, Content: fmt.Sprintf("message %d", id)},
 				}
-				node.SetLLMMessages(messages)
-				_ = node.GetLLMMessages()
+				node.SetChatMessages(messages)
+				_ = node.GetChatMessages()
 				done <- true
 			}(i)
 		}

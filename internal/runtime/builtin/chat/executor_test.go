@@ -1,4 +1,4 @@
-package llm
+package chat
 
 import (
 	"testing"
@@ -16,7 +16,7 @@ func TestExecutor_MessageSaving(t *testing.T) {
 
 		executor := &Executor{
 			step: core.Step{
-				LLM: &core.LLMConfig{
+				Chat: &core.ChatConfig{
 					Provider: "openai",
 					Model:    "gpt-4o",
 				},
@@ -59,7 +59,7 @@ func TestExecutor_MessageSaving(t *testing.T) {
 
 		executor := &Executor{
 			step: core.Step{
-				LLM: &core.LLMConfig{
+				Chat: &core.ChatConfig{
 					Provider: "gemini",
 					Model:    "gemini-pro",
 				},
