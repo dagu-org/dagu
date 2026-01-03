@@ -261,14 +261,15 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	if err := buildStepSubDAG(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("subDAG", err))
 	}
+	if err := buildStepExecutor(ctx, s, result); err != nil {
+		errs = append(errs, wrapTransformError("executor", err))
+	}
+	// LLM must be after executor so we know if type supports LLM
 	if err := buildStepLLM(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("llm", err))
 	}
 	if err := buildStepMessages(s, result); err != nil {
 		errs = append(errs, wrapTransformError("messages", err))
-	}
-	if err := buildStepExecutor(ctx, s, result); err != nil {
-		errs = append(errs, wrapTransformError("executor", err))
 	}
 	if err := buildStepCommand(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("command", err))
