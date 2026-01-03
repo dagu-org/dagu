@@ -253,7 +253,7 @@ func renderHTML(nodes []*execution.Node) string {
 			statusClass = "status-running"
 		case "skipped":
 			statusClass = "status-skipped"
-		case "partial success":
+		case "partially_succeeded":
 			statusClass = "status-partial-success"
 		case "aborted":
 			statusClass = "status-aborted"
@@ -593,7 +593,7 @@ func renderHTMLWithDAGInfo(dagStatus execution.DAGRunStatus) string {
 			nodeStatusClass = "status-running"
 		case "skipped":
 			nodeStatusClass = "status-skipped"
-		case "partial success":
+		case "partially_succeeded":
 			nodeStatusClass = "status-partial-success"
 		case "aborted":
 			nodeStatusClass = "status-aborted"
