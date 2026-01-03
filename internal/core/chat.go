@@ -24,8 +24,9 @@ type LLMConfig struct {
 	TopP *float64 `json:"topP,omitempty"`
 	// BaseURL is a custom API endpoint.
 	BaseURL string `json:"baseURL,omitempty"`
-	// APIKey overrides the default environment variable for the API key.
-	APIKey string `json:"apiKey,omitempty"`
+	// APIKeyName is the name of the environment variable containing the API key.
+	// If not specified, the default environment variable for the provider is used.
+	APIKeyName string `json:"apiKeyName,omitempty"`
 	// Stream enables or disables streaming output.
 	// Default is true.
 	Stream *bool `json:"stream,omitempty"`

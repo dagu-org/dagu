@@ -1856,9 +1856,9 @@
           "type": "string",
           "description": "Custom API endpoint URL. Overrides the default endpoint for the provider."
         },
-        "apiKey": {
+        "apiKeyName": {
           "type": "string",
-          "description": "API key for authentication. Overrides the default environment variable (e.g., OPENAI_API_KEY)."
+          "description": "Name of the environment variable containing the API key. If not specified, the default for the provider is used (e.g., OPENAI_API_KEY)."
         },
         "stream": {
           "type": "boolean",

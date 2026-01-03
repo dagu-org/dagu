@@ -13,6 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec/types"
+	"github.com/dagu-org/dagu/internal/llm"
 )
 
 // step defines a step in the DAG.
@@ -147,8 +148,9 @@ type llmConfig struct {
 	TopP *float64 `yaml:"topP,omitempty"`
 	// BaseURL is a custom API endpoint.
 	BaseURL string `yaml:"baseURL,omitempty"`
-	// APIKey overrides the default environment variable for the API key.
-	APIKey string `yaml:"apiKey,omitempty"`
+	// APIKeyName is the name of the environment variable containing the API key.
+	// If not specified, the default environment variable for the provider is used.
+	APIKeyName string `yaml:"apiKeyName,omitempty"`
 	// Stream enables or disables streaming output.
 	// Default is true.
 	Stream *bool `yaml:"stream,omitempty"`
@@ -303,6 +305,9 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	}
 	if err := validateLLM(result); err != nil {
 		errs = append(errs, wrapTransformError("llm", err))
+	}
+	if err := validateMessages(result); err != nil {
+		errs = append(errs, wrapTransformError("messages", err))
 	}
 
 	// Validate that stdout and stderr don't point to the same file
@@ -1009,6 +1014,21 @@ func validateLLM(result *core.Step) error {
 	return nil
 }
 
+// validateMessages checks if the executor type supports the messages field.
+func validateMessages(result *core.Step) error {
+	if len(result.Messages) == 0 {
+		return nil
+	}
+	if !core.SupportsLLM(result.ExecutorConfig.Type) {
+		return core.NewValidationError(
+			"messages",
+			result.Messages,
+			fmt.Errorf("executor type %q does not support messages field; use type: chat", result.ExecutorConfig.Type),
+		)
+	}
+	return nil
+}
+
 // validateConflicts checks for mutual exclusivity between step fields.
 // This only checks new-vs-legacy format conflicts (type/config vs executor).
 // Execution type conflicts are handled by capability-based validators.
@@ -1234,22 +1254,15 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 
 	// Validate provider if specified
 	if cfg.Provider != "" {
-		validProviders := map[string]bool{
-			"openai": true, "anthropic": true, "gemini": true,
-			"openrouter": true, "local": true,
-			// Aliases for local provider
-			"ollama": true, "vllm": true, "llama": true,
-		}
-		if !validProviders[cfg.Provider] {
-			return core.NewValidationError("llm.provider", cfg.Provider,
-				fmt.Errorf("invalid provider: must be one of openai, anthropic, gemini, openrouter, local (or aliases: ollama, vllm, llama)"))
+		if _, err := llm.ParseProviderType(cfg.Provider); err != nil {
+			return core.NewValidationError("llm.provider", cfg.Provider, err)
 		}
 	}
 
 	// Validate model is specified
 	if cfg.Model == "" {
 		return core.NewValidationError("llm.model", cfg.Model,
-			fmt.Errorf("model is required"))
+			fmt.Errorf("model must be specified when llm config is provided"))
 	}
 
 	// Validate temperature range
@@ -1257,6 +1270,14 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 		if *cfg.Temperature < 0.0 || *cfg.Temperature > 2.0 {
 			return core.NewValidationError("llm.temperature", *cfg.Temperature,
 				fmt.Errorf("temperature must be between 0.0 and 2.0"))
+		}
+	}
+
+	// Validate maxTokens if specified
+	if cfg.MaxTokens != nil {
+		if *cfg.MaxTokens < 1 {
+			return core.NewValidationError("llm.maxTokens", *cfg.MaxTokens,
+				fmt.Errorf("maxTokens must be at least 1"))
 		}
 	}
 
@@ -1276,7 +1297,7 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 		MaxTokens:   cfg.MaxTokens,
 		TopP:        cfg.TopP,
 		BaseURL:     cfg.BaseURL,
-		APIKey:      cfg.APIKey,
+		APIKeyName:  cfg.APIKeyName,
 		Stream:      cfg.Stream,
 	}
 

@@ -8,6 +8,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	llmpkg "github.com/dagu-org/dagu/internal/llm"
@@ -45,23 +47,21 @@ func newChatExecutor(_ context.Context, step core.Step) (executor.Executor, erro
 		return nil, fmt.Errorf("invalid provider: %w", err)
 	}
 
+	// Determine which environment variable to use for API key
+	apiKeyEnvVar := cfg.APIKeyName
+	if apiKeyEnvVar == "" {
+		apiKeyEnvVar = llmpkg.DefaultAPIKeyEnvVar(providerType)
+	}
+
 	// Build provider config
 	providerCfg := llmpkg.Config{
-		APIKey:          cfg.APIKey,
+		APIKey:          os.Getenv(apiKeyEnvVar),
 		BaseURL:         cfg.BaseURL,
 		Timeout:         5 * time.Minute,
 		MaxRetries:      3,
 		InitialInterval: 1 * time.Second,
 		MaxInterval:     30 * time.Second,
 		Multiplier:      2.0,
-	}
-
-	// Use default API key from environment if not specified
-	if providerCfg.APIKey == "" {
-		envVar := llmpkg.DefaultAPIKeyEnvVar(providerType)
-		if envVar != "" {
-			providerCfg.APIKey = os.Getenv(envVar)
-		}
 	}
 
 	// Use default base URL if not specified
@@ -202,7 +202,9 @@ func (e *Executor) Run(ctx context.Context) error {
 			}
 			if event.Delta != "" {
 				responseContent += event.Delta
-				_, _ = e.stdout.Write([]byte(event.Delta))
+				if _, err := e.stdout.Write([]byte(event.Delta)); err != nil {
+					logger.Error(ctx, "failed to write streaming response", tag.Error(err))
+				}
 			}
 			// Capture usage from final event
 			if event.Usage != nil {
@@ -210,7 +212,9 @@ func (e *Executor) Run(ctx context.Context) error {
 			}
 		}
 		// Add newline after streaming response
-		_, _ = e.stdout.Write([]byte("\n"))
+		if _, err := e.stdout.Write([]byte("\n")); err != nil {
+			logger.Error(ctx, "failed to write newline", tag.Error(err))
+		}
 	} else {
 		resp, err := e.provider.Chat(ctx, req)
 		if err != nil {
@@ -218,7 +222,9 @@ func (e *Executor) Run(ctx context.Context) error {
 		}
 		responseContent = resp.Content
 		usage = &resp.Usage
-		_, _ = fmt.Fprintln(e.stdout, responseContent)
+		if _, err := fmt.Fprintln(e.stdout, responseContent); err != nil {
+			logger.Error(ctx, "failed to write response", tag.Error(err))
+		}
 	}
 
 	// Build metadata for the assistant response

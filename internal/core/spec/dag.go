@@ -1187,6 +1187,14 @@ func buildLLM(_ BuildContext, d *dag) (*core.LLMConfig, error) {
 		}
 	}
 
+	// Validate maxTokens if specified
+	if cfg.MaxTokens != nil {
+		if *cfg.MaxTokens < 1 {
+			return nil, core.NewValidationError("llm.maxTokens", *cfg.MaxTokens,
+				fmt.Errorf("maxTokens must be at least 1"))
+		}
+	}
+
 	return &core.LLMConfig{
 		Provider:    cfg.Provider,
 		Model:       cfg.Model,
@@ -1195,7 +1203,7 @@ func buildLLM(_ BuildContext, d *dag) (*core.LLMConfig, error) {
 		MaxTokens:   cfg.MaxTokens,
 		TopP:        cfg.TopP,
 		BaseURL:     cfg.BaseURL,
-		APIKey:      cfg.APIKey,
+		APIKeyName:  cfg.APIKeyName,
 		Stream:      cfg.Stream,
 	}, nil
 }
