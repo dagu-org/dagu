@@ -8,6 +8,30 @@ const (
 	LLMRoleTool      = "tool"
 )
 
+// ThinkingEffort constants for reasoning/thinking depth.
+const (
+	ThinkingEffortLow    = "low"
+	ThinkingEffortMedium = "medium"
+	ThinkingEffortHigh   = "high"
+	ThinkingEffortXHigh  = "xhigh"
+)
+
+// ThinkingConfig contains configuration for extended thinking/reasoning.
+type ThinkingConfig struct {
+	// Enabled activates thinking mode for supported models.
+	Enabled bool `json:"enabled,omitempty"`
+	// Effort controls reasoning depth: low, medium, high, xhigh.
+	// Maps to provider-specific parameters.
+	Effort string `json:"effort,omitempty"`
+	// BudgetTokens sets explicit token budget (provider-specific).
+	// For Anthropic: minimum 1024, max 128K.
+	// For Gemini 2.5: range 128-32768.
+	BudgetTokens *int `json:"budgetTokens,omitempty"`
+	// IncludeInOutput includes thinking blocks in stdout.
+	// Default is false for consistency across providers.
+	IncludeInOutput bool `json:"includeInOutput,omitempty"`
+}
+
 // LLMConfig contains the configuration for LLM-based executors (chat, agent, etc.).
 type LLMConfig struct {
 	// Provider is the LLM provider (openai, anthropic, gemini, openrouter, local).
@@ -30,6 +54,10 @@ type LLMConfig struct {
 	// Stream enables or disables streaming output.
 	// Default is true.
 	Stream *bool `json:"stream,omitempty"`
+	// Thinking enables extended thinking/reasoning mode.
+	// Provider-specific: Anthropic uses budget_tokens, OpenAI uses reasoning.effort,
+	// Gemini uses thinkingLevel/thinkingBudget, OpenRouter normalizes across providers.
+	Thinking *ThinkingConfig `json:"thinking,omitempty"`
 }
 
 // LLMMessage represents a message in the LLM conversation.

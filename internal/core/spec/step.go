@@ -133,6 +133,18 @@ type retryPolicy struct {
 }
 
 // llmConfig defines the LLM configuration for a step.
+// thinkingConfig defines thinking/reasoning mode configuration for YAML parsing.
+type thinkingConfig struct {
+	// Enabled activates thinking mode for supported models.
+	Enabled bool `yaml:"enabled,omitempty"`
+	// Effort controls reasoning depth: low, medium, high, xhigh.
+	Effort string `yaml:"effort,omitempty"`
+	// BudgetTokens sets explicit token budget (provider-specific).
+	BudgetTokens *int `yaml:"budgetTokens,omitempty"`
+	// IncludeInOutput includes thinking blocks in stdout.
+	IncludeInOutput bool `yaml:"includeInOutput,omitempty"`
+}
+
 type llmConfig struct {
 	// Provider is the LLM provider (openai, anthropic, gemini, openrouter, local).
 	Provider string `yaml:"provider,omitempty"`
@@ -154,6 +166,8 @@ type llmConfig struct {
 	// Stream enables or disables streaming output.
 	// Default is true.
 	Stream *bool `yaml:"stream,omitempty"`
+	// Thinking enables extended thinking/reasoning mode.
+	Thinking *thinkingConfig `yaml:"thinking,omitempty"`
 }
 
 // llmMessage defines a message in the LLM conversation.
@@ -1299,6 +1313,7 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 		BaseURL:     cfg.BaseURL,
 		APIKeyName:  cfg.APIKeyName,
 		Stream:      cfg.Stream,
+		Thinking:    buildThinkingConfig(cfg.Thinking),
 	}
 
 	// NOTE: Executor type is NOT set here - it must be specified explicitly
@@ -1306,6 +1321,19 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 	// for future executor types like type: agent.
 
 	return nil
+}
+
+// buildThinkingConfig converts thinkingConfig to core.ThinkingConfig.
+func buildThinkingConfig(cfg *thinkingConfig) *core.ThinkingConfig {
+	if cfg == nil {
+		return nil
+	}
+	return &core.ThinkingConfig{
+		Enabled:         cfg.Enabled,
+		Effort:          cfg.Effort,
+		BudgetTokens:    cfg.BudgetTokens,
+		IncludeInOutput: cfg.IncludeInOutput,
+	}
 }
 
 // buildStepMessages parses the messages field for chat steps.

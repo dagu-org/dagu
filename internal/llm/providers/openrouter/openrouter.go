@@ -144,6 +144,21 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 		chatReq.Stop = req.Stop
 	}
 
+	// Add reasoning configuration if enabled
+	// OpenRouter normalizes reasoning across different providers
+	if req.Thinking != nil && req.Thinking.Enabled {
+		reasoning := &reasoningRequest{}
+		if req.Thinking.Effort != "" {
+			reasoning.Effort = req.Thinking.Effort
+		} else {
+			reasoning.Effort = "medium" // Default effort
+		}
+		if req.Thinking.BudgetTokens != nil {
+			reasoning.MaxTokens = req.Thinking.BudgetTokens
+		}
+		chatReq.Reasoning = reasoning
+	}
+
 	return json.Marshal(chatReq)
 }
 
@@ -295,13 +310,20 @@ type message struct {
 }
 
 type chatCompletionRequest struct {
-	Model       string    `json:"model"`
-	Messages    []message `json:"messages"`
-	Temperature *float64  `json:"temperature,omitempty"`
-	MaxTokens   *int      `json:"max_tokens,omitempty"`
-	TopP        *float64  `json:"top_p,omitempty"`
-	Stop        []string  `json:"stop,omitempty"`
-	Stream      bool      `json:"stream,omitempty"`
+	Model       string            `json:"model"`
+	Messages    []message         `json:"messages"`
+	Temperature *float64          `json:"temperature,omitempty"`
+	MaxTokens   *int              `json:"max_tokens,omitempty"`
+	TopP        *float64          `json:"top_p,omitempty"`
+	Stop        []string          `json:"stop,omitempty"`
+	Stream      bool              `json:"stream,omitempty"`
+	Reasoning   *reasoningRequest `json:"reasoning,omitempty"`
+}
+
+// reasoningRequest represents OpenRouter's unified reasoning configuration.
+type reasoningRequest struct {
+	Effort    string `json:"effort,omitempty"`
+	MaxTokens *int   `json:"max_tokens,omitempty"`
 }
 
 type chatCompletionResponse struct {

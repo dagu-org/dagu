@@ -172,7 +172,40 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 		chatReq.StopSequences = req.Stop
 	}
 
+	// Add thinking configuration if enabled
+	if req.Thinking != nil && req.Thinking.Enabled {
+		budgetTokens := p.getThinkingBudget(req.Thinking)
+		chatReq.Thinking = &thinkingRequest{
+			Type:        "enabled",
+			BudgetToken: budgetTokens,
+		}
+	}
+
 	return json.Marshal(chatReq)
+}
+
+// getThinkingBudget determines the token budget for thinking mode.
+// Uses explicit BudgetTokens if provided, otherwise maps effort level to tokens.
+func (p *Provider) getThinkingBudget(thinking *llm.ThinkingRequest) int {
+	// Use explicit budget if provided
+	if thinking.BudgetTokens != nil && *thinking.BudgetTokens > 0 {
+		return *thinking.BudgetTokens
+	}
+
+	// Map effort level to budget tokens
+	switch thinking.Effort {
+	case "low":
+		return 1024
+	case "medium":
+		return 4096
+	case "high":
+		return 16384
+	case "xhigh":
+		return 65536
+	default:
+		// Default to medium effort
+		return 4096
+	}
 }
 
 func (p *Provider) doRequest(ctx context.Context, body []byte, streaming bool) (io.ReadCloser, error) {
@@ -339,14 +372,21 @@ type message struct {
 }
 
 type messagesRequest struct {
-	Model         string    `json:"model"`
-	Messages      []message `json:"messages"`
-	System        string    `json:"system,omitempty"`
-	MaxTokens     int       `json:"max_tokens"`
-	Temperature   *float64  `json:"temperature,omitempty"`
-	TopP          *float64  `json:"top_p,omitempty"`
-	StopSequences []string  `json:"stop_sequences,omitempty"`
-	Stream        bool      `json:"stream,omitempty"`
+	Model         string           `json:"model"`
+	Messages      []message        `json:"messages"`
+	System        string           `json:"system,omitempty"`
+	MaxTokens     int              `json:"max_tokens"`
+	Temperature   *float64         `json:"temperature,omitempty"`
+	TopP          *float64         `json:"top_p,omitempty"`
+	StopSequences []string         `json:"stop_sequences,omitempty"`
+	Stream        bool             `json:"stream,omitempty"`
+	Thinking      *thinkingRequest `json:"thinking,omitempty"`
+}
+
+// thinkingRequest represents Anthropic's extended thinking configuration.
+type thinkingRequest struct {
+	Type        string `json:"type"`
+	BudgetToken int    `json:"budget_tokens"`
 }
 
 type contentBlock struct {

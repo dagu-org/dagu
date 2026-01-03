@@ -1205,6 +1205,7 @@ func buildLLM(_ BuildContext, d *dag) (*core.LLMConfig, error) {
 		BaseURL:     cfg.BaseURL,
 		APIKeyName:  cfg.APIKeyName,
 		Stream:      cfg.Stream,
+		Thinking:    buildThinkingConfig(cfg.Thinking),
 	}, nil
 }
 

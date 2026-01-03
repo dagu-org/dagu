@@ -186,11 +186,37 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest) ([]byte, error) {
 		hasConfig = true
 	}
 
+	// Add thinking configuration if enabled
+	if req.Thinking != nil && req.Thinking.Enabled {
+		// Use explicit budget if provided
+		if req.Thinking.BudgetTokens != nil {
+			genConfig.ThinkingBudget = req.Thinking.BudgetTokens
+		} else {
+			// Map effort level to thinkingLevel
+			genConfig.ThinkingLevel = p.mapEffortToThinkingLevel(req.Thinking.Effort)
+		}
+		hasConfig = true
+	}
+
 	if hasConfig {
 		geminiReq.GenerationConfig = genConfig
 	}
 
 	return json.Marshal(geminiReq)
+}
+
+// mapEffortToThinkingLevel maps unified effort levels to Gemini thinkingLevel.
+func (p *Provider) mapEffortToThinkingLevel(effort string) string {
+	switch effort {
+	case "low":
+		return "low"
+	case "medium":
+		return "medium"
+	case "high", "xhigh":
+		return "high"
+	default:
+		return "medium"
+	}
 }
 
 func (p *Provider) doRequest(ctx context.Context, endpoint string, body []byte, streaming bool) (io.ReadCloser, error) {
@@ -352,6 +378,10 @@ type generationConfig struct {
 	MaxOutputTokens *int     `json:"maxOutputTokens,omitempty"`
 	TopP            *float64 `json:"topP,omitempty"`
 	StopSequences   []string `json:"stopSequences,omitempty"`
+	// ThinkingLevel for Gemini 3 models: minimal, low, medium, high
+	ThinkingLevel string `json:"thinkingLevel,omitempty"`
+	// ThinkingBudget for Gemini 2.5 models: 128-32768, 0=disable, -1=dynamic
+	ThinkingBudget *int `json:"thinkingBudget,omitempty"`
 }
 
 type generateContentRequest struct {

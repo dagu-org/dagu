@@ -1864,9 +1864,40 @@
           "type": "boolean",
           "default": true,
           "description": "Enable streaming output. When true (default), response tokens are streamed to stdout as they arrive."
+        },
+        "thinking": {
+          "$ref": "#/definitions/thinkingConfig",
+          "description": "Extended thinking/reasoning configuration. Enables deeper reasoning for complex tasks."
         }
       },
       "description": "LLM configuration. Supports OpenAI, Anthropic, Google Gemini, OpenRouter, and local models (Ollama/vLLM)."
+    },
+    "thinkingConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable extended thinking/reasoning mode. When true, the model uses additional computation for more thorough reasoning."
+        },
+        "effort": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "xhigh"],
+          "description": "Reasoning effort level. Maps to provider-specific settings: low (minimal reasoning), medium (default), high (thorough), xhigh (maximum, OpenAI GPT-5.2+ only)."
+        },
+        "budgetTokens": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Explicit token budget for thinking (provider-specific). Anthropic: 1024-128K, Gemini 2.5: 128-32768. Overrides effort-based defaults."
+        },
+        "includeInOutput": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include thinking blocks in stdout output. When false (default), only the final response is shown."
+        }
+      },
+      "description": "Configuration for extended thinking/reasoning capabilities. Provider support varies: Anthropic (Claude 3.7+), OpenAI (o1/o3/GPT-5), Gemini (2.5+), OpenRouter (unified)."
     },
     "llmMessage": {
       "type": "object",

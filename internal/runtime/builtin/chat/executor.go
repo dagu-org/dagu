@@ -142,6 +142,19 @@ func toLLMMessages(msgs []execution.LLMMessage) []llmpkg.Message {
 	return result
 }
 
+// toThinkingRequest converts core.ThinkingConfig to llmpkg.ThinkingRequest.
+func toThinkingRequest(cfg *core.ThinkingConfig) *llmpkg.ThinkingRequest {
+	if cfg == nil {
+		return nil
+	}
+	return &llmpkg.ThinkingRequest{
+		Enabled:         cfg.Enabled,
+		Effort:          cfg.Effort,
+		BudgetTokens:    cfg.BudgetTokens,
+		IncludeInOutput: cfg.IncludeInOutput,
+	}
+}
+
 // evalMessages evaluates variable substitution in message content.
 func evalMessages(ctx context.Context, msgs []execution.LLMMessage) ([]execution.LLMMessage, error) {
 	result := make([]execution.LLMMessage, len(msgs))
@@ -183,6 +196,7 @@ func (e *Executor) Run(ctx context.Context) error {
 		Temperature: cfg.Temperature,
 		MaxTokens:   cfg.MaxTokens,
 		TopP:        cfg.TopP,
+		Thinking:    toThinkingRequest(cfg.Thinking),
 	}
 
 	var responseContent string

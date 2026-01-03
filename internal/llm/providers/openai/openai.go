@@ -141,6 +141,25 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 		chatReq.Stop = req.Stop
 	}
 
+	// Add reasoning configuration if enabled
+	if req.Thinking != nil && req.Thinking.Enabled {
+		effort := req.Thinking.Effort
+		if effort == "" {
+			effort = "medium" // Default effort
+		}
+		chatReq.Reasoning = &reasoningRequest{Effort: effort}
+
+		// For reasoning models, use max_completion_tokens instead of max_tokens
+		if req.MaxTokens != nil {
+			chatReq.MaxCompletionTokens = req.MaxTokens
+			chatReq.MaxTokens = nil
+		}
+
+		// Reasoning models don't support temperature and topP
+		chatReq.Temperature = nil
+		chatReq.TopP = nil
+	}
+
 	// Include usage in stream for final event
 	if stream {
 		chatReq.StreamOptions = &streamOptions{IncludeUsage: true}
@@ -295,14 +314,21 @@ type streamOptions struct {
 }
 
 type chatCompletionRequest struct {
-	Model         string         `json:"model"`
-	Messages      []message      `json:"messages"`
-	Temperature   *float64       `json:"temperature,omitempty"`
-	MaxTokens     *int           `json:"max_tokens,omitempty"`
-	TopP          *float64       `json:"top_p,omitempty"`
-	Stop          []string       `json:"stop,omitempty"`
-	Stream        bool           `json:"stream,omitempty"`
-	StreamOptions *streamOptions `json:"stream_options,omitempty"`
+	Model               string            `json:"model"`
+	Messages            []message         `json:"messages"`
+	Temperature         *float64          `json:"temperature,omitempty"`
+	MaxTokens           *int              `json:"max_tokens,omitempty"`
+	MaxCompletionTokens *int              `json:"max_completion_tokens,omitempty"`
+	TopP                *float64          `json:"top_p,omitempty"`
+	Stop                []string          `json:"stop,omitempty"`
+	Stream              bool              `json:"stream,omitempty"`
+	StreamOptions       *streamOptions    `json:"stream_options,omitempty"`
+	Reasoning           *reasoningRequest `json:"reasoning,omitempty"`
+}
+
+// reasoningRequest represents OpenAI's reasoning configuration for o1/o3/GPT-5 models.
+type reasoningRequest struct {
+	Effort string `json:"effort"`
 }
 
 type chatCompletionResponse struct {

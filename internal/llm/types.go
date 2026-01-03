@@ -94,6 +94,19 @@ func DefaultConfig() Config {
 	}
 }
 
+// ThinkingRequest contains configuration for extended thinking/reasoning mode.
+// Each provider maps this to their native format.
+type ThinkingRequest struct {
+	// Enabled activates thinking mode.
+	Enabled bool
+	// Effort controls reasoning depth: low, medium, high, xhigh.
+	Effort string
+	// BudgetTokens sets explicit token budget (provider-specific).
+	BudgetTokens *int
+	// IncludeInOutput includes thinking blocks in the response content.
+	IncludeInOutput bool
+}
+
 // ChatRequest contains the input for a chat completion request.
 type ChatRequest struct {
 	// Model is the identifier of the model to use.
@@ -109,6 +122,9 @@ type ChatRequest struct {
 	TopP *float64
 	// Stop is a list of sequences where the model will stop generating.
 	Stop []string
+	// Thinking enables extended thinking/reasoning mode.
+	// Provider-specific handling in each provider implementation.
+	Thinking *ThinkingRequest
 }
 
 // ChatResponse contains the output from a chat completion request.
