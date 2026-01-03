@@ -244,7 +244,7 @@ func (e *Executor) Run(ctx context.Context) error {
 
 func init() {
 	executor.RegisterExecutor(core.ExecutorTypeChat, newChatExecutor, nil, core.ExecutorCapabilities{
-		Chat: true,
+		LLM: true,
 		// All others false - chat doesn't support command, script, shell, container, subdag
 	})
 }

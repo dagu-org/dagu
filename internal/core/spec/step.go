@@ -974,7 +974,7 @@ func validateLLM(result *core.Step) error {
 	if result.LLM == nil {
 		return nil
 	}
-	if !core.SupportsChat(result.ExecutorConfig.Type) {
+	if !core.SupportsLLM(result.ExecutorConfig.Type) {
 		return core.NewValidationError(
 			"llm",
 			result.LLM,
@@ -1215,10 +1215,14 @@ func buildStepContainer(ctx StepBuildContext, s *step, result *core.Step) error 
 // If step has no llm: config but DAG has one, the DAG config is inherited.
 // If step has llm: config, it completely overrides DAG-level (full override pattern).
 func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
-	// If step has no LLM config, check if DAG has one to inherit
+	// Only process LLM for executors that support it
+	if !core.SupportsLLM(result.ExecutorConfig.Type) {
+		return nil
+	}
+
+	// If step has no LLM config, inherit from DAG
 	if s.LLM == nil {
 		if ctx.dag != nil && ctx.dag.LLM != nil {
-			// Inherit DAG-level LLM config
 			result.LLM = ctx.dag.LLM
 		}
 		return nil

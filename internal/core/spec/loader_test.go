@@ -261,13 +261,23 @@ mailOn:
 	t.Run("InheritBaseConfig", func(t *testing.T) {
 		t.Parallel()
 
-		baseDAG := createTempYAMLFile(t, `env:
+		// Base config with env, logDir, and LLM
+		baseDAG := createTempYAMLFile(t, `
+env:
   BASE_ENV: "base_value"
   OVERWRITE_ENV: "base_overwrite_value"
 
 logDir: "/base/logs"
+
+llm:
+  provider: openai
+  model: gpt-4o
+  system: "Base system prompt"
 `)
-		testDAG := createTempYAMLFile(t, `env:
+
+		// Child DAG inherits all base config fields
+		childDAG := createTempYAMLFile(t, `
+env:
   SUB_ENV: "sub_value"
   OVERWRITE_ENV: "sub_overwrite_value"
 
@@ -275,18 +285,69 @@ steps:
   - name: "step1"
     command: echo "step1"
 `)
-		dag, err := spec.Load(context.Background(), testDAG, spec.WithBaseConfig(baseDAG))
-		require.NotNil(t, dag)
+		dag, err := spec.Load(context.Background(), childDAG, spec.WithBaseConfig(baseDAG))
 		require.NoError(t, err)
+		require.NotNil(t, dag)
 
-		// Check if fields are inherited correctly
-		assert.Equal(t, "/base/logs", dag.LogDir)
+		// Env inheritance: base + child merged, child overrides base
 		assert.Contains(t, dag.Env, "BASE_ENV=base_value")
 		assert.Contains(t, dag.Env, "SUB_ENV=sub_value")
 		assert.Contains(t, dag.Env, "OVERWRITE_ENV=sub_overwrite_value")
-		// 3 from base + 1 from child. For now we keep the base env vars that are overwritten in the sub DAG
-		// TODO: This should be changed not
-		assert.Len(t, dag.Env, 4)
+
+		// LogDir inherited from base
+		assert.Equal(t, "/base/logs", dag.LogDir)
+
+		// LLM inherited from base
+		require.NotNil(t, dag.LLM)
+		assert.Equal(t, "openai", dag.LLM.Provider)
+		assert.Equal(t, "gpt-4o", dag.LLM.Model)
+		assert.Equal(t, "Base system prompt", dag.LLM.System)
+	})
+
+	t.Run("OverrideBaseConfig", func(t *testing.T) {
+		t.Parallel()
+
+		// Base config with env, logDir, and LLM
+		baseDAG := createTempYAMLFile(t, `
+env:
+  BASE_ENV: "base_value"
+
+logDir: "/base/logs"
+
+llm:
+  provider: openai
+  model: gpt-4o
+  system: "Base system prompt"
+`)
+
+		// Child DAG overrides specific fields
+		overrideDAG := createTempYAMLFile(t, `
+logDir: "/override/logs"
+
+llm:
+  provider: anthropic
+  model: claude-sonnet-4-20250514
+  system: "Override system prompt"
+
+steps:
+  - name: "step1"
+    command: echo "step1"
+`)
+		dag, err := spec.Load(context.Background(), overrideDAG, spec.WithBaseConfig(baseDAG))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+
+		// LogDir overridden
+		assert.Equal(t, "/override/logs", dag.LogDir)
+
+		// LLM overridden
+		require.NotNil(t, dag.LLM)
+		assert.Equal(t, "anthropic", dag.LLM.Provider)
+		assert.Equal(t, "claude-sonnet-4-20250514", dag.LLM.Model)
+		assert.Equal(t, "Override system prompt", dag.LLM.System)
+
+		// Env still inherited from base (since not specified in override DAG)
+		assert.Contains(t, dag.Env, "BASE_ENV=base_value")
 	})
 }
 
