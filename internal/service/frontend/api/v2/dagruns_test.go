@@ -476,7 +476,7 @@ func TestApprovalInputPassing(t *testing.T) {
 
 	// Find the use-approval-data step and verify it received the inputs
 	for _, node := range details.DagRun.Nodes {
-		if node.Name == "use-approval-data" {
+		if node.Step.Name == "use-approval-data" {
 			require.Equal(t, api.NodeStatus(core.NodeSucceeded), node.Status)
 		}
 	}
@@ -545,7 +545,7 @@ func TestApproveSubDAGRunStep(t *testing.T) {
 	// Find the call-child step and get its sub-dag run ID
 	var subDAGRunId string
 	for _, node := range details.DagRun.Nodes {
-		if node.Name == "call-child" && node.SubRuns != nil && len(*node.SubRuns) > 0 {
+		if node.Step.Name == "call-child" && node.SubRuns != nil && len(*node.SubRuns) > 0 {
 			subDAGRunId = (*node.SubRuns)[0].DagRunId
 			break
 		}
