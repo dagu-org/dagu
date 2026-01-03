@@ -23,6 +23,7 @@ func TestReporter(t *testing.T) {
 		"no error mail":       testNoErrorMail,
 		"create success mail": testSuccessMail,
 		"create wait mail":    testWaitMail,
+		"no wait mail":        testNoWaitMail,
 		"create summary":      testRenderSummary,
 		"create node list":    testRenderTable,
 	} {
@@ -238,6 +239,19 @@ func testWaitMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, n
 	require.Contains(t, mock.subject, "Waiting")
 	require.Contains(t, mock.subject, "test DAG")
 	require.Equal(t, 1, mock.count)
+}
+
+func testNoWaitMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*execution.Node) {
+	dag.MailOn.Failure = false
+	dag.MailOn.Success = false
+	dag.MailOn.Wait = false
+
+	err := rp.send(context.Background(), dag, execution.DAGRunStatus{
+		Status: core.Wait,
+		Nodes:  nodes,
+	}, nil)
+	require.NoError(t, err)
+	require.Equal(t, 0, mock.count)
 }
 
 func testRenderSummary(t *testing.T, _ *reporter, _ *mockSender, dag *core.DAG, _ []*execution.Node) {
