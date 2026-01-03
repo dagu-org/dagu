@@ -34,8 +34,8 @@ type dagExecutor struct {
 
 // Errors for DAG executor
 var (
-	ErrWorkingDirNotExist       = fmt.Errorf("working directory does not exist")
-	ErrWaitStepsWithWorker      = fmt.Errorf("sub-DAG with wait steps cannot be dispatched to workers")
+	ErrWorkingDirNotExist  = fmt.Errorf("working directory does not exist")
+	ErrWaitStepsWithWorker = fmt.Errorf("sub-DAG with wait steps cannot be dispatched to workers")
 )
 
 func newDAGExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
