@@ -44,6 +44,11 @@ type DAGRunAttempt interface {
 	// ReadOutputs reads the collected step outputs for the dag-run.
 	// Returns nil if no outputs file exists or if the file is in v1 format.
 	ReadOutputs(ctx context.Context) (*DAGRunOutputs, error)
+	// WriteStepMessages writes LLM messages for a single step.
+	WriteStepMessages(ctx context.Context, stepName string, messages []LLMMessage) error
+	// ReadStepMessages reads LLM messages for a single step.
+	// Returns nil if no messages exist for the step.
+	ReadStepMessages(ctx context.Context, stepName string) ([]LLMMessage, error)
 }
 
 var _ DAGRunAttempt = (*MockDAGRunAttempt)(nil)
