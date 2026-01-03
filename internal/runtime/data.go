@@ -494,3 +494,35 @@ func (d *Data) GetChatMessages() []execution.LLMMessage {
 	defer d.mu.RUnlock()
 	return d.inner.State.ChatMessages
 }
+
+// GetApprovalInputs returns a copy of the approval inputs map.
+func (d *Data) GetApprovalInputs() map[string]string {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	if d.inner.State.ApprovalInputs == nil {
+		return nil
+	}
+
+	result := make(map[string]string, len(d.inner.State.ApprovalInputs))
+	for k, v := range d.inner.State.ApprovalInputs {
+		result[k] = v
+	}
+	return result
+}
+
+// SetApprovalInputs sets the approval inputs map.
+func (d *Data) SetApprovalInputs(inputs map[string]string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if inputs == nil {
+		d.inner.State.ApprovalInputs = nil
+		return
+	}
+
+	d.inner.State.ApprovalInputs = make(map[string]string, len(inputs))
+	for k, v := range inputs {
+		d.inner.State.ApprovalInputs[k] = v
+	}
+}

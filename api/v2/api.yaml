@@ -3192,7 +3192,7 @@ components:
         - "Success"
         - "Queued"
         - "PartialSuccess"
-        - "Wait"
+        - "Waiting"
       description: |
         Numeric status code indicating current DAG-run state:
         0: "Not started"

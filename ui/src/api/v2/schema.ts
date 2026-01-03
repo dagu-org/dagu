@@ -5314,7 +5314,7 @@ export enum Status {
     Success = 4,
     Queued = 5,
     PartialSuccess = 6,
-    Wait = 7
+    Waiting = 7
 }
 export enum StatusLabel {
     not_started = "not_started",

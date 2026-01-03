@@ -73,6 +73,13 @@ export function ApprovalModal({ visible, dismissModal, step, onApprove }: Props)
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey && isValid && !loading) {
+      e.preventDefault();
+      handleApprove();
+    }
+  };
+
   return (
     <Dialog open={visible} onOpenChange={dismissModal}>
       <DialogContent className="sm:max-w-[500px]">
@@ -95,15 +102,17 @@ export function ApprovalModal({ visible, dismissModal, step, onApprove }: Props)
             <div className="space-y-3">
               {inputFields.map((field) => {
                 const isRequired = requiredFields.includes(field);
+                const fieldId = `approval-input-${field}`;
                 return (
                   <div key={field}>
-                    <label className="block text-sm font-medium mb-1">
+                    <label htmlFor={fieldId} className="block text-sm font-medium mb-1">
                       {field}
                       {isRequired && (
                         <span className="text-error ml-1">*</span>
                       )}
                     </label>
                     <input
+                      id={fieldId}
                       type="text"
                       value={inputs[field] || ''}
                       onChange={(e) =>
@@ -112,7 +121,8 @@ export function ApprovalModal({ visible, dismissModal, step, onApprove }: Props)
                           [field]: e.target.value,
                         }))
                       }
-                      className="w-full px-3 py-2 text-sm border border-border rounded bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      onKeyDown={handleKeyDown}
+                      className="w-full px-3 py-1 text-sm border border-border rounded bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                       placeholder={`Enter ${field}`}
                     />
                   </div>

@@ -296,6 +296,7 @@ steps:
 		assert.Equal(t, "wait@example.com", dag.WaitMail.From)
 		assert.Equal(t, []string{"single@example.com"}, dag.WaitMail.To)
 		assert.Equal(t, "[WAIT]", dag.WaitMail.Prefix)
+		assert.False(t, dag.WaitMail.AttachLogs)
 	})
 }
 
