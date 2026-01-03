@@ -411,6 +411,10 @@
       "$ref": "#/definitions/sshConfig",
       "description": "Default SSH configuration for all steps in the DAG. Steps can override this configuration with their own SSH settings. Note: SSH and container configurations are mutually exclusive at the DAG level."
     },
+    "llm": {
+      "$ref": "#/definitions/llmConfig",
+      "description": "Default LLM configuration for all chat steps in the DAG. Steps with type: chat inherit this configuration if they don't specify their own llm field. If a step specifies llm, it completely overrides the DAG-level configuration."
+    },
     "steps": {
       "oneOf": [
         {
@@ -1814,11 +1818,11 @@
             "vllm",
             "llama"
           ],
-          "description": "LLM provider to use. Aliases 'ollama', 'vllm', 'llama' map to 'local'. Required."
+          "description": "LLM provider to use. Aliases 'ollama', 'vllm', 'llama' map to 'local'."
         },
         "model": {
           "type": "string",
-          "description": "Model identifier (e.g., 'gpt-4o', 'claude-sonnet-4-20250514', 'gemini-pro'). Required."
+          "description": "Model identifier (e.g., 'gpt-4o', 'claude-sonnet-4-20250514', 'gemini-pro')."
         },
         "messages": {
           "type": "array",
@@ -1852,18 +1856,13 @@
           "type": "string",
           "description": "API key for authentication. Overrides the default environment variable (e.g., OPENAI_API_KEY)."
         },
-        "history": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable conversation history from dependent steps. When true (default), messages from steps in 'depends' are included."
-        },
         "stream": {
           "type": "boolean",
           "default": true,
           "description": "Enable streaming output. When true (default), response tokens are streamed to stdout as they arrive."
         }
       },
-      "description": "LLM configuration for chat executor (and future agent executor). Supports OpenAI, Anthropic, Google Gemini, OpenRouter, and local models (Ollama/vLLM)."
+      "description": "LLM configuration. Supports OpenAI, Anthropic, Google Gemini, OpenRouter, and local models (Ollama/vLLM)."
     },
     "llmMessage": {
       "type": "object",

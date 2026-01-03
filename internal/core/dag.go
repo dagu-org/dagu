@@ -168,6 +168,9 @@ type DAG struct {
 	RegistryAuths map[string]*AuthConfig `json:"registryAuths,omitempty"`
 	// SSH contains the default SSH configuration for the DAG.
 	SSH *SSHConfig `json:"ssh,omitempty"`
+	// LLM contains the default LLM configuration for the DAG.
+	// Steps with type: chat inherit this configuration if they don't specify their own llm field.
+	LLM *LLMConfig `json:"llm,omitempty"`
 	// Secrets contains references to external secrets to be resolved at runtime.
 	Secrets []SecretRef `json:"secrets,omitempty"`
 }

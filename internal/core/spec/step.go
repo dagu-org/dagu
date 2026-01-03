@@ -974,12 +974,28 @@ func validateLLM(result *core.Step) error {
 			fmt.Errorf("executor type %q does not support llm field; use type: chat with llm: config", result.ExecutorConfig.Type),
 		)
 	}
-	// Provider is required
+	// Provider is required (can be set at DAG or step level)
 	if result.LLM.Provider == "" {
 		return core.NewValidationError(
 			"llm.provider",
 			result.LLM.Provider,
-			fmt.Errorf("provider is required"),
+			fmt.Errorf("provider is required (set at DAG or step level)"),
+		)
+	}
+	// Model is required (can be set at DAG or step level)
+	if result.LLM.Model == "" {
+		return core.NewValidationError(
+			"llm.model",
+			result.LLM.Model,
+			fmt.Errorf("model is required (set at DAG or step level)"),
+		)
+	}
+	// Messages are required
+	if len(result.LLM.Messages) == 0 {
+		return core.NewValidationError(
+			"llm.messages",
+			result.LLM.Messages,
+			fmt.Errorf("at least one message is required"),
 		)
 	}
 	return nil
@@ -1189,11 +1205,19 @@ func buildStepContainer(ctx StepBuildContext, s *step, result *core.Step) error 
 // buildStepLLM parses the LLM configuration in the step definition.
 // Note: This only populates result.LLM. The executor type must be set explicitly
 // via type: chat in YAML (no auto-detection).
-func buildStepLLM(_ StepBuildContext, s *step, result *core.Step) error {
+// If step has no llm: config but DAG has one, the DAG config is inherited.
+// If step has llm: config, it completely overrides DAG-level (full override pattern).
+func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
+	// If step has no LLM config, check if DAG has one to inherit
 	if s.LLM == nil {
+		if ctx.dag != nil && ctx.dag.LLM != nil {
+			// Inherit DAG-level LLM config
+			result.LLM = ctx.dag.LLM
+		}
 		return nil
 	}
 
+	// Step has explicit llm: config - use it (full override of DAG-level)
 	cfg := s.LLM
 
 	// Validate provider if specified
