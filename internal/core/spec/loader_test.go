@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -261,13 +262,16 @@ mailOn:
 	t.Run("InheritBaseConfig", func(t *testing.T) {
 		t.Parallel()
 
-		// Base config with env, logDir, and LLM
+		// Base config with multiple inheritable fields
 		baseDAG := createTempYAMLFile(t, `
 env:
   BASE_ENV: "base_value"
   OVERWRITE_ENV: "base_overwrite_value"
 
 logDir: "/base/logs"
+logOutput: merged
+histRetentionDays: 90
+maxCleanUpTimeSec: 120
 
 llm:
   provider: openai
@@ -297,6 +301,15 @@ steps:
 		// LogDir inherited from base
 		assert.Equal(t, "/base/logs", dag.LogDir)
 
+		// LogOutput inherited from base
+		assert.Equal(t, core.LogOutputMerged, dag.LogOutput)
+
+		// HistRetentionDays inherited from base
+		assert.Equal(t, 90, dag.HistRetentionDays)
+
+		// MaxCleanUpTime inherited from base
+		assert.Equal(t, 120*time.Second, dag.MaxCleanUpTime)
+
 		// LLM inherited from base
 		require.NotNil(t, dag.LLM)
 		assert.Equal(t, "openai", dag.LLM.Provider)
@@ -307,12 +320,15 @@ steps:
 	t.Run("OverrideBaseConfig", func(t *testing.T) {
 		t.Parallel()
 
-		// Base config with env, logDir, and LLM
+		// Base config with multiple inheritable fields
 		baseDAG := createTempYAMLFile(t, `
 env:
   BASE_ENV: "base_value"
 
 logDir: "/base/logs"
+logOutput: merged
+histRetentionDays: 90
+maxCleanUpTimeSec: 120
 
 llm:
   provider: openai
@@ -323,6 +339,9 @@ llm:
 		// Child DAG overrides specific fields
 		overrideDAG := createTempYAMLFile(t, `
 logDir: "/override/logs"
+logOutput: separate
+histRetentionDays: 7
+maxCleanUpTimeSec: 30
 
 llm:
   provider: anthropic
@@ -339,6 +358,15 @@ steps:
 
 		// LogDir overridden
 		assert.Equal(t, "/override/logs", dag.LogDir)
+
+		// LogOutput overridden
+		assert.Equal(t, core.LogOutputSeparate, dag.LogOutput)
+
+		// HistRetentionDays overridden
+		assert.Equal(t, 7, dag.HistRetentionDays)
+
+		// MaxCleanUpTime overridden
+		assert.Equal(t, 30*time.Second, dag.MaxCleanUpTime)
 
 		// LLM overridden
 		require.NotNil(t, dag.LLM)

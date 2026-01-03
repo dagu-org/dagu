@@ -1862,9 +1862,9 @@ func TestBuildLogOutput(t *testing.T) {
 		errContains string
 	}{
 		{
-			name:     "Default_Separate",
+			name:     "Default_Empty",
 			yaml:     "",
-			expected: core.LogOutputSeparate,
+			expected: "", // Empty allows inheritance; default applied in InitializeDefaults
 		},
 		{
 			name:     "ExplicitSeparate",
