@@ -243,6 +243,60 @@ steps:
 		assert.Equal(t, "smtp.base.com", dag.SMTP.Host, "smtp host should be inherited from base")
 		assert.Equal(t, "587", dag.SMTP.Port, "smtp port should be inherited from base")
 	})
+	t.Run("WaitMailConfig", func(t *testing.T) {
+		t.Parallel()
+
+		// Test waitMail loading independently with all fields
+		dagFile := createTempYAMLFile(t, `
+waitMail:
+  from: "wait@example.com"
+  to:
+    - "approvers@example.com"
+    - "managers@example.com"
+  prefix: "[APPROVAL REQUIRED]"
+  attachLogs: false
+
+mailOn:
+  wait: true
+
+steps:
+  - name: "1"
+    command: "true"
+`)
+		dag, err := spec.Load(context.Background(), dagFile)
+		require.NoError(t, err)
+
+		require.NotNil(t, dag.WaitMail)
+		assert.Equal(t, "wait@example.com", dag.WaitMail.From)
+		assert.Equal(t, []string{"approvers@example.com", "managers@example.com"}, dag.WaitMail.To)
+		assert.Equal(t, "[APPROVAL REQUIRED]", dag.WaitMail.Prefix)
+		assert.False(t, dag.WaitMail.AttachLogs)
+
+		require.NotNil(t, dag.MailOn)
+		assert.True(t, dag.MailOn.Wait)
+	})
+	t.Run("WaitMailSingleRecipient", func(t *testing.T) {
+		t.Parallel()
+
+		// Test waitMail with single recipient (string format)
+		dagFile := createTempYAMLFile(t, `
+waitMail:
+  from: "wait@example.com"
+  to: "single@example.com"
+  prefix: "[WAIT]"
+
+steps:
+  - name: "1"
+    command: "true"
+`)
+		dag, err := spec.Load(context.Background(), dagFile)
+		require.NoError(t, err)
+
+		require.NotNil(t, dag.WaitMail)
+		assert.Equal(t, "wait@example.com", dag.WaitMail.From)
+		assert.Equal(t, []string{"single@example.com"}, dag.WaitMail.To)
+		assert.Equal(t, "[WAIT]", dag.WaitMail.Prefix)
+	})
 }
 
 func TestLoadBaseConfig(t *testing.T) {
