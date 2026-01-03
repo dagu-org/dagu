@@ -75,6 +75,15 @@ func (r *reporter) send(ctx context.Context, dag *core.DAG, dagStatus execution.
 			attachments := addAttachments(dag.InfoMail.AttachLogs, dagStatus.Nodes)
 			_ = r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
 		}
+	} else if dagStatus.Status == core.Wait {
+		if dag.MailOn != nil && dag.MailOn.Wait && dag.WaitMail != nil {
+			fromAddress := dag.WaitMail.From
+			toAddresses := dag.WaitMail.To
+			subject := fmt.Sprintf("%s %s (%s)", dag.WaitMail.Prefix, dag.Name, dagStatus.Status)
+			html := renderHTMLWithDAGInfo(dagStatus)
+			attachments := addAttachments(dag.WaitMail.AttachLogs, dagStatus.Nodes)
+			return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
+		}
 	}
 	return nil
 }
@@ -361,6 +370,11 @@ func renderHTMLWithDAGInfo(dagStatus execution.DAGRunStatus) string {
             color: #374151;
             box-shadow: 0 0 0 1px rgba(107, 114, 128, 0.1);
         }
+        .status-badge.wait {
+            background-color: #fef3c7;
+            color: #92400e;
+            box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.1);
+        }
         .dag-info-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -467,6 +481,8 @@ func renderHTMLWithDAGInfo(dagStatus execution.DAGRunStatus) string {
 		statusClass = "skipped"
 	case "aborted":
 		statusClass = "aborted"
+	case "wait":
+		statusClass = "wait"
 	}
 	_, _ = buffer.WriteString(statusClass)
 	_, _ = buffer.WriteString(`">`)

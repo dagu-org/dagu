@@ -22,6 +22,7 @@ func TestReporter(t *testing.T) {
 		"create error mail":   testErrorMail,
 		"no error mail":       testNoErrorMail,
 		"create success mail": testSuccessMail,
+		"create wait mail":    testWaitMail,
 		"create summary":      testRenderSummary,
 		"create node list":    testRenderTable,
 	} {
@@ -39,6 +40,11 @@ func TestReporter(t *testing.T) {
 				},
 				InfoMail: &core.MailConfig{
 					Prefix: "Success: ",
+					From:   "from@mailer.com",
+					To:     []string{"to@mailer.com"},
+				},
+				WaitMail: &core.MailConfig{
+					Prefix: "Waiting: ",
 					From:   "from@mailer.com",
 					To:     []string{"to@mailer.com"},
 				},
@@ -214,6 +220,22 @@ func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG
 	require.NoError(t, err)
 
 	require.Contains(t, mock.subject, "Success")
+	require.Contains(t, mock.subject, "test DAG")
+	require.Equal(t, 1, mock.count)
+}
+
+func testWaitMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*execution.Node) {
+	dag.MailOn.Failure = false
+	dag.MailOn.Success = false
+	dag.MailOn.Wait = true
+
+	err := rp.send(context.Background(), dag, execution.DAGRunStatus{
+		Status: core.Wait,
+		Nodes:  nodes,
+	}, nil)
+	require.NoError(t, err)
+
+	require.Contains(t, mock.subject, "Waiting")
 	require.Contains(t, mock.subject, "test DAG")
 	require.Equal(t, 1, mock.count)
 }

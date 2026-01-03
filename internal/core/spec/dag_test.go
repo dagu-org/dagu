@@ -476,6 +476,16 @@ func TestBuildMailOn(t *testing.T) {
 			input:    &mailOn{Failure: true, Success: false},
 			expected: &core.MailOn{Failure: true, Success: false},
 		},
+		{
+			name:     "WaitOnly",
+			input:    &mailOn{Wait: true},
+			expected: &core.MailOn{Wait: true},
+		},
+		{
+			name:     "AllTrue",
+			input:    &mailOn{Failure: true, Success: true, Wait: true},
+			expected: &core.MailOn{Failure: true, Success: true, Wait: true},
+		},
 	}
 
 	for _, tt := range tests {

@@ -65,6 +65,8 @@ type dag struct {
 	ErrorMail mailConfig
 	// InfoMail is the mail configuration for information.
 	InfoMail mailConfig
+	// WaitMail is the mail configuration for wait status.
+	WaitMail mailConfig
 	// TimeoutSec is the timeout in seconds to finish the DAG.
 	TimeoutSec int
 	// DelaySec is the delay in seconds to start the first node.
@@ -155,6 +157,7 @@ func (m mailConfig) IsZero() bool {
 type mailOn struct {
 	Failure bool // Send mail on failure
 	Success bool // Send mail on success
+	Wait    bool // Send mail on wait status
 }
 
 // container defines the container configuration for the DAG.
@@ -324,6 +327,7 @@ var fullTransformers = []transform{
 	{"smtpConfig", newTransformer("SMTP", buildSMTPConfig)},
 	{"errMailConfig", newTransformer("ErrorMail", buildErrMailConfig)},
 	{"infoMailConfig", newTransformer("InfoMail", buildInfoMailConfig)},
+	{"waitMailConfig", newTransformer("WaitMail", buildWaitMailConfig)},
 	{"preconditions", newTransformer("Preconditions", buildPreconditions)},
 	{"otel", newTransformer("OTel", buildOTel)},
 }
@@ -531,6 +535,7 @@ func buildMailOn(_ BuildContext, d *dag) (*core.MailOn, error) {
 	return &core.MailOn{
 		Failure: d.MailOn.Failure,
 		Success: d.MailOn.Success,
+		Wait:    d.MailOn.Wait,
 	}, nil
 }
 
@@ -1318,6 +1323,10 @@ func buildErrMailConfig(_ BuildContext, d *dag) (*core.MailConfig, error) {
 
 func buildInfoMailConfig(_ BuildContext, d *dag) (*core.MailConfig, error) {
 	return buildMailConfigInternal(d.InfoMail)
+}
+
+func buildWaitMailConfig(_ BuildContext, d *dag) (*core.MailConfig, error) {
+	return buildMailConfigInternal(d.WaitMail)
 }
 
 func buildPreconditions(ctx BuildContext, d *dag) ([]*core.Condition, error) {

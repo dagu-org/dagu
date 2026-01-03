@@ -125,6 +125,8 @@ type DAG struct {
 	ErrorMail *MailConfig `json:"errorMail,omitempty"`
 	// InfoMail contains the mail configuration for informational messages.
 	InfoMail *MailConfig `json:"infoMail,omitempty"`
+	// WaitMail contains the mail configuration for wait status.
+	WaitMail *MailConfig `json:"waitMail,omitempty"`
 	// MailOn contains the conditions to send mail.
 	MailOn *MailOn `json:"mailOn,omitempty"`
 	// Timeout specifies the maximum execution time of the DAG task.
@@ -559,6 +561,7 @@ type HandlerOn struct {
 type MailOn struct {
 	Failure bool `json:"failure,omitempty"`
 	Success bool `json:"success,omitempty"`
+	Wait    bool `json:"wait,omitempty"`
 }
 
 // SMTPConfig contains the SMTP configuration.
