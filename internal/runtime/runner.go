@@ -187,9 +187,8 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 			activeReadyCh = readyCh
 		}
 
-		// Check for Wait condition: if no nodes are running and we're waiting for approval,
-		// exit gracefully to allow the agent process to terminate.
-		if running == 0 && len(r.collectWaitingNodes(plan)) > 0 {
+		// Check for Wait condition: no running nodes, no ready nodes, and waiting for approval.
+		if running == 0 && len(readyCh) == 0 && len(r.getWaitingNodes(plan)) > 0 {
 			logger.Info(ctx, "DAG entering wait status - waiting for human approval")
 			break
 		}
@@ -297,7 +296,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 		if handlerNode != nil {
 			// Set DAG_WAITING_STEPS environment variable
 			var stepNames []string
-			for _, node := range r.collectWaitingNodes(plan) {
+			for _, node := range r.getWaitingNodes(plan) {
 				stepNames = append(stepNames, node.Name())
 			}
 			waitingSteps := strings.Join(stepNames, ",")
@@ -727,7 +726,7 @@ func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
 
 	// Check for Wait condition before other terminal states.
 	// This occurs when all active work is done but nodes are waiting for approval.
-	if len(r.collectWaitingNodes(p)) > 0 {
+	if len(r.getWaitingNodes(p)) > 0 {
 		return core.Wait
 	}
 
@@ -742,63 +741,15 @@ func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
 	return core.Succeeded
 }
 
-// collectWaitingNodes returns nodes in NodeWaiting status if the DAG should enter Wait state.
-// Returns nil if any node is running or if a NotStarted node could run.
-func (r *Runner) collectWaitingNodes(p *Plan) []*Node {
+// getWaitingNodes returns nodes with NodeWaiting status.
+func (r *Runner) getWaitingNodes(p *Plan) []*Node {
 	var waiting []*Node
-
 	for _, node := range p.Nodes() {
-		status := node.State().Status
-
-		if status == core.NodeRunning {
-			return nil
-		}
-
-		if status == core.NodeNotStarted && r.canNodeRun(p, node) {
-			return nil
-		}
-
-		if status == core.NodeWaiting {
+		if node.State().Status == core.NodeWaiting {
 			waiting = append(waiting, node)
 		}
 	}
-
 	return waiting
-}
-
-// canNodeRun checks if a NotStarted node could potentially run.
-// Returns false if the node is blocked by a dependency in NodeWaiting status.
-func (r *Runner) canNodeRun(p *Plan, node *Node) bool {
-	visited := make(map[int]bool)
-	return r.canNodeRunHelper(p, node, visited)
-}
-
-func (r *Runner) canNodeRunHelper(p *Plan, node *Node, visited map[int]bool) bool {
-	// Cycle detection - if we've already visited this node, it can't run
-	if visited[node.id] {
-		return true // Return true to not block on cycles (deadlock detector will catch this)
-	}
-	visited[node.id] = true
-
-	for _, depID := range p.Dependencies(node.id) {
-		dep := p.GetNode(depID)
-		depStatus := dep.State().Status
-
-		// If dependency is waiting, this node is blocked
-		if depStatus == core.NodeWaiting {
-			return false
-		}
-
-		// If dependency hasn't finished successfully, node can't run yet
-		if depStatus != core.NodeSucceeded && depStatus != core.NodePartiallySucceeded {
-			// Check if the dependency itself is blocked by a waiting node
-			if depStatus == core.NodeNotStarted && !r.canNodeRunHelper(p, dep, visited) {
-				return false
-			}
-		}
-	}
-
-	return true
 }
 
 func (r *Runner) isError() bool {
