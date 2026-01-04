@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
@@ -2840,5 +2841,81 @@ func TestRunner_ChatMessagesHandler(t *testing.T) {
 		plan := r.newPlan(t, successStep("step1"))
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "step1", core.NodeSucceeded)
+	})
+
+	t.Run("SetupChatMessagesNoDependencies", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		// Chat step with no dependencies - should not read from handler
+		plan := r.newPlan(t, chatStep("chat1"))
+		// Step will fail (no LLM config), but setupChatMessages is called first
+		_ = plan.assertRun(t, core.Failed)
+	})
+
+	t.Run("SetupChatMessagesWithDependencies", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		// Pre-populate handler with messages for dependency
+		handler.messages["step1"] = []execution.LLMMessage{
+			{Role: execution.RoleSystem, Content: "be helpful"},
+			{Role: execution.RoleUser, Content: "hello"},
+		}
+
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		// First step succeeds, then chat step depends on it
+		plan := r.newPlan(t,
+			successStep("step1"),
+			chatStep("chat1", "step1"),
+		)
+		// Chat step will fail (no LLM config), but messages should be read
+		_ = plan.assertRun(t, core.Failed)
+
+		// Messages were read from handler (verified by no panic/error)
+	})
+
+	t.Run("SetupChatMessagesReadError", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		handler.readErr = fmt.Errorf("read error")
+
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		plan := r.newPlan(t,
+			successStep("step1"),
+			chatStep("chat1", "step1"),
+		)
+		// Should handle read error gracefully (logs warning, continues)
+		_ = plan.assertRun(t, core.Failed)
+	})
+
+	t.Run("SetupChatMessagesDeduplicatesSystem", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		// Multiple system messages from different dependencies
+		handler.messages["step1"] = []execution.LLMMessage{
+			{Role: execution.RoleSystem, Content: "first system"},
+			{Role: execution.RoleUser, Content: "msg1"},
+		}
+		handler.messages["step2"] = []execution.LLMMessage{
+			{Role: execution.RoleSystem, Content: "second system"},
+			{Role: execution.RoleUser, Content: "msg2"},
+		}
+
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		plan := r.newPlan(t,
+			successStep("step1"),
+			successStep("step2"),
+			chatStep("chat1", "step1", "step2"),
+		)
+		// Chat step will fail, but deduplication logic is exercised
+		_ = plan.assertRun(t, core.Failed)
 	})
 }

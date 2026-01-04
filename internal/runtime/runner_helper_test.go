@@ -363,3 +363,13 @@ func withMessagesHandler(handler runtime.ChatMessagesHandler) runnerOption {
 		cfg.MessagesHandler = handler
 	}
 }
+
+func withExecutorType(t string) stepOption {
+	return func(step *core.Step) {
+		step.ExecutorConfig.Type = t
+	}
+}
+
+func chatStep(name string, depends ...string) core.Step {
+	return newStep(name, withDepends(depends...), withExecutorType(core.ExecutorTypeChat))
+}
