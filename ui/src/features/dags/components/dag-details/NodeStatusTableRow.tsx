@@ -886,19 +886,21 @@ function NodeStatusTableRow({
                     </Button>
                   </>
                 )}
-                {/* Retry button */}
-                <Button
-                  size="icon-sm"
-                  className="btn-3d-secondary"
-                  title="Retry from this step"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowDialog(true);
-                  }}
-                  disabled={loading || dagRun.status === Status.Running}
-                >
-                  <Play className="h-4 w-4 text-success" />
-                </Button>
+                {/* Retry button - hidden for Waiting and Rejected steps */}
+                {node.status !== NodeStatus.Waiting && node.status !== NodeStatus.Rejected && (
+                  <Button
+                    size="icon-sm"
+                    className="btn-3d-secondary"
+                    title="Retry from this step"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowDialog(true);
+                    }}
+                    disabled={loading || dagRun.status === Status.Running}
+                  >
+                    <Play className="h-4 w-4 text-success" />
+                  </Button>
+                )}
               </div>
               <Dialog open={showDialog} onOpenChange={setShowDialog}>
                 <DialogContent>
@@ -1313,15 +1315,17 @@ function NodeStatusTableRow({
               </button>
             </>
           )}
-          {/* Retry button */}
-          <button
-            className="p-2 rounded-full hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Retry from this step"
-            onClick={() => setShowDialog(true)}
-            disabled={loading || dagRun.status === Status.Running}
-          >
-            <Play className="h-6 w-6 text-success" />
-          </button>
+          {/* Retry button - hidden for Waiting and Rejected steps */}
+          {node.status !== NodeStatus.Waiting && node.status !== NodeStatus.Rejected && (
+            <button
+              className="p-2 rounded-full hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Retry from this step"
+              onClick={() => setShowDialog(true)}
+              disabled={loading || dagRun.status === Status.Running}
+            >
+              <Play className="h-6 w-6 text-success" />
+            </button>
+          )}
           <Dialog open={showDialog} onOpenChange={setShowDialog}>
             <DialogContent>
               <DialogHeader>
