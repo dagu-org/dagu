@@ -166,10 +166,6 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest) ([]byte, error) {
 		genConfig.Temperature = req.Temperature
 		hasConfig = true
 	}
-	if req.MaxTokens != nil {
-		genConfig.MaxOutputTokens = req.MaxTokens
-		hasConfig = true
-	}
 	if req.TopP != nil {
 		genConfig.TopP = req.TopP
 		hasConfig = true
@@ -180,15 +176,41 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest) ([]byte, error) {
 	}
 
 	// Add thinking configuration if enabled
+	// Note: maxOutputTokens must accommodate both thinking tokens AND response tokens
+	// Known issue: MAX_TOKENS finish reason if thoughts_token_count + output_token_count > maxOutputTokens
+	var thinkingBudget int
 	if req.Thinking != nil && req.Thinking.Enabled {
 		// Use explicit budget if provided
 		if req.Thinking.BudgetTokens != nil {
 			genConfig.ThinkingBudget = req.Thinking.BudgetTokens
+			thinkingBudget = *req.Thinking.BudgetTokens
 		} else {
 			// Map effort level to thinkingLevel
 			genConfig.ThinkingLevel = p.mapEffortToThinkingLevel(req.Thinking.Effort)
+			// Estimate budget based on effort level for maxOutputTokens calculation
+			thinkingBudget = p.estimateThinkingBudget(req.Thinking.Effort)
 		}
 		hasConfig = true
+	}
+
+	// Set maxOutputTokens after thinking config
+	if req.MaxTokens != nil {
+		genConfig.MaxOutputTokens = req.MaxTokens
+		hasConfig = true
+	}
+
+	// Ensure maxOutputTokens > thinkingBudget when thinking is enabled
+	// Gemini requires maxOutputTokens to accommodate both thinking AND response
+	if thinkingBudget > 0 {
+		currentMax := 0
+		if genConfig.MaxOutputTokens != nil {
+			currentMax = *genConfig.MaxOutputTokens
+		}
+		if currentMax <= thinkingBudget {
+			newMax := thinkingBudget + 4096
+			genConfig.MaxOutputTokens = &newMax
+			hasConfig = true
+		}
 	}
 
 	if hasConfig {
@@ -209,6 +231,23 @@ func (p *Provider) mapEffortToThinkingLevel(effort llm.ThinkingEffort) string {
 		return "high"
 	default:
 		return "medium"
+	}
+}
+
+// estimateThinkingBudget estimates token budget for effort levels when using thinkingLevel.
+// These are conservative estimates to ensure maxOutputTokens is sufficient.
+func (p *Provider) estimateThinkingBudget(effort llm.ThinkingEffort) int {
+	switch effort {
+	case llm.ThinkingEffortLow:
+		return 1024
+	case llm.ThinkingEffortMedium:
+		return 4096
+	case llm.ThinkingEffortHigh:
+		return 8192
+	case llm.ThinkingEffortXHigh:
+		return 16384
+	default:
+		return 4096
 	}
 }
 

@@ -1,0 +1,176 @@
+package gemini
+
+import (
+	"encoding/json"
+	"testing"
+
+	"github.com/dagu-org/dagu/internal/llm"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
+	t.Parallel()
+
+	provider := &Provider{
+		config: llm.Config{APIKey: "test-key"},
+	}
+
+	tests := []struct {
+		name                   string
+		maxTokens              *int
+		thinking               *llm.ThinkingRequest
+		expectedMaxOutputTokens *int
+		expectedHasThinking    bool
+		expectedThinkingBudget *int
+		expectedThinkingLevel  string
+	}{
+		{
+			name:                   "no thinking, no max tokens",
+			maxTokens:              nil,
+			thinking:               nil,
+			expectedMaxOutputTokens: nil,
+			expectedHasThinking:    false,
+		},
+		{
+			name:                   "no thinking, explicit max tokens",
+			maxTokens:              intPtr(8192),
+			thinking:               nil,
+			expectedMaxOutputTokens: intPtr(8192),
+			expectedHasThinking:    false,
+		},
+		{
+			name:      "thinking with budget, no max tokens - auto adjust",
+			maxTokens: nil,
+			thinking: &llm.ThinkingRequest{
+				Enabled:      true,
+				BudgetTokens: intPtr(4096),
+			},
+			expectedMaxOutputTokens: intPtr(4096 + 4096),
+			expectedHasThinking:    true,
+			expectedThinkingBudget: intPtr(4096),
+		},
+		{
+			name:      "thinking with budget, max tokens less than budget - auto adjust",
+			maxTokens: intPtr(2000),
+			thinking: &llm.ThinkingRequest{
+				Enabled:      true,
+				BudgetTokens: intPtr(4096),
+			},
+			expectedMaxOutputTokens: intPtr(4096 + 4096),
+			expectedHasThinking:    true,
+			expectedThinkingBudget: intPtr(4096),
+		},
+		{
+			name:      "thinking with budget, max tokens greater than budget - use provided",
+			maxTokens: intPtr(16000),
+			thinking: &llm.ThinkingRequest{
+				Enabled:      true,
+				BudgetTokens: intPtr(4096),
+			},
+			expectedMaxOutputTokens: intPtr(16000),
+			expectedHasThinking:    true,
+			expectedThinkingBudget: intPtr(4096),
+		},
+		{
+			name:      "thinking with effort level low",
+			maxTokens: nil,
+			thinking: &llm.ThinkingRequest{
+				Enabled: true,
+				Effort:  llm.ThinkingEffortLow,
+			},
+			// Estimated budget 1024, so no adjustment needed with default
+			expectedMaxOutputTokens: intPtr(1024 + 4096),
+			expectedHasThinking:    true,
+			expectedThinkingLevel:  "low",
+		},
+		{
+			name:      "thinking with effort level medium",
+			maxTokens: nil,
+			thinking: &llm.ThinkingRequest{
+				Enabled: true,
+				Effort:  llm.ThinkingEffortMedium,
+			},
+			// Estimated budget 4096, auto-adjust to 8192
+			expectedMaxOutputTokens: intPtr(4096 + 4096),
+			expectedHasThinking:    true,
+			expectedThinkingLevel:  "medium",
+		},
+		{
+			name:      "thinking with effort level high",
+			maxTokens: nil,
+			thinking: &llm.ThinkingRequest{
+				Enabled: true,
+				Effort:  llm.ThinkingEffortHigh,
+			},
+			// Estimated budget 8192, auto-adjust to 12288
+			expectedMaxOutputTokens: intPtr(8192 + 4096),
+			expectedHasThinking:    true,
+			expectedThinkingLevel:  "high",
+		},
+		{
+			name:      "thinking with effort level xhigh",
+			maxTokens: nil,
+			thinking: &llm.ThinkingRequest{
+				Enabled: true,
+				Effort:  llm.ThinkingEffortXHigh,
+			},
+			// Estimated budget 16384, auto-adjust to 20480
+			expectedMaxOutputTokens: intPtr(16384 + 4096),
+			expectedHasThinking:    true,
+			expectedThinkingLevel:  "high", // xhigh maps to high for Gemini
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := &llm.ChatRequest{
+				Model: "gemini-2.5-flash",
+				Messages: []llm.Message{
+					{Role: llm.RoleUser, Content: "Hello"},
+				},
+				MaxTokens: tt.maxTokens,
+				Thinking:  tt.thinking,
+			}
+
+			body, err := provider.buildRequestBody(req)
+			require.NoError(t, err)
+
+			var parsed generateContentRequest
+			err = json.Unmarshal(body, &parsed)
+			require.NoError(t, err)
+
+			if tt.expectedMaxOutputTokens != nil || tt.expectedHasThinking {
+				require.NotNil(t, parsed.GenerationConfig, "generationConfig should be present")
+
+				if tt.expectedMaxOutputTokens != nil {
+					require.NotNil(t, parsed.GenerationConfig.MaxOutputTokens, "maxOutputTokens should be present")
+					assert.Equal(t, *tt.expectedMaxOutputTokens, *parsed.GenerationConfig.MaxOutputTokens,
+						"maxOutputTokens should be %d, got %d", *tt.expectedMaxOutputTokens, *parsed.GenerationConfig.MaxOutputTokens)
+				}
+
+				if tt.expectedThinkingBudget != nil {
+					require.NotNil(t, parsed.GenerationConfig.ThinkingBudget, "thinkingBudget should be present")
+					assert.Equal(t, *tt.expectedThinkingBudget, *parsed.GenerationConfig.ThinkingBudget)
+					// Verify maxOutputTokens > thinkingBudget
+					require.NotNil(t, parsed.GenerationConfig.MaxOutputTokens, "maxOutputTokens should be set when thinkingBudget is set")
+					assert.Greater(t, *parsed.GenerationConfig.MaxOutputTokens, *parsed.GenerationConfig.ThinkingBudget,
+						"maxOutputTokens (%d) must be greater than thinkingBudget (%d)",
+						*parsed.GenerationConfig.MaxOutputTokens, *parsed.GenerationConfig.ThinkingBudget)
+				}
+
+				if tt.expectedThinkingLevel != "" {
+					assert.Equal(t, tt.expectedThinkingLevel, parsed.GenerationConfig.ThinkingLevel)
+				}
+			} else {
+				assert.Nil(t, parsed.GenerationConfig, "generationConfig should not be present")
+			}
+		})
+	}
+}
+
+func intPtr(i int) *int {
+	return &i
+}

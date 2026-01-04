@@ -127,9 +127,6 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 	if req.Temperature != nil {
 		chatReq.Temperature = req.Temperature
 	}
-	if req.MaxTokens != nil {
-		chatReq.MaxTokens = req.MaxTokens
-	}
 	if req.TopP != nil {
 		chatReq.TopP = req.TopP
 	}
@@ -139,6 +136,8 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 
 	// Add reasoning configuration if enabled
 	// OpenRouter normalizes reasoning across different providers
+	// Note: max_tokens must be strictly higher than reasoning budget
+	var reasoningBudget int
 	if req.Thinking != nil && req.Thinking.Enabled {
 		reasoning := &reasoningRequest{}
 		if req.Thinking.Effort != "" {
@@ -148,8 +147,27 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 		}
 		if req.Thinking.BudgetTokens != nil {
 			reasoning.MaxTokens = req.Thinking.BudgetTokens
+			reasoningBudget = *req.Thinking.BudgetTokens
 		}
 		chatReq.Reasoning = reasoning
+	}
+
+	// Set max_tokens after reasoning config
+	if req.MaxTokens != nil {
+		chatReq.MaxTokens = req.MaxTokens
+	}
+
+	// Ensure max_tokens > reasoning budget when reasoning is enabled
+	// OpenRouter requires max_tokens to be strictly higher than reasoning budget
+	if reasoningBudget > 0 {
+		currentMax := 0
+		if chatReq.MaxTokens != nil {
+			currentMax = *chatReq.MaxTokens
+		}
+		if currentMax <= reasoningBudget {
+			newMax := reasoningBudget + 4096
+			chatReq.MaxTokens = &newMax
+		}
 	}
 
 	return json.Marshal(chatReq)
