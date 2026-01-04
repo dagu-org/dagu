@@ -288,6 +288,15 @@ func TestPlan_NodeStates(t *testing.T) {
 			wantHasNotStarted: true,
 		},
 		{
+			name: "rejected and waiting together",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeRejected),
+				makeNode("b", core.NodeWaiting),
+			},
+			wantHasRejected: true,
+			wantHasWaiting:  true,
+		},
+		{
 			name: "mix of all states",
 			nodes: []*runtime.Node{
 				makeNode("a", core.NodeRunning),

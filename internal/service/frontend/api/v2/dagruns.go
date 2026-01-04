@@ -809,6 +809,10 @@ func (a *API) RejectDAGRunStep(ctx context.Context, request api.RejectDAGRunStep
 		dagStatus.Nodes[stepIdx].RejectionReason = *request.Body.Reason
 	}
 
+	// Update the overall DAG status to Rejected
+	dagStatus.Status = core.Rejected
+	dagStatus.FinishedAt = time.Now().Format(time.RFC3339)
+
 	// Save the updated status
 	if err := a.dagRunMgr.UpdateStatus(ctx, ref, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
@@ -891,6 +895,10 @@ func (a *API) RejectSubDAGRunStep(ctx context.Context, request api.RejectSubDAGR
 	if request.Body != nil && request.Body.Reason != nil {
 		dagStatus.Nodes[stepIdx].RejectionReason = *request.Body.Reason
 	}
+
+	// Update the overall DAG status to Rejected
+	dagStatus.Status = core.Rejected
+	dagStatus.FinishedAt = time.Now().Format(time.RFC3339)
 
 	// Save the updated status
 	if err := a.dagRunMgr.UpdateStatus(ctx, subRef, *dagStatus); err != nil {

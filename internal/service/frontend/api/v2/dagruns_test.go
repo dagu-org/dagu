@@ -338,6 +338,107 @@ func TestApproveDAGRunStepNotWaiting(t *testing.T) {
 	).ExpectStatus(http.StatusBadRequest).Send(t)
 }
 
+func TestRejectDAGRunStep(t *testing.T) {
+	server := test.SetupServer(t)
+
+	dagSpec := `steps:
+  - name: wait-step
+    executor:
+      type: hitl
+      config:
+        prompt: "Please approve"
+  - name: after-wait
+    depends: [wait-step]
+    command: "echo should not run"`
+
+	_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+		Name: "rejection_test_dag",
+		Spec: &dagSpec,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	startResp := server.Client().Post("/api/v2/dags/rejection_test_dag/start", api.ExecuteDAGJSONRequestBody{}).
+		ExpectStatus(http.StatusOK).Send(t)
+
+	var startBody api.ExecuteDAG200JSONResponse
+	startResp.Unmarshal(t, &startBody)
+	require.NotEmpty(t, startBody.DagRunId)
+
+	// Wait for DAG to enter Wait status
+	require.Eventually(t, func() bool {
+		url := fmt.Sprintf("/api/v2/dags/rejection_test_dag/dag-runs/%s", startBody.DagRunId)
+		statusResp := server.Client().Get(url).Send(t)
+		if statusResp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
+
+		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
+		statusResp.Unmarshal(t, &dagRunStatus)
+		return dagRunStatus.DagRun.Status == api.Status(core.Waiting)
+	}, 10*time.Second, 100*time.Millisecond)
+
+	// Reject the wait step
+	reason := "test rejection reason"
+	rejectResp := server.Client().Post(
+		fmt.Sprintf("/api/v2/dag-runs/rejection_test_dag/%s/steps/wait-step/reject", startBody.DagRunId),
+		api.RejectStepRequest{Reason: &reason},
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	var rejectBody api.RejectDAGRunStep200JSONResponse
+	rejectResp.Unmarshal(t, &rejectBody)
+	require.Equal(t, startBody.DagRunId, rejectBody.DagRunId)
+	require.Equal(t, "wait-step", rejectBody.StepName)
+
+	// Verify DAG status is Rejected
+	require.Eventually(t, func() bool {
+		url := fmt.Sprintf("/api/v2/dags/rejection_test_dag/dag-runs/%s", startBody.DagRunId)
+		statusResp := server.Client().Get(url).Send(t)
+		if statusResp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
+
+		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
+		statusResp.Unmarshal(t, &dagRunStatus)
+		return dagRunStatus.DagRun.Status == api.Status(core.Rejected)
+	}, 10*time.Second, 100*time.Millisecond)
+}
+
+func TestRejectDAGRunStepNotWaiting(t *testing.T) {
+	server := test.SetupServer(t)
+
+	dagSpec := `steps:
+  - name: main
+    command: "echo done"`
+
+	_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+		Name: "reject_not_waiting_dag",
+		Spec: &dagSpec,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	startResp := server.Client().Post("/api/v2/dags/reject_not_waiting_dag/start", api.ExecuteDAGJSONRequestBody{}).
+		ExpectStatus(http.StatusOK).Send(t)
+
+	var startBody api.ExecuteDAG200JSONResponse
+	startResp.Unmarshal(t, &startBody)
+
+	require.Eventually(t, func() bool {
+		url := fmt.Sprintf("/api/v2/dags/reject_not_waiting_dag/dag-runs/%s", startBody.DagRunId)
+		statusResp := server.Client().Get(url).Send(t)
+		if statusResp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
+
+		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
+		statusResp.Unmarshal(t, &dagRunStatus)
+		return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
+	}, 10*time.Second, 100*time.Millisecond)
+
+	// Try to reject a step that's not waiting - should fail
+	_ = server.Client().Post(
+		fmt.Sprintf("/api/v2/dag-runs/reject_not_waiting_dag/%s/steps/main/reject", startBody.DagRunId),
+		api.RejectStepRequest{},
+	).ExpectStatus(http.StatusBadRequest).Send(t)
+}
+
 func TestRescheduleDAGRun(t *testing.T) {
 	server := test.SetupServer(t)
 

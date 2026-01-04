@@ -34,7 +34,7 @@ type dagExecutor struct {
 
 // Errors for DAG executor
 var (
-	ErrWorkingDirNotExist   = fmt.Errorf("working directory does not exist")
+	ErrWorkingDirNotExist  = fmt.Errorf("working directory does not exist")
 	ErrHITLStepsWithWorker = fmt.Errorf("sub-DAG with HITL steps cannot be dispatched to workers")
 )
 

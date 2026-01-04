@@ -1237,6 +1237,37 @@ func TestStatus_IsActive(t *testing.T) {
 	}
 }
 
+func TestRunner_StatusPrecedence(t *testing.T) {
+	t.Run("RejectedTakesPrecedenceOverWaiting", func(t *testing.T) {
+		t.Parallel()
+
+		dag := &core.DAG{Name: "precedence_test"}
+		nodes := []*runtime.Node{
+			runtime.NodeWithData(runtime.NodeData{
+				Step:  core.Step{Name: "rejected_step"},
+				State: runtime.NodeState{Status: core.NodeRejected},
+			}),
+			runtime.NodeWithData(runtime.NodeData{
+				Step:  core.Step{Name: "waiting_step"},
+				State: runtime.NodeState{Status: core.NodeWaiting},
+			}),
+		}
+		for _, n := range nodes {
+			dag.Steps = append(dag.Steps, n.Step())
+		}
+
+		plan, err := runtime.CreateRetryPlan(context.Background(), dag, nodes...)
+		require.NoError(t, err)
+
+		runner := runtime.New(&runtime.Config{})
+		ctx := runtime.NewContext(context.Background(), dag, "test-run-id", "/tmp/test.log")
+
+		// Status should be Rejected, not Waiting
+		status := runner.Status(ctx, plan)
+		require.Equal(t, core.Rejected, status, "rejected should take precedence over waiting")
+	})
+}
+
 func TestRunner_DryRun(t *testing.T) {
 	r := setupRunner(t, func(cfg *runtime.Config) {
 		cfg.Dry = true
