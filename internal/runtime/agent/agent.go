@@ -289,7 +289,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Initialize the runner
-	a.runner = a.newRunner()
+	a.runner = a.newRunner(attempt)
 
 	// Setup the reporter to send the report to the user.
 	a.setupReporter(ctx)
@@ -912,19 +912,20 @@ func (a *Agent) setupReporter(ctx context.Context) {
 }
 
 // newRunner creates a runner instance for the dag-run.
-func (a *Agent) newRunner() *runtime.Runner {
+func (a *Agent) newRunner(attempt execution.DAGRunAttempt) *runtime.Runner {
 	// runnerLogDir is the directory to store the log files for each node in the dag-run.
 	const dateTimeFormatUTC = "20060102_150405Z"
 	ts := time.Now().UTC().Format(dateTimeFormatUTC)
 	runnerLogDir := filepath.Join(a.logDir, "run_"+ts+"_"+a.dagRunAttemptID)
 
 	cfg := &runtime.Config{
-		LogDir:         runnerLogDir,
-		MaxActiveSteps: a.dag.MaxActiveSteps,
-		Timeout:        a.dag.Timeout,
-		Delay:          a.dag.Delay,
-		Dry:            a.dry,
-		DAGRunID:       a.dagRunID,
+		LogDir:          runnerLogDir,
+		MaxActiveSteps:  a.dag.MaxActiveSteps,
+		Timeout:         a.dag.Timeout,
+		Delay:           a.dag.Delay,
+		Dry:             a.dry,
+		DAGRunID:        a.dagRunID,
+		MessagesHandler: attempt, // Attempt implements ChatMessagesHandler
 	}
 
 	if a.dag.HandlerOn.Init != nil {

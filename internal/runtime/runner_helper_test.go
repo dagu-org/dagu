@@ -1,6 +1,7 @@
 package runtime_test
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"syscall"
@@ -9,7 +10,9 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/runtime/builtin/chat"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -322,4 +325,56 @@ func (rr runResult) nodeByName(t *testing.T, stepName string) *runtime.Node {
 
 	t.Fatalf("step %s not found", stepName)
 	return nil
+}
+
+// mockMessagesHandler is a mock implementation of ChatMessagesHandler for testing.
+type mockMessagesHandler struct {
+	messages   map[string][]execution.LLMMessage
+	readErr    error
+	writeErr   error
+	writeCalls int
+}
+
+var _ runtime.ChatMessagesHandler = (*mockMessagesHandler)(nil)
+
+func newMockMessagesHandler() *mockMessagesHandler {
+	return &mockMessagesHandler{
+		messages: make(map[string][]execution.LLMMessage),
+	}
+}
+
+func (m *mockMessagesHandler) ReadStepMessages(_ context.Context, stepName string) ([]execution.LLMMessage, error) {
+	if m.readErr != nil {
+		return nil, m.readErr
+	}
+	return m.messages[stepName], nil
+}
+
+func (m *mockMessagesHandler) WriteStepMessages(_ context.Context, stepName string, messages []execution.LLMMessage) error {
+	m.writeCalls++
+	if m.writeErr != nil {
+		return m.writeErr
+	}
+	m.messages[stepName] = messages
+	return nil
+}
+
+func withMessagesHandler(handler runtime.ChatMessagesHandler) runnerOption {
+	return func(cfg *runtime.Config) {
+		cfg.MessagesHandler = handler
+	}
+}
+
+func withExecutorType(t string) stepOption {
+	return func(step *core.Step) {
+		step.ExecutorConfig.Type = t
+	}
+}
+
+func chatStep(name string, depends ...string) core.Step {
+	return newStep(name, withDepends(depends...), withExecutorType(core.ExecutorTypeChat))
+}
+
+func init() {
+	chat.RegisterMockExecutors()
 }

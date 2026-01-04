@@ -190,6 +190,8 @@ func generateTypedStepName(existingNames map[string]struct{}, step *core.Step, i
 	// Determine prefix based on the built step's properties
 	if step.ExecutorConfig.Type != "" {
 		prefix = step.ExecutorConfig.Type
+	} else if step.Container != nil {
+		prefix = "docker"
 	} else if step.Parallel != nil {
 		prefix = "parallel"
 	} else if step.SubDAG != nil {

@@ -107,6 +107,9 @@ type dag struct {
 	RegistryAuths any
 	// SSH is the default SSH configuration for the DAG.
 	SSH *ssh
+	// LLM is the default LLM configuration for all chat steps in this DAG.
+	// Steps can override this configuration by specifying their own llm field.
+	LLM *llmConfig `yaml:"llm,omitempty"`
 	// Secrets contains references to external secrets.
 	Secrets []secretRef
 }
@@ -314,6 +317,7 @@ var fullTransformers = []transform{
 	{"container", newTransformer("Container", buildContainer)},
 	{"registryAuths", newTransformer("RegistryAuths", buildRegistryAuths)},
 	{"ssh", newTransformer("SSH", buildSSH)},
+	{"llm", newTransformer("LLM", buildLLM)},
 	{"secrets", newTransformer("Secrets", buildSecrets)},
 	{"dotenv", newTransformer("Dotenv", buildDotenv)},
 	{"smtpConfig", newTransformer("SMTP", buildSMTPConfig)},
@@ -503,7 +507,9 @@ func buildLogDir(_ BuildContext, d *dag) (string, error) {
 
 func buildLogOutput(_ BuildContext, d *dag) (core.LogOutputMode, error) {
 	if d.LogOutput.IsZero() {
-		return core.LogOutputSeparate, nil
+		// Return empty to allow inheritance from base config.
+		// Default is applied in core.InitializeDefaults.
+		return "", nil
 	}
 	return d.LogOutput.Mode(), nil
 }
@@ -1141,6 +1147,70 @@ func buildSSH(_ BuildContext, d *dag) (*core.SSHConfig, error) {
 		KnownHostFile: d.SSH.KnownHostFile,
 		Shell:         shell,
 		ShellArgs:     shellArgs,
+	}, nil
+}
+
+func buildLLM(_ BuildContext, d *dag) (*core.LLMConfig, error) {
+	if d.LLM == nil {
+		return nil, nil
+	}
+
+	cfg := d.LLM
+
+	// Validate provider if specified (optional at DAG level)
+	if cfg.Provider != "" {
+		validProviders := map[string]bool{
+			"openai": true, "anthropic": true, "gemini": true,
+			"openrouter": true, "local": true,
+			// Aliases for local provider
+			"ollama": true, "vllm": true, "llama": true,
+		}
+		if !validProviders[cfg.Provider] {
+			return nil, core.NewValidationError("llm.provider", cfg.Provider,
+				fmt.Errorf("invalid provider: must be one of openai, anthropic, gemini, openrouter, local (or aliases: ollama, vllm, llama)"))
+		}
+	}
+
+	// Validate temperature range if specified
+	if cfg.Temperature != nil {
+		if *cfg.Temperature < 0.0 || *cfg.Temperature > 2.0 {
+			return nil, core.NewValidationError("llm.temperature", *cfg.Temperature,
+				fmt.Errorf("temperature must be between 0.0 and 2.0"))
+		}
+	}
+
+	// Validate topP range if specified
+	if cfg.TopP != nil {
+		if *cfg.TopP < 0.0 || *cfg.TopP > 1.0 {
+			return nil, core.NewValidationError("llm.topP", *cfg.TopP,
+				fmt.Errorf("topP must be between 0.0 and 1.0"))
+		}
+	}
+
+	// Validate maxTokens if specified
+	if cfg.MaxTokens != nil {
+		if *cfg.MaxTokens < 1 {
+			return nil, core.NewValidationError("llm.maxTokens", *cfg.MaxTokens,
+				fmt.Errorf("maxTokens must be at least 1"))
+		}
+	}
+
+	thinking, err := buildThinkingConfig(cfg.Thinking)
+	if err != nil {
+		return nil, err
+	}
+
+	return &core.LLMConfig{
+		Provider:    cfg.Provider,
+		Model:       cfg.Model,
+		System:      cfg.System,
+		Temperature: cfg.Temperature,
+		MaxTokens:   cfg.MaxTokens,
+		TopP:        cfg.TopP,
+		BaseURL:     cfg.BaseURL,
+		APIKeyName:  cfg.APIKeyName,
+		Stream:      cfg.Stream,
+		Thinking:    thinking,
 	}, nil
 }
 

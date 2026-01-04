@@ -1577,3 +1577,75 @@ func TestLogOutputMode(t *testing.T) {
 		assert.Contains(t, content, "line4-stderr")
 	})
 }
+
+func TestNodeChatMessages(t *testing.T) {
+	t.Parallel()
+
+	t.Run("SetAndGetMessages", func(t *testing.T) {
+		t.Parallel()
+
+		step := core.Step{Name: "test-chat-step"}
+		node := runtime.NewNode(step, runtime.NodeState{})
+
+		// Initially should be empty
+		assert.Empty(t, node.GetChatMessages())
+
+		// Set messages
+		messages := []execution.LLMMessage{
+			{Role: execution.RoleSystem, Content: "be helpful"},
+			{Role: execution.RoleUser, Content: "hello"},
+			{Role: execution.RoleAssistant, Content: "hi there"},
+		}
+		node.SetChatMessages(messages)
+
+		// Should return the messages
+		assert.Equal(t, messages, node.GetChatMessages())
+	})
+
+	t.Run("EmptyMessages", func(t *testing.T) {
+		t.Parallel()
+
+		step := core.Step{Name: "test-empty-messages"}
+		node := runtime.NewNode(step, runtime.NodeState{})
+
+		// Set empty messages
+		node.SetChatMessages([]execution.LLMMessage{})
+		assert.Empty(t, node.GetChatMessages())
+	})
+
+	t.Run("NilMessages", func(t *testing.T) {
+		t.Parallel()
+
+		step := core.Step{Name: "test-nil-messages"}
+		node := runtime.NewNode(step, runtime.NodeState{})
+
+		// Set nil messages
+		node.SetChatMessages(nil)
+		assert.Nil(t, node.GetChatMessages())
+	})
+
+	t.Run("ConcurrentAccess", func(t *testing.T) {
+		t.Parallel()
+
+		step := core.Step{Name: "test-concurrent"}
+		node := runtime.NewNode(step, runtime.NodeState{})
+
+		// Test concurrent access to message methods
+		done := make(chan bool)
+		for i := 0; i < 10; i++ {
+			go func(id int) {
+				messages := []execution.LLMMessage{
+					{Role: execution.RoleUser, Content: fmt.Sprintf("message %d", id)},
+				}
+				node.SetChatMessages(messages)
+				_ = node.GetChatMessages()
+				done <- true
+			}(i)
+		}
+
+		// Wait for all goroutines
+		for i := 0; i < 10; i++ {
+			<-done
+		}
+	})
+}

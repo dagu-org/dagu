@@ -160,7 +160,11 @@ export const mainListItems = React.forwardRef<
                       </SelectTrigger>
                       <SelectContent>
                         {context.remoteNodes.map((node) => (
-                          <SelectItem key={node} value={node} className="text-sm">
+                          <SelectItem
+                            key={node}
+                            value={node}
+                            className="text-sm"
+                          >
                             {node}
                           </SelectItem>
                         ))}
@@ -282,7 +286,7 @@ export const mainListItems = React.forwardRef<
             isOpen ? 'text-left' : 'text-center'
           )}
         >
-          {isOpen ? config.version : config.version.split('.')[0]}
+          v{isOpen ? config.version : config.version.split('.')[0]}
         </div>
       )}
     </div>

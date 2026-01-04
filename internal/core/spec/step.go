@@ -13,6 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec/types"
+	"github.com/dagu-org/dagu/internal/llm"
 )
 
 // step defines a step in the DAG.
@@ -100,6 +101,14 @@ type step struct {
 
 	// Config contains executor-specific configuration.
 	Config map[string]any `yaml:"config,omitempty"`
+
+	// LLM contains the configuration for LLM-based executors (chat, agent, etc.).
+	// Requires explicit type: chat (or future type: agent).
+	LLM *llmConfig `yaml:"llm,omitempty"`
+
+	// Messages contains the conversation messages for chat steps.
+	// Only valid when type is "chat".
+	Messages []llmMessage `yaml:"messages,omitempty"`
 }
 
 // repeatPolicy defines the repeat policy for a step.
@@ -121,6 +130,52 @@ type retryPolicy struct {
 	ExitCode       []int `yaml:"exitCode,omitempty"`
 	Backoff        any   `yaml:"backoff,omitempty"` // Accepts bool or float
 	MaxIntervalSec int   `yaml:"maxIntervalSec,omitempty"`
+}
+
+// llmConfig defines the LLM configuration for a step.
+// thinkingConfig defines thinking/reasoning mode configuration for YAML parsing.
+type thinkingConfig struct {
+	// Enabled activates thinking mode for supported models.
+	Enabled bool `yaml:"enabled,omitempty"`
+	// Effort controls reasoning depth: low, medium, high, xhigh.
+	Effort string `yaml:"effort,omitempty"`
+	// BudgetTokens sets explicit token budget (provider-specific).
+	BudgetTokens *int `yaml:"budgetTokens,omitempty"`
+	// IncludeInOutput includes thinking blocks in stdout.
+	IncludeInOutput bool `yaml:"includeInOutput,omitempty"`
+}
+
+type llmConfig struct {
+	// Provider is the LLM provider (openai, anthropic, gemini, openrouter, local).
+	Provider string `yaml:"provider,omitempty"`
+	// Model is the model to use (e.g., gpt-4o, claude-sonnet-4-20250514).
+	Model string `yaml:"model,omitempty"`
+	// System is the default system prompt for conversations.
+	System string `yaml:"system,omitempty"`
+	// Temperature controls randomness (0.0-2.0).
+	Temperature *float64 `yaml:"temperature,omitempty"`
+	// MaxTokens is the maximum number of tokens to generate.
+	MaxTokens *int `yaml:"maxTokens,omitempty"`
+	// TopP is the nucleus sampling parameter.
+	TopP *float64 `yaml:"topP,omitempty"`
+	// BaseURL is a custom API endpoint.
+	BaseURL string `yaml:"baseURL,omitempty"`
+	// APIKeyName is the name of the environment variable containing the API key.
+	// If not specified, the default environment variable for the provider is used.
+	APIKeyName string `yaml:"apiKeyName,omitempty"`
+	// Stream enables or disables streaming output.
+	// Default is true.
+	Stream *bool `yaml:"stream,omitempty"`
+	// Thinking enables extended thinking/reasoning mode.
+	Thinking *thinkingConfig `yaml:"thinking,omitempty"`
+}
+
+// llmMessage defines a message in the LLM conversation.
+type llmMessage struct {
+	// Role is the message role (system, user, assistant, tool).
+	Role string `yaml:"role,omitempty"`
+	// Content is the message content. Supports variable substitution with ${VAR}.
+	Content string `yaml:"content,omitempty"`
 }
 
 // stepTransformer is a generic implementation for step field transformations
@@ -225,6 +280,13 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	if err := buildStepExecutor(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("executor", err))
 	}
+	// LLM must be after executor so we know if type supports LLM
+	if err := buildStepLLM(ctx, s, result); err != nil {
+		errs = append(errs, wrapTransformError("llm", err))
+	}
+	if err := buildStepMessages(s, result); err != nil {
+		errs = append(errs, wrapTransformError("messages", err))
+	}
 	if err := buildStepCommand(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("command", err))
 	}
@@ -233,6 +295,7 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	}
 
 	// Final validators run after the executor type is determined
+	// Capabilities-based validators handle all execution type conflicts
 	if err := validateCommand(result); err != nil {
 		errs = append(errs, wrapTransformError("command", err))
 	}
@@ -253,6 +316,12 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	}
 	if err := validateWorkerSelector(result); err != nil {
 		errs = append(errs, wrapTransformError("workerSelector", err))
+	}
+	if err := validateLLM(result); err != nil {
+		errs = append(errs, wrapTransformError("llm", err))
+	}
+	if err := validateMessages(result); err != nil {
+		errs = append(errs, wrapTransformError("messages", err))
 	}
 
 	// Validate that stdout and stderr don't point to the same file
@@ -920,7 +989,63 @@ func validateWorkerSelector(result *core.Step) error {
 	return nil
 }
 
+// validateLLM checks if the executor type supports the llm field.
+func validateLLM(result *core.Step) error {
+	if result.LLM == nil {
+		return nil
+	}
+	if !core.SupportsLLM(result.ExecutorConfig.Type) {
+		return core.NewValidationError(
+			"llm",
+			result.LLM,
+			fmt.Errorf("executor type %q does not support llm field; use type: chat with llm: config", result.ExecutorConfig.Type),
+		)
+	}
+	// Provider is required (can be set at DAG or step level)
+	if result.LLM.Provider == "" {
+		return core.NewValidationError(
+			"llm.provider",
+			result.LLM.Provider,
+			fmt.Errorf("provider is required (set at DAG or step level)"),
+		)
+	}
+	// Model is required (can be set at DAG or step level)
+	if result.LLM.Model == "" {
+		return core.NewValidationError(
+			"llm.model",
+			result.LLM.Model,
+			fmt.Errorf("model is required (set at DAG or step level)"),
+		)
+	}
+	// Messages are required (at step level)
+	if len(result.Messages) == 0 {
+		return core.NewValidationError(
+			"messages",
+			result.Messages,
+			fmt.Errorf("at least one message is required"),
+		)
+	}
+	return nil
+}
+
+// validateMessages checks if the executor type supports the messages field.
+func validateMessages(result *core.Step) error {
+	if len(result.Messages) == 0 {
+		return nil
+	}
+	if !core.SupportsLLM(result.ExecutorConfig.Type) {
+		return core.NewValidationError(
+			"messages",
+			result.Messages,
+			fmt.Errorf("executor type %q does not support messages field; use type: chat", result.ExecutorConfig.Type),
+		)
+	}
+	return nil
+}
+
 // validateConflicts checks for mutual exclusivity between step fields.
+// This only checks new-vs-legacy format conflicts (type/config vs executor).
+// Execution type conflicts are handled by capability-based validators.
 func validateConflicts(s *step) error {
 	// Check for new format vs legacy format conflict
 	hasNewFormat := s.Type != "" || len(s.Config) > 0
@@ -933,34 +1058,6 @@ func validateConflicts(s *step) error {
 		}
 		return core.NewValidationError("config", s.Config,
 			fmt.Errorf("cannot use both 'config' and 'executor' fields; use 'type' + 'config' instead"))
-	}
-
-	hasSubDAG := strings.TrimSpace(s.Call) != "" || strings.TrimSpace(s.Run) != "" || s.Parallel != nil
-	hasExecutor := s.Executor != nil
-	hasCommand := s.Command != nil
-	hasScript := s.Script != ""
-	hasContainer := s.Container != nil
-
-	if hasSubDAG {
-		if hasExecutor {
-			return core.NewValidationError("executor", s.Executor, ErrSubDAGAndExecutorConflict)
-		}
-		if hasCommand {
-			return core.NewValidationError("command", s.Command, ErrSubDAGAndCommandConflict)
-		}
-		if hasScript {
-			return core.NewValidationError("script", s.Script, ErrSubDAGAndScriptConflict)
-		}
-		if hasContainer {
-			return core.NewValidationError("container", s.Container, fmt.Errorf("cannot use 'container' field with sub-DAG execution"))
-		}
-	}
-
-	if hasContainer && hasExecutor {
-		return core.NewValidationError("executor", s.Executor, ErrContainerAndExecutorConflict)
-	}
-	if hasContainer && hasScript {
-		return core.NewValidationError("script", s.Script, ErrContainerAndScriptConflict)
 	}
 
 	return nil
@@ -1144,6 +1241,135 @@ func buildStepContainer(ctx StepBuildContext, s *step, result *core.Step) error 
 	}
 
 	result.Container = ct
+	return nil
+}
+
+// buildStepLLM parses the LLM configuration in the step definition.
+// Note: This only populates result.LLM. The executor type must be set explicitly
+// via type: chat in YAML (no auto-detection).
+// If step has no llm: config but DAG has one, the DAG config is inherited.
+// If step has llm: config, it completely overrides DAG-level (full override pattern).
+func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
+	// Only process LLM for executors that support it
+	if !core.SupportsLLM(result.ExecutorConfig.Type) {
+		return nil
+	}
+
+	// If step has no LLM config, inherit from DAG
+	if s.LLM == nil {
+		if ctx.dag != nil && ctx.dag.LLM != nil {
+			result.LLM = ctx.dag.LLM
+		}
+		return nil
+	}
+
+	// Step has explicit llm: config - use it (full override of DAG-level)
+	cfg := s.LLM
+
+	// Validate provider if specified
+	if cfg.Provider != "" {
+		if _, err := llm.ParseProviderType(cfg.Provider); err != nil {
+			return core.NewValidationError("llm.provider", cfg.Provider, err)
+		}
+	}
+
+	// Validate model is specified
+	if cfg.Model == "" {
+		return core.NewValidationError("llm.model", cfg.Model,
+			fmt.Errorf("model must be specified when llm config is provided"))
+	}
+
+	// Validate temperature range
+	if cfg.Temperature != nil {
+		if *cfg.Temperature < 0.0 || *cfg.Temperature > 2.0 {
+			return core.NewValidationError("llm.temperature", *cfg.Temperature,
+				fmt.Errorf("temperature must be between 0.0 and 2.0"))
+		}
+	}
+
+	// Validate maxTokens if specified
+	if cfg.MaxTokens != nil {
+		if *cfg.MaxTokens < 1 {
+			return core.NewValidationError("llm.maxTokens", *cfg.MaxTokens,
+				fmt.Errorf("maxTokens must be at least 1"))
+		}
+	}
+
+	// Validate topP range
+	if cfg.TopP != nil {
+		if *cfg.TopP < 0.0 || *cfg.TopP > 1.0 {
+			return core.NewValidationError("llm.topP", *cfg.TopP,
+				fmt.Errorf("topP must be between 0.0 and 1.0"))
+		}
+	}
+
+	thinking, err := buildThinkingConfig(cfg.Thinking)
+	if err != nil {
+		return err
+	}
+
+	result.LLM = &core.LLMConfig{
+		Provider:    cfg.Provider,
+		Model:       cfg.Model,
+		System:      cfg.System,
+		Temperature: cfg.Temperature,
+		MaxTokens:   cfg.MaxTokens,
+		TopP:        cfg.TopP,
+		BaseURL:     cfg.BaseURL,
+		APIKeyName:  cfg.APIKeyName,
+		Stream:      cfg.Stream,
+		Thinking:    thinking,
+	}
+
+	return nil
+}
+
+// buildThinkingConfig converts thinkingConfig to core.ThinkingConfig.
+func buildThinkingConfig(cfg *thinkingConfig) (*core.ThinkingConfig, error) {
+	if cfg == nil {
+		return nil, nil
+	}
+	effort, err := core.ParseThinkingEffort(cfg.Effort)
+	if err != nil {
+		return nil, core.NewValidationError("thinking.effort", cfg.Effort, err)
+	}
+	return &core.ThinkingConfig{
+		Enabled:         cfg.Enabled,
+		Effort:          effort,
+		BudgetTokens:    cfg.BudgetTokens,
+		IncludeInOutput: cfg.IncludeInOutput,
+	}, nil
+}
+
+// buildStepMessages parses the messages field for chat steps.
+func buildStepMessages(s *step, result *core.Step) error {
+	if len(s.Messages) == 0 {
+		return nil
+	}
+
+	result.Messages = make([]core.LLMMessage, len(s.Messages))
+	for i, msg := range s.Messages {
+		if msg.Role == "" {
+			return core.NewValidationError(
+				fmt.Sprintf("messages[%d].role", i), msg.Role,
+				fmt.Errorf("role is required"))
+		}
+		role, err := core.ParseLLMRole(msg.Role)
+		if err != nil {
+			return core.NewValidationError(
+				fmt.Sprintf("messages[%d].role", i), msg.Role, err)
+		}
+		if msg.Content == "" {
+			return core.NewValidationError(
+				fmt.Sprintf("messages[%d].content", i), msg.Content,
+				fmt.Errorf("content is required"))
+		}
+		result.Messages[i] = core.LLMMessage{
+			Role:    role,
+			Content: msg.Content,
+		}
+	}
+
 	return nil
 }
 

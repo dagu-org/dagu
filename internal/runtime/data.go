@@ -11,6 +11,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
 // Data is a thread-safe wrapper around NodeData.
@@ -62,6 +63,8 @@ type NodeState struct {
 	// OutputVariables stores the output variables for the following steps.
 	// It only contains the local output variables.
 	OutputVariables *collections.SyncMap
+	// ChatMessages stores the chat conversation messages for message passing between steps.
+	ChatMessages []execution.LLMMessage
 }
 
 // Parallel represents the evaluated parallel execution configuration for a node.
@@ -473,4 +476,18 @@ func (d *Data) MarkError(err error) {
 
 	d.inner.State.Error = err
 	d.inner.State.Status = core.NodeFailed
+}
+
+// SetChatMessages sets the chat conversation messages for the node.
+func (d *Data) SetChatMessages(messages []execution.LLMMessage) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.inner.State.ChatMessages = messages
+}
+
+// GetChatMessages returns the chat conversation messages for the node.
+func (d *Data) GetChatMessages() []execution.LLMMessage {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.inner.State.ChatMessages
 }

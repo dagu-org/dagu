@@ -675,3 +675,164 @@ func TestAttempt_ReadOutputs(t *testing.T) {
 		assert.Equal(t, outputs.Outputs, readOutputs.Outputs)
 	})
 }
+
+func TestAttempt_WriteStepMessages(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("WriteAndReadStepMessages", func(t *testing.T) {
+		th := setupTestStore(t)
+		dag := th.DAG("test-messages")
+
+		att, err := th.Store.CreateAttempt(ctx, dag.DAG, time.Now(), "run-1", execution.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+
+		messages := []execution.LLMMessage{
+			{Role: execution.RoleSystem, Content: "be helpful"},
+			{Role: execution.RoleUser, Content: "hello"},
+			{Role: execution.RoleAssistant, Content: "hi there"},
+		}
+
+		err = att.WriteStepMessages(ctx, "step1", messages)
+		require.NoError(t, err)
+
+		readMsgs, err := att.ReadStepMessages(ctx, "step1")
+		require.NoError(t, err)
+		require.NotNil(t, readMsgs)
+		require.Len(t, readMsgs, 3)
+		assert.Equal(t, execution.RoleSystem, readMsgs[0].Role)
+		assert.Equal(t, "be helpful", readMsgs[0].Content)
+	})
+
+	t.Run("WriteEmptyMessages", func(t *testing.T) {
+		th := setupTestStore(t)
+		dag := th.DAG("test-empty-messages")
+
+		att, err := th.Store.CreateAttempt(ctx, dag.DAG, time.Now(), "run-1", execution.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+
+		err = att.WriteStepMessages(ctx, "step1", []execution.LLMMessage{})
+		require.NoError(t, err)
+
+		// File should not exist for empty messages
+		readMsgs, err := att.ReadStepMessages(ctx, "step1")
+		require.NoError(t, err)
+		assert.Nil(t, readMsgs)
+	})
+
+	t.Run("ReadNonExistentStepMessages", func(t *testing.T) {
+		th := setupTestStore(t)
+		dag := th.DAG("test-nonexistent-messages")
+
+		att, err := th.Store.CreateAttempt(ctx, dag.DAG, time.Now(), "run-1", execution.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+
+		readMsgs, err := att.ReadStepMessages(ctx, "nonexistent-step")
+		require.NoError(t, err)
+		assert.Nil(t, readMsgs)
+	})
+
+	t.Run("UpdateStepMessages", func(t *testing.T) {
+		th := setupTestStore(t)
+		dag := th.DAG("test-update-messages")
+
+		att, err := th.Store.CreateAttempt(ctx, dag.DAG, time.Now(), "run-1", execution.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+
+		// Write initial messages
+		messages1 := []execution.LLMMessage{
+			{Role: execution.RoleUser, Content: "first"},
+		}
+		err = att.WriteStepMessages(ctx, "step1", messages1)
+		require.NoError(t, err)
+
+		// Update with more messages (overwrites)
+		messages2 := []execution.LLMMessage{
+			{Role: execution.RoleUser, Content: "first"},
+			{Role: execution.RoleAssistant, Content: "response"},
+		}
+		err = att.WriteStepMessages(ctx, "step1", messages2)
+		require.NoError(t, err)
+
+		readMsgs, err := att.ReadStepMessages(ctx, "step1")
+		require.NoError(t, err)
+		require.NotNil(t, readMsgs)
+		assert.Len(t, readMsgs, 2)
+	})
+
+	t.Run("MultipleSteps", func(t *testing.T) {
+		th := setupTestStore(t)
+		dag := th.DAG("test-multiple-steps")
+
+		att, err := th.Store.CreateAttempt(ctx, dag.DAG, time.Now(), "run-1", execution.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+
+		// Write messages for step1
+		step1Msgs := []execution.LLMMessage{
+			{Role: execution.RoleUser, Content: "question 1"},
+			{Role: execution.RoleAssistant, Content: "answer 1"},
+		}
+		err = att.WriteStepMessages(ctx, "step1", step1Msgs)
+		require.NoError(t, err)
+
+		// Write messages for step2
+		step2Msgs := []execution.LLMMessage{
+			{Role: execution.RoleUser, Content: "question 2"},
+			{Role: execution.RoleAssistant, Content: "answer 2"},
+		}
+		err = att.WriteStepMessages(ctx, "step2", step2Msgs)
+		require.NoError(t, err)
+
+		// Verify each step's messages are independent
+		read1, err := att.ReadStepMessages(ctx, "step1")
+		require.NoError(t, err)
+		require.Len(t, read1, 2)
+		assert.Equal(t, "question 1", read1[0].Content)
+
+		read2, err := att.ReadStepMessages(ctx, "step2")
+		require.NoError(t, err)
+		require.Len(t, read2, 2)
+		assert.Equal(t, "question 2", read2[0].Content)
+	})
+
+	t.Run("MessagesSharedAcrossRetryAttempts", func(t *testing.T) {
+		th := setupTestStore(t)
+		dag := th.DAG("test-retry-messages")
+		dagRunID := "retry-run-1"
+
+		// First attempt writes messages
+		att1, err := th.Store.CreateAttempt(ctx, dag.DAG, time.Now(), dagRunID, execution.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+
+		step1Msgs := []execution.LLMMessage{
+			{Role: execution.RoleUser, Content: "hello"},
+			{Role: execution.RoleAssistant, Content: "hi there"},
+		}
+		err = att1.WriteStepMessages(ctx, "step1", step1Msgs)
+		require.NoError(t, err)
+
+		// Second attempt (retry) should be able to read the same messages
+		att2, err := th.Store.CreateAttempt(ctx, dag.DAG, time.Now().Add(time.Second), dagRunID, execution.NewDAGRunAttemptOptions{Retry: true})
+		require.NoError(t, err)
+
+		readMsgs, err := att2.ReadStepMessages(ctx, "step1")
+		require.NoError(t, err)
+		require.NotNil(t, readMsgs, "retry attempt should be able to read messages from first attempt")
+		require.Len(t, readMsgs, 2)
+		assert.Equal(t, "hello", readMsgs[0].Content)
+		assert.Equal(t, "hi there", readMsgs[1].Content)
+
+		// Retry attempt can also write new step messages
+		step2Msgs := []execution.LLMMessage{
+			{Role: execution.RoleUser, Content: "follow up"},
+			{Role: execution.RoleAssistant, Content: "response"},
+		}
+		err = att2.WriteStepMessages(ctx, "step2", step2Msgs)
+		require.NoError(t, err)
+
+		// Both attempts should see step2 messages (they share the dag-run level storage)
+		finalMsgs, err := att1.ReadStepMessages(ctx, "step2")
+		require.NoError(t, err)
+		require.NotNil(t, finalMsgs)
+		assert.Len(t, finalMsgs, 2)
+	})
+}

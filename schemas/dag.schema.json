@@ -411,6 +411,10 @@
       "$ref": "#/definitions/sshConfig",
       "description": "Default SSH configuration for all steps in the DAG. Steps can override this configuration with their own SSH settings. Note: SSH and container configurations are mutually exclusive at the DAG level."
     },
+    "llm": {
+      "$ref": "#/definitions/llmConfig",
+      "description": "Default LLM configuration for all chat steps in the DAG. Steps with type: chat inherit this configuration if they don't specify their own llm field. If a step specifies llm, it completely overrides the DAG-level configuration."
+    },
     "steps": {
       "oneOf": [
         {
@@ -1028,36 +1032,81 @@
         "config": {
           "$ref": "#/definitions/executorConfig",
           "description": "Executor-specific configuration. This is the new format replacing executor.config. Cannot be used together with 'executor' field."
+        },
+        "llm": {
+          "$ref": "#/definitions/llmConfig",
+          "description": "LLM configuration for AI-powered steps. Required when type is 'chat' (or future type: agent)."
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/llmMessage"
+          },
+          "description": "Conversation messages for chat steps. Only valid when type is 'chat'. Supports variable substitution with ${VAR}."
         }
       },
       "allOf": [
         {
           "if": { "properties": { "type": { "const": "http" } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/httpExecutorConfig" } } }
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/httpExecutorConfig" }
+            }
+          }
         },
         {
           "if": { "properties": { "type": { "const": "ssh" } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/sshExecutorConfig" } } }
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/sshExecutorConfig" }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "enum": ["docker", "container"] } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/dockerExecutorConfig" } } }
+          "if": {
+            "properties": { "type": { "enum": ["docker", "container"] } }
+          },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/dockerExecutorConfig" }
+            }
+          }
         },
         {
           "if": { "properties": { "type": { "const": "mail" } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/mailExecutorConfig" } } }
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/mailExecutorConfig" }
+            }
+          }
         },
         {
           "if": { "properties": { "type": { "const": "jq" } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/jqExecutorConfig" } } }
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/jqExecutorConfig" }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "enum": ["gha", "github_action", "github-action"] } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/ghaExecutorConfig" } } }
+          "if": {
+            "properties": {
+              "type": { "enum": ["gha", "github_action", "github-action"] }
+            }
+          },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/ghaExecutorConfig" }
+            }
+          }
         },
         {
           "if": { "properties": { "type": { "const": "archive" } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/archiveExecutorConfig" } } }
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/archiveExecutorConfig" }
+            }
+          }
         }
       ]
     },
@@ -1444,10 +1493,7 @@
           "description": "Alias for 'host'. IP address of the SSH server."
         },
         "port": {
-          "oneOf": [
-            { "type": "string" },
-            { "type": "integer" }
-          ],
+          "oneOf": [{ "type": "string" }, { "type": "integer" }],
           "default": "22",
           "description": "SSH port number. Defaults to 22."
         },
@@ -1506,17 +1552,21 @@
         },
         "pull": {
           "oneOf": [
-            { "type": "boolean", "description": "Boolean shorthand: true = 'always', false = 'never'" },
-            { "type": "string", "enum": ["always", "never", "missing"], "description": "Pull policy string" }
+            {
+              "type": "boolean",
+              "description": "Boolean shorthand: true = 'always', false = 'never'"
+            },
+            {
+              "type": "string",
+              "enum": ["always", "never", "missing"],
+              "description": "Pull policy string"
+            }
           ],
           "default": "missing",
           "description": "Image pull policy. 'always' pulls every time, 'never' uses only local, 'missing' pulls if not present."
         },
         "autoRemove": {
-          "oneOf": [
-            { "type": "boolean" },
-            { "type": "string" }
-          ],
+          "oneOf": [{ "type": "boolean" }, { "type": "string" }],
           "description": "Automatically remove the container after it exits."
         },
         "workingDir": {
@@ -1562,8 +1612,15 @@
         },
         "to": {
           "oneOf": [
-            { "type": "string", "description": "Single recipient email address" },
-            { "type": "array", "items": { "type": "string" }, "description": "List of recipient email addresses" }
+            {
+              "type": "string",
+              "description": "Single recipient email address"
+            },
+            {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "List of recipient email addresses"
+            }
           ],
           "description": "Recipient email address(es). Required."
         },
@@ -1751,15 +1808,133 @@
       },
       "description": "Configuration for archive operations (create, extract, list)."
     },
+    "llmConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "model"],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "openai",
+            "anthropic",
+            "gemini",
+            "openrouter",
+            "local",
+            "ollama",
+            "vllm",
+            "llama"
+          ],
+          "description": "LLM provider to use. Aliases 'ollama', 'vllm', 'llama' map to 'local'."
+        },
+        "model": {
+          "type": "string",
+          "description": "Model identifier (e.g., 'gpt-4o', 'claude-sonnet-4-20250514', 'gemini-pro')."
+        },
+        "system": {
+          "type": "string",
+          "description": "Default system prompt for conversations. Prepended to messages if specified."
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Controls randomness in responses (0.0-2.0). Lower values are more deterministic."
+        },
+        "maxTokens": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of tokens to generate in the response."
+        },
+        "topP": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Nucleus sampling parameter (0.0-1.0). Alternative to temperature for controlling randomness."
+        },
+        "baseURL": {
+          "type": "string",
+          "description": "Custom API endpoint URL. Overrides the default endpoint for the provider."
+        },
+        "apiKeyName": {
+          "type": "string",
+          "description": "Name of the environment variable containing the API key. If not specified, the default for the provider is used (e.g., OPENAI_API_KEY)."
+        },
+        "stream": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable streaming output. When true (default), response tokens are streamed to stdout as they arrive."
+        },
+        "thinking": {
+          "$ref": "#/definitions/thinkingConfig",
+          "description": "Extended thinking/reasoning configuration. Enables deeper reasoning for complex tasks."
+        }
+      },
+      "description": "LLM configuration. Supports OpenAI, Anthropic, Google Gemini, OpenRouter, and local models (Ollama/vLLM)."
+    },
+    "thinkingConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable extended thinking/reasoning mode. When true, the model uses additional computation for more thorough reasoning."
+        },
+        "effort": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "xhigh"],
+          "description": "Reasoning effort level. Maps to provider-specific settings: low (minimal reasoning), medium (default), high (thorough), xhigh (maximum, OpenAI GPT-5.2+ only)."
+        },
+        "budgetTokens": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Explicit token budget for thinking (provider-specific). Anthropic: 1024-128K, Gemini 2.5: 128-32768. Overrides effort-based defaults."
+        },
+        "includeInOutput": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include thinking blocks in stdout output. When false (default), only the final response is shown."
+        }
+      },
+      "description": "Configuration for extended thinking/reasoning capabilities. Provider support varies: Anthropic (Claude 3.7+), OpenAI (o1/o3/GPT-5), Gemini (2.5+), OpenRouter (unified)."
+    },
+    "llmMessage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "content"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": ["system", "user", "assistant"],
+          "description": "Message role. 'system' for instructions, 'user' for prompts, 'assistant' for model responses."
+        },
+        "content": {
+          "type": "string",
+          "description": "Message content. Supports variable substitution with ${VAR} syntax."
+        }
+      },
+      "description": "A single message in an LLM conversation."
+    },
     "executorType": {
       "type": "string",
       "enum": [
-        "command", "shell",
-        "docker", "container",
-        "http", "mail", "ssh", "jq",
-        "gha", "github_action", "github-action",
-        "dag", "subworkflow",
-        "parallel", "archive"
+        "command",
+        "shell",
+        "docker",
+        "container",
+        "http",
+        "mail",
+        "ssh",
+        "jq",
+        "gha",
+        "github_action",
+        "github-action",
+        "dag",
+        "subworkflow",
+        "parallel",
+        "archive",
+        "chat"
       ],
       "description": "Type of executor to use for this step."
     },
@@ -1782,43 +1957,103 @@
       "allOf": [
         {
           "if": { "properties": { "type": { "const": "http" } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/httpExecutorConfig" } } }
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/httpExecutorConfig" }
+            }
+          }
         },
         {
           "if": { "properties": { "type": { "const": "ssh" } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/sshExecutorConfig" } } }
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/sshExecutorConfig" }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "enum": ["docker", "container"] } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/dockerExecutorConfig" } } }
+          "if": {
+            "properties": { "type": { "enum": ["docker", "container"] } }
+          },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/dockerExecutorConfig" }
+            }
+          }
         },
         {
           "if": { "properties": { "type": { "const": "mail" } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/mailExecutorConfig" } } }
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/mailExecutorConfig" }
+            }
+          }
         },
         {
           "if": { "properties": { "type": { "const": "jq" } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/jqExecutorConfig" } } }
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/jqExecutorConfig" }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "enum": ["gha", "github_action", "github-action"] } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/ghaExecutorConfig" } } }
+          "if": {
+            "properties": {
+              "type": { "enum": ["gha", "github_action", "github-action"] }
+            }
+          },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/ghaExecutorConfig" }
+            }
+          }
         },
         {
           "if": { "properties": { "type": { "const": "archive" } } },
-          "then": { "properties": { "config": { "$ref": "#/definitions/archiveExecutorConfig" } } }
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/archiveExecutorConfig" }
+            }
+          }
         },
         {
           "if": { "properties": { "type": { "enum": ["command", "shell"] } } },
-          "then": { "properties": { "config": { "type": "object", "additionalProperties": false, "description": "Command/shell executors do not use executor.config. Configure at step level." } } }
+          "then": {
+            "properties": {
+              "config": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "Command/shell executors do not use executor.config. Configure at step level."
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "enum": ["dag", "subworkflow"] } } },
-          "then": { "properties": { "config": { "type": "object", "additionalProperties": false, "description": "DAG/subworkflow executors do not use executor.config. Use step.call or step.run field." } } }
+          "if": {
+            "properties": { "type": { "enum": ["dag", "subworkflow"] } }
+          },
+          "then": {
+            "properties": {
+              "config": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "DAG/subworkflow executors do not use executor.config. Use step.call or step.run field."
+              }
+            }
+          }
         },
         {
           "if": { "properties": { "type": { "const": "parallel" } } },
-          "then": { "properties": { "config": { "type": "object", "additionalProperties": false, "description": "Parallel executor does not use executor.config. Use step.parallel field." } } }
+          "then": {
+            "properties": {
+              "config": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "Parallel executor does not use executor.config. Use step.parallel field."
+              }
+            }
+          }
         }
       ],
       "description": "Executor configuration object with type-specific config validation."

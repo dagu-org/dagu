@@ -30,19 +30,28 @@ var (
 	ErrDeadlockDetected = errors.New("deadlock detected: no runnable nodes but DAG not finished")
 )
 
+// ChatMessagesHandler handles chat conversation messages for persistence.
+type ChatMessagesHandler interface {
+	// WriteStepMessages writes messages for a single step.
+	WriteStepMessages(ctx context.Context, stepName string, messages []execution.LLMMessage) error
+	// ReadStepMessages reads messages for a single step.
+	ReadStepMessages(ctx context.Context, stepName string) ([]execution.LLMMessage, error)
+}
+
 // Runner runs a plan of steps.
 type Runner struct {
-	logDir        string
-	maxActiveRuns int
-	timeout       time.Duration
-	delay         time.Duration
-	dry           bool
-	onInit        *core.Step
-	onExit        *core.Step
-	onSuccess     *core.Step
-	onFailure     *core.Step
-	onCancel      *core.Step
-	dagRunID      string
+	logDir          string
+	maxActiveRuns   int
+	timeout         time.Duration
+	delay           time.Duration
+	dry             bool
+	onInit          *core.Step
+	onExit          *core.Step
+	onSuccess       *core.Step
+	onFailure       *core.Step
+	onCancel        *core.Step
+	dagRunID        string
+	messagesHandler ChatMessagesHandler
 
 	canceled  int32
 	mu        sync.RWMutex
@@ -65,33 +74,35 @@ type Runner struct {
 
 func New(cfg *Config) *Runner {
 	return &Runner{
-		logDir:        cfg.LogDir,
-		maxActiveRuns: cfg.MaxActiveSteps,
-		timeout:       cfg.Timeout,
-		delay:         cfg.Delay,
-		dry:           cfg.Dry,
-		onInit:        cfg.OnInit,
-		onExit:        cfg.OnExit,
-		onSuccess:     cfg.OnSuccess,
-		onFailure:     cfg.OnFailure,
-		onCancel:      cfg.OnCancel,
-		dagRunID:      cfg.DAGRunID,
-		pause:         time.Millisecond * 100,
+		logDir:          cfg.LogDir,
+		maxActiveRuns:   cfg.MaxActiveSteps,
+		timeout:         cfg.Timeout,
+		delay:           cfg.Delay,
+		dry:             cfg.Dry,
+		onInit:          cfg.OnInit,
+		onExit:          cfg.OnExit,
+		onSuccess:       cfg.OnSuccess,
+		onFailure:       cfg.OnFailure,
+		onCancel:        cfg.OnCancel,
+		dagRunID:        cfg.DAGRunID,
+		messagesHandler: cfg.MessagesHandler,
+		pause:           time.Millisecond * 100,
 	}
 }
 
 type Config struct {
-	LogDir         string
-	MaxActiveSteps int
-	Timeout        time.Duration
-	Delay          time.Duration
-	Dry            bool
-	OnInit         *core.Step
-	OnExit         *core.Step
-	OnSuccess      *core.Step
-	OnFailure      *core.Step
-	OnCancel       *core.Step
-	DAGRunID       string
+	LogDir          string
+	MaxActiveSteps  int
+	Timeout         time.Duration
+	Delay           time.Duration
+	Dry             bool
+	OnInit          *core.Step
+	OnExit          *core.Step
+	OnSuccess       *core.Step
+	OnFailure       *core.Step
+	OnCancel        *core.Step
+	DAGRunID        string
+	MessagesHandler ChatMessagesHandler
 }
 
 // Run runs the plan of steps.
@@ -376,6 +387,9 @@ func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, p
 
 	ctx = node.SetupEnv(ctx)
 
+	// Setup chat messages from dependencies before execution
+	r.setupChatMessages(ctx, node)
+
 ExecRepeat: // repeat execution
 	for !r.isCanceled() {
 		logger.Debug(ctx, "Executing node loop")
@@ -409,6 +423,11 @@ ExecRepeat: // repeat execution
 		node.SetStatus(core.NodeSucceeded)
 	}
 
+	// Save chat messages after successful execution
+	if node.State().Status == core.NodeSucceeded {
+		r.saveChatMessages(ctx, node)
+	}
+
 	if err := r.teardownNode(node); err != nil {
 		r.setLastError(err)
 		node.SetStatus(core.NodeFailed)
@@ -438,6 +457,62 @@ func (r *Runner) teardownNode(node *Node) error {
 		return node.Teardown()
 	}
 	return nil
+}
+
+// setupChatMessages loads and merges chat messages from dependent steps.
+func (r *Runner) setupChatMessages(ctx context.Context, node *Node) {
+	if r.messagesHandler == nil {
+		return
+	}
+
+	step := node.Step()
+	if !core.SupportsLLM(step.ExecutorConfig.Type) {
+		return
+	}
+
+	if len(step.Depends) == 0 {
+		return
+	}
+
+	// Read messages from each dependency step
+	var inherited []execution.LLMMessage
+	for _, dep := range step.Depends {
+		msgs, err := r.messagesHandler.ReadStepMessages(ctx, dep)
+		if err != nil {
+			logger.Warn(ctx, "Failed to read chat messages for dependency",
+				tag.Step(dep), tag.Error(err))
+			continue
+		}
+		inherited = append(inherited, msgs...)
+	}
+
+	// Deduplicate system messages (keep only first)
+	inherited = execution.DeduplicateSystemMessages(inherited)
+	if len(inherited) > 0 {
+		node.SetChatMessages(inherited)
+	}
+}
+
+// saveChatMessages saves the node's chat messages to the handler.
+func (r *Runner) saveChatMessages(ctx context.Context, node *Node) {
+	if r.messagesHandler == nil {
+		return
+	}
+
+	step := node.Step()
+	if !core.SupportsLLM(step.ExecutorConfig.Type) {
+		return
+	}
+
+	savedMsgs := node.GetChatMessages()
+	if len(savedMsgs) == 0 {
+		return
+	}
+
+	// Direct write - no read-modify-write cycle
+	if err := r.messagesHandler.WriteStepMessages(ctx, step.Name, savedMsgs); err != nil {
+		logger.Warn(ctx, "Failed to write chat messages", tag.Error(err))
+	}
 }
 
 func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) context.Context {

@@ -157,6 +157,16 @@ func (n *Node) Execute(ctx context.Context) error {
 		return err
 	}
 
+	// Check if executor supports chat message handling
+	chatHandler, _ := cmd.(executor.ChatMessageHandler)
+
+	// Set chat context from prior steps
+	if chatHandler != nil {
+		if messages := n.GetChatMessages(); len(messages) > 0 {
+			chatHandler.SetContext(messages)
+		}
+	}
+
 	flusher := n.startOutputFlusher()
 	defer func() {
 		n.stopOutputFlusher(flusher)
@@ -165,6 +175,11 @@ func (n *Node) Execute(ctx context.Context) error {
 	exitCode, err := n.runCommand(ctx, cmd, stepTimeout)
 	n.SetError(err)
 	n.SetExitCode(exitCode)
+
+	// Capture chat messages after execution
+	if chatHandler != nil {
+		n.SetChatMessages(chatHandler.GetMessages())
+	}
 
 	if err := n.captureOutput(ctx); err != nil {
 		return err

@@ -67,7 +67,7 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 		dagRunStore.On("ListStatuses", ctx, mock.Anything).Return([]*execution.DAGRunStatus{runningStatus}, nil)
 
 		// Mock attempt
-		attempt := &mockDAGRunAttempt{}
+		attempt := &execution.MockDAGRunAttempt{}
 		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
 		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return(attempt, nil)
 
@@ -110,7 +110,7 @@ func TestZombieDetector_detectAndCleanZombies(t *testing.T) {
 		dagRunStore.On("ListStatuses", ctx, mock.Anything).Return([]*execution.DAGRunStatus{runningStatus}, nil)
 
 		// Mock attempt
-		attempt := &mockDAGRunAttempt{}
+		attempt := &execution.MockDAGRunAttempt{}
 		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
 		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return(attempt, nil)
 
@@ -207,7 +207,7 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 		}
 
 		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
-		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return((*mockDAGRunAttempt)(nil), errors.New("not found"))
+		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return((*execution.MockDAGRunAttempt)(nil), errors.New("not found"))
 
 		err := detector.checkAndCleanZombie(ctx, status)
 		assert.Error(t, err)
@@ -229,7 +229,7 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 			Status:   core.Running,
 		}
 
-		attempt := &mockDAGRunAttempt{}
+		attempt := &execution.MockDAGRunAttempt{}
 		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
 		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return(attempt, nil)
 		attempt.On("ReadDAG", mock.Anything).Return((*core.DAG)(nil), errors.New("read error"))
@@ -255,7 +255,7 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 			Status:   core.Running,
 		}
 
-		attempt := &mockDAGRunAttempt{}
+		attempt := &execution.MockDAGRunAttempt{}
 		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
 		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return(attempt, nil)
 
@@ -290,7 +290,7 @@ func TestZombieDetector_checkAndCleanZombie_errors(t *testing.T) {
 			Status:   core.Running,
 		}
 
-		attempt := &mockDAGRunAttempt{}
+		attempt := &execution.MockDAGRunAttempt{}
 		dagRunRef := execution.NewDAGRunRef("test-dag", "run-123")
 		dagRunStore.On("FindAttempt", mock.Anything, dagRunRef).Return(attempt, nil)
 
@@ -471,74 +471,4 @@ func (m *mockProcStore) ListAllAlive(ctx context.Context) (map[string][]executio
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(map[string][]execution.DAGRunRef), args.Error(1)
-}
-
-var _ execution.DAGRunAttempt = (*mockDAGRunAttempt)(nil)
-
-// Mock DAGRunAttempt
-type mockDAGRunAttempt struct {
-	mock.Mock
-}
-
-func (m *mockDAGRunAttempt) ID() string {
-	args := m.Called()
-	return args.String(0)
-}
-
-func (m *mockDAGRunAttempt) Open(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *mockDAGRunAttempt) Write(ctx context.Context, status execution.DAGRunStatus) error {
-	args := m.Called(ctx, status)
-	return args.Error(0)
-}
-
-func (m *mockDAGRunAttempt) Close(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *mockDAGRunAttempt) ReadStatus(ctx context.Context) (*execution.DAGRunStatus, error) {
-	args := m.Called(ctx)
-	return args.Get(0).(*execution.DAGRunStatus), args.Error(1)
-}
-
-func (m *mockDAGRunAttempt) ReadDAG(ctx context.Context) (*core.DAG, error) {
-	args := m.Called(ctx)
-	return args.Get(0).(*core.DAG), args.Error(1)
-}
-
-func (m *mockDAGRunAttempt) Abort(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *mockDAGRunAttempt) IsAborting(ctx context.Context) (bool, error) {
-	args := m.Called(ctx)
-	return args.Bool(0), args.Error(1)
-}
-
-func (m *mockDAGRunAttempt) Hide(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *mockDAGRunAttempt) Hidden() bool {
-	args := m.Called()
-	return args.Bool(0)
-}
-
-func (m *mockDAGRunAttempt) WriteOutputs(ctx context.Context, outputs *execution.DAGRunOutputs) error {
-	args := m.Called(ctx, outputs)
-	return args.Error(0)
-}
-
-func (m *mockDAGRunAttempt) ReadOutputs(ctx context.Context) (*execution.DAGRunOutputs, error) {
-	args := m.Called(ctx)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*execution.DAGRunOutputs), args.Error(1)
 }

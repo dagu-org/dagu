@@ -12,6 +12,10 @@ coverage:
     - "internal/scheduler/filenotify"
     # Legacy persistence code
     - "internal/persistence/legacy"
+    # LLM provider implementations - require external API mocking
+    - "internal/llm/providers"
+    # HTTP client wrapper - requires HTTP mocking
+    - "internal/llm/http.go"
   status:
     project:
       default:

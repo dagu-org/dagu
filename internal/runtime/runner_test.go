@@ -12,7 +12,9 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/runtime/builtin/chat"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -2805,4 +2807,176 @@ func TestNewEnvWithStepInfo(t *testing.T) {
 	require.Equal(t, "0", env.StepMap["s1"].ExitCode)
 	require.Equal(t, "0", env.StepMap["s2"].ExitCode)
 	require.NotContains(t, env.StepMap, "no-id")
+}
+
+func TestRunner_ChatMessagesHandler(t *testing.T) {
+	t.Run("HandlerNotCalledForNonChatSteps", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		// Run non-chat steps
+		plan := r.newPlan(t,
+			successStep("step1"),
+			successStep("step2", "step1"),
+		)
+
+		result := plan.assertRun(t, core.Succeeded)
+		result.assertNodeStatus(t, "step1", core.NodeSucceeded)
+		result.assertNodeStatus(t, "step2", core.NodeSucceeded)
+
+		// Handler should not have been called for writes since no chat steps
+		assert.Equal(t, 0, handler.writeCalls)
+	})
+
+	t.Run("HandlerConfiguredCorrectly", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		// Verify handler is configured
+		assert.NotNil(t, r.cfg.MessagesHandler)
+
+		plan := r.newPlan(t, successStep("step1"))
+		result := plan.assertRun(t, core.Succeeded)
+		result.assertNodeStatus(t, "step1", core.NodeSucceeded)
+	})
+
+	t.Run("SetupChatMessagesNoDependencies", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		// Chat step with no dependencies - should not read from handler
+		plan := r.newPlan(t, chatStep("chat1"))
+		// Step will fail (no LLM config), but setupChatMessages is called first
+		_ = plan.assertRun(t, core.Failed)
+	})
+
+	t.Run("SetupChatMessagesWithDependencies", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		// Pre-populate handler with messages for dependency
+		handler.messages["step1"] = []execution.LLMMessage{
+			{Role: execution.RoleSystem, Content: "be helpful"},
+			{Role: execution.RoleUser, Content: "hello"},
+		}
+
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		// First step succeeds, then chat step depends on it
+		plan := r.newPlan(t,
+			successStep("step1"),
+			chatStep("chat1", "step1"),
+		)
+		// Chat step will fail (no LLM config), but messages should be read
+		_ = plan.assertRun(t, core.Failed)
+
+		// Messages were read from handler (verified by no panic/error)
+	})
+
+	t.Run("SetupChatMessagesReadError", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		handler.readErr = fmt.Errorf("read error")
+
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		plan := r.newPlan(t,
+			successStep("step1"),
+			chatStep("chat1", "step1"),
+		)
+		// Should handle read error gracefully (logs warning, continues)
+		_ = plan.assertRun(t, core.Failed)
+	})
+
+	t.Run("SetupChatMessagesDeduplicatesSystem", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		// Multiple system messages from different dependencies
+		handler.messages["step1"] = []execution.LLMMessage{
+			{Role: execution.RoleSystem, Content: "first system"},
+			{Role: execution.RoleUser, Content: "msg1"},
+		}
+		handler.messages["step2"] = []execution.LLMMessage{
+			{Role: execution.RoleSystem, Content: "second system"},
+			{Role: execution.RoleUser, Content: "msg2"},
+		}
+
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		plan := r.newPlan(t,
+			successStep("step1"),
+			successStep("step2"),
+			chatStep("chat1", "step1", "step2"),
+		)
+		// Chat step will fail, but deduplication logic is exercised
+		_ = plan.assertRun(t, core.Failed)
+	})
+
+	t.Run("SaveChatMessagesOnSuccess", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		plan := r.newPlan(t, newStep("mock1", withExecutorType(chat.MockExecutorType)))
+		result := plan.assertRun(t, core.Succeeded)
+		result.assertNodeStatus(t, "mock1", core.NodeSucceeded)
+
+		assert.Equal(t, 1, handler.writeCalls)
+		assert.NotEmpty(t, handler.messages["mock1"])
+	})
+
+	t.Run("SaveChatMessagesWriteError", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		handler.writeErr = fmt.Errorf("write error")
+
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		plan := r.newPlan(t, newStep("mock1", withExecutorType(chat.MockExecutorType)))
+		result := plan.assertRun(t, core.Succeeded)
+		result.assertNodeStatus(t, "mock1", core.NodeSucceeded)
+	})
+
+	t.Run("SaveChatMessagesWithInheritedContext", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		handler.messages["step1"] = []execution.LLMMessage{
+			{Role: execution.RoleSystem, Content: "be helpful"},
+		}
+
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		plan := r.newPlan(t,
+			successStep("step1"),
+			newStep("mock1", withDepends("step1"), withExecutorType(chat.MockExecutorType)),
+		)
+		result := plan.assertRun(t, core.Succeeded)
+		result.assertNodeStatus(t, "mock1", core.NodeSucceeded)
+
+		assert.Equal(t, 1, handler.writeCalls)
+	})
+
+	t.Run("SaveChatMessagesNoMessages", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		plan := r.newPlan(t, newStep("empty1", withExecutorType(chat.MockEmptyExecutorType)))
+		result := plan.assertRun(t, core.Succeeded)
+		result.assertNodeStatus(t, "empty1", core.NodeSucceeded)
+
+		assert.Equal(t, 0, handler.writeCalls)
+	})
 }

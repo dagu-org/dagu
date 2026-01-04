@@ -3092,7 +3092,11 @@ steps:
 `)
 		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
-		// Default should be separate
+		// Empty at build time - default applied in InitializeDefaults
+		assert.Equal(t, core.LogOutputMode(""), dag.LogOutput)
+
+		// After InitializeDefaults, should be separate
+		core.InitializeDefaults(dag)
 		assert.Equal(t, core.LogOutputSeparate, dag.LogOutput)
 	})
 
