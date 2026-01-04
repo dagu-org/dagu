@@ -186,7 +186,6 @@ func (a *API) loadInlineDAG(ctx context.Context, specContent string, name *strin
 		return nil, func() {}, fmt.Errorf("failed to write spec to temp file: %w", err)
 	}
 
-	// Set working directory to cwd or home - not the temp dir which gets cleaned up
 	workDir, _ := os.Getwd()
 	if workDir == "" {
 		workDir, _ = os.UserHomeDir()
@@ -205,7 +204,8 @@ func (a *API) loadInlineDAG(ctx context.Context, specContent string, name *strin
 		}
 	}
 
-	return dag, cleanup, nil
+	// Skip cleanup: temp files needed for async execution
+	return dag, func() {}, nil
 }
 
 // no sanitize helper: DAG name is validated by core.ValidateDAGName
