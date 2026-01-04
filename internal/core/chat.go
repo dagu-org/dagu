@@ -2,13 +2,27 @@ package core
 
 import "fmt"
 
+// LLMRole represents the role of a message sender in a conversation.
+type LLMRole string
+
 // LLM message role constants.
 const (
-	LLMRoleSystem    = "system"
-	LLMRoleUser      = "user"
-	LLMRoleAssistant = "assistant"
-	LLMRoleTool      = "tool"
+	LLMRoleSystem    LLMRole = "system"
+	LLMRoleUser      LLMRole = "user"
+	LLMRoleAssistant LLMRole = "assistant"
+	LLMRoleTool      LLMRole = "tool"
 )
+
+// ParseLLMRole validates and returns an LLMRole from a string.
+// Returns error for invalid or empty role values.
+func ParseLLMRole(s string) (LLMRole, error) {
+	switch LLMRole(s) {
+	case LLMRoleSystem, LLMRoleUser, LLMRoleAssistant, LLMRoleTool:
+		return LLMRole(s), nil
+	default:
+		return "", fmt.Errorf("invalid role %q: must be one of: system, user, assistant, tool", s)
+	}
+}
 
 // ThinkingEffort represents the reasoning depth level for thinking mode.
 type ThinkingEffort string
@@ -83,7 +97,7 @@ type LLMConfig struct {
 // LLMMessage represents a message in the LLM conversation.
 type LLMMessage struct {
 	// Role is the message role (system, user, assistant, tool).
-	Role string `json:"role,omitempty"`
+	Role LLMRole `json:"role,omitempty"`
 	// Content is the message content. Supports variable substitution with ${VAR}.
 	Content string `json:"content,omitempty"`
 }

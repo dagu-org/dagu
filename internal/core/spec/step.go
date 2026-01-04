@@ -1347,35 +1347,25 @@ func buildStepMessages(s *step, result *core.Step) error {
 		return nil
 	}
 
-	validRoles := map[string]bool{
-		core.LLMRoleSystem:    true,
-		core.LLMRoleUser:      true,
-		core.LLMRoleAssistant: true,
-		core.LLMRoleTool:      true,
-	}
+	result.Messages = make([]core.LLMMessage, len(s.Messages))
 	for i, msg := range s.Messages {
 		if msg.Role == "" {
 			return core.NewValidationError(
 				fmt.Sprintf("messages[%d].role", i), msg.Role,
 				fmt.Errorf("role is required"))
 		}
-		if !validRoles[msg.Role] {
+		role, err := core.ParseLLMRole(msg.Role)
+		if err != nil {
 			return core.NewValidationError(
-				fmt.Sprintf("messages[%d].role", i), msg.Role,
-				fmt.Errorf("invalid role: must be one of system, user, assistant, tool"))
+				fmt.Sprintf("messages[%d].role", i), msg.Role, err)
 		}
 		if msg.Content == "" {
 			return core.NewValidationError(
 				fmt.Sprintf("messages[%d].content", i), msg.Content,
 				fmt.Errorf("content is required"))
 		}
-	}
-
-	// Build core.LLMMessage slice
-	result.Messages = make([]core.LLMMessage, len(s.Messages))
-	for i, msg := range s.Messages {
 		result.Messages[i] = core.LLMMessage{
-			Role:    msg.Role,
+			Role:    role,
 			Content: msg.Content,
 		}
 	}

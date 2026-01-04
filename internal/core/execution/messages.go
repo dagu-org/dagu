@@ -13,7 +13,7 @@ const (
 // LLMMessage represents a single message in the conversation.
 type LLMMessage struct {
 	// Role is the message role (system, user, assistant).
-	Role string `json:"role"`
+	Role core.LLMRole `json:"role"`
 	// Content is the message content.
 	Content string `json:"content"`
 	// Metadata contains API call metadata (only set for assistant responses).
