@@ -49,6 +49,8 @@ func TestMain(m *testing.M) {
 	}
 	// mail: no command support
 	core.RegisterExecutorCapabilities("mail", core.ExecutorCapabilities{})
+	// chat: LLM executor
+	core.RegisterExecutorCapabilities("chat", core.ExecutorCapabilities{LLM: true})
 
 	os.Exit(m.Run())
 }
@@ -3316,6 +3318,382 @@ func TestStepExecutorNewFormat_Integration(t *testing.T) {
 			assert.Equal(t, tt.wantType, step.ExecutorConfig.Type)
 			for k, v := range tt.wantConfig {
 				assert.Equal(t, v, step.ExecutorConfig.Config[k], "config key %q mismatch", k)
+			}
+		})
+	}
+}
+
+func TestValidateLLM(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		step    *core.Step
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "NilLLM",
+			step:    &core.Step{},
+			wantErr: false,
+		},
+		{
+			name: "ValidChatStep",
+			step: &core.Step{
+				ExecutorConfig: core.ExecutorConfig{Type: "chat"},
+				LLM:            &core.LLMConfig{Provider: "openai", Model: "gpt-4"},
+				Messages:       []core.LLMMessage{{Role: "user", Content: "hello"}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "UnsupportedExecutorType",
+			step: &core.Step{
+				ExecutorConfig: core.ExecutorConfig{Type: "shell"},
+				LLM:            &core.LLMConfig{Provider: "openai", Model: "gpt-4"},
+			},
+			wantErr: true,
+			errMsg:  "does not support llm field",
+		},
+		{
+			name: "MissingProvider",
+			step: &core.Step{
+				ExecutorConfig: core.ExecutorConfig{Type: "chat"},
+				LLM:            &core.LLMConfig{Model: "gpt-4"},
+				Messages:       []core.LLMMessage{{Role: "user", Content: "hello"}},
+			},
+			wantErr: true,
+			errMsg:  "provider is required",
+		},
+		{
+			name: "MissingModel",
+			step: &core.Step{
+				ExecutorConfig: core.ExecutorConfig{Type: "chat"},
+				LLM:            &core.LLMConfig{Provider: "openai"},
+				Messages:       []core.LLMMessage{{Role: "user", Content: "hello"}},
+			},
+			wantErr: true,
+			errMsg:  "model is required",
+		},
+		{
+			name: "MissingMessages",
+			step: &core.Step{
+				ExecutorConfig: core.ExecutorConfig{Type: "chat"},
+				LLM:            &core.LLMConfig{Provider: "openai", Model: "gpt-4"},
+			},
+			wantErr: true,
+			errMsg:  "at least one message is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := validateLLM(tt.step)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateMessages(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		step    *core.Step
+		wantErr bool
+	}{
+		{
+			name:    "NoMessages",
+			step:    &core.Step{},
+			wantErr: false,
+		},
+		{
+			name: "MessagesWithChatExecutor",
+			step: &core.Step{
+				ExecutorConfig: core.ExecutorConfig{Type: "chat"},
+				Messages:       []core.LLMMessage{{Role: "user", Content: "hello"}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "MessagesWithUnsupportedExecutor",
+			step: &core.Step{
+				ExecutorConfig: core.ExecutorConfig{Type: "shell"},
+				Messages:       []core.LLMMessage{{Role: "user", Content: "hello"}},
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := validateMessages(tt.step)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "does not support messages field")
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestBuildStepLLM(t *testing.T) {
+	t.Parallel()
+
+	temp := func(v float64) *float64 { return &v }
+	tokens := func(v int) *int { return &v }
+
+	tests := []struct {
+		name    string
+		step    *step
+		dag     *core.DAG
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "NonLLMExecutor",
+			step:    &step{},
+			wantErr: false,
+		},
+		{
+			name: "InheritFromDAG",
+			step: &step{Type: "chat"},
+			dag: &core.DAG{
+				LLM: &core.LLMConfig{Provider: "openai", Model: "gpt-4"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "InvalidProvider",
+			step: &step{
+				Type: "chat",
+				LLM:  &llmConfig{Provider: "invalid", Model: "test"},
+			},
+			wantErr: true,
+			errMsg:  "llm.provider",
+		},
+		{
+			name: "MissingModel",
+			step: &step{
+				Type: "chat",
+				LLM:  &llmConfig{Provider: "openai"},
+			},
+			wantErr: true,
+			errMsg:  "llm.model",
+		},
+		{
+			name: "TemperatureTooLow",
+			step: &step{
+				Type: "chat",
+				LLM:  &llmConfig{Provider: "openai", Model: "gpt-4", Temperature: temp(-0.1)},
+			},
+			wantErr: true,
+			errMsg:  "llm.temperature",
+		},
+		{
+			name: "TemperatureTooHigh",
+			step: &step{
+				Type: "chat",
+				LLM:  &llmConfig{Provider: "openai", Model: "gpt-4", Temperature: temp(2.1)},
+			},
+			wantErr: true,
+			errMsg:  "llm.temperature",
+		},
+		{
+			name: "MaxTokensInvalid",
+			step: &step{
+				Type: "chat",
+				LLM:  &llmConfig{Provider: "openai", Model: "gpt-4", MaxTokens: tokens(0)},
+			},
+			wantErr: true,
+			errMsg:  "llm.maxTokens",
+		},
+		{
+			name: "TopPTooLow",
+			step: &step{
+				Type: "chat",
+				LLM:  &llmConfig{Provider: "openai", Model: "gpt-4", TopP: temp(-0.1)},
+			},
+			wantErr: true,
+			errMsg:  "llm.topP",
+		},
+		{
+			name: "TopPTooHigh",
+			step: &step{
+				Type: "chat",
+				LLM:  &llmConfig{Provider: "openai", Model: "gpt-4", TopP: temp(1.1)},
+			},
+			wantErr: true,
+			errMsg:  "llm.topP",
+		},
+		{
+			name: "ValidConfig",
+			step: &step{
+				Type: "chat",
+				LLM: &llmConfig{
+					Provider:    "openai",
+					Model:       "gpt-4",
+					Temperature: temp(0.7),
+					MaxTokens:   tokens(100),
+					TopP:        temp(0.9),
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := &core.Step{ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)}}
+
+			// Build executor first to set the type
+			ctx := StepBuildContext{
+				BuildContext: BuildContext{ctx: context.Background()},
+				dag:          tt.dag,
+			}
+			_ = buildStepExecutor(ctx, tt.step, result)
+
+			err := buildStepLLM(ctx, tt.step, result)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestBuildThinkingConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		cfg     *thinkingConfig
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "NilConfig",
+			cfg:     nil,
+			wantErr: false,
+		},
+		{
+			name:    "ValidLowEffort",
+			cfg:     &thinkingConfig{Enabled: true, Effort: "low"},
+			wantErr: false,
+		},
+		{
+			name:    "ValidMediumEffort",
+			cfg:     &thinkingConfig{Enabled: true, Effort: "medium"},
+			wantErr: false,
+		},
+		{
+			name:    "ValidHighEffort",
+			cfg:     &thinkingConfig{Enabled: true, Effort: "high"},
+			wantErr: false,
+		},
+		{
+			name:    "InvalidEffort",
+			cfg:     &thinkingConfig{Enabled: true, Effort: "invalid"},
+			wantErr: true,
+			errMsg:  "thinking.effort",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := buildThinkingConfig(tt.cfg)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errMsg)
+			} else {
+				require.NoError(t, err)
+				if tt.cfg == nil {
+					assert.Nil(t, result)
+				} else {
+					assert.NotNil(t, result)
+					assert.Equal(t, tt.cfg.Enabled, result.Enabled)
+				}
+			}
+		})
+	}
+}
+
+func TestBuildStepMessages(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		step    *step
+		wantErr bool
+		errMsg  string
+		wantLen int
+	}{
+		{
+			name:    "NoMessages",
+			step:    &step{},
+			wantErr: false,
+			wantLen: 0,
+		},
+		{
+			name: "ValidMessages",
+			step: &step{
+				Messages: []llmMessage{
+					{Role: "user", Content: "hello"},
+					{Role: "assistant", Content: "hi"},
+				},
+			},
+			wantErr: false,
+			wantLen: 2,
+		},
+		{
+			name: "MissingRole",
+			step: &step{
+				Messages: []llmMessage{{Content: "hello"}},
+			},
+			wantErr: true,
+			errMsg:  "messages[0].role",
+		},
+		{
+			name: "InvalidRole",
+			step: &step{
+				Messages: []llmMessage{{Role: "invalid", Content: "hello"}},
+			},
+			wantErr: true,
+			errMsg:  "messages[0].role",
+		},
+		{
+			name: "MissingContent",
+			step: &step{
+				Messages: []llmMessage{{Role: "user"}},
+			},
+			wantErr: true,
+			errMsg:  "messages[0].content",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := &core.Step{}
+			err := buildStepMessages(tt.step, result)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errMsg)
+			} else {
+				require.NoError(t, err)
+				assert.Len(t, result.Messages, tt.wantLen)
 			}
 		})
 	}
