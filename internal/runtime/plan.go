@@ -345,6 +345,8 @@ func (p *Plan) NodeStates() (hasRunning, hasWaiting, hasNotStarted bool) {
 			hasWaiting = true
 		case core.NodeNotStarted:
 			hasNotStarted = true
+		case core.NodeSucceeded, core.NodeFailed, core.NodeAborted, core.NodeSkipped, core.NodePartiallySucceeded:
+			// Terminal states
 		}
 	}
 	return
