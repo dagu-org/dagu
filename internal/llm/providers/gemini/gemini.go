@@ -3,15 +3,12 @@ package gemini
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
@@ -29,9 +26,8 @@ func init() {
 
 // Provider implements the llm.Provider interface for Google Gemini.
 type Provider struct {
-	config           llm.Config
-	httpClient       *http.Client
-	streamHttpClient *http.Client
+	config     llm.Config
+	httpClient *llm.HTTPClient
 }
 
 // New creates a new Gemini provider.
@@ -41,11 +37,8 @@ func New(cfg llm.Config) (llm.Provider, error) {
 	}
 
 	return &Provider{
-		config: cfg,
-		httpClient: &http.Client{
-			Timeout: cfg.Timeout,
-		},
-		streamHttpClient: &http.Client{},
+		config:     cfg,
+		httpClient: llm.NewHTTPClient(cfg),
 	}, nil
 }
 
@@ -62,7 +55,7 @@ func (p *Provider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.ChatRes
 	}
 
 	endpoint := fmt.Sprintf(generateContentPath, req.Model)
-	respBody, err := p.doRequest(ctx, endpoint, body, false)
+	respBody, err := p.doRequest(ctx, endpoint, body)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +104,7 @@ func (p *Provider) ChatStream(ctx context.Context, req *llm.ChatRequest) (<-chan
 	}
 
 	endpoint := fmt.Sprintf(streamContentPath, req.Model)
-	respBody, err := p.doRequest(ctx, endpoint+"?alt=sse", body, true)
+	respBody, err := p.doRequest(ctx, endpoint+"?alt=sse", body)
 	if err != nil {
 		return nil, err
 	}
@@ -219,67 +212,14 @@ func (p *Provider) mapEffortToThinkingLevel(effort llm.ThinkingEffort) string {
 	}
 }
 
-func (p *Provider) doRequest(ctx context.Context, endpoint string, body []byte, streaming bool) (io.ReadCloser, error) {
-	url := p.config.BaseURL + endpoint
-
-	client := p.httpClient
-	if streaming {
-		client = p.streamHttpClient
-	}
-
-	var respBody io.ReadCloser
-
-	policy := &backoff.ExponentialBackoffPolicy{
-		InitialInterval: p.config.InitialInterval,
-		BackoffFactor:   p.config.Multiplier,
-		MaxInterval:     p.config.MaxInterval,
-		MaxRetries:      p.config.MaxRetries,
-	}
-
-	err := backoff.Retry(ctx, func(ctx context.Context) error {
-		httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
-		if err != nil {
-			return backoff.PermanentError(llm.WrapError(providerName, fmt.Errorf("failed to create request: %w", err)))
-		}
-
-		httpReq.Header.Set("Content-Type", "application/json")
-		httpReq.Header.Set("x-goog-api-key", p.config.APIKey)
-
-		resp, err := client.Do(httpReq)
-		if err != nil {
-			return err // Retriable
-		}
-
-		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			respBody = resp.Body
-			return nil
-		}
-
-		// Read error response
-		errBody, _ := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-
-		apiErr := p.parseErrorResponse(resp.StatusCode, errBody)
-		if !apiErr.Retryable {
-			return backoff.PermanentError(apiErr)
-		}
-		return apiErr
-	}, policy, nil)
-
-	if err != nil {
-		return nil, err
-	}
-	return respBody, nil
+func (p *Provider) doRequest(ctx context.Context, endpoint string, body []byte) (io.ReadCloser, error) {
+	return p.httpClient.Do(ctx, p.config.BaseURL+endpoint, body, p.authHeaders())
 }
 
-func (p *Provider) parseErrorResponse(statusCode int, body []byte) *llm.APIError {
-	var errResp errorResponse
-	message := string(body)
-	if err := json.Unmarshal(body, &errResp); err == nil && errResp.Error.Message != "" {
-		message = errResp.Error.Message
+func (p *Provider) authHeaders() map[string]string {
+	return map[string]string{
+		"x-goog-api-key": p.config.APIKey,
 	}
-
-	return llm.NewAPIError(providerName, statusCode, message)
 }
 
 func (p *Provider) streamResponse(ctx context.Context, body io.ReadCloser, events chan<- llm.StreamEvent) {

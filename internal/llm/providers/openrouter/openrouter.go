@@ -4,15 +4,12 @@ package openrouter
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
@@ -29,9 +26,8 @@ func init() {
 
 // Provider implements the llm.Provider interface for OpenRouter.
 type Provider struct {
-	config           llm.Config
-	httpClient       *http.Client
-	streamHttpClient *http.Client
+	config     llm.Config
+	httpClient *llm.HTTPClient
 	// Optional metadata for OpenRouter
 	SiteURL  string
 	SiteName string
@@ -44,13 +40,10 @@ func New(cfg llm.Config) (llm.Provider, error) {
 	}
 
 	return &Provider{
-		config: cfg,
-		httpClient: &http.Client{
-			Timeout: cfg.Timeout,
-		},
-		streamHttpClient: &http.Client{},
-		SiteURL:          "https://github.com/dagu-org/dagu",
-		SiteName:         "Dagu Workflow Engine",
+		config:     cfg,
+		httpClient: llm.NewHTTPClient(cfg),
+		SiteURL:    "https://github.com/dagu-org/dagu",
+		SiteName:   "Dagu Workflow Engine",
 	}, nil
 }
 
@@ -66,7 +59,7 @@ func (p *Provider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.ChatRes
 		return nil, err
 	}
 
-	respBody, err := p.doRequest(ctx, body, false)
+	respBody, err := p.doRequest(ctx, body)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +92,7 @@ func (p *Provider) ChatStream(ctx context.Context, req *llm.ChatRequest) (<-chan
 		return nil, err
 	}
 
-	respBody, err := p.doRequest(ctx, body, true)
+	respBody, err := p.doRequest(ctx, body)
 	if err != nil {
 		return nil, err
 	}
@@ -162,75 +155,22 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 	return json.Marshal(chatReq)
 }
 
-func (p *Provider) doRequest(ctx context.Context, body []byte, streaming bool) (io.ReadCloser, error) {
-	url := p.config.BaseURL + defaultChatEndpoint
-
-	client := p.httpClient
-	if streaming {
-		client = p.streamHttpClient
-	}
-
-	var respBody io.ReadCloser
-
-	policy := &backoff.ExponentialBackoffPolicy{
-		InitialInterval: p.config.InitialInterval,
-		BackoffFactor:   p.config.Multiplier,
-		MaxInterval:     p.config.MaxInterval,
-		MaxRetries:      p.config.MaxRetries,
-	}
-
-	err := backoff.Retry(ctx, func(ctx context.Context) error {
-		httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
-		if err != nil {
-			return backoff.PermanentError(llm.WrapError(providerName, fmt.Errorf("failed to create request: %w", err)))
-		}
-
-		httpReq.Header.Set("Content-Type", "application/json")
-		httpReq.Header.Set("Authorization", "Bearer "+p.config.APIKey)
-
-		// OpenRouter-specific headers
-		if p.SiteURL != "" {
-			httpReq.Header.Set("HTTP-Referer", p.SiteURL)
-		}
-		if p.SiteName != "" {
-			httpReq.Header.Set("X-Title", p.SiteName)
-		}
-
-		resp, err := client.Do(httpReq)
-		if err != nil {
-			return err // Retriable
-		}
-
-		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			respBody = resp.Body
-			return nil
-		}
-
-		// Read error response
-		errBody, _ := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-
-		apiErr := p.parseErrorResponse(resp.StatusCode, errBody)
-		if !apiErr.Retryable {
-			return backoff.PermanentError(apiErr)
-		}
-		return apiErr
-	}, policy, nil)
-
-	if err != nil {
-		return nil, err
-	}
-	return respBody, nil
+func (p *Provider) doRequest(ctx context.Context, body []byte) (io.ReadCloser, error) {
+	return p.httpClient.Do(ctx, p.config.BaseURL+defaultChatEndpoint, body, p.authHeaders())
 }
 
-func (p *Provider) parseErrorResponse(statusCode int, body []byte) *llm.APIError {
-	var errResp errorResponse
-	message := string(body)
-	if err := json.Unmarshal(body, &errResp); err == nil && errResp.Error.Message != "" {
-		message = errResp.Error.Message
+func (p *Provider) authHeaders() map[string]string {
+	headers := map[string]string{
+		"Authorization": "Bearer " + p.config.APIKey,
 	}
-
-	return llm.NewAPIError(providerName, statusCode, message)
+	// OpenRouter-specific headers
+	if p.SiteURL != "" {
+		headers["HTTP-Referer"] = p.SiteURL
+	}
+	if p.SiteName != "" {
+		headers["X-Title"] = p.SiteName
+	}
+	return headers
 }
 
 func (p *Provider) streamResponse(ctx context.Context, body io.ReadCloser, events chan<- llm.StreamEvent) {
