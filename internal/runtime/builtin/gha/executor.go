@@ -25,17 +25,15 @@ import (
 ```yaml
 steps:
   - name: checkout
+    type: gha
     command: actions/checkout@v4
-    executor:
-      type: gha
     params:
       repository: myorg/myrepo
       ref: main
 
   - name: setup-go
+    type: gha
     command: actions/setup-go@v5
-    executor:
-      type: gha
     params:
       go-version: '1.23'
 ```

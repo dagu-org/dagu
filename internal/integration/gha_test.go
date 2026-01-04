@@ -20,10 +20,9 @@ workingDir: `+tmpDir+`
 steps:
   - name: test-action
     command: actions/checkout@v4
-    executor:
-      type: github_action
-      config:
-        runner: node:25-bookworm
+    type: github_action
+    config:
+      runner: node:25-bookworm
     params:
       repository: dagu-org/dagu
       sparse-checkout: README.md

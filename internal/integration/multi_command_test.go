@@ -389,7 +389,7 @@ func TestMultipleCommands_Validation(t *testing.T) {
 		yamlContent := `
 steps:
   - name: jq-multi
-    executor: jq
+    type: jq
     command:
       - ".foo"
       - ".bar"
@@ -413,7 +413,7 @@ steps:
 		yamlContent := `
 steps:
   - name: http-multi
-    executor: http
+    type: http
     command:
       - "GET https://example.com"
       - "POST https://example.com"
@@ -432,7 +432,7 @@ steps:
 		dag := th.DAG(t, `
 steps:
   - name: shell-multi
-    executor: shell
+    type: shell
     command:
       - echo hello
       - echo world
@@ -452,7 +452,7 @@ steps:
 		dag := th.DAG(t, `
 steps:
   - name: cmd-multi
-    executor: command
+    type: command
     command:
       - echo hello
       - echo world

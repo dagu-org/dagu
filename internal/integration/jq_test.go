@@ -16,10 +16,9 @@ func TestJQExecutor(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: extract-array-raw
-    executor: 
-      type: jq
-      config:
-        raw: true
+    type: jq
+    config:
+      raw: true
     script: |
       { "data": [1, 2, 3] }
     command: '.data[]'
@@ -41,10 +40,9 @@ func TestJQExecutor(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: extract-array-json
-    executor: 
-      type: jq
-      config:
-        raw: false
+    type: jq
+    config:
+      raw: false
     script: |
       { "data": [1, 2, 3] }
     command: '.data[]'
@@ -66,10 +64,9 @@ func TestJQExecutor(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: extract-strings-raw
-    executor: 
-      type: jq
-      config:
-        raw: true
+    type: jq
+    config:
+      raw: true
     script: |
       { "messages": ["hello", "world"] }
     command: '.messages[]'
@@ -91,10 +88,9 @@ func TestJQExecutor(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: extract-strings-json
-    executor: 
-      type: jq
-      config:
-        raw: false
+    type: jq
+    config:
+      raw: false
     script: |
       { "messages": ["hello", "world"] }
     command: '.messages[]'
@@ -116,10 +112,9 @@ func TestJQExecutor(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: extract-tsv
-    executor: 
-      type: jq
-      config:
-        raw: true
+    type: jq
+    config:
+      raw: true
     script: |
       { "data": [1, 2, 3] }
     command: '.data[] | [., 100 * .] | @tsv'
@@ -141,10 +136,9 @@ func TestJQExecutor(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: extract-single-string-raw
-    executor: 
-      type: jq
-      config:
-        raw: true
+    type: jq
+    config:
+      raw: true
     script: |
       {"foo": "bar"}
     command: .foo
@@ -167,10 +161,9 @@ func TestJQExecutor(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: extract-single-string-json
-    executor: 
-      type: jq
-      config:
-        raw: false
+    type: jq
+    config:
+      raw: false
     script: |
       {"foo": "bar"}
     command: .foo
@@ -193,10 +186,9 @@ func TestJQExecutor(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: extract-single-number-raw
-    executor: 
-      type: jq
-      config:
-        raw: true
+    type: jq
+    config:
+      raw: true
     script: |
       {"value": 42}
     command: .value
@@ -219,10 +211,9 @@ func TestJQExecutor(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: extract-single-boolean-raw
-    executor: 
-      type: jq
-      config:
-        raw: true
+    type: jq
+    config:
+      raw: true
     script: |
       {"enabled": true, "disabled": false}
     command: .enabled
@@ -245,10 +236,9 @@ func TestJQExecutor(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: extract-null-raw
-    executor: 
-      type: jq
-      config:
-        raw: true
+    type: jq
+    config:
+      raw: true
     script: |
       {"value": null}
     command: .value
@@ -273,10 +263,9 @@ func TestJQExecutor(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: extract-object-raw
-    executor: 
-      type: jq
-      config:
-        raw: true
+    type: jq
+    config:
+      raw: true
     script: |
       {"user": {"name": "John", "age": 30}}
     command: .user
@@ -303,10 +292,9 @@ func TestJQExecutor(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: extract-special-chars-raw
-    executor: 
-      type: jq
-      config:
-        raw: true
+    type: jq
+    config:
+      raw: true
     script: |
       {"message": "hello\nworld\ttab"}
     command: .message

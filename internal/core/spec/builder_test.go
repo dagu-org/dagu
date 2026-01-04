@@ -559,7 +559,7 @@ steps:
 steps:
   - command: GET http://example.com
     name: step1
-    executor: http
+    type: http
 `)
 		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -574,12 +574,11 @@ steps:
 steps:
   - command: http://example.com
     name: step1
-    executor:
-      type: http
-      config:
-        key: value
-        map:
-          foo: bar
+    type: http
+    config:
+      key: value
+      map:
+        foo: bar
 `)
 		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -1655,19 +1654,16 @@ steps:
   - echo "command"
   - script: |
       echo "script content"
-  - executor:
-      type: http
-      config:
-        url: https://example.com
+  - type: http
+    config:
+      url: https://example.com
   - call: sub-dag
-  - executor:
-      type: docker
-      config:
-        image: alpine
-  - executor:
-      type: ssh
-      config:
-        host: example.com
+  - type: docker
+    config:
+      image: alpine
+  - type: ssh
+    config:
+      host: example.com
 `)
 		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -2502,14 +2498,14 @@ container:
 steps:
   - name: step1
     command: echo test
-    executor: shell
+    type: shell
 `
 		ctx := context.Background()
 		dag, err := spec.LoadYAML(ctx, []byte(yaml))
 		require.NoError(t, err)
 		require.Len(t, dag.Steps, 1)
 
-		// Explicit executor should override DAG-level container
+		// Explicit type should override DAG-level container
 		assert.Equal(t, "shell", dag.Steps[0].ExecutorConfig.Type)
 	})
 
@@ -2535,10 +2531,9 @@ container:
 steps:
   - name: step1
     command: node app.js
-    executor:
-      type: docker
-      config:
-        image: python:3.11
+    type: docker
+    config:
+      image: python:3.11
 `
 		ctx := context.Background()
 		dag, err := spec.LoadYAML(ctx, []byte(yaml))
@@ -2559,7 +2554,7 @@ steps:
     command: echo "step 1"
   - name: step2
     command: echo "step 2"
-    executor: shell
+    type: shell
   - name: step3
     command: echo "step 3"
 `
@@ -2608,15 +2603,13 @@ ssh:
 steps:
   - name: step1
     command: echo hello
-    executor:
-      type: ssh
-      config:
-        user: overrideuser
-        ip: override.com
+    type: ssh
+    config:
+      user: overrideuser
+      ip: override.com
   - name: step2
     command: echo world
-    executor:
-      type: command
+    type: command
 `
 		ctx := context.Background()
 		dag, err := spec.LoadYAML(ctx, []byte(yaml))

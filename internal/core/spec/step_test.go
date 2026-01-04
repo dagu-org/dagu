@@ -2626,8 +2626,7 @@ func TestUnregisteredExecutorValidation(t *testing.T) {
 	yaml := `
 steps:
   - name: invalid-step
-    executor:
-      type: non-existent
+    type: non-existent
     command: echo hello
 `
 	tmpDir := t.TempDir()
@@ -3266,18 +3265,17 @@ func TestStepExecutorNewFormat_Integration(t *testing.T) {
 			},
 		},
 		{
-			name: "LegacyFormat_StillWorks",
+			name: "NewFormat_SSH",
 			yaml: `steps:
-  - name: legacy
-    executor:
-      type: ssh
-      config:
-        host: legacy.example.com
+  - name: ssh-step
+    type: ssh
+    config:
+      host: example.com
     command: uptime
 `,
 			wantType: "ssh",
 			wantConfig: map[string]any{
-				"host": "legacy.example.com",
+				"host": "example.com",
 			},
 		},
 		{

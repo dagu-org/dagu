@@ -40,11 +40,10 @@ env:
   - FOO: BAR
   - ABC=XYZ
 steps:
-  - executor:
-      type: docker
-      config:
-        image: alpine:3
-        autoRemove: true
+  - type: docker
+    config:
+      image: alpine:3
+      autoRemove: true
     command: echo 123 abc $FOO $ABC
     output: DOCKER_EXEC_OUT1
 `,
@@ -56,12 +55,11 @@ steps:
 			name: "AutoStartContainer",
 			dagConfig: `
 steps:
-  - executor:
-      type: docker
-      config:
-        image: alpine:3
-        autoRemove: true
-        containerName: dagu-autostart
+  - type: docker
+    config:
+      image: alpine:3
+      autoRemove: true
+      containerName: dagu-autostart
     command: echo "container started"
     output: DOCKER_EXEC_OUT1
 `,
@@ -346,12 +344,11 @@ func TestDockerExecutor_ExecInExistingContainer(t *testing.T) {
 
 	dagConfig := fmt.Sprintf(`
 steps:
-  - executor:
-      type: docker
-      config:
-        containerName: %s
-        exec:
-          workingDir: /
+  - type: docker
+    config:
+      containerName: %s
+      exec:
+        workingDir: /
     command: echo hello-existing
     output: EXEC_EXISTING_OUT
 `, containerName)
@@ -369,11 +366,10 @@ func TestDockerExecutor_ErrorIncludesRecentStderr(t *testing.T) {
 
 	dagConfig := fmt.Sprintf(`
 steps:
-  - executor:
-      type: docker
-      config:
-        image: %s
-        autoRemove: true
+  - type: docker
+    config:
+      image: %s
+      autoRemove: true
     command: sh -c 'echo first 1>&2; echo second 1>&2; exit 7'
 `, testImage)
 

@@ -119,10 +119,9 @@ func TestApproveDAGRunStep(t *testing.T) {
 
 	dagSpec := `steps:
   - name: wait-step
-    executor:
-      type: hitl
-      config:
-        prompt: "Please approve"
+    type: hitl
+    config:
+      prompt: "Please approve"
   - name: after-wait
     depends: [wait-step]
     command: "echo approved"`
@@ -184,15 +183,14 @@ func TestApproveDAGRunStepWithInputs(t *testing.T) {
 
 	dagSpec := `steps:
   - name: wait-step
-    executor:
-      type: hitl
-      config:
-        prompt: "Please provide reason"
-        input:
-          - reason
-          - approver
-        required:
-          - reason
+    type: hitl
+    config:
+      prompt: "Please provide reason"
+      input:
+        - reason
+        - approver
+      required:
+        - reason
   - name: after-wait
     depends: [wait-step]
     command: "echo reason=$reason approver=$approver"`
@@ -256,14 +254,13 @@ func TestApproveDAGRunStepMissingRequired(t *testing.T) {
 
 	dagSpec := `steps:
   - name: wait-step
-    executor:
-      type: hitl
-      config:
-        prompt: "Please provide reason"
-        input:
-          - reason
-        required:
-          - reason
+    type: hitl
+    config:
+      prompt: "Please provide reason"
+      input:
+        - reason
+      required:
+        - reason
   - name: after-wait
     depends: [wait-step]
     command: "echo done"`
@@ -343,10 +340,9 @@ func TestRejectDAGRunStep(t *testing.T) {
 
 	dagSpec := `steps:
   - name: wait-step
-    executor:
-      type: hitl
-      config:
-        prompt: "Please approve"
+    type: hitl
+    config:
+      prompt: "Please approve"
   - name: after-wait
     depends: [wait-step]
     command: "echo should not run"`

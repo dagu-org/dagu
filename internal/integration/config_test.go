@@ -336,7 +336,7 @@ steps:
 		t.Parallel()
 
 		dag := th.DAG(t, `steps:
-  - executor: jq
+  - type: jq
     command: .user.name # Get user name from JSON
     output: NAME
     script: |

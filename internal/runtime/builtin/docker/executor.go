@@ -28,24 +28,22 @@ var (
 ```yaml
 steps:
  - name: exec-in-existing
-   executor:
-     type: docker
-     config:
-       containerName: <container-name>
-       autoRemove: true
-       exec:
-         user: root     # optional
-         workingDir: /  # optional
-         env:           # optional
-           - MY_VAR=value
+   type: docker
+   config:
+     containerName: <container-name>
+     autoRemove: true
+     exec:
+       user: root     # optional
+       workingDir: /  # optional
+       env:           # optional
+         - MY_VAR=value
    command: echo "Hello from existing container"
 
  - name: create-new
-   executor:
-     type: docker
-     config:
-       image: alpine:latest
-       autoRemove: true
+   type: docker
+   config:
+     image: alpine:latest
+     autoRemove: true
    command: echo "Hello from new container"
 ```
 */

@@ -15,10 +15,9 @@ func TestWaitStepApproval(t *testing.T) {
 		testDAG := th.DAG(t, `
 steps:
   - name: wait-step
-    executor:
-      type: hitl
-      config:
-        prompt: "Please approve"
+    type: hitl
+    config:
+      prompt: "Please approve"
   - name: after-wait
     depends: [wait-step]
     command: echo "approved"
@@ -49,8 +48,7 @@ steps:
     command: echo "before"
   - name: wait-step
     depends: [before-wait]
-    executor:
-      type: hitl
+    type: hitl
   - name: after-wait-1
     depends: [wait-step]
     command: echo "after1"
@@ -86,8 +84,7 @@ steps:
     depends: [branch-a-1]
     command: echo "a2"
   - name: wait-branch
-    executor:
-      type: hitl
+    type: hitl
   - name: after-wait
     depends: [wait-branch]
     command: echo "after wait"
