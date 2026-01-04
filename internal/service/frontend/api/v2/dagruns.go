@@ -204,8 +204,7 @@ func (a *API) loadInlineDAG(ctx context.Context, specContent string, name *strin
 		}
 	}
 
-	// Skip cleanup: temp files needed for async execution
-	return dag, func() {}, nil
+	return dag, cleanup, nil
 }
 
 // no sanitize helper: DAG name is validated by core.ValidateDAGName
