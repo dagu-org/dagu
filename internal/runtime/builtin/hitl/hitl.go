@@ -1,4 +1,4 @@
-package wait
+package hitl
 
 import (
 	"context"
@@ -12,26 +12,26 @@ import (
 )
 
 var (
-	_ executor.Executor             = (*waitExecutor)(nil)
-	_ executor.NodeStatusDeterminer = (*waitExecutor)(nil)
+	_ executor.Executor             = (*hitlExecutor)(nil)
+	_ executor.NodeStatusDeterminer = (*hitlExecutor)(nil)
 )
 
-type waitExecutor struct {
+type hitlExecutor struct {
 	stdout io.Writer
 	stderr io.Writer
 	step   core.Step
 	config Config
 }
 
-func newWait(_ context.Context, step core.Step) (executor.Executor, error) {
+func newHITL(_ context.Context, step core.Step) (executor.Executor, error) {
 	var cfg Config
 	if step.ExecutorConfig.Config != nil {
 		if err := decodeConfig(step.ExecutorConfig.Config, &cfg); err != nil {
-			return nil, fmt.Errorf("failed to decode wait config: %w", err)
+			return nil, fmt.Errorf("failed to decode hitl config: %w", err)
 		}
 	}
 
-	return &waitExecutor{
+	return &hitlExecutor{
 		stdout: os.Stdout,
 		stderr: os.Stderr,
 		step:   step,
@@ -39,21 +39,21 @@ func newWait(_ context.Context, step core.Step) (executor.Executor, error) {
 	}, nil
 }
 
-func (e *waitExecutor) SetStdout(out io.Writer) {
+func (e *hitlExecutor) SetStdout(out io.Writer) {
 	e.stdout = out
 }
 
-func (e *waitExecutor) SetStderr(out io.Writer) {
+func (e *hitlExecutor) SetStderr(out io.Writer) {
 	e.stderr = out
 }
 
-func (*waitExecutor) Kill(_ os.Signal) error {
+func (*hitlExecutor) Kill(_ os.Signal) error {
 	return nil
 }
 
-// Run outputs the wait step information and completes immediately.
+// Run outputs the HITL step information and completes immediately.
 // The actual waiting is handled by the runner which detects NodeWaiting status.
-func (e *waitExecutor) Run(_ context.Context) error {
+func (e *hitlExecutor) Run(_ context.Context) error {
 	_, _ = fmt.Fprintln(e.stdout, "Waiting for human approval...")
 
 	if e.config.Prompt != "" {
@@ -74,7 +74,7 @@ func (e *waitExecutor) Run(_ context.Context) error {
 }
 
 // DetermineNodeStatus returns NodeWaiting to signal this step requires approval.
-func (e *waitExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
+func (e *hitlExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 	return core.NodeWaiting, nil
 }
 
@@ -82,7 +82,7 @@ func validateConfig(step core.Step) error {
 	var cfg Config
 	if step.ExecutorConfig.Config != nil {
 		if err := decodeConfig(step.ExecutorConfig.Config, &cfg); err != nil {
-			return fmt.Errorf("failed to decode wait config: %w", err)
+			return fmt.Errorf("failed to decode hitl config: %w", err)
 		}
 	}
 
@@ -97,5 +97,5 @@ func validateConfig(step core.Step) error {
 }
 
 func init() {
-	executor.RegisterExecutor("wait", newWait, validateConfig, core.ExecutorCapabilities{})
+	executor.RegisterExecutor("hitl", newHITL, validateConfig, core.ExecutorCapabilities{})
 }

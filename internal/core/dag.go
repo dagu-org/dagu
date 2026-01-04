@@ -200,12 +200,12 @@ func (d *DAG) HasTag(tag string) bool {
 	return false
 }
 
-// HasWaitSteps returns true if the DAG contains any wait executor steps.
-// DAGs with wait steps cannot be dispatched to workers because
-// wait steps require local storage access for approval.
-func (d *DAG) HasWaitSteps() bool {
+// HasHITLSteps returns true if the DAG contains any HITL executor steps.
+// DAGs with HITL steps cannot be dispatched to workers because
+// HITL steps require local storage access for approval.
+func (d *DAG) HasHITLSteps() bool {
 	for _, step := range d.Steps {
-		if step.ExecutorConfig.Type == ExecutorTypeWait {
+		if step.ExecutorConfig.Type == ExecutorTypeHITL {
 			return true
 		}
 	}

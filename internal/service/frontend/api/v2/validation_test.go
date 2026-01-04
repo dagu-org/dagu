@@ -31,7 +31,7 @@ func TestValidateRequiredInputs(t *testing.T) {
 			step: core.Step{
 				Name: "test",
 				ExecutorConfig: core.ExecutorConfig{
-					Type:   "wait",
+					Type:   "hitl",
 					Config: map[string]any{},
 				},
 			},
@@ -43,7 +43,7 @@ func TestValidateRequiredInputs(t *testing.T) {
 			step: core.Step{
 				Name: "test",
 				ExecutorConfig: core.ExecutorConfig{
-					Type: "wait",
+					Type: "hitl",
 					Config: map[string]any{
 						"input": []any{"reason", "approver"},
 					},
@@ -57,7 +57,7 @@ func TestValidateRequiredInputs(t *testing.T) {
 			step: core.Step{
 				Name: "test",
 				ExecutorConfig: core.ExecutorConfig{
-					Type: "wait",
+					Type: "hitl",
 					Config: map[string]any{
 						"input":    []any{"reason", "approver"},
 						"required": []any{"reason"},
@@ -76,7 +76,7 @@ func TestValidateRequiredInputs(t *testing.T) {
 			step: core.Step{
 				Name: "test",
 				ExecutorConfig: core.ExecutorConfig{
-					Type: "wait",
+					Type: "hitl",
 					Config: map[string]any{
 						"required": []any{"reason"},
 					},
@@ -91,7 +91,7 @@ func TestValidateRequiredInputs(t *testing.T) {
 			step: core.Step{
 				Name: "test",
 				ExecutorConfig: core.ExecutorConfig{
-					Type: "wait",
+					Type: "hitl",
 					Config: map[string]any{
 						"required": []any{"reason", "approver"},
 					},
@@ -108,7 +108,7 @@ func TestValidateRequiredInputs(t *testing.T) {
 			step: core.Step{
 				Name: "test",
 				ExecutorConfig: core.ExecutorConfig{
-					Type: "wait",
+					Type: "hitl",
 					Config: map[string]any{
 						"required": []any{"reason", "approver"},
 					},
@@ -127,7 +127,7 @@ func TestValidateRequiredInputs(t *testing.T) {
 			step: core.Step{
 				Name: "test",
 				ExecutorConfig: core.ExecutorConfig{
-					Type: "wait",
+					Type: "hitl",
 					Config: map[string]any{
 						"required": []any{"reason"},
 					},

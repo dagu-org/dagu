@@ -120,7 +120,7 @@ func TestApproveDAGRunStep(t *testing.T) {
 	dagSpec := `steps:
   - name: wait-step
     executor:
-      type: wait
+      type: hitl
       config:
         prompt: "Please approve"
   - name: after-wait
@@ -185,7 +185,7 @@ func TestApproveDAGRunStepWithInputs(t *testing.T) {
 	dagSpec := `steps:
   - name: wait-step
     executor:
-      type: wait
+      type: hitl
       config:
         prompt: "Please provide reason"
         input:
@@ -257,7 +257,7 @@ func TestApproveDAGRunStepMissingRequired(t *testing.T) {
 	dagSpec := `steps:
   - name: wait-step
     executor:
-      type: wait
+      type: hitl
       config:
         prompt: "Please provide reason"
         input:

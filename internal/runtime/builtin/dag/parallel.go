@@ -58,9 +58,9 @@ func newParallelExecutor(
 		return nil, err
 	}
 
-	// Validate: sub-DAGs with wait steps cannot be dispatched to workers
-	if len(step.WorkerSelector) > 0 && child.DAG.HasWaitSteps() {
-		return nil, fmt.Errorf("%w: %s", ErrWaitStepsWithWorker, step.SubDAG.Name)
+	// Validate: sub-DAGs with HITL steps cannot be dispatched to workers
+	if len(step.WorkerSelector) > 0 && child.DAG.HasHITLSteps() {
+		return nil, fmt.Errorf("%w: %s", ErrHITLStepsWithWorker, step.SubDAG.Name)
 	}
 
 	dir := runtime.GetEnv(ctx).WorkingDir

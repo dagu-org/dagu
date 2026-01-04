@@ -1,8 +1,8 @@
-package wait
+package hitl
 
 import "github.com/go-viper/mapstructure/v2"
 
-// Config holds the configuration for a wait step.
+// Config holds the configuration for a HITL step.
 type Config struct {
 	// Prompt is the message displayed to the approver.
 	Prompt string `mapstructure:"prompt"`

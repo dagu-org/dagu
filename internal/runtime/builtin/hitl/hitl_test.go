@@ -1,4 +1,4 @@
-package wait
+package hitl
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestWaitExecutorRun(t *testing.T) {
+func TestHITLExecutorRun(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -49,14 +49,14 @@ func TestWaitExecutorRun(t *testing.T) {
 			t.Parallel()
 
 			step := core.Step{
-				Name: "test-wait",
+				Name: "test-hitl",
 				ExecutorConfig: core.ExecutorConfig{
-					Type:   "wait",
+					Type:   "hitl",
 					Config: tt.config,
 				},
 			}
 
-			exec, err := newWait(context.Background(), step)
+			exec, err := newHITL(context.Background(), step)
 			require.NoError(t, err)
 
 			stdout := &bytes.Buffer{}
@@ -81,17 +81,17 @@ func TestWaitExecutorRun(t *testing.T) {
 	}
 }
 
-func TestWaitExecutorDetermineNodeStatus(t *testing.T) {
+func TestHITLExecutorDetermineNodeStatus(t *testing.T) {
 	t.Parallel()
 
 	step := core.Step{
-		Name: "test-wait",
+		Name: "test-hitl",
 		ExecutorConfig: core.ExecutorConfig{
-			Type: "wait",
+			Type: "hitl",
 		},
 	}
 
-	exec, err := newWait(context.Background(), step)
+	exec, err := newHITL(context.Background(), step)
 	require.NoError(t, err)
 
 	determiner, ok := exec.(interface {
@@ -104,7 +104,7 @@ func TestWaitExecutorDetermineNodeStatus(t *testing.T) {
 	assert.Equal(t, core.NodeWaiting, status)
 }
 
-func TestWaitValidateConfig(t *testing.T) {
+func TestHITLValidateConfig(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -142,9 +142,9 @@ func TestWaitValidateConfig(t *testing.T) {
 			t.Parallel()
 
 			step := core.Step{
-				Name: "test-wait",
+				Name: "test-hitl",
 				ExecutorConfig: core.ExecutorConfig{
-					Type:   "wait",
+					Type:   "hitl",
 					Config: tt.config,
 				},
 			}

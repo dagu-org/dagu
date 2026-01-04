@@ -204,7 +204,7 @@ handlerOn:
 
 steps:
   - name: wait-step
-    type: wait
+    type: hitl
 `,
 			setupFunc: func(t *testing.T, dag *core.DAG) {
 				require.NotNil(t, dag.HandlerOn.Wait)
@@ -228,7 +228,7 @@ handlerOn:
 
 steps:
   - name: wait-step
-    type: wait
+    type: hitl
 `,
 			runFunc: func(_ *testing.T, ctx context.Context, agent *test.Agent) {
 				_ = agent.Run(ctx)
@@ -721,7 +721,7 @@ steps:
     command: "true"
 
   - name: wait-step
-    type: wait
+    type: hitl
     depends:
       - first-step
 `)
@@ -762,7 +762,7 @@ steps:
     command: "true"
 
   - name: approval-gate
-    type: wait
+    type: hitl
     depends:
       - setup-step
 `)

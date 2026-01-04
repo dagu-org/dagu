@@ -878,7 +878,7 @@ func TestDAG_GetName(t *testing.T) {
 	})
 }
 
-func TestDAGHasWaitSteps(t *testing.T) {
+func TestDAGHasHITLSteps(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -892,7 +892,7 @@ func TestDAGHasWaitSteps(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "NoWait",
+			name: "NoHITL",
 			steps: []core.Step{
 				{Name: "step1", ExecutorConfig: core.ExecutorConfig{Type: "command"}},
 				{Name: "step2", ExecutorConfig: core.ExecutorConfig{Type: "dag"}},
@@ -900,17 +900,17 @@ func TestDAGHasWaitSteps(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "HasWait",
+			name: "HasHITL",
 			steps: []core.Step{
 				{Name: "step1", ExecutorConfig: core.ExecutorConfig{Type: "command"}},
-				{Name: "step2", ExecutorConfig: core.ExecutorConfig{Type: "wait"}},
+				{Name: "step2", ExecutorConfig: core.ExecutorConfig{Type: "hitl"}},
 			},
 			expected: true,
 		},
 		{
-			name: "OnlyWait",
+			name: "OnlyHITL",
 			steps: []core.Step{
-				{Name: "step1", ExecutorConfig: core.ExecutorConfig{Type: "wait"}},
+				{Name: "step1", ExecutorConfig: core.ExecutorConfig{Type: "hitl"}},
 			},
 			expected: true,
 		},
@@ -927,7 +927,7 @@ func TestDAGHasWaitSteps(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dag := &core.DAG{Steps: tt.steps}
-			result := dag.HasWaitSteps()
+			result := dag.HasHITLSteps()
 			assert.Equal(t, tt.expected, result)
 		})
 	}

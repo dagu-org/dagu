@@ -16,7 +16,7 @@ func TestWaitStepApproval(t *testing.T) {
 steps:
   - name: wait-step
     executor:
-      type: wait
+      type: hitl
       config:
         prompt: "Please approve"
   - name: after-wait
@@ -50,7 +50,7 @@ steps:
   - name: wait-step
     depends: [before-wait]
     executor:
-      type: wait
+      type: hitl
   - name: after-wait-1
     depends: [wait-step]
     command: echo "after1"
@@ -87,7 +87,7 @@ steps:
     command: echo "a2"
   - name: wait-branch
     executor:
-      type: wait
+      type: hitl
   - name: after-wait
     depends: [wait-branch]
     command: echo "after wait"

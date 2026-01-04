@@ -395,12 +395,12 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 		errs = append(errs, err)
 	}
 
-	// Validate workerSelector compatibility with wait steps
-	if len(result.WorkerSelector) > 0 && result.HasWaitSteps() {
+	// Validate workerSelector compatibility with HITL steps
+	if len(result.WorkerSelector) > 0 && result.HasHITLSteps() {
 		errs = append(errs, core.NewValidationError(
 			"workerSelector",
 			result.WorkerSelector,
-			fmt.Errorf("DAG with wait steps cannot be dispatched to workers"),
+			fmt.Errorf("DAG with HITL steps cannot be dispatched to workers"),
 		))
 	}
 
