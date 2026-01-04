@@ -286,13 +286,13 @@ type message struct {
 }
 
 type chatCompletionRequest struct {
-	Model       string   `json:"model"`
+	Model       string    `json:"model"`
 	Messages    []message `json:"messages"`
-	Temperature *float64 `json:"temperature,omitempty"`
-	MaxTokens   *int     `json:"max_tokens,omitempty"`
-	TopP        *float64 `json:"top_p,omitempty"`
-	Stop        []string `json:"stop,omitempty"`
-	Stream      bool     `json:"stream,omitempty"`
+	Temperature *float64  `json:"temperature,omitempty"`
+	MaxTokens   *int      `json:"max_tokens,omitempty"`
+	TopP        *float64  `json:"top_p,omitempty"`
+	Stop        []string  `json:"stop,omitempty"`
+	Stream      bool      `json:"stream,omitempty"`
 }
 
 type chatCompletionResponse struct {
