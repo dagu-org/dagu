@@ -42,6 +42,9 @@ func ToNode(n *execution.Node) *runtime.Node {
 		ApprovalInputs:  n.ApprovalInputs,
 		ApprovedAt:      n.ApprovedAt,
 		ApprovedBy:      n.ApprovedBy,
+		RejectedAt:      n.RejectedAt,
+		RejectedBy:      n.RejectedBy,
+		RejectionReason: n.RejectionReason,
 	})
 }
 
@@ -77,5 +80,8 @@ func newNode(node runtime.NodeData) *execution.Node {
 		ApprovalInputs:  node.State.ApprovalInputs,
 		ApprovedAt:      node.State.ApprovedAt,
 		ApprovedBy:      node.State.ApprovedBy,
+		RejectedAt:      node.State.RejectedAt,
+		RejectedBy:      node.State.RejectedBy,
+		RejectionReason: node.State.RejectionReason,
 	}
 }

@@ -72,6 +72,12 @@ type NodeState struct {
 	ApprovedAt string
 	// ApprovedBy is the username of the user who approved the HITL step.
 	ApprovedBy string
+	// RejectedAt is the time when the HITL step was rejected.
+	RejectedAt string
+	// RejectedBy is the username of the user who rejected the HITL step.
+	RejectedBy string
+	// RejectionReason stores the optional reason for rejection.
+	RejectionReason string
 }
 
 // Parallel represents the evaluated parallel execution configuration for a node.

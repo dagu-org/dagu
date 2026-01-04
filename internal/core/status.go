@@ -12,6 +12,7 @@ const (
 	Queued
 	PartiallySucceeded
 	Wait
+	Rejected
 )
 
 // String returns the canonical lowercase token used across APIs, logs, and
@@ -34,6 +35,8 @@ func (s Status) String() string {
 		return "not_started"
 	case Wait:
 		return "waiting"
+	case Rejected:
+		return "rejected"
 	default:
 		return "unknown"
 	}
@@ -67,6 +70,7 @@ const (
 	NodeSkipped
 	NodePartiallySucceeded
 	NodeWaiting
+	NodeRejected
 )
 
 // IsSuccess checks if the node status indicates a successful execution.
@@ -98,6 +102,8 @@ func (s NodeStatus) String() string {
 		return "not_started"
 	case NodeWaiting:
 		return "waiting"
+	case NodeRejected:
+		return "rejected"
 	default:
 		return "unknown"
 	}

@@ -332,9 +332,9 @@ func (p *Plan) Finish() {
 	p.finishedAt = time.Now()
 }
 
-// NodeStates returns whether any nodes are running, waiting, or not started.
+// NodeStates returns whether any nodes are running, waiting, not started, or rejected.
 // Single pass, single lock for atomic read.
-func (p *Plan) NodeStates() (hasRunning, hasWaiting, hasNotStarted bool) {
+func (p *Plan) NodeStates() (hasRunning, hasWaiting, hasNotStarted, hasRejected bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	for _, node := range p.nodes {
@@ -345,6 +345,8 @@ func (p *Plan) NodeStates() (hasRunning, hasWaiting, hasNotStarted bool) {
 			hasWaiting = true
 		case core.NodeNotStarted:
 			hasNotStarted = true
+		case core.NodeRejected:
+			hasRejected = true
 		case core.NodeSucceeded, core.NodeFailed, core.NodeAborted, core.NodeSkipped, core.NodePartiallySucceeded:
 			// Terminal states
 		}

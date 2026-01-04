@@ -27,6 +27,7 @@ import (
 var (
 	ErrUpstreamFailed   = fmt.Errorf("upstream failed")
 	ErrUpstreamSkipped  = fmt.Errorf("upstream skipped")
+	ErrUpstreamRejected = fmt.Errorf("upstream rejected")
 	ErrDeadlockDetected = errors.New("deadlock detected: no runnable nodes but DAG not finished")
 )
 
@@ -188,7 +189,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 		}
 
 		// Check for Wait condition: no running nodes, no ready nodes, and waiting for approval.
-		_, hasWaiting, _ := plan.NodeStates()
+		_, hasWaiting, _, _ := plan.NodeStates()
 		if running == 0 && len(readyCh) == 0 && hasWaiting {
 			logger.Info(ctx, "DAG entering wait status - waiting for human approval")
 			break
@@ -704,13 +705,16 @@ func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
 	// Note: IsFinished() is called separately, so there's a small window where
 	// the plan could be marked finished between these calls. This is acceptable
 	// for status reporting as it self-corrects on the next Status() call.
-	hasRunning, hasWaiting, hasNotStarted := p.NodeStates()
+	hasRunning, hasWaiting, hasNotStarted, hasRejected := p.NodeStates()
 
 	if hasRunning {
 		return core.Running
 	}
 	if hasWaiting {
 		return core.Wait
+	}
+	if hasRejected {
+		return core.Rejected
 	}
 	if hasNotStarted && !p.IsFinished() {
 		return core.Running
@@ -818,6 +822,16 @@ func isReady(ctx context.Context, plan *Plan, node *Node) bool {
 				tag.Dependency(dep.Name()),
 			)
 			ready = false
+
+		case core.NodeRejected:
+			// Dependency was rejected - abort dependent nodes
+			logger.Debug(ctx, "Dependency rejected",
+				tag.Step(node.Name()),
+				tag.Dependency(dep.Name()),
+			)
+			ready = false
+			node.SetStatus(core.NodeAborted)
+			node.SetError(ErrUpstreamRejected)
 
 		default:
 			ready = false

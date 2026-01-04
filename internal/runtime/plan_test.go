@@ -252,6 +252,7 @@ func TestPlan_NodeStates(t *testing.T) {
 		wantHasRunning    bool
 		wantHasWaiting    bool
 		wantHasNotStarted bool
+		wantHasRejected   bool
 	}{
 		{
 			name: "all succeeded",
@@ -259,9 +260,6 @@ func TestPlan_NodeStates(t *testing.T) {
 				makeNode("a", core.NodeSucceeded),
 				makeNode("b", core.NodeSucceeded, "a"),
 			},
-			wantHasRunning:    false,
-			wantHasWaiting:    false,
-			wantHasNotStarted: false,
 		},
 		{
 			name: "one running",
@@ -269,9 +267,7 @@ func TestPlan_NodeStates(t *testing.T) {
 				makeNode("a", core.NodeSucceeded),
 				makeNode("b", core.NodeRunning, "a"),
 			},
-			wantHasRunning:    true,
-			wantHasWaiting:    false,
-			wantHasNotStarted: false,
+			wantHasRunning: true,
 		},
 		{
 			name: "one waiting with blocked dependents",
@@ -279,8 +275,16 @@ func TestPlan_NodeStates(t *testing.T) {
 				makeNode("a", core.NodeWaiting),
 				makeNode("b", core.NodeNotStarted, "a"),
 			},
-			wantHasRunning:    false,
 			wantHasWaiting:    true,
+			wantHasNotStarted: true,
+		},
+		{
+			name: "one rejected",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeRejected),
+				makeNode("b", core.NodeNotStarted, "a"),
+			},
+			wantHasRejected:   true,
 			wantHasNotStarted: true,
 		},
 		{
@@ -306,10 +310,11 @@ func TestPlan_NodeStates(t *testing.T) {
 			p, err := runtime.CreateRetryPlan(context.Background(), dag, tt.nodes...)
 			require.NoError(t, err)
 
-			hasRunning, hasWaiting, hasNotStarted := p.NodeStates()
+			hasRunning, hasWaiting, hasNotStarted, hasRejected := p.NodeStates()
 			require.Equal(t, tt.wantHasRunning, hasRunning, "hasRunning")
 			require.Equal(t, tt.wantHasWaiting, hasWaiting, "hasWaiting")
 			require.Equal(t, tt.wantHasNotStarted, hasNotStarted, "hasNotStarted")
+			require.Equal(t, tt.wantHasRejected, hasRejected, "hasRejected")
 		})
 	}
 }

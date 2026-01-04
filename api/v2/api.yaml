@@ -2053,6 +2053,50 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dag-runs/{name}/{dagRunId}/steps/{stepName}/reject:
+    post:
+      summary: "Reject a waiting step for HITL"
+      description: "Rejects a step that is in Waiting status, optionally providing a reason for rejection"
+      operationId: "rejectDAGRunStep"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - $ref: "#/components/parameters/StepName"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectStepRequest"
+      responses:
+        "200":
+          description: "Step rejected successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RejectStepResponse"
+        "400":
+          description: "Step is not in Waiting status"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "DAG-run or step not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}:
     get:
       summary: "Retrieve detailed status of a sub DAG-run"
@@ -2263,6 +2307,56 @@ paths:
                 $ref: "#/components/schemas/ApproveStepResponse"
         "400":
           description: "Step is not in Waiting status or required inputs missing"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Sub DAG-run or step not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/reject:
+    post:
+      summary: "Reject a waiting step in a sub DAG-run for HITL"
+      description: "Rejects a step that is in Waiting status within a sub DAG-run, optionally providing a reason for rejection"
+      operationId: "rejectSubDAGRunStep"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run containing the step to reject"
+        - $ref: "#/components/parameters/StepName"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectStepRequest"
+      responses:
+        "200":
+          description: "Step rejected successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RejectStepResponse"
+        "400":
+          description: "Step is not in Waiting status"
           content:
             application/json:
               schema:
@@ -2886,6 +2980,28 @@ components:
         - stepName
         - resumed
 
+    RejectStepRequest:
+      type: object
+      description: "Request body for rejecting a waiting step"
+      properties:
+        reason:
+          type: string
+          description: "Optional reason for rejecting the step"
+
+    RejectStepResponse:
+      type: object
+      description: "Response after rejecting a waiting step"
+      properties:
+        dagRunId:
+          type: string
+          description: "The DAG run ID"
+        stepName:
+          type: string
+          description: "The rejected step name"
+      required:
+        - dagRunId
+        - stepName
+
     Error:
       type: object
       description: "Generic error response object"
@@ -3183,7 +3299,7 @@ components:
 
     Status:
       type: integer
-      enum: [0, 1, 2, 3, 4, 5, 6, 7]
+      enum: [0, 1, 2, 3, 4, 5, 6, 7, 8]
       x-enum-varnames:
         - "NotStarted"
         - "Running"
@@ -3193,6 +3309,7 @@ components:
         - "Queued"
         - "PartialSuccess"
         - "Waiting"
+        - "Rejected"
       description: |
         Numeric status code indicating current DAG-run state:
         0: "Not started"
@@ -3203,6 +3320,7 @@ components:
         5: "Queued"
         6: "Partial Success"
         7: "Waiting for approval"
+        8: "Rejected"
 
     StatusLabel:
       type: string
@@ -3216,10 +3334,11 @@ components:
         - "queued"
         - "partially_succeeded"
         - "waiting"
+        - "rejected"
 
     NodeStatus:
       type: integer
-      enum: [0, 1, 2, 3, 4, 5, 6, 7]
+      enum: [0, 1, 2, 3, 4, 5, 6, 7, 8]
       x-enum-varnames:
         - "NotStarted"
         - "Running"
@@ -3229,6 +3348,7 @@ components:
         - "Skipped"
         - "PartialSuccess"
         - "Waiting"
+        - "Rejected"
       description: |
         Numeric status code indicating current node state:
         0: "Not started"
@@ -3239,6 +3359,7 @@ components:
         5: "Skipped"
         6: "Partial Success"
         7: "Waiting for approval"
+        8: "Rejected"
 
     NodeStatusLabel:
       type: string
@@ -3252,6 +3373,7 @@ components:
         - "skipped"
         - "partially_succeeded"
         - "waiting"
+        - "rejected"
 
     SchedulerStatusResponse:
       type: object
@@ -3634,6 +3756,15 @@ components:
           additionalProperties:
             type: string
           description: "Key-value inputs provided during HITL approval"
+        rejectedAt:
+          type: string
+          description: "RFC3339 timestamp when the HITL step was rejected"
+        rejectedBy:
+          type: string
+          description: "Username of who rejected the HITL step"
+        rejectionReason:
+          type: string
+          description: "Optional reason for rejection"
       required:
         - step
         - stdout

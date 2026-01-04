@@ -34,6 +34,9 @@ func TestNodeFieldsRoundTrip(t *testing.T) {
 		ApprovalInputs:  map[string]string{"input1": "value1"},
 		ApprovedAt:      "2024-01-15T10:02:00Z",
 		ApprovedBy:      "admin",
+		RejectedAt:      "2024-01-15T10:03:00Z",
+		RejectedBy:      "reviewer",
+		RejectionReason: "test rejection reason",
 	}
 
 	// Round-trip: execution.Node -> runtime.Node -> execution.Node
