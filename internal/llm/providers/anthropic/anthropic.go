@@ -153,12 +153,31 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 		chatReq.System = systemContent
 	}
 
+	// Add thinking configuration if enabled
+	// Must be done before setting max_tokens since max_tokens must be > budget_tokens
+	var thinkingBudget int
+	if req.Thinking != nil && req.Thinking.Enabled {
+		thinkingBudget = p.getThinkingBudget(req.Thinking)
+		chatReq.Thinking = &thinkingRequest{
+			Type:        "enabled",
+			BudgetToken: thinkingBudget,
+		}
+	}
+
 	// Set max_tokens (required by Anthropic)
+	// When thinking is enabled, max_tokens must be > budget_tokens
 	if req.MaxTokens != nil {
 		chatReq.MaxTokens = *req.MaxTokens
 	} else {
 		// Default to 4096 if not specified
 		chatReq.MaxTokens = 4096
+	}
+
+	// Ensure max_tokens > budget_tokens when thinking is enabled
+	if thinkingBudget > 0 && chatReq.MaxTokens <= thinkingBudget {
+		// Set max_tokens to budget + reasonable buffer for response
+		// Anthropic recommends having room for the actual response after thinking
+		chatReq.MaxTokens = thinkingBudget + 4096
 	}
 
 	if req.Temperature != nil {
@@ -169,15 +188,6 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 	}
 	if len(req.Stop) > 0 {
 		chatReq.StopSequences = req.Stop
-	}
-
-	// Add thinking configuration if enabled
-	if req.Thinking != nil && req.Thinking.Enabled {
-		budgetTokens := p.getThinkingBudget(req.Thinking)
-		chatReq.Thinking = &thinkingRequest{
-			Type:        "enabled",
-			BudgetToken: budgetTokens,
-		}
 	}
 
 	return json.Marshal(chatReq)
