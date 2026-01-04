@@ -368,11 +368,3 @@ type streamEvent struct {
 		Message string `json:"message"`
 	} `json:"error,omitempty"`
 }
-
-type errorResponse struct {
-	Type  string `json:"type"`
-	Error struct {
-		Type    string `json:"type"`
-		Message string `json:"message"`
-	} `json:"error"`
-}

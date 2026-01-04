@@ -341,11 +341,3 @@ type generateContentResponse struct {
 		TotalTokenCount      int `json:"totalTokenCount"`
 	} `json:"usageMetadata"`
 }
-
-type errorResponse struct {
-	Error struct {
-		Code    int    `json:"code"`
-		Message string `json:"message"`
-		Status  string `json:"status"`
-	} `json:"error"`
-}

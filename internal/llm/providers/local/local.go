@@ -271,11 +271,3 @@ type streamChunk struct {
 		TotalTokens      int `json:"total_tokens"`
 	} `json:"usage,omitempty"`
 }
-
-type errorResponse struct {
-	Error struct {
-		Message string `json:"message"`
-		Type    string `json:"type"`
-		Code    string `json:"code"`
-	} `json:"error"`
-}
