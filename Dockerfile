@@ -3,7 +3,7 @@
 FROM --platform=$BUILDPLATFORM node:25-alpine AS ui-builder
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+RUN npm install -g corepack && corepack enable
 
 WORKDIR /app
 COPY ui/ ./
@@ -79,8 +79,8 @@ RUN set -eux; \
     chmod 0440 /etc/sudoers.d/99-dagu && \
     visudo -cf /etc/sudoers.d/99-dagu
 
-# Delete the default ubuntu user
-RUN userdel -f ubuntu
+# Delete the default ubuntu user if it exists
+RUN userdel -f ubuntu || true
 
 # Create the DAGU_HOME directory and set permissions
 RUN mkdir -p "${DAGU_HOME}" && \
