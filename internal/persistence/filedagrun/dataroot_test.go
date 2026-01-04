@@ -288,6 +288,54 @@ func TestDataRootRemoveOld(t *testing.T) {
 		// The method should clean up empty year/month/day directories
 		assert.True(t, root.IsEmpty(), "Root should be empty after cleanup")
 	})
+
+	t.Run("PreserveWaitStatusDAGRuns", func(t *testing.T) {
+		root := setupTestDataRoot(t)
+
+		// Create old dag-runs: one completed (should be deleted), one waiting (should be preserved)
+		oldTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+
+		completedRun := root.CreateTestDAGRun(t, "completed-run", execution.NewUTC(oldTime))
+		waitingRun := root.CreateTestDAGRun(t, "waiting-run", execution.NewUTC(oldTime))
+
+		// Create attempts with different statuses
+		createAttemptWithStatusType := func(dagRunTest DAGRunTest, ts time.Time, status core.Status) *Attempt {
+			attempt, err := dagRunTest.CreateAttempt(root.Context, execution.NewUTC(ts), nil)
+			require.NoError(t, err)
+			require.NoError(t, attempt.Open(root.Context))
+			dagStatus := execution.DAGRunStatus{
+				Name:     "test-dag",
+				DAGRunID: dagRunTest.dagRunID,
+				Status:   status,
+			}
+			require.NoError(t, attempt.Write(root.Context, dagStatus))
+			require.NoError(t, attempt.Close(root.Context))
+
+			// Set the file modification time to match the old timestamp
+			err = os.Chtimes(attempt.file, ts, ts)
+			require.NoError(t, err)
+
+			return attempt
+		}
+
+		createAttemptWithStatusType(completedRun, oldTime, core.Succeeded)
+		createAttemptWithStatusType(waitingRun, oldTime, core.Waiting)
+
+		// Verify dag-runs exist
+		assert.True(t, fileutil.FileExists(completedRun.baseDir), "Completed dag-run should exist before cleanup")
+		assert.True(t, fileutil.FileExists(waitingRun.baseDir), "Waiting dag-run should exist before cleanup")
+
+		// Remove all old dag-runs (retention = 0)
+		// Wait status should be preserved because it's considered "active"
+		removedIDs, err := root.RemoveOld(root.Context, 0, false)
+		require.NoError(t, err)
+		assert.Len(t, removedIDs, 1, "Only completed run should be removed")
+		assert.Contains(t, removedIDs, "completed-run", "Completed run should be in removed list")
+
+		// Verify completed dag-run is removed but waiting one is kept
+		assert.False(t, fileutil.FileExists(completedRun.baseDir), "Completed dag-run should be removed")
+		assert.True(t, fileutil.FileExists(waitingRun.baseDir), "Waiting dag-run should be preserved")
+	})
 }
 
 func TestDataRootRename(t *testing.T) {

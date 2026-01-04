@@ -12,3 +12,4 @@ export { default as LinkTab } from './LinkTab';
 export { default as LiveSwitch } from './LiveSwitch';
 export { default as NodeStatusChip } from './NodeStatusChip';
 export { StatusDot } from './StatusDot';
+export { STATUS_DISPLAY_LABELS } from './statusLabels';

@@ -107,6 +107,18 @@ func toStep(obj core.Step) api.Step {
 		}
 		step.Parallel = &parallel
 	}
+
+	// Add executor config if present
+	if obj.ExecutorConfig.Type != "" || obj.ExecutorConfig.Config != nil {
+		step.ExecutorConfig = &struct {
+			Config *map[string]any `json:"config,omitempty"`
+			Type   *string         `json:"type,omitempty"`
+		}{
+			Type:   ptrOf(obj.ExecutorConfig.Type),
+			Config: ptrOf(obj.ExecutorConfig.Config),
+		}
+	}
+
 	return step
 }
 
@@ -187,6 +199,12 @@ func toNode(node *execution.Node) api.Node {
 		Error:           ptrOf(node.Error),
 		SubRuns:         ptrOf(toSubDAGRuns(node.SubRuns)),
 		SubRunsRepeated: ptrOf(toSubDAGRuns(node.SubRunsRepeated)),
+		ApprovedAt:      ptrOf(node.ApprovedAt),
+		ApprovedBy:      ptrOf(node.ApprovedBy),
+		ApprovalInputs:  ptrOf(node.ApprovalInputs),
+		RejectedAt:      ptrOf(node.RejectedAt),
+		RejectedBy:      ptrOf(node.RejectedBy),
+		RejectionReason: ptrOf(node.RejectionReason),
 	}
 }
 

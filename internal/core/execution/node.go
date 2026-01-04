@@ -21,6 +21,18 @@ type Node struct {
 	SubRuns         []SubDAGRun          `json:"children,omitempty"`
 	SubRunsRepeated []SubDAGRun          `json:"childrenRepeated,omitempty"` // repeated sub DAG runs
 	OutputVariables *collections.SyncMap `json:"outputVariables,omitempty"`
+	// ApprovedAt records when this wait step was approved (HITL)
+	ApprovedAt string `json:"approvedAt,omitempty"`
+	// ApprovalInputs stores key-value parameters provided during approval
+	ApprovalInputs map[string]string `json:"approvalInputs,omitempty"`
+	// ApprovedBy records who approved this wait step (username)
+	ApprovedBy string `json:"approvedBy,omitempty"`
+	// RejectedAt records when this wait step was rejected (HITL)
+	RejectedAt string `json:"rejectedAt,omitempty"`
+	// RejectedBy records who rejected this wait step (username)
+	RejectedBy string `json:"rejectedBy,omitempty"`
+	// RejectionReason stores the optional reason for rejection
+	RejectionReason string `json:"rejectionReason,omitempty"`
 }
 
 // SubDAGRun represents a sub DAG run associated with a node

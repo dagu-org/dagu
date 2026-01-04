@@ -73,7 +73,16 @@ func (r *reporter) send(ctx context.Context, dag *core.DAG, dagStatus execution.
 			subject := fmt.Sprintf("%s %s (%s)", dag.InfoMail.Prefix, dag.Name, dagStatus.Status)
 			html := renderHTMLWithDAGInfo(dagStatus)
 			attachments := addAttachments(dag.InfoMail.AttachLogs, dagStatus.Nodes)
-			_ = r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
+			return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
+		}
+	} else if dagStatus.Status == core.Waiting {
+		if dag.MailOn != nil && dag.MailOn.Wait && dag.WaitMail != nil {
+			fromAddress := dag.WaitMail.From
+			toAddresses := dag.WaitMail.To
+			subject := fmt.Sprintf("%s %s (%s)", dag.WaitMail.Prefix, dag.Name, dagStatus.Status)
+			html := renderHTMLWithDAGInfo(dagStatus)
+			attachments := addAttachments(dag.WaitMail.AttachLogs, dagStatus.Nodes)
+			return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
 		}
 	}
 	return nil
@@ -187,6 +196,7 @@ func renderHTML(nodes []*execution.Node) string {
         .status-skipped { color: #6b7280; font-weight: 500; }
         .status-aborted { color: #db2777; font-weight: 500; }
         .status-partial-success { color: #ea580c; font-weight: 500; }
+        .status-waiting { color: #92400e; font-weight: 500; }
         .row-number { 
             background-color: #f1f5f9; 
             font-weight: 600; 
@@ -243,10 +253,12 @@ func renderHTML(nodes []*execution.Node) string {
 			statusClass = "status-running"
 		case "skipped":
 			statusClass = "status-skipped"
-		case "partial success":
+		case "partially_succeeded":
 			statusClass = "status-partial-success"
 		case "aborted":
 			statusClass = "status-aborted"
+		case "waiting":
+			statusClass = "status-waiting"
 		}
 		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"%s\">%s</td>", statusClass, status))
 
@@ -361,6 +373,11 @@ func renderHTMLWithDAGInfo(dagStatus execution.DAGRunStatus) string {
             color: #374151;
             box-shadow: 0 0 0 1px rgba(107, 114, 128, 0.1);
         }
+        .status-badge.wait {
+            background-color: #fef3c7;
+            color: #92400e;
+            box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.1);
+        }
         .dag-info-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -435,7 +452,10 @@ func renderHTMLWithDAGInfo(dagStatus execution.DAGRunStatus) string {
         .status-failed { color: #dc2626; font-weight: 500; }
         .status-running { color: #2563eb; font-weight: 500; }
         .status-skipped { color: #6b7280; font-weight: 500; }
-        .row-number { 
+        .status-aborted { color: #db2777; font-weight: 500; }
+        .status-partial-success { color: #ea580c; font-weight: 500; }
+        .status-waiting { color: #92400e; font-weight: 500; }
+        .row-number {
             background-color: #f1f5f9; 
             font-weight: 600; 
             text-align: center; 
@@ -467,6 +487,8 @@ func renderHTMLWithDAGInfo(dagStatus execution.DAGRunStatus) string {
 		statusClass = "skipped"
 	case "aborted":
 		statusClass = "aborted"
+	case "wait":
+		statusClass = "wait"
 	}
 	_, _ = buffer.WriteString(statusClass)
 	_, _ = buffer.WriteString(`">`)
@@ -571,6 +593,12 @@ func renderHTMLWithDAGInfo(dagStatus execution.DAGRunStatus) string {
 			nodeStatusClass = "status-running"
 		case "skipped":
 			nodeStatusClass = "status-skipped"
+		case "partially_succeeded":
+			nodeStatusClass = "status-partial-success"
+		case "aborted":
+			nodeStatusClass = "status-aborted"
+		case "waiting":
+			nodeStatusClass = "status-waiting"
 		}
 		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"%s\">%s</td>", nodeStatusClass, nodeStatus))
 

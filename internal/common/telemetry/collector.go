@@ -426,9 +426,9 @@ func (c *Collector) collectQueueMetrics(ctx context.Context, ch chan<- prometheu
 // isCompletedStatus returns true if the status represents a terminal state
 func isCompletedStatus(s core.Status) bool {
 	switch s {
-	case core.Succeeded, core.Failed, core.Aborted, core.PartiallySucceeded:
+	case core.Succeeded, core.Failed, core.Aborted, core.PartiallySucceeded, core.Rejected:
 		return true
-	case core.NotStarted, core.Running, core.Queued:
+	case core.NotStarted, core.Running, core.Queued, core.Waiting:
 		return false
 	}
 	return false

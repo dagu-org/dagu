@@ -65,6 +65,19 @@ type NodeState struct {
 	OutputVariables *collections.SyncMap
 	// ChatMessages stores the chat conversation messages for message passing between steps.
 	ChatMessages []execution.LLMMessage
+	// ApprovalInputs stores key-value parameters provided during HITL approval.
+	// These are available as environment variables in subsequent steps.
+	ApprovalInputs map[string]string
+	// ApprovedAt is the time when the HITL step was approved.
+	ApprovedAt string
+	// ApprovedBy is the username of the user who approved the HITL step.
+	ApprovedBy string
+	// RejectedAt is the time when the HITL step was rejected.
+	RejectedAt string
+	// RejectedBy is the username of the user who rejected the HITL step.
+	RejectedBy string
+	// RejectionReason stores the optional reason for rejection.
+	RejectionReason string
 }
 
 // Parallel represents the evaluated parallel execution configuration for a node.
@@ -490,4 +503,36 @@ func (d *Data) GetChatMessages() []execution.LLMMessage {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return d.inner.State.ChatMessages
+}
+
+// GetApprovalInputs returns a copy of the approval inputs map.
+func (d *Data) GetApprovalInputs() map[string]string {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	if d.inner.State.ApprovalInputs == nil {
+		return nil
+	}
+
+	result := make(map[string]string, len(d.inner.State.ApprovalInputs))
+	for k, v := range d.inner.State.ApprovalInputs {
+		result[k] = v
+	}
+	return result
+}
+
+// SetApprovalInputs sets the approval inputs map.
+func (d *Data) SetApprovalInputs(inputs map[string]string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if inputs == nil {
+		d.inner.State.ApprovalInputs = nil
+		return
+	}
+
+	d.inner.State.ApprovalInputs = make(map[string]string, len(inputs))
+	for k, v := range inputs {
+		d.inner.State.ApprovalInputs[k] = v
+	}
 }

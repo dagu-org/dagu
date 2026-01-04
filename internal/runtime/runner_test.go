@@ -1237,6 +1237,33 @@ func TestStatus_IsActive(t *testing.T) {
 	}
 }
 
+func TestRunner_StatusPrecedence(t *testing.T) {
+	t.Run("RejectedTakesPrecedenceOverWaiting", func(t *testing.T) {
+		t.Parallel()
+
+		dag := &core.DAG{Name: "precedence_test"}
+		nodes := []*runtime.Node{
+			runtime.NodeWithData(runtime.NodeData{
+				Step:  core.Step{Name: "rejected_step"},
+				State: runtime.NodeState{Status: core.NodeRejected},
+			}),
+			runtime.NodeWithData(runtime.NodeData{
+				Step:  core.Step{Name: "waiting_step"},
+				State: runtime.NodeState{Status: core.NodeWaiting},
+			}),
+		}
+
+		plan, err := runtime.NewPlanFromNodes(nodes...)
+		require.NoError(t, err)
+
+		runner := runtime.New(&runtime.Config{})
+		ctx := runtime.NewContext(context.Background(), dag, "test-run-id", "/tmp/test.log")
+
+		status := runner.Status(ctx, plan)
+		require.Equal(t, core.Rejected, status, "rejected should take precedence over waiting")
+	})
+}
+
 func TestRunner_DryRun(t *testing.T) {
 	r := setupRunner(t, func(cfg *runtime.Config) {
 		cfg.Dry = true
@@ -2978,5 +3005,129 @@ func TestRunner_ChatMessagesHandler(t *testing.T) {
 		result.assertNodeStatus(t, "empty1", core.NodeSucceeded)
 
 		assert.Equal(t, 0, handler.writeCalls)
+	})
+}
+
+func TestWaitStep(t *testing.T) {
+	t.Run("WaitStepResultsInWaitStatus", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t)
+
+		// 1 -> wait -> 3
+		// When wait step completes, DAG should be in Wait status
+		plan := r.newPlan(t,
+			successStep("1"),
+			waitStep("wait", "1"),
+			successStep("3", "wait"),
+		)
+
+		result := plan.assertRun(t, core.Waiting)
+
+		result.assertNodeStatus(t, "1", core.NodeSucceeded)
+		result.assertNodeStatus(t, "wait", core.NodeWaiting)
+		result.assertNodeStatus(t, "3", core.NodeNotStarted)
+	})
+
+	t.Run("WaitStepBlocksDependentNodes", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t)
+
+		// 1 -> wait -> 2 -> 3
+		plan := r.newPlan(t,
+			successStep("1"),
+			waitStep("wait", "1"),
+			successStep("2", "wait"),
+			successStep("3", "2"),
+		)
+
+		result := plan.assertRun(t, core.Waiting)
+
+		// Node 1 should succeed, wait should be waiting, 2 and 3 should not start
+		result.assertNodeStatus(t, "1", core.NodeSucceeded)
+		result.assertNodeStatus(t, "wait", core.NodeWaiting)
+		result.assertNodeStatus(t, "2", core.NodeNotStarted)
+		result.assertNodeStatus(t, "3", core.NodeNotStarted)
+	})
+
+	t.Run("ParallelBranchWithWaitStep", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t)
+
+		// Two parallel branches: 1 -> 2 (normal), wait -> 3 (wait)
+		plan := r.newPlan(t,
+			successStep("1"),
+			successStep("2", "1"),
+			waitStep("wait"),
+			successStep("3", "wait"),
+		)
+
+		result := plan.assertRun(t, core.Waiting)
+
+		// Normal branch completes, wait branch blocks
+		result.assertNodeStatus(t, "1", core.NodeSucceeded)
+		result.assertNodeStatus(t, "2", core.NodeSucceeded)
+		result.assertNodeStatus(t, "wait", core.NodeWaiting)
+		result.assertNodeStatus(t, "3", core.NodeNotStarted)
+	})
+
+	t.Run("WaitStepAtStart", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t)
+
+		// wait -> 1 -> 2
+		plan := r.newPlan(t,
+			waitStep("wait"),
+			successStep("1", "wait"),
+			successStep("2", "1"),
+		)
+
+		result := plan.assertRun(t, core.Waiting)
+
+		result.assertNodeStatus(t, "wait", core.NodeWaiting)
+		result.assertNodeStatus(t, "1", core.NodeNotStarted)
+		result.assertNodeStatus(t, "2", core.NodeNotStarted)
+	})
+
+	t.Run("WaitStepWithInputConfig", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t)
+
+		// Wait step with input configuration
+		waitWithInputs := newStep("wait-inputs",
+			withExecutor("hitl", map[string]any{
+				"prompt":   "Please provide approval",
+				"input":    []string{"reason", "approver"},
+				"required": []string{"reason"},
+			}),
+		)
+
+		plan := r.newPlan(t,
+			waitWithInputs,
+			successStep("after", "wait-inputs"),
+		)
+
+		result := plan.assertRun(t, core.Waiting)
+
+		result.assertNodeStatus(t, "wait-inputs", core.NodeWaiting)
+		result.assertNodeStatus(t, "after", core.NodeNotStarted)
+	})
+
+	t.Run("MultipleWaitSteps", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t)
+
+		// Multiple wait steps in sequence: wait1 -> wait2 -> final
+		plan := r.newPlan(t,
+			waitStep("wait1"),
+			waitStep("wait2", "wait1"),
+			successStep("final", "wait2"),
+		)
+
+		result := plan.assertRun(t, core.Waiting)
+
+		// First wait should be waiting, others not started
+		result.assertNodeStatus(t, "wait1", core.NodeWaiting)
+		result.assertNodeStatus(t, "wait2", core.NodeNotStarted)
+		result.assertNodeStatus(t, "final", core.NodeNotStarted)
 	})
 }

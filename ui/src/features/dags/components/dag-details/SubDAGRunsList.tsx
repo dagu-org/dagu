@@ -4,7 +4,7 @@ import { useQuery } from '@/hooks/api';
 import dayjs from '@/lib/dayjs';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useContext, useEffect, useMemo, useState } from 'react';
-import { StatusDot } from '../common';
+import { STATUS_DISPLAY_LABELS, StatusDot } from '../common';
 
 type SubDAGRun = components['schemas']['SubDAGRun'];
 type SubDAGRunDetail = components['schemas']['SubDAGRunDetail'];
@@ -14,17 +14,6 @@ type SubRunListItem = IndexedSubRun | IndexedSubRunDetail;
 
 // "all" is a special filter that shows everything
 type StatusFilterValue = 'all' | StatusLabel;
-
-// Display labels for status values
-const STATUS_DISPLAY_LABELS: Record<StatusLabel, string> = {
-  [StatusLabel.not_started]: 'Not Started',
-  [StatusLabel.running]: 'Running',
-  [StatusLabel.failed]: 'Failed',
-  [StatusLabel.aborted]: 'Aborted',
-  [StatusLabel.succeeded]: 'Succeeded',
-  [StatusLabel.queued]: 'Queued',
-  [StatusLabel.partially_succeeded]: 'Partial',
-};
 
 type Props = {
   /** Current DAG name (the parent of sub-runs) - used for display */

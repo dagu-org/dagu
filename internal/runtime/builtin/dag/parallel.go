@@ -58,6 +58,11 @@ func newParallelExecutor(
 		return nil, err
 	}
 
+	// Validate: sub-DAGs with HITL steps cannot be dispatched to workers
+	if len(step.WorkerSelector) > 0 && child.DAG.HasHITLSteps() {
+		return nil, fmt.Errorf("%w: %s", ErrHITLStepsWithWorker, step.SubDAG.Name)
+	}
+
 	dir := runtime.GetEnv(ctx).WorkingDir
 	if dir != "" && !fileutil.FileExists(dir) {
 		return nil, ErrWorkingDirNotExist
@@ -159,10 +164,11 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	}
 
 	// Check if any sub DAGs failed (even if they completed without execution errors)
+	// Wait status is not treated as failure - DetermineNodeStatus handles it
 	e.lock.Lock()
 	failedCount := 0
 	for _, result := range e.results {
-		if !result.Status.IsSuccess() {
+		if !result.Status.IsSuccess() && result.Status != core.Waiting {
 			failedCount++
 		}
 	}
@@ -199,18 +205,30 @@ func (e *parallelExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 		return core.NodeFailed, fmt.Errorf("no results available for node status determination")
 	}
 
-	// Check if all sub DAGs succeeded or if any had partial success
+	// Check if all sub DAGs succeeded or if any had partial success or waiting
 	// For error cases, we return an error status with error message
-	var partialSuccess bool
+	var (
+		partialSuccess bool
+		hasWaiting     bool
+	)
 	for _, result := range e.results {
 		switch result.Status {
 		case core.Succeeded:
 			// continue checking other results
 		case core.PartiallySucceeded:
 			partialSuccess = true
+		case core.Waiting:
+			// Sub-DAG is waiting for human approval (HITL)
+			hasWaiting = true
 		default:
 			return core.NodeFailed, fmt.Errorf("sub DAG run %s is still in progress with status: %s", result.DAGRunID, result.Status)
 		}
+	}
+
+	// If any sub-DAG is waiting, propagate the waiting status to the parent
+	// This takes priority over partial success since we need human action
+	if hasWaiting {
+		return core.NodeWaiting, nil
 	}
 
 	// Check count of items equal to count of succeeded items

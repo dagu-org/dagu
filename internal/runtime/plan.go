@@ -94,6 +94,29 @@ func CreateRetryPlan(ctx context.Context, dag *core.DAG, nodes ...*Node) (*Plan,
 	return p, nil
 }
 
+// NewPlanFromNodes creates a plan from existing nodes without modifying their states.
+func NewPlanFromNodes(nodes ...*Node) (*Plan, error) {
+	p := &Plan{
+		nodeByID:      make(map[int]*Node),
+		nodeByName:    make(map[string]*Node),
+		DependencyMap: make(map[int][]int),
+		DependantMap:  make(map[int][]int),
+		nodes:         make([]*Node, 0, len(nodes)),
+		startedAt:     time.Now(),
+	}
+
+	for _, node := range nodes {
+		node.Init()
+		p.addNode(node)
+	}
+
+	if err := p.buildEdges(); err != nil {
+		return nil, err
+	}
+
+	return p, nil
+}
+
 // CreateStepRetryPlan creates a new execution plan for retrying a specific step.
 func CreateStepRetryPlan(dag *core.DAG, nodes []*Node, stepName string) (*Plan, error) {
 	p := &Plan{
@@ -217,7 +240,8 @@ func (p *Plan) setupRetry(ctx context.Context, steps map[string]core.Step) error
 		for _, u := range frontier {
 			shouldRetry := toRetry[u] ||
 				nodeStatus[u] == core.NodeFailed ||
-				nodeStatus[u] == core.NodeAborted
+				nodeStatus[u] == core.NodeAborted ||
+				nodeStatus[u] == core.NodeRejected
 
 			if shouldRetry {
 				node := p.nodeByID[u]
@@ -332,10 +356,59 @@ func (p *Plan) Finish() {
 	p.finishedAt = time.Now()
 }
 
+// PlanNodeStates holds the state flags for nodes in a plan.
+type PlanNodeStates struct {
+	HasRunning    bool
+	HasWaiting    bool
+	HasNotStarted bool
+	HasRejected   bool
+}
+
+// NodeStates returns whether any nodes are running, waiting, not started, or rejected.
+// Single pass, single lock for atomic read.
+func (p *Plan) NodeStates() PlanNodeStates {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	var states PlanNodeStates
+	for _, node := range p.nodes {
+		switch node.State().Status {
+		case core.NodeRunning:
+			states.HasRunning = true
+		case core.NodeWaiting:
+			states.HasWaiting = true
+		case core.NodeNotStarted:
+			states.HasNotStarted = true
+		case core.NodeRejected:
+			states.HasRejected = true
+		case core.NodeSucceeded, core.NodeFailed, core.NodeAborted, core.NodeSkipped, core.NodePartiallySucceeded:
+			// Terminal states
+		}
+	}
+	return states
+}
+
+// WaitingStepNames returns the names of steps that are waiting for approval.
+func (p *Plan) WaitingStepNames() []string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	var names []string
+	for _, node := range p.nodes {
+		if node.State().Status == core.NodeWaiting {
+			names = append(names, node.Name())
+		}
+	}
+	return names
+}
+
 // IsRunning checks if any node is currently running or pending.
 func (p *Plan) IsRunning() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
+	return p.isRunningLocked()
+}
+
+// isRunningLocked is the lock-free implementation for internal use.
+func (p *Plan) isRunningLocked() bool {
 	for _, node := range p.nodes {
 		s := node.State().Status
 		if s == core.NodeRunning {

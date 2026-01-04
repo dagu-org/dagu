@@ -10,24 +10,13 @@ import { useQuery } from '@/hooks/api';
 import { ExternalLink, Layers } from 'lucide-react';
 import React, { useContext, useMemo, useState } from 'react';
 import { components, StatusLabel } from '../../../../api/v2/schema';
-import { StatusDot } from '../common';
+import { STATUS_DISPLAY_LABELS, StatusDot } from '../common';
 
 type SubDAGRun = components['schemas']['SubDAGRun'];
 type SubDAGRunDetail = components['schemas']['SubDAGRunDetail'];
 
 // "all" is a special filter that shows everything
 type StatusFilterValue = 'all' | StatusLabel;
-
-// Display labels for status values
-const STATUS_DISPLAY_LABELS: Record<StatusLabel, string> = {
-  [StatusLabel.not_started]: 'Not Started',
-  [StatusLabel.running]: 'Running',
-  [StatusLabel.failed]: 'Failed',
-  [StatusLabel.aborted]: 'Aborted',
-  [StatusLabel.succeeded]: 'Succeeded',
-  [StatusLabel.queued]: 'Queued',
-  [StatusLabel.partially_succeeded]: 'Partial',
-};
 
 type Props = {
   isOpen: boolean;

@@ -27,6 +27,7 @@ import (
 var (
 	ErrUpstreamFailed   = fmt.Errorf("upstream failed")
 	ErrUpstreamSkipped  = fmt.Errorf("upstream skipped")
+	ErrUpstreamRejected = fmt.Errorf("upstream rejected")
 	ErrDeadlockDetected = errors.New("deadlock detected: no runnable nodes but DAG not finished")
 )
 
@@ -52,6 +53,7 @@ type Runner struct {
 	onCancel        *core.Step
 	dagRunID        string
 	messagesHandler ChatMessagesHandler
+	onWait          *core.Step
 
 	canceled  int32
 	mu        sync.RWMutex
@@ -87,6 +89,7 @@ func New(cfg *Config) *Runner {
 		dagRunID:        cfg.DAGRunID,
 		messagesHandler: cfg.MessagesHandler,
 		pause:           time.Millisecond * 100,
+		onWait:          cfg.OnWait,
 	}
 }
 
@@ -103,6 +106,7 @@ type Config struct {
 	OnCancel        *core.Step
 	DAGRunID        string
 	MessagesHandler ChatMessagesHandler
+	OnWait          *core.Step
 }
 
 // Run runs the plan of steps.
@@ -182,6 +186,13 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 		// 2. maxActiveRuns is 0 (unlimited) OR running < maxActiveRuns
 		if !r.isCanceled() && (r.maxActiveRuns == 0 || running < r.maxActiveRuns) {
 			activeReadyCh = readyCh
+		}
+
+		// Check for Wait condition: no running nodes, no ready nodes, and waiting for approval.
+		nodeStates := plan.NodeStates()
+		if running == 0 && len(readyCh) == 0 && nodeStates.HasWaiting {
+			logger.Info(ctx, "DAG entering wait status - waiting for human approval")
+			break
 		}
 
 		// Deadlock detection: if no nodes are running, no nodes are ready, and the graph is not finished,
@@ -277,6 +288,39 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 
 	case core.Aborted:
 		eventHandlers = append(eventHandlers, core.HandlerOnCancel)
+
+	case core.Rejected:
+		eventHandlers = append(eventHandlers, core.HandlerOnFailure)
+
+	case core.Waiting:
+		// Execute onWait handler before terminating
+		r.handlerMu.RLock()
+		handlerNode := r.handlers[core.HandlerOnWait]
+		r.handlerMu.RUnlock()
+
+		if handlerNode != nil {
+			// Set DAG_WAITING_STEPS environment variable
+			waitingSteps := strings.Join(plan.WaitingStepNames(), ",")
+			ctx = r.setupEnvironEventHandler(ctx, plan, handlerNode)
+			env := GetEnv(ctx).WithEnvVars("DAG_WAITING_STEPS", waitingSteps)
+			ctx = WithEnv(ctx, env)
+
+			logger.Info(ctx, "Executing onWait handler",
+				slog.String("waitingSteps", waitingSteps),
+			)
+
+			if err := r.runEventHandler(ctx, plan, handlerNode); err != nil {
+				// Log error but don't fail - notification failure shouldn't block Wait status
+				logger.Error(ctx, "onWait handler failed", tag.Error(err))
+			}
+
+			if progressCh != nil {
+				progressCh <- handlerNode
+			}
+		}
+
+		logger.Info(ctx, "DAG waiting for approval")
+		return r.lastError
 
 	case core.NotStarted, core.Running, core.Queued:
 		// These states should not occur at this point
@@ -518,7 +562,7 @@ func (r *Runner) saveChatMessages(ctx context.Context, node *Node) {
 func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) context.Context {
 	env := NewPlanEnv(ctx, node.Step(), plan)
 
-	// Load output variables from predecessor nodes (dependencies)
+	// Load output variables and approval inputs from predecessor nodes (dependencies)
 	// This traverses backwards from the current node to find all nodes it depends on
 	curr := node.id
 	visited := make(map[int]struct{})
@@ -541,6 +585,7 @@ func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) con
 		queue = append(queue, plan.Dependencies(predID)...)
 
 		// Load output variables from this predecessor node
+		// (includes approval inputs which are stored in OutputVariables)
 		predNode := plan.GetNode(predID)
 		if predNode != nil && predNode.inner.State.OutputVariables != nil {
 			env.LoadOutputVariables(predNode.inner.State.OutputVariables)
@@ -576,16 +621,24 @@ func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) con
 }
 
 func (r *Runner) setupEnvironEventHandler(ctx context.Context, plan *Plan, node *Node) context.Context {
+	// Preserve any extra env vars from the incoming context (e.g., DAG_WAITING_STEPS)
+	existingEnv := GetEnv(ctx)
+
 	env := NewPlanEnv(ctx, node.Step(), plan)
 	env.Envs[execution.EnvKeyDAGRunStatus] = r.Status(ctx, plan).String()
 
-	// get all output variables
-	for _, node := range plan.Nodes() {
-		if node.inner.State.OutputVariables == nil {
-			continue
+	// Copy extra env vars from existing context that aren't standard step envs
+	for k, v := range existingEnv.Envs {
+		if _, exists := env.Envs[k]; !exists {
+			env.Envs[k] = v
 		}
+	}
 
-		env.LoadOutputVariables(node.inner.State.OutputVariables)
+	// get all output variables (includes approval inputs which are stored in OutputVariables)
+	for _, node := range plan.Nodes() {
+		if node.inner.State.OutputVariables != nil {
+			env.LoadOutputVariables(node.inner.State.OutputVariables)
+		}
 	}
 
 	return WithEnv(ctx, env)
@@ -650,7 +703,23 @@ func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
 	if !p.IsStarted() {
 		return core.NotStarted
 	}
-	if p.IsRunning() {
+
+	// Get node states atomically, then check plan finished state.
+	// Note: IsFinished() is called separately, so there's a small window where
+	// the plan could be marked finished between these calls. This is acceptable
+	// for status reporting as it self-corrects on the next Status() call.
+	states := p.NodeStates()
+
+	if states.HasRunning {
+		return core.Running
+	}
+	if states.HasRejected {
+		return core.Rejected
+	}
+	if states.HasWaiting {
+		return core.Waiting
+	}
+	if states.HasNotStarted && !p.IsFinished() {
 		return core.Running
 	}
 
@@ -749,6 +818,24 @@ func isReady(ctx context.Context, plan *Plan, node *Node) bool {
 			)
 			ready = false
 
+		case core.NodeWaiting:
+			// Dependency is waiting for human approval - block dependent nodes
+			logger.Debug(ctx, "Dependency waiting for approval",
+				tag.Step(node.Name()),
+				tag.Dependency(dep.Name()),
+			)
+			ready = false
+
+		case core.NodeRejected:
+			// Dependency was rejected - abort dependent nodes
+			logger.Debug(ctx, "Dependency rejected",
+				tag.Step(node.Name()),
+				tag.Dependency(dep.Name()),
+			)
+			ready = false
+			node.SetStatus(core.NodeAborted)
+			node.SetError(ErrUpstreamRejected)
+
 		default:
 			ready = false
 
@@ -820,6 +907,9 @@ func (r *Runner) setup(ctx context.Context) (err error) {
 	if r.onCancel != nil {
 		r.handlers[core.HandlerOnCancel] = &Node{Data: newSafeData(NodeData{Step: *r.onCancel})}
 	}
+	if r.onWait != nil {
+		r.handlers[core.HandlerOnWait] = &Node{Data: newSafeData(NodeData{Step: *r.onWait})}
+	}
 
 	// Initialize metrics
 	r.metrics.startTime = time.Now()
@@ -888,7 +978,7 @@ func (r *Runner) isPartialSuccess(ctx context.Context, p *Plan) bool {
 			// Partial success at node level contributes to overall partial success
 			hasFailuresWithContinueOn = true
 			hasSuccessfulNodes = true
-		case core.NodeNotStarted, core.NodeRunning, core.NodeAborted, core.NodeSkipped:
+		case core.NodeNotStarted, core.NodeRunning, core.NodeAborted, core.NodeSkipped, core.NodeWaiting, core.NodeRejected:
 			// These statuses don't affect partial success determination, but are needed for linter
 		}
 	}
@@ -1008,6 +1098,10 @@ func (r *Runner) finishNode(node *Node, wg *sync.WaitGroup) {
 		r.metrics.canceledNodes++
 	case core.NodePartiallySucceeded:
 		r.metrics.completedNodes++ // Count partial success as completed
+	case core.NodeWaiting:
+		// Waiting nodes are counted when they complete after approval
+	case core.NodeRejected:
+		r.metrics.failedNodes++ // Rejected nodes are counted as failed
 	case core.NodeNotStarted, core.NodeRunning:
 		// Should not happen at this point
 	}

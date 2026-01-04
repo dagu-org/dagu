@@ -34,7 +34,8 @@ type dagExecutor struct {
 
 // Errors for DAG executor
 var (
-	ErrWorkingDirNotExist = fmt.Errorf("working directory does not exist")
+	ErrWorkingDirNotExist  = fmt.Errorf("working directory does not exist")
+	ErrHITLStepsWithWorker = fmt.Errorf("sub-DAG with HITL steps cannot be dispatched to workers")
 )
 
 func newDAGExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
@@ -45,6 +46,11 @@ func newDAGExecutor(ctx context.Context, step core.Step) (executor.Executor, err
 	child, err := executor.NewSubDAGExecutor(ctx, step.SubDAG.Name)
 	if err != nil {
 		return nil, err
+	}
+
+	// Validate: sub-DAGs with HITL steps cannot be dispatched to workers
+	if len(step.WorkerSelector) > 0 && child.DAG.HasHITLSteps() {
+		return nil, fmt.Errorf("%w: %s", ErrHITLStepsWithWorker, step.SubDAG.Name)
 	}
 
 	dir := runtime.GetEnv(ctx).WorkingDir
@@ -108,6 +114,10 @@ func (e *dagExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 		return core.NodeSucceeded, nil
 	case core.PartiallySucceeded:
 		return core.NodePartiallySucceeded, nil
+	case core.Waiting:
+		// Sub-DAG is waiting for human approval (HITL)
+		// Propagate the waiting status to the parent
+		return core.NodeWaiting, nil
 	case core.NotStarted, core.Running, core.Failed, core.Aborted, core.Queued:
 		return core.NodeFailed, fmt.Errorf("sub DAG run %s failed with status: %s", e.result.DAGRunID, e.result.Status)
 	default:

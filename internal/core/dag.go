@@ -125,6 +125,8 @@ type DAG struct {
 	ErrorMail *MailConfig `json:"errorMail,omitempty"`
 	// InfoMail contains the mail configuration for informational messages.
 	InfoMail *MailConfig `json:"infoMail,omitempty"`
+	// WaitMail contains the mail configuration for wait status.
+	WaitMail *MailConfig `json:"waitMail,omitempty"`
 	// MailOn contains the conditions to send mail.
 	MailOn *MailOn `json:"mailOn,omitempty"`
 	// Timeout specifies the maximum execution time of the DAG task.
@@ -192,6 +194,18 @@ type SecretRef struct {
 func (d *DAG) HasTag(tag string) bool {
 	for _, t := range d.Tags {
 		if t == tag {
+			return true
+		}
+	}
+	return false
+}
+
+// HasHITLSteps returns true if the DAG contains any HITL executor steps.
+// DAGs with HITL steps cannot be dispatched to workers because
+// HITL steps require local storage access for approval.
+func (d *DAG) HasHITLSteps() bool {
+	for _, step := range d.Steps {
+		if step.ExecutorConfig.Type == ExecutorTypeHITL {
 			return true
 		}
 	}
@@ -540,12 +554,14 @@ type HandlerOn struct {
 	Success *Step `json:"success,omitempty"`
 	Cancel  *Step `json:"cancel,omitempty"`
 	Exit    *Step `json:"exit,omitempty"`
+	Wait    *Step `json:"wait,omitempty"`
 }
 
 // MailOn contains the conditions to send mail.
 type MailOn struct {
 	Failure bool `json:"failure,omitempty"`
 	Success bool `json:"success,omitempty"`
+	Wait    bool `json:"wait,omitempty"`
 }
 
 // SMTPConfig contains the SMTP configuration.
@@ -583,6 +599,7 @@ const (
 	HandlerOnFailure HandlerType = "onFailure"
 	HandlerOnCancel  HandlerType = "onCancel"
 	HandlerOnExit    HandlerType = "onExit"
+	HandlerOnWait    HandlerType = "onWait"
 )
 
 func (h HandlerType) String() string {

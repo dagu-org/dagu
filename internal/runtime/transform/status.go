@@ -115,6 +115,15 @@ func WithOnCancelNode(node *runtime.Node) StatusOption {
 	}
 }
 
+// WithOnWaitNode returns a StatusOption that sets the wait handler node
+func WithOnWaitNode(node *runtime.Node) StatusOption {
+	return func(s *execution.DAGRunStatus) {
+		if node != nil {
+			s.OnWait = newNode(node.NodeData())
+		}
+	}
+}
+
 // WithLogFilePath returns a StatusOption that sets the log file path
 func WithLogFilePath(logFilePath string) StatusOption {
 	return func(s *execution.DAGRunStatus) {

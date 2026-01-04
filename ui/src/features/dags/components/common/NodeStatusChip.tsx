@@ -62,7 +62,7 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
         'bg-[rgba(128,128,128,0.1)],169,169,0.2)]';
       borderColorClass = 'border-[gray]';
       textColorClass = 'text-[gray]';
-      statusIcon = '▫'; // White small square
+      statusIcon = '―'; // Horizontal bar
       break;
     case NodeStatus.NotStarted: // none -> lightblue
       bgColorClass =
@@ -76,6 +76,19 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
       borderColorClass = 'border-[#f59e0b]';
       textColorClass = 'text-[#f59e0b]';
       statusIcon = '◐'; // Half-filled circle
+      break;
+    case NodeStatus.Waiting: // waiting for approval -> amber/yellow
+      bgColorClass = 'bg-[rgba(245,158,11,0.15)]';
+      borderColorClass = 'border-[#f59e0b]';
+      textColorClass = 'text-[#d97706]';
+      pulseAnimation = 'animate-pulse';
+      statusIcon = '□'; // Empty square
+      break;
+    case NodeStatus.Rejected: // rejected -> red
+      bgColorClass = 'bg-[rgba(220,38,38,0.1)]';
+      borderColorClass = 'border-[#dc2626]';
+      textColorClass = 'text-[#dc2626]';
+      statusIcon = '⊘'; // Prohibited sign
       break;
     default: // Fallback to gray
       bgColorClass =

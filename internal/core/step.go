@@ -325,4 +325,7 @@ const (
 
 	// ExecutorTypeParallel is the executor type for parallel steps.
 	ExecutorTypeParallel = "parallel"
+
+	// ExecutorTypeHITL is the executor type for HITL (Human In The Loop) steps.
+	ExecutorTypeHITL = "hitl"
 )

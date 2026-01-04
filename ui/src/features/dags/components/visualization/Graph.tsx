@@ -267,6 +267,12 @@ const Graph: React.FC<Props> = ({
     dat.push(
       `classDef partial color:${nodeColor},fill:${nodeFill},stroke:#c4956a,stroke-width:1.2px`
     );
+    dat.push(
+      `classDef waiting color:${nodeColor},fill:${nodeFill},stroke:#f59e0b,stroke-width:1.2px`
+    );
+    dat.push(
+      `classDef rejected color:${nodeColor},fill:${nodeFill},stroke:#dc2626,stroke-width:1.2px`
+    );
 
     // Add custom link styles
     dat.push(...linkStyles);
@@ -466,12 +472,14 @@ const calculateGraphBreadth = (steps: Steps) => {
 export default Graph;
 
 // Map node status to CSS classes for styling
-const graphStatusMap = {
-  [0]: ':::none',
-  [1]: ':::running',
-  [2]: ':::error',
-  [3]: ':::cancel',
-  [4]: ':::done',
-  [5]: ':::skipped',
-  [6]: ':::partial',
+const graphStatusMap: Record<NodeStatus, string> = {
+  [NodeStatus.NotStarted]: ':::none',
+  [NodeStatus.Running]: ':::running',
+  [NodeStatus.Failed]: ':::error',
+  [NodeStatus.Aborted]: ':::cancel',
+  [NodeStatus.Success]: ':::done',
+  [NodeStatus.Skipped]: ':::skipped',
+  [NodeStatus.PartialSuccess]: ':::partial',
+  [NodeStatus.Waiting]: ':::waiting',
+  [NodeStatus.Rejected]: ':::rejected',
 };

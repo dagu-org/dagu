@@ -476,6 +476,16 @@ func TestBuildMailOn(t *testing.T) {
 			input:    &mailOn{Failure: true, Success: false},
 			expected: &core.MailOn{Failure: true, Success: false},
 		},
+		{
+			name:     "WaitOnly",
+			input:    &mailOn{Wait: true},
+			expected: &core.MailOn{Wait: true},
+		},
+		{
+			name:     "AllTrue",
+			input:    &mailOn{Failure: true, Success: true, Wait: true},
+			expected: &core.MailOn{Failure: true, Success: true, Wait: true},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1726,6 +1736,7 @@ func TestBuildHandlers(t *testing.T) {
 				Success: &step{Command: "echo success"},
 				Failure: &step{Command: "echo failure"},
 				Abort:   &step{Command: "echo abort"},
+				Wait:    &step{Command: "echo wait"},
 			},
 		}
 		result := &core.DAG{}
@@ -1746,6 +1757,9 @@ func TestBuildHandlers(t *testing.T) {
 		require.NotNil(t, handlerOn.Cancel)
 		require.Len(t, handlerOn.Cancel.Commands, 1)
 		assert.Equal(t, "echo abort", handlerOn.Cancel.Commands[0].CmdWithArgs)
+		require.NotNil(t, handlerOn.Wait)
+		require.Len(t, handlerOn.Wait.Commands, 1)
+		assert.Equal(t, "echo wait", handlerOn.Wait.Commands[0].CmdWithArgs)
 	})
 
 	t.Run("CancelDeprecated", func(t *testing.T) {
@@ -1788,6 +1802,7 @@ func TestBuildHandlers(t *testing.T) {
 		assert.Nil(t, handlerOn.Success)
 		assert.Nil(t, handlerOn.Failure)
 		assert.Nil(t, handlerOn.Cancel)
+		assert.Nil(t, handlerOn.Wait)
 	})
 
 	t.Run("InitHandlerError", func(t *testing.T) {
@@ -1843,6 +1858,34 @@ func TestBuildHandlers(t *testing.T) {
 		d := &dag{
 			HandlerOn: handlerOn{
 				Abort: &step{Command: "   "}, // Empty command after trim causes error
+			},
+		}
+		result := &core.DAG{}
+		_, err := buildHandlers(testBuildContext(), d, result)
+		require.Error(t, err)
+	})
+
+	t.Run("WaitHandler", func(t *testing.T) {
+		t.Parallel()
+		d := &dag{
+			HandlerOn: handlerOn{
+				Wait: &step{Command: "echo wait"},
+			},
+		}
+		result := &core.DAG{}
+		handlerOn, err := buildHandlers(testBuildContext(), d, result)
+		require.NoError(t, err)
+		require.NotNil(t, handlerOn.Wait)
+		require.Len(t, handlerOn.Wait.Commands, 1)
+		assert.Equal(t, "echo wait", handlerOn.Wait.Commands[0].CmdWithArgs)
+		assert.Equal(t, "onWait", handlerOn.Wait.Name)
+	})
+
+	t.Run("WaitHandlerError", func(t *testing.T) {
+		t.Parallel()
+		d := &dag{
+			HandlerOn: handlerOn{
+				Wait: &step{Command: "   "}, // Empty command after trim causes error
 			},
 		}
 		result := &core.DAG{}
@@ -1913,6 +1956,80 @@ func TestBuildLogOutput(t *testing.T) {
 			result, err := buildLogOutput(testBuildContext(), &d)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestBuildHITLStepsValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		dag         *dag
+		expectErr   bool
+		errContains string
+	}{
+		{
+			name: "NoHITLSteps",
+			dag: &dag{
+				Name:           "test-dag",
+				WorkerSelector: map[string]string{"region": "us-west"},
+				Steps: []any{
+					map[string]any{"name": "step1", "script": "echo hello"},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			name: "NoWorkerSelector",
+			dag: &dag{
+				Name: "test-dag",
+				Steps: []any{
+					map[string]any{"name": "step1", "type": "hitl"},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			name: "Conflict",
+			dag: &dag{
+				Name:           "test-dag",
+				WorkerSelector: map[string]string{"region": "us-west"},
+				Steps: []any{
+					map[string]any{"name": "step1", "type": "hitl"},
+				},
+			},
+			expectErr:   true,
+			errContains: "DAG with HITL steps cannot be dispatched to workers",
+		},
+		{
+			name: "ConflictMultipleSteps",
+			dag: &dag{
+				Name:           "test-dag",
+				WorkerSelector: map[string]string{"region": "us-west"},
+				Steps: []any{
+					map[string]any{"name": "step1", "script": "echo hello"},
+					map[string]any{"name": "step2", "type": "hitl"},
+					map[string]any{"name": "step3", "script": "echo done"},
+				},
+			},
+			expectErr:   true,
+			errContains: "DAG with HITL steps cannot be dispatched to workers",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := tt.dag.build(testBuildContext())
+			if tt.expectErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, result)
+			}
 		})
 	}
 }

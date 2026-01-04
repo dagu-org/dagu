@@ -351,6 +351,24 @@ function DAGStatusOverview({
               </span>
             </div>
           )}
+
+          {nodeStatus.waiting && (
+            <div className="flex items-center">
+              <div className="h-2 w-2 mr-1 rounded-full bg-amber-500 animate-pulse"></div>
+              <span className="text-xs text-muted-foreground">
+                Waiting: {nodeStatus.waiting}
+              </span>
+            </div>
+          )}
+
+          {nodeStatus.rejected && (
+            <div className="flex items-center">
+              <div className="h-2 w-2 mr-1 rounded-full bg-red-600"></div>
+              <span className="text-xs text-muted-foreground">
+                Rejected: {nodeStatus.rejected}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Progress bar */}
@@ -396,6 +414,22 @@ function DAGStatusOverview({
                 }}
               ></div>
             )}
+            {nodeStatus.waiting && (
+              <div
+                className="h-full bg-amber-500 float-left animate-pulse"
+                style={{
+                  width: `${(nodeStatus.waiting / totalNodes) * 100}%`,
+                }}
+              ></div>
+            )}
+            {nodeStatus.rejected && (
+              <div
+                className="h-full bg-red-600 float-left"
+                style={{
+                  width: `${(nodeStatus.rejected / totalNodes) * 100}%`,
+                }}
+              ></div>
+            )}
           </div>
         )}
 
@@ -416,6 +450,18 @@ function DAGStatusOverview({
           <div className="mt-1.5 flex items-center text-xs text-muted-foreground">
             <StopCircle className="h-3 w-3 mr-1 text-pink-400" />
             <span>Execution was aborted</span>
+          </div>
+        )}
+        {status.status === Status.Waiting && (
+          <div className="mt-1.5 flex items-center text-xs text-muted-foreground">
+            <Clock className="h-3 w-3 mr-1 text-amber-500" />
+            <span>Waiting for approval</span>
+          </div>
+        )}
+        {status.status === Status.Rejected && (
+          <div className="mt-1.5 flex items-center text-xs text-muted-foreground">
+            <StopCircle className="h-3 w-3 mr-1 text-red-600" />
+            <span>Execution was rejected</span>
           </div>
         )}
       </div>

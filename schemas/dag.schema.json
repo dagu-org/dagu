@@ -1934,7 +1934,8 @@
         "subworkflow",
         "parallel",
         "archive",
-        "chat"
+        "chat",
+        "hitl"
       ],
       "description": "Type of executor to use for this step."
     },

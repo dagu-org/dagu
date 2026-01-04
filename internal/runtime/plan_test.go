@@ -142,6 +142,43 @@ func TestRetryPlan(t *testing.T) {
 	require.Equal(t, core.NodeSkipped, nodes[7].State().Status)
 }
 
+func TestRetryPlanWithRejectedNode(t *testing.T) {
+	ctx := context.Background()
+	dag := &core.DAG{Steps: []core.Step{
+		{Name: "1"}, {Name: "2", Depends: []string{"1"}}, {Name: "3", Depends: []string{"2"}},
+	}}
+
+	// Create rejected node with metadata
+	rejectedNode := runtime.NodeWithData(runtime.NodeData{
+		Step: core.Step{Name: "2", Depends: []string{"1"}},
+		State: runtime.NodeState{
+			Status:          core.NodeRejected,
+			RejectedAt:      "2024-01-15T10:00:00Z",
+			RejectedBy:      "test-user",
+			RejectionReason: "test reason",
+		},
+	})
+
+	nodes := []*runtime.Node{
+		makeNode("1", core.NodeSucceeded),
+		rejectedNode,
+		makeNode("3", core.NodeAborted, "2"),
+	}
+	p, err := runtime.CreateRetryPlan(ctx, dag, nodes...)
+	require.NoError(t, err)
+	require.NotNil(t, p)
+
+	// Rejected node should be cleared and retried
+	require.Equal(t, core.NodeSucceeded, nodes[0].State().Status)
+	require.Equal(t, core.NodeNotStarted, nodes[1].State().Status)
+	require.Equal(t, core.NodeNotStarted, nodes[2].State().Status)
+
+	// Rejection metadata should be cleared
+	require.Empty(t, rejectedNode.State().RejectedAt)
+	require.Empty(t, rejectedNode.State().RejectedBy)
+	require.Empty(t, rejectedNode.State().RejectionReason)
+}
+
 func TestStepRetryPlan(t *testing.T) {
 	dag := &core.DAG{Steps: []core.Step{
 		{Name: "1"}, {Name: "2", Depends: []string{"1"}}, {Name: "3", Depends: []string{"2"}},
@@ -242,4 +279,127 @@ func TestPlan_Timing(t *testing.T) {
 	require.True(t, p.IsFinished())
 	finish := p.FinishAt()
 	require.WithinDuration(t, time.Now(), finish, time.Second)
+}
+
+func TestPlan_NodeStates(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name              string
+		nodes             []*runtime.Node
+		wantHasRunning    bool
+		wantHasWaiting    bool
+		wantHasNotStarted bool
+		wantHasRejected   bool
+	}{
+		{
+			name: "all succeeded",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeSucceeded),
+				makeNode("b", core.NodeSucceeded, "a"),
+			},
+		},
+		{
+			name: "one running",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeSucceeded),
+				makeNode("b", core.NodeRunning, "a"),
+			},
+			wantHasRunning: true,
+		},
+		{
+			name: "one waiting with blocked dependents",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeWaiting),
+				makeNode("b", core.NodeNotStarted, "a"),
+			},
+			wantHasWaiting:    true,
+			wantHasNotStarted: true,
+		},
+		{
+			name: "one rejected",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeRejected),
+				makeNode("b", core.NodeNotStarted, "a"),
+			},
+			wantHasRejected:   true,
+			wantHasNotStarted: true,
+		},
+		{
+			name: "rejected and waiting together",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeRejected),
+				makeNode("b", core.NodeWaiting),
+			},
+			wantHasRejected: true,
+			wantHasWaiting:  true,
+		},
+		{
+			name: "mix of all states",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeRunning),
+				makeNode("b", core.NodeWaiting),
+				makeNode("c", core.NodeNotStarted, "b"),
+				makeNode("d", core.NodeSucceeded),
+			},
+			wantHasRunning:    true,
+			wantHasWaiting:    true,
+			wantHasNotStarted: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			p, err := runtime.NewPlanFromNodes(tt.nodes...)
+			require.NoError(t, err)
+
+			states := p.NodeStates()
+			require.Equal(t, tt.wantHasRunning, states.HasRunning, "hasRunning")
+			require.Equal(t, tt.wantHasWaiting, states.HasWaiting, "hasWaiting")
+			require.Equal(t, tt.wantHasNotStarted, states.HasNotStarted, "hasNotStarted")
+			require.Equal(t, tt.wantHasRejected, states.HasRejected, "hasRejected")
+		})
+	}
+}
+
+func TestPlan_WaitingStepNames(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		nodes     []*runtime.Node
+		wantNames []string
+	}{
+		{
+			name: "no waiting",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeSucceeded),
+			},
+			wantNames: nil,
+		},
+		{
+			name: "one waiting",
+			nodes: []*runtime.Node{
+				makeNode("wait-step", core.NodeWaiting),
+			},
+			wantNames: []string{"wait-step"},
+		},
+		{
+			name: "multiple waiting",
+			nodes: []*runtime.Node{
+				makeNode("wait-1", core.NodeWaiting),
+				makeNode("wait-2", core.NodeWaiting),
+				makeNode("not-waiting", core.NodeSucceeded),
+			},
+			wantNames: []string{"wait-1", "wait-2"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			p, err := runtime.NewPlanFromNodes(tt.nodes...)
+			require.NoError(t, err)
+
+			names := p.WaitingStepNames()
+			require.Equal(t, tt.wantNames, names)
+		})
+	}
 }

@@ -195,6 +195,51 @@ steps:
 				require.Equal(t, core.NodeSucceeded, status.OnExit.Status)
 			},
 		},
+		{
+			name: "WaitHandler_ExecutedOnWaitStatus",
+			dagYAML: `
+handlerOn:
+  wait:
+    command: "true"
+
+steps:
+  - name: wait-step
+    type: hitl
+`,
+			setupFunc: func(t *testing.T, dag *core.DAG) {
+				require.NotNil(t, dag.HandlerOn.Wait)
+				require.Equal(t, "onWait", dag.HandlerOn.Wait.Name)
+			},
+			runFunc: func(_ *testing.T, ctx context.Context, agent *test.Agent) {
+				_ = agent.Run(ctx)
+			},
+			validateFunc: func(t *testing.T, status *execution.DAGRunStatus) {
+				require.Equal(t, core.Waiting, status.Status)
+				require.NotNil(t, status.OnWait, "wait handler should have been executed")
+				require.Equal(t, core.NodeSucceeded, status.OnWait.Status)
+			},
+		},
+		{
+			name: "WaitHandler_FailureDoesNotBlockWaitStatus",
+			dagYAML: `
+handlerOn:
+  wait:
+    command: exit 1
+
+steps:
+  - name: wait-step
+    type: hitl
+`,
+			runFunc: func(_ *testing.T, ctx context.Context, agent *test.Agent) {
+				_ = agent.Run(ctx)
+			},
+			validateFunc: func(t *testing.T, status *execution.DAGRunStatus) {
+				// DAG should still be in Wait status even if handler failed
+				require.Equal(t, core.Waiting, status.Status)
+				require.NotNil(t, status.OnWait, "wait handler should have been executed")
+				require.Equal(t, core.NodeFailed, status.OnWait.Status)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -657,5 +702,85 @@ steps:
 		// Init handler cannot access step output (steps haven't run yet)
 		assert.Contains(t, outputStr, "step_output:NOT_YET_AVAILABLE",
 			"init handler should not access step outputs")
+	})
+
+	t.Run("WaitHandler_DAG_WAITING_STEPS_EnvVar", func(t *testing.T) {
+		t.Parallel()
+		th := test.Setup(t)
+
+		// DAG_WAITING_STEPS should contain comma-separated list of waiting step names
+		dag := th.DAG(t, `
+handlerOn:
+  wait:
+    command: |
+      echo "waiting_steps:${DAG_WAITING_STEPS}"
+    output: WAIT_HANDLER_OUTPUT
+
+steps:
+  - name: first-step
+    command: "true"
+
+  - name: wait-step
+    type: hitl
+    depends:
+      - first-step
+`)
+		agent := dag.Agent()
+		_ = agent.Run(th.Context)
+
+		status := agent.Status(th.Context)
+		require.Equal(t, core.Waiting, status.Status)
+		require.NotNil(t, status.OnWait, "wait handler should have been executed")
+		require.Equal(t, core.NodeSucceeded, status.OnWait.Status)
+		require.NotNil(t, status.OnWait.OutputVariables)
+
+		output, ok := status.OnWait.OutputVariables.Load("WAIT_HANDLER_OUTPUT")
+		require.True(t, ok)
+
+		outputStr := extractValue(output.(string))
+
+		// Verify DAG_WAITING_STEPS contains the wait step name
+		assert.Contains(t, outputStr, "waiting_steps:wait-step",
+			"DAG_WAITING_STEPS should contain 'wait-step'")
+	})
+
+	t.Run("WaitHandler_EnvVarFormat", func(t *testing.T) {
+		t.Parallel()
+		th := test.Setup(t)
+
+		// Verify DAG_WAITING_STEPS format is correct (comma-separated list)
+		// This test has a step with a hyphenated name to verify proper formatting
+		dag := th.DAG(t, `
+handlerOn:
+  wait:
+    command: |
+      echo "waiting_steps:${DAG_WAITING_STEPS}"
+    output: WAIT_HANDLER_OUTPUT
+
+steps:
+  - name: setup-step
+    command: "true"
+
+  - name: approval-gate
+    type: hitl
+    depends:
+      - setup-step
+`)
+		agent := dag.Agent()
+		_ = agent.Run(th.Context)
+
+		status := agent.Status(th.Context)
+		require.Equal(t, core.Waiting, status.Status)
+		require.NotNil(t, status.OnWait)
+		require.NotNil(t, status.OnWait.OutputVariables)
+
+		output, ok := status.OnWait.OutputVariables.Load("WAIT_HANDLER_OUTPUT")
+		require.True(t, ok)
+
+		outputStr := extractValue(output.(string))
+
+		// Verify DAG_WAITING_STEPS contains the wait step name with proper formatting
+		assert.Contains(t, outputStr, "waiting_steps:approval-gate",
+			"DAG_WAITING_STEPS should contain 'approval-gate' with correct format")
 	})
 }

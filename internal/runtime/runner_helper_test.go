@@ -26,6 +26,10 @@ func failStep(name string, depends ...string) core.Step {
 	return newStep(name, withDepends(depends...), withCommand("false"))
 }
 
+func waitStep(name string, depends ...string) core.Step {
+	return newStep(name, withDepends(depends...), withExecutor("hitl", nil))
+}
+
 type stepOption func(*core.Step)
 
 func withDepends(depends ...string) stepOption {
@@ -102,6 +106,15 @@ func withCommand(command string) stepOption {
 func withID(id string) stepOption {
 	return func(step *core.Step) {
 		step.ID = id
+	}
+}
+
+func withExecutor(executorType string, config map[string]any) stepOption {
+	return func(step *core.Step) {
+		step.ExecutorConfig = core.ExecutorConfig{
+			Type:   executorType,
+			Config: config,
+		}
 	}
 }
 
@@ -236,7 +249,7 @@ func (ph planHelper) assertRun(t *testing.T, expectedStatus core.Status) runResu
 	close(progressCh)
 
 	switch expectedStatus {
-	case core.Succeeded, core.Aborted:
+	case core.Succeeded, core.Aborted, core.Waiting, core.Rejected:
 		require.NoError(t, err)
 
 	case core.Failed, core.PartiallySucceeded:
