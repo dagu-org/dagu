@@ -338,6 +338,7 @@ type NodeStatusSummary struct {
 	HasRunning    bool
 	HasWaiting    bool
 	HasNotStarted bool
+	IsFinished    bool // true if finishedAt is set
 	WaitingNodes  []*Node
 }
 
@@ -347,7 +348,9 @@ func (p *Plan) GetNodeStatusSummary() NodeStatusSummary {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	var summary NodeStatusSummary
+	summary := NodeStatusSummary{
+		IsFinished: !p.finishedAt.IsZero(),
+	}
 	for _, node := range p.nodes {
 		switch node.State().Status {
 		case core.NodeRunning:
@@ -377,21 +380,6 @@ func (p *Plan) isRunningLocked() bool {
 			return true
 		}
 		if s == core.NodeNotStarted && p.finishedAt.IsZero() {
-			return true
-		}
-	}
-	return false
-}
-
-// HasActivelyRunningNodes checks if any node is in NodeRunning status.
-// Unlike IsRunning(), this does not consider NodeNotStarted nodes as running.
-// This is used to distinguish between actively executing work and nodes that
-// are pending but blocked (e.g., by a waiting node requiring approval).
-func (p *Plan) HasActivelyRunningNodes() bool {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	for _, node := range p.nodes {
-		if node.State().Status == core.NodeRunning {
 			return true
 		}
 	}

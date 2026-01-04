@@ -188,7 +188,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 		}
 
 		// Check for Wait condition: no running nodes, no ready nodes, and waiting for approval.
-		if running == 0 && len(readyCh) == 0 && len(r.getWaitingNodes(plan)) > 0 {
+		if running == 0 && len(readyCh) == 0 && plan.GetNodeStatusSummary().HasWaiting {
 			logger.Info(ctx, "DAG entering wait status - waiting for human approval")
 			break
 		}
@@ -296,7 +296,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 		if handlerNode != nil {
 			// Set DAG_WAITING_STEPS environment variable
 			var stepNames []string
-			for _, node := range r.getWaitingNodes(plan) {
+			for _, node := range plan.GetNodeStatusSummary().WaitingNodes {
 				stepNames = append(stepNames, node.Name())
 			}
 			waitingSteps := strings.Join(stepNames, ",")
@@ -739,7 +739,7 @@ func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
 	}
 
 	// Check if there's still pending work (not blocked by waiting nodes)
-	if summary.HasNotStarted && !p.IsFinished() {
+	if summary.HasNotStarted && !summary.IsFinished {
 		return core.Running
 	}
 
@@ -752,11 +752,6 @@ func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
 	}
 
 	return core.Succeeded
-}
-
-// getWaitingNodes returns nodes with NodeWaiting status.
-func (r *Runner) getWaitingNodes(p *Plan) []*Node {
-	return p.GetNodeStatusSummary().WaitingNodes
 }
 
 func (r *Runner) isError() bool {
