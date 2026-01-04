@@ -1195,6 +1195,11 @@ func buildLLM(_ BuildContext, d *dag) (*core.LLMConfig, error) {
 		}
 	}
 
+	thinking, err := buildThinkingConfig(cfg.Thinking)
+	if err != nil {
+		return nil, err
+	}
+
 	return &core.LLMConfig{
 		Provider:    cfg.Provider,
 		Model:       cfg.Model,
@@ -1205,7 +1210,7 @@ func buildLLM(_ BuildContext, d *dag) (*core.LLMConfig, error) {
 		BaseURL:     cfg.BaseURL,
 		APIKeyName:  cfg.APIKeyName,
 		Stream:      cfg.Stream,
-		Thinking:    buildThinkingConfig(cfg.Thinking),
+		Thinking:    thinking,
 	}, nil
 }
 

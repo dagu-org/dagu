@@ -1,5 +1,7 @@
 package core
 
+import "fmt"
+
 // LLM message role constants.
 const (
 	LLMRoleSystem    = "system"
@@ -19,13 +21,28 @@ const (
 	ThinkingEffortXHigh  ThinkingEffort = "xhigh"
 )
 
+// ParseThinkingEffort validates and returns a ThinkingEffort from a string.
+// Returns empty string for empty input (no effort specified).
+// Returns error for invalid effort values.
+func ParseThinkingEffort(s string) (ThinkingEffort, error) {
+	if s == "" {
+		return "", nil
+	}
+	switch ThinkingEffort(s) {
+	case ThinkingEffortLow, ThinkingEffortMedium, ThinkingEffortHigh, ThinkingEffortXHigh:
+		return ThinkingEffort(s), nil
+	default:
+		return "", fmt.Errorf("invalid thinking effort %q: must be one of: low, medium, high, xhigh", s)
+	}
+}
+
 // ThinkingConfig contains configuration for extended thinking/reasoning.
 type ThinkingConfig struct {
 	// Enabled activates thinking mode for supported models.
 	Enabled bool `json:"enabled,omitempty"`
 	// Effort controls reasoning depth: low, medium, high, xhigh.
 	// Maps to provider-specific parameters.
-	Effort string `json:"effort,omitempty"`
+	Effort ThinkingEffort `json:"effort,omitempty"`
 	// BudgetTokens sets explicit token budget (provider-specific).
 	// For Anthropic: minimum 1024, max 128K.
 	// For Gemini 2.5: range 128-32768.

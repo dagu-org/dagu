@@ -1303,6 +1303,11 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 		}
 	}
 
+	thinking, err := buildThinkingConfig(cfg.Thinking)
+	if err != nil {
+		return err
+	}
+
 	result.LLM = &core.LLMConfig{
 		Provider:    cfg.Provider,
 		Model:       cfg.Model,
@@ -1313,7 +1318,7 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 		BaseURL:     cfg.BaseURL,
 		APIKeyName:  cfg.APIKeyName,
 		Stream:      cfg.Stream,
-		Thinking:    buildThinkingConfig(cfg.Thinking),
+		Thinking:    thinking,
 	}
 
 	// NOTE: Executor type is NOT set here - it must be specified explicitly
@@ -1324,16 +1329,21 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 }
 
 // buildThinkingConfig converts thinkingConfig to core.ThinkingConfig.
-func buildThinkingConfig(cfg *thinkingConfig) *core.ThinkingConfig {
+func buildThinkingConfig(cfg *thinkingConfig) (*core.ThinkingConfig, error) {
 	if cfg == nil {
-		return nil
+		return nil, nil
+	}
+	// Validate effort value
+	effort, err := core.ParseThinkingEffort(cfg.Effort)
+	if err != nil {
+		return nil, core.NewValidationError("thinking.effort", cfg.Effort, err)
 	}
 	return &core.ThinkingConfig{
 		Enabled:         cfg.Enabled,
-		Effort:          cfg.Effort,
+		Effort:          effort,
 		BudgetTokens:    cfg.BudgetTokens,
 		IncludeInOutput: cfg.IncludeInOutput,
-	}
+	}, nil
 }
 
 // buildStepMessages parses the messages field for chat steps.
