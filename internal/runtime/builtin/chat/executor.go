@@ -137,32 +137,41 @@ func toThinkingRequest(cfg *core.ThinkingConfig) *llmpkg.ThinkingRequest {
 	}
 }
 
+// normalizeEnvVarExpr converts an environment variable reference to ${VAR} format.
+// Handles: VAR → ${VAR}, $VAR → ${VAR}, ${VAR} → ${VAR}
+func normalizeEnvVarExpr(expr string) string {
+	if strings.HasPrefix(expr, "${") {
+		// Already in ${VAR} format, use as-is
+		return expr
+	}
+	if strings.HasPrefix(expr, "$") {
+		// Convert $VAR to ${VAR}
+		return "${" + strings.TrimPrefix(expr, "$") + "}"
+	}
+	// Plain variable name, wrap in ${...}
+	return "${" + expr + "}"
+}
+
 // createProvider creates the LLM provider with evaluated config values.
 // This is called at runtime to support variable substitution in config fields.
 func (e *Executor) createProvider(ctx context.Context) (llmpkg.Provider, error) {
 	cfg := e.step.LLM
 
 	// Evaluate API key from environment variable (supports ${VAR} substitution)
-	// Handle different formats: VAR, $VAR, ${VAR}
-	apiKeyExpr := e.apiKeyEnvVar
-	if strings.HasPrefix(apiKeyExpr, "${") {
-		// Already in ${VAR} format, use as-is
-	} else if strings.HasPrefix(apiKeyExpr, "$") {
-		// Convert $VAR to ${VAR}
-		apiKeyExpr = "${" + strings.TrimPrefix(apiKeyExpr, "$") + "}"
-	} else {
-		// Plain variable name, wrap in ${...}
-		apiKeyExpr = "${" + apiKeyExpr + "}"
-	}
-
-	apiKey, err := runtime.EvalString(ctx, apiKeyExpr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to evaluate API key: %w", err)
+	var apiKey string
+	if e.apiKeyEnvVar != "" {
+		apiKeyExpr := normalizeEnvVarExpr(e.apiKeyEnvVar)
+		var err error
+		apiKey, err = runtime.EvalString(ctx, apiKeyExpr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate API key: %w", err)
+		}
 	}
 
 	// Evaluate base URL if specified
 	baseURL := cfg.BaseURL
 	if baseURL != "" {
+		var err error
 		baseURL, err = runtime.EvalString(ctx, baseURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate baseURL: %w", err)

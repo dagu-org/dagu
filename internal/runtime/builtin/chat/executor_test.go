@@ -138,3 +138,42 @@ func TestExecutor_GetMessages(t *testing.T) {
 		assert.Equal(t, execution.RoleAssistant, saved[1].Role)
 	})
 }
+
+func TestNormalizeEnvVarExpr(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "PlainVariableName",
+			input:    "OPENAI_API_KEY",
+			expected: "${OPENAI_API_KEY}",
+		},
+		{
+			name:     "DollarPrefix",
+			input:    "$ANTHROPIC_KEY",
+			expected: "${ANTHROPIC_KEY}",
+		},
+		{
+			name:     "BracedFormat",
+			input:    "${MY_API_KEY}",
+			expected: "${MY_API_KEY}",
+		},
+		{
+			name:     "DollarPrefixWithUnderscore",
+			input:    "$MY_CUSTOM_KEY",
+			expected: "${MY_CUSTOM_KEY}",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			result := normalizeEnvVarExpr(tc.input)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
