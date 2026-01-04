@@ -17,6 +17,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
@@ -547,8 +548,13 @@ func (a *API) ApproveDAGRunStep(ctx context.Context, request api.ApproveDAGRunSt
 		dagStatus.Nodes[stepIdx].ApprovedBy = approvedBy
 	}
 
+	// Convert input keys to camelCase (same pattern as outputs)
 	if request.Body != nil && request.Body.Inputs != nil {
-		dagStatus.Nodes[stepIdx].ApprovalInputs = *request.Body.Inputs
+		camelInputs := make(map[string]string, len(*request.Body.Inputs))
+		for k, v := range *request.Body.Inputs {
+			camelInputs[stringutil.ScreamingSnakeToCamel(k)] = v
+		}
+		dagStatus.Nodes[stepIdx].ApprovalInputs = camelInputs
 	}
 
 	// Log approval with JSON-serialized inputs
@@ -685,8 +691,13 @@ func (a *API) ApproveSubDAGRunStep(ctx context.Context, request api.ApproveSubDA
 		dagStatus.Nodes[stepIdx].ApprovedBy = approvedBy
 	}
 
+	// Convert input keys to camelCase (same pattern as outputs)
 	if request.Body != nil && request.Body.Inputs != nil {
-		dagStatus.Nodes[stepIdx].ApprovalInputs = *request.Body.Inputs
+		camelInputs := make(map[string]string, len(*request.Body.Inputs))
+		for k, v := range *request.Body.Inputs {
+			camelInputs[stringutil.ScreamingSnakeToCamel(k)] = v
+		}
+		dagStatus.Nodes[stepIdx].ApprovalInputs = camelInputs
 	}
 
 	// Log approval with JSON-serialized inputs
