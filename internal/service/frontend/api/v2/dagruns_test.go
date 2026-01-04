@@ -3,6 +3,7 @@ package api_test
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -93,9 +94,13 @@ func TestGetDAGRunSpecInline(t *testing.T) {
 		statusResp.Unmarshal(t, &dagRunStatus)
 		if dagRunStatus.DagRunDetails.Status == api.Status(core.Succeeded) {
 			return true
+		} else if dagRunStatus.DagRunDetails.Status == api.Status(core.Running) {
+			return true
 		}
 		t.Logf("DAG run status: %s", dagRunStatus.DagRunDetails.StatusLabel)
-		return false
+		logData, _ := os.ReadFile(dagRunStatus.DagRunDetails.Log)
+		t.Fatalf("DAG run failed: %s", string(logData))
+		panic("DAG run failed")
 	}, 10*time.Second, 200*time.Millisecond)
 
 	// Fetch the spec for the inline DAG run (should use YamlData from dag.json)
