@@ -681,6 +681,26 @@ function NodeStatusTableRow({
                   {currentDuration}
                 </div>
               )}
+              {/* Approval info for HITL steps */}
+              {node.approvedBy && (
+                <div className="text-xs text-muted-foreground leading-tight">
+                  <span className="font-medium">Approved by:</span>{' '}
+                  <span className="text-info">{node.approvedBy}</span>
+                  {node.approvedAt && (
+                    <span className="ml-1">
+                      at {formatTimestamp(node.approvedAt)}
+                    </span>
+                  )}
+                </div>
+              )}
+              {node.approvalInputs && Object.keys(node.approvalInputs).length > 0 && (
+                <div className="text-xs text-muted-foreground leading-tight">
+                  <span className="font-medium">Inputs:</span>{' '}
+                  <span className="font-mono text-foreground/80">
+                    {JSON.stringify(node.approvalInputs)}
+                  </span>
+                </div>
+              )}
             </div>
           </TableCell>
 
@@ -1070,6 +1090,26 @@ function NodeStatusTableRow({
                 )}
               </span>
               {currentDuration}
+            </div>
+          )}
+          {/* Approval info for HITL steps */}
+          {node.approvedBy && (
+            <div className="text-xs text-muted-foreground">
+              <span className="font-medium">Approved by:</span>{' '}
+              <span className="text-info">{node.approvedBy}</span>
+              {node.approvedAt && (
+                <span className="ml-1">
+                  at {formatTimestamp(node.approvedAt)}
+                </span>
+              )}
+            </div>
+          )}
+          {node.approvalInputs && Object.keys(node.approvalInputs).length > 0 && (
+            <div className="text-xs text-muted-foreground">
+              <span className="font-medium">Inputs:</span>{' '}
+              <span className="font-mono text-foreground/80">
+                {JSON.stringify(node.approvalInputs)}
+              </span>
             </div>
           )}
         </div>
