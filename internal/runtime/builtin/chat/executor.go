@@ -112,6 +112,29 @@ func (e *Executor) GetMessages() []execution.LLMMessage {
 	return e.savedMessages
 }
 
+// buildMessageList orders messages so step's system message takes precedence over context.
+func buildMessageList(stepMsgs, contextMsgs []execution.LLMMessage) []execution.LLMMessage {
+	var result []execution.LLMMessage
+	var stepSystemMsg *execution.LLMMessage
+	var stepOtherMsgs []execution.LLMMessage
+
+	for i := range stepMsgs {
+		if stepMsgs[i].Role == execution.RoleSystem {
+			stepSystemMsg = &stepMsgs[i]
+		} else {
+			stepOtherMsgs = append(stepOtherMsgs, stepMsgs[i])
+		}
+	}
+
+	if stepSystemMsg != nil {
+		result = append(result, *stepSystemMsg)
+	}
+	result = append(result, contextMsgs...)
+	result = append(result, stepOtherMsgs...)
+
+	return execution.DeduplicateSystemMessages(result)
+}
+
 // toLLMMessages converts execution.LLMMessage to llmpkg.Message for provider calls.
 func toLLMMessages(msgs []execution.LLMMessage) []llmpkg.Message {
 	result := make([]llmpkg.Message, len(msgs))
@@ -232,21 +255,13 @@ func (e *Executor) Run(ctx context.Context) error {
 		return err
 	}
 
-	// Evaluate variable substitution in this step's messages
 	evaluatedMessages, err := evalMessages(ctx, e.messages)
 	if err != nil {
 		return err
 	}
 
-	// Build complete message list: context + this step's messages
-	var allMessages []execution.LLMMessage
-	allMessages = append(allMessages, e.contextMessages...)
-	allMessages = append(allMessages, evaluatedMessages...)
+	allMessages := buildMessageList(evaluatedMessages, e.contextMessages)
 
-	// Deduplicate system messages (keep only the first one)
-	allMessages = execution.DeduplicateSystemMessages(allMessages)
-
-	// Build chat request - convert to provider format only at boundary
 	req := &llmpkg.ChatRequest{
 		Model:       cfg.Model,
 		Messages:    toLLMMessages(allMessages),

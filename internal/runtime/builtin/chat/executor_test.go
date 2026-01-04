@@ -363,6 +363,61 @@ func TestToLLMMessages(t *testing.T) {
 	})
 }
 
+func TestBuildMessageList(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		stepMsgs        []execution.LLMMessage
+		contextMsgs     []execution.LLMMessage
+		wantFirstSystem string
+		wantLen         int
+	}{
+		{
+			name: "step system takes precedence",
+			stepMsgs: []execution.LLMMessage{
+				{Role: execution.RoleSystem, Content: "step system"},
+				{Role: execution.RoleUser, Content: "user"},
+			},
+			contextMsgs: []execution.LLMMessage{
+				{Role: execution.RoleSystem, Content: "context system"},
+			},
+			wantFirstSystem: "step system",
+			wantLen:         2,
+		},
+		{
+			name:     "context system used when step has none",
+			stepMsgs: []execution.LLMMessage{{Role: execution.RoleUser, Content: "user"}},
+			contextMsgs: []execution.LLMMessage{
+				{Role: execution.RoleSystem, Content: "context system"},
+			},
+			wantFirstSystem: "context system",
+			wantLen:         2,
+		},
+		{
+			name: "no context",
+			stepMsgs: []execution.LLMMessage{
+				{Role: execution.RoleSystem, Content: "step system"},
+			},
+			contextMsgs:     nil,
+			wantFirstSystem: "step system",
+			wantLen:         1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := buildMessageList(tt.stepMsgs, tt.contextMsgs)
+
+			require.Len(t, result, tt.wantLen)
+			assert.Equal(t, execution.RoleSystem, result[0].Role)
+			assert.Equal(t, tt.wantFirstSystem, result[0].Content)
+		})
+	}
+}
+
 func TestToThinkingRequest(t *testing.T) {
 	t.Parallel()
 
