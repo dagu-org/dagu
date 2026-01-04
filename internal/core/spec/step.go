@@ -1321,10 +1321,6 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 		Thinking:    thinking,
 	}
 
-	// NOTE: Executor type is NOT set here - it must be specified explicitly
-	// via type: chat in the YAML. This allows the llm: config to be reused
-	// for future executor types like type: agent.
-
 	return nil
 }
 
@@ -1333,7 +1329,6 @@ func buildThinkingConfig(cfg *thinkingConfig) (*core.ThinkingConfig, error) {
 	if cfg == nil {
 		return nil, nil
 	}
-	// Validate effort value
 	effort, err := core.ParseThinkingEffort(cfg.Effort)
 	if err != nil {
 		return nil, core.NewValidationError("thinking.effort", cfg.Effort, err)
@@ -1352,7 +1347,6 @@ func buildStepMessages(s *step, result *core.Step) error {
 		return nil
 	}
 
-	// Validate each message
 	validRoles := map[string]bool{
 		core.LLMRoleSystem:    true,
 		core.LLMRoleUser:      true,
