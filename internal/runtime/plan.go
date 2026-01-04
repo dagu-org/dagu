@@ -332,37 +332,35 @@ func (p *Plan) Finish() {
 	p.finishedAt = time.Now()
 }
 
-// NodeStatusSummary provides an atomic snapshot of node status counts.
-// This allows callers to make decisions based on consistent state.
-type NodeStatusSummary struct {
-	HasRunning    bool
-	HasWaiting    bool
-	HasNotStarted bool
-	IsFinished    bool // true if finishedAt is set
-	WaitingNodes  []*Node
-}
-
-// GetNodeStatusSummary returns an atomic snapshot of node statuses in a single pass.
-// This avoids race conditions from multiple separate status checks.
-func (p *Plan) GetNodeStatusSummary() NodeStatusSummary {
+// NodeStates returns whether any nodes are running, waiting, or not started.
+// Single pass, single lock for atomic read.
+func (p *Plan) NodeStates() (hasRunning, hasWaiting, hasNotStarted bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-
-	summary := NodeStatusSummary{
-		IsFinished: !p.finishedAt.IsZero(),
-	}
 	for _, node := range p.nodes {
 		switch node.State().Status {
 		case core.NodeRunning:
-			summary.HasRunning = true
+			hasRunning = true
 		case core.NodeWaiting:
-			summary.HasWaiting = true
-			summary.WaitingNodes = append(summary.WaitingNodes, node)
+			hasWaiting = true
 		case core.NodeNotStarted:
-			summary.HasNotStarted = true
+			hasNotStarted = true
 		}
 	}
-	return summary
+	return
+}
+
+// WaitingStepNames returns the names of steps that are waiting for approval.
+func (p *Plan) WaitingStepNames() []string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	var names []string
+	for _, node := range p.nodes {
+		if node.State().Status == core.NodeWaiting {
+			names = append(names, node.Name())
+		}
+	}
+	return names
 }
 
 // IsRunning checks if any node is currently running or pending.

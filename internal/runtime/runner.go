@@ -188,7 +188,8 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 		}
 
 		// Check for Wait condition: no running nodes, no ready nodes, and waiting for approval.
-		if running == 0 && len(readyCh) == 0 && plan.GetNodeStatusSummary().HasWaiting {
+		_, hasWaiting, _ := plan.NodeStates()
+		if running == 0 && len(readyCh) == 0 && hasWaiting {
 			logger.Info(ctx, "DAG entering wait status - waiting for human approval")
 			break
 		}
@@ -295,11 +296,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 
 		if handlerNode != nil {
 			// Set DAG_WAITING_STEPS environment variable
-			var stepNames []string
-			for _, node := range plan.GetNodeStatusSummary().WaitingNodes {
-				stepNames = append(stepNames, node.Name())
-			}
-			waitingSteps := strings.Join(stepNames, ",")
+			waitingSteps := strings.Join(plan.WaitingStepNames(), ",")
 			ctx = r.setupEnvironEventHandler(ctx, plan, handlerNode)
 			env := GetEnv(ctx).WithEnvVars("DAG_WAITING_STEPS", waitingSteps)
 			ctx = WithEnv(ctx, env)
@@ -721,25 +718,18 @@ func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
 		return core.NotStarted
 	}
 
-	// Get atomic snapshot of node statuses in a single pass.
-	// This avoids race conditions from multiple separate status checks.
-	summary := p.GetNodeStatusSummary()
+	// Check nodes are actively running - takes precedence
+	// Check for waiting nodes - blocks dependent NotStarted nodes
+	// Check for pending work (NotStarted nodes that can still run)
+	hasRunning, hasWaiting, hasNotStarted := p.NodeStates()
 
-	// Check if any nodes are actively running (NodeRunning status).
-	// This takes precedence - we need to wait for active work to complete.
-	if summary.HasRunning {
+	if hasRunning {
 		return core.Running
 	}
-
-	// Check for Wait condition - nodes waiting for approval.
-	// This must be checked BEFORE checking for pending work because
-	// NotStarted nodes may be blocked by waiting nodes and can't proceed.
-	if summary.HasWaiting {
+	if hasWaiting {
 		return core.Wait
 	}
-
-	// Check if there's still pending work (not blocked by waiting nodes)
-	if summary.HasNotStarted && !summary.IsFinished {
+	if hasNotStarted && !p.IsFinished() {
 		return core.Running
 	}
 

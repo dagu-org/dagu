@@ -244,17 +244,14 @@ func TestPlan_Timing(t *testing.T) {
 	require.WithinDuration(t, time.Now(), finish, time.Second)
 }
 
-func TestPlan_GetNodeStatusSummary(t *testing.T) {
+func TestPlan_NodeStates(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name              string
 		nodes             []*runtime.Node
-		finishPlan        bool
 		wantHasRunning    bool
 		wantHasWaiting    bool
 		wantHasNotStarted bool
-		wantIsFinished    bool
-		wantWaitingCount  int
 	}{
 		{
 			name: "all succeeded",
@@ -265,8 +262,6 @@ func TestPlan_GetNodeStatusSummary(t *testing.T) {
 			wantHasRunning:    false,
 			wantHasWaiting:    false,
 			wantHasNotStarted: false,
-			wantIsFinished:    false,
-			wantWaitingCount:  0,
 		},
 		{
 			name: "one running",
@@ -277,8 +272,6 @@ func TestPlan_GetNodeStatusSummary(t *testing.T) {
 			wantHasRunning:    true,
 			wantHasWaiting:    false,
 			wantHasNotStarted: false,
-			wantIsFinished:    false,
-			wantWaitingCount:  0,
 		},
 		{
 			name: "one waiting with blocked dependents",
@@ -289,21 +282,6 @@ func TestPlan_GetNodeStatusSummary(t *testing.T) {
 			wantHasRunning:    false,
 			wantHasWaiting:    true,
 			wantHasNotStarted: true,
-			wantIsFinished:    false,
-			wantWaitingCount:  1,
-		},
-		{
-			name: "multiple waiting nodes",
-			nodes: []*runtime.Node{
-				makeNode("a", core.NodeWaiting),
-				makeNode("b", core.NodeWaiting),
-				makeNode("c", core.NodeNotStarted, "a", "b"),
-			},
-			wantHasRunning:    false,
-			wantHasWaiting:    true,
-			wantHasNotStarted: true,
-			wantIsFinished:    false,
-			wantWaitingCount:  2,
 		},
 		{
 			name: "mix of all states",
@@ -316,34 +294,6 @@ func TestPlan_GetNodeStatusSummary(t *testing.T) {
 			wantHasRunning:    true,
 			wantHasWaiting:    true,
 			wantHasNotStarted: true,
-			wantIsFinished:    false,
-			wantWaitingCount:  1,
-		},
-		{
-			name: "finished plan",
-			nodes: []*runtime.Node{
-				makeNode("a", core.NodeSucceeded),
-				makeNode("b", core.NodeSucceeded, "a"),
-			},
-			finishPlan:        true,
-			wantHasRunning:    false,
-			wantHasWaiting:    false,
-			wantHasNotStarted: false,
-			wantIsFinished:    true,
-			wantWaitingCount:  0,
-		},
-		{
-			name: "finished plan with not started nodes",
-			nodes: []*runtime.Node{
-				makeNode("a", core.NodeSucceeded),
-				makeNode("b", core.NodeNotStarted, "a"),
-			},
-			finishPlan:        true,
-			wantHasRunning:    false,
-			wantHasWaiting:    false,
-			wantHasNotStarted: true,
-			wantIsFinished:    true,
-			wantWaitingCount:  0,
 		},
 	}
 	for _, tt := range tests {
@@ -356,16 +306,57 @@ func TestPlan_GetNodeStatusSummary(t *testing.T) {
 			p, err := runtime.CreateRetryPlan(context.Background(), dag, tt.nodes...)
 			require.NoError(t, err)
 
-			if tt.finishPlan {
-				p.Finish()
-			}
+			hasRunning, hasWaiting, hasNotStarted := p.NodeStates()
+			require.Equal(t, tt.wantHasRunning, hasRunning, "hasRunning")
+			require.Equal(t, tt.wantHasWaiting, hasWaiting, "hasWaiting")
+			require.Equal(t, tt.wantHasNotStarted, hasNotStarted, "hasNotStarted")
+		})
+	}
+}
 
-			summary := p.GetNodeStatusSummary()
-			require.Equal(t, tt.wantHasRunning, summary.HasRunning, "HasRunning mismatch")
-			require.Equal(t, tt.wantHasWaiting, summary.HasWaiting, "HasWaiting mismatch")
-			require.Equal(t, tt.wantHasNotStarted, summary.HasNotStarted, "HasNotStarted mismatch")
-			require.Equal(t, tt.wantIsFinished, summary.IsFinished, "IsFinished mismatch")
-			require.Len(t, summary.WaitingNodes, tt.wantWaitingCount, "WaitingNodes count mismatch")
+func TestPlan_WaitingStepNames(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		nodes     []*runtime.Node
+		wantNames []string
+	}{
+		{
+			name: "no waiting",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeSucceeded),
+			},
+			wantNames: nil,
+		},
+		{
+			name: "one waiting",
+			nodes: []*runtime.Node{
+				makeNode("wait-step", core.NodeWaiting),
+			},
+			wantNames: []string{"wait-step"},
+		},
+		{
+			name: "multiple waiting",
+			nodes: []*runtime.Node{
+				makeNode("wait-1", core.NodeWaiting),
+				makeNode("wait-2", core.NodeWaiting),
+				makeNode("not-waiting", core.NodeSucceeded),
+			},
+			wantNames: []string{"wait-1", "wait-2"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dag := &core.DAG{}
+			for _, n := range tt.nodes {
+				dag.Steps = append(dag.Steps, n.Step())
+			}
+			p, err := runtime.CreateRetryPlan(context.Background(), dag, tt.nodes...)
+			require.NoError(t, err)
+
+			names := p.WaitingStepNames()
+			require.Equal(t, tt.wantNames, names)
 		})
 	}
 }
