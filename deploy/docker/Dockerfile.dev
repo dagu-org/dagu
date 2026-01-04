@@ -21,6 +21,7 @@ WORKDIR /app
 COPY . .
 RUN go mod download && rm -rf frontend/assets
 COPY --from=ui-builder /app/dist/ ./internal/service/frontend/assets/
+COPY schemas/dag.schema.json ./internal/service/frontend/assets/
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags="${LDFLAGS}" -o ./bin/dagu ./cmd
 
 # Stage 3: Final Image
