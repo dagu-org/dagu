@@ -14,6 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/runtime/builtin/chat"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -2917,5 +2918,65 @@ func TestRunner_ChatMessagesHandler(t *testing.T) {
 		)
 		// Chat step will fail, but deduplication logic is exercised
 		_ = plan.assertRun(t, core.Failed)
+	})
+
+	t.Run("SaveChatMessagesOnSuccess", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		plan := r.newPlan(t, newStep("mock1", withExecutorType(chat.MockExecutorType)))
+		result := plan.assertRun(t, core.Succeeded)
+		result.assertNodeStatus(t, "mock1", core.NodeSucceeded)
+
+		assert.Equal(t, 1, handler.writeCalls)
+		assert.NotEmpty(t, handler.messages["mock1"])
+	})
+
+	t.Run("SaveChatMessagesWriteError", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		handler.writeErr = fmt.Errorf("write error")
+
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		plan := r.newPlan(t, newStep("mock1", withExecutorType(chat.MockExecutorType)))
+		result := plan.assertRun(t, core.Succeeded)
+		result.assertNodeStatus(t, "mock1", core.NodeSucceeded)
+	})
+
+	t.Run("SaveChatMessagesWithInheritedContext", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		handler.messages["step1"] = []execution.LLMMessage{
+			{Role: execution.RoleSystem, Content: "be helpful"},
+		}
+
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		plan := r.newPlan(t,
+			successStep("step1"),
+			newStep("mock1", withDepends("step1"), withExecutorType(chat.MockExecutorType)),
+		)
+		result := plan.assertRun(t, core.Succeeded)
+		result.assertNodeStatus(t, "mock1", core.NodeSucceeded)
+
+		assert.Equal(t, 1, handler.writeCalls)
+	})
+
+	t.Run("SaveChatMessagesNoMessages", func(t *testing.T) {
+		t.Parallel()
+
+		handler := newMockMessagesHandler()
+		r := setupRunner(t, withMessagesHandler(handler))
+
+		plan := r.newPlan(t, newStep("empty1", withExecutorType(chat.MockEmptyExecutorType)))
+		result := plan.assertRun(t, core.Succeeded)
+		result.assertNodeStatus(t, "empty1", core.NodeSucceeded)
+
+		assert.Equal(t, 0, handler.writeCalls)
 	})
 }

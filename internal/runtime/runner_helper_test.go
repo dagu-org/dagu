@@ -12,6 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/runtime/builtin/chat"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -372,4 +373,8 @@ func withExecutorType(t string) stepOption {
 
 func chatStep(name string, depends ...string) core.Step {
 	return newStep(name, withDepends(depends...), withExecutorType(core.ExecutorTypeChat))
+}
+
+func init() {
+	chat.RegisterMockExecutors()
 }
