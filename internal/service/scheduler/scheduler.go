@@ -280,7 +280,7 @@ func (s *Scheduler) startHeartbeat(ctx context.Context) {
 
 // cronLoop runs the main scheduler loop to invoke jobs at scheduled times.
 func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
-	tickTime := s.clock().Truncate(time.Minute)
+	tickTime := s.clock().Truncate(time.Second)
 
 	timer := time.NewTimer(0)
 	defer timer.Stop()
@@ -307,7 +307,7 @@ func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 
 // NextTick returns the next tick time for the scheduler.
 func (*Scheduler) NextTick(now time.Time) time.Time {
-	return now.Add(time.Minute).Truncate(time.Second * 60)
+	return now.Add(time.Second).Truncate(time.Second)
 }
 
 // IsRunning returns whether the scheduler is currently running.
