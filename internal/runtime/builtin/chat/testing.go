@@ -61,8 +61,8 @@ func NewMockEmptyExecutor(_ context.Context, _ core.Step) (executor.Executor, er
 	return &MockEmptyExecutor{}, nil
 }
 
-func (m *MockEmptyExecutor) SetStdout(_ io.Writer) {}
-func (m *MockEmptyExecutor) SetStderr(_ io.Writer) {}
+func (m *MockEmptyExecutor) SetStdout(_ io.Writer)  {}
+func (m *MockEmptyExecutor) SetStderr(_ io.Writer)  {}
 func (m *MockEmptyExecutor) Kill(_ os.Signal) error { return nil }
 func (m *MockEmptyExecutor) Run(_ context.Context) error {
 	return nil
