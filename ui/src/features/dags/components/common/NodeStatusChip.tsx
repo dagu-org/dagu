@@ -62,7 +62,7 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
         'bg-[rgba(128,128,128,0.1)],169,169,0.2)]';
       borderColorClass = 'border-[gray]';
       textColorClass = 'text-[gray]';
-      statusIcon = '▫'; // White small square
+      statusIcon = '―'; // Horizontal bar
       break;
     case NodeStatus.NotStarted: // none -> lightblue
       bgColorClass =
@@ -82,7 +82,7 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
       borderColorClass = 'border-[#f59e0b]';
       textColorClass = 'text-[#d97706]';
       pulseAnimation = 'animate-pulse';
-      statusIcon = '⏸'; // Pause icon
+      statusIcon = '□'; // Empty square
       break;
     default: // Fallback to gray
       bgColorClass =
