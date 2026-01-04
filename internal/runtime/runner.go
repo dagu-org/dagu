@@ -718,9 +718,10 @@ func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
 		return core.NotStarted
 	}
 
-	// Check nodes are actively running - takes precedence
-	// Check for waiting nodes - blocks dependent NotStarted nodes
-	// Check for pending work (NotStarted nodes that can still run)
+	// Get node states atomically, then check plan finished state.
+	// Note: IsFinished() is called separately, so there's a small window where
+	// the plan could be marked finished between these calls. This is acceptable
+	// for status reporting as it self-corrects on the next Status() call.
 	hasRunning, hasWaiting, hasNotStarted := p.NodeStates()
 
 	if hasRunning {
