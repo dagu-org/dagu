@@ -186,7 +186,12 @@ func (a *API) loadInlineDAG(ctx context.Context, specContent string, name *strin
 		return nil, func() {}, fmt.Errorf("failed to write spec to temp file: %w", err)
 	}
 
-	var loadOpts []spec.LoadOption
+	// Set working directory to cwd or home - not the temp dir which gets cleaned up
+	workDir, _ := os.Getwd()
+	if workDir == "" {
+		workDir, _ = os.UserHomeDir()
+	}
+	loadOpts := []spec.LoadOption{spec.WithDefaultWorkingDir(workDir)}
 	if name != nil && *name != "" {
 		loadOpts = append(loadOpts, spec.WithName(*name))
 	}
