@@ -27,7 +27,7 @@ func failStep(name string, depends ...string) core.Step {
 }
 
 func waitStep(name string, depends ...string) core.Step {
-	return newStep(name, withDepends(depends...), withExecutor("wait", nil))
+	return newStep(name, withDepends(depends...), withExecutor("hitl", nil))
 }
 
 type stepOption func(*core.Step)
