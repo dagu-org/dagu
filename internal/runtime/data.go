@@ -68,6 +68,10 @@ type NodeState struct {
 	// ApprovalInputs stores key-value parameters provided during HITL approval.
 	// These are available as environment variables in subsequent steps.
 	ApprovalInputs map[string]string
+	// ApprovedAt is the time when the HITL step was approved.
+	ApprovedAt string
+	// ApprovedBy is the username of the user who approved the HITL step.
+	ApprovedBy string
 }
 
 // Parallel represents the evaluated parallel execution configuration for a node.
