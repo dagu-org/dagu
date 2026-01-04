@@ -159,7 +159,14 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 				if user, pass, ok := r.BasicAuth(); ok {
 					// Credentials were provided - must validate
 					if checkBasicAuth(user, pass, opts.Creds) {
-						next.ServeHTTP(w, r)
+						// Create user and add to context
+						basicUser := &auth.User{
+							ID:       user,
+							Username: user,
+							Role:     auth.RoleAdmin,
+						}
+						ctx := auth.WithUser(r.Context(), basicUser)
+						next.ServeHTTP(w, r.WithContext(ctx))
 						return
 					}
 					// Invalid credentials - always reject
