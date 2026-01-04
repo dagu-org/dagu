@@ -243,3 +243,75 @@ func TestPlan_Timing(t *testing.T) {
 	finish := p.FinishAt()
 	require.WithinDuration(t, time.Now(), finish, time.Second)
 }
+
+func TestPlan_HasActivelyRunningNodes(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		nodes    []*runtime.Node
+		expected bool
+	}{
+		{
+			name: "no nodes running",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeSucceeded),
+				makeNode("b", core.NodeSucceeded, "a"),
+			},
+			expected: false,
+		},
+		{
+			name: "one node running",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeSucceeded),
+				makeNode("b", core.NodeRunning, "a"),
+			},
+			expected: true,
+		},
+		{
+			name: "only not started nodes",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeNotStarted),
+				makeNode("b", core.NodeNotStarted, "a"),
+			},
+			expected: false,
+		},
+		{
+			name: "waiting node with not started dependents",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeWaiting),
+				makeNode("b", core.NodeNotStarted, "a"),
+			},
+			expected: false,
+		},
+		{
+			name: "mix of completed and waiting",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeSucceeded),
+				makeNode("b", core.NodeWaiting, "a"),
+				makeNode("c", core.NodeNotStarted, "b"),
+			},
+			expected: false,
+		},
+		{
+			name: "running node alongside waiting",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeRunning),
+				makeNode("b", core.NodeWaiting),
+				makeNode("c", core.NodeNotStarted, "b"),
+			},
+			expected: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dag := &core.DAG{}
+			for _, n := range tt.nodes {
+				dag.Steps = append(dag.Steps, n.Step())
+			}
+			p, err := runtime.CreateRetryPlan(context.Background(), dag, tt.nodes...)
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, p.HasActivelyRunningNodes())
+		})
+	}
+}
