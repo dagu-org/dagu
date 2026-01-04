@@ -114,7 +114,7 @@ func (e *dagExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 		return core.NodeSucceeded, nil
 	case core.PartiallySucceeded:
 		return core.NodePartiallySucceeded, nil
-	case core.Wait:
+	case core.Waiting:
 		// Sub-DAG is waiting for human approval (HITL)
 		// Propagate the waiting status to the parent
 		return core.NodeWaiting, nil

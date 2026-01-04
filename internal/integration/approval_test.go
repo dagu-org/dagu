@@ -28,7 +28,7 @@ steps:
 		err := agent.Run(agent.Context)
 		require.NoError(t, err)
 
-		testDAG.AssertLatestStatus(t, core.Wait)
+		testDAG.AssertLatestStatus(t, core.Waiting)
 
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
 		require.NoError(t, err)
@@ -63,7 +63,7 @@ steps:
 		err := agent.Run(agent.Context)
 		require.NoError(t, err)
 
-		testDAG.AssertLatestStatus(t, core.Wait)
+		testDAG.AssertLatestStatus(t, core.Waiting)
 
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
 		require.NoError(t, err)
@@ -97,7 +97,7 @@ steps:
 		err := agent.Run(agent.Context)
 		require.NoError(t, err)
 
-		testDAG.AssertLatestStatus(t, core.Wait)
+		testDAG.AssertLatestStatus(t, core.Waiting)
 
 		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, testDAG.DAG)
 		require.NoError(t, err)

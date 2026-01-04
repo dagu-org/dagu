@@ -214,7 +214,7 @@ steps:
 				_ = agent.Run(ctx)
 			},
 			validateFunc: func(t *testing.T, status *execution.DAGRunStatus) {
-				require.Equal(t, core.Wait, status.Status)
+				require.Equal(t, core.Waiting, status.Status)
 				require.NotNil(t, status.OnWait, "wait handler should have been executed")
 				require.Equal(t, core.NodeSucceeded, status.OnWait.Status)
 			},
@@ -235,7 +235,7 @@ steps:
 			},
 			validateFunc: func(t *testing.T, status *execution.DAGRunStatus) {
 				// DAG should still be in Wait status even if handler failed
-				require.Equal(t, core.Wait, status.Status)
+				require.Equal(t, core.Waiting, status.Status)
 				require.NotNil(t, status.OnWait, "wait handler should have been executed")
 				require.Equal(t, core.NodeFailed, status.OnWait.Status)
 			},
@@ -729,7 +729,7 @@ steps:
 		_ = agent.Run(th.Context)
 
 		status := agent.Status(th.Context)
-		require.Equal(t, core.Wait, status.Status)
+		require.Equal(t, core.Waiting, status.Status)
 		require.NotNil(t, status.OnWait, "wait handler should have been executed")
 		require.Equal(t, core.NodeSucceeded, status.OnWait.Status)
 		require.NotNil(t, status.OnWait.OutputVariables)
@@ -770,7 +770,7 @@ steps:
 		_ = agent.Run(th.Context)
 
 		status := agent.Status(th.Context)
-		require.Equal(t, core.Wait, status.Status)
+		require.Equal(t, core.Waiting, status.Status)
 		require.NotNil(t, status.OnWait)
 		require.NotNil(t, status.OnWait.OutputVariables)
 

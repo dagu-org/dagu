@@ -231,7 +231,7 @@ func testWaitMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, n
 	dag.MailOn.Wait = true
 
 	err := rp.send(context.Background(), dag, execution.DAGRunStatus{
-		Status: core.Wait,
+		Status: core.Waiting,
 		Nodes:  nodes,
 	}, nil)
 	require.NoError(t, err)
@@ -247,7 +247,7 @@ func testNoWaitMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG,
 	dag.MailOn.Wait = false
 
 	err := rp.send(context.Background(), dag, execution.DAGRunStatus{
-		Status: core.Wait,
+		Status: core.Waiting,
 		Nodes:  nodes,
 	}, nil)
 	require.NoError(t, err)

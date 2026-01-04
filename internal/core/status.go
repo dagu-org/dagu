@@ -11,7 +11,7 @@ const (
 	Succeeded
 	Queued
 	PartiallySucceeded
-	Wait
+	Waiting
 	Rejected
 )
 
@@ -33,7 +33,7 @@ func (s Status) String() string {
 		return "partially_succeeded"
 	case NotStarted:
 		return "not_started"
-	case Wait:
+	case Waiting:
 		return "waiting"
 	case Rejected:
 		return "rejected"
@@ -45,7 +45,7 @@ func (s Status) String() string {
 // IsActive checks if the status is active (not yet completed).
 // This includes Running, Queued, and Wait (waiting for human approval).
 func (s Status) IsActive() bool {
-	return s == Running || s == Queued || s == Wait
+	return s == Running || s == Queued || s == Waiting
 }
 
 // IsSuccess checks if the status indicates a successful execution.
@@ -55,7 +55,7 @@ func (s Status) IsSuccess() bool {
 
 // IsWaiting checks if the status is waiting for human approval.
 func (s Status) IsWaiting() bool {
-	return s == Wait
+	return s == Waiting
 }
 
 // NodeStatus represents the canonical lifecycle phases for an individual node.

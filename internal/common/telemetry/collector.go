@@ -428,7 +428,7 @@ func isCompletedStatus(s core.Status) bool {
 	switch s {
 	case core.Succeeded, core.Failed, core.Aborted, core.PartiallySucceeded:
 		return true
-	case core.NotStarted, core.Running, core.Queued, core.Wait:
+	case core.NotStarted, core.Running, core.Queued, core.Waiting:
 		return false
 	}
 	return false

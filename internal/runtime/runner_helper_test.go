@@ -249,7 +249,7 @@ func (ph planHelper) assertRun(t *testing.T, expectedStatus core.Status) runResu
 	close(progressCh)
 
 	switch expectedStatus {
-	case core.Succeeded, core.Aborted, core.Wait:
+	case core.Succeeded, core.Aborted, core.Waiting:
 		require.NoError(t, err)
 
 	case core.Failed, core.PartiallySucceeded:

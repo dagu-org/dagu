@@ -75,7 +75,7 @@ func (r *reporter) send(ctx context.Context, dag *core.DAG, dagStatus execution.
 			attachments := addAttachments(dag.InfoMail.AttachLogs, dagStatus.Nodes)
 			return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
 		}
-	} else if dagStatus.Status == core.Wait {
+	} else if dagStatus.Status == core.Waiting {
 		if dag.MailOn != nil && dag.MailOn.Wait && dag.WaitMail != nil {
 			fromAddress := dag.WaitMail.From
 			toAddresses := dag.WaitMail.To

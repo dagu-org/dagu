@@ -319,7 +319,7 @@ func TestDataRootRemoveOld(t *testing.T) {
 		}
 
 		createAttemptWithStatusType(completedRun, oldTime, core.Succeeded)
-		createAttemptWithStatusType(waitingRun, oldTime, core.Wait)
+		createAttemptWithStatusType(waitingRun, oldTime, core.Waiting)
 
 		// Verify dag-runs exist
 		assert.True(t, fileutil.FileExists(completedRun.baseDir), "Completed dag-run should exist before cleanup")

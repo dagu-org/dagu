@@ -2994,7 +2994,7 @@ func TestWaitStep(t *testing.T) {
 			successStep("3", "wait"),
 		)
 
-		result := plan.assertRun(t, core.Wait)
+		result := plan.assertRun(t, core.Waiting)
 
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		result.assertNodeStatus(t, "wait", core.NodeWaiting)
@@ -3013,7 +3013,7 @@ func TestWaitStep(t *testing.T) {
 			successStep("3", "2"),
 		)
 
-		result := plan.assertRun(t, core.Wait)
+		result := plan.assertRun(t, core.Waiting)
 
 		// Node 1 should succeed, wait should be waiting, 2 and 3 should not start
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
@@ -3034,7 +3034,7 @@ func TestWaitStep(t *testing.T) {
 			successStep("3", "wait"),
 		)
 
-		result := plan.assertRun(t, core.Wait)
+		result := plan.assertRun(t, core.Waiting)
 
 		// Normal branch completes, wait branch blocks
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
@@ -3054,7 +3054,7 @@ func TestWaitStep(t *testing.T) {
 			successStep("2", "1"),
 		)
 
-		result := plan.assertRun(t, core.Wait)
+		result := plan.assertRun(t, core.Waiting)
 
 		result.assertNodeStatus(t, "wait", core.NodeWaiting)
 		result.assertNodeStatus(t, "1", core.NodeNotStarted)
@@ -3079,7 +3079,7 @@ func TestWaitStep(t *testing.T) {
 			successStep("after", "wait-inputs"),
 		)
 
-		result := plan.assertRun(t, core.Wait)
+		result := plan.assertRun(t, core.Waiting)
 
 		result.assertNodeStatus(t, "wait-inputs", core.NodeWaiting)
 		result.assertNodeStatus(t, "after", core.NodeNotStarted)
@@ -3096,7 +3096,7 @@ func TestWaitStep(t *testing.T) {
 			successStep("final", "wait2"),
 		)
 
-		result := plan.assertRun(t, core.Wait)
+		result := plan.assertRun(t, core.Waiting)
 
 		// First wait should be waiting, others not started
 		result.assertNodeStatus(t, "wait1", core.NodeWaiting)

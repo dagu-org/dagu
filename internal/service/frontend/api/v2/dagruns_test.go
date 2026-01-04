@@ -150,7 +150,7 @@ func TestApproveDAGRunStep(t *testing.T) {
 
 		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
 		statusResp.Unmarshal(t, &dagRunStatus)
-		return dagRunStatus.DagRun.Status == api.Status(core.Wait)
+		return dagRunStatus.DagRun.Status == api.Status(core.Waiting)
 	}, 10*time.Second, 100*time.Millisecond)
 
 	// Approve the wait step
@@ -220,7 +220,7 @@ func TestApproveDAGRunStepWithInputs(t *testing.T) {
 
 		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
 		statusResp.Unmarshal(t, &dagRunStatus)
-		return dagRunStatus.DagRun.Status == api.Status(core.Wait)
+		return dagRunStatus.DagRun.Status == api.Status(core.Waiting)
 	}, 10*time.Second, 100*time.Millisecond)
 
 	// Approve with inputs
@@ -290,7 +290,7 @@ func TestApproveDAGRunStepMissingRequired(t *testing.T) {
 
 		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
 		statusResp.Unmarshal(t, &dagRunStatus)
-		return dagRunStatus.DagRun.Status == api.Status(core.Wait)
+		return dagRunStatus.DagRun.Status == api.Status(core.Waiting)
 	}, 10*time.Second, 100*time.Millisecond)
 
 	// Try to approve without required input - should fail

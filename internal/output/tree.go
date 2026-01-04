@@ -660,7 +660,7 @@ func nodeStatusToStatus(ns core.NodeStatus) core.Status {
 	case core.NodeSkipped:
 		return core.NotStarted
 	case core.NodeWaiting:
-		return core.Wait
+		return core.Waiting
 	}
 	return core.NotStarted
 }

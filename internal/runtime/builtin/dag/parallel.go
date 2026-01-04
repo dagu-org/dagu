@@ -168,7 +168,7 @@ func (e *parallelExecutor) Run(ctx context.Context) error {
 	e.lock.Lock()
 	failedCount := 0
 	for _, result := range e.results {
-		if !result.Status.IsSuccess() && result.Status != core.Wait {
+		if !result.Status.IsSuccess() && result.Status != core.Waiting {
 			failedCount++
 		}
 	}
@@ -217,7 +217,7 @@ func (e *parallelExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 			// continue checking other results
 		case core.PartiallySucceeded:
 			partialSuccess = true
-		case core.Wait:
+		case core.Waiting:
 			// Sub-DAG is waiting for human approval (HITL)
 			hasWaiting = true
 		default:

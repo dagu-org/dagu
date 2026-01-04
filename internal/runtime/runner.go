@@ -289,7 +289,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 	case core.Aborted:
 		eventHandlers = append(eventHandlers, core.HandlerOnCancel)
 
-	case core.Wait:
+	case core.Waiting:
 		// Execute onWait handler before terminating
 		r.handlerMu.RLock()
 		handlerNode := r.handlers[core.HandlerOnWait]
@@ -710,11 +710,11 @@ func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
 	if hasRunning {
 		return core.Running
 	}
-	if hasWaiting {
-		return core.Wait
-	}
 	if hasRejected {
 		return core.Rejected
+	}
+	if hasWaiting {
+		return core.Waiting
 	}
 	if hasNotStarted && !p.IsFinished() {
 		return core.Running
