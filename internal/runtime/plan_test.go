@@ -142,6 +142,43 @@ func TestRetryPlan(t *testing.T) {
 	require.Equal(t, core.NodeSkipped, nodes[7].State().Status)
 }
 
+func TestRetryPlanWithRejectedNode(t *testing.T) {
+	ctx := context.Background()
+	dag := &core.DAG{Steps: []core.Step{
+		{Name: "1"}, {Name: "2", Depends: []string{"1"}}, {Name: "3", Depends: []string{"2"}},
+	}}
+
+	// Create rejected node with metadata
+	rejectedNode := runtime.NodeWithData(runtime.NodeData{
+		Step: core.Step{Name: "2", Depends: []string{"1"}},
+		State: runtime.NodeState{
+			Status:          core.NodeRejected,
+			RejectedAt:      "2024-01-15T10:00:00Z",
+			RejectedBy:      "test-user",
+			RejectionReason: "test reason",
+		},
+	})
+
+	nodes := []*runtime.Node{
+		makeNode("1", core.NodeSucceeded),
+		rejectedNode,
+		makeNode("3", core.NodeAborted, "2"),
+	}
+	p, err := runtime.CreateRetryPlan(ctx, dag, nodes...)
+	require.NoError(t, err)
+	require.NotNil(t, p)
+
+	// Rejected node should be cleared and retried
+	require.Equal(t, core.NodeSucceeded, nodes[0].State().Status)
+	require.Equal(t, core.NodeNotStarted, nodes[1].State().Status)
+	require.Equal(t, core.NodeNotStarted, nodes[2].State().Status)
+
+	// Rejection metadata should be cleared
+	require.Empty(t, rejectedNode.State().RejectedAt)
+	require.Empty(t, rejectedNode.State().RejectedBy)
+	require.Empty(t, rejectedNode.State().RejectionReason)
+}
+
 func TestStepRetryPlan(t *testing.T) {
 	dag := &core.DAG{Steps: []core.Step{
 		{Name: "1"}, {Name: "2", Depends: []string{"1"}}, {Name: "3", Depends: []string{"2"}},

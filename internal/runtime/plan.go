@@ -217,7 +217,8 @@ func (p *Plan) setupRetry(ctx context.Context, steps map[string]core.Step) error
 		for _, u := range frontier {
 			shouldRetry := toRetry[u] ||
 				nodeStatus[u] == core.NodeFailed ||
-				nodeStatus[u] == core.NodeAborted
+				nodeStatus[u] == core.NodeAborted ||
+				nodeStatus[u] == core.NodeRejected
 
 			if shouldRetry {
 				node := p.nodeByID[u]
