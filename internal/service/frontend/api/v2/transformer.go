@@ -111,8 +111,8 @@ func toStep(obj core.Step) api.Step {
 	// Add executor config if present
 	if obj.ExecutorConfig.Type != "" || obj.ExecutorConfig.Config != nil {
 		step.ExecutorConfig = &struct {
-			Config *map[string]interface{} `json:"config,omitempty"`
-			Type   *string                 `json:"type,omitempty"`
+			Config *map[string]any `json:"config,omitempty"`
+			Type   *string         `json:"type,omitempty"`
 		}{
 			Type:   ptrOf(obj.ExecutorConfig.Type),
 			Config: ptrOf(obj.ExecutorConfig.Config),

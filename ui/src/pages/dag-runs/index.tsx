@@ -666,6 +666,14 @@ function DAGRuns() {
                     <StatusChip status={Status.PartialSuccess} size="sm">
                       partially_succeeded
                     </StatusChip>
+                  ) : status === String(Status.Waiting) ? (
+                    <StatusChip status={Status.Waiting} size="sm">
+                      waiting
+                    </StatusChip>
+                  ) : status === String(Status.Rejected) ? (
+                    <StatusChip status={Status.Rejected} size="sm">
+                      rejected
+                    </StatusChip>
                   ) : null}
                 </SelectValue>
               </SelectTrigger>
@@ -708,6 +716,16 @@ function DAGRuns() {
                 <SelectItem value={String(Status.PartialSuccess)}>
                   <StatusChip status={Status.PartialSuccess} size="sm">
                     partially_succeeded
+                  </StatusChip>
+                </SelectItem>
+                <SelectItem value={String(Status.Waiting)}>
+                  <StatusChip status={Status.Waiting} size="sm">
+                    waiting
+                  </StatusChip>
+                </SelectItem>
+                <SelectItem value={String(Status.Rejected)}>
+                  <StatusChip status={Status.Rejected} size="sm">
+                    rejected
                   </StatusChip>
                 </SelectItem>
               </SelectContent>

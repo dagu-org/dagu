@@ -319,11 +319,11 @@ func TestPlan_NodeStates(t *testing.T) {
 			p, err := runtime.CreateRetryPlan(context.Background(), dag, tt.nodes...)
 			require.NoError(t, err)
 
-			hasRunning, hasWaiting, hasNotStarted, hasRejected := p.NodeStates()
-			require.Equal(t, tt.wantHasRunning, hasRunning, "hasRunning")
-			require.Equal(t, tt.wantHasWaiting, hasWaiting, "hasWaiting")
-			require.Equal(t, tt.wantHasNotStarted, hasNotStarted, "hasNotStarted")
-			require.Equal(t, tt.wantHasRejected, hasRejected, "hasRejected")
+			states := p.NodeStates()
+			require.Equal(t, tt.wantHasRunning, states.HasRunning, "hasRunning")
+			require.Equal(t, tt.wantHasWaiting, states.HasWaiting, "hasWaiting")
+			require.Equal(t, tt.wantHasNotStarted, states.HasNotStarted, "hasNotStarted")
+			require.Equal(t, tt.wantHasRejected, states.HasRejected, "hasRejected")
 		})
 	}
 }

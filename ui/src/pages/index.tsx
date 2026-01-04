@@ -38,6 +38,8 @@ const initializeMetrics = (): Metrics => {
     Status.Queued,
     Status.NotStarted,
     Status.PartialSuccess,
+    Status.Waiting,
+    Status.Rejected,
   ];
   relevantStatuses.forEach((status: Status) => {
     initialMetrics[status] = 0;
@@ -422,6 +424,18 @@ function Dashboard(): React.ReactElement | null {
             <div className="flex items-baseline gap-1">
               <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">{metrics[Status.Queued]}</span>
               <span className="text-xs">queued</span>
+            </div>
+          )}
+          {metrics[Status.Waiting] > 0 && (
+            <div className="flex items-baseline gap-1">
+              <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">{metrics[Status.Waiting]}</span>
+              <span className="text-xs">waiting</span>
+            </div>
+          )}
+          {metrics[Status.Rejected] > 0 && (
+            <div className="flex items-baseline gap-1">
+              <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">{metrics[Status.Rejected]}</span>
+              <span className="text-xs">rejected</span>
             </div>
           )}
         </div>

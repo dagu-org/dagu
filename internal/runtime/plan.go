@@ -332,26 +332,35 @@ func (p *Plan) Finish() {
 	p.finishedAt = time.Now()
 }
 
+// PlanNodeStates holds the state flags for nodes in a plan.
+type PlanNodeStates struct {
+	HasRunning    bool
+	HasWaiting    bool
+	HasNotStarted bool
+	HasRejected   bool
+}
+
 // NodeStates returns whether any nodes are running, waiting, not started, or rejected.
 // Single pass, single lock for atomic read.
-func (p *Plan) NodeStates() (hasRunning, hasWaiting, hasNotStarted, hasRejected bool) {
+func (p *Plan) NodeStates() PlanNodeStates {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
+	var states PlanNodeStates
 	for _, node := range p.nodes {
 		switch node.State().Status {
 		case core.NodeRunning:
-			hasRunning = true
+			states.HasRunning = true
 		case core.NodeWaiting:
-			hasWaiting = true
+			states.HasWaiting = true
 		case core.NodeNotStarted:
-			hasNotStarted = true
+			states.HasNotStarted = true
 		case core.NodeRejected:
-			hasRejected = true
+			states.HasRejected = true
 		case core.NodeSucceeded, core.NodeFailed, core.NodeAborted, core.NodeSkipped, core.NodePartiallySucceeded:
 			// Terminal states
 		}
 	}
-	return
+	return states
 }
 
 // WaitingStepNames returns the names of steps that are waiting for approval.

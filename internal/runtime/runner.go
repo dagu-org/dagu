@@ -189,8 +189,8 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 		}
 
 		// Check for Wait condition: no running nodes, no ready nodes, and waiting for approval.
-		_, hasWaiting, _, _ := plan.NodeStates()
-		if running == 0 && len(readyCh) == 0 && hasWaiting {
+		nodeStates := plan.NodeStates()
+		if running == 0 && len(readyCh) == 0 && nodeStates.HasWaiting {
 			logger.Info(ctx, "DAG entering wait status - waiting for human approval")
 			break
 		}
@@ -288,6 +288,9 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 
 	case core.Aborted:
 		eventHandlers = append(eventHandlers, core.HandlerOnCancel)
+
+	case core.Rejected:
+		eventHandlers = append(eventHandlers, core.HandlerOnFailure)
 
 	case core.Waiting:
 		// Execute onWait handler before terminating
@@ -705,18 +708,18 @@ func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
 	// Note: IsFinished() is called separately, so there's a small window where
 	// the plan could be marked finished between these calls. This is acceptable
 	// for status reporting as it self-corrects on the next Status() call.
-	hasRunning, hasWaiting, hasNotStarted, hasRejected := p.NodeStates()
+	states := p.NodeStates()
 
-	if hasRunning {
+	if states.HasRunning {
 		return core.Running
 	}
-	if hasRejected {
+	if states.HasRejected {
 		return core.Rejected
 	}
-	if hasWaiting {
+	if states.HasWaiting {
 		return core.Waiting
 	}
-	if hasNotStarted && !p.IsFinished() {
+	if states.HasNotStarted && !p.IsFinished() {
 		return core.Running
 	}
 
@@ -975,7 +978,7 @@ func (r *Runner) isPartialSuccess(ctx context.Context, p *Plan) bool {
 			// Partial success at node level contributes to overall partial success
 			hasFailuresWithContinueOn = true
 			hasSuccessfulNodes = true
-		case core.NodeNotStarted, core.NodeRunning, core.NodeAborted, core.NodeSkipped, core.NodeWaiting:
+		case core.NodeNotStarted, core.NodeRunning, core.NodeAborted, core.NodeSkipped, core.NodeWaiting, core.NodeRejected:
 			// These statuses don't affect partial success determination, but are needed for linter
 		}
 	}
@@ -1097,6 +1100,8 @@ func (r *Runner) finishNode(node *Node, wg *sync.WaitGroup) {
 		r.metrics.completedNodes++ // Count partial success as completed
 	case core.NodeWaiting:
 		// Waiting nodes are counted when they complete after approval
+	case core.NodeRejected:
+		r.metrics.failedNodes++ // Rejected nodes are counted as failed
 	case core.NodeNotStarted, core.NodeRunning:
 		// Should not happen at this point
 	}

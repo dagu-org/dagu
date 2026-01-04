@@ -109,6 +109,10 @@ func (n *Node) ShouldContinue(ctx context.Context) bool {
 		// Partial success is treated like success for continue on
 		return true
 
+	case core.NodeRejected:
+		// Rejected nodes should not allow dependents to continue
+		return false
+
 	case core.NodeNotStarted, core.NodeRunning, core.NodeWaiting:
 		// Unexpected state
 		logger.Error(ctx, "Unexpected node status",

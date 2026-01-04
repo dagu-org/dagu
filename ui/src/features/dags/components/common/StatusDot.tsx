@@ -37,6 +37,9 @@ export function StatusDot({ status, statusLabel }: Props) {
       bgColor = 'bg-[#f59e0b]';
       animation = 'animate-pulse';
       break;
+    case Status.Rejected:
+      bgColor = 'bg-[#dc2626]';
+      break;
     default:
       bgColor = 'bg-[gray]';
   }

@@ -175,16 +175,6 @@ type oidcClaims struct {
 	Name              string `json:"name"`
 }
 
-// verifyIDToken verifies an ID token string using the provided verifier.
-// Returns nil if valid, error otherwise.
-func verifyIDToken(verifier *oidc.IDTokenVerifier, raw string) error {
-	if verifier == nil {
-		return errors.New("verifier is nil")
-	}
-	_, err := verifier.Verify(context.Background(), raw)
-	return err
-}
-
 // verifyAndExtractUser verifies an ID token and extracts user information.
 func verifyAndExtractUser(verifier *oidc.IDTokenVerifier, raw string) (*auth.User, error) {
 	if verifier == nil {
