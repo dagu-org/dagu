@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
@@ -142,7 +143,19 @@ func (e *Executor) createProvider(ctx context.Context) (llmpkg.Provider, error) 
 	cfg := e.step.LLM
 
 	// Evaluate API key from environment variable (supports ${VAR} substitution)
-	apiKey, err := runtime.EvalString(ctx, "${"+e.apiKeyEnvVar+"}")
+	// Handle different formats: VAR, $VAR, ${VAR}
+	apiKeyExpr := e.apiKeyEnvVar
+	if strings.HasPrefix(apiKeyExpr, "${") {
+		// Already in ${VAR} format, use as-is
+	} else if strings.HasPrefix(apiKeyExpr, "$") {
+		// Convert $VAR to ${VAR}
+		apiKeyExpr = "${" + strings.TrimPrefix(apiKeyExpr, "$") + "}"
+	} else {
+		// Plain variable name, wrap in ${...}
+		apiKeyExpr = "${" + apiKeyExpr + "}"
+	}
+
+	apiKey, err := runtime.EvalString(ctx, apiKeyExpr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to evaluate API key: %w", err)
 	}
