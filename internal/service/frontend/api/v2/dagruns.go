@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -557,20 +556,6 @@ func (a *API) ApproveDAGRunStep(ctx context.Context, request api.ApproveDAGRunSt
 		dagStatus.Nodes[stepIdx].ApprovalInputs = camelInputs
 	}
 
-	// Log approval with JSON-serialized inputs
-	var inputsJSON string
-	if dagStatus.Nodes[stepIdx].ApprovalInputs != nil {
-		if data, err := json.Marshal(dagStatus.Nodes[stepIdx].ApprovalInputs); err == nil {
-			inputsJSON = string(data)
-		}
-	}
-	logger.Info(ctx, "Step approved",
-		slog.String("dagRunId", request.DagRunId),
-		slog.String("step", request.StepName),
-		slog.String("approvedBy", approvedBy),
-		slog.String("inputs", inputsJSON),
-	)
-
 	// Save the updated status
 	if err := a.dagRunMgr.UpdateStatus(ctx, ref, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
@@ -699,21 +684,6 @@ func (a *API) ApproveSubDAGRunStep(ctx context.Context, request api.ApproveSubDA
 		}
 		dagStatus.Nodes[stepIdx].ApprovalInputs = camelInputs
 	}
-
-	// Log approval with JSON-serialized inputs
-	var inputsJSON string
-	if dagStatus.Nodes[stepIdx].ApprovalInputs != nil {
-		if data, err := json.Marshal(dagStatus.Nodes[stepIdx].ApprovalInputs); err == nil {
-			inputsJSON = string(data)
-		}
-	}
-	logger.Info(ctx, "Sub DAG step approved",
-		slog.String("dagRunId", request.DagRunId),
-		slog.String("subDagRunId", request.SubDAGRunId),
-		slog.String("step", request.StepName),
-		slog.String("approvedBy", approvedBy),
-		slog.String("inputs", inputsJSON),
-	)
 
 	// Save the updated status
 	if err := a.dagRunMgr.UpdateStatus(ctx, rootRef, *dagStatus); err != nil {
