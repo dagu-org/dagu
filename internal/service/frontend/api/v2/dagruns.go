@@ -12,6 +12,7 @@ import (
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
@@ -547,10 +548,16 @@ func (a *API) ApproveDAGRunStep(ctx context.Context, request api.ApproveDAGRunSt
 		dagStatus.Nodes[stepIdx].ApprovedBy = approvedBy
 	}
 
-	// Convert input keys to camelCase (same pattern as outputs)
+	// Store approval inputs in OutputVariables (original keys for env vars)
+	// and ApprovalInputs (camelCase for UI display)
 	if request.Body != nil && request.Body.Inputs != nil {
+		// Store in OutputVariables with original keys for env vars
+		if dagStatus.Nodes[stepIdx].OutputVariables == nil {
+			dagStatus.Nodes[stepIdx].OutputVariables = &collections.SyncMap{}
+		}
 		camelInputs := make(map[string]string, len(*request.Body.Inputs))
 		for k, v := range *request.Body.Inputs {
+			dagStatus.Nodes[stepIdx].OutputVariables.Store(k, k+"="+v)
 			camelInputs[stringutil.ScreamingSnakeToCamel(k)] = v
 		}
 		dagStatus.Nodes[stepIdx].ApprovalInputs = camelInputs
@@ -676,10 +683,16 @@ func (a *API) ApproveSubDAGRunStep(ctx context.Context, request api.ApproveSubDA
 		dagStatus.Nodes[stepIdx].ApprovedBy = approvedBy
 	}
 
-	// Convert input keys to camelCase (same pattern as outputs)
+	// Store approval inputs in OutputVariables (original keys for env vars)
+	// and ApprovalInputs (camelCase for UI display)
 	if request.Body != nil && request.Body.Inputs != nil {
+		// Store in OutputVariables with original keys for env vars
+		if dagStatus.Nodes[stepIdx].OutputVariables == nil {
+			dagStatus.Nodes[stepIdx].OutputVariables = &collections.SyncMap{}
+		}
 		camelInputs := make(map[string]string, len(*request.Body.Inputs))
 		for k, v := range *request.Body.Inputs {
+			dagStatus.Nodes[stepIdx].OutputVariables.Store(k, k+"="+v)
 			camelInputs[stringutil.ScreamingSnakeToCamel(k)] = v
 		}
 		dagStatus.Nodes[stepIdx].ApprovalInputs = camelInputs

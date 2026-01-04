@@ -581,19 +581,10 @@ func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) con
 		queue = append(queue, plan.Dependencies(predID)...)
 
 		// Load output variables from this predecessor node
+		// (includes approval inputs which are stored in OutputVariables)
 		predNode := plan.GetNode(predID)
 		if predNode != nil && predNode.inner.State.OutputVariables != nil {
 			env.LoadOutputVariables(predNode.inner.State.OutputVariables)
-		}
-
-		// Load approval inputs from approved wait steps
-		// These are available as environment variables in subsequent steps
-		if predNode != nil && predNode.inner.State.ApprovalInputs != nil {
-			approvalVars := &collections.SyncMap{}
-			for key, value := range predNode.inner.State.ApprovalInputs {
-				approvalVars.Store(key, key+"="+value)
-			}
-			env.LoadOutputVariables(approvalVars)
 		}
 	}
 
@@ -639,19 +630,10 @@ func (r *Runner) setupEnvironEventHandler(ctx context.Context, plan *Plan, node 
 		}
 	}
 
-	// get all output variables and approval inputs
+	// get all output variables (includes approval inputs which are stored in OutputVariables)
 	for _, node := range plan.Nodes() {
 		if node.inner.State.OutputVariables != nil {
 			env.LoadOutputVariables(node.inner.State.OutputVariables)
-		}
-
-		// Load approval inputs from approved wait steps
-		if node.inner.State.ApprovalInputs != nil {
-			approvalVars := &collections.SyncMap{}
-			for key, value := range node.inner.State.ApprovalInputs {
-				approvalVars.Store(key, key+"="+value)
-			}
-			env.LoadOutputVariables(approvalVars)
 		}
 	}
 
