@@ -13,6 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	llmpkg "github.com/dagu-org/dagu/internal/llm"
+
 	// Import all providers to register them
 	_ "github.com/dagu-org/dagu/internal/llm/allproviders"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -27,7 +28,8 @@ type Executor struct {
 	stdout          io.Writer
 	stderr          io.Writer
 	step            core.Step
-	provider        llmpkg.Provider
+	providerType    llmpkg.ProviderType
+	apiKeyEnvVar    string
 	messages        []execution.LLMMessage
 	contextMessages []execution.LLMMessage
 	savedMessages   []execution.LLMMessage
@@ -53,28 +55,6 @@ func newChatExecutor(_ context.Context, step core.Step) (executor.Executor, erro
 		apiKeyEnvVar = llmpkg.DefaultAPIKeyEnvVar(providerType)
 	}
 
-	// Build provider config
-	providerCfg := llmpkg.Config{
-		APIKey:          os.Getenv(apiKeyEnvVar),
-		BaseURL:         cfg.BaseURL,
-		Timeout:         5 * time.Minute,
-		MaxRetries:      3,
-		InitialInterval: 1 * time.Second,
-		MaxInterval:     30 * time.Second,
-		Multiplier:      2.0,
-	}
-
-	// Use default base URL if not specified
-	if providerCfg.BaseURL == "" {
-		providerCfg.BaseURL = llmpkg.DefaultBaseURL(providerType)
-	}
-
-	// Create provider
-	provider, err := llmpkg.NewProvider(providerType, providerCfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create LLM provider: %w", err)
-	}
-
 	// Convert messages from core.LLMMessage to execution.LLMMessage
 	// Messages are now at step level, not inside LLM config
 	messages := make([]execution.LLMMessage, 0, len(step.Messages)+1)
@@ -96,11 +76,12 @@ func newChatExecutor(_ context.Context, step core.Step) (executor.Executor, erro
 	}
 
 	return &Executor{
-		stdout:   os.Stdout,
-		stderr:   os.Stderr,
-		step:     step,
-		provider: provider,
-		messages: messages,
+		stdout:       os.Stdout,
+		stderr:       os.Stderr,
+		step:         step,
+		providerType: providerType,
+		apiKeyEnvVar: apiKeyEnvVar,
+		messages:     messages,
 	}, nil
 }
 
@@ -155,6 +136,51 @@ func toThinkingRequest(cfg *core.ThinkingConfig) *llmpkg.ThinkingRequest {
 	}
 }
 
+// createProvider creates the LLM provider with evaluated config values.
+// This is called at runtime to support variable substitution in config fields.
+func (e *Executor) createProvider(ctx context.Context) (llmpkg.Provider, error) {
+	cfg := e.step.LLM
+
+	// Evaluate API key from environment variable (supports ${VAR} substitution)
+	apiKey, err := runtime.EvalString(ctx, "${"+e.apiKeyEnvVar+"}")
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate API key: %w", err)
+	}
+
+	// Evaluate base URL if specified
+	baseURL := cfg.BaseURL
+	if baseURL != "" {
+		baseURL, err = runtime.EvalString(ctx, baseURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate baseURL: %w", err)
+		}
+	}
+
+	// Use default base URL if not specified
+	if baseURL == "" {
+		baseURL = llmpkg.DefaultBaseURL(e.providerType)
+	}
+
+	// Build provider config
+	providerCfg := llmpkg.Config{
+		APIKey:          apiKey,
+		BaseURL:         baseURL,
+		Timeout:         5 * time.Minute,
+		MaxRetries:      3,
+		InitialInterval: 1 * time.Second,
+		MaxInterval:     30 * time.Second,
+		Multiplier:      2.0,
+	}
+
+	// Create provider
+	provider, err := llmpkg.NewProvider(e.providerType, providerCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create LLM provider: %w", err)
+	}
+
+	return provider, nil
+}
+
 // evalMessages evaluates variable substitution in message content.
 func evalMessages(ctx context.Context, msgs []execution.LLMMessage) ([]execution.LLMMessage, error) {
 	result := make([]execution.LLMMessage, len(msgs))
@@ -174,6 +200,12 @@ func evalMessages(ctx context.Context, msgs []execution.LLMMessage) ([]execution
 // Run executes the chat request.
 func (e *Executor) Run(ctx context.Context) error {
 	cfg := e.step.LLM
+
+	// Create provider with evaluated config (supports variable substitution)
+	provider, err := e.createProvider(ctx)
+	if err != nil {
+		return err
+	}
 
 	// Evaluate variable substitution in this step's messages
 	evaluatedMessages, err := evalMessages(ctx, e.messages)
@@ -204,7 +236,7 @@ func (e *Executor) Run(ctx context.Context) error {
 
 	// Execute request (streaming or non-streaming)
 	if cfg.StreamEnabled() {
-		events, err := e.provider.ChatStream(ctx, req)
+		events, err := provider.ChatStream(ctx, req)
 		if err != nil {
 			return fmt.Errorf("chat stream request failed: %w", err)
 		}
@@ -230,7 +262,7 @@ func (e *Executor) Run(ctx context.Context) error {
 			logger.Error(ctx, "failed to write newline", tag.Error(err))
 		}
 	} else {
-		resp, err := e.provider.Chat(ctx, req)
+		resp, err := provider.Chat(ctx, req)
 		if err != nil {
 			return fmt.Errorf("chat request failed: %w", err)
 		}
