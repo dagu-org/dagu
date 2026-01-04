@@ -145,9 +145,9 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 	if req.Thinking != nil && req.Thinking.Enabled {
 		effort := req.Thinking.Effort
 		if effort == "" {
-			effort = "medium" // Default effort
+			effort = llm.ThinkingEffortMedium
 		}
-		chatReq.Reasoning = &reasoningRequest{Effort: effort}
+		chatReq.Reasoning = &reasoningRequest{Effort: string(effort)}
 
 		// For reasoning models, use max_completion_tokens instead of max_tokens
 		if req.MaxTokens != nil {

@@ -18,6 +18,21 @@ const (
 	RoleTool Role = "tool"
 )
 
+// ThinkingEffort represents the reasoning depth level for thinking mode.
+type ThinkingEffort string
+
+const (
+	// ThinkingEffortLow provides quick reasoning with minimal token budget.
+	ThinkingEffortLow ThinkingEffort = "low"
+	// ThinkingEffortMedium provides balanced reasoning (default).
+	ThinkingEffortMedium ThinkingEffort = "medium"
+	// ThinkingEffortHigh provides thorough analysis with larger token budget.
+	ThinkingEffortHigh ThinkingEffort = "high"
+	// ThinkingEffortXHigh provides maximum reasoning depth.
+	// Note: Not all providers support this level.
+	ThinkingEffortXHigh ThinkingEffort = "xhigh"
+)
+
 // ParseRole converts a string to a Role, with support for common aliases.
 func ParseRole(s string) Role {
 	switch s {
@@ -100,7 +115,7 @@ type ThinkingRequest struct {
 	// Enabled activates thinking mode.
 	Enabled bool
 	// Effort controls reasoning depth: low, medium, high, xhigh.
-	Effort string
+	Effort ThinkingEffort
 	// BudgetTokens sets explicit token budget (provider-specific).
 	BudgetTokens *int
 	// IncludeInOutput includes thinking blocks in the response content.

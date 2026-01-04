@@ -91,7 +91,11 @@ func TestGetDAGRunSpecInline(t *testing.T) {
 
 		var dagRunStatus api.GetDAGRunDetails200JSONResponse
 		statusResp.Unmarshal(t, &dagRunStatus)
-		return dagRunStatus.DagRunDetails.Status == api.Status(core.Succeeded)
+		if dagRunStatus.DagRunDetails.Status == api.Status(core.Succeeded) {
+			return true
+		}
+		t.Log(fmt.Sprintf("DAG run status: %s", dagRunStatus.DagRunDetails.StatusLabel))
+		return false
 	}, 10*time.Second, 200*time.Millisecond)
 
 	// Fetch the spec for the inline DAG run (should use YamlData from dag.json)

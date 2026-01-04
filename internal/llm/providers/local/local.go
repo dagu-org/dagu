@@ -142,16 +142,11 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 		chatReq.Stop = req.Stop
 	}
 
-	// Pass through reasoning configuration for compatible local models.
-	// Local models that support OpenAI-compatible reasoning (e.g., DeepSeek-R1)
-	// will use this; others will ignore the parameter.
-	if req.Thinking != nil && req.Thinking.Enabled {
-		effort := req.Thinking.Effort
-		if effort == "" {
-			effort = "medium" // Default effort
-		}
-		chatReq.Reasoning = &reasoningRequest{Effort: effort}
-	}
+	// Note: Reasoning/thinking support for local models is highly model-dependent.
+	// Most local models ignore unrecognized fields, so we omit reasoning config
+	// rather than sending potentially incompatible parameters.
+	// Users needing reasoning with specific models (DeepSeek-R1, etc.) should
+	// configure model-specific parameters through the model's native interface.
 
 	return json.Marshal(chatReq)
 }
@@ -291,20 +286,13 @@ type message struct {
 }
 
 type chatCompletionRequest struct {
-	Model       string            `json:"model"`
-	Messages    []message         `json:"messages"`
-	Temperature *float64          `json:"temperature,omitempty"`
-	MaxTokens   *int              `json:"max_tokens,omitempty"`
-	TopP        *float64          `json:"top_p,omitempty"`
-	Stop        []string          `json:"stop,omitempty"`
-	Stream      bool              `json:"stream,omitempty"`
-	Reasoning   *reasoningRequest `json:"reasoning,omitempty"`
-}
-
-// reasoningRequest represents OpenAI-compatible reasoning configuration.
-// Passed through for local models that support it (e.g., DeepSeek-R1, QwQ).
-type reasoningRequest struct {
-	Effort string `json:"effort,omitempty"`
+	Model       string   `json:"model"`
+	Messages    []message `json:"messages"`
+	Temperature *float64 `json:"temperature,omitempty"`
+	MaxTokens   *int     `json:"max_tokens,omitempty"`
+	TopP        *float64 `json:"top_p,omitempty"`
+	Stop        []string `json:"stop,omitempty"`
+	Stream      bool     `json:"stream,omitempty"`
 }
 
 type chatCompletionResponse struct {

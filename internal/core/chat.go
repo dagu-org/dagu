@@ -8,12 +8,15 @@ const (
 	LLMRoleTool      = "tool"
 )
 
+// ThinkingEffort represents the reasoning depth level for thinking mode.
+type ThinkingEffort string
+
 // ThinkingEffort constants for reasoning/thinking depth.
 const (
-	ThinkingEffortLow    = "low"
-	ThinkingEffortMedium = "medium"
-	ThinkingEffortHigh   = "high"
-	ThinkingEffortXHigh  = "xhigh"
+	ThinkingEffortLow    ThinkingEffort = "low"
+	ThinkingEffortMedium ThinkingEffort = "medium"
+	ThinkingEffortHigh   ThinkingEffort = "high"
+	ThinkingEffortXHigh  ThinkingEffort = "xhigh"
 )
 
 // ThinkingConfig contains configuration for extended thinking/reasoning.

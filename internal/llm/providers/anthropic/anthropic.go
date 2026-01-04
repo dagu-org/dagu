@@ -21,6 +21,13 @@ const (
 	defaultMessagesPath = "/v1/messages"
 	anthropicAPIVersion = "2023-06-01"
 	streamPrefix        = "data: "
+
+	// Thinking budget token limits for different effort levels.
+	// Note: Anthropic recommends budgets <= 32K to avoid timeout issues.
+	thinkingBudgetLow    = 1024
+	thinkingBudgetMedium = 4096
+	thinkingBudgetHigh   = 16384
+	thinkingBudgetXHigh  = 32768
 )
 
 func init() {
@@ -194,17 +201,16 @@ func (p *Provider) getThinkingBudget(thinking *llm.ThinkingRequest) int {
 
 	// Map effort level to budget tokens
 	switch thinking.Effort {
-	case "low":
-		return 1024
-	case "medium":
-		return 4096
-	case "high":
-		return 16384
-	case "xhigh":
-		return 65536
+	case llm.ThinkingEffortLow:
+		return thinkingBudgetLow
+	case llm.ThinkingEffortMedium:
+		return thinkingBudgetMedium
+	case llm.ThinkingEffortHigh:
+		return thinkingBudgetHigh
+	case llm.ThinkingEffortXHigh:
+		return thinkingBudgetXHigh
 	default:
-		// Default to medium effort
-		return 4096
+		return thinkingBudgetMedium
 	}
 }
 

@@ -206,13 +206,13 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest) ([]byte, error) {
 }
 
 // mapEffortToThinkingLevel maps unified effort levels to Gemini thinkingLevel.
-func (p *Provider) mapEffortToThinkingLevel(effort string) string {
+func (p *Provider) mapEffortToThinkingLevel(effort llm.ThinkingEffort) string {
 	switch effort {
-	case "low":
+	case llm.ThinkingEffortLow:
 		return "low"
-	case "medium":
+	case llm.ThinkingEffortMedium:
 		return "medium"
-	case "high", "xhigh":
+	case llm.ThinkingEffortHigh, llm.ThinkingEffortXHigh:
 		return "high"
 	default:
 		return "medium"
@@ -369,7 +369,8 @@ type generationConfig struct {
 	MaxOutputTokens *int     `json:"maxOutputTokens,omitempty"`
 	TopP            *float64 `json:"topP,omitempty"`
 	StopSequences   []string `json:"stopSequences,omitempty"`
-	// ThinkingLevel for Gemini 3 models: minimal, low, medium, high
+	// ThinkingLevel for Gemini 3 models: low, medium, high
+	// Maps from effort: low→low, medium→medium, high/xhigh→high
 	ThinkingLevel string `json:"thinkingLevel,omitempty"`
 	// ThinkingBudget for Gemini 2.5 models: 128-32768, 0=disable, -1=dynamic
 	ThinkingBudget *int `json:"thinkingBudget,omitempty"`

@@ -131,7 +131,7 @@ func toThinkingRequest(cfg *core.ThinkingConfig) *llmpkg.ThinkingRequest {
 	}
 	return &llmpkg.ThinkingRequest{
 		Enabled:         cfg.Enabled,
-		Effort:          cfg.Effort,
+		Effort:          llmpkg.ThinkingEffort(cfg.Effort),
 		BudgetTokens:    cfg.BudgetTokens,
 		IncludeInOutput: cfg.IncludeInOutput,
 	}
