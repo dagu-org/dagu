@@ -10,6 +10,7 @@ import (
 	"time"
 
 	oidc "github.com/coreos/go-oidc"
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
@@ -166,6 +167,14 @@ func callbackHandler(provider *oidc.Provider, verifier *oidc.IDTokenVerifier,
 	}
 }
 
+// oidcClaims represents the claims extracted from an OIDC ID token.
+type oidcClaims struct {
+	Subject           string `json:"sub"`
+	Email             string `json:"email"`
+	PreferredUsername string `json:"preferred_username"`
+	Name              string `json:"name"`
+}
+
 // verifyIDToken verifies an ID token string using the provided verifier.
 // Returns nil if valid, error otherwise.
 func verifyIDToken(verifier *oidc.IDTokenVerifier, raw string) error {
@@ -176,13 +185,46 @@ func verifyIDToken(verifier *oidc.IDTokenVerifier, raw string) error {
 	return err
 }
 
+// verifyAndExtractUser verifies an ID token and extracts user information.
+func verifyAndExtractUser(verifier *oidc.IDTokenVerifier, raw string) (*auth.User, error) {
+	if verifier == nil {
+		return nil, errors.New("verifier is nil")
+	}
+	token, err := verifier.Verify(context.Background(), raw)
+	if err != nil {
+		return nil, err
+	}
+
+	var claims oidcClaims
+	if err := token.Claims(&claims); err != nil {
+		return nil, err
+	}
+
+	// Determine username: prefer preferred_username, then email, then subject
+	username := claims.PreferredUsername
+	if username == "" {
+		username = claims.Email
+	}
+	if username == "" {
+		username = claims.Subject
+	}
+
+	return &auth.User{
+		ID:       claims.Subject,
+		Username: username,
+		Role:     auth.RoleAdmin, // OIDC users get admin by default
+	}, nil
+}
+
 func checkOIDCAuth(next http.Handler, provider *oidc.Provider, verifier *oidc.IDTokenVerifier,
 	config *oauth2.Config, whitelist []string, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	// Fast-path: already authenticated and not hitting the callback endpoint.
 	if authorized, err := r.Cookie(cookieOIDCToken); err == nil && authorized.Value != "" && !strings.HasSuffix(config.RedirectURL, r.URL.Path) {
-		if err := verifyIDToken(verifier, authorized.Value); err == nil {
-			next.ServeHTTP(w, r)
+		if user, err := verifyAndExtractUser(verifier, authorized.Value); err == nil {
+			// Add user to context
+			ctx = auth.WithUser(ctx, user)
+			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
 		logger.Warn(ctx, "OIDC cookie rejected: token verification failed during UI access",
@@ -221,7 +263,8 @@ func checkOIDCToken(next http.Handler, verifier *oidc.IDTokenVerifier, w http.Re
 		http.Error(w, "Authentication required: OIDC token is empty", http.StatusUnauthorized)
 		return
 	}
-	if err := verifyIDToken(verifier, authorized.Value); err != nil {
+	user, err := verifyAndExtractUser(verifier, authorized.Value)
+	if err != nil {
 		logger.Warn(ctx, "OIDC authentication failed: token verification failed",
 			tag.Path(r.URL.Path),
 			slog.String("method", r.Method),
@@ -230,7 +273,9 @@ func checkOIDCToken(next http.Handler, verifier *oidc.IDTokenVerifier, w http.Re
 		http.Error(w, "Authentication failed: invalid or expired OIDC token", http.StatusUnauthorized)
 		return
 	}
-	next.ServeHTTP(w, r)
+	// Add user to context
+	ctx = auth.WithUser(ctx, user)
+	next.ServeHTTP(w, r.WithContext(ctx))
 }
 
 func setCookie(w http.ResponseWriter, r *http.Request, name, value string, expire int) {
