@@ -10,8 +10,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
+	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
@@ -171,14 +171,6 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 func (p *Provider) doRequest(ctx context.Context, body []byte, streaming bool) (io.ReadCloser, error) {
 	url := p.config.BaseURL + defaultChatEndpoint
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
-	if err != nil {
-		return nil, llm.WrapError(providerName, fmt.Errorf("failed to create request: %w", err))
-	}
-
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+p.config.APIKey)
-
 	// Use appropriate client based on request type
 	// Streaming uses client without timeout to avoid premature termination
 	client := p.httpClient
@@ -186,33 +178,32 @@ func (p *Provider) doRequest(ctx context.Context, body []byte, streaming bool) (
 		client = p.streamHttpClient
 	}
 
-	var resp *http.Response
-	var lastErr error
+	var respBody io.ReadCloser
 
-	// Retry loop with backoff
-	interval := p.config.InitialInterval
-	for attempt := 0; attempt <= p.config.MaxRetries; attempt++ {
-		if attempt > 0 {
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case <-time.After(interval):
-			}
-			interval = time.Duration(float64(interval) * p.config.Multiplier)
-			if interval > p.config.MaxInterval {
-				interval = p.config.MaxInterval
-			}
-			// Recreate request body reader
-			httpReq.Body = io.NopCloser(bytes.NewReader(body))
+	policy := &backoff.ExponentialBackoffPolicy{
+		InitialInterval: p.config.InitialInterval,
+		BackoffFactor:   p.config.Multiplier,
+		MaxInterval:     p.config.MaxInterval,
+		MaxRetries:      p.config.MaxRetries,
+	}
+
+	err := backoff.Retry(ctx, func(ctx context.Context) error {
+		httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+		if err != nil {
+			return backoff.PermanentError(llm.WrapError(providerName, fmt.Errorf("failed to create request: %w", err)))
 		}
 
-		resp, lastErr = client.Do(httpReq)
-		if lastErr != nil {
-			continue
+		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set("Authorization", "Bearer "+p.config.APIKey)
+
+		resp, err := client.Do(httpReq)
+		if err != nil {
+			return err // Retriable
 		}
 
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			return resp.Body, nil
+			respBody = resp.Body
+			return nil
 		}
 
 		// Read error response
@@ -221,15 +212,15 @@ func (p *Provider) doRequest(ctx context.Context, body []byte, streaming bool) (
 
 		apiErr := p.parseErrorResponse(resp.StatusCode, errBody)
 		if !apiErr.Retryable {
-			return nil, apiErr
+			return backoff.PermanentError(apiErr)
 		}
-		lastErr = apiErr
-	}
+		return apiErr
+	}, policy, nil)
 
-	if lastErr != nil {
-		return nil, lastErr
+	if err != nil {
+		return nil, err
 	}
-	return nil, llm.WrapError(providerName, fmt.Errorf("request failed after %d retries", p.config.MaxRetries))
+	return respBody, nil
 }
 
 func (p *Provider) parseErrorResponse(statusCode int, body []byte) *llm.APIError {
