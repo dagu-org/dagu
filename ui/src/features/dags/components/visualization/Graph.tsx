@@ -270,6 +270,9 @@ const Graph: React.FC<Props> = ({
     dat.push(
       `classDef waiting color:${nodeColor},fill:${nodeFill},stroke:#f59e0b,stroke-width:1.2px`
     );
+    dat.push(
+      `classDef rejected color:${nodeColor},fill:${nodeFill},stroke:#dc2626,stroke-width:1.2px`
+    );
 
     // Add custom link styles
     dat.push(...linkStyles);
@@ -478,4 +481,5 @@ const graphStatusMap: Record<NodeStatus, string> = {
   [NodeStatus.Skipped]: ':::skipped',
   [NodeStatus.PartialSuccess]: ':::partial',
   [NodeStatus.Waiting]: ':::waiting',
+  [NodeStatus.Rejected]: ':::rejected',
 };

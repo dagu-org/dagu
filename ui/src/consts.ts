@@ -17,6 +17,7 @@ export const statusColorMapping: statusColorMapping = {
   [Status.Aborted]: { backgroundColor: '#d97706', color: 'white' }, // amber-600
   [Status.Success]: { backgroundColor: '#16a34a', color: 'white' }, // green-600
   [Status.PartialSuccess]: { backgroundColor: '#ca8a04', color: 'white' }, // yellow-600
+  [Status.Rejected]: { backgroundColor: '#b91c1c', color: 'white' }, // red-700
 };
 
 export const nodeStatusColorMapping = {
@@ -27,4 +28,5 @@ export const nodeStatusColorMapping = {
   [NodeStatus.Success]: statusColorMapping[Status.Success],
   [NodeStatus.Skipped]: { backgroundColor: '#9ca3af', color: 'white' }, // gray-400
   [NodeStatus.PartialSuccess]: statusColorMapping[Status.PartialSuccess],
+  [NodeStatus.Rejected]: statusColorMapping[Status.Rejected],
 };

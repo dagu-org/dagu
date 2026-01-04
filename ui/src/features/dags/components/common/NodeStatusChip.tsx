@@ -84,6 +84,12 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
       pulseAnimation = 'animate-pulse';
       statusIcon = '□'; // Empty square
       break;
+    case NodeStatus.Rejected: // rejected -> red
+      bgColorClass = 'bg-[rgba(220,38,38,0.1)]';
+      borderColorClass = 'border-[#dc2626]';
+      textColorClass = 'text-[#dc2626]';
+      statusIcon = '⊘'; // Prohibited sign
+      break;
     default: // Fallback to gray
       bgColorClass =
         'bg-[rgba(128,128,128,0.1)],169,169,0.2)]';

@@ -25,6 +25,7 @@ import {
 } from '@/ui/CustomDialog';
 import {
   AlertCircle,
+  Ban,
   Check,
   ChevronDown,
   ChevronRight,
@@ -45,6 +46,7 @@ import {
 import StyledTableRow from '../../../../ui/StyledTableRow';
 import { NodeStatusChip } from '../common';
 import { ApprovalModal } from '../dag-execution/ApprovalModal';
+import { RejectionModal } from '../dag-execution/RejectionModal';
 import StatusUpdateModal from '../dag-execution/StatusUpdateModal';
 import { SubDAGRunsList } from './SubDAGRunsList';
 
@@ -259,6 +261,8 @@ function NodeStatusTableRow({
   const [showStatusModal, setShowStatusModal] = useState(false);
   // State for approval modal
   const [showApprovalModal, setShowApprovalModal] = useState(false);
+  // State for rejection modal
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
   // Check if this is a sub dagRun node
   // Include both regular and repeated sub runs
   const allSubRuns = [...(node.subRuns || []), ...(node.subRunsRepeated || [])];
@@ -501,6 +505,44 @@ function NodeStatusTableRow({
     }
   };
 
+  // Handle rejection for wait steps
+  const handleReject = async (reason: string) => {
+    // Check if this is a sub DAG-run
+    const isSubDAGRun =
+      dagRun.rootDAGRunId &&
+      dagRun.rootDAGRunName &&
+      dagRun.rootDAGRunId !== dagRun.dagRunId;
+
+    // Define path parameters
+    const pathParams = {
+      name: isSubDAGRun ? dagRun.rootDAGRunName : dagName,
+      dagRunId: isSubDAGRun ? dagRun.rootDAGRunId : dagRunId || '',
+      stepName: node.step.name,
+      ...(isSubDAGRun ? { subDAGRunId: dagRun.dagRunId } : {}),
+    };
+
+    // Use the appropriate endpoint
+    const endpoint = isSubDAGRun
+      ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/reject'
+      : '/dag-runs/{name}/{dagRunId}/steps/{stepName}/reject';
+
+    const { error } = await client.POST(endpoint, {
+      params: {
+        path: pathParams,
+        query: {
+          remoteNode,
+        },
+      },
+      body: {
+        reason: reason || undefined,
+      },
+    });
+
+    if (error) {
+      throw new Error(error.message || 'Failed to reject step');
+    }
+  };
+
   // Determine if logs are available
   const hasStdout = !!node.stdout;
   const hasStderr = !!node.stderr;
@@ -701,6 +743,24 @@ function NodeStatusTableRow({
                   </span>
                 </div>
               )}
+              {/* Rejection info for rejected HITL steps */}
+              {node.rejectedBy && (
+                <div className="text-xs text-muted-foreground leading-tight">
+                  <span className="font-medium">Rejected by:</span>{' '}
+                  <span className="text-error">{node.rejectedBy}</span>
+                  {node.rejectedAt && (
+                    <span className="ml-1">
+                      at {formatTimestamp(node.rejectedAt)}
+                    </span>
+                  )}
+                </div>
+              )}
+              {node.rejectionReason && (
+                <div className="text-xs text-muted-foreground leading-tight">
+                  <span className="font-medium">Reason:</span>{' '}
+                  <span className="text-foreground/80">{node.rejectionReason}</span>
+                </div>
+              )}
             </div>
           </TableCell>
 
@@ -801,17 +861,30 @@ function NodeStatusTableRow({
               <div className="flex items-center justify-center gap-1">
                 {/* Approve button for waiting steps */}
                 {node.status === NodeStatus.Waiting && (
-                  <Button
-                    size="icon-sm"
-                    className="btn-3d-secondary bg-warning/10 hover:bg-warning/20"
-                    title="Approve this step"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowApprovalModal(true);
-                    }}
-                  >
-                    <Check className="h-4 w-4 text-warning" />
-                  </Button>
+                  <>
+                    <Button
+                      size="icon-sm"
+                      className="btn-3d-secondary bg-warning/10 hover:bg-warning/20"
+                      title="Approve this step"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowApprovalModal(true);
+                      }}
+                    >
+                      <Check className="h-4 w-4 text-warning" />
+                    </Button>
+                    <Button
+                      size="icon-sm"
+                      className="btn-3d-secondary bg-error/10 hover:bg-error/20"
+                      title="Reject this step"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowRejectionModal(true);
+                      }}
+                    >
+                      <Ban className="h-4 w-4 text-error" />
+                    </Button>
+                  </>
                 )}
                 {/* Retry button */}
                 <Button
@@ -958,6 +1031,14 @@ function NodeStatusTableRow({
           dismissModal={() => setShowApprovalModal(false)}
           step={node.step}
           onApprove={handleApprove}
+        />
+
+        {/* Rejection Modal for wait steps */}
+        <RejectionModal
+          visible={showRejectionModal}
+          dismissModal={() => setShowRejectionModal(false)}
+          step={node.step}
+          onReject={handleReject}
         />
       </>
     );
@@ -1112,6 +1193,24 @@ function NodeStatusTableRow({
               </span>
             </div>
           )}
+          {/* Rejection info for rejected HITL steps */}
+          {node.rejectedBy && (
+            <div className="text-xs text-muted-foreground">
+              <span className="font-medium">Rejected by:</span>{' '}
+              <span className="text-error">{node.rejectedBy}</span>
+              {node.rejectedAt && (
+                <span className="ml-1">
+                  at {formatTimestamp(node.rejectedAt)}
+                </span>
+              )}
+            </div>
+          )}
+          {node.rejectionReason && (
+            <div className="text-xs text-muted-foreground">
+              <span className="font-medium">Reason:</span>{' '}
+              <span className="text-foreground/80">{node.rejectionReason}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1195,15 +1294,24 @@ function NodeStatusTableRow({
 
       {dagRunId && (
         <div className="flex justify-end mt-4 gap-2">
-          {/* Approve button for waiting steps */}
+          {/* Approve and Reject buttons for waiting steps */}
           {node.status === NodeStatus.Waiting && (
-            <button
-              className="p-2 rounded-full hover:bg-warning/20 bg-warning/10"
-              title="Approve this step"
-              onClick={() => setShowApprovalModal(true)}
-            >
-              <Check className="h-6 w-6 text-warning" />
-            </button>
+            <>
+              <button
+                className="p-2 rounded-full hover:bg-warning/20 bg-warning/10"
+                title="Approve this step"
+                onClick={() => setShowApprovalModal(true)}
+              >
+                <Check className="h-6 w-6 text-warning" />
+              </button>
+              <button
+                className="p-2 rounded-full hover:bg-error/20 bg-error/10"
+                title="Reject this step"
+                onClick={() => setShowRejectionModal(true)}
+              >
+                <Ban className="h-6 w-6 text-error" />
+              </button>
+            </>
           )}
           {/* Retry button */}
           <button
@@ -1254,6 +1362,14 @@ function NodeStatusTableRow({
             dismissModal={() => setShowApprovalModal(false)}
             step={node.step}
             onApprove={handleApprove}
+          />
+
+          {/* Rejection Modal for wait steps */}
+          <RejectionModal
+            visible={showRejectionModal}
+            dismissModal={() => setShowRejectionModal(false)}
+            step={node.step}
+            onReject={handleReject}
           />
         </div>
       )}

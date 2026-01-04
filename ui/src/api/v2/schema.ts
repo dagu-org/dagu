@@ -816,6 +816,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dag-runs/{name}/{dagRunId}/steps/{stepName}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject a waiting step for HITL
+         * @description Rejects a step that is in Waiting status, optionally providing a reason for rejection
+         */
+        post: operations["rejectDAGRunStep"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}": {
         parameters: {
             query?: never;
@@ -910,6 +930,26 @@ export interface paths {
          * @description Approves a step that is in Waiting status within a sub DAG-run, optionally providing input parameters that will be available as environment variables in subsequent steps
          */
         post: operations["approveSubDAGRunStep"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject a waiting step in a sub DAG-run for HITL
+         * @description Rejects a step that is in Waiting status within a sub DAG-run, optionally providing a reason for rejection
+         */
+        post: operations["rejectSubDAGRunStep"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1155,6 +1195,18 @@ export interface components {
             /** @description Whether the DAG run was re-enqueued for execution */
             resumed: boolean;
         };
+        /** @description Request body for rejecting a waiting step */
+        RejectStepRequest: {
+            /** @description Optional reason for rejecting the step */
+            reason?: string;
+        };
+        /** @description Response after rejecting a waiting step */
+        RejectStepResponse: {
+            /** @description The DAG run ID */
+            dagRunId: string;
+            /** @description The rejected step name */
+            stepName: string;
+        };
         /** @description Generic error response object */
         Error: {
             code: components["schemas"]["ErrorCode"];
@@ -1328,6 +1380,7 @@ export interface components {
          *     5: "Queued"
          *     6: "Partial Success"
          *     7: "Waiting for approval"
+         *     8: "Rejected"
          *
          * @enum {integer}
          */
@@ -1347,6 +1400,7 @@ export interface components {
          *     5: "Skipped"
          *     6: "Partial Success"
          *     7: "Waiting for approval"
+         *     8: "Rejected"
          *
          * @enum {integer}
          */
@@ -1562,6 +1616,12 @@ export interface components {
             approvalInputs?: {
                 [key: string]: string;
             };
+            /** @description RFC3339 timestamp when the HITL step was rejected */
+            rejectedAt?: string;
+            /** @description Username of who rejected the HITL step */
+            rejectedBy?: string;
+            /** @description Optional reason for rejection */
+            rejectionReason?: string;
         };
         /** @description Metadata for a sub DAG-run */
         SubDAGRun: {
@@ -4490,6 +4550,67 @@ export interface operations {
             };
         };
     };
+    rejectDAGRunStep: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+                /** @description name of the step */
+                stepName: components["parameters"]["StepName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RejectStepRequest"];
+            };
+        };
+        responses: {
+            /** @description Step rejected successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RejectStepResponse"];
+                };
+            };
+            /** @description Step is not in Waiting status */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description DAG-run or step not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getSubDAGRunDetails: {
         parameters: {
             query?: {
@@ -4754,6 +4875,69 @@ export interface operations {
                 };
             };
             /** @description Step is not in Waiting status or required inputs missing */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Sub DAG-run or step not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    rejectSubDAGRunStep: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+                /** @description ID of the sub DAG-run containing the step to reject */
+                subDAGRunId: string;
+                /** @description name of the step */
+                stepName: components["parameters"]["StepName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RejectStepRequest"];
+            };
+        };
+        responses: {
+            /** @description Step rejected successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RejectStepResponse"];
+                };
+            };
+            /** @description Step is not in Waiting status */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -5322,7 +5506,8 @@ export enum Status {
     Success = 4,
     Queued = 5,
     PartialSuccess = 6,
-    Waiting = 7
+    Waiting = 7,
+    Rejected = 8
 }
 export enum StatusLabel {
     not_started = "not_started",
@@ -5332,7 +5517,8 @@ export enum StatusLabel {
     succeeded = "succeeded",
     queued = "queued",
     partially_succeeded = "partially_succeeded",
-    waiting = "waiting"
+    waiting = "waiting",
+    rejected = "rejected"
 }
 export enum NodeStatus {
     NotStarted = 0,
@@ -5342,7 +5528,8 @@ export enum NodeStatus {
     Success = 4,
     Skipped = 5,
     PartialSuccess = 6,
-    Waiting = 7
+    Waiting = 7,
+    Rejected = 8
 }
 export enum NodeStatusLabel {
     not_started = "not_started",
@@ -5352,7 +5539,8 @@ export enum NodeStatusLabel {
     succeeded = "succeeded",
     skipped = "skipped",
     partially_succeeded = "partially_succeeded",
-    waiting = "waiting"
+    waiting = "waiting",
+    rejected = "rejected"
 }
 export enum SchedulerInstanceStatus {
     active = "active",

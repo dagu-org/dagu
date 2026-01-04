@@ -13,4 +13,5 @@ export const STATUS_DISPLAY_LABELS: Record<StatusLabel, string> = {
   [StatusLabel.queued]: 'Queued',
   [StatusLabel.partially_succeeded]: 'Partial',
   [StatusLabel.waiting]: 'Waiting',
+  [StatusLabel.rejected]: 'Rejected',
 };

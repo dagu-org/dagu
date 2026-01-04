@@ -48,6 +48,10 @@ function getStatusLabel(status: NodeStatus): string {
       return 'Skipped';
     case NodeStatus.PartialSuccess:
       return 'Partial Success';
+    case NodeStatus.Waiting:
+      return 'Waiting';
+    case NodeStatus.Rejected:
+      return 'Rejected';
     default:
       return 'Unknown';
   }
@@ -86,6 +90,7 @@ const statusColors: Record<NodeStatus, { bg: string; border: string }> = {
   [NodeStatus.Skipped]: { bg: '#6b635a', border: '#6b635a' },
   [NodeStatus.PartialSuccess]: { bg: '#c4956a', border: '#c4956a' },
   [NodeStatus.Waiting]: { bg: '#f59e0b', border: '#f59e0b' },
+  [NodeStatus.Rejected]: { bg: '#dc2626', border: '#dc2626' },
 };
 
 /**

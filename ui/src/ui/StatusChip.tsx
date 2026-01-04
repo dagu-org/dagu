@@ -54,6 +54,11 @@ function StatusChip({ status, children, size = 'md' }: Props) {
       borderColorClass = 'border-[#f59e0b]';
       textColorClass = 'text-[#d97706]';
       break;
+    case Status.Rejected: // rejected -> coral/red (sepia-compatible)
+      bgColorClass = 'bg-[rgba(220,38,38,0.12)]';
+      borderColorClass = 'border-[#dc2626]';
+      textColorClass = 'text-[#b91c1c]';
+      break;
     default: // Fallback to warm gray (sepia-compatible)
       bgColorClass = 'bg-[rgba(168,160,152,0.12)]';
       borderColorClass = 'border-[#a8a098]';
