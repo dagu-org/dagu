@@ -349,11 +349,7 @@ func TestPlan_NodeStates(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			dag := &core.DAG{}
-			for _, n := range tt.nodes {
-				dag.Steps = append(dag.Steps, n.Step())
-			}
-			p, err := runtime.CreateRetryPlan(context.Background(), dag, tt.nodes...)
+			p, err := runtime.NewPlanFromNodes(tt.nodes...)
 			require.NoError(t, err)
 
 			states := p.NodeStates()
@@ -399,11 +395,7 @@ func TestPlan_WaitingStepNames(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			dag := &core.DAG{}
-			for _, n := range tt.nodes {
-				dag.Steps = append(dag.Steps, n.Step())
-			}
-			p, err := runtime.CreateRetryPlan(context.Background(), dag, tt.nodes...)
+			p, err := runtime.NewPlanFromNodes(tt.nodes...)
 			require.NoError(t, err)
 
 			names := p.WaitingStepNames()

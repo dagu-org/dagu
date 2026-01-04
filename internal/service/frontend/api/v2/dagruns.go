@@ -838,24 +838,13 @@ func (a *API) RejectSubDAGRunStep(ctx context.Context, request api.RejectSubDAGR
 		return nil, err
 	}
 
-	// Find the sub DAG run
-	ref := execution.NewDAGRunRef(request.Name, request.DagRunId)
-	subRef := execution.NewDAGRunRef("", request.SubDAGRunId)
-
-	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, subRef)
+	// Get the sub DAG run status
+	rootRef := execution.NewDAGRunRef(request.Name, request.DagRunId)
+	dagStatus, err := a.dagRunMgr.FindSubDAGRunStatus(ctx, rootRef, request.SubDAGRunId)
 	if err != nil {
-		// Try to find via parent
-		parentStatus, parentErr := a.dagRunMgr.GetSavedStatus(ctx, ref)
-		if parentErr != nil {
-			return &api.RejectSubDAGRunStep404JSONResponse{
-				Code:    api.ErrorCodeNotFound,
-				Message: fmt.Sprintf("sub dag-run ID %s not found", request.SubDAGRunId),
-			}, nil
-		}
-		_ = parentStatus
 		return &api.RejectSubDAGRunStep404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("sub dag-run ID %s not found", request.SubDAGRunId),
+			Message: fmt.Sprintf("sub DAG-run ID %s not found", request.SubDAGRunId),
 		}, nil
 	}
 
@@ -901,8 +890,8 @@ func (a *API) RejectSubDAGRunStep(ctx context.Context, request api.RejectSubDAGR
 	dagStatus.FinishedAt = time.Now().Format(time.RFC3339)
 
 	// Save the updated status
-	if err := a.dagRunMgr.UpdateStatus(ctx, subRef, *dagStatus); err != nil {
-		return nil, fmt.Errorf("error updating status: %w", err)
+	if err := a.dagRunMgr.UpdateStatus(ctx, rootRef, *dagStatus); err != nil {
+		return nil, fmt.Errorf("error updating sub DAG-run status: %w", err)
 	}
 
 	logger.Info(ctx, "Sub DAG step rejected",

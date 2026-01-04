@@ -94,6 +94,29 @@ func CreateRetryPlan(ctx context.Context, dag *core.DAG, nodes ...*Node) (*Plan,
 	return p, nil
 }
 
+// NewPlanFromNodes creates a plan from existing nodes without modifying their states.
+func NewPlanFromNodes(nodes ...*Node) (*Plan, error) {
+	p := &Plan{
+		nodeByID:      make(map[int]*Node),
+		nodeByName:    make(map[string]*Node),
+		DependencyMap: make(map[int][]int),
+		DependantMap:  make(map[int][]int),
+		nodes:         make([]*Node, 0, len(nodes)),
+		startedAt:     time.Now(),
+	}
+
+	for _, node := range nodes {
+		node.Init()
+		p.addNode(node)
+	}
+
+	if err := p.buildEdges(); err != nil {
+		return nil, err
+	}
+
+	return p, nil
+}
+
 // CreateStepRetryPlan creates a new execution plan for retrying a specific step.
 func CreateStepRetryPlan(dag *core.DAG, nodes []*Node, stepName string) (*Plan, error) {
 	p := &Plan{

@@ -1252,17 +1252,13 @@ func TestRunner_StatusPrecedence(t *testing.T) {
 				State: runtime.NodeState{Status: core.NodeWaiting},
 			}),
 		}
-		for _, n := range nodes {
-			dag.Steps = append(dag.Steps, n.Step())
-		}
 
-		plan, err := runtime.CreateRetryPlan(context.Background(), dag, nodes...)
+		plan, err := runtime.NewPlanFromNodes(nodes...)
 		require.NoError(t, err)
 
 		runner := runtime.New(&runtime.Config{})
 		ctx := runtime.NewContext(context.Background(), dag, "test-run-id", "/tmp/test.log")
 
-		// Status should be Rejected, not Waiting
 		status := runner.Status(ctx, plan)
 		require.Equal(t, core.Rejected, status, "rejected should take precedence over waiting")
 	})
