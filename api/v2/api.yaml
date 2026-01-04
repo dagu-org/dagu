@@ -3623,6 +3623,17 @@ components:
         error:
           type: string
           description: "Error message if the step failed"
+        approvedAt:
+          type: string
+          description: "RFC3339 timestamp when the HITL step was approved"
+        approvedBy:
+          type: string
+          description: "Username of who approved the HITL step"
+        approvalInputs:
+          type: object
+          additionalProperties:
+            type: string
+          description: "Key-value inputs provided during HITL approval"
       required:
         - step
         - stdout

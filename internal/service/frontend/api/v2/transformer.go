@@ -199,6 +199,9 @@ func toNode(node *execution.Node) api.Node {
 		Error:           ptrOf(node.Error),
 		SubRuns:         ptrOf(toSubDAGRuns(node.SubRuns)),
 		SubRunsRepeated: ptrOf(toSubDAGRuns(node.SubRunsRepeated)),
+		ApprovedAt:      ptrOf(node.ApprovedAt),
+		ApprovedBy:      ptrOf(node.ApprovedBy),
+		ApprovalInputs:  ptrOf(node.ApprovalInputs),
 	}
 }
 

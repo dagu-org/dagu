@@ -25,6 +25,8 @@ type Node struct {
 	ApprovedAt string `json:"approvedAt,omitempty"`
 	// ApprovalInputs stores key-value parameters provided during approval
 	ApprovalInputs map[string]string `json:"approvalInputs,omitempty"`
+	// ApprovedBy records who approved this wait step (username)
+	ApprovedBy string `json:"approvedBy,omitempty"`
 }
 
 // SubDAGRun represents a sub DAG run associated with a node

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
@@ -537,9 +539,31 @@ func (a *API) ApproveDAGRunStep(ctx context.Context, request api.ApproveDAGRunSt
 	// Update the node status to Succeeded
 	dagStatus.Nodes[stepIdx].Status = core.NodeSucceeded
 	dagStatus.Nodes[stepIdx].ApprovedAt = time.Now().Format(time.RFC3339)
+
+	// Record who approved
+	var approvedBy string
+	if user, ok := auth.UserFromContext(ctx); ok {
+		approvedBy = user.Username
+		dagStatus.Nodes[stepIdx].ApprovedBy = approvedBy
+	}
+
 	if request.Body != nil && request.Body.Inputs != nil {
 		dagStatus.Nodes[stepIdx].ApprovalInputs = *request.Body.Inputs
 	}
+
+	// Log approval with JSON-serialized inputs
+	var inputsJSON string
+	if dagStatus.Nodes[stepIdx].ApprovalInputs != nil {
+		if data, err := json.Marshal(dagStatus.Nodes[stepIdx].ApprovalInputs); err == nil {
+			inputsJSON = string(data)
+		}
+	}
+	logger.Info(ctx, "Step approved",
+		slog.String("dagRunId", request.DagRunId),
+		slog.String("step", request.StepName),
+		slog.String("approvedBy", approvedBy),
+		slog.String("inputs", inputsJSON),
+	)
 
 	// Save the updated status
 	if err := a.dagRunMgr.UpdateStatus(ctx, ref, *dagStatus); err != nil {
@@ -653,9 +677,32 @@ func (a *API) ApproveSubDAGRunStep(ctx context.Context, request api.ApproveSubDA
 	// Update the node status to Succeeded
 	dagStatus.Nodes[stepIdx].Status = core.NodeSucceeded
 	dagStatus.Nodes[stepIdx].ApprovedAt = time.Now().Format(time.RFC3339)
+
+	// Record who approved
+	var approvedBy string
+	if user, ok := auth.UserFromContext(ctx); ok {
+		approvedBy = user.Username
+		dagStatus.Nodes[stepIdx].ApprovedBy = approvedBy
+	}
+
 	if request.Body != nil && request.Body.Inputs != nil {
 		dagStatus.Nodes[stepIdx].ApprovalInputs = *request.Body.Inputs
 	}
+
+	// Log approval with JSON-serialized inputs
+	var inputsJSON string
+	if dagStatus.Nodes[stepIdx].ApprovalInputs != nil {
+		if data, err := json.Marshal(dagStatus.Nodes[stepIdx].ApprovalInputs); err == nil {
+			inputsJSON = string(data)
+		}
+	}
+	logger.Info(ctx, "Sub DAG step approved",
+		slog.String("dagRunId", request.DagRunId),
+		slog.String("subDagRunId", request.SubDAGRunId),
+		slog.String("step", request.StepName),
+		slog.String("approvedBy", approvedBy),
+		slog.String("inputs", inputsJSON),
+	)
 
 	// Save the updated status
 	if err := a.dagRunMgr.UpdateStatus(ctx, rootRef, *dagStatus); err != nil {

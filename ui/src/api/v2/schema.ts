@@ -1554,6 +1554,14 @@ export interface components {
             subRunsRepeated?: components["schemas"]["SubDAGRun"][];
             /** @description Error message if the step failed */
             error?: string;
+            /** @description RFC3339 timestamp when the HITL step was approved */
+            approvedAt?: string;
+            /** @description Username of who approved the HITL step */
+            approvedBy?: string;
+            /** @description Key-value inputs provided during HITL approval */
+            approvalInputs?: {
+                [key: string]: string;
+            };
         };
         /** @description Metadata for a sub DAG-run */
         SubDAGRun: {
