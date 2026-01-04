@@ -348,6 +348,21 @@ func (p *Plan) IsRunning() bool {
 	return false
 }
 
+// HasActivelyRunningNodes checks if any node is in NodeRunning status.
+// Unlike IsRunning(), this does not consider NodeNotStarted nodes as running.
+// This is used to distinguish between actively executing work and nodes that
+// are pending but blocked (e.g., by a waiting node requiring approval).
+func (p *Plan) HasActivelyRunningNodes() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	for _, node := range p.nodes {
+		if node.State().Status == core.NodeRunning {
+			return true
+		}
+	}
+	return false
+}
+
 // CheckFinished checks if all nodes have completed (successfully or otherwise).
 func (p *Plan) CheckFinished() bool {
 	p.mu.RLock()

@@ -720,14 +720,24 @@ func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
 	if !p.IsStarted() {
 		return core.NotStarted
 	}
-	if p.IsRunning() {
+
+	// Check if any nodes are actively running (NodeRunning status).
+	// This takes precedence - we need to wait for active work to complete.
+	if p.HasActivelyRunningNodes() {
 		return core.Running
 	}
 
-	// Check for Wait condition before other terminal states.
-	// This occurs when all active work is done but nodes are waiting for approval.
+	// Check for Wait condition - nodes waiting for approval.
+	// This must be checked BEFORE IsRunning() because IsRunning() considers
+	// NodeNotStarted nodes as "running", but those nodes may be blocked by
+	// waiting nodes and can't proceed without approval.
 	if len(r.getWaitingNodes(p)) > 0 {
 		return core.Wait
+	}
+
+	// Check if there's still pending work (not blocked by waiting nodes)
+	if p.IsRunning() {
+		return core.Running
 	}
 
 	if r.isPartialSuccess(ctx, p) {
