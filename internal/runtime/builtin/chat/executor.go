@@ -138,8 +138,11 @@ func toThinkingRequest(cfg *core.ThinkingConfig) *llmpkg.ThinkingRequest {
 }
 
 // normalizeEnvVarExpr converts an environment variable reference to ${VAR} format.
-// Handles: VAR → ${VAR}, $VAR → ${VAR}, ${VAR} → ${VAR}
+// Handles: VAR → ${VAR}, $VAR → ${VAR}, ${VAR} → ${VAR}, "" → ""
 func normalizeEnvVarExpr(expr string) string {
+	if expr == "" {
+		return ""
+	}
 	if strings.HasPrefix(expr, "${") {
 		// Already in ${VAR} format, use as-is
 		return expr

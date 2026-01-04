@@ -148,6 +148,11 @@ func TestNormalizeEnvVarExpr(t *testing.T) {
 		expected string
 	}{
 		{
+			name:     "EmptyString",
+			input:    "",
+			expected: "",
+		},
+		{
 			name:     "PlainVariableName",
 			input:    "OPENAI_API_KEY",
 			expected: "${OPENAI_API_KEY}",
@@ -161,11 +166,6 @@ func TestNormalizeEnvVarExpr(t *testing.T) {
 			name:     "BracedFormat",
 			input:    "${MY_API_KEY}",
 			expected: "${MY_API_KEY}",
-		},
-		{
-			name:     "DollarPrefixWithUnderscore",
-			input:    "$MY_CUSTOM_KEY",
-			expected: "${MY_CUSTOM_KEY}",
 		},
 	}
 
