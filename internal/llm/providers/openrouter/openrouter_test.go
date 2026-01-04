@@ -17,11 +17,11 @@ func TestBuildRequestBody_ReasoningTokens(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                  string
-		maxTokens             *int
-		thinking              *llm.ThinkingRequest
-		expectedMaxTokens     *int
-		expectedHasReasoning  bool
+		name                    string
+		maxTokens               *int
+		thinking                *llm.ThinkingRequest
+		expectedMaxTokens       *int
+		expectedHasReasoning    bool
 		expectedReasoningBudget *int
 	}{
 		{

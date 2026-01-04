@@ -17,27 +17,27 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                   string
-		maxTokens              *int
-		thinking               *llm.ThinkingRequest
+		name                    string
+		maxTokens               *int
+		thinking                *llm.ThinkingRequest
 		expectedMaxOutputTokens *int
-		expectedHasThinking    bool
-		expectedThinkingBudget *int
-		expectedThinkingLevel  string
+		expectedHasThinking     bool
+		expectedThinkingBudget  *int
+		expectedThinkingLevel   string
 	}{
 		{
-			name:                   "no thinking, no max tokens",
-			maxTokens:              nil,
-			thinking:               nil,
+			name:                    "no thinking, no max tokens",
+			maxTokens:               nil,
+			thinking:                nil,
 			expectedMaxOutputTokens: nil,
-			expectedHasThinking:    false,
+			expectedHasThinking:     false,
 		},
 		{
-			name:                   "no thinking, explicit max tokens",
-			maxTokens:              intPtr(8192),
-			thinking:               nil,
+			name:                    "no thinking, explicit max tokens",
+			maxTokens:               intPtr(8192),
+			thinking:                nil,
 			expectedMaxOutputTokens: intPtr(8192),
-			expectedHasThinking:    false,
+			expectedHasThinking:     false,
 		},
 		{
 			name:      "thinking with budget, no max tokens - auto adjust",
@@ -47,8 +47,8 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 				BudgetTokens: intPtr(4096),
 			},
 			expectedMaxOutputTokens: intPtr(4096 + 4096),
-			expectedHasThinking:    true,
-			expectedThinkingBudget: intPtr(4096),
+			expectedHasThinking:     true,
+			expectedThinkingBudget:  intPtr(4096),
 		},
 		{
 			name:      "thinking with budget, max tokens less than budget - auto adjust",
@@ -58,8 +58,8 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 				BudgetTokens: intPtr(4096),
 			},
 			expectedMaxOutputTokens: intPtr(4096 + 4096),
-			expectedHasThinking:    true,
-			expectedThinkingBudget: intPtr(4096),
+			expectedHasThinking:     true,
+			expectedThinkingBudget:  intPtr(4096),
 		},
 		{
 			name:      "thinking with budget, max tokens greater than budget - use provided",
@@ -69,8 +69,8 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 				BudgetTokens: intPtr(4096),
 			},
 			expectedMaxOutputTokens: intPtr(16000),
-			expectedHasThinking:    true,
-			expectedThinkingBudget: intPtr(4096),
+			expectedHasThinking:     true,
+			expectedThinkingBudget:  intPtr(4096),
 		},
 		{
 			name:      "thinking with effort level low",
@@ -81,8 +81,8 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 			},
 			// Estimated budget 1024, so no adjustment needed with default
 			expectedMaxOutputTokens: intPtr(1024 + 4096),
-			expectedHasThinking:    true,
-			expectedThinkingLevel:  "low",
+			expectedHasThinking:     true,
+			expectedThinkingLevel:   "low",
 		},
 		{
 			name:      "thinking with effort level medium",
@@ -93,8 +93,8 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 			},
 			// Estimated budget 4096, auto-adjust to 8192
 			expectedMaxOutputTokens: intPtr(4096 + 4096),
-			expectedHasThinking:    true,
-			expectedThinkingLevel:  "medium",
+			expectedHasThinking:     true,
+			expectedThinkingLevel:   "medium",
 		},
 		{
 			name:      "thinking with effort level high",
@@ -105,8 +105,8 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 			},
 			// Estimated budget 8192, auto-adjust to 12288
 			expectedMaxOutputTokens: intPtr(8192 + 4096),
-			expectedHasThinking:    true,
-			expectedThinkingLevel:  "high",
+			expectedHasThinking:     true,
+			expectedThinkingLevel:   "high",
 		},
 		{
 			name:      "thinking with effort level xhigh",
@@ -117,8 +117,8 @@ func TestBuildRequestBody_ThinkingTokens(t *testing.T) {
 			},
 			// Estimated budget 16384, auto-adjust to 20480
 			expectedMaxOutputTokens: intPtr(16384 + 4096),
-			expectedHasThinking:    true,
-			expectedThinkingLevel:  "high", // xhigh maps to high for Gemini
+			expectedHasThinking:     true,
+			expectedThinkingLevel:   "high", // xhigh maps to high for Gemini
 		},
 	}
 
