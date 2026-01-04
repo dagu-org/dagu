@@ -721,22 +721,25 @@ func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
 		return core.NotStarted
 	}
 
+	// Get atomic snapshot of node statuses in a single pass.
+	// This avoids race conditions from multiple separate status checks.
+	summary := p.GetNodeStatusSummary()
+
 	// Check if any nodes are actively running (NodeRunning status).
 	// This takes precedence - we need to wait for active work to complete.
-	if p.HasActivelyRunningNodes() {
+	if summary.HasRunning {
 		return core.Running
 	}
 
 	// Check for Wait condition - nodes waiting for approval.
-	// This must be checked BEFORE IsRunning() because IsRunning() considers
-	// NodeNotStarted nodes as "running", but those nodes may be blocked by
-	// waiting nodes and can't proceed without approval.
-	if len(r.getWaitingNodes(p)) > 0 {
+	// This must be checked BEFORE checking for pending work because
+	// NotStarted nodes may be blocked by waiting nodes and can't proceed.
+	if summary.HasWaiting {
 		return core.Wait
 	}
 
 	// Check if there's still pending work (not blocked by waiting nodes)
-	if p.IsRunning() {
+	if summary.HasNotStarted && !p.IsFinished() {
 		return core.Running
 	}
 
@@ -753,13 +756,7 @@ func (r *Runner) Status(ctx context.Context, p *Plan) core.Status {
 
 // getWaitingNodes returns nodes with NodeWaiting status.
 func (r *Runner) getWaitingNodes(p *Plan) []*Node {
-	var waiting []*Node
-	for _, node := range p.Nodes() {
-		if node.State().Status == core.NodeWaiting {
-			waiting = append(waiting, node)
-		}
-	}
-	return waiting
+	return p.GetNodeStatusSummary().WaitingNodes
 }
 
 func (r *Runner) isError() bool {

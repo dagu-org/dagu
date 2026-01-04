@@ -315,3 +315,91 @@ func TestPlan_HasActivelyRunningNodes(t *testing.T) {
 		})
 	}
 }
+
+func TestPlan_GetNodeStatusSummary(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name              string
+		nodes             []*runtime.Node
+		wantHasRunning    bool
+		wantHasWaiting    bool
+		wantHasNotStarted bool
+		wantWaitingCount  int
+	}{
+		{
+			name: "all succeeded",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeSucceeded),
+				makeNode("b", core.NodeSucceeded, "a"),
+			},
+			wantHasRunning:    false,
+			wantHasWaiting:    false,
+			wantHasNotStarted: false,
+			wantWaitingCount:  0,
+		},
+		{
+			name: "one running",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeSucceeded),
+				makeNode("b", core.NodeRunning, "a"),
+			},
+			wantHasRunning:    true,
+			wantHasWaiting:    false,
+			wantHasNotStarted: false,
+			wantWaitingCount:  0,
+		},
+		{
+			name: "one waiting with blocked dependents",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeWaiting),
+				makeNode("b", core.NodeNotStarted, "a"),
+			},
+			wantHasRunning:    false,
+			wantHasWaiting:    true,
+			wantHasNotStarted: true,
+			wantWaitingCount:  1,
+		},
+		{
+			name: "multiple waiting nodes",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeWaiting),
+				makeNode("b", core.NodeWaiting),
+				makeNode("c", core.NodeNotStarted, "a", "b"),
+			},
+			wantHasRunning:    false,
+			wantHasWaiting:    true,
+			wantHasNotStarted: true,
+			wantWaitingCount:  2,
+		},
+		{
+			name: "mix of all states",
+			nodes: []*runtime.Node{
+				makeNode("a", core.NodeRunning),
+				makeNode("b", core.NodeWaiting),
+				makeNode("c", core.NodeNotStarted, "b"),
+				makeNode("d", core.NodeSucceeded),
+			},
+			wantHasRunning:    true,
+			wantHasWaiting:    true,
+			wantHasNotStarted: true,
+			wantWaitingCount:  1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dag := &core.DAG{}
+			for _, n := range tt.nodes {
+				dag.Steps = append(dag.Steps, n.Step())
+			}
+			p, err := runtime.CreateRetryPlan(context.Background(), dag, tt.nodes...)
+			require.NoError(t, err)
+
+			summary := p.GetNodeStatusSummary()
+			require.Equal(t, tt.wantHasRunning, summary.HasRunning, "HasRunning mismatch")
+			require.Equal(t, tt.wantHasWaiting, summary.HasWaiting, "HasWaiting mismatch")
+			require.Equal(t, tt.wantHasNotStarted, summary.HasNotStarted, "HasNotStarted mismatch")
+			require.Len(t, summary.WaitingNodes, tt.wantWaitingCount, "WaitingNodes count mismatch")
+		})
+	}
+}

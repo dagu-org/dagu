@@ -332,10 +332,45 @@ func (p *Plan) Finish() {
 	p.finishedAt = time.Now()
 }
 
+// NodeStatusSummary provides an atomic snapshot of node status counts.
+// This allows callers to make decisions based on consistent state.
+type NodeStatusSummary struct {
+	HasRunning    bool
+	HasWaiting    bool
+	HasNotStarted bool
+	WaitingNodes  []*Node
+}
+
+// GetNodeStatusSummary returns an atomic snapshot of node statuses in a single pass.
+// This avoids race conditions from multiple separate status checks.
+func (p *Plan) GetNodeStatusSummary() NodeStatusSummary {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	var summary NodeStatusSummary
+	for _, node := range p.nodes {
+		switch node.State().Status {
+		case core.NodeRunning:
+			summary.HasRunning = true
+		case core.NodeWaiting:
+			summary.HasWaiting = true
+			summary.WaitingNodes = append(summary.WaitingNodes, node)
+		case core.NodeNotStarted:
+			summary.HasNotStarted = true
+		}
+	}
+	return summary
+}
+
 // IsRunning checks if any node is currently running or pending.
 func (p *Plan) IsRunning() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
+	return p.isRunningLocked()
+}
+
+// isRunningLocked is the lock-free implementation for internal use.
+func (p *Plan) isRunningLocked() bool {
 	for _, node := range p.nodes {
 		s := node.State().Status
 		if s == core.NodeRunning {
