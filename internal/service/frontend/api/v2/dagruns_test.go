@@ -94,7 +94,7 @@ func TestGetDAGRunSpecInline(t *testing.T) {
 		if dagRunStatus.DagRunDetails.Status == api.Status(core.Succeeded) {
 			return true
 		}
-		t.Log(fmt.Sprintf("DAG run status: %s", dagRunStatus.DagRunDetails.StatusLabel))
+		t.Logf("DAG run status: %s", dagRunStatus.DagRunDetails.StatusLabel)
 		return false
 	}, 10*time.Second, 200*time.Millisecond)
 
