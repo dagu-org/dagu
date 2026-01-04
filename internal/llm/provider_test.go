@@ -128,7 +128,7 @@ func TestNewProvider(t *testing.T) {
 	registry = make(map[ProviderType]ProviderFactory)
 
 	testType := ProviderType("test")
-	RegisterProvider(testType, func(cfg Config) (Provider, error) {
+	RegisterProvider(testType, func(_ Config) (Provider, error) {
 		return &mockProvider{name: "test"}, nil
 	})
 
