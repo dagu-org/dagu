@@ -542,10 +542,8 @@ func (a *API) ApproveDAGRunStep(ctx context.Context, request api.ApproveDAGRunSt
 	dagStatus.Nodes[stepIdx].ApprovedAt = time.Now().Format(time.RFC3339)
 
 	// Record who approved
-	var approvedBy string
-	if user, ok := auth.UserFromContext(ctx); ok {
-		approvedBy = user.Username
-		dagStatus.Nodes[stepIdx].ApprovedBy = approvedBy
+	if user, ok := auth.UserFromContext(ctx); ok && user != nil {
+		dagStatus.Nodes[stepIdx].ApprovedBy = user.Username
 	}
 
 	// Store approval inputs in OutputVariables (original keys for env vars)
@@ -677,10 +675,8 @@ func (a *API) ApproveSubDAGRunStep(ctx context.Context, request api.ApproveSubDA
 	dagStatus.Nodes[stepIdx].ApprovedAt = time.Now().Format(time.RFC3339)
 
 	// Record who approved
-	var approvedBy string
-	if user, ok := auth.UserFromContext(ctx); ok {
-		approvedBy = user.Username
-		dagStatus.Nodes[stepIdx].ApprovedBy = approvedBy
+	if user, ok := auth.UserFromContext(ctx); ok && user != nil {
+		dagStatus.Nodes[stepIdx].ApprovedBy = user.Username
 	}
 
 	// Store approval inputs in OutputVariables (original keys for env vars)
