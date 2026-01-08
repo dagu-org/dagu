@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -214,6 +215,23 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Initialize propagators for W3C trace context before anything else
 	telemetry.InitializePropagators()
 
+	// Resolve secrets early so they're available for OTel config evaluation
+	a.dag.LoadDotEnv(ctx)
+	secretEnvs, secretErr := a.resolveSecrets(ctx)
+
+	// Build variables map for config evaluation (DAG env + secrets)
+	configVars := make(map[string]string)
+	for _, env := range a.dag.Env {
+		if key, value, found := strings.Cut(env, "="); found {
+			configVars[key] = value
+		}
+	}
+	for _, env := range secretEnvs {
+		if key, value, found := strings.Cut(env, "="); found {
+			configVars[key] = value
+		}
+	}
+
 	// Extract trace context from environment variables if present
 	// This must be done BEFORE initializing the tracer so sub DAGs
 	// can continue the parent's trace
@@ -222,7 +240,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Initialize OpenTelemetry tracer
-	tracer, err := telemetry.NewTracer(ctx, a.dag)
+	tracer, err := telemetry.NewTracer(ctx, a.dag, configVars)
 	if err != nil {
 		logger.Warn(ctx, "Failed to initialize OpenTelemetry tracer", tag.Error(err))
 		// Continue without tracing
@@ -301,10 +319,6 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Initialize coordinator client factory for distributed execution
 	coordinatorCli := a.createCoordinatorClient(ctx)
-
-	// Resolve secrets if defined
-	a.dag.LoadDotEnv(ctx)
-	secretEnvs, secretErr := a.resolveSecrets(ctx)
 
 	ctx = runtime.NewContext(ctx, a.dag, a.dagRunID, a.logFile,
 		runtime.WithDatabase(dbClient),

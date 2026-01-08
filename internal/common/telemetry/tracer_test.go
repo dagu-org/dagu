@@ -17,7 +17,7 @@ func TestNewTracer(t *testing.T) {
 			OTel: nil, // OTel not configured
 		}
 
-		tracer, err := NewTracer(context.Background(), dag)
+		tracer, err := NewTracer(context.Background(), dag, nil)
 		require.NoError(t, err)
 		assert.NotNil(t, tracer)
 		assert.False(t, tracer.IsEnabled())
@@ -33,7 +33,7 @@ func TestNewTracer(t *testing.T) {
 			},
 		}
 
-		tracer, err := NewTracer(context.Background(), dag)
+		tracer, err := NewTracer(context.Background(), dag, nil)
 		require.NoError(t, err)
 		assert.NotNil(t, tracer)
 		assert.False(t, tracer.IsEnabled())
@@ -49,7 +49,7 @@ func TestNewTracer(t *testing.T) {
 			},
 		}
 
-		tracer, err := NewTracer(context.Background(), dag)
+		tracer, err := NewTracer(context.Background(), dag, nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "endpoint is required")
 		assert.Nil(t, tracer)
@@ -65,7 +65,7 @@ func TestNewTracer(t *testing.T) {
 		}
 
 		// This will try to connect to a non-existent endpoint, but that's fine for testing
-		tracer, err := NewTracer(context.Background(), dag)
+		tracer, err := NewTracer(context.Background(), dag, nil)
 		require.NoError(t, err)
 		assert.NotNil(t, tracer)
 		assert.True(t, tracer.IsEnabled())
@@ -86,7 +86,7 @@ func TestNewTracer(t *testing.T) {
 		}
 
 		// This will try to connect to a non-existent endpoint, but that's fine for testing
-		tracer, err := NewTracer(context.Background(), dag)
+		tracer, err := NewTracer(context.Background(), dag, nil)
 		require.NoError(t, err)
 		assert.NotNil(t, tracer)
 		assert.True(t, tracer.IsEnabled())
@@ -111,7 +111,7 @@ func TestNewTracer(t *testing.T) {
 			},
 		}
 
-		tracer, err := NewTracer(context.Background(), dag)
+		tracer, err := NewTracer(context.Background(), dag, nil)
 		require.NoError(t, err)
 		assert.NotNil(t, tracer)
 		assert.True(t, tracer.IsEnabled())
@@ -138,7 +138,7 @@ func TestNewTracer(t *testing.T) {
 			},
 		}
 
-		tracer, err := NewTracer(context.Background(), dag)
+		tracer, err := NewTracer(context.Background(), dag, nil)
 		require.NoError(t, err)
 		assert.NotNil(t, tracer)
 		assert.True(t, tracer.IsEnabled())
@@ -159,7 +159,7 @@ func TestTracerStart(t *testing.T) {
 			},
 		}
 
-		tracer, err := NewTracer(context.Background(), dag)
+		tracer, err := NewTracer(context.Background(), dag, nil)
 		require.NoError(t, err)
 		defer func() {
 			_ = tracer.Shutdown(context.Background())
@@ -180,7 +180,7 @@ func TestTracerStart(t *testing.T) {
 			OTel: nil,
 		}
 
-		tracer, err := NewTracer(context.Background(), dag)
+		tracer, err := NewTracer(context.Background(), dag, nil)
 		require.NoError(t, err)
 
 		ctx, span := tracer.Start(context.Background(), "test-span")
