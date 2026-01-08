@@ -56,7 +56,7 @@ func TestValidateExecutorConfig_EmptyConfig(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestValidateExecutorConfig_ConcurrentAccess(t *testing.T) {
+func TestValidateExecutorConfig_ConcurrentAccess(_ *testing.T) {
 	schema := &jsonschema.Schema{
 		Type: "object",
 		Properties: map[string]*jsonschema.Schema{
