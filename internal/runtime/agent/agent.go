@@ -291,9 +291,6 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Initialize the runner
 	a.runner = a.newRunner(attempt)
 
-	// Setup the reporter to send the report to the user.
-	a.setupReporter(ctx)
-
 	// Setup the execution plan for the DAG.
 	if err := a.setupPlan(ctx); err != nil {
 		return fmt.Errorf("failed to setup execution plan: %w", err)
@@ -316,11 +313,6 @@ func (a *Agent) Run(ctx context.Context) error {
 		runtime.WithCoordinator(coordinatorCli),
 		runtime.WithSecrets(secretEnvs),
 	)
-
-	// Evaluate SMTP and mail configs with environment variables and secrets
-	if err := a.evaluateMailConfigs(ctx); err != nil {
-		return err
-	}
 
 	// Add structured logging context
 	logFields := []slog.Attr{
@@ -350,6 +342,15 @@ func (a *Agent) Run(ctx context.Context) error {
 	if err := attempt.Open(ctx); err != nil {
 		return fmt.Errorf("failed to open execution history: %w", err)
 	}
+
+	// Evaluate SMTP and mail configs with environment variables and secrets.
+	// This must happen AFTER attempt.Open() to avoid persisting expanded secrets.
+	if err := a.evaluateMailConfigs(ctx); err != nil {
+		return err
+	}
+
+	// Setup the reporter to send notifications (must be after mail config evaluation)
+	a.setupReporter(ctx)
 
 	// Update the status to running
 	st := a.Status(ctx)
