@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/bmatcuk/doublestar/v4"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/go-viper/mapstructure/v2"
 )
 
@@ -82,4 +83,28 @@ func validateConfig(operation string, cfg *Config) error {
 	}
 
 	return nil
+}
+
+// ConfigSchema defines the schema for archive executor config.
+// This struct is ONLY for generating JSON Schema - not used at runtime.
+type ConfigSchema struct {
+	Source           string   `json:"source" jsonschema:"File or directory to archive/extract"`
+	Destination      string   `json:"destination,omitempty" jsonschema:"Archive file path (required for create)"`
+	Format           string   `json:"format,omitempty" jsonschema:"Archive format (zip, tar, tar.gz, etc.)"`
+	CompressionLevel *int     `json:"compressionLevel,omitempty" jsonschema:"Compression level (-1 for default)"`
+	Password         string   `json:"password,omitempty" jsonschema:"Password for extract/list only"`
+	Overwrite        bool     `json:"overwrite,omitempty" jsonschema:"Overwrite existing files"`
+	PreservePaths    *bool    `json:"preservePaths,omitempty" jsonschema:"Preserve directory structure (default: true)"`
+	StripComponents  *int     `json:"stripComponents,omitempty" jsonschema:"Strip leading path components (must be >= 0)"`
+	Include          []string `json:"include,omitempty" jsonschema:"Glob patterns to include"`
+	Exclude          []string `json:"exclude,omitempty" jsonschema:"Glob patterns to exclude"`
+	DryRun           bool     `json:"dryRun,omitempty" jsonschema:"Simulate without making changes"`
+	Verbose          bool     `json:"verbose,omitempty" jsonschema:"Enable verbose output"`
+	FollowSymlinks   bool     `json:"followSymlinks,omitempty" jsonschema:"Follow symbolic links"`
+	VerifyIntegrity  bool     `json:"verifyIntegrity,omitempty" jsonschema:"Verify archive integrity"`
+	ContinueOnError  bool     `json:"continueOnError,omitempty" jsonschema:"Continue on errors"`
+}
+
+func init() {
+	core.RegisterExecutorConfigType[ConfigSchema]("archive")
 }

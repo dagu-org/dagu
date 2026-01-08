@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/go-viper/mapstructure/v2"
 )
 
@@ -91,4 +92,23 @@ func parseShellConfig(shell string, args []string) (string, []string, error) {
 		resultArgs = append(parsedArgs, resultArgs...)
 	}
 	return parsedShell, resultArgs, nil
+}
+
+// ConfigSchema defines the schema for ssh executor config.
+// This struct is ONLY for generating JSON Schema - not used at runtime.
+type ConfigSchema struct {
+	User          string   `json:"user,omitempty" jsonschema:"SSH username"`
+	Host          string   `json:"host,omitempty" jsonschema:"SSH hostname"`
+	IP            string   `json:"ip,omitempty" jsonschema:"SSH host IP (alias for host)"`
+	Port          string   `json:"port,omitempty" jsonschema:"SSH port"`
+	Key           string   `json:"key,omitempty" jsonschema:"Path to private key file"`
+	Password      string   `json:"password,omitempty" jsonschema:"SSH password"`
+	StrictHostKey *bool    `json:"strictHostKey,omitempty" jsonschema:"Enable strict host key checking"`
+	KnownHostFile string   `json:"knownHostFile,omitempty" jsonschema:"Path to known_hosts file"`
+	Shell         string   `json:"shell,omitempty" jsonschema:"Shell for remote execution"`
+	ShellArgs     []string `json:"shellArgs,omitempty" jsonschema:"Additional shell arguments"`
+}
+
+func init() {
+	core.RegisterExecutorConfigType[ConfigSchema]("ssh")
 }

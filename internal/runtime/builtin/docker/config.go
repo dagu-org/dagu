@@ -277,3 +277,26 @@ func loadDefaults(cfg *Config) *Config {
 	}
 	return cfg
 }
+
+// ConfigSchema defines the schema for docker executor config.
+// This struct is ONLY for generating JSON Schema - not used at runtime.
+// Nested Docker SDK types use map[string]any to allow flexibility.
+type ConfigSchema struct {
+	Image         string         `json:"image,omitempty" jsonschema:"Docker image to use"`
+	ContainerName string         `json:"containerName,omitempty" jsonschema:"Name or ID of existing container to exec into"`
+	Platform      string         `json:"platform,omitempty" jsonschema:"Target platform (e.g., linux/amd64)"`
+	Pull          string         `json:"pull,omitempty" jsonschema:"Image pull policy: missing, always, never"`
+	AutoRemove    bool           `json:"autoRemove,omitempty" jsonschema:"Remove container after exit"`
+	WorkingDir    string         `json:"workingDir,omitempty" jsonschema:"Working directory inside container"`
+	Volumes       []string       `json:"volumes,omitempty" jsonschema:"Volume bindings (host:container format)"`
+	Container     map[string]any `json:"container,omitempty" jsonschema:"Docker container config (see Docker SDK)"`
+	Host          map[string]any `json:"host,omitempty" jsonschema:"Docker host config (see Docker SDK)"`
+	Network       map[string]any `json:"network,omitempty" jsonschema:"Docker network config (see Docker SDK)"`
+	Exec          map[string]any `json:"exec,omitempty" jsonschema:"Docker exec options (see Docker SDK)"`
+}
+
+func init() {
+	// Register for both executor type aliases
+	core.RegisterExecutorConfigType[ConfigSchema]("docker")
+	core.RegisterExecutorConfigType[ConfigSchema]("container")
+}
