@@ -317,6 +317,11 @@ func (a *Agent) Run(ctx context.Context) error {
 		runtime.WithSecrets(secretEnvs),
 	)
 
+	// Evaluate SMTP and mail configs with environment variables and secrets
+	if err := a.evaluateMailConfigs(ctx); err != nil {
+		return err
+	}
+
 	// Add structured logging context
 	logFields := []slog.Attr{
 		tag.DAG(a.dag.Name),
@@ -1010,6 +1015,51 @@ func (a *Agent) resolveSecrets(ctx context.Context) ([]string, error) {
 		tag.Count(len(resolvedSecrets)),
 	)
 	return resolvedSecrets, nil
+}
+
+// evaluateMailConfigs evaluates SMTP and mail notification configs with
+// environment variables and secrets. This follows the same pattern used for
+// container and SSH configs.
+func (a *Agent) evaluateMailConfigs(ctx context.Context) error {
+	vars := runtime.AllEnvsMap(ctx)
+
+	// Evaluate SMTP config if defined
+	if a.dag.SMTP != nil {
+		evaluated, err := cmdutil.EvalObject(ctx, *a.dag.SMTP, vars)
+		if err != nil {
+			return fmt.Errorf("failed to evaluate smtp config: %w", err)
+		}
+		a.dag.SMTP = &evaluated
+	}
+
+	// Evaluate error mail config if defined
+	if a.dag.ErrorMail != nil {
+		evaluated, err := cmdutil.EvalObject(ctx, *a.dag.ErrorMail, vars)
+		if err != nil {
+			return fmt.Errorf("failed to evaluate error mail config: %w", err)
+		}
+		a.dag.ErrorMail = &evaluated
+	}
+
+	// Evaluate info mail config if defined
+	if a.dag.InfoMail != nil {
+		evaluated, err := cmdutil.EvalObject(ctx, *a.dag.InfoMail, vars)
+		if err != nil {
+			return fmt.Errorf("failed to evaluate info mail config: %w", err)
+		}
+		a.dag.InfoMail = &evaluated
+	}
+
+	// Evaluate wait mail config if defined
+	if a.dag.WaitMail != nil {
+		evaluated, err := cmdutil.EvalObject(ctx, *a.dag.WaitMail, vars)
+		if err != nil {
+			return fmt.Errorf("failed to evaluate wait mail config: %w", err)
+		}
+		a.dag.WaitMail = &evaluated
+	}
+
+	return nil
 }
 
 // dryRun performs a dry-run of the DAG. It only simulates the execution of
