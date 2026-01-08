@@ -4,7 +4,9 @@ import (
 	"fmt"
 
 	"github.com/bmatcuk/doublestar/v4"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/go-viper/mapstructure/v2"
+	"github.com/google/jsonschema-go/jsonschema"
 )
 
 // Config contains runtime options for the archive executor.
@@ -82,4 +84,32 @@ func validateConfig(operation string, cfg *Config) error {
 	}
 
 	return nil
+}
+
+var configSchema = &jsonschema.Schema{
+	Type:     "object",
+	Required: []string{"source"},
+	Properties: map[string]*jsonschema.Schema{
+		"source":           {Type: "string", Description: "File or directory to archive/extract"},
+		"destination":      {Type: "string", Description: "Archive file path (required for create)"},
+		"format":           {Type: "string", Description: "Archive format (zip, tar, tar.gz, etc.)"},
+		"compressionLevel": {Type: "integer", Description: "Compression level (-1 for default)"},
+		"password":         {Type: "string", Description: "Password for extract/list only"},
+		"overwrite":        {Type: "boolean", Description: "Overwrite existing files"},
+		"preservePaths":    {Type: "boolean", Description: "Preserve directory structure (default: true)"},
+		"stripComponents":  {Type: "integer", Minimum: ptrFloat(0), Description: "Strip leading path components (must be >= 0)"},
+		"include":          {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Glob patterns to include"},
+		"exclude":          {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Glob patterns to exclude"},
+		"dryRun":           {Type: "boolean", Description: "Simulate without making changes"},
+		"verbose":          {Type: "boolean", Description: "Enable verbose output"},
+		"followSymlinks":   {Type: "boolean", Description: "Follow symbolic links"},
+		"verifyIntegrity":  {Type: "boolean", Description: "Verify archive integrity"},
+		"continueOnError":  {Type: "boolean", Description: "Continue on errors"},
+	},
+}
+
+func ptrFloat(f float64) *float64 { return &f }
+
+func init() {
+	core.RegisterExecutorConfigSchema("archive", configSchema)
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/go-viper/mapstructure/v2"
+	"github.com/google/jsonschema-go/jsonschema"
 )
 
 // Config holds the configuration for creating or using a container.
@@ -276,4 +277,43 @@ func loadDefaults(cfg *Config) *Config {
 		cfg.WaitFor = "running"
 	}
 	return cfg
+}
+
+func init() {
+	core.RegisterExecutorConfigSchema("docker", configSchema)
+	core.RegisterExecutorConfigSchema("container", configSchema)
+}
+
+// configSchema defines the JSON schema for docker/container executor config.
+// Validates that either image or containerName is provided, and that exec
+// with image also requires containerName.
+var configSchema = &jsonschema.Schema{
+	Type: "object",
+	Properties: map[string]*jsonschema.Schema{
+		"image":         {Type: "string", Description: "Docker image (for new container mode)"},
+		"containerName": {Type: "string", Description: "Container name (for exec mode or to name new container)"},
+		"platform":      {Type: "string", Description: "Target platform (e.g., linux/amd64)"},
+		"pull":          {Type: "string", Description: "Image pull policy (always, never, missing)"},
+		"autoRemove":    {Type: "boolean", Description: "Remove container after exit"},
+		"workingDir":    {Type: "string", Description: "Working directory inside container"},
+		"volumes":       {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Volume bindings (host:container)"},
+		"container":     {Type: "object", AdditionalProperties: &jsonschema.Schema{}},
+		"host":          {Type: "object", AdditionalProperties: &jsonschema.Schema{}},
+		"network":       {Type: "object", AdditionalProperties: &jsonschema.Schema{}},
+		"exec":          {Type: "object", AdditionalProperties: &jsonschema.Schema{}},
+	},
+	AllOf: []*jsonschema.Schema{
+		// Require at least one of image or containerName
+		{
+			AnyOf: []*jsonschema.Schema{
+				{Required: []string{"image"}},
+				{Required: []string{"containerName"}},
+			},
+		},
+		// If exec + image, then containerName required
+		{
+			If:   &jsonschema.Schema{Required: []string{"exec", "image"}},
+			Then: &jsonschema.Schema{Required: []string{"containerName"}},
+		},
+	},
 }

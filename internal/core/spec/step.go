@@ -324,6 +324,14 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 		errs = append(errs, wrapTransformError("messages", err))
 	}
 
+	// Validate executor config against registered schema
+	// Only validate when config has actual values (not just initialized as empty map)
+	if len(result.ExecutorConfig.Config) > 0 {
+		if err := core.ValidateExecutorConfig(result.ExecutorConfig.Type, result.ExecutorConfig.Config); err != nil {
+			errs = append(errs, wrapTransformError("config", err))
+		}
+	}
+
 	// Validate that stdout and stderr don't point to the same file
 	if err := validateStdoutStderr(result); err != nil {
 		errs = append(errs, err)
