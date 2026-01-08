@@ -454,7 +454,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			KnownHostFile: a.dag.SSH.KnownHostFile,
 			Shell:         a.dag.SSH.Shell,
 			ShellArgs:     a.dag.SSH.ShellArgs,
-		}, a.dag.ParamsMap())
+		}, runtime.AllEnvsMap(ctx))
 		if err != nil {
 			initErr = fmt.Errorf("failed to evaluate ssh config: %w", err)
 			return initErr
