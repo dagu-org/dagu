@@ -324,6 +324,13 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 		errs = append(errs, wrapTransformError("messages", err))
 	}
 
+	// Validate executor config against registered schema
+	if result.ExecutorConfig.Config != nil {
+		if err := core.ValidateExecutorConfig(result.ExecutorConfig.Type, result.ExecutorConfig.Config); err != nil {
+			errs = append(errs, wrapTransformError("config", err))
+		}
+	}
+
 	// Validate that stdout and stderr don't point to the same file
 	if err := validateStdoutStderr(result); err != nil {
 		errs = append(errs, err)
