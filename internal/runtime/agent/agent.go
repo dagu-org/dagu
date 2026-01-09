@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -214,6 +215,23 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Initialize propagators for W3C trace context before anything else
 	telemetry.InitializePropagators()
 
+	// Resolve secrets early so they're available for OTel config evaluation
+	a.dag.LoadDotEnv(ctx)
+	secretEnvs, secretErr := a.resolveSecrets(ctx)
+
+	// Build variables map for config evaluation (DAG env + secrets)
+	configVars := make(map[string]string)
+	for _, env := range a.dag.Env {
+		if key, value, found := strings.Cut(env, "="); found {
+			configVars[key] = value
+		}
+	}
+	for _, env := range secretEnvs {
+		if key, value, found := strings.Cut(env, "="); found {
+			configVars[key] = value
+		}
+	}
+
 	// Extract trace context from environment variables if present
 	// This must be done BEFORE initializing the tracer so sub DAGs
 	// can continue the parent's trace
@@ -222,7 +240,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Initialize OpenTelemetry tracer
-	tracer, err := telemetry.NewTracer(ctx, a.dag)
+	tracer, err := telemetry.NewTracer(ctx, a.dag, configVars)
 	if err != nil {
 		logger.Warn(ctx, "Failed to initialize OpenTelemetry tracer", tag.Error(err))
 		// Continue without tracing
@@ -291,9 +309,6 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Initialize the runner
 	a.runner = a.newRunner(attempt)
 
-	// Setup the reporter to send the report to the user.
-	a.setupReporter(ctx)
-
 	// Setup the execution plan for the DAG.
 	if err := a.setupPlan(ctx); err != nil {
 		return fmt.Errorf("failed to setup execution plan: %w", err)
@@ -304,10 +319,6 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Initialize coordinator client factory for distributed execution
 	coordinatorCli := a.createCoordinatorClient(ctx)
-
-	// Resolve secrets if defined
-	a.dag.LoadDotEnv(ctx)
-	secretEnvs, secretErr := a.resolveSecrets(ctx)
 
 	ctx = runtime.NewContext(ctx, a.dag, a.dagRunID, a.logFile,
 		runtime.WithDatabase(dbClient),
@@ -345,6 +356,15 @@ func (a *Agent) Run(ctx context.Context) error {
 	if err := attempt.Open(ctx); err != nil {
 		return fmt.Errorf("failed to open execution history: %w", err)
 	}
+
+	// Evaluate SMTP and mail configs with environment variables and secrets.
+	// This must happen AFTER attempt.Open() to avoid persisting expanded secrets.
+	if err := a.evaluateMailConfigs(ctx); err != nil {
+		return err
+	}
+
+	// Setup the reporter to send notifications (must be after mail config evaluation)
+	a.setupReporter(ctx)
 
 	// Update the status to running
 	st := a.Status(ctx)
@@ -448,7 +468,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			KnownHostFile: a.dag.SSH.KnownHostFile,
 			Shell:         a.dag.SSH.Shell,
 			ShellArgs:     a.dag.SSH.ShellArgs,
-		}, a.dag.ParamsMap())
+		}, runtime.AllEnvsMap(ctx))
 		if err != nil {
 			initErr = fmt.Errorf("failed to evaluate ssh config: %w", err)
 			return initErr
@@ -1010,6 +1030,51 @@ func (a *Agent) resolveSecrets(ctx context.Context) ([]string, error) {
 		tag.Count(len(resolvedSecrets)),
 	)
 	return resolvedSecrets, nil
+}
+
+// evaluateMailConfigs evaluates SMTP and mail notification configs with
+// environment variables and secrets. This follows the same pattern used for
+// container and SSH configs.
+func (a *Agent) evaluateMailConfigs(ctx context.Context) error {
+	vars := runtime.AllEnvsMap(ctx)
+
+	// Evaluate SMTP config if defined
+	if a.dag.SMTP != nil {
+		evaluated, err := cmdutil.EvalObject(ctx, *a.dag.SMTP, vars)
+		if err != nil {
+			return fmt.Errorf("failed to evaluate smtp config: %w", err)
+		}
+		a.dag.SMTP = &evaluated
+	}
+
+	// Evaluate error mail config if defined
+	if a.dag.ErrorMail != nil {
+		evaluated, err := cmdutil.EvalObject(ctx, *a.dag.ErrorMail, vars)
+		if err != nil {
+			return fmt.Errorf("failed to evaluate error mail config: %w", err)
+		}
+		a.dag.ErrorMail = &evaluated
+	}
+
+	// Evaluate info mail config if defined
+	if a.dag.InfoMail != nil {
+		evaluated, err := cmdutil.EvalObject(ctx, *a.dag.InfoMail, vars)
+		if err != nil {
+			return fmt.Errorf("failed to evaluate info mail config: %w", err)
+		}
+		a.dag.InfoMail = &evaluated
+	}
+
+	// Evaluate wait mail config if defined
+	if a.dag.WaitMail != nil {
+		evaluated, err := cmdutil.EvalObject(ctx, *a.dag.WaitMail, vars)
+		if err != nil {
+			return fmt.Errorf("failed to evaluate wait mail config: %w", err)
+		}
+		a.dag.WaitMail = &evaluated
+	}
+
+	return nil
 }
 
 // dryRun performs a dry-run of the DAG. It only simulates the execution of

@@ -34,13 +34,14 @@ type Tracer struct {
 	config   *core.OTelConfig
 }
 
-// NewTracer creates a new OpenTelemetry tracer for a DAG
-func NewTracer(ctx context.Context, dag *core.DAG) (*Tracer, error) {
+// NewTracer creates a new OpenTelemetry tracer for a DAG.
+// The vars parameter is used to evaluate environment variables and secrets in the OTel config.
+func NewTracer(ctx context.Context, dag *core.DAG, vars map[string]string) (*Tracer, error) {
 	if dag.OTel == nil || !dag.OTel.Enabled {
 		return &Tracer{tracer: otel.Tracer(TracerName)}, nil
 	}
 
-	cfg, err := cmdutil.EvalObject(ctx, *dag.OTel, map[string]string{})
+	cfg, err := cmdutil.EvalObject(ctx, *dag.OTel, vars)
 	if err != nil {
 		return nil, fmt.Errorf("failed to evaluate OTel config: %w", err)
 	}
