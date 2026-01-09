@@ -30,7 +30,7 @@ Built for developers who want powerful workflow orchestration without the operat
 ![Demo CLI](./assets/images/demo-cli.webp)
 
 ### Try It Live
-Explore Dagu without installing: [Live Demo](https://victory-snow.exe.xyz:8080/) (credentials: `demouser` / `demouser`)
+Explore Dagu without installing: [Live Demo](http://23.251.149.55:8525/) (credentials: `demouser` / `demouser`)
 
 ## Why Dagu?
 
