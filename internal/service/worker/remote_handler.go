@@ -78,15 +78,21 @@ func (h *remoteTaskHandler) Handle(ctx context.Context, task *coordinatorv1.Task
 
 	switch task.Operation {
 	case coordinatorv1.Operation_OPERATION_START:
-		return h.handleStart(ctx, task)
+		return h.handleStart(ctx, task, false)
 	case coordinatorv1.Operation_OPERATION_RETRY:
+		// OPERATION_RETRY from the queue processor means "execute this queued item".
+		// This is only an actual step retry if a specific Step is specified.
+		// Without a Step, it's a fresh start from the queue (queuedRun = true).
+		if task.Step == "" {
+			return h.handleStart(ctx, task, true)
+		}
 		return h.handleRetry(ctx, task)
 	default:
 		return fmt.Errorf("unsupported operation: %v", task.Operation)
 	}
 }
 
-func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1.Task) error {
+func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1.Task, queuedRun bool) error {
 	// Load the DAG
 	dag, err := h.loadDAG(ctx, task)
 	if err != nil {
@@ -111,7 +117,7 @@ func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1
 	)
 
 	// Create and run the agent
-	return h.executeDAGRun(ctx, dag, task.DagRunId, root, parent, statusPusher, logStreamer)
+	return h.executeDAGRun(ctx, dag, task.DagRunId, root, parent, statusPusher, logStreamer, queuedRun)
 }
 
 func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1.Task) error {
@@ -210,6 +216,7 @@ func (h *remoteTaskHandler) executeDAGRun(
 	parent execution.DAGRunRef,
 	statusPusher *remote.StatusPusher,
 	logStreamer *remote.LogStreamer,
+	queuedRun bool,
 ) error {
 	// For remote mode, we don't write logs locally
 	// Create a temporary directory for any local operations
@@ -236,6 +243,7 @@ func (h *remoteTaskHandler) executeDAGRun(
 			WorkerID:         h.workerID,
 			StatusPusher:     statusPusher,
 			LogWriterFactory: logStreamer,
+			QueuedRun:        queuedRun,
 		},
 	)
 

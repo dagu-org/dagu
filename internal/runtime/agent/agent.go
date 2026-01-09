@@ -143,6 +143,10 @@ type Agent struct {
 	// logWriterFactory is used to create log writers for step output.
 	// When nil, logs are written to local filesystem.
 	logWriterFactory execution.LogWriterFactory
+
+	// queuedRun indicates this execution is from a queued item.
+	// The dag-run was already created by the enqueue command.
+	queuedRun bool
 }
 
 // StatusPusher is an interface for pushing status updates remotely.
@@ -177,6 +181,11 @@ type Options struct {
 	// LogWriterFactory is used to create log writers for step output.
 	// When nil, logs are written to local filesystem.
 	LogWriterFactory execution.LogWriterFactory
+	// QueuedRun indicates this execution is from a queued item.
+	// When true, the agent will find the existing dag-run (created by enqueue)
+	// instead of creating a new one. This is used for distributed execution
+	// where the dag-run directory was already created by the scheduler.
+	QueuedRun bool
 }
 
 // New creates a new Agent.
@@ -211,6 +220,7 @@ func New(
 		workerID:         opts.WorkerID,
 		statusPusher:     opts.StatusPusher,
 		logWriterFactory: opts.LogWriterFactory,
+		queuedRun:        opts.QueuedRun,
 	}
 
 	// Initialize progress display if enabled
@@ -341,13 +351,18 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Initialize coordinator client factory for distributed execution
 	coordinatorCli := a.createCoordinatorClient(ctx)
 
-	ctx = runtime.NewContext(ctx, a.dag, a.dagRunID, a.logFile,
+	contextOpts := []runtime.ContextOption{
 		runtime.WithDatabase(dbClient),
 		runtime.WithRootDAGRun(a.rootDAGRun),
 		runtime.WithParams(a.dag.Params),
 		runtime.WithCoordinator(coordinatorCli),
 		runtime.WithSecrets(secretEnvs),
-	)
+	}
+
+	if a.logWriterFactory != nil {
+		contextOpts = append(contextOpts, runtime.WithLogWriterFactory(a.logWriterFactory))
+	}
+	ctx = runtime.NewContext(ctx, a.dag, a.dagRunID, a.logFile, contextOpts...)
 
 	// Add structured logging context
 	logFields := []slog.Attr{
@@ -851,21 +866,22 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 		)
 }
 
-// writeStatus writes the current status to both local storage and remote coordinator.
-// It writes to local storage via attempt.Write if attempt is not nil.
-// It pushes to remote coordinator via statusPusher if configured.
+// writeStatus writes the current status to storage.
+// In shared-nothing mode (statusPusher is set), it only pushes to the coordinator.
+// In local mode, it writes to local storage via attempt.Write.
 func (a *Agent) writeStatus(ctx context.Context, attempt execution.DAGRunAttempt, status execution.DAGRunStatus) {
-	// Write to local storage if attempt is available
-	if attempt != nil {
-		if err := attempt.Write(ctx, status); err != nil {
-			logger.Error(ctx, "Failed to write status to local storage", tag.Error(err))
-		}
-	}
-
-	// Push to remote coordinator if configured
+	// In shared-nothing mode, only push to coordinator (coordinator writes to its storage)
 	if a.statusPusher != nil {
 		if err := a.statusPusher.Push(ctx, status); err != nil {
 			logger.Error(ctx, "Failed to push status to coordinator", tag.Error(err))
+		}
+		return
+	}
+
+	// In local mode, write to local storage
+	if attempt != nil {
+		if err := attempt.Write(ctx, status); err != nil {
+			logger.Error(ctx, "Failed to write status to local storage", tag.Error(err))
 		}
 	}
 }
@@ -1249,7 +1265,10 @@ func (a *Agent) setupDAGRunAttempt(ctx context.Context) (execution.DAGRunAttempt
 		logger.Error(ctx, "DAG runs data cleanup failed", tag.Error(err))
 	}
 
-	opts := execution.NewDAGRunAttemptOptions{Retry: a.retryTarget != nil}
+	// Retry is true when:
+	// 1. Retrying a failed execution (retryTarget != nil)
+	// 2. Running from queue (queuedRun = true) - the dag-run was already created by enqueue
+	opts := execution.NewDAGRunAttemptOptions{Retry: a.retryTarget != nil || a.queuedRun}
 	if a.isSubDAGRun.Load() {
 		opts.RootDAGRun = &a.rootDAGRun
 	}

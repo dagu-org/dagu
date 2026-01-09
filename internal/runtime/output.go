@@ -201,6 +201,22 @@ func (oc *OutputCoordinator) closeResources() error {
 
 	var lastErr error
 
+	// Close stdout/stderr writers if they implement io.Closer.
+	// This is needed for remote log streaming where the writers need
+	// to flush their buffers and send final markers.
+	closedWriters := make(map[io.Writer]bool)
+	for _, w := range []io.Writer{oc.stdoutWriter, oc.stderrWriter, oc.stdoutRedirectWriter, oc.stderrRedirectWriter} {
+		if w == nil || closedWriters[w] {
+			continue
+		}
+		closedWriters[w] = true
+		if closer, ok := w.(io.Closer); ok {
+			if err := closer.Close(); err != nil {
+				lastErr = err
+			}
+		}
+	}
+
 	// Close the output writer first to signal EOF to any readers
 	if oc.outputWriter != nil {
 		_ = oc.outputWriter.Close()

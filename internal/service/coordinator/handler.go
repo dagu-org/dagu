@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"google.golang.org/grpc/codes"
@@ -36,6 +37,10 @@ type Handler struct {
 	// Optional: for shared-nothing worker architecture
 	dagRunStore execution.DAGRunStore // For status persistence
 	logDir      string                // For log storage
+
+	// Open attempts cache for status persistence
+	attemptsMu     sync.Mutex
+	openAttempts   map[string]execution.DAGRunAttempt // dagRunID -> open attempt
 }
 
 // HandlerOption configures the Handler
@@ -59,6 +64,7 @@ func NewHandler(opts ...HandlerOption) *Handler {
 	h := &Handler{
 		waitingPollers: make(map[string]*workerInfo),
 		heartbeats:     make(map[string]*heartbeatInfo),
+		openAttempts:   make(map[string]execution.DAGRunAttempt),
 	}
 	for _, opt := range opts {
 		opt(h)
@@ -245,15 +251,12 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 	// Convert proto to execution.DAGRunStatus
 	dagRunStatus := protoToDAGRunStatus(req.Status)
 
-	// Find or create the attempt
-	ref := execution.DAGRunRef{Name: dagRunStatus.Name, ID: dagRunStatus.DAGRunID}
-	attempt, err := h.dagRunStore.FindAttempt(ctx, ref)
+	// Get or create an open attempt for this dag run
+	attempt, err := h.getOrOpenAttempt(ctx, dagRunStatus.Name, dagRunStatus.DAGRunID)
 	if err != nil {
-		// Attempt doesn't exist - this shouldn't happen in normal flow
-		// because the scheduler/coordinator should have created it
 		return &coordinatorv1.ReportStatusResponse{
 			Accepted: false,
-			Error:    "attempt not found: " + err.Error(),
+			Error:    err.Error(),
 		}, nil
 	}
 
@@ -265,7 +268,59 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 		}, nil
 	}
 
+	// Note: We don't close the attempt immediately on terminal status because
+	// the agent may push the same terminal status multiple times from different
+	// code paths. Attempts are cleaned up during coordinator shutdown.
+
 	return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
+}
+
+// getOrOpenAttempt retrieves an open attempt from cache or opens a new one
+func (h *Handler) getOrOpenAttempt(ctx context.Context, dagName, dagRunID string) (execution.DAGRunAttempt, error) {
+	h.attemptsMu.Lock()
+	defer h.attemptsMu.Unlock()
+
+	// Check cache first
+	if attempt, ok := h.openAttempts[dagRunID]; ok {
+		return attempt, nil
+	}
+
+	// Find the attempt
+	ref := execution.DAGRunRef{Name: dagName, ID: dagRunID}
+	attempt, err := h.dagRunStore.FindAttempt(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+
+	// Open the attempt for writing
+	if err := attempt.Open(ctx); err != nil {
+		return nil, err
+	}
+
+	// Cache the open attempt
+	h.openAttempts[dagRunID] = attempt
+	return attempt, nil
+}
+
+// closeAttempt closes an open attempt and removes it from cache
+func (h *Handler) closeAttempt(ctx context.Context, dagRunID string) {
+	h.attemptsMu.Lock()
+	defer h.attemptsMu.Unlock()
+
+	if attempt, ok := h.openAttempts[dagRunID]; ok {
+		_ = attempt.Close(ctx)
+		delete(h.openAttempts, dagRunID)
+	}
+}
+
+// isTerminalStatus checks if the status is a terminal state (execution completed)
+func isTerminalStatus(s core.Status) bool {
+	switch s {
+	case core.Succeeded, core.PartiallySucceeded, core.Failed, core.Aborted, core.Rejected:
+		return true
+	default:
+		return false
+	}
 }
 
 // StreamLogs receives log streams from workers and writes them to local filesystem.
