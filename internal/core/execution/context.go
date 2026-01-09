@@ -34,9 +34,17 @@ type Context struct {
 // - Remote streaming to coordinator (shared-nothing mode)
 type LogWriterFactory interface {
 	// NewStepWriter creates a writer for a step's log output.
-	// stepName identifies the step, streamType: 1 = stdout, 2 = stderr.
+	// stepName identifies the step, streamType should be StreamTypeStdout or StreamTypeStderr.
 	NewStepWriter(ctx context.Context, stepName string, streamType int) io.WriteCloser
 }
+
+// Stream type constants for LogWriterFactory.NewStepWriter
+const (
+	// StreamTypeStdout indicates stdout stream
+	StreamTypeStdout = 1
+	// StreamTypeStderr indicates stderr stream
+	StreamTypeStderr = 2
+)
 
 // UserEnvsMap returns only user-defined environment variables as a map,
 // excluding OS environment (BaseEnv). Use this for isolated execution environments.

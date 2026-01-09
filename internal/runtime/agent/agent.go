@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -143,17 +142,12 @@ type Agent struct {
 
 	// logWriterFactory is used to create log writers for step output.
 	// When nil, logs are written to local filesystem.
-	logWriterFactory LogWriterFactory
+	logWriterFactory execution.LogWriterFactory
 }
 
 // StatusPusher is an interface for pushing status updates remotely.
 type StatusPusher interface {
 	Push(ctx context.Context, status execution.DAGRunStatus) error
-}
-
-// LogWriterFactory creates log writers for step stdout/stderr.
-type LogWriterFactory interface {
-	NewStepWriter(ctx context.Context, stepName string, streamType int) io.WriteCloser
 }
 
 // Options is the configuration for the Agent.
@@ -182,7 +176,7 @@ type Options struct {
 	StatusPusher StatusPusher
 	// LogWriterFactory is used to create log writers for step output.
 	// When nil, logs are written to local filesystem.
-	LogWriterFactory LogWriterFactory
+	LogWriterFactory execution.LogWriterFactory
 }
 
 // New creates a new Agent.
