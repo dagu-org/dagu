@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -135,6 +136,24 @@ type Agent struct {
 
 	// tracer is the OpenTelemetry tracer for the agent.
 	tracer *telemetry.Tracer
+
+	// statusPusher is used to push status updates to a remote coordinator.
+	// When nil, status is written to local filesystem via DAGRunAttempt.
+	statusPusher StatusPusher
+
+	// logWriterFactory is used to create log writers for step output.
+	// When nil, logs are written to local filesystem.
+	logWriterFactory LogWriterFactory
+}
+
+// StatusPusher is an interface for pushing status updates remotely.
+type StatusPusher interface {
+	Push(ctx context.Context, status execution.DAGRunStatus) error
+}
+
+// LogWriterFactory creates log writers for step stdout/stderr.
+type LogWriterFactory interface {
+	NewStepWriter(ctx context.Context, stepName string, streamType int) io.WriteCloser
 }
 
 // Options is the configuration for the Agent.
@@ -158,6 +177,12 @@ type Options struct {
 	// For distributed execution, this is set to the worker's ID.
 	// For local execution, this defaults to "local".
 	WorkerID string
+	// StatusPusher is used to push status updates to a remote coordinator.
+	// When nil, status is written to local filesystem via DAGRunAttempt.
+	StatusPusher StatusPusher
+	// LogWriterFactory is used to create log writers for step output.
+	// When nil, logs are written to local filesystem.
+	LogWriterFactory LogWriterFactory
 }
 
 // New creates a new Agent.
@@ -175,21 +200,23 @@ func New(
 	opts Options,
 ) *Agent {
 	a := &Agent{
-		rootDAGRun:   root,
-		parentDAGRun: opts.ParentDAGRun,
-		dagRunID:     dagRunID,
-		dag:          dag,
-		dry:          opts.Dry,
-		retryTarget:  opts.RetryTarget,
-		logDir:       logDir,
-		logFile:      logFile,
-		dagRunMgr:    drm,
-		dagStore:     ds,
-		dagRunStore:  drs,
-		registry:     reg,
-		stepRetry:    opts.StepRetry,
-		peerConfig:   peerConfig,
-		workerID:     opts.WorkerID,
+		rootDAGRun:       root,
+		parentDAGRun:     opts.ParentDAGRun,
+		dagRunID:         dagRunID,
+		dag:              dag,
+		dry:              opts.Dry,
+		retryTarget:      opts.RetryTarget,
+		logDir:           logDir,
+		logFile:          logFile,
+		dagRunMgr:        drm,
+		dagStore:         ds,
+		dagRunStore:      drs,
+		registry:         reg,
+		stepRetry:        opts.StepRetry,
+		peerConfig:       peerConfig,
+		workerID:         opts.WorkerID,
+		statusPusher:     opts.StatusPusher,
+		logWriterFactory: opts.LogWriterFactory,
 	}
 
 	// Initialize progress display if enabled
@@ -369,9 +396,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Update the status to running
 	st := a.Status(ctx)
 	st.Status = core.Running
-	if err := attempt.Write(ctx, st); err != nil {
-		logger.Error(ctx, "Status write failed", tag.Error(err))
-	}
+	a.writeStatus(ctx, attempt, st)
 
 	defer func() {
 		if initErr != nil {
@@ -379,9 +404,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			logger.Error(ctx, "Failed to initialize DAG execution", tag.Error(initErr))
 			st := a.Status(ctx)
 			st.Status = core.Failed
-			if err := attempt.Write(ctx, st); err != nil {
-				logger.Error(ctx, "Status write failed", tag.Error(err))
-			}
+			a.writeStatus(ctx, attempt, st)
 		}
 		if err := attempt.Close(ctx); err != nil {
 			logger.Error(ctx, "Failed to close runstore store", tag.Error(err))
@@ -394,9 +417,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		return initErr
 	}
 
-	if err := attempt.Write(ctx, a.Status(ctx)); err != nil {
-		logger.Error(ctx, "Failed to write status", tag.Error(err))
-	}
+	a.writeStatus(ctx, attempt, a.Status(ctx))
 
 	// Start the unix socket server for receiving HTTP requests from
 	// the local client (e.g., the frontend server, etc).
@@ -526,9 +547,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		defer close(progressDone)
 		for node := range progressCh {
 			status := a.Status(ctx)
-			if err := attempt.Write(ctx, status); err != nil {
-				logger.Error(ctx, "Failed to write status", tag.Error(err))
-			}
+			a.writeStatus(ctx, attempt, status)
 			if err := a.reporter.reportStep(ctx, a.dag, status, node); err != nil {
 				logger.Error(ctx, "Failed to report step", tag.Error(err))
 			}
@@ -550,9 +569,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		if a.finished.Load() {
 			return
 		}
-		if err := attempt.Write(ctx, a.Status(ctx)); err != nil {
-			logger.Error(ctx, "Status write failed", tag.Error(err))
-		}
+		a.writeStatus(ctx, attempt, a.Status(ctx))
 	})
 
 	// Start the dag-run.
@@ -610,9 +627,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Finalize status (after outputs are written)
-	if err := attempt.Write(ctx, a.Status(ctx)); err != nil {
-		logger.Error(ctx, "Status write failed", tag.Error(err))
-	}
+	a.writeStatus(ctx, attempt, a.Status(ctx))
 
 	// Send the execution report if necessary.
 	a.lastErr = lastErr
@@ -840,6 +855,25 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 			a.plan.StartAt(),
 			opts...,
 		)
+}
+
+// writeStatus writes the current status to both local storage and remote coordinator.
+// It writes to local storage via attempt.Write if attempt is not nil.
+// It pushes to remote coordinator via statusPusher if configured.
+func (a *Agent) writeStatus(ctx context.Context, attempt execution.DAGRunAttempt, status execution.DAGRunStatus) {
+	// Write to local storage if attempt is available
+	if attempt != nil {
+		if err := attempt.Write(ctx, status); err != nil {
+			logger.Error(ctx, "Failed to write status to local storage", tag.Error(err))
+		}
+	}
+
+	// Push to remote coordinator if configured
+	if a.statusPusher != nil {
+		if err := a.statusPusher.Push(ctx, status); err != nil {
+			logger.Error(ctx, "Failed to push status to coordinator", tag.Error(err))
+		}
+	}
 }
 
 // watchCancelRequested is a goroutine that watches for cancel requests

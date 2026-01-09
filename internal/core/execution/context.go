@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/common/config"
@@ -24,6 +25,17 @@ type Context struct {
 	CoordinatorCli     Dispatcher
 	Shell              string // Default shell for this DAG (from DAG.Shell)
 	LogEncodingCharset string // Character encoding for log files (e.g., "utf-8", "shift_jis", "euc-jp")
+	LogWriterFactory   LogWriterFactory // For remote log streaming (nil = use local files)
+}
+
+// LogWriterFactory creates log writers for step stdout/stderr.
+// It abstracts where logs are written, allowing for:
+// - Local file-based storage (default)
+// - Remote streaming to coordinator (shared-nothing mode)
+type LogWriterFactory interface {
+	// NewStepWriter creates a writer for a step's log output.
+	// stepName identifies the step, streamType: 1 = stdout, 2 = stderr.
+	NewStepWriter(ctx context.Context, stepName string, streamType int) io.WriteCloser
 }
 
 // UserEnvsMap returns only user-defined environment variables as a map,
@@ -150,6 +162,7 @@ type contextOptions struct {
 	coordinator        Dispatcher
 	secretEnvs         []string
 	logEncodingCharset string
+	logWriterFactory   LogWriterFactory
 }
 
 // ContextOption configures optional parameters for NewContext.
@@ -197,6 +210,14 @@ func WithLogEncoding(charset string) ContextOption {
 	}
 }
 
+// WithLogWriterFactory sets the log writer factory for remote log streaming.
+// When set, logs are streamed to the coordinator instead of written to local files.
+func WithLogWriterFactory(factory LogWriterFactory) ContextOption {
+	return func(o *contextOptions) {
+		o.logWriterFactory = factory
+	}
+}
+
 // NewContext creates a new context with DAG execution metadata.
 // Required: ctx, dag, dagRunID, logFile
 // Optional: use ContextOption functions (WithDatabase, WithParams, etc.)
@@ -237,6 +258,7 @@ func NewContext(
 		CoordinatorCli:     options.coordinator,
 		Shell:              dag.Shell,
 		LogEncodingCharset: options.logEncodingCharset,
+		LogWriterFactory:   options.logWriterFactory,
 	})
 }
 

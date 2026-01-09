@@ -19,10 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CoordinatorService_Poll_FullMethodName       = "/coordinator.v1.CoordinatorService/Poll"
-	CoordinatorService_Dispatch_FullMethodName   = "/coordinator.v1.CoordinatorService/Dispatch"
-	CoordinatorService_GetWorkers_FullMethodName = "/coordinator.v1.CoordinatorService/GetWorkers"
-	CoordinatorService_Heartbeat_FullMethodName  = "/coordinator.v1.CoordinatorService/Heartbeat"
+	CoordinatorService_Poll_FullMethodName         = "/coordinator.v1.CoordinatorService/Poll"
+	CoordinatorService_Dispatch_FullMethodName     = "/coordinator.v1.CoordinatorService/Dispatch"
+	CoordinatorService_GetWorkers_FullMethodName   = "/coordinator.v1.CoordinatorService/GetWorkers"
+	CoordinatorService_Heartbeat_FullMethodName    = "/coordinator.v1.CoordinatorService/Heartbeat"
+	CoordinatorService_ReportStatus_FullMethodName = "/coordinator.v1.CoordinatorService/ReportStatus"
+	CoordinatorService_StreamLogs_FullMethodName   = "/coordinator.v1.CoordinatorService/StreamLogs"
 )
 
 // CoordinatorServiceClient is the client API for CoordinatorService service.
@@ -39,6 +41,12 @@ type CoordinatorServiceClient interface {
 	GetWorkers(ctx context.Context, in *GetWorkersRequest, opts ...grpc.CallOption) (*GetWorkersResponse, error)
 	// Heartbeat is called by workers to report their status.
 	Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error)
+	// ReportStatus is called by workers to push DAG run status updates.
+	// Used in shared-nothing architecture where workers don't have filesystem access.
+	ReportStatus(ctx context.Context, in *ReportStatusRequest, opts ...grpc.CallOption) (*ReportStatusResponse, error)
+	// StreamLogs is called by workers to stream step logs to the coordinator.
+	// Uses client streaming for efficient log transmission.
+	StreamLogs(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[LogChunk, StreamLogsResponse], error)
 }
 
 type coordinatorServiceClient struct {
@@ -89,6 +97,29 @@ func (c *coordinatorServiceClient) Heartbeat(ctx context.Context, in *HeartbeatR
 	return out, nil
 }
 
+func (c *coordinatorServiceClient) ReportStatus(ctx context.Context, in *ReportStatusRequest, opts ...grpc.CallOption) (*ReportStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReportStatusResponse)
+	err := c.cc.Invoke(ctx, CoordinatorService_ReportStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coordinatorServiceClient) StreamLogs(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[LogChunk, StreamLogsResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &CoordinatorService_ServiceDesc.Streams[0], CoordinatorService_StreamLogs_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[LogChunk, StreamLogsResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type CoordinatorService_StreamLogsClient = grpc.ClientStreamingClient[LogChunk, StreamLogsResponse]
+
 // CoordinatorServiceServer is the server API for CoordinatorService service.
 // All implementations must embed UnimplementedCoordinatorServiceServer
 // for forward compatibility.
@@ -103,6 +134,12 @@ type CoordinatorServiceServer interface {
 	GetWorkers(context.Context, *GetWorkersRequest) (*GetWorkersResponse, error)
 	// Heartbeat is called by workers to report their status.
 	Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error)
+	// ReportStatus is called by workers to push DAG run status updates.
+	// Used in shared-nothing architecture where workers don't have filesystem access.
+	ReportStatus(context.Context, *ReportStatusRequest) (*ReportStatusResponse, error)
+	// StreamLogs is called by workers to stream step logs to the coordinator.
+	// Uses client streaming for efficient log transmission.
+	StreamLogs(grpc.ClientStreamingServer[LogChunk, StreamLogsResponse]) error
 	mustEmbedUnimplementedCoordinatorServiceServer()
 }
 
@@ -124,6 +161,12 @@ func (UnimplementedCoordinatorServiceServer) GetWorkers(context.Context, *GetWor
 }
 func (UnimplementedCoordinatorServiceServer) Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Heartbeat not implemented")
+}
+func (UnimplementedCoordinatorServiceServer) ReportStatus(context.Context, *ReportStatusRequest) (*ReportStatusResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReportStatus not implemented")
+}
+func (UnimplementedCoordinatorServiceServer) StreamLogs(grpc.ClientStreamingServer[LogChunk, StreamLogsResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method StreamLogs not implemented")
 }
 func (UnimplementedCoordinatorServiceServer) mustEmbedUnimplementedCoordinatorServiceServer() {}
 func (UnimplementedCoordinatorServiceServer) testEmbeddedByValue()                            {}
@@ -218,6 +261,31 @@ func _CoordinatorService_Heartbeat_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CoordinatorService_ReportStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReportStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoordinatorServiceServer).ReportStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoordinatorService_ReportStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoordinatorServiceServer).ReportStatus(ctx, req.(*ReportStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CoordinatorService_StreamLogs_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(CoordinatorServiceServer).StreamLogs(&grpc.GenericServerStream[LogChunk, StreamLogsResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type CoordinatorService_StreamLogsServer = grpc.ClientStreamingServer[LogChunk, StreamLogsResponse]
+
 // CoordinatorService_ServiceDesc is the grpc.ServiceDesc for CoordinatorService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -241,7 +309,17 @@ var CoordinatorService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "Heartbeat",
 			Handler:    _CoordinatorService_Heartbeat_Handler,
 		},
+		{
+			MethodName: "ReportStatus",
+			Handler:    _CoordinatorService_ReportStatus_Handler,
+		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "StreamLogs",
+			Handler:       _CoordinatorService_StreamLogs_Handler,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "proto/coordinator/v1/coordinator.proto",
 }

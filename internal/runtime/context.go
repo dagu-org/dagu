@@ -38,7 +38,12 @@ var (
 	WithSecrets = execution.WithSecrets
 	// WithLogEncoding sets the log file character encoding.
 	WithLogEncoding = execution.WithLogEncoding
+	// WithLogWriterFactory sets the log writer factory for remote log streaming.
+	WithLogWriterFactory = execution.WithLogWriterFactory
 )
+
+// LogWriterFactory is re-exported from execution package
+type LogWriterFactory = execution.LogWriterFactory
 
 // GetDAGContext retrieves the DAGContext from the context.
 // This is a convenience wrapper for execution.GetContext.

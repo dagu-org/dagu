@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/core/execution"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -31,13 +32,38 @@ type Handler struct {
 	mu             sync.Mutex
 	waitingPollers map[string]*workerInfo    // pollerID -> worker info
 	heartbeats     map[string]*heartbeatInfo // workerID -> heartbeat info
+
+	// Optional: for shared-nothing worker architecture
+	dagRunStore execution.DAGRunStore // For status persistence
+	logDir      string                // For log storage
 }
 
-func NewHandler() *Handler {
-	return &Handler{
+// HandlerOption configures the Handler
+type HandlerOption func(*Handler)
+
+// WithDAGRunStore sets the DAGRunStore for status persistence
+func WithDAGRunStore(store execution.DAGRunStore) HandlerOption {
+	return func(h *Handler) {
+		h.dagRunStore = store
+	}
+}
+
+// WithLogDir sets the log directory for log storage
+func WithLogDir(dir string) HandlerOption {
+	return func(h *Handler) {
+		h.logDir = dir
+	}
+}
+
+func NewHandler(opts ...HandlerOption) *Handler {
+	h := &Handler{
 		waitingPollers: make(map[string]*workerInfo),
 		heartbeats:     make(map[string]*heartbeatInfo),
 	}
+	for _, opt := range opts {
+		opt(h)
+	}
+	return h
 }
 
 // Poll implements long polling - workers wait until a task is available
@@ -203,4 +229,53 @@ func (h *Handler) Heartbeat(_ context.Context, req *coordinatorv1.HeartbeatReque
 	}
 
 	return &coordinatorv1.HeartbeatResponse{}, nil
+}
+
+// ReportStatus receives status updates from workers and persists them.
+// This is used in shared-nothing architecture where workers don't have filesystem access.
+func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+	if h.dagRunStore == nil {
+		return nil, status.Error(codes.FailedPrecondition, "status reporting not configured: dagRunStore is nil")
+	}
+
+	if req.Status == nil {
+		return nil, status.Error(codes.InvalidArgument, "status is required")
+	}
+
+	// Convert proto to execution.DAGRunStatus
+	dagRunStatus := protoToDAGRunStatus(req.Status)
+
+	// Find or create the attempt
+	ref := execution.DAGRunRef{Name: dagRunStatus.Name, ID: dagRunStatus.DAGRunID}
+	attempt, err := h.dagRunStore.FindAttempt(ctx, ref)
+	if err != nil {
+		// Attempt doesn't exist - this shouldn't happen in normal flow
+		// because the scheduler/coordinator should have created it
+		return &coordinatorv1.ReportStatusResponse{
+			Accepted: false,
+			Error:    "attempt not found: " + err.Error(),
+		}, nil
+	}
+
+	// Write the status
+	if err := attempt.Write(ctx, *dagRunStatus); err != nil {
+		return &coordinatorv1.ReportStatusResponse{
+			Accepted: false,
+			Error:    "failed to write status: " + err.Error(),
+		}, nil
+	}
+
+	return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
+}
+
+// StreamLogs receives log streams from workers and writes them to local filesystem.
+// This is used in shared-nothing architecture where workers don't have filesystem access.
+func (h *Handler) StreamLogs(stream coordinatorv1.CoordinatorService_StreamLogsServer) error {
+	if h.logDir == "" {
+		return status.Error(codes.FailedPrecondition, "log streaming not configured: logDir is nil")
+	}
+
+	// Delegate to the log handler
+	logHandler := newLogHandler(h.logDir)
+	return logHandler.handleStream(stream)
 }

@@ -602,7 +602,48 @@ func (l *ConfigLoader) loadWorkerConfig(cfg *Config, def Definition) {
 				}
 			}
 		}
+
+		// Parse coordinators for static service discovery
+		if def.Worker.Coordinators != nil {
+			cfg.Worker.Coordinators = parseCoordinatorAddresses(def.Worker.Coordinators)
+		}
 	}
+}
+
+// parseCoordinatorAddresses parses coordinator addresses from various input formats.
+// It accepts either a comma-separated string or a list of strings.
+func parseCoordinatorAddresses(input interface{}) []string {
+	var addresses []string
+
+	switch v := input.(type) {
+	case string:
+		// Parse comma-separated string: "host1:port1,host2:port2"
+		if v != "" {
+			parts := strings.Split(v, ",")
+			for _, part := range parts {
+				part = strings.TrimSpace(part)
+				if part != "" {
+					addresses = append(addresses, part)
+				}
+			}
+		}
+	case []interface{}:
+		// Parse list from YAML
+		for _, item := range v {
+			if addr, ok := item.(string); ok && addr != "" {
+				addresses = append(addresses, strings.TrimSpace(addr))
+			}
+		}
+	case []string:
+		// Already a string slice
+		for _, addr := range v {
+			if addr = strings.TrimSpace(addr); addr != "" {
+				addresses = append(addresses, addr)
+			}
+		}
+	}
+
+	return addresses
 }
 
 // loadSchedulerConfig loads the scheduler configuration.
@@ -1054,6 +1095,7 @@ var envBindings = []envBinding{
 	{key: "worker.id", env: "WORKER_ID"},
 	{key: "worker.maxActiveRuns", env: "WORKER_MAX_ACTIVE_RUNS"},
 	{key: "worker.labels", env: "WORKER_LABELS"},
+	{key: "worker.coordinators", env: "WORKER_COORDINATORS"},
 
 	// Peer configuration
 	{key: "peer.certFile", env: "PEER_CERT_FILE"},

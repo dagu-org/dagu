@@ -273,10 +273,41 @@ func (oc *OutputCoordinator) setupStderrRedirect(ctx context.Context, data NodeD
 	return nil
 }
 
-func (oc *OutputCoordinator) setupWriters(_ context.Context, data NodeData) error {
+func (oc *OutputCoordinator) setupWriters(ctx context.Context, data NodeData) error {
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
+	// Check if remote log streaming is available
+	rCtx := GetDAGContext(ctx)
+	if rCtx.LogWriterFactory != nil {
+		return oc.setupRemoteWriters(ctx, data, rCtx.LogWriterFactory)
+	}
+
+	// Local file-based writers (default)
+	return oc.setupLocalWriters(ctx, data)
+}
+
+// setupRemoteWriters creates writers that stream to coordinator
+func (oc *OutputCoordinator) setupRemoteWriters(ctx context.Context, data NodeData, factory LogWriterFactory) error {
+	stepName := data.Step.Name
+
+	// Create streaming writers for stdout (type 1) and stderr (type 2)
+	oc.stdoutWriter = factory.NewStepWriter(ctx, stepName, 1) // stdout
+	oc.stdoutFileName = data.State.Stdout                     // Keep path for status reporting
+
+	// Check if stdout and stderr should be merged
+	if data.State.Stdout == data.State.Stderr {
+		oc.stderrWriter = oc.stdoutWriter
+	} else {
+		oc.stderrWriter = factory.NewStepWriter(ctx, stepName, 2) // stderr
+	}
+	oc.stderrFileName = data.State.Stderr
+
+	return nil
+}
+
+// setupLocalWriters creates file-based writers (original behavior)
+func (oc *OutputCoordinator) setupLocalWriters(_ context.Context, data NodeData) error {
 	// Check if stdout and stderr should be merged (same file path)
 	isMerged := data.State.Stdout == data.State.Stderr
 

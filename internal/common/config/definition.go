@@ -318,6 +318,12 @@ type WorkerDef struct {
 	// Labels are the worker labels for capability matching.
 	// Can be either a string (key1=value1,key2=value2) or a map in YAML.
 	Labels interface{} `mapstructure:"labels"`
+
+	// Coordinators is a list of coordinator addresses for static service discovery.
+	// Can be either a string (host1:port1,host2:port2) or a list in YAML.
+	// When specified, the worker will connect directly to these coordinators
+	// instead of using the file-based service registry.
+	Coordinators interface{} `mapstructure:"coordinators"`
 }
 
 // SchedulerDef holds the configuration for the scheduler.

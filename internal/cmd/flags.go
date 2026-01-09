@@ -213,6 +213,14 @@ var (
 		bindViper: true,
 	}
 
+	// workerCoordinatorsFlag specifies coordinator addresses for static service discovery.
+	// This enables shared-nothing deployment where workers don't need access to the service registry.
+	workerCoordinatorsFlag = commandLineFlag{
+		name:      "worker.coordinators",
+		usage:     "Coordinator addresses for static discovery (format: host1:port1,host2:port2)",
+		bindViper: true,
+	}
+
 	// peerInsecureFlag disables TLS for peer connections.
 	peerInsecureFlag = commandLineFlag{
 		name:      "peer.insecure",
