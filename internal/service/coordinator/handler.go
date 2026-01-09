@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"google.golang.org/grpc/codes"
@@ -300,27 +299,6 @@ func (h *Handler) getOrOpenAttempt(ctx context.Context, dagName, dagRunID string
 	// Cache the open attempt
 	h.openAttempts[dagRunID] = attempt
 	return attempt, nil
-}
-
-// closeAttempt closes an open attempt and removes it from cache
-func (h *Handler) closeAttempt(ctx context.Context, dagRunID string) {
-	h.attemptsMu.Lock()
-	defer h.attemptsMu.Unlock()
-
-	if attempt, ok := h.openAttempts[dagRunID]; ok {
-		_ = attempt.Close(ctx)
-		delete(h.openAttempts, dagRunID)
-	}
-}
-
-// isTerminalStatus checks if the status is a terminal state (execution completed)
-func isTerminalStatus(s core.Status) bool {
-	switch s {
-	case core.Succeeded, core.PartiallySucceeded, core.Failed, core.Aborted, core.Rejected:
-		return true
-	default:
-		return false
-	}
 }
 
 // StreamLogs receives log streams from workers and writes them to local filesystem.
