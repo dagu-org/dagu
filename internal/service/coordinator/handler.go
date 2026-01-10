@@ -483,8 +483,12 @@ func (h *Handler) StartZombieDetector(ctx context.Context, interval time.Duratio
 // WaitZombieDetector waits for the zombie detector goroutine to finish.
 // This should be called after the context passed to StartZombieDetector is canceled.
 func (h *Handler) WaitZombieDetector() {
-	if h.zombieDetectorDone != nil {
-		<-h.zombieDetectorDone
+	h.zombieDetectorMu.Lock()
+	done := h.zombieDetectorDone
+	h.zombieDetectorMu.Unlock()
+
+	if done != nil {
+		<-done
 	}
 }
 
