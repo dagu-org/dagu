@@ -416,21 +416,7 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 			}
 
 		case <-ticker.C:
-			// Check if the sub DAG run has completed
-			isCompleted, err := e.isSubDAGRunCompleted(ctx, dagRunID)
-			if err != nil {
-				logger.Warn(waitCtx, "Failed to check sub DAG run completion",
-					tag.Error(err),
-				)
-				continue // Retry on error
-			}
-
-			if !isCompleted {
-				logger.Debug(waitCtx, "Sub DAG run not completed yet")
-				continue // Not completed, keep polling
-			}
-
-			// Check the final status of the sub DAG run
+			// Get sub DAG run status (single RPC call)
 			result, err := e.getSubDAGRunStatus(ctx, dagRunID)
 			if err != nil {
 				// Not found yet, continue polling
@@ -440,7 +426,13 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 				continue
 			}
 
-			// If we got a result, the sub DAG has completed
+			// Check if completed based on status
+			if result.Status.IsActive() {
+				logger.Debug(waitCtx, "Sub DAG run not completed yet")
+				continue // Not completed, keep polling
+			}
+
+			// Sub DAG has completed
 			logger.Info(waitCtx, "Distributed execution completed",
 				tag.Name(result.Name),
 			)
@@ -532,31 +524,6 @@ func extractOutputsFromNodes(nodes []*execution.Node) map[string]string {
 		})
 	}
 	return outputs
-}
-
-// isSubDAGRunCompleted checks if a sub-DAG run has completed.
-// For distributed runs, it queries the coordinator; otherwise, it uses the local DB.
-func (e *SubDAGExecutor) isSubDAGRunCompleted(ctx context.Context, dagRunID string) (bool, error) {
-	rCtx := execution.GetContext(ctx)
-
-	if e.coordinatorCli != nil {
-		rootRef := &rCtx.RootDAGRun
-		resp, err := e.coordinatorCli.GetDAGRunStatus(ctx, e.DAG.Name, dagRunID, rootRef)
-		if err != nil {
-			return false, fmt.Errorf("failed to get DAG run status from coordinator: %w", err)
-		}
-		if !resp.Found {
-			return false, nil
-		}
-		dagRunStatus := convert.ProtoToDAGRunStatus(resp.Status)
-		return !dagRunStatus.Status.IsActive(), nil
-	}
-
-	if rCtx.DB != nil {
-		return rCtx.DB.IsSubDAGRunCompleted(ctx, dagRunID, rCtx.RootDAGRun)
-	}
-
-	return false, fmt.Errorf("no coordinator or database available to check sub-DAG completion")
 }
 
 // Kill terminates all running sub DAG processes (both local and distributed)

@@ -327,14 +327,13 @@ steps:
 		runRef := execution.NewDAGRunRef(st.Name, st.DAGRunID)
 		var canceled bool
 		for _, child := range parallelNode.SubRuns {
-			att, _ := coord.DAGRunStore.FindSubAttempt(coord.Context, runRef, child.DAGRunID)
-			if att == nil {
+			att, findErr := coord.DAGRunStore.FindSubAttempt(coord.Context, runRef, child.DAGRunID)
+			if findErr != nil || att == nil {
 				continue
 			}
-			require.NoError(t, err)
 
-			status, err := att.ReadStatus(coord.Context)
-			require.NoError(t, err)
+			status, readErr := att.ReadStatus(coord.Context)
+			require.NoError(t, readErr)
 			require.Equal(t, core.Aborted, status.Status)
 			canceled = true
 		}

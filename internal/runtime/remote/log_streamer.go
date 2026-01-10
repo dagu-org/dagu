@@ -169,6 +169,7 @@ func (w *stepLogWriter) Close() error {
 
 	// Send final marker
 	if w.stream != nil {
+		w.sequence++
 		finalChunk := &coordinatorv1.LogChunk{
 			WorkerId:       w.streamer.workerID,
 			DagRunId:       w.streamer.dagRunID,
@@ -176,6 +177,7 @@ func (w *stepLogWriter) Close() error {
 			StepName:       w.stepName,
 			StreamType:     toProtoStreamType(w.streamType),
 			IsFinal:        true,
+			Sequence:       w.sequence,
 			RootDagRunName: w.streamer.rootRef.Name,
 			RootDagRunId:   w.streamer.rootRef.ID,
 			AttemptId:      w.streamer.getAttemptID(),

@@ -135,6 +135,8 @@ func (m *Manager) stopSingleDAGRun(ctx context.Context, dag *core.DAG, dagRunID 
 				logger.Info(ctx, "Successfully stopped DAG via socket")
 				return nil
 			}
+			logger.Debug(ctx, "Socket stop request failed, will use abort flag",
+				tag.Error(err))
 		}
 	}
 

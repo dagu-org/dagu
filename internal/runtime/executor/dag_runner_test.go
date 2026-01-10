@@ -271,14 +271,10 @@ func TestCleanup_LocalDAG(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Create a temporary file
-	tempDir := filepath.Join(os.TempDir(), "dagu-test")
-	err := os.MkdirAll(tempDir, 0750)
-	require.NoError(t, err)
-	defer func() { _ = os.RemoveAll(tempDir) }()
-
+	// Create a temporary file using t.TempDir() for automatic cleanup
+	tempDir := t.TempDir()
 	tempFile := filepath.Join(tempDir, "test.yaml")
-	err = os.WriteFile(tempFile, []byte("test content"), 0600)
+	err := os.WriteFile(tempFile, []byte("test content"), 0600)
 	require.NoError(t, err)
 
 	executor := &SubDAGExecutor{

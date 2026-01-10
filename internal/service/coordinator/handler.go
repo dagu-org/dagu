@@ -52,7 +52,9 @@ type Handler struct {
 	openAttempts map[string]execution.DAGRunAttempt // dagRunID -> open attempt
 
 	// Zombie detector shutdown synchronization
-	zombieDetectorDone chan struct{}
+	zombieDetectorMu      sync.Mutex
+	zombieDetectorStarted bool
+	zombieDetectorDone    chan struct{}
 }
 
 // HandlerOption configures the Handler
@@ -91,7 +93,10 @@ func (h *Handler) Close(ctx context.Context) {
 	defer h.attemptsMu.Unlock()
 
 	for dagRunID, attempt := range h.openAttempts {
-		_ = attempt.Close(ctx)
+		if err := attempt.Close(ctx); err != nil {
+			logger.Warn(ctx, "Failed to close attempt during handler shutdown",
+				tag.RunID(dagRunID), tag.Error(err))
+		}
 		delete(h.openAttempts, dagRunID)
 	}
 }
@@ -389,7 +394,7 @@ func (h *Handler) getOrOpenAttemptWithFinder(ctx context.Context, cacheKey strin
 // This is used in shared-nothing architecture where workers don't have filesystem access.
 func (h *Handler) StreamLogs(stream coordinatorv1.CoordinatorService_StreamLogsServer) error {
 	if h.logDir == "" {
-		return status.Error(codes.FailedPrecondition, "log streaming not configured: logDir is nil")
+		return status.Error(codes.FailedPrecondition, "log streaming not configured: logDir is empty")
 	}
 
 	// Delegate to the log handler
@@ -448,8 +453,17 @@ func (h *Handler) GetDAGRunStatus(ctx context.Context, req *coordinatorv1.GetDAG
 // It detects workers that have stopped sending heartbeats and marks their running tasks as failed.
 // The interval parameter controls how often the detector runs (recommended: 45 seconds).
 // Call WaitZombieDetector after canceling the context to ensure clean shutdown.
+// This method is safe to call multiple times; subsequent calls are no-ops.
 func (h *Handler) StartZombieDetector(ctx context.Context, interval time.Duration) {
+	h.zombieDetectorMu.Lock()
+	defer h.zombieDetectorMu.Unlock()
+
+	if h.zombieDetectorStarted {
+		return // Already started
+	}
+	h.zombieDetectorStarted = true
 	h.zombieDetectorDone = make(chan struct{})
+
 	go func() {
 		defer close(h.zombieDetectorDone)
 		ticker := time.NewTicker(interval)
@@ -519,16 +533,20 @@ func (h *Handler) markWorkerTasksFailed(ctx context.Context, info *heartbeatInfo
 
 // markRunFailed marks a single DAG run as FAILED.
 // This is used to clean up zombie runs when their worker becomes unresponsive.
+// Uses context.WithoutCancel to ensure cleanup I/O completes even if the
+// zombie detector context is canceled mid-flight.
 func (h *Handler) markRunFailed(ctx context.Context, dagName, dagRunID, reason string) {
+	// Use non-cancelable context for store operations to ensure cleanup completes
+	storeCtx := context.WithoutCancel(ctx)
 	ref := execution.DAGRunRef{Name: dagName, ID: dagRunID}
-	attempt, err := h.dagRunStore.FindAttempt(ctx, ref)
+	attempt, err := h.dagRunStore.FindAttempt(storeCtx, ref)
 	if err != nil {
 		logger.Error(ctx, "Failed to find attempt for zombie cleanup",
 			tag.DAG(dagName), tag.RunID(dagRunID), tag.Error(err))
 		return
 	}
 
-	dagRunStatus, err := attempt.ReadStatus(ctx)
+	dagRunStatus, err := attempt.ReadStatus(storeCtx)
 	if err != nil {
 		logger.Error(ctx, "Failed to read status for zombie cleanup",
 			tag.DAG(dagName), tag.RunID(dagRunID), tag.Error(err))
@@ -556,14 +574,14 @@ func (h *Handler) markRunFailed(ctx context.Context, dagName, dagRunID, reason s
 	}
 
 	// Persist the failed status
-	if err := attempt.Open(ctx); err != nil {
+	if err := attempt.Open(storeCtx); err != nil {
 		logger.Error(ctx, "Failed to open attempt for zombie cleanup",
 			tag.DAG(dagName), tag.RunID(dagRunID), tag.Error(err))
 		return
 	}
-	defer func() { _ = attempt.Close(ctx) }()
+	defer func() { _ = attempt.Close(storeCtx) }()
 
-	if err := attempt.Write(ctx, *dagRunStatus); err != nil {
+	if err := attempt.Write(storeCtx, *dagRunStatus); err != nil {
 		logger.Error(ctx, "Failed to write failed status for zombie cleanup",
 			tag.DAG(dagName), tag.RunID(dagRunID), tag.Error(err))
 		return

@@ -183,8 +183,12 @@ func TestHandler_Poll(t *testing.T) {
 			}
 		}()
 
-		// Give the poller time to register
-		time.Sleep(100 * time.Millisecond)
+		// Wait for poller to register
+		require.Eventually(t, func() bool {
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			return len(h.waitingPollers) == 1
+		}, time.Second, 10*time.Millisecond)
 
 		// Dispatch a task
 		task := &coordinatorv1.Task{
@@ -253,8 +257,12 @@ func TestHandler_Poll(t *testing.T) {
 			pollDone <- err
 		}()
 
-		// Give the poller time to register
-		time.Sleep(100 * time.Millisecond)
+		// Wait for poller to register
+		require.Eventually(t, func() bool {
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			return len(h.waitingPollers) == 1
+		}, time.Second, 10*time.Millisecond)
 
 		// Cancel the context
 		cancel()
@@ -739,11 +747,12 @@ func TestHandler_ZombieDetection(t *testing.T) {
 
 		h.StartZombieDetector(ctx, 50*time.Millisecond)
 
-		// Wait for detector to run
-		time.Sleep(100 * time.Millisecond)
+		// Wait for detector to mark task as failed
+		require.Eventually(t, func() bool {
+			return attempt.WasWritten()
+		}, time.Second, 10*time.Millisecond)
 
 		// Verify the task was marked as failed
-		require.True(t, attempt.WasWritten())
 		s, _ := attempt.ReadStatus(ctx)
 		require.Equal(t, core.Failed, s.Status)
 	})

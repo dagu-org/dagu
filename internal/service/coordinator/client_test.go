@@ -21,13 +21,13 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func parsePort(addr string) int {
-	parts := strings.Split(addr, ":")
-	if len(parts) < 2 {
-		return 0
+func parseHostPort(addr string) (string, int) {
+	host, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "", 0
 	}
-	port, _ := strconv.Atoi(parts[1])
-	return port
+	port, _ := strconv.Atoi(portStr)
+	return host, port
 }
 
 func TestClientNew(t *testing.T) {
@@ -67,9 +67,10 @@ func TestClientDispatch(t *testing.T) {
 		server, addr := startMockServer(t, mockCoord)
 		defer server.Stop()
 
+		host, port := parseHostPort(addr)
 		monitor := &mockServiceMonitor{
 			members: []execution.HostInfo{
-				{ID: "coord-1", Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: execution.ServiceStatusActive},
+				{ID: "coord-1", Host: host, Port: port, Status: execution.ServiceStatusActive},
 			},
 		}
 
@@ -138,8 +139,9 @@ func TestClientPoll(t *testing.T) {
 	server, addr := startMockServer(t, mockCoord)
 	defer server.Stop()
 
+	host, port := parseHostPort(addr)
 	monitor := &mockServiceMonitor{
-		members: []execution.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: execution.ServiceStatusActive}},
+		members: []execution.HostInfo{{Host: host, Port: port, Status: execution.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -185,8 +187,9 @@ func TestClientGetWorkers(t *testing.T) {
 	server, addr := startMockServer(t, mockCoord)
 	defer server.Stop()
 
+	host, port := parseHostPort(addr)
 	monitor := &mockServiceMonitor{
-		members: []execution.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: execution.ServiceStatusActive}},
+		members: []execution.HostInfo{{Host: host, Port: port, Status: execution.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -218,8 +221,9 @@ func TestClientHeartbeat(t *testing.T) {
 	server, addr := startMockServer(t, mockCoord)
 	defer server.Stop()
 
+	host, port := parseHostPort(addr)
 	monitor := &mockServiceMonitor{
-		members: []execution.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: execution.ServiceStatusActive}},
+		members: []execution.HostInfo{{Host: host, Port: port, Status: execution.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -262,8 +266,9 @@ func TestClientMetrics(t *testing.T) {
 	server, addr := startMockServer(t, mockCoord)
 	defer server.Stop()
 
+	host, port := parseHostPort(addr)
 	monitor := &mockServiceMonitor{
-		members: []execution.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: execution.ServiceStatusActive}},
+		members: []execution.HostInfo{{Host: host, Port: port, Status: execution.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -304,8 +309,9 @@ func TestClientCleanup(t *testing.T) {
 	server, addr := startMockServer(t, mockCoord)
 	defer server.Stop()
 
+	host, port := parseHostPort(addr)
 	monitor := &mockServiceMonitor{
-		members: []execution.HostInfo{{Host: strings.Split(addr, ":")[0], Port: parsePort(addr), Status: execution.ServiceStatusActive}},
+		members: []execution.HostInfo{{Host: host, Port: port, Status: execution.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)

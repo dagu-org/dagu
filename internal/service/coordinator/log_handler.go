@@ -65,6 +65,7 @@ func newLogHandler(logDir string) *logHandler {
 
 // handleStream processes the log stream from a worker
 func (h *logHandler) handleStream(stream coordinatorv1.CoordinatorService_StreamLogsServer) error {
+	ctx := stream.Context()
 	var chunksReceived uint64
 	var bytesWritten uint64
 
@@ -85,7 +86,7 @@ func (h *logHandler) handleStream(stream coordinatorv1.CoordinatorService_Stream
 
 		// Handle final marker
 		if chunk.IsFinal {
-			h.closeWriter(chunk)
+			h.closeWriter(ctx, chunk)
 			continue
 		}
 
@@ -120,11 +121,13 @@ func (h *logHandler) handleStream(stream coordinatorv1.CoordinatorService_Stream
 	}
 }
 
-// streamKey creates a unique key for identifying a log stream
+// streamKey creates a unique key for identifying a log stream.
+// Includes AttemptId to prevent collisions during retry scenarios.
 func (h *logHandler) streamKey(chunk *coordinatorv1.LogChunk) string {
-	return fmt.Sprintf("%s/%s/%s/%s",
+	return fmt.Sprintf("%s/%s/%s/%s/%s",
 		chunk.DagName,
 		chunk.DagRunId,
+		chunk.AttemptId,
 		chunk.StepName,
 		chunk.StreamType.String(),
 	)
@@ -169,14 +172,14 @@ func (h *logHandler) getOrCreateWriter(chunk *coordinatorv1.LogChunk) (*logWrite
 }
 
 // closeWriter closes and removes a writer
-func (h *logHandler) closeWriter(chunk *coordinatorv1.LogChunk) {
+func (h *logHandler) closeWriter(ctx context.Context, chunk *coordinatorv1.LogChunk) {
 	key := h.streamKey(chunk)
 
 	h.writersMu.Lock()
 	defer h.writersMu.Unlock()
 
 	if w, ok := h.writers[key]; ok {
-		w.close(context.Background())
+		w.close(ctx)
 		delete(h.writers, key)
 	}
 }
