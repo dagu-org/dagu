@@ -580,17 +580,8 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		}
 	}
 
-	// Check for validation errors (e.g., duplicate step names)
-	if len(dag.BuildErrors) > 0 {
-		var errMessages []string
-		for _, buildErr := range dag.BuildErrors {
-			errMessages = append(errMessages, buildErr.Error())
-		}
-		return nil, &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeBadRequest,
-			Message:    strings.Join(errMessages, "; "),
-		}
+	if err := buildErrorsToAPIError(dag.BuildErrors); err != nil {
+		return nil, err
 	}
 
 	var dagRunId, params string
@@ -657,6 +648,22 @@ func (a *API) startDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, 
 		nameOverride: nameOverride,
 		singleton:    singleton,
 	})
+}
+
+// buildErrorsToAPIError returns an API error if the DAG has build errors, nil otherwise.
+func buildErrorsToAPIError(buildErrors []error) *Error {
+	if len(buildErrors) == 0 {
+		return nil
+	}
+	var errMessages []string
+	for _, buildErr := range buildErrors {
+		errMessages = append(errMessages, buildErr.Error())
+	}
+	return &Error{
+		HTTPStatus: http.StatusBadRequest,
+		Code:       api.ErrorCodeBadRequest,
+		Message:    strings.Join(errMessages, "; "),
+	}
 }
 
 // ensureDAGRunIDUnique validates that the given dagRunID is not already in use for this DAG.
@@ -759,17 +766,8 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		}
 	}
 
-	// Check for validation errors (e.g., duplicate step names)
-	if len(dag.BuildErrors) > 0 {
-		var errMessages []string
-		for _, buildErr := range dag.BuildErrors {
-			errMessages = append(errMessages, buildErr.Error())
-		}
-		return nil, &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeBadRequest,
-			Message:    strings.Join(errMessages, "; "),
-		}
+	if err := buildErrorsToAPIError(dag.BuildErrors); err != nil {
+		return nil, err
 	}
 
 	// Apply queue override if provided
