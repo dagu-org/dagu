@@ -5,6 +5,7 @@ package oidcprovision
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -19,6 +20,10 @@ type mockUserStore struct {
 	users          map[string]*auth.User
 	byUsername     map[string]*auth.User
 	byOIDCIdentity map[string]*auth.User
+
+	// Error injection for testing error paths
+	getByOIDCIdentityErr error
+	createErr            error
 }
 
 func newMockUserStore() *mockUserStore {
@@ -30,6 +35,9 @@ func newMockUserStore() *mockUserStore {
 }
 
 func (m *mockUserStore) Create(_ context.Context, user *auth.User) error {
+	if m.createErr != nil {
+		return m.createErr
+	}
 	if _, exists := m.users[user.ID]; exists {
 		return auth.ErrUserAlreadyExists
 	}
@@ -62,6 +70,9 @@ func (m *mockUserStore) GetByUsername(_ context.Context, username string) (*auth
 }
 
 func (m *mockUserStore) GetByOIDCIdentity(_ context.Context, issuer, subject string) (*auth.User, error) {
+	if m.getByOIDCIdentityErr != nil {
+		return nil, m.getByOIDCIdentityErr
+	}
 	key := issuer + ":" + subject
 	user, exists := m.byOIDCIdentity[key]
 	if !exists {
@@ -480,4 +491,164 @@ func TestIsEmailAllowed(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+// Tests for error paths and edge cases
+
+func TestProcessLogin_OIDCIdentityLookupError(t *testing.T) {
+	store := newMockUserStore()
+	store.getByOIDCIdentityErr = errors.New("database connection failed")
+
+	svc := New(store, Config{
+		Issuer:      "https://issuer.example.com",
+		AutoSignup:  true,
+		DefaultRole: auth.RoleViewer,
+	})
+
+	claims := OIDCClaims{
+		Subject:           "sub123",
+		Email:             "user@example.com",
+		PreferredUsername: "testuser",
+	}
+
+	user, isNew, err := svc.ProcessLogin(context.Background(), claims)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to lookup OIDC identity")
+	assert.Nil(t, user)
+	assert.False(t, isNew)
+}
+
+func TestProcessLogin_UserCreationError(t *testing.T) {
+	store := newMockUserStore()
+	store.createErr = errors.New("database write failed")
+
+	svc := New(store, Config{
+		Issuer:      "https://issuer.example.com",
+		AutoSignup:  true,
+		DefaultRole: auth.RoleViewer,
+	})
+
+	claims := OIDCClaims{
+		Subject:           "sub123",
+		Email:             "user@example.com",
+		PreferredUsername: "testuser",
+	}
+
+	user, isNew, err := svc.ProcessLogin(context.Background(), claims)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create OIDC user")
+	assert.Nil(t, user)
+	assert.False(t, isNew)
+}
+
+func TestExtractDomain(t *testing.T) {
+	svc := &Service{}
+
+	tests := []struct {
+		email    string
+		expected string
+	}{
+		{"user@example.com", "example.com"},
+		{"invalid-email", ""},
+		{"multiple@at@signs.com", ""},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.email, func(t *testing.T) {
+			result := svc.extractDomain(tt.email)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestEmailLocalPart(t *testing.T) {
+	svc := &Service{}
+
+	tests := []struct {
+		email    string
+		expected string
+	}{
+		{"user@example.com", "user"},
+		{"john.doe@company.org", "john.doe"},
+		{"invalid-email", ""},
+		{"multiple@at@signs.com", ""},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.email, func(t *testing.T) {
+			result := svc.emailLocalPart(tt.email)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestGenerateUniqueUsername_SanitizedToEmpty(t *testing.T) {
+	store := newMockUserStore()
+	svc := New(store, Config{
+		Issuer:      "https://issuer.example.com",
+		AutoSignup:  true,
+		DefaultRole: auth.RoleViewer,
+	})
+
+	// Both preferred_username and email local part sanitize to empty
+	claims := OIDCClaims{
+		Subject:           "abcd1234efgh",
+		Email:             "!!!@example.com", // Sanitizes to empty
+		PreferredUsername: "日本語",            // Non-ASCII, sanitizes to empty
+	}
+
+	username := svc.generateUniqueUsername(context.Background(), claims)
+	assert.Equal(t, "user_abcd1234", username) // Falls back to subject
+}
+
+func TestGenerateUniqueUsername_ShortSubject(t *testing.T) {
+	store := newMockUserStore()
+	svc := New(store, Config{
+		Issuer:      "https://issuer.example.com",
+		AutoSignup:  true,
+		DefaultRole: auth.RoleViewer,
+	})
+
+	// Subject is less than 8 characters
+	claims := OIDCClaims{
+		Subject:           "abc",
+		Email:             "!!!@example.com", // Sanitizes to empty
+		PreferredUsername: "",
+	}
+
+	username := svc.generateUniqueUsername(context.Background(), claims)
+	assert.Equal(t, "user_abc", username) // Uses full short subject
+}
+
+func TestGenerateUniqueUsername_SSONumberedFallback(t *testing.T) {
+	store := newMockUserStore()
+
+	// Block base username with builtin user, and also block _sso variant
+	_ = store.Create(context.Background(), &auth.User{
+		ID:           "builtin-id",
+		Username:     "johndoe",
+		AuthProvider: "builtin",
+	})
+	_ = store.Create(context.Background(), &auth.User{
+		ID:           "sso-id",
+		Username:     "johndoe_sso",
+		AuthProvider: "oidc",
+	})
+
+	svc := New(store, Config{
+		Issuer:      "https://issuer.example.com",
+		AutoSignup:  true,
+		DefaultRole: auth.RoleViewer,
+	})
+
+	claims := OIDCClaims{
+		Subject:           "sub123",
+		Email:             "john.doe@example.com",
+		PreferredUsername: "johndoe",
+	}
+
+	username := svc.generateUniqueUsername(context.Background(), claims)
+	assert.Equal(t, "johndoe_sso2", username) // Falls back to numbered _sso
 }
