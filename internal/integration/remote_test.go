@@ -315,6 +315,69 @@ steps:
 	})
 }
 
+// TestRemote_QueueDispatchWithPreviousStatus verifies that queued DAGs receive PreviousStatus
+// when dispatched to workers in shared-nothing mode.
+// This test ensures the fix for "retry requires either previous_status in task or local dagRunStore"
+// is working correctly.
+func TestRemote_QueueDispatchWithPreviousStatus(t *testing.T) {
+	t.Run("queued DAG receives previous status on dispatch", func(t *testing.T) {
+		yamlContent := `
+name: queue-status-test
+workerSelector:
+  test: "true"
+steps:
+  - name: step1
+    command: echo "step1 executed"
+  - name: step2
+    command: echo "step2 executed"
+    depends: [step1]
+`
+		// Setup coordinator with status persistence (required for shared-nothing mode)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
+		coord.Config.Queues.Enabled = true
+
+		// Setup worker with remote task handler (shared-nothing mode)
+		// This worker has NO access to local dagRunStore - it relies on PreviousStatus from task
+		setupRemoteWorker(t, coord, "worker-1", 10, map[string]string{"test": "true"})
+
+		// Load and enqueue the DAG
+		dagWrapper := coord.DAG(t, yamlContent)
+		coordinatorClient := coord.GetCoordinatorClient(t)
+
+		subCmdBuilder := runtime.NewSubCmdBuilder(coord.Config)
+		enqueueSpec := subCmdBuilder.Enqueue(dagWrapper.DAG, runtime.EnqueueOptions{Quiet: true})
+		err := runtime.Start(coord.Context, enqueueSpec)
+		require.NoError(t, err, "enqueue should succeed")
+
+		// Verify the DAG was queued
+		require.Eventually(t, func() bool {
+			items, _ := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)
+			return len(items) == 1
+		}, 2*time.Second, 50*time.Millisecond, "DAG should be enqueued")
+
+		// Start scheduler - this triggers queue processing which dispatches with PreviousStatus
+		schedulerCtx, schedulerCancel := context.WithTimeout(coord.Context, 30*time.Second)
+		defer schedulerCancel()
+
+		schedulerInst := setupSchedulerWithCoordinator(t, coord, coordinatorClient)
+		go func() { _ = schedulerInst.Start(schedulerCtx) }()
+
+		// Wait for completion - if PreviousStatus is not passed, this would fail with:
+		// "retry requires either previous_status in task or local dagRunStore"
+		status := waitForStatus(t, coord, dagWrapper.DAG, core.Succeeded, 20*time.Second)
+		schedulerCancel()
+
+		// Verify execution succeeded
+		require.Equal(t, core.Succeeded, status.Status, "DAG should succeed")
+		require.Len(t, status.Nodes, 2, "should have 2 nodes")
+
+		// Verify both steps executed
+		for _, node := range status.Nodes {
+			assert.Equal(t, core.NodeSucceeded, node.Status, "node %s should succeed", node.Step.Name)
+		}
+	})
+}
+
 // TestRemote_Cancellation verifies cancellation propagates to workers
 func TestRemote_Cancellation(t *testing.T) {
 	t.Run("cancellation propagates to remote worker", func(t *testing.T) {
