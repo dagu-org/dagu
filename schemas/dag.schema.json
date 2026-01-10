@@ -1107,6 +1107,22 @@
               "config": { "$ref": "#/definitions/archiveExecutorConfig" }
             }
           }
+        },
+        {
+          "if": { "properties": { "type": { "const": "postgres" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/postgresExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "sqlite" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/sqliteExecutorConfig" }
+            }
+          }
         }
       ]
     },
@@ -1809,6 +1825,245 @@
       },
       "description": "Configuration for archive operations (create, extract, list)."
     },
+    "sqlImportConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputFile", "table"],
+      "properties": {
+        "inputFile": {
+          "type": "string",
+          "description": "Path to input file (CSV, TSV, or JSONL). Required."
+        },
+        "table": {
+          "type": "string",
+          "description": "Target table name. Required."
+        },
+        "format": {
+          "type": "string",
+          "enum": ["csv", "tsv", "jsonl"],
+          "description": "Input format. Auto-detected from file extension if not specified."
+        },
+        "hasHeader": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether first row is a header row. Default: false."
+        },
+        "delimiter": {
+          "type": "string",
+          "description": "Field delimiter. Default: ',' for csv, '\\t' for tsv."
+        },
+        "columns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Explicit column names. Overrides header row if specified."
+        },
+        "nullValues": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Values to treat as NULL. Default: ['', 'NULL', 'null', '\\N']."
+        },
+        "batchSize": {
+          "type": "integer",
+          "default": 1000,
+          "description": "Number of rows per INSERT statement. Default: 1000."
+        },
+        "onConflict": {
+          "type": "string",
+          "enum": ["error", "ignore", "replace"],
+          "default": "error",
+          "description": "Conflict handling strategy. Default: 'error'. Note: PostgreSQL 'replace' uses ON CONFLICT DO NOTHING (same as ignore)."
+        },
+        "skipRows": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Skip first N data rows."
+        },
+        "maxRows": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum rows to import. 0 = unlimited."
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Validate without actually importing data."
+        }
+      },
+      "description": "Configuration for importing data from CSV/TSV/JSONL files into a database table."
+    },
+    "postgresExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dsn"],
+      "properties": {
+        "dsn": {
+          "type": "string",
+          "description": "PostgreSQL connection string. Format: postgres://user:pass@host:port/dbname?sslmode=disable"
+        },
+        "maxOpenConns": {
+          "type": "integer",
+          "default": 5,
+          "description": "Maximum number of open connections. Default: 5."
+        },
+        "maxIdleConns": {
+          "type": "integer",
+          "default": 2,
+          "description": "Maximum number of idle connections. Default: 2."
+        },
+        "connMaxLifetime": {
+          "type": "integer",
+          "default": 300,
+          "description": "Maximum connection lifetime in seconds. Default: 300."
+        },
+        "params": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Named parameters as map (e.g., {name: 'value'}). Use :name in query."
+            },
+            {
+              "type": "array",
+              "items": {},
+              "description": "Positional parameters as array. Use $1, $2, etc. in query."
+            }
+          ],
+          "description": "Query parameters for SQL injection prevention."
+        },
+        "timeout": {
+          "type": "integer",
+          "default": 60,
+          "description": "Query timeout in seconds. Default: 60."
+        },
+        "transaction": {
+          "type": "boolean",
+          "description": "Wrap execution in a transaction."
+        },
+        "isolationLevel": {
+          "type": "string",
+          "enum": ["default", "read_committed", "repeatable_read", "serializable"],
+          "description": "Transaction isolation level."
+        },
+        "advisoryLock": {
+          "type": "string",
+          "description": "Named advisory lock. Prevents concurrent execution across distributed workers."
+        },
+        "outputFormat": {
+          "type": "string",
+          "enum": ["jsonl", "json", "csv"],
+          "default": "jsonl",
+          "description": "Output format for query results. Default: jsonl."
+        },
+        "headers": {
+          "type": "boolean",
+          "description": "Include headers in CSV output."
+        },
+        "nullString": {
+          "type": "string",
+          "default": "null",
+          "description": "String representation for NULL values. Default: 'null'."
+        },
+        "maxRows": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum rows to return. 0 = unlimited."
+        },
+        "streaming": {
+          "type": "boolean",
+          "description": "Stream results to file instead of stdout."
+        },
+        "outputFile": {
+          "type": "string",
+          "description": "File path for streaming output."
+        },
+        "import": {
+          "$ref": "#/definitions/sqlImportConfig",
+          "description": "Import data from CSV/TSV/JSONL file into a table."
+        }
+      },
+      "description": "PostgreSQL executor configuration for database operations."
+    },
+    "sqliteExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dsn"],
+      "properties": {
+        "dsn": {
+          "type": "string",
+          "description": "SQLite connection string. Format: file:./path/to/db.sqlite or :memory: for in-memory database."
+        },
+        "maxOpenConns": {
+          "type": "integer",
+          "default": 5,
+          "description": "Maximum number of open connections. Default: 5. Recommended: 1 for SQLite."
+        },
+        "maxIdleConns": {
+          "type": "integer",
+          "default": 2,
+          "description": "Maximum number of idle connections. Default: 2."
+        },
+        "params": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Named parameters as map (e.g., {name: 'value'}). Use :name in query."
+            },
+            {
+              "type": "array",
+              "items": {},
+              "description": "Positional parameters as array. Use ? placeholders in query."
+            }
+          ],
+          "description": "Query parameters for SQL injection prevention."
+        },
+        "timeout": {
+          "type": "integer",
+          "default": 60,
+          "description": "Query timeout in seconds. Default: 60."
+        },
+        "transaction": {
+          "type": "boolean",
+          "description": "Wrap execution in a transaction."
+        },
+        "fileLock": {
+          "type": "boolean",
+          "description": "Use file locking for exclusive database access. Creates a .lock file."
+        },
+        "outputFormat": {
+          "type": "string",
+          "enum": ["jsonl", "json", "csv"],
+          "default": "jsonl",
+          "description": "Output format for query results. Default: jsonl."
+        },
+        "headers": {
+          "type": "boolean",
+          "description": "Include headers in CSV output."
+        },
+        "nullString": {
+          "type": "string",
+          "default": "null",
+          "description": "String representation for NULL values. Default: 'null'."
+        },
+        "maxRows": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum rows to return. 0 = unlimited."
+        },
+        "streaming": {
+          "type": "boolean",
+          "description": "Stream results to file instead of stdout."
+        },
+        "outputFile": {
+          "type": "string",
+          "description": "File path for streaming output."
+        },
+        "import": {
+          "$ref": "#/definitions/sqlImportConfig",
+          "description": "Import data from CSV/TSV/JSONL file into a table."
+        }
+      },
+      "description": "SQLite executor configuration for database operations. Uses pure Go SQLite with automatic pragmas: foreign_keys=ON, busy_timeout=5000."
+    },
     "llmConfig": {
       "type": "object",
       "additionalProperties": false,
@@ -1936,7 +2191,9 @@
         "parallel",
         "archive",
         "chat",
-        "hitl"
+        "hitl",
+        "postgres",
+        "sqlite"
       ],
       "description": "Type of executor to use for this step."
     },
@@ -2016,6 +2273,22 @@
           "then": {
             "properties": {
               "config": { "$ref": "#/definitions/archiveExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "postgres" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/postgresExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "sqlite" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/sqliteExecutorConfig" }
             }
           }
         },
