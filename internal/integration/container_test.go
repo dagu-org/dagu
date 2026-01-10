@@ -967,19 +967,14 @@ steps:
 	dag.Agent().RunCheckErr(t, "timed out waiting for container to be running")
 }
 
-// TestContainerCustomHealthcheck tests that custom healthcheck configuration works correctly.
-// This test verifies that the healthcheck field in container config is properly
-// passed to Docker and that waitFor: healthy actually waits for the container
-// to become healthy (not just running).
+// TestContainerCustomHealthcheck verifies that custom healthcheck configuration
+// is passed to Docker and waitFor: healthy waits for the container to become
+// healthy (not just running). Uses a file creation delay to prove actual waiting.
 func TestContainerCustomHealthcheck(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
 
-	// This test uses a custom healthcheck that checks for a file that is
-	// created after a 2 second delay. This ensures the waitFor: healthy
-	// actually waits for the healthcheck to pass, not just for the container
-	// to be running.
 	dagConfig := fmt.Sprintf(`
 container:
   image: %s
