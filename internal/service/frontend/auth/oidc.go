@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -47,52 +48,90 @@ var oidcProviderFactory = func(ctx context.Context, issuer string) (*oidc.Provid
 	return oidc.NewProvider(ctx, issuer)
 }
 
-func InitVerifierAndConfig(i config.AuthOIDC) (_ *OIDCConfig, err error) {
-	// Basic input validation to fail fast with clearer diagnostics.
-	if i.Issuer == "" {
+// oidcProviderParams holds the common parameters for OIDC provider initialization.
+type oidcProviderParams struct {
+	Issuer       string
+	ClientID     string
+	ClientSecret string
+	ClientURL    string
+	Scopes       []string
+}
+
+// oidcProviderResult holds the initialized OIDC components.
+type oidcProviderResult struct {
+	Provider     *oidc.Provider
+	Verifier     *oidc.IDTokenVerifier
+	OAuth2Config *oauth2.Config
+}
+
+// initOIDCProviderCore initializes the common OIDC provider components.
+func initOIDCProviderCore(params oidcProviderParams) (*oidcProviderResult, error) {
+	// Basic input validation
+	if params.Issuer == "" {
 		return nil, errors.New("failed to init OIDC provider: issuer is empty")
 	}
-	if i.ClientId == "" {
+	if params.ClientID == "" {
 		return nil, errors.New("failed to init OIDC provider: client id is empty")
 	}
-	if i.ClientUrl == "" {
+	if params.ClientURL == "" {
 		return nil, errors.New("failed to init OIDC provider: client url is empty")
 	}
-	// ClientSecret may be empty for public clients; don't enforce.
-
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("failed to init OIDC provider: %v", r)
-		}
-	}()
 
 	ctx := oidc.ClientContext(context.Background(), &http.Client{
 		Timeout: oidcProviderInitTimeout,
 	})
 
-	provider, err := oidcProviderFactory(ctx, i.Issuer)
+	provider, err := oidcProviderFactory(ctx, params.Issuer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init OIDC provider: %w", err)
 	}
 	if provider == nil {
 		return nil, errors.New("failed to init OIDC provider: provider is nil")
 	}
+
 	oidcConfig := &oidc.Config{
-		ClientID: i.ClientId,
+		ClientID: params.ClientID,
 	}
 	verifier := provider.Verifier(oidcConfig)
 	endpoint := provider.Endpoint()
-	config := &oauth2.Config{
+
+	oauth2Config := &oauth2.Config{
+		ClientID:     params.ClientID,
+		ClientSecret: params.ClientSecret,
+		Endpoint:     endpoint,
+		RedirectURL:  fmt.Sprintf("%s/oidc-callback", strings.TrimSuffix(params.ClientURL, "/")),
+		Scopes:       params.Scopes,
+	}
+
+	return &oidcProviderResult{
+		Provider:     provider,
+		Verifier:     verifier,
+		OAuth2Config: oauth2Config,
+	}, nil
+}
+
+func InitVerifierAndConfig(i config.AuthOIDC) (_ *OIDCConfig, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("failed to init OIDC provider: %v", r)
+		}
+	}()
+
+	result, err := initOIDCProviderCore(oidcProviderParams{
+		Issuer:       i.Issuer,
 		ClientID:     i.ClientId,
 		ClientSecret: i.ClientSecret,
-		Endpoint:     endpoint,
-		RedirectURL:  fmt.Sprintf("%s/oidc-callback", strings.TrimSuffix(i.ClientUrl, "/")),
+		ClientURL:    i.ClientUrl,
 		Scopes:       i.Scopes,
+	})
+	if err != nil {
+		return nil, err
 	}
+
 	return &OIDCConfig{
-		Provider: provider,
-		Verifier: verifier,
-		Config:   config,
+		Provider: result.Provider,
+		Verifier: result.Verifier,
+		Config:   result.OAuth2Config,
 	}, nil
 }
 
@@ -163,19 +202,9 @@ func callbackHandler(provider *oidc.Provider, verifier *oidc.IDTokenVerifier,
 			expireSeconds = defaultTokenExpirySecs
 		}
 		setCookie(w, r, cookieOIDCToken, rawIDToken, expireSeconds)
-		clearCookie(w, r, cookieState)
-		clearCookie(w, r, cookieNonce)
-		clearCookie(w, r, cookieOriginalURL)
+		clearOIDCStateCookies(w, r)
 		http.Redirect(w, r, originalURL.Value, http.StatusFound)
 	}
-}
-
-// oidcClaims represents the claims extracted from an OIDC ID token.
-type oidcClaims struct {
-	Subject           string `json:"sub"`
-	Email             string `json:"email"`
-	PreferredUsername string `json:"preferred_username"`
-	Name              string `json:"name"`
 }
 
 // verifyAndExtractUser verifies an ID token and extracts user information.
@@ -188,19 +217,13 @@ func verifyAndExtractUser(verifier *oidc.IDTokenVerifier, raw string) (*auth.Use
 		return nil, err
 	}
 
-	var claims oidcClaims
+	var claims oidcprovision.OIDCClaims
 	if err := token.Claims(&claims); err != nil {
 		return nil, err
 	}
 
-	// Determine username: prefer preferred_username, then email, then subject
-	username := claims.PreferredUsername
-	if username == "" {
-		username = claims.Email
-	}
-	if username == "" {
-		username = claims.Subject
-	}
+	// Determine username with fallback: preferred_username -> email -> subject
+	username := cmp.Or(claims.PreferredUsername, claims.Email, claims.Subject)
 
 	return &auth.User{
 		ID:       claims.Subject,
@@ -288,6 +311,13 @@ func clearCookie(w http.ResponseWriter, r *http.Request, name string) {
 	setCookie(w, r, name, "", -1)
 }
 
+// clearOIDCStateCookies removes all OIDC-related state cookies.
+func clearOIDCStateCookies(w http.ResponseWriter, r *http.Request) {
+	clearCookie(w, r, cookieState)
+	clearCookie(w, r, cookieNonce)
+	clearCookie(w, r, cookieOriginalURL)
+}
+
 func isSecureRequest(r *http.Request) bool {
 	if r.TLS != nil {
 		return true
@@ -307,41 +337,15 @@ type BuiltinOIDCConfig struct {
 
 // InitBuiltinOIDCConfig initializes OIDC for builtin auth mode.
 func InitBuiltinOIDCConfig(cfg config.BuiltinOIDC, authSvc *authservice.Service, provisionSvc *oidcprovision.Service, basePath string) (*BuiltinOIDCConfig, error) {
-	// Basic input validation
-	if cfg.Issuer == "" {
-		return nil, errors.New("failed to init OIDC provider: issuer is empty")
-	}
-	if cfg.ClientId == "" {
-		return nil, errors.New("failed to init OIDC provider: client id is empty")
-	}
-	if cfg.ClientUrl == "" {
-		return nil, errors.New("failed to init OIDC provider: client url is empty")
-	}
-
-	ctx := oidc.ClientContext(context.Background(), &http.Client{
-		Timeout: oidcProviderInitTimeout,
-	})
-
-	provider, err := oidcProviderFactory(ctx, cfg.Issuer)
-	if err != nil {
-		return nil, fmt.Errorf("failed to init OIDC provider: %w", err)
-	}
-	if provider == nil {
-		return nil, errors.New("failed to init OIDC provider: provider is nil")
-	}
-
-	oidcConfig := &oidc.Config{
-		ClientID: cfg.ClientId,
-	}
-	verifier := provider.Verifier(oidcConfig)
-	endpoint := provider.Endpoint()
-
-	oauth2Config := &oauth2.Config{
+	result, err := initOIDCProviderCore(oidcProviderParams{
+		Issuer:       cfg.Issuer,
 		ClientID:     cfg.ClientId,
 		ClientSecret: cfg.ClientSecret,
-		Endpoint:     endpoint,
-		RedirectURL:  fmt.Sprintf("%s/oidc-callback", strings.TrimSuffix(cfg.ClientUrl, "/")),
+		ClientURL:    cfg.ClientUrl,
 		Scopes:       cfg.Scopes,
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	loginBasePath := basePath
@@ -353,9 +357,9 @@ func InitBuiltinOIDCConfig(cfg config.BuiltinOIDC, authSvc *authservice.Service,
 	}
 
 	return &BuiltinOIDCConfig{
-		Provider:      provider,
-		Verifier:      verifier,
-		OAuth2Config:  oauth2Config,
+		Provider:      result.Provider,
+		Verifier:      result.Verifier,
+		OAuth2Config:  result.OAuth2Config,
 		Provision:     provisionSvc,
 		AuthService:   authSvc,
 		LoginBasePath: loginBasePath,
@@ -438,7 +442,7 @@ func BuiltinOIDCCallbackHandler(cfg *BuiltinOIDCConfig) http.HandlerFunc {
 		}
 
 		// Extract claims
-		var claims oidcClaims
+		var claims oidcprovision.OIDCClaims
 		if err := idToken.Claims(&claims); err != nil {
 			logger.Error(ctx, "Failed to extract OIDC claims", tag.Error(err))
 			redirectWithError(w, r, cfg.LoginBasePath, "Authentication failed: could not read user info")
@@ -458,14 +462,7 @@ func BuiltinOIDCCallbackHandler(cfg *BuiltinOIDCConfig) http.HandlerFunc {
 		}
 
 		// Process login (create/lookup user)
-		provisionClaims := oidcprovision.OIDCClaims{
-			Subject:           claims.Subject,
-			Email:             claims.Email,
-			PreferredUsername: claims.PreferredUsername,
-			Name:              claims.Name,
-		}
-
-		user, isNewUser, err := cfg.Provision.ProcessLogin(ctx, provisionClaims)
+		user, isNewUser, err := cfg.Provision.ProcessLogin(ctx, claims)
 		if err != nil {
 			logger.Warn(ctx, "OIDC provisioning failed",
 				slog.String("email", claims.Email),
@@ -484,9 +481,7 @@ func BuiltinOIDCCallbackHandler(cfg *BuiltinOIDCConfig) http.HandlerFunc {
 		}
 
 		// Clear OIDC cookies
-		clearCookie(w, r, cookieState)
-		clearCookie(w, r, cookieNonce)
-		clearCookie(w, r, cookieOriginalURL)
+		clearOIDCStateCookies(w, r)
 
 		// Set JWT token cookie
 		expireSeconds := int(tokenResult.ExpiresAt.Sub(time.Now()).Seconds())
@@ -503,9 +498,7 @@ func BuiltinOIDCCallbackHandler(cfg *BuiltinOIDCConfig) http.HandlerFunc {
 
 // redirectWithError redirects to the login page with an error message.
 func redirectWithError(w http.ResponseWriter, r *http.Request, basePath, errMsg string) {
-	clearCookie(w, r, cookieState)
-	clearCookie(w, r, cookieNonce)
-	clearCookie(w, r, cookieOriginalURL)
+	clearOIDCStateCookies(w, r)
 
 	redirectURL := basePath + "/login?error=" + url.QueryEscape(errMsg)
 	http.Redirect(w, r, redirectURL, http.StatusFound)

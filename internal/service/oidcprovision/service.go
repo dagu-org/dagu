@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/auth"
+	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/google/uuid"
 )
 
@@ -20,8 +21,6 @@ import (
 var (
 	// ErrEmailNotAllowed is returned when the user's email domain is not authorized.
 	ErrEmailNotAllowed = errors.New("your email domain is not authorized")
-	// ErrUserDisabled is returned when the user's account has been disabled.
-	ErrUserDisabled = errors.New("your account has been disabled, contact administrator")
 	// ErrAutoSignupDisabled is returned when auto-signup is disabled and user doesn't exist.
 	ErrAutoSignupDisabled = errors.New("automatic account creation is disabled, contact administrator")
 	// ErrEmailRequired is returned when the email claim is not provided by the identity provider.
@@ -47,13 +46,13 @@ type Config struct {
 // OIDCClaims contains the claims extracted from an OIDC ID token.
 type OIDCClaims struct {
 	// Subject is the unique identifier for the user from the OIDC provider.
-	Subject string
+	Subject string `json:"sub"`
 	// Email is the user's email address.
-	Email string
+	Email string `json:"email"`
 	// PreferredUsername is the user's preferred username from the OIDC provider.
-	PreferredUsername string
+	PreferredUsername string `json:"preferred_username"`
 	// Name is the user's display name.
-	Name string
+	Name string `json:"name"`
 }
 
 // Service provides OIDC user provisioning functionality.
@@ -96,7 +95,7 @@ func (s *Service) ProcessLogin(ctx context.Context, claims OIDCClaims) (*auth.Us
 			s.logger.Warn("OIDC login rejected: user disabled",
 				slog.String("user_id", user.ID),
 				slog.String("username", user.Username))
-			return nil, false, ErrUserDisabled
+			return nil, false, authservice.ErrUserDisabled
 		}
 		s.logger.Debug("OIDC login: existing user",
 			slog.String("user_id", user.ID),

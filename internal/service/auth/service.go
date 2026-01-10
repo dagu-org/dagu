@@ -31,7 +31,7 @@ var (
 	ErrInvalidWebhookToken  = errors.New("invalid webhook token")
 	ErrWebhookNotConfigured = errors.New("webhook management is not configured")
 	ErrWebhookDisabled      = errors.New("webhook is disabled")
-	ErrUserDisabled         = errors.New("user account is disabled")
+	ErrUserDisabled         = errors.New("your account has been disabled, contact administrator")
 )
 
 const (

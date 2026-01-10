@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/auth"
+	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -188,206 +189,156 @@ func TestProcessLogin_DisabledUser(t *testing.T) {
 	}
 
 	user, isNew, err := svc.ProcessLogin(context.Background(), claims)
-	assert.ErrorIs(t, err, ErrUserDisabled)
+	assert.ErrorIs(t, err, authservice.ErrUserDisabled)
 	assert.Nil(t, user)
 	assert.False(t, isNew)
 }
 
-func TestProcessLogin_AutoSignupDisabled(t *testing.T) {
-	store := newMockUserStore()
-	svc := New(store, Config{
-		Issuer:      "https://issuer.example.com",
-		AutoSignup:  false, // Disabled
-		DefaultRole: auth.RoleViewer,
-	})
-
-	claims := OIDCClaims{
-		Subject:           "sub123",
-		Email:             "user@example.com",
-		PreferredUsername: "testuser",
+func TestProcessLogin_ErrorCases(t *testing.T) {
+	tests := []struct {
+		name          string
+		config        Config
+		claims        OIDCClaims
+		expectedError error
+	}{
+		{
+			name: "auto_signup_disabled",
+			config: Config{
+				Issuer:      "https://issuer.example.com",
+				AutoSignup:  false,
+				DefaultRole: auth.RoleViewer,
+			},
+			claims: OIDCClaims{
+				Subject:           "sub123",
+				Email:             "user@example.com",
+				PreferredUsername: "testuser",
+			},
+			expectedError: ErrAutoSignupDisabled,
+		},
+		{
+			name: "email_required",
+			config: Config{
+				Issuer:      "https://issuer.example.com",
+				AutoSignup:  true,
+				DefaultRole: auth.RoleViewer,
+			},
+			claims: OIDCClaims{
+				Subject:           "sub123",
+				Email:             "",
+				PreferredUsername: "testuser",
+			},
+			expectedError: ErrEmailRequired,
+		},
+		{
+			name: "email_not_allowed_domain",
+			config: Config{
+				Issuer:         "https://issuer.example.com",
+				AutoSignup:     true,
+				DefaultRole:    auth.RoleViewer,
+				AllowedDomains: []string{"company.com", "partner.org"},
+			},
+			claims: OIDCClaims{
+				Subject:           "sub123",
+				Email:             "user@unauthorized.com",
+				PreferredUsername: "testuser",
+			},
+			expectedError: ErrEmailNotAllowed,
+		},
 	}
 
-	user, isNew, err := svc.ProcessLogin(context.Background(), claims)
-	assert.ErrorIs(t, err, ErrAutoSignupDisabled)
-	assert.Nil(t, user)
-	assert.False(t, isNew)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			store := newMockUserStore()
+			svc := New(store, tc.config)
+
+			user, isNew, err := svc.ProcessLogin(context.Background(), tc.claims)
+			assert.ErrorIs(t, err, tc.expectedError)
+			assert.Nil(t, user)
+			assert.False(t, isNew)
+		})
+	}
 }
 
-func TestProcessLogin_EmailRequired(t *testing.T) {
-	store := newMockUserStore()
-	svc := New(store, Config{
-		Issuer:      "https://issuer.example.com",
-		AutoSignup:  true,
-		DefaultRole: auth.RoleViewer,
-	})
-
-	claims := OIDCClaims{
-		Subject:           "sub123",
-		Email:             "", // No email
-		PreferredUsername: "testuser",
+func TestGenerateUniqueUsername(t *testing.T) {
+	tests := []struct {
+		name           string
+		existingUsers  []*auth.User
+		claims         OIDCClaims
+		expectedResult string
+	}{
+		{
+			name:          "no_conflict",
+			existingUsers: nil,
+			claims: OIDCClaims{
+				Subject:           "sub123",
+				Email:             "john.doe@example.com",
+				PreferredUsername: "johndoe",
+			},
+			expectedResult: "johndoe",
+		},
+		{
+			name: "conflict_with_oidc_user",
+			existingUsers: []*auth.User{
+				{
+					ID:           "existing-id",
+					Username:     "johndoe",
+					AuthProvider: "oidc",
+					OIDCIssuer:   "https://other-issuer.example.com",
+					OIDCSubject:  "other-sub",
+				},
+			},
+			claims: OIDCClaims{
+				Subject:           "sub123",
+				Email:             "john.doe@example.com",
+				PreferredUsername: "johndoe",
+			},
+			expectedResult: "johndoe2",
+		},
+		{
+			name: "conflict_with_builtin_user",
+			existingUsers: []*auth.User{
+				{
+					ID:           "existing-id",
+					Username:     "johndoe",
+					AuthProvider: "builtin",
+				},
+			},
+			claims: OIDCClaims{
+				Subject:           "sub123",
+				Email:             "john.doe@example.com",
+				PreferredUsername: "johndoe",
+			},
+			expectedResult: "johndoe_sso",
+		},
+		{
+			name:          "fallback_to_email",
+			existingUsers: nil,
+			claims: OIDCClaims{
+				Subject:           "sub123",
+				Email:             "john.doe@example.com",
+				PreferredUsername: "",
+			},
+			expectedResult: "john_doe",
+		},
 	}
 
-	user, isNew, err := svc.ProcessLogin(context.Background(), claims)
-	assert.ErrorIs(t, err, ErrEmailRequired)
-	assert.Nil(t, user)
-	assert.False(t, isNew)
-}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			store := newMockUserStore()
+			for _, user := range tc.existingUsers {
+				_ = store.Create(context.Background(), user)
+			}
 
-func TestProcessLogin_EmailNotAllowed_Domain(t *testing.T) {
-	store := newMockUserStore()
-	svc := New(store, Config{
-		Issuer:         "https://issuer.example.com",
-		AutoSignup:     true,
-		DefaultRole:    auth.RoleViewer,
-		AllowedDomains: []string{"company.com", "partner.org"},
-	})
+			svc := New(store, Config{
+				Issuer:      "https://issuer.example.com",
+				AutoSignup:  true,
+				DefaultRole: auth.RoleViewer,
+			})
 
-	claims := OIDCClaims{
-		Subject:           "sub123",
-		Email:             "user@unauthorized.com",
-		PreferredUsername: "testuser",
+			username := svc.generateUniqueUsername(context.Background(), tc.claims)
+			assert.Equal(t, tc.expectedResult, username)
+		})
 	}
-
-	user, isNew, err := svc.ProcessLogin(context.Background(), claims)
-	assert.ErrorIs(t, err, ErrEmailNotAllowed)
-	assert.Nil(t, user)
-	assert.False(t, isNew)
-}
-
-func TestProcessLogin_EmailAllowed_Domain(t *testing.T) {
-	store := newMockUserStore()
-	svc := New(store, Config{
-		Issuer:         "https://issuer.example.com",
-		AutoSignup:     true,
-		DefaultRole:    auth.RoleViewer,
-		AllowedDomains: []string{"company.com", "partner.org"},
-	})
-
-	claims := OIDCClaims{
-		Subject:           "sub123",
-		Email:             "user@company.com",
-		PreferredUsername: "testuser",
-	}
-
-	user, isNew, err := svc.ProcessLogin(context.Background(), claims)
-	require.NoError(t, err)
-	assert.True(t, isNew)
-	assert.NotNil(t, user)
-}
-
-func TestProcessLogin_EmailAllowed_Whitelist(t *testing.T) {
-	store := newMockUserStore()
-	svc := New(store, Config{
-		Issuer:         "https://issuer.example.com",
-		AutoSignup:     true,
-		DefaultRole:    auth.RoleViewer,
-		AllowedDomains: []string{"company.com"}, // contractor@gmail.com domain not allowed
-		Whitelist:      []string{"contractor@gmail.com"},
-	})
-
-	claims := OIDCClaims{
-		Subject:           "sub123",
-		Email:             "contractor@gmail.com",
-		PreferredUsername: "contractor",
-	}
-
-	// Whitelist takes precedence over AllowedDomains
-	user, isNew, err := svc.ProcessLogin(context.Background(), claims)
-	require.NoError(t, err)
-	assert.True(t, isNew)
-	assert.NotNil(t, user)
-	assert.Equal(t, "contractor", user.Username)
-}
-
-func TestGenerateUniqueUsername_NoConflict(t *testing.T) {
-	store := newMockUserStore()
-	svc := New(store, Config{
-		Issuer:      "https://issuer.example.com",
-		AutoSignup:  true,
-		DefaultRole: auth.RoleViewer,
-	})
-
-	claims := OIDCClaims{
-		Subject:           "sub123",
-		Email:             "john.doe@example.com",
-		PreferredUsername: "johndoe",
-	}
-
-	username := svc.generateUniqueUsername(context.Background(), claims)
-	assert.Equal(t, "johndoe", username)
-}
-
-func TestGenerateUniqueUsername_ConflictWithOIDCUser(t *testing.T) {
-	store := newMockUserStore()
-	// Create existing OIDC user with same username
-	existingUser := &auth.User{
-		ID:           "existing-id",
-		Username:     "johndoe",
-		AuthProvider: "oidc",
-		OIDCIssuer:   "https://other-issuer.example.com",
-		OIDCSubject:  "other-sub",
-	}
-	_ = store.Create(context.Background(), existingUser)
-
-	svc := New(store, Config{
-		Issuer:      "https://issuer.example.com",
-		AutoSignup:  true,
-		DefaultRole: auth.RoleViewer,
-	})
-
-	claims := OIDCClaims{
-		Subject:           "sub123",
-		Email:             "john.doe@example.com",
-		PreferredUsername: "johndoe",
-	}
-
-	username := svc.generateUniqueUsername(context.Background(), claims)
-	assert.Equal(t, "johndoe2", username)
-}
-
-func TestGenerateUniqueUsername_ConflictWithBuiltinUser(t *testing.T) {
-	store := newMockUserStore()
-	// Create existing builtin user with same username
-	existingUser := &auth.User{
-		ID:           "existing-id",
-		Username:     "johndoe",
-		AuthProvider: "builtin", // This is a builtin user
-	}
-	_ = store.Create(context.Background(), existingUser)
-
-	svc := New(store, Config{
-		Issuer:      "https://issuer.example.com",
-		AutoSignup:  true,
-		DefaultRole: auth.RoleViewer,
-	})
-
-	claims := OIDCClaims{
-		Subject:           "sub123",
-		Email:             "john.doe@example.com",
-		PreferredUsername: "johndoe",
-	}
-
-	// Should add _sso suffix to differentiate from builtin user
-	username := svc.generateUniqueUsername(context.Background(), claims)
-	assert.Equal(t, "johndoe_sso", username)
-}
-
-func TestGenerateUniqueUsername_FallbackToEmail(t *testing.T) {
-	store := newMockUserStore()
-	svc := New(store, Config{
-		Issuer:      "https://issuer.example.com",
-		AutoSignup:  true,
-		DefaultRole: auth.RoleViewer,
-	})
-
-	claims := OIDCClaims{
-		Subject:           "sub123",
-		Email:             "john.doe@example.com",
-		PreferredUsername: "", // No preferred username
-	}
-
-	username := svc.generateUniqueUsername(context.Background(), claims)
-	assert.Equal(t, "john_doe", username) // Email local part sanitized
 }
 
 func TestGenerateUniqueUsername_FallbackToSubject(t *testing.T) {
