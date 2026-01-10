@@ -38,6 +38,13 @@ type Store struct {
 	byID map[string]string
 	// byUsername maps username to user ID
 	byUsername map[string]string
+	// byOIDCIdentity maps "issuer:subject" to user ID for OIDC users
+	byOIDCIdentity map[string]string
+}
+
+// oidcIdentityKey creates a composite key for the OIDC identity index.
+func oidcIdentityKey(issuer, subject string) string {
+	return issuer + ":" + subject
 }
 
 var _ auth.UserStore = (*Store)(nil)
@@ -57,9 +64,10 @@ func New(baseDir string, opts ...Option) (*Store, error) {
 	}
 
 	store := &Store{
-		baseDir:    baseDir,
-		byID:       make(map[string]string),
-		byUsername: make(map[string]string),
+		baseDir:        baseDir,
+		byID:           make(map[string]string),
+		byUsername:     make(map[string]string),
+		byOIDCIdentity: make(map[string]string),
 	}
 
 	for _, opt := range opts {
@@ -87,6 +95,7 @@ func (s *Store) rebuildIndex() error {
 	// Clear existing index
 	s.byID = make(map[string]string)
 	s.byUsername = make(map[string]string)
+	s.byOIDCIdentity = make(map[string]string)
 
 	// Scan directory for user files
 	entries, err := os.ReadDir(s.baseDir)
@@ -111,6 +120,12 @@ func (s *Store) rebuildIndex() error {
 
 		s.byID[user.ID] = filePath
 		s.byUsername[user.Username] = user.ID
+
+		// Index OIDC identity if present
+		if user.OIDCIssuer != "" && user.OIDCSubject != "" {
+			key := oidcIdentityKey(user.OIDCIssuer, user.OIDCSubject)
+			s.byOIDCIdentity[key] = user.ID
+		}
 	}
 
 	return nil
@@ -170,6 +185,12 @@ func (s *Store) Create(_ context.Context, user *auth.User) error {
 	// Update index
 	s.byID[user.ID] = filePath
 	s.byUsername[user.Username] = user.ID
+
+	// Index OIDC identity if present
+	if user.OIDCIssuer != "" && user.OIDCSubject != "" {
+		key := oidcIdentityKey(user.OIDCIssuer, user.OIDCSubject)
+		s.byOIDCIdentity[key] = user.ID
+	}
 
 	return nil
 }
@@ -234,6 +255,25 @@ func (s *Store) GetByUsername(ctx context.Context, username string) (*auth.User,
 
 	if !exists {
 		return nil, auth.ErrUserNotFound
+	}
+
+	return s.GetByID(ctx, userID)
+}
+
+// GetByOIDCIdentity retrieves a user by their OIDC identity (issuer + subject).
+func (s *Store) GetByOIDCIdentity(ctx context.Context, issuer, subject string) (*auth.User, error) {
+	if issuer == "" || subject == "" {
+		return nil, auth.ErrOIDCIdentityNotFound
+	}
+
+	key := oidcIdentityKey(issuer, subject)
+
+	s.mu.RLock()
+	userID, exists := s.byOIDCIdentity[key]
+	s.mu.RUnlock()
+
+	if !exists {
+		return nil, auth.ErrOIDCIdentityNotFound
 	}
 
 	return s.GetByID(ctx, userID)

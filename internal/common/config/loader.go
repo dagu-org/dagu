@@ -450,6 +450,25 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 					}
 				}
 			}
+			// Load OIDC configuration under builtin auth
+			if def.Auth.Builtin.OIDC != nil {
+				oidc := def.Auth.Builtin.OIDC
+				if oidc.Enabled != nil {
+					cfg.Server.Auth.Builtin.OIDC.Enabled = *oidc.Enabled
+				}
+				cfg.Server.Auth.Builtin.OIDC.ClientId = oidc.ClientId
+				cfg.Server.Auth.Builtin.OIDC.ClientSecret = oidc.ClientSecret
+				cfg.Server.Auth.Builtin.OIDC.ClientUrl = oidc.ClientUrl
+				cfg.Server.Auth.Builtin.OIDC.Issuer = oidc.Issuer
+				cfg.Server.Auth.Builtin.OIDC.Scopes = oidc.Scopes
+				if oidc.AutoSignup != nil {
+					cfg.Server.Auth.Builtin.OIDC.AutoSignup = *oidc.AutoSignup
+				}
+				cfg.Server.Auth.Builtin.OIDC.DefaultRole = oidc.DefaultRole
+				cfg.Server.Auth.Builtin.OIDC.AllowedDomains = oidc.AllowedDomains
+				cfg.Server.Auth.Builtin.OIDC.Whitelist = oidc.Whitelist
+				cfg.Server.Auth.Builtin.OIDC.ButtonLabel = oidc.ButtonLabel
+			}
 		}
 
 		// Auto-detect auth mode if not explicitly set
@@ -476,6 +495,17 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 	// Set default admin username if not specified
 	if cfg.Server.Auth.Builtin.Admin.Username == "" {
 		cfg.Server.Auth.Builtin.Admin.Username = "admin"
+	}
+
+	// Set defaults for builtin OIDC configuration
+	if len(cfg.Server.Auth.Builtin.OIDC.Scopes) == 0 {
+		cfg.Server.Auth.Builtin.OIDC.Scopes = []string{"openid", "profile", "email"}
+	}
+	if cfg.Server.Auth.Builtin.OIDC.DefaultRole == "" {
+		cfg.Server.Auth.Builtin.OIDC.DefaultRole = "viewer"
+	}
+	if cfg.Server.Auth.Builtin.OIDC.ButtonLabel == "" {
+		cfg.Server.Auth.Builtin.OIDC.ButtonLabel = "Login with SSO"
 	}
 
 	// Normalize the BasePath value for proper URL construction.
@@ -1090,6 +1120,19 @@ var envBindings = []envBinding{
 	{key: "auth.builtin.admin.password", env: "AUTH_ADMIN_PASSWORD"},
 	{key: "auth.builtin.token.secret", env: "AUTH_TOKEN_SECRET"},
 	{key: "auth.builtin.token.ttl", env: "AUTH_TOKEN_TTL"},
+
+	// Authentication configurations (builtin OIDC)
+	{key: "auth.builtin.oidc.enabled", env: "AUTH_BUILTIN_OIDC_ENABLED"},
+	{key: "auth.builtin.oidc.clientId", env: "AUTH_BUILTIN_OIDC_CLIENT_ID"},
+	{key: "auth.builtin.oidc.clientSecret", env: "AUTH_BUILTIN_OIDC_CLIENT_SECRET"},
+	{key: "auth.builtin.oidc.clientUrl", env: "AUTH_BUILTIN_OIDC_CLIENT_URL"},
+	{key: "auth.builtin.oidc.issuer", env: "AUTH_BUILTIN_OIDC_ISSUER"},
+	{key: "auth.builtin.oidc.scopes", env: "AUTH_BUILTIN_OIDC_SCOPES"},
+	{key: "auth.builtin.oidc.autoSignup", env: "AUTH_BUILTIN_OIDC_AUTO_SIGNUP"},
+	{key: "auth.builtin.oidc.defaultRole", env: "AUTH_BUILTIN_OIDC_DEFAULT_ROLE"},
+	{key: "auth.builtin.oidc.allowedDomains", env: "AUTH_BUILTIN_OIDC_ALLOWED_DOMAINS"},
+	{key: "auth.builtin.oidc.whitelist", env: "AUTH_BUILTIN_OIDC_WHITELIST"},
+	{key: "auth.builtin.oidc.buttonLabel", env: "AUTH_BUILTIN_OIDC_BUTTON_LABEL"},
 
 	// TLS configurations
 	{key: "tls.certFile", env: "CERT_FILE"},

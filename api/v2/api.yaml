@@ -4376,6 +4376,13 @@ components:
           description: "User's username"
         role:
           $ref: "#/components/schemas/UserRole"
+        authProvider:
+          type: string
+          enum: [builtin, oidc]
+          description: "Authentication provider (builtin or oidc)"
+        isDisabled:
+          type: boolean
+          description: "Whether the user account is disabled"
         createdAt:
           type: string
           format: date-time

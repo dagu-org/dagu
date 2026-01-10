@@ -175,8 +175,24 @@ type AuthDef struct {
 
 // AuthBuiltinDef represents the builtin authentication configuration
 type AuthBuiltinDef struct {
-	Admin *AdminConfigDef `mapstructure:"admin"`
-	Token *TokenConfigDef `mapstructure:"token"`
+	Admin *AdminConfigDef  `mapstructure:"admin"`
+	Token *TokenConfigDef  `mapstructure:"token"`
+	OIDC  *BuiltinOIDCDef  `mapstructure:"oidc"` // OIDC as a login method under builtin auth
+}
+
+// BuiltinOIDCDef represents the OIDC configuration for builtin auth mode
+type BuiltinOIDCDef struct {
+	Enabled        *bool    `mapstructure:"enabled"`        // Enable OIDC login (default: false)
+	ClientId       string   `mapstructure:"clientId"`       // OIDC client ID
+	ClientSecret   string   `mapstructure:"clientSecret"`   // OIDC client secret
+	ClientUrl      string   `mapstructure:"clientUrl"`      // Application URL for callback
+	Issuer         string   `mapstructure:"issuer"`         // OIDC issuer URL
+	Scopes         []string `mapstructure:"scopes"`         // OIDC scopes (default: openid, profile, email)
+	AutoSignup     *bool    `mapstructure:"autoSignup"`     // Auto-create users on first login (default: false)
+	DefaultRole    string   `mapstructure:"defaultRole"`    // Default role for new users (default: viewer)
+	AllowedDomains []string `mapstructure:"allowedDomains"` // Email domain whitelist
+	Whitelist      []string `mapstructure:"whitelist"`      // Specific email whitelist
+	ButtonLabel    string   `mapstructure:"buttonLabel"`    // Login button text (default: "Login with SSO")
 }
 
 // AdminConfigDef represents the initial admin user configuration

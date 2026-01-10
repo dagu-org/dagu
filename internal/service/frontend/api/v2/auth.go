@@ -112,13 +112,27 @@ func (a *API) ChangePassword(ctx context.Context, request api.ChangePasswordRequ
 // toAPIUser converts a core auth.User into its API representation.
 // The provided user must be non-nil.
 func toAPIUser(user *auth.User) api.User {
-	return api.User{
+	apiUser := api.User{
 		Id:        user.ID,
 		Username:  user.Username,
 		Role:      api.UserRole(user.Role),
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,
 	}
+
+	// Include auth provider (default to "builtin" if empty)
+	authProvider := user.AuthProvider
+	if authProvider == "" {
+		authProvider = "builtin"
+	}
+	apiUser.AuthProvider = (*api.UserAuthProvider)(&authProvider)
+
+	// Include disabled status
+	if user.IsDisabled {
+		apiUser.IsDisabled = &user.IsDisabled
+	}
+
+	return apiUser
 }
 
 // preserving the input order.

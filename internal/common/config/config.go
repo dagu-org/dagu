@@ -170,6 +170,22 @@ type Auth struct {
 type AuthBuiltin struct {
 	Admin AdminConfig
 	Token TokenConfig
+	OIDC  BuiltinOIDC // OIDC as a login method under builtin auth
+}
+
+// BuiltinOIDC represents the OIDC configuration for builtin auth mode
+type BuiltinOIDC struct {
+	Enabled        bool     // Enable OIDC login (default: false)
+	ClientId       string   // OIDC client ID
+	ClientSecret   string   // OIDC client secret
+	ClientUrl      string   // Application URL for callback
+	Issuer         string   // OIDC issuer URL
+	Scopes         []string // OIDC scopes (default: openid, profile, email)
+	AutoSignup     bool     // Auto-create users on first login (default: false)
+	DefaultRole    string   // Default role for new users (default: viewer)
+	AllowedDomains []string // Email domain whitelist
+	Whitelist      []string // Specific email whitelist
+	ButtonLabel    string   // Login button text (default: "Login with SSO")
 }
 
 // AdminConfig represents the initial admin user configuration
@@ -377,6 +393,58 @@ func (c *Config) validateBuiltinAuth() error {
 	// Token TTL must be positive
 	if c.Server.Auth.Builtin.Token.TTL <= 0 {
 		return fmt.Errorf("builtin auth requires a positive token TTL")
+	}
+
+	// Validate OIDC configuration if enabled
+	if c.Server.Auth.Builtin.OIDC.Enabled {
+		if err := c.validateBuiltinOIDC(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateBuiltinOIDC validates the OIDC configuration under builtin auth.
+func (c *Config) validateBuiltinOIDC() error {
+	oidc := c.Server.Auth.Builtin.OIDC
+
+	// Required fields when OIDC is enabled
+	if oidc.ClientId == "" {
+		return fmt.Errorf("builtin OIDC requires clientId to be set")
+	}
+	if oidc.ClientSecret == "" {
+		return fmt.Errorf("builtin OIDC requires clientSecret to be set")
+	}
+	if oidc.ClientUrl == "" {
+		return fmt.Errorf("builtin OIDC requires clientUrl to be set")
+	}
+	if oidc.Issuer == "" {
+		return fmt.Errorf("builtin OIDC requires issuer to be set")
+	}
+
+	// Validate defaultRole is a valid role
+	validRoles := map[string]bool{
+		"admin":    true,
+		"manager":  true,
+		"operator": true,
+		"viewer":   true,
+	}
+	if !validRoles[oidc.DefaultRole] {
+		return fmt.Errorf("builtin OIDC defaultRole must be one of: admin, manager, operator, viewer (got: %q)", oidc.DefaultRole)
+	}
+
+	// Warn if email scope is not included (required for access control)
+	hasEmailScope := false
+	for _, scope := range oidc.Scopes {
+		if scope == "email" {
+			hasEmailScope = true
+			break
+		}
+	}
+	if !hasEmailScope {
+		// This is a warning, not an error - we'll add it to warnings in the loader
+		// For now, just allow it since email might come from userinfo endpoint
 	}
 
 	return nil

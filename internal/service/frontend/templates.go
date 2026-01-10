@@ -61,6 +61,9 @@ type funcsConfig struct {
 	Permissions           map[config.Permission]bool
 	Paths                 config.PathsConfig
 	AuthMode              config.AuthMode
+	// OIDC configuration for builtin auth mode
+	OIDCEnabled     bool
+	OIDCButtonLabel string
 }
 
 // and simple utility helpers for use inside HTML templates.
@@ -141,6 +144,12 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 		},
 		"authMode": func() string {
 			return string(cfg.AuthMode)
+		},
+		"oidcEnabled": func() string {
+			return convertBooleanToString(cfg.OIDCEnabled)
+		},
+		"oidcButtonLabel": func() string {
+			return cfg.OIDCButtonLabel
 		},
 	}
 }

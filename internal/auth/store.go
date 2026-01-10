@@ -16,6 +16,8 @@ var (
 	ErrInvalidUsername = errors.New("invalid username")
 	// ErrInvalidUserID is returned when the user ID is invalid.
 	ErrInvalidUserID = errors.New("invalid user ID")
+	// ErrOIDCIdentityNotFound is returned when an OIDC identity cannot be found.
+	ErrOIDCIdentityNotFound = errors.New("OIDC identity not found")
 )
 
 // Common errors for API key store operations.
@@ -64,6 +66,10 @@ type UserStore interface {
 	// GetByUsername retrieves a user by their username.
 	// Returns ErrUserNotFound if the user does not exist.
 	GetByUsername(ctx context.Context, username string) (*User, error)
+
+	// GetByOIDCIdentity retrieves a user by their OIDC identity (issuer + subject).
+	// Returns ErrOIDCIdentityNotFound if no user exists with the given OIDC identity.
+	GetByOIDCIdentity(ctx context.Context, issuer, subject string) (*User, error)
 
 	// List returns all users in the store.
 	List(ctx context.Context) ([]*User, error)

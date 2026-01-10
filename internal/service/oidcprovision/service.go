@@ -1,0 +1,279 @@
+// Copyright (C) 2024 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+// Package oidcprovision provides OIDC user provisioning functionality for builtin auth mode.
+package oidcprovision
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"strings"
+	"time"
+
+	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/google/uuid"
+)
+
+// Service errors with user-friendly messages.
+var (
+	// ErrEmailNotAllowed is returned when the user's email domain is not authorized.
+	ErrEmailNotAllowed = errors.New("your email domain is not authorized")
+	// ErrUserDisabled is returned when the user's account has been disabled.
+	ErrUserDisabled = errors.New("your account has been disabled, contact administrator")
+	// ErrAutoSignupDisabled is returned when auto-signup is disabled and user doesn't exist.
+	ErrAutoSignupDisabled = errors.New("automatic account creation is disabled, contact administrator")
+	// ErrEmailRequired is returned when the email claim is not provided by the identity provider.
+	ErrEmailRequired = errors.New("email claim is required but not provided by identity provider")
+)
+
+// Config holds the configuration for the OIDC provisioning service.
+type Config struct {
+	// Issuer is the OIDC provider issuer URL.
+	Issuer string
+	// AutoSignup enables automatic user creation on first login.
+	AutoSignup bool
+	// DefaultRole is the role assigned to new OIDC users.
+	DefaultRole auth.Role
+	// AllowedDomains is a list of email domains allowed to sign up.
+	// If empty, all domains are allowed (unless Whitelist is set).
+	AllowedDomains []string
+	// Whitelist is a list of specific email addresses always allowed.
+	// Takes precedence over AllowedDomains.
+	Whitelist []string
+}
+
+// OIDCClaims contains the claims extracted from an OIDC ID token.
+type OIDCClaims struct {
+	// Subject is the unique identifier for the user from the OIDC provider.
+	Subject string
+	// Email is the user's email address.
+	Email string
+	// PreferredUsername is the user's preferred username from the OIDC provider.
+	PreferredUsername string
+	// Name is the user's display name.
+	Name string
+}
+
+// Service provides OIDC user provisioning functionality.
+type Service struct {
+	userStore auth.UserStore
+	config    Config
+	logger    *slog.Logger
+}
+
+// New creates a new OIDC provisioning service.
+func New(userStore auth.UserStore, config Config) *Service {
+	return &Service{
+		userStore: userStore,
+		config:    config,
+		logger:    slog.Default().With(slog.String("service", "oidcprovision")),
+	}
+}
+
+// ProcessLogin handles OIDC authentication with auto-provisioning.
+// Returns the user, whether it's a new user, and any error.
+func (s *Service) ProcessLogin(ctx context.Context, claims OIDCClaims) (*auth.User, bool, error) {
+	// 0. Validate email claim exists (required for access control)
+	if claims.Email == "" {
+		return nil, false, ErrEmailRequired
+	}
+
+	// 1. Check access control (whitelist + allowedDomains)
+	if !s.isEmailAllowed(claims.Email) {
+		s.logger.Warn("OIDC login rejected: email not allowed",
+			slog.String("email", claims.Email),
+			slog.String("subject", claims.Subject))
+		return nil, false, ErrEmailNotAllowed
+	}
+
+	// 2. Look up existing user by OIDC identity
+	user, err := s.userStore.GetByOIDCIdentity(ctx, s.config.Issuer, claims.Subject)
+	if err == nil {
+		// User found - check if disabled
+		if user.IsDisabled {
+			s.logger.Warn("OIDC login rejected: user disabled",
+				slog.String("user_id", user.ID),
+				slog.String("username", user.Username))
+			return nil, false, ErrUserDisabled
+		}
+		s.logger.Debug("OIDC login: existing user",
+			slog.String("user_id", user.ID),
+			slog.String("username", user.Username))
+		return user, false, nil // Existing user
+	}
+
+	// 3. User not found - check if it's a not found error
+	if !errors.Is(err, auth.ErrOIDCIdentityNotFound) {
+		return nil, false, fmt.Errorf("failed to lookup OIDC identity: %w", err)
+	}
+
+	// 4. Check if auto-signup is enabled
+	if !s.config.AutoSignup {
+		s.logger.Info("OIDC login rejected: auto-signup disabled",
+			slog.String("email", claims.Email),
+			slog.String("subject", claims.Subject))
+		return nil, false, ErrAutoSignupDisabled
+	}
+
+	// 5. Generate unique username (avoid conflicts with builtin users)
+	username := s.generateUniqueUsername(ctx, claims)
+
+	// 6. Create new user
+	now := time.Now().UTC()
+	user = &auth.User{
+		ID:           uuid.New().String(),
+		Username:     username,
+		Role:         s.config.DefaultRole,
+		AuthProvider: "oidc",
+		OIDCIssuer:   s.config.Issuer,
+		OIDCSubject:  claims.Subject,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	if err := s.userStore.Create(ctx, user); err != nil {
+		return nil, false, fmt.Errorf("failed to create OIDC user: %w", err)
+	}
+
+	// Log audit event
+	s.logger.Info("OIDC user created",
+		slog.String("user_id", user.ID),
+		slog.String("username", username),
+		slog.String("email", claims.Email),
+		slog.String("role", string(user.Role)))
+
+	return user, true, nil // New user created
+}
+
+// isEmailAllowed checks if an email is allowed based on whitelist and allowedDomains.
+// Logic:
+//   - If whitelist is not empty and email is in whitelist: ALLOW
+//   - If allowedDomains is not empty and email domain is in allowedDomains: ALLOW
+//   - If allowedDomains is not empty and email domain is NOT in allowedDomains: DENY
+//   - If both whitelist and allowedDomains are empty: ALLOW (no restrictions)
+func (s *Service) isEmailAllowed(email string) bool {
+	email = strings.ToLower(email)
+
+	// Check whitelist first (takes precedence)
+	if len(s.config.Whitelist) > 0 {
+		for _, allowed := range s.config.Whitelist {
+			if strings.EqualFold(email, allowed) {
+				return true
+			}
+		}
+	}
+
+	// Check allowed domains
+	if len(s.config.AllowedDomains) > 0 {
+		domain := s.extractDomain(email)
+		for _, allowed := range s.config.AllowedDomains {
+			if strings.EqualFold(domain, allowed) {
+				return true
+			}
+		}
+		// Domain not in allowed list
+		return false
+	}
+
+	// No restrictions configured
+	return true
+}
+
+// extractDomain extracts the domain part from an email address.
+func (s *Service) extractDomain(email string) string {
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 {
+		return ""
+	}
+	return parts[1]
+}
+
+// generateUniqueUsername creates a username avoiding conflicts with existing users.
+func (s *Service) generateUniqueUsername(ctx context.Context, claims OIDCClaims) string {
+	candidates := []string{claims.PreferredUsername, s.emailLocalPart(claims.Email)}
+
+	for _, base := range candidates {
+		if base == "" {
+			continue
+		}
+
+		// Sanitize the username (remove special characters, etc.)
+		base = s.sanitizeUsername(base)
+		if base == "" {
+			continue
+		}
+
+		// Check if username exists
+		existing, err := s.userStore.GetByUsername(ctx, base)
+		if err != nil {
+			// Username available
+			return base
+		}
+
+		// If exists but is an OIDC user, try suffix
+		if existing.AuthProvider == "oidc" {
+			for i := 2; i <= 99; i++ {
+				candidate := fmt.Sprintf("%s%d", base, i)
+				if _, err := s.userStore.GetByUsername(ctx, candidate); err != nil {
+					return candidate
+				}
+			}
+		}
+
+		// Conflict with builtin user - use suffix to differentiate
+		ssoCandidate := fmt.Sprintf("%s_sso", base)
+		if _, err := s.userStore.GetByUsername(ctx, ssoCandidate); err != nil {
+			return ssoCandidate
+		}
+
+		// Try with numbers
+		for i := 2; i <= 99; i++ {
+			candidate := fmt.Sprintf("%s_sso%d", base, i)
+			if _, err := s.userStore.GetByUsername(ctx, candidate); err != nil {
+				return candidate
+			}
+		}
+	}
+
+	// Fallback: use first 8 chars of subject
+	if len(claims.Subject) >= 8 {
+		return fmt.Sprintf("user_%s", claims.Subject[:8])
+	}
+	return fmt.Sprintf("user_%s", claims.Subject)
+}
+
+// emailLocalPart extracts the local part (before @) from an email address.
+func (s *Service) emailLocalPart(email string) string {
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 {
+		return ""
+	}
+	return parts[0]
+}
+
+// sanitizeUsername removes or replaces characters that are not suitable for usernames.
+func (s *Service) sanitizeUsername(username string) string {
+	// Convert to lowercase
+	username = strings.ToLower(username)
+
+	// Replace common separators with underscores
+	replacer := strings.NewReplacer(
+		".", "_",
+		"-", "_",
+		" ", "_",
+	)
+	username = replacer.Replace(username)
+
+	// Remove any characters that aren't alphanumeric or underscore
+	var result strings.Builder
+	for _, r := range username {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' {
+			result.WriteRune(r)
+		}
+	}
+
+	// Trim leading/trailing underscores
+	return strings.Trim(result.String(), "_")
+}
