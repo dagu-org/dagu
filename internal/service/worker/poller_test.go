@@ -392,8 +392,12 @@ func newMockCoordinatorCli() *mockCoordinatorCli {
 }
 
 func (m *mockCoordinatorCli) Poll(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
-	if m.PollFunc != nil {
-		task, err := m.PollFunc(ctx, policy, req)
+	m.mu.Lock()
+	pollFunc := m.PollFunc
+	m.mu.Unlock()
+
+	if pollFunc != nil {
+		task, err := pollFunc(ctx, policy, req)
 		m.updateState(err)
 		return task, err
 	}
@@ -401,20 +405,25 @@ func (m *mockCoordinatorCli) Poll(ctx context.Context, policy backoff.RetryPolic
 }
 
 func (m *mockCoordinatorCli) Dispatch(ctx context.Context, task *coordinatorv1.Task) error {
-	if m.DispatchFunc != nil {
-		return m.DispatchFunc(ctx, task)
+	m.mu.Lock()
+	dispatchFunc := m.DispatchFunc
+	m.mu.Unlock()
+
+	if dispatchFunc != nil {
+		return dispatchFunc(ctx, task)
 	}
 	return nil
 }
 
 func (m *mockCoordinatorCli) Metrics() coordinator.Metrics {
-	if m.MetricsFunc != nil {
-		return m.MetricsFunc()
+	m.mu.Lock()
+	metricsFunc := m.MetricsFunc
+	if metricsFunc != nil {
+		m.mu.Unlock()
+		return metricsFunc()
 	}
 
-	m.mu.Lock()
 	defer m.mu.Unlock()
-
 	return coordinator.Metrics{
 		IsConnected:      m.isConnected,
 		ConsecutiveFails: m.consecutiveFails,
@@ -423,8 +432,12 @@ func (m *mockCoordinatorCli) Metrics() coordinator.Metrics {
 }
 
 func (m *mockCoordinatorCli) Cleanup(ctx context.Context) error {
-	if m.CleanupFunc != nil {
-		return m.CleanupFunc(ctx)
+	m.mu.Lock()
+	cleanupFunc := m.CleanupFunc
+	m.mu.Unlock()
+
+	if cleanupFunc != nil {
+		return cleanupFunc(ctx)
 	}
 	return nil
 }
@@ -435,8 +448,12 @@ func (m *mockCoordinatorCli) GetWorkers(_ context.Context) ([]*coordinatorv1.Wor
 }
 
 func (m *mockCoordinatorCli) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
-	if m.HeartbeatFunc != nil {
-		return m.HeartbeatFunc(ctx, req)
+	m.mu.Lock()
+	heartbeatFunc := m.HeartbeatFunc
+	m.mu.Unlock()
+
+	if heartbeatFunc != nil {
+		return heartbeatFunc(ctx, req)
 	}
 	// Return success by default for tests
 	return &coordinatorv1.HeartbeatResponse{}, nil
@@ -467,4 +484,18 @@ func (m *mockCoordinatorCli) updateState(err error) {
 		m.consecutiveFails = 0
 		m.lastError = nil
 	}
+}
+
+// SetPollFunc safely sets the PollFunc for concurrent access
+func (m *mockCoordinatorCli) SetPollFunc(f func(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.PollFunc = f
+}
+
+// SetHeartbeatFunc safely sets the HeartbeatFunc for concurrent access
+func (m *mockCoordinatorCli) SetHeartbeatFunc(f func(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.HeartbeatFunc = f
 }

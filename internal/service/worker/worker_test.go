@@ -622,7 +622,7 @@ func TestWorkerCancellation(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Dispatch a task with the ID that will be cancelled
-		mockCoordinatorCli.PollFunc = func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+		mockCoordinatorCli.SetPollFunc(func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
 			// Return task once then wait
 			select {
 			case <-ctx.Done():
@@ -633,7 +633,7 @@ func TestWorkerCancellation(t *testing.T) {
 					Target:   "test.yaml",
 				}, nil
 			}
-		}
+		})
 
 		// Wait for task to be cancelled
 		select {
@@ -684,7 +684,7 @@ func TestWorkerCancellation(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Dispatch a task with a DIFFERENT ID than what will be cancelled
-		mockCoordinatorCli.PollFunc = func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+		mockCoordinatorCli.SetPollFunc(func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -694,7 +694,7 @@ func TestWorkerCancellation(t *testing.T) {
 					Target:   "test.yaml",
 				}, nil
 			}
-		}
+		})
 
 		// Task should complete normally
 		select {
@@ -757,7 +757,7 @@ func TestWorkerCancellation(t *testing.T) {
 
 		// Setup poll to return tasks
 		var taskIndex atomic.Int32
-		mockCoordinatorCli.PollFunc = func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+		mockCoordinatorCli.SetPollFunc(func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
 			idx := taskIndex.Add(1)
 			if idx <= 3 {
 				return &coordinatorv1.Task{
@@ -771,7 +771,7 @@ func TestWorkerCancellation(t *testing.T) {
 			case <-time.After(100 * time.Millisecond):
 				return nil, nil
 			}
-		}
+		})
 
 		// Wait for cancellations
 		cancelledCount := 0
