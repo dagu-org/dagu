@@ -378,9 +378,13 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 
 			var status *execution.RunStatus
 
+			// Use a fresh context for status queries during cancellation wait
+			// since the original context may be canceled
+			cancelWaitCtx := context.WithoutCancel(ctx)
+
 			for {
 				var err error
-				status, err = e.getSubDAGRunStatus(ctx, dagRunID)
+				status, err = e.getSubDAGRunStatus(cancelWaitCtx, dagRunID)
 				if err != nil {
 					logger.Warn(waitCtx, "Failed to get sub DAG run status during cancellation wait",
 						tag.Error(err),
@@ -462,6 +466,9 @@ func (e *SubDAGExecutor) getSubDAGRunStatus(ctx context.Context, dagRunID string
 		resp, err := e.coordinatorCli.GetDAGRunStatus(ctx, e.DAG.Name, dagRunID, rootRef)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get DAG run status from coordinator: %w", err)
+		}
+		if resp == nil {
+			return nil, fmt.Errorf("no response from coordinator")
 		}
 		if !resp.Found {
 			return nil, fmt.Errorf("DAG run not found in coordinator")

@@ -226,8 +226,8 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 
 				// Ensure node is finished and wg is decremented
 				defer r.finishNode(n, &wg)
-				// Recover from panics
-				defer r.recoverNodePanic(ctx, n)
+				// Recover from panics and signal progress for status updates
+				defer r.recoverNodePanic(ctx, n, progressCh)
 				// Signal completion to runner loop
 				defer func() {
 					doneCh <- n
@@ -1063,7 +1063,8 @@ func (r *Runner) shouldRetryNode(ctx context.Context, node *Node, execErr error)
 }
 
 // recoverNodePanic handles panic recovery for a node goroutine.
-func (r *Runner) recoverNodePanic(ctx context.Context, node *Node) {
+// It signals progressCh so the agent can write the updated status to storage.
+func (r *Runner) recoverNodePanic(ctx context.Context, node *Node, progressCh chan *Node) {
 	if panicObj := recover(); panicObj != nil {
 		stack := string(debug.Stack())
 		err := fmt.Errorf("panic recovered in node %s: %v\n%s", node.Name(), panicObj, stack)
@@ -1079,6 +1080,11 @@ func (r *Runner) recoverNodePanic(ctx context.Context, node *Node) {
 		r.mu.Lock()
 		r.metrics.failedNodes++
 		r.mu.Unlock()
+
+		// Signal progress so status is written to storage
+		if progressCh != nil {
+			progressCh <- node
+		}
 	}
 }
 

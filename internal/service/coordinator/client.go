@@ -214,6 +214,7 @@ func (cli *clientImpl) attemptCall(ctx context.Context, members []execution.Host
 				tag.Error(err))
 			cli.removeClient(member.ID) // Remove failed client
 			cli.recordFailure(err)
+			lastErr = err
 			continue
 		}
 
@@ -225,6 +226,7 @@ func (cli *clientImpl) attemptCall(ctx context.Context, members []execution.Host
 				tag.Port(member.Port),
 				tag.Error(err))
 			cli.recordFailure(err)
+			lastErr = err
 			continue
 		}
 
