@@ -95,7 +95,12 @@ func (w *stepLogWriter) Write(p []byte) (int, error) {
 	// Flush when buffer exceeds threshold
 	if len(w.buffer) >= 32*1024 {
 		if err := w.flush(); err != nil {
-			return 0, err
+			// Log streaming is best-effort - don't fail the command
+			logger.Warn(w.ctx, "Failed to stream logs, discarding buffer",
+				tag.Error(err),
+				tag.Step(w.stepName),
+			)
+			w.buffer = w.buffer[:0] // Discard to prevent memory growth
 		}
 	}
 

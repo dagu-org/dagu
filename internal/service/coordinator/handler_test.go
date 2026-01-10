@@ -375,6 +375,9 @@ func TestHandler_Heartbeat(t *testing.T) {
 		_, err := h.Heartbeat(ctx, req)
 		require.NoError(t, err)
 
+		// Trigger zombie detection (this is now done periodically, not on heartbeat)
+		h.detectAndCleanupZombies(ctx)
+
 		// Old worker should be cleaned up
 		resp, err := h.GetWorkers(ctx, &coordinatorv1.GetWorkersRequest{})
 		require.NoError(t, err)
@@ -633,12 +636,8 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		}
 		h.mu.Unlock()
 
-		// Send a new heartbeat from a different worker to trigger cleanup
-		_, err := h.Heartbeat(ctx, &coordinatorv1.HeartbeatRequest{
-			WorkerId: "new-worker",
-			Labels:   map[string]string{},
-		})
-		require.NoError(t, err)
+		// Trigger zombie detection (this is now done periodically, not on heartbeat)
+		h.detectAndCleanupZombies(ctx)
 
 		// Verify the stale worker's task was marked as failed
 		require.True(t, attempt.WasWritten())

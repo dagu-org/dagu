@@ -68,7 +68,7 @@ func SetupCoordinator(t *testing.T, opts ...HelperOption) *Coordinator {
 	handler := coordinator.NewHandler(handlerOpts...)
 
 	// Create service with ServiceMonitor from helper
-	service := coordinator.NewService(grpcServer, handler, listener, healthServer, helper.ServiceRegistry, "test-coordinator", "127.0.0.1")
+	service := coordinator.NewService(grpcServer, handler, listener, healthServer, helper.ServiceRegistry, helper.Config, "test-coordinator", "127.0.0.1")
 
 	coord := &Coordinator{
 		Helper:       helper,

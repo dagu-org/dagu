@@ -221,13 +221,22 @@ func CreateTempDAGFile(subDir, dagName string, yamlData []byte, extraDocs ...[]b
 		}
 
 		// Write additional YAML documents if provided
+		lastData := yamlData
 		for _, doc := range extraDocs {
+			// Ensure previous data ends with newline before adding separator
+			// YAML spec requires document separator to start on its own line
+			if len(lastData) > 0 && lastData[len(lastData)-1] != '\n' {
+				if _, err := tempFile.WriteString("\n"); err != nil {
+					return err
+				}
+			}
 			if _, err := tempFile.WriteString("---\n"); err != nil {
 				return err
 			}
 			if _, err := tempFile.Write(doc); err != nil {
 				return err
 			}
+			lastData = doc
 		}
 		return nil
 	}()

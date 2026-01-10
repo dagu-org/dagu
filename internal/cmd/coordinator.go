@@ -191,7 +191,7 @@ func newCoordinator(ctx context.Context, cfg *config.Config, registry execution.
 	)
 
 	// Create and return service with advertise address for service registry
-	return coordinator.NewService(grpcServer, handler, listener, healthServer, registry, instanceID, advertiseAddr), handler, nil
+	return coordinator.NewService(grpcServer, handler, listener, healthServer, registry, cfg, instanceID, advertiseAddr), handler, nil
 }
 
 // loadCoordinatorTLSCredentials loads TLS credentials for the coordinator server.

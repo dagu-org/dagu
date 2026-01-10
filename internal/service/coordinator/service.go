@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/execution"
@@ -23,6 +24,7 @@ type Service struct {
 	grpcListener   net.Listener
 	healthServer   *health.Server
 	registry       execution.ServiceRegistry
+	cfg            *config.Config
 	instanceID     string
 	hostPort       string
 	configuredHost string
@@ -34,6 +36,7 @@ func NewService(
 	grpcListener net.Listener,
 	healthServer *health.Server,
 	registry execution.ServiceRegistry,
+	cfg *config.Config,
 	instanceID string,
 	configuredHost string,
 ) *Service {
@@ -43,6 +46,7 @@ func NewService(
 		grpcListener:   grpcListener,
 		healthServer:   healthServer,
 		registry:       registry,
+		cfg:            cfg,
 		instanceID:     instanceID,
 		hostPort:       grpcListener.Addr().String(),
 		configuredHost: configuredHost,
@@ -58,7 +62,13 @@ func (srv *Service) Start(ctx context.Context) error {
 	srv.healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 
 	// Start the zombie detector to clean up runs from crashed workers
-	srv.handler.StartZombieDetector(ctx, 45*time.Second)
+	// Use configured interval or default to 45 seconds
+	zombieInterval := 45 * time.Second
+	if srv.cfg != nil && srv.cfg.Scheduler.ZombieDetectionInterval > 0 {
+		zombieInterval = srv.cfg.Scheduler.ZombieDetectionInterval
+	}
+	srv.handler.StartZombieDetector(ctx, zombieInterval)
+	logger.Info(ctx, "Started zombie detector", tag.Interval(zombieInterval))
 
 	// Register with service registry if monitor is available
 	if srv.registry != nil {
@@ -116,6 +126,9 @@ func (srv *Service) Stop(ctx context.Context) error {
 
 	srv.server.GracefulStop()
 	t.Stop()
+
+	// Wait for zombie detector to finish before closing handler
+	srv.handler.WaitZombieDetector()
 
 	// Close handler resources (open attempts, etc.)
 	srv.handler.Close(ctx)

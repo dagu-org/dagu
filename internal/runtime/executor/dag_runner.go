@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"strings"
 	"sync"
 	"time"
 
@@ -491,17 +490,18 @@ func (e *SubDAGExecutor) getSubDAGRunStatus(ctx context.Context, dagRunID string
 }
 
 // extractOutputsFromNodes extracts output variables from nodes.
-// Output variables are stored as "key=value" strings in the node's OutputVariables field.
+// Output variables are stored as key-value pairs in the node's OutputVariables SyncMap.
+// The key is the variable name and the value is the variable value.
 func extractOutputsFromNodes(nodes []*execution.Node) map[string]string {
 	outputs := make(map[string]string)
 	for _, node := range nodes {
 		if node.OutputVariables == nil {
 			continue
 		}
-		node.OutputVariables.Range(func(_, value any) bool {
-			if s, ok := value.(string); ok {
-				if key, val, found := strings.Cut(s, "="); found {
-					outputs[key] = val
+		node.OutputVariables.Range(func(key, value any) bool {
+			if k, ok := key.(string); ok {
+				if v, ok := value.(string); ok {
+					outputs[k] = v
 				}
 			}
 			return true

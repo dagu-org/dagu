@@ -502,28 +502,44 @@ func (cli *clientImpl) ReportStatus(ctx context.Context, req *coordinatorv1.Repo
 	return resp, err
 }
 
-// StreamLogs returns a log streaming client for sending logs to the coordinator
+// StreamLogs returns a log streaming client for sending logs to the coordinator.
+// It performs health checks and tries multiple coordinators for failover.
 func (cli *clientImpl) StreamLogs(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 	members, err := cli.getCoordinatorMembers(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	// Shuffle members to distribute load evenly
+	rand.Shuffle(len(members), func(i, j int) {
+		members[i], members[j] = members[j], members[i]
+	})
+
 	// Try each coordinator until one works
 	var lastErr error
 	for _, member := range members {
 		client, err := cli.getOrCreateClient(member)
 		if err != nil {
+			cli.recordFailure(err)
+			lastErr = err
+			continue
+		}
+
+		// Check if the coordinator is healthy before streaming
+		if err := cli.isHealthy(ctx, member); err != nil {
+			cli.recordFailure(err)
 			lastErr = err
 			continue
 		}
 
 		stream, err := client.client.StreamLogs(ctx)
 		if err != nil {
+			cli.recordFailure(err)
 			lastErr = err
 			continue
 		}
 
+		cli.recordSuccess(ctx)
 		return stream, nil
 	}
 

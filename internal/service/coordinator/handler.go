@@ -48,7 +48,7 @@ type Handler struct {
 	logDir      string                // For log storage
 
 	// Open attempts cache for status persistence
-	attemptsMu   sync.Mutex
+	attemptsMu   sync.RWMutex
 	openAttempts map[string]execution.DAGRunAttempt // dagRunID -> open attempt
 
 	// Zombie detector shutdown synchronization
@@ -244,8 +244,8 @@ func (h *Handler) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatReq
 	}
 	h.mu.Unlock()
 
-	// Clean up stale heartbeats outside the lock to avoid blocking I/O while holding mutex
-	h.detectAndCleanupZombies(ctx)
+	// Note: Zombie detection is handled by StartZombieDetector's periodic ticker,
+	// not on every heartbeat, to avoid O(n²) complexity with many workers.
 
 	// Check for cancelled runs among the worker's running tasks
 	cancelledRuns := h.getCancelledRunsForWorker(ctx, req.Stats)
@@ -332,56 +332,74 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 	return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
 }
 
-// getOrOpenAttempt retrieves an open attempt from cache or opens a new one
+// getOrOpenAttempt retrieves an open attempt from cache or opens a new one.
+// Uses double-check locking to avoid holding the mutex during blocking I/O.
 func (h *Handler) getOrOpenAttempt(ctx context.Context, dagName, dagRunID string) (execution.DAGRunAttempt, error) {
-	h.attemptsMu.Lock()
-	defer h.attemptsMu.Unlock()
-
-	// Check cache first
+	// First check: fast path with read lock
+	h.attemptsMu.RLock()
 	if attempt, ok := h.openAttempts[dagRunID]; ok {
+		h.attemptsMu.RUnlock()
 		return attempt, nil
 	}
+	h.attemptsMu.RUnlock()
 
-	// Find the attempt
+	// Perform I/O without lock to avoid blocking other goroutines
 	ref := execution.DAGRunRef{Name: dagName, ID: dagRunID}
 	attempt, err := h.dagRunStore.FindAttempt(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
 
-	// Open the attempt for writing
 	if err := attempt.Open(ctx); err != nil {
 		return nil, err
 	}
 
-	// Cache the open attempt
+	// Second check: acquire write lock and verify no race
+	h.attemptsMu.Lock()
+	defer h.attemptsMu.Unlock()
+
+	if existing, ok := h.openAttempts[dagRunID]; ok {
+		// Another goroutine opened it first, close ours and use theirs
+		_ = attempt.Close(ctx)
+		return existing, nil
+	}
+
 	h.openAttempts[dagRunID] = attempt
 	return attempt, nil
 }
 
 // getOrOpenSubAttempt retrieves an open sub-attempt from cache or opens a new one.
 // This is used for sub-DAG status reporting in distributed execution.
+// Uses double-check locking to avoid holding the mutex during blocking I/O.
 func (h *Handler) getOrOpenSubAttempt(ctx context.Context, rootRef execution.DAGRunRef, subDAGRunID string) (execution.DAGRunAttempt, error) {
-	h.attemptsMu.Lock()
-	defer h.attemptsMu.Unlock()
-
-	// Check cache first
+	// First check: fast path with read lock
+	h.attemptsMu.RLock()
 	if attempt, ok := h.openAttempts[subDAGRunID]; ok {
+		h.attemptsMu.RUnlock()
 		return attempt, nil
 	}
+	h.attemptsMu.RUnlock()
 
-	// Find the sub-attempt
+	// Perform I/O without lock to avoid blocking other goroutines
 	attempt, err := h.dagRunStore.FindSubAttempt(ctx, rootRef, subDAGRunID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Open the attempt for writing
 	if err := attempt.Open(ctx); err != nil {
 		return nil, err
 	}
 
-	// Cache the open attempt
+	// Second check: acquire write lock and verify no race
+	h.attemptsMu.Lock()
+	defer h.attemptsMu.Unlock()
+
+	if existing, ok := h.openAttempts[subDAGRunID]; ok {
+		// Another goroutine opened it first, close ours and use theirs
+		_ = attempt.Close(ctx)
+		return existing, nil
+	}
+
 	h.openAttempts[subDAGRunID] = attempt
 	return attempt, nil
 }
