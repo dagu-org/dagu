@@ -115,28 +115,9 @@ function InlineLogViewer({
   const isSubDAGRun =
     dagRun && dagRun.rootDAGRunId && dagRun.rootDAGRunId !== dagRun.dagRunId;
 
-  // Determine the API endpoint
-  const apiEndpoint = isSubDAGRun
-    ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log'
-    : '/dag-runs/{name}/{dagRunId}/steps/{stepName}/log';
-
-  // Prepare path parameters
-  const pathParams = isSubDAGRun
-    ? {
-        name: dagRun.rootDAGRunName,
-        dagRunId: dagRun.rootDAGRunId,
-        subDAGRunId: dagRun.dagRunId,
-        stepName,
-      }
-    : {
-        name: dagName,
-        dagRunId,
-        stepName,
-      };
-
-  // Fetch last 100 lines
-  const { data, isLoading } = useQuery(
-    apiEndpoint,
+  // Fetch sub-DAG-run step log (only when isSubDAGRun is true)
+  const subDAGQuery = useQuery(
+    '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log',
     {
       params: {
         query: {
@@ -144,14 +125,47 @@ function InlineLogViewer({
           stream,
           tail: 100,
         },
-        path: pathParams,
+        path: {
+          name: dagRun?.rootDAGRunName || '',
+          dagRunId: dagRun?.rootDAGRunId || '',
+          subDAGRunId: dagRun?.dagRunId || '',
+          stepName,
+        },
       },
     },
     {
-      refreshInterval: 2000, // Auto-refresh every 2s
+      refreshInterval: 2000,
       revalidateOnFocus: false,
+      isPaused: () => !isSubDAGRun,
     }
   );
+
+  // Fetch regular DAG-run step log (only when isSubDAGRun is false)
+  const dagRunQuery = useQuery(
+    '/dag-runs/{name}/{dagRunId}/steps/{stepName}/log',
+    {
+      params: {
+        query: {
+          remoteNode,
+          stream,
+          tail: 100,
+        },
+        path: {
+          name: dagName,
+          dagRunId,
+          stepName,
+        },
+      },
+    },
+    {
+      refreshInterval: 2000,
+      revalidateOnFocus: false,
+      isPaused: () => !!isSubDAGRun,
+    }
+  );
+
+  // Use the appropriate query based on whether this is a sub-DAG-run
+  const { data, isLoading } = isSubDAGRun ? subDAGQuery : dagRunQuery;
 
   // Process log content
   const content =

@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { components, NodeStatus, Status } from '../../../../api/v2/schema';
+import { components, NodeStatus, Status, Stream } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient, useQuery } from '../../../../hooks/api';
 import { toMermaidNodeId } from '../../../../lib/utils';
@@ -99,7 +99,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
     logType: 'step' as 'execution' | 'step',
     stepName: '',
     dagRunId: '',
-    stream: 'stdout' as 'stdout' | 'stderr',
+    stream: Stream.stdout as Stream,
   });
 
   // Get the selected dagRun index from URL parameters using React Router
@@ -356,7 +356,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
                       logType: 'execution',
                       stepName: '',
                       dagRunId,
-                      stream: 'stdout',
+                      stream: Stream.stdout,
                     });
                   }}
                 />
@@ -378,7 +378,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
                     stepName: actualStepName,
                     dagRunId:
                       dagRunId || reversedDAGRuns[idx]?.dagRunId || '',
-                    stream: isStderr ? 'stderr' : 'stdout',
+                    stream: isStderr ? Stream.stderr : Stream.stdout,
                   });
                 }}
               />
@@ -400,7 +400,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
                       stepName: actualStepName,
                       dagRunId:
                         dagRunId || reversedDAGRuns[idx]?.dagRunId || '',
-                      stream: isStderr ? 'stderr' : 'stdout',
+                      stream: isStderr ? Stream.stderr : Stream.stdout,
                     });
                   }}
                 />

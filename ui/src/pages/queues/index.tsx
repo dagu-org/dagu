@@ -100,16 +100,21 @@ function Queues() {
     appBarContext.setTitle('Queue Dashboard');
   }, [appBarContext]);
 
-  const { data, error, isLoading, mutate } = useQuery('/queues', {
-    params: {
-      query: {
-        remoteNode: appBarContext.selectedRemoteNode || 'local',
+  const { data, error, isLoading, mutate } = useQuery(
+    '/queues',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
       },
     },
-    refreshInterval: 3000, // Refresh every 3 seconds for real-time updates
-    revalidateOnFocus: true,
-    revalidateOnReconnect: true,
-  });
+    {
+      refreshInterval: 3000, // Refresh every 3 seconds for real-time updates
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+    }
+  );
 
   const handleRefresh = async () => {
     await mutate();

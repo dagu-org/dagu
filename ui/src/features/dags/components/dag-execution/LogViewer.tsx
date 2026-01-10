@@ -1,5 +1,5 @@
 import React from 'react';
-import { components } from '../../../../api/v2/schema';
+import { components, Stream } from '../../../../api/v2/schema';
 import ExecutionLog from './ExecutionLog';
 import LogSideModal from './LogSideModal';
 import StepLog from './StepLog';
@@ -13,7 +13,7 @@ type LogViewerProps = {
   stepName?: string;
   isInModal?: boolean;
   dagRun?: components['schemas']['DAGRunDetails'];
-  stream?: 'stdout' | 'stderr';
+  stream?: Stream;
   node?: components['schemas']['Node'];
 };
 
@@ -30,7 +30,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
   stepName,
   isInModal = true,
   dagRun,
-  stream = 'stdout',
+  stream = Stream.stdout,
   node,
 }) => {
   // Determine the title based on the log type

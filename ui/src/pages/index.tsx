@@ -166,17 +166,22 @@ function Dashboard(): React.ReactElement | null {
   };
 
   // DAG runs data
-  const { data, error, isLoading, mutate } = useQuery('/dag-runs', {
-    params: {
-      query: {
-        remoteNode: appBarContext.selectedRemoteNode || 'local',
-        fromDate: dateRange.startDate,
-        toDate: dateRange.endDate,
-        name: selectedDAGRun !== 'all' ? selectedDAGRun : undefined,
+  const { data, error, isLoading, mutate } = useQuery(
+    '/dag-runs',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+          fromDate: dateRange.startDate,
+          toDate: dateRange.endDate,
+          name: selectedDAGRun !== 'all' ? selectedDAGRun : undefined,
+        },
       },
     },
-    refreshInterval: 5000,
-  });
+    {
+      refreshInterval: 5000,
+    }
+  );
 
   // System status data
   const {
@@ -239,14 +244,19 @@ function Dashboard(): React.ReactElement | null {
     error: workersError,
     isLoading: workersLoading,
     mutate: mutateWorkers,
-  } = useQuery('/workers', {
-    params: {
-      query: {
-        remoteNode: appBarContext.selectedRemoteNode || 'local',
+  } = useQuery(
+    '/workers',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
       },
     },
-    refreshInterval: 1000,
-  });
+    {
+      refreshInterval: 1000,
+    }
+  );
 
   const handleRefreshAll = async () => {
     await Promise.all([

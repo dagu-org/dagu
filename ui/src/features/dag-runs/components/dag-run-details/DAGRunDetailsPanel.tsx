@@ -31,33 +31,43 @@ const DAGRunDetailsPanel: React.FC<DAGRunDetailsPanelProps> = ({
   const parentDAGRunId = searchParams.get('dagRunId');
   const parentName = searchParams.get('dagRunName') || name;
 
-  // Determine the API endpoint based on whether this is a sub DAG-run
-  const endpoint = subDAGRunId
-    ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}'
-    : '/dag-runs/{name}/{dagRunId}';
-
-  // Fetch DAG-run details
-  const { data, mutate } = useQuery(
-    endpoint,
+  // Fetch sub-DAG-run details (only when subDAGRunId exists)
+  const subDAGQuery = useQuery(
+    '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
     {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
-        path: subDAGRunId
-          ? {
-              name: parentName || '',
-              dagRunId: parentDAGRunId || '',
-              subDAGRunId: subDAGRunId,
-            }
-          : {
-              name: name || '',
-              dagRunId: dagRunId || 'latest',
-            },
+        path: {
+          name: parentName || '',
+          dagRunId: parentDAGRunId || '',
+          subDAGRunId: subDAGRunId || '',
+        },
       },
     },
-    { refreshInterval: 2000, keepPreviousData: true }
+    { refreshInterval: 2000, keepPreviousData: true, isPaused: () => !subDAGRunId }
   );
+
+  // Fetch regular DAG-run details (only when subDAGRunId doesn't exist)
+  const dagRunQuery = useQuery(
+    '/dag-runs/{name}/{dagRunId}',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
+        path: {
+          name: name || '',
+          dagRunId: dagRunId || 'latest',
+        },
+      },
+    },
+    { refreshInterval: 2000, keepPreviousData: true, isPaused: () => !!subDAGRunId }
+  );
+
+  // Use the appropriate query based on whether this is a sub-DAG-run
+  const { data, mutate } = subDAGRunId ? subDAGQuery : dagRunQuery;
 
   // Keep track of last valid data to prevent flickering
   const [lastValidData, setLastValidData] = React.useState(data);
