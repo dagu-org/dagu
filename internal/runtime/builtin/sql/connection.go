@@ -20,10 +20,11 @@ type ConnectionManager struct {
 }
 
 // Connection retry settings
+// These are generous to handle slow container startup in CI environments
 const (
-	maxConnRetries    = 10
+	maxConnRetries    = 30
 	initialRetryDelay = 500 * time.Millisecond
-	maxRetryDelay     = 5 * time.Second
+	maxRetryDelay     = 2 * time.Second
 )
 
 // NewConnectionManager creates a new connection manager.
