@@ -117,14 +117,9 @@ func (cli *clientImpl) Dispatch(ctx context.Context, task *coordinatorv1.Task) e
 			return ctx.Err()
 		}
 
-		// Get all available coordinators from registry
-		members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+		members, err := cli.getCoordinatorMembers(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to get coordinator members: %w", err)
-		}
-
-		if len(members) == 0 {
-			return fmt.Errorf("no coordinator instances available")
+			return err
 		}
 
 		return cli.attemptCall(ctx, members, func(ctx context.Context, member execution.HostInfo, client *client) error {
@@ -163,14 +158,9 @@ func (cli *clientImpl) Dispatch(ctx context.Context, task *coordinatorv1.Task) e
 func (cli *clientImpl) Poll(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
 	var task *coordinatorv1.Task
 	err := backoff.Retry(ctx, func(ctx context.Context) error {
-		// Get all available coordinators from registry
-		members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+		members, err := cli.getCoordinatorMembers(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to get coordinator members: %w", err)
-		}
-
-		if len(members) == 0 {
-			return fmt.Errorf("no coordinator instances available")
+			return err
 		}
 
 		return cli.attemptCall(ctx, members, func(ctx context.Context, member execution.HostInfo, client *client) error {

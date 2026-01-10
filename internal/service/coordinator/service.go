@@ -28,6 +28,9 @@ type Service struct {
 	instanceID     string
 	hostPort       string
 	configuredHost string
+
+	// For graceful shutdown
+	stopCancel context.CancelFunc // Cancels the service's internal context
 }
 
 func NewService(
@@ -61,13 +64,17 @@ func (srv *Service) Start(ctx context.Context) error {
 	// Also set the overall server status
 	srv.healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 
+	// Create an internal context that can be cancelled by Stop()
+	internalCtx, cancel := context.WithCancel(ctx)
+	srv.stopCancel = cancel
+
 	// Start the zombie detector to clean up runs from crashed workers
 	// Use configured interval or default to 45 seconds
 	zombieInterval := 45 * time.Second
 	if srv.cfg != nil && srv.cfg.Scheduler.ZombieDetectionInterval > 0 {
 		zombieInterval = srv.cfg.Scheduler.ZombieDetectionInterval
 	}
-	srv.handler.StartZombieDetector(ctx, zombieInterval)
+	srv.handler.StartZombieDetector(internalCtx, zombieInterval)
 	logger.Info(ctx, "Started zombie detector", tag.Interval(zombieInterval))
 
 	// Register with service registry if monitor is available
@@ -126,6 +133,11 @@ func (srv *Service) Stop(ctx context.Context) error {
 
 	srv.server.GracefulStop()
 	t.Stop()
+
+	// Cancel the internal context to signal zombie detector to stop
+	if srv.stopCancel != nil {
+		srv.stopCancel()
+	}
 
 	// Wait for zombie detector to finish before closing handler
 	srv.handler.WaitZombieDetector()

@@ -31,6 +31,11 @@ type Worker struct {
 
 	// For cancellation support
 	cancelFuncs map[string]context.CancelFunc // dagRunID -> cancel function
+
+	// For graceful shutdown
+	stopOnce   sync.Once
+	stopCancel context.CancelFunc // Cancels the worker's internal context
+	stopDone   chan struct{}      // Signals when all goroutines have stopped
 }
 
 // SetHandler sets a custom task executor for testing or custom execution logic
@@ -66,6 +71,12 @@ func (w *Worker) Start(ctx context.Context) error {
 		tag.WorkerID(w.id),
 		tag.MaxConcurrency(w.maxActiveRuns))
 
+	// Create an internal context that can be cancelled by Stop()
+	// This context is cancelled when either the parent context is done OR Stop() is called
+	internalCtx, cancel := context.WithCancel(ctx)
+	w.stopCancel = cancel
+	w.stopDone = make(chan struct{})
+
 	// Create a wait group to track all polling goroutines
 	var wg sync.WaitGroup
 
@@ -81,7 +92,7 @@ func (w *Worker) Start(ctx context.Context) error {
 				handler:     w.handler,
 			}
 			poller := NewPoller(w.id, w.coordinatorCli, wrappedHandler, pollerIndex, w.labels)
-			poller.Run(ctx)
+			poller.Run(internalCtx)
 		}(i)
 	}
 
@@ -89,25 +100,50 @@ func (w *Worker) Start(ctx context.Context) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		w.sendHeartbeats(ctx)
+		w.sendHeartbeats(internalCtx)
 	}()
 
-	// Wait for all goroutines to complete
-	wg.Wait()
+	// Wait for all goroutines to complete, then signal done
+	go func() {
+		wg.Wait()
+		close(w.stopDone)
+	}()
+
+	// Block until all goroutines complete
+	<-w.stopDone
 
 	return nil
 }
 
 // Stop gracefully shuts down the worker.
 func (w *Worker) Stop(ctx context.Context) error {
-	logger.Info(ctx, "Worker stopping", tag.WorkerID(w.id))
+	var err error
+	w.stopOnce.Do(func() {
+		logger.Info(ctx, "Worker stopping", tag.WorkerID(w.id))
 
-	// Cleanup coordinator client connections
-	if err := w.coordinatorCli.Cleanup(ctx); err != nil {
-		return fmt.Errorf("failed to cleanup coordinator client: %w", err)
-	}
+		// Cancel the internal context to signal all goroutines to stop
+		if w.stopCancel != nil {
+			w.stopCancel()
+		}
 
-	return nil
+		// Wait for all goroutines to complete (with timeout from ctx)
+		if w.stopDone != nil {
+			select {
+			case <-w.stopDone:
+				// All goroutines have stopped
+			case <-ctx.Done():
+				logger.Warn(ctx, "Worker stop timed out waiting for goroutines",
+					tag.WorkerID(w.id))
+			}
+		}
+
+		// Cleanup coordinator client connections
+		if cleanupErr := w.coordinatorCli.Cleanup(ctx); cleanupErr != nil {
+			err = fmt.Errorf("failed to cleanup coordinator client: %w", cleanupErr)
+		}
+	})
+
+	return err
 }
 
 // trackingHandler wraps a TaskHandler to track running task state
