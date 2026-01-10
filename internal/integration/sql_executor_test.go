@@ -203,7 +203,7 @@ func TestSQLExecutor_SQLite_OutputFormats(t *testing.T) {
 			name:   "JSON",
 			format: "json",
 			expected: []test.Contains{
-				`"id": 1`,       // JSON format is pretty-printed with spaces
+				`"id": 1`,        // JSON format is pretty-printed with spaces
 				`"name": "test"`, // JSON format is pretty-printed with spaces
 			},
 		},
