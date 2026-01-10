@@ -1123,6 +1123,14 @@
               "config": { "$ref": "#/definitions/sqliteExecutorConfig" }
             }
           }
+        },
+        {
+          "if": { "properties": { "type": { "const": "hitl" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/hitlExecutorConfig" }
+            }
+          }
         }
       ]
     },
@@ -2106,6 +2114,27 @@
       },
       "description": "SQLite executor configuration for database operations. Uses pure Go SQLite with automatic pragmas: foreign_keys=ON, busy_timeout=5000."
     },
+    "hitlExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "description": "Message displayed to the approver explaining what approval is needed."
+        },
+        "input": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of input field names expected from the approver."
+        },
+        "required": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Subset of input fields that must be provided. All values must exist in 'input' array."
+        }
+      },
+      "description": "Human-in-the-loop executor configuration. Pauses workflow execution until human approval is received."
+    },
     "llmConfig": {
       "type": "object",
       "additionalProperties": false,
@@ -2331,6 +2360,14 @@
           "then": {
             "properties": {
               "config": { "$ref": "#/definitions/sqliteExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "hitl" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/hitlExecutorConfig" }
             }
           }
         },
