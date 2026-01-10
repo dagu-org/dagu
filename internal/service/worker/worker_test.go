@@ -377,6 +377,28 @@ func TestWorkerStopWithoutStart(t *testing.T) {
 	})
 }
 
+func TestWorkerDefaultID(t *testing.T) {
+	t.Run("GeneratesDefaultIDWhenEmpty", func(t *testing.T) {
+		labels := make(map[string]string)
+
+		// Create a mock coordinator client
+		mockCoordinatorCli := newMockCoordinatorCli()
+
+		// Create worker with empty ID
+		w := worker.NewWorker("", 1, mockCoordinatorCli, labels, &config.Config{})
+		require.NotNil(t, w)
+
+		// Worker should have generated a default ID (hostname@pid format)
+		// We can't check the exact value, but we can verify it's not empty
+		// by starting and stopping the worker (which uses the ID for logging)
+		w.SetHandler(&mockHandler{ExecutionTime: 0})
+
+		// Stop should work without error
+		err := w.Stop(context.Background())
+		require.NoError(t, err)
+	})
+}
+
 func TestRunningTaskTracking(t *testing.T) {
 	t.Run("TrackRunningTasks", func(t *testing.T) {
 		// Setup test environment

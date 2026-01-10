@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -469,4 +470,206 @@ func TestLogHandler_ConcurrentAccess(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		<-done
 	}
+}
+
+func TestLogHandler_HandleStream(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ProcessesMultipleChunks", func(t *testing.T) {
+		t.Parallel()
+
+		logDir := t.TempDir()
+		h := newLogHandler(logDir)
+		defer h.Close()
+
+		chunks := []*coordinatorv1.LogChunk{
+			{
+				DagName:    "test-dag",
+				DagRunId:   "run-123",
+				AttemptId:  "attempt-1",
+				StepName:   "step1",
+				StreamType: coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDOUT,
+				Data:       []byte("line 1\n"),
+			},
+			{
+				DagName:    "test-dag",
+				DagRunId:   "run-123",
+				AttemptId:  "attempt-1",
+				StepName:   "step1",
+				StreamType: coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDOUT,
+				Data:       []byte("line 2\n"),
+			},
+			{
+				DagName:    "test-dag",
+				DagRunId:   "run-123",
+				AttemptId:  "attempt-1",
+				StepName:   "step1",
+				StreamType: coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDOUT,
+				IsFinal:    true,
+			},
+		}
+
+		stream := &mockStreamLogsServer{
+			chunks: chunks,
+			ctx:    context.Background(),
+		}
+
+		err := h.handleStream(stream)
+		require.NoError(t, err)
+		require.NotNil(t, stream.response)
+		assert.Equal(t, uint64(3), stream.response.ChunksReceived)
+		assert.Equal(t, uint64(14), stream.response.BytesWritten) // "line 1\n" + "line 2\n"
+
+		// Verify file was created with correct content
+		expectedPath := filepath.Join(logDir, "test-dag", "run-123", "attempt-1", "step1.stdout.log")
+		content, err := os.ReadFile(expectedPath)
+		require.NoError(t, err)
+		assert.Equal(t, "line 1\nline 2\n", string(content))
+	})
+
+	t.Run("HandlesEmptyChunks", func(t *testing.T) {
+		t.Parallel()
+
+		logDir := t.TempDir()
+		h := newLogHandler(logDir)
+		defer h.Close()
+
+		chunks := []*coordinatorv1.LogChunk{
+			{
+				DagName:    "test-dag",
+				DagRunId:   "run-123",
+				AttemptId:  "attempt-1",
+				StepName:   "step1",
+				StreamType: coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDOUT,
+				Data:       []byte{}, // Empty data
+			},
+			{
+				DagName:    "test-dag",
+				DagRunId:   "run-123",
+				AttemptId:  "attempt-1",
+				StepName:   "step1",
+				StreamType: coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDOUT,
+				Data:       []byte("actual data\n"),
+			},
+		}
+
+		stream := &mockStreamLogsServer{
+			chunks: chunks,
+			ctx:    context.Background(),
+		}
+
+		err := h.handleStream(stream)
+		require.NoError(t, err)
+		assert.Equal(t, uint64(2), stream.response.ChunksReceived)
+		assert.Equal(t, uint64(12), stream.response.BytesWritten) // Only "actual data\n"
+	})
+
+	t.Run("HandlesFinalMarker", func(t *testing.T) {
+		t.Parallel()
+
+		logDir := t.TempDir()
+		h := newLogHandler(logDir)
+		defer h.Close()
+
+		chunks := []*coordinatorv1.LogChunk{
+			{
+				DagName:    "test-dag",
+				DagRunId:   "run-456",
+				AttemptId:  "attempt-1",
+				StepName:   "step1",
+				StreamType: coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDERR,
+				Data:       []byte("error message\n"),
+			},
+			{
+				DagName:    "test-dag",
+				DagRunId:   "run-456",
+				AttemptId:  "attempt-1",
+				StepName:   "step1",
+				StreamType: coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDERR,
+				IsFinal:    true, // Final marker
+			},
+		}
+
+		stream := &mockStreamLogsServer{
+			chunks: chunks,
+			ctx:    context.Background(),
+		}
+
+		err := h.handleStream(stream)
+		require.NoError(t, err)
+
+		// Verify writer was closed (removed from map)
+		key := h.streamKey(chunks[0])
+		h.writersMu.Lock()
+		_, exists := h.writers[key]
+		h.writersMu.Unlock()
+		assert.False(t, exists, "Writer should be closed after IsFinal marker")
+	})
+
+	t.Run("HandlesMultipleStreams", func(t *testing.T) {
+		t.Parallel()
+
+		logDir := t.TempDir()
+		h := newLogHandler(logDir)
+		defer h.Close()
+
+		chunks := []*coordinatorv1.LogChunk{
+			// Stream 1 - stdout
+			{
+				DagName:    "test-dag",
+				DagRunId:   "run-789",
+				AttemptId:  "attempt-1",
+				StepName:   "step1",
+				StreamType: coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDOUT,
+				Data:       []byte("stdout output\n"),
+			},
+			// Stream 2 - stderr
+			{
+				DagName:    "test-dag",
+				DagRunId:   "run-789",
+				AttemptId:  "attempt-1",
+				StepName:   "step1",
+				StreamType: coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDERR,
+				Data:       []byte("stderr output\n"),
+			},
+			// Final for stdout
+			{
+				DagName:    "test-dag",
+				DagRunId:   "run-789",
+				AttemptId:  "attempt-1",
+				StepName:   "step1",
+				StreamType: coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDOUT,
+				IsFinal:    true,
+			},
+			// Final for stderr
+			{
+				DagName:    "test-dag",
+				DagRunId:   "run-789",
+				AttemptId:  "attempt-1",
+				StepName:   "step1",
+				StreamType: coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDERR,
+				IsFinal:    true,
+			},
+		}
+
+		stream := &mockStreamLogsServer{
+			chunks: chunks,
+			ctx:    context.Background(),
+		}
+
+		err := h.handleStream(stream)
+		require.NoError(t, err)
+
+		// Verify both files were created
+		stdoutPath := filepath.Join(logDir, "test-dag", "run-789", "attempt-1", "step1.stdout.log")
+		stderrPath := filepath.Join(logDir, "test-dag", "run-789", "attempt-1", "step1.stderr.log")
+
+		stdoutContent, err := os.ReadFile(stdoutPath)
+		require.NoError(t, err)
+		assert.Equal(t, "stdout output\n", string(stdoutContent))
+
+		stderrContent, err := os.ReadFile(stderrPath)
+		require.NoError(t, err)
+		assert.Equal(t, "stderr output\n", string(stderrContent))
+	})
 }

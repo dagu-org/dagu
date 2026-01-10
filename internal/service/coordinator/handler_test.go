@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"context"
+	"io"
 	"sync"
 	"testing"
 	"time"
@@ -9,21 +10,36 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
 // mockDAGRunStore is a test implementation of execution.DAGRunStore
 type mockDAGRunStore struct {
-	attempts map[string]*mockDAGRunAttempt
-	mu       sync.Mutex
+	attempts    map[string]*mockDAGRunAttempt
+	subAttempts map[string]*mockDAGRunAttempt // key: rootID:subID
+	mu          sync.Mutex
 }
 
 func newMockDAGRunStore() *mockDAGRunStore {
 	return &mockDAGRunStore{
-		attempts: make(map[string]*mockDAGRunAttempt),
+		attempts:    make(map[string]*mockDAGRunAttempt),
+		subAttempts: make(map[string]*mockDAGRunAttempt),
 	}
+}
+
+func (m *mockDAGRunStore) addSubAttempt(rootRef execution.DAGRunRef, subDAGRunID string, status *execution.DAGRunStatus) *mockDAGRunAttempt {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	attempt := &mockDAGRunAttempt{
+		status: status,
+	}
+	key := rootRef.ID + ":" + subDAGRunID
+	m.subAttempts[key] = attempt
+	return attempt
 }
 
 func (m *mockDAGRunStore) addAttempt(ref execution.DAGRunRef, status *execution.DAGRunStatus) *mockDAGRunAttempt {
@@ -31,6 +47,17 @@ func (m *mockDAGRunStore) addAttempt(ref execution.DAGRunRef, status *execution.
 	defer m.mu.Unlock()
 	attempt := &mockDAGRunAttempt{
 		status: status,
+	}
+	m.attempts[ref.ID] = attempt
+	return attempt
+}
+
+func (m *mockDAGRunStore) addAbortingAttempt(ref execution.DAGRunRef, status *execution.DAGRunStatus) *mockDAGRunAttempt {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	attempt := &mockDAGRunAttempt{
+		status:   status,
+		aborting: true,
 	}
 	m.attempts[ref.ID] = attempt
 	return attempt
@@ -58,8 +85,14 @@ func (m *mockDAGRunStore) LatestAttempt(_ context.Context, _ string) (execution.
 func (m *mockDAGRunStore) ListStatuses(_ context.Context, _ ...execution.ListDAGRunStatusesOption) ([]*execution.DAGRunStatus, error) {
 	return nil, nil
 }
-func (m *mockDAGRunStore) FindSubAttempt(_ context.Context, _ execution.DAGRunRef, _ string) (execution.DAGRunAttempt, error) {
-	return nil, nil
+func (m *mockDAGRunStore) FindSubAttempt(_ context.Context, rootRef execution.DAGRunRef, subDAGRunID string) (execution.DAGRunAttempt, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	key := rootRef.ID + ":" + subDAGRunID
+	if attempt, ok := m.subAttempts[key]; ok {
+		return attempt, nil
+	}
+	return nil, execution.ErrDAGRunIDNotFound
 }
 func (m *mockDAGRunStore) RemoveOldDAGRuns(_ context.Context, _ string, _ int, _ ...execution.RemoveOldDAGRunsOption) ([]string, error) {
 	return nil, nil
@@ -71,11 +104,12 @@ func (m *mockDAGRunStore) RemoveDAGRun(_ context.Context, _ execution.DAGRunRef)
 
 // mockDAGRunAttempt is a test implementation of execution.DAGRunAttempt
 type mockDAGRunAttempt struct {
-	status  *execution.DAGRunStatus
-	opened  bool
-	closed  bool
-	written bool
-	mu      sync.Mutex
+	status   *execution.DAGRunStatus
+	opened   bool
+	closed   bool
+	written  bool
+	aborting bool
+	mu       sync.Mutex
 }
 
 func (m *mockDAGRunAttempt) ID() string { return "test-attempt" }
@@ -108,7 +142,11 @@ func (m *mockDAGRunAttempt) ReadStatus(_ context.Context) (*execution.DAGRunStat
 }
 func (m *mockDAGRunAttempt) ReadDAG(_ context.Context) (*core.DAG, error) { return nil, nil }
 func (m *mockDAGRunAttempt) Abort(_ context.Context) error                { return nil }
-func (m *mockDAGRunAttempt) IsAborting(_ context.Context) (bool, error)   { return false, nil }
+func (m *mockDAGRunAttempt) IsAborting(_ context.Context) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.aborting, nil
+}
 func (m *mockDAGRunAttempt) Hide(_ context.Context) error                 { return nil }
 func (m *mockDAGRunAttempt) Hidden() bool                                 { return false }
 func (m *mockDAGRunAttempt) WriteOutputs(_ context.Context, _ *execution.DAGRunOutputs) error {
@@ -1164,5 +1202,217 @@ func TestHandlerOptions(t *testing.T) {
 
 		require.Same(t, store, h.dagRunStore)
 		require.Equal(t, logDir, h.logDir)
+	})
+}
+
+// mockStreamLogsServer implements coordinatorv1.CoordinatorService_StreamLogsServer for testing
+type mockStreamLogsServer struct {
+	chunks   []*coordinatorv1.LogChunk
+	idx      int
+	response *coordinatorv1.StreamLogsResponse
+	ctx      context.Context
+}
+
+func (m *mockStreamLogsServer) Recv() (*coordinatorv1.LogChunk, error) {
+	if m.idx >= len(m.chunks) {
+		return nil, io.EOF
+	}
+	chunk := m.chunks[m.idx]
+	m.idx++
+	return chunk, nil
+}
+
+func (m *mockStreamLogsServer) SendAndClose(resp *coordinatorv1.StreamLogsResponse) error {
+	m.response = resp
+	return nil
+}
+
+func (m *mockStreamLogsServer) SetHeader(_ metadata.MD) error  { return nil }
+func (m *mockStreamLogsServer) SendHeader(_ metadata.MD) error { return nil }
+func (m *mockStreamLogsServer) SetTrailer(_ metadata.MD)       {}
+func (m *mockStreamLogsServer) Context() context.Context       { return m.ctx }
+func (m *mockStreamLogsServer) SendMsg(_ any) error { return nil }
+func (m *mockStreamLogsServer) RecvMsg(_ any) error { return nil }
+
+func TestHandler_StreamLogs_Full(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ReturnsErrorWhenLogDirEmpty", func(t *testing.T) {
+		t.Parallel()
+
+		h := NewHandler() // No logDir
+		stream := &mockStreamLogsServer{
+			chunks: []*coordinatorv1.LogChunk{},
+			ctx:    context.Background(),
+		}
+
+		err := h.StreamLogs(stream)
+		require.Error(t, err)
+		st, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, st.Code())
+		assert.Contains(t, st.Message(), "logDir is empty")
+	})
+
+	t.Run("WritesLogsToFileSystem", func(t *testing.T) {
+		t.Parallel()
+
+		logDir := t.TempDir()
+		h := NewHandler(WithLogDir(logDir))
+
+		chunks := []*coordinatorv1.LogChunk{
+			{
+				DagName:    "test-dag",
+				DagRunId:   "run-123",
+				AttemptId:  "attempt-1",
+				StepName:   "step1",
+				StreamType: coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDOUT,
+				Data:       []byte("test log data\n"),
+			},
+			{
+				DagName:    "test-dag",
+				DagRunId:   "run-123",
+				AttemptId:  "attempt-1",
+				StepName:   "step1",
+				StreamType: coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDOUT,
+				IsFinal:    true,
+			},
+		}
+
+		stream := &mockStreamLogsServer{
+			chunks: chunks,
+			ctx:    context.Background(),
+		}
+
+		err := h.StreamLogs(stream)
+		require.NoError(t, err)
+		require.NotNil(t, stream.response)
+		assert.Equal(t, uint64(2), stream.response.ChunksReceived)
+		assert.Equal(t, uint64(14), stream.response.BytesWritten)
+	})
+}
+
+func TestHandler_GetCancelledRunsForWorker_Full(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ReturnsCancelledRuns", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		// Create an attempt that is aborting (cancelled)
+		ref := execution.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		store.addAbortingAttempt(ref, &execution.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: "run-123",
+			Status:   core.Running, // Status doesn't matter, IsAborting is what's checked
+		})
+
+		stats := &coordinatorv1.WorkerStats{
+			RunningTasks: []*coordinatorv1.RunningTask{
+				{DagRunId: "run-123", DagName: "test-dag"},
+			},
+		}
+
+		result := h.getCancelledRunsForWorker(ctx, stats)
+		assert.Contains(t, result, "run-123")
+	})
+
+	t.Run("DoesNotReturnRunningTasks", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		// Create an attempt that is running (not cancelled)
+		ref := execution.DAGRunRef{Name: "test-dag", ID: "run-456"}
+		store.addAttempt(ref, &execution.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: "run-456",
+			Status:   core.Running,
+		})
+
+		stats := &coordinatorv1.WorkerStats{
+			RunningTasks: []*coordinatorv1.RunningTask{
+				{DagRunId: "run-456", DagName: "test-dag"},
+			},
+		}
+
+		result := h.getCancelledRunsForWorker(ctx, stats)
+		assert.NotContains(t, result, "run-456")
+	})
+}
+
+func TestHandler_GetOrOpenSubAttempt(t *testing.T) {
+	t.Parallel()
+
+	t.Run("OpensSubAttemptOnFirstAccess", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		// Add a sub-attempt
+		rootRef := execution.DAGRunRef{Name: "parent-dag", ID: "root-123"}
+		subDAGRunID := "sub-456"
+		store.addSubAttempt(rootRef, subDAGRunID, &execution.DAGRunStatus{
+			Name:     "child-dag",
+			DAGRunID: subDAGRunID,
+			Status:   core.Running,
+		})
+
+		// Get the sub-attempt
+		attempt, err := h.getOrOpenSubAttempt(ctx, rootRef, subDAGRunID)
+		require.NoError(t, err)
+		require.NotNil(t, attempt)
+
+		// Verify it was opened
+		mockAttempt := attempt.(*mockDAGRunAttempt)
+		assert.True(t, mockAttempt.WasOpened())
+	})
+
+	t.Run("ReturnsCachedAttemptOnSecondAccess", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		// Add a sub-attempt
+		rootRef := execution.DAGRunRef{Name: "parent-dag", ID: "root-789"}
+		subDAGRunID := "sub-101"
+		store.addSubAttempt(rootRef, subDAGRunID, &execution.DAGRunStatus{
+			Name:     "child-dag",
+			DAGRunID: subDAGRunID,
+			Status:   core.Running,
+		})
+
+		// Get the sub-attempt twice
+		attempt1, err := h.getOrOpenSubAttempt(ctx, rootRef, subDAGRunID)
+		require.NoError(t, err)
+
+		attempt2, err := h.getOrOpenSubAttempt(ctx, rootRef, subDAGRunID)
+		require.NoError(t, err)
+
+		// Both should be the same instance
+		assert.Same(t, attempt1, attempt2)
+	})
+
+	t.Run("ReturnsErrorWhenSubAttemptNotFound", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		rootRef := execution.DAGRunRef{Name: "parent-dag", ID: "root-999"}
+
+		// Try to get a non-existent sub-attempt
+		_, err := h.getOrOpenSubAttempt(ctx, rootRef, "non-existent")
+		assert.Error(t, err)
 	})
 }
