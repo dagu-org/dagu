@@ -40,19 +40,21 @@ func (d *SQLiteDriver) Connect(ctx context.Context, cfg *sqlexec.Config) (*sql.D
 		dbPath := extractDBPath(dsn)
 		lockPath := dbPath + ".lock"
 
+		// Hold mutex across entire lock creation, acquisition, and storage
+		// to prevent race conditions with concurrent Connect() calls
 		d.locksMu.Lock()
 		fl := flock.New(lockPath)
-		d.locksMu.Unlock()
 
 		locked, err := fl.TryLock()
 		if err != nil {
+			d.locksMu.Unlock()
 			return nil, nil, fmt.Errorf("failed to acquire file lock: %w", err)
 		}
 		if !locked {
+			d.locksMu.Unlock()
 			return nil, nil, fmt.Errorf("database is locked by another process")
 		}
 
-		d.locksMu.Lock()
 		d.locks[lockPath] = fl
 		d.locksMu.Unlock()
 
@@ -92,15 +94,10 @@ func (d *SQLiteDriver) Connect(ctx context.Context, cfg *sqlexec.Config) (*sql.D
 		}
 	}
 
-	// Wrap cleanup to also close the database
-	finalCleanup := func() error {
-		if cleanup != nil {
-			return cleanup()
-		}
-		return nil
-	}
-
-	return db, finalCleanup, nil
+	// Return cleanup function for file lock release.
+	// Note: db.Close() is handled by ConnectionManager.closeInternal(),
+	// not by this cleanup function, to avoid double-close.
+	return db, cleanup, nil
 }
 
 // SupportsAdvisoryLock returns false as SQLite doesn't support advisory locks.

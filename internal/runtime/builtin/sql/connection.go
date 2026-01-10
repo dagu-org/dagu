@@ -16,6 +16,7 @@ type ConnectionManager struct {
 	cfg      *Config
 	cleanup  func() error
 	refCount int
+	closed   bool
 }
 
 // Connection retry settings
@@ -135,6 +136,12 @@ func (m *ConnectionManager) Close() error {
 }
 
 func (m *ConnectionManager) closeInternal() error {
+	// Guard against double-close
+	if m.closed {
+		return nil
+	}
+	m.closed = true
+
 	var errs []error
 
 	if m.cleanup != nil {

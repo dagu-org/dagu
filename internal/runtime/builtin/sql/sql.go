@@ -401,7 +401,7 @@ func (e *sqlExecutor) executeScript(ctx context.Context, script string) error {
 }
 
 // executeSelectQuery executes a SELECT query and writes results.
-func (e *sqlExecutor) executeSelectQuery(ctx context.Context, qe QueryExecutor, query string, params []any) (int64, error) {
+func (e *sqlExecutor) executeSelectQuery(ctx context.Context, qe QueryExecutor, query string, params []any) (rowCount int64, err error) {
 	rows, err := qe.QueryContext(ctx, query, params...)
 	if err != nil {
 		return 0, err
@@ -430,9 +430,25 @@ func (e *sqlExecutor) executeSelectQuery(ctx context.Context, qe QueryExecutor, 
 			return 0, fmt.Errorf("failed to create output file: %w", err)
 		}
 		defer func() {
-			outputFile.Close()
-			// Atomic rename
-			_ = os.Rename(tmpFile, e.cfg.OutputFile)
+			// Close the file first
+			closeErr := outputFile.Close()
+			if closeErr != nil {
+				// Only set error if no previous error
+				if err == nil {
+					err = fmt.Errorf("failed to close output file: %w", closeErr)
+				}
+				// Try to remove temp file on close failure
+				_ = os.Remove(tmpFile)
+				return
+			}
+			// Atomic rename only if close succeeded
+			if renameErr := os.Rename(tmpFile, e.cfg.OutputFile); renameErr != nil {
+				if err == nil {
+					err = fmt.Errorf("failed to rename output file: %w", renameErr)
+				}
+				// Try to remove temp file on rename failure
+				_ = os.Remove(tmpFile)
+			}
 		}()
 		output = outputFile
 	}
@@ -442,7 +458,6 @@ func (e *sqlExecutor) executeSelectQuery(ctx context.Context, qe QueryExecutor, 
 		return 0, fmt.Errorf("failed to write header: %w", err)
 	}
 
-	var rowCount int64
 	for rows.Next() {
 		if e.cfg.MaxRows > 0 && rowCount >= int64(e.cfg.MaxRows) {
 			break

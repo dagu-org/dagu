@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -214,11 +215,8 @@ func (r *JSONLReader) ReadHeader() ([]string, error) {
 		return nil, fmt.Errorf("failed to parse JSONL header line: %w", err)
 	}
 
-	// Extract keys in consistent order
-	r.columns = make([]string, 0, len(obj))
-	for k := range obj {
-		r.columns = append(r.columns, k)
-	}
+	// Extract keys and sort for deterministic ordering
+	r.columns = extractSortedKeys(obj)
 
 	// Note: The first row data is consumed to detect columns.
 	// Use NewJSONLReaderWithHeader if you need to preserve it.
@@ -227,17 +225,20 @@ func (r *JSONLReader) ReadHeader() ([]string, error) {
 
 // ReadRow reads the next JSON object from the input.
 func (r *JSONLReader) ReadRow() ([]any, error) {
-	if !r.scanner.Scan() {
-		if err := r.scanner.Err(); err != nil {
-			return nil, fmt.Errorf("failed to read JSONL: %w", err)
+	// Read lines until we get a non-empty one (iterative, not recursive)
+	var line string
+	for {
+		if !r.scanner.Scan() {
+			if err := r.scanner.Err(); err != nil {
+				return nil, fmt.Errorf("failed to read JSONL: %w", err)
+			}
+			return nil, io.EOF
 		}
-		return nil, io.EOF
-	}
-
-	line := r.scanner.Text()
-	if line == "" {
-		// Skip empty lines
-		return r.ReadRow()
+		line = r.scanner.Text()
+		if line != "" {
+			break
+		}
+		// Skip empty lines and continue loop
 	}
 
 	var obj map[string]any
@@ -270,6 +271,16 @@ func (r *JSONLReader) Close() error {
 	return nil
 }
 
+// extractSortedKeys extracts keys from a map and returns them in sorted order.
+func extractSortedKeys(obj map[string]any) []string {
+	keys := make([]string, 0, len(obj))
+	for k := range obj {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 // JSONLReaderWithFirstRow is a variant that can return a pre-read first row.
 type JSONLReaderWithFirstRow struct {
 	*JSONLReader
@@ -299,11 +310,8 @@ func NewJSONLReaderWithHeader(r io.Reader, opts InputOptions) (*JSONLReaderWithF
 		return nil, fmt.Errorf("failed to parse JSONL first line: %w", err)
 	}
 
-	// Extract keys
-	jr.columns = make([]string, 0, len(obj))
-	for k := range obj {
-		jr.columns = append(jr.columns, k)
-	}
+	// Extract keys and sort for deterministic ordering
+	jr.columns = extractSortedKeys(obj)
 	jr.headerRead = true
 
 	// Build first row

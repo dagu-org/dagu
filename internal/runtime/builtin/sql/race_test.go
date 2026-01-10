@@ -73,6 +73,7 @@ func TestRace_ConnectionManagerConcurrent(t *testing.T) {
 
 	cm, err := sqlexec.NewConnectionManager(ctx, driver, cfg)
 	require.NoError(t, err)
+	defer cm.Close()
 
 	numGoroutines := 20
 	var wg sync.WaitGroup
@@ -96,9 +97,6 @@ func TestRace_ConnectionManagerConcurrent(t *testing.T) {
 	}
 
 	wg.Wait()
-
-	// Final release
-	_ = cm.Release()
 }
 
 // TestRace_DriverRegistryConcurrent tests concurrent access to the driver registry.

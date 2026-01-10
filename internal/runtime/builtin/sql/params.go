@@ -11,6 +11,9 @@ import (
 // namedParamRegex matches named parameters like :param_name or :paramName
 var namedParamRegex = regexp.MustCompile(`:([a-zA-Z_][a-zA-Z0-9_]*)`)
 
+// positionalParamRegex matches positional parameters like $1, $2, etc.
+var positionalParamRegex = regexp.MustCompile(`\$(\d+)`)
+
 // ConvertNamedToPositional converts named parameters (:param) to positional parameters ($1, $2, ...).
 // Returns the converted query and ordered parameter values.
 func ConvertNamedToPositional(query string, params map[string]any, placeholder string) (string, []any, error) {
@@ -90,11 +93,13 @@ func ConvertPositionalParams(query string, params []any, placeholder string) ([]
 	if placeholder == "?" {
 		count = strings.Count(query, "?")
 	} else {
-		// Count $N placeholders
-		for i := 1; i <= len(params)+10; i++ {
-			if strings.Contains(query, placeholder+strconv.Itoa(i)) {
-				if i > count {
-					count = i
+		// Count $N placeholders using regex to find the highest numbered placeholder
+		matches := positionalParamRegex.FindAllStringSubmatch(query, -1)
+		for _, match := range matches {
+			if len(match) > 1 {
+				n, err := strconv.Atoi(match[1])
+				if err == nil && n > count {
+					count = n
 				}
 			}
 		}
