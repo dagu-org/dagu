@@ -1384,6 +1384,40 @@
           "type": "boolean",
           "default": false,
           "description": "Keep the container running after the step completes. Useful for debugging or when running services that need to persist between steps. Not applicable in exec mode."
+        },
+        "healthcheck": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "test": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1,
+              "description": "Command to run to check health. Must start with 'NONE' (disable healthcheck), 'CMD' (run command directly), or 'CMD-SHELL' (run command in shell). Examples: ['CMD', 'pg_isready', '-U', 'postgres'] or ['CMD-SHELL', 'curl -f http://localhost/ || exit 1']."
+            },
+            "interval": {
+              "type": "string",
+              "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$",
+              "description": "Time between health checks (e.g., '5s', '1m'). Default is 30s."
+            },
+            "timeout": {
+              "type": "string",
+              "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$",
+              "description": "Maximum time to wait for a health check to complete (e.g., '3s', '10s'). Default is 30s."
+            },
+            "startPeriod": {
+              "type": "string",
+              "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$",
+              "description": "Grace period for the container to initialize before health checks start counting failures (e.g., '10s', '1m'). Default is 0s."
+            },
+            "retries": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of consecutive failures needed to mark the container as unhealthy. Default is 3."
+            }
+          },
+          "required": ["test"],
+          "description": "Custom healthcheck configuration for the container. Allows 'waitFor: healthy' to work with images that don't have built-in healthchecks (e.g., postgres, mysql). Not applicable in exec mode."
         }
       },
       "description": "Container configuration object. Either 'exec' (to run in an existing container) or 'image' (to create a new container) must be specified, but not both."
