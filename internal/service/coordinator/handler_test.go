@@ -2,14 +2,127 @@ package coordinator
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+// mockDAGRunStore is a test implementation of execution.DAGRunStore
+type mockDAGRunStore struct {
+	attempts map[string]*mockDAGRunAttempt
+	mu       sync.Mutex
+}
+
+func newMockDAGRunStore() *mockDAGRunStore {
+	return &mockDAGRunStore{
+		attempts: make(map[string]*mockDAGRunAttempt),
+	}
+}
+
+func (m *mockDAGRunStore) addAttempt(ref execution.DAGRunRef, status *execution.DAGRunStatus) *mockDAGRunAttempt {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	attempt := &mockDAGRunAttempt{
+		status: status,
+	}
+	m.attempts[ref.ID] = attempt
+	return attempt
+}
+
+func (m *mockDAGRunStore) FindAttempt(_ context.Context, dagRun execution.DAGRunRef) (execution.DAGRunAttempt, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if attempt, ok := m.attempts[dagRun.ID]; ok {
+		return attempt, nil
+	}
+	return nil, execution.ErrDAGRunIDNotFound
+}
+
+// Implement other required interface methods (unused in tests)
+func (m *mockDAGRunStore) CreateAttempt(_ context.Context, _ *core.DAG, _ time.Time, _ string, _ execution.NewDAGRunAttemptOptions) (execution.DAGRunAttempt, error) {
+	return nil, nil
+}
+func (m *mockDAGRunStore) RecentAttempts(_ context.Context, _ string, _ int) []execution.DAGRunAttempt {
+	return nil
+}
+func (m *mockDAGRunStore) LatestAttempt(_ context.Context, _ string) (execution.DAGRunAttempt, error) {
+	return nil, nil
+}
+func (m *mockDAGRunStore) ListStatuses(_ context.Context, _ ...execution.ListDAGRunStatusesOption) ([]*execution.DAGRunStatus, error) {
+	return nil, nil
+}
+func (m *mockDAGRunStore) FindSubAttempt(_ context.Context, _ execution.DAGRunRef, _ string) (execution.DAGRunAttempt, error) {
+	return nil, nil
+}
+func (m *mockDAGRunStore) RemoveOldDAGRuns(_ context.Context, _ string, _ int, _ ...execution.RemoveOldDAGRunsOption) ([]string, error) {
+	return nil, nil
+}
+func (m *mockDAGRunStore) RenameDAGRuns(_ context.Context, _, _ string) error { return nil }
+func (m *mockDAGRunStore) RemoveDAGRun(_ context.Context, _ execution.DAGRunRef) error {
+	return nil
+}
+
+// mockDAGRunAttempt is a test implementation of execution.DAGRunAttempt
+type mockDAGRunAttempt struct {
+	status  *execution.DAGRunStatus
+	opened  bool
+	closed  bool
+	written bool
+	mu      sync.Mutex
+}
+
+func (m *mockDAGRunAttempt) ID() string { return "test-attempt" }
+func (m *mockDAGRunAttempt) Open(_ context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.opened = true
+	return nil
+}
+func (m *mockDAGRunAttempt) Write(_ context.Context, s execution.DAGRunStatus) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.status = &s
+	m.written = true
+	return nil
+}
+func (m *mockDAGRunAttempt) Close(_ context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.closed = true
+	return nil
+}
+func (m *mockDAGRunAttempt) ReadStatus(_ context.Context) (*execution.DAGRunStatus, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.status == nil {
+		return nil, execution.ErrNoStatusData
+	}
+	return m.status, nil
+}
+func (m *mockDAGRunAttempt) ReadDAG(_ context.Context) (*core.DAG, error) { return nil, nil }
+func (m *mockDAGRunAttempt) Abort(_ context.Context) error                { return nil }
+func (m *mockDAGRunAttempt) IsAborting(_ context.Context) (bool, error)   { return false, nil }
+func (m *mockDAGRunAttempt) Hide(_ context.Context) error                 { return nil }
+func (m *mockDAGRunAttempt) Hidden() bool                                 { return false }
+func (m *mockDAGRunAttempt) WriteOutputs(_ context.Context, _ *execution.DAGRunOutputs) error {
+	return nil
+}
+func (m *mockDAGRunAttempt) ReadOutputs(_ context.Context) (*execution.DAGRunOutputs, error) {
+	return nil, nil
+}
+func (m *mockDAGRunAttempt) WriteStepMessages(_ context.Context, _ string, _ []execution.LLMMessage) error {
+	return nil
+}
+func (m *mockDAGRunAttempt) ReadStepMessages(_ context.Context, _ string) ([]execution.LLMMessage, error) {
+	return nil, nil
+}
 
 func TestHandler_Poll(t *testing.T) {
 	t.Run("PollWithoutPollerID", func(t *testing.T) {
@@ -339,4 +452,241 @@ func TestHandler_GetWorkers(t *testing.T) {
 		}
 	})
 
+}
+
+func TestHandler_ZombieDetection(t *testing.T) {
+	t.Run("MarkRunFailedUpdatesStatus", func(t *testing.T) {
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		// Create a running DAG run
+		ref := execution.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		initialStatus := &execution.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: "run-123",
+			Status:   core.Running,
+			Nodes: []*execution.Node{
+				{Status: core.NodeRunning},
+				{Status: core.NodeSucceeded},
+			},
+		}
+		attempt := store.addAttempt(ref, initialStatus)
+
+		// Mark the run as failed
+		h.markRunFailed(ctx, "test-dag", "run-123", "worker crashed")
+
+		// Verify the status was updated
+		require.True(t, attempt.opened)
+		require.True(t, attempt.written)
+		require.True(t, attempt.closed)
+
+		// Check the status
+		status, err := attempt.ReadStatus(ctx)
+		require.NoError(t, err)
+		require.Equal(t, core.Failed, status.Status)
+		require.Equal(t, "worker crashed", status.Error)
+		require.NotEmpty(t, status.FinishedAt)
+
+		// Check that running node was marked as failed
+		require.Equal(t, core.NodeFailed, status.Nodes[0].Status)
+		require.Equal(t, "worker crashed", status.Nodes[0].Error)
+		// Succeeded node should remain unchanged
+		require.Equal(t, core.NodeSucceeded, status.Nodes[1].Status)
+	})
+
+	t.Run("MarkRunFailedSkipsCompletedRuns", func(t *testing.T) {
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		// Create an already completed DAG run
+		ref := execution.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		initialStatus := &execution.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: "run-123",
+			Status:   core.Succeeded,
+		}
+		attempt := store.addAttempt(ref, initialStatus)
+
+		// Try to mark the run as failed
+		h.markRunFailed(ctx, "test-dag", "run-123", "worker crashed")
+
+		// Verify no writes occurred (status should remain Succeeded)
+		require.False(t, attempt.written)
+		status, err := attempt.ReadStatus(ctx)
+		require.NoError(t, err)
+		require.Equal(t, core.Succeeded, status.Status)
+	})
+
+	t.Run("MarkWorkerTasksFailedWithNoStore", func(t *testing.T) {
+		// Handler without dagRunStore
+		h := NewHandler()
+		ctx := context.Background()
+
+		info := &heartbeatInfo{
+			workerID: "worker1",
+			stats: &coordinatorv1.WorkerStats{
+				RunningTasks: []*coordinatorv1.RunningTask{
+					{DagRunId: "run-123", DagName: "test-dag"},
+				},
+			},
+		}
+
+		// Should not panic, just skip
+		h.markWorkerTasksFailed(ctx, info)
+	})
+
+	t.Run("MarkWorkerTasksFailedWithNoStats", func(t *testing.T) {
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		info := &heartbeatInfo{
+			workerID: "worker1",
+			stats:    nil, // No stats
+		}
+
+		// Should not panic, just skip
+		h.markWorkerTasksFailed(ctx, info)
+	})
+
+	t.Run("StaleHeartbeatMarksTasksAsFailed", func(t *testing.T) {
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		// Create a running DAG run
+		ref := execution.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		initialStatus := &execution.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: "run-123",
+			Status:   core.Running,
+		}
+		attempt := store.addAttempt(ref, initialStatus)
+
+		// Add a stale heartbeat with running tasks
+		h.mu.Lock()
+		h.heartbeats["stale-worker"] = &heartbeatInfo{
+			workerID:        "stale-worker",
+			lastHeartbeatAt: time.Now().Add(-40 * time.Second), // 40 seconds old
+			stats: &coordinatorv1.WorkerStats{
+				RunningTasks: []*coordinatorv1.RunningTask{
+					{DagRunId: "run-123", DagName: "test-dag"},
+				},
+			},
+		}
+		h.mu.Unlock()
+
+		// Send a new heartbeat from a different worker to trigger cleanup
+		_, err := h.Heartbeat(ctx, &coordinatorv1.HeartbeatRequest{
+			WorkerId: "new-worker",
+			Labels:   map[string]string{},
+		})
+		require.NoError(t, err)
+
+		// Verify the stale worker's task was marked as failed
+		require.True(t, attempt.written)
+		status, err := attempt.ReadStatus(ctx)
+		require.NoError(t, err)
+		require.Equal(t, core.Failed, status.Status)
+		require.Contains(t, status.Error, "stale-worker")
+		require.Contains(t, status.Error, "unresponsive")
+	})
+
+	t.Run("DetectAndCleanupZombies", func(t *testing.T) {
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		// Create two running DAG runs
+		ref1 := execution.DAGRunRef{Name: "dag1", ID: "run-1"}
+		status1 := &execution.DAGRunStatus{
+			Name:     "dag1",
+			DAGRunID: "run-1",
+			Status:   core.Running,
+		}
+		attempt1 := store.addAttempt(ref1, status1)
+
+		ref2 := execution.DAGRunRef{Name: "dag2", ID: "run-2"}
+		status2 := &execution.DAGRunStatus{
+			Name:     "dag2",
+			DAGRunID: "run-2",
+			Status:   core.Running,
+		}
+		attempt2 := store.addAttempt(ref2, status2)
+
+		// Add a stale heartbeat with both running tasks
+		h.mu.Lock()
+		h.heartbeats["crashed-worker"] = &heartbeatInfo{
+			workerID:        "crashed-worker",
+			lastHeartbeatAt: time.Now().Add(-40 * time.Second),
+			stats: &coordinatorv1.WorkerStats{
+				RunningTasks: []*coordinatorv1.RunningTask{
+					{DagRunId: "run-1", DagName: "dag1"},
+					{DagRunId: "run-2", DagName: "dag2"},
+				},
+			},
+		}
+		h.mu.Unlock()
+
+		// Run zombie detection
+		h.detectAndCleanupZombies(ctx)
+
+		// Verify both tasks were marked as failed
+		require.True(t, attempt1.written)
+		require.True(t, attempt2.written)
+
+		s1, _ := attempt1.ReadStatus(ctx)
+		s2, _ := attempt2.ReadStatus(ctx)
+		require.Equal(t, core.Failed, s1.Status)
+		require.Equal(t, core.Failed, s2.Status)
+
+		// Verify the stale worker was removed
+		h.mu.Lock()
+		_, exists := h.heartbeats["crashed-worker"]
+		h.mu.Unlock()
+		require.False(t, exists)
+	})
+
+	t.Run("StartZombieDetectorRunsPeriodically", func(t *testing.T) {
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+
+		// Create a running DAG run
+		ref := execution.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		status := &execution.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: "run-123",
+			Status:   core.Running,
+		}
+		attempt := store.addAttempt(ref, status)
+
+		// Add a stale heartbeat
+		h.mu.Lock()
+		h.heartbeats["zombie-worker"] = &heartbeatInfo{
+			workerID:        "zombie-worker",
+			lastHeartbeatAt: time.Now().Add(-40 * time.Second),
+			stats: &coordinatorv1.WorkerStats{
+				RunningTasks: []*coordinatorv1.RunningTask{
+					{DagRunId: "run-123", DagName: "test-dag"},
+				},
+			},
+		}
+		h.mu.Unlock()
+
+		// Start zombie detector with short interval for testing
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		h.StartZombieDetector(ctx, 50*time.Millisecond)
+
+		// Wait for detector to run
+		time.Sleep(100 * time.Millisecond)
+
+		// Verify the task was marked as failed
+		require.True(t, attempt.written)
+		s, _ := attempt.ReadStatus(ctx)
+		require.Equal(t, core.Failed, s.Status)
+	})
 }

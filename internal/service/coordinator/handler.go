@@ -2,9 +2,15 @@ package coordinator
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"google.golang.org/grpc/codes"
@@ -25,6 +31,9 @@ type heartbeatInfo struct {
 	stats           *coordinatorv1.WorkerStats
 	lastHeartbeatAt time.Time
 }
+
+// staleHeartbeatThreshold is the duration after which a worker's heartbeat is considered stale.
+const staleHeartbeatThreshold = 30 * time.Second
 
 type Handler struct {
 	coordinatorv1.UnimplementedCoordinatorServiceServer
@@ -216,7 +225,7 @@ func calculateHealthStatus(sinceLastHeartbeat time.Duration) coordinatorv1.Worke
 }
 
 // Heartbeat receives periodic status updates from workers
-func (h *Handler) Heartbeat(_ context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
+func (h *Handler) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
 	if req.WorkerId == "" {
 		return nil, status.Error(codes.InvalidArgument, "worker_id is required")
 	}
@@ -232,13 +241,8 @@ func (h *Handler) Heartbeat(_ context.Context, req *coordinatorv1.HeartbeatReque
 		lastHeartbeatAt: time.Now(),
 	}
 
-	// Clean up stale heartbeats (older than 30 seconds)
-	staleThreshold := time.Now().Add(-30 * time.Second)
-	for workerID, info := range h.heartbeats {
-		if info.lastHeartbeatAt.Before(staleThreshold) {
-			delete(h.heartbeats, workerID)
-		}
-	}
+	// Clean up stale heartbeats and mark their tasks as failed
+	h.cleanupStaleHeartbeats(ctx)
 
 	return &coordinatorv1.HeartbeatResponse{}, nil
 }
@@ -319,4 +323,112 @@ func (h *Handler) StreamLogs(stream coordinatorv1.CoordinatorService_StreamLogsS
 	logHandler := newLogHandler(h.logDir)
 	defer logHandler.Close() // Ensure file handles are closed on stream end or error
 	return logHandler.handleStream(stream)
+}
+
+// StartZombieDetector starts a background goroutine that periodically checks for zombie runs.
+// It detects workers that have stopped sending heartbeats and marks their running tasks as failed.
+// The interval parameter controls how often the detector runs (recommended: 45 seconds).
+func (h *Handler) StartZombieDetector(ctx context.Context, interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				h.detectAndCleanupZombies(ctx)
+			}
+		}
+	}()
+}
+
+// detectAndCleanupZombies checks for stale workers and marks their tasks as failed.
+func (h *Handler) detectAndCleanupZombies(ctx context.Context) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.cleanupStaleHeartbeats(ctx)
+}
+
+// cleanupStaleHeartbeats removes stale heartbeats and marks their tasks as failed.
+// Must be called with h.mu held.
+func (h *Handler) cleanupStaleHeartbeats(ctx context.Context) {
+	staleThreshold := time.Now().Add(-staleHeartbeatThreshold)
+	for workerID, info := range h.heartbeats {
+		if info.lastHeartbeatAt.Before(staleThreshold) {
+			h.markWorkerTasksFailed(ctx, info)
+			delete(h.heartbeats, workerID)
+		}
+	}
+}
+
+// markWorkerTasksFailed marks all running tasks from a failed worker as FAILED.
+// This is called when a worker's heartbeat becomes stale (worker crashed or disconnected).
+func (h *Handler) markWorkerTasksFailed(ctx context.Context, info *heartbeatInfo) {
+	if h.dagRunStore == nil || info.stats == nil {
+		return
+	}
+
+	for _, task := range info.stats.RunningTasks {
+		reason := fmt.Sprintf("worker %s became unresponsive", info.workerID)
+		h.markRunFailed(ctx, task.DagName, task.DagRunId, reason)
+	}
+}
+
+// markRunFailed marks a single DAG run as FAILED.
+// This is used to clean up zombie runs when their worker becomes unresponsive.
+func (h *Handler) markRunFailed(ctx context.Context, dagName, dagRunID, reason string) {
+	ref := execution.DAGRunRef{Name: dagName, ID: dagRunID}
+	attempt, err := h.dagRunStore.FindAttempt(ctx, ref)
+	if err != nil {
+		logger.Error(ctx, "Failed to find attempt for zombie cleanup",
+			tag.DAG(dagName), tag.RunID(dagRunID), tag.Error(err))
+		return
+	}
+
+	dagRunStatus, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		logger.Error(ctx, "Failed to read status for zombie cleanup",
+			tag.DAG(dagName), tag.RunID(dagRunID), tag.Error(err))
+		return
+	}
+
+	// Only mark as failed if still active (running, queued, or waiting)
+	if !dagRunStatus.Status.IsActive() {
+		return
+	}
+
+	// Update status to FAILED with consistent timestamp
+	finishedAt := stringutil.FormatTime(time.Now())
+	dagRunStatus.Status = core.Failed
+	dagRunStatus.FinishedAt = finishedAt
+	dagRunStatus.Error = reason
+
+	// Mark all running nodes as failed
+	for i, node := range dagRunStatus.Nodes {
+		if node.Status == core.NodeRunning {
+			dagRunStatus.Nodes[i].Status = core.NodeFailed
+			dagRunStatus.Nodes[i].FinishedAt = finishedAt
+			dagRunStatus.Nodes[i].Error = reason
+		}
+	}
+
+	// Persist the failed status
+	if err := attempt.Open(ctx); err != nil {
+		logger.Error(ctx, "Failed to open attempt for zombie cleanup",
+			tag.DAG(dagName), tag.RunID(dagRunID), tag.Error(err))
+		return
+	}
+	defer func() { _ = attempt.Close(ctx) }()
+
+	if err := attempt.Write(ctx, *dagRunStatus); err != nil {
+		logger.Error(ctx, "Failed to write failed status for zombie cleanup",
+			tag.DAG(dagName), tag.RunID(dagRunID), tag.Error(err))
+		return
+	}
+
+	logger.Warn(ctx, "Marked zombie run as FAILED",
+		tag.DAG(dagName), tag.RunID(dagRunID), slog.String("reason", reason))
 }

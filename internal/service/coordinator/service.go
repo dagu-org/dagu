@@ -57,6 +57,9 @@ func (srv *Service) Start(ctx context.Context) error {
 	// Also set the overall server status
 	srv.healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 
+	// Start the zombie detector to clean up runs from crashed workers
+	srv.handler.StartZombieDetector(ctx, 45*time.Second)
+
 	// Register with service registry if monitor is available
 	if srv.registry != nil {
 		// Parse port from listener address
