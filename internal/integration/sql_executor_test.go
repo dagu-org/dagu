@@ -3,6 +3,7 @@ package integration_test
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
@@ -38,6 +39,16 @@ steps:
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, core.Succeeded)
+
+	// Verify query output contains expected rows
+	dag.AssertOutputs(t, map[string]any{
+		"USERS": []test.Contains{
+			`"id":1`,
+			`"name":"Alice"`,
+			`"id":2`,
+			`"name":"Bob"`,
+		},
+	})
 }
 
 // TestSQLExecutor_SQLite_Transaction tests transaction commit behavior.
@@ -78,6 +89,16 @@ steps:
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, core.Succeeded)
+
+	// Verify balances after transfer: account 1 = 50, account 2 = 250
+	dag.AssertOutputs(t, map[string]any{
+		"BALANCES": []test.Contains{
+			`"id":1`,
+			`"balance":50`,
+			`"id":2`,
+			`"balance":250`,
+		},
+	})
 }
 
 // TestSQLExecutor_SQLite_TransactionRollback tests that failed transactions
@@ -125,6 +146,11 @@ steps:
 	// The DAG is partially_succeeded because one step failed (even with continueOn: failure: true)
 	// The value should still be 100 because the transaction was rolled back
 	dag.AssertLatestStatus(t, core.PartiallySucceeded)
+
+	// Verify rollback: value should still be 100, NOT 999
+	dag.AssertOutputs(t, map[string]any{
+		"VALUE_AFTER_ROLLBACK": test.Contains(`"value":100`),
+	})
 }
 
 // TestSQLExecutor_SQLite_NullValues tests NULL value handling in output.
@@ -145,17 +171,50 @@ steps:
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, core.Succeeded)
+
+	// Verify NULL values are represented as null in JSON and non-null values are correct
+	dag.AssertOutputs(t, map[string]any{
+		"NULL_VALUES": []test.Contains{
+			`"null_text":null`,
+			`"null_int":null`,
+			`"null_bool":null`,
+			`"regular_text":"not_null"`,
+			`"regular_int":42`,
+		},
+	})
 }
 
 // TestSQLExecutor_SQLite_OutputFormats tests different output formats.
 func TestSQLExecutor_SQLite_OutputFormats(t *testing.T) {
 	tests := []struct {
-		name   string
-		format string
+		name     string
+		format   string
+		expected []test.Contains
 	}{
-		{"JSONL", "jsonl"},
-		{"JSON", "json"},
-		{"CSV", "csv"},
+		{
+			name:   "JSONL",
+			format: "jsonl",
+			expected: []test.Contains{
+				`"id":1`,
+				`"name":"test"`,
+			},
+		},
+		{
+			name:   "JSON",
+			format: "json",
+			expected: []test.Contains{
+				`"id": 1`,       // JSON format is pretty-printed with spaces
+				`"name": "test"`, // JSON format is pretty-printed with spaces
+			},
+		},
+		{
+			name:   "CSV",
+			format: "csv",
+			expected: []test.Contains{
+				`id,name`, // header
+				`1,test`,  // data row
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -180,6 +239,11 @@ steps:
 
 			dag.Agent().RunSuccess(t)
 			dag.AssertLatestStatus(t, core.Succeeded)
+
+			// Verify format-specific output
+			dag.AssertOutputs(t, map[string]any{
+				"RESULT": tt.expected,
+			})
 		})
 	}
 }
@@ -206,6 +270,27 @@ steps:
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, core.Succeeded)
+
+	// Verify output contains rows 1-5
+	dag.AssertOutputs(t, map[string]any{
+		"LIMITED_ROWS": []test.Contains{
+			`"id":1`,
+			`"id":2`,
+			`"id":3`,
+			`"id":4`,
+			`"id":5`,
+		},
+	})
+
+	// Verify rows 6-10 are NOT in output (maxRows=5 should limit)
+	outputs := dag.ReadOutputs(t)
+	limitedRows := outputs["LIMITED_ROWS"]
+	if strings.Contains(limitedRows, `"id":6`) {
+		t.Errorf("maxRows=5 but row 6 was returned")
+	}
+	if strings.Contains(limitedRows, `"id":10`) {
+		t.Errorf("maxRows=5 but row 10 was returned")
+	}
 }
 
 // TestSQLExecutor_SQLite_NamedParams tests named parameter substitution.
@@ -238,6 +323,20 @@ steps:
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, core.Succeeded)
+
+	// Verify only products with price >= 1.00 are returned (Apple, Orange but NOT Banana)
+	dag.AssertOutputs(t, map[string]any{
+		"FILTERED_PRODUCTS": []test.Contains{
+			`"name":"Apple"`,
+			`"name":"Orange"`,
+		},
+	})
+
+	// Verify Banana (price 0.75) is NOT in results
+	outputs := dag.ReadOutputs(t)
+	if strings.Contains(outputs["FILTERED_PRODUCTS"], `"name":"Banana"`) {
+		t.Errorf("Banana should be filtered out (price 0.75 < min_price 1.00)")
+	}
 }
 
 // TestSQLExecutor_SQLite_MultiStatement tests multi-statement scripts.
@@ -270,6 +369,11 @@ steps:
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, core.Succeeded)
+
+	// Verify status was updated from 'pending' to 'completed'
+	dag.AssertOutputs(t, map[string]any{
+		"ORDER_STATUS": test.Contains(`"status":"completed"`),
+	})
 }
 
 // TestSQLExecutor_SQLite_InMemory tests SQLite in-memory database (single step).
@@ -293,6 +397,16 @@ steps:
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, core.Succeeded)
+
+	// Verify query returns Alice and Bob
+	dag.AssertOutputs(t, map[string]any{
+		"SQLITE_RESULT": []test.Contains{
+			`"id":1`,
+			`"name":"Alice"`,
+			`"id":2`,
+			`"name":"Bob"`,
+		},
+	})
 }
 
 // TestSQLExecutor_SQLite_TransactionSingleStep tests SQLite transaction handling in a single step.
@@ -319,4 +433,9 @@ steps:
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, core.Succeeded)
+
+	// Verify counter was incremented twice: 0 + 1 + 1 = 2
+	dag.AssertOutputs(t, map[string]any{
+		"COUNTER_VALUE": test.Contains(`"value":2`),
+	})
 }
