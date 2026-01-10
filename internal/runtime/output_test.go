@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -285,4 +286,169 @@ func TestNode_ConcurrentOutputCapture(t *testing.T) {
 	assert.Contains(t, output, "Process", "output should contain process output")
 
 	_ = node.Teardown()
+}
+
+func TestOutputCapture_BasicCapture(t *testing.T) {
+	t.Parallel()
+
+	t.Run("CapturesSmallOutput", func(t *testing.T) {
+		t.Parallel()
+
+		oc := newOutputCapture(1024 * 1024) // 1MB limit
+
+		// Create a pipe to simulate output
+		reader, writer, err := os.Pipe()
+		require.NoError(t, err)
+
+		ctx := context.Background()
+		oc.start(ctx, reader)
+
+		// Write test data
+		testData := "Hello, World!"
+		_, err = writer.WriteString(testData)
+		require.NoError(t, err)
+		_ = writer.Close()
+
+		// Wait for capture
+		output, err := oc.wait()
+		assert.NoError(t, err)
+		assert.Equal(t, testData, output)
+	})
+
+	t.Run("CapturesLargeOutput", func(t *testing.T) {
+		t.Parallel()
+
+		oc := newOutputCapture(1024 * 1024) // 1MB limit
+
+		reader, writer, err := os.Pipe()
+		require.NoError(t, err)
+
+		ctx := context.Background()
+		oc.start(ctx, reader)
+
+		// Write 100KB of data
+		testData := strings.Repeat("x", 100*1024)
+		_, err = writer.WriteString(testData)
+		require.NoError(t, err)
+		_ = writer.Close()
+
+		output, err := oc.wait()
+		assert.NoError(t, err)
+		assert.Equal(t, testData, output)
+	})
+
+	t.Run("TruncatesExcessOutput", func(t *testing.T) {
+		t.Parallel()
+
+		maxSize := int64(1024) // 1KB limit
+		oc := newOutputCapture(maxSize)
+
+		reader, writer, err := os.Pipe()
+		require.NoError(t, err)
+
+		ctx := context.Background()
+		oc.start(ctx, reader)
+
+		// Write data larger than limit
+		testData := strings.Repeat("x", 2048) // 2KB
+		_, err = writer.WriteString(testData)
+		require.NoError(t, err)
+		_ = writer.Close()
+
+		output, err := oc.wait()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "exceeded maximum size limit")
+		assert.Equal(t, int(maxSize), len(output))
+	})
+
+	t.Run("HandlesEmptyOutput", func(t *testing.T) {
+		t.Parallel()
+
+		oc := newOutputCapture(1024)
+
+		reader, writer, err := os.Pipe()
+		require.NoError(t, err)
+
+		ctx := context.Background()
+		oc.start(ctx, reader)
+
+		// Close writer immediately with no data
+		_ = writer.Close()
+
+		output, err := oc.wait()
+		assert.NoError(t, err)
+		assert.Empty(t, output)
+	})
+}
+
+func TestOutputCoordinator_StdoutFile(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ReturnsFileName", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{
+			stdoutFileName: "/var/log/test.stdout.log",
+		}
+
+		result := oc.StdoutFile()
+		assert.Equal(t, "/var/log/test.stdout.log", result)
+	})
+
+	t.Run("ReturnsEmptyWhenNotSet", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{}
+
+		result := oc.StdoutFile()
+		assert.Empty(t, result)
+	})
+}
+
+func TestOutputCoordinator_FlushWriters(t *testing.T) {
+	t.Parallel()
+
+	t.Run("NoErrorWhenClosed", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{
+			closed: true,
+		}
+
+		err := oc.flushWriters()
+		assert.NoError(t, err)
+	})
+
+	t.Run("NoErrorWithNilWriters", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{}
+
+		err := oc.flushWriters()
+		assert.NoError(t, err)
+	})
+}
+
+func TestOutputCoordinator_CloseResources(t *testing.T) {
+	t.Parallel()
+
+	t.Run("NoErrorWhenAlreadyClosed", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{
+			closed: true,
+		}
+
+		err := oc.closeResources()
+		assert.NoError(t, err)
+	})
+
+	t.Run("MarksAsClosed", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{}
+
+		_ = oc.closeResources()
+		assert.True(t, oc.closed)
+	})
 }

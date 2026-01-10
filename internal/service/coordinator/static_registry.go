@@ -22,7 +22,7 @@ type StaticRegistry struct {
 func NewStaticRegistry(addresses []string) (*StaticRegistry, error) {
 	hosts := make([]execution.HostInfo, 0, len(addresses))
 
-	for i, addr := range addresses {
+	for _, addr := range addresses {
 		if addr == "" {
 			continue
 		}
@@ -33,7 +33,7 @@ func NewStaticRegistry(addresses []string) (*StaticRegistry, error) {
 		}
 
 		hosts = append(hosts, execution.HostInfo{
-			ID:        fmt.Sprintf("coord-%d", i),
+			ID:        fmt.Sprintf("coord-%d", len(hosts)),
 			Host:      host,
 			Port:      port,
 			Status:    execution.ServiceStatusActive,

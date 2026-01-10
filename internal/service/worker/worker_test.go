@@ -2,6 +2,7 @@ package worker_test
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -545,4 +546,232 @@ func createTestWorker(t *testing.T, workerID string, maxActiveRuns int, coord *t
 
 	labels := make(map[string]string)
 	return worker.NewWorker(workerID, maxActiveRuns, coordinatorClient, labels, &config.Config{})
+}
+
+func TestWorkerCancellation(t *testing.T) {
+	t.Run("CancelRunningTaskViaCancellationDirective", func(t *testing.T) {
+		// Create a mock coordinator client that returns cancellation directives
+		cancelledRunID := "task-to-cancel"
+		var heartbeatCount atomic.Int32
+
+		mockCoordinatorCli := newMockCoordinatorCli()
+
+		// Track when heartbeat is called and return cancellation directive
+		mockCoordinatorCli.HeartbeatFunc = func(_ context.Context, _ *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
+			count := heartbeatCount.Add(1)
+			// After a few heartbeats, return the cancellation directive
+			if count >= 2 {
+				return &coordinatorv1.HeartbeatResponse{
+					CancelledRuns: []string{cancelledRunID},
+				}, nil
+			}
+			return &coordinatorv1.HeartbeatResponse{}, nil
+		}
+
+		labels := make(map[string]string)
+		w := worker.NewWorker("test-worker", 1, mockCoordinatorCli, labels, &config.Config{})
+
+		// Track if task was cancelled via context
+		taskCancelled := make(chan bool, 1)
+
+		w.SetHandler(&mockHandler{
+			ExecuteFunc: func(ctx context.Context, _ *coordinatorv1.Task) error {
+				// Wait for cancellation signal from context
+				select {
+				case <-ctx.Done():
+					taskCancelled <- true
+					return ctx.Err()
+				case <-time.After(5 * time.Second):
+					taskCancelled <- false
+					return nil
+				}
+			},
+		})
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// Start worker
+		go func() {
+			_ = w.Start(ctx)
+		}()
+
+		// Give worker time to connect
+		time.Sleep(100 * time.Millisecond)
+
+		// Dispatch a task with the ID that will be cancelled
+		mockCoordinatorCli.PollFunc = func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+			// Return task once then wait
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			default:
+				return &coordinatorv1.Task{
+					DagRunId: cancelledRunID,
+					Target:   "test.yaml",
+				}, nil
+			}
+		}
+
+		// Wait for task to be cancelled
+		select {
+		case cancelled := <-taskCancelled:
+			assert.True(t, cancelled, "Task should have been cancelled via context")
+		case <-time.After(5 * time.Second):
+			t.Fatal("Timeout waiting for task cancellation")
+		}
+
+		// Stop worker
+		cancel()
+		_ = w.Stop(context.Background())
+	})
+
+	t.Run("CancellationIgnoresNonExistentTasks", func(t *testing.T) {
+		// Create a mock coordinator client
+		mockCoordinatorCli := newMockCoordinatorCli()
+
+		// Return cancellation directive for non-existent task
+		mockCoordinatorCli.HeartbeatFunc = func(_ context.Context, _ *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
+			return &coordinatorv1.HeartbeatResponse{
+				CancelledRuns: []string{"non-existent-task"},
+			}, nil
+		}
+
+		labels := make(map[string]string)
+		w := worker.NewWorker("test-worker", 1, mockCoordinatorCli, labels, &config.Config{})
+
+		taskExecuted := make(chan bool, 1)
+		w.SetHandler(&mockHandler{
+			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
+				// Task should complete normally (not cancelled)
+				time.Sleep(50 * time.Millisecond)
+				taskExecuted <- true
+				return nil
+			},
+		})
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// Start worker
+		go func() {
+			_ = w.Start(ctx)
+		}()
+
+		// Give worker time to connect
+		time.Sleep(100 * time.Millisecond)
+
+		// Dispatch a task with a DIFFERENT ID than what will be cancelled
+		mockCoordinatorCli.PollFunc = func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			default:
+				return &coordinatorv1.Task{
+					DagRunId: "different-task-id",
+					Target:   "test.yaml",
+				}, nil
+			}
+		}
+
+		// Task should complete normally
+		select {
+		case executed := <-taskExecuted:
+			assert.True(t, executed, "Task should have executed normally")
+		case <-time.After(2 * time.Second):
+			t.Fatal("Timeout waiting for task execution")
+		}
+
+		// Stop worker
+		cancel()
+		_ = w.Stop(context.Background())
+	})
+
+	t.Run("MultipleCancellationsInSingleResponse", func(t *testing.T) {
+		// Create a mock coordinator client
+		mockCoordinatorCli := newMockCoordinatorCli()
+
+		// Track heartbeats
+		var heartbeatCount atomic.Int32
+
+		mockCoordinatorCli.HeartbeatFunc = func(_ context.Context, _ *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
+			count := heartbeatCount.Add(1)
+			// Return multiple cancellation directives after some heartbeats
+			if count >= 2 {
+				return &coordinatorv1.HeartbeatResponse{
+					CancelledRuns: []string{"task-1", "task-2", "task-3"},
+				}, nil
+			}
+			return &coordinatorv1.HeartbeatResponse{}, nil
+		}
+
+		labels := make(map[string]string)
+		w := worker.NewWorker("test-worker", 3, mockCoordinatorCli, labels, &config.Config{})
+
+		// Track cancelled tasks
+		cancelledTasks := make(chan string, 3)
+
+		w.SetHandler(&mockHandler{
+			ExecuteFunc: func(ctx context.Context, task *coordinatorv1.Task) error {
+				select {
+				case <-ctx.Done():
+					cancelledTasks <- task.DagRunId
+					return ctx.Err()
+				case <-time.After(5 * time.Second):
+					return nil
+				}
+			},
+		})
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// Start worker
+		go func() {
+			_ = w.Start(ctx)
+		}()
+
+		time.Sleep(100 * time.Millisecond)
+
+		// Setup poll to return tasks
+		var taskIndex atomic.Int32
+		mockCoordinatorCli.PollFunc = func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+			idx := taskIndex.Add(1)
+			if idx <= 3 {
+				return &coordinatorv1.Task{
+					DagRunId: fmt.Sprintf("task-%d", idx),
+					Target:   "test.yaml",
+				}, nil
+			}
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(100 * time.Millisecond):
+				return nil, nil
+			}
+		}
+
+		// Wait for cancellations
+		cancelledCount := 0
+		timeout := time.After(5 * time.Second)
+
+	collectLoop:
+		for {
+			select {
+			case <-cancelledTasks:
+				cancelledCount++
+				if cancelledCount >= 3 {
+					break collectLoop
+				}
+			case <-timeout:
+				break collectLoop
+			}
+		}
+
+		assert.Equal(t, 3, cancelledCount, "All 3 tasks should have been cancelled")
+
+		// Stop worker
+		cancel()
+		_ = w.Stop(context.Background())
+	})
 }

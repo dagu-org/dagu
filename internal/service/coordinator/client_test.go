@@ -239,8 +239,9 @@ func TestClientHeartbeat(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
-	_, err := client.Heartbeat(ctx, req)
+	resp, err := client.Heartbeat(ctx, req)
 	require.NoError(t, err)
+	require.NotNil(t, resp, "HeartbeatResponse should not be nil")
 	require.NotNil(t, receivedReq)
 	assert.Equal(t, "test-worker", receivedReq.WorkerId)
 	assert.NotNil(t, receivedReq.Stats)

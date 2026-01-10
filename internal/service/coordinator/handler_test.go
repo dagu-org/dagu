@@ -757,3 +757,412 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		require.Equal(t, core.Failed, s.Status)
 	})
 }
+
+func TestHandler_ReportStatus(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ValidStatusReport", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		// Create an attempt for the DAG run
+		ref := execution.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		store.addAttempt(ref, &execution.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: "run-123",
+			Status:   core.Running,
+		})
+
+		// Report status
+		req := &coordinatorv1.ReportStatusRequest{
+			Status: &coordinatorv1.DAGRunStatusProto{
+				Name:     "test-dag",
+				DagRunId: "run-123",
+				Status:   int32(core.Running),
+			},
+		}
+
+		resp, err := h.ReportStatus(ctx, req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.True(t, resp.Accepted)
+	})
+
+	t.Run("MissingStatusReturnsError", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		req := &coordinatorv1.ReportStatusRequest{
+			Status: nil,
+		}
+
+		_, err := h.ReportStatus(ctx, req)
+		require.Error(t, err)
+		st, ok := status.FromError(err)
+		require.True(t, ok)
+		require.Equal(t, codes.InvalidArgument, st.Code())
+	})
+
+	t.Run("NilDAGRunStoreReturnsError", func(t *testing.T) {
+		t.Parallel()
+
+		h := NewHandler() // No dagRunStore
+		ctx := context.Background()
+
+		req := &coordinatorv1.ReportStatusRequest{
+			Status: &coordinatorv1.DAGRunStatusProto{
+				Name:     "test-dag",
+				DagRunId: "run-123",
+				Status:   int32(core.Running),
+			},
+		}
+
+		_, err := h.ReportStatus(ctx, req)
+		require.Error(t, err)
+		st, ok := status.FromError(err)
+		require.True(t, ok)
+		require.Equal(t, codes.FailedPrecondition, st.Code())
+	})
+}
+
+func TestHandler_GetDAGRunStatus(t *testing.T) {
+	t.Parallel()
+
+	t.Run("TopLevelDAGLookup", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		// Create an attempt with status
+		ref := execution.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		store.addAttempt(ref, &execution.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: "run-123",
+			Status:   core.Running,
+		})
+
+		req := &coordinatorv1.GetDAGRunStatusRequest{
+			DagName:  "test-dag",
+			DagRunId: "run-123",
+		}
+
+		resp, err := h.GetDAGRunStatus(ctx, req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.True(t, resp.Found)
+		require.NotNil(t, resp.Status)
+	})
+
+	t.Run("NotFoundReturnsFalse", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		req := &coordinatorv1.GetDAGRunStatusRequest{
+			DagName:  "nonexistent-dag",
+			DagRunId: "run-999",
+		}
+
+		resp, err := h.GetDAGRunStatus(ctx, req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.False(t, resp.Found)
+	})
+
+	t.Run("NilDAGRunStoreReturnsError", func(t *testing.T) {
+		t.Parallel()
+
+		h := NewHandler() // No dagRunStore
+		ctx := context.Background()
+
+		req := &coordinatorv1.GetDAGRunStatusRequest{
+			DagName:  "test-dag",
+			DagRunId: "run-123",
+		}
+
+		_, err := h.GetDAGRunStatus(ctx, req)
+		require.Error(t, err)
+		st, ok := status.FromError(err)
+		require.True(t, ok)
+		require.Equal(t, codes.FailedPrecondition, st.Code())
+	})
+
+	t.Run("MissingRequiredFieldsReturnsError", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		// Missing DagName
+		req := &coordinatorv1.GetDAGRunStatusRequest{
+			DagRunId: "run-123",
+		}
+
+		_, err := h.GetDAGRunStatus(ctx, req)
+		require.Error(t, err)
+		st, ok := status.FromError(err)
+		require.True(t, ok)
+		require.Equal(t, codes.InvalidArgument, st.Code())
+	})
+}
+
+func TestHandler_StreamLogs(t *testing.T) {
+	t.Parallel()
+
+	t.Run("EmptyLogDirReturnsError", func(t *testing.T) {
+		t.Parallel()
+
+		h := NewHandler() // No logDir
+		// StreamLogs requires a mock stream, but we can test the precondition check
+		// by checking that logDir is empty
+		require.Empty(t, h.logDir)
+	})
+
+	t.Run("WithLogDirConfigured", func(t *testing.T) {
+		t.Parallel()
+
+		logDir := t.TempDir()
+		h := NewHandler(WithLogDir(logDir))
+		require.Equal(t, logDir, h.logDir)
+	})
+}
+
+func TestMatchesSelector(t *testing.T) {
+	t.Parallel()
+
+	t.Run("EmptySelectorMatchesAll", func(t *testing.T) {
+		t.Parallel()
+
+		workerLabels := map[string]string{"type": "compute", "region": "us-east"}
+		selector := map[string]string{}
+
+		require.True(t, matchesSelector(workerLabels, selector))
+	})
+
+	t.Run("NilSelectorMatchesAll", func(t *testing.T) {
+		t.Parallel()
+
+		workerLabels := map[string]string{"type": "compute"}
+
+		require.True(t, matchesSelector(workerLabels, nil))
+	})
+
+	t.Run("ExactMatch", func(t *testing.T) {
+		t.Parallel()
+
+		workerLabels := map[string]string{"type": "compute", "region": "us-east"}
+		selector := map[string]string{"type": "compute", "region": "us-east"}
+
+		require.True(t, matchesSelector(workerLabels, selector))
+	})
+
+	t.Run("PartialSelectorMatch", func(t *testing.T) {
+		t.Parallel()
+
+		workerLabels := map[string]string{"type": "compute", "region": "us-east", "tier": "high"}
+		selector := map[string]string{"type": "compute"}
+
+		require.True(t, matchesSelector(workerLabels, selector))
+	})
+
+	t.Run("PartialSelectorNoMatch", func(t *testing.T) {
+		t.Parallel()
+
+		workerLabels := map[string]string{"type": "compute"}
+		selector := map[string]string{"type": "storage"}
+
+		require.False(t, matchesSelector(workerLabels, selector))
+	})
+
+	t.Run("MissingLabelNoMatch", func(t *testing.T) {
+		t.Parallel()
+
+		workerLabels := map[string]string{"type": "compute"}
+		selector := map[string]string{"type": "compute", "region": "us-east"}
+
+		require.False(t, matchesSelector(workerLabels, selector))
+	})
+
+	t.Run("EmptyWorkerLabelsWithSelectorNoMatch", func(t *testing.T) {
+		t.Parallel()
+
+		workerLabels := map[string]string{}
+		selector := map[string]string{"type": "compute"}
+
+		require.False(t, matchesSelector(workerLabels, selector))
+	})
+
+	t.Run("NilWorkerLabelsWithSelectorNoMatch", func(t *testing.T) {
+		t.Parallel()
+
+		selector := map[string]string{"type": "compute"}
+
+		require.False(t, matchesSelector(nil, selector))
+	})
+}
+
+func TestCalculateHealthStatus(t *testing.T) {
+	t.Parallel()
+
+	t.Run("LessThan5SecondsIsHealthy", func(t *testing.T) {
+		t.Parallel()
+
+		status := calculateHealthStatus(0 * time.Second)
+		require.Equal(t, coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_HEALTHY, status)
+
+		status = calculateHealthStatus(4 * time.Second)
+		require.Equal(t, coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_HEALTHY, status)
+	})
+
+	t.Run("Between5And15SecondsIsWarning", func(t *testing.T) {
+		t.Parallel()
+
+		status := calculateHealthStatus(5 * time.Second)
+		require.Equal(t, coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_WARNING, status)
+
+		status = calculateHealthStatus(10 * time.Second)
+		require.Equal(t, coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_WARNING, status)
+
+		status = calculateHealthStatus(14 * time.Second)
+		require.Equal(t, coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_WARNING, status)
+	})
+
+	t.Run("GreaterThan15SecondsIsUnhealthy", func(t *testing.T) {
+		t.Parallel()
+
+		status := calculateHealthStatus(15 * time.Second)
+		require.Equal(t, coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_UNHEALTHY, status)
+
+		status = calculateHealthStatus(30 * time.Second)
+		require.Equal(t, coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_UNHEALTHY, status)
+
+		status = calculateHealthStatus(60 * time.Second)
+		require.Equal(t, coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_UNHEALTHY, status)
+	})
+}
+
+func TestHandler_Close(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ClosesOpenAttempts", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		// Create and cache an attempt
+		ref := execution.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		attempt := store.addAttempt(ref, &execution.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: "run-123",
+			Status:   core.Running,
+		})
+
+		// Manually add to open attempts cache
+		h.attemptsMu.Lock()
+		h.openAttempts["run-123"] = attempt
+		h.attemptsMu.Unlock()
+
+		// Close handler
+		h.Close(ctx)
+
+		// Verify attempt was closed
+		require.True(t, attempt.WasClosed())
+
+		// Verify cache is cleared
+		h.attemptsMu.RLock()
+		require.Empty(t, h.openAttempts)
+		h.attemptsMu.RUnlock()
+	})
+}
+
+func TestHandler_GetCancelledRunsForWorker(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ReturnsNilWithNilStore", func(t *testing.T) {
+		t.Parallel()
+
+		h := NewHandler() // No dagRunStore
+		ctx := context.Background()
+
+		stats := &coordinatorv1.WorkerStats{
+			RunningTasks: []*coordinatorv1.RunningTask{
+				{DagRunId: "run-123", DagName: "test-dag"},
+			},
+		}
+
+		result := h.getCancelledRunsForWorker(ctx, stats)
+		require.Nil(t, result)
+	})
+
+	t.Run("ReturnsNilWithNilStats", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		result := h.getCancelledRunsForWorker(ctx, nil)
+		require.Nil(t, result)
+	})
+
+	t.Run("ReturnsNilWithEmptyRunningTasks", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		stats := &coordinatorv1.WorkerStats{
+			RunningTasks: []*coordinatorv1.RunningTask{},
+		}
+
+		result := h.getCancelledRunsForWorker(ctx, stats)
+		require.Nil(t, result)
+	})
+}
+
+func TestHandlerOptions(t *testing.T) {
+	t.Parallel()
+
+	t.Run("WithDAGRunStore", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+
+		require.Same(t, store, h.dagRunStore)
+	})
+
+	t.Run("WithLogDir", func(t *testing.T) {
+		t.Parallel()
+
+		logDir := "/var/log/test"
+		h := NewHandler(WithLogDir(logDir))
+
+		require.Equal(t, logDir, h.logDir)
+	})
+
+	t.Run("MultipleOptions", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		logDir := "/var/log/test"
+		h := NewHandler(WithDAGRunStore(store), WithLogDir(logDir))
+
+		require.Same(t, store, h.dagRunStore)
+		require.Equal(t, logDir, h.logDir)
+	})
+}

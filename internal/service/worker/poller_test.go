@@ -372,10 +372,11 @@ var _ coordinator.Client = (*mockCoordinatorCli)(nil)
 
 // mockCoordinatorCli is a mock implementation of coordinator.Client
 type mockCoordinatorCli struct {
-	PollFunc     func(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error)
-	DispatchFunc func(ctx context.Context, task *coordinatorv1.Task) error
-	MetricsFunc  func() coordinator.Metrics
-	CleanupFunc  func(ctx context.Context) error
+	PollFunc      func(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error)
+	DispatchFunc  func(ctx context.Context, task *coordinatorv1.Task) error
+	MetricsFunc   func() coordinator.Metrics
+	CleanupFunc   func(ctx context.Context) error
+	HeartbeatFunc func(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error)
 
 	// Internal state tracking
 	mu               sync.Mutex
@@ -433,7 +434,10 @@ func (m *mockCoordinatorCli) GetWorkers(_ context.Context) ([]*coordinatorv1.Wor
 	return []*coordinatorv1.WorkerInfo{}, nil
 }
 
-func (m *mockCoordinatorCli) Heartbeat(_ context.Context, _ *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
+func (m *mockCoordinatorCli) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
+	if m.HeartbeatFunc != nil {
+		return m.HeartbeatFunc(ctx, req)
+	}
 	// Return success by default for tests
 	return &coordinatorv1.HeartbeatResponse{}, nil
 }

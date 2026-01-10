@@ -35,7 +35,11 @@ func TestCreateFile(t *testing.T) {
 	t.Run("InvalidPath", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := OpenOrCreateFile("/nonexistent/directory/test.log")
+		// Create a temp directory and remove it to get a guaranteed invalid path
+		dir := t.TempDir()
+		invalidPath := filepath.Join(dir, "removed", "test.log")
+
+		_, err := OpenOrCreateFile(invalidPath)
 		assert.Error(t, err)
 	})
 }
