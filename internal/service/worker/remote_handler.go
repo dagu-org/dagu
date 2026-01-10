@@ -82,19 +82,19 @@ func (h *remoteTaskHandler) Handle(ctx context.Context, task *coordinatorv1.Task
 	switch task.Operation {
 	case coordinatorv1.Operation_OPERATION_START:
 		return h.handleStart(ctx, task, false)
+
 	case coordinatorv1.Operation_OPERATION_RETRY:
-		// OPERATION_RETRY from the queue processor means "execute this queued item".
-		// This is only an actual step retry if a specific Step is specified.
 		// Without a Step, it's a fresh start from the queue (queuedRun = true).
+		// With a Step, it's an actual step retry.
 		if task.Step == "" {
 			return h.handleStart(ctx, task, true)
 		}
 		return h.handleRetry(ctx, task)
+
 	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
-		return fmt.Errorf("unspecified operation")
-	default:
 		return fmt.Errorf("unsupported operation: %v", task.Operation)
 	}
+	return fmt.Errorf("unsupported operation: %v", task.Operation)
 }
 
 func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1.Task, queuedRun bool) error {

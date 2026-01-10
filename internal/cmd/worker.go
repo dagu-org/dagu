@@ -74,56 +74,26 @@ var workerFlags = []commandLineFlag{
 }
 
 func runWorker(ctx *Context, _ []string) error {
-	// Use config values directly - viper binding handles flag overrides
 	workerID := ctx.Config.Worker.ID
 	maxActiveRuns := ctx.Config.Worker.MaxActiveRuns
-
-	// Create and start the worker
 	labels := ctx.Config.Worker.Labels
 	if labels == nil {
 		labels = make(map[string]string)
 	}
 
-	// Create coordinator client with appropriate service registry
-	var coordinatorCli coordinator.Client
-	var useRemoteHandler bool
-	if len(ctx.Config.Worker.Coordinators) > 0 {
-		// Use static registry for shared-nothing deployment
-		staticRegistry, err := coordinator.NewStaticRegistry(ctx.Config.Worker.Coordinators)
-		if err != nil {
-			return fmt.Errorf("failed to create static registry: %w", err)
-		}
-		logger.Info(ctx, "Using static coordinator discovery",
-			slog.Any("coordinators", ctx.Config.Worker.Coordinators))
-
-		// Create coordinator client config
-		coordinatorCliCfg := coordinator.DefaultConfig()
-		coordinatorCliCfg.CAFile = ctx.Config.Core.Peer.ClientCaFile
-		coordinatorCliCfg.CertFile = ctx.Config.Core.Peer.CertFile
-		coordinatorCliCfg.KeyFile = ctx.Config.Core.Peer.KeyFile
-		coordinatorCliCfg.SkipTLSVerify = ctx.Config.Core.Peer.SkipTLSVerify
-		coordinatorCliCfg.Insecure = ctx.Config.Core.Peer.Insecure
-
-		if err := coordinatorCliCfg.Validate(); err != nil {
-			return fmt.Errorf("invalid coordinator client configuration: %w", err)
-		}
-		coordinatorCli = coordinator.New(staticRegistry, coordinatorCliCfg)
-		useRemoteHandler = true
-	} else {
-		// Use file-based service registry (legacy mode)
-		coordinatorCli = ctx.NewCoordinatorClient()
+	coordinatorCli, useRemoteHandler, err := createCoordinatorClient(ctx)
+	if err != nil {
+		return err
 	}
+
 	w := worker.NewWorker(workerID, maxActiveRuns, coordinatorCli, labels, ctx.Config)
 
-	// Set up RemoteTaskHandler for shared-nothing mode
 	if useRemoteHandler {
 		handlerCfg := worker.RemoteTaskHandlerConfig{
 			WorkerID:          workerID,
 			CoordinatorClient: coordinatorCli,
-			// DAGRunStore is nil - fully remote mode
-			// DAGStore is nil - DAG definitions come via task.Definition
-			PeerConfig: ctx.Config.Core.Peer,
-			Config:     ctx.Config,
+			PeerConfig:        ctx.Config.Core.Peer,
+			Config:            ctx.Config,
 		}
 		w.SetHandler(worker.NewRemoteTaskHandler(handlerCfg))
 		logger.Info(ctx, "Using remote task handler for shared-nothing mode")
@@ -151,4 +121,32 @@ func runWorker(ctx *Context, _ []string) error {
 	}
 
 	return nil
+}
+
+// createCoordinatorClient creates the appropriate coordinator client based on configuration.
+// Returns the client, whether to use remote handler, and any error.
+func createCoordinatorClient(ctx *Context) (coordinator.Client, bool, error) {
+	if len(ctx.Config.Worker.Coordinators) == 0 {
+		return ctx.NewCoordinatorClient(), false, nil
+	}
+
+	staticRegistry, err := coordinator.NewStaticRegistry(ctx.Config.Worker.Coordinators)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to create static registry: %w", err)
+	}
+	logger.Info(ctx, "Using static coordinator discovery",
+		slog.Any("coordinators", ctx.Config.Worker.Coordinators))
+
+	coordinatorCliCfg := coordinator.DefaultConfig()
+	coordinatorCliCfg.CAFile = ctx.Config.Core.Peer.ClientCaFile
+	coordinatorCliCfg.CertFile = ctx.Config.Core.Peer.CertFile
+	coordinatorCliCfg.KeyFile = ctx.Config.Core.Peer.KeyFile
+	coordinatorCliCfg.SkipTLSVerify = ctx.Config.Core.Peer.SkipTLSVerify
+	coordinatorCliCfg.Insecure = ctx.Config.Core.Peer.Insecure
+
+	if err := coordinatorCliCfg.Validate(); err != nil {
+		return nil, false, fmt.Errorf("invalid coordinator client configuration: %w", err)
+	}
+
+	return coordinator.New(staticRegistry, coordinatorCliCfg), true, nil
 }

@@ -460,41 +460,41 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 func (e *SubDAGExecutor) getSubDAGRunStatus(ctx context.Context, dagRunID string) (*execution.RunStatus, error) {
 	rCtx := execution.GetContext(ctx)
 
-	// For distributed runs, query the coordinator
 	if e.coordinatorCli != nil {
-		// Pass root reference so coordinator can find the sub-DAG status
-		rootRef := &rCtx.RootDAGRun
-		resp, err := e.coordinatorCli.GetDAGRunStatus(ctx, e.DAG.Name, dagRunID, rootRef)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get DAG run status from coordinator: %w", err)
-		}
-		if resp == nil {
-			return nil, fmt.Errorf("no response from coordinator")
-		}
-		if !resp.Found {
-			return nil, fmt.Errorf("DAG run not found in coordinator")
-		}
-		// Convert proto status to execution.RunStatus
-		dagRunStatus := convert.ProtoToDAGRunStatus(resp.Status)
-
-		// Extract outputs from node output variables
-		outputs := extractOutputsFromNodes(dagRunStatus.Nodes)
-
-		return &execution.RunStatus{
-			Name:     dagRunStatus.Name,
-			DAGRunID: dagRunID,
-			Params:   dagRunStatus.Params,
-			Outputs:  outputs,
-			Status:   dagRunStatus.Status,
-		}, nil
+		return e.getStatusFromCoordinator(ctx, dagRunID, rCtx.RootDAGRun)
 	}
 
-	// Fallback to local DB for non-distributed runs
 	if rCtx.DB != nil {
 		return rCtx.DB.GetSubDAGRunStatus(ctx, dagRunID, rCtx.RootDAGRun)
 	}
 
 	return nil, fmt.Errorf("no coordinator or database available to get sub-DAG status")
+}
+
+// getStatusFromCoordinator queries the coordinator for sub-DAG run status.
+func (e *SubDAGExecutor) getStatusFromCoordinator(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) (*execution.RunStatus, error) {
+	rootRef := &rootDAGRun
+	resp, err := e.coordinatorCli.GetDAGRunStatus(ctx, e.DAG.Name, dagRunID, rootRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get DAG run status from coordinator: %w", err)
+	}
+	if resp == nil {
+		return nil, fmt.Errorf("no response from coordinator")
+	}
+	if !resp.Found {
+		return nil, fmt.Errorf("DAG run not found in coordinator")
+	}
+
+	dagRunStatus := convert.ProtoToDAGRunStatus(resp.Status)
+	outputs := extractOutputsFromNodes(dagRunStatus.Nodes)
+
+	return &execution.RunStatus{
+		Name:     dagRunStatus.Name,
+		DAGRunID: dagRunID,
+		Params:   dagRunStatus.Params,
+		Outputs:  outputs,
+		Status:   dagRunStatus.Status,
+	}, nil
 }
 
 // extractOutputsFromNodes extracts output variables from nodes.
@@ -539,23 +539,19 @@ func extractOutputsFromNodes(nodes []*execution.Node) map[string]string {
 func (e *SubDAGExecutor) isSubDAGRunCompleted(ctx context.Context, dagRunID string) (bool, error) {
 	rCtx := execution.GetContext(ctx)
 
-	// For distributed runs, query the coordinator
 	if e.coordinatorCli != nil {
-		// Pass root reference so coordinator can find the sub-DAG status
 		rootRef := &rCtx.RootDAGRun
 		resp, err := e.coordinatorCli.GetDAGRunStatus(ctx, e.DAG.Name, dagRunID, rootRef)
 		if err != nil {
 			return false, fmt.Errorf("failed to get DAG run status from coordinator: %w", err)
 		}
 		if !resp.Found {
-			return false, nil // Not found means not completed yet
+			return false, nil
 		}
-		// Check if the status is terminal (not active)
 		dagRunStatus := convert.ProtoToDAGRunStatus(resp.Status)
 		return !dagRunStatus.Status.IsActive(), nil
 	}
 
-	// Fallback to local DB for non-distributed runs
 	if rCtx.DB != nil {
 		return rCtx.DB.IsSubDAGRunCompleted(ctx, dagRunID, rCtx.RootDAGRun)
 	}

@@ -25,7 +25,6 @@ func setupRemoteWorker(t *testing.T, coord *test.Coordinator, workerID string, m
 	t.Helper()
 	coordinatorClient := coord.GetCoordinatorClient(t)
 
-	// Create remote task handler config using the coordinator client for load balancing
 	handlerCfg := worker.RemoteTaskHandlerConfig{
 		WorkerID:          workerID,
 		CoordinatorClient: coordinatorClient,
@@ -40,19 +39,7 @@ func setupRemoteWorker(t *testing.T, coord *test.Coordinator, workerID string, m
 	workerInst := worker.NewWorker(workerID, maxActiveRuns, coordinatorClient, labels, coord.Config)
 	workerInst.SetHandler(worker.NewRemoteTaskHandler(handlerCfg))
 
-	go func() {
-		if err := workerInst.Start(coord.Context); err != nil {
-			t.Logf("Worker stopped: %v", err)
-		}
-	}()
-
-	t.Cleanup(func() {
-		if err := workerInst.Stop(coord.Context); err != nil {
-			t.Logf("Error stopping worker: %v", err)
-		}
-	})
-
-	return workerInst
+	return startAndCleanupWorker(t, coord, workerInst)
 }
 
 // setupWorker creates and starts a single worker with the given labels.
@@ -60,8 +47,13 @@ func setupRemoteWorker(t *testing.T, coord *test.Coordinator, workerID string, m
 func setupWorker(t *testing.T, coord *test.Coordinator, workerID string, maxActiveRuns int, labels map[string]string) *worker.Worker {
 	t.Helper()
 	coordinatorClient := coord.GetCoordinatorClient(t)
-
 	workerInst := worker.NewWorker(workerID, maxActiveRuns, coordinatorClient, labels, coord.Config)
+	return startAndCleanupWorker(t, coord, workerInst)
+}
+
+// startAndCleanupWorker starts a worker and registers cleanup.
+func startAndCleanupWorker(t *testing.T, coord *test.Coordinator, workerInst *worker.Worker) *worker.Worker {
+	t.Helper()
 
 	go func() {
 		if err := workerInst.Start(coord.Context); err != nil {
@@ -82,32 +74,10 @@ func setupWorker(t *testing.T, coord *test.Coordinator, workerID string, maxActi
 // All workers are automatically stopped when the test completes.
 func setupWorkers(t *testing.T, coord *test.Coordinator, count int, labels map[string]string) []*worker.Worker {
 	t.Helper()
-	coordinatorClient := coord.GetCoordinatorClient(t)
 	workers := make([]*worker.Worker, count)
-
 	for i := range count {
-		workerInst := worker.NewWorker(
-			fmt.Sprintf("test-worker-%d", i+1),
-			10,
-			coordinatorClient,
-			labels,
-			coord.Config,
-		)
-		workers[i] = workerInst
-
-		go func(w *worker.Worker) {
-			if err := w.Start(coord.Context); err != nil {
-				t.Logf("Worker stopped: %v", err)
-			}
-		}(workerInst)
-
-		t.Cleanup(func() {
-			if err := workerInst.Stop(coord.Context); err != nil {
-				t.Logf("Error stopping worker: %v", err)
-			}
-		})
+		workers[i] = setupWorker(t, coord, fmt.Sprintf("test-worker-%d", i+1), 10, labels)
 	}
-
 	return workers
 }
 

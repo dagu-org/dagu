@@ -12,6 +12,11 @@ import (
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
+const (
+	// logBufferSize is the size of the buffer for accumulating log data before flushing.
+	logBufferSize = 32 * 1024 // 32KB
+)
+
 // LogStreamer streams logs to coordinator via gRPC
 type LogStreamer struct {
 	client    coordinator.Client
@@ -64,7 +69,7 @@ func (s *LogStreamer) NewStepWriter(ctx context.Context, stepName string, stream
 		streamer:   s,
 		stepName:   stepName,
 		streamType: streamType,
-		buffer:     make([]byte, 0, 32*1024), // 32KB buffer
+		buffer:     make([]byte, 0, logBufferSize),
 	}
 }
 
@@ -93,7 +98,7 @@ func (w *stepLogWriter) Write(p []byte) (int, error) {
 	w.buffer = append(w.buffer, p...)
 
 	// Flush when buffer exceeds threshold
-	if len(w.buffer) >= 32*1024 {
+	if len(w.buffer) >= logBufferSize {
 		if err := w.flush(); err != nil {
 			// Log streaming is best-effort - don't fail the command
 			logger.Warn(w.ctx, "Failed to stream logs, discarding buffer",

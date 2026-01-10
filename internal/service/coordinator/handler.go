@@ -335,53 +335,34 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 // getOrOpenAttempt retrieves an open attempt from cache or opens a new one.
 // Uses double-check locking to avoid holding the mutex during blocking I/O.
 func (h *Handler) getOrOpenAttempt(ctx context.Context, dagName, dagRunID string) (execution.DAGRunAttempt, error) {
-	// First check: fast path with read lock
-	h.attemptsMu.RLock()
-	if attempt, ok := h.openAttempts[dagRunID]; ok {
-		h.attemptsMu.RUnlock()
-		return attempt, nil
-	}
-	h.attemptsMu.RUnlock()
-
-	// Perform I/O without lock to avoid blocking other goroutines
 	ref := execution.DAGRunRef{Name: dagName, ID: dagRunID}
-	attempt, err := h.dagRunStore.FindAttempt(ctx, ref)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := attempt.Open(ctx); err != nil {
-		return nil, err
-	}
-
-	// Second check: acquire write lock and verify no race
-	h.attemptsMu.Lock()
-	defer h.attemptsMu.Unlock()
-
-	if existing, ok := h.openAttempts[dagRunID]; ok {
-		// Another goroutine opened it first, close ours and use theirs
-		_ = attempt.Close(ctx)
-		return existing, nil
-	}
-
-	h.openAttempts[dagRunID] = attempt
-	return attempt, nil
+	return h.getOrOpenAttemptWithFinder(ctx, dagRunID, func() (execution.DAGRunAttempt, error) {
+		return h.dagRunStore.FindAttempt(ctx, ref)
+	})
 }
 
 // getOrOpenSubAttempt retrieves an open sub-attempt from cache or opens a new one.
 // This is used for sub-DAG status reporting in distributed execution.
-// Uses double-check locking to avoid holding the mutex during blocking I/O.
 func (h *Handler) getOrOpenSubAttempt(ctx context.Context, rootRef execution.DAGRunRef, subDAGRunID string) (execution.DAGRunAttempt, error) {
+	return h.getOrOpenAttemptWithFinder(ctx, subDAGRunID, func() (execution.DAGRunAttempt, error) {
+		return h.dagRunStore.FindSubAttempt(ctx, rootRef, subDAGRunID)
+	})
+}
+
+// getOrOpenAttemptWithFinder is a generic helper that retrieves an open attempt from cache
+// or uses the provided finder function to locate and open a new one.
+// Uses double-check locking to avoid holding the mutex during blocking I/O.
+func (h *Handler) getOrOpenAttemptWithFinder(ctx context.Context, cacheKey string, finder func() (execution.DAGRunAttempt, error)) (execution.DAGRunAttempt, error) {
 	// First check: fast path with read lock
 	h.attemptsMu.RLock()
-	if attempt, ok := h.openAttempts[subDAGRunID]; ok {
+	if attempt, ok := h.openAttempts[cacheKey]; ok {
 		h.attemptsMu.RUnlock()
 		return attempt, nil
 	}
 	h.attemptsMu.RUnlock()
 
 	// Perform I/O without lock to avoid blocking other goroutines
-	attempt, err := h.dagRunStore.FindSubAttempt(ctx, rootRef, subDAGRunID)
+	attempt, err := finder()
 	if err != nil {
 		return nil, err
 	}
@@ -394,13 +375,13 @@ func (h *Handler) getOrOpenSubAttempt(ctx context.Context, rootRef execution.DAG
 	h.attemptsMu.Lock()
 	defer h.attemptsMu.Unlock()
 
-	if existing, ok := h.openAttempts[subDAGRunID]; ok {
+	if existing, ok := h.openAttempts[cacheKey]; ok {
 		// Another goroutine opened it first, close ours and use theirs
 		_ = attempt.Close(ctx)
 		return existing, nil
 	}
 
-	h.openAttempts[subDAGRunID] = attempt
+	h.openAttempts[cacheKey] = attempt
 	return attempt, nil
 }
 
