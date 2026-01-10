@@ -5,8 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 
@@ -125,6 +123,42 @@ func (d *SQLiteDriver) PlaceholderFormat() string {
 	return "?"
 }
 
+// BuildInsertQuery generates a multi-row INSERT statement for SQLite.
+func (d *SQLiteDriver) BuildInsertQuery(table string, columns []string, rowCount int, onConflict string) string {
+	var sb strings.Builder
+
+	// SQLite uses INSERT OR IGNORE / INSERT OR REPLACE
+	switch onConflict {
+	case "ignore":
+		sb.WriteString("INSERT OR IGNORE INTO ")
+	case "replace":
+		sb.WriteString("INSERT OR REPLACE INTO ")
+	default:
+		sb.WriteString("INSERT INTO ")
+	}
+
+	sb.WriteString(table)
+	sb.WriteString(" (")
+	sb.WriteString(strings.Join(columns, ", "))
+	sb.WriteString(") VALUES ")
+
+	for i := 0; i < rowCount; i++ {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString("(")
+		for j := 0; j < len(columns); j++ {
+			if j > 0 {
+				sb.WriteString(", ")
+			}
+			sb.WriteString("?")
+		}
+		sb.WriteString(")")
+	}
+
+	return sb.String()
+}
+
 // isMemoryDB checks if the DSN is for an in-memory database.
 func isMemoryDB(dsn string) bool {
 	return dsn == ":memory:" || strings.Contains(dsn, "mode=memory")
@@ -146,160 +180,6 @@ func extractDBPath(dsn string) string {
 		return dsn[:idx]
 	}
 	return dsn
-}
-
-// EnsureDBDir ensures the directory for the database file exists.
-func EnsureDBDir(dsn string) error {
-	if isMemoryDB(dsn) {
-		return nil
-	}
-	dbPath := extractDBPath(dsn)
-	dir := filepath.Dir(dbPath)
-	return os.MkdirAll(dir, 0o755)
-}
-
-// SplitStatements splits SQL script into individual statements.
-func SplitStatements(script string) []string {
-	var statements []string
-	var current strings.Builder
-	inString := false
-	stringChar := rune(0)
-
-	for i, r := range script {
-		// Handle strings
-		if (r == '\'' || r == '"') && !inString {
-			inString = true
-			stringChar = r
-			current.WriteRune(r)
-			continue
-		}
-
-		if inString {
-			current.WriteRune(r)
-			// Check for escaped quote
-			if r == stringChar {
-				if i+1 < len(script) && rune(script[i+1]) == stringChar {
-					// Skip next character (escaped quote)
-				} else {
-					inString = false
-				}
-			}
-			continue
-		}
-
-		// Handle statement terminator
-		if r == ';' {
-			stmt := strings.TrimSpace(current.String())
-			if stmt != "" {
-				statements = append(statements, stmt)
-			}
-			current.Reset()
-			continue
-		}
-
-		current.WriteRune(r)
-	}
-
-	// Handle final statement without semicolon
-	stmt := strings.TrimSpace(current.String())
-	if stmt != "" {
-		statements = append(statements, stmt)
-	}
-
-	return statements
-}
-
-// IsSelectQuery checks if a query is a SELECT statement.
-func IsSelectQuery(query string) bool {
-	trimmed := strings.TrimSpace(strings.ToUpper(query))
-	return strings.HasPrefix(trimmed, "SELECT") ||
-		strings.HasPrefix(trimmed, "WITH") ||
-		strings.HasPrefix(trimmed, "VALUES") ||
-		strings.HasPrefix(trimmed, "PRAGMA")
-}
-
-// FormatError formats SQLite-specific errors.
-func FormatError(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	errStr := err.Error()
-
-	switch {
-	case strings.Contains(errStr, "database is locked"):
-		return fmt.Errorf("sqlite database is locked: %w", err)
-	case strings.Contains(errStr, "no such table"):
-		return fmt.Errorf("sqlite table not found: %w", err)
-	case strings.Contains(errStr, "no such column"):
-		return fmt.Errorf("sqlite column not found: %w", err)
-	case strings.Contains(errStr, "syntax error"):
-		return fmt.Errorf("sqlite syntax error: %w", err)
-	case strings.Contains(errStr, "UNIQUE constraint failed"):
-		return fmt.Errorf("sqlite unique constraint violation: %w", err)
-	case strings.Contains(errStr, "FOREIGN KEY constraint failed"):
-		return fmt.Errorf("sqlite foreign key violation: %w", err)
-	case strings.Contains(errStr, "NOT NULL constraint failed"):
-		return fmt.Errorf("sqlite not null constraint violation: %w", err)
-	case strings.Contains(errStr, "unable to open database"):
-		return fmt.Errorf("sqlite unable to open database: %w", err)
-	default:
-		return err
-	}
-}
-
-// MapExitCode maps SQLite errors to exit codes.
-func MapExitCode(err error) int {
-	if err == nil {
-		return 0
-	}
-
-	errStr := err.Error()
-
-	switch {
-	case strings.Contains(errStr, "database is locked"):
-		return 5 // Database locked
-	case strings.Contains(errStr, "unable to open"):
-		return 2 // Connection error
-	case strings.Contains(errStr, "syntax error"):
-		return 4 // Syntax error
-	case strings.Contains(errStr, "constraint"):
-		return 6 // Constraint violation
-	case strings.Contains(errStr, "no such"):
-		return 4 // Object not found
-	default:
-		return 1 // Generic error
-	}
-}
-
-// BuildDSN constructs a SQLite DSN from a file path and options.
-func BuildDSN(filePath string, mode string, journal string, busyTimeout int) string {
-	if filePath == ":memory:" {
-		return filePath
-	}
-
-	var dsn strings.Builder
-	dsn.WriteString("file:")
-	dsn.WriteString(filePath)
-
-	params := make([]string, 0)
-
-	if mode != "" {
-		params = append(params, "mode="+mode)
-	}
-	if journal != "" {
-		params = append(params, "_journal_mode="+journal)
-	}
-	if busyTimeout > 0 {
-		params = append(params, fmt.Sprintf("_busy_timeout=%d", busyTimeout))
-	}
-
-	if len(params) > 0 {
-		dsn.WriteString("?")
-		dsn.WriteString(strings.Join(params, "&"))
-	}
-
-	return dsn.String()
 }
 
 func init() {

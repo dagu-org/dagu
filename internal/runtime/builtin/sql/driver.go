@@ -28,6 +28,14 @@ type Driver interface {
 
 	// PlaceholderFormat returns the placeholder format for the driver ("$" for PostgreSQL, "?" for SQLite).
 	PlaceholderFormat() string
+
+	// BuildInsertQuery generates a multi-row INSERT statement for batch imports.
+	// table: target table name
+	// columns: column names to insert
+	// rowCount: number of rows in this batch
+	// onConflict: conflict handling strategy ("error", "ignore", "replace")
+	// Returns the SQL query string with placeholders.
+	BuildInsertQuery(table string, columns []string, rowCount int, onConflict string) string
 }
 
 // DriverRegistry holds registered database drivers.

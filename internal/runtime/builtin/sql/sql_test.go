@@ -663,6 +663,706 @@ func TestParseConfig_FileLock(t *testing.T) {
 	assert.True(t, cfg.FileLock)
 }
 
+func TestParseConfig_Import(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  map[string]any
+		wantErr bool
+		check   func(*testing.T, *sqlexec.Config)
+	}{
+		{
+			name: "basic import config",
+			config: map[string]any{
+				"dsn": "file:./test.db",
+				"import": map[string]any{
+					"inputFile": "/path/to/data.csv",
+					"table":     "users",
+				},
+			},
+			wantErr: false,
+			check: func(t *testing.T, cfg *sqlexec.Config) {
+				require.NotNil(t, cfg.Import)
+				assert.Equal(t, "/path/to/data.csv", cfg.Import.InputFile)
+				assert.Equal(t, "users", cfg.Import.Table)
+				assert.Equal(t, "csv", cfg.Import.Format)       // auto-detected
+				assert.Equal(t, 1000, cfg.Import.BatchSize)     // default
+				assert.Equal(t, "error", cfg.Import.OnConflict) // default
+			},
+		},
+		{
+			name: "full import config",
+			config: map[string]any{
+				"dsn": "file:./test.db",
+				"import": map[string]any{
+					"inputFile":  "/path/to/data.tsv",
+					"table":      "users",
+					"format":     "tsv",
+					"hasHeader":  true,
+					"delimiter":  "\t",
+					"columns":    []string{"name", "age"},
+					"nullValues": []string{"NA", "N/A"},
+					"batchSize":  500,
+					"onConflict": "ignore",
+					"skipRows":   1,
+					"maxRows":    1000,
+					"dryRun":     true,
+				},
+			},
+			wantErr: false,
+			check: func(t *testing.T, cfg *sqlexec.Config) {
+				require.NotNil(t, cfg.Import)
+				assert.Equal(t, "tsv", cfg.Import.Format)
+				assert.True(t, cfg.Import.HasHeader)
+				assert.Equal(t, "\t", cfg.Import.Delimiter)
+				assert.Equal(t, []string{"name", "age"}, cfg.Import.Columns)
+				assert.Equal(t, []string{"NA", "N/A"}, cfg.Import.NullValues)
+				assert.Equal(t, 500, cfg.Import.BatchSize)
+				assert.Equal(t, "ignore", cfg.Import.OnConflict)
+				assert.Equal(t, 1, cfg.Import.SkipRows)
+				assert.Equal(t, 1000, cfg.Import.MaxRows)
+				assert.True(t, cfg.Import.DryRun)
+			},
+		},
+		{
+			name: "import with jsonl format",
+			config: map[string]any{
+				"dsn": "file:./test.db",
+				"import": map[string]any{
+					"inputFile": "/path/to/data.jsonl",
+					"table":     "users",
+				},
+			},
+			wantErr: false,
+			check: func(t *testing.T, cfg *sqlexec.Config) {
+				require.NotNil(t, cfg.Import)
+				assert.Equal(t, "jsonl", cfg.Import.Format) // auto-detected
+			},
+		},
+		{
+			name: "missing inputFile",
+			config: map[string]any{
+				"dsn": "file:./test.db",
+				"import": map[string]any{
+					"table": "users",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing table",
+			config: map[string]any{
+				"dsn": "file:./test.db",
+				"import": map[string]any{
+					"inputFile": "/path/to/data.csv",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid format",
+			config: map[string]any{
+				"dsn": "file:./test.db",
+				"import": map[string]any{
+					"inputFile": "/path/to/data.csv",
+					"table":     "users",
+					"format":    "xml",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid onConflict",
+			config: map[string]any{
+				"dsn": "file:./test.db",
+				"import": map[string]any{
+					"inputFile":  "/path/to/data.csv",
+					"table":      "users",
+					"onConflict": "crash",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative batchSize",
+			config: map[string]any{
+				"dsn": "file:./test.db",
+				"import": map[string]any{
+					"inputFile": "/path/to/data.csv",
+					"table":     "users",
+					"batchSize": -1,
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "onConflict replace",
+			config: map[string]any{
+				"dsn": "file:./test.db",
+				"import": map[string]any{
+					"inputFile":  "/path/to/data.csv",
+					"table":      "users",
+					"onConflict": "replace",
+				},
+			},
+			wantErr: false,
+			check: func(t *testing.T, cfg *sqlexec.Config) {
+				require.NotNil(t, cfg.Import)
+				assert.Equal(t, "replace", cfg.Import.OnConflict)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := sqlexec.ParseConfig(context.Background(), tt.config)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			if tt.check != nil {
+				tt.check(t, cfg)
+			}
+		})
+	}
+}
+
+// --- Integration Tests for CSV/JSONL Import ---
+
+func TestSQLiteExecutor_ImportCSV(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	// Create CSV file
+	csvPath := filepath.Join(tmpDir, "users.csv")
+	csvContent := "name,age,city\nAlice,30,NYC\nBob,25,LA\nCharlie,35,Chicago\n"
+	require.NoError(t, os.WriteFile(csvPath, []byte(csvContent), 0o644))
+
+	// Create database file
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// First create the table
+	setupStep := core.Step{
+		Name: "setup",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": dbPath,
+			},
+		},
+		Script: "CREATE TABLE users (name TEXT, age INTEGER, city TEXT);",
+	}
+
+	setupExec, err := newSQLiteExecutor(ctx, setupStep)
+	require.NoError(t, err)
+	require.NoError(t, setupExec.Run(ctx))
+
+	// Now import the CSV
+	importStep := core.Step{
+		Name: "import-users",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": dbPath,
+				"import": map[string]any{
+					"inputFile": csvPath,
+					"table":     "users",
+					"format":    "csv",
+					"hasHeader": true,
+				},
+			},
+		},
+	}
+
+	importExec, err := newSQLiteExecutor(ctx, importStep)
+	require.NoError(t, err)
+
+	var stderr bytes.Buffer
+	importExec.SetStderr(&stderr)
+
+	err = importExec.Run(ctx)
+	require.NoError(t, err)
+
+	// Check metrics
+	metricsOutput := stderr.String()
+	assert.Contains(t, metricsOutput, `"rows_imported":3`)
+	assert.Contains(t, metricsOutput, `"status":"completed"`)
+
+	// Verify imported data
+	verifyStep := core.Step{
+		Name: "verify",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": dbPath,
+			},
+		},
+		Script: "SELECT * FROM users ORDER BY name;",
+	}
+
+	verifyExec, err := newSQLiteExecutor(ctx, verifyStep)
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	verifyExec.SetStdout(&stdout)
+	require.NoError(t, verifyExec.Run(ctx))
+
+	output := stdout.String()
+	assert.Contains(t, output, "Alice")
+	assert.Contains(t, output, "Bob")
+	assert.Contains(t, output, "Charlie")
+}
+
+func TestSQLiteExecutor_ImportCSV_NoHeader(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	// Create CSV file without header
+	csvPath := filepath.Join(tmpDir, "data.csv")
+	csvContent := "Alice,30,NYC\nBob,25,LA\n"
+	require.NoError(t, os.WriteFile(csvPath, []byte(csvContent), 0o644))
+
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// Create table
+	setupStep := core.Step{
+		Name: "setup",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": dbPath,
+			},
+		},
+		Script: "CREATE TABLE users (name TEXT, age INTEGER, city TEXT);",
+	}
+
+	setupExec, err := newSQLiteExecutor(ctx, setupStep)
+	require.NoError(t, err)
+	require.NoError(t, setupExec.Run(ctx))
+
+	// Import with explicit columns
+	importStep := core.Step{
+		Name: "import",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": dbPath,
+				"import": map[string]any{
+					"inputFile": csvPath,
+					"table":     "users",
+					"hasHeader": false,
+					"columns":   []string{"name", "age", "city"},
+				},
+			},
+		},
+	}
+
+	importExec, err := newSQLiteExecutor(ctx, importStep)
+	require.NoError(t, err)
+
+	var stderr bytes.Buffer
+	importExec.SetStderr(&stderr)
+	require.NoError(t, importExec.Run(ctx))
+
+	assert.Contains(t, stderr.String(), `"rows_imported":2`)
+}
+
+func TestSQLiteExecutor_ImportJSONL(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	// Create JSONL file
+	jsonlPath := filepath.Join(tmpDir, "users.jsonl")
+	jsonlContent := `{"name":"Alice","age":30,"city":"NYC"}
+{"name":"Bob","age":25,"city":"LA"}
+`
+	require.NoError(t, os.WriteFile(jsonlPath, []byte(jsonlContent), 0o644))
+
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// Create table
+	setupStep := core.Step{
+		Name: "setup",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": dbPath,
+			},
+		},
+		Script: "CREATE TABLE users (name TEXT, age INTEGER, city TEXT);",
+	}
+
+	setupExec, err := newSQLiteExecutor(ctx, setupStep)
+	require.NoError(t, err)
+	require.NoError(t, setupExec.Run(ctx))
+
+	// Import JSONL
+	importStep := core.Step{
+		Name: "import",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": dbPath,
+				"import": map[string]any{
+					"inputFile": jsonlPath,
+					"table":     "users",
+					"columns":   []string{"name", "age", "city"},
+				},
+			},
+		},
+	}
+
+	importExec, err := newSQLiteExecutor(ctx, importStep)
+	require.NoError(t, err)
+
+	var stderr bytes.Buffer
+	importExec.SetStderr(&stderr)
+	require.NoError(t, importExec.Run(ctx))
+
+	assert.Contains(t, stderr.String(), `"rows_imported":2`)
+}
+
+func TestSQLiteExecutor_ImportWithTransaction(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	// Create CSV file
+	csvPath := filepath.Join(tmpDir, "data.csv")
+	csvContent := "value\n1\n2\n3\n"
+	require.NoError(t, os.WriteFile(csvPath, []byte(csvContent), 0o644))
+
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// Create table
+	setupStep := core.Step{
+		Name: "setup",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": dbPath,
+			},
+		},
+		Script: "CREATE TABLE numbers (value INTEGER);",
+	}
+
+	setupExec, err := newSQLiteExecutor(ctx, setupStep)
+	require.NoError(t, err)
+	require.NoError(t, setupExec.Run(ctx))
+
+	// Import with transaction
+	importStep := core.Step{
+		Name: "import",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn":         dbPath,
+				"transaction": true,
+				"import": map[string]any{
+					"inputFile": csvPath,
+					"table":     "numbers",
+					"hasHeader": true,
+				},
+			},
+		},
+	}
+
+	importExec, err := newSQLiteExecutor(ctx, importStep)
+	require.NoError(t, err)
+
+	var stderr bytes.Buffer
+	importExec.SetStderr(&stderr)
+	require.NoError(t, importExec.Run(ctx))
+
+	assert.Contains(t, stderr.String(), `"rows_imported":3`)
+}
+
+func TestSQLiteExecutor_ImportDryRun(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	// Create CSV file
+	csvPath := filepath.Join(tmpDir, "data.csv")
+	csvContent := "name\nAlice\nBob\n"
+	require.NoError(t, os.WriteFile(csvPath, []byte(csvContent), 0o644))
+
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// Create table
+	setupStep := core.Step{
+		Name: "setup",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": dbPath,
+			},
+		},
+		Script: "CREATE TABLE users (name TEXT);",
+	}
+
+	setupExec, err := newSQLiteExecutor(ctx, setupStep)
+	require.NoError(t, err)
+	require.NoError(t, setupExec.Run(ctx))
+
+	// Import with dry run
+	importStep := core.Step{
+		Name: "import",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": dbPath,
+				"import": map[string]any{
+					"inputFile": csvPath,
+					"table":     "users",
+					"hasHeader": true,
+					"dryRun":    true,
+				},
+			},
+		},
+	}
+
+	importExec, err := newSQLiteExecutor(ctx, importStep)
+	require.NoError(t, err)
+
+	var stderr bytes.Buffer
+	importExec.SetStderr(&stderr)
+	require.NoError(t, importExec.Run(ctx))
+
+	// Should show rows imported (in dry run mode, counted but not inserted)
+	assert.Contains(t, stderr.String(), `"rows_imported":2`)
+
+	// Verify table is empty (dry run didn't insert)
+	verifyStep := core.Step{
+		Name: "verify",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": dbPath,
+			},
+		},
+		Script: "SELECT COUNT(*) as cnt FROM users;",
+	}
+
+	verifyExec, err := newSQLiteExecutor(ctx, verifyStep)
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	verifyExec.SetStdout(&stdout)
+	require.NoError(t, verifyExec.Run(ctx))
+
+	// Count should be 0 because dry run doesn't insert
+	assert.Contains(t, stdout.String(), `"cnt":0`)
+}
+
+func TestSQLiteExecutor_ImportIgnoreConflict(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// Create table with unique constraint
+	setupStep := core.Step{
+		Name: "setup",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": dbPath,
+			},
+		},
+		Script: `
+			CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);
+			INSERT INTO users VALUES (1, 'Existing');
+		`,
+	}
+
+	setupExec, err := newSQLiteExecutor(ctx, setupStep)
+	require.NoError(t, err)
+	require.NoError(t, setupExec.Run(ctx))
+
+	// Create CSV with conflicting id
+	csvPath := filepath.Join(tmpDir, "data.csv")
+	csvContent := "id,name\n1,Alice\n2,Bob\n"
+	require.NoError(t, os.WriteFile(csvPath, []byte(csvContent), 0o644))
+
+	// Import with ignore
+	importStep := core.Step{
+		Name: "import",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": dbPath,
+				"import": map[string]any{
+					"inputFile":  csvPath,
+					"table":      "users",
+					"hasHeader":  true,
+					"onConflict": "ignore",
+				},
+			},
+		},
+	}
+
+	importExec, err := newSQLiteExecutor(ctx, importStep)
+	require.NoError(t, err)
+	require.NoError(t, importExec.Run(ctx))
+
+	// Verify id=1 still has original name (Existing), and id=2 was inserted
+	verifyStep := core.Step{
+		Name: "verify",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": dbPath,
+			},
+		},
+		Script: "SELECT * FROM users ORDER BY id;",
+	}
+
+	verifyExec, err := newSQLiteExecutor(ctx, verifyStep)
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	verifyExec.SetStdout(&stdout)
+	require.NoError(t, verifyExec.Run(ctx))
+
+	output := stdout.String()
+	assert.Contains(t, output, "Existing") // Original row preserved
+	assert.Contains(t, output, "Bob")      // New row inserted
+}
+
+func TestSQLiteExecutor_ImportMaxRows(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	// Create CSV file with many rows
+	csvPath := filepath.Join(tmpDir, "data.csv")
+	csvContent := "value\n1\n2\n3\n4\n5\n"
+	require.NoError(t, os.WriteFile(csvPath, []byte(csvContent), 0o644))
+
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// Create table
+	setupStep := core.Step{
+		Name: "setup",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": dbPath,
+			},
+		},
+		Script: "CREATE TABLE numbers (value INTEGER);",
+	}
+
+	setupExec, err := newSQLiteExecutor(ctx, setupStep)
+	require.NoError(t, err)
+	require.NoError(t, setupExec.Run(ctx))
+
+	// Import with maxRows limit
+	importStep := core.Step{
+		Name: "import",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": dbPath,
+				"import": map[string]any{
+					"inputFile": csvPath,
+					"table":     "numbers",
+					"hasHeader": true,
+					"maxRows":   3,
+				},
+			},
+		},
+	}
+
+	importExec, err := newSQLiteExecutor(ctx, importStep)
+	require.NoError(t, err)
+
+	var stderr bytes.Buffer
+	importExec.SetStderr(&stderr)
+	require.NoError(t, importExec.Run(ctx))
+
+	// Should only import 3 rows
+	assert.Contains(t, stderr.String(), `"rows_imported":3`)
+}
+
+func TestSQLiteExecutor_ImportSkipRows(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	// Create CSV file
+	csvPath := filepath.Join(tmpDir, "data.csv")
+	csvContent := "name\nAlice\nBob\nCharlie\n"
+	require.NoError(t, os.WriteFile(csvPath, []byte(csvContent), 0o644))
+
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// Create table
+	setupStep := core.Step{
+		Name: "setup",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": dbPath,
+			},
+		},
+		Script: "CREATE TABLE users (name TEXT);",
+	}
+
+	setupExec, err := newSQLiteExecutor(ctx, setupStep)
+	require.NoError(t, err)
+	require.NoError(t, setupExec.Run(ctx))
+
+	// Import with skipRows
+	importStep := core.Step{
+		Name: "import",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": dbPath,
+				"import": map[string]any{
+					"inputFile": csvPath,
+					"table":     "users",
+					"hasHeader": true,
+					"skipRows":  1, // Skip first data row (Alice)
+				},
+			},
+		},
+	}
+
+	importExec, err := newSQLiteExecutor(ctx, importStep)
+	require.NoError(t, err)
+
+	var stderr bytes.Buffer
+	importExec.SetStderr(&stderr)
+	require.NoError(t, importExec.Run(ctx))
+
+	// Should import 2 rows (skipped 1)
+	assert.Contains(t, stderr.String(), `"rows_imported":2`)
+	assert.Contains(t, stderr.String(), `"rows_skipped":1`)
+
+	// Verify Alice was skipped
+	verifyStep := core.Step{
+		Name: "verify",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": dbPath,
+			},
+		},
+		Script: "SELECT * FROM users ORDER BY name;",
+	}
+
+	verifyExec, err := newSQLiteExecutor(ctx, verifyStep)
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	verifyExec.SetStdout(&stdout)
+	require.NoError(t, verifyExec.Run(ctx))
+
+	output := stdout.String()
+	assert.NotContains(t, output, "Alice")
+	assert.Contains(t, output, "Bob")
+	assert.Contains(t, output, "Charlie")
+}
+
 func TestNewResultWriter(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -1475,41 +2175,6 @@ func TestSanitizeIdentifier_Extended(t *testing.T) {
 	}
 }
 
-func TestExtractParamNames_Extended(t *testing.T) {
-	tests := []struct {
-		name   string
-		query  string
-		want   []string
-	}{
-		{
-			name:  "single param",
-			query: "SELECT * FROM users WHERE id = :id",
-			want:  []string{"id"},
-		},
-		{
-			name:  "multiple params",
-			query: "SELECT * FROM users WHERE id = :id AND name = :name",
-			want:  []string{"id", "name"},
-		},
-		{
-			name:  "repeated param",
-			query: "SELECT * FROM users WHERE id = :id OR parent_id = :id",
-			want:  []string{"id"}, // Deduplicated
-		},
-		{
-			name:  "no params",
-			query: "SELECT * FROM users",
-			want:  nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := sqlexec.ExtractParamNames(tt.query)
-			assert.Equal(t, tt.want, result)
-		})
-	}
-}
 
 func TestGetPositionalParams(t *testing.T) {
 	ctx := context.Background()

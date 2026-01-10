@@ -3,6 +3,7 @@ package sql
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -135,6 +136,11 @@ func (e *sqlExecutor) Run(ctx context.Context) error {
 		}()
 	}
 
+	// Check if this is an import operation
+	if e.cfg.Import != nil {
+		return e.executeImport(ctx)
+	}
+
 	// Get the query to execute
 	query, err := e.getQuery()
 	if err != nil {
@@ -146,6 +152,66 @@ func (e *sqlExecutor) Run(ctx context.Context) error {
 		return e.executeScript(ctx, query)
 	}
 	return e.executeQuery(ctx, query)
+}
+
+// executeImport handles data import from CSV/TSV/JSONL files.
+func (e *sqlExecutor) executeImport(ctx context.Context) error {
+	db := e.connMgr.DB()
+	var tx *Transaction
+	var err error
+
+	// Begin transaction if configured
+	if e.cfg.Transaction {
+		tx, err = BeginTransaction(ctx, db, e.cfg.IsolationLevel)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if tx != nil {
+				_ = tx.Rollback()
+			}
+		}()
+	}
+
+	// Create importer with optional transaction
+	var sqlTx *sql.Tx
+	if tx != nil {
+		sqlTx = tx.Tx()
+	}
+	importer := NewImporter(db, sqlTx, e.driver, e.cfg.Import)
+
+	// Execute import
+	metrics, err := importer.Import(ctx)
+
+	// Write metrics to stderr
+	e.writeImportMetrics(metrics)
+
+	if err != nil {
+		return err
+	}
+
+	// Commit transaction if we started one
+	if tx != nil {
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("failed to commit transaction: %w", err)
+		}
+		tx = nil
+	}
+
+	return nil
+}
+
+// writeImportMetrics writes import metrics to stderr.
+func (e *sqlExecutor) writeImportMetrics(metrics *ImportMetrics) {
+	if metrics == nil {
+		return
+	}
+	data, err := json.Marshal(metrics)
+	if err != nil {
+		return
+	}
+	_, _ = e.stderr.Write(data)
+	_, _ = e.stderr.Write([]byte("\n"))
 }
 
 // getQuery extracts the SQL query from the step configuration.

@@ -44,6 +44,40 @@ type Config struct {
 	MaxRows    int    `mapstructure:"maxRows"`    // Maximum rows to return (0 = unlimited)
 	Streaming  bool   `mapstructure:"streaming"`  // Stream results to file
 	OutputFile string `mapstructure:"outputFile"` // File path for streaming output
+
+	// Import settings
+	Import *ImportConfig `mapstructure:"import"` // Import data from file
+}
+
+// ImportConfig configures data import from CSV/TSV/JSONL files.
+type ImportConfig struct {
+	// Required fields
+	InputFile string `mapstructure:"inputFile"` // Path to input file
+	Table     string `mapstructure:"table"`     // Target table name
+
+	// Format options
+	Format    string `mapstructure:"format"`    // csv, tsv, jsonl (auto-detect if empty)
+	HasHeader bool   `mapstructure:"hasHeader"` // Whether first row is header (default: true)
+	Delimiter string `mapstructure:"delimiter"` // Field delimiter (default: "," for csv, "\t" for tsv)
+
+	// Column mapping
+	Columns []string `mapstructure:"columns"` // Explicit column names (overrides header)
+
+	// NULL handling
+	NullValues []string `mapstructure:"nullValues"` // Values to treat as NULL
+
+	// Batch settings
+	BatchSize int `mapstructure:"batchSize"` // Rows per INSERT statement (default: 1000)
+
+	// Conflict handling
+	OnConflict string `mapstructure:"onConflict"` // error (default), ignore, replace
+
+	// Row limits
+	SkipRows int `mapstructure:"skipRows"` // Skip first N data rows
+	MaxRows  int `mapstructure:"maxRows"`  // Limit import (0 = unlimited)
+
+	// Validation
+	DryRun bool `mapstructure:"dryRun"` // Validate without importing
 }
 
 // DefaultConfig returns a Config with default values.
@@ -98,7 +132,78 @@ func ParseConfig(_ context.Context, mapCfg map[string]any) (*Config, error) {
 		}
 	}
 
+	// Validate and set defaults for import config
+	if cfg.Import != nil {
+		if err := cfg.Import.validate(); err != nil {
+			return nil, fmt.Errorf("invalid import config: %w", err)
+		}
+		cfg.Import.setDefaults()
+	}
+
 	return cfg, nil
+}
+
+// validate checks required fields and valid values for ImportConfig.
+func (c *ImportConfig) validate() error {
+	if c.InputFile == "" {
+		return fmt.Errorf("inputFile is required")
+	}
+	if c.Table == "" {
+		return fmt.Errorf("table is required")
+	}
+
+	// Validate format if specified
+	if c.Format != "" {
+		switch c.Format {
+		case "csv", "tsv", "jsonl":
+			// Valid
+		default:
+			return fmt.Errorf("invalid format: %s (must be csv, tsv, or jsonl)", c.Format)
+		}
+	}
+
+	// Validate onConflict if specified
+	if c.OnConflict != "" {
+		switch c.OnConflict {
+		case "error", "ignore", "replace":
+			// Valid
+		default:
+			return fmt.Errorf("invalid onConflict: %s (must be error, ignore, or replace)", c.OnConflict)
+		}
+	}
+
+	// Validate batch size
+	if c.BatchSize < 0 {
+		return fmt.Errorf("batchSize must be non-negative")
+	}
+
+	// Validate row limits
+	if c.SkipRows < 0 {
+		return fmt.Errorf("skipRows must be non-negative")
+	}
+	if c.MaxRows < 0 {
+		return fmt.Errorf("maxRows must be non-negative")
+	}
+
+	return nil
+}
+
+// setDefaults applies default values to ImportConfig.
+func (c *ImportConfig) setDefaults() {
+	if c.Format == "" {
+		c.Format = DetectFormat(c.InputFile)
+	}
+	if c.BatchSize == 0 {
+		c.BatchSize = 1000
+	}
+	if c.OnConflict == "" {
+		c.OnConflict = "error"
+	}
+	if len(c.NullValues) == 0 {
+		c.NullValues = []string{"", "NULL", "null", "\\N"}
+	}
+	// HasHeader defaults to true for CSV/TSV (Go zero value is false)
+	// This is handled during parsing by checking if it was explicitly set
 }
 
 // GetNamedParams returns params as a map if they are named parameters.
@@ -117,6 +222,27 @@ func (c *Config) GetPositionalParams() ([]any, bool) {
 	}
 	params, ok := c.Params.([]any)
 	return params, ok
+}
+
+// importConfigSchema defines the JSON schema for import configuration.
+var importConfigSchema = &jsonschema.Schema{
+	Type:        "object",
+	Description: "Import data from CSV/TSV/JSONL file",
+	Properties: map[string]*jsonschema.Schema{
+		"inputFile":  {Type: "string", Description: "Path to input file"},
+		"table":      {Type: "string", Description: "Target table name"},
+		"format":     {Type: "string", Enum: []any{"csv", "tsv", "jsonl"}, Description: "Input format (auto-detected from file extension if not specified)"},
+		"hasHeader":  {Type: "boolean", Description: "Whether first row is header (default: true)"},
+		"delimiter":  {Type: "string", Description: "Field delimiter (default: ',' for csv, '\\t' for tsv)"},
+		"columns":    {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Explicit column names"},
+		"nullValues": {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Values to treat as NULL"},
+		"batchSize":  {Type: "integer", Description: "Rows per INSERT statement (default: 1000)"},
+		"onConflict": {Type: "string", Enum: []any{"error", "ignore", "replace"}, Description: "Conflict handling (default: error)"},
+		"skipRows":   {Type: "integer", Description: "Skip first N data rows"},
+		"maxRows":    {Type: "integer", Description: "Limit import rows (0 = unlimited)"},
+		"dryRun":     {Type: "boolean", Description: "Validate without importing"},
+	},
+	Required: []string{"inputFile", "table"},
 }
 
 // JSON Schema for SQL executor configurations
@@ -144,6 +270,7 @@ var postgresConfigSchema = &jsonschema.Schema{
 		"maxRows":        {Type: "integer", Description: "Maximum rows to return"},
 		"streaming":      {Type: "boolean", Description: "Stream results to file"},
 		"outputFile":     {Type: "string", Description: "File path for streaming output"},
+		"import":         importConfigSchema,
 	},
 	Required: []string{"dsn"},
 }
@@ -170,6 +297,7 @@ var sqliteConfigSchema = &jsonschema.Schema{
 		"maxRows":      {Type: "integer", Description: "Maximum rows to return"},
 		"streaming":    {Type: "boolean", Description: "Stream results to file"},
 		"outputFile":   {Type: "string", Description: "File path for streaming output"},
+		"import":       importConfigSchema,
 	},
 	Required: []string{"dsn"},
 }
