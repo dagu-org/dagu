@@ -538,7 +538,7 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		require.Equal(t, core.Succeeded, status.Status)
 	})
 
-	t.Run("MarkWorkerTasksFailedWithNoStore", func(t *testing.T) {
+	t.Run("MarkWorkerTasksFailedWithNoStore", func(_ *testing.T) {
 		// Handler without dagRunStore
 		h := NewHandler()
 		ctx := context.Background()
@@ -556,7 +556,7 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		h.markWorkerTasksFailed(ctx, info)
 	})
 
-	t.Run("MarkWorkerTasksFailedWithNoStats", func(t *testing.T) {
+	t.Run("MarkWorkerTasksFailedWithNoStats", func(_ *testing.T) {
 		store := newMockDAGRunStore()
 		h := NewHandler(WithDAGRunStore(store))
 		ctx := context.Background()

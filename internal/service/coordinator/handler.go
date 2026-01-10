@@ -12,6 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/proto/convert"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -261,7 +262,7 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 	}
 
 	// Convert proto to execution.DAGRunStatus
-	dagRunStatus := protoToDAGRunStatus(req.Status)
+	dagRunStatus := convert.ProtoToDAGRunStatus(req.Status)
 
 	// Get or create an open attempt for this dag run
 	attempt, err := h.getOrOpenAttempt(ctx, dagRunStatus.Name, dagRunStatus.DAGRunID)
