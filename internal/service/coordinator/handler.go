@@ -299,7 +299,17 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 	dagRunStatus := convert.ProtoToDAGRunStatus(req.Status)
 
 	// Get or create an open attempt for this dag run
-	attempt, err := h.getOrOpenAttempt(ctx, dagRunStatus.Name, dagRunStatus.DAGRunID)
+	// Check if this is a sub-DAG (has root that differs from self)
+	var attempt execution.DAGRunAttempt
+	var err error
+
+	isSubDAG := dagRunStatus.Root.ID != "" && dagRunStatus.Root.ID != dagRunStatus.DAGRunID
+	if isSubDAG {
+		attempt, err = h.getOrOpenSubAttempt(ctx, dagRunStatus.Root, dagRunStatus.DAGRunID)
+	} else {
+		attempt, err = h.getOrOpenAttempt(ctx, dagRunStatus.Name, dagRunStatus.DAGRunID)
+	}
+
 	if err != nil {
 		return &coordinatorv1.ReportStatusResponse{
 			Accepted: false,
@@ -349,6 +359,33 @@ func (h *Handler) getOrOpenAttempt(ctx context.Context, dagName, dagRunID string
 	return attempt, nil
 }
 
+// getOrOpenSubAttempt retrieves an open sub-attempt from cache or opens a new one.
+// This is used for sub-DAG status reporting in distributed execution.
+func (h *Handler) getOrOpenSubAttempt(ctx context.Context, rootRef execution.DAGRunRef, subDAGRunID string) (execution.DAGRunAttempt, error) {
+	h.attemptsMu.Lock()
+	defer h.attemptsMu.Unlock()
+
+	// Check cache first
+	if attempt, ok := h.openAttempts[subDAGRunID]; ok {
+		return attempt, nil
+	}
+
+	// Find the sub-attempt
+	attempt, err := h.dagRunStore.FindSubAttempt(ctx, rootRef, subDAGRunID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Open the attempt for writing
+	if err := attempt.Open(ctx); err != nil {
+		return nil, err
+	}
+
+	// Cache the open attempt
+	h.openAttempts[subDAGRunID] = attempt
+	return attempt, nil
+}
+
 // StreamLogs receives log streams from workers and writes them to local filesystem.
 // This is used in shared-nothing architecture where workers don't have filesystem access.
 func (h *Handler) StreamLogs(stream coordinatorv1.CoordinatorService_StreamLogsServer) error {
@@ -373,8 +410,20 @@ func (h *Handler) GetDAGRunStatus(ctx context.Context, req *coordinatorv1.GetDAG
 		return nil, status.Error(codes.InvalidArgument, "dag_name and dag_run_id are required")
 	}
 
-	ref := execution.DAGRunRef{Name: req.DagName, ID: req.DagRunId}
-	attempt, err := h.dagRunStore.FindAttempt(ctx, ref)
+	var attempt execution.DAGRunAttempt
+	var err error
+
+	// Check if this is a sub-DAG query (root info provided)
+	if req.RootDagRunName != "" && req.RootDagRunId != "" {
+		// Look up as a sub-DAG
+		rootRef := execution.DAGRunRef{Name: req.RootDagRunName, ID: req.RootDagRunId}
+		attempt, err = h.dagRunStore.FindSubAttempt(ctx, rootRef, req.DagRunId)
+	} else {
+		// Look up as a top-level DAG run
+		ref := execution.DAGRunRef{Name: req.DagName, ID: req.DagRunId}
+		attempt, err = h.dagRunStore.FindAttempt(ctx, ref)
+	}
+
 	if err != nil {
 		// Not found is not an error, just return found=false
 		return &coordinatorv1.GetDAGRunStatusResponse{

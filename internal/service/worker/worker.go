@@ -183,10 +183,6 @@ func (w *Worker) sendHeartbeats(ctx context.Context) {
 			return
 		}
 
-		if ctx.Err() != nil {
-			return
-		}
-
 		if err := w.sendHeartbeat(ctx); err != nil {
 			nextInterval, nextErr := retrier.Next(err)
 			if nextErr != nil {

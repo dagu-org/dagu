@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/backoff"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/worker"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -422,7 +423,7 @@ func (m *mockCoordinatorCli) StreamLogs(_ context.Context) (coordinatorv1.Coordi
 	return nil, nil
 }
 
-func (m *mockCoordinatorCli) GetDAGRunStatus(_ context.Context, _, _ string) (*coordinatorv1.GetDAGRunStatusResponse, error) {
+func (m *mockCoordinatorCli) GetDAGRunStatus(_ context.Context, _, _ string, _ *execution.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error) {
 	return &coordinatorv1.GetDAGRunStatusResponse{Found: false}, nil
 }
 

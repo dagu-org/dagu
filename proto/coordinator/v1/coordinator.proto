@@ -273,6 +273,10 @@ message StreamLogsResponse {
 message GetDAGRunStatusRequest {
   string dag_name = 1;      // Name of the DAG
   string dag_run_id = 2;    // ID of the DAG run
+  // Root DAG run info for sub-DAG queries (optional).
+  // When set, the coordinator looks up the status as a sub-DAG.
+  string root_dag_run_name = 3;
+  string root_dag_run_id = 4;
 }
 
 // Response message for getting DAG run status.

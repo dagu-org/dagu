@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 
 	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -47,7 +47,7 @@ func (e *taskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) erro
 			tag.DAG(task.Target),
 			tag.Size(len(task.Definition)))
 
-		tf, err := createTempDAGFile(task.Target, []byte(task.Definition))
+		tf, err := fileutil.CreateTempDAGFile("worker-dags", task.Target, []byte(task.Definition))
 		if err != nil {
 			return fmt.Errorf("failed to create temp DAG file: %w", err)
 		}
@@ -96,30 +96,4 @@ func (e *taskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) erro
 		tag.RunID(task.DagRunId))
 
 	return nil
-}
-
-func createTempDAGFile(dagName string, yamlData []byte) (string, error) {
-	// Create a temporary directory if it doesn't exist
-	tempDir := filepath.Join(os.TempDir(), "dagu", "worker-dags")
-	if err := os.MkdirAll(tempDir, 0750); err != nil {
-		return "", fmt.Errorf("failed to create temp directory: %w", err)
-	}
-
-	// Create a temporary file with a meaningful name
-	pattern := fmt.Sprintf("%s-*.yaml", dagName)
-	tempFile, err := os.CreateTemp(tempDir, pattern)
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp file: %w", err)
-	}
-	defer func() {
-		_ = tempFile.Close()
-	}()
-
-	// Write the YAML data
-	if _, err := tempFile.Write(yamlData); err != nil {
-		_ = os.Remove(tempFile.Name())
-		return "", fmt.Errorf("failed to write YAML data: %w", err)
-	}
-
-	return tempFile.Name(), nil
 }

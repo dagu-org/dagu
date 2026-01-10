@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
@@ -189,7 +190,7 @@ func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Tas
 			tag.DAG(task.Target),
 			tag.Size(len(task.Definition)))
 
-		tempFile, err := createTempDAGFile(task.Target, []byte(task.Definition))
+		tempFile, err := fileutil.CreateTempDAGFile("worker-dags", task.Target, []byte(task.Definition))
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create temp DAG file: %w", err)
 		}

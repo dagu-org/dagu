@@ -163,8 +163,9 @@ type Dispatcher interface {
 
 	// GetDAGRunStatus retrieves the status of a DAG run from the coordinator.
 	// Used by parent DAGs to poll status of remote sub-DAGs.
+	// For sub-DAG queries, provide rootRef to look up the status under the root DAG run.
 	// Returns (nil, nil) if the DAG run is not found.
-	GetDAGRunStatus(ctx context.Context, dagName, dagRunID string) (*coordinatorv1.GetDAGRunStatusResponse, error)
+	GetDAGRunStatus(ctx context.Context, dagName, dagRunID string, rootRef *DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error)
 }
 
 // contextOptions holds optional configuration for NewContext.

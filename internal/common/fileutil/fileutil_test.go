@@ -219,3 +219,65 @@ func TestIsFile(t *testing.T) {
 		require.False(t, IsFile(filepath.Join(tmpDir, "nonexistent")))
 	})
 }
+
+func TestCreateTempDAGFile(t *testing.T) {
+	t.Run("BasicFile", func(t *testing.T) {
+		yamlData := []byte("name: test-dag\nsteps:\n  - name: step1\n    command: echo test")
+		path, err := CreateTempDAGFile("test-subdir", "test-dag", yamlData)
+		require.NoError(t, err)
+		require.NotEmpty(t, path)
+		t.Cleanup(func() { _ = os.Remove(path) })
+
+		// Verify file exists
+		assert.FileExists(t, path)
+
+		// Verify content
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.Equal(t, yamlData, content)
+
+		// Verify path contains expected components
+		assert.Contains(t, path, "test-dag")
+		assert.Contains(t, path, ".yaml")
+		assert.Contains(t, path, filepath.Join("dagu", "test-subdir"))
+	})
+
+	t.Run("WithExtraDocs", func(t *testing.T) {
+		primaryDoc := []byte("name: parent-dag\nsteps:\n  - name: step1")
+		extraDoc1 := []byte("name: child1\nsteps:\n  - name: s1")
+		extraDoc2 := []byte("name: child2\nsteps:\n  - name: s2")
+
+		path, err := CreateTempDAGFile("test-subdir", "parent-dag", primaryDoc, extraDoc1, extraDoc2)
+		require.NoError(t, err)
+		require.NotEmpty(t, path)
+		t.Cleanup(func() { _ = os.Remove(path) })
+
+		// Verify file exists
+		assert.FileExists(t, path)
+
+		// Verify content has all docs separated by ---
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		contentStr := string(content)
+
+		assert.Contains(t, contentStr, "name: parent-dag")
+		assert.Contains(t, contentStr, "---")
+		assert.Contains(t, contentStr, "name: child1")
+		assert.Contains(t, contentStr, "name: child2")
+	})
+
+	t.Run("EmptyExtraDocs", func(t *testing.T) {
+		primaryDoc := []byte("name: solo-dag")
+
+		path, err := CreateTempDAGFile("test-subdir", "solo-dag", primaryDoc)
+		require.NoError(t, err)
+		require.NotEmpty(t, path)
+		t.Cleanup(func() { _ = os.Remove(path) })
+
+		// Verify content has only the primary doc (no separators)
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.Equal(t, primaryDoc, content)
+		assert.NotContains(t, string(content), "---")
+	})
+}

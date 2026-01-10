@@ -879,7 +879,10 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 func (a *Agent) writeStatus(ctx context.Context, attempt execution.DAGRunAttempt, status execution.DAGRunStatus) {
 	// In shared-nothing mode, only push to coordinator (coordinator writes to its storage)
 	if a.statusPusher != nil {
-		if err := a.statusPusher.Push(ctx, status); err != nil {
+		// Use a context that won't be cancelled, so final status is always pushed
+		// even when the execution was cancelled (e.g., via heartbeat directive).
+		pushCtx := context.WithoutCancel(ctx)
+		if err := a.statusPusher.Push(pushCtx, status); err != nil {
 			logger.Error(ctx, "Failed to push status to coordinator", tag.Error(err))
 		}
 		return

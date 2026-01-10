@@ -194,20 +194,20 @@ steps:
 }
 
 // TestRemote_SubDAG verifies sub-DAG status propagation through coordinator
-// TODO: This test needs adjustment for the distributed sub-DAG execution flow.
-// The implementation is complete but the test infrastructure needs work.
 func TestRemote_SubDAG(t *testing.T) {
-	t.Skip("Test needs adjustment for distributed sub-DAG execution flow")
 	t.Run("sub-DAG execution via coordinator", func(t *testing.T) {
 		// Multi-document YAML with parent and child DAGs
+		// Both parent and child have workerSelector so they run on workers
 		yamlContent := `
 name: parent-remote
+workerSelector:
+  type: parent
 steps:
   - run: child-remote
 ---
 name: child-remote
 workerSelector:
-  foo: bar
+  type: child
 steps:
   - name: child-step
     command: echo "child executed"
@@ -216,27 +216,34 @@ steps:
 		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 		coord.Config.Queues.Enabled = true
 
-		// Setup worker with remote task handler for child DAG
-		setupRemoteWorker(t, coord, "worker-1", 10, map[string]string{"foo": "bar"})
+		// Setup workers - one for parent and one for child
+		setupRemoteWorker(t, coord, "parent-worker", 10, map[string]string{"type": "parent"})
+		setupRemoteWorker(t, coord, "child-worker", 10, map[string]string{"type": "child"})
 
 		// Load the DAG
 		dagWrapper := coord.DAG(t, yamlContent)
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
-		// Start the parent DAG (not enqueue - parent runs locally, child gets dispatched)
+		// Enqueue the parent DAG to coordinator (runs on worker with coordinator client)
 		subCmdBuilder := runtime.NewSubCmdBuilder(coord.Config)
-		startSpec := subCmdBuilder.Start(dagWrapper.DAG, runtime.StartOptions{Quiet: true})
-		err := runtime.Start(coord.Context, startSpec)
+		enqueueSpec := subCmdBuilder.Enqueue(dagWrapper.DAG, runtime.EnqueueOptions{Quiet: true})
+		err := runtime.Start(coord.Context, enqueueSpec)
 		require.NoError(t, err)
 
-		// Start scheduler to handle child DAG dispatch
+		// Verify the DAG was queued
+		require.Eventually(t, func() bool {
+			items, _ := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)
+			return len(items) == 1
+		}, 2*time.Second, 50*time.Millisecond)
+
+		// Start scheduler to handle DAG dispatch
 		schedulerCtx, schedulerCancel := context.WithTimeout(coord.Context, 30*time.Second)
 		defer schedulerCancel()
 
 		schedulerInst := setupSchedulerWithCoordinator(t, coord, coordinatorClient)
 		go func() { _ = schedulerInst.Start(schedulerCtx) }()
 
-		// Wait for parent to complete
+		// Wait for parent to complete (which means child also completed)
 		status := waitForStatus(t, coord, dagWrapper.DAG, core.Succeeded, 25*time.Second)
 		schedulerCancel()
 
@@ -309,10 +316,7 @@ steps:
 }
 
 // TestRemote_Cancellation verifies cancellation propagates to workers
-// TODO: This test needs adjustment for the heartbeat-based cancellation timing.
-// The implementation is complete but the test infrastructure needs work.
 func TestRemote_Cancellation(t *testing.T) {
-	t.Skip("Test needs adjustment for heartbeat-based cancellation timing")
 	t.Run("cancellation propagates to remote worker", func(t *testing.T) {
 		yamlContent := `
 name: cancel-test

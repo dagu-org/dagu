@@ -36,6 +36,10 @@ func (p *StatusPusher) Push(ctx context.Context, status execution.DAGRunStatus) 
 		return fmt.Errorf("failed to report status: %w", err)
 	}
 
+	if resp == nil {
+		return fmt.Errorf("received nil response from coordinator")
+	}
+
 	if !resp.Accepted {
 		return fmt.Errorf("status rejected: %s", resp.Error)
 	}

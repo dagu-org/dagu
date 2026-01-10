@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
 	runtime1 "github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/test"
@@ -168,7 +169,7 @@ func TestTaskHandler(t *testing.T) {
 }
 
 func TestCreateTempDAGFile(t *testing.T) {
-	path, err := createTempDAGFile("simple", []byte("steps:\n  - name: example\n"))
+	path, err := fileutil.CreateTempDAGFile("worker-dags", "simple", []byte("steps:\n  - name: example\n"))
 	require.NoError(t, err)
 
 	t.Cleanup(func() { _ = os.Remove(path) })

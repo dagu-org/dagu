@@ -48,9 +48,7 @@ type Client interface {
 	// StreamLogs returns a log streaming client for sending logs to the coordinator
 	StreamLogs(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error)
 
-	// GetDAGRunStatus retrieves the status of a DAG run from the coordinator
-	// Used by parent DAGs to poll status of remote sub-DAGs
-	GetDAGRunStatus(ctx context.Context, dagName, dagRunID string) (*coordinatorv1.GetDAGRunStatusResponse, error)
+	// GetDAGRunStatus is inherited from execution.Dispatcher
 
 	// Metrics returns the metrics for the coordinator client
 	Metrics() Metrics
@@ -537,7 +535,7 @@ func (cli *clientImpl) StreamLogs(ctx context.Context) (coordinatorv1.Coordinato
 }
 
 // GetDAGRunStatus retrieves the status of a DAG run from the coordinator
-func (cli *clientImpl) GetDAGRunStatus(ctx context.Context, dagName, dagRunID string) (*coordinatorv1.GetDAGRunStatusResponse, error) {
+func (cli *clientImpl) GetDAGRunStatus(ctx context.Context, dagName, dagRunID string, rootRef *execution.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error) {
 	// Get all available coordinators from discovery
 	members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
 	if err != nil {
@@ -551,6 +549,12 @@ func (cli *clientImpl) GetDAGRunStatus(ctx context.Context, dagName, dagRunID st
 	req := &coordinatorv1.GetDAGRunStatusRequest{
 		DagName:  dagName,
 		DagRunId: dagRunID,
+	}
+
+	// Include root reference for sub-DAG queries
+	if rootRef != nil {
+		req.RootDagRunName = rootRef.Name
+		req.RootDagRunId = rootRef.ID
 	}
 
 	var resp *coordinatorv1.GetDAGRunStatusResponse
@@ -567,7 +571,7 @@ func (cli *clientImpl) GetDAGRunStatus(ctx context.Context, dagName, dagRunID st
 
 // getDialOptions returns the appropriate gRPC dial options based on TLS configuration
 func getDialOptions(config *Config) ([]grpc.DialOption, error) {
-	opts := []grpc.DialOption{}
+	var opts []grpc.DialOption
 
 	if config.Insecure {
 		// Use insecure connection (h2c)

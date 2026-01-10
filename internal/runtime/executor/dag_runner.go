@@ -8,12 +8,13 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/telemetry"
@@ -63,8 +64,16 @@ func NewSubDAGExecutor(ctx context.Context, childName string) (*SubDAGExecutor, 
 	// First, check if it's a local DAG in the parent
 	if rCtx.DAG != nil && rCtx.DAG.LocalDAGs != nil {
 		if localDAG, ok := rCtx.DAG.LocalDAGs[childName]; ok {
+			// Collect extra docs from other local DAGs
+			var extraDocs [][]byte
+			for _, otherDAG := range rCtx.DAG.LocalDAGs {
+				if otherDAG.Name != childName {
+					extraDocs = append(extraDocs, otherDAG.YamlData)
+				}
+			}
+
 			// Create a temporary file for the local DAG
-			tempFile, err := createTempDAGFile(childName, localDAG.YamlData, rCtx.DAG.LocalDAGs)
+			tempFile, err := fileutil.CreateTempDAGFile("local-dags", childName, localDAG.YamlData, extraDocs...)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create temp file for local DAG: %w", err)
 			}
@@ -449,7 +458,9 @@ func (e *SubDAGExecutor) getSubDAGRunStatus(ctx context.Context, dagRunID string
 
 	// For distributed runs, query the coordinator
 	if e.coordinatorCli != nil {
-		resp, err := e.coordinatorCli.GetDAGRunStatus(ctx, e.DAG.Name, dagRunID)
+		// Pass root reference so coordinator can find the sub-DAG status
+		rootRef := &rCtx.RootDAGRun
+		resp, err := e.coordinatorCli.GetDAGRunStatus(ctx, e.DAG.Name, dagRunID, rootRef)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get DAG run status from coordinator: %w", err)
 		}
@@ -484,20 +495,17 @@ func (e *SubDAGExecutor) getSubDAGRunStatus(ctx context.Context, dagRunID string
 func extractOutputsFromNodes(nodes []*execution.Node) map[string]string {
 	outputs := make(map[string]string)
 	for _, node := range nodes {
-		if node.OutputVariables != nil {
-			node.OutputVariables.Range(func(_, value any) bool {
-				if s, ok := value.(string); ok {
-					// Split the value by '=' to get the key and value
-					for i := 0; i < len(s); i++ {
-						if s[i] == '=' {
-							outputs[s[:i]] = s[i+1:]
-							break
-						}
-					}
-				}
-				return true
-			})
+		if node.OutputVariables == nil {
+			continue
 		}
+		node.OutputVariables.Range(func(_, value any) bool {
+			if s, ok := value.(string); ok {
+				if key, val, found := strings.Cut(s, "="); found {
+					outputs[key] = val
+				}
+			}
+			return true
+		})
 	}
 	return outputs
 }
@@ -509,7 +517,9 @@ func (e *SubDAGExecutor) isSubDAGRunCompleted(ctx context.Context, dagRunID stri
 
 	// For distributed runs, query the coordinator
 	if e.coordinatorCli != nil {
-		resp, err := e.coordinatorCli.GetDAGRunStatus(ctx, e.DAG.Name, dagRunID)
+		// Pass root reference so coordinator can find the sub-DAG status
+		rootRef := &rCtx.RootDAGRun
+		resp, err := e.coordinatorCli.GetDAGRunStatus(ctx, e.DAG.Name, dagRunID, rootRef)
 		if err != nil {
 			return false, fmt.Errorf("failed to get DAG run status from coordinator: %w", err)
 		}
@@ -584,53 +594,6 @@ func (e *SubDAGExecutor) Kill(sig os.Signal) error {
 		return errs[0]
 	}
 	return nil
-}
-
-// createTempDAGFile creates a temporary file with the DAG YAML content.
-func createTempDAGFile(dagName string, yamlData []byte, localDAGs map[string]*core.DAG) (string, error) {
-	// Create a temporary directory if it doesn't exist
-	tempDir := filepath.Join(os.TempDir(), "dagu", "local-dags")
-	if err := os.MkdirAll(tempDir, 0750); err != nil {
-		return "", fmt.Errorf("failed to create temp directory: %w", err)
-	}
-
-	// Create a temporary file with a meaningful name
-	pattern := fmt.Sprintf("%s-*.yaml", dagName)
-	tempFile, err := os.CreateTemp(tempDir, pattern)
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp file: %w", err)
-	}
-
-	tempFileName := tempFile.Name()
-	writeErr := func() error {
-		defer func() { _ = tempFile.Close() }()
-
-		// Write the YAML data
-		if _, err := tempFile.Write(yamlData); err != nil {
-			return err
-		}
-
-		// Add other local DAG data to the temporary file
-		for _, localDAG := range localDAGs {
-			if localDAG.Name == dagName {
-				continue
-			}
-			if _, err := tempFile.WriteString("---\n"); err != nil {
-				return err
-			}
-			if _, err := tempFile.Write(localDAG.YamlData); err != nil {
-				return err
-			}
-		}
-		return nil
-	}()
-
-	if writeErr != nil {
-		_ = os.Remove(tempFileName)
-		return "", fmt.Errorf("failed to write YAML data: %w", writeErr)
-	}
-
-	return tempFileName, nil
 }
 
 // executablePath returns the path to the dagu executable.

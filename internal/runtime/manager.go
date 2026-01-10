@@ -119,39 +119,45 @@ func (m *Manager) stopSingleDAGRun(ctx context.Context, dag *core.DAG, dagRunID 
 	// Set run ID in context for all logs in this function
 	ctx = logger.WithValues(ctx, tag.RunID(dagRunID))
 
-	// Check if the process is running using proc store
+	// Check if the process is running locally using proc store
 	alive, err := m.procStore.IsRunAlive(ctx, dag.ProcGroup(), execution.NewDAGRunRef(dag.Name, dagRunID))
-
 	if err != nil {
 		return fmt.Errorf("failed to retrieve status from proc store: %w", err)
 	}
-	if !alive {
-		logger.Info(ctx, "The DAG is not running")
-		return nil
-	}
 
-	addr := dag.SockAddr(dagRunID)
-	if fileutil.FileExists(addr) {
-		// In case the socket exists, we try to send a stop request
-		client := sock.NewClient(addr)
-		if _, err := client.Request("POST", "/stop"); err == nil {
-			logger.Info(ctx, "Successfully stopped DAG via socket")
-			return nil
+	// If running locally, try to stop via socket first
+	if alive {
+		addr := dag.SockAddr(dagRunID)
+		if fileutil.FileExists(addr) {
+			// In case the socket exists, we try to send a stop request
+			client := sock.NewClient(addr)
+			if _, err := client.Request("POST", "/stop"); err == nil {
+				logger.Info(ctx, "Successfully stopped DAG via socket")
+				return nil
+			}
 		}
 	}
 
-	// Try to find the running dag-run attempt and request cancel
+	// Try to find the dag-run attempt and request cancel (works for both local and distributed runs)
+	// This creates an abort flag that the coordinator can detect on heartbeat
 	runRef := execution.NewDAGRunRef(dag.Name, dagRunID)
 	run, err := m.dagRunStore.FindAttempt(ctx, runRef)
 	if err == nil {
 		if err := run.Abort(ctx); err != nil {
 			return fmt.Errorf("failed to request cancel for dag-run %s: %w", dagRunID, err)
 		}
-		logger.Info(ctx, "Wrote stop file for running DAG")
+		logger.Info(ctx, "Abort flag created for DAG run")
 		return nil
 	}
 
-	return fmt.Errorf("failed to stop DAG %s (run %s): %w", dag.Name, dagRunID, err)
+	// If we couldn't find the attempt and the process isn't running locally, nothing to do
+	if !alive {
+		logger.Info(ctx, "The DAG is not running locally and no attempt found")
+		return nil
+	}
+
+	// Process is alive but we couldn't find the attempt - this shouldn't happen
+	return fmt.Errorf("failed to find dag-run attempt: %w", err)
 }
 
 // GenDAGRunID generates a unique ID for a dag-run using UUID version 7.

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/stretchr/testify/assert"
@@ -302,8 +303,8 @@ func TestCreateTempDAGFile(t *testing.T) {
 	dagName := "test-dag"
 	yamlData := []byte("name: test-dag\nsteps:\n  - name: step1\n    command: echo test")
 
-	// Pass nil for localDAGs since we're testing with a single DAG
-	tempFile, err := createTempDAGFile(dagName, yamlData, nil)
+	// Test with no extra docs
+	tempFile, err := fileutil.CreateTempDAGFile("local-dags", dagName, yamlData)
 	require.NoError(t, err)
 	require.NotEmpty(t, tempFile)
 	defer func() { _ = os.Remove(tempFile) }()
@@ -319,23 +320,13 @@ func TestCreateTempDAGFile(t *testing.T) {
 	assert.Contains(t, tempFile, ".yaml")
 }
 
-func TestCreateTempDAGFile_WithLocalDAGs(t *testing.T) {
+func TestCreateTempDAGFile_WithExtraDocs(t *testing.T) {
 	dagName := "parent-dag"
 	yamlData := []byte("name: parent-dag\nsteps:\n  - name: step1\n    call: child-dag")
+	childYamlData := []byte("name: child-dag\nsteps:\n  - name: step1\n    command: echo child")
 
-	// Create local DAGs map with additional DAGs
-	localDAGs := map[string]*core.DAG{
-		"parent-dag": {
-			Name:     "parent-dag",
-			YamlData: yamlData,
-		},
-		"child-dag": {
-			Name:     "child-dag",
-			YamlData: []byte("name: child-dag\nsteps:\n  - name: step1\n    command: echo child"),
-		},
-	}
-
-	tempFile, err := createTempDAGFile(dagName, yamlData, localDAGs)
+	// Test with extra docs (simulating multiple DAGs in one file)
+	tempFile, err := fileutil.CreateTempDAGFile("local-dags", dagName, yamlData, childYamlData)
 	require.NoError(t, err)
 	require.NotEmpty(t, tempFile)
 	defer func() { _ = os.Remove(tempFile) }()

@@ -1826,11 +1826,15 @@ func (x *StreamLogsResponse) GetError() string {
 
 // Request message for getting DAG run status.
 type GetDAGRunStatusRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	DagName       string                 `protobuf:"bytes,1,opt,name=dag_name,json=dagName,proto3" json:"dag_name,omitempty"`      // Name of the DAG
-	DagRunId      string                 `protobuf:"bytes,2,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"` // ID of the DAG run
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	DagName  string                 `protobuf:"bytes,1,opt,name=dag_name,json=dagName,proto3" json:"dag_name,omitempty"`      // Name of the DAG
+	DagRunId string                 `protobuf:"bytes,2,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"` // ID of the DAG run
+	// Root DAG run info for sub-DAG queries (optional).
+	// When set, the coordinator looks up the status as a sub-DAG.
+	RootDagRunName string `protobuf:"bytes,3,opt,name=root_dag_run_name,json=rootDagRunName,proto3" json:"root_dag_run_name,omitempty"`
+	RootDagRunId   string `protobuf:"bytes,4,opt,name=root_dag_run_id,json=rootDagRunId,proto3" json:"root_dag_run_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetDAGRunStatusRequest) Reset() {
@@ -1873,6 +1877,20 @@ func (x *GetDAGRunStatusRequest) GetDagName() string {
 func (x *GetDAGRunStatusRequest) GetDagRunId() string {
 	if x != nil {
 		return x.DagRunId
+	}
+	return ""
+}
+
+func (x *GetDAGRunStatusRequest) GetRootDagRunName() string {
+	if x != nil {
+		return x.RootDagRunName
+	}
+	return ""
+}
+
+func (x *GetDAGRunStatusRequest) GetRootDagRunId() string {
+	if x != nil {
+		return x.RootDagRunId
 	}
 	return ""
 }
@@ -2117,11 +2135,13 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x12StreamLogsResponse\x12'\n" +
 	"\x0fchunks_received\x18\x01 \x01(\x04R\x0echunksReceived\x12#\n" +
 	"\rbytes_written\x18\x02 \x01(\x04R\fbytesWritten\x12\x14\n" +
-	"\x05error\x18\x03 \x01(\tR\x05error\"Q\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\"\xa3\x01\n" +
 	"\x16GetDAGRunStatusRequest\x12\x19\n" +
 	"\bdag_name\x18\x01 \x01(\tR\adagName\x12\x1c\n" +
 	"\n" +
-	"dag_run_id\x18\x02 \x01(\tR\bdagRunId\"\x80\x01\n" +
+	"dag_run_id\x18\x02 \x01(\tR\bdagRunId\x12)\n" +
+	"\x11root_dag_run_name\x18\x03 \x01(\tR\x0erootDagRunName\x12%\n" +
+	"\x0froot_dag_run_id\x18\x04 \x01(\tR\frootDagRunId\"\x80\x01\n" +
 	"\x17GetDAGRunStatusResponse\x12\x14\n" +
 	"\x05found\x18\x01 \x01(\bR\x05found\x129\n" +
 	"\x06status\x18\x02 \x01(\v2!.coordinator.v1.DAGRunStatusProtoR\x06status\x12\x14\n" +

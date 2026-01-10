@@ -192,3 +192,50 @@ func ResolvePathOrBlank(path string) string {
 	}
 	return resolvedPath
 }
+
+// CreateTempDAGFile creates a temporary file with DAG YAML content.
+// The file is created in {os.TempDir()}/dagu/{subDir}/ with pattern {dagName}-*.yaml.
+// Additional YAML documents can be appended by providing extraDocs.
+// Returns the path to the created file or an error.
+func CreateTempDAGFile(subDir, dagName string, yamlData []byte, extraDocs ...[]byte) (string, error) {
+	// Create a temporary directory if it doesn't exist
+	tempDir := filepath.Join(os.TempDir(), "dagu", subDir)
+	if err := os.MkdirAll(tempDir, 0750); err != nil {
+		return "", fmt.Errorf("failed to create temp directory: %w", err)
+	}
+
+	// Create a temporary file with a meaningful name
+	pattern := fmt.Sprintf("%s-*.yaml", dagName)
+	tempFile, err := os.CreateTemp(tempDir, pattern)
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+
+	tempFileName := tempFile.Name()
+	writeErr := func() error {
+		defer func() { _ = tempFile.Close() }()
+
+		// Write the primary YAML data
+		if _, err := tempFile.Write(yamlData); err != nil {
+			return err
+		}
+
+		// Write additional YAML documents if provided
+		for _, doc := range extraDocs {
+			if _, err := tempFile.WriteString("---\n"); err != nil {
+				return err
+			}
+			if _, err := tempFile.Write(doc); err != nil {
+				return err
+			}
+		}
+		return nil
+	}()
+
+	if writeErr != nil {
+		_ = os.Remove(tempFileName)
+		return "", fmt.Errorf("failed to write YAML data: %w", writeErr)
+	}
+
+	return tempFileName, nil
+}
