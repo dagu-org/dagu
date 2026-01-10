@@ -10,6 +10,9 @@ import (
 	"time"
 )
 
+// JSON formatting constants
+const jsonIndent = "  " // Two spaces for JSON indentation
+
 // ResultWriter defines the interface for writing query results.
 type ResultWriter interface {
 	// WriteHeader writes the column headers (if applicable).
@@ -129,7 +132,7 @@ func (w *JSONWriter) Flush() error {
 
 // Close writes the accumulated JSON array.
 func (w *JSONWriter) Close() error {
-	data, err := json.MarshalIndent(w.rows, "", "  ")
+	data, err := json.MarshalIndent(w.rows, "", jsonIndent)
 	if err != nil {
 		return fmt.Errorf("failed to marshal rows: %w", err)
 	}
@@ -310,6 +313,10 @@ func valueToString(val any, nullString string) string {
 
 // ScanRow scans a row into a slice of interface values.
 func ScanRow(rows *sql.Rows, columns []string) ([]any, error) {
+	if rows == nil {
+		return nil, fmt.Errorf("rows is nil")
+	}
+
 	values := make([]any, len(columns))
 	valuePtrs := make([]any, len(columns))
 

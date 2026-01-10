@@ -33,12 +33,14 @@ func TestSQLiteDriver_BuildInsertQuery(t *testing.T) {
 	driver := &SQLiteDriver{}
 
 	tests := []struct {
-		name       string
-		table      string
-		columns    []string
-		rowCount   int
-		onConflict string
-		want       string
+		name           string
+		table          string
+		columns        []string
+		rowCount       int
+		onConflict     string
+		conflictTarget string   // ignored by SQLite but kept for interface compatibility
+		updateColumns  []string // ignored by SQLite but kept for interface compatibility
+		want           string
 	}{
 		{
 			name:       "single row",
@@ -46,7 +48,7 @@ func TestSQLiteDriver_BuildInsertQuery(t *testing.T) {
 			columns:    []string{"name", "age"},
 			rowCount:   1,
 			onConflict: "error",
-			want:       "INSERT INTO users (name, age) VALUES (?, ?)",
+			want:       `INSERT INTO "users" ("name", "age") VALUES (?, ?)`,
 		},
 		{
 			name:       "multiple rows",
@@ -54,7 +56,7 @@ func TestSQLiteDriver_BuildInsertQuery(t *testing.T) {
 			columns:    []string{"name", "age"},
 			rowCount:   3,
 			onConflict: "error",
-			want:       "INSERT INTO users (name, age) VALUES (?, ?), (?, ?), (?, ?)",
+			want:       `INSERT INTO "users" ("name", "age") VALUES (?, ?), (?, ?), (?, ?)`,
 		},
 		{
 			name:       "with ignore",
@@ -62,7 +64,7 @@ func TestSQLiteDriver_BuildInsertQuery(t *testing.T) {
 			columns:    []string{"id", "name"},
 			rowCount:   2,
 			onConflict: "ignore",
-			want:       "INSERT OR IGNORE INTO users (id, name) VALUES (?, ?), (?, ?)",
+			want:       `INSERT OR IGNORE INTO "users" ("id", "name") VALUES (?, ?), (?, ?)`,
 		},
 		{
 			name:       "with replace",
@@ -70,7 +72,7 @@ func TestSQLiteDriver_BuildInsertQuery(t *testing.T) {
 			columns:    []string{"id", "name"},
 			rowCount:   1,
 			onConflict: "replace",
-			want:       "INSERT OR REPLACE INTO users (id, name) VALUES (?, ?)",
+			want:       `INSERT OR REPLACE INTO "users" ("id", "name") VALUES (?, ?)`,
 		},
 		{
 			name:       "single column",
@@ -78,13 +80,44 @@ func TestSQLiteDriver_BuildInsertQuery(t *testing.T) {
 			columns:    []string{"value"},
 			rowCount:   2,
 			onConflict: "error",
-			want:       "INSERT INTO items (value) VALUES (?), (?)",
+			want:       `INSERT INTO "items" ("value") VALUES (?), (?)`,
+		},
+		{
+			name:       "reserved word table name",
+			table:      "order",
+			columns:    []string{"select", "from"},
+			rowCount:   1,
+			onConflict: "error",
+			want:       `INSERT INTO "order" ("select", "from") VALUES (?, ?)`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := driver.BuildInsertQuery(tt.table, tt.columns, tt.rowCount, tt.onConflict)
+			got := driver.BuildInsertQuery(tt.table, tt.columns, tt.rowCount, tt.onConflict, tt.conflictTarget, tt.updateColumns)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestSQLiteDriver_QuoteIdentifier(t *testing.T) {
+	driver := &SQLiteDriver{}
+
+	tests := []struct {
+		name string
+		want string
+	}{
+		{"users", `"users"`},
+		{"order", `"order"`},                     // Reserved word
+		{`table"name`, `"table""name"`},          // Contains quote
+		{"CamelCase", `"CamelCase"`},             // Preserves case
+		{"with spaces", `"with spaces"`},         // Contains spaces
+		{"special!@#chars", `"special!@#chars"`}, // Special characters
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := driver.QuoteIdentifier(tt.name)
 			assert.Equal(t, tt.want, got)
 		})
 	}

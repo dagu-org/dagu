@@ -1879,8 +1879,8 @@
         },
         "hasHeader": {
           "type": "boolean",
-          "default": false,
-          "description": "Whether first row is a header row. Default: false."
+          "default": true,
+          "description": "Whether first row is a header row. Default: true for CSV/TSV files."
         },
         "delimiter": {
           "type": "string",
@@ -1898,6 +1898,7 @@
         },
         "batchSize": {
           "type": "integer",
+          "minimum": 1,
           "default": 1000,
           "description": "Number of rows per INSERT statement. Default: 1000."
         },
@@ -1935,18 +1936,21 @@
         },
         "maxOpenConns": {
           "type": "integer",
+          "minimum": 1,
           "default": 5,
           "description": "Maximum number of open connections. Default: 5."
         },
         "maxIdleConns": {
           "type": "integer",
+          "minimum": 0,
           "default": 2,
           "description": "Maximum number of idle connections. Default: 2."
         },
         "connMaxLifetime": {
           "type": "integer",
+          "minimum": 0,
           "default": 300,
-          "description": "Maximum connection lifetime in seconds. Default: 300."
+          "description": "Maximum connection lifetime in seconds. 0 = no limit. Default: 300."
         },
         "params": {
           "oneOf": [
@@ -1965,6 +1969,7 @@
         },
         "timeout": {
           "type": "integer",
+          "minimum": 1,
           "default": 60,
           "description": "Query timeout in seconds. Default: 60."
         },
@@ -2027,11 +2032,13 @@
         },
         "maxOpenConns": {
           "type": "integer",
+          "minimum": 1,
           "default": 5,
           "description": "Maximum number of open connections. Default: 5. Recommended: 1 for SQLite."
         },
         "maxIdleConns": {
           "type": "integer",
+          "minimum": 0,
           "default": 2,
           "description": "Maximum number of idle connections. Default: 2."
         },
@@ -2052,6 +2059,7 @@
         },
         "timeout": {
           "type": "integer",
+          "minimum": 1,
           "default": 60,
           "description": "Query timeout in seconds. Default: 60."
         },

@@ -3,7 +3,9 @@ package sql_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 
@@ -21,6 +23,7 @@ import (
 func TestRace_ConcurrentExecutors(t *testing.T) {
 	ctx := context.Background()
 	numExecutors := 10
+	tmpDir := t.TempDir()
 
 	var wg sync.WaitGroup
 
@@ -29,12 +32,15 @@ func TestRace_ConcurrentExecutors(t *testing.T) {
 		go func(idx int) {
 			defer wg.Done()
 
+			// Use unique file-based database for each executor to avoid shared cache conflicts
+			dbPath := filepath.Join(tmpDir, fmt.Sprintf("test_%d.db", idx))
+
 			step := core.Step{
 				Name: "test-concurrent",
 				ExecutorConfig: core.ExecutorConfig{
 					Type: "sqlite",
 					Config: map[string]any{
-						"dsn": ":memory:",
+						"dsn": dbPath,
 					},
 				},
 				Script: `
@@ -62,9 +68,10 @@ func TestRace_ConcurrentExecutors(t *testing.T) {
 // on ConnectionManager for race conditions.
 func TestRace_ConnectionManagerConcurrent(t *testing.T) {
 	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "test_connmgr.db")
 
 	cfg, err := sqlexec.ParseConfig(ctx, map[string]any{
-		"dsn": ":memory:",
+		"dsn": dbPath,
 	})
 	require.NoError(t, err)
 
@@ -126,9 +133,10 @@ func TestRace_DriverRegistryConcurrent(t *testing.T) {
 // TestRace_TransactionConcurrent tests concurrent transaction operations.
 func TestRace_TransactionConcurrent(t *testing.T) {
 	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "test_transaction.db")
 
 	cfg, err := sqlexec.ParseConfig(ctx, map[string]any{
-		"dsn": ":memory:",
+		"dsn": dbPath,
 	})
 	require.NoError(t, err)
 
@@ -269,14 +277,18 @@ func TestRace_ConfigParsing(t *testing.T) {
 func TestRace_ExecutorKill(t *testing.T) {
 	ctx := context.Background()
 	numIterations := 5
+	tmpDir := t.TempDir()
 
 	for i := 0; i < numIterations; i++ {
+		// Use unique file-based database for each iteration
+		dbPath := filepath.Join(tmpDir, fmt.Sprintf("test_kill_%d.db", i))
+
 		step := core.Step{
 			Name: "test-kill-race",
 			ExecutorConfig: core.ExecutorConfig{
 				Type: "sqlite",
 				Config: map[string]any{
-					"dsn": ":memory:",
+					"dsn": dbPath,
 				},
 			},
 			Script: `

@@ -6,6 +6,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// boolPtr is a helper to create bool pointers in tests.
+func boolPtr(b bool) *bool {
+	return &b
+}
+
 func TestFlattenRows(t *testing.T) {
 	tests := []struct {
 		name string
@@ -70,7 +75,7 @@ func TestBuildInputOptions(t *testing.T) {
 			name: "csv with default delimiter",
 			cfg: &ImportConfig{
 				Format:    "csv",
-				HasHeader: true,
+				HasHeader: boolPtr(true),
 			},
 			wantDelim: ',',
 		},
@@ -78,7 +83,7 @@ func TestBuildInputOptions(t *testing.T) {
 			name: "tsv with default delimiter",
 			cfg: &ImportConfig{
 				Format:    "tsv",
-				HasHeader: true,
+				HasHeader: boolPtr(true),
 			},
 			wantDelim: '\t',
 		},

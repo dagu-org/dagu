@@ -11,6 +11,12 @@ import (
 	"strings"
 )
 
+// Scanner buffer sizes for JSONL reading
+const (
+	defaultScannerBufSize = 64 * 1024   // 64KB initial buffer
+	maxScannerBufSize     = 1024 * 1024 // 1MB max buffer for large JSON lines
+)
+
 // InputReader defines the interface for reading input data for import.
 // This is the symmetric inverse of ResultWriter - it reads rows for input
 // rather than writing rows for output.
@@ -160,10 +166,12 @@ func (r *CSVReader) Close() error {
 
 // JSONLReader implements InputReader for JSON Lines formatted input.
 type JSONLReader struct {
-	scanner    *bufio.Scanner
-	columns    []string
-	nullValues map[string]bool
-	headerRead bool
+	scanner      *bufio.Scanner
+	columns      []string
+	nullValues   map[string]bool
+	headerRead   bool
+	firstRow     []any // Preserved first row when columns are auto-detected
+	firstRowRead bool  // Whether the preserved first row has been returned
 }
 
 // NewJSONLReader creates a new JSON Lines reader.
@@ -175,7 +183,7 @@ func NewJSONLReader(r io.Reader, opts InputOptions) *JSONLReader {
 
 	scanner := bufio.NewScanner(r)
 	// Increase buffer size for large JSON lines
-	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+	scanner.Buffer(make([]byte, defaultScannerBufSize), maxScannerBufSize)
 
 	return &JSONLReader{
 		scanner:    scanner,
@@ -218,13 +226,32 @@ func (r *JSONLReader) ReadHeader() ([]string, error) {
 	// Extract keys and sort for deterministic ordering
 	r.columns = extractSortedKeys(obj)
 
-	// Note: The first row data is consumed to detect columns.
-	// Use NewJSONLReaderWithHeader if you need to preserve it.
+	// Preserve the first row data so it can be returned by ReadRow
+	r.firstRow = make([]any, len(r.columns))
+	for i, col := range r.columns {
+		val, exists := obj[col]
+		if !exists {
+			r.firstRow[i] = nil
+			continue
+		}
+		if strVal, ok := val.(string); ok && r.nullValues[strVal] {
+			r.firstRow[i] = nil
+		} else {
+			r.firstRow[i] = val
+		}
+	}
+
 	return r.columns, nil
 }
 
 // ReadRow reads the next JSON object from the input.
 func (r *JSONLReader) ReadRow() ([]any, error) {
+	// Return preserved first row if it exists and hasn't been returned yet
+	if r.firstRow != nil && !r.firstRowRead {
+		r.firstRowRead = true
+		return r.firstRow, nil
+	}
+
 	// Read lines until we get a non-empty one (iterative, not recursive)
 	var line string
 	for {
@@ -279,67 +306,4 @@ func extractSortedKeys(obj map[string]any) []string {
 	}
 	sort.Strings(keys)
 	return keys
-}
-
-// JSONLReaderWithFirstRow is a variant that can return a pre-read first row.
-type JSONLReaderWithFirstRow struct {
-	*JSONLReader
-	firstRow     []any
-	firstRowRead bool
-}
-
-// NewJSONLReaderWithHeader creates a JSONL reader that auto-detects columns from first row.
-func NewJSONLReaderWithHeader(r io.Reader, opts InputOptions) (*JSONLReaderWithFirstRow, error) {
-	jr := NewJSONLReader(r, opts)
-
-	// Read first line to get columns
-	if !jr.scanner.Scan() {
-		if err := jr.scanner.Err(); err != nil {
-			return nil, fmt.Errorf("failed to read JSONL: %w", err)
-		}
-		return nil, io.EOF
-	}
-
-	line := jr.scanner.Text()
-	if line == "" {
-		return nil, fmt.Errorf("empty first line in JSONL")
-	}
-
-	var obj map[string]any
-	if err := json.Unmarshal([]byte(line), &obj); err != nil {
-		return nil, fmt.Errorf("failed to parse JSONL first line: %w", err)
-	}
-
-	// Extract keys and sort for deterministic ordering
-	jr.columns = extractSortedKeys(obj)
-	jr.headerRead = true
-
-	// Build first row
-	firstRow := make([]any, len(jr.columns))
-	for i, col := range jr.columns {
-		val, exists := obj[col]
-		if !exists {
-			firstRow[i] = nil
-			continue
-		}
-		if strVal, ok := val.(string); ok && jr.nullValues[strVal] {
-			firstRow[i] = nil
-		} else {
-			firstRow[i] = val
-		}
-	}
-
-	return &JSONLReaderWithFirstRow{
-		JSONLReader: jr,
-		firstRow:    firstRow,
-	}, nil
-}
-
-// ReadRow returns the first row on first call, then delegates to parent.
-func (r *JSONLReaderWithFirstRow) ReadRow() ([]any, error) {
-	if !r.firstRowRead {
-		r.firstRowRead = true
-		return r.firstRow, nil
-	}
-	return r.JSONLReader.ReadRow()
 }

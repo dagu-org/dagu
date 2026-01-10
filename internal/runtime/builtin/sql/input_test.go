@@ -297,24 +297,6 @@ func TestJSONLReader_BasicRead(t *testing.T) {
 	assert.Equal(t, io.EOF, err)
 }
 
-func TestJSONLReader_AutoDetectColumns(t *testing.T) {
-	input := `{"name":"Alice","age":30}
-{"name":"Bob","age":25}
-`
-	r := strings.NewReader(input)
-	opts := InputOptions{} // No columns provided
-
-	reader := NewJSONLReader(r, opts)
-
-	// ReadHeader should parse first line to get columns
-	header, err := reader.ReadHeader()
-	require.NoError(t, err)
-	assert.Len(t, header, 2)
-	// Note: map iteration order is not guaranteed, so just check both keys exist
-	assert.Contains(t, header, "name")
-	assert.Contains(t, header, "age")
-}
-
 func TestJSONLReader_NullValues(t *testing.T) {
 	input := `{"name":"Alice","value":null}
 {"name":"Bob","value":"NULL"}
@@ -401,25 +383,26 @@ not valid json
 	assert.Error(t, err)
 }
 
-func TestJSONLReaderWithFirstRow(t *testing.T) {
+func TestJSONLReader_AutoDetectColumns(t *testing.T) {
 	input := `{"name":"Alice","age":30}
 {"name":"Bob","age":25}
 `
 	r := strings.NewReader(input)
 	opts := InputOptions{}
 
-	reader, err := NewJSONLReaderWithHeader(r, opts)
-	require.NoError(t, err)
+	reader := NewJSONLReader(r, opts)
 
-	// Columns should be extracted
-	assert.Len(t, reader.columns, 2)
+	// Read header - this auto-detects columns and preserves first row
+	columns, err := reader.ReadHeader()
+	require.NoError(t, err)
+	assert.Len(t, columns, 2)
 
 	// First ReadRow should return the first row (not skip it)
 	row1, err := reader.ReadRow()
 	require.NoError(t, err)
 	// Find name and age positions
 	var nameVal, ageVal any
-	for i, col := range reader.columns {
+	for i, col := range columns {
 		if col == "name" {
 			nameVal = row1[i]
 		} else if col == "age" {
@@ -432,7 +415,7 @@ func TestJSONLReaderWithFirstRow(t *testing.T) {
 	// Second row
 	row2, err := reader.ReadRow()
 	require.NoError(t, err)
-	for i, col := range reader.columns {
+	for i, col := range columns {
 		if col == "name" {
 			nameVal = row2[i]
 		} else if col == "age" {
@@ -447,19 +430,21 @@ func TestJSONLReaderWithFirstRow(t *testing.T) {
 	assert.Equal(t, io.EOF, err)
 }
 
-func TestJSONLReaderWithFirstRow_EmptyInput(t *testing.T) {
+func TestJSONLReader_EmptyInput(t *testing.T) {
 	r := strings.NewReader("")
 	opts := InputOptions{}
 
-	_, err := NewJSONLReaderWithHeader(r, opts)
+	reader := NewJSONLReader(r, opts)
+	_, err := reader.ReadHeader()
 	assert.Error(t, err) // Should fail on empty input
 }
 
-func TestJSONLReaderWithFirstRow_InvalidFirstLine(t *testing.T) {
+func TestJSONLReader_InvalidFirstLine(t *testing.T) {
 	r := strings.NewReader("not json\n")
 	opts := InputOptions{}
 
-	_, err := NewJSONLReaderWithHeader(r, opts)
+	reader := NewJSONLReader(r, opts)
+	_, err := reader.ReadHeader()
 	assert.Error(t, err)
 }
 

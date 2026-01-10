@@ -35,6 +35,9 @@ type Config struct {
 	AdvisoryLock string `mapstructure:"advisoryLock"` // Named advisory lock (PostgreSQL)
 	FileLock     bool   `mapstructure:"fileLock"`     // Use file locking (SQLite)
 
+	// SQLite-specific options
+	SharedMemory bool `mapstructure:"sharedMemory"` // Enable shared cache for :memory: databases (SQLite)
+
 	// Output settings
 	OutputFormat string `mapstructure:"outputFormat"` // jsonl (default), json, csv
 	Headers      bool   `mapstructure:"headers"`      // Include headers in CSV output
@@ -57,7 +60,7 @@ type ImportConfig struct {
 
 	// Format options
 	Format    string `mapstructure:"format"`    // csv, tsv, jsonl (auto-detect if empty)
-	HasHeader bool   `mapstructure:"hasHeader"` // Whether first row is header (default: true)
+	HasHeader *bool  `mapstructure:"hasHeader"` // Whether first row is header (default: true for csv/tsv)
 	Delimiter string `mapstructure:"delimiter"` // Field delimiter (default: "," for csv, "\t" for tsv)
 
 	// Column mapping
@@ -70,7 +73,9 @@ type ImportConfig struct {
 	BatchSize int `mapstructure:"batchSize"` // Rows per INSERT statement (default: 1000)
 
 	// Conflict handling
-	OnConflict string `mapstructure:"onConflict"` // error (default), ignore, replace
+	OnConflict     string   `mapstructure:"onConflict"`     // error (default), ignore, replace
+	ConflictTarget string   `mapstructure:"conflictTarget"` // Column(s) for conflict detection (required for PostgreSQL UPSERT with "replace")
+	UpdateColumns  []string `mapstructure:"updateColumns"`  // Columns to update on conflict (if empty, updates all non-key columns)
 
 	// Row limits
 	SkipRows int `mapstructure:"skipRows"` // Skip first N data rows
@@ -81,11 +86,12 @@ type ImportConfig struct {
 }
 
 // DefaultConfig returns a Config with default values.
+// These defaults match the JSON schema documentation.
 func DefaultConfig() *Config {
 	return &Config{
-		MaxOpenConns:    1,
-		MaxIdleConns:    1,
-		ConnMaxLifetime: 0,
+		MaxOpenConns:    5,   // Match schema default
+		MaxIdleConns:    2,   // Match schema default
+		ConnMaxLifetime: 300, // Match schema default (seconds)
 		Timeout:         60,
 		OutputFormat:    "jsonl",
 		NullString:      "null",
@@ -128,8 +134,25 @@ func ParseConfig(_ context.Context, mapCfg map[string]any) (*Config, error) {
 		case "default", "read_committed", "repeatable_read", "serializable":
 			// Valid - "default" uses database's default isolation level
 		default:
-			return nil, fmt.Errorf("invalid isolationLevel: %s", cfg.IsolationLevel)
+			return nil, fmt.Errorf("invalid isolationLevel: %s (valid: default, read_committed, repeatable_read, serializable)", cfg.IsolationLevel)
 		}
+	}
+
+	// Validate connection pool settings
+	if cfg.MaxOpenConns < 0 {
+		return nil, fmt.Errorf("maxOpenConns must be non-negative")
+	}
+	if cfg.MaxIdleConns < 0 {
+		return nil, fmt.Errorf("maxIdleConns must be non-negative")
+	}
+	if cfg.MaxIdleConns > cfg.MaxOpenConns && cfg.MaxOpenConns > 0 {
+		return nil, fmt.Errorf("maxIdleConns (%d) cannot exceed maxOpenConns (%d)", cfg.MaxIdleConns, cfg.MaxOpenConns)
+	}
+	if cfg.ConnMaxLifetime < 0 {
+		return nil, fmt.Errorf("connMaxLifetime must be non-negative")
+	}
+	if cfg.Timeout < 0 {
+		return nil, fmt.Errorf("timeout must be non-negative")
 	}
 
 	// Validate and set defaults for import config
@@ -202,8 +225,11 @@ func (c *ImportConfig) setDefaults() {
 	if len(c.NullValues) == 0 {
 		c.NullValues = []string{"", "NULL", "null", "\\N"}
 	}
-	// HasHeader defaults to true for CSV/TSV (Go zero value is false)
-	// This is handled during parsing by checking if it was explicitly set
+	// HasHeader defaults to true for CSV/TSV (most files have headers)
+	if c.HasHeader == nil {
+		t := true
+		c.HasHeader = &t
+	}
 }
 
 // GetNamedParams returns params as a map if they are named parameters.
@@ -229,18 +255,20 @@ var importConfigSchema = &jsonschema.Schema{
 	Type:        "object",
 	Description: "Import data from CSV/TSV/JSONL file",
 	Properties: map[string]*jsonschema.Schema{
-		"inputFile":  {Type: "string", Description: "Path to input file"},
-		"table":      {Type: "string", Description: "Target table name"},
-		"format":     {Type: "string", Enum: []any{"csv", "tsv", "jsonl"}, Description: "Input format (auto-detected from file extension if not specified)"},
-		"hasHeader":  {Type: "boolean", Description: "Whether first row is header (default: true)"},
-		"delimiter":  {Type: "string", Description: "Field delimiter (default: ',' for csv, '\\t' for tsv)"},
-		"columns":    {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Explicit column names"},
-		"nullValues": {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Values to treat as NULL"},
-		"batchSize":  {Type: "integer", Description: "Rows per INSERT statement (default: 1000)"},
-		"onConflict": {Type: "string", Enum: []any{"error", "ignore", "replace"}, Description: "Conflict handling (default: error)"},
-		"skipRows":   {Type: "integer", Description: "Skip first N data rows"},
-		"maxRows":    {Type: "integer", Description: "Limit import rows (0 = unlimited)"},
-		"dryRun":     {Type: "boolean", Description: "Validate without importing"},
+		"inputFile":      {Type: "string", Description: "Path to input file"},
+		"table":          {Type: "string", Description: "Target table name"},
+		"format":         {Type: "string", Enum: []any{"csv", "tsv", "jsonl"}, Description: "Input format (auto-detected from file extension if not specified)"},
+		"hasHeader":      {Type: "boolean", Description: "Whether first row is header (default: true)"},
+		"delimiter":      {Type: "string", Description: "Field delimiter (default: ',' for csv, '\\t' for tsv)"},
+		"columns":        {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Explicit column names"},
+		"nullValues":     {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Values to treat as NULL"},
+		"batchSize":      {Type: "integer", Description: "Rows per INSERT statement (default: 1000)"},
+		"onConflict":     {Type: "string", Enum: []any{"error", "ignore", "replace"}, Description: "Conflict handling (default: error)"},
+		"conflictTarget": {Type: "string", Description: "Column(s) for conflict detection (required for PostgreSQL UPSERT with 'replace')"},
+		"updateColumns":  {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Columns to update on conflict (if empty, updates all non-key columns)"},
+		"skipRows":       {Type: "integer", Description: "Skip first N data rows"},
+		"maxRows":        {Type: "integer", Description: "Limit import rows (0 = unlimited)"},
+		"dryRun":         {Type: "boolean", Description: "Validate without importing"},
 	},
 	Required: []string{"inputFile", "table"},
 }
@@ -291,6 +319,7 @@ var sqliteConfigSchema = &jsonschema.Schema{
 		"timeout":      {Type: "integer", Description: "Query timeout in seconds"},
 		"transaction":  {Type: "boolean", Description: "Wrap execution in transaction"},
 		"fileLock":     {Type: "boolean", Description: "Use file locking for exclusive access"},
+		"sharedMemory": {Type: "boolean", Description: "Enable shared cache for :memory: databases to share data across DAG steps"},
 		"outputFormat": {Type: "string", Enum: []any{"jsonl", "json", "csv"}, Description: "Output format"},
 		"headers":      {Type: "boolean", Description: "Include headers in CSV output"},
 		"nullString":   {Type: "string", Description: "String representation for NULL values"},

@@ -19,6 +19,9 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
+// File system constants
+const defaultDirPermissions = 0o755
+
 var _ executor.Executor = (*sqlExecutor)(nil)
 
 // sqlExecutor implements the Executor interface for SQL operations.
@@ -346,54 +349,9 @@ func (e *sqlExecutor) executeScript(ctx context.Context, script string) error {
 	qe := GetQueryExecutor(db, tx)
 
 	for i, stmt := range statements {
-		metrics := &ExecutionMetrics{
-			QueryHash: hashQuery(stmt),
-			StartedAt: time.Now(),
+		if err := e.executeStatement(ctx, qe, stmt, i+1); err != nil {
+			return err
 		}
-
-		// Prepare parameters (only for the first statement gets params)
-		var params []any
-		convertedStmt := stmt
-		if i == 0 {
-			convertedStmt, params, err = PrepareParams(stmt, e.cfg, e.driver)
-			if err != nil {
-				metrics.Status = "error"
-				metrics.Error = err.Error()
-				metrics.FinishedAt = time.Now()
-				metrics.DurationMs = metrics.FinishedAt.Sub(metrics.StartedAt).Milliseconds()
-				e.writeMetrics(metrics)
-				return err
-			}
-		}
-
-		if isSelectQuery(convertedStmt) {
-			rowCount, err := e.executeSelectQuery(ctx, qe, convertedStmt, params)
-			if err != nil {
-				metrics.Status = "error"
-				metrics.Error = err.Error()
-				metrics.FinishedAt = time.Now()
-				metrics.DurationMs = metrics.FinishedAt.Sub(metrics.StartedAt).Milliseconds()
-				e.writeMetrics(metrics)
-				return fmt.Errorf("statement %d failed: %w", i+1, err)
-			}
-			metrics.RowsReturned = rowCount
-		} else {
-			affected, err := e.executeExecQuery(ctx, qe, convertedStmt, params)
-			if err != nil {
-				metrics.Status = "error"
-				metrics.Error = err.Error()
-				metrics.FinishedAt = time.Now()
-				metrics.DurationMs = metrics.FinishedAt.Sub(metrics.StartedAt).Milliseconds()
-				e.writeMetrics(metrics)
-				return fmt.Errorf("statement %d failed: %w", i+1, err)
-			}
-			metrics.RowsAffected = affected
-		}
-
-		metrics.Status = "success"
-		metrics.FinishedAt = time.Now()
-		metrics.DurationMs = metrics.FinishedAt.Sub(metrics.StartedAt).Milliseconds()
-		e.writeMetrics(metrics)
 	}
 
 	// Commit transaction if we started one
@@ -404,6 +362,48 @@ func (e *sqlExecutor) executeScript(ctx context.Context, script string) error {
 		tx = nil
 	}
 
+	return nil
+}
+
+// executeStatement executes a single statement with metrics tracking.
+func (e *sqlExecutor) executeStatement(ctx context.Context, qe QueryExecutor, stmt string, stmtNum int) error {
+	metrics := &ExecutionMetrics{
+		QueryHash: hashQuery(stmt),
+		StartedAt: time.Now(),
+	}
+
+	defer func() {
+		metrics.FinishedAt = time.Now()
+		metrics.DurationMs = metrics.FinishedAt.Sub(metrics.StartedAt).Milliseconds()
+		e.writeMetrics(metrics)
+	}()
+
+	convertedStmt, params, err := PrepareParams(stmt, e.cfg, e.driver)
+	if err != nil {
+		metrics.Status = "error"
+		metrics.Error = err.Error()
+		return err
+	}
+
+	if isSelectQuery(convertedStmt) {
+		rowCount, err := e.executeSelectQuery(ctx, qe, convertedStmt, params)
+		if err != nil {
+			metrics.Status = "error"
+			metrics.Error = err.Error()
+			return fmt.Errorf("statement %d failed: %w", stmtNum, err)
+		}
+		metrics.RowsReturned = rowCount
+	} else {
+		affected, err := e.executeExecQuery(ctx, qe, convertedStmt, params)
+		if err != nil {
+			metrics.Status = "error"
+			metrics.Error = err.Error()
+			return fmt.Errorf("statement %d failed: %w", stmtNum, err)
+		}
+		metrics.RowsAffected = affected
+	}
+
+	metrics.Status = "success"
 	return nil
 }
 
@@ -426,7 +426,7 @@ func (e *sqlExecutor) executeSelectQuery(ctx context.Context, qe QueryExecutor, 
 
 	if e.cfg.Streaming && e.cfg.OutputFile != "" {
 		// Ensure directory exists
-		if err := os.MkdirAll(filepath.Dir(e.cfg.OutputFile), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(e.cfg.OutputFile), defaultDirPermissions); err != nil {
 			return 0, fmt.Errorf("failed to create output directory: %w", err)
 		}
 
@@ -504,7 +504,12 @@ func (e *sqlExecutor) executeExecQuery(ctx context.Context, qe QueryExecutor, qu
 		return 0, err
 	}
 
-	affected, _ := result.RowsAffected()
+	affected, err := result.RowsAffected()
+	if err != nil {
+		// Some drivers don't support RowsAffected, log and continue
+		logger.Debug(ctx, "failed to get rows affected (driver may not support it)", tag.Error(err))
+		return 0, nil
+	}
 	return affected, nil
 }
 
@@ -521,6 +526,14 @@ func (e *sqlExecutor) writeMetrics(metrics *ExecutionMetrics) {
 // isSelectQuery determines if a query is a SELECT statement.
 func isSelectQuery(query string) bool {
 	trimmed := strings.TrimSpace(strings.ToUpper(query))
+
+	// Check for RETURNING clause (PostgreSQL/SQLite)
+	// INSERT/UPDATE/DELETE with RETURNING returns rows like SELECT
+	if strings.Contains(trimmed, " RETURNING ") || strings.HasSuffix(trimmed, " RETURNING") {
+		return true
+	}
+
+	// Standard select-like statements
 	return strings.HasPrefix(trimmed, "SELECT") ||
 		strings.HasPrefix(trimmed, "WITH") ||
 		strings.HasPrefix(trimmed, "TABLE") ||

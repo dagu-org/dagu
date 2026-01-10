@@ -7,10 +7,16 @@ import (
 	"fmt"
 	"hash/fnv"
 	"strings"
+	"time"
 
 	sqlexec "github.com/dagu-org/dagu/internal/runtime/builtin/sql"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // PostgreSQL driver
+)
+
+const (
+	// advisoryLockReleaseTimeout is the timeout for releasing advisory locks.
+	advisoryLockReleaseTimeout = 30 * time.Second
 )
 
 // PostgresDriver implements the Driver interface for PostgreSQL.
@@ -49,9 +55,11 @@ func (d *PostgresDriver) AcquireAdvisoryLock(ctx context.Context, db *sql.DB, lo
 		return nil, fmt.Errorf("failed to acquire advisory lock %q: %w", lockName, err)
 	}
 
-	// Return release function
+	// Return release function with timeout to prevent indefinite blocking
 	release := func() error {
-		_, err := db.ExecContext(context.Background(), "SELECT pg_advisory_unlock($1)", lockID)
+		releaseCtx, cancel := context.WithTimeout(context.Background(), advisoryLockReleaseTimeout)
+		defer cancel()
+		_, err := db.ExecContext(releaseCtx, "SELECT pg_advisory_unlock($1)", lockID)
 		if err != nil {
 			return fmt.Errorf("failed to release advisory lock %q: %w", lockName, err)
 		}
@@ -71,14 +79,26 @@ func (d *PostgresDriver) PlaceholderFormat() string {
 	return "$"
 }
 
+// QuoteIdentifier quotes a table or column name for PostgreSQL.
+// This handles reserved words and special characters by wrapping in double quotes.
+func (d *PostgresDriver) QuoteIdentifier(name string) string {
+	return sqlexec.QuoteIdentifier(name)
+}
+
 // BuildInsertQuery generates a multi-row INSERT statement for PostgreSQL.
-func (d *PostgresDriver) BuildInsertQuery(table string, columns []string, rowCount int, onConflict string) string {
+// If onConflict is "replace" and conflictTarget is provided, generates a proper UPSERT.
+func (d *PostgresDriver) BuildInsertQuery(table string, columns []string, rowCount int, onConflict, conflictTarget string, updateColumns []string) string {
 	var sb strings.Builder
 
 	sb.WriteString("INSERT INTO ")
-	sb.WriteString(table)
+	sb.WriteString(d.QuoteIdentifier(table))
 	sb.WriteString(" (")
-	sb.WriteString(strings.Join(columns, ", "))
+	for i, col := range columns {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(d.QuoteIdentifier(col))
+	}
 	sb.WriteString(") VALUES ")
 
 	paramIdx := 1
@@ -98,11 +118,40 @@ func (d *PostgresDriver) BuildInsertQuery(table string, columns []string, rowCou
 	}
 
 	// ON CONFLICT handling
-	// Note: "replace" requires knowing the conflict target (primary key or unique constraint),
-	// which is not available at this level. Both "ignore" and "replace" use DO NOTHING.
 	switch onConflict {
-	case "ignore", "replace":
+	case "ignore":
 		sb.WriteString(" ON CONFLICT DO NOTHING")
+	case "replace":
+		if conflictTarget != "" {
+			// Proper UPSERT with ON CONFLICT DO UPDATE
+			sb.WriteString(" ON CONFLICT (")
+			sb.WriteString(conflictTarget) // User provides quoted if needed, e.g., "id" or "(user_id, org_id)"
+			sb.WriteString(") DO UPDATE SET ")
+
+			// Determine which columns to update
+			colsToUpdate := updateColumns
+			if len(colsToUpdate) == 0 {
+				// Default: update all columns except conflict target columns
+				conflictCols := sqlexec.ParseConflictTarget(conflictTarget)
+				for _, col := range columns {
+					if !sqlexec.Contains(conflictCols, col) {
+						colsToUpdate = append(colsToUpdate, col)
+					}
+				}
+			}
+
+			// Generate SET clause
+			for i, col := range colsToUpdate {
+				if i > 0 {
+					sb.WriteString(", ")
+				}
+				quotedCol := d.QuoteIdentifier(col)
+				sb.WriteString(fmt.Sprintf("%s = EXCLUDED.%s", quotedCol, quotedCol))
+			}
+		} else {
+			// No conflict target provided, fall back to DO NOTHING
+			sb.WriteString(" ON CONFLICT DO NOTHING")
+		}
 	}
 
 	return sb.String()

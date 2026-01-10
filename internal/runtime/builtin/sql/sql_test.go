@@ -712,7 +712,8 @@ func TestParseConfig_Import(t *testing.T) {
 			check: func(t *testing.T, cfg *sqlexec.Config) {
 				require.NotNil(t, cfg.Import)
 				assert.Equal(t, "tsv", cfg.Import.Format)
-				assert.True(t, cfg.Import.HasHeader)
+				require.NotNil(t, cfg.Import.HasHeader)
+				assert.True(t, *cfg.Import.HasHeader)
 				assert.Equal(t, "\t", cfg.Import.Delimiter)
 				assert.Equal(t, []string{"name", "age"}, cfg.Import.Columns)
 				assert.Equal(t, []string{"NA", "N/A"}, cfg.Import.NullValues)
@@ -1508,13 +1509,14 @@ func TestSQLiteExecutor_Command(t *testing.T) {
 
 func TestSQLiteExecutor_NullHandling(t *testing.T) {
 	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "null_handling.db")
 
 	step := core.Step{
 		Name: "test-null-handling",
 		ExecutorConfig: core.ExecutorConfig{
 			Type: "sqlite",
 			Config: map[string]any{
-				"dsn":        ":memory:",
+				"dsn":        dbPath,
 				"nullString": "NULL",
 			},
 		},
@@ -1631,13 +1633,14 @@ func TestSQLiteExecutor_EmptyResult(t *testing.T) {
 
 func TestSQLiteExecutor_InsertReturnsAffected(t *testing.T) {
 	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "insert_affected.db")
 
 	step := core.Step{
 		Name: "test-insert",
 		ExecutorConfig: core.ExecutorConfig{
 			Type: "sqlite",
 			Config: map[string]any{
-				"dsn": ":memory:",
+				"dsn": dbPath,
 			},
 		},
 		Script: `
@@ -1777,9 +1780,10 @@ func TestConnectionManager_AcquireRelease_Concurrent(t *testing.T) {
 
 func TestTransaction_BeginCommitRollback(t *testing.T) {
 	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "transaction.db")
 
 	cfg, err := sqlexec.ParseConfig(ctx, map[string]any{
-		"dsn": ":memory:",
+		"dsn": dbPath,
 	})
 	require.NoError(t, err)
 

@@ -25,6 +25,7 @@ const (
 	maxConnRetries    = 30
 	initialRetryDelay = 500 * time.Millisecond
 	maxRetryDelay     = 2 * time.Second
+	pingTimeout       = 5 * time.Second
 )
 
 // NewConnectionManager creates a new connection manager.
@@ -61,7 +62,7 @@ func NewConnectionManager(ctx context.Context, driver Driver, cfg *Config) (*Con
 		db.SetConnMaxLifetime(time.Duration(cfg.ConnMaxLifetime) * time.Second)
 
 		// Verify connection with ping
-		pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		pingCtx, cancel := context.WithTimeout(ctx, pingTimeout)
 		lastErr = db.PingContext(pingCtx)
 		cancel()
 

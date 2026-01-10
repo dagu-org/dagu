@@ -33,6 +33,14 @@ func (d *SQLiteDriver) Name() string {
 // Connect establishes a connection to SQLite.
 func (d *SQLiteDriver) Connect(ctx context.Context, cfg *sqlexec.Config) (*sql.DB, func() error, error) {
 	dsn := cfg.DSN
+
+	// Convert :memory: to shared cache mode if SharedMemory is enabled.
+	// This allows multiple steps in a DAG to share the same in-memory database.
+	// Without this, each connection to :memory: creates a separate isolated database.
+	if cfg.SharedMemory && dsn == ":memory:" {
+		dsn = "file::memory:?cache=shared"
+	}
+
 	var cleanup func() error
 
 	// Handle file locking if requested
@@ -120,8 +128,16 @@ func (d *SQLiteDriver) PlaceholderFormat() string {
 	return "?"
 }
 
+// QuoteIdentifier quotes a table or column name for SQLite.
+// This handles reserved words and special characters by wrapping in double quotes.
+func (d *SQLiteDriver) QuoteIdentifier(name string) string {
+	return sqlexec.QuoteIdentifier(name)
+}
+
 // BuildInsertQuery generates a multi-row INSERT statement for SQLite.
-func (d *SQLiteDriver) BuildInsertQuery(table string, columns []string, rowCount int, onConflict string) string {
+// Note: SQLite uses INSERT OR IGNORE/REPLACE which doesn't need conflictTarget or updateColumns,
+// but we accept these parameters for interface compatibility with PostgreSQL.
+func (d *SQLiteDriver) BuildInsertQuery(table string, columns []string, rowCount int, onConflict, conflictTarget string, updateColumns []string) string {
 	var sb strings.Builder
 
 	// SQLite uses INSERT OR IGNORE / INSERT OR REPLACE
@@ -134,9 +150,14 @@ func (d *SQLiteDriver) BuildInsertQuery(table string, columns []string, rowCount
 		sb.WriteString("INSERT INTO ")
 	}
 
-	sb.WriteString(table)
+	sb.WriteString(d.QuoteIdentifier(table))
 	sb.WriteString(" (")
-	sb.WriteString(strings.Join(columns, ", "))
+	for i, col := range columns {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(d.QuoteIdentifier(col))
+	}
 	sb.WriteString(") VALUES ")
 
 	for i := 0; i < rowCount; i++ {

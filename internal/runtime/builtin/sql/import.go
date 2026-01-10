@@ -94,9 +94,10 @@ func (i *Importer) doImport(ctx context.Context) error {
 func (i *Importer) buildInputOptions() InputOptions {
 	opts := DefaultInputOptions(i.cfg.Format)
 
-	// HasHeader: use config value (defaults to true via DefaultInputOptions,
-	// but ImportConfig.HasHeader=false should override it)
-	opts.HasHeader = i.cfg.HasHeader
+	// HasHeader: use config value if set, otherwise keep default from DefaultInputOptions
+	if i.cfg.HasHeader != nil {
+		opts.HasHeader = *i.cfg.HasHeader
+	}
 
 	if i.cfg.Delimiter != "" {
 		opts.Delimiter = rune(i.cfg.Delimiter[0])
@@ -197,7 +198,7 @@ func (i *Importer) insertBatch(ctx context.Context, columns []string, rows [][]a
 	}
 
 	// Build the INSERT query
-	query := i.driver.BuildInsertQuery(i.cfg.Table, columns, len(rows), i.cfg.OnConflict)
+	query := i.driver.BuildInsertQuery(i.cfg.Table, columns, len(rows), i.cfg.OnConflict, i.cfg.ConflictTarget, i.cfg.UpdateColumns)
 
 	// Flatten rows into parameters
 	params := flattenRows(rows)
@@ -226,13 +227,8 @@ func flattenRows(rows [][]any) []any {
 		return nil
 	}
 
-	// Estimate capacity
-	totalParams := 0
-	for _, row := range rows {
-		totalParams += len(row)
-	}
-
-	params := make([]any, 0, totalParams)
+	// All rows have the same number of columns, so we can estimate capacity efficiently
+	params := make([]any, 0, len(rows)*len(rows[0]))
 	for _, row := range rows {
 		params = append(params, row...)
 	}

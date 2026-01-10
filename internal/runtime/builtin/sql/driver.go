@@ -3,6 +3,8 @@ package sql
 import (
 	"context"
 	"database/sql"
+	"strings"
+	"sync"
 )
 
 // Driver defines the interface for SQL database drivers.
@@ -34,12 +36,19 @@ type Driver interface {
 	// columns: column names to insert
 	// rowCount: number of rows in this batch
 	// onConflict: conflict handling strategy ("error", "ignore", "replace")
+	// conflictTarget: column(s) for conflict detection (required for PostgreSQL UPSERT with "replace")
+	// updateColumns: columns to update on conflict (if empty, updates all non-key columns)
 	// Returns the SQL query string with placeholders.
-	BuildInsertQuery(table string, columns []string, rowCount int, onConflict string) string
+	BuildInsertQuery(table string, columns []string, rowCount int, onConflict, conflictTarget string, updateColumns []string) string
+
+	// QuoteIdentifier quotes a table or column name to handle reserved words and special characters.
+	// For PostgreSQL and SQLite, this wraps the identifier in double quotes.
+	QuoteIdentifier(name string) string
 }
 
-// DriverRegistry holds registered database drivers.
+// DriverRegistry holds registered database drivers with thread-safe access.
 type DriverRegistry struct {
+	mu      sync.RWMutex
 	drivers map[string]Driver
 }
 
@@ -50,13 +59,17 @@ func NewDriverRegistry() *DriverRegistry {
 	}
 }
 
-// Register adds a driver to the registry.
+// Register adds a driver to the registry (thread-safe).
 func (r *DriverRegistry) Register(driver Driver) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.drivers[driver.Name()] = driver
 }
 
-// Get retrieves a driver by name.
+// Get retrieves a driver by name (thread-safe).
 func (r *DriverRegistry) Get(name string) (Driver, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	driver, ok := r.drivers[name]
 	return driver, ok
 }
@@ -72,4 +85,43 @@ func RegisterDriver(driver Driver) {
 // GetDriver retrieves a driver from the global registry.
 func GetDriver(name string) (Driver, bool) {
 	return globalRegistry.Get(name)
+}
+
+// QuoteIdentifier quotes a table or column name to handle reserved words and special characters.
+// This is a shared implementation for SQL databases that use double quotes (PostgreSQL, SQLite).
+// Any existing double quotes in the identifier are escaped by doubling them.
+func QuoteIdentifier(name string) string {
+	escaped := strings.ReplaceAll(name, `"`, `""`)
+	return `"` + escaped + `"`
+}
+
+// ParseConflictTarget extracts column names from a conflict target string.
+// Handles both single column "id" and composite "(user_id, org_id)" formats.
+func ParseConflictTarget(target string) []string {
+	target = strings.TrimSpace(target)
+	// Remove surrounding parentheses if present
+	target = strings.TrimPrefix(target, "(")
+	target = strings.TrimSuffix(target, ")")
+
+	parts := strings.Split(target, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		// Remove quotes if present
+		p = strings.Trim(p, `"`)
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
+// Contains checks if a string slice contains a specific string.
+func Contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }
