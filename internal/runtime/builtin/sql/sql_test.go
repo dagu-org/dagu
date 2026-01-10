@@ -2175,7 +2175,6 @@ func TestSanitizeIdentifier_Extended(t *testing.T) {
 	}
 }
 
-
 func TestGetPositionalParams(t *testing.T) {
 	ctx := context.Background()
 

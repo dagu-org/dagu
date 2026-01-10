@@ -87,52 +87,52 @@ func TestPostgresDriver_ConvertNamedParams(t *testing.T) {
 	driver := &PostgresDriver{}
 
 	tests := []struct {
-		name        string
-		query       string
-		params      map[string]any
-		wantQuery   string
-		wantParams  []any
-		wantErr     bool
+		name       string
+		query      string
+		params     map[string]any
+		wantQuery  string
+		wantParams []any
+		wantErr    bool
 	}{
 		{
-			name:        "single parameter",
-			query:       "SELECT * FROM users WHERE id = :id",
-			params:      map[string]any{"id": 123},
-			wantQuery:   "SELECT * FROM users WHERE id = $1",
-			wantParams:  []any{123},
-			wantErr:     false,
+			name:       "single parameter",
+			query:      "SELECT * FROM users WHERE id = :id",
+			params:     map[string]any{"id": 123},
+			wantQuery:  "SELECT * FROM users WHERE id = $1",
+			wantParams: []any{123},
+			wantErr:    false,
 		},
 		{
-			name:        "multiple parameters",
-			query:       "SELECT * FROM users WHERE name = :name AND status = :status",
-			params:      map[string]any{"name": "Alice", "status": "active"},
-			wantQuery:   "SELECT * FROM users WHERE name = $1 AND status = $2",
-			wantParams:  []any{"Alice", "active"},
-			wantErr:     false,
+			name:       "multiple parameters",
+			query:      "SELECT * FROM users WHERE name = :name AND status = :status",
+			params:     map[string]any{"name": "Alice", "status": "active"},
+			wantQuery:  "SELECT * FROM users WHERE name = $1 AND status = $2",
+			wantParams: []any{"Alice", "active"},
+			wantErr:    false,
 		},
 		{
-			name:        "repeated parameter",
-			query:       "SELECT * FROM users WHERE id = :id OR parent_id = :id",
-			params:      map[string]any{"id": 123},
-			wantQuery:   "SELECT * FROM users WHERE id = $1 OR parent_id = $1",
-			wantParams:  []any{123},
-			wantErr:     false,
+			name:       "repeated parameter",
+			query:      "SELECT * FROM users WHERE id = :id OR parent_id = :id",
+			params:     map[string]any{"id": 123},
+			wantQuery:  "SELECT * FROM users WHERE id = $1 OR parent_id = $1",
+			wantParams: []any{123},
+			wantErr:    false,
 		},
 		{
-			name:        "no parameters in query",
-			query:       "SELECT * FROM users",
-			params:      map[string]any{"id": 123},
-			wantQuery:   "SELECT * FROM users",
-			wantParams:  nil,
-			wantErr:     false,
+			name:       "no parameters in query",
+			query:      "SELECT * FROM users",
+			params:     map[string]any{"id": 123},
+			wantQuery:  "SELECT * FROM users",
+			wantParams: nil,
+			wantErr:    false,
 		},
 		{
-			name:        "missing parameter",
-			query:       "SELECT * FROM users WHERE id = :id",
-			params:      map[string]any{"other": 123},
-			wantQuery:   "",
-			wantParams:  nil,
-			wantErr:     true,
+			name:       "missing parameter",
+			query:      "SELECT * FROM users WHERE id = :id",
+			params:     map[string]any{"other": 123},
+			wantQuery:  "",
+			wantParams: nil,
+			wantErr:    true,
 		},
 	}
 
@@ -149,4 +149,3 @@ func TestPostgresDriver_ConvertNamedParams(t *testing.T) {
 		})
 	}
 }
-
