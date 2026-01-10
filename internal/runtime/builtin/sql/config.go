@@ -17,10 +17,10 @@ type Config struct {
 	// - SQLite: "file:./data.db?mode=rw" or ":memory:"
 	DSN string `mapstructure:"dsn"`
 
-	// Connection pool settings
-	MaxOpenConns    int `mapstructure:"maxOpenConns"`    // Maximum open connections (default: 5)
-	MaxIdleConns    int `mapstructure:"maxIdleConns"`    // Maximum idle connections (default: 2)
-	ConnMaxLifetime int `mapstructure:"connMaxLifetime"` // Connection max lifetime in seconds (default: 300)
+	// Connection pool settings (1:1 is sufficient for workflow steps)
+	MaxOpenConns    int `mapstructure:"maxOpenConns"`    // Maximum open connections (default: 1)
+	MaxIdleConns    int `mapstructure:"maxIdleConns"`    // Maximum idle connections (default: 1)
+	ConnMaxLifetime int `mapstructure:"connMaxLifetime"` // Connection max lifetime in seconds (default: 0, no limit)
 
 	// Parameterized queries (SQL injection prevention)
 	// Can be map[string]any for named params or []any for positional params
@@ -83,9 +83,9 @@ type ImportConfig struct {
 // DefaultConfig returns a Config with default values.
 func DefaultConfig() *Config {
 	return &Config{
-		MaxOpenConns:    5,
-		MaxIdleConns:    2,
-		ConnMaxLifetime: 300,
+		MaxOpenConns:    1,
+		MaxIdleConns:    1,
+		ConnMaxLifetime: 0,
 		Timeout:         60,
 		OutputFormat:    "jsonl",
 		NullString:      "null",
