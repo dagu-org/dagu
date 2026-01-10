@@ -967,6 +967,76 @@ steps:
 	dag.Agent().RunCheckErr(t, "timed out waiting for container to be running")
 }
 
+// TestContainerCustomHealthcheck tests that custom healthcheck configuration works correctly.
+// This test verifies that the healthcheck field in container config is properly
+// passed to Docker and that waitFor: healthy actually waits for the container
+// to become healthy (not just running).
+func TestContainerCustomHealthcheck(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	// This test uses a custom healthcheck that checks for a file that is
+	// created after a 2 second delay. This ensures the waitFor: healthy
+	// actually waits for the healthcheck to pass, not just for the container
+	// to be running.
+	dagConfig := fmt.Sprintf(`
+container:
+  image: %s
+  startup: command
+  command: ["sh", "-c", "sleep 2 && touch /tmp/ready && while true; do sleep 3600; done"]
+  healthcheck:
+    test: ["CMD", "test", "-f", "/tmp/ready"]
+    interval: 1s
+    timeout: 5s
+    startPeriod: 5s
+    retries: 10
+  waitFor: healthy
+steps:
+  - command: echo "container is healthy"
+    output: HEALTHCHECK_OUT
+`, testImage)
+
+	dag := th.DAG(t, dagConfig)
+	dag.Agent().RunSuccess(t)
+	dag.AssertLatestStatus(t, core.Succeeded)
+	dag.AssertOutputs(t, map[string]any{
+		"HEALTHCHECK_OUT": "container is healthy",
+	})
+}
+
+// TestContainerCustomHealthcheck_StepLevel tests custom healthcheck at step level.
+func TestContainerCustomHealthcheck_StepLevel(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	dagConfig := fmt.Sprintf(`
+steps:
+  - name: step-with-healthcheck
+    container:
+      image: %s
+      startup: command
+      command: ["sh", "-c", "sleep 1 && touch /tmp/step_ready && while true; do sleep 3600; done"]
+      healthcheck:
+        test: ["CMD-SHELL", "test -f /tmp/step_ready"]
+        interval: 500ms
+        timeout: 3s
+        startPeriod: 3s
+        retries: 10
+      waitFor: healthy
+    command: echo "step container healthy"
+    output: STEP_HEALTHCHECK_OUT
+`, testImage)
+
+	dag := th.DAG(t, dagConfig)
+	dag.Agent().RunSuccess(t)
+	dag.AssertLatestStatus(t, core.Succeeded)
+	dag.AssertOutputs(t, map[string]any{
+		"STEP_HEALTHCHECK_OUT": "step container healthy",
+	})
+}
+
 // TestContainerExecVariableExpansion tests that environment variables are expanded in container names.
 func TestContainerExecVariableExpansion(t *testing.T) {
 	t.Parallel()

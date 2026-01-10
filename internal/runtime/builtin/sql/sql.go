@@ -230,16 +230,15 @@ func (e *sqlExecutor) getQuery() (string, error) {
 		return e.step.Script, nil
 	}
 
-	// Check for command
-	// Use CmdWithArgs to get the full command string (including args)
-	// because cmdutil.SplitCommand splits SQL queries into command+args
-	// Fall back to Command if CmdWithArgs is not set (e.g., in unit tests)
+	// Check for command - prefer CmdWithArgs (full command string) over Command
+	// (which may be split by cmdutil.SplitCommand for shell commands)
 	if len(e.step.Commands) > 0 {
-		if e.step.Commands[0].CmdWithArgs != "" {
-			return e.step.Commands[0].CmdWithArgs, nil
+		cmd := e.step.Commands[0]
+		if cmd.CmdWithArgs != "" {
+			return cmd.CmdWithArgs, nil
 		}
-		if e.step.Commands[0].Command != "" {
-			return e.step.Commands[0].Command, nil
+		if cmd.Command != "" {
+			return cmd.Command, nil
 		}
 	}
 
