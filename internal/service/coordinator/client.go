@@ -390,6 +390,19 @@ func (cli *clientImpl) recordSuccess(ctx context.Context) {
 	cli.state.LastError = nil
 }
 
+// getCoordinatorMembers discovers available coordinators from the service registry.
+// Returns an error if discovery fails or no coordinators are available.
+func (cli *clientImpl) getCoordinatorMembers(ctx context.Context) ([]execution.HostInfo, error) {
+	members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	if err != nil {
+		return nil, fmt.Errorf("failed to discover coordinators: %w", err)
+	}
+	if len(members) == 0 {
+		return nil, fmt.Errorf("no coordinators available")
+	}
+	return members, nil
+}
+
 // GetWorkers retrieves the list of workers from all coordinators
 func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerInfo, error) {
 	// Get all available coordinators from discovery
@@ -453,20 +466,13 @@ func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerI
 
 // Heartbeat sends a heartbeat to coordinators and returns the response
 func (cli *clientImpl) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
-	// Get all available coordinators from discovery
-	members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	members, err := cli.getCoordinatorMembers(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to discover coordinators: %w", err)
-	}
-
-	if len(members) == 0 {
-		return nil, fmt.Errorf("no coordinators available")
+		return nil, err
 	}
 
 	var resp *coordinatorv1.HeartbeatResponse
-	// Use attemptCall to send heartbeat to any available coordinator
 	err = cli.attemptCall(ctx, members, func(ctx context.Context, _ execution.HostInfo, client *client) error {
-		// Send heartbeat
 		var callErr error
 		resp, callErr = client.client.Heartbeat(ctx, req)
 		if callErr != nil {
@@ -479,14 +485,9 @@ func (cli *clientImpl) Heartbeat(ctx context.Context, req *coordinatorv1.Heartbe
 
 // ReportStatus sends a status update to the coordinator
 func (cli *clientImpl) ReportStatus(ctx context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
-	// Get all available coordinators from discovery
-	members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	members, err := cli.getCoordinatorMembers(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to discover coordinators: %w", err)
-	}
-
-	if len(members) == 0 {
-		return nil, fmt.Errorf("no coordinators available")
+		return nil, err
 	}
 
 	var resp *coordinatorv1.ReportStatusResponse
@@ -503,14 +504,9 @@ func (cli *clientImpl) ReportStatus(ctx context.Context, req *coordinatorv1.Repo
 
 // StreamLogs returns a log streaming client for sending logs to the coordinator
 func (cli *clientImpl) StreamLogs(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
-	// Get all available coordinators from discovery
-	members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	members, err := cli.getCoordinatorMembers(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to discover coordinators: %w", err)
-	}
-
-	if len(members) == 0 {
-		return nil, fmt.Errorf("no coordinators available")
+		return nil, err
 	}
 
 	// Try each coordinator until one works
@@ -536,14 +532,9 @@ func (cli *clientImpl) StreamLogs(ctx context.Context) (coordinatorv1.Coordinato
 
 // GetDAGRunStatus retrieves the status of a DAG run from the coordinator
 func (cli *clientImpl) GetDAGRunStatus(ctx context.Context, dagName, dagRunID string, rootRef *execution.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error) {
-	// Get all available coordinators from discovery
-	members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	members, err := cli.getCoordinatorMembers(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to discover coordinators: %w", err)
-	}
-
-	if len(members) == 0 {
-		return nil, fmt.Errorf("no coordinators available")
+		return nil, err
 	}
 
 	req := &coordinatorv1.GetDAGRunStatusRequest{

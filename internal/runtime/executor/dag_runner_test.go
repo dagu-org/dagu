@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/common/config"
-	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/stretchr/testify/assert"
@@ -313,61 +312,6 @@ func TestCleanup_NonExistentFile(t *testing.T) {
 	// Cleanup should not error on non-existent file
 	err := executor.Cleanup(ctx)
 	assert.NoError(t, err)
-}
-
-func TestCreateTempDAGFile(t *testing.T) {
-	t.Parallel()
-
-	dagName := "test-dag"
-	yamlData := []byte("name: test-dag\nsteps:\n  - name: step1\n    command: echo test")
-
-	// Test with no extra docs
-	tempFile, err := fileutil.CreateTempDAGFile("local-dags", dagName, yamlData)
-	require.NoError(t, err)
-	require.NotEmpty(t, tempFile)
-	defer func() { _ = os.Remove(tempFile) }()
-
-	// Verify file exists and has correct content
-	assert.FileExists(t, tempFile)
-	content, err := os.ReadFile(tempFile)
-	require.NoError(t, err)
-	assert.Equal(t, yamlData, content)
-
-	// Verify file name pattern
-	assert.Contains(t, tempFile, "test-dag")
-	assert.Contains(t, tempFile, ".yaml")
-}
-
-func TestCreateTempDAGFile_WithExtraDocs(t *testing.T) {
-	t.Parallel()
-
-	dagName := "parent-dag"
-	yamlData := []byte("name: parent-dag\nsteps:\n  - name: step1\n    call: child-dag")
-	childYamlData := []byte("name: child-dag\nsteps:\n  - name: step1\n    command: echo child")
-
-	// Test with extra docs (simulating multiple DAGs in one file)
-	tempFile, err := fileutil.CreateTempDAGFile("local-dags", dagName, yamlData, childYamlData)
-	require.NoError(t, err)
-	require.NotEmpty(t, tempFile)
-	defer func() { _ = os.Remove(tempFile) }()
-
-	// Verify file exists
-	assert.FileExists(t, tempFile)
-
-	// Read content and verify it contains both DAGs separated by ---
-	content, err := os.ReadFile(tempFile)
-	require.NoError(t, err)
-
-	contentStr := string(content)
-	// Should contain the parent DAG data
-	assert.Contains(t, contentStr, "name: parent-dag")
-	// Should contain separator and child DAG data
-	assert.Contains(t, contentStr, "---")
-	assert.Contains(t, contentStr, "name: child-dag")
-
-	// Verify file name pattern
-	assert.Contains(t, tempFile, "parent-dag")
-	assert.Contains(t, tempFile, ".yaml")
 }
 
 func TestExecutablePath(t *testing.T) {
