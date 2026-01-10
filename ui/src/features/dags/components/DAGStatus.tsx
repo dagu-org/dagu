@@ -14,7 +14,7 @@ import {
 import React, { useState, useEffect } from 'react';
 import { useCookies } from 'react-cookie';
 import { useNavigate } from 'react-router-dom';
-import { components, NodeStatus, Status } from '../../../api/v2/schema';
+import { components, NodeStatus, Status, Stream } from '../../../api/v2/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { useConfig } from '../../../contexts/ConfigContext';
 import { useClient } from '../../../hooks/api';
@@ -60,14 +60,14 @@ function DAGStatus({ dagRun, fileName }: Props) {
     logType: 'execution' | 'step';
     stepName: string;
     dagRunId: string;
-    stream: 'stdout' | 'stderr';
+    stream: Stream;
     node?: components['schemas']['Node'];
   }>({
     isOpen: false,
     logType: 'step',
     stepName: '',
     dagRunId: '',
-    stream: 'stdout',
+    stream: Stream.stdout,
   });
   // State for parallel execution modal
   const [parallelExecutionModal, setParallelExecutionModal] = useState<{
@@ -259,7 +259,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
       logType: 'step',
       stepName: actualStepName,
       dagRunId: dagRunId || dagRun.dagRunId,
-      stream: isStderr ? 'stderr' : 'stdout',
+      stream: isStderr ? Stream.stderr : Stream.stdout,
       node,
     });
   };
@@ -372,7 +372,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
                           logType: 'execution',
                           stepName: '',
                           dagRunId,
-                          stream: 'stdout',
+                          stream: Stream.stdout,
                         });
                       }}
                     />

@@ -16,33 +16,46 @@ function DAGRunDetailsPage() {
   const parentDAGRunId = searchParams.get('dagRunId');
   const parentName = searchParams.get('dagRunName') || name;
 
-  // Determine the API endpoint based on whether this is a sub DAG-run
-  const endpoint = subDAGRunId
-    ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}'
-    : '/dag-runs/{name}/{dagRunId}';
+  // Guard: only query sub-DAG endpoint when all required params are present
+  const canQuerySubDag = !!(subDAGRunId && parentDAGRunId && parentName);
 
-  // Fetch DAG-run details
-  const { data, error, mutate } = useQuery(
-    endpoint,
+  // Fetch sub-DAG-run details (only when all sub-DAG params are valid)
+  const subDAGQuery = useQuery(
+    '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
     {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
-        path: subDAGRunId
-          ? {
-              name: parentName || '',
-              dagRunId: parentDAGRunId || '',
-              subDAGRunId: subDAGRunId,
-            }
-          : {
-              name: name || '',
-              dagRunId: dagRunId || 'latest',
-            },
+        path: {
+          name: parentName as string,
+          dagRunId: parentDAGRunId as string,
+          subDAGRunId: subDAGRunId as string,
+        },
       },
     },
-    { refreshInterval: 2000 }
+    { refreshInterval: 2000, isPaused: () => !canQuerySubDag }
   );
+
+  // Fetch regular DAG-run details (only when not querying sub-DAG)
+  const dagRunQuery = useQuery(
+    '/dag-runs/{name}/{dagRunId}',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
+        path: {
+          name: name || '',
+          dagRunId: dagRunId || 'latest',
+        },
+      },
+    },
+    { refreshInterval: 2000, isPaused: () => canQuerySubDag }
+  );
+
+  // Use the appropriate query based on whether this is a sub-DAG-run
+  const { data, error, mutate } = canQuerySubDag ? subDAGQuery : dagRunQuery;
 
   const refreshFn = React.useCallback(() => {
     setTimeout(() => mutate(), 500);

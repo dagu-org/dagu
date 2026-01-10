@@ -90,8 +90,8 @@ importers:
         specifier: ^5.4.0
         version: 5.4.0(monaco-editor@0.52.2)
       openapi-fetch:
-        specifier: ^0.14.0
-        version: 0.14.0
+        specifier: ^0.15.0
+        version: 0.15.0
       prism-react-renderer:
         specifier: ^2.4.1
         version: 2.4.1(react@19.1.0)
@@ -114,8 +114,8 @@ importers:
         specifier: ^2.3.4
         version: 2.3.4(react@19.1.0)
       swr-openapi:
-        specifier: ^5.3.0
-        version: 5.3.0(openapi-fetch@0.14.0)(openapi-typescript@7.8.0(typescript@5.8.3))(react@19.1.0)(swr@2.3.4(react@19.1.0))(typescript@5.8.3)
+        specifier: ^5.5.0
+        version: 5.5.1(openapi-fetch@0.15.0)(openapi-typescript@7.8.0(typescript@5.8.3))(react@19.1.0)(swr@2.3.4(react@19.1.0))(typescript@5.8.3)
       tailwind-merge:
         specifier: ^3.3.1
         version: 3.3.1
@@ -3964,8 +3964,8 @@ packages:
     resolution: {integrity: sha512-zy1wx4+P3PfhXSEPJNtZmJXfhkkIaxU1VauWIrDZw1O7uJRDRJtKr9n3Ic4NgbA16KyOxOXO2ng9gYwCdXuSXA==}
     engines: {node: '>=18'}
 
-  openapi-fetch@0.14.0:
-    resolution: {integrity: sha512-PshIdm1NgdLvb05zp8LqRQMNSKzIlPkyMxYFxwyHR+UlKD4t2nUjkDhNxeRbhRSEd3x5EUNh2w5sJYwkhOH4fg==}
+  openapi-fetch@0.15.0:
+    resolution: {integrity: sha512-OjQUdi61WO4HYhr9+byCPMj0+bgste/LtSBEcV6FzDdONTs7x0fWn8/ndoYwzqCsKWIxEZwo4FN/TG1c1rI8IQ==}
 
   openapi-typescript-helpers@0.0.15:
     resolution: {integrity: sha512-opyTPaunsklCBpTK8JGef6mfPhLSnyy5a0IN9vKtx3+4aExf+KxEqYwIy3hqkedXIB97u357uLMJsOnm3GVjsw==}
@@ -4752,14 +4752,14 @@ packages:
     resolution: {integrity: sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==}
     engines: {node: '>= 0.4'}
 
-  swr-openapi@5.3.0:
-    resolution: {integrity: sha512-E//wBSuJPMAfRle6K1CdWpodxS5cRgQ4UboM4AKlP57/xfw8sHZgyLs9VNXki+X7FktjihfryqvQT5QWna26Iw==}
+  swr-openapi@5.5.1:
+    resolution: {integrity: sha512-c50hCrPgp5D2qn0tlu8dl3B27rnGIEjM3nh6okQYgBMyS1aXifjChly4ZB4Czu4qbiJIL6bPZUt146T2O5uBoQ==}
     peerDependencies:
-      openapi-fetch: 0.14.0
-      openapi-typescript: 7.8.0
-      react: 18 || 19
+      openapi-fetch: '>=0.15'
+      openapi-typescript: '7'
+      react: '>=18'
       swr: '2'
-      typescript: ^5.x
+      typescript: '5'
     peerDependenciesMeta:
       openapi-typescript:
         optional: true
@@ -4768,6 +4768,10 @@ packages:
     resolution: {integrity: sha512-bYd2lrhc+VarcpkgWclcUi92wYCpOgMws9Sd1hG1ntAu0NEy+14CbotuFjshBU2kt9rYj9TSmDcybpxpeTU1fg==}
     peerDependencies:
       react: ^16.11.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  tagged-tag@1.0.0:
+    resolution: {integrity: sha512-yEFYrVhod+hdNyx7g5Bnkkb0G6si8HJurOoOEgC8B/O0uXLHlaey/65KRv6cuWBNhBgHKAROVpc7QyYqE5gFng==}
+    engines: {node: '>=20'}
 
   tailwind-merge@3.3.1:
     resolution: {integrity: sha512-gBXpgUm/3rp1lMZZrM/w7D8GKqshif0zAymAhbCyIt8KMe+0v9DQ7cdYLR4FHH/cKpdTXb+A/tKKU3eolfsI+g==}
@@ -4872,9 +4876,9 @@ packages:
     resolution: {integrity: sha512-ABHZ2/tS2JkvH1PEjxFDTUWC8dB5OsIGZP4IFLhR293GqT5Y5qB1WwL2kMPYhQW9DVgVD8Hd7I8gjwPIf5GFkw==}
     engines: {node: '>=16'}
 
-  type-fest@4.41.0:
-    resolution: {integrity: sha512-TeTSQ6H5YHvpqVwBRcnLDCBnDOHWYu7IvGbHT6N8AOymcr9PJGjc1GTtiWZTYg0NCgYwvnYWEkVChQAr9bjfwA==}
-    engines: {node: '>=16'}
+  type-fest@5.3.1:
+    resolution: {integrity: sha512-VCn+LMHbd4t6sF3wfU/+HKT63C9OoyrSIf4b+vtWHpt2U7/4InZG467YDNMFMR70DdHjAdpPWmw2lzRdg0Xqqg==}
+    engines: {node: '>=20'}
 
   type-is@1.6.18:
     resolution: {integrity: sha512-TkRKr9sUTxEH8MdfuCSP7VizJyzRNMjj2J2do2Jr3Kym598JVdEksuzPQCnlFPW4ky9Q+iA+ma9BGm06XQBy8g==}
@@ -9052,7 +9056,7 @@ snapshots:
       is-inside-container: 1.0.0
       is-wsl: 3.1.0
 
-  openapi-fetch@0.14.0:
+  openapi-fetch@0.15.0:
     dependencies:
       openapi-typescript-helpers: 0.0.15
 
@@ -9961,13 +9965,13 @@ snapshots:
 
   supports-preserve-symlinks-flag@1.0.0: {}
 
-  swr-openapi@5.3.0(openapi-fetch@0.14.0)(openapi-typescript@7.8.0(typescript@5.8.3))(react@19.1.0)(swr@2.3.4(react@19.1.0))(typescript@5.8.3):
+  swr-openapi@5.5.1(openapi-fetch@0.15.0)(openapi-typescript@7.8.0(typescript@5.8.3))(react@19.1.0)(swr@2.3.4(react@19.1.0))(typescript@5.8.3):
     dependencies:
-      openapi-fetch: 0.14.0
+      openapi-fetch: 0.15.0
       openapi-typescript-helpers: 0.0.15
       react: 19.1.0
       swr: 2.3.4(react@19.1.0)
-      type-fest: 4.41.0
+      type-fest: 5.3.1
       typescript: 5.8.3
     optionalDependencies:
       openapi-typescript: 7.8.0(typescript@5.8.3)
@@ -9977,6 +9981,8 @@ snapshots:
       dequal: 2.0.3
       react: 19.1.0
       use-sync-external-store: 1.5.0(react@19.1.0)
+
+  tagged-tag@1.0.0: {}
 
   tailwind-merge@3.3.1: {}
 
@@ -10062,7 +10068,9 @@ snapshots:
 
   type-fest@4.40.0: {}
 
-  type-fest@4.41.0: {}
+  type-fest@5.3.1:
+    dependencies:
+      tagged-tag: 1.0.0
 
   type-is@1.6.18:
     dependencies:

@@ -38,8 +38,6 @@ type Props = {
   dagRunId: string;
   /** Full DAG-run details (optional) - used to determine if this is a sub DAG-run */
   dagRun?: components['schemas']['DAGRunDetails'];
-  /** Whether to show stdout or stderr logs */
-  stream?: 'stdout' | 'stderr';
 };
 
 /**
@@ -55,7 +53,7 @@ const ANSI_CODES_REGEX = [
  * ExecutionLog displays the log output for a DAG run
  * Fetches log data from the API and refreshes every 30 seconds
  */
-function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
+function ExecutionLog({ name, dagRunId, dagRun }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const { preferences, updatePreference } = useUserPreferences();
   const [viewMode, setViewMode] = useState<'tail' | 'head' | 'page'>('tail');
@@ -80,59 +78,76 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
   const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
-  // Determine if this is a sub dagRun
+  // Determine if this is a sub dagRun - check both rootDAGRunId AND rootDAGRunName
   const isSubDAGRun =
-    dagRun && dagRun.rootDAGRunId && dagRun.rootDAGRunId !== dagRun.dagRunId;
+    dagRun &&
+    dagRun.rootDAGRunId &&
+    dagRun.rootDAGRunName &&
+    dagRun.rootDAGRunId !== dagRun.dagRunId;
 
-  // Determine query parameters based on view mode
-  const queryParams: Record<string, number | string> = {
-    remoteNode: appBarContext.selectedRemoteNode || 'local',
-    stream,
-  };
+  // Build query params based on view mode
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const tail = viewMode === 'tail' ? pageSize : undefined;
+  const head = viewMode === 'head' ? pageSize : undefined;
+  const offset = viewMode === 'page' ? (currentPage - 1) * pageSize + 1 : undefined;
+  const limit = viewMode === 'page' ? pageSize : undefined;
 
-  // Add pagination parameters based on view mode
-  if (viewMode === 'tail') {
-    queryParams.tail = pageSize;
-  } else if (viewMode === 'head') {
-    queryParams.head = pageSize;
-  } else if (viewMode === 'page') {
-    queryParams.offset = (currentPage - 1) * pageSize + 1;
-    queryParams.limit = pageSize;
-  }
+  // SWR options shared by both queries
+  const swrOptions = React.useMemo(
+    () => ({
+      refreshInterval: isLiveMode ? 2000 : 0,
+      keepPreviousData: true,
+      revalidateOnFocus: false,
+      dedupingInterval: 1000,
+    }),
+    [isLiveMode]
+  );
 
-  // Determine the API endpoint based on whether this is a sub DAG-run
-  const apiEndpoint = isSubDAGRun
-    ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/log'
-    : '/dag-runs/{name}/{dagRunId}/log';
-
-  // Prepare path parameters based on whether this is a sub DAG-run
-  const pathParams = isSubDAGRun
-    ? {
-        name: dagRun.rootDAGRunName,
-        dagRunId: dagRun.rootDAGRunId,
-        subDAGRunId: dagRun.dagRunId,
-      }
-    : {
-        name,
-        dagRunId,
-      };
-
-  // Fetch log data with periodic refresh
-  const { data, isLoading, error, mutate } = useQuery(
-    apiEndpoint,
+  // Fetch sub-DAG-run log (only when isSubDAGRun is true)
+  const subDAGQuery = useQuery(
+    '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/log',
     {
       params: {
-        query: queryParams,
-        path: pathParams,
+        query: {
+          remoteNode,
+          tail,
+          head,
+          offset,
+          limit,
+        },
+        path: {
+          name: dagRun?.rootDAGRunName as string,
+          dagRunId: dagRun?.rootDAGRunId as string,
+          subDAGRunId: dagRun?.dagRunId as string,
+        },
       },
     },
-    {
-      refreshInterval: isLiveMode ? 2000 : 0, // 2s in live mode, 0 (disabled) otherwise
-      keepPreviousData: true, // Keep previous data while loading new data
-      revalidateOnFocus: false, // Don't revalidate when window regains focus
-      dedupingInterval: 1000, // Deduplicate requests within 1 second
-    }
+    { ...swrOptions, isPaused: () => !isSubDAGRun }
   );
+
+  // Fetch regular DAG-run log (only when isSubDAGRun is false)
+  const dagRunQuery = useQuery(
+    '/dag-runs/{name}/{dagRunId}/log',
+    {
+      params: {
+        query: {
+          remoteNode,
+          tail,
+          head,
+          offset,
+          limit,
+        },
+        path: {
+          name,
+          dagRunId,
+        },
+      },
+    },
+    { ...swrOptions, isPaused: () => !!isSubDAGRun }
+  );
+
+  // Use the appropriate query based on whether this is a sub-DAG-run
+  const { data, isLoading, error, mutate } = isSubDAGRun ? subDAGQuery : dagRunQuery;
 
   // Function to scroll to the bottom of the log container
   const scrollToBottom = useCallback(() => {
