@@ -8,21 +8,25 @@ import (
 )
 
 func TestPostgresDriver_Name(t *testing.T) {
+	t.Parallel()
 	driver := &PostgresDriver{}
 	assert.Equal(t, "postgres", driver.Name())
 }
 
 func TestPostgresDriver_PlaceholderFormat(t *testing.T) {
+	t.Parallel()
 	driver := &PostgresDriver{}
 	assert.Equal(t, "$", driver.PlaceholderFormat())
 }
 
 func TestPostgresDriver_SupportsAdvisoryLock(t *testing.T) {
+	t.Parallel()
 	driver := &PostgresDriver{}
 	assert.True(t, driver.SupportsAdvisoryLock())
 }
 
 func TestPostgresDriver_BuildInsertQuery(t *testing.T) {
+	t.Parallel()
 	driver := &PostgresDriver{}
 
 	tests := []struct {
@@ -115,6 +119,7 @@ func TestPostgresDriver_BuildInsertQuery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := driver.BuildInsertQuery(tt.table, tt.columns, tt.rowCount, tt.onConflict, tt.conflictTarget, tt.updateColumns)
 			assert.Equal(t, tt.want, got)
 		})
@@ -122,6 +127,7 @@ func TestPostgresDriver_BuildInsertQuery(t *testing.T) {
 }
 
 func TestPostgresDriver_QuoteIdentifier(t *testing.T) {
+	t.Parallel()
 	driver := &PostgresDriver{}
 
 	tests := []struct {
@@ -138,6 +144,7 @@ func TestPostgresDriver_QuoteIdentifier(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := driver.QuoteIdentifier(tt.name)
 			assert.Equal(t, tt.want, got)
 		})
@@ -145,6 +152,7 @@ func TestPostgresDriver_QuoteIdentifier(t *testing.T) {
 }
 
 func TestPostgresDriver_ConvertNamedParams(t *testing.T) {
+	t.Parallel()
 	driver := &PostgresDriver{}
 
 	tests := []struct {
@@ -199,6 +207,7 @@ func TestPostgresDriver_ConvertNamedParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			gotQuery, gotParams, err := driver.ConvertNamedParams(tt.query, tt.params)
 			if tt.wantErr {
 				assert.Error(t, err)

@@ -10,6 +10,7 @@ import (
 )
 
 func TestDetectFormat(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		path     string
 		expected string
@@ -27,6 +28,7 @@ func TestDetectFormat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
+			t.Parallel()
 			got := DetectFormat(tt.path)
 			assert.Equal(t, tt.expected, got)
 		})
@@ -34,6 +36,7 @@ func TestDetectFormat(t *testing.T) {
 }
 
 func TestDefaultInputOptions(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		format    string
 		delimiter rune
@@ -47,6 +50,7 @@ func TestDefaultInputOptions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.format, func(t *testing.T) {
+			t.Parallel()
 			opts := DefaultInputOptions(tt.format)
 			assert.Equal(t, tt.delimiter, opts.Delimiter)
 			assert.True(t, opts.HasHeader)
@@ -57,6 +61,7 @@ func TestDefaultInputOptions(t *testing.T) {
 }
 
 func TestNewInputReader(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		format  string
 		wantErr bool
@@ -70,6 +75,7 @@ func TestNewInputReader(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.format, func(t *testing.T) {
+			t.Parallel()
 			// Create a fresh reader for each subtest to avoid exhaustion
 			r := strings.NewReader("a,b\n1,2\n")
 			opts := DefaultInputOptions("csv")
@@ -87,6 +93,7 @@ func TestNewInputReader(t *testing.T) {
 }
 
 func TestCSVReader_BasicRead(t *testing.T) {
+	t.Parallel()
 	input := "name,age,city\nAlice,30,NYC\nBob,25,LA\n"
 	r := strings.NewReader(input)
 	opts := InputOptions{
@@ -120,6 +127,7 @@ func TestCSVReader_BasicRead(t *testing.T) {
 }
 
 func TestCSVReader_NoHeader(t *testing.T) {
+	t.Parallel()
 	input := "Alice,30,NYC\nBob,25,LA\n"
 	r := strings.NewReader(input)
 	opts := InputOptions{
@@ -147,6 +155,7 @@ func TestCSVReader_NoHeader(t *testing.T) {
 }
 
 func TestCSVReader_NullValues(t *testing.T) {
+	t.Parallel()
 	input := "name,value\nAlice,\nBob,NULL\nCharlie,null\nDave,\\N\nEve,actual\n"
 	r := strings.NewReader(input)
 	opts := InputOptions{
@@ -187,6 +196,7 @@ func TestCSVReader_NullValues(t *testing.T) {
 }
 
 func TestCSVReader_TSV(t *testing.T) {
+	t.Parallel()
 	input := "name\tage\tcity\nAlice\t30\tNYC\n"
 	r := strings.NewReader(input)
 	opts := InputOptions{
@@ -206,6 +216,7 @@ func TestCSVReader_TSV(t *testing.T) {
 }
 
 func TestCSVReader_QuotedFields(t *testing.T) {
+	t.Parallel()
 	input := `name,description
 "Alice","Hello, World"
 "Bob","Line1
@@ -234,6 +245,7 @@ Line2"
 }
 
 func TestCSVReader_ReadRowAutoHeader(t *testing.T) {
+	t.Parallel()
 	// Test that ReadRow automatically reads header if not done
 	input := "name,age\nAlice,30\n"
 	r := strings.NewReader(input)
@@ -251,6 +263,7 @@ func TestCSVReader_ReadRowAutoHeader(t *testing.T) {
 }
 
 func TestCSVReader_EmptyInput(t *testing.T) {
+	t.Parallel()
 	r := strings.NewReader("")
 	opts := InputOptions{
 		HasHeader: true,
@@ -264,6 +277,7 @@ func TestCSVReader_EmptyInput(t *testing.T) {
 }
 
 func TestJSONLReader_BasicRead(t *testing.T) {
+	t.Parallel()
 	input := `{"name":"Alice","age":30,"city":"NYC"}
 {"name":"Bob","age":25,"city":"LA"}
 `
@@ -299,6 +313,7 @@ func TestJSONLReader_BasicRead(t *testing.T) {
 }
 
 func TestJSONLReader_NullValues(t *testing.T) {
+	t.Parallel()
 	input := `{"name":"Alice","value":null}
 {"name":"Bob","value":"NULL"}
 `
@@ -325,6 +340,7 @@ func TestJSONLReader_NullValues(t *testing.T) {
 }
 
 func TestJSONLReader_MissingFields(t *testing.T) {
+	t.Parallel()
 	input := `{"name":"Alice"}
 `
 	r := strings.NewReader(input)
@@ -342,6 +358,7 @@ func TestJSONLReader_MissingFields(t *testing.T) {
 }
 
 func TestJSONLReader_SkipEmptyLines(t *testing.T) {
+	t.Parallel()
 	input := `{"name":"Alice"}
 
 {"name":"Bob"}
@@ -365,6 +382,7 @@ func TestJSONLReader_SkipEmptyLines(t *testing.T) {
 }
 
 func TestJSONLReader_InvalidJSON(t *testing.T) {
+	t.Parallel()
 	input := `{"name":"Alice"}
 not valid json
 `
@@ -385,6 +403,7 @@ not valid json
 }
 
 func TestJSONLReader_AutoDetectColumns(t *testing.T) {
+	t.Parallel()
 	input := `{"name":"Alice","age":30}
 {"name":"Bob","age":25}
 `
@@ -432,6 +451,7 @@ func TestJSONLReader_AutoDetectColumns(t *testing.T) {
 }
 
 func TestJSONLReader_EmptyInput(t *testing.T) {
+	t.Parallel()
 	r := strings.NewReader("")
 	opts := InputOptions{}
 
@@ -441,6 +461,7 @@ func TestJSONLReader_EmptyInput(t *testing.T) {
 }
 
 func TestJSONLReader_InvalidFirstLine(t *testing.T) {
+	t.Parallel()
 	r := strings.NewReader("not json\n")
 	opts := InputOptions{}
 
@@ -450,6 +471,7 @@ func TestJSONLReader_InvalidFirstLine(t *testing.T) {
 }
 
 func TestCSVReader_HeaderReadOnce(t *testing.T) {
+	t.Parallel()
 	input := "name,age\nAlice,30\nBob,25\n"
 	r := strings.NewReader(input)
 	opts := InputOptions{
@@ -475,6 +497,7 @@ func TestCSVReader_HeaderReadOnce(t *testing.T) {
 }
 
 func TestJSONLReader_HeaderReadOnce(t *testing.T) {
+	t.Parallel()
 	input := `{"name":"Alice"}
 {"name":"Bob"}
 `
@@ -496,6 +519,7 @@ func TestJSONLReader_HeaderReadOnce(t *testing.T) {
 }
 
 func TestCSVReader_LeadingWhitespace(t *testing.T) {
+	t.Parallel()
 	input := "name, age\nAlice, 30\n"
 	r := strings.NewReader(input)
 	opts := InputOptions{

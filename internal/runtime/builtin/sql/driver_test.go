@@ -31,6 +31,7 @@ func (d *mockDriver) BuildInsertQuery(table string, columns []string, rowCount i
 }
 
 func TestQuoteIdentifier(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -48,6 +49,7 @@ func TestQuoteIdentifier(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := QuoteIdentifier(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -55,6 +57,7 @@ func TestQuoteIdentifier(t *testing.T) {
 }
 
 func TestParseConflictTarget(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -72,6 +75,7 @@ func TestParseConflictTarget(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := ParseConflictTarget(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -79,6 +83,7 @@ func TestParseConflictTarget(t *testing.T) {
 }
 
 func TestContains(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		slice    []string
@@ -94,6 +99,7 @@ func TestContains(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := Contains(tt.slice, tt.item)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -101,6 +107,7 @@ func TestContains(t *testing.T) {
 }
 
 func TestDriverRegistry_ConcurrentAccess(t *testing.T) {
+	t.Parallel()
 	registry := NewDriverRegistry()
 
 	// Test concurrent registration and retrieval

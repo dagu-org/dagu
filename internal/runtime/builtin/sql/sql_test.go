@@ -22,6 +22,8 @@ import (
 )
 
 func TestParseConfig(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		config  map[string]any
@@ -78,6 +80,8 @@ func TestParseConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			cfg, err := sqlexec.ParseConfig(context.Background(), tt.config)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -92,6 +96,8 @@ func TestParseConfig(t *testing.T) {
 }
 
 func TestConvertNamedToPositional(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		query       string
@@ -157,6 +163,8 @@ func TestConvertNamedToPositional(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			gotQuery, gotParams, err := sqlexec.ConvertNamedToPositional(tt.query, tt.params, tt.placeholder)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -170,6 +178,8 @@ func TestConvertNamedToPositional(t *testing.T) {
 }
 
 func TestExtractParamNames(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		query string
@@ -199,6 +209,8 @@ func TestExtractParamNames(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := sqlexec.ExtractParamNames(tt.query)
 			assert.Equal(t, tt.want, got)
 		})
@@ -206,6 +218,8 @@ func TestExtractParamNames(t *testing.T) {
 }
 
 func TestJSONLWriter(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 	writer := sqlexec.NewJSONLWriter(&buf, "null")
 
@@ -230,6 +244,8 @@ func TestJSONLWriter(t *testing.T) {
 }
 
 func TestCSVWriter(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 	writer := sqlexec.NewCSVWriter(&buf, "NULL", true)
 
@@ -252,6 +268,8 @@ func TestCSVWriter(t *testing.T) {
 }
 
 func TestJSONWriter(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 	writer := sqlexec.NewJSONWriter(&buf, "null")
 
@@ -276,6 +294,8 @@ func TestJSONWriter(t *testing.T) {
 }
 
 func TestDriverRegistry(t *testing.T) {
+	t.Parallel()
+
 	// Test that drivers are registered
 	postgres, ok := sqlexec.GetDriver("postgres")
 	assert.True(t, ok)
@@ -293,6 +313,8 @@ func TestDriverRegistry(t *testing.T) {
 }
 
 func TestSanitizeIdentifier(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input   string
 		wantErr bool
@@ -309,6 +331,8 @@ func TestSanitizeIdentifier(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+
 			_, err := sqlexec.SanitizeIdentifier(tt.input)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -320,6 +344,8 @@ func TestSanitizeIdentifier(t *testing.T) {
 }
 
 func TestValidateParams(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		query   string
@@ -354,6 +380,8 @@ func TestValidateParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			err := sqlexec.ValidateParams(tt.query, tt.params)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -370,6 +398,8 @@ func newSQLiteExecutor(ctx context.Context, step core.Step) (executor.Executor, 
 }
 
 func TestSQLiteExecutor_InMemory(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	// Create a step with SQLite config
@@ -405,6 +435,8 @@ func TestSQLiteExecutor_InMemory(t *testing.T) {
 }
 
 func TestSQLiteExecutor_FileDB(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")
@@ -443,6 +475,8 @@ func TestSQLiteExecutor_FileDB(t *testing.T) {
 }
 
 func TestSQLiteExecutor_Transaction(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	step := core.Step{
@@ -478,6 +512,8 @@ func TestSQLiteExecutor_Transaction(t *testing.T) {
 }
 
 func TestSQLiteExecutor_OutputFormats(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	tests := []struct {
@@ -509,6 +545,8 @@ func TestSQLiteExecutor_OutputFormats(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			step := core.Step{
 				Name: "test-format",
 				ExecutorConfig: core.ExecutorConfig{
@@ -547,6 +585,8 @@ func TestSQLiteExecutor_OutputFormats(t *testing.T) {
 }
 
 func TestSQLiteExecutor_MaxRows(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	step := core.Step{
@@ -584,6 +624,8 @@ func TestSQLiteExecutor_MaxRows(t *testing.T) {
 // --- Additional Unit Tests for Extended Coverage ---
 
 func TestParseConfig_IsolationLevels(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		level   string
@@ -599,6 +641,8 @@ func TestParseConfig_IsolationLevels(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			config := map[string]any{
 				"dsn":            "postgres://localhost/test",
 				"isolationLevel": tt.level,
@@ -614,6 +658,8 @@ func TestParseConfig_IsolationLevels(t *testing.T) {
 }
 
 func TestParseConfig_ConnectionPool(t *testing.T) {
+	t.Parallel()
+
 	config := map[string]any{
 		"dsn":             "postgres://localhost/test",
 		"maxOpenConns":    20,
@@ -629,6 +675,8 @@ func TestParseConfig_ConnectionPool(t *testing.T) {
 }
 
 func TestParseConfig_Streaming(t *testing.T) {
+	t.Parallel()
+
 	config := map[string]any{
 		"dsn":        "postgres://localhost/test",
 		"streaming":  true,
@@ -642,6 +690,8 @@ func TestParseConfig_Streaming(t *testing.T) {
 }
 
 func TestParseConfig_AdvisoryLock(t *testing.T) {
+	t.Parallel()
+
 	config := map[string]any{
 		"dsn":          "postgres://localhost/test",
 		"advisoryLock": "my_pipeline_lock",
@@ -653,6 +703,8 @@ func TestParseConfig_AdvisoryLock(t *testing.T) {
 }
 
 func TestParseConfig_FileLock(t *testing.T) {
+	t.Parallel()
+
 	config := map[string]any{
 		"dsn":      "file:./test.db",
 		"fileLock": true,
@@ -664,6 +716,8 @@ func TestParseConfig_FileLock(t *testing.T) {
 }
 
 func TestParseConfig_Import(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		config  map[string]any
@@ -815,6 +869,8 @@ func TestParseConfig_Import(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			cfg, err := sqlexec.ParseConfig(context.Background(), tt.config)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -831,6 +887,8 @@ func TestParseConfig_Import(t *testing.T) {
 // --- Integration Tests for CSV/JSONL Import ---
 
 func TestSQLiteExecutor_ImportCSV(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	tmpDir := t.TempDir()
 
@@ -915,6 +973,8 @@ func TestSQLiteExecutor_ImportCSV(t *testing.T) {
 }
 
 func TestSQLiteExecutor_ImportCSV_NoHeader(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	tmpDir := t.TempDir()
 
@@ -969,6 +1029,8 @@ func TestSQLiteExecutor_ImportCSV_NoHeader(t *testing.T) {
 }
 
 func TestSQLiteExecutor_ImportJSONL(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	tmpDir := t.TempDir()
 
@@ -1024,6 +1086,8 @@ func TestSQLiteExecutor_ImportJSONL(t *testing.T) {
 }
 
 func TestSQLiteExecutor_ImportWithTransaction(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	tmpDir := t.TempDir()
 
@@ -1078,6 +1142,8 @@ func TestSQLiteExecutor_ImportWithTransaction(t *testing.T) {
 }
 
 func TestSQLiteExecutor_ImportDryRun(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	tmpDir := t.TempDir()
 
@@ -1155,6 +1221,8 @@ func TestSQLiteExecutor_ImportDryRun(t *testing.T) {
 }
 
 func TestSQLiteExecutor_ImportIgnoreConflict(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	tmpDir := t.TempDir()
 
@@ -1230,6 +1298,8 @@ func TestSQLiteExecutor_ImportIgnoreConflict(t *testing.T) {
 }
 
 func TestSQLiteExecutor_ImportMaxRows(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	tmpDir := t.TempDir()
 
@@ -1285,6 +1355,8 @@ func TestSQLiteExecutor_ImportMaxRows(t *testing.T) {
 }
 
 func TestSQLiteExecutor_ImportSkipRows(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	tmpDir := t.TempDir()
 
@@ -1365,6 +1437,8 @@ func TestSQLiteExecutor_ImportSkipRows(t *testing.T) {
 }
 
 func TestNewResultWriter(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name   string
 		format string
@@ -1376,6 +1450,8 @@ func TestNewResultWriter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			var buf bytes.Buffer
 			writer := sqlexec.NewResultWriter(&buf, tt.format, "null", true)
 			require.NotNil(t, writer)
@@ -1395,6 +1471,8 @@ func TestNewResultWriter(t *testing.T) {
 }
 
 func TestCSVWriter_SpecialCharacters(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 	writer := sqlexec.NewCSVWriter(&buf, "NULL", true)
 
@@ -1422,6 +1500,8 @@ func TestCSVWriter_SpecialCharacters(t *testing.T) {
 }
 
 func TestJSONLWriter_AllTypes(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 	writer := sqlexec.NewJSONLWriter(&buf, "null")
 
@@ -1443,6 +1523,8 @@ func TestJSONLWriter_AllTypes(t *testing.T) {
 }
 
 func TestSQLiteExecutor_NamedParams(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	// Named params work with single queries (command), not multi-statement scripts
@@ -1478,6 +1560,8 @@ func TestSQLiteExecutor_NamedParams(t *testing.T) {
 }
 
 func TestSQLiteExecutor_Command(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	step := core.Step{
@@ -1508,6 +1592,8 @@ func TestSQLiteExecutor_Command(t *testing.T) {
 }
 
 func TestSQLiteExecutor_NullHandling(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "null_handling.db")
 
@@ -1545,6 +1631,8 @@ func TestSQLiteExecutor_NullHandling(t *testing.T) {
 }
 
 func TestSQLiteExecutor_Timeout(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	step := core.Step{
@@ -1573,6 +1661,8 @@ func TestSQLiteExecutor_Timeout(t *testing.T) {
 }
 
 func TestSQLiteExecutor_Pragma(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	step := core.Step{
@@ -1601,6 +1691,8 @@ func TestSQLiteExecutor_Pragma(t *testing.T) {
 }
 
 func TestSQLiteExecutor_EmptyResult(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	step := core.Step{
@@ -1632,6 +1724,8 @@ func TestSQLiteExecutor_EmptyResult(t *testing.T) {
 }
 
 func TestSQLiteExecutor_InsertReturnsAffected(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "insert_affected.db")
 
@@ -1668,6 +1762,8 @@ func TestSQLiteExecutor_InsertReturnsAffected(t *testing.T) {
 // --- Connection Manager Tests ---
 
 func TestConnectionManager_NewAndClose(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	cfg, err := sqlexec.ParseConfig(ctx, map[string]any{
@@ -1698,6 +1794,8 @@ func TestConnectionManager_NewAndClose(t *testing.T) {
 }
 
 func TestConnectionManager_RefCounting(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	cfg, err := sqlexec.ParseConfig(ctx, map[string]any{
@@ -1744,6 +1842,8 @@ func TestConnectionManager_RefCounting(t *testing.T) {
 }
 
 func TestConnectionManager_AcquireRelease_Concurrent(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	cfg, err := sqlexec.ParseConfig(ctx, map[string]any{
@@ -1779,6 +1879,8 @@ func TestConnectionManager_AcquireRelease_Concurrent(t *testing.T) {
 }
 
 func TestTransaction_BeginCommitRollback(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "transaction.db")
 
@@ -1839,6 +1941,8 @@ func TestTransaction_BeginCommitRollback(t *testing.T) {
 }
 
 func TestTransaction_IsolationLevels(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	cfg, err := sqlexec.ParseConfig(ctx, map[string]any{
@@ -1884,6 +1988,8 @@ func TestTransaction_IsolationLevels(t *testing.T) {
 }
 
 func TestGetQueryExecutor(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	cfg, err := sqlexec.ParseConfig(ctx, map[string]any{
@@ -1926,6 +2032,8 @@ func TestGetQueryExecutor(t *testing.T) {
 }
 
 func TestConnectionManager_ConnectionPoolSettings(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	cfg, err := sqlexec.ParseConfig(ctx, map[string]any{
@@ -1953,6 +2061,8 @@ func TestConnectionManager_ConnectionPoolSettings(t *testing.T) {
 }
 
 func TestConnectionManager_DoubleClose(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	cfg, err := sqlexec.ParseConfig(ctx, map[string]any{
@@ -1978,6 +2088,8 @@ func TestConnectionManager_DoubleClose(t *testing.T) {
 // --- Additional Coverage Tests for Result Writers and Params ---
 
 func TestConvertPositionalParams(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		query       string
@@ -2024,6 +2136,8 @@ func TestConvertPositionalParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result, err := sqlexec.ConvertPositionalParams(tt.query, tt.params, tt.placeholder)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -2038,6 +2152,8 @@ func TestConvertPositionalParams(t *testing.T) {
 }
 
 func TestResultWriter_JSONTypes(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 	writer := sqlexec.NewJSONLWriter(&buf, "null")
 
@@ -2083,6 +2199,8 @@ func TestResultWriter_JSONTypes(t *testing.T) {
 }
 
 func TestResultWriter_CSVTypes(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 	writer := sqlexec.NewCSVWriter(&buf, "NULL", true)
 
@@ -2125,6 +2243,8 @@ func TestResultWriter_CSVTypes(t *testing.T) {
 }
 
 func TestResultWriter_JSONWriter(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 	writer := sqlexec.NewJSONWriter(&buf, "null")
 
@@ -2149,6 +2269,8 @@ func TestResultWriter_JSONWriter(t *testing.T) {
 }
 
 func TestSanitizeIdentifier_Extended(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		identifier string
@@ -2168,6 +2290,8 @@ func TestSanitizeIdentifier_Extended(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result, err := sqlexec.SanitizeIdentifier(tt.identifier)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -2180,6 +2304,8 @@ func TestSanitizeIdentifier_Extended(t *testing.T) {
 }
 
 func TestGetPositionalParams(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	// Test with positional params

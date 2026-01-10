@@ -12,6 +12,7 @@ func boolPtr(b bool) *bool {
 }
 
 func TestFlattenRows(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		rows [][]any
@@ -59,6 +60,7 @@ func TestFlattenRows(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := flattenRows(tt.rows)
 			assert.Equal(t, tt.want, got)
 		})
@@ -66,6 +68,7 @@ func TestFlattenRows(t *testing.T) {
 }
 
 func TestBuildInputOptions(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		cfg       *ImportConfig
@@ -107,6 +110,7 @@ func TestBuildInputOptions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			importer := &Importer{cfg: tt.cfg}
 			opts := importer.buildInputOptions()
 			assert.Equal(t, tt.wantDelim, opts.Delimiter)
@@ -115,6 +119,7 @@ func TestBuildInputOptions(t *testing.T) {
 }
 
 func TestImportMetrics(t *testing.T) {
+	t.Parallel()
 	metrics := &ImportMetrics{
 		RowsRead:     100,
 		RowsImported: 95,

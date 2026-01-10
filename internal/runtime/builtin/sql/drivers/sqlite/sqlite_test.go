@@ -8,21 +8,25 @@ import (
 )
 
 func TestSQLiteDriver_Name(t *testing.T) {
+	t.Parallel()
 	driver := &SQLiteDriver{}
 	assert.Equal(t, "sqlite", driver.Name())
 }
 
 func TestSQLiteDriver_PlaceholderFormat(t *testing.T) {
+	t.Parallel()
 	driver := &SQLiteDriver{}
 	assert.Equal(t, "?", driver.PlaceholderFormat())
 }
 
 func TestSQLiteDriver_SupportsAdvisoryLock(t *testing.T) {
+	t.Parallel()
 	driver := &SQLiteDriver{}
 	assert.False(t, driver.SupportsAdvisoryLock())
 }
 
 func TestSQLiteDriver_AcquireAdvisoryLock(t *testing.T) {
+	t.Parallel()
 	driver := &SQLiteDriver{}
 	_, err := driver.AcquireAdvisoryLock(nil, nil, "test")
 	assert.Error(t, err)
@@ -30,6 +34,7 @@ func TestSQLiteDriver_AcquireAdvisoryLock(t *testing.T) {
 }
 
 func TestSQLiteDriver_BuildInsertQuery(t *testing.T) {
+	t.Parallel()
 	driver := &SQLiteDriver{}
 
 	tests := []struct {
@@ -94,6 +99,7 @@ func TestSQLiteDriver_BuildInsertQuery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := driver.BuildInsertQuery(tt.table, tt.columns, tt.rowCount, tt.onConflict, tt.conflictTarget, tt.updateColumns)
 			assert.Equal(t, tt.want, got)
 		})
@@ -101,6 +107,7 @@ func TestSQLiteDriver_BuildInsertQuery(t *testing.T) {
 }
 
 func TestSQLiteDriver_QuoteIdentifier(t *testing.T) {
+	t.Parallel()
 	driver := &SQLiteDriver{}
 
 	tests := []struct {
@@ -117,6 +124,7 @@ func TestSQLiteDriver_QuoteIdentifier(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := driver.QuoteIdentifier(tt.name)
 			assert.Equal(t, tt.want, got)
 		})
@@ -124,6 +132,7 @@ func TestSQLiteDriver_QuoteIdentifier(t *testing.T) {
 }
 
 func TestSQLiteDriver_ConvertNamedParams(t *testing.T) {
+	t.Parallel()
 	driver := &SQLiteDriver{}
 
 	tests := []struct {
@@ -178,6 +187,7 @@ func TestSQLiteDriver_ConvertNamedParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			gotQuery, gotParams, err := driver.ConvertNamedParams(tt.query, tt.params)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -191,6 +201,7 @@ func TestSQLiteDriver_ConvertNamedParams(t *testing.T) {
 }
 
 func TestIsMemoryDB(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		dsn  string
 		want bool
@@ -205,6 +216,7 @@ func TestIsMemoryDB(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.dsn, func(t *testing.T) {
+			t.Parallel()
 			got := isMemoryDB(tt.dsn)
 			assert.Equal(t, tt.want, got)
 		})
@@ -212,6 +224,7 @@ func TestIsMemoryDB(t *testing.T) {
 }
 
 func TestExtractDBPath(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		dsn  string
@@ -251,6 +264,7 @@ func TestExtractDBPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := extractDBPath(tt.dsn)
 			assert.Equal(t, tt.want, got)
 		})
