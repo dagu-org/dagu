@@ -272,9 +272,33 @@ func TestCreateTempDAGFile(t *testing.T) {
 		contentStr := string(content)
 
 		assert.Contains(t, contentStr, "name: parent-dag")
-		assert.Contains(t, contentStr, "---")
 		assert.Contains(t, contentStr, "name: child1")
 		assert.Contains(t, contentStr, "name: child2")
+
+		// Verify YAML separators appear on their own line (not appended to previous content)
+		// The separator should be "\n---\n" format per YAML spec
+		assert.Contains(t, contentStr, "\n---\n", "YAML separator should appear on its own line")
+		assert.NotContains(t, contentStr, "step1---", "separator should not be appended directly to content")
+	})
+
+	t.Run("WithExtraDocs_NoTrailingNewline", func(t *testing.T) {
+		t.Parallel()
+
+		// Primary doc without trailing newline - should still produce valid YAML
+		primaryDoc := []byte("name: parent-dag")
+		extraDoc := []byte("name: child-dag")
+
+		path, err := CreateTempDAGFile("test-subdir", "no-newline-dag", primaryDoc, extraDoc)
+		require.NoError(t, err)
+		require.NotEmpty(t, path)
+		t.Cleanup(func() { _ = os.Remove(path) })
+
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		contentStr := string(content)
+
+		// Should have newline inserted before separator
+		assert.Contains(t, contentStr, "name: parent-dag\n---\n", "newline should be inserted before separator when missing")
 	})
 
 	t.Run("EmptyExtraDocs", func(t *testing.T) {

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -497,8 +498,10 @@ func (e *SubDAGExecutor) getSubDAGRunStatus(ctx context.Context, dagRunID string
 }
 
 // extractOutputsFromNodes extracts output variables from nodes.
-// Output variables are stored as key-value pairs in the node's OutputVariables SyncMap.
-// The key is the variable name and the value is the variable value.
+// Output variables may be stored in two formats:
+// 1. Local format: key="VAR", value="VAR=actual_value" (KeyValue string)
+// 2. Proto format: key="VAR", value="actual_value" (direct value)
+// This function normalizes both formats to extract the actual value.
 func extractOutputsFromNodes(nodes []*execution.Node) map[string]string {
 	outputs := make(map[string]string)
 	for _, node := range nodes {
@@ -506,10 +509,24 @@ func extractOutputsFromNodes(nodes []*execution.Node) map[string]string {
 			continue
 		}
 		node.OutputVariables.Range(func(key, value any) bool {
-			if k, ok := key.(string); ok {
-				if v, ok := value.(string); ok {
-					outputs[k] = v
-				}
+			k, ok := key.(string)
+			if !ok {
+				return true
+			}
+			v, ok := value.(string)
+			if !ok {
+				return true
+			}
+
+			// Handle both local format (KEY=value) and proto format (just value)
+			// Local format stores "KEY=value" as the value string
+			// Proto format stores just "value" directly
+			if strings.HasPrefix(v, k+"=") {
+				// Local format: extract value after "KEY="
+				outputs[k] = strings.TrimPrefix(v, k+"=")
+			} else {
+				// Proto format or already normalized: use value directly
+				outputs[k] = v
 			}
 			return true
 		})
