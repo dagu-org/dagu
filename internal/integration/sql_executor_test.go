@@ -19,8 +19,9 @@ const (
 func GetAvailablePort(t *testing.T) int {
 	listener, err := net.Listen("tcp", "localhost:0")
 	require.NoError(t, err, "failed to find available port")
-	defer listener.Close()
-	return listener.Addr().(*net.TCPAddr).Port
+	port := listener.Addr().(*net.TCPAddr).Port
+	require.NoError(t, listener.Close())
+	return port
 }
 
 // TestSQLExecutor_PostgresContainer_BasicQuery tests basic PostgreSQL query execution

@@ -18,37 +18,79 @@ type ConnectionManager struct {
 	refCount int
 }
 
+// Connection retry settings
+const (
+	maxConnRetries    = 10
+	initialRetryDelay = 500 * time.Millisecond
+	maxRetryDelay     = 5 * time.Second
+)
+
 // NewConnectionManager creates a new connection manager.
 func NewConnectionManager(ctx context.Context, driver Driver, cfg *Config) (*ConnectionManager, error) {
-	db, cleanup, err := driver.Connect(ctx, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
-	}
+	var db *sql.DB
+	var cleanup func() error
+	var lastErr error
 
-	// Configure connection pool
-	db.SetMaxOpenConns(cfg.MaxOpenConns)
-	db.SetMaxIdleConns(cfg.MaxIdleConns)
-	db.SetConnMaxLifetime(time.Duration(cfg.ConnMaxLifetime) * time.Second)
+	// Retry connection with exponential backoff
+	retryDelay := initialRetryDelay
+	for attempt := 1; attempt <= maxConnRetries; attempt++ {
+		// Check context before attempting
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("context cancelled before connection: %w", ctx.Err())
+		}
 
-	// Verify connection
-	pingCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
+		db, cleanup, lastErr = driver.Connect(ctx, cfg)
+		if lastErr != nil {
+			if attempt < maxConnRetries {
+				select {
+				case <-ctx.Done():
+					return nil, fmt.Errorf("context cancelled during connection retry: %w", ctx.Err())
+				case <-time.After(retryDelay):
+					retryDelay = min(retryDelay*2, maxRetryDelay)
+					continue
+				}
+			}
+			return nil, fmt.Errorf("failed to connect to database after %d attempts: %w", attempt, lastErr)
+		}
 
-	if err := db.PingContext(pingCtx); err != nil {
+		// Configure connection pool
+		db.SetMaxOpenConns(cfg.MaxOpenConns)
+		db.SetMaxIdleConns(cfg.MaxIdleConns)
+		db.SetConnMaxLifetime(time.Duration(cfg.ConnMaxLifetime) * time.Second)
+
+		// Verify connection with ping
+		pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		lastErr = db.PingContext(pingCtx)
+		cancel()
+
+		if lastErr == nil {
+			// Connection successful
+			return &ConnectionManager{
+				db:       db,
+				driver:   driver,
+				cfg:      cfg,
+				cleanup:  cleanup,
+				refCount: 1,
+			}, nil
+		}
+
+		// Ping failed, close and retry
 		if cleanup != nil {
 			_ = cleanup()
 		}
 		_ = db.Close()
-		return nil, fmt.Errorf("failed to ping database: %w", err)
+
+		if attempt < maxConnRetries {
+			select {
+			case <-ctx.Done():
+				return nil, fmt.Errorf("context cancelled during ping retry: %w", ctx.Err())
+			case <-time.After(retryDelay):
+				retryDelay = min(retryDelay*2, maxRetryDelay)
+			}
+		}
 	}
 
-	return &ConnectionManager{
-		db:       db,
-		driver:   driver,
-		cfg:      cfg,
-		cleanup:  cleanup,
-		refCount: 1,
-	}, nil
+	return nil, fmt.Errorf("failed to ping database after %d attempts: %w", maxConnRetries, lastErr)
 }
 
 // DB returns the underlying database connection.
