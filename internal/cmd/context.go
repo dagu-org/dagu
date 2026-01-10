@@ -151,7 +151,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	}
 
 	switch cmd.Name() {
-	case "server", "scheduler", "start-all":
+	case "server", "scheduler", "start-all", "coordinator":
 		// For long-running process, we setup file cache for better performance
 		limits := cfg.Cache.Limits()
 		hc := fileutil.NewCache[*execution.DAGRunStatus]("dag_run_status", limits.DAGRun.Limit, limits.DAGRun.TTL)

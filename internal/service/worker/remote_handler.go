@@ -111,6 +111,10 @@ func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1
 }
 
 func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1.Task) error {
+	if h.dagRunStore == nil {
+		return fmt.Errorf("retry not supported in fully remote mode: dagRunStore is nil")
+	}
+
 	root := execution.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
 
 	attempt, err := h.dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef(task.RootDagRunName, task.DagRunId))

@@ -49,6 +49,9 @@ type Handler struct {
 	// Open attempts cache for status persistence
 	attemptsMu   sync.Mutex
 	openAttempts map[string]execution.DAGRunAttempt // dagRunID -> open attempt
+
+	// Zombie detector shutdown synchronization
+	zombieDetectorDone chan struct{}
 }
 
 // HandlerOption configures the Handler
@@ -230,19 +233,18 @@ func (h *Handler) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatReq
 		return nil, status.Error(codes.InvalidArgument, "worker_id is required")
 	}
 
+	// Update heartbeat under lock
 	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	// Update or create heartbeat info
 	h.heartbeats[req.WorkerId] = &heartbeatInfo{
 		workerID:        req.WorkerId,
 		labels:          req.Labels,
 		stats:           req.Stats,
 		lastHeartbeatAt: time.Now(),
 	}
+	h.mu.Unlock()
 
-	// Clean up stale heartbeats and mark their tasks as failed
-	h.cleanupStaleHeartbeats(ctx)
+	// Clean up stale heartbeats outside the lock to avoid blocking I/O while holding mutex
+	h.detectAndCleanupZombies(ctx)
 
 	return &coordinatorv1.HeartbeatResponse{}, nil
 }
@@ -328,8 +330,11 @@ func (h *Handler) StreamLogs(stream coordinatorv1.CoordinatorService_StreamLogsS
 // StartZombieDetector starts a background goroutine that periodically checks for zombie runs.
 // It detects workers that have stopped sending heartbeats and marks their running tasks as failed.
 // The interval parameter controls how often the detector runs (recommended: 45 seconds).
+// Call WaitZombieDetector after canceling the context to ensure clean shutdown.
 func (h *Handler) StartZombieDetector(ctx context.Context, interval time.Duration) {
+	h.zombieDetectorDone = make(chan struct{})
 	go func() {
+		defer close(h.zombieDetectorDone)
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
@@ -344,24 +349,42 @@ func (h *Handler) StartZombieDetector(ctx context.Context, interval time.Duratio
 	}()
 }
 
+// WaitZombieDetector waits for the zombie detector goroutine to finish.
+// This should be called after the context passed to StartZombieDetector is canceled.
+func (h *Handler) WaitZombieDetector() {
+	if h.zombieDetectorDone != nil {
+		<-h.zombieDetectorDone
+	}
+}
+
 // detectAndCleanupZombies checks for stale workers and marks their tasks as failed.
 func (h *Handler) detectAndCleanupZombies(ctx context.Context) {
+	// Collect stale workers under lock, then process outside lock to avoid
+	// holding the mutex during blocking I/O operations.
+	staleWorkers := h.collectAndRemoveStaleHeartbeats()
+
+	// Process stale workers outside the lock
+	for _, info := range staleWorkers {
+		h.markWorkerTasksFailed(ctx, info)
+	}
+}
+
+// collectAndRemoveStaleHeartbeats finds and removes stale heartbeats from the map.
+// Returns the removed heartbeat infos for processing.
+func (h *Handler) collectAndRemoveStaleHeartbeats() []*heartbeatInfo {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	h.cleanupStaleHeartbeats(ctx)
-}
-
-// cleanupStaleHeartbeats removes stale heartbeats and marks their tasks as failed.
-// Must be called with h.mu held.
-func (h *Handler) cleanupStaleHeartbeats(ctx context.Context) {
 	staleThreshold := time.Now().Add(-staleHeartbeatThreshold)
+	var stale []*heartbeatInfo
+
 	for workerID, info := range h.heartbeats {
 		if info.lastHeartbeatAt.Before(staleThreshold) {
-			h.markWorkerTasksFailed(ctx, info)
+			stale = append(stale, info)
 			delete(h.heartbeats, workerID)
 		}
 	}
+	return stale
 }
 
 // markWorkerTasksFailed marks all running tasks from a failed worker as FAILED.

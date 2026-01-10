@@ -2,13 +2,16 @@ package coordinator
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/common/logger"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -89,7 +92,9 @@ func (h *logHandler) handleStream(stream coordinatorv1.CoordinatorService_Stream
 
 		// Flush periodically to ensure data is visible
 		if writer.bytesSinceFlush >= flushThreshold {
-			_ = writer.writer.Flush()
+			if err := writer.writer.Flush(); err != nil {
+				return fmt.Errorf("failed to flush log buffer for %s: %w", writer.path, err)
+			}
 			writer.bytesSinceFlush = 0
 		}
 	}
@@ -151,9 +156,22 @@ func (h *logHandler) closeWriter(chunk *coordinatorv1.LogChunk) {
 	defer h.writersMu.Unlock()
 
 	if w, ok := h.writers[key]; ok {
-		_ = w.writer.Flush()
-		_ = w.file.Sync()
-		_ = w.file.Close()
+		ctx := context.Background()
+		if err := w.writer.Flush(); err != nil {
+			logger.Warn(ctx, "Failed to flush log writer",
+				slog.String("path", w.path),
+				slog.String("error", err.Error()))
+		}
+		if err := w.file.Sync(); err != nil {
+			logger.Warn(ctx, "Failed to sync log file",
+				slog.String("path", w.path),
+				slog.String("error", err.Error()))
+		}
+		if err := w.file.Close(); err != nil {
+			logger.Warn(ctx, "Failed to close log file",
+				slog.String("path", w.path),
+				slog.String("error", err.Error()))
+		}
 		delete(h.writers, key)
 	}
 }
@@ -205,10 +223,23 @@ func (h *logHandler) Close() {
 	h.writersMu.Lock()
 	defer h.writersMu.Unlock()
 
+	ctx := context.Background()
 	for _, w := range h.writers {
-		_ = w.writer.Flush()
-		_ = w.file.Sync()
-		_ = w.file.Close()
+		if err := w.writer.Flush(); err != nil {
+			logger.Warn(ctx, "Failed to flush log writer on close",
+				slog.String("path", w.path),
+				slog.String("error", err.Error()))
+		}
+		if err := w.file.Sync(); err != nil {
+			logger.Warn(ctx, "Failed to sync log file on close",
+				slog.String("path", w.path),
+				slog.String("error", err.Error()))
+		}
+		if err := w.file.Close(); err != nil {
+			logger.Warn(ctx, "Failed to close log file on close",
+				slog.String("path", w.path),
+				slog.String("error", err.Error()))
+		}
 	}
 	h.writers = make(map[string]*logWriter)
 }

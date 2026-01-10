@@ -124,6 +124,25 @@ func (m *mockDAGRunAttempt) ReadStepMessages(_ context.Context, _ string) ([]exe
 	return nil, nil
 }
 
+// Thread-safe getters for test assertions
+func (m *mockDAGRunAttempt) WasOpened() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.opened
+}
+
+func (m *mockDAGRunAttempt) WasWritten() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.written
+}
+
+func (m *mockDAGRunAttempt) WasClosed() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.closed
+}
+
 func TestHandler_Poll(t *testing.T) {
 	t.Run("PollWithoutPollerID", func(t *testing.T) {
 		h := NewHandler()
@@ -477,9 +496,9 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		h.markRunFailed(ctx, "test-dag", "run-123", "worker crashed")
 
 		// Verify the status was updated
-		require.True(t, attempt.opened)
-		require.True(t, attempt.written)
-		require.True(t, attempt.closed)
+		require.True(t, attempt.WasOpened())
+		require.True(t, attempt.WasWritten())
+		require.True(t, attempt.WasClosed())
 
 		// Check the status
 		status, err := attempt.ReadStatus(ctx)
@@ -513,7 +532,7 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		h.markRunFailed(ctx, "test-dag", "run-123", "worker crashed")
 
 		// Verify no writes occurred (status should remain Succeeded)
-		require.False(t, attempt.written)
+		require.False(t, attempt.WasWritten())
 		status, err := attempt.ReadStatus(ctx)
 		require.NoError(t, err)
 		require.Equal(t, core.Succeeded, status.Status)
@@ -586,7 +605,7 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify the stale worker's task was marked as failed
-		require.True(t, attempt.written)
+		require.True(t, attempt.WasWritten())
 		status, err := attempt.ReadStatus(ctx)
 		require.NoError(t, err)
 		require.Equal(t, core.Failed, status.Status)
@@ -634,8 +653,8 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		h.detectAndCleanupZombies(ctx)
 
 		// Verify both tasks were marked as failed
-		require.True(t, attempt1.written)
-		require.True(t, attempt2.written)
+		require.True(t, attempt1.WasWritten())
+		require.True(t, attempt2.WasWritten())
 
 		s1, _ := attempt1.ReadStatus(ctx)
 		s2, _ := attempt2.ReadStatus(ctx)
@@ -685,7 +704,7 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Verify the task was marked as failed
-		require.True(t, attempt.written)
+		require.True(t, attempt.WasWritten())
 		s, _ := attempt.ReadStatus(ctx)
 		require.Equal(t, core.Failed, s.Status)
 	})
