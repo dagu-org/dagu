@@ -56,7 +56,6 @@ const LogViewer: React.FC<LogViewerProps> = ({
             name={dagName}
             dagRunId={dagRunId}
             dagRun={dagRun}
-            stream={stream}
           />
         ) : (
           stepName && (

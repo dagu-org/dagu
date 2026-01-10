@@ -4,7 +4,7 @@
  * @module features/dags/components/dag-execution
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { components, Status, Stream } from '../../../../api/v2/schema';
+import { components, Status } from '../../../../api/v2/schema';
 import { Button } from '../../../../components/ui/button';
 import { Input } from '../../../../components/ui/input';
 import { ReloadButton } from '../../../../components/ui/reload-button';
@@ -38,8 +38,6 @@ type Props = {
   dagRunId: string;
   /** Full DAG-run details (optional) - used to determine if this is a sub DAG-run */
   dagRun?: components['schemas']['DAGRunDetails'];
-  /** Whether to show stdout or stderr logs */
-  stream?: Stream;
 };
 
 /**
@@ -55,7 +53,7 @@ const ANSI_CODES_REGEX = [
  * ExecutionLog displays the log output for a DAG run
  * Fetches log data from the API and refreshes every 30 seconds
  */
-function ExecutionLog({ name, dagRunId, dagRun, stream = Stream.stdout }: Props) {
+function ExecutionLog({ name, dagRunId, dagRun }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const { preferences, updatePreference } = useUserPreferences();
   const [viewMode, setViewMode] = useState<'tail' | 'head' | 'page'>('tail');
@@ -112,7 +110,6 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = Stream.stdout }: Props)
       params: {
         query: {
           remoteNode,
-          stream,
           tail,
           head,
           offset,
@@ -135,7 +132,6 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = Stream.stdout }: Props)
       params: {
         query: {
           remoteNode,
-          stream,
           tail,
           head,
           offset,
