@@ -58,8 +58,14 @@ func ConvertNamedToPositional(query string, params map[string]any, placeholder s
 
 		// Write the positional placeholder
 		if placeholder == "?" {
+			// For ? placeholder (SQLite), each occurrence needs its own parameter value
 			result.WriteString("?")
+			if exists {
+				// Duplicate the value for repeated parameters
+				orderedParams = append(orderedParams, value)
+			}
 		} else {
+			// For $N placeholder (PostgreSQL), reuse the same position
 			result.WriteString(placeholder + strconv.Itoa(pos))
 		}
 

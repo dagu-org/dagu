@@ -3,9 +3,12 @@ package sql_test
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
@@ -576,4 +579,1000 @@ func TestSQLiteExecutor_MaxRows(t *testing.T) {
 	assert.Contains(t, output, `"n":1`)
 	assert.Contains(t, output, `"n":2`)
 	assert.NotContains(t, output, `"n":3`)
+}
+
+// --- Additional Unit Tests for Extended Coverage ---
+
+func TestParseConfig_IsolationLevels(t *testing.T) {
+	tests := []struct {
+		name    string
+		level   string
+		wantErr bool
+	}{
+		{"read_committed", "read_committed", false},
+		{"repeatable_read", "repeatable_read", false},
+		{"serializable", "serializable", false},
+		{"default", "default", false},
+		{"empty is valid", "", false},
+		{"invalid", "invalid_level", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := map[string]any{
+				"dsn":            "postgres://localhost/test",
+				"isolationLevel": tt.level,
+			}
+			_, err := sqlexec.ParseConfig(context.Background(), config)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestParseConfig_ConnectionPool(t *testing.T) {
+	config := map[string]any{
+		"dsn":             "postgres://localhost/test",
+		"maxOpenConns":    20,
+		"maxIdleConns":    10,
+		"connMaxLifetime": 600,
+	}
+
+	cfg, err := sqlexec.ParseConfig(context.Background(), config)
+	require.NoError(t, err)
+	assert.Equal(t, 20, cfg.MaxOpenConns)
+	assert.Equal(t, 10, cfg.MaxIdleConns)
+	assert.Equal(t, 600, cfg.ConnMaxLifetime)
+}
+
+func TestParseConfig_Streaming(t *testing.T) {
+	config := map[string]any{
+		"dsn":        "postgres://localhost/test",
+		"streaming":  true,
+		"outputFile": "/tmp/output.jsonl",
+	}
+
+	cfg, err := sqlexec.ParseConfig(context.Background(), config)
+	require.NoError(t, err)
+	assert.True(t, cfg.Streaming)
+	assert.Equal(t, "/tmp/output.jsonl", cfg.OutputFile)
+}
+
+func TestParseConfig_AdvisoryLock(t *testing.T) {
+	config := map[string]any{
+		"dsn":          "postgres://localhost/test",
+		"advisoryLock": "my_pipeline_lock",
+	}
+
+	cfg, err := sqlexec.ParseConfig(context.Background(), config)
+	require.NoError(t, err)
+	assert.Equal(t, "my_pipeline_lock", cfg.AdvisoryLock)
+}
+
+func TestParseConfig_FileLock(t *testing.T) {
+	config := map[string]any{
+		"dsn":      "file:./test.db",
+		"fileLock": true,
+	}
+
+	cfg, err := sqlexec.ParseConfig(context.Background(), config)
+	require.NoError(t, err)
+	assert.True(t, cfg.FileLock)
+}
+
+func TestNewResultWriter(t *testing.T) {
+	tests := []struct {
+		name   string
+		format string
+	}{
+		{"jsonl format", "jsonl"},
+		{"json format", "json"},
+		{"csv format", "csv"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			writer := sqlexec.NewResultWriter(&buf, tt.format, "null", true)
+			require.NotNil(t, writer)
+
+			err := writer.WriteHeader([]string{"col1", "col2"})
+			require.NoError(t, err)
+
+			err = writer.WriteRow([]any{1, "test"})
+			require.NoError(t, err)
+
+			err = writer.Close()
+			require.NoError(t, err)
+
+			assert.NotEmpty(t, buf.String())
+		})
+	}
+}
+
+func TestCSVWriter_SpecialCharacters(t *testing.T) {
+	var buf bytes.Buffer
+	writer := sqlexec.NewCSVWriter(&buf, "NULL", true)
+
+	err := writer.WriteHeader([]string{"id", "description"})
+	require.NoError(t, err)
+
+	// Test with comma in value
+	err = writer.WriteRow([]any{1, "Hello, World"})
+	require.NoError(t, err)
+
+	// Test with newline in value
+	err = writer.WriteRow([]any{2, "Line1\nLine2"})
+	require.NoError(t, err)
+
+	// Test with quote in value
+	err = writer.WriteRow([]any{3, `Say "Hello"`})
+	require.NoError(t, err)
+
+	err = writer.Close()
+	require.NoError(t, err)
+
+	output := buf.String()
+	// CSV should properly escape these
+	assert.Contains(t, output, "id,description")
+}
+
+func TestJSONLWriter_AllTypes(t *testing.T) {
+	var buf bytes.Buffer
+	writer := sqlexec.NewJSONLWriter(&buf, "null")
+
+	err := writer.WriteHeader([]string{"int_col", "float_col", "bool_col", "str_col", "nil_col"})
+	require.NoError(t, err)
+
+	err = writer.WriteRow([]any{42, 3.14, true, "hello", nil})
+	require.NoError(t, err)
+
+	err = writer.Close()
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, `"int_col":42`)
+	assert.Contains(t, output, `"float_col":3.14`)
+	assert.Contains(t, output, `"bool_col":true`)
+	assert.Contains(t, output, `"str_col":"hello"`)
+	assert.Contains(t, output, `"nil_col":null`)
+}
+
+func TestSQLiteExecutor_NamedParams(t *testing.T) {
+	ctx := context.Background()
+
+	// Named params work with single queries (command), not multi-statement scripts
+	step := core.Step{
+		Name: "test-named-params",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": ":memory:",
+				"params": map[string]any{
+					"value1": 42,
+					"value2": 100,
+				},
+			},
+		},
+		Commands: []core.CommandEntry{
+			{Command: "SELECT :value1 as v1, :value2 as v2"},
+		},
+	}
+
+	exec, err := newSQLiteExecutor(ctx, step)
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	exec.SetStdout(&stdout)
+
+	err = exec.Run(ctx)
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, `"v1":42`)
+	assert.Contains(t, output, `"v2":100`)
+}
+
+func TestSQLiteExecutor_Command(t *testing.T) {
+	ctx := context.Background()
+
+	step := core.Step{
+		Name: "test-command",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": ":memory:",
+			},
+		},
+		Commands: []core.CommandEntry{
+			{Command: "SELECT 1 as result, 'hello' as message"},
+		},
+	}
+
+	exec, err := newSQLiteExecutor(ctx, step)
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	exec.SetStdout(&stdout)
+
+	err = exec.Run(ctx)
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, `"result":1`)
+	assert.Contains(t, output, `"message":"hello"`)
+}
+
+func TestSQLiteExecutor_NullHandling(t *testing.T) {
+	ctx := context.Background()
+
+	step := core.Step{
+		Name: "test-null-handling",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn":        ":memory:",
+				"nullString": "NULL",
+			},
+		},
+		Script: `
+			CREATE TABLE test (id INTEGER, nullable_int INTEGER, nullable_text TEXT);
+			INSERT INTO test VALUES (1, NULL, NULL);
+			INSERT INTO test VALUES (2, 42, 'hello');
+			SELECT * FROM test ORDER BY id;
+		`,
+	}
+
+	exec, err := newSQLiteExecutor(ctx, step)
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	exec.SetStdout(&stdout)
+
+	err = exec.Run(ctx)
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, `"nullable_int":null`)
+	assert.Contains(t, output, `"nullable_text":null`)
+	assert.Contains(t, output, `"nullable_int":42`)
+	assert.Contains(t, output, `"nullable_text":"hello"`)
+}
+
+func TestSQLiteExecutor_Timeout(t *testing.T) {
+	ctx := context.Background()
+
+	step := core.Step{
+		Name: "test-timeout",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn":     ":memory:",
+				"timeout": 30,
+			},
+		},
+		Script: "SELECT 1 as result;",
+	}
+
+	exec, err := newSQLiteExecutor(ctx, step)
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	exec.SetStdout(&stdout)
+
+	err = exec.Run(ctx)
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, `"result":1`)
+}
+
+func TestSQLiteExecutor_Pragma(t *testing.T) {
+	ctx := context.Background()
+
+	step := core.Step{
+		Name: "test-pragma",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": ":memory:",
+			},
+		},
+		Script: "PRAGMA table_info('sqlite_master');",
+	}
+
+	exec, err := newSQLiteExecutor(ctx, step)
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	exec.SetStdout(&stdout)
+
+	err = exec.Run(ctx)
+	require.NoError(t, err)
+
+	// PRAGMA should return table structure info
+	output := stdout.String()
+	assert.NotEmpty(t, output)
+}
+
+func TestSQLiteExecutor_EmptyResult(t *testing.T) {
+	ctx := context.Background()
+
+	step := core.Step{
+		Name: "test-empty-result",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": ":memory:",
+			},
+		},
+		Script: `
+			CREATE TABLE empty_table (id INTEGER);
+			SELECT * FROM empty_table;
+		`,
+	}
+
+	exec, err := newSQLiteExecutor(ctx, step)
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	exec.SetStdout(&stdout)
+
+	err = exec.Run(ctx)
+	require.NoError(t, err)
+
+	// Empty result should not have any rows
+	output := stdout.String()
+	assert.Empty(t, output)
+}
+
+func TestSQLiteExecutor_InsertReturnsAffected(t *testing.T) {
+	ctx := context.Background()
+
+	step := core.Step{
+		Name: "test-insert",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": ":memory:",
+			},
+		},
+		Script: `
+			CREATE TABLE test (id INTEGER PRIMARY KEY);
+			INSERT INTO test VALUES (1), (2), (3);
+		`,
+	}
+
+	exec, err := newSQLiteExecutor(ctx, step)
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exec.SetStdout(&stdout)
+	exec.SetStderr(&stderr)
+
+	err = exec.Run(ctx)
+	require.NoError(t, err)
+
+	// Metrics should show rows_affected
+	metrics := stderr.String()
+	assert.Contains(t, metrics, `"rows_affected":3`)
+}
+
+// --- Connection Manager Tests ---
+
+func TestConnectionManager_NewAndClose(t *testing.T) {
+	ctx := context.Background()
+
+	cfg, err := sqlexec.ParseConfig(ctx, map[string]any{
+		"dsn":             ":memory:",
+		"maxOpenConns":    5,
+		"maxIdleConns":    2,
+		"connMaxLifetime": 300,
+	})
+	require.NoError(t, err)
+
+	driver, ok := sqlexec.GetDriver("sqlite")
+	require.True(t, ok)
+	require.NotNil(t, driver)
+
+	cm, err := sqlexec.NewConnectionManager(ctx, driver, cfg)
+	require.NoError(t, err)
+	require.NotNil(t, cm)
+
+	// Verify accessors
+	assert.NotNil(t, cm.DB())
+	assert.NotNil(t, cm.Driver())
+	assert.NotNil(t, cm.Config())
+	assert.Equal(t, "sqlite", cm.Driver().Name())
+
+	// Close should succeed
+	err = cm.Close()
+	assert.NoError(t, err)
+}
+
+func TestConnectionManager_RefCounting(t *testing.T) {
+	ctx := context.Background()
+
+	cfg, err := sqlexec.ParseConfig(ctx, map[string]any{
+		"dsn": ":memory:",
+	})
+	require.NoError(t, err)
+
+	driver, ok := sqlexec.GetDriver("sqlite")
+	require.True(t, ok)
+	require.NotNil(t, driver)
+
+	cm, err := sqlexec.NewConnectionManager(ctx, driver, cfg)
+	require.NoError(t, err)
+
+	// Initial refCount is 1
+
+	// Acquire twice (refCount = 3)
+	cm.Acquire()
+	cm.Acquire()
+
+	// First release (refCount = 2)
+	err = cm.Release()
+	assert.NoError(t, err)
+
+	// Connection should still be usable
+	_, err = cm.DB().ExecContext(ctx, "SELECT 1")
+	assert.NoError(t, err)
+
+	// Second release (refCount = 1)
+	err = cm.Release()
+	assert.NoError(t, err)
+
+	// Still usable
+	_, err = cm.DB().ExecContext(ctx, "SELECT 1")
+	assert.NoError(t, err)
+
+	// Third release (refCount = 0) - connection closed
+	err = cm.Release()
+	assert.NoError(t, err)
+
+	// Connection should now be closed
+	err = cm.DB().PingContext(ctx)
+	assert.Error(t, err) // Should fail because connection is closed
+}
+
+func TestConnectionManager_AcquireRelease_Concurrent(t *testing.T) {
+	ctx := context.Background()
+
+	cfg, err := sqlexec.ParseConfig(ctx, map[string]any{
+		"dsn": ":memory:",
+	})
+	require.NoError(t, err)
+
+	driver, ok := sqlexec.GetDriver("sqlite")
+	require.True(t, ok)
+	cm, err := sqlexec.NewConnectionManager(ctx, driver, cfg)
+	require.NoError(t, err)
+
+	// Simulate concurrent acquire/release
+	var wg sync.WaitGroup
+	numGoroutines := 10
+
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			cm.Acquire()
+			// Simulate some work
+			time.Sleep(10 * time.Millisecond)
+			_ = cm.Release()
+		}()
+	}
+
+	wg.Wait()
+
+	// Final release for the initial refCount
+	err = cm.Release()
+	assert.NoError(t, err)
+}
+
+func TestTransaction_BeginCommitRollback(t *testing.T) {
+	ctx := context.Background()
+
+	cfg, err := sqlexec.ParseConfig(ctx, map[string]any{
+		"dsn": ":memory:",
+	})
+	require.NoError(t, err)
+
+	driver, ok := sqlexec.GetDriver("sqlite")
+	require.True(t, ok)
+	cm, err := sqlexec.NewConnectionManager(ctx, driver, cfg)
+	require.NoError(t, err)
+	defer cm.Close()
+
+	db := cm.DB()
+
+	// Create a table
+	_, err = db.ExecContext(ctx, "CREATE TABLE test (id INTEGER PRIMARY KEY, value INTEGER)")
+	require.NoError(t, err)
+
+	// Test commit
+	t.Run("commit", func(t *testing.T) {
+		tx, err := sqlexec.BeginTransaction(ctx, db, "")
+		require.NoError(t, err)
+		require.NotNil(t, tx)
+		require.NotNil(t, tx.Tx())
+
+		_, err = tx.Tx().ExecContext(ctx, "INSERT INTO test (value) VALUES (100)")
+		require.NoError(t, err)
+
+		err = tx.Commit()
+		require.NoError(t, err)
+
+		// Verify committed
+		var value int
+		err = db.QueryRowContext(ctx, "SELECT value FROM test WHERE value = 100").Scan(&value)
+		assert.NoError(t, err)
+		assert.Equal(t, 100, value)
+	})
+
+	// Test rollback
+	t.Run("rollback", func(t *testing.T) {
+		tx, err := sqlexec.BeginTransaction(ctx, db, "")
+		require.NoError(t, err)
+
+		_, err = tx.Tx().ExecContext(ctx, "INSERT INTO test (value) VALUES (999)")
+		require.NoError(t, err)
+
+		err = tx.Rollback()
+		require.NoError(t, err)
+
+		// Verify rolled back
+		var count int
+		err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM test WHERE value = 999").Scan(&count)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, count)
+	})
+}
+
+func TestTransaction_IsolationLevels(t *testing.T) {
+	ctx := context.Background()
+
+	cfg, err := sqlexec.ParseConfig(ctx, map[string]any{
+		"dsn": ":memory:",
+	})
+	require.NoError(t, err)
+
+	driver, ok := sqlexec.GetDriver("sqlite")
+	require.True(t, ok)
+	cm, err := sqlexec.NewConnectionManager(ctx, driver, cfg)
+	require.NoError(t, err)
+	defer cm.Close()
+
+	db := cm.DB()
+
+	tests := []struct {
+		name    string
+		level   string
+		wantErr bool
+	}{
+		{"empty", "", false},
+		{"default", "default", false},
+		{"read_committed", "read_committed", false},
+		{"repeatable_read", "repeatable_read", false},
+		{"serializable", "serializable", false},
+		{"invalid", "invalid_level", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tx, err := sqlexec.BeginTransaction(ctx, db, tt.level)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, tx)
+
+			// Clean up
+			_ = tx.Rollback()
+		})
+	}
+}
+
+func TestGetQueryExecutor(t *testing.T) {
+	ctx := context.Background()
+
+	cfg, err := sqlexec.ParseConfig(ctx, map[string]any{
+		"dsn": ":memory:",
+	})
+	require.NoError(t, err)
+
+	driver, ok := sqlexec.GetDriver("sqlite")
+	require.True(t, ok)
+	cm, err := sqlexec.NewConnectionManager(ctx, driver, cfg)
+	require.NoError(t, err)
+	defer cm.Close()
+
+	db := cm.DB()
+
+	t.Run("without transaction", func(t *testing.T) {
+		qe := sqlexec.GetQueryExecutor(db, nil)
+		require.NotNil(t, qe)
+
+		// Should be able to execute queries
+		rows, err := qe.QueryContext(ctx, "SELECT 1")
+		require.NoError(t, err)
+		rows.Close()
+	})
+
+	t.Run("with transaction", func(t *testing.T) {
+		tx, err := sqlexec.BeginTransaction(ctx, db, "")
+		require.NoError(t, err)
+
+		qe := sqlexec.GetQueryExecutor(db, tx)
+		require.NotNil(t, qe)
+
+		// Should be able to execute queries
+		rows, err := qe.QueryContext(ctx, "SELECT 1")
+		require.NoError(t, err)
+		rows.Close()
+
+		_ = tx.Rollback()
+	})
+}
+
+func TestConnectionManager_ConnectionPoolSettings(t *testing.T) {
+	ctx := context.Background()
+
+	cfg, err := sqlexec.ParseConfig(ctx, map[string]any{
+		"dsn":             ":memory:",
+		"maxOpenConns":    10,
+		"maxIdleConns":    5,
+		"connMaxLifetime": 600,
+	})
+	require.NoError(t, err)
+
+	driver, ok := sqlexec.GetDriver("sqlite")
+	require.True(t, ok)
+	cm, err := sqlexec.NewConnectionManager(ctx, driver, cfg)
+	require.NoError(t, err)
+	defer cm.Close()
+
+	// Verify config is properly set
+	assert.Equal(t, 10, cm.Config().MaxOpenConns)
+	assert.Equal(t, 5, cm.Config().MaxIdleConns)
+	assert.Equal(t, 600, cm.Config().ConnMaxLifetime)
+
+	// Connection should be usable
+	_, err = cm.DB().ExecContext(ctx, "SELECT 1")
+	assert.NoError(t, err)
+}
+
+func TestConnectionManager_DoubleClose(t *testing.T) {
+	ctx := context.Background()
+
+	cfg, err := sqlexec.ParseConfig(ctx, map[string]any{
+		"dsn": ":memory:",
+	})
+	require.NoError(t, err)
+
+	driver, ok := sqlexec.GetDriver("sqlite")
+	require.True(t, ok)
+	cm, err := sqlexec.NewConnectionManager(ctx, driver, cfg)
+	require.NoError(t, err)
+
+	// First close
+	err = cm.Close()
+	assert.NoError(t, err)
+
+	// Second close - should not panic
+	// Note: SQLite in-memory DB may not return error on double close
+	// The important thing is that it doesn't panic
+	_ = cm.Close()
+}
+
+// --- Additional Coverage Tests for Result Writers and Params ---
+
+func TestConvertPositionalParams(t *testing.T) {
+	tests := []struct {
+		name        string
+		query       string
+		params      []any
+		placeholder string
+		wantErr     bool
+	}{
+		{
+			name:        "nil params",
+			query:       "SELECT * FROM users",
+			params:      nil,
+			placeholder: "?",
+			wantErr:     false,
+		},
+		{
+			name:        "correct count with ?",
+			query:       "SELECT * FROM users WHERE id = ? AND name = ?",
+			params:      []any{1, "Alice"},
+			placeholder: "?",
+			wantErr:     false,
+		},
+		{
+			name:        "correct count with $N",
+			query:       "SELECT * FROM users WHERE id = $1 AND name = $2",
+			params:      []any{1, "Alice"},
+			placeholder: "$",
+			wantErr:     false,
+		},
+		{
+			name:        "mismatch count with ?",
+			query:       "SELECT * FROM users WHERE id = ?",
+			params:      []any{1, 2}, // Too many params
+			placeholder: "?",
+			wantErr:     true,
+		},
+		{
+			name:        "mismatch count with $N",
+			query:       "SELECT * FROM users WHERE id = $1 AND name = $2",
+			params:      []any{1}, // Not enough params
+			placeholder: "$",
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := sqlexec.ConvertPositionalParams(tt.query, tt.params, tt.placeholder)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			if tt.params != nil {
+				assert.Equal(t, tt.params, result)
+			}
+		})
+	}
+}
+
+func TestResultWriter_JSONTypes(t *testing.T) {
+	var buf bytes.Buffer
+	writer := sqlexec.NewJSONLWriter(&buf, "null")
+
+	err := writer.WriteHeader([]string{"bytes", "time", "null_str", "null_int", "null_float", "null_bool", "null_time"})
+	require.NoError(t, err)
+
+	// Test all type branches in convertValue
+	testTime := time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC)
+	err = writer.WriteRow([]any{
+		[]byte("byte data"),
+		testTime,
+		sqlNullString("valid string"),
+		sqlNullInt64(42),
+		sqlNullFloat64(3.14),
+		sqlNullBool(true),
+		sqlNullTime(testTime),
+	})
+	require.NoError(t, err)
+
+	// Test invalid (null) values for sql.Null types
+	err = writer.WriteRow([]any{
+		nil,
+		nil,
+		sqlNullStringInvalid(),
+		sqlNullInt64Invalid(),
+		sqlNullFloat64Invalid(),
+		sqlNullBoolInvalid(),
+		sqlNullTimeInvalid(),
+	})
+	require.NoError(t, err)
+
+	err = writer.Close()
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, `"bytes":"byte data"`)
+	assert.Contains(t, output, `"time":"2024-01-15T10:30:00Z"`)
+	assert.Contains(t, output, `"null_str":"valid string"`)
+	assert.Contains(t, output, `"null_int":42`)
+	assert.Contains(t, output, `"null_float":3.14`)
+	assert.Contains(t, output, `"null_bool":true`)
+	assert.Contains(t, output, `:null`)
+}
+
+func TestResultWriter_CSVTypes(t *testing.T) {
+	var buf bytes.Buffer
+	writer := sqlexec.NewCSVWriter(&buf, "NULL", true)
+
+	err := writer.WriteHeader([]string{"int", "int64", "float", "bool", "time", "bytes", "str"})
+	require.NoError(t, err)
+
+	testTime := time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC)
+	err = writer.WriteRow([]any{
+		int(42),
+		int64(123456),
+		float64(3.14159),
+		true,
+		testTime,
+		[]byte("bytes"),
+		"string",
+	})
+	require.NoError(t, err)
+
+	// Test sql.Null* types for CSV
+	err = writer.WriteRow([]any{
+		sqlNullInt64(99),
+		sqlNullInt64Invalid(),
+		sqlNullFloat64(2.71),
+		sqlNullBool(false),
+		sqlNullTime(testTime),
+		sqlNullString("null str"),
+		sqlNullStringInvalid(),
+	})
+	require.NoError(t, err)
+
+	err = writer.Close()
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "42")
+	assert.Contains(t, output, "123456")
+	assert.Contains(t, output, "3.14159")
+	assert.Contains(t, output, "true")
+	assert.Contains(t, output, "NULL")
+}
+
+func TestResultWriter_JSONWriter(t *testing.T) {
+	var buf bytes.Buffer
+	writer := sqlexec.NewJSONWriter(&buf, "null")
+
+	err := writer.WriteHeader([]string{"id", "name"})
+	require.NoError(t, err)
+
+	err = writer.WriteRow([]any{1, "Alice"})
+	require.NoError(t, err)
+
+	err = writer.WriteRow([]any{2, "Bob"})
+	require.NoError(t, err)
+
+	err = writer.Close()
+	require.NoError(t, err)
+
+	output := buf.String()
+	// JSON array format (pretty printed with spaces)
+	assert.Contains(t, output, "[")
+	assert.Contains(t, output, "]")
+	assert.Contains(t, output, `"id": 1`)
+	assert.Contains(t, output, `"name": "Alice"`)
+}
+
+func TestSanitizeIdentifier_Extended(t *testing.T) {
+	tests := []struct {
+		name       string
+		identifier string
+		wantErr    bool
+	}{
+		{"valid simple", "users", false},
+		{"valid with underscore", "user_table", false},
+		{"valid with dot", "schema.table", false},
+		{"valid mixed case", "UserTable", false},
+		{"valid alphanumeric", "user123", false},
+		{"empty string", "", true},
+		{"starts with digit", "123table", true},
+		{"contains space", "user table", true},
+		{"contains hyphen", "user-table", true},
+		{"contains semicolon", "users;", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := sqlexec.SanitizeIdentifier(tt.identifier)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.identifier, result)
+		})
+	}
+}
+
+func TestExtractParamNames_Extended(t *testing.T) {
+	tests := []struct {
+		name   string
+		query  string
+		want   []string
+	}{
+		{
+			name:  "single param",
+			query: "SELECT * FROM users WHERE id = :id",
+			want:  []string{"id"},
+		},
+		{
+			name:  "multiple params",
+			query: "SELECT * FROM users WHERE id = :id AND name = :name",
+			want:  []string{"id", "name"},
+		},
+		{
+			name:  "repeated param",
+			query: "SELECT * FROM users WHERE id = :id OR parent_id = :id",
+			want:  []string{"id"}, // Deduplicated
+		},
+		{
+			name:  "no params",
+			query: "SELECT * FROM users",
+			want:  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := sqlexec.ExtractParamNames(tt.query)
+			assert.Equal(t, tt.want, result)
+		})
+	}
+}
+
+func TestGetPositionalParams(t *testing.T) {
+	ctx := context.Background()
+
+	// Test with positional params
+	cfg, err := sqlexec.ParseConfig(ctx, map[string]any{
+		"dsn":    ":memory:",
+		"params": []any{1, 2, 3},
+	})
+	require.NoError(t, err)
+
+	params, ok := cfg.GetPositionalParams()
+	assert.True(t, ok)
+	assert.Equal(t, []any{1, 2, 3}, params)
+
+	// Test when params is not positional
+	cfg2, err := sqlexec.ParseConfig(ctx, map[string]any{
+		"dsn":    ":memory:",
+		"params": map[string]any{"id": 1},
+	})
+	require.NoError(t, err)
+
+	_, ok = cfg2.GetPositionalParams()
+	assert.False(t, ok)
+}
+
+// Helper functions to create sql.Null* types
+func sqlNullString(s string) any {
+	return sql.NullString{String: s, Valid: true}
+}
+
+func sqlNullStringInvalid() any {
+	return sql.NullString{Valid: false}
+}
+
+func sqlNullInt64(i int64) any {
+	return sql.NullInt64{Int64: i, Valid: true}
+}
+
+func sqlNullInt64Invalid() any {
+	return sql.NullInt64{Valid: false}
+}
+
+func sqlNullFloat64(f float64) any {
+	return sql.NullFloat64{Float64: f, Valid: true}
+}
+
+func sqlNullFloat64Invalid() any {
+	return sql.NullFloat64{Valid: false}
+}
+
+func sqlNullBool(b bool) any {
+	return sql.NullBool{Bool: b, Valid: true}
+}
+
+func sqlNullBoolInvalid() any {
+	return sql.NullBool{Valid: false}
+}
+
+func sqlNullTime(t time.Time) any {
+	return sql.NullTime{Time: t, Valid: true}
+}
+
+func sqlNullTimeInvalid() any {
+	return sql.NullTime{Valid: false}
 }

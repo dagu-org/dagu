@@ -91,8 +91,8 @@ func ParseConfig(_ context.Context, mapCfg map[string]any) (*Config, error) {
 	// Validate isolation level if specified
 	if cfg.IsolationLevel != "" {
 		switch cfg.IsolationLevel {
-		case "read_committed", "repeatable_read", "serializable":
-			// Valid
+		case "default", "read_committed", "repeatable_read", "serializable":
+			// Valid - "default" uses database's default isolation level
 		default:
 			return nil, fmt.Errorf("invalid isolationLevel: %s", cfg.IsolationLevel)
 		}
@@ -136,7 +136,7 @@ var postgresConfigSchema = &jsonschema.Schema{
 		},
 		"timeout":        {Type: "integer", Description: "Query timeout in seconds"},
 		"transaction":    {Type: "boolean", Description: "Wrap execution in transaction"},
-		"isolationLevel": {Type: "string", Enum: []any{"read_committed", "repeatable_read", "serializable"}, Description: "Transaction isolation level"},
+		"isolationLevel": {Type: "string", Enum: []any{"default", "read_committed", "repeatable_read", "serializable"}, Description: "Transaction isolation level"},
 		"advisoryLock":   {Type: "string", Description: "Named advisory lock"},
 		"outputFormat":   {Type: "string", Enum: []any{"jsonl", "json", "csv"}, Description: "Output format"},
 		"headers":        {Type: "boolean", Description: "Include headers in CSV output"},

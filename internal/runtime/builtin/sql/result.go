@@ -215,12 +215,11 @@ func NewResultWriter(w io.Writer, format, nullString string, headers bool) Resul
 }
 
 // convertValue converts a SQL value to a JSON-compatible type.
-func convertValue(val any, nullString string) any {
+// For JSON/JSONL output, NULL values are always converted to nil (JSON null).
+// The nullString parameter is kept for compatibility but ignored for JSON output.
+func convertValue(val any, _ string) any {
 	if val == nil {
-		if nullString == "null" {
-			return nil
-		}
-		return nullString
+		return nil // Always return nil for JSON null
 	}
 
 	switch v := val.(type) {
@@ -232,42 +231,27 @@ func convertValue(val any, nullString string) any {
 		if v.Valid {
 			return v.String
 		}
-		if nullString == "null" {
-			return nil
-		}
-		return nullString
+		return nil
 	case sql.NullInt64:
 		if v.Valid {
 			return v.Int64
 		}
-		if nullString == "null" {
-			return nil
-		}
-		return nullString
+		return nil
 	case sql.NullFloat64:
 		if v.Valid {
 			return v.Float64
 		}
-		if nullString == "null" {
-			return nil
-		}
-		return nullString
+		return nil
 	case sql.NullBool:
 		if v.Valid {
 			return v.Bool
 		}
-		if nullString == "null" {
-			return nil
-		}
-		return nullString
+		return nil
 	case sql.NullTime:
 		if v.Valid {
 			return v.Time.Format(time.RFC3339)
 		}
-		if nullString == "null" {
-			return nil
-		}
-		return nullString
+		return nil
 	default:
 		return v
 	}

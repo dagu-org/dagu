@@ -205,7 +205,7 @@ func ExtractErrorCode(err error) string {
 	errStr := err.Error()
 	// Look for SQLSTATE pattern
 	if idx := strings.Index(errStr, "SQLSTATE"); idx >= 0 {
-		end := idx + 13 // "SQLSTATE " + 5 char code
+		end := idx + 14 // "SQLSTATE " (9 chars) + 5 char code = 14
 		if end <= len(errStr) {
 			return errStr[idx+9 : end]
 		}
