@@ -33,11 +33,40 @@ type logWriter struct {
 	writer          *bufio.Writer
 	path            string
 	bytesSinceFlush uint64 // Track bytes written since last flush
+	mu              sync.Mutex
+}
+
+// write writes data to the buffer and flushes if threshold is exceeded.
+// Returns the number of bytes written and any error.
+func (w *logWriter) write(data []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	n, err := w.writer.Write(data)
+	if err != nil {
+		return n, err
+	}
+	if n > 0 {
+		w.bytesSinceFlush += uint64(n)
+	}
+
+	// Flush periodically to ensure data is visible
+	if w.bytesSinceFlush >= flushThreshold {
+		if err := w.writer.Flush(); err != nil {
+			return n, fmt.Errorf("failed to flush log buffer for %s: %w", w.path, err)
+		}
+		w.bytesSinceFlush = 0
+	}
+
+	return n, nil
 }
 
 // close flushes the buffer, syncs to disk, and closes the file.
 // Errors are logged but not returned since this is typically called during cleanup.
 func (w *logWriter) close(ctx context.Context) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
 	if err := w.writer.Flush(); err != nil {
 		logger.Warn(ctx, "Failed to flush log writer",
 			slog.String("path", w.path),
@@ -101,22 +130,13 @@ func (h *logHandler) handleStream(stream coordinatorv1.CoordinatorService_Stream
 			return fmt.Errorf("failed to create writer: %w", err)
 		}
 
-		// Write the data
-		n, err := writer.writer.Write(chunk.Data)
+		// Write the data using thread-safe method
+		n, err := writer.write(chunk.Data)
 		if err != nil {
 			return fmt.Errorf("failed to write data: %w", err)
 		}
 		if n > 0 {
 			bytesWritten += uint64(n) // #nosec G115 -- n is non-negative from successful Write
-			writer.bytesSinceFlush += uint64(n)
-		}
-
-		// Flush periodically to ensure data is visible
-		if writer.bytesSinceFlush >= flushThreshold {
-			if err := writer.writer.Flush(); err != nil {
-				return fmt.Errorf("failed to flush log buffer for %s: %w", writer.path, err)
-			}
-			writer.bytesSinceFlush = 0
 		}
 	}
 }

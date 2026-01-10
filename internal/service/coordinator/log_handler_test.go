@@ -406,16 +406,13 @@ func TestLogWriter_WriteAndFlush(t *testing.T) {
 		writer, err := h.getOrCreateWriter(chunk)
 		require.NoError(t, err)
 
-		// Write some data
+		// Write some data using thread-safe method
 		testData := []byte("Hello, World!\n")
-		n, err := writer.writer.Write(testData)
+		n, err := writer.write(testData)
 		require.NoError(t, err)
 		require.Equal(t, len(testData), n)
 
-		// Flush and close
-		err = writer.writer.Flush()
-		require.NoError(t, err)
-
+		// Close writer (which flushes)
 		ctx := context.Background()
 		h.closeWriter(ctx, chunk)
 
@@ -454,8 +451,8 @@ func TestLogHandler_ConcurrentAccess(t *testing.T) {
 				return
 			}
 
-			// Write some data
-			_, err = writer.writer.Write([]byte("test\n"))
+			// Write some data using thread-safe method
+			_, err = writer.write([]byte("test\n"))
 			if err != nil {
 				t.Errorf("goroutine %d: Write failed: %v", idx, err)
 				done <- false
