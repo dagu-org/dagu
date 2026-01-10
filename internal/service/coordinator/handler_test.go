@@ -144,7 +144,10 @@ func (m *mockDAGRunAttempt) WasClosed() bool {
 }
 
 func TestHandler_Poll(t *testing.T) {
+	t.Parallel()
+
 	t.Run("PollWithoutPollerID", func(t *testing.T) {
+		t.Parallel()
 		h := NewHandler()
 		ctx := context.Background()
 
@@ -160,6 +163,8 @@ func TestHandler_Poll(t *testing.T) {
 	})
 
 	t.Run("PollAndDispatch", func(t *testing.T) {
+		t.Parallel()
+
 		h := NewHandler()
 		ctx := context.Background()
 
@@ -210,6 +215,8 @@ func TestHandler_Poll(t *testing.T) {
 	})
 
 	t.Run("DispatchWithNoWaitingPollers", func(t *testing.T) {
+		t.Parallel()
+
 		h := NewHandler()
 		ctx := context.Background()
 
@@ -231,6 +238,8 @@ func TestHandler_Poll(t *testing.T) {
 	})
 
 	t.Run("PollContextCancellation", func(t *testing.T) {
+		t.Parallel()
+
 		h := NewHandler()
 		ctx, cancel := context.WithCancel(context.Background())
 
@@ -262,7 +271,10 @@ func TestHandler_Poll(t *testing.T) {
 }
 
 func TestHandler_Heartbeat(t *testing.T) {
+	t.Parallel()
+
 	t.Run("ValidHeartbeat", func(t *testing.T) {
+		t.Parallel()
 		h := NewHandler()
 		ctx := context.Background()
 
@@ -288,6 +300,8 @@ func TestHandler_Heartbeat(t *testing.T) {
 	})
 
 	t.Run("MissingWorkerID", func(t *testing.T) {
+		t.Parallel()
+
 		h := NewHandler()
 		ctx := context.Background()
 
@@ -303,6 +317,8 @@ func TestHandler_Heartbeat(t *testing.T) {
 	})
 
 	t.Run("HeartbeatUpdatesWorkerInfo", func(t *testing.T) {
+		t.Parallel()
+
 		h := NewHandler()
 		ctx := context.Background()
 
@@ -333,6 +349,8 @@ func TestHandler_Heartbeat(t *testing.T) {
 	})
 
 	t.Run("StaleHeartbeatCleanup", func(t *testing.T) {
+		t.Parallel()
+
 		h := NewHandler()
 		ctx := context.Background()
 
@@ -366,7 +384,10 @@ func TestHandler_Heartbeat(t *testing.T) {
 }
 
 func TestHandler_GetWorkers(t *testing.T) {
+	t.Parallel()
+
 	t.Run("NoWorkers", func(t *testing.T) {
+		t.Parallel()
 		h := NewHandler()
 		ctx := context.Background()
 
@@ -377,6 +398,8 @@ func TestHandler_GetWorkers(t *testing.T) {
 	})
 
 	t.Run("WorkersFromHeartbeats", func(t *testing.T) {
+		t.Parallel()
+
 		h := NewHandler()
 		ctx := context.Background()
 
@@ -426,6 +449,8 @@ func TestHandler_GetWorkers(t *testing.T) {
 	})
 
 	t.Run("RunningTasksInHeartbeat", func(t *testing.T) {
+		t.Parallel()
+
 		h := NewHandler()
 		ctx := context.Background()
 
@@ -474,7 +499,10 @@ func TestHandler_GetWorkers(t *testing.T) {
 }
 
 func TestHandler_ZombieDetection(t *testing.T) {
+	t.Parallel()
+
 	t.Run("MarkRunFailedUpdatesStatus", func(t *testing.T) {
+		t.Parallel()
 		store := newMockDAGRunStore()
 		h := NewHandler(WithDAGRunStore(store))
 		ctx := context.Background()
@@ -515,6 +543,8 @@ func TestHandler_ZombieDetection(t *testing.T) {
 	})
 
 	t.Run("MarkRunFailedSkipsCompletedRuns", func(t *testing.T) {
+		t.Parallel()
+
 		store := newMockDAGRunStore()
 		h := NewHandler(WithDAGRunStore(store))
 		ctx := context.Background()
@@ -538,7 +568,9 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		require.Equal(t, core.Succeeded, status.Status)
 	})
 
-	t.Run("MarkWorkerTasksFailedWithNoStore", func(_ *testing.T) {
+	t.Run("MarkWorkerTasksFailedWithNoStore", func(t *testing.T) {
+		t.Parallel()
+
 		// Handler without dagRunStore
 		h := NewHandler()
 		ctx := context.Background()
@@ -556,7 +588,9 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		h.markWorkerTasksFailed(ctx, info)
 	})
 
-	t.Run("MarkWorkerTasksFailedWithNoStats", func(_ *testing.T) {
+	t.Run("MarkWorkerTasksFailedWithNoStats", func(t *testing.T) {
+		t.Parallel()
+
 		store := newMockDAGRunStore()
 		h := NewHandler(WithDAGRunStore(store))
 		ctx := context.Background()
@@ -571,6 +605,8 @@ func TestHandler_ZombieDetection(t *testing.T) {
 	})
 
 	t.Run("StaleHeartbeatMarksTasksAsFailed", func(t *testing.T) {
+		t.Parallel()
+
 		store := newMockDAGRunStore()
 		h := NewHandler(WithDAGRunStore(store))
 		ctx := context.Background()
@@ -614,6 +650,8 @@ func TestHandler_ZombieDetection(t *testing.T) {
 	})
 
 	t.Run("DetectAndCleanupZombies", func(t *testing.T) {
+		t.Parallel()
+
 		store := newMockDAGRunStore()
 		h := NewHandler(WithDAGRunStore(store))
 		ctx := context.Background()
@@ -669,6 +707,8 @@ func TestHandler_ZombieDetection(t *testing.T) {
 	})
 
 	t.Run("StartZombieDetectorRunsPeriodically", func(t *testing.T) {
+		t.Parallel()
+
 		store := newMockDAGRunStore()
 		h := NewHandler(WithDAGRunStore(store))
 

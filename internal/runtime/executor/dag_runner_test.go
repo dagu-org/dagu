@@ -17,6 +17,8 @@ import (
 )
 
 func TestNewSubDAGExecutor_LocalDAG(t *testing.T) {
+	t.Parallel()
+
 	// Create a context with environment
 	ctx := context.Background()
 
@@ -71,6 +73,8 @@ func TestNewSubDAGExecutor_LocalDAG(t *testing.T) {
 }
 
 func TestNewSubDAGExecutor_RegularDAG(t *testing.T) {
+	t.Parallel()
+
 	// Create a context with environment
 	ctx := context.Background()
 
@@ -114,6 +118,8 @@ func TestNewSubDAGExecutor_RegularDAG(t *testing.T) {
 }
 
 func TestNewSubDAGExecutor_NotFound(t *testing.T) {
+	t.Parallel()
+
 	// Create a context with environment
 	ctx := context.Background()
 
@@ -149,6 +155,8 @@ func TestNewSubDAGExecutor_NotFound(t *testing.T) {
 }
 
 func TestBuildCommand(t *testing.T) {
+	t.Parallel()
+
 	// Create a context with environment
 	ctx := context.Background()
 
@@ -200,6 +208,8 @@ func TestBuildCommand(t *testing.T) {
 }
 
 func TestBuildCommand_NoRunID(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	// Set up the DAG context
@@ -230,6 +240,8 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 }
 
 func TestBuildCommand_NoRootDAGRun(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	// Set up the DAG context without RootDAGRun
@@ -256,6 +268,8 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 }
 
 func TestCleanup_LocalDAG(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	// Create a temporary file
@@ -286,6 +300,8 @@ func TestCleanup_LocalDAG(t *testing.T) {
 }
 
 func TestCleanup_NonExistentFile(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	executor := &SubDAGExecutor{
@@ -300,6 +316,8 @@ func TestCleanup_NonExistentFile(t *testing.T) {
 }
 
 func TestCreateTempDAGFile(t *testing.T) {
+	t.Parallel()
+
 	dagName := "test-dag"
 	yamlData := []byte("name: test-dag\nsteps:\n  - name: step1\n    command: echo test")
 
@@ -321,6 +339,8 @@ func TestCreateTempDAGFile(t *testing.T) {
 }
 
 func TestCreateTempDAGFile_WithExtraDocs(t *testing.T) {
+	t.Parallel()
+
 	dagName := "parent-dag"
 	yamlData := []byte("name: parent-dag\nsteps:\n  - name: step1\n    call: child-dag")
 	childYamlData := []byte("name: child-dag\nsteps:\n  - name: step1\n    command: echo child")
@@ -368,6 +388,8 @@ func TestExecutablePath(t *testing.T) {
 }
 
 func TestSubDAGExecutor_Kill_MixedProcesses(t *testing.T) {
+	t.Parallel()
+
 	// Create a mock database
 	mockDB := new(mockDatabase)
 
@@ -414,6 +436,8 @@ func TestSubDAGExecutor_Kill_MixedProcesses(t *testing.T) {
 }
 
 func TestSubDAGExecutor_Kill_OnlyDistributed(t *testing.T) {
+	t.Parallel()
+
 	// Create a mock database
 	mockDB := new(mockDatabase)
 
@@ -456,6 +480,8 @@ func TestSubDAGExecutor_Kill_OnlyDistributed(t *testing.T) {
 }
 
 func TestSubDAGExecutor_Kill_OnlyLocal(t *testing.T) {
+	t.Parallel()
+
 	// Create a mock database
 	mockDB := new(mockDatabase)
 
@@ -493,6 +519,8 @@ func TestSubDAGExecutor_Kill_OnlyLocal(t *testing.T) {
 }
 
 func TestSubDAGExecutor_Kill_Empty(t *testing.T) {
+	t.Parallel()
+
 	// Create a mock database
 	mockDB := new(mockDatabase)
 

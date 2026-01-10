@@ -31,6 +31,8 @@ func parsePort(addr string) int {
 }
 
 func TestClientNew(t *testing.T) {
+	t.Parallel()
+
 	config := coordinator.DefaultConfig()
 	monitor := &mockServiceMonitor{}
 
@@ -46,7 +48,10 @@ func TestClientNew(t *testing.T) {
 }
 
 func TestClientDispatch(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Success", func(t *testing.T) {
+		t.Parallel()
 		config := coordinator.DefaultConfig()
 		config.MaxRetries = 0
 		config.RequestTimeout = 100 * time.Millisecond
@@ -83,6 +88,8 @@ func TestClientDispatch(t *testing.T) {
 	})
 
 	t.Run("NoCoordinators", func(t *testing.T) {
+		t.Parallel()
+
 		config := coordinator.DefaultConfig()
 		config.MaxRetries = 0
 		config.RequestTimeout = 100 * time.Millisecond
@@ -110,6 +117,8 @@ func TestClientDispatch(t *testing.T) {
 }
 
 func TestClientPoll(t *testing.T) {
+	t.Parallel()
+
 	config := coordinator.DefaultConfig()
 	config.RequestTimeout = 100 * time.Millisecond
 
@@ -151,6 +160,8 @@ func TestClientPoll(t *testing.T) {
 }
 
 func TestClientGetWorkers(t *testing.T) {
+	t.Parallel()
+
 	config := coordinator.DefaultConfig()
 	config.RequestTimeout = 100 * time.Millisecond
 
@@ -191,6 +202,8 @@ func TestClientGetWorkers(t *testing.T) {
 }
 
 func TestClientHeartbeat(t *testing.T) {
+	t.Parallel()
+
 	config := coordinator.DefaultConfig()
 	config.RequestTimeout = 100 * time.Millisecond
 
@@ -232,6 +245,8 @@ func TestClientHeartbeat(t *testing.T) {
 }
 
 func TestClientMetrics(t *testing.T) {
+	t.Parallel()
+
 	// Test metrics tracking during failures
 	config := coordinator.DefaultConfig()
 	config.MaxRetries = 0 // No retries
@@ -275,6 +290,8 @@ func TestClientMetrics(t *testing.T) {
 }
 
 func TestClientCleanup(t *testing.T) {
+	t.Parallel()
+
 	config := coordinator.DefaultConfig()
 	config.RequestTimeout = 100 * time.Millisecond
 
@@ -315,6 +332,8 @@ func TestClientCleanup(t *testing.T) {
 }
 
 func TestClientDispatcherInterface(t *testing.T) {
+	t.Parallel()
+
 	// Verify that clientImpl implements the execution.Dispatcher interface
 	config := coordinator.DefaultConfig()
 	monitor := &mockServiceMonitor{}

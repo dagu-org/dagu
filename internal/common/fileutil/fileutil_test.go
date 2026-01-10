@@ -10,7 +10,11 @@ import (
 )
 
 func TestCreateFile(t *testing.T) {
+	t.Parallel()
+
 	t.Run("FileCreationAndPermissions", func(t *testing.T) {
+		t.Parallel()
+
 		dir := t.TempDir()
 		filePath := filepath.Join(dir, "test.log")
 
@@ -29,6 +33,8 @@ func TestCreateFile(t *testing.T) {
 	})
 
 	t.Run("InvalidPath", func(t *testing.T) {
+		t.Parallel()
+
 		_, err := OpenOrCreateFile("/nonexistent/directory/test.log")
 		assert.Error(t, err)
 	})
@@ -221,7 +227,10 @@ func TestIsFile(t *testing.T) {
 }
 
 func TestCreateTempDAGFile(t *testing.T) {
+	t.Parallel()
+
 	t.Run("BasicFile", func(t *testing.T) {
+		t.Parallel()
 		yamlData := []byte("name: test-dag\nsteps:\n  - name: step1\n    command: echo test")
 		path, err := CreateTempDAGFile("test-subdir", "test-dag", yamlData)
 		require.NoError(t, err)
@@ -243,6 +252,8 @@ func TestCreateTempDAGFile(t *testing.T) {
 	})
 
 	t.Run("WithExtraDocs", func(t *testing.T) {
+		t.Parallel()
+
 		primaryDoc := []byte("name: parent-dag\nsteps:\n  - name: step1")
 		extraDoc1 := []byte("name: child1\nsteps:\n  - name: s1")
 		extraDoc2 := []byte("name: child2\nsteps:\n  - name: s2")
@@ -267,6 +278,8 @@ func TestCreateTempDAGFile(t *testing.T) {
 	})
 
 	t.Run("EmptyExtraDocs", func(t *testing.T) {
+		t.Parallel()
+
 		primaryDoc := []byte("name: solo-dag")
 
 		path, err := CreateTempDAGFile("test-subdir", "solo-dag", primaryDoc)

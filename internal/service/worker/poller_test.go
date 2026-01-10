@@ -21,7 +21,10 @@ import (
 
 // TestPollerStateTracking tests that the poller correctly tracks connection state via coordinator client
 func TestPollerStateTracking(t *testing.T) {
+	t.Parallel()
+
 	t.Run("InitialStateIsConnected", func(t *testing.T) {
+		t.Parallel()
 		mockCoordinatorCli := newMockCoordinatorCli()
 		mockHandler := &mockHandler{}
 		labels := make(map[string]string)
@@ -36,6 +39,8 @@ func TestPollerStateTracking(t *testing.T) {
 	})
 
 	t.Run("StateReflectsDispatcherMetrics", func(t *testing.T) {
+		t.Parallel()
+
 		mockCoordinatorCli := newMockCoordinatorCli()
 		connectionError := status.Error(codes.Unavailable, "connection refused")
 
@@ -61,7 +66,10 @@ func TestPollerStateTracking(t *testing.T) {
 }
 
 func TestPollerTaskDispatch(t *testing.T) {
+	t.Parallel()
+
 	t.Run("DispatchTaskToExecutor", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -104,6 +112,8 @@ func TestPollerTaskDispatch(t *testing.T) {
 	})
 
 	t.Run("ContinuePollingAfterTaskExecution", func(t *testing.T) {
+		t.Parallel()
+
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -154,7 +164,10 @@ func TestPollerTaskDispatch(t *testing.T) {
 }
 
 func TestPollerErrorHandling(t *testing.T) {
+	t.Parallel()
+
 	t.Run("HandleExecutorError", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -197,6 +210,8 @@ func TestPollerErrorHandling(t *testing.T) {
 	})
 
 	t.Run("ContinueOnPollError", func(t *testing.T) {
+		t.Parallel()
+
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -238,7 +253,10 @@ func TestPollerErrorHandling(t *testing.T) {
 }
 
 func TestPollerContextCancellation(t *testing.T) {
+	t.Parallel()
+
 	t.Run("StopOnContextCancel", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithCancel(context.Background())
 
 		var pollStarted atomic.Bool
@@ -272,6 +290,8 @@ func TestPollerContextCancellation(t *testing.T) {
 	})
 
 	t.Run("StopExecutionOnContextCancel", func(t *testing.T) {
+		t.Parallel()
+
 		ctx, cancel := context.WithCancel(context.Background())
 
 		mockCoordinatorCli := newMockCoordinatorCli()
@@ -315,7 +335,10 @@ func TestPollerContextCancellation(t *testing.T) {
 }
 
 func TestPollerWithLabels(t *testing.T) {
+	t.Parallel()
+
 	t.Run("SendLabelsInPollRequest", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
