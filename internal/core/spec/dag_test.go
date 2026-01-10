@@ -2043,3 +2043,195 @@ func intPtr(i int) *int {
 func boolPtr(b bool) *bool {
 	return &b
 }
+
+func TestParseHealthcheck(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		input   *healthcheck
+		wantErr string
+	}{
+		{
+			name: "valid CMD healthcheck",
+			input: &healthcheck{
+				Test:     []string{"CMD", "pg_isready"},
+				Interval: "5s",
+				Timeout:  "3s",
+				Retries:  3,
+			},
+			wantErr: "",
+		},
+		{
+			name: "valid CMD-SHELL healthcheck",
+			input: &healthcheck{
+				Test:        []string{"CMD-SHELL", "pg_isready -U postgres"},
+				Interval:    "2s",
+				StartPeriod: "10s",
+			},
+			wantErr: "",
+		},
+		{
+			name: "valid NONE healthcheck",
+			input: &healthcheck{
+				Test: []string{"NONE"},
+			},
+			wantErr: "",
+		},
+		{
+			name:    "nil healthcheck",
+			input:   nil,
+			wantErr: "",
+		},
+		{
+			name: "empty test",
+			input: &healthcheck{
+				Test: []string{},
+			},
+			wantErr: "test is required",
+		},
+		{
+			name: "invalid test prefix",
+			input: &healthcheck{
+				Test: []string{"INVALID", "command"},
+			},
+			wantErr: "must start with NONE, CMD, or CMD-SHELL",
+		},
+		{
+			name: "NONE with extra args",
+			input: &healthcheck{
+				Test: []string{"NONE", "extra"},
+			},
+			wantErr: "NONE healthcheck should not have additional arguments",
+		},
+		{
+			name: "CMD without command",
+			input: &healthcheck{
+				Test: []string{"CMD"},
+			},
+			wantErr: "CMD healthcheck requires a command",
+		},
+		{
+			name: "CMD-SHELL without command",
+			input: &healthcheck{
+				Test: []string{"CMD-SHELL"},
+			},
+			wantErr: "CMD-SHELL healthcheck requires a command",
+		},
+		{
+			name: "negative retries",
+			input: &healthcheck{
+				Test:    []string{"CMD", "true"},
+				Retries: -1,
+			},
+			wantErr: "retries must be non-negative",
+		},
+		{
+			name: "invalid interval duration",
+			input: &healthcheck{
+				Test:     []string{"CMD", "true"},
+				Interval: "invalid",
+			},
+			wantErr: "invalid interval",
+		},
+		{
+			name: "invalid timeout duration",
+			input: &healthcheck{
+				Test:    []string{"CMD", "true"},
+				Timeout: "5",
+			},
+			wantErr: "invalid timeout",
+		},
+		{
+			name: "invalid startPeriod duration",
+			input: &healthcheck{
+				Test:        []string{"CMD", "true"},
+				StartPeriod: "bad",
+			},
+			wantErr: "invalid startPeriod",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseHealthcheck(tt.input)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+			} else {
+				require.NoError(t, err)
+				if tt.input == nil {
+					assert.Nil(t, result)
+				} else {
+					assert.NotNil(t, result)
+					assert.Equal(t, tt.input.Test, result.Test)
+				}
+			}
+		})
+	}
+}
+
+func TestParseHealthcheck_DurationsCorrect(t *testing.T) {
+	t.Parallel()
+
+	input := &healthcheck{
+		Test:        []string{"CMD", "pg_isready"},
+		Interval:    "5s",
+		Timeout:     "3s",
+		StartPeriod: "10s",
+		Retries:     5,
+	}
+
+	result, err := parseHealthcheck(input)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Equal(t, 5*time.Second, result.Interval)
+	assert.Equal(t, 3*time.Second, result.Timeout)
+	assert.Equal(t, 10*time.Second, result.StartPeriod)
+	assert.Equal(t, 5, result.Retries)
+}
+
+func TestBuildContainerFromSpec_HealthcheckInExecMode(t *testing.T) {
+	t.Parallel()
+
+	c := &container{
+		Exec: "my-container",
+		Healthcheck: &healthcheck{
+			Test: []string{"CMD", "true"},
+		},
+	}
+
+	_, err := buildContainerFromSpec(testBuildContext(), c)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "healthcheck")
+	assert.Contains(t, err.Error(), "cannot be used with 'exec'")
+}
+
+func TestBuildContainerFromSpec_HealthcheckInImageMode(t *testing.T) {
+	t.Parallel()
+
+	c := &container{
+		Image: "postgres:alpine",
+		Healthcheck: &healthcheck{
+			Test:        []string{"CMD-SHELL", "pg_isready -U postgres"},
+			Interval:    "2s",
+			Timeout:     "5s",
+			StartPeriod: "10s",
+			Retries:     5,
+		},
+		WaitFor: "healthy",
+	}
+
+	result, err := buildContainerFromSpec(testBuildContext(), c)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.Healthcheck)
+
+	assert.Equal(t, []string{"CMD-SHELL", "pg_isready -U postgres"}, result.Healthcheck.Test)
+	assert.Equal(t, 2*time.Second, result.Healthcheck.Interval)
+	assert.Equal(t, 5*time.Second, result.Healthcheck.Timeout)
+	assert.Equal(t, 10*time.Second, result.Healthcheck.StartPeriod)
+	assert.Equal(t, 5, result.Healthcheck.Retries)
+	assert.Equal(t, core.WaitForHealthy, result.WaitFor)
+}

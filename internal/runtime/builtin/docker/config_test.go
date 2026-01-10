@@ -2,6 +2,7 @@ package docker
 
 import (
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/require"
@@ -55,4 +56,83 @@ func TestDockerConfigSchema(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDockerConfig_Healthcheck(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    core.Container
+		wantTest []string
+		wantNil  bool
+	}{
+		{
+			name: "with CMD healthcheck",
+			input: core.Container{
+				Image: "postgres:alpine",
+				Healthcheck: &core.Healthcheck{
+					Test:        []string{"CMD", "pg_isready"},
+					Interval:    5 * time.Second,
+					Timeout:     3 * time.Second,
+					StartPeriod: 10 * time.Second,
+					Retries:     5,
+				},
+			},
+			wantTest: []string{"CMD", "pg_isready"},
+		},
+		{
+			name: "with CMD-SHELL healthcheck",
+			input: core.Container{
+				Image: "mysql:8",
+				Healthcheck: &core.Healthcheck{
+					Test:     []string{"CMD-SHELL", "mysqladmin ping -h localhost"},
+					Interval: 2 * time.Second,
+					Retries:  3,
+				},
+			},
+			wantTest: []string{"CMD-SHELL", "mysqladmin ping -h localhost"},
+		},
+		{
+			name: "without healthcheck",
+			input: core.Container{
+				Image: "alpine:3",
+			},
+			wantNil: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := LoadConfig("", tt.input, nil)
+			require.NoError(t, err)
+
+			if tt.wantNil {
+				require.Nil(t, cfg.Container.Healthcheck)
+			} else {
+				require.NotNil(t, cfg.Container.Healthcheck)
+				require.Equal(t, tt.wantTest, cfg.Container.Healthcheck.Test)
+			}
+		})
+	}
+}
+
+func TestDockerConfig_Healthcheck_DurationsPreserved(t *testing.T) {
+	input := core.Container{
+		Image: "postgres:alpine",
+		Healthcheck: &core.Healthcheck{
+			Test:        []string{"CMD", "pg_isready"},
+			Interval:    5 * time.Second,
+			Timeout:     3 * time.Second,
+			StartPeriod: 10 * time.Second,
+			Retries:     5,
+		},
+	}
+
+	cfg, err := LoadConfig("", input, nil)
+	require.NoError(t, err)
+	require.NotNil(t, cfg.Container.Healthcheck)
+
+	require.Equal(t, 5*time.Second, cfg.Container.Healthcheck.Interval)
+	require.Equal(t, 3*time.Second, cfg.Container.Healthcheck.Timeout)
+	require.Equal(t, 10*time.Second, cfg.Container.Healthcheck.StartPeriod)
+	require.Equal(t, 5, cfg.Container.Healthcheck.Retries)
 }

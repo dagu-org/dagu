@@ -1107,6 +1107,30 @@
               "config": { "$ref": "#/definitions/archiveExecutorConfig" }
             }
           }
+        },
+        {
+          "if": { "properties": { "type": { "const": "postgres" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/postgresExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "sqlite" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/sqliteExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "hitl" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/hitlExecutorConfig" }
+            }
+          }
         }
       ]
     },
@@ -1368,6 +1392,40 @@
           "type": "boolean",
           "default": false,
           "description": "Keep the container running after the step completes. Useful for debugging or when running services that need to persist between steps. Not applicable in exec mode."
+        },
+        "healthcheck": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "test": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1,
+              "description": "Command to run to check health. Must start with 'NONE' (disable healthcheck), 'CMD' (run command directly), or 'CMD-SHELL' (run command in shell). Examples: ['CMD', 'pg_isready', '-U', 'postgres'] or ['CMD-SHELL', 'curl -f http://localhost/ || exit 1']."
+            },
+            "interval": {
+              "type": "string",
+              "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$",
+              "description": "Time between health checks (e.g., '5s', '1m'). Default is 30s."
+            },
+            "timeout": {
+              "type": "string",
+              "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$",
+              "description": "Maximum time to wait for a health check to complete (e.g., '3s', '10s'). Default is 30s."
+            },
+            "startPeriod": {
+              "type": "string",
+              "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$",
+              "description": "Grace period for the container to initialize before health checks start counting failures (e.g., '10s', '1m'). Default is 0s."
+            },
+            "retries": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of consecutive failures needed to mark the container as unhealthy. Default is 3."
+            }
+          },
+          "required": ["test"],
+          "description": "Custom healthcheck configuration for the container. Allows 'waitFor: healthy' to work with images that don't have built-in healthchecks (e.g., postgres, mysql). Not applicable in exec mode."
         }
       },
       "description": "Container configuration object. Either 'exec' (to run in an existing container) or 'image' (to create a new container) must be specified, but not both."
@@ -1809,6 +1867,274 @@
       },
       "description": "Configuration for archive operations (create, extract, list)."
     },
+    "sqlImportConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputFile", "table"],
+      "properties": {
+        "inputFile": {
+          "type": "string",
+          "description": "Path to input file (CSV, TSV, or JSONL). Required."
+        },
+        "table": {
+          "type": "string",
+          "description": "Target table name. Required."
+        },
+        "format": {
+          "type": "string",
+          "enum": ["csv", "tsv", "jsonl"],
+          "description": "Input format. Auto-detected from file extension if not specified."
+        },
+        "hasHeader": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether first row is a header row. Default: true for CSV/TSV files."
+        },
+        "delimiter": {
+          "type": "string",
+          "description": "Field delimiter. Default: ',' for csv, '\\t' for tsv."
+        },
+        "columns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Explicit column names. Overrides header row if specified."
+        },
+        "nullValues": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Values to treat as NULL. Default: ['', 'NULL', 'null', '\\N']."
+        },
+        "batchSize": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1000,
+          "description": "Number of rows per INSERT statement. Default: 1000."
+        },
+        "onConflict": {
+          "type": "string",
+          "enum": ["error", "ignore", "replace"],
+          "default": "error",
+          "description": "Conflict handling strategy. Default: 'error'. For PostgreSQL, 'replace' requires 'conflictTarget' to perform UPSERT (ON CONFLICT DO UPDATE); without it, falls back to DO NOTHING. SQLite uses INSERT OR REPLACE which replaces the entire row."
+        },
+        "skipRows": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Skip first N data rows."
+        },
+        "maxRows": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum rows to import. 0 = unlimited."
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Validate without actually importing data."
+        }
+      },
+      "description": "Configuration for importing data from CSV/TSV/JSONL files into a database table."
+    },
+    "postgresExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dsn"],
+      "properties": {
+        "dsn": {
+          "type": "string",
+          "description": "PostgreSQL connection string. Format: postgres://user:pass@host:port/dbname?sslmode=disable"
+        },
+        "maxOpenConns": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5,
+          "description": "Maximum number of open connections. Default: 5."
+        },
+        "maxIdleConns": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 2,
+          "description": "Maximum number of idle connections. Default: 2."
+        },
+        "connMaxLifetime": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 300,
+          "description": "Maximum connection lifetime in seconds. 0 = no limit. Default: 300."
+        },
+        "params": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Named parameters as map (e.g., {name: 'value'}). Use :name in query."
+            },
+            {
+              "type": "array",
+              "items": {},
+              "description": "Positional parameters as array. Use $1, $2, etc. in query."
+            }
+          ],
+          "description": "Query parameters for SQL injection prevention."
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 60,
+          "description": "Query timeout in seconds. Default: 60."
+        },
+        "transaction": {
+          "type": "boolean",
+          "description": "Wrap execution in a transaction."
+        },
+        "isolationLevel": {
+          "type": "string",
+          "enum": ["default", "read_committed", "repeatable_read", "serializable"],
+          "description": "Transaction isolation level."
+        },
+        "advisoryLock": {
+          "type": "string",
+          "description": "Named advisory lock. Prevents concurrent execution across distributed workers."
+        },
+        "outputFormat": {
+          "type": "string",
+          "enum": ["jsonl", "json", "csv"],
+          "default": "jsonl",
+          "description": "Output format for query results. Default: jsonl."
+        },
+        "headers": {
+          "type": "boolean",
+          "description": "Include headers in CSV output."
+        },
+        "nullString": {
+          "type": "string",
+          "default": "null",
+          "description": "String representation for NULL values. Default: 'null'."
+        },
+        "maxRows": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum rows to return. 0 = unlimited."
+        },
+        "streaming": {
+          "type": "boolean",
+          "description": "Stream results to file instead of stdout."
+        },
+        "outputFile": {
+          "type": "string",
+          "description": "File path for streaming output."
+        },
+        "import": {
+          "$ref": "#/definitions/sqlImportConfig",
+          "description": "Import data from CSV/TSV/JSONL file into a table."
+        }
+      },
+      "description": "PostgreSQL executor configuration for database operations."
+    },
+    "sqliteExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dsn"],
+      "properties": {
+        "dsn": {
+          "type": "string",
+          "description": "SQLite connection string. Format: file:./path/to/db.sqlite or :memory: for in-memory database."
+        },
+        "maxOpenConns": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5,
+          "description": "Maximum number of open connections. Default: 5. Recommended: 1 for SQLite."
+        },
+        "maxIdleConns": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 2,
+          "description": "Maximum number of idle connections. Default: 2."
+        },
+        "params": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Named parameters as map (e.g., {name: 'value'}). Use :name in query."
+            },
+            {
+              "type": "array",
+              "items": {},
+              "description": "Positional parameters as array. Use ? placeholders in query."
+            }
+          ],
+          "description": "Query parameters for SQL injection prevention."
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 60,
+          "description": "Query timeout in seconds. Default: 60."
+        },
+        "transaction": {
+          "type": "boolean",
+          "description": "Wrap execution in a transaction."
+        },
+        "fileLock": {
+          "type": "boolean",
+          "description": "Use file locking for exclusive database access. Creates a .lock file."
+        },
+        "outputFormat": {
+          "type": "string",
+          "enum": ["jsonl", "json", "csv"],
+          "default": "jsonl",
+          "description": "Output format for query results. Default: jsonl."
+        },
+        "headers": {
+          "type": "boolean",
+          "description": "Include headers in CSV output."
+        },
+        "nullString": {
+          "type": "string",
+          "default": "null",
+          "description": "String representation for NULL values. Default: 'null'."
+        },
+        "maxRows": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum rows to return. 0 = unlimited."
+        },
+        "streaming": {
+          "type": "boolean",
+          "description": "Stream results to file instead of stdout."
+        },
+        "outputFile": {
+          "type": "string",
+          "description": "File path for streaming output."
+        },
+        "import": {
+          "$ref": "#/definitions/sqlImportConfig",
+          "description": "Import data from CSV/TSV/JSONL file into a table."
+        }
+      },
+      "description": "SQLite executor configuration for database operations. Uses pure Go SQLite with automatic pragmas: foreign_keys=ON, busy_timeout=5000."
+    },
+    "hitlExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "description": "Message displayed to the approver explaining what approval is needed."
+        },
+        "input": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of input field names expected from the approver."
+        },
+        "required": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Subset of input fields that must be provided. All values must exist in 'input' array."
+        }
+      },
+      "description": "Human-in-the-loop executor configuration. Pauses workflow execution until human approval is received."
+    },
     "llmConfig": {
       "type": "object",
       "additionalProperties": false,
@@ -1936,7 +2262,9 @@
         "parallel",
         "archive",
         "chat",
-        "hitl"
+        "hitl",
+        "postgres",
+        "sqlite"
       ],
       "description": "Type of executor to use for this step."
     },
@@ -2016,6 +2344,30 @@
           "then": {
             "properties": {
               "config": { "$ref": "#/definitions/archiveExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "postgres" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/postgresExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "sqlite" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/sqliteExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "hitl" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/hitlExecutorConfig" }
             }
           }
         },
