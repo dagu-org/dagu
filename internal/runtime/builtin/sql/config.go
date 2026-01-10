@@ -17,10 +17,10 @@ type Config struct {
 	// - SQLite: "file:./data.db?mode=rw" or ":memory:"
 	DSN string `mapstructure:"dsn"`
 
-	// Connection pool settings (1:1 is sufficient for workflow steps)
-	MaxOpenConns    int `mapstructure:"maxOpenConns"`    // Maximum open connections (default: 1)
-	MaxIdleConns    int `mapstructure:"maxIdleConns"`    // Maximum idle connections (default: 1)
-	ConnMaxLifetime int `mapstructure:"connMaxLifetime"` // Connection max lifetime in seconds (default: 0, no limit)
+	// Connection pool settings
+	MaxOpenConns    int `mapstructure:"maxOpenConns"`    // Maximum open connections (default: 5)
+	MaxIdleConns    int `mapstructure:"maxIdleConns"`    // Maximum idle connections (default: 2)
+	ConnMaxLifetime int `mapstructure:"connMaxLifetime"` // Connection max lifetime in seconds (default: 300)
 
 	// Parameterized queries (SQL injection prevention)
 	// Can be map[string]any for named params or []any for positional params

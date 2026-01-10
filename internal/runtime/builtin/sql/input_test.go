@@ -57,9 +57,6 @@ func TestDefaultInputOptions(t *testing.T) {
 }
 
 func TestNewInputReader(t *testing.T) {
-	r := strings.NewReader("a,b\n1,2\n")
-	opts := DefaultInputOptions("csv")
-
 	tests := []struct {
 		format  string
 		wantErr bool
@@ -73,6 +70,10 @@ func TestNewInputReader(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.format, func(t *testing.T) {
+			// Create a fresh reader for each subtest to avoid exhaustion
+			r := strings.NewReader("a,b\n1,2\n")
+			opts := DefaultInputOptions("csv")
+
 			reader, err := NewInputReader(r, tt.format, opts)
 			if tt.wantErr {
 				assert.Error(t, err)

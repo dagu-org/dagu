@@ -1906,7 +1906,7 @@
           "type": "string",
           "enum": ["error", "ignore", "replace"],
           "default": "error",
-          "description": "Conflict handling strategy. Default: 'error'. Note: PostgreSQL 'replace' uses ON CONFLICT DO NOTHING (same as ignore)."
+          "description": "Conflict handling strategy. Default: 'error'. For PostgreSQL, 'replace' requires 'conflictTarget' to perform UPSERT (ON CONFLICT DO UPDATE); without it, falls back to DO NOTHING. SQLite uses INSERT OR REPLACE which replaces the entire row."
         },
         "skipRows": {
           "type": "integer",

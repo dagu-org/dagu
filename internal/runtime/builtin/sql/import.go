@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"time"
+	"unicode/utf8"
 )
 
 // ImportMetrics tracks import operation statistics.
@@ -100,7 +101,11 @@ func (i *Importer) buildInputOptions() InputOptions {
 	}
 
 	if i.cfg.Delimiter != "" {
-		opts.Delimiter = rune(i.cfg.Delimiter[0])
+		// Properly decode UTF-8 delimiter (handles multi-byte characters)
+		r, _ := utf8.DecodeRuneInString(i.cfg.Delimiter)
+		if r != utf8.RuneError {
+			opts.Delimiter = r
+		}
 	}
 
 	if len(i.cfg.Columns) > 0 {
