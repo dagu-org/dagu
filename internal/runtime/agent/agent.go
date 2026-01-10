@@ -1357,6 +1357,6 @@ func encodeError(w http.ResponseWriter, err error) {
 	if errors.As(err, &httpErr) {
 		http.Error(w, httpErr.Error(), httpErr.Code)
 	} else {
-		http.Error(w, httpErr.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

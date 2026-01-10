@@ -600,37 +600,37 @@ func createTempDAGFile(dagName string, yamlData []byte, localDAGs map[string]*co
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
-	defer func() {
-		_ = tempFile.Close()
+
+	tempFileName := tempFile.Name()
+	writeErr := func() error {
+		defer func() { _ = tempFile.Close() }()
+
+		// Write the YAML data
+		if _, err := tempFile.Write(yamlData); err != nil {
+			return err
+		}
+
+		// Add other local DAG data to the temporary file
+		for _, localDAG := range localDAGs {
+			if localDAG.Name == dagName {
+				continue
+			}
+			if _, err := tempFile.WriteString("---\n"); err != nil {
+				return err
+			}
+			if _, err := tempFile.Write(localDAG.YamlData); err != nil {
+				return err
+			}
+		}
+		return nil
 	}()
 
-	// Write the YAML data
-	var writeErr error
-	if _, err := tempFile.Write(yamlData); err != nil {
-		writeErr = err
-		goto Fail
+	if writeErr != nil {
+		_ = os.Remove(tempFileName)
+		return "", fmt.Errorf("failed to write YAML data: %w", writeErr)
 	}
 
-	// Add other local DAG data to the temporary file
-	for _, localDAG := range localDAGs {
-		if localDAG.Name == dagName {
-			continue
-		}
-		if _, err := tempFile.WriteString("---\n"); err != nil {
-			writeErr = err
-			goto Fail
-		}
-		if _, err := tempFile.Write(localDAG.YamlData); err != nil {
-			writeErr = err
-			goto Fail
-		}
-	}
-
-	return tempFile.Name(), nil
-
-Fail:
-	_ = os.Remove(tempFile.Name())
-	return "", fmt.Errorf("failed to write YAML data: %w", writeErr)
+	return tempFileName, nil
 }
 
 // executablePath returns the path to the dagu executable.

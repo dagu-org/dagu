@@ -225,15 +225,8 @@ func (w *Worker) sendHeartbeat(ctx context.Context) error {
 	w.pollersMu.Unlock()
 
 	// Safely convert to int32, capping at max int32 if needed
-	totalPollers := int32(math.MaxInt32)
-	if w.maxActiveRuns <= math.MaxInt32 {
-		totalPollers = int32(w.maxActiveRuns) //nolint:gosec // Already checked above
-	}
-
-	busyCount32 := int32(math.MaxInt32)
-	if busyCount <= math.MaxInt32 {
-		busyCount32 = int32(busyCount) //nolint:gosec // Already checked above
-	}
+	totalPollers := int32(min(w.maxActiveRuns, math.MaxInt32)) //nolint:gosec
+	busyCount32 := int32(min(busyCount, math.MaxInt32))        //nolint:gosec
 
 	req := &coordinatorv1.HeartbeatRequest{
 		WorkerId: w.id,
