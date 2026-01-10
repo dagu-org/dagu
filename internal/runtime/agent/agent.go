@@ -904,12 +904,13 @@ func (a *Agent) watchCancelRequested(ctx context.Context, attempt execution.DAGR
 	for {
 		select {
 		case <-ctx.Done():
-			// Context cancelled - signal the agent to stop.
+			// Only signal if the agent hasn't finished yet.
 			// This handles cancellation from the worker (via heartbeat CancelledRuns)
-			// in shared-nothing mode where the CANCEL_REQUESTED flag is on the
-			// coordinator's storage, not the worker's local storage.
-			// Use background context since the original context is already cancelled.
-			a.signal(context.Background(), syscall.SIGTERM, true)
+			// in shared-nothing mode. If the agent already finished normally,
+			// we don't want to send an unnecessary SIGTERM.
+			if !a.finished.Load() {
+				a.signal(context.Background(), syscall.SIGTERM, true)
+			}
 			return
 		case <-ticker.C:
 			if cancelled, _ := attempt.IsAborting(ctx); cancelled {
