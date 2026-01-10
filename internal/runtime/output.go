@@ -15,6 +15,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/masking"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
@@ -204,6 +205,9 @@ func (oc *OutputCoordinator) closeResources() error {
 	// Close stdout/stderr writers if they implement io.Closer.
 	// This is needed for remote log streaming where the writers need
 	// to flush their buffers and send final markers.
+	// NOTE: Close errors are logged by the writer but not propagated here.
+	// Log streaming failures are non-fatal - they shouldn't fail an otherwise
+	// successful step execution. Lost logs are unfortunate but acceptable.
 	closedWriters := make(map[io.Writer]bool)
 	for _, w := range []io.Writer{oc.stdoutWriter, oc.stderrWriter, oc.stdoutRedirectWriter, oc.stderrRedirectWriter} {
 		if w == nil || closedWriters[w] {
@@ -211,9 +215,7 @@ func (oc *OutputCoordinator) closeResources() error {
 		}
 		closedWriters[w] = true
 		if closer, ok := w.(io.Closer); ok {
-			if err := closer.Close(); err != nil {
-				lastErr = err
-			}
+			_ = closer.Close()
 		}
 	}
 
@@ -307,15 +309,15 @@ func (oc *OutputCoordinator) setupWriters(ctx context.Context, data NodeData) er
 func (oc *OutputCoordinator) setupRemoteWriters(ctx context.Context, data NodeData, factory LogWriterFactory) error {
 	stepName := data.Step.Name
 
-	// Create streaming writers for stdout (type 1) and stderr (type 2)
-	oc.stdoutWriter = factory.NewStepWriter(ctx, stepName, 1) // stdout
-	oc.stdoutFileName = data.State.Stdout                     // Keep path for status reporting
+	// Create streaming writers for stdout and stderr
+	oc.stdoutWriter = factory.NewStepWriter(ctx, stepName, execution.StreamTypeStdout)
+	oc.stdoutFileName = data.State.Stdout // Keep path for status reporting
 
 	// Check if stdout and stderr should be merged
 	if data.State.Stdout == data.State.Stderr {
 		oc.stderrWriter = oc.stdoutWriter
 	} else {
-		oc.stderrWriter = factory.NewStepWriter(ctx, stepName, 2) // stderr
+		oc.stderrWriter = factory.NewStepWriter(ctx, stepName, execution.StreamTypeStderr)
 	}
 	oc.stderrFileName = data.State.Stderr
 

@@ -335,6 +335,13 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 		attempt = att
 		a.dagRunAttemptID = attempt.ID()
+
+		// Set the attemptID on the log writer factory if it supports it
+		if a.logWriterFactory != nil {
+			if setter, ok := a.logWriterFactory.(interface{ SetAttemptID(string) }); ok {
+				setter.SetAttemptID(a.dagRunAttemptID)
+			}
+		}
 	}
 
 	// Initialize the runner

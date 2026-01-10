@@ -23,8 +23,8 @@ type Context struct {
 	Envs               map[string]string
 	SecretEnvs         map[string]string // Secret environment variables (highest priority)
 	CoordinatorCli     Dispatcher
-	Shell              string // Default shell for this DAG (from DAG.Shell)
-	LogEncodingCharset string // Character encoding for log files (e.g., "utf-8", "shift_jis", "euc-jp")
+	Shell              string           // Default shell for this DAG (from DAG.Shell)
+	LogEncodingCharset string           // Character encoding for log files (e.g., "utf-8", "shift_jis", "euc-jp")
 	LogWriterFactory   LogWriterFactory // For remote log streaming (nil = use local files)
 }
 

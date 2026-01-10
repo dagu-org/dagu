@@ -378,7 +378,7 @@ func TestProtoToNode(t *testing.T) {
 		require.NotNil(t, result.OutputVariables)
 
 		var val1, val2 string
-		result.OutputVariables.Range(func(key, value interface{}) bool {
+		result.OutputVariables.Range(func(key, value any) bool {
 			if key == "key1" {
 				val1 = value.(string)
 			}

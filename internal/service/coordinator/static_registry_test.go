@@ -147,7 +147,7 @@ func TestStaticRegistry_NoOps(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("unregister is no-op", func(t *testing.T) {
+	t.Run("unregister is no-op", func(_ *testing.T) {
 		// Should not panic
 		registry.Unregister(context.Background())
 	})

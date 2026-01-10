@@ -38,8 +38,8 @@ type Handler struct {
 	logDir      string                // For log storage
 
 	// Open attempts cache for status persistence
-	attemptsMu     sync.Mutex
-	openAttempts   map[string]execution.DAGRunAttempt // dagRunID -> open attempt
+	attemptsMu   sync.Mutex
+	openAttempts map[string]execution.DAGRunAttempt // dagRunID -> open attempt
 }
 
 // HandlerOption configures the Handler
@@ -69,6 +69,18 @@ func NewHandler(opts ...HandlerOption) *Handler {
 		opt(h)
 	}
 	return h
+}
+
+// Close cleans up all resources held by the handler.
+// This should be called during coordinator shutdown.
+func (h *Handler) Close(ctx context.Context) {
+	h.attemptsMu.Lock()
+	defer h.attemptsMu.Unlock()
+
+	for dagRunID, attempt := range h.openAttempts {
+		_ = attempt.Close(ctx)
+		delete(h.openAttempts, dagRunID)
+	}
 }
 
 // Poll implements long polling - workers wait until a task is available
@@ -168,32 +180,17 @@ func (h *Handler) GetWorkers(_ context.Context, _ *coordinatorv1.GetWorkersReque
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	// Return aggregated worker info from heartbeats
 	workers := make([]*coordinatorv1.WorkerInfo, 0, len(h.heartbeats))
 	now := time.Now()
 
 	for _, hb := range h.heartbeats {
-		// Calculate health status based on heartbeat recency
-		secondsSinceHeartbeat := now.Sub(hb.lastHeartbeatAt).Seconds()
-		var healthStatus coordinatorv1.WorkerHealthStatus
-
-		switch {
-		case secondsSinceHeartbeat < 5:
-			healthStatus = coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_HEALTHY
-		case secondsSinceHeartbeat < 15:
-			healthStatus = coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_WARNING
-		default:
-			healthStatus = coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_UNHEALTHY
-		}
-
 		workerInfo := &coordinatorv1.WorkerInfo{
 			WorkerId:        hb.workerID,
 			Labels:          hb.labels,
 			LastHeartbeatAt: hb.lastHeartbeatAt.Unix(),
-			HealthStatus:    healthStatus,
+			HealthStatus:    calculateHealthStatus(now.Sub(hb.lastHeartbeatAt)),
 		}
 
-		// Add stats if available
 		if hb.stats != nil {
 			workerInfo.TotalPollers = hb.stats.TotalPollers
 			workerInfo.BusyPollers = hb.stats.BusyPollers
@@ -203,9 +200,19 @@ func (h *Handler) GetWorkers(_ context.Context, _ *coordinatorv1.GetWorkersReque
 		workers = append(workers, workerInfo)
 	}
 
-	return &coordinatorv1.GetWorkersResponse{
-		Workers: workers,
-	}, nil
+	return &coordinatorv1.GetWorkersResponse{Workers: workers}, nil
+}
+
+// calculateHealthStatus determines worker health based on time since last heartbeat.
+func calculateHealthStatus(sinceLastHeartbeat time.Duration) coordinatorv1.WorkerHealthStatus {
+	switch {
+	case sinceLastHeartbeat < 5*time.Second:
+		return coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_HEALTHY
+	case sinceLastHeartbeat < 15*time.Second:
+		return coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_WARNING
+	default:
+		return coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_UNHEALTHY
+	}
 }
 
 // Heartbeat receives periodic status updates from workers
@@ -310,5 +317,6 @@ func (h *Handler) StreamLogs(stream coordinatorv1.CoordinatorService_StreamLogsS
 
 	// Delegate to the log handler
 	logHandler := newLogHandler(h.logDir)
+	defer logHandler.Close() // Ensure file handles are closed on stream end or error
 	return logHandler.handleStream(stream)
 }

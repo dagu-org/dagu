@@ -87,81 +87,79 @@ func (h *remoteTaskHandler) Handle(ctx context.Context, task *coordinatorv1.Task
 			return h.handleStart(ctx, task, true)
 		}
 		return h.handleRetry(ctx, task)
+	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
+		return fmt.Errorf("unspecified operation")
 	default:
 		return fmt.Errorf("unsupported operation: %v", task.Operation)
 	}
 }
 
 func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1.Task, queuedRun bool) error {
-	// Load the DAG
-	dag, err := h.loadDAG(ctx, task)
+	dag, cleanup, err := h.loadDAG(ctx, task)
 	if err != nil {
 		return fmt.Errorf("failed to load DAG: %w", err)
 	}
+	if cleanup != nil {
+		defer cleanup()
+	}
 
-	// Parse references
 	root := execution.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
 	parent := execution.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
+	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
 
-	// Create status pusher
-	statusPusher := remote.NewStatusPusher(h.coordinatorClient, h.workerID)
-
-	// Create log streamer
-	logStreamer := remote.NewLogStreamer(
-		h.coordinatorClient,
-		h.workerID,
-		task.DagRunId,
-		dag.Name,
-		"", // attemptID will be set later
-		root,
-	)
-
-	// Create and run the agent
-	return h.executeDAGRun(ctx, dag, task.DagRunId, root, parent, statusPusher, logStreamer, queuedRun)
+	return h.executeDAGRun(ctx, dag, task.DagRunId, root, parent, statusPusher, logStreamer, queuedRun, nil)
 }
 
 func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1.Task) error {
-	// For retry, we need to find the previous run and retry it
 	root := execution.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
 
-	// Find the previous attempt
 	attempt, err := h.dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef(task.RootDagRunName, task.DagRunId))
 	if err != nil {
 		return fmt.Errorf("failed to find previous run: %w", err)
 	}
 
-	// Read the previous status
 	status, err := attempt.ReadStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read previous status: %w", err)
 	}
 
-	// Read the DAG snapshot from the previous run
 	dag, err := attempt.ReadDAG(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read DAG from previous run: %w", err)
 	}
 
-	// Create status pusher
-	statusPusher := remote.NewStatusPusher(h.coordinatorClient, h.workerID)
+	parent := execution.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
+	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
 
-	// Create log streamer
+	return h.executeDAGRun(ctx, dag, task.DagRunId, root, parent, statusPusher, logStreamer, false, &retryConfig{
+		target:   status,
+		stepName: task.Step,
+	})
+}
+
+// retryConfig holds retry-specific configuration
+type retryConfig struct {
+	target   *execution.DAGRunStatus
+	stepName string
+}
+
+// createRemoteHandlers creates the status pusher and log streamer for remote execution.
+func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root execution.DAGRunRef) (*remote.StatusPusher, *remote.LogStreamer) {
+	statusPusher := remote.NewStatusPusher(h.coordinatorClient, h.workerID)
 	logStreamer := remote.NewLogStreamer(
 		h.coordinatorClient,
 		h.workerID,
-		task.DagRunId,
-		dag.Name,
-		"", // attemptID will be set later
+		dagRunID,
+		dagName,
+		"", // attemptID will be set by agent after attempt creation
 		root,
 	)
-
-	parent := execution.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
-
-	// Create and run the agent with retry target
-	return h.executeRetry(ctx, dag, status, root, parent, task.Step, statusPusher, logStreamer)
+	return statusPusher, logStreamer
 }
 
-func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Task) (*core.DAG, error) {
+// loadDAG loads the DAG from task definition or target path.
+// Returns the loaded DAG and a cleanup function that should be called after task execution.
+func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Task) (*core.DAG, func(), error) {
 	var target string
 	var cleanupFunc func()
 
@@ -173,7 +171,7 @@ func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Tas
 
 		tempFile, err := createTempDAGFile(task.Target, []byte(task.Definition))
 		if err != nil {
-			return nil, fmt.Errorf("failed to create temp DAG file: %w", err)
+			return nil, nil, fmt.Errorf("failed to create temp DAG file: %w", err)
 		}
 		target = tempFile
 		cleanupFunc = func() {
@@ -197,15 +195,38 @@ func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Tas
 		if cleanupFunc != nil {
 			cleanupFunc()
 		}
-		return nil, fmt.Errorf("failed to load DAG from %s: %w", target, err)
+		return nil, nil, fmt.Errorf("failed to load DAG from %s: %w", target, err)
 	}
 
-	// Schedule cleanup after DAG is loaded (actual cleanup happens when task completes)
-	if cleanupFunc != nil {
-		defer cleanupFunc()
+	return dag, cleanupFunc, nil
+}
+
+// agentEnv holds temporary directories and cleanup function for agent execution.
+type agentEnv struct {
+	logDir  string
+	logFile string
+	cleanup func()
+}
+
+// createAgentEnv creates temporary directories for agent execution.
+// The cleanup function must be called after execution completes.
+func (h *remoteTaskHandler) createAgentEnv(ctx context.Context, dagRunID string) (*agentEnv, error) {
+	logDir := filepath.Join(os.TempDir(), "dagu", "worker-logs", dagRunID)
+	if err := os.MkdirAll(logDir, 0750); err != nil {
+		return nil, fmt.Errorf("failed to create log directory: %w", err)
 	}
 
-	return dag, nil
+	return &agentEnv{
+		logDir:  logDir,
+		logFile: filepath.Join(logDir, "scheduler.log"),
+		cleanup: func() {
+			if err := os.RemoveAll(logDir); err != nil {
+				logger.Warn(ctx, "Failed to cleanup temp log directory",
+					slog.String("path", logDir),
+					tag.Error(err))
+			}
+		},
+	}, nil
 }
 
 func (h *remoteTaskHandler) executeDAGRun(
@@ -217,34 +238,43 @@ func (h *remoteTaskHandler) executeDAGRun(
 	statusPusher *remote.StatusPusher,
 	logStreamer *remote.LogStreamer,
 	queuedRun bool,
+	retry *retryConfig,
 ) error {
-	// For remote mode, we don't write logs locally
-	// Create a temporary directory for any local operations
-	logDir := filepath.Join(os.TempDir(), "dagu", "worker-logs", dagRunID)
-	if err := os.MkdirAll(logDir, 0750); err != nil {
-		return fmt.Errorf("failed to create log directory: %w", err)
+	// Create temporary directory for local operations
+	env, err := h.createAgentEnv(ctx, dagRunID)
+	if err != nil {
+		return err
 	}
-	logFile := filepath.Join(logDir, "scheduler.log")
+	defer env.cleanup()
 
-	// Create the agent with remote status pusher and log streamer
+	// Build agent options
+	opts := agent.Options{
+		ParentDAGRun:     parent,
+		WorkerID:         h.workerID,
+		StatusPusher:     statusPusher,
+		LogWriterFactory: logStreamer,
+		QueuedRun:        queuedRun,
+	}
+
+	// Add retry configuration if present
+	if retry != nil {
+		opts.RetryTarget = retry.target
+		opts.StepRetry = retry.stepName
+	}
+
+	// Create the agent
 	agentInstance := agent.New(
 		dagRunID,
 		dag,
-		logDir,
-		logFile,
+		env.logDir,
+		env.logFile,
 		h.dagRunMgr,
 		h.dagStore,
 		h.dagRunStore,
 		h.serviceRegistry,
 		root,
 		h.peerConfig,
-		agent.Options{
-			ParentDAGRun:     parent,
-			WorkerID:         h.workerID,
-			StatusPusher:     statusPusher,
-			LogWriterFactory: logStreamer,
-			QueuedRun:        queuedRun,
-		},
+		opts,
 	)
 
 	// Run the agent
@@ -256,61 +286,6 @@ func (h *remoteTaskHandler) executeDAGRun(
 	}
 
 	logger.Info(ctx, "DAG execution completed",
-		tag.RunID(dagRunID))
-
-	return nil
-}
-
-func (h *remoteTaskHandler) executeRetry(
-	ctx context.Context,
-	dag *core.DAG,
-	retryTarget *execution.DAGRunStatus,
-	root execution.DAGRunRef,
-	parent execution.DAGRunRef,
-	stepName string,
-	statusPusher *remote.StatusPusher,
-	logStreamer *remote.LogStreamer,
-) error {
-	dagRunID := retryTarget.DAGRunID
-
-	// For remote mode, we don't write logs locally
-	logDir := filepath.Join(os.TempDir(), "dagu", "worker-logs", dagRunID)
-	if err := os.MkdirAll(logDir, 0750); err != nil {
-		return fmt.Errorf("failed to create log directory: %w", err)
-	}
-	logFile := filepath.Join(logDir, "scheduler.log")
-
-	// Create the agent with retry target and remote status pusher
-	agentInstance := agent.New(
-		dagRunID,
-		dag,
-		logDir,
-		logFile,
-		h.dagRunMgr,
-		h.dagStore,
-		h.dagRunStore,
-		h.serviceRegistry,
-		root,
-		h.peerConfig,
-		agent.Options{
-			ParentDAGRun:     parent,
-			RetryTarget:      retryTarget,
-			StepRetry:        stepName,
-			WorkerID:         h.workerID,
-			StatusPusher:     statusPusher,
-			LogWriterFactory: logStreamer,
-		},
-	)
-
-	// Run the agent
-	if err := agentInstance.Run(ctx); err != nil {
-		logger.Error(ctx, "DAG retry execution failed",
-			tag.RunID(dagRunID),
-			tag.Error(err))
-		return err
-	}
-
-	logger.Info(ctx, "DAG retry execution completed",
 		tag.RunID(dagRunID))
 
 	return nil

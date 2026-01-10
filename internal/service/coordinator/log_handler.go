@@ -12,6 +12,9 @@ import (
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
+// flushThreshold is the number of bytes after which to flush a writer
+const flushThreshold = 65536
+
 // logHandler handles log streaming from workers
 type logHandler struct {
 	logDir string
@@ -23,9 +26,10 @@ type logHandler struct {
 
 // logWriter manages writing to a single log file
 type logWriter struct {
-	file   *os.File
-	writer *bufio.Writer
-	path   string
+	file            *os.File
+	writer          *bufio.Writer
+	path            string
+	bytesSinceFlush uint64 // Track bytes written since last flush
 }
 
 // newLogHandler creates a new log handler
@@ -78,11 +82,15 @@ func (h *logHandler) handleStream(stream coordinatorv1.CoordinatorService_Stream
 		if err != nil {
 			return fmt.Errorf("failed to write data: %w", err)
 		}
-		bytesWritten += uint64(n)
+		if n > 0 {
+			bytesWritten += uint64(n) // #nosec G115 -- n is non-negative from successful Write
+			writer.bytesSinceFlush += uint64(n)
+		}
 
 		// Flush periodically to ensure data is visible
-		if bytesWritten%65536 == 0 {
+		if writer.bytesSinceFlush >= flushThreshold {
 			_ = writer.writer.Flush()
+			writer.bytesSinceFlush = 0
 		}
 	}
 }
@@ -150,42 +158,46 @@ func (h *logHandler) closeWriter(chunk *coordinatorv1.LogChunk) {
 	}
 }
 
-// logFilePath generates the log file path following the existing pattern
+// logFilePath generates the log file path following the existing pattern.
+// Path format: {logDir}/{dagName}/{dagRunID}/{attemptID}/{stepName}.{ext}
 func (h *logHandler) logFilePath(chunk *coordinatorv1.LogChunk) string {
-	// Use root DAG info if this is a sub-DAG
 	dagName := chunk.DagName
 	dagRunID := chunk.DagRunId
+
+	// For sub-DAGs, store under root DAG's directory
 	if chunk.RootDagRunId != "" {
-		// For sub-DAGs, store under root DAG's directory
 		dagName = chunk.RootDagRunName
 		dagRunID = chunk.RootDagRunId
 	}
 
-	// Determine file extension based on stream type
-	var ext string
-	switch chunk.StreamType {
-	case coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDOUT:
-		ext = "stdout.log"
-	case coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDERR:
-		ext = "stderr.log"
-	default:
-		ext = "log"
-	}
-
-	// Build path: {logDir}/{dagName}/{dagRunID}/{attemptID}/{stepName}.{ext}
-	// If no attemptID, use dagRunID directly
 	attemptDir := chunk.AttemptId
 	if attemptDir == "" {
 		attemptDir = dagRunID
 	}
 
+	ext := streamTypeToExtension(chunk.StreamType)
+	filename := fmt.Sprintf("%s.%s", fileutil.SafeName(chunk.StepName), ext)
+
 	return filepath.Join(
 		h.logDir,
 		fileutil.SafeName(dagName),
 		fileutil.SafeName(dagRunID),
-		attemptDir,
-		fmt.Sprintf("%s.%s", fileutil.SafeName(chunk.StepName), ext),
+		fileutil.SafeName(attemptDir),
+		filename,
 	)
+}
+
+// streamTypeToExtension returns the file extension for a given stream type.
+func streamTypeToExtension(streamType coordinatorv1.LogStreamType) string {
+	switch streamType {
+	case coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDOUT:
+		return "stdout.log"
+	case coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDERR:
+		return "stderr.log"
+	case coordinatorv1.LogStreamType_LOG_STREAM_TYPE_UNSPECIFIED:
+		return "log"
+	}
+	return "log"
 }
 
 // Close closes all open writers

@@ -114,5 +114,8 @@ func (srv *Service) Stop(ctx context.Context) error {
 	srv.server.GracefulStop()
 	t.Stop()
 
+	// Close handler resources (open attempts, etc.)
+	srv.handler.Close(ctx)
+
 	return nil
 }

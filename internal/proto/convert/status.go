@@ -20,9 +20,9 @@ func DAGRunStatusToProto(s *execution.DAGRunStatus) *coordinatorv1.DAGRunStatusP
 		Name:       s.Name,
 		DagRunId:   s.DAGRunID,
 		AttemptId:  s.AttemptID,
-		Status:     int32(s.Status),
+		Status:     int32(s.Status), // #nosec G115 -- Status is a small enum value
 		WorkerId:   s.WorkerID,
-		Pid:        int32(s.PID),
+		Pid:        int32(s.PID), // #nosec G115 -- PID fits in int32
 		CreatedAt:  s.CreatedAt,
 		QueuedAt:   s.QueuedAt,
 		StartedAt:  s.StartedAt,
@@ -69,14 +69,14 @@ func NodeToProto(n *execution.Node) *coordinatorv1.NodeStatusProto {
 
 	p := &coordinatorv1.NodeStatusProto{
 		StepName:   n.Step.Name,
-		Status:     int32(n.Status),
+		Status:     int32(n.Status), // #nosec G115 -- Status is a small enum value
 		Stdout:     n.Stdout,
 		Stderr:     n.Stderr,
 		StartedAt:  n.StartedAt,
 		FinishedAt: n.FinishedAt,
 		Error:      n.Error,
-		RetryCount: int32(n.RetryCount),
-		DoneCount:  int32(n.DoneCount),
+		RetryCount: int32(n.RetryCount), // #nosec G115 -- RetryCount is small
+		DoneCount:  int32(n.DoneCount),  // #nosec G115 -- DoneCount is small
 		RetriedAt:  n.RetriedAt,
 		Step: &coordinatorv1.StepProto{
 			Name:         n.Step.Name,
@@ -97,7 +97,7 @@ func NodeToProto(n *execution.Node) *coordinatorv1.NodeStatusProto {
 	// Convert output variables
 	if n.OutputVariables != nil {
 		p.OutputVariables = make(map[string]string)
-		n.OutputVariables.Range(func(key, value interface{}) bool {
+		n.OutputVariables.Range(func(key, value any) bool {
 			if k, ok := key.(string); ok {
 				if v, ok := value.(string); ok {
 					p.OutputVariables[k] = v
@@ -170,9 +170,6 @@ func ProtoToNode(p *coordinatorv1.NodeStatusProto) *execution.Node {
 	}
 
 	node := &execution.Node{
-		Step: core.Step{
-			Name: p.StepName,
-		},
 		Stdout:     p.Stdout,
 		Stderr:     p.Stderr,
 		StartedAt:  p.StartedAt,
@@ -184,11 +181,15 @@ func ProtoToNode(p *coordinatorv1.NodeStatusProto) *execution.Node {
 		Error:      p.Error,
 	}
 
-	// Convert step info if present
+	// Convert step info - prefer p.Step if present, otherwise use p.StepName
 	if p.Step != nil {
-		node.Step.Name = p.Step.Name
-		node.Step.Description = p.Step.Description
+		node.Step = core.Step{
+			Name:        p.Step.Name,
+			Description: p.Step.Description,
+		}
 		node.Step.ExecutorConfig.Type = p.Step.ExecutorType
+	} else {
+		node.Step.Name = p.StepName
 	}
 
 	// Convert sub-runs

@@ -5,20 +5,10 @@ import (
 	"io"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
-)
-
-// LogStreamType represents the type of log stream
-type LogStreamType int
-
-const (
-	// StreamTypeStdout represents stdout stream
-	StreamTypeStdout LogStreamType = iota + 1
-	// StreamTypeStderr represents stderr stream
-	StreamTypeStderr
 )
 
 // LogStreamer streams logs to coordinator via gRPC
@@ -29,6 +19,7 @@ type LogStreamer struct {
 	dagName   string
 	attemptID string
 	rootRef   execution.DAGRunRef
+	mu        sync.RWMutex
 }
 
 // NewLogStreamer creates a new LogStreamer
@@ -50,14 +41,28 @@ func NewLogStreamer(
 	}
 }
 
+// SetAttemptID updates the attemptID after the agent creates the attempt
+func (s *LogStreamer) SetAttemptID(attemptID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.attemptID = attemptID
+}
+
+// getAttemptID returns the current attemptID
+func (s *LogStreamer) getAttemptID() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.attemptID
+}
+
 // NewStepWriter creates a writer that streams to coordinator
-// streamType: 1 = stdout, 2 = stderr
+// streamType should be execution.StreamTypeStdout or execution.StreamTypeStderr
 func (s *LogStreamer) NewStepWriter(ctx context.Context, stepName string, streamType int) io.WriteCloser {
 	return &stepLogWriter{
 		ctx:        ctx,
 		streamer:   s,
 		stepName:   stepName,
-		streamType: LogStreamType(streamType),
+		streamType: streamType,
 		buffer:     make([]byte, 0, 32*1024), // 32KB buffer
 	}
 }
@@ -67,7 +72,7 @@ type stepLogWriter struct {
 	ctx        context.Context
 	streamer   *LogStreamer
 	stepName   string
-	streamType LogStreamType
+	streamType int
 	buffer     []byte
 	sequence   uint64
 	stream     coordinatorv1.CoordinatorService_StreamLogsClient
@@ -111,6 +116,10 @@ func (w *stepLogWriter) flush() error {
 		}
 	}
 
+	// Copy buffer to avoid data corruption if Send buffers the message
+	dataCopy := make([]byte, len(w.buffer))
+	copy(dataCopy, w.buffer)
+
 	w.sequence++
 	chunk := &coordinatorv1.LogChunk{
 		WorkerId:       w.streamer.workerID,
@@ -118,11 +127,11 @@ func (w *stepLogWriter) flush() error {
 		DagName:        w.streamer.dagName,
 		StepName:       w.stepName,
 		StreamType:     toProtoStreamType(w.streamType),
-		Data:           w.buffer,
+		Data:           dataCopy,
 		Sequence:       w.sequence,
 		RootDagRunName: w.streamer.rootRef.Name,
 		RootDagRunId:   w.streamer.rootRef.ID,
-		AttemptId:      w.streamer.attemptID,
+		AttemptId:      w.streamer.getAttemptID(),
 	}
 
 	w.buffer = w.buffer[:0]
@@ -139,9 +148,12 @@ func (w *stepLogWriter) Close() error {
 	}
 	w.closed = true
 
+	var firstErr error
+
 	// Flush any remaining data
 	if err := w.flush(); err != nil {
 		logger.Error(w.ctx, "Failed to flush log buffer", tag.Error(err))
+		firstErr = err
 	}
 
 	// Send final marker
@@ -155,27 +167,33 @@ func (w *stepLogWriter) Close() error {
 			IsFinal:        true,
 			RootDagRunName: w.streamer.rootRef.Name,
 			RootDagRunId:   w.streamer.rootRef.ID,
-			AttemptId:      w.streamer.attemptID,
+			AttemptId:      w.streamer.getAttemptID(),
 		}
 		if err := w.stream.Send(finalChunk); err != nil {
 			logger.Error(w.ctx, "Failed to send final log chunk", tag.Error(err))
+			if firstErr == nil {
+				firstErr = err
+			}
 		}
 
 		// Close and receive response
 		if _, err := w.stream.CloseAndRecv(); err != nil {
 			logger.Error(w.ctx, "Failed to close log stream", tag.Error(err))
+			if firstErr == nil {
+				firstErr = err
+			}
 		}
 	}
 
-	return nil
+	return firstErr
 }
 
-// toProtoStreamType converts LogStreamType to proto LogStreamType
-func toProtoStreamType(t LogStreamType) coordinatorv1.LogStreamType {
-	switch t {
-	case StreamTypeStdout:
+// toProtoStreamType converts streamType int to proto LogStreamType
+func toProtoStreamType(streamType int) coordinatorv1.LogStreamType {
+	switch streamType {
+	case execution.StreamTypeStdout:
 		return coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDOUT
-	case StreamTypeStderr:
+	case execution.StreamTypeStderr:
 		return coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDERR
 	default:
 		return coordinatorv1.LogStreamType_LOG_STREAM_TYPE_UNSPECIFIED
