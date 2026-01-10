@@ -2370,3 +2370,328 @@ func sqlNullTime(t time.Time) any {
 func sqlNullTimeInvalid() any {
 	return sql.NullTime{Valid: false}
 }
+
+// TestSQLiteExecutor_StreamingOutput tests streaming query results to a file.
+func TestSQLiteExecutor_StreamingOutput(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	outputFile := filepath.Join(tmpDir, "output.jsonl")
+
+	step := core.Step{
+		Name: "test-streaming",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn":          ":memory:",
+				"streaming":    true,
+				"outputFile":   outputFile,
+				"outputFormat": "jsonl",
+			},
+		},
+		Script: `
+			CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);
+			INSERT INTO users (name) VALUES ('Alice'), ('Bob'), ('Charlie');
+			SELECT * FROM users ORDER BY id;
+		`,
+	}
+
+	exec, err := newSQLiteExecutor(ctx, step)
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	exec.SetStdout(&stdout)
+
+	err = exec.Run(ctx)
+	require.NoError(t, err)
+
+	// Verify output file was created and contains data
+	content, err := os.ReadFile(outputFile)
+	require.NoError(t, err)
+
+	output := string(content)
+	assert.Contains(t, output, `"name":"Alice"`)
+	assert.Contains(t, output, `"name":"Bob"`)
+	assert.Contains(t, output, `"name":"Charlie"`)
+}
+
+// TestSQLiteExecutor_StreamingOutputCSV tests streaming CSV output to a file.
+func TestSQLiteExecutor_StreamingOutputCSV(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	outputFile := filepath.Join(tmpDir, "output.csv")
+
+	step := core.Step{
+		Name: "test-streaming-csv",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn":          ":memory:",
+				"streaming":    true,
+				"outputFile":   outputFile,
+				"outputFormat": "csv",
+				"headers":      true,
+			},
+		},
+		Script: `
+			CREATE TABLE data (id INTEGER, value TEXT);
+			INSERT INTO data VALUES (1, 'one'), (2, 'two');
+			SELECT * FROM data ORDER BY id;
+		`,
+	}
+
+	exec, err := newSQLiteExecutor(ctx, step)
+	require.NoError(t, err)
+
+	err = exec.Run(ctx)
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(outputFile)
+	require.NoError(t, err)
+
+	output := string(content)
+	assert.Contains(t, output, "id,value")
+	assert.Contains(t, output, "1,one")
+	assert.Contains(t, output, "2,two")
+}
+
+// TestSQLiteExecutor_StreamingOutputSubdir tests streaming to a file in a subdirectory.
+func TestSQLiteExecutor_StreamingOutputSubdir(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	// Create path in non-existent subdirectory
+	outputFile := filepath.Join(tmpDir, "subdir", "nested", "output.jsonl")
+
+	step := core.Step{
+		Name: "test-streaming-subdir",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn":          ":memory:",
+				"streaming":    true,
+				"outputFile":   outputFile,
+				"outputFormat": "jsonl",
+			},
+		},
+		Script: `SELECT 1 as value;`,
+	}
+
+	exec, err := newSQLiteExecutor(ctx, step)
+	require.NoError(t, err)
+
+	err = exec.Run(ctx)
+	require.NoError(t, err)
+
+	// Verify subdirectories were created and file exists
+	content, err := os.ReadFile(outputFile)
+	require.NoError(t, err)
+	assert.Contains(t, string(content), `"value":1`)
+}
+
+// TestSQLiteExecutor_FileLock tests file locking for exclusive access.
+func TestSQLiteExecutor_FileLock(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "locked.db")
+
+	step := core.Step{
+		Name: "test-filelock",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn":      dbPath,
+				"fileLock": true,
+			},
+		},
+		Script: `
+			CREATE TABLE test (id INTEGER PRIMARY KEY);
+			INSERT INTO test VALUES (1);
+			SELECT * FROM test;
+		`,
+	}
+
+	exec, err := newSQLiteExecutor(ctx, step)
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	exec.SetStdout(&stdout)
+
+	err = exec.Run(ctx)
+	require.NoError(t, err)
+
+	// Verify data was written (lock was acquired and released successfully)
+	assert.Contains(t, stdout.String(), `"id":1`)
+
+	// The lock file may or may not exist after release (flock doesn't delete the file,
+	// it just releases the lock). What matters is that the execution succeeded.
+}
+
+// TestSQLiteExecutor_SharedMemory tests shared memory mode for in-memory databases.
+func TestSQLiteExecutor_SharedMemory(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	// First step creates the table with shared memory
+	step1 := core.Step{
+		Name: "test-shared-memory-create",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn":          ":memory:",
+				"sharedMemory": true,
+			},
+		},
+		Script: `
+			CREATE TABLE shared_test (id INTEGER PRIMARY KEY, value TEXT);
+			INSERT INTO shared_test VALUES (1, 'shared');
+		`,
+	}
+
+	exec1, err := newSQLiteExecutor(ctx, step1)
+	require.NoError(t, err)
+
+	err = exec1.Run(ctx)
+	require.NoError(t, err)
+
+	// Note: In a real DAG scenario, multiple steps would share the connection.
+	// This test verifies the sharedMemory config is properly processed.
+}
+
+// TestSQLiteExecutor_ScriptFile tests reading SQL from a file using file:// prefix.
+func TestSQLiteExecutor_ScriptFile(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	// Create a SQL script file
+	scriptFile := filepath.Join(tmpDir, "script.sql")
+	scriptContent := `
+		CREATE TABLE from_file (id INTEGER, name TEXT);
+		INSERT INTO from_file VALUES (1, 'from file');
+		SELECT * FROM from_file;
+	`
+	err := os.WriteFile(scriptFile, []byte(scriptContent), 0644)
+	require.NoError(t, err)
+
+	step := core.Step{
+		Name: "test-script-file",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sqlite",
+			Config: map[string]any{
+				"dsn": ":memory:",
+			},
+		},
+		// Use file:// prefix to load SQL from external file
+		Script: "file://" + scriptFile,
+	}
+
+	exec, err := newSQLiteExecutor(ctx, step)
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	exec.SetStdout(&stdout)
+
+	err = exec.Run(ctx)
+	require.NoError(t, err)
+
+	assert.Contains(t, stdout.String(), `"name":"from file"`)
+}
+
+// TestSplitStatements tests the SQL statement splitting function.
+func TestSplitStatements(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{
+			name:     "single statement",
+			input:    "SELECT 1",
+			expected: []string{"SELECT 1"},
+		},
+		{
+			name:     "multiple statements",
+			input:    "SELECT 1; SELECT 2; SELECT 3",
+			expected: []string{"SELECT 1", "SELECT 2", "SELECT 3"},
+		},
+		{
+			name:     "statement with string containing semicolon",
+			input:    "INSERT INTO t VALUES ('a;b'); SELECT 1",
+			expected: []string{"INSERT INTO t VALUES ('a;b')", "SELECT 1"},
+		},
+		{
+			name:     "statement with double-quoted string",
+			input:    `INSERT INTO t VALUES ("test;value"); SELECT 2`,
+			expected: []string{`INSERT INTO t VALUES ("test;value")`, "SELECT 2"},
+		},
+		{
+			name:     "empty statements filtered",
+			input:    "SELECT 1;; ; SELECT 2",
+			expected: []string{"SELECT 1", "SELECT 2"},
+		},
+		{
+			name:     "multiline script",
+			input:    "CREATE TABLE t (id INT);\nINSERT INTO t VALUES (1);\nSELECT * FROM t;",
+			expected: []string{"CREATE TABLE t (id INT)", "INSERT INTO t VALUES (1)", "SELECT * FROM t"},
+		},
+		{
+			name:     "postgres dollar-quoted string",
+			input:    "SELECT $tag$hello;world$tag$; SELECT 1",
+			expected: []string{"SELECT $tag$hello;world$tag$", "SELECT 1"},
+		},
+		{
+			name:     "escaped single quote",
+			input:    "INSERT INTO t VALUES ('it''s a test'); SELECT 1",
+			expected: []string{"INSERT INTO t VALUES ('it''s a test')", "SELECT 1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := sqlexec.SplitStatements(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsSelectQuery tests the SELECT query detection function.
+func TestIsSelectQuery(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		query    string
+		expected bool
+	}{
+		{"SELECT * FROM users", true},
+		{"  SELECT id FROM users", true},
+		{"\n\tSELECT 1", true},
+		{"select lower", true},
+		{"INSERT INTO users VALUES (1)", false},
+		{"UPDATE users SET name = 'test'", false},
+		{"DELETE FROM users", false},
+		{"CREATE TABLE users (id INT)", false},
+		{"INSERT INTO users VALUES (1) RETURNING id", true},
+		{"INSERT INTO users VALUES (1) RETURNING", true},
+		{"WITH cte AS (SELECT 1) SELECT * FROM cte", true},
+		{"  WITH RECURSIVE cte AS (SELECT 1) SELECT * FROM cte", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.query, func(t *testing.T) {
+			t.Parallel()
+			result := sqlexec.IsSelectQuery(tt.query)
+			assert.Equal(t, tt.expected, result, "query: %s", tt.query)
+		})
+	}
+}

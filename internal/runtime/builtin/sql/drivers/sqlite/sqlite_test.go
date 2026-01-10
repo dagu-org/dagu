@@ -1,8 +1,12 @@
 package sqlite
 
 import (
+	"context"
+	"path/filepath"
 	"testing"
 
+	sqlexec "github.com/dagu-org/dagu/internal/runtime/builtin/sql"
+	"github.com/gofrs/flock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -269,4 +273,174 @@ func TestExtractDBPath(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+// newTestDriver creates a new SQLiteDriver for testing.
+func newTestDriver() *SQLiteDriver {
+	return &SQLiteDriver{
+		locks: make(map[string]*flock.Flock),
+	}
+}
+
+// TestSQLiteDriver_Connect tests the Connect function with various configurations.
+func TestSQLiteDriver_Connect(t *testing.T) {
+	t.Parallel()
+
+	t.Run("memory database", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		driver := newTestDriver()
+
+		cfg := &sqlexec.Config{
+			DSN: ":memory:",
+		}
+
+		db, cleanup, err := driver.Connect(ctx, cfg)
+		require.NoError(t, err)
+		require.NotNil(t, db)
+
+		// Verify connection works
+		_, err = db.ExecContext(ctx, "SELECT 1")
+		require.NoError(t, err)
+
+		// Cleanup
+		if cleanup != nil {
+			_ = cleanup()
+		}
+		_ = db.Close()
+	})
+
+	t.Run("shared memory mode", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		driver := newTestDriver()
+
+		cfg := &sqlexec.Config{
+			DSN:          ":memory:",
+			SharedMemory: true,
+		}
+
+		db, cleanup, err := driver.Connect(ctx, cfg)
+		require.NoError(t, err)
+		require.NotNil(t, db)
+
+		// Verify connection works
+		_, err = db.ExecContext(ctx, "CREATE TABLE shared_test (id INTEGER)")
+		require.NoError(t, err)
+
+		if cleanup != nil {
+			_ = cleanup()
+		}
+		_ = db.Close()
+	})
+
+	t.Run("file database", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		driver := newTestDriver()
+
+		dbPath := filepath.Join(t.TempDir(), "test.db")
+		cfg := &sqlexec.Config{
+			DSN: dbPath,
+		}
+
+		db, cleanup, err := driver.Connect(ctx, cfg)
+		require.NoError(t, err)
+		require.NotNil(t, db)
+
+		// Verify connection works
+		_, err = db.ExecContext(ctx, "CREATE TABLE file_test (id INTEGER)")
+		require.NoError(t, err)
+
+		if cleanup != nil {
+			_ = cleanup()
+		}
+		_ = db.Close()
+	})
+
+	t.Run("file lock enabled", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		driver := newTestDriver()
+
+		dbPath := filepath.Join(t.TempDir(), "locked.db")
+		cfg := &sqlexec.Config{
+			DSN:      dbPath,
+			FileLock: true,
+		}
+
+		db, cleanup, err := driver.Connect(ctx, cfg)
+		require.NoError(t, err)
+		require.NotNil(t, db)
+		require.NotNil(t, cleanup, "cleanup function should be set when FileLock is enabled")
+
+		// Verify connection works
+		_, err = db.ExecContext(ctx, "SELECT 1")
+		require.NoError(t, err)
+
+		// Release lock
+		err = cleanup()
+		require.NoError(t, err)
+
+		_ = db.Close()
+	})
+
+	t.Run("file lock not for memory db", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		driver := newTestDriver()
+
+		cfg := &sqlexec.Config{
+			DSN:      ":memory:",
+			FileLock: true, // Should be ignored for memory databases
+		}
+
+		db, cleanup, err := driver.Connect(ctx, cfg)
+		require.NoError(t, err)
+		require.NotNil(t, db)
+		// No cleanup for memory databases even with FileLock
+		assert.Nil(t, cleanup)
+
+		_ = db.Close()
+	})
+}
+
+// TestSQLiteDriver_Connect_ConcurrentLock tests that file locking prevents concurrent access.
+func TestSQLiteDriver_Connect_ConcurrentLock(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	driver := newTestDriver()
+
+	dbPath := filepath.Join(t.TempDir(), "concurrent.db")
+	cfg := &sqlexec.Config{
+		DSN:      dbPath,
+		FileLock: true,
+	}
+
+	// First connection should succeed
+	db1, cleanup1, err := driver.Connect(ctx, cfg)
+	require.NoError(t, err)
+	require.NotNil(t, db1)
+	require.NotNil(t, cleanup1)
+
+	// Second connection should fail (database is locked)
+	_, _, err = driver.Connect(ctx, cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "locked")
+
+	// Release first lock
+	err = cleanup1()
+	require.NoError(t, err)
+	_ = db1.Close()
+
+	// Now third connection should succeed
+	db3, cleanup3, err := driver.Connect(ctx, cfg)
+	require.NoError(t, err)
+	require.NotNil(t, db3)
+
+	if cleanup3 != nil {
+		_ = cleanup3()
+	}
+	_ = db3.Close()
 }
