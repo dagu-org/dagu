@@ -24,6 +24,10 @@ service CoordinatorService {
   // StreamLogs is called by workers to stream step logs to the coordinator.
   // Uses client streaming for efficient log transmission.
   rpc StreamLogs (stream LogChunk) returns (StreamLogsResponse);
+
+  // GetDAGRunStatus retrieves the status of a DAG run from the coordinator.
+  // Used by parent DAGs to poll status of remote sub-DAGs in shared-nothing mode.
+  rpc GetDAGRunStatus (GetDAGRunStatusRequest) returns (GetDAGRunStatusResponse);
 }
 
 // Request message for polling a task.
@@ -62,6 +66,9 @@ message Task {
   map<string, string> worker_selector = 10; // Required worker labels for execution
   string definition = 11; // Optional: DAG definition (YAML) for local DAGs
   string worker_id = 12; // ID of the worker that will execute this task
+  // Previous status for OPERATION_RETRY in shared-nothing mode.
+  // When set, workers can retry without needing local DAGRunStore access.
+  DAGRunStatusProto previous_status = 13;
 }
 
 enum Operation {
@@ -111,7 +118,9 @@ message HeartbeatRequest {
 
 // Response message for heartbeat.
 message HeartbeatResponse {
-  // Empty for now
+  // List of DAG run IDs that should be cancelled by the worker.
+  // Workers check this on each heartbeat and cancel matching running tasks.
+  repeated string cancelled_runs = 1;
 }
 
 // Worker statistics reported via heartbeat.
@@ -254,4 +263,21 @@ message StreamLogsResponse {
   uint64 chunks_received = 1;
   uint64 bytes_written = 2;
   string error = 3;
+}
+
+// ============================================================================
+// DAG Run Status Query Messages (for sub-DAG status polling in shared-nothing mode)
+// ============================================================================
+
+// Request message for getting DAG run status.
+message GetDAGRunStatusRequest {
+  string dag_name = 1;      // Name of the DAG
+  string dag_run_id = 2;    // ID of the DAG run
+}
+
+// Response message for getting DAG run status.
+message GetDAGRunStatusResponse {
+  bool found = 1;                   // Whether the DAG run was found
+  DAGRunStatusProto status = 2;     // The status (only set if found)
+  string error = 3;                 // Error message if any
 }

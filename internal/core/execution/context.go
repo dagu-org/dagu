@@ -160,6 +160,11 @@ type Dispatcher interface {
 
 	// Cleanup cleans up any resources used by the coordinator client
 	Cleanup(ctx context.Context) error
+
+	// GetDAGRunStatus retrieves the status of a DAG run from the coordinator.
+	// Used by parent DAGs to poll status of remote sub-DAGs.
+	// Returns (nil, nil) if the DAG run is not found.
+	GetDAGRunStatus(ctx context.Context, dagName, dagRunID string) (*coordinatorv1.GetDAGRunStatusResponse, error)
 }
 
 // contextOptions holds optional configuration for NewContext.

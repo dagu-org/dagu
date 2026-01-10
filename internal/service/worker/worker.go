@@ -28,6 +28,9 @@ type Worker struct {
 	// For tracking poller states and heartbeats
 	pollersMu    sync.Mutex
 	runningTasks map[string]*coordinatorv1.RunningTask // pollerID -> running task
+
+	// For cancellation support
+	cancelFuncs map[string]context.CancelFunc // dagRunID -> cancel function
 }
 
 // SetHandler sets a custom task executor for testing or custom execution logic
@@ -53,6 +56,7 @@ func NewWorker(workerID string, maxActiveRuns int, coordinatorClient coordinator
 		handler:        &taskHandler{subCmdBuilder: runtime.NewSubCmdBuilder(cfg)},
 		labels:         labels,
 		runningTasks:   make(map[string]*coordinatorv1.RunningTask),
+		cancelFuncs:    make(map[string]context.CancelFunc),
 	}
 }
 
@@ -117,7 +121,11 @@ type trackingHandler struct {
 func (t *trackingHandler) Handle(ctx context.Context, task *coordinatorv1.Task) error {
 	pollerID := fmt.Sprintf("poller-%d", t.pollerIndex)
 
-	// Mark task as running
+	// Create a cancellable context for this task
+	taskCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Mark task as running and register cancel function
 	t.worker.pollersMu.Lock()
 	t.worker.runningTasks[pollerID] = &coordinatorv1.RunningTask{
 		DagRunId:         task.DagRunId,
@@ -128,14 +136,16 @@ func (t *trackingHandler) Handle(ctx context.Context, task *coordinatorv1.Task) 
 		ParentDagRunName: task.ParentDagRunName,
 		ParentDagRunId:   task.ParentDagRunId,
 	}
+	t.worker.cancelFuncs[task.DagRunId] = cancel
 	t.worker.pollersMu.Unlock()
 
-	// Execute the task
-	err := t.handler.Handle(ctx, task)
+	// Execute the task with cancellable context
+	err := t.handler.Handle(taskCtx, task)
 
-	// Remove from running tasks
+	// Remove from running tasks and cancel registry
 	t.worker.pollersMu.Lock()
 	delete(t.worker.runningTasks, pollerID)
+	delete(t.worker.cancelFuncs, task.DagRunId)
 	t.worker.pollersMu.Unlock()
 
 	return err
@@ -235,5 +245,30 @@ func (w *Worker) sendHeartbeat(ctx context.Context) error {
 		},
 	}
 
-	return w.coordinatorCli.Heartbeat(ctx, req)
+	resp, err := w.coordinatorCli.Heartbeat(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	// Process cancellation directives from the coordinator
+	if resp != nil && len(resp.CancelledRuns) > 0 {
+		w.processCancellations(ctx, resp.CancelledRuns)
+	}
+
+	return nil
+}
+
+// processCancellations cancels tasks that the coordinator has marked for cancellation
+func (w *Worker) processCancellations(ctx context.Context, cancelledRunIDs []string) {
+	w.pollersMu.Lock()
+	defer w.pollersMu.Unlock()
+
+	for _, dagRunID := range cancelledRunIDs {
+		if cancelFunc, exists := w.cancelFuncs[dagRunID]; exists {
+			logger.Info(ctx, "Cancelling task per coordinator directive",
+				tag.RunID(dagRunID),
+				tag.WorkerID(w.id))
+			cancelFunc()
+		}
+	}
 }

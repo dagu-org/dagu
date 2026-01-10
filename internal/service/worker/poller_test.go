@@ -409,9 +409,21 @@ func (m *mockCoordinatorCli) GetWorkers(_ context.Context) ([]*coordinatorv1.Wor
 	return []*coordinatorv1.WorkerInfo{}, nil
 }
 
-func (m *mockCoordinatorCli) Heartbeat(_ context.Context, _ *coordinatorv1.HeartbeatRequest) error {
+func (m *mockCoordinatorCli) Heartbeat(_ context.Context, _ *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
 	// Return success by default for tests
-	return nil
+	return &coordinatorv1.HeartbeatResponse{}, nil
+}
+
+func (m *mockCoordinatorCli) ReportStatus(_ context.Context, _ *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+	return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
+}
+
+func (m *mockCoordinatorCli) StreamLogs(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+	return nil, nil
+}
+
+func (m *mockCoordinatorCli) GetDAGRunStatus(_ context.Context, _, _ string) (*coordinatorv1.GetDAGRunStatusResponse, error) {
+	return &coordinatorv1.GetDAGRunStatusResponse{Found: false}, nil
 }
 
 func (m *mockCoordinatorCli) updateState(err error) {

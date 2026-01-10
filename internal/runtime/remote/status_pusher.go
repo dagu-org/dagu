@@ -6,17 +6,18 @@ import (
 
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/proto/convert"
+	"github.com/dagu-org/dagu/internal/service/coordinator"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
 // StatusPusher sends status updates to coordinator via gRPC
 type StatusPusher struct {
-	client   coordinatorv1.CoordinatorServiceClient
+	client   coordinator.Client
 	workerID string
 }
 
 // NewStatusPusher creates a new StatusPusher
-func NewStatusPusher(client coordinatorv1.CoordinatorServiceClient, workerID string) *StatusPusher {
+func NewStatusPusher(client coordinator.Client, workerID string) *StatusPusher {
 	return &StatusPusher{
 		client:   client,
 		workerID: workerID,

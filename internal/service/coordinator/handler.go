@@ -247,7 +247,41 @@ func (h *Handler) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatReq
 	// Clean up stale heartbeats outside the lock to avoid blocking I/O while holding mutex
 	h.detectAndCleanupZombies(ctx)
 
-	return &coordinatorv1.HeartbeatResponse{}, nil
+	// Check for cancelled runs among the worker's running tasks
+	cancelledRuns := h.getCancelledRunsForWorker(ctx, req.Stats)
+
+	return &coordinatorv1.HeartbeatResponse{
+		CancelledRuns: cancelledRuns,
+	}, nil
+}
+
+// getCancelledRunsForWorker checks which of the worker's running tasks have been cancelled
+func (h *Handler) getCancelledRunsForWorker(ctx context.Context, stats *coordinatorv1.WorkerStats) []string {
+	if h.dagRunStore == nil || stats == nil || len(stats.RunningTasks) == 0 {
+		return nil
+	}
+
+	var cancelledRuns []string
+	for _, task := range stats.RunningTasks {
+		ref := execution.DAGRunRef{Name: task.DagName, ID: task.DagRunId}
+		attempt, err := h.dagRunStore.FindAttempt(ctx, ref)
+		if err != nil {
+			// Attempt not found, skip
+			continue
+		}
+
+		// Check if the attempt has been marked for cancellation
+		aborting, err := attempt.IsAborting(ctx)
+		if err != nil {
+			continue
+		}
+
+		if aborting {
+			cancelledRuns = append(cancelledRuns, task.DagRunId)
+		}
+	}
+
+	return cancelledRuns
 }
 
 // ReportStatus receives status updates from workers and persists them.
@@ -326,6 +360,40 @@ func (h *Handler) StreamLogs(stream coordinatorv1.CoordinatorService_StreamLogsS
 	logHandler := newLogHandler(h.logDir)
 	defer logHandler.Close() // Ensure file handles are closed on stream end or error
 	return logHandler.handleStream(stream)
+}
+
+// GetDAGRunStatus retrieves the status of a DAG run.
+// This is used by parent DAGs to poll the status of remote sub-DAGs in shared-nothing mode.
+func (h *Handler) GetDAGRunStatus(ctx context.Context, req *coordinatorv1.GetDAGRunStatusRequest) (*coordinatorv1.GetDAGRunStatusResponse, error) {
+	if h.dagRunStore == nil {
+		return nil, status.Error(codes.FailedPrecondition, "DAG run status query not configured: dagRunStore is nil")
+	}
+
+	if req.DagName == "" || req.DagRunId == "" {
+		return nil, status.Error(codes.InvalidArgument, "dag_name and dag_run_id are required")
+	}
+
+	ref := execution.DAGRunRef{Name: req.DagName, ID: req.DagRunId}
+	attempt, err := h.dagRunStore.FindAttempt(ctx, ref)
+	if err != nil {
+		// Not found is not an error, just return found=false
+		return &coordinatorv1.GetDAGRunStatusResponse{
+			Found: false,
+		}, nil
+	}
+
+	runStatus, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return &coordinatorv1.GetDAGRunStatusResponse{
+			Found: false,
+			Error: fmt.Sprintf("failed to read status: %v", err),
+		}, nil
+	}
+
+	return &coordinatorv1.GetDAGRunStatusResponse{
+		Found:  true,
+		Status: convert.DAGRunStatusToProto(runStatus),
+	}, nil
 }
 
 // StartZombieDetector starts a background goroutine that periodically checks for zombie runs.

@@ -38,8 +38,19 @@ type Client interface {
 	// GetWorkers retrieves the list of workers from the coordinator
 	GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerInfo, error)
 
-	// Heartbeat sends a heartbeat to the coordinator
-	Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) error
+	// Heartbeat sends a heartbeat to the coordinator and returns the response
+	// which may include cancellation directives
+	Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error)
+
+	// ReportStatus sends a status update to the coordinator (for shared-nothing workers)
+	ReportStatus(ctx context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error)
+
+	// StreamLogs returns a log streaming client for sending logs to the coordinator
+	StreamLogs(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error)
+
+	// GetDAGRunStatus retrieves the status of a DAG run from the coordinator
+	// Used by parent DAGs to poll status of remote sub-DAGs
+	GetDAGRunStatus(ctx context.Context, dagName, dagRunID string) (*coordinatorv1.GetDAGRunStatusResponse, error)
 
 	// Metrics returns the metrics for the coordinator client
 	Metrics() Metrics
@@ -442,27 +453,116 @@ func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerI
 	return allWorkers, nil
 }
 
-// Heartbeat sends a heartbeat to coordinators
-func (cli *clientImpl) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) error {
+// Heartbeat sends a heartbeat to coordinators and returns the response
+func (cli *clientImpl) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
 	// Get all available coordinators from discovery
 	members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
 	if err != nil {
-		return fmt.Errorf("failed to discover coordinators: %w", err)
+		return nil, fmt.Errorf("failed to discover coordinators: %w", err)
 	}
 
 	if len(members) == 0 {
-		return fmt.Errorf("no coordinators available")
+		return nil, fmt.Errorf("no coordinators available")
 	}
 
+	var resp *coordinatorv1.HeartbeatResponse
 	// Use attemptCall to send heartbeat to any available coordinator
-	return cli.attemptCall(ctx, members, func(ctx context.Context, _ execution.HostInfo, client *client) error {
+	err = cli.attemptCall(ctx, members, func(ctx context.Context, _ execution.HostInfo, client *client) error {
 		// Send heartbeat
-		_, err := client.client.Heartbeat(ctx, req)
-		if err != nil {
-			return fmt.Errorf("heartbeat failed: %w", err)
+		var callErr error
+		resp, callErr = client.client.Heartbeat(ctx, req)
+		if callErr != nil {
+			return fmt.Errorf("heartbeat failed: %w", callErr)
 		}
 		return nil
 	})
+	return resp, err
+}
+
+// ReportStatus sends a status update to the coordinator
+func (cli *clientImpl) ReportStatus(ctx context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+	// Get all available coordinators from discovery
+	members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	if err != nil {
+		return nil, fmt.Errorf("failed to discover coordinators: %w", err)
+	}
+
+	if len(members) == 0 {
+		return nil, fmt.Errorf("no coordinators available")
+	}
+
+	var resp *coordinatorv1.ReportStatusResponse
+	err = cli.attemptCall(ctx, members, func(ctx context.Context, _ execution.HostInfo, client *client) error {
+		var callErr error
+		resp, callErr = client.client.ReportStatus(ctx, req)
+		if callErr != nil {
+			return fmt.Errorf("report status failed: %w", callErr)
+		}
+		return nil
+	})
+	return resp, err
+}
+
+// StreamLogs returns a log streaming client for sending logs to the coordinator
+func (cli *clientImpl) StreamLogs(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+	// Get all available coordinators from discovery
+	members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	if err != nil {
+		return nil, fmt.Errorf("failed to discover coordinators: %w", err)
+	}
+
+	if len(members) == 0 {
+		return nil, fmt.Errorf("no coordinators available")
+	}
+
+	// Try each coordinator until one works
+	var lastErr error
+	for _, member := range members {
+		client, err := cli.getOrCreateClient(member)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		stream, err := client.client.StreamLogs(ctx)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		return stream, nil
+	}
+
+	return nil, fmt.Errorf("failed to create log stream: %w", lastErr)
+}
+
+// GetDAGRunStatus retrieves the status of a DAG run from the coordinator
+func (cli *clientImpl) GetDAGRunStatus(ctx context.Context, dagName, dagRunID string) (*coordinatorv1.GetDAGRunStatusResponse, error) {
+	// Get all available coordinators from discovery
+	members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	if err != nil {
+		return nil, fmt.Errorf("failed to discover coordinators: %w", err)
+	}
+
+	if len(members) == 0 {
+		return nil, fmt.Errorf("no coordinators available")
+	}
+
+	req := &coordinatorv1.GetDAGRunStatusRequest{
+		DagName:  dagName,
+		DagRunId: dagRunID,
+	}
+
+	var resp *coordinatorv1.GetDAGRunStatusResponse
+	err = cli.attemptCall(ctx, members, func(ctx context.Context, _ execution.HostInfo, client *client) error {
+		var callErr error
+		resp, callErr = client.client.GetDAGRunStatus(ctx, req)
+		if callErr != nil {
+			return fmt.Errorf("get DAG run status failed: %w", callErr)
+		}
+		return nil
+	})
+	return resp, err
 }
 
 // getDialOptions returns the appropriate gRPC dial options based on TLS configuration

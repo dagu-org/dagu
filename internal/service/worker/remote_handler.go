@@ -13,9 +13,11 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
+	"github.com/dagu-org/dagu/internal/proto/convert"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/dagu-org/dagu/internal/runtime/remote"
+	"github.com/dagu-org/dagu/internal/service/coordinator"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -25,8 +27,8 @@ var _ TaskHandler = (*remoteTaskHandler)(nil)
 type RemoteTaskHandlerConfig struct {
 	// WorkerID is the identifier of this worker
 	WorkerID string
-	// CoordinatorClient is the gRPC client to communicate with the coordinator
-	CoordinatorClient coordinatorv1.CoordinatorServiceClient
+	// CoordinatorClient is the coordinator client with load balancing support
+	CoordinatorClient coordinator.Client
 	// DAGRunStore is the store for DAG run status (may be nil for fully remote mode)
 	DAGRunStore execution.DAGRunStore
 	// DAGStore is the store for DAG definitions
@@ -58,7 +60,7 @@ func NewRemoteTaskHandler(cfg RemoteTaskHandlerConfig) TaskHandler {
 
 type remoteTaskHandler struct {
 	workerID          string
-	coordinatorClient coordinatorv1.CoordinatorServiceClient
+	coordinatorClient coordinator.Client
 	dagRunStore       execution.DAGRunStore
 	dagStore          execution.DAGStore
 	dagRunMgr         runtime.Manager
@@ -111,25 +113,39 @@ func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1
 }
 
 func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1.Task) error {
-	if h.dagRunStore == nil {
-		return fmt.Errorf("retry not supported in fully remote mode: dagRunStore is nil")
-	}
-
 	root := execution.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
 
-	attempt, err := h.dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef(task.RootDagRunName, task.DagRunId))
-	if err != nil {
-		return fmt.Errorf("failed to find previous run: %w", err)
+	// Get previous status - prefer from task (shared-nothing mode), fallback to local store
+	var status *execution.DAGRunStatus
+	if task.PreviousStatus != nil {
+		// Shared-nothing mode: status is provided in the task
+		status = convert.ProtoToDAGRunStatus(task.PreviousStatus)
+		logger.Info(ctx, "Using previous status from task for retry",
+			tag.RunID(task.DagRunId),
+			slog.Int("nodes", len(status.Nodes)))
+	} else if h.dagRunStore != nil {
+		// Fallback: read from local store
+		attempt, err := h.dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef(task.RootDagRunName, task.DagRunId))
+		if err != nil {
+			return fmt.Errorf("failed to find previous run: %w", err)
+		}
+
+		var readErr error
+		status, readErr = attempt.ReadStatus(ctx)
+		if readErr != nil {
+			return fmt.Errorf("failed to read previous status: %w", readErr)
+		}
+	} else {
+		return fmt.Errorf("retry requires either previous_status in task or local dagRunStore")
 	}
 
-	status, err := attempt.ReadStatus(ctx)
+	// Load the DAG - use task definition if provided, otherwise load from store
+	dag, cleanup, err := h.loadDAG(ctx, task)
 	if err != nil {
-		return fmt.Errorf("failed to read previous status: %w", err)
+		return fmt.Errorf("failed to load DAG: %w", err)
 	}
-
-	dag, err := attempt.ReadDAG(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to read DAG from previous run: %w", err)
+	if cleanup != nil {
+		defer cleanup()
 	}
 
 	parent := execution.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}

@@ -13,11 +13,8 @@ import (
 	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/dagu-org/dagu/internal/service/worker"
 	"github.com/dagu-org/dagu/internal/test"
-	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // Helper functions shared across distributed integration tests
@@ -28,16 +25,10 @@ func setupRemoteWorker(t *testing.T, coord *test.Coordinator, workerID string, m
 	t.Helper()
 	coordinatorClient := coord.GetCoordinatorClient(t)
 
-	// Create gRPC client for remote task handler
-	conn, err := grpc.NewClient(coord.Address(), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	require.NoError(t, err, "failed to create gRPC client")
-
-	grpcClient := coordinatorv1.NewCoordinatorServiceClient(conn)
-
-	// Create remote task handler config
+	// Create remote task handler config using the coordinator client for load balancing
 	handlerCfg := worker.RemoteTaskHandlerConfig{
 		WorkerID:          workerID,
-		CoordinatorClient: grpcClient,
+		CoordinatorClient: coordinatorClient,
 		DAGRunStore:       coord.DAGRunStore,
 		DAGStore:          coord.DAGStore,
 		DAGRunMgr:         coord.DAGRunMgr,
@@ -56,7 +47,6 @@ func setupRemoteWorker(t *testing.T, coord *test.Coordinator, workerID string, m
 	}()
 
 	t.Cleanup(func() {
-		_ = conn.Close()
 		if err := workerInst.Stop(coord.Context); err != nil {
 			t.Logf("Error stopping worker: %v", err)
 		}

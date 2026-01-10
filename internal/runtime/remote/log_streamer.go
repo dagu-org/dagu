@@ -8,12 +8,13 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/service/coordinator"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
 // LogStreamer streams logs to coordinator via gRPC
 type LogStreamer struct {
-	client    coordinatorv1.CoordinatorServiceClient
+	client    coordinator.Client
 	workerID  string
 	dagRunID  string
 	dagName   string
@@ -24,7 +25,7 @@ type LogStreamer struct {
 
 // NewLogStreamer creates a new LogStreamer
 func NewLogStreamer(
-	client coordinatorv1.CoordinatorServiceClient,
+	client coordinator.Client,
 	workerID string,
 	dagRunID string,
 	dagName string,

@@ -19,6 +19,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/telemetry"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/proto/convert"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -336,7 +337,6 @@ func (e *SubDAGExecutor) dispatchToCoordinator(ctx context.Context, runParams Ru
 }
 
 func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*execution.RunStatus, error) {
-	rCtx := execution.GetContext(ctx)
 	waitCtx := logger.WithValues(ctx,
 		tag.RunID(dagRunID),
 		tag.DAG(e.DAG.Name),
@@ -372,7 +372,7 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 
 			for {
 				var err error
-				status, err = rCtx.DB.GetSubDAGRunStatus(ctx, dagRunID, rCtx.RootDAGRun)
+				status, err = e.getSubDAGRunStatus(ctx, dagRunID)
 				if err != nil {
 					logger.Warn(waitCtx, "Failed to get sub DAG run status during cancellation wait",
 						tag.Error(err),
@@ -404,7 +404,7 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 
 		case <-ticker.C:
 			// Check if the sub DAG run has completed
-			isCompleted, err := rCtx.DB.IsSubDAGRunCompleted(ctx, dagRunID, rCtx.RootDAGRun)
+			isCompleted, err := e.isSubDAGRunCompleted(ctx, dagRunID)
 			if err != nil {
 				logger.Warn(waitCtx, "Failed to check sub DAG run completion",
 					tag.Error(err),
@@ -418,7 +418,7 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 			}
 
 			// Check the final status of the sub DAG run
-			result, err := rCtx.DB.GetSubDAGRunStatus(ctx, dagRunID, rCtx.RootDAGRun)
+			result, err := e.getSubDAGRunStatus(ctx, dagRunID)
 			if err != nil {
 				// Not found yet, continue polling
 				logger.Debug(waitCtx, "Sub DAG run status not available yet",
@@ -440,6 +440,93 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 			)
 		}
 	}
+}
+
+// getSubDAGRunStatus retrieves the status of a sub-DAG run.
+// For distributed runs, it queries the coordinator; otherwise, it uses the local DB.
+func (e *SubDAGExecutor) getSubDAGRunStatus(ctx context.Context, dagRunID string) (*execution.RunStatus, error) {
+	rCtx := execution.GetContext(ctx)
+
+	// For distributed runs, query the coordinator
+	if e.coordinatorCli != nil {
+		resp, err := e.coordinatorCli.GetDAGRunStatus(ctx, e.DAG.Name, dagRunID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get DAG run status from coordinator: %w", err)
+		}
+		if !resp.Found {
+			return nil, fmt.Errorf("DAG run not found in coordinator")
+		}
+		// Convert proto status to execution.RunStatus
+		dagRunStatus := convert.ProtoToDAGRunStatus(resp.Status)
+
+		// Extract outputs from node output variables
+		outputs := extractOutputsFromNodes(dagRunStatus.Nodes)
+
+		return &execution.RunStatus{
+			Name:     dagRunStatus.Name,
+			DAGRunID: dagRunID,
+			Params:   dagRunStatus.Params,
+			Outputs:  outputs,
+			Status:   dagRunStatus.Status,
+		}, nil
+	}
+
+	// Fallback to local DB for non-distributed runs
+	if rCtx.DB != nil {
+		return rCtx.DB.GetSubDAGRunStatus(ctx, dagRunID, rCtx.RootDAGRun)
+	}
+
+	return nil, fmt.Errorf("no coordinator or database available to get sub-DAG status")
+}
+
+// extractOutputsFromNodes extracts output variables from nodes.
+// Output variables are stored as "key=value" strings in the node's OutputVariables field.
+func extractOutputsFromNodes(nodes []*execution.Node) map[string]string {
+	outputs := make(map[string]string)
+	for _, node := range nodes {
+		if node.OutputVariables != nil {
+			node.OutputVariables.Range(func(_, value any) bool {
+				if s, ok := value.(string); ok {
+					// Split the value by '=' to get the key and value
+					for i := 0; i < len(s); i++ {
+						if s[i] == '=' {
+							outputs[s[:i]] = s[i+1:]
+							break
+						}
+					}
+				}
+				return true
+			})
+		}
+	}
+	return outputs
+}
+
+// isSubDAGRunCompleted checks if a sub-DAG run has completed.
+// For distributed runs, it queries the coordinator; otherwise, it uses the local DB.
+func (e *SubDAGExecutor) isSubDAGRunCompleted(ctx context.Context, dagRunID string) (bool, error) {
+	rCtx := execution.GetContext(ctx)
+
+	// For distributed runs, query the coordinator
+	if e.coordinatorCli != nil {
+		resp, err := e.coordinatorCli.GetDAGRunStatus(ctx, e.DAG.Name, dagRunID)
+		if err != nil {
+			return false, fmt.Errorf("failed to get DAG run status from coordinator: %w", err)
+		}
+		if !resp.Found {
+			return false, nil // Not found means not completed yet
+		}
+		// Check if the status is terminal (not active)
+		dagRunStatus := convert.ProtoToDAGRunStatus(resp.Status)
+		return !dagRunStatus.Status.IsActive(), nil
+	}
+
+	// Fallback to local DB for non-distributed runs
+	if rCtx.DB != nil {
+		return rCtx.DB.IsSubDAGRunCompleted(ctx, dagRunID, rCtx.RootDAGRun)
+	}
+
+	return false, fmt.Errorf("no coordinator or database available to check sub-DAG completion")
 }
 
 // Kill terminates all running sub DAG processes (both local and distributed)

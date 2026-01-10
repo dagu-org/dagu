@@ -86,6 +86,7 @@ func runWorker(ctx *Context, _ []string) error {
 
 	// Create coordinator client with appropriate service registry
 	var coordinatorCli coordinator.Client
+	var useRemoteHandler bool
 	if len(ctx.Config.Worker.Coordinators) > 0 {
 		// Use static registry for shared-nothing deployment
 		staticRegistry, err := coordinator.NewStaticRegistry(ctx.Config.Worker.Coordinators)
@@ -107,11 +108,26 @@ func runWorker(ctx *Context, _ []string) error {
 			return fmt.Errorf("invalid coordinator client configuration: %w", err)
 		}
 		coordinatorCli = coordinator.New(staticRegistry, coordinatorCliCfg)
+		useRemoteHandler = true
 	} else {
 		// Use file-based service registry (legacy mode)
 		coordinatorCli = ctx.NewCoordinatorClient()
 	}
 	w := worker.NewWorker(workerID, maxActiveRuns, coordinatorCli, labels, ctx.Config)
+
+	// Set up RemoteTaskHandler for shared-nothing mode
+	if useRemoteHandler {
+		handlerCfg := worker.RemoteTaskHandlerConfig{
+			WorkerID:          workerID,
+			CoordinatorClient: coordinatorCli,
+			// DAGRunStore is nil - fully remote mode
+			// DAGStore is nil - DAG definitions come via task.Definition
+			PeerConfig: ctx.Config.Core.Peer,
+			Config:     ctx.Config,
+		}
+		w.SetHandler(worker.NewRemoteTaskHandler(handlerCfg))
+		logger.Info(ctx, "Using remote task handler for shared-nothing mode")
+	}
 
 	logger.Info(ctx, "Starting worker", tag.WorkerID(workerID), tag.MaxConcurrency(maxActiveRuns), slog.Any("labels", labels))
 
