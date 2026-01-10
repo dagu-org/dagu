@@ -28,7 +28,7 @@ steps:
       echo "Start task $1"
       exit 1
 `
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 
 		setupWorker(t, coord, "test-worker-1", 10, map[string]string{"type": "test-worker"})
 
@@ -67,7 +67,7 @@ steps:
     output: MESSAGE
 `
 		// Setup and start coordinator
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 
 		// Create and start worker with selector labels
 		setupWorker(t, coord, "test-worker-1", 10, map[string]string{"type": "test-worker"})
@@ -103,7 +103,7 @@ steps:
     output: MESSAGE
 `
 		// Setup coordinator without any matching workers
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -137,7 +137,7 @@ steps:
     output: MESSAGE
 `
 		// Setup and start coordinator
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 
 		// Create and start worker with selector labels
 		setupWorker(t, coord, "test-worker-1", 10, map[string]string{"type": "test-worker"})

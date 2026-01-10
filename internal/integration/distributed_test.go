@@ -29,7 +29,7 @@ steps:
     depends:
       - task-on-worker
 `
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 		coord.Config.Queues.Enabled = true
 
 		// Load the DAG
@@ -80,7 +80,7 @@ steps:
   - name: task
     command: echo "Direct execution"
 `
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 		ctx := coord.Context
 
 		// Load the DAG
@@ -119,7 +119,7 @@ steps:
   - name: failing-task
     command: exit 1
 `
-	coord := test.SetupCoordinator(t)
+	coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 	coord.Config.Queues.Enabled = true
 
 	// Load the DAG
