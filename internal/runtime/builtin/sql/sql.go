@@ -231,8 +231,16 @@ func (e *sqlExecutor) getQuery() (string, error) {
 	}
 
 	// Check for command
-	if len(e.step.Commands) > 0 && e.step.Commands[0].Command != "" {
-		return e.step.Commands[0].Command, nil
+	// Use CmdWithArgs to get the full command string (including args)
+	// because cmdutil.SplitCommand splits SQL queries into command+args
+	// Fall back to Command if CmdWithArgs is not set (e.g., in unit tests)
+	if len(e.step.Commands) > 0 {
+		if e.step.Commands[0].CmdWithArgs != "" {
+			return e.step.Commands[0].CmdWithArgs, nil
+		}
+		if e.step.Commands[0].Command != "" {
+			return e.step.Commands[0].Command, nil
+		}
 	}
 
 	return "", fmt.Errorf("no sql query provided")

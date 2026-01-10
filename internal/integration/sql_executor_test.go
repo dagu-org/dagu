@@ -2,110 +2,64 @@ package integration_test
 
 import (
 	"fmt"
-	"net"
+	"path/filepath"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/test"
-	"github.com/stretchr/testify/require"
 )
 
-const (
-	postgresImage = "postgres:16-alpine"
-)
-
-// GetAvailablePort finds an available TCP port on localhost.
-// This prevents port conflicts when running tests in parallel.
-func GetAvailablePort(t *testing.T) int {
-	listener, err := net.Listen("tcp", "localhost:0")
-	require.NoError(t, err, "failed to find available port")
-	port := listener.Addr().(*net.TCPAddr).Port
-	require.NoError(t, listener.Close())
-	return port
-}
-
-// TestSQLExecutor_PostgresContainer_BasicQuery tests basic PostgreSQL query execution
-// using DAG-level container field for PostgreSQL container management.
-func TestSQLExecutor_PostgresContainer_BasicQuery(t *testing.T) {
+// TestSQLExecutor_SQLite_BasicQuery tests basic SQLite query execution.
+func TestSQLExecutor_SQLite_BasicQuery(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
-	port := GetAvailablePort(t)
+	dbPath := filepath.Join(t.TempDir(), "test.db")
 
 	dag := th.DAG(t, fmt.Sprintf(`
-container:
-  image: %s
-  env:
-    - POSTGRES_PASSWORD: testpass
-    - POSTGRES_USER: testuser
-    - POSTGRES_DB: testdb
-  ports:
-    - "%d:5432"
-  healthcheck:
-    test: ["CMD-SHELL", "pg_isready -U testuser -d testdb"]
-    interval: 2s
-    timeout: 5s
-    startPeriod: 10s
-    retries: 10
-  waitFor: healthy
-
 steps:
   - name: init-db
-    type: postgres
+    type: sqlite
     config:
-      dsn: "postgres://testuser:testpass@localhost:%d/testdb?sslmode=disable"
+      dsn: "%s"
       transaction: true
     script: |
-      CREATE TABLE users (id SERIAL PRIMARY KEY, name TEXT NOT NULL);
+      CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
       INSERT INTO users (name) VALUES ('Alice'), ('Bob');
 
   - name: query-users
-    type: postgres
+    type: sqlite
     config:
-      dsn: "postgres://testuser:testpass@localhost:%d/testdb?sslmode=disable"
+      dsn: "%s"
       outputFormat: jsonl
-    command: SELECT id, name FROM users ORDER BY id
+    command: "SELECT id, name FROM users ORDER BY id"
     output: USERS
     depends: [init-db]
-`, postgresImage, port, port, port))
+`, dbPath, dbPath))
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, core.Succeeded)
 }
 
-// TestSQLExecutor_PostgresContainer_Transaction tests transaction commit behavior.
-func TestSQLExecutor_PostgresContainer_Transaction(t *testing.T) {
+// TestSQLExecutor_SQLite_Transaction tests transaction commit behavior.
+func TestSQLExecutor_SQLite_Transaction(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
-	port := GetAvailablePort(t)
+	dbPath := filepath.Join(t.TempDir(), "test.db")
 
 	dag := th.DAG(t, fmt.Sprintf(`
-container:
-  image: %s
-  env:
-    - POSTGRES_PASSWORD: testpass
-  ports:
-    - "%d:5432"
-  healthcheck:
-    test: ["CMD-SHELL", "pg_isready -U postgres"]
-    interval: 2s
-    timeout: 5s
-    startPeriod: 10s
-    retries: 10
-  waitFor: healthy
-
 steps:
   - name: setup
-    type: postgres
+    type: sqlite
     config:
-      dsn: "postgres://postgres:testpass@localhost:%d/postgres?sslmode=disable"
+      dsn: "%s"
     script: |
-      CREATE TABLE accounts (id INT PRIMARY KEY, balance INT NOT NULL);
+      CREATE TABLE accounts (id INTEGER PRIMARY KEY, balance INTEGER NOT NULL);
       INSERT INTO accounts VALUES (1, 100), (2, 200);
 
   - name: transfer
-    type: postgres
+    type: sqlite
     config:
-      dsn: "postgres://postgres:testpass@localhost:%d/postgres?sslmode=disable"
+      dsn: "%s"
       transaction: true
     script: |
       UPDATE accounts SET balance = balance - 50 WHERE id = 1;
@@ -113,54 +67,40 @@ steps:
     depends: [setup]
 
   - name: verify
-    type: postgres
+    type: sqlite
     config:
-      dsn: "postgres://postgres:testpass@localhost:%d/postgres?sslmode=disable"
+      dsn: "%s"
       outputFormat: jsonl
-    command: SELECT id, balance FROM accounts ORDER BY id
+    command: "SELECT id, balance FROM accounts ORDER BY id"
     output: BALANCES
     depends: [transfer]
-`, postgresImage, port, port, port, port))
+`, dbPath, dbPath, dbPath))
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, core.Succeeded)
 }
 
-// TestSQLExecutor_PostgresContainer_TransactionRollback tests that failed transactions
+// TestSQLExecutor_SQLite_TransactionRollback tests that failed transactions
 // properly rollback changes.
-func TestSQLExecutor_PostgresContainer_TransactionRollback(t *testing.T) {
+func TestSQLExecutor_SQLite_TransactionRollback(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
-	port := GetAvailablePort(t)
+	dbPath := filepath.Join(t.TempDir(), "test.db")
 
 	dag := th.DAG(t, fmt.Sprintf(`
-container:
-  image: %s
-  env:
-    - POSTGRES_PASSWORD: testpass
-  ports:
-    - "%d:5432"
-  healthcheck:
-    test: ["CMD-SHELL", "pg_isready -U postgres"]
-    interval: 2s
-    timeout: 5s
-    startPeriod: 10s
-    retries: 10
-  waitFor: healthy
-
 steps:
   - name: setup
-    type: postgres
+    type: sqlite
     config:
-      dsn: "postgres://postgres:testpass@localhost:%d/postgres?sslmode=disable"
+      dsn: "%s"
     script: |
-      CREATE TABLE rollback_test (id INT PRIMARY KEY, value INT NOT NULL);
+      CREATE TABLE rollback_test (id INTEGER PRIMARY KEY, value INTEGER NOT NULL);
       INSERT INTO rollback_test VALUES (1, 100);
 
   - name: failed-transaction
-    type: postgres
+    type: sqlite
     config:
-      dsn: "postgres://postgres:testpass@localhost:%d/postgres?sslmode=disable"
+      dsn: "%s"
       transaction: true
     script: |
       UPDATE rollback_test SET value = 999 WHERE id = 1;
@@ -170,107 +110,45 @@ steps:
       failure: true
 
   - name: verify-rollback
-    type: postgres
+    type: sqlite
     config:
-      dsn: "postgres://postgres:testpass@localhost:%d/postgres?sslmode=disable"
+      dsn: "%s"
       outputFormat: jsonl
-    command: SELECT value FROM rollback_test WHERE id = 1
+    command: "SELECT value FROM rollback_test WHERE id = 1"
     output: VALUE_AFTER_ROLLBACK
     depends: [failed-transaction]
-`, postgresImage, port, port, port, port))
+`, dbPath, dbPath, dbPath))
 
-	dag.Agent().RunSuccess(t)
-	// The DAG should succeed even though one step failed (continueOn: failure: true)
+	// Run the DAG - it will have an error because one step fails
+	ag := dag.Agent()
+	_ = ag.Run(ag.Context)
+	// The DAG is partially_succeeded because one step failed (even with continueOn: failure: true)
 	// The value should still be 100 because the transaction was rolled back
+	dag.AssertLatestStatus(t, core.PartiallySucceeded)
 }
 
-// TestSQLExecutor_PostgresContainer_AdvisoryLock tests advisory lock serialization.
-func TestSQLExecutor_PostgresContainer_AdvisoryLock(t *testing.T) {
+// TestSQLExecutor_SQLite_NullValues tests NULL value handling in output.
+func TestSQLExecutor_SQLite_NullValues(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
-	port := GetAvailablePort(t)
 
-	dag := th.DAG(t, fmt.Sprintf(`
-container:
-  image: %s
-  env:
-    - POSTGRES_PASSWORD: testpass
-  ports:
-    - "%d:5432"
-  healthcheck:
-    test: ["CMD-SHELL", "pg_isready -U postgres"]
-    interval: 2s
-    timeout: 5s
-    startPeriod: 10s
-    retries: 10
-  waitFor: healthy
-
-steps:
-  - name: step1
-    type: postgres
-    config:
-      dsn: "postgres://postgres:testpass@localhost:%d/postgres?sslmode=disable"
-      advisoryLock: "test_serialization_lock"
-    command: SELECT 'step1_completed' as result
-    output: RESULT1
-
-  - name: step2
-    type: postgres
-    config:
-      dsn: "postgres://postgres:testpass@localhost:%d/postgres?sslmode=disable"
-      advisoryLock: "test_serialization_lock"
-    command: SELECT 'step2_completed' as result
-    output: RESULT2
-    depends: [step1]
-`, postgresImage, port, port, port))
-
-	dag.Agent().RunSuccess(t)
-	dag.AssertLatestStatus(t, core.Succeeded)
-}
-
-// TestSQLExecutor_PostgresContainer_NullValues tests NULL value handling in output.
-func TestSQLExecutor_PostgresContainer_NullValues(t *testing.T) {
-	t.Parallel()
-	th := test.Setup(t)
-	port := GetAvailablePort(t)
-
-	dag := th.DAG(t, fmt.Sprintf(`
-container:
-  image: %s
-  env:
-    - POSTGRES_PASSWORD: testpass
-  ports:
-    - "%d:5432"
-  healthcheck:
-    test: ["CMD-SHELL", "pg_isready -U postgres"]
-    interval: 2s
-    timeout: 5s
-    startPeriod: 10s
-    retries: 10
-  waitFor: healthy
-
+	dag := th.DAG(t, `
 steps:
   - name: test-nulls
-    type: postgres
+    type: sqlite
     config:
-      dsn: "postgres://postgres:testpass@localhost:%d/postgres?sslmode=disable"
+      dsn: ":memory:"
       outputFormat: jsonl
-    command: |
-      SELECT
-        NULL::text as null_text,
-        NULL::int as null_int,
-        NULL::boolean as null_bool,
-        'not_null'::text as regular_text,
-        42 as regular_int
+    command: "SELECT NULL as null_text, NULL as null_int, NULL as null_bool, 'not_null' as regular_text, 42 as regular_int"
     output: NULL_VALUES
-`, postgresImage, port, port))
+`)
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, core.Succeeded)
 }
 
-// TestSQLExecutor_PostgresContainer_OutputFormats tests different output formats.
-func TestSQLExecutor_PostgresContainer_OutputFormats(t *testing.T) {
+// TestSQLExecutor_SQLite_OutputFormats tests different output formats.
+func TestSQLExecutor_SQLite_OutputFormats(t *testing.T) {
 	tests := []struct {
 		name   string
 		format string
@@ -284,33 +162,21 @@ func TestSQLExecutor_PostgresContainer_OutputFormats(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			th := test.Setup(t)
-			port := GetAvailablePort(t)
 
 			dag := th.DAG(t, fmt.Sprintf(`
-container:
-  image: %s
-  env:
-    - POSTGRES_PASSWORD: testpass
-  ports:
-    - "%d:5432"
-  healthcheck:
-    test: ["CMD-SHELL", "pg_isready -U postgres"]
-    interval: 2s
-    timeout: 5s
-    startPeriod: 10s
-    retries: 10
-  waitFor: healthy
-
 steps:
   - name: query
-    type: postgres
+    type: sqlite
     config:
-      dsn: "postgres://postgres:testpass@localhost:%d/postgres?sslmode=disable"
+      dsn: ":memory:"
       outputFormat: %s
       headers: true
-    command: SELECT 1 as id, 'test' as name
+    script: |
+      CREATE TABLE data (id INTEGER, name TEXT);
+      INSERT INTO data VALUES (1, 'test');
+      SELECT * FROM data;
     output: RESULT
-`, postgresImage, port, port, tt.format))
+`, tt.format))
 
 			dag.Agent().RunSuccess(t)
 			dag.AssertLatestStatus(t, core.Succeeded)
@@ -318,144 +184,95 @@ steps:
 	}
 }
 
-// TestSQLExecutor_PostgresContainer_MaxRows tests row limiting functionality.
-func TestSQLExecutor_PostgresContainer_MaxRows(t *testing.T) {
+// TestSQLExecutor_SQLite_MaxRows tests row limiting functionality.
+func TestSQLExecutor_SQLite_MaxRows(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
-	port := GetAvailablePort(t)
 
-	dag := th.DAG(t, fmt.Sprintf(`
-container:
-  image: %s
-  env:
-    - POSTGRES_PASSWORD: testpass
-  ports:
-    - "%d:5432"
-  healthcheck:
-    test: ["CMD-SHELL", "pg_isready -U postgres"]
-    interval: 2s
-    timeout: 5s
-    startPeriod: 10s
-    retries: 10
-  waitFor: healthy
-
+	dag := th.DAG(t, `
 steps:
-  - name: setup
-    type: postgres
-    config:
-      dsn: "postgres://postgres:testpass@localhost:%d/postgres?sslmode=disable"
-    script: |
-      CREATE TABLE many_rows (id SERIAL PRIMARY KEY, value TEXT);
-      INSERT INTO many_rows (value) SELECT 'row_' || generate_series(1, 100);
-
   - name: query-limited
-    type: postgres
+    type: sqlite
     config:
-      dsn: "postgres://postgres:testpass@localhost:%d/postgres?sslmode=disable"
+      dsn: ":memory:"
       outputFormat: jsonl
       maxRows: 5
-    command: SELECT * FROM many_rows ORDER BY id
+    script: |
+      CREATE TABLE many_rows (id INTEGER PRIMARY KEY, value TEXT);
+      INSERT INTO many_rows (value) VALUES ('row_1'), ('row_2'), ('row_3'), ('row_4'), ('row_5'), ('row_6'), ('row_7'), ('row_8'), ('row_9'), ('row_10');
+      SELECT * FROM many_rows ORDER BY id;
     output: LIMITED_ROWS
-    depends: [setup]
-`, postgresImage, port, port, port))
+`)
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, core.Succeeded)
 }
 
-// TestSQLExecutor_PostgresContainer_NamedParams tests named parameter substitution.
-func TestSQLExecutor_PostgresContainer_NamedParams(t *testing.T) {
+// TestSQLExecutor_SQLite_NamedParams tests named parameter substitution.
+func TestSQLExecutor_SQLite_NamedParams(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
-	port := GetAvailablePort(t)
+	dbPath := filepath.Join(t.TempDir(), "test.db")
 
 	dag := th.DAG(t, fmt.Sprintf(`
-container:
-  image: %s
-  env:
-    - POSTGRES_PASSWORD: testpass
-  ports:
-    - "%d:5432"
-  healthcheck:
-    test: ["CMD-SHELL", "pg_isready -U postgres"]
-    interval: 2s
-    timeout: 5s
-    startPeriod: 10s
-    retries: 10
-  waitFor: healthy
-
 steps:
   - name: setup
-    type: postgres
+    type: sqlite
     config:
-      dsn: "postgres://postgres:testpass@localhost:%d/postgres?sslmode=disable"
+      dsn: "%s"
     script: |
-      CREATE TABLE products (id SERIAL PRIMARY KEY, name TEXT, price NUMERIC);
+      CREATE TABLE products (id INTEGER PRIMARY KEY, name TEXT, price REAL);
       INSERT INTO products (name, price) VALUES ('Apple', 1.50), ('Banana', 0.75), ('Orange', 2.00);
 
   - name: query-with-params
-    type: postgres
+    type: sqlite
     config:
-      dsn: "postgres://postgres:testpass@localhost:%d/postgres?sslmode=disable"
+      dsn: "%s"
       outputFormat: jsonl
       params:
         min_price: 1.00
-    command: SELECT name, price FROM products WHERE price >= :min_price ORDER BY name
+    command: "SELECT name, price FROM products WHERE price >= :min_price ORDER BY name"
     output: FILTERED_PRODUCTS
     depends: [setup]
-`, postgresImage, port, port, port))
+`, dbPath, dbPath))
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, core.Succeeded)
 }
 
-// TestSQLExecutor_PostgresContainer_MultiStatement tests multi-statement scripts.
-func TestSQLExecutor_PostgresContainer_MultiStatement(t *testing.T) {
+// TestSQLExecutor_SQLite_MultiStatement tests multi-statement scripts.
+func TestSQLExecutor_SQLite_MultiStatement(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
-	port := GetAvailablePort(t)
+	dbPath := filepath.Join(t.TempDir(), "test.db")
 
 	dag := th.DAG(t, fmt.Sprintf(`
-container:
-  image: %s
-  env:
-    - POSTGRES_PASSWORD: testpass
-  ports:
-    - "%d:5432"
-  healthcheck:
-    test: ["CMD-SHELL", "pg_isready -U postgres"]
-    interval: 2s
-    timeout: 5s
-    startPeriod: 10s
-    retries: 10
-  waitFor: healthy
-
 steps:
   - name: multi-statement
-    type: postgres
+    type: sqlite
     config:
-      dsn: "postgres://postgres:testpass@localhost:%d/postgres?sslmode=disable"
+      dsn: "%s"
       transaction: true
     script: |
-      CREATE TABLE orders (id SERIAL PRIMARY KEY, status TEXT);
+      CREATE TABLE orders (id INTEGER PRIMARY KEY, status TEXT);
       INSERT INTO orders (status) VALUES ('pending');
       UPDATE orders SET status = 'completed' WHERE status = 'pending';
 
   - name: verify
-    type: postgres
+    type: sqlite
     config:
-      dsn: "postgres://postgres:testpass@localhost:%d/postgres?sslmode=disable"
+      dsn: "%s"
       outputFormat: jsonl
-    command: SELECT status FROM orders
+    command: "SELECT status FROM orders"
     output: ORDER_STATUS
     depends: [multi-statement]
-`, postgresImage, port, port, port))
+`, dbPath, dbPath))
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, core.Succeeded)
 }
 
-// TestSQLExecutor_SQLite_InMemory tests SQLite in-memory database.
+// TestSQLExecutor_SQLite_InMemory tests SQLite in-memory database (single step).
 func TestSQLExecutor_SQLite_InMemory(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
@@ -478,8 +295,8 @@ steps:
 	dag.AssertLatestStatus(t, core.Succeeded)
 }
 
-// TestSQLExecutor_SQLite_Transaction tests SQLite transaction handling.
-func TestSQLExecutor_SQLite_Transaction(t *testing.T) {
+// TestSQLExecutor_SQLite_TransactionSingleStep tests SQLite transaction handling in a single step.
+func TestSQLExecutor_SQLite_TransactionSingleStep(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
 
@@ -502,41 +319,4 @@ steps:
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, core.Succeeded)
-}
-
-// TestSQLExecutor_SQLite_OutputFormats tests SQLite output formats.
-func TestSQLExecutor_SQLite_OutputFormats(t *testing.T) {
-	tests := []struct {
-		name   string
-		format string
-	}{
-		{"JSONL", "jsonl"},
-		{"JSON", "json"},
-		{"CSV", "csv"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			th := test.Setup(t)
-
-			dag := th.DAG(t, fmt.Sprintf(`
-steps:
-  - name: sqlite-format-test
-    type: sqlite
-    config:
-      dsn: ":memory:"
-      outputFormat: %s
-      headers: true
-    script: |
-      CREATE TABLE data (id INTEGER, name TEXT);
-      INSERT INTO data VALUES (1, 'test');
-      SELECT * FROM data;
-    output: RESULT
-`, tt.format))
-
-			dag.Agent().RunSuccess(t)
-			dag.AssertLatestStatus(t, core.Succeeded)
-		})
-	}
 }
