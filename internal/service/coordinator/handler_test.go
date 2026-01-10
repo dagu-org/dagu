@@ -147,8 +147,8 @@ func (m *mockDAGRunAttempt) IsAborting(_ context.Context) (bool, error) {
 	defer m.mu.Unlock()
 	return m.aborting, nil
 }
-func (m *mockDAGRunAttempt) Hide(_ context.Context) error                 { return nil }
-func (m *mockDAGRunAttempt) Hidden() bool                                 { return false }
+func (m *mockDAGRunAttempt) Hide(_ context.Context) error { return nil }
+func (m *mockDAGRunAttempt) Hidden() bool                 { return false }
 func (m *mockDAGRunAttempt) WriteOutputs(_ context.Context, _ *execution.DAGRunOutputs) error {
 	return nil
 }
@@ -1231,8 +1231,8 @@ func (m *mockStreamLogsServer) SetHeader(_ metadata.MD) error  { return nil }
 func (m *mockStreamLogsServer) SendHeader(_ metadata.MD) error { return nil }
 func (m *mockStreamLogsServer) SetTrailer(_ metadata.MD)       {}
 func (m *mockStreamLogsServer) Context() context.Context       { return m.ctx }
-func (m *mockStreamLogsServer) SendMsg(_ any) error { return nil }
-func (m *mockStreamLogsServer) RecvMsg(_ any) error { return nil }
+func (m *mockStreamLogsServer) SendMsg(_ any) error            { return nil }
+func (m *mockStreamLogsServer) RecvMsg(_ any) error            { return nil }
 
 func TestHandler_StreamLogs_Full(t *testing.T) {
 	t.Parallel()
