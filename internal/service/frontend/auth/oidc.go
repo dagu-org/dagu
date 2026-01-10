@@ -484,7 +484,7 @@ func BuiltinOIDCCallbackHandler(cfg *BuiltinOIDCConfig) http.HandlerFunc {
 		clearOIDCStateCookies(w, r)
 
 		// Set JWT token cookie
-		expireSeconds := int(tokenResult.ExpiresAt.Sub(time.Now()).Seconds())
+		expireSeconds := int(time.Until(tokenResult.ExpiresAt).Seconds())
 		setCookie(w, r, "token", tokenResult.Token, expireSeconds)
 
 		// Redirect to home with welcome flag for new users

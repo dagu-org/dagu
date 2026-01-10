@@ -175,9 +175,9 @@ type AuthDef struct {
 
 // AuthBuiltinDef represents the builtin authentication configuration
 type AuthBuiltinDef struct {
-	Admin *AdminConfigDef  `mapstructure:"admin"`
-	Token *TokenConfigDef  `mapstructure:"token"`
-	OIDC  *BuiltinOIDCDef  `mapstructure:"oidc"` // OIDC as a login method under builtin auth
+	Admin *AdminConfigDef `mapstructure:"admin"`
+	Token *TokenConfigDef `mapstructure:"token"`
+	OIDC  *BuiltinOIDCDef `mapstructure:"oidc"` // OIDC as a login method under builtin auth
 }
 
 // BuiltinOIDCDef represents the OIDC configuration for builtin auth mode

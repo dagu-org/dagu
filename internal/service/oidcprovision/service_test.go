@@ -596,7 +596,7 @@ func TestGenerateUniqueUsername_SanitizedToEmpty(t *testing.T) {
 	claims := OIDCClaims{
 		Subject:           "abcd1234efgh",
 		Email:             "!!!@example.com", // Sanitizes to empty
-		PreferredUsername: "日本語",            // Non-ASCII, sanitizes to empty
+		PreferredUsername: "日本語",             // Non-ASCII, sanitizes to empty
 	}
 
 	username := svc.generateUniqueUsername(context.Background(), claims)

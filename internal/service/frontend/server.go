@@ -44,12 +44,12 @@ import (
 
 // Server represents the HTTP server for the frontend application
 type Server struct {
-	apiV1           *apiv1.API
-	apiV2           *apiv2.API
-	config          *config.Config
-	httpServer      *http.Server
-	funcsConfig     funcsConfig
-	builtinOIDCCfg  *auth.BuiltinOIDCConfig // OIDC config for builtin auth mode
+	apiV1          *apiv1.API
+	apiV2          *apiv2.API
+	config         *config.Config
+	httpServer     *http.Server
+	funcsConfig    funcsConfig
+	builtinOIDCCfg *auth.BuiltinOIDCConfig // OIDC config for builtin auth mode
 }
 
 // NewServer constructs a Server configured from cfg and the provided stores, managers, and services.
