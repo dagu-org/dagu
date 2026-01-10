@@ -192,6 +192,17 @@ func LoadConfig(workDir string, ct core.Container, registryAuths map[string]*cor
 		WorkingDir: ct.GetWorkingDir(),
 	}
 
+	// Convert healthcheck if provided
+	if ct.Healthcheck != nil {
+		containerConfig.Healthcheck = &container.HealthConfig{
+			Test:        ct.Healthcheck.Test,
+			Interval:    ct.Healthcheck.Interval,
+			Timeout:     ct.Healthcheck.Timeout,
+			StartPeriod: ct.Healthcheck.StartPeriod,
+			Retries:     ct.Healthcheck.Retries,
+		}
+	}
+
 	hostConfig := &container.HostConfig{}
 	networkConfig := &network.NetworkingConfig{}
 	execOptions := &container.ExecOptions{}

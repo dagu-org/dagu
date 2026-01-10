@@ -40,6 +40,12 @@ container:
     - POSTGRES_DB: testdb
   ports:
     - "%d:5432"
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U testuser -d testdb"]
+    interval: 2s
+    timeout: 5s
+    startPeriod: 10s
+    retries: 10
   waitFor: healthy
 
 steps:
@@ -79,6 +85,12 @@ container:
     - POSTGRES_PASSWORD: testpass
   ports:
     - "%d:5432"
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U postgres"]
+    interval: 2s
+    timeout: 5s
+    startPeriod: 10s
+    retries: 10
   waitFor: healthy
 
 steps:
@@ -128,6 +140,12 @@ container:
     - POSTGRES_PASSWORD: testpass
   ports:
     - "%d:5432"
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U postgres"]
+    interval: 2s
+    timeout: 5s
+    startPeriod: 10s
+    retries: 10
   waitFor: healthy
 
 steps:
@@ -179,6 +197,12 @@ container:
     - POSTGRES_PASSWORD: testpass
   ports:
     - "%d:5432"
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U postgres"]
+    interval: 2s
+    timeout: 5s
+    startPeriod: 10s
+    retries: 10
   waitFor: healthy
 
 steps:
@@ -217,6 +241,12 @@ container:
     - POSTGRES_PASSWORD: testpass
   ports:
     - "%d:5432"
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U postgres"]
+    interval: 2s
+    timeout: 5s
+    startPeriod: 10s
+    retries: 10
   waitFor: healthy
 
 steps:
@@ -263,6 +293,12 @@ container:
     - POSTGRES_PASSWORD: testpass
   ports:
     - "%d:5432"
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U postgres"]
+    interval: 2s
+    timeout: 5s
+    startPeriod: 10s
+    retries: 10
   waitFor: healthy
 
 steps:
@@ -295,6 +331,12 @@ container:
     - POSTGRES_PASSWORD: testpass
   ports:
     - "%d:5432"
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U postgres"]
+    interval: 2s
+    timeout: 5s
+    startPeriod: 10s
+    retries: 10
   waitFor: healthy
 
 steps:
@@ -334,6 +376,12 @@ container:
     - POSTGRES_PASSWORD: testpass
   ports:
     - "%d:5432"
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U postgres"]
+    interval: 2s
+    timeout: 5s
+    startPeriod: 10s
+    retries: 10
   waitFor: healthy
 
 steps:
@@ -374,6 +422,12 @@ container:
     - POSTGRES_PASSWORD: testpass
   ports:
     - "%d:5432"
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U postgres"]
+    interval: 2s
+    timeout: 5s
+    startPeriod: 10s
+    retries: 10
   waitFor: healthy
 
 steps:

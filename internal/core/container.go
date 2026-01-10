@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"strconv"
+	"time"
 )
 
 // Container defines the container configuration for the DAG.
@@ -46,6 +47,28 @@ type Container struct {
 	LogPattern string `yaml:"logPattern,omitempty"`
 	// RestartPolicy applies Docker restart policy for long-running containers ("no", "always", or "unless-stopped").
 	RestartPolicy string `yaml:"restartPolicy,omitempty"`
+	// Healthcheck specifies a custom healthcheck for the container.
+	// If specified with waitFor: healthy, this healthcheck is used instead of
+	// relying on the image's built-in healthcheck.
+	Healthcheck *Healthcheck `yaml:"healthcheck,omitempty"`
+}
+
+// Healthcheck defines a custom health check for a container.
+// This allows waitFor: healthy to work with images that don't have built-in healthchecks.
+type Healthcheck struct {
+	// Test is the command to run to check health. Must start with:
+	// - ["NONE"] - disable healthcheck
+	// - ["CMD", "command", "arg1", ...] - run command directly
+	// - ["CMD-SHELL", "command"] - run command in shell
+	Test []string `yaml:"test,omitempty"`
+	// Interval is the time between health checks (e.g., "5s", "1m").
+	Interval time.Duration `yaml:"interval,omitempty"`
+	// Timeout is how long to wait for the health check to complete (e.g., "3s").
+	Timeout time.Duration `yaml:"timeout,omitempty"`
+	// StartPeriod is the grace period for the container to initialize (e.g., "10s").
+	StartPeriod time.Duration `yaml:"startPeriod,omitempty"`
+	// Retries is the number of consecutive failures needed to consider unhealthy.
+	Retries int `yaml:"retries,omitempty"`
 }
 
 // ContainerStartup is an enum for DAG-level container startup modes.

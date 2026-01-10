@@ -200,6 +200,23 @@ type container struct {
 	LogPattern string `yaml:"logPattern,omitempty"`
 	// RestartPolicy: no|always|unless-stopped
 	RestartPolicy string `yaml:"restartPolicy,omitempty"`
+	// Healthcheck defines a custom healthcheck for the container.
+	Healthcheck *healthcheck `yaml:"healthcheck,omitempty"`
+}
+
+// healthcheck is the spec representation for custom health checks.
+// Durations are specified as strings (e.g., "5s", "1m") for YAML convenience.
+type healthcheck struct {
+	// Test is the command to run. Must start with NONE, CMD, or CMD-SHELL.
+	Test []string `yaml:"test,omitempty"`
+	// Interval is the time between checks (e.g., "5s").
+	Interval string `yaml:"interval,omitempty"`
+	// Timeout is how long to wait for the check to complete (e.g., "3s").
+	Timeout string `yaml:"timeout,omitempty"`
+	// StartPeriod is the grace period for container initialization (e.g., "10s").
+	StartPeriod string `yaml:"startPeriod,omitempty"`
+	// Retries is the number of consecutive failures needed to mark unhealthy.
+	Retries int `yaml:"retries,omitempty"`
 }
 
 // runConfig defines configuration for controlling user interactions during DAG runs.
@@ -970,6 +987,9 @@ func buildContainerFromSpec(ctx BuildContext, c *container) (*core.Container, er
 		if c.KeepContainer {
 			invalidFields = append(invalidFields, "keepContainer")
 		}
+		if c.Healthcheck != nil {
+			invalidFields = append(invalidFields, "healthcheck")
+		}
 
 		if len(invalidFields) > 0 {
 			return nil, core.NewValidationError("container", nil,
@@ -1018,6 +1038,16 @@ func buildContainerFromSpec(ctx BuildContext, c *container) (*core.Container, er
 		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 	}
 
+	// Parse healthcheck if provided
+	var hc *core.Healthcheck
+	if c.Healthcheck != nil {
+		var err error
+		hc, err = parseHealthcheck(c.Healthcheck)
+		if err != nil {
+			return nil, core.NewValidationError("container.healthcheck", c.Healthcheck, err)
+		}
+	}
+
 	result := &core.Container{
 		Name:          strings.TrimSpace(c.Name),
 		Image:         c.Image,
@@ -1034,6 +1064,7 @@ func buildContainerFromSpec(ctx BuildContext, c *container) (*core.Container, er
 		WaitFor:       core.ContainerWaitFor(strings.ToLower(strings.TrimSpace(c.WaitFor))),
 		LogPattern:    c.LogPattern,
 		RestartPolicy: strings.TrimSpace(c.RestartPolicy),
+		Healthcheck:   hc,
 	}
 
 	// Backward compatibility
@@ -1044,6 +1075,75 @@ func buildContainerFromSpec(ctx BuildContext, c *container) (*core.Container, er
 	}
 
 	return result, nil
+}
+
+// parseHealthcheck converts a spec healthcheck to a core.Healthcheck with validation.
+func parseHealthcheck(h *healthcheck) (*core.Healthcheck, error) {
+	if h == nil {
+		return nil, nil
+	}
+
+	// Validate test field
+	if len(h.Test) == 0 {
+		return nil, fmt.Errorf("test is required")
+	}
+
+	// First element must be a valid command type
+	validPrefixes := map[string]bool{
+		"NONE":      true,
+		"CMD":       true,
+		"CMD-SHELL": true,
+	}
+	if !validPrefixes[h.Test[0]] {
+		return nil, fmt.Errorf("test must start with NONE, CMD, or CMD-SHELL, got %q", h.Test[0])
+	}
+
+	// NONE should be the only element
+	if h.Test[0] == "NONE" && len(h.Test) > 1 {
+		return nil, fmt.Errorf("NONE healthcheck should not have additional arguments")
+	}
+
+	// CMD and CMD-SHELL need at least one more element (the command)
+	if (h.Test[0] == "CMD" || h.Test[0] == "CMD-SHELL") && len(h.Test) < 2 {
+		return nil, fmt.Errorf("%s healthcheck requires a command", h.Test[0])
+	}
+
+	// Validate retries
+	if h.Retries < 0 {
+		return nil, fmt.Errorf("retries must be non-negative, got %d", h.Retries)
+	}
+
+	hc := &core.Healthcheck{
+		Test:    h.Test,
+		Retries: h.Retries,
+	}
+
+	// Parse duration strings
+	if h.Interval != "" {
+		d, err := time.ParseDuration(h.Interval)
+		if err != nil {
+			return nil, fmt.Errorf("invalid interval %q: %w", h.Interval, err)
+		}
+		hc.Interval = d
+	}
+
+	if h.Timeout != "" {
+		d, err := time.ParseDuration(h.Timeout)
+		if err != nil {
+			return nil, fmt.Errorf("invalid timeout %q: %w", h.Timeout, err)
+		}
+		hc.Timeout = d
+	}
+
+	if h.StartPeriod != "" {
+		d, err := time.ParseDuration(h.StartPeriod)
+		if err != nil {
+			return nil, fmt.Errorf("invalid startPeriod %q: %w", h.StartPeriod, err)
+		}
+		hc.StartPeriod = d
+	}
+
+	return hc, nil
 }
 
 func buildRegistryAuths(ctx BuildContext, d *dag) (map[string]*core.AuthConfig, error) {
