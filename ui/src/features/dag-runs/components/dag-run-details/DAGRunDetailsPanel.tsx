@@ -31,7 +31,10 @@ const DAGRunDetailsPanel: React.FC<DAGRunDetailsPanelProps> = ({
   const parentDAGRunId = searchParams.get('dagRunId');
   const parentName = searchParams.get('dagRunName') || name;
 
-  // Fetch sub-DAG-run details (only when subDAGRunId exists)
+  // Guard: only query sub-DAG endpoint when all required params are present
+  const canQuerySubDag = !!(subDAGRunId && parentDAGRunId && parentName);
+
+  // Fetch sub-DAG-run details (only when all sub-DAG params are valid)
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
     {
@@ -40,16 +43,16 @@ const DAGRunDetailsPanel: React.FC<DAGRunDetailsPanelProps> = ({
           remoteNode: appBarContext.selectedRemoteNode || 'local',
         },
         path: {
-          name: parentName || '',
-          dagRunId: parentDAGRunId || '',
-          subDAGRunId: subDAGRunId || '',
+          name: parentName as string,
+          dagRunId: parentDAGRunId as string,
+          subDAGRunId: subDAGRunId as string,
         },
       },
     },
-    { refreshInterval: 2000, keepPreviousData: true, isPaused: () => !subDAGRunId }
+    { refreshInterval: 2000, keepPreviousData: true, isPaused: () => !canQuerySubDag }
   );
 
-  // Fetch regular DAG-run details (only when subDAGRunId doesn't exist)
+  // Fetch regular DAG-run details (only when not querying sub-DAG)
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}',
     {
@@ -63,11 +66,11 @@ const DAGRunDetailsPanel: React.FC<DAGRunDetailsPanelProps> = ({
         },
       },
     },
-    { refreshInterval: 2000, keepPreviousData: true, isPaused: () => !!subDAGRunId }
+    { refreshInterval: 2000, keepPreviousData: true, isPaused: () => canQuerySubDag }
   );
 
   // Use the appropriate query based on whether this is a sub-DAG-run
-  const { data, mutate } = subDAGRunId ? subDAGQuery : dagRunQuery;
+  const { data, mutate } = canQuerySubDag ? subDAGQuery : dagRunQuery;
 
   // Keep track of last valid data to prevent flickering
   const [lastValidData, setLastValidData] = React.useState(data);

@@ -87,9 +87,12 @@ function StepLog({
   const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
-  // Determine if this is a sub DAG-run
+  // Determine if this is a sub DAG-run - check both rootDAGRunId AND rootDAGRunName
   const isSubDAGRun =
-    dagRun && dagRun.rootDAGRunId && dagRun.rootDAGRunId !== dagRun.dagRunId;
+    dagRun &&
+    dagRun.rootDAGRunId &&
+    dagRun.rootDAGRunName &&
+    dagRun.rootDAGRunId !== dagRun.dagRunId;
 
   // Build query params based on view mode
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
@@ -98,13 +101,16 @@ function StepLog({
   const offset = viewMode === 'page' ? (currentPage - 1) * pageSize + 1 : undefined;
   const limit = viewMode === 'page' ? pageSize : undefined;
 
-  // SWR options shared by both queries
-  const swrOptions = {
-    refreshInterval: isLiveMode && isRunning ? 2000 : 0,
-    keepPreviousData: true,
-    revalidateOnFocus: false,
-    dedupingInterval: 1000,
-  };
+  // SWR options shared by both queries - memoized to prevent unnecessary re-renders
+  const swrOptions = React.useMemo(
+    () => ({
+      refreshInterval: isLiveMode && isRunning ? 2000 : 0,
+      keepPreviousData: true,
+      revalidateOnFocus: false,
+      dedupingInterval: 1000,
+    }),
+    [isLiveMode, isRunning]
+  );
 
   // Fetch sub-DAG-run step log (only when isSubDAGRun is true)
   const subDAGQuery = useQuery(
@@ -120,9 +126,9 @@ function StepLog({
           limit,
         },
         path: {
-          name: dagRun?.rootDAGRunName || '',
-          dagRunId: dagRun?.rootDAGRunId || '',
-          subDAGRunId: dagRun?.dagRunId || '',
+          name: dagRun?.rootDAGRunName as string,
+          dagRunId: dagRun?.rootDAGRunId as string,
+          subDAGRunId: dagRun?.dagRunId as string,
           stepName,
         },
       },

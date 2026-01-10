@@ -94,12 +94,18 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
   const [modal, setModal] = React.useState(false);
 
   // State for log viewer
-  const [logViewer, setLogViewer] = useState({
+  const [logViewer, setLogViewer] = useState<{
+    isOpen: boolean;
+    logType: 'execution' | 'step';
+    stepName: string;
+    dagRunId: string;
+    stream: Stream;
+  }>({
     isOpen: false,
-    logType: 'step' as 'execution' | 'step',
+    logType: 'step',
     stepName: '',
     dagRunId: '',
-    stream: Stream.stdout as Stream,
+    stream: Stream.stdout,
   });
 
   // Get the selected dagRun index from URL parameters using React Router

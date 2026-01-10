@@ -80,9 +80,12 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
   const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
-  // Determine if this is a sub dagRun
+  // Determine if this is a sub dagRun - check both rootDAGRunId AND rootDAGRunName
   const isSubDAGRun =
-    dagRun && dagRun.rootDAGRunId && dagRun.rootDAGRunId !== dagRun.dagRunId;
+    dagRun &&
+    dagRun.rootDAGRunId &&
+    dagRun.rootDAGRunName &&
+    dagRun.rootDAGRunId !== dagRun.dagRunId;
 
   // Build query params based on view mode
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
@@ -92,12 +95,15 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
   const limit = viewMode === 'page' ? pageSize : undefined;
 
   // SWR options shared by both queries
-  const swrOptions = {
-    refreshInterval: isLiveMode ? 2000 : 0,
-    keepPreviousData: true,
-    revalidateOnFocus: false,
-    dedupingInterval: 1000,
-  };
+  const swrOptions = React.useMemo(
+    () => ({
+      refreshInterval: isLiveMode ? 2000 : 0,
+      keepPreviousData: true,
+      revalidateOnFocus: false,
+      dedupingInterval: 1000,
+    }),
+    [isLiveMode]
+  );
 
   // Fetch sub-DAG-run log (only when isSubDAGRun is true)
   const subDAGQuery = useQuery(
@@ -112,9 +118,9 @@ function ExecutionLog({ name, dagRunId, dagRun, stream = 'stdout' }: Props) {
           limit,
         },
         path: {
-          name: dagRun?.rootDAGRunName || '',
-          dagRunId: dagRun?.rootDAGRunId || '',
-          subDAGRunId: dagRun?.dagRunId || '',
+          name: dagRun?.rootDAGRunName as string,
+          dagRunId: dagRun?.rootDAGRunId as string,
+          subDAGRunId: dagRun?.dagRunId as string,
         },
       },
     },

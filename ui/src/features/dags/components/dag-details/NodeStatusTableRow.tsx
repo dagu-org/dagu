@@ -111,9 +111,12 @@ function InlineLogViewer({
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
-  // Determine if this is a sub DAG run
+  // Determine if this is a sub DAG run - check both rootDAGRunId AND rootDAGRunName
   const isSubDAGRun =
-    dagRun && dagRun.rootDAGRunId && dagRun.rootDAGRunId !== dagRun.dagRunId;
+    dagRun &&
+    dagRun.rootDAGRunId &&
+    dagRun.rootDAGRunName &&
+    dagRun.rootDAGRunId !== dagRun.dagRunId;
 
   // Fetch sub-DAG-run step log (only when isSubDAGRun is true)
   const subDAGQuery = useQuery(
@@ -126,9 +129,9 @@ function InlineLogViewer({
           tail: 100,
         },
         path: {
-          name: dagRun?.rootDAGRunName || '',
-          dagRunId: dagRun?.rootDAGRunId || '',
-          subDAGRunId: dagRun?.dagRunId || '',
+          name: dagRun?.rootDAGRunName as string,
+          dagRunId: dagRun?.rootDAGRunId as string,
+          subDAGRunId: dagRun?.dagRunId as string,
           stepName,
         },
       },
