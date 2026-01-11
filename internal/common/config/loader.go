@@ -434,21 +434,22 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 			cfg.Server.Auth.OIDC.ClientSecret = oidc.ClientSecret
 			cfg.Server.Auth.OIDC.ClientUrl = oidc.ClientUrl
 			cfg.Server.Auth.OIDC.Issuer = oidc.Issuer
-			cfg.Server.Auth.OIDC.Scopes = oidc.Scopes
-			cfg.Server.Auth.OIDC.Whitelist = oidc.Whitelist
+			// Use parseStringList to support both comma-separated strings and YAML lists
+			cfg.Server.Auth.OIDC.Scopes = parseStringList(l.v.Get("auth.oidc.scopes"))
+			cfg.Server.Auth.OIDC.Whitelist = parseStringList(l.v.Get("auth.oidc.whitelist"))
 			// Builtin-specific fields (only used when auth.mode=builtin)
-			if oidc.Enabled != nil {
-				cfg.Server.Auth.OIDC.Enabled = *oidc.Enabled
-			}
 			if oidc.AutoSignup != nil {
 				cfg.Server.Auth.OIDC.AutoSignup = *oidc.AutoSignup
+			} else {
+				// Default to true - if OIDC is configured, auto-signup is expected
+				cfg.Server.Auth.OIDC.AutoSignup = true
 			}
-			cfg.Server.Auth.OIDC.DefaultRole = oidc.DefaultRole
-			cfg.Server.Auth.OIDC.AllowedDomains = oidc.AllowedDomains
+			cfg.Server.Auth.OIDC.AllowedDomains = parseStringList(l.v.Get("auth.oidc.allowedDomains"))
 			cfg.Server.Auth.OIDC.ButtonLabel = oidc.ButtonLabel
 			// Load role mapping configuration
 			if oidc.RoleMapping != nil {
 				rm := oidc.RoleMapping
+				cfg.Server.Auth.OIDC.RoleMapping.DefaultRole = rm.DefaultRole
 				cfg.Server.Auth.OIDC.RoleMapping.GroupsClaim = rm.GroupsClaim
 				cfg.Server.Auth.OIDC.RoleMapping.GroupMappings = rm.GroupMappings
 				cfg.Server.Auth.OIDC.RoleMapping.RoleAttributePath = rm.RoleAttributePath
@@ -507,8 +508,8 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 	if len(cfg.Server.Auth.OIDC.Scopes) == 0 {
 		cfg.Server.Auth.OIDC.Scopes = []string{"openid", "profile", "email"}
 	}
-	if cfg.Server.Auth.OIDC.DefaultRole == "" {
-		cfg.Server.Auth.OIDC.DefaultRole = "viewer"
+	if cfg.Server.Auth.OIDC.RoleMapping.DefaultRole == "" {
+		cfg.Server.Auth.OIDC.RoleMapping.DefaultRole = "viewer"
 	}
 	if cfg.Server.Auth.OIDC.ButtonLabel == "" {
 		cfg.Server.Auth.OIDC.ButtonLabel = "Login with SSO"
@@ -1117,12 +1118,11 @@ var envBindings = []envBinding{
 	{key: "auth.oidc.scopes", env: "AUTH_OIDC_SCOPES"},
 	{key: "auth.oidc.whitelist", env: "AUTH_OIDC_WHITELIST"},
 	// Builtin-specific OIDC fields (only used when auth.mode=builtin)
-	{key: "auth.oidc.enabled", env: "AUTH_OIDC_ENABLED"},
 	{key: "auth.oidc.autoSignup", env: "AUTH_OIDC_AUTO_SIGNUP"},
-	{key: "auth.oidc.defaultRole", env: "AUTH_OIDC_DEFAULT_ROLE"},
 	{key: "auth.oidc.allowedDomains", env: "AUTH_OIDC_ALLOWED_DOMAINS"},
 	{key: "auth.oidc.buttonLabel", env: "AUTH_OIDC_BUTTON_LABEL"},
 	// OIDC Role Mapping configuration (builtin-specific)
+	{key: "auth.oidc.roleMapping.defaultRole", env: "AUTH_OIDC_DEFAULT_ROLE"},
 	{key: "auth.oidc.roleMapping.groupsClaim", env: "AUTH_OIDC_GROUPS_CLAIM"},
 	{key: "auth.oidc.roleMapping.groupMappings", env: "AUTH_OIDC_GROUP_MAPPINGS"},
 	{key: "auth.oidc.roleMapping.roleAttributePath", env: "AUTH_OIDC_ROLE_ATTRIBUTE_PATH"},
@@ -1245,6 +1245,41 @@ func parseWorkerLabels(labelsStr string) map[string]string {
 	}
 
 	return labels
+}
+
+// parseStringList parses input that can be either a comma-separated string or a list of strings.
+// This allows config values to be specified as either:
+//   - YAML list: ["a", "b", "c"]
+//   - Comma-separated string: "a,b,c"
+//
+// Empty strings and whitespace-only entries are filtered out.
+func parseStringList(input interface{}) []string {
+	var result []string
+	switch v := input.(type) {
+	case string:
+		if v != "" {
+			for _, s := range strings.Split(v, ",") {
+				if trimmed := strings.TrimSpace(s); trimmed != "" {
+					result = append(result, trimmed)
+				}
+			}
+		}
+	case []interface{}:
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				if trimmed := strings.TrimSpace(s); trimmed != "" {
+					result = append(result, trimmed)
+				}
+			}
+		}
+	case []string:
+		for _, s := range v {
+			if trimmed := strings.TrimSpace(s); trimmed != "" {
+				result = append(result, trimmed)
+			}
+		}
+	}
+	return result
 }
 
 func cleanServerBasePath(s string) string {

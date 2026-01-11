@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -174,6 +175,8 @@ type AuthBuiltin struct {
 
 // OIDCRoleMapping defines how OIDC claims are mapped to Dagu roles
 type OIDCRoleMapping struct {
+	// DefaultRole is the role assigned to new OIDC users when no mapping matches (default: "viewer")
+	DefaultRole string
 	// GroupsClaim specifies the claim name containing groups (default: "groups")
 	GroupsClaim string
 	// GroupMappings maps IdP group names to Dagu roles
@@ -211,8 +214,9 @@ type AuthToken struct {
 
 // AuthOIDC represents the OIDC authentication configuration.
 // Core fields (ClientId, ClientSecret, etc.) are used by both standalone OIDC mode
-// and builtin auth mode with OIDC login. Builtin-specific fields (Enabled, AutoSignup,
+// and builtin auth mode with OIDC login. Builtin-specific fields (AutoSignup,
 // DefaultRole, etc.) are only used when auth.mode=builtin.
+// OIDC is automatically enabled when all required fields are configured.
 type AuthOIDC struct {
 	// Core OIDC fields (used by both standalone and builtin modes)
 	ClientId     string   // OIDC client ID from the authorization service
@@ -223,12 +227,16 @@ type AuthOIDC struct {
 	Whitelist    []string // Specific email addresses always allowed
 
 	// Builtin-specific fields (only used when auth.mode=builtin)
-	Enabled        bool            // Enable OIDC login under builtin auth (default: false)
-	AutoSignup     bool            // Auto-create users on first login (default: false)
-	DefaultRole    string          // Default role for new users (default: viewer)
+	AutoSignup     bool            // Auto-create users on first login (default: true)
 	AllowedDomains []string        // Email domain whitelist
 	ButtonLabel    string          // Login button text (default: "Login with SSO")
 	RoleMapping    OIDCRoleMapping // Role mapping configuration
+}
+
+// IsConfigured returns true if all required OIDC fields are set.
+// When true, OIDC login is automatically enabled under builtin auth mode.
+func (o AuthOIDC) IsConfigured() bool {
+	return o.ClientId != "" && o.ClientSecret != "" && o.ClientUrl != "" && o.Issuer != ""
 }
 
 // Paths represents the file system paths configuration
@@ -406,8 +414,8 @@ func (c *Config) validateBuiltinAuth() error {
 		return fmt.Errorf("builtin auth requires a positive token TTL")
 	}
 
-	// Validate OIDC configuration if enabled under builtin auth
-	if c.Server.Auth.OIDC.Enabled {
+	// Validate OIDC configuration if configured under builtin auth
+	if c.Server.Auth.OIDC.IsConfigured() {
 		if err := c.validateOIDCForBuiltin(); err != nil {
 			return err
 		}
@@ -441,21 +449,21 @@ func (c *Config) validateOIDCForBuiltin() error {
 		"operator": true,
 		"viewer":   true,
 	}
-	if !validRoles[oidc.DefaultRole] {
-		return fmt.Errorf("OIDC defaultRole must be one of: admin, manager, operator, viewer (got: %q)", oidc.DefaultRole)
+	if !validRoles[oidc.RoleMapping.DefaultRole] {
+		return fmt.Errorf("OIDC roleMapping.defaultRole must be one of: admin, manager, operator, viewer (got: %q)", oidc.RoleMapping.DefaultRole)
 	}
 
-	// Warn if email scope is not included (required for access control)
-	hasEmailScope := false
-	for _, scope := range oidc.Scopes {
-		if scope == "email" {
-			hasEmailScope = true
-			break
-		}
-	}
+	// Check if email scope is included
+	hasEmailScope := slices.Contains(oidc.Scopes, "email")
+
+	// Error if access control features require email but scope is missing
 	if !hasEmailScope {
+		if len(oidc.Whitelist) > 0 || len(oidc.AllowedDomains) > 0 {
+			return fmt.Errorf("OIDC scopes must include 'email' when whitelist or allowedDomains is configured")
+		}
+		// Just warn if no access control is configured
 		c.Warnings = append(c.Warnings,
-			"OIDC scopes do not include 'email'; access control features may not work correctly")
+			"OIDC scopes do not include 'email'; access control features will not work if added later")
 	}
 
 	return nil

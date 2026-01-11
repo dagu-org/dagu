@@ -85,9 +85,9 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 		}
 		apiOpts = append(apiOpts, apiv2.WithAuthService(result.AuthService))
 
-		// Initialize OIDC if enabled under builtin mode
+		// Initialize OIDC if configured under builtin mode
 		oidcCfg := cfg.Server.Auth.OIDC
-		if oidcCfg.Enabled {
+		if oidcCfg.IsConfigured() {
 			oidcEnabled = true
 			oidcButtonLabel = oidcCfg.ButtonLabel
 
@@ -95,7 +95,7 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 			provisionCfg := oidcprovision.Config{
 				Issuer:         oidcCfg.Issuer,
 				AutoSignup:     oidcCfg.AutoSignup,
-				DefaultRole:    authmodel.Role(oidcCfg.DefaultRole),
+				DefaultRole:    authmodel.Role(oidcCfg.RoleMapping.DefaultRole),
 				AllowedDomains: oidcCfg.AllowedDomains,
 				Whitelist:      oidcCfg.Whitelist,
 				RoleMapping: oidcprovision.RoleMapperConfig{
@@ -104,7 +104,7 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 					RoleAttributePath:   oidcCfg.RoleMapping.RoleAttributePath,
 					RoleAttributeStrict: oidcCfg.RoleMapping.RoleAttributeStrict,
 					SkipOrgRoleSync:     oidcCfg.RoleMapping.SkipOrgRoleSync,
-					DefaultRole:         authmodel.Role(oidcCfg.DefaultRole),
+					DefaultRole:         authmodel.Role(oidcCfg.RoleMapping.DefaultRole),
 				},
 			}
 			provisionSvc, err := oidcprovision.New(result.UserStore, provisionCfg)
@@ -126,7 +126,7 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 			logger.Info(context.Background(), "OIDC enabled for builtin auth mode",
 				slog.String("issuer", oidcCfg.Issuer),
 				slog.Bool("autoSignup", oidcCfg.AutoSignup),
-				slog.String("defaultRole", oidcCfg.DefaultRole))
+				slog.String("defaultRole", oidcCfg.RoleMapping.DefaultRole))
 		}
 	}
 

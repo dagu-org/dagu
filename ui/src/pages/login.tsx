@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, TOKEN_KEY } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,18 +31,28 @@ export default function LoginPage() {
 
   const from = (location.state as { from?: Location })?.from?.pathname || '/';
 
-  // Check for error or welcome messages from URL params (set by OIDC callback)
+  // Handle OIDC callback token and messages from URL params
   useEffect(() => {
+    const tokenParam = searchParams.get('token');
     const errorParam = searchParams.get('error');
     const welcomeParam = searchParams.get('welcome');
 
+    // Handle OIDC callback token - store in localStorage and navigate to home
+    if (tokenParam) {
+      localStorage.setItem(TOKEN_KEY, tokenParam);
+      // Navigate to home immediately - AuthProvider will validate token on next page load
+      navigate(from, { replace: true });
+      return;
+    }
+
     if (errorParam) {
-      setError(decodeURIComponent(errorParam));
+      // Note: searchParams.get() already decodes URL params, no need for decodeURIComponent
+      setError(errorParam);
     }
     if (welcomeParam === 'true') {
       setWelcomeMessage('Welcome! Your account has been created.');
     }
-  }, [searchParams]);
+  }, [searchParams, navigate, from]);
 
   // Redirect if already authenticated - use useEffect to avoid render-phase side effects
   useEffect(() => {
@@ -72,7 +82,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="min-h-screen flex items-center justify-center bg-muted/50">
       <div className="w-full max-w-sm p-6 space-y-6">
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-bold">{config.title || 'Dagu'}</h1>

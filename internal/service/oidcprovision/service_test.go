@@ -480,6 +480,18 @@ func TestIsEmailAllowed(t *testing.T) {
 			email:          "user@partner.org",
 			expected:       true,
 		},
+		{
+			name:      "whitelist only - email not in whitelist - denied",
+			whitelist: []string{"allowed@example.com"},
+			email:     "other@example.com",
+			expected:  false,
+		},
+		{
+			name:      "whitelist only - email in whitelist - allowed",
+			whitelist: []string{"allowed@example.com"},
+			email:     "allowed@example.com",
+			expected:  true,
+		},
 	}
 
 	for _, tt := range tests {

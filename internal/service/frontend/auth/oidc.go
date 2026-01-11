@@ -32,8 +32,10 @@ type OIDCConfig struct {
 // Tunable constants for OIDC auth behaviour.
 const (
 	oidcProviderInitTimeout = 10 * time.Second
-	stateCookieExpiry       = 120 // seconds for transient state/nonce/originalURL cookies
-	defaultTokenExpirySecs  = 60  // fallback when ID token expiry is invalid or already passed
+	oidcProviderMaxRetries  = 3                      // max retries for OIDC provider init (network issues)
+	oidcProviderRetryDelay  = 500 * time.Millisecond // delay between retries
+	stateCookieExpiry       = 120                    // seconds for transient state/nonce/originalURL cookies
+	defaultTokenExpirySecs  = 60                     // fallback when ID token expiry is invalid or already passed
 )
 
 // Cookie names centralised to avoid copy-paste strings.
@@ -81,7 +83,22 @@ func initOIDCProviderCore(params oidcProviderParams) (*oidcProviderResult, error
 		Timeout: oidcProviderInitTimeout,
 	})
 
-	provider, err := oidcProviderFactory(ctx, params.Issuer)
+	// Retry OIDC provider init in case of transient network errors
+	var provider *oidc.Provider
+	var err error
+	for attempt := 1; attempt <= oidcProviderMaxRetries; attempt++ {
+		provider, err = oidcProviderFactory(ctx, params.Issuer)
+		if err == nil && provider != nil {
+			break
+		}
+		if attempt < oidcProviderMaxRetries {
+			slog.Warn("OIDC provider init failed, retrying",
+				tag.Error(err),
+				slog.Int("attempt", attempt),
+				slog.Int("maxRetries", oidcProviderMaxRetries))
+			time.Sleep(oidcProviderRetryDelay)
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to init OIDC provider: %w", err)
 	}
@@ -501,14 +518,14 @@ func BuiltinOIDCCallbackHandler(cfg *BuiltinOIDCConfig) http.HandlerFunc {
 		// Clear OIDC cookies
 		clearOIDCStateCookies(w, r)
 
-		// Set JWT token cookie
-		expireSeconds := int(time.Until(tokenResult.ExpiresAt).Seconds())
-		setCookie(w, r, "token", tokenResult.Token, expireSeconds)
-
-		// Redirect to home with welcome flag for new users
-		redirectURL := cfg.LoginBasePath
+		// Redirect to login page with token in URL for frontend to store in localStorage
+		// This is secure because:
+		// 1. It's a one-time redirect (not a shareable link)
+		// 2. Frontend stores the token and navigates away with replace:true (React Router)
+		// 3. Token won't appear in browser history after navigation completes
+		redirectURL := strings.TrimSuffix(cfg.LoginBasePath, "/") + "/login?token=" + url.QueryEscape(tokenResult.Token)
 		if isNewUser {
-			redirectURL += "?welcome=true"
+			redirectURL += "&welcome=true"
 		}
 		http.Redirect(w, r, redirectURL, http.StatusFound)
 	}
@@ -518,6 +535,6 @@ func BuiltinOIDCCallbackHandler(cfg *BuiltinOIDCConfig) http.HandlerFunc {
 func redirectWithError(w http.ResponseWriter, r *http.Request, basePath, errMsg string) {
 	clearOIDCStateCookies(w, r)
 
-	redirectURL := basePath + "/login?error=" + url.QueryEscape(errMsg)
+	redirectURL := strings.TrimSuffix(basePath, "/") + "/login?error=" + url.QueryEscape(errMsg)
 	http.Redirect(w, r, redirectURL, http.StatusFound)
 }

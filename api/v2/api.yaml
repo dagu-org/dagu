@@ -4363,6 +4363,9 @@ components:
           maxLength: 64
         role:
           $ref: "#/components/schemas/UserRole"
+        isDisabled:
+          type: boolean
+          description: "Whether to disable the user account"
 
     User:
       type: object

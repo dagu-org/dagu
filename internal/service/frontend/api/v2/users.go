@@ -148,6 +148,20 @@ func (a *API) UpdateUser(ctx context.Context, request api.UpdateUserRequestObjec
 		}
 		input.Role = &role
 	}
+	if request.Body.IsDisabled != nil {
+		// Prevent self-disable
+		if *request.Body.IsDisabled {
+			currentUser, ok := auth.UserFromContext(ctx)
+			if ok && currentUser.ID == request.UserId {
+				return nil, &Error{
+					Code:       api.ErrorCodeForbidden,
+					Message:    "Cannot disable your own account",
+					HTTPStatus: http.StatusForbidden,
+				}
+			}
+		}
+		input.IsDisabled = request.Body.IsDisabled
+	}
 
 	user, err := a.authService.UpdateUser(ctx, request.UserId, input)
 	if err != nil {

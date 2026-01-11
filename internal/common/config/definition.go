@@ -181,6 +181,8 @@ type AuthBuiltinDef struct {
 
 // OIDCRoleMappingDef defines how OIDC claims are mapped to Dagu roles
 type OIDCRoleMappingDef struct {
+	// DefaultRole is the role assigned to new OIDC users when no mapping matches (default: "viewer")
+	DefaultRole string `mapstructure:"defaultRole"`
 	// GroupsClaim specifies the claim name containing groups (default: "groups")
 	// Common values: "groups", "roles", "cognito:groups", "realm_access.roles"
 	GroupsClaim string `mapstructure:"groupsClaim"`
@@ -223,6 +225,8 @@ type AuthTokenDef struct {
 // AuthOIDCDef represents the OIDC authentication configuration.
 // Core fields are used by both standalone OIDC mode and builtin auth mode with OIDC.
 // Builtin-specific fields are only used when auth.mode=builtin.
+// OIDC is automatically enabled under builtin mode when all required fields
+// (clientId, clientSecret, clientUrl, issuer) are configured.
 type AuthOIDCDef struct {
 	// Core OIDC fields (used by both standalone and builtin modes)
 	ClientId     string   `mapstructure:"clientId"`
@@ -233,9 +237,7 @@ type AuthOIDCDef struct {
 	Whitelist    []string `mapstructure:"whitelist"`
 
 	// Builtin-specific fields (only used when auth.mode=builtin)
-	Enabled        *bool               `mapstructure:"enabled"`        // Enable OIDC login under builtin auth
-	AutoSignup     *bool               `mapstructure:"autoSignup"`     // Auto-create users on first login
-	DefaultRole    string              `mapstructure:"defaultRole"`    // Default role for new users
+	AutoSignup     *bool               `mapstructure:"autoSignup"`     // Auto-create users on first login (default: true)
 	AllowedDomains []string            `mapstructure:"allowedDomains"` // Email domain whitelist
 	ButtonLabel    string              `mapstructure:"buttonLabel"`    // Login button text
 	RoleMapping    *OIDCRoleMappingDef `mapstructure:"roleMapping"`    // Role mapping configuration

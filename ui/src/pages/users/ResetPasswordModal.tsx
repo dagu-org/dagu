@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { useConfig } from '@/contexts/ConfigContext';
+import { AppBarContext } from '@/contexts/AppBarContext';
 import { components } from '@/api/v2/schema';
 import {
   Dialog,
@@ -34,6 +35,7 @@ type ResetPasswordModalProps = {
  */
 export function ResetPasswordModal({ open, user, onClose }: ResetPasswordModalProps) {
   const config = useConfig();
+  const appBarContext = useContext(AppBarContext);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +74,11 @@ export function ResetPasswordModal({ open, user, onClose }: ResetPasswordModalPr
 
     try {
       const token = localStorage.getItem('dagu_auth_token');
-      const response = await fetch(`${config.apiURL}/users/${user.id}/reset-password`, {
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+      const remoteNode = encodeURIComponent(appBarContext.selectedRemoteNode || 'local');
+      const response = await fetch(`${config.apiURL}/users/${user.id}/reset-password?remoteNode=${remoteNode}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
