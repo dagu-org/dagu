@@ -1134,3 +1134,48 @@ cache: invalid
 		assert.Equal(t, CacheModeLow, cfg.Cache)
 	})
 }
+
+func TestParseCoordinatorAddresses(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    interface{}
+		expected []string
+	}{
+		// String input tests
+		{"empty string", "", nil},
+		{"single address string", "host:8080", []string{"host:8080"}},
+		{"multiple addresses string", "host1:8080,host2:9090", []string{"host1:8080", "host2:9090"}},
+		{"whitespace trimmed string", " host1:8080 , host2:9090 ", []string{"host1:8080", "host2:9090"}},
+		{"empty parts filtered", "host1:8080,,host2:9090", []string{"host1:8080", "host2:9090"}},
+		{"trailing comma", "host:8080,", []string{"host:8080"}},
+		{"leading comma", ",host:8080", []string{"host:8080"}},
+
+		// []interface{} input tests (YAML)
+		{"empty interface slice", []interface{}{}, nil},
+		{"interface slice with addresses", []interface{}{"host1:8080", "host2:9090"}, []string{"host1:8080", "host2:9090"}},
+		{"interface slice filters non-strings", []interface{}{"host:8080", 123, "host2:9090"}, []string{"host:8080", "host2:9090"}},
+		{"interface slice filters empty strings", []interface{}{"host:8080", "", "host2:9090"}, []string{"host:8080", "host2:9090"}},
+		{"interface slice trims whitespace", []interface{}{" host1:8080 ", " host2:9090 "}, []string{"host1:8080", "host2:9090"}},
+
+		// []string input tests
+		{"empty string slice", []string{}, nil},
+		{"string slice with addresses", []string{"host1:8080", "host2:9090"}, []string{"host1:8080", "host2:9090"}},
+		{"string slice trims whitespace", []string{" host1:8080 ", " host2:9090 "}, []string{"host1:8080", "host2:9090"}},
+		{"string slice filters empty", []string{"host:8080", "", "host2:9090"}, []string{"host:8080", "host2:9090"}},
+
+		// Edge cases
+		{"nil input", nil, nil},
+		{"unsupported type int", 12345, nil},
+		{"unsupported type map", map[string]string{"key": "value"}, nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := parseCoordinatorAddresses(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

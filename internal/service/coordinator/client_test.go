@@ -249,6 +249,135 @@ func TestClientHeartbeat(t *testing.T) {
 	assert.Equal(t, int32(2), receivedReq.Stats.BusyPollers)
 }
 
+func TestClientReportStatus(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Success", func(t *testing.T) {
+		t.Parallel()
+
+		config := coordinator.DefaultConfig()
+		config.RequestTimeout = 100 * time.Millisecond
+
+		var receivedReq *coordinatorv1.ReportStatusRequest
+		mockCoord := &mockCoordinatorService{
+			reportStatusFunc: func(_ context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+				receivedReq = req
+				return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
+			},
+		}
+
+		server, addr := startMockServer(t, mockCoord)
+		defer server.Stop()
+
+		host, port := parseHostPort(addr)
+		monitor := &mockServiceMonitor{
+			members: []execution.HostInfo{{Host: host, Port: port, Status: execution.ServiceStatusActive}},
+		}
+
+		client := coordinator.New(monitor, config)
+
+		req := &coordinatorv1.ReportStatusRequest{
+			WorkerId: "test-worker",
+			Status: &coordinatorv1.DAGRunStatusProto{
+				DagRunId:  "test-run-123",
+				Status:    1, // Running status
+				StartedAt: "2024-01-01T00:00:00Z",
+			},
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+
+		resp, err := client.ReportStatus(ctx, req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.True(t, resp.Accepted)
+
+		require.NotNil(t, receivedReq)
+		assert.Equal(t, "test-worker", receivedReq.WorkerId)
+		require.NotNil(t, receivedReq.Status)
+		assert.Equal(t, "test-run-123", receivedReq.Status.DagRunId)
+	})
+
+	t.Run("NotAccepted", func(t *testing.T) {
+		t.Parallel()
+
+		config := coordinator.DefaultConfig()
+		config.RequestTimeout = 100 * time.Millisecond
+
+		mockCoord := &mockCoordinatorService{
+			reportStatusFunc: func(_ context.Context, _ *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+				return &coordinatorv1.ReportStatusResponse{Accepted: false}, nil
+			},
+		}
+
+		server, addr := startMockServer(t, mockCoord)
+		defer server.Stop()
+
+		host, port := parseHostPort(addr)
+		monitor := &mockServiceMonitor{
+			members: []execution.HostInfo{{Host: host, Port: port, Status: execution.ServiceStatusActive}},
+		}
+
+		client := coordinator.New(monitor, config)
+
+		req := &coordinatorv1.ReportStatusRequest{
+			WorkerId: "test-worker",
+			Status: &coordinatorv1.DAGRunStatusProto{
+				DagRunId: "test-run-456",
+				Status:   2, // Success status
+			},
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+
+		resp, err := client.ReportStatus(ctx, req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.False(t, resp.Accepted)
+	})
+
+	t.Run("Error", func(t *testing.T) {
+		t.Parallel()
+
+		config := coordinator.DefaultConfig()
+		config.MaxRetries = 0
+		config.RequestTimeout = 100 * time.Millisecond
+
+		mockCoord := &mockCoordinatorService{
+			reportStatusFunc: func(_ context.Context, _ *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+				return nil, status.Error(codes.Internal, "internal error")
+			},
+		}
+
+		server, addr := startMockServer(t, mockCoord)
+		defer server.Stop()
+
+		host, port := parseHostPort(addr)
+		monitor := &mockServiceMonitor{
+			members: []execution.HostInfo{{Host: host, Port: port, Status: execution.ServiceStatusActive}},
+		}
+
+		client := coordinator.New(monitor, config)
+
+		req := &coordinatorv1.ReportStatusRequest{
+			WorkerId: "test-worker",
+			Status: &coordinatorv1.DAGRunStatusProto{
+				DagRunId: "test-run-789",
+				Status:   3, // Failed status
+			},
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+
+		resp, err := client.ReportStatus(ctx, req)
+		require.Error(t, err)
+		assert.Nil(t, resp)
+	})
+}
+
 func TestClientMetrics(t *testing.T) {
 	t.Parallel()
 
@@ -406,10 +535,11 @@ var _ coordinatorv1.CoordinatorServiceServer = (*mockCoordinatorService)(nil)
 type mockCoordinatorService struct {
 	coordinatorv1.UnimplementedCoordinatorServiceServer
 
-	dispatchFunc   func(context.Context, *coordinatorv1.DispatchRequest) (*coordinatorv1.DispatchResponse, error)
-	pollFunc       func(context.Context, *coordinatorv1.PollRequest) (*coordinatorv1.PollResponse, error)
-	getWorkersFunc func(context.Context, *coordinatorv1.GetWorkersRequest) (*coordinatorv1.GetWorkersResponse, error)
-	heartbeatFunc  func(context.Context, *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error)
+	dispatchFunc     func(context.Context, *coordinatorv1.DispatchRequest) (*coordinatorv1.DispatchResponse, error)
+	pollFunc         func(context.Context, *coordinatorv1.PollRequest) (*coordinatorv1.PollResponse, error)
+	getWorkersFunc   func(context.Context, *coordinatorv1.GetWorkersRequest) (*coordinatorv1.GetWorkersResponse, error)
+	heartbeatFunc    func(context.Context, *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error)
+	reportStatusFunc func(context.Context, *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error)
 }
 
 func (m *mockCoordinatorService) Dispatch(ctx context.Context, req *coordinatorv1.DispatchRequest) (*coordinatorv1.DispatchResponse, error) {
@@ -436,6 +566,13 @@ func (m *mockCoordinatorService) GetWorkers(ctx context.Context, req *coordinato
 func (m *mockCoordinatorService) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
 	if m.heartbeatFunc != nil {
 		return m.heartbeatFunc(ctx, req)
+	}
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (m *mockCoordinatorService) ReportStatus(ctx context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+	if m.reportStatusFunc != nil {
+		return m.reportStatusFunc(ctx, req)
 	}
 	return nil, status.Error(codes.Unimplemented, "not implemented")
 }
