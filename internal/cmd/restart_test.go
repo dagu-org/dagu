@@ -18,7 +18,7 @@ steps:
   - name: "1"
     script: "echo $1"
   - name: "2"
-    script: "sleep 1"
+    script: "sleep 5"
 `)
 
 	// Start the DAG to restart.
