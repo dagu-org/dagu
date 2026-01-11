@@ -235,9 +235,9 @@ func (e *docker) runInExistingContainer(ctx context.Context, cli *Client, tw *ex
 
 // runInNewContainer executes commands in a newly created container.
 func (e *docker) runInNewContainer(ctx context.Context, tw *executor.TailWriter) error {
-	// If no commands, run with empty command (use image default)
+	// If no step-level commands, use container.command (StartCmd) if specified
 	if len(e.step.Commands) == 0 {
-		exitCode, err := e.container.Run(ctx, nil, e.stdout, e.stderr)
+		exitCode, err := e.container.Run(ctx, e.cfg.StartCmd, e.stdout, e.stderr)
 		e.mu.Lock()
 		e.exitCode = exitCode
 		e.mu.Unlock()
