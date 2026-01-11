@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -287,8 +288,21 @@ func (h *remoteTaskHandler) executeDAGRun(
 		}
 	}()
 
-	// Configure logger to write to the scheduler log file
-	ctx = logger.WithLogger(ctx, logger.NewLogger(logger.WithWriter(logFile)))
+	// Create a writer that writes to both local file AND streams to coordinator in real-time.
+	// This enables viewing scheduler logs while the DAG is still running.
+	var logWriter io.Writer = logFile
+	if logStreamer != nil {
+		streamingWriter := logStreamer.NewSchedulerLogWriter(ctx, logFile)
+		defer func() {
+			if closeErr := streamingWriter.Close(); closeErr != nil {
+				logger.Warn(ctx, "Failed to close scheduler log streamer", tag.Error(closeErr))
+			}
+		}()
+		logWriter = streamingWriter
+	}
+
+	// Configure logger to use the streaming writer
+	ctx = logger.WithLogger(ctx, logger.NewLogger(logger.WithWriter(logWriter)))
 
 	// Build agent options
 	opts := agent.Options{

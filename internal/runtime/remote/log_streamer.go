@@ -79,6 +79,18 @@ func (s *LogStreamer) NewStepWriter(ctx context.Context, stepName string, stream
 	}
 }
 
+// NewSchedulerLogWriter creates a writer that writes to both a local file
+// and streams to the coordinator in real-time. This enables viewing scheduler
+// logs while the DAG is still running.
+func (s *LogStreamer) NewSchedulerLogWriter(ctx context.Context, localFile *os.File) io.WriteCloser {
+	return &schedulerLogWriter{
+		ctx:       ctx,
+		streamer:  s,
+		localFile: localFile,
+		buffer:    make([]byte, 0, logBufferSize),
+	}
+}
+
 // StreamSchedulerLog reads the local scheduler.log file and streams it to the coordinator.
 // This should be called after DAG execution completes.
 func (s *LogStreamer) StreamSchedulerLog(ctx context.Context, logFilePath string) error {
@@ -331,4 +343,144 @@ func toProtoStreamType(streamType int) coordinatorv1.LogStreamType {
 	default:
 		return coordinatorv1.LogStreamType_LOG_STREAM_TYPE_UNSPECIFIED
 	}
+}
+
+// schedulerLogWriter writes to both local file and streams to coordinator in real-time.
+// This enables viewing scheduler logs while the DAG is still running.
+type schedulerLogWriter struct {
+	ctx              context.Context
+	streamer         *LogStreamer
+	localFile        *os.File
+	buffer           []byte
+	sequence         uint64
+	stream           coordinatorv1.CoordinatorService_StreamLogsClient
+	mu               sync.Mutex
+	closed           bool
+	streamInitFailed bool // Tracks permanent stream initialization failure
+}
+
+// Write implements io.Writer - writes to local file and buffers for streaming
+func (w *schedulerLogWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if w.closed {
+		return 0, io.ErrClosedPipe
+	}
+
+	// Always write to local file first (primary storage)
+	n, err := w.localFile.Write(p)
+	if err != nil {
+		return n, err
+	}
+
+	// Buffer for streaming (best-effort, don't fail on streaming errors)
+	w.buffer = append(w.buffer, p...)
+
+	// Flush to coordinator when buffer exceeds threshold
+	if len(w.buffer) >= logBufferSize {
+		if err := w.flush(); err != nil {
+			// Log streaming is best-effort - don't fail the write
+			// Avoid recursive logging by not using logger here
+			w.buffer = w.buffer[:0] // Discard to prevent memory growth
+		}
+	}
+
+	return n, nil
+}
+
+// flush sends buffered data to coordinator
+func (w *schedulerLogWriter) flush() error {
+	if len(w.buffer) == 0 {
+		return nil
+	}
+
+	// Check for permanent stream initialization failure
+	if w.streamInitFailed {
+		w.buffer = w.buffer[:0]
+		return nil // Silently fail - already logged on first failure
+	}
+
+	// Initialize stream if needed
+	if w.stream == nil {
+		var err error
+		w.stream, err = w.streamer.client.StreamLogs(w.ctx)
+		if err != nil {
+			w.streamInitFailed = true
+			w.buffer = w.buffer[:0]
+			return err
+		}
+	}
+
+	// Split buffer into chunks if necessary
+	data := w.buffer
+	w.buffer = w.buffer[:0]
+
+	for len(data) > 0 {
+		chunkSize := len(data)
+		if chunkSize > maxChunkSize {
+			chunkSize = maxChunkSize
+		}
+
+		chunkData := make([]byte, chunkSize)
+		copy(chunkData, data[:chunkSize])
+		data = data[chunkSize:]
+
+		nextSeq := w.sequence + 1
+		chunk := &coordinatorv1.LogChunk{
+			WorkerId:       w.streamer.workerID,
+			DagRunId:       w.streamer.dagRunID,
+			DagName:        w.streamer.dagName,
+			StepName:       "scheduler",
+			StreamType:     coordinatorv1.LogStreamType_LOG_STREAM_TYPE_SCHEDULER,
+			Data:           chunkData,
+			Sequence:       nextSeq,
+			RootDagRunName: w.streamer.rootRef.Name,
+			RootDagRunId:   w.streamer.rootRef.ID,
+			AttemptId:      w.streamer.getAttemptID(),
+		}
+
+		if err := w.stream.Send(chunk); err != nil {
+			return err
+		}
+		w.sequence = nextSeq
+	}
+
+	return nil
+}
+
+// Close implements io.Closer - flushes remaining data and closes the stream
+func (w *schedulerLogWriter) Close() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if w.closed {
+		return nil
+	}
+	w.closed = true
+
+	// Flush any remaining buffered data
+	_ = w.flush() // Ignore error - best effort
+
+	// Send final marker if stream was initialized
+	if w.stream != nil {
+		nextSeq := w.sequence + 1
+		finalChunk := &coordinatorv1.LogChunk{
+			WorkerId:       w.streamer.workerID,
+			DagRunId:       w.streamer.dagRunID,
+			DagName:        w.streamer.dagName,
+			StepName:       "scheduler",
+			StreamType:     coordinatorv1.LogStreamType_LOG_STREAM_TYPE_SCHEDULER,
+			IsFinal:        true,
+			Sequence:       nextSeq,
+			RootDagRunName: w.streamer.rootRef.Name,
+			RootDagRunId:   w.streamer.rootRef.ID,
+			AttemptId:      w.streamer.getAttemptID(),
+		}
+		_ = w.stream.Send(finalChunk)  // Ignore error - best effort
+		_, _ = w.stream.CloseAndRecv() // Ignore error - best effort
+	}
+
+	// Note: localFile is NOT closed here - caller owns it
+	return nil
 }
