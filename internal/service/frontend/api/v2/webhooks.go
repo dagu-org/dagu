@@ -122,10 +122,14 @@ func (a *API) CreateDAGWebhook(ctx context.Context, request api.CreateDAGWebhook
 	if a.auditService != nil {
 		currentUser, _ := auth.UserFromContext(ctx)
 		clientIP, _ := auth.ClientIPFromContext(ctx)
-		details, _ := json.Marshal(map[string]string{
+		details, err := json.Marshal(map[string]string{
 			"dag_name":   request.FileName,
 			"webhook_id": result.Webhook.ID,
 		})
+		if err != nil {
+			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
+			details = []byte("{}")
+		}
 		entry := audit.NewEntry(audit.CategoryWebhook, "webhook_create", currentUser.ID, currentUser.Username).
 			WithDetails(string(details)).
 			WithIPAddress(clientIP)
@@ -175,7 +179,11 @@ func (a *API) DeleteDAGWebhook(ctx context.Context, request api.DeleteDAGWebhook
 		if targetWebhook != nil {
 			detailsMap["webhook_id"] = targetWebhook.ID
 		}
-		details, _ := json.Marshal(detailsMap)
+		details, err := json.Marshal(detailsMap)
+		if err != nil {
+			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
+			details = []byte("{}")
+		}
 		entry := audit.NewEntry(audit.CategoryWebhook, "webhook_delete", currentUser.ID, currentUser.Username).
 			WithDetails(string(details)).
 			WithIPAddress(clientIP)
@@ -215,10 +223,14 @@ func (a *API) RegenerateDAGWebhookToken(ctx context.Context, request api.Regener
 	if a.auditService != nil {
 		currentUser, _ := auth.UserFromContext(ctx)
 		clientIP, _ := auth.ClientIPFromContext(ctx)
-		details, _ := json.Marshal(map[string]string{
+		details, err := json.Marshal(map[string]string{
 			"dag_name":   request.FileName,
 			"webhook_id": result.Webhook.ID,
 		})
+		if err != nil {
+			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
+			details = []byte("{}")
+		}
 		entry := audit.NewEntry(audit.CategoryWebhook, "webhook_token_regenerate", currentUser.ID, currentUser.Username).
 			WithDetails(string(details)).
 			WithIPAddress(clientIP)
@@ -264,11 +276,15 @@ func (a *API) ToggleDAGWebhook(ctx context.Context, request api.ToggleDAGWebhook
 	if a.auditService != nil {
 		currentUser, _ := auth.UserFromContext(ctx)
 		clientIP, _ := auth.ClientIPFromContext(ctx)
-		details, _ := json.Marshal(map[string]any{
+		details, err := json.Marshal(map[string]any{
 			"dag_name":   request.FileName,
 			"webhook_id": webhook.ID,
 			"enabled":    request.Body.Enabled,
 		})
+		if err != nil {
+			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
+			details = []byte("{}")
+		}
 		entry := audit.NewEntry(audit.CategoryWebhook, "webhook_toggle", currentUser.ID, currentUser.Username).
 			WithDetails(string(details)).
 			WithIPAddress(clientIP)

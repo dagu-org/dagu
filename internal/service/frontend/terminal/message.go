@@ -3,7 +3,6 @@ package terminal
 
 import (
 	"encoding/base64"
-	"encoding/json"
 )
 
 // MessageType represents the type of terminal message.
@@ -56,16 +55,4 @@ func (m *Message) DecodeData() ([]byte, error) {
 		return nil, nil
 	}
 	return base64.StdEncoding.DecodeString(m.Data)
-}
-
-// MarshalJSON marshals the message to JSON.
-func (m *Message) MarshalJSON() ([]byte, error) {
-	type alias Message
-	return json.Marshal((*alias)(m))
-}
-
-// UnmarshalJSON unmarshals the message from JSON.
-func (m *Message) UnmarshalJSON(data []byte) error {
-	type alias Message
-	return json.Unmarshal(data, (*alias)(m))
 }

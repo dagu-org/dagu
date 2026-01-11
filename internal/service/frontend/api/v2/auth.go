@@ -8,6 +8,8 @@ import (
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 )
@@ -35,7 +37,11 @@ func (a *API) Login(ctx context.Context, request api.LoginRequestObject) (api.Lo
 		if errors.Is(err, authservice.ErrInvalidCredentials) {
 			// Log failed login attempt
 			if a.auditService != nil {
-				details, _ := json.Marshal(map[string]string{"reason": "invalid_credentials"})
+				details, err := json.Marshal(map[string]string{"reason": "invalid_credentials"})
+				if err != nil {
+					logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
+					details = []byte("{}")
+				}
 				entry := audit.NewEntry(audit.CategoryUser, "login_failed", "", request.Body.Username).
 					WithDetails(string(details)).
 					WithIPAddress(clientIP)

@@ -803,6 +803,27 @@ func (a *API) ApproveSubDAGRunStep(ctx context.Context, request api.ApproveSubDA
 		)
 	}
 
+	// Log sub DAG step approval
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		details, err := json.Marshal(map[string]any{
+			"dag_name":       request.Name,
+			"dag_run_id":     request.DagRunId,
+			"sub_dag_run_id": request.SubDAGRunId,
+			"step_name":      request.StepName,
+			"resumed":        shouldResume,
+		})
+		if err != nil {
+			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
+			details = []byte("{}")
+		}
+		entry := audit.NewEntry(audit.CategoryDAG, "sub_dag_step_approve", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
+	}
+
 	return &api.ApproveSubDAGRunStep200JSONResponse{
 		DagRunId: request.SubDAGRunId,
 		StepName: request.StepName,
@@ -973,6 +994,30 @@ func (a *API) RejectSubDAGRunStep(ctx context.Context, request api.RejectSubDAGR
 		slog.String("subDagRunId", request.SubDAGRunId),
 		slog.String("step", request.StepName),
 	)
+
+	// Log sub DAG step rejection
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		detailsMap := map[string]any{
+			"dag_name":       request.Name,
+			"dag_run_id":     request.DagRunId,
+			"sub_dag_run_id": request.SubDAGRunId,
+			"step_name":      request.StepName,
+		}
+		if request.Body != nil && request.Body.Reason != nil {
+			detailsMap["reason"] = *request.Body.Reason
+		}
+		details, err := json.Marshal(detailsMap)
+		if err != nil {
+			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
+			details = []byte("{}")
+		}
+		entry := audit.NewEntry(audit.CategoryDAG, "sub_dag_step_reject", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
+	}
 
 	return &api.RejectSubDAGRunStep200JSONResponse{
 		DagRunId: request.SubDAGRunId,

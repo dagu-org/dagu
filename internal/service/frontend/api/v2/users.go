@@ -8,6 +8,8 @@ import (
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 )
@@ -91,11 +93,15 @@ func (a *API) CreateUser(ctx context.Context, request api.CreateUserRequestObjec
 	if a.auditService != nil {
 		currentUser, _ := auth.UserFromContext(ctx)
 		clientIP, _ := auth.ClientIPFromContext(ctx)
-		details, _ := json.Marshal(map[string]string{
+		details, err := json.Marshal(map[string]string{
 			"target_user_id":  user.ID,
 			"target_username": user.Username,
 			"role":            string(user.Role),
 		})
+		if err != nil {
+			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
+			details = []byte("{}")
+		}
 		entry := audit.NewEntry(audit.CategoryUser, "user_create", currentUser.ID, currentUser.Username).
 			WithDetails(string(details)).
 			WithIPAddress(clientIP)
@@ -218,7 +224,11 @@ func (a *API) UpdateUser(ctx context.Context, request api.UpdateUserRequestObjec
 		if input.Role != nil {
 			changes["role"] = string(*input.Role)
 		}
-		details, _ := json.Marshal(changes)
+		details, err := json.Marshal(changes)
+		if err != nil {
+			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
+			details = []byte("{}")
+		}
 		entry := audit.NewEntry(audit.CategoryUser, "user_update", currentUser.ID, currentUser.Username).
 			WithDetails(string(details)).
 			WithIPAddress(clientIP)
@@ -278,7 +288,11 @@ func (a *API) DeleteUser(ctx context.Context, request api.DeleteUserRequestObjec
 		if targetUser != nil {
 			detailsMap["target_username"] = targetUser.Username
 		}
-		details, _ := json.Marshal(detailsMap)
+		details, err := json.Marshal(detailsMap)
+		if err != nil {
+			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
+			details = []byte("{}")
+		}
 		entry := audit.NewEntry(audit.CategoryUser, "user_delete", currentUser.ID, currentUser.Username).
 			WithDetails(string(details)).
 			WithIPAddress(clientIP)
@@ -335,7 +349,11 @@ func (a *API) ResetUserPassword(ctx context.Context, request api.ResetUserPasswo
 		if targetUser != nil {
 			detailsMap["target_username"] = targetUser.Username
 		}
-		details, _ := json.Marshal(detailsMap)
+		details, err := json.Marshal(detailsMap)
+		if err != nil {
+			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
+			details = []byte("{}")
+		}
 		entry := audit.NewEntry(audit.CategoryUser, "password_reset", currentUser.ID, currentUser.Username).
 			WithDetails(string(details)).
 			WithIPAddress(clientIP)

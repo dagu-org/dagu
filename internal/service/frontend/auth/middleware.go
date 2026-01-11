@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/subtle"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 
@@ -278,10 +279,11 @@ func GetClientIP(r *http.Request) string {
 		return strings.TrimSpace(xri)
 	}
 
-	// Fall back to RemoteAddr
-	ip := r.RemoteAddr
-	if idx := strings.LastIndex(ip, ":"); idx != -1 {
-		ip = ip[:idx]
+	// Fall back to RemoteAddr - use net.SplitHostPort for proper IPv6 handling
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		// Return as-is if parsing fails (e.g., no port present)
+		return r.RemoteAddr
 	}
-	return ip
+	return host
 }

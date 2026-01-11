@@ -58,10 +58,11 @@ export default function TerminalPage() {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Set page title
+  // Set page title on mount
   useEffect(() => {
     appBarContext.setTitle('Terminal');
-  }, [appBarContext]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const sendMessage = useCallback((msg: TerminalMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

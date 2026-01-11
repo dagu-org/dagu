@@ -64,9 +64,12 @@ func TestStore_QueryWithCategory(t *testing.T) {
 	require.NoError(t, err)
 
 	// Add mixed entries
-	_ = store.Append(context.Background(), audit.NewEntry(audit.CategoryUser, "login", "u1", "user1"))
-	_ = store.Append(context.Background(), audit.NewEntry(audit.CategoryTerminal, "command", "u1", "user1"))
-	_ = store.Append(context.Background(), audit.NewEntry(audit.CategoryUser, "logout", "u1", "user1"))
+	err = store.Append(context.Background(), audit.NewEntry(audit.CategoryUser, "login", "u1", "user1"))
+	require.NoError(t, err)
+	err = store.Append(context.Background(), audit.NewEntry(audit.CategoryTerminal, "command", "u1", "user1"))
+	require.NoError(t, err)
+	err = store.Append(context.Background(), audit.NewEntry(audit.CategoryUser, "logout", "u1", "user1"))
+	require.NoError(t, err)
 
 	result, err := store.Query(context.Background(), audit.QueryFilter{Category: audit.CategoryUser})
 	require.NoError(t, err)
@@ -80,7 +83,8 @@ func TestStore_QueryWithPagination(t *testing.T) {
 	// Add entries
 	for i := 0; i < 10; i++ {
 		entry := audit.NewEntry(audit.CategoryUser, "login", "user-123", "testuser")
-		_ = store.Append(context.Background(), entry)
+		err = store.Append(context.Background(), entry)
+		require.NoError(t, err)
 	}
 
 	result, err := store.Query(context.Background(), audit.QueryFilter{Limit: 3, Offset: 2})
@@ -94,7 +98,8 @@ func TestStore_QueryWithTimeRange(t *testing.T) {
 	require.NoError(t, err)
 
 	now := time.Now().UTC()
-	_ = store.Append(context.Background(), audit.NewEntry(audit.CategoryUser, "login", "u1", "user1"))
+	err = store.Append(context.Background(), audit.NewEntry(audit.CategoryUser, "login", "u1", "user1"))
+	require.NoError(t, err)
 
 	result, err := store.Query(context.Background(), audit.QueryFilter{
 		StartTime: now.Add(-1 * time.Hour),
@@ -108,7 +113,8 @@ func TestStore_QueryOffsetBeyondTotal(t *testing.T) {
 	store, err := New(t.TempDir())
 	require.NoError(t, err)
 
-	_ = store.Append(context.Background(), audit.NewEntry(audit.CategoryUser, "login", "u1", "user1"))
+	err = store.Append(context.Background(), audit.NewEntry(audit.CategoryUser, "login", "u1", "user1"))
+	require.NoError(t, err)
 
 	result, err := store.Query(context.Background(), audit.QueryFilter{Offset: 100})
 	require.NoError(t, err)

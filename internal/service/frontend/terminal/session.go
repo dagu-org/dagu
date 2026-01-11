@@ -76,13 +76,26 @@ func (s *Session) Run(ctx context.Context, auditSvc *audit.Service) error {
 
 	// Create done channel for cleanup
 	done := make(chan struct{})
-	defer close(done)
+
+	// Use WaitGroup to track goroutine lifecycle
+	var wg sync.WaitGroup
+	wg.Add(1)
 
 	// Read from PTY and write to WebSocket
-	go s.readFromPTY(ctx, done)
+	go func() {
+		defer wg.Done()
+		s.readFromPTY(ctx, done)
+	}()
 
 	// Read from WebSocket and write to PTY
 	s.readFromWebSocket(ctx, auditSvc)
+
+	// Set read deadline to unblock PTY read, then signal done
+	_ = ptmx.SetReadDeadline(time.Now())
+	close(done)
+
+	// Wait for goroutine to finish
+	wg.Wait()
 
 	// Wait for command to finish
 	_ = cmd.Wait()

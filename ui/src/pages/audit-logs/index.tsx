@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useContext } from 'react';
+import { useState, useEffect, useCallback, useContext, useRef } from 'react';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useIsAdmin, TOKEN_KEY } from '@/contexts/AuthContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
@@ -51,12 +51,28 @@ export default function AuditLogsPage() {
   // Get selected remote node
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
-  // Set page title
+  // Track previous values to detect filter changes
+  const prevCategoryRef = useRef(category);
+  const prevRemoteNodeRef = useRef(remoteNode);
+
+  // Set page title on mount
   useEffect(() => {
     appBarContext.setTitle('Audit Logs');
-  }, [appBarContext]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const fetchAuditLogs = useCallback(async () => {
+  const fetchAuditLogs = useCallback(async (resetOffset = false) => {
+    // Reset offset if filters changed
+    let effectiveOffset = offset;
+    if (resetOffset || prevCategoryRef.current !== category || prevRemoteNodeRef.current !== remoteNode) {
+      effectiveOffset = 0;
+      if (prevCategoryRef.current !== category || prevRemoteNodeRef.current !== remoteNode) {
+        setOffset(0);
+        prevCategoryRef.current = category;
+        prevRemoteNodeRef.current = remoteNode;
+      }
+    }
+
     try {
       setIsLoading(true);
       const token = localStorage.getItem(TOKEN_KEY);
@@ -65,7 +81,7 @@ export default function AuditLogsPage() {
       params.set('remoteNode', remoteNode);
       if (category && category !== 'all') params.set('category', category);
       params.set('limit', String(PAGE_SIZE));
-      params.set('offset', String(offset));
+      params.set('offset', String(effectiveOffset));
 
       const response = await fetch(`${config.apiURL}/audit?${params.toString()}`, {
         headers: {
@@ -94,11 +110,6 @@ export default function AuditLogsPage() {
   useEffect(() => {
     fetchAuditLogs();
   }, [fetchAuditLogs]);
-
-  // Reset offset when category or remote node changes
-  useEffect(() => {
-    setOffset(0);
-  }, [category, remoteNode]);
 
   const handlePreviousPage = () => {
     setOffset(Math.max(0, offset - PAGE_SIZE));

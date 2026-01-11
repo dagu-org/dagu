@@ -47,6 +47,20 @@ func (a *API) ListAuditLogs(ctx context.Context, request api.ListAuditLogsReques
 		filter.Offset = *request.Params.Offset
 	}
 
+	// Apply pagination defaults and caps
+	const (
+		defaultLimit = 50
+		maxLimit     = 500
+	)
+	if filter.Limit <= 0 {
+		filter.Limit = defaultLimit
+	} else if filter.Limit > maxLimit {
+		filter.Limit = maxLimit
+	}
+	if filter.Offset < 0 {
+		filter.Offset = 0
+	}
+
 	// Query the audit service
 	result, err := a.auditService.Query(ctx, filter)
 	if err != nil {
@@ -81,25 +95,4 @@ func (a *API) ListAuditLogs(ctx context.Context, request api.ListAuditLogsReques
 		Entries: entries,
 		Total:   result.Total,
 	}, nil
-}
-
-// GetAuditService returns the audit service for use by other components (e.g., terminal handler).
-func (a *API) GetAuditService() *audit.Service {
-	return a.auditService
-}
-
-// AuditEntry is a helper to log terminal session events.
-// This is used by the terminal handler.
-func (a *API) LogAuditEntry(ctx context.Context, category audit.Category, action, userID, username, details, ipAddress string) error {
-	if a.auditService == nil {
-		return nil // Silently skip if audit not configured
-	}
-	entry := audit.NewEntry(category, action, userID, username)
-	if details != "" {
-		entry.WithDetails(details)
-	}
-	if ipAddress != "" {
-		entry.WithIPAddress(ipAddress)
-	}
-	return a.auditService.Log(ctx, entry)
 }

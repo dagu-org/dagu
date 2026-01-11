@@ -99,6 +99,7 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 			// to prevent server from running without expected authentication
 			return nil, fmt.Errorf("failed to initialize builtin auth service: %w", err)
 		}
+		authSvc = result.AuthService
 		apiOpts = append(apiOpts, apiv2.WithAuthService(result.AuthService))
 
 		// Initialize OIDC if configured under builtin mode

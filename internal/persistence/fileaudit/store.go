@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -170,11 +171,16 @@ func (s *Store) readEntriesFromFile(filePath string, filter audit.QueryFilter) (
 
 	var entries []*audit.Entry
 	scanner := bufio.NewScanner(f)
+	lineNum := 0
 
 	for scanner.Scan() {
-		var entry audit.Entry
-		if err := json.Unmarshal(scanner.Bytes(), &entry); err != nil {
-			// Skip malformed entries
+		lineNum++
+		entry := new(audit.Entry) // Allocate on heap to avoid pointer escaping issues
+		if err := json.Unmarshal(scanner.Bytes(), entry); err != nil {
+			slog.Warn("fileaudit: skipping malformed entry",
+				slog.String("file", filePath),
+				slog.Int("line", lineNum),
+				slog.String("error", err.Error()))
 			continue
 		}
 
@@ -192,7 +198,7 @@ func (s *Store) readEntriesFromFile(filePath string, filter audit.QueryFilter) (
 			continue
 		}
 
-		entries = append(entries, &entry)
+		entries = append(entries, entry)
 	}
 
 	if err := scanner.Err(); err != nil {
