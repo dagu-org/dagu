@@ -487,3 +487,122 @@ func TestRescheduleDAGRun(t *testing.T) {
 		return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
 	}, 10*time.Second, 200*time.Millisecond)
 }
+
+func TestExecuteDAGSync(t *testing.T) {
+	server := test.SetupServer(t)
+
+	dagSpec := `steps:
+  - name: echo-step
+    command: "echo hello sync"`
+
+	// Create a new DAG
+	_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+		Name: "sync_test_dag",
+		Spec: &dagSpec,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	// Execute synchronously with timeout
+	timeout := 30
+	syncResp := server.Client().Post("/api/v2/dags/sync_test_dag/start-sync", api.ExecuteDAGSyncJSONRequestBody{
+		Timeout: timeout,
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	var syncBody api.ExecuteDAGSync200JSONResponse
+	syncResp.Unmarshal(t, &syncBody)
+
+	// Verify the response contains full DAGRunDetails
+	require.NotEmpty(t, syncBody.DagRun.DagRunId)
+	require.Equal(t, "sync_test_dag", syncBody.DagRun.Name)
+	require.Equal(t, api.Status(core.Succeeded), syncBody.DagRun.Status)
+	require.Equal(t, api.StatusLabel("succeeded"), syncBody.DagRun.StatusLabel)
+	require.NotNil(t, syncBody.DagRun.Nodes)
+	require.Len(t, syncBody.DagRun.Nodes, 1)
+	require.Equal(t, "echo-step", syncBody.DagRun.Nodes[0].Step.Name)
+}
+
+func TestExecuteDAGSyncTimeout(t *testing.T) {
+	server := test.SetupServer(t)
+
+	// Create a DAG with a step that takes longer than the timeout
+	dagSpec := `steps:
+  - name: slow-step
+    command: "sleep 10"`
+
+	_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+		Name: "sync_timeout_dag",
+		Spec: &dagSpec,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	// Execute synchronously with a very short timeout (1 second)
+	timeout := 1
+	syncResp := server.Client().Post("/api/v2/dags/sync_timeout_dag/start-sync", api.ExecuteDAGSyncJSONRequestBody{
+		Timeout: timeout,
+	}).ExpectStatus(http.StatusRequestTimeout).Send(t)
+
+	var errBody api.TimeoutError
+	syncResp.Unmarshal(t, &errBody)
+	require.Equal(t, api.ErrorCodeTimeout, errBody.Code)
+	require.Contains(t, errBody.Message, "timeout")
+	require.Contains(t, errBody.Message, "DAG run continues in background")
+	require.NotEmpty(t, errBody.DagRunId, "408 response should include dagRunId for tracking")
+}
+
+func TestExecuteDAGSyncWithWaitingStatus(t *testing.T) {
+	server := test.SetupServer(t)
+
+	// Create a DAG with HITL step that will wait for approval
+	dagSpec := `steps:
+  - name: wait-step
+    type: hitl
+    config:
+      prompt: "Approve this"`
+
+	_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+		Name: "sync_waiting_dag",
+		Spec: &dagSpec,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	// Execute synchronously - should return when DAG reaches waiting status
+	timeout := 30
+	syncResp := server.Client().Post("/api/v2/dags/sync_waiting_dag/start-sync", api.ExecuteDAGSyncJSONRequestBody{
+		Timeout: timeout,
+	}).ExpectStatus(http.StatusOK).Send(t)
+
+	var syncBody api.ExecuteDAGSync200JSONResponse
+	syncResp.Unmarshal(t, &syncBody)
+
+	// Should return with waiting status (not timeout)
+	require.NotEmpty(t, syncBody.DagRun.DagRunId)
+	require.Equal(t, api.Status(core.Waiting), syncBody.DagRun.Status)
+	require.Equal(t, api.StatusLabel("waiting"), syncBody.DagRun.StatusLabel)
+}
+
+func TestExecuteDAGSyncSingleton(t *testing.T) {
+	server := test.SetupServer(t)
+
+	// Create a DAG with a slow step
+	dagSpec := `steps:
+  - name: slow-step
+    command: "sleep 5"`
+
+	_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+		Name: "sync_singleton_dag",
+		Spec: &dagSpec,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	// Start the DAG asynchronously first
+	startResp := server.Client().Post("/api/v2/dags/sync_singleton_dag/start", api.ExecuteDAGJSONRequestBody{}).
+		ExpectStatus(http.StatusOK).Send(t)
+
+	var startBody api.ExecuteDAG200JSONResponse
+	startResp.Unmarshal(t, &startBody)
+	require.NotEmpty(t, startBody.DagRunId)
+
+	// Try to start another sync execution with singleton mode - should fail with 409
+	singleton := true
+	timeout := 30
+	_ = server.Client().Post("/api/v2/dags/sync_singleton_dag/start-sync", api.ExecuteDAGSyncJSONRequestBody{
+		Timeout:   timeout,
+		Singleton: &singleton,
+	}).ExpectStatus(http.StatusConflict).Send(t)
+}

@@ -13,6 +13,7 @@ import (
 
 	oidc "github.com/coreos/go-oidc"
 	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
@@ -31,11 +32,12 @@ type OIDCConfig struct {
 
 // Tunable constants for OIDC auth behaviour.
 const (
-	oidcProviderInitTimeout = 10 * time.Second
-	oidcProviderMaxRetries  = 3                      // max retries for OIDC provider init (network issues)
-	oidcProviderRetryDelay  = 500 * time.Millisecond // delay between retries
-	stateCookieExpiry       = 120                    // seconds for transient state/nonce/originalURL cookies
-	defaultTokenExpirySecs  = 60                     // fallback when ID token expiry is invalid or already passed
+	oidcProviderInitTimeout     = 10 * time.Second
+	oidcProviderMaxRetries      = 10                     // max retries for OIDC provider init (network issues)
+	oidcProviderInitialInterval = 500 * time.Millisecond // initial backoff interval
+	oidcProviderMaxInterval     = 5 * time.Second        // maximum backoff interval
+	stateCookieExpiry           = 120                    // seconds for transient state/nonce/originalURL cookies
+	defaultTokenExpirySecs      = 60                     // fallback when ID token expiry is invalid or already passed
 )
 
 // Cookie names centralised to avoid copy-paste strings.
@@ -79,26 +81,28 @@ func initOIDCProviderCore(params oidcProviderParams) (*oidcProviderResult, error
 		return nil, errors.New("failed to init OIDC provider: client url is empty")
 	}
 
-	ctx := oidc.ClientContext(context.Background(), &http.Client{
-		Timeout: oidcProviderInitTimeout,
-	})
+	// Create a background context with the HTTP client for OIDC operations
+	httpClient := &http.Client{Timeout: oidcProviderInitTimeout}
+	ctx := oidc.ClientContext(context.Background(), httpClient)
 
-	// Retry OIDC provider init in case of transient network errors
+	// Create retry policy with exponential backoff for transient network errors
+	policy := backoff.NewExponentialBackoffPolicy(oidcProviderInitialInterval)
+	policy.MaxInterval = oidcProviderMaxInterval
+	policy.MaxRetries = oidcProviderMaxRetries
+
 	var provider *oidc.Provider
-	var err error
-	for attempt := 1; attempt <= oidcProviderMaxRetries; attempt++ {
-		provider, err = oidcProviderFactory(ctx, params.Issuer)
-		if err == nil && provider != nil {
-			break
+	err := backoff.Retry(ctx, func(ctx context.Context) error {
+		var providerErr error
+		provider, providerErr = oidcProviderFactory(ctx, params.Issuer)
+		if providerErr != nil {
+			slog.Warn("OIDC provider init failed, will retry",
+				tag.Error(providerErr),
+				slog.String("issuer", params.Issuer))
+			return providerErr
 		}
-		if attempt < oidcProviderMaxRetries {
-			slog.Warn("OIDC provider init failed, retrying",
-				tag.Error(err),
-				slog.Int("attempt", attempt),
-				slog.Int("maxRetries", oidcProviderMaxRetries))
-			time.Sleep(oidcProviderRetryDelay)
-		}
-	}
+		return nil
+	}, policy, nil)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to init OIDC provider: %w", err)
 	}
