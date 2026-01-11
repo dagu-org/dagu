@@ -290,16 +290,20 @@ func (s *Service) generateUniqueUsername(ctx context.Context, claims OIDCClaims)
 
 		// Check if username exists
 		existing, err := s.userStore.GetByUsername(ctx, base)
-		if err != nil {
+		if errors.Is(err, auth.ErrUserNotFound) {
 			// Username available
 			return base
+		}
+		if err != nil {
+			// Other error (I/O, etc.) - skip this candidate, try next
+			continue
 		}
 
 		// If exists but is an OIDC user, try suffix
 		if existing.AuthProvider == "oidc" {
 			for i := 2; i <= 99; i++ {
 				candidate := fmt.Sprintf("%s%d", base, i)
-				if _, err := s.userStore.GetByUsername(ctx, candidate); err != nil {
+				if _, err := s.userStore.GetByUsername(ctx, candidate); errors.Is(err, auth.ErrUserNotFound) {
 					return candidate
 				}
 			}
@@ -307,14 +311,14 @@ func (s *Service) generateUniqueUsername(ctx context.Context, claims OIDCClaims)
 
 		// Conflict with builtin user - use suffix to differentiate
 		ssoCandidate := fmt.Sprintf("%s_sso", base)
-		if _, err := s.userStore.GetByUsername(ctx, ssoCandidate); err != nil {
+		if _, err := s.userStore.GetByUsername(ctx, ssoCandidate); errors.Is(err, auth.ErrUserNotFound) {
 			return ssoCandidate
 		}
 
 		// Try with numbers
 		for i := 2; i <= 99; i++ {
 			candidate := fmt.Sprintf("%s_sso%d", base, i)
-			if _, err := s.userStore.GetByUsername(ctx, candidate); err != nil {
+			if _, err := s.userStore.GetByUsername(ctx, candidate); errors.Is(err, auth.ErrUserNotFound) {
 				return candidate
 			}
 		}
