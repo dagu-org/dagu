@@ -434,8 +434,9 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 			cfg.Server.Auth.OIDC.ClientSecret = oidc.ClientSecret
 			cfg.Server.Auth.OIDC.ClientUrl = oidc.ClientUrl
 			cfg.Server.Auth.OIDC.Issuer = oidc.Issuer
-			cfg.Server.Auth.OIDC.Scopes = oidc.Scopes
-			cfg.Server.Auth.OIDC.Whitelist = oidc.Whitelist
+			// Use parseStringList to support both comma-separated strings and YAML lists
+			cfg.Server.Auth.OIDC.Scopes = parseStringList(l.v.Get("auth.oidc.scopes"))
+			cfg.Server.Auth.OIDC.Whitelist = parseStringList(l.v.Get("auth.oidc.whitelist"))
 			// Builtin-specific fields (only used when auth.mode=builtin)
 			if oidc.AutoSignup != nil {
 				cfg.Server.Auth.OIDC.AutoSignup = *oidc.AutoSignup
@@ -443,7 +444,7 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 				// Default to true - if OIDC is configured, auto-signup is expected
 				cfg.Server.Auth.OIDC.AutoSignup = true
 			}
-			cfg.Server.Auth.OIDC.AllowedDomains = oidc.AllowedDomains
+			cfg.Server.Auth.OIDC.AllowedDomains = parseStringList(l.v.Get("auth.oidc.allowedDomains"))
 			cfg.Server.Auth.OIDC.ButtonLabel = oidc.ButtonLabel
 			// Load role mapping configuration
 			if oidc.RoleMapping != nil {
@@ -1244,6 +1245,35 @@ func parseWorkerLabels(labelsStr string) map[string]string {
 	}
 
 	return labels
+}
+
+// parseStringList parses input that can be either a comma-separated string or a list of strings.
+// This allows config values to be specified as either:
+//   - YAML list: ["a", "b", "c"]
+//   - Comma-separated string: "a,b,c"
+//
+// Empty strings and whitespace-only entries are filtered out.
+func parseStringList(input interface{}) []string {
+	var result []string
+	switch v := input.(type) {
+	case string:
+		if v != "" {
+			for _, s := range strings.Split(v, ",") {
+				if trimmed := strings.TrimSpace(s); trimmed != "" {
+					result = append(result, trimmed)
+				}
+			}
+		}
+	case []interface{}:
+		for _, item := range v {
+			if s, ok := item.(string); ok && s != "" {
+				result = append(result, s)
+			}
+		}
+	case []string:
+		result = v
+	}
+	return result
 }
 
 func cleanServerBasePath(s string) string {

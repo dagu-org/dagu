@@ -240,13 +240,15 @@ func (s *Service) syncUserRole(ctx context.Context, user *auth.User, claims OIDC
 // Logic:
 //   - If whitelist is not empty and email is in whitelist: ALLOW
 //   - If allowedDomains is not empty and email domain is in allowedDomains: ALLOW
-//   - If allowedDomains is not empty and email domain is NOT in allowedDomains: DENY
+//   - If either whitelist or allowedDomains is configured but email doesn't match: DENY
 //   - If both whitelist and allowedDomains are empty: ALLOW (no restrictions)
 func (s *Service) isEmailAllowed(email string) bool {
 	email = strings.ToLower(email)
+	hasWhitelist := len(s.config.Whitelist) > 0
+	hasAllowedDomains := len(s.config.AllowedDomains) > 0
 
 	// Check whitelist first (takes precedence)
-	if len(s.config.Whitelist) > 0 {
+	if hasWhitelist {
 		for _, allowed := range s.config.Whitelist {
 			if strings.EqualFold(email, allowed) {
 				return true
@@ -255,14 +257,17 @@ func (s *Service) isEmailAllowed(email string) bool {
 	}
 
 	// Check allowed domains
-	if len(s.config.AllowedDomains) > 0 {
+	if hasAllowedDomains {
 		domain := stringutil.ExtractEmailDomain(email)
 		for _, allowed := range s.config.AllowedDomains {
 			if strings.EqualFold(domain, allowed) {
 				return true
 			}
 		}
-		// Domain not in allowed list
+	}
+
+	// If any restriction is configured but email didn't match, deny
+	if hasWhitelist || hasAllowedDomains {
 		return false
 	}
 
