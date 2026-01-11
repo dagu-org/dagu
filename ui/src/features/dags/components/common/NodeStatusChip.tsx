@@ -5,8 +5,23 @@
  */
 import { cn } from '@/lib/utils';
 import MatrixText from '@/ui/MatrixText';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NodeStatus } from '../../../../api/v2/schema';
+
+const BRAILLE_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+function BrailleSpinner() {
+  const [frame, setFrame] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFrame((prev) => (prev + 1) % BRAILLE_FRAMES.length);
+    }, 80);
+    return () => clearInterval(interval);
+  }, []);
+
+  return <>{BRAILLE_FRAMES[frame]}</>;
+}
 
 /**
  * Props for the NodeStatusChip component
@@ -48,8 +63,7 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
       bgColorClass = 'bg-[rgba(0,255,0,0.1)],205,50,0.2)]';
       borderColorClass = 'border-success';
       textColorClass = 'text-success';
-      pulseAnimation = 'animate-pulse';
-      statusIcon = '●'; // Dot
+      // No static icon - uses BrailleSpinner
       break;
     case NodeStatus.Aborted: // aborted -> pink
       bgColorClass =
@@ -120,10 +134,10 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
       )}
     >
       <span
-        className={cn('mr-1.5 inline-flex', pulseAnimation, textColorClass)}
+        className={cn('mr-1.5 inline-flex', textColorClass)}
         aria-hidden="true"
       >
-        {statusIcon}
+        {isRunning ? <BrailleSpinner /> : statusIcon}
       </span>
       <span
         className={cn(
