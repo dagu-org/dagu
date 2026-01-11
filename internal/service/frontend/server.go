@@ -345,7 +345,7 @@ func (srv *Server) Serve(ctx context.Context) error {
 	logger.Info(ctx, "Server is starting", tag.Addr(addr))
 
 	// Start the server in a goroutine
-	go srv.startServer(ctx, addr)
+	go srv.startServer(ctx)
 
 	// Set up graceful shutdown
 	srv.setupGracefulShutdown(ctx)
@@ -496,7 +496,7 @@ func (srv *Server) setupTerminalRoute(ctx context.Context, r *chi.Mux, apiV2Base
 }
 
 // startServer starts the HTTP server with or without TLS
-func (srv *Server) startServer(ctx context.Context, addr string) {
+func (srv *Server) startServer(ctx context.Context) {
 	var err error
 	if srv.config.Server.TLS != nil {
 		// Use TLS configuration
