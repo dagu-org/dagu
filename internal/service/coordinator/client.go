@@ -63,7 +63,7 @@ type Metrics struct {
 }
 
 var (
-	_ Client              = (*clientImpl)(nil)
+	_ Client               = (*clientImpl)(nil)
 	_ execution.Dispatcher = (*clientImpl)(nil)
 )
 

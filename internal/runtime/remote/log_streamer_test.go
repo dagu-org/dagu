@@ -86,8 +86,8 @@ func (m *mockStreamLogsClient) Header() (metadata.MD, error) { return nil, nil }
 func (m *mockStreamLogsClient) Trailer() metadata.MD         { return nil }
 func (m *mockStreamLogsClient) CloseSend() error             { return nil }
 func (m *mockStreamLogsClient) Context() context.Context     { return context.Background() }
-func (m *mockStreamLogsClient) SendMsg(_ any) error { return nil }
-func (m *mockStreamLogsClient) RecvMsg(_ any) error { return nil }
+func (m *mockStreamLogsClient) SendMsg(_ any) error          { return nil }
+func (m *mockStreamLogsClient) RecvMsg(_ any) error          { return nil }
 
 // getSentChunks returns a copy of sent chunks for thread-safe access
 func (m *mockStreamLogsClient) getSentChunks() []*coordinatorv1.LogChunk {

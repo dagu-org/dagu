@@ -91,18 +91,7 @@ func (m *mockStreamLogsClient) RecvMsg(any) error {
 	return nil
 }
 
-func (m *mockStreamLogsClient) GetChunks() []*coordinatorv1.LogChunk {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	result := make([]*coordinatorv1.LogChunk, len(m.chunks))
-	copy(result, m.chunks)
-	return result
-}
-
 type mockRemoteCoordinatorClient struct {
-	mu sync.Mutex
-
-	// Function hooks for customization
 	ReportStatusFunc    func(ctx context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error)
 	StreamLogsFunc      func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error)
 	GetDAGRunStatusFunc func(ctx context.Context, dagName, dagRunID string, rootRef *execution.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error)
@@ -112,10 +101,6 @@ type mockRemoteCoordinatorClient struct {
 	GetWorkersFunc      func(ctx context.Context) ([]*coordinatorv1.WorkerInfo, error)
 	CleanupFunc         func(ctx context.Context) error
 	MetricsFunc         func() coordinator.Metrics
-
-	// Tracking
-	reportStatusCalls int
-	streamLogsCalls   int
 }
 
 func newMockRemoteCoordinatorClient() *mockRemoteCoordinatorClient {
@@ -136,9 +121,6 @@ func newMockRemoteCoordinatorClient() *mockRemoteCoordinatorClient {
 }
 
 func (m *mockRemoteCoordinatorClient) ReportStatus(ctx context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
-	m.mu.Lock()
-	m.reportStatusCalls++
-	m.mu.Unlock()
 	if m.ReportStatusFunc != nil {
 		return m.ReportStatusFunc(ctx, req)
 	}
@@ -146,9 +128,6 @@ func (m *mockRemoteCoordinatorClient) ReportStatus(ctx context.Context, req *coo
 }
 
 func (m *mockRemoteCoordinatorClient) StreamLogs(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
-	m.mu.Lock()
-	m.streamLogsCalls++
-	m.mu.Unlock()
 	if m.StreamLogsFunc != nil {
 		return m.StreamLogsFunc(ctx)
 	}
@@ -202,18 +181,6 @@ func (m *mockRemoteCoordinatorClient) Metrics() coordinator.Metrics {
 		return m.MetricsFunc()
 	}
 	return coordinator.Metrics{IsConnected: true}
-}
-
-func (m *mockRemoteCoordinatorClient) GetReportStatusCalls() int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.reportStatusCalls
-}
-
-func (m *mockRemoteCoordinatorClient) GetStreamLogsCalls() int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.streamLogsCalls
 }
 
 // mockRemoteDAGRunAttempt implements execution.DAGRunAttempt for testing
