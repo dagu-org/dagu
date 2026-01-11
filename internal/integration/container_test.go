@@ -709,6 +709,27 @@ steps:
 				"STEP_ENV_ONLY_OUT": "hello_from_step",
 			},
 		},
+		{
+			// Regression test for: https://github.com/dagu-org/dagu/issues/1565
+			// When container.command is specified without a top-level command,
+			// the container.command should be executed and output should be captured.
+			name: "ContainerCommandWithOutput",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+steps:
+  - name: step1
+    container:
+      image: %s
+      command:
+        - echo
+        - '{"name": "Alice", "age": 30}'
+    output: CONTAINER_CMD_OUT
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"CONTAINER_CMD_OUT": `{"name": "Alice", "age": 30}`,
+			},
+		},
 	}
 
 	for _, tt := range tests {
