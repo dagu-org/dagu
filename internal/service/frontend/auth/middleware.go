@@ -55,7 +55,7 @@ func DefaultOptions() Options {
 func ClientIPMiddleware() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := auth.WithClientIP(r.Context(), getClientIP(r))
+			ctx := auth.WithClientIP(r.Context(), GetClientIP(r))
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -123,7 +123,7 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 					if err == nil {
 						// JWT token valid - inject user and client IP into context
 						ctx := auth.WithUser(r.Context(), user)
-						ctx = auth.WithClientIP(ctx, getClientIP(r))
+						ctx = auth.WithClientIP(ctx, GetClientIP(r))
 						next.ServeHTTP(w, r.WithContext(ctx))
 						return
 					}
@@ -144,7 +144,7 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 							Role:     apiKey.Role,
 						}
 						ctx := auth.WithUser(r.Context(), syntheticUser)
-						ctx = auth.WithClientIP(ctx, getClientIP(r))
+						ctx = auth.WithClientIP(ctx, GetClientIP(r))
 						next.ServeHTTP(w, r.WithContext(ctx))
 						return
 					}
@@ -163,7 +163,7 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 					Role:     auth.RoleAdmin,
 				}
 				ctx := auth.WithUser(r.Context(), adminUser)
-				ctx = auth.WithClientIP(ctx, getClientIP(r))
+				ctx = auth.WithClientIP(ctx, GetClientIP(r))
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
@@ -180,7 +180,7 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 							Role:     auth.RoleAdmin,
 						}
 						ctx := auth.WithUser(r.Context(), basicUser)
-						ctx = auth.WithClientIP(ctx, getClientIP(r))
+						ctx = auth.WithClientIP(ctx, GetClientIP(r))
 						next.ServeHTTP(w, r.WithContext(ctx))
 						return
 					}
@@ -261,9 +261,9 @@ func requireBearerAuth(w http.ResponseWriter, realm string) {
 	w.WriteHeader(http.StatusUnauthorized)
 }
 
-// getClientIP extracts the client IP address from the request.
+// GetClientIP extracts the client IP address from the request.
 // It checks X-Forwarded-For and X-Real-IP headers for proxied requests.
-func getClientIP(r *http.Request) string {
+func GetClientIP(r *http.Request) string {
 	// Check X-Forwarded-For header first (for proxies)
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		// Take the first IP in the chain

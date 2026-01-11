@@ -263,8 +263,13 @@ func initBuiltinAuthService(cfg *config.Config, collector *telemetry.Collector) 
 }
 
 // initAuditService creates a file-based audit store and service.
-// Returns nil service if audit logging cannot be configured (non-fatal).
+// Returns nil service if audit logging is disabled or cannot be configured.
 func initAuditService(cfg *config.Config) (*audit.Service, error) {
+	// Check if audit logging is enabled
+	if !cfg.Server.Audit.Enabled {
+		return nil, nil
+	}
+
 	// Use AdminLogsDir for audit logs
 	auditDir := filepath.Join(cfg.Paths.AdminLogsDir, "audit")
 

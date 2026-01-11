@@ -146,6 +146,9 @@ type Definition struct {
 
 	// Terminal contains configuration for the web-based terminal feature.
 	Terminal *TerminalDef `mapstructure:"terminal"`
+
+	// Audit contains configuration for the audit logging feature.
+	Audit *AuditDef `mapstructure:"audit"`
 }
 
 // TerminalDef represents the terminal configuration.
@@ -153,6 +156,14 @@ type TerminalDef struct {
 	// Enabled determines if the terminal feature is available.
 	// Default: false
 	// Env: DAGU_TERMINAL_ENABLED
+	Enabled *bool `mapstructure:"enabled"`
+}
+
+// AuditDef represents the audit logging configuration.
+type AuditDef struct {
+	// Enabled determines if audit logging is active.
+	// Default: true
+	// Env: DAGU_AUDIT_ENABLED
 	Enabled *bool `mapstructure:"enabled"`
 }
 

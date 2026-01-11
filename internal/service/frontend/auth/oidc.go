@@ -257,7 +257,7 @@ func checkOIDCAuth(next http.Handler, provider *oidc.Provider, verifier *oidc.ID
 		if user, err := verifyAndExtractUser(verifier, authorized.Value); err == nil {
 			// Add user and client IP to context
 			ctx = auth.WithUser(ctx, user)
-			ctx = auth.WithClientIP(ctx, getClientIP(r))
+			ctx = auth.WithClientIP(ctx, GetClientIP(r))
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
@@ -309,7 +309,7 @@ func checkOIDCToken(next http.Handler, verifier *oidc.IDTokenVerifier, w http.Re
 	}
 	// Add user and client IP to context
 	ctx = auth.WithUser(ctx, user)
-	ctx = auth.WithClientIP(ctx, getClientIP(r))
+	ctx = auth.WithClientIP(ctx, GetClientIP(r))
 	next.ServeHTTP(w, r.WithContext(ctx))
 }
 

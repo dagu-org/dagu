@@ -3,10 +3,10 @@ package terminal
 import (
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
+	frontendauth "github.com/dagu-org/dagu/internal/service/frontend/auth"
 	"nhooyr.io/websocket"
 )
 
@@ -51,11 +51,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get client IP address
-	ipAddress := getClientIP(r)
+	ipAddress := frontendauth.GetClientIP(r)
 
 	// Upgrade to WebSocket
+	// InsecureSkipVerify allows any origin since access is already protected by token auth
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		// Allow all origins for now. In production, you might want to restrict this.
 		InsecureSkipVerify: true,
 	})
 	if err != nil {
@@ -65,30 +65,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Create and run session
 	session := NewSession(user, h.shell, conn, ipAddress)
 	_ = session.Run(ctx, h.auditService)
-}
-
-// getClientIP extracts the client IP address from the request.
-func getClientIP(r *http.Request) string {
-	// Check X-Forwarded-For header first (for proxies)
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// Take the first IP in the chain
-		if idx := strings.Index(xff, ","); idx != -1 {
-			return strings.TrimSpace(xff[:idx])
-		}
-		return strings.TrimSpace(xff)
-	}
-
-	// Check X-Real-IP header
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return strings.TrimSpace(xri)
-	}
-
-	// Fall back to RemoteAddr
-	ip := r.RemoteAddr
-	if idx := strings.LastIndex(ip, ":"); idx != -1 {
-		ip = ip[:idx]
-	}
-	return ip
 }
 
 // GetDefaultShell returns the default shell for the current system.

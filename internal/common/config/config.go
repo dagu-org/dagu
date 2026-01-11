@@ -129,6 +129,9 @@ type Server struct {
 
 	// Terminal contains configuration for the web-based terminal feature.
 	Terminal TerminalConfig
+
+	// Audit contains configuration for the audit logging feature.
+	Audit AuditConfig
 }
 
 // TerminalConfig contains configuration for the web-based terminal feature.
@@ -136,6 +139,14 @@ type TerminalConfig struct {
 	// Enabled determines if the terminal feature is available.
 	// Default: false
 	// Env: DAGU_TERMINAL_ENABLED
+	Enabled bool
+}
+
+// AuditConfig contains configuration for the audit logging feature.
+type AuditConfig struct {
+	// Enabled determines if audit logging is active.
+	// Default: true
+	// Env: DAGU_AUDIT_ENABLED
 	Enabled bool
 }
 

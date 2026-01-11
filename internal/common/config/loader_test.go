@@ -118,6 +118,9 @@ func TestLoad_Env(t *testing.T) {
 
 		// Terminal configuration
 		"DAGU_TERMINAL_ENABLED": "true",
+
+		// Audit configuration
+		"DAGU_AUDIT_ENABLED": "false",
 	}
 
 	// Save and clear existing environment variables
@@ -195,6 +198,7 @@ func TestLoad_Env(t *testing.T) {
 			StrictValidation:  false,
 			Metrics:           MetricsAccessPrivate,
 			Terminal:          TerminalConfig{Enabled: true},
+			Audit:             AuditConfig{Enabled: false},
 		},
 		Paths: PathsConfig{
 			DAGsDir:            filepath.Join(testPaths, "dags"),
@@ -432,7 +436,9 @@ scheduler:
 				PermissionWriteDAGs: false,
 				PermissionRunDAGs:   false,
 			},
-			Metrics: MetricsAccessPrivate,
+			Metrics:  MetricsAccessPrivate,
+			Terminal: TerminalConfig{Enabled: false},
+			Audit:    AuditConfig{Enabled: true},
 		},
 		Paths: PathsConfig{
 			DAGsDir:            "/var/dagu/dags",
@@ -1246,5 +1252,52 @@ terminal:
 			"DAGU_TERMINAL_ENABLED": "true",
 		})
 		assert.True(t, cfg.Server.Terminal.Enabled)
+	})
+}
+
+func TestLoad_Audit(t *testing.T) {
+	t.Run("AuditDefault", func(t *testing.T) {
+		cfg := loadFromYAML(t, "# empty")
+		assert.True(t, cfg.Server.Audit.Enabled)
+	})
+
+	t.Run("AuditEnabled", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+audit:
+  enabled: true
+`)
+		assert.True(t, cfg.Server.Audit.Enabled)
+	})
+
+	t.Run("AuditDisabled", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+audit:
+  enabled: false
+`)
+		assert.False(t, cfg.Server.Audit.Enabled)
+	})
+
+	t.Run("AuditEnabledFromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_AUDIT_ENABLED": "true",
+		})
+		assert.True(t, cfg.Server.Audit.Enabled)
+	})
+
+	t.Run("AuditDisabledFromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_AUDIT_ENABLED": "false",
+		})
+		assert.False(t, cfg.Server.Audit.Enabled)
+	})
+
+	t.Run("AuditEnvOverridesYAML", func(t *testing.T) {
+		cfg := loadWithEnv(t, `
+audit:
+  enabled: true
+`, map[string]string{
+			"DAGU_AUDIT_ENABLED": "false",
+		})
+		assert.False(t, cfg.Server.Audit.Enabled)
 	})
 }
