@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useConfig } from '@/contexts/ConfigContext';
+import { AppBarContext } from '@/contexts/AppBarContext';
 import { components } from '@/api/v2/schema';
 import {
   Dialog,
@@ -46,6 +47,7 @@ const ROLES = [
  */
 export function UserFormModal({ open, user, onClose, onSuccess }: UserFormModalProps) {
   const config = useConfig();
+  const appBarContext = useContext(AppBarContext);
   const isEditing = !!user;
 
   const [username, setUsername] = useState('');
@@ -80,11 +82,12 @@ export function UserFormModal({ open, user, onClose, onSuccess }: UserFormModalP
 
     try {
       const token = localStorage.getItem('dagu_auth_token');
+      const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
       if (isEditing) {
         // Update user
-        const response = await fetch(`${config.apiURL}/users/${user.id}`, {
-          method: 'PUT',
+        const response = await fetch(`${config.apiURL}/users/${user.id}?remoteNode=${remoteNode}`, {
+          method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
@@ -98,7 +101,7 @@ export function UserFormModal({ open, user, onClose, onSuccess }: UserFormModalP
         }
       } else {
         // Create user
-        const response = await fetch(`${config.apiURL}/users`, {
+        const response = await fetch(`${config.apiURL}/users?remoteNode=${remoteNode}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

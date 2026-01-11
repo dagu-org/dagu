@@ -1911,6 +1911,8 @@ export interface components {
             /** @description New username (must be unique) */
             username?: string;
             role?: components["schemas"]["UserRole"];
+            /** @description Whether to disable the user account */
+            isDisabled?: boolean;
         };
         /** @description User information */
         User: {
@@ -1919,6 +1921,13 @@ export interface components {
             /** @description User's username */
             username: string;
             role: components["schemas"]["UserRole"];
+            /**
+             * @description Authentication provider (builtin or oidc)
+             * @enum {string}
+             */
+            authProvider?: UserAuthProvider;
+            /** @description Whether the user account is disabled */
+            isDisabled?: boolean;
             /**
              * Format: date-time
              * @description Account creation timestamp
@@ -5570,4 +5579,8 @@ export enum UserRole {
     manager = "manager",
     operator = "operator",
     viewer = "viewer"
+}
+export enum UserAuthProvider {
+    builtin = "builtin",
+    oidc = "oidc"
 }

@@ -148,6 +148,9 @@ func (a *API) UpdateUser(ctx context.Context, request api.UpdateUserRequestObjec
 		}
 		input.Role = &role
 	}
+	if request.Body.IsDisabled != nil {
+		input.IsDisabled = request.Body.IsDisabled
+	}
 
 	user, err := a.authService.UpdateUser(ctx, request.UserId, input)
 	if err != nil {

@@ -284,9 +284,10 @@ func (s *Service) ListUsers(ctx context.Context) ([]*auth.User, error) {
 // but the API handler intentionally omits it - password changes should
 // go through ChangePassword (user self-service) or ResetPassword (admin).
 type UpdateUserInput struct {
-	Username *string
-	Role     *auth.Role
-	Password *string
+	Username   *string
+	Role       *auth.Role
+	Password   *string
+	IsDisabled *bool
 }
 
 // UpdateUser updates an existing user.
@@ -316,6 +317,10 @@ func (s *Service) UpdateUser(ctx context.Context, id string, input UpdateUserInp
 			return nil, fmt.Errorf("failed to hash password: %w", err)
 		}
 		user.PasswordHash = string(passwordHash)
+	}
+
+	if input.IsDisabled != nil {
+		user.IsDisabled = *input.IsDisabled
 	}
 
 	user.UpdatedAt = time.Now().UTC()
