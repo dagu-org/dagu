@@ -733,3 +733,23 @@ func TestRandomString(t *testing.T) {
 		require.Greater(t, len(strings), 1, "expected different strings, but all were identical")
 	})
 }
+
+func TestExtractEmailDomain(t *testing.T) {
+	tests := []struct {
+		email    string
+		expected string
+	}{
+		{"user@example.com", "example.com"},
+		{"john.doe@company.org", "company.org"},
+		{"invalid-email", ""},
+		{"multiple@at@signs.com", ""},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.email, func(t *testing.T) {
+			result := stringutil.ExtractEmailDomain(tt.email)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}

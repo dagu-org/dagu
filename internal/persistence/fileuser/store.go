@@ -1,6 +1,3 @@
-// Copyright (C) 2024 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 // Package fileuser provides a file-based implementation of the UserStore interface.
 package fileuser
 
@@ -10,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
@@ -38,6 +36,14 @@ type Store struct {
 	byID map[string]string
 	// byUsername maps username to user ID
 	byUsername map[string]string
+	// byOIDCIdentity maps "issuer:subject" to user ID for OIDC users
+	byOIDCIdentity map[string]string
+}
+
+// oidcIdentityKey creates a composite key for the OIDC identity index.
+// Uses URL encoding to prevent collisions when issuer contains ports or subject contains colons.
+func oidcIdentityKey(issuer, subject string) string {
+	return url.QueryEscape(issuer) + ":" + url.QueryEscape(subject)
 }
 
 var _ auth.UserStore = (*Store)(nil)
@@ -57,9 +63,10 @@ func New(baseDir string, opts ...Option) (*Store, error) {
 	}
 
 	store := &Store{
-		baseDir:    baseDir,
-		byID:       make(map[string]string),
-		byUsername: make(map[string]string),
+		baseDir:        baseDir,
+		byID:           make(map[string]string),
+		byUsername:     make(map[string]string),
+		byOIDCIdentity: make(map[string]string),
 	}
 
 	for _, opt := range opts {
@@ -87,6 +94,7 @@ func (s *Store) rebuildIndex() error {
 	// Clear existing index
 	s.byID = make(map[string]string)
 	s.byUsername = make(map[string]string)
+	s.byOIDCIdentity = make(map[string]string)
 
 	// Scan directory for user files
 	entries, err := os.ReadDir(s.baseDir)
@@ -111,6 +119,12 @@ func (s *Store) rebuildIndex() error {
 
 		s.byID[user.ID] = filePath
 		s.byUsername[user.Username] = user.ID
+
+		// Index OIDC identity if present
+		if user.OIDCIssuer != "" && user.OIDCSubject != "" {
+			key := oidcIdentityKey(user.OIDCIssuer, user.OIDCSubject)
+			s.byOIDCIdentity[key] = user.ID
+		}
 	}
 
 	return nil
@@ -161,6 +175,14 @@ func (s *Store) Create(_ context.Context, user *auth.User) error {
 		return auth.ErrUserAlreadyExists
 	}
 
+	// Check if OIDC identity already exists
+	if user.OIDCIssuer != "" && user.OIDCSubject != "" {
+		key := oidcIdentityKey(user.OIDCIssuer, user.OIDCSubject)
+		if _, exists := s.byOIDCIdentity[key]; exists {
+			return auth.ErrOIDCIdentityAlreadyExists
+		}
+	}
+
 	// Write user to file
 	filePath := s.userFilePath(user.ID)
 	if err := s.writeUserToFile(filePath, user); err != nil {
@@ -170,6 +192,12 @@ func (s *Store) Create(_ context.Context, user *auth.User) error {
 	// Update index
 	s.byID[user.ID] = filePath
 	s.byUsername[user.Username] = user.ID
+
+	// Index OIDC identity if present
+	if user.OIDCIssuer != "" && user.OIDCSubject != "" {
+		key := oidcIdentityKey(user.OIDCIssuer, user.OIDCSubject)
+		s.byOIDCIdentity[key] = user.ID
+	}
 
 	return nil
 }
@@ -239,6 +267,25 @@ func (s *Store) GetByUsername(ctx context.Context, username string) (*auth.User,
 	return s.GetByID(ctx, userID)
 }
 
+// GetByOIDCIdentity retrieves a user by their OIDC identity (issuer + subject).
+func (s *Store) GetByOIDCIdentity(ctx context.Context, issuer, subject string) (*auth.User, error) {
+	if issuer == "" || subject == "" {
+		return nil, auth.ErrOIDCIdentityNotFound
+	}
+
+	key := oidcIdentityKey(issuer, subject)
+
+	s.mu.RLock()
+	userID, exists := s.byOIDCIdentity[key]
+	s.mu.RUnlock()
+
+	if !exists {
+		return nil, auth.ErrOIDCIdentityNotFound
+	}
+
+	return s.GetByID(ctx, userID)
+}
+
 // List returns all users in the store.
 func (s *Store) List(ctx context.Context) ([]*auth.User, error) {
 	s.mu.RLock()
@@ -299,14 +346,45 @@ func (s *Store) Update(_ context.Context, user *auth.User) error {
 		s.byUsername[user.Username] = user.ID
 	}
 
+	// Handle OIDC identity changes
+	oldOIDCKey := oidcIdentityKey(existingUser.OIDCIssuer, existingUser.OIDCSubject)
+	newOIDCKey := oidcIdentityKey(user.OIDCIssuer, user.OIDCSubject)
+	oidcChanged := oldOIDCKey != newOIDCKey
+
+	if oidcChanged {
+		// Check if new OIDC identity already exists (and belongs to a different user)
+		if user.OIDCIssuer != "" && user.OIDCSubject != "" {
+			if existingID, taken := s.byOIDCIdentity[newOIDCKey]; taken && existingID != user.ID {
+				// Rollback username change if needed
+				if existingUser.Username != user.Username {
+					delete(s.byUsername, user.Username)
+					s.byUsername[existingUser.Username] = user.ID
+				}
+				return auth.ErrOIDCIdentityAlreadyExists
+			}
+		}
+	}
+
 	// Write updated user
 	if err := s.writeUserToFile(filePath, user); err != nil {
-		// Rollback index change on failure
+		// Rollback index changes on failure
 		if existingUser.Username != user.Username {
 			delete(s.byUsername, user.Username)
 			s.byUsername[existingUser.Username] = user.ID
 		}
 		return err
+	}
+
+	// Update OIDC index after successful write
+	if oidcChanged {
+		// Remove old OIDC identity index (if it was set)
+		if existingUser.OIDCIssuer != "" && existingUser.OIDCSubject != "" {
+			delete(s.byOIDCIdentity, oldOIDCKey)
+		}
+		// Add new OIDC identity index (if it is set)
+		if user.OIDCIssuer != "" && user.OIDCSubject != "" {
+			s.byOIDCIdentity[newOIDCKey] = user.ID
+		}
 	}
 
 	return nil
@@ -341,11 +419,23 @@ func (s *Store) Delete(_ context.Context, id string) error {
 	delete(s.byID, id)
 	if user != nil {
 		delete(s.byUsername, user.Username)
+		// Remove OIDC identity index if present
+		if user.OIDCIssuer != "" && user.OIDCSubject != "" {
+			key := oidcIdentityKey(user.OIDCIssuer, user.OIDCSubject)
+			delete(s.byOIDCIdentity, key)
+		}
 	} else {
 		// File was already gone; remove any username entry that still points to this ID.
 		for username, userID := range s.byUsername {
 			if userID == id {
 				delete(s.byUsername, username)
+				break
+			}
+		}
+		// Also clean up any OIDC identity entry that points to this ID
+		for key, userID := range s.byOIDCIdentity {
+			if userID == id {
+				delete(s.byOIDCIdentity, key)
 				break
 			}
 		}

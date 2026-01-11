@@ -428,12 +428,37 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 			cfg.Server.Auth.Token.Value = def.Auth.Token.Value
 		}
 		if def.Auth.OIDC != nil {
-			cfg.Server.Auth.OIDC.ClientId = def.Auth.OIDC.ClientId
-			cfg.Server.Auth.OIDC.ClientSecret = def.Auth.OIDC.ClientSecret
-			cfg.Server.Auth.OIDC.ClientUrl = def.Auth.OIDC.ClientUrl
-			cfg.Server.Auth.OIDC.Issuer = def.Auth.OIDC.Issuer
-			cfg.Server.Auth.OIDC.Scopes = def.Auth.OIDC.Scopes
-			cfg.Server.Auth.OIDC.Whitelist = def.Auth.OIDC.Whitelist
+			oidc := def.Auth.OIDC
+			// Core OIDC fields (used by both standalone and builtin modes)
+			cfg.Server.Auth.OIDC.ClientId = oidc.ClientId
+			cfg.Server.Auth.OIDC.ClientSecret = oidc.ClientSecret
+			cfg.Server.Auth.OIDC.ClientUrl = oidc.ClientUrl
+			cfg.Server.Auth.OIDC.Issuer = oidc.Issuer
+			cfg.Server.Auth.OIDC.Scopes = oidc.Scopes
+			cfg.Server.Auth.OIDC.Whitelist = oidc.Whitelist
+			// Builtin-specific fields (only used when auth.mode=builtin)
+			if oidc.Enabled != nil {
+				cfg.Server.Auth.OIDC.Enabled = *oidc.Enabled
+			}
+			if oidc.AutoSignup != nil {
+				cfg.Server.Auth.OIDC.AutoSignup = *oidc.AutoSignup
+			}
+			cfg.Server.Auth.OIDC.DefaultRole = oidc.DefaultRole
+			cfg.Server.Auth.OIDC.AllowedDomains = oidc.AllowedDomains
+			cfg.Server.Auth.OIDC.ButtonLabel = oidc.ButtonLabel
+			// Load role mapping configuration
+			if oidc.RoleMapping != nil {
+				rm := oidc.RoleMapping
+				cfg.Server.Auth.OIDC.RoleMapping.GroupsClaim = rm.GroupsClaim
+				cfg.Server.Auth.OIDC.RoleMapping.GroupMappings = rm.GroupMappings
+				cfg.Server.Auth.OIDC.RoleMapping.RoleAttributePath = rm.RoleAttributePath
+				if rm.RoleAttributeStrict != nil {
+					cfg.Server.Auth.OIDC.RoleMapping.RoleAttributeStrict = *rm.RoleAttributeStrict
+				}
+				if rm.SkipOrgRoleSync != nil {
+					cfg.Server.Auth.OIDC.RoleMapping.SkipOrgRoleSync = *rm.SkipOrgRoleSync
+				}
+			}
 		}
 		if def.Auth.Builtin != nil {
 			if def.Auth.Builtin.Admin != nil {
@@ -476,6 +501,17 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 	// Set default admin username if not specified
 	if cfg.Server.Auth.Builtin.Admin.Username == "" {
 		cfg.Server.Auth.Builtin.Admin.Username = "admin"
+	}
+
+	// Set defaults for OIDC configuration (used by both standalone and builtin modes)
+	if len(cfg.Server.Auth.OIDC.Scopes) == 0 {
+		cfg.Server.Auth.OIDC.Scopes = []string{"openid", "profile", "email"}
+	}
+	if cfg.Server.Auth.OIDC.DefaultRole == "" {
+		cfg.Server.Auth.OIDC.DefaultRole = "viewer"
+	}
+	if cfg.Server.Auth.OIDC.ButtonLabel == "" {
+		cfg.Server.Auth.OIDC.ButtonLabel = "Login with SSO"
 	}
 
 	// Normalize the BasePath value for proper URL construction.
@@ -1073,12 +1109,25 @@ var envBindings = []envBinding{
 	{key: "auth.token.value", env: "AUTH_TOKEN"},
 
 	// Authentication configurations (OIDC)
+	// Core OIDC fields (used by both standalone and builtin modes)
 	{key: "auth.oidc.clientId", env: "AUTH_OIDC_CLIENT_ID"},
 	{key: "auth.oidc.clientSecret", env: "AUTH_OIDC_CLIENT_SECRET"},
 	{key: "auth.oidc.clientUrl", env: "AUTH_OIDC_CLIENT_URL"},
 	{key: "auth.oidc.issuer", env: "AUTH_OIDC_ISSUER"},
 	{key: "auth.oidc.scopes", env: "AUTH_OIDC_SCOPES"},
 	{key: "auth.oidc.whitelist", env: "AUTH_OIDC_WHITELIST"},
+	// Builtin-specific OIDC fields (only used when auth.mode=builtin)
+	{key: "auth.oidc.enabled", env: "AUTH_OIDC_ENABLED"},
+	{key: "auth.oidc.autoSignup", env: "AUTH_OIDC_AUTO_SIGNUP"},
+	{key: "auth.oidc.defaultRole", env: "AUTH_OIDC_DEFAULT_ROLE"},
+	{key: "auth.oidc.allowedDomains", env: "AUTH_OIDC_ALLOWED_DOMAINS"},
+	{key: "auth.oidc.buttonLabel", env: "AUTH_OIDC_BUTTON_LABEL"},
+	// OIDC Role Mapping configuration (builtin-specific)
+	{key: "auth.oidc.roleMapping.groupsClaim", env: "AUTH_OIDC_GROUPS_CLAIM"},
+	{key: "auth.oidc.roleMapping.groupMappings", env: "AUTH_OIDC_GROUP_MAPPINGS"},
+	{key: "auth.oidc.roleMapping.roleAttributePath", env: "AUTH_OIDC_ROLE_ATTRIBUTE_PATH"},
+	{key: "auth.oidc.roleMapping.roleAttributeStrict", env: "AUTH_OIDC_ROLE_ATTRIBUTE_STRICT"},
+	{key: "auth.oidc.roleMapping.skipOrgRoleSync", env: "AUTH_OIDC_SKIP_ORG_ROLE_SYNC"},
 
 	// Authentication configurations (legacy keys)
 	{key: "auth.basic.username", env: "BASICAUTH_USERNAME"},

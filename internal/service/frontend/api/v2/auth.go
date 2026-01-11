@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cmp"
 	"context"
 	"errors"
 
@@ -112,13 +113,23 @@ func (a *API) ChangePassword(ctx context.Context, request api.ChangePasswordRequ
 // toAPIUser converts a core auth.User into its API representation.
 // The provided user must be non-nil.
 func toAPIUser(user *auth.User) api.User {
-	return api.User{
-		Id:        user.ID,
-		Username:  user.Username,
-		Role:      api.UserRole(user.Role),
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
+	// Default to "builtin" if auth provider is empty
+	authProvider := cmp.Or(user.AuthProvider, "builtin")
+
+	apiUser := api.User{
+		Id:           user.ID,
+		Username:     user.Username,
+		Role:         api.UserRole(user.Role),
+		CreatedAt:    user.CreatedAt,
+		UpdatedAt:    user.UpdatedAt,
+		AuthProvider: (*api.UserAuthProvider)(&authProvider),
 	}
+
+	if user.IsDisabled {
+		apiUser.IsDisabled = &user.IsDisabled
+	}
+
+	return apiUser
 }
 
 // preserving the input order.

@@ -1,11 +1,13 @@
 package auth
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -15,6 +17,8 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
+	authservice "github.com/dagu-org/dagu/internal/service/auth"
+	"github.com/dagu-org/dagu/internal/service/oidcprovision"
 	"golang.org/x/oauth2"
 )
 
@@ -44,52 +48,90 @@ var oidcProviderFactory = func(ctx context.Context, issuer string) (*oidc.Provid
 	return oidc.NewProvider(ctx, issuer)
 }
 
-func InitVerifierAndConfig(i config.AuthOIDC) (_ *OIDCConfig, err error) {
-	// Basic input validation to fail fast with clearer diagnostics.
-	if i.Issuer == "" {
+// oidcProviderParams holds the common parameters for OIDC provider initialization.
+type oidcProviderParams struct {
+	Issuer       string
+	ClientID     string
+	ClientSecret string
+	ClientURL    string
+	Scopes       []string
+}
+
+// oidcProviderResult holds the initialized OIDC components.
+type oidcProviderResult struct {
+	Provider     *oidc.Provider
+	Verifier     *oidc.IDTokenVerifier
+	OAuth2Config *oauth2.Config
+}
+
+// initOIDCProviderCore initializes the common OIDC provider components.
+func initOIDCProviderCore(params oidcProviderParams) (*oidcProviderResult, error) {
+	// Basic input validation
+	if params.Issuer == "" {
 		return nil, errors.New("failed to init OIDC provider: issuer is empty")
 	}
-	if i.ClientId == "" {
+	if params.ClientID == "" {
 		return nil, errors.New("failed to init OIDC provider: client id is empty")
 	}
-	if i.ClientUrl == "" {
+	if params.ClientURL == "" {
 		return nil, errors.New("failed to init OIDC provider: client url is empty")
 	}
-	// ClientSecret may be empty for public clients; don't enforce.
-
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("failed to init OIDC provider: %v", r)
-		}
-	}()
 
 	ctx := oidc.ClientContext(context.Background(), &http.Client{
 		Timeout: oidcProviderInitTimeout,
 	})
 
-	provider, err := oidcProviderFactory(ctx, i.Issuer)
+	provider, err := oidcProviderFactory(ctx, params.Issuer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init OIDC provider: %w", err)
 	}
 	if provider == nil {
 		return nil, errors.New("failed to init OIDC provider: provider is nil")
 	}
+
 	oidcConfig := &oidc.Config{
-		ClientID: i.ClientId,
+		ClientID: params.ClientID,
 	}
 	verifier := provider.Verifier(oidcConfig)
 	endpoint := provider.Endpoint()
-	config := &oauth2.Config{
+
+	oauth2Config := &oauth2.Config{
+		ClientID:     params.ClientID,
+		ClientSecret: params.ClientSecret,
+		Endpoint:     endpoint,
+		RedirectURL:  fmt.Sprintf("%s/oidc-callback", strings.TrimSuffix(params.ClientURL, "/")),
+		Scopes:       params.Scopes,
+	}
+
+	return &oidcProviderResult{
+		Provider:     provider,
+		Verifier:     verifier,
+		OAuth2Config: oauth2Config,
+	}, nil
+}
+
+func InitVerifierAndConfig(i config.AuthOIDC) (_ *OIDCConfig, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("failed to init OIDC provider: %v", r)
+		}
+	}()
+
+	result, err := initOIDCProviderCore(oidcProviderParams{
+		Issuer:       i.Issuer,
 		ClientID:     i.ClientId,
 		ClientSecret: i.ClientSecret,
-		Endpoint:     endpoint,
-		RedirectURL:  fmt.Sprintf("%s/oidc-callback", strings.TrimSuffix(i.ClientUrl, "/")),
+		ClientURL:    i.ClientUrl,
 		Scopes:       i.Scopes,
+	})
+	if err != nil {
+		return nil, err
 	}
+
 	return &OIDCConfig{
-		Provider: provider,
-		Verifier: verifier,
-		Config:   config,
+		Provider: result.Provider,
+		Verifier: result.Verifier,
+		Config:   result.OAuth2Config,
 	}, nil
 }
 
@@ -160,19 +202,9 @@ func callbackHandler(provider *oidc.Provider, verifier *oidc.IDTokenVerifier,
 			expireSeconds = defaultTokenExpirySecs
 		}
 		setCookie(w, r, cookieOIDCToken, rawIDToken, expireSeconds)
-		clearCookie(w, r, cookieState)
-		clearCookie(w, r, cookieNonce)
-		clearCookie(w, r, cookieOriginalURL)
+		clearOIDCStateCookies(w, r)
 		http.Redirect(w, r, originalURL.Value, http.StatusFound)
 	}
-}
-
-// oidcClaims represents the claims extracted from an OIDC ID token.
-type oidcClaims struct {
-	Subject           string `json:"sub"`
-	Email             string `json:"email"`
-	PreferredUsername string `json:"preferred_username"`
-	Name              string `json:"name"`
 }
 
 // verifyAndExtractUser verifies an ID token and extracts user information.
@@ -185,19 +217,13 @@ func verifyAndExtractUser(verifier *oidc.IDTokenVerifier, raw string) (*auth.Use
 		return nil, err
 	}
 
-	var claims oidcClaims
+	var claims oidcprovision.OIDCClaims
 	if err := token.Claims(&claims); err != nil {
 		return nil, err
 	}
 
-	// Determine username: prefer preferred_username, then email, then subject
-	username := claims.PreferredUsername
-	if username == "" {
-		username = claims.Email
-	}
-	if username == "" {
-		username = claims.Subject
-	}
+	// Determine username with fallback: preferred_username -> email -> subject
+	username := cmp.Or(claims.PreferredUsername, claims.Email, claims.Subject)
 
 	return &auth.User{
 		ID:       claims.Subject,
@@ -285,9 +311,213 @@ func clearCookie(w http.ResponseWriter, r *http.Request, name string) {
 	setCookie(w, r, name, "", -1)
 }
 
+// clearOIDCStateCookies removes all OIDC-related state cookies.
+func clearOIDCStateCookies(w http.ResponseWriter, r *http.Request) {
+	clearCookie(w, r, cookieState)
+	clearCookie(w, r, cookieNonce)
+	clearCookie(w, r, cookieOriginalURL)
+}
+
 func isSecureRequest(r *http.Request) bool {
 	if r.TLS != nil {
 		return true
 	}
 	return strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+}
+
+// BuiltinOIDCConfig holds configuration for OIDC under builtin auth mode.
+type BuiltinOIDCConfig struct {
+	Provider      *oidc.Provider
+	Verifier      *oidc.IDTokenVerifier
+	OAuth2Config  *oauth2.Config
+	Provision     *oidcprovision.Service
+	AuthService   *authservice.Service
+	LoginBasePath string // Base path for login page redirect
+}
+
+// InitBuiltinOIDCConfig initializes OIDC for builtin auth mode.
+func InitBuiltinOIDCConfig(cfg config.AuthOIDC, authSvc *authservice.Service, provisionSvc *oidcprovision.Service, basePath string) (*BuiltinOIDCConfig, error) {
+	result, err := initOIDCProviderCore(oidcProviderParams{
+		Issuer:       cfg.Issuer,
+		ClientID:     cfg.ClientId,
+		ClientSecret: cfg.ClientSecret,
+		ClientURL:    cfg.ClientUrl,
+		Scopes:       cfg.Scopes,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	loginBasePath := basePath
+	if loginBasePath == "" {
+		loginBasePath = "/"
+	}
+	if !strings.HasPrefix(loginBasePath, "/") {
+		loginBasePath = "/" + loginBasePath
+	}
+
+	return &BuiltinOIDCConfig{
+		Provider:      result.Provider,
+		Verifier:      result.Verifier,
+		OAuth2Config:  result.OAuth2Config,
+		Provision:     provisionSvc,
+		AuthService:   authSvc,
+		LoginBasePath: loginBasePath,
+	}, nil
+}
+
+// BuiltinOIDCLoginHandler returns a handler that initiates the OIDC login flow.
+func BuiltinOIDCLoginHandler(cfg *BuiltinOIDCConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		state := stringutil.RandomString(16)
+		nonce := stringutil.RandomString(16)
+
+		setCookie(w, r, cookieState, state, stateCookieExpiry)
+		setCookie(w, r, cookieNonce, nonce, stateCookieExpiry)
+		setCookie(w, r, cookieOriginalURL, cfg.LoginBasePath, stateCookieExpiry)
+
+		http.Redirect(w, r, cfg.OAuth2Config.AuthCodeURL(state, oidc.Nonce(nonce)), http.StatusFound)
+	}
+}
+
+// BuiltinOIDCCallbackHandler returns a handler that processes the OIDC callback.
+// It uses the provisioning service to create/lookup users and generates JWT tokens.
+func BuiltinOIDCCallbackHandler(cfg *BuiltinOIDCConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		// Verify state
+		stateCookie, err := r.Cookie(cookieState)
+		if err != nil {
+			redirectWithError(w, r, cfg.LoginBasePath, "Authentication failed: state not found")
+			return
+		}
+		if r.URL.Query().Get("state") != stateCookie.Value {
+			redirectWithError(w, r, cfg.LoginBasePath, "Authentication failed: state mismatch")
+			return
+		}
+
+		// Check for error from OIDC provider
+		if errParam := r.URL.Query().Get("error"); errParam != "" {
+			errDesc := r.URL.Query().Get("error_description")
+			if errDesc == "" {
+				errDesc = errParam
+			}
+			redirectWithError(w, r, cfg.LoginBasePath, "Authentication failed: "+errDesc)
+			return
+		}
+
+		// Exchange code for token
+		oauth2Token, err := cfg.OAuth2Config.Exchange(ctx, r.URL.Query().Get("code"))
+		if err != nil {
+			logger.Error(ctx, "OIDC token exchange failed", tag.Error(err))
+			redirectWithError(w, r, cfg.LoginBasePath, "Authentication failed: could not exchange token")
+			return
+		}
+
+		// Get raw ID token
+		rawIDToken, ok := oauth2Token.Extra("id_token").(string)
+		if !ok {
+			redirectWithError(w, r, cfg.LoginBasePath, "Authentication failed: no ID token")
+			return
+		}
+
+		// Verify ID token
+		idToken, err := cfg.Verifier.Verify(ctx, rawIDToken)
+		if err != nil {
+			logger.Error(ctx, "OIDC token verification failed", tag.Error(err))
+			redirectWithError(w, r, cfg.LoginBasePath, "Authentication failed: invalid token")
+			return
+		}
+
+		// Verify nonce
+		nonceCookie, err := r.Cookie(cookieNonce)
+		if err != nil {
+			redirectWithError(w, r, cfg.LoginBasePath, "Authentication failed: nonce not found")
+			return
+		}
+		if idToken.Nonce != nonceCookie.Value {
+			redirectWithError(w, r, cfg.LoginBasePath, "Authentication failed: nonce mismatch")
+			return
+		}
+
+		// Extract typed claims
+		var claims oidcprovision.OIDCClaims
+		if err := idToken.Claims(&claims); err != nil {
+			logger.Error(ctx, "Failed to extract OIDC claims", tag.Error(err))
+			redirectWithError(w, r, cfg.LoginBasePath, "Authentication failed: could not read user info")
+			return
+		}
+
+		// Extract raw claims for role mapping
+		var rawClaims map[string]any
+		if err := idToken.Claims(&rawClaims); err != nil {
+			logger.Error(ctx, "Failed to extract raw OIDC claims", tag.Error(err))
+			redirectWithError(w, r, cfg.LoginBasePath, "Authentication failed: could not read user info")
+			return
+		}
+		claims.RawClaims = rawClaims
+
+		// Get userinfo for email (may not be in ID token)
+		userInfo, err := cfg.Provider.UserInfo(ctx, oauth2.StaticTokenSource(oauth2Token))
+		if err != nil {
+			logger.Warn(ctx, "Failed to get userinfo, using ID token claims", tag.Error(err))
+			// Continue with ID token claims if userinfo fails
+		} else {
+			// Prefer userinfo email
+			if userInfo.Email != "" {
+				claims.Email = userInfo.Email
+			}
+			// Merge userinfo claims into raw claims for role mapping
+			var userInfoClaims map[string]any
+			if err := userInfo.Claims(&userInfoClaims); err == nil {
+				for k, v := range userInfoClaims {
+					if _, exists := claims.RawClaims[k]; !exists {
+						claims.RawClaims[k] = v
+					}
+				}
+			}
+		}
+
+		// Process login (create/lookup user)
+		user, isNewUser, err := cfg.Provision.ProcessLogin(ctx, claims)
+		if err != nil {
+			logger.Warn(ctx, "OIDC provisioning failed",
+				slog.String("email_domain", stringutil.ExtractEmailDomain(claims.Email)),
+				slog.String("subject", claims.Subject),
+				tag.Error(err))
+			redirectWithError(w, r, cfg.LoginBasePath, err.Error())
+			return
+		}
+
+		// Generate JWT token
+		tokenResult, err := cfg.AuthService.GenerateToken(user)
+		if err != nil {
+			logger.Error(ctx, "Failed to generate JWT token", tag.Error(err))
+			redirectWithError(w, r, cfg.LoginBasePath, "Authentication failed: could not create session")
+			return
+		}
+
+		// Clear OIDC cookies
+		clearOIDCStateCookies(w, r)
+
+		// Set JWT token cookie
+		expireSeconds := int(time.Until(tokenResult.ExpiresAt).Seconds())
+		setCookie(w, r, "token", tokenResult.Token, expireSeconds)
+
+		// Redirect to home with welcome flag for new users
+		redirectURL := cfg.LoginBasePath
+		if isNewUser {
+			redirectURL += "?welcome=true"
+		}
+		http.Redirect(w, r, redirectURL, http.StatusFound)
+	}
+}
+
+// redirectWithError redirects to the login page with an error message.
+func redirectWithError(w http.ResponseWriter, r *http.Request, basePath, errMsg string) {
+	clearOIDCStateCookies(w, r)
+
+	redirectURL := basePath + "/login?error=" + url.QueryEscape(errMsg)
+	http.Redirect(w, r, redirectURL, http.StatusFound)
 }

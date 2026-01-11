@@ -21,6 +21,17 @@ type User struct {
 	CreatedAt time.Time `json:"created_at"`
 	// UpdatedAt is the timestamp when the user was last modified.
 	UpdatedAt time.Time `json:"updated_at"`
+
+	// AuthProvider indicates how the user was created: "builtin" or "oidc".
+	// Empty string is treated as "builtin" for backward compatibility.
+	AuthProvider string `json:"auth_provider,omitempty"`
+	// OIDCIssuer is the OIDC provider issuer URL (set when AuthProvider is "oidc").
+	OIDCIssuer string `json:"oidc_issuer,omitempty"`
+	// OIDCSubject is the unique subject identifier from the OIDC provider.
+	OIDCSubject string `json:"oidc_subject,omitempty"`
+	// IsDisabled indicates if the user account is disabled.
+	// Disabled users cannot log in.
+	IsDisabled bool `json:"is_disabled,omitempty"`
 }
 
 // NewUser creates a User with a new UUID and sets CreatedAt and UpdatedAt to the current UTC time.
@@ -46,6 +57,10 @@ type UserForStorage struct {
 	Role         Role      `json:"role"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+	AuthProvider string    `json:"auth_provider,omitempty"`
+	OIDCIssuer   string    `json:"oidc_issuer,omitempty"`
+	OIDCSubject  string    `json:"oidc_subject,omitempty"`
+	IsDisabled   bool      `json:"is_disabled,omitempty"`
 }
 
 // ToStorage converts a User to UserForStorage for persistence.
@@ -57,6 +72,10 @@ func (u *User) ToStorage() *UserForStorage {
 		Role:         u.Role,
 		CreatedAt:    u.CreatedAt,
 		UpdatedAt:    u.UpdatedAt,
+		AuthProvider: u.AuthProvider,
+		OIDCIssuer:   u.OIDCIssuer,
+		OIDCSubject:  u.OIDCSubject,
+		IsDisabled:   u.IsDisabled,
 	}
 }
 
@@ -69,5 +88,14 @@ func (s *UserForStorage) ToUser() *User {
 		Role:         s.Role,
 		CreatedAt:    s.CreatedAt,
 		UpdatedAt:    s.UpdatedAt,
+		AuthProvider: s.AuthProvider,
+		OIDCIssuer:   s.OIDCIssuer,
+		OIDCSubject:  s.OIDCSubject,
+		IsDisabled:   s.IsDisabled,
 	}
+}
+
+// IsOIDCUser returns true if the user was created via OIDC auto-signup.
+func (u *User) IsOIDCUser() bool {
+	return u.AuthProvider == "oidc"
 }

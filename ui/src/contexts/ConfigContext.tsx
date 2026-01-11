@@ -26,6 +26,8 @@ export type Config = {
   maxDashboardPageLimit: number;
   remoteNodes: string;
   authMode: AuthMode;
+  oidcEnabled: boolean;
+  oidcButtonLabel: string;
   permissions: {
     writeDags: boolean;
     runDags: boolean;

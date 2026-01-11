@@ -314,6 +314,11 @@ Full documentation is available at [docs.dagu.cloud](https://docs.dagu.cloud/).
 | `DAGU_AUTH_OIDC_ISSUER` | - | OIDC issuer URL |
 | `DAGU_AUTH_OIDC_SCOPES` | - | OIDC scopes (comma-separated) |
 | `DAGU_AUTH_OIDC_WHITELIST` | - | OIDC email whitelist (comma-separated) |
+| `DAGU_AUTH_OIDC_ENABLED` | `false` | Enable OIDC under builtin auth |
+| `DAGU_AUTH_OIDC_AUTO_SIGNUP` | `false` | Auto-create users on first OIDC login |
+| `DAGU_AUTH_OIDC_DEFAULT_ROLE` | `viewer` | Role for auto-created users |
+| `DAGU_AUTH_OIDC_ALLOWED_DOMAINS` | - | Allowed email domains (comma-separated) |
+| `DAGU_AUTH_OIDC_BUTTON_LABEL` | `Login with SSO` | SSO login button text |
 
 ### Builtin Authentication (RBAC)
 
@@ -491,55 +496,6 @@ This section outlines the current capabilities of Dagu.
 |                             | Scheduled DAG management        | Enable/disable schedule for a DAG                                   | <a href="https://docs.dagu.cloud/overview/web-ui">Web UI</a> |
 |                             | UI organization                 | Logical DAG grouping                                               | <a href="https://docs.dagu.cloud/overview/web-ui#dag-organization">DAG Organization</a> |
 | Others                      | Windows support                 | Windows support                                                     | |
-
-## Roadmap
-
-This section outlines the planned features for Dagu.
-
-**Legend:**
-- Status: 🏗️ In Progress / 📋 Planned / 💭 Designing / ⛔ Blocked / 🏢 Enterprise
-- Priority: P0 = Must have / P1 = Should have / P2 = Could have
-
-| Category                    | Capability                      | Description                                                              | Status | Priority | Link |
-| --------------------------- | ------------------------------- | ------------------------------------------------------------------------ | ------ | -------- | ---- |
-| Definition & Templates      | Variables store                 | Env-scoped variables                                                    | 💭    | P1       | |
-|                             | Code-based SDK                  | Python / Go / TS SDK to build DAG programmatically                     | 💭    | P2       | <a href="https://github.com/dagu-org/dagu/issues/583">#583</a> |
-|                             | Go template support            | Use Go templates in DAG definitions                                     | 💭    | P2       | <a href="https://github.com/dagu-org/dagu/issues/738">#738</a> |
-| Control Structures          | Matrix runs                     | Create all parameter combinations                                        | 💭    | P1       | <a href="https://github.com/dagu-org/dagu/issues/879">#879</a>, <a href="https://github.com/dagu-org/dagu/issues/990">#990</a> |
-|                             | Human-in-the-loop               | Wait for human approval / input                                         | 💭    | P0       | <a href="https://github.com/dagu-org/dagu/issues/978">#978</a> |
-| Triggers & Scheduling       | Second-precision cron           | Per-DAG TZ, holiday calendar, exclusion windows                     | 💭    | P2       | <a href="https://github.com/dagu-org/dagu/issues/676">#676</a> |
-|                             | Sunset/Sunrise triggers         | Trigger DAG on sunrise/sunset events                                     | 💭    | P2       |<a href="https://github.com/dagu-org/dagu/issues/1004">#1004</a> |
-|                             | Catch up                        | Catch up on missed executions with safety caps                            | 💭    | P0       | <a href="https://github.com/dagu-org/dagu/issues/695">#695</a> |
-|                             | Overlap                         | Overlap policy (skip/queue/cancel)                                       | 📋    | P1       | |
-|                             | Queue Override                  | Override queue for specific runs                                 | 📋    | P0       | <a href="https://github.com/dagu-org/dagu/issues/1111">#1111</a> |
-|                             | Backfill                        | Historical range runs with safety caps                                   | 💭    | P2       | <a href="https://github.com/dagu-org/dagu/issues/695">#695</a> |
-|                             | File watcher trigger            | Trigger DAG on file changes in a directory                                | 💭    | P0       | <a href="https://github.com/dagu-org/dagu/issues/372">#372</a> |
-|                             | Holiday calendars               | Import & reference holiday calendars                                     | 💭    | P2       | <a href="https://github.com/dagu-org/dagu/issues/676">#676</a> |
-| Container Native Execution  | On-the-fly image build          | Builds image on-the-fly during DAG execution                             | 📋    | P0       | |
-|                             | Kubernetes native execution    | Run steps as Kubernetes jobs/pods                                   | 💭    | P0       | <a href="https://github.com/dagu-org/dagu/issues/837">#837</a> |
-| Resource Management         | Resource limits                 | CPU/Memory/IO requests & limits per-step                                 | 💭    | P0       | |
-|                             | Rate limiting                   | Token bucket per key/endpoint for external APIs                          | 💭    | P1       | |
-|                             | Distributed locks               | Keyed semaphore for exclusivity                                          | 💭    | P0       |  |
-| Data & Artifacts            | JSON Schema validation          | Parameter validation with JSON Schema                                    |  💭    | P0       | <a href="https://github.com/dagu-org/dagu/issues/325">#325</a> |
-|                             | External storage                | Stream large logs/artifacts to S3/GCS/Azure                              | 💭    | P2       | <a href="https://github.com/dagu-org/dagu/issues/640">#640</a>, <a href="https://github.com/dagu-org/dagu/issues/548">#548</a>, <a href="https://github.com/dagu-org/dagu/issues/267">#267</a> |
-|                             | Inter DAG-run state management  | Manage state and data sharing between DAG-runs                          | 💭    | P0       | |
-|                             | Database backend support       | Support for external databases (PostgreSQL, MySQL) instead of filesystem | 💭    | P1       | <a href="https://github.com/dagu-org/dagu/issues/539">#539</a>, <a href="https://github.com/dagu-org/dagu/issues/267">#267</a> |
-| Observability               | Resource usage monitoring      | CPU/Memory/IO usage per DAG/step with live graphs                        | 💭    | P0       | <a href="https://github.com/dagu-org/dagu/issues/546">#546</a> |
-| Security & Governance       | Fine-grained permissions        | DAG-level and resource-level permissions                                | 🏢    |          | |
-|                             | Resource quotas                 | CPU time and memory limit                                                | 📋    | P0       | |
-|                             | Audit trail                     | Immutable events for all manual actions                                  | 🏢    |          | |
-|                             | Audit logging                   | Immutable who/what/when records (WORM)                                   | 🏢    |          | |
-| Executor types              | `database`                      | Direct database read/write operations                                   | 💭    | P2       | <a href="https://github.com/dagu-org/dagu/issues/789">#789</a> |
-|                             | `ftp`                           | File transfer protocol support                                          | 💭    | P2       | <a href="https://github.com/dagu-org/dagu/issues/1079">#1079</a> |
-|                             | Custom plugin system            | Custom executor types                                                    | 💭    | P1       | <a href="https://github.com/dagu-org/dagu/issues/583">#583</a> |
-| DevX & Testing              | Debug mode                      | debug mode for step-by-step DAG execution                                | 💭    | P1       | <a href="https://github.com/dagu-org/dagu/issues/1119">#1119</a> |
-|                             | Static analysis                 | DAG Validation tool                                                      | 💭    | P0       | <a href="https://github.com/dagu-org/dagu/issues/325">#325</a> |
-|                             | Migration helpers               | Provide migration helpers from cron-only DAGs to full scheduler          | 💭    | P1       | <a href="https://github.com/dagu-org/dagu/issues/448">#448</a> |
-| UI & Operations             | Pause / resume operations       | Pause / resume DAG executions                                       | 💭    | P0       | |
-|                             | Run single step                 | Run a single step in a DAG                                          |   💭      | P0         | <a href="https://github.com/dagu-org/dagu/issues/1047">#1047</a> |
-|                             | Edit & retry                    | Edit DAG definition before retrying a run                            | 💭      | P0         |<a href="https://github.com/dagu-org/dagu/issues/326">#326</a>, <a href="https://github.com/dagu-org/dagu/issues/1058">#1058</a> |
-|                             | Version control                 | Diff/compare/rollback DAG definitions                               | 💭    | P2       | <a href="https://github.com/dagu-org/dagu/issues/320">#320</a>, <a href="https://github.com/dagu-org/dagu/issues/374">#374</a> |
-| Others                      | Snap packaging                  | Snap packaging                                                      | 📋    | P1       | <a href="https://github.com/dagu-org/dagu/issues/821">#821</a>, <a href="https://github.com/dagu-org/dagu/issues/871">#871</a> |
 
 ## Discussion
 

@@ -385,6 +385,16 @@ func parseSpaceSeparated(s string) []string {
 	return strings.Fields(s)
 }
 
+// ExtractEmailDomain extracts the domain part from an email address.
+// Returns an empty string if the email format is invalid.
+func ExtractEmailDomain(email string) string {
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 {
+		return ""
+	}
+	return parts[1]
+}
+
 // RandomString generates a random string of length n using letters from letterBytes.
 func RandomString(n int) string {
 	b := make([]byte, n)

@@ -31,6 +31,7 @@ var (
 	ErrInvalidWebhookToken  = errors.New("invalid webhook token")
 	ErrWebhookNotConfigured = errors.New("webhook management is not configured")
 	ErrWebhookDisabled      = errors.New("webhook is disabled")
+	ErrUserDisabled         = errors.New("your account has been disabled, contact administrator")
 )
 
 const (
@@ -140,6 +141,11 @@ func (s *Service) Authenticate(ctx context.Context, username, password string) (
 		return nil, ErrInvalidCredentials
 	}
 
+	// Check if user is disabled
+	if user.IsDisabled {
+		return nil, ErrUserDisabled
+	}
+
 	return user, nil
 }
 
@@ -223,6 +229,11 @@ func (s *Service) GetUserFromToken(ctx context.Context, tokenString string) (*au
 			return nil, ErrInvalidToken
 		}
 		return nil, fmt.Errorf("failed to get user from token: %w", err)
+	}
+
+	// Check if user is disabled
+	if user.IsDisabled {
+		return nil, ErrUserDisabled
 	}
 
 	return user, nil

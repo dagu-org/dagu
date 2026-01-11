@@ -33,6 +33,7 @@ import (
 	apiv2 "github.com/dagu-org/dagu/internal/service/frontend/api/v2"
 	"github.com/dagu-org/dagu/internal/service/frontend/auth"
 	"github.com/dagu-org/dagu/internal/service/frontend/metrics"
+	"github.com/dagu-org/dagu/internal/service/oidcprovision"
 	"github.com/dagu-org/dagu/internal/service/resource"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -43,11 +44,12 @@ import (
 
 // Server represents the HTTP server for the frontend application
 type Server struct {
-	apiV1       *apiv1.API
-	apiV2       *apiv2.API
-	config      *config.Config
-	httpServer  *http.Server
-	funcsConfig funcsConfig
+	apiV1          *apiv1.API
+	apiV2          *apiv2.API
+	config         *config.Config
+	httpServer     *http.Server
+	funcsConfig    funcsConfig
+	builtinOIDCCfg *auth.BuiltinOIDCConfig // OIDC config for builtin auth mode
 }
 
 // NewServer constructs a Server configured from cfg and the provided stores, managers, and services.
@@ -68,21 +70,71 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 	// Build API options
 	var apiOpts []apiv2.APIOption
 
+	// OIDC config for builtin mode
+	var builtinOIDCCfg *auth.BuiltinOIDCConfig
+	var oidcEnabled bool
+	var oidcButtonLabel string
+
 	// Initialize auth service if builtin mode is enabled
 	if cfg.Server.Auth.Mode == config.AuthModeBuiltin {
-		authSvc, err := initBuiltinAuthService(cfg, collector)
+		result, err := initBuiltinAuthService(cfg, collector)
 		if err != nil {
 			// Fail fast: if auth is configured but fails to initialize, return error
 			// to prevent server from running without expected authentication
 			return nil, fmt.Errorf("failed to initialize builtin auth service: %w", err)
 		}
-		apiOpts = append(apiOpts, apiv2.WithAuthService(authSvc))
+		apiOpts = append(apiOpts, apiv2.WithAuthService(result.AuthService))
+
+		// Initialize OIDC if enabled under builtin mode
+		oidcCfg := cfg.Server.Auth.OIDC
+		if oidcCfg.Enabled {
+			oidcEnabled = true
+			oidcButtonLabel = oidcCfg.ButtonLabel
+
+			// Create OIDC provisioning service
+			provisionCfg := oidcprovision.Config{
+				Issuer:         oidcCfg.Issuer,
+				AutoSignup:     oidcCfg.AutoSignup,
+				DefaultRole:    authmodel.Role(oidcCfg.DefaultRole),
+				AllowedDomains: oidcCfg.AllowedDomains,
+				Whitelist:      oidcCfg.Whitelist,
+				RoleMapping: oidcprovision.RoleMapperConfig{
+					GroupsClaim:         oidcCfg.RoleMapping.GroupsClaim,
+					GroupMappings:       oidcCfg.RoleMapping.GroupMappings,
+					RoleAttributePath:   oidcCfg.RoleMapping.RoleAttributePath,
+					RoleAttributeStrict: oidcCfg.RoleMapping.RoleAttributeStrict,
+					SkipOrgRoleSync:     oidcCfg.RoleMapping.SkipOrgRoleSync,
+					DefaultRole:         authmodel.Role(oidcCfg.DefaultRole),
+				},
+			}
+			provisionSvc, err := oidcprovision.New(result.UserStore, provisionCfg)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create OIDC provisioning service: %w", err)
+			}
+
+			// Initialize OIDC provider
+			builtinOIDCCfg, err = auth.InitBuiltinOIDCConfig(
+				oidcCfg,
+				result.AuthService,
+				provisionSvc,
+				cfg.Server.BasePath,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to initialize builtin OIDC: %w", err)
+			}
+
+			logger.Info(context.Background(), "OIDC enabled for builtin auth mode",
+				slog.String("issuer", oidcCfg.Issuer),
+				slog.Bool("autoSignup", oidcCfg.AutoSignup),
+				slog.String("defaultRole", oidcCfg.DefaultRole))
+		}
 	}
 
 	return &Server{
-		apiV1:  apiv1.New(dr, drs, drm, cfg),
-		apiV2:  apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, apiOpts...),
-		config: cfg,
+		apiV1:          apiv1.New(dr, drs, drm, cfg),
+		apiV2:          apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, apiOpts...),
+		config:         cfg,
+		builtinOIDCCfg: builtinOIDCCfg,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,
 			NavbarTitle:           cfg.UI.NavbarTitle,
@@ -95,15 +147,23 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 			Permissions:           cfg.Server.Permissions,
 			Paths:                 cfg.Paths,
 			AuthMode:              cfg.Server.Auth.Mode,
+			OIDCEnabled:           oidcEnabled,
+			OIDCButtonLabel:       oidcButtonLabel,
 		},
 	}, nil
+}
+
+// builtinAuthResult holds the result of initializing builtin auth.
+type builtinAuthResult struct {
+	AuthService *authservice.Service
+	UserStore   authmodel.UserStore
 }
 
 // initBuiltinAuthService creates a file-based user store, constructs the builtin
 // authentication service, and ensures a default admin user exists.
 // If the admin password is auto-generated, the password is printed to stdout.
-// It returns the initialized auth service or an error if any step fails.
-func initBuiltinAuthService(cfg *config.Config, collector *telemetry.Collector) (*authservice.Service, error) {
+// It returns the initialized auth service and user store, or an error if any step fails.
+func initBuiltinAuthService(cfg *config.Config, collector *telemetry.Collector) (*builtinAuthResult, error) {
 	ctx := context.Background()
 
 	// Validate token secret is configured
@@ -178,7 +238,10 @@ func initBuiltinAuthService(cfg *config.Config, collector *telemetry.Collector) 
 		}
 	}
 
-	return authSvc, nil
+	return &builtinAuthResult{
+		AuthService: authSvc,
+		UserStore:   userStore,
+	}, nil
 }
 
 // Serve starts the HTTP server and configures routes
@@ -307,12 +370,12 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 	// Serve UI pages
 	indexHandler := srv.useTemplate(ctx, "index.gohtml", "index")
 
-	// Initialize OIDC if enabled
+	// Initialize OIDC if enabled (legacy mode: oidc)
 	authConfig := srv.config.Server.Auth
 	authOIDC := authConfig.OIDC
 
 	var oidcAuthOptions *auth.Options
-	if authConfig.OIDC.ClientId != "" && authConfig.OIDC.ClientSecret != "" && authOIDC.Issuer != "" {
+	if authConfig.Mode == config.AuthModeOIDC && authConfig.OIDC.ClientId != "" && authConfig.OIDC.ClientSecret != "" && authOIDC.Issuer != "" {
 		oidcCfg, err := auth.InitVerifierAndConfig(authOIDC)
 		if err != nil {
 			return fmt.Errorf("failed to initialize OIDC: %w", err)
@@ -324,6 +387,12 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 			OIDCVerify:      oidcCfg.Verifier,
 			OIDCConfig:      oidcCfg.Config,
 		}
+	}
+
+	// Add OIDC routes for builtin auth mode (if configured)
+	if srv.builtinOIDCCfg != nil {
+		r.Get("/oidc-login", auth.BuiltinOIDCLoginHandler(srv.builtinOIDCCfg))
+		r.Get("/oidc-callback", auth.BuiltinOIDCCallbackHandler(srv.builtinOIDCCfg))
 	}
 
 	r.Route("/", func(r chi.Router) {
