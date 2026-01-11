@@ -619,6 +619,10 @@ func waitForDAGCompletionWithProgress(ctx *Context, d *core.DAG, dagRunID string
 					logger.Info(ctx, "DAG completed successfully", tag.RunID(dagRunID))
 					return nil
 				}
+				// Include error details from response if available
+				if resp.Error != "" {
+					return fmt.Errorf("DAG run failed with status %s: %s", status, resp.Error)
+				}
 				return fmt.Errorf("DAG run failed with status: %s", status)
 			}
 		}

@@ -70,13 +70,14 @@ func startAndCleanupWorker(t *testing.T, coord *test.Coordinator, workerInst *wo
 	return workerInst
 }
 
-// setupWorkers creates and starts multiple workers with the given labels.
-// All workers are automatically stopped when the test completes.
-func setupWorkers(t *testing.T, coord *test.Coordinator, count int, labels map[string]string) []*worker.Worker {
+// setupRemoteWorkers creates and starts multiple workers with remoteTaskHandler.
+// This is the correct choice for shared-nothing mode tests where workers need to
+// push status and stream logs to the coordinator.
+func setupRemoteWorkers(t *testing.T, coord *test.Coordinator, count int, labels map[string]string) []*worker.Worker {
 	t.Helper()
 	workers := make([]*worker.Worker, count)
 	for i := range count {
-		workers[i] = setupWorker(t, coord, fmt.Sprintf("test-worker-%d", i+1), 10, labels)
+		workers[i] = setupRemoteWorker(t, coord, fmt.Sprintf("test-worker-%d", i+1), 10, labels)
 	}
 	return workers
 }

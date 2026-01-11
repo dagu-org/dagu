@@ -354,7 +354,7 @@ func (a *API) GetDAGRunLog(ctx context.Context, request api.GetDAGRunLogRequestO
 	// Use the new log utility function
 	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(dagStatus.Log, options)
 	if err != nil {
-		if strings.Contains(err.Error(), "file not found") {
+		if errors.Is(err, os.ErrNotExist) {
 			return api.GetDAGRunLog404JSONResponse{
 				Code:    api.ErrorCodeNotFound,
 				Message: fmt.Sprintf("log file not found for dag-run %s", dagRunId),
@@ -1126,6 +1126,13 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 			}
 		}
 		// Send cancel request via coordinator
+		if a.coordinatorCli == nil {
+			return nil, &Error{
+				HTTPStatus: http.StatusServiceUnavailable,
+				Code:       api.ErrorCodeInternalError,
+				Message:    "coordinator not configured for distributed DAG cancellation",
+			}
+		}
 		if err := a.coordinatorCli.RequestCancel(ctx, request.Name, request.DagRunId, nil); err != nil {
 			return nil, fmt.Errorf("error requesting cancel: %w", err)
 		}

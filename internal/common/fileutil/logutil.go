@@ -181,7 +181,7 @@ func getEncodingDecoder(charset string) *encoding.Decoder {
 func ReadLogLines(filePath string, options LogReadOptions) (*LogResult, error) {
 	// Check if file exists
 	if !FileExists(filePath) {
-		return nil, fmt.Errorf("file not found: %s", filePath)
+		return nil, fmt.Errorf("file not found: %s: %w", filePath, os.ErrNotExist)
 	}
 
 	// Get file info for size

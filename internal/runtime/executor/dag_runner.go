@@ -532,7 +532,8 @@ func (e *SubDAGExecutor) Kill(sig os.Signal) error {
 	defer e.mu.Unlock()
 
 	var errs []error
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	// Cancel distributed runs
 	for runID := range e.distributedRuns {

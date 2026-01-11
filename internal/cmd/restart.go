@@ -135,6 +135,9 @@ func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRu
 		if coordinatorCli == nil {
 			return fmt.Errorf("workerSelector requires a coordinator to be configured")
 		}
+		// Add context tagging for observability parity with local path
+		ctx.Context = logger.WithValues(ctx.Context, tag.DAG(dag.Name), tag.RunID(dagRunID))
+		logger.Info(ctx, "Dag-run restart initiated (distributed)")
 		return dispatchToCoordinatorAndWait(ctx, dag, dagRunID, coordinatorCli)
 	}
 

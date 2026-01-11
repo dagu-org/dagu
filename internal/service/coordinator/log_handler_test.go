@@ -30,6 +30,11 @@ func TestStreamTypeToExtension(t *testing.T) {
 			expected:   "stderr.log",
 		},
 		{
+			name:       "SCHEDULER",
+			streamType: coordinatorv1.LogStreamType_LOG_STREAM_TYPE_SCHEDULER,
+			expected:   "scheduler.log",
+		},
+		{
 			name:       "UNSPECIFIED",
 			streamType: coordinatorv1.LogStreamType_LOG_STREAM_TYPE_UNSPECIFIED,
 			expected:   "log",

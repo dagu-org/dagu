@@ -178,47 +178,54 @@ func (p *RemoteProgressDisplay) printHeader() {
 	}
 }
 
+// completedAndPercent returns capped completed count and percentage.
+// Must be called with mu held.
+func (p *RemoteProgressDisplay) completedAndPercent() (completed, percent int) {
+	completed = p.completed
+	if completed > p.total {
+		completed = p.total
+	}
+	if p.total > 0 {
+		percent = (completed * 100) / p.total
+	}
+	return completed, percent
+}
+
 // render must be called with mu held.
 func (p *RemoteProgressDisplay) render() {
 	if !p.isTTY {
-		return // No inline updates for non-TTY
+		return
 	}
 
 	spinner := stringutil.SpinnerFrames[p.spinnerIndex%len(stringutil.SpinnerFrames)]
 	p.spinnerIndex++
 
-	percent := 0
-	if p.total > 0 {
-		percent = (p.completed * 100) / p.total
-	}
-
+	completed, percent := p.completedAndPercent()
 	elapsed := stringutil.FormatDuration(time.Since(p.startTime))
 
 	// Use \r to overwrite the line, pad with spaces to clear previous content
-	fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps) %s   ", spinner, percent, p.completed, p.total, p.gray(elapsed))
+	fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps) %s   ", spinner, percent, completed, p.total, p.gray(elapsed))
 }
 
 func (p *RemoteProgressDisplay) printFinal(status *execution.DAGRunStatus) {
-	if !p.isTTY {
-		return
-	}
-
 	p.mu.Lock()
-	percent := 0
-	if p.total > 0 {
-		percent = (p.completed * 100) / p.total
-	}
+	completed, percent := p.completedAndPercent()
 	p.mu.Unlock()
 
 	icon := "✓"
+	statusText := "completed"
 	if status != nil && (status.Status == core.Failed || status.Status == core.Aborted) {
 		icon = "✗"
+		statusText = output.StatusText(status.Status)
 	}
 
 	elapsed := stringutil.FormatDuration(time.Since(p.startTime))
 
-	// Clear line and print final status
-	fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps) %s   \n", icon, percent, p.completed, p.total, p.gray(elapsed))
+	if p.isTTY {
+		fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps) %s   \n", icon, percent, completed, p.total, p.gray(elapsed))
+	} else {
+		fmt.Fprintf(os.Stderr, "Finished: %s (%d/%d steps) [%s]\n", statusText, completed, p.total, elapsed)
+	}
 }
 
 // gray returns text in gray color if color is enabled.

@@ -70,6 +70,11 @@ type Server struct {
 // The context is used for OIDC provider initialization and should be cancellable
 // to allow graceful shutdown during startup.
 func NewServer(ctx context.Context, cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunStore, qs execution.QueueStore, ps execution.ProcStore, drm runtime.Manager, cc coordinator.Client, sr execution.ServiceRegistry, mr *prometheus.Registry, collector *telemetry.Collector, rs *resource.Service) (*Server, error) {
+	// Defensive nil-context guard to prevent surprising crashes from older call sites
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	var remoteNodes []string
 	for _, n := range cfg.Server.RemoteNodes {
 		remoteNodes = append(remoteNodes, n.Name)
@@ -143,7 +148,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr execution.DAGStore, d
 				return nil, fmt.Errorf("failed to initialize builtin OIDC: %w", err)
 			}
 
-			logger.Info(context.Background(), "OIDC enabled for builtin auth mode",
+			logger.Info(ctx, "OIDC enabled for builtin auth mode",
 				slog.String("issuer", oidcCfg.Issuer),
 				slog.Bool("autoSignup", oidcCfg.AutoSignup),
 				slog.String("defaultRole", oidcCfg.RoleMapping.DefaultRole))

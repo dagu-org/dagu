@@ -441,6 +441,20 @@ func (store *Store) CreateSubAttempt(ctx context.Context, rootRef execution.DAGR
 	}
 
 	root := NewDataRoot(store.baseDir, rootRef.Name)
+
+	// Acquire lock to prevent concurrent creation conflicts
+	lockCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	if err := root.Lock(lockCtx); err != nil {
+		return nil, fmt.Errorf("failed to acquire lock for sub dag-run %s: %w", subDAGRunID, err)
+	}
+	defer func() {
+		if err := root.Unlock(); err != nil {
+			logger.Error(ctx, "Failed to unlock sub dag-run", tag.RunID(subDAGRunID), tag.Error(err))
+		}
+	}()
+
 	dagRun, err := root.FindByDAGRunID(ctx, rootRef.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find root dag-run: %w", err)

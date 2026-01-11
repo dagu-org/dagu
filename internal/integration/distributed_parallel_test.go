@@ -37,11 +37,11 @@ steps:
     command: echo "Processing $1 on worker"
     output: RESULT
 `
-		// Setup and start coordinator
-		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
+		// Setup and start coordinator with status and log persistence for shared-nothing mode
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence(), test.WithLogPersistence())
 
-		// Create and start multiple workers to handle parallel execution
-		setupWorkers(t, coord, 2, map[string]string{"type": "test-worker"})
+		// Create and start multiple workers with remoteTaskHandler for shared-nothing mode
+		setupRemoteWorkers(t, coord, 2, map[string]string{"type": "test-worker"})
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -115,11 +115,11 @@ steps:
       echo "Processing region: $1"
     output: RESULT
 `
-		// Setup and start coordinator
-		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
+		// Setup and start coordinator with status and log persistence for shared-nothing mode
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence(), test.WithLogPersistence())
 
-		// Create multiple workers of the same type
-		setupWorkers(t, coord, 3, map[string]string{"type": "test-worker"})
+		// Create multiple workers with remoteTaskHandler for shared-nothing mode
+		setupRemoteWorkers(t, coord, 3, map[string]string{"type": "test-worker"})
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -175,9 +175,9 @@ steps:
       fi
       echo "Processed $1"
 `
-		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence(), test.WithLogPersistence())
 
-		setupWorker(t, coord, "test-worker-failure", 10, map[string]string{"type": "test-worker"})
+		setupRemoteWorker(t, coord, "test-worker-failure", 10, map[string]string{"type": "test-worker"})
 
 		dagWrapper := coord.DAG(t, yamlContent)
 		agent := dagWrapper.Agent()
@@ -256,15 +256,15 @@ steps:
   - name: sleep
     command: sleep $1
 `
-		// Setup and start coordinator
+		// Setup and start coordinator with status and log persistence for shared-nothing mode
 		tmpDir := t.TempDir()
-		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir), test.WithStatusPersistence())
+		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir), test.WithStatusPersistence(), test.WithLogPersistence())
 
 		// Get dispatcher client from coordinator
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
-		// Create and start multiple workers to handle parallel execution
-		setupWorkers(t, coord, 2, map[string]string{"type": "test-worker"})
+		// Create and start multiple workers with remoteTaskHandler for shared-nothing mode
+		setupRemoteWorkers(t, coord, 2, map[string]string{"type": "test-worker"})
 
 		// Load the DAG using helper
 		dag := coord.DAG(t, yamlContent)
@@ -379,12 +379,12 @@ steps:
   - name: sleep
     command: sleep $1
 `
-		// Setup and start coordinator
+		// Setup and start coordinator with status and log persistence for shared-nothing mode
 		tmpDir := t.TempDir()
-		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir), test.WithStatusPersistence())
+		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir), test.WithStatusPersistence(), test.WithLogPersistence())
 
-		// Create worker for distributed execution
-		setupWorker(t, coord, "test-worker-1", 10, map[string]string{"type": "test-worker"})
+		// Create worker with remoteTaskHandler for shared-nothing mode
+		setupRemoteWorker(t, coord, "test-worker-1", 10, map[string]string{"type": "test-worker"})
 
 		// Load the DAG and create agent
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -463,12 +463,12 @@ steps:
       sleep 0.3
       echo "Completed task $1"
 `
-		// Setup and start coordinator
+		// Setup and start coordinator with status and log persistence for shared-nothing mode
 		tmpDir := t.TempDir()
-		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir), test.WithStatusPersistence())
+		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir), test.WithStatusPersistence(), test.WithLogPersistence())
 
-		// Create multiple workers using the helper
-		setupWorkers(t, coord, 3, map[string]string{"type": "test-worker"})
+		// Create multiple workers with remoteTaskHandler for shared-nothing mode
+		setupRemoteWorkers(t, coord, 3, map[string]string{"type": "test-worker"})
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)

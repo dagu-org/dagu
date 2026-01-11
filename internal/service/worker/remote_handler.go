@@ -218,6 +218,11 @@ func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Tas
 		loadOpts = append(loadOpts, spec.WithName(task.Target))
 	}
 
+	// Pass task params to the DAG (e.g., from parallel execution items)
+	if task.Params != "" {
+		loadOpts = append(loadOpts, spec.WithParams(task.Params))
+	}
+
 	// Load the DAG
 	dag, err := spec.Load(ctx, target, loadOpts...)
 	if err != nil {

@@ -113,6 +113,10 @@ func (s *LogStreamer) StreamSchedulerLog(ctx context.Context, logFilePath string
 	if err != nil {
 		return fmt.Errorf("failed to create log stream: %w", err)
 	}
+	// Ensure stream is closed on all paths to prevent resource leaks
+	defer func() {
+		_, _ = stream.CloseAndRecv()
+	}()
 
 	// Split into chunks if necessary (scheduler logs can be large)
 	var sequence uint64 = 0
@@ -163,9 +167,7 @@ func (s *LogStreamer) StreamSchedulerLog(ctx context.Context, logFilePath string
 		return fmt.Errorf("failed to send final marker: %w", err)
 	}
 
-	// Close and get response
-	_, err = stream.CloseAndRecv()
-	return err
+	return nil
 }
 
 // stepLogWriter implements io.WriteCloser for streaming logs

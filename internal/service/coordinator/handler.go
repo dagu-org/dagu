@@ -185,7 +185,12 @@ func (h *Handler) Dispatch(ctx context.Context, req *coordinatorv1.DispatchReque
 		return nil, status.Error(codes.InvalidArgument, "task is required")
 	}
 
-	// Create attempt before dispatching to ensure coordinator has a place to store status updates
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	// Create attempt before dispatching to ensure coordinator has a place to store status updates.
+	// This is done after acquiring the lock to prevent race conditions where multiple concurrent
+	// Dispatch() calls could create duplicate attempts for the same DagRunId.
 	isRootRun := req.Task.ParentDagRunId == "" &&
 		(req.Task.RootDagRunId == "" || req.Task.RootDagRunId == req.Task.DagRunId)
 
@@ -204,9 +209,6 @@ func (h *Handler) Dispatch(ctx context.Context, req *coordinatorv1.DispatchReque
 			}
 		}
 	}
-
-	h.mu.Lock()
-	defer h.mu.Unlock()
 
 	// Try to find a waiting poller that matches the worker selector
 	for pollerID, worker := range h.waitingPollers {
@@ -512,26 +514,31 @@ func (h *Handler) transformLogPaths(status *execution.DAGRunStatus) {
 	}
 
 	// Transform node log paths
-	transformNode := func(node *execution.Node) {
+	transformNode := func(node *execution.Node, fallbackName string) {
 		if node == nil {
 			return
 		}
-		node.Stdout = computePath(node.Step.Name, coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDOUT)
-		node.Stderr = computePath(node.Step.Name, coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDERR)
+		// Use step name, or fallback for handler nodes with empty names
+		stepName := node.Step.Name
+		if stepName == "" {
+			stepName = fallbackName
+		}
+		node.Stdout = computePath(stepName, coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDOUT)
+		node.Stderr = computePath(stepName, coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDERR)
 	}
 
 	// Transform all regular nodes
 	for _, node := range status.Nodes {
-		transformNode(node)
+		transformNode(node, "step")
 	}
 
-	// Transform handler nodes
-	transformNode(status.OnInit)
-	transformNode(status.OnExit)
-	transformNode(status.OnSuccess)
-	transformNode(status.OnFailure)
-	transformNode(status.OnCancel)
-	transformNode(status.OnWait)
+	// Transform handler nodes with explicit fallback names
+	transformNode(status.OnInit, "on_init")
+	transformNode(status.OnExit, "on_exit")
+	transformNode(status.OnSuccess, "on_success")
+	transformNode(status.OnFailure, "on_failure")
+	transformNode(status.OnCancel, "on_cancel")
+	transformNode(status.OnWait, "on_wait")
 
 	// Transform scheduler log path
 	status.Log = filepath.Join(
@@ -639,22 +646,35 @@ func (h *Handler) GetDAGRunStatus(ctx context.Context, req *coordinatorv1.GetDAG
 	var attempt execution.DAGRunAttempt
 	var err error
 
-	// Check if this is a sub-DAG query (root info provided)
-	if req.RootDagRunName != "" && req.RootDagRunId != "" {
-		// Look up as a sub-DAG
-		rootRef := execution.DAGRunRef{Name: req.RootDagRunName, ID: req.RootDagRunId}
-		attempt, err = h.dagRunStore.FindSubAttempt(ctx, rootRef, req.DagRunId)
-	} else {
-		// Look up as a top-level DAG run
-		ref := execution.DAGRunRef{Name: req.DagName, ID: req.DagRunId}
-		attempt, err = h.dagRunStore.FindAttempt(ctx, ref)
-	}
+	// First check the cache for open attempts. This is critical for shared-nothing mode
+	// where ReportStatus writes to a cached attempt object. The write is buffered, so
+	// we need to read from the same cached attempt to see the latest status.
+	// The cached attempt's ReadStatus method will flush the buffer before reading.
+	h.attemptsMu.RLock()
+	cachedAttempt, found := h.openAttempts[req.DagRunId]
+	h.attemptsMu.RUnlock()
 
-	if err != nil {
-		// Not found is not an error, just return found=false
-		return &coordinatorv1.GetDAGRunStatusResponse{
-			Found: false,
-		}, nil
+	if found {
+		attempt = cachedAttempt
+	} else {
+		// Fall back to finding the attempt on disk
+		// Check if this is a sub-DAG query (root info provided)
+		if req.RootDagRunName != "" && req.RootDagRunId != "" {
+			// Look up as a sub-DAG
+			rootRef := execution.DAGRunRef{Name: req.RootDagRunName, ID: req.RootDagRunId}
+			attempt, err = h.dagRunStore.FindSubAttempt(ctx, rootRef, req.DagRunId)
+		} else {
+			// Look up as a top-level DAG run
+			ref := execution.DAGRunRef{Name: req.DagName, ID: req.DagRunId}
+			attempt, err = h.dagRunStore.FindAttempt(ctx, ref)
+		}
+
+		if err != nil {
+			// Not found is not an error, just return found=false
+			return &coordinatorv1.GetDAGRunStatusResponse{
+				Found: false,
+			}, nil
+		}
 	}
 
 	runStatus, err := attempt.ReadStatus(ctx)
@@ -853,6 +873,12 @@ func (h *Handler) markRunFailed(ctx context.Context, dagName, dagRunID, reason s
 func (h *Handler) RequestCancel(ctx context.Context, req *coordinatorv1.RequestCancelRequest) (*coordinatorv1.RequestCancelResponse, error) {
 	if h.dagRunStore == nil {
 		return nil, status.Error(codes.FailedPrecondition, "cancellation not available: DAG run storage not configured")
+	}
+	if req.DagName == "" {
+		return nil, status.Error(codes.InvalidArgument, "dag_name is required")
+	}
+	if req.DagRunId == "" {
+		return nil, status.Error(codes.InvalidArgument, "dag_run_id is required")
 	}
 
 	ctx = logger.WithValues(ctx,

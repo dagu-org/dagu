@@ -79,7 +79,10 @@ func runWorker(ctx *Context, _ []string) error {
 	workerID := ctx.Config.Worker.ID
 	// Default to hostname@PID if not configured
 	if workerID == "" {
-		hostname, _ := os.Hostname()
+		hostname, err := os.Hostname()
+		if err != nil || hostname == "" {
+			hostname = "unknown"
+		}
 		workerID = fmt.Sprintf("%s@%d", hostname, os.Getpid())
 	}
 

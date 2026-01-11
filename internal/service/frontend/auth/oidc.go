@@ -98,6 +98,18 @@ func initOIDCProviderCore(ctx context.Context, params oidcProviderParams) (*oidc
 		var providerErr error
 		provider, providerErr = oidcProviderFactory(retryCtx, params.Issuer)
 		if providerErr != nil {
+			// Check for permanent errors that shouldn't be retried
+			// (e.g., invalid URL format, unsupported scheme)
+			errStr := providerErr.Error()
+			if strings.Contains(errStr, "unsupported protocol scheme") ||
+				strings.Contains(errStr, "invalid URI") ||
+				strings.Contains(errStr, "invalid URL") {
+				slog.Error("OIDC provider init failed with permanent error",
+					tag.Error(providerErr),
+					slog.String("issuer", params.Issuer))
+				return backoff.PermanentError(providerErr)
+			}
+
 			slog.Warn("OIDC provider init failed, will retry",
 				tag.Error(providerErr),
 				slog.String("issuer", params.Issuer))

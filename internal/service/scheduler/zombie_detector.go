@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -13,12 +14,13 @@ import (
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
-// panicToError converts a panic value to an error.
+// panicToError converts a panic value to an error, including stack trace.
 func panicToError(r any) error {
+	stack := string(debug.Stack())
 	if err, ok := r.(error); ok {
-		return err
+		return fmt.Errorf("panic: %w\n%s", err, stack)
 	}
-	return fmt.Errorf("%v", r)
+	return fmt.Errorf("panic: %v\n%s", r, stack)
 }
 
 // ZombieDetector finds and cleans up zombie DAG runs

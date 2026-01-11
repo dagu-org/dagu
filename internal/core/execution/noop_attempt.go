@@ -2,9 +2,13 @@ package execution
 
 import (
 	"context"
+	"errors"
 
 	"github.com/dagu-org/dagu/internal/core"
 )
+
+// ErrNoopAttemptNotSupported is returned when an operation is not supported in shared-nothing mode.
+var ErrNoopAttemptNotSupported = errors.New("operation not supported in shared-nothing mode")
 
 // noopDAGRunAttempt is a no-op implementation of DAGRunAttempt for shared-nothing mode.
 // In this mode, status is pushed via statusPusher to the coordinator, so local
@@ -38,7 +42,7 @@ func (n *noopDAGRunAttempt) Close(_ context.Context) error {
 }
 
 func (n *noopDAGRunAttempt) ReadStatus(_ context.Context) (*DAGRunStatus, error) {
-	return nil, nil
+	return nil, ErrNoopAttemptNotSupported
 }
 
 func (n *noopDAGRunAttempt) ReadDAG(_ context.Context) (*core.DAG, error) {
@@ -66,7 +70,7 @@ func (n *noopDAGRunAttempt) WriteOutputs(_ context.Context, _ *DAGRunOutputs) er
 }
 
 func (n *noopDAGRunAttempt) ReadOutputs(_ context.Context) (*DAGRunOutputs, error) {
-	return nil, nil
+	return nil, ErrNoopAttemptNotSupported
 }
 
 func (n *noopDAGRunAttempt) WriteStepMessages(_ context.Context, _ string, _ []LLMMessage) error {
