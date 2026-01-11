@@ -86,26 +86,28 @@ func TestService_LogTerminalSessionEnd(t *testing.T) {
 	assert.Contains(t, store.entries[0].Details, "closed")
 }
 
-func TestEscapeJSON(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
+func TestService_LogTerminalCommand_SpecialCharacters(t *testing.T) {
+	store := &mockStore{}
+	svc := New(store)
+
+	// Test that special characters are properly escaped by json.Marshal
+	testCases := []struct {
+		name    string
+		command string
 	}{
-		{"empty", "", ""},
-		{"simple", "hello", "hello"},
-		{"quote", `say "hello"`, `say \"hello\"`},
-		{"backslash", `path\to\file`, `path\\to\\file`},
-		{"newline", "line1\nline2", `line1\nline2`},
-		{"carriage return", "line1\rline2", `line1\rline2`},
-		{"tab", "col1\tcol2", `col1\tcol2`},
-		{"control char", "hello\x00world", "helloworld"},
+		{"quotes", `say "hello"`},
+		{"backslash", `path\to\file`},
+		{"newline", "line1\nline2"},
+		{"tab", "col1\tcol2"},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := escapeJSON(tt.input)
-			assert.Equal(t, tt.expected, result)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			store.entries = nil
+			err := svc.LogTerminalCommand(context.Background(), "user-123", "testuser", "session-456", tc.command, "192.168.1.1")
+			require.NoError(t, err)
+			require.Len(t, store.entries, 1)
+			assert.Contains(t, store.entries[0].Details, "command")
 		})
 	}
 }

@@ -2,6 +2,7 @@ package audit
 
 import (
 	"context"
+	"encoding/json"
 )
 
 // Store defines the interface for persisting audit entries.
@@ -34,51 +35,33 @@ func (s *Service) Query(ctx context.Context, filter QueryFilter) (*QueryResult, 
 
 // LogTerminalSessionStart logs the start of a terminal session.
 func (s *Service) LogTerminalSessionStart(ctx context.Context, userID, username, sessionID, ipAddress string) error {
+	details, _ := json.Marshal(map[string]string{"session_id": sessionID})
 	entry := NewEntry(CategoryTerminal, "session_start", userID, username).
-		WithDetails(`{"session_id":"` + sessionID + `"}`).
+		WithDetails(string(details)).
 		WithIPAddress(ipAddress)
 	return s.Log(ctx, entry)
 }
 
 // LogTerminalCommand logs a command executed in a terminal session.
 func (s *Service) LogTerminalCommand(ctx context.Context, userID, username, sessionID, command, ipAddress string) error {
+	details, _ := json.Marshal(map[string]string{
+		"session_id": sessionID,
+		"command":    command,
+	})
 	entry := NewEntry(CategoryTerminal, "command", userID, username).
-		WithDetails(`{"session_id":"` + sessionID + `","command":"` + escapeJSON(command) + `"}`).
+		WithDetails(string(details)).
 		WithIPAddress(ipAddress)
 	return s.Log(ctx, entry)
 }
 
 // LogTerminalSessionEnd logs the end of a terminal session.
 func (s *Service) LogTerminalSessionEnd(ctx context.Context, userID, username, sessionID, reason, ipAddress string) error {
+	details, _ := json.Marshal(map[string]string{
+		"session_id": sessionID,
+		"reason":     reason,
+	})
 	entry := NewEntry(CategoryTerminal, "session_end", userID, username).
-		WithDetails(`{"session_id":"` + sessionID + `","reason":"` + reason + `"}`).
+		WithDetails(string(details)).
 		WithIPAddress(ipAddress)
 	return s.Log(ctx, entry)
-}
-
-// escapeJSON escapes special characters for JSON strings.
-func escapeJSON(s string) string {
-	result := make([]byte, 0, len(s))
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		switch c {
-		case '"':
-			result = append(result, '\\', '"')
-		case '\\':
-			result = append(result, '\\', '\\')
-		case '\n':
-			result = append(result, '\\', 'n')
-		case '\r':
-			result = append(result, '\\', 'r')
-		case '\t':
-			result = append(result, '\\', 't')
-		default:
-			if c < 32 {
-				// Skip other control characters
-				continue
-			}
-			result = append(result, c)
-		}
-	}
-	return string(result)
 }

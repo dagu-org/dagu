@@ -8,6 +8,35 @@ import { useAuth, useIsAdmin, TOKEN_KEY } from '@/contexts/AuthContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
 
 type MessageType = 'input' | 'output' | 'resize' | 'close' | 'error';
+type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
+
+function getStatusBadgeClass(status: ConnectionStatus): string {
+  switch (status) {
+    case 'connected':
+      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+    case 'connecting':
+      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+    case 'error':
+      return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+    case 'disconnected':
+    default:
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
+  }
+}
+
+function getStatusText(status: ConnectionStatus, errorMessage: string | null): string {
+  switch (status) {
+    case 'connected':
+      return 'Connected';
+    case 'connecting':
+      return 'Connecting...';
+    case 'error':
+      return errorMessage || 'Error';
+    case 'disconnected':
+    default:
+      return 'Disconnected';
+  }
+}
 
 interface TerminalMessage {
   type: MessageType;
@@ -26,7 +55,7 @@ export default function TerminalPage() {
   const { user } = useAuth();
   const isAdmin = useIsAdmin();
   const appBarContext = useContext(AppBarContext);
-  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Set page title
@@ -199,16 +228,8 @@ export default function TerminalPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded ${
-            connectionStatus === 'connected' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-            connectionStatus === 'connecting' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-            connectionStatus === 'error' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-            'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
-          }`}>
-            {connectionStatus === 'connected' && 'Connected'}
-            {connectionStatus === 'connecting' && 'Connecting...'}
-            {connectionStatus === 'disconnected' && 'Disconnected'}
-            {connectionStatus === 'error' && (errorMessage || 'Error')}
+          <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded ${getStatusBadgeClass(connectionStatus)}`}>
+            {getStatusText(connectionStatus, errorMessage)}
           </span>
         </div>
       </div>
