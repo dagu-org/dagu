@@ -320,6 +320,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dags/{fileName}/start-sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Execute DAG synchronously and wait for completion
+         * @description Creates a DAG-run from the DAG definition, starts its execution, waits for it to complete (or timeout), and returns the full execution details including node statuses.
+         *
+         *     **Important behaviors:**
+         *     - If the timeout is exceeded, the DAG run continues executing in the background. The 408 response includes the `dagRunId` so clients can monitor or cancel the run.
+         *     - If the DAG reaches a 'waiting' status (human-in-the-loop approval needed), the endpoint returns immediately with 200 and the current status.
+         *
+         */
+        post: operations["executeDAGSync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dags/{fileName}/enqueue": {
         parameters: {
             query?: never;
@@ -1263,6 +1288,10 @@ export interface components {
             message: string;
             /** @description Additional error details */
             details?: Record<string, never>;
+        };
+        /** @description Timeout error response with DAG run tracking information */
+        TimeoutError: components["schemas"]["Error"] & {
+            dagRunId: components["schemas"]["DAGRunId"] & unknown;
         };
         /**
          * @description Error code indicating the type of error
@@ -3285,6 +3314,78 @@ export interface operations {
                 };
             };
             /** @description DAG is already running (singleton mode) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    executeDAGSync: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Parameters to pass to the DAG-run in JSON format */
+                    params?: string;
+                    dagRunId?: components["schemas"]["DAGRunId"] & unknown;
+                    /** @description Optional DAG name override to use for the created dag-run */
+                    dagName?: string;
+                    /**
+                     * @description If true, prevent starting if DAG is already running (returns 409 conflict)
+                     * @default false
+                     */
+                    singleton?: boolean;
+                    /** @description Maximum seconds to wait for DAG execution to complete (required) */
+                    timeout: number;
+                };
+            };
+        };
+        responses: {
+            /** @description DAG-run completed (or reached waiting status) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        dagRun: components["schemas"]["DAGRunDetails"];
+                    };
+                };
+            };
+            /** @description Timeout waiting for DAG execution to complete. The DAG run continues executing in the background. */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimeoutError"];
+                };
+            };
+            /** @description DAG is already running (singleton mode) or dagRunId already exists */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -5608,7 +5709,8 @@ export enum ErrorCode {
     already_exists = "already_exists",
     auth_unauthorized = "auth.unauthorized",
     auth_token_invalid = "auth.token_invalid",
-    auth_forbidden = "auth.forbidden"
+    auth_forbidden = "auth.forbidden",
+    timeout = "timeout"
 }
 export enum Stream {
     stdout = "stdout",

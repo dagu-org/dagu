@@ -32,12 +32,12 @@ type OIDCConfig struct {
 
 // Tunable constants for OIDC auth behaviour.
 const (
-	oidcProviderInitTimeout      = 10 * time.Second
-	oidcProviderMaxRetries       = 10                     // max retries for OIDC provider init (network issues)
-	oidcProviderInitialInterval  = 500 * time.Millisecond // initial backoff interval
-	oidcProviderMaxInterval      = 5 * time.Second        // maximum backoff interval
-	stateCookieExpiry            = 120                    // seconds for transient state/nonce/originalURL cookies
-	defaultTokenExpirySecs       = 60                     // fallback when ID token expiry is invalid or already passed
+	oidcProviderInitTimeout     = 10 * time.Second
+	oidcProviderMaxRetries      = 10                     // max retries for OIDC provider init (network issues)
+	oidcProviderInitialInterval = 500 * time.Millisecond // initial backoff interval
+	oidcProviderMaxInterval     = 5 * time.Second        // maximum backoff interval
+	stateCookieExpiry           = 120                    // seconds for transient state/nonce/originalURL cookies
+	defaultTokenExpirySecs      = 60                     // fallback when ID token expiry is invalid or already passed
 )
 
 // Cookie names centralised to avoid copy-paste strings.
