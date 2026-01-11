@@ -495,7 +495,7 @@ steps:
 			if concurrentNode.Status != core.NodeRunning {
 				return false
 			}
-			rootRef := execution.NewDAGRunRef(dagWrapper.DAG.Name, st.DAGRunID)
+			rootRef := execution.NewDAGRunRef(dagWrapper.Name, st.DAGRunID)
 			for _, subRun := range concurrentNode.SubRuns {
 				subStatus, err := coord.DAGRunMgr.FindSubDAGRunStatus(coord.Context, rootRef, subRun.DAGRunID)
 				if err == nil && !subStatus.Status.IsActive() {
