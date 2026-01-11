@@ -32,8 +32,10 @@ type OIDCConfig struct {
 // Tunable constants for OIDC auth behaviour.
 const (
 	oidcProviderInitTimeout = 10 * time.Second
-	stateCookieExpiry       = 120 // seconds for transient state/nonce/originalURL cookies
-	defaultTokenExpirySecs  = 60  // fallback when ID token expiry is invalid or already passed
+	oidcProviderMaxRetries  = 3                      // max retries for OIDC provider init (network issues)
+	oidcProviderRetryDelay  = 500 * time.Millisecond // delay between retries
+	stateCookieExpiry       = 120                    // seconds for transient state/nonce/originalURL cookies
+	defaultTokenExpirySecs  = 60                     // fallback when ID token expiry is invalid or already passed
 )
 
 // Cookie names centralised to avoid copy-paste strings.
@@ -81,7 +83,22 @@ func initOIDCProviderCore(params oidcProviderParams) (*oidcProviderResult, error
 		Timeout: oidcProviderInitTimeout,
 	})
 
-	provider, err := oidcProviderFactory(ctx, params.Issuer)
+	// Retry OIDC provider init in case of transient network errors
+	var provider *oidc.Provider
+	var err error
+	for attempt := 1; attempt <= oidcProviderMaxRetries; attempt++ {
+		provider, err = oidcProviderFactory(ctx, params.Issuer)
+		if err == nil && provider != nil {
+			break
+		}
+		if attempt < oidcProviderMaxRetries {
+			slog.Warn("OIDC provider init failed, retrying",
+				tag.Error(err),
+				slog.Int("attempt", attempt),
+				slog.Int("maxRetries", oidcProviderMaxRetries))
+			time.Sleep(oidcProviderRetryDelay)
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to init OIDC provider: %w", err)
 	}
