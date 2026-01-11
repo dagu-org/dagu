@@ -985,6 +985,75 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dags/{fileName}/start-sync:
+    post:
+      summary: "Execute DAG synchronously and wait for completion"
+      description: "Creates a DAG-run from the DAG definition, starts its execution, waits for it to complete (or timeout), and returns the full execution details including node statuses"
+      operationId: "executeDAGSync"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - timeout
+              properties:
+                params:
+                  type: string
+                  description: "Parameters to pass to the DAG-run in JSON format"
+                dagRunId:
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "Optional ID for the DAG-run, if not provided a new one will be generated"
+                dagName:
+                  type: string
+                  description: "Optional DAG name override to use for the created dag-run"
+                singleton:
+                  type: boolean
+                  description: "If true, prevent starting if DAG is already running (returns 409 conflict)"
+                  default: false
+                timeout:
+                  type: integer
+                  minimum: 1
+                  maximum: 86400
+                  description: "Maximum seconds to wait for DAG execution to complete (required)"
+      responses:
+        "200":
+          description: "DAG-run completed (or reached waiting status)"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - dagRun
+                properties:
+                  dagRun:
+                    $ref: "#/components/schemas/DAGRunDetails"
+        "408":
+          description: "Timeout waiting for DAG execution to complete"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "DAG is already running (singleton mode) or dagRunId already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dags/{fileName}/enqueue:
     post:
       summary: "Enqueue a DAG-run from DAG"
@@ -3168,6 +3237,7 @@ components:
         - "auth.unauthorized"
         - "auth.token_invalid"
         - "auth.forbidden"
+        - "timeout"
 
     WebhookRequest:
       type: object

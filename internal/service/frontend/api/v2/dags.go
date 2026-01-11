@@ -708,6 +708,161 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 	}, nil
 }
 
+// ExecuteDAGSync executes a DAG and waits for completion before returning.
+// It returns the full DAGRunDetails including all node statuses.
+func (a *API) ExecuteDAGSync(ctx context.Context, request api.ExecuteDAGSyncRequestObject) (api.ExecuteDAGSyncResponseObject, error) {
+	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
+
+	if request.Body == nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "request body is required",
+		}
+	}
+
+	dag, err := a.dagStore.GetDetails(ctx, request.FileName, spec.WithAllowBuildErrors())
+	if err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
+		}
+	}
+
+	if err := buildErrorsToAPIError(dag.BuildErrors); err != nil {
+		return nil, err
+	}
+
+	dagRunId := valueOf(request.Body.DagRunId)
+	params := valueOf(request.Body.Params)
+	singleton := valueOf(request.Body.Singleton)
+	nameOverride := strings.TrimSpace(valueOf(request.Body.DagName))
+	timeout := request.Body.Timeout
+
+	if nameOverride != "" {
+		if err := core.ValidateDAGName(nameOverride); err != nil {
+			return nil, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    err.Error(),
+			}
+		}
+		dag.Name = nameOverride
+	}
+
+	if dagRunId == "" {
+		var err error
+		dagRunId, err = a.dagRunMgr.GenDAGRunID(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("error generating dag-run ID: %w", err)
+		}
+	}
+
+	if singleton {
+		alive, err := a.procStore.CountAliveByDAGName(ctx, dag.ProcGroup(), dag.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check singleton execution status: %w", err)
+		}
+		if alive > 0 {
+			return nil, &Error{
+				HTTPStatus: http.StatusConflict,
+				Code:       api.ErrorCodeAlreadyExists,
+				Message:    fmt.Sprintf("DAG %s is already running (singleton mode)", dag.Name),
+			}
+		}
+	}
+
+	if err := a.ensureDAGRunIDUnique(ctx, dag, dagRunId); err != nil {
+		return nil, err
+	}
+
+	// Start the DAG run
+	if err := a.startDAGRun(ctx, dag, params, dagRunId, nameOverride, singleton); err != nil {
+		return nil, fmt.Errorf("error starting dag-run: %w", err)
+	}
+
+	// Wait for DAG completion
+	dagStatus, err := a.waitForDAGCompletion(ctx, dag, dagRunId, timeout)
+	if err != nil {
+		// Check if it's a timeout error
+		if errors.Is(err, context.DeadlineExceeded) {
+			return api.ExecuteDAGSync408JSONResponse{
+				Code:    api.ErrorCodeTimeout,
+				Message: fmt.Sprintf("timeout waiting for DAG %s to complete after %d seconds", dag.Name, timeout),
+			}, nil
+		}
+		return nil, err
+	}
+
+	return api.ExecuteDAGSync200JSONResponse{
+		DagRun: toDAGRunDetails(*dagStatus),
+	}, nil
+}
+
+// waitForDAGCompletion polls the DAG status until it reaches a terminal state or timeout.
+// It returns the final DAGRunStatus or an error if timeout is exceeded.
+func (a *API) waitForDAGCompletion(
+	ctx context.Context,
+	dag *core.DAG,
+	dagRunId string,
+	timeoutSeconds int,
+) (*execution.DAGRunStatus, error) {
+	// Create context with timeout
+	waitCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
+	defer cancel()
+
+	// Adaptive polling: start at 100ms, increase to max 2s
+	pollInterval := 100 * time.Millisecond
+	maxPollInterval := 2 * time.Second
+
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	var lastStatus *execution.DAGRunStatus
+
+	for {
+		select {
+		case <-waitCtx.Done():
+			// Timeout or context cancelled
+			return lastStatus, waitCtx.Err()
+
+		case <-ticker.C:
+			status, err := a.dagRunMgr.GetCurrentStatus(ctx, dag, dagRunId)
+			if err != nil {
+				// Log error but continue polling - DAG might still be initializing
+				logger.Debug(ctx, "Error getting DAG status during wait", tag.Error(err))
+				continue
+			}
+
+			if status == nil {
+				continue
+			}
+
+			lastStatus = status
+
+			// Check if execution is complete (not active) or waiting for human approval
+			if !status.Status.IsActive() || status.Status.IsWaiting() {
+				return status, nil
+			}
+
+			// Adaptive polling: increase interval (up to max)
+			if pollInterval < maxPollInterval {
+				pollInterval = time.Duration(float64(pollInterval) * 1.5)
+				if pollInterval > maxPollInterval {
+					pollInterval = maxPollInterval
+				}
+				ticker.Reset(pollInterval)
+			}
+		}
+	}
+}
+
 func (a *API) startDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride string, singleton bool) error {
 	return a.startDAGRunWithOptions(ctx, dag, startDAGRunOptions{
 		params:       params,
