@@ -44,24 +44,13 @@ var serverFlags = []commandLineFlag{dagsFlag, hostFlag, portFlag}
 // constructs the server with that resource service, and then begins serving.
 // It returns an error if the resource service fails to start, the server fails to initialize, or serving fails.
 func runServer(ctx *Context, _ []string) error {
-	// Create a context that will be cancelled on interrupt signal
-	// This must be created BEFORE server initialization so OIDC provider init can be cancelled
+	// Create a context that will be cancelled on interrupt signal.
+	// This must be created BEFORE server initialization so OIDC provider init can be cancelled.
 	signalCtx, stop := signal.NotifyContext(ctx.Context, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Create a new context with the signal context for services
-	serviceCtx := &Context{
-		Context:         signalCtx,
-		Command:         ctx.Command,
-		Flags:           ctx.Flags,
-		Config:          ctx.Config,
-		Quiet:           ctx.Quiet,
-		DAGRunStore:     ctx.DAGRunStore,
-		DAGRunMgr:       ctx.DAGRunMgr,
-		ProcStore:       ctx.ProcStore,
-		QueueStore:      ctx.QueueStore,
-		ServiceRegistry: ctx.ServiceRegistry,
-	}
+	// Create a signal-aware context for services
+	serviceCtx := ctx.WithContext(signalCtx)
 
 	logger.Info(serviceCtx, "Server initialization",
 		tag.Host(serviceCtx.Config.Server.Host),

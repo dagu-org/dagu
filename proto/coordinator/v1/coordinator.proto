@@ -28,6 +28,11 @@ service CoordinatorService {
   // GetDAGRunStatus retrieves the status of a DAG run from the coordinator.
   // Used by parent DAGs to poll status of remote sub-DAGs in shared-nothing mode.
   rpc GetDAGRunStatus (GetDAGRunStatusRequest) returns (GetDAGRunStatusResponse);
+
+  // RequestCancel is called to request cancellation of a DAG run.
+  // Used in shared-nothing mode for sub-DAG cancellation where the parent
+  // cannot directly access the sub-DAG's attempt.
+  rpc RequestCancel (RequestCancelRequest) returns (RequestCancelResponse);
 }
 
 // Request message for polling a task.
@@ -272,4 +277,19 @@ message GetDAGRunStatusResponse {
   bool found = 1;                   // Whether the DAG run was found
   DAGRunStatusProto status = 2;     // The status (only set if found)
   string error = 3;                 // Error message if any
+}
+
+// Request message for cancelling a DAG run.
+message RequestCancelRequest {
+  string dag_name = 1;
+  string dag_run_id = 2;
+  // Root DAG run info for sub-DAG cancellation
+  string root_dag_run_name = 3;
+  string root_dag_run_id = 4;
+}
+
+// Response message for cancelling a DAG run.
+message RequestCancelResponse {
+  bool accepted = 1;
+  string error = 2;
 }

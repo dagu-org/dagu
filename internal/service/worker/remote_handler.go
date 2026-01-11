@@ -91,10 +91,9 @@ func (h *remoteTaskHandler) Handle(ctx context.Context, task *coordinatorv1.Task
 		}
 		return h.handleRetry(ctx, task)
 
-	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
+	default:
 		return fmt.Errorf("unsupported operation: %v", task.Operation)
 	}
-	return fmt.Errorf("unsupported operation: %v", task.Operation)
 }
 
 func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1.Task, queuedRun bool) error {

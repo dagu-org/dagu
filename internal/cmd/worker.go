@@ -82,11 +82,9 @@ func runWorker(ctx *Context, _ []string) error {
 		hostname, _ := os.Hostname()
 		workerID = fmt.Sprintf("%s@%d", hostname, os.Getpid())
 	}
+
 	maxActiveRuns := ctx.Config.Worker.MaxActiveRuns
 	labels := ctx.Config.Worker.Labels
-	if labels == nil {
-		labels = make(map[string]string)
-	}
 
 	coordinatorCli, useRemoteHandler, err := createCoordinatorClient(ctx)
 	if err != nil {

@@ -734,3 +734,54 @@ func (h *Handler) markRunFailed(ctx context.Context, dagName, dagRunID, reason s
 	logger.Warn(ctx, "Marked zombie run as FAILED",
 		tag.DAG(dagName), tag.RunID(dagRunID), slog.String("reason", reason))
 }
+
+// RequestCancel handles requests to cancel a DAG run.
+// This is used in shared-nothing mode for sub-DAG cancellation where the parent
+// worker cannot directly access the sub-DAG's attempt.
+func (h *Handler) RequestCancel(ctx context.Context, req *coordinatorv1.RequestCancelRequest) (*coordinatorv1.RequestCancelResponse, error) {
+	if h.dagRunStore == nil {
+		return nil, status.Error(codes.FailedPrecondition, "cancellation not available: DAG run storage not configured")
+	}
+
+	ctx = logger.WithValues(ctx,
+		tag.DAG(req.DagName),
+		tag.RunID(req.DagRunId),
+	)
+
+	// Find the attempt (either root or sub-DAG)
+	var attempt execution.DAGRunAttempt
+	var err error
+
+	isSubDAG := req.RootDagRunId != "" && req.RootDagRunId != req.DagRunId
+	if isSubDAG {
+		rootRef := execution.DAGRunRef{Name: req.RootDagRunName, ID: req.RootDagRunId}
+		attempt, err = h.dagRunStore.FindSubAttempt(ctx, rootRef, req.DagRunId)
+		logger.Info(ctx, "Looking up sub-DAG attempt for cancellation",
+			slog.String("root-dag-run-id", req.RootDagRunId),
+		)
+	} else {
+		ref := execution.DAGRunRef{Name: req.DagName, ID: req.DagRunId}
+		attempt, err = h.dagRunStore.FindAttempt(ctx, ref)
+		logger.Info(ctx, "Looking up DAG attempt for cancellation")
+	}
+
+	if err != nil {
+		logger.Warn(ctx, "Failed to find DAG run for cancellation", tag.Error(err))
+		return &coordinatorv1.RequestCancelResponse{
+			Accepted: false,
+			Error:    fmt.Sprintf("failed to find DAG run: %v", err),
+		}, nil
+	}
+
+	// Set the abort flag
+	if err := attempt.Abort(ctx); err != nil {
+		logger.Warn(ctx, "Failed to abort DAG run", tag.Error(err))
+		return &coordinatorv1.RequestCancelResponse{
+			Accepted: false,
+			Error:    fmt.Sprintf("failed to abort: %v", err),
+		}, nil
+	}
+
+	logger.Info(ctx, "DAG run cancellation requested successfully")
+	return &coordinatorv1.RequestCancelResponse{Accepted: true}, nil
+}

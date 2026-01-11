@@ -1008,30 +1008,12 @@ func (a *Agent) newRunner(attempt execution.DAGRunAttempt) *runtime.Runner {
 		Dry:             a.dry,
 		DAGRunID:        a.dagRunID,
 		MessagesHandler: attempt, // Attempt implements ChatMessagesHandler
-	}
-
-	if a.dag.HandlerOn.Init != nil {
-		cfg.OnInit = a.dag.HandlerOn.Init
-	}
-
-	if a.dag.HandlerOn.Exit != nil {
-		cfg.OnExit = a.dag.HandlerOn.Exit
-	}
-
-	if a.dag.HandlerOn.Success != nil {
-		cfg.OnSuccess = a.dag.HandlerOn.Success
-	}
-
-	if a.dag.HandlerOn.Failure != nil {
-		cfg.OnFailure = a.dag.HandlerOn.Failure
-	}
-
-	if a.dag.HandlerOn.Cancel != nil {
-		cfg.OnCancel = a.dag.HandlerOn.Cancel
-	}
-
-	if a.dag.HandlerOn.Wait != nil {
-		cfg.OnWait = a.dag.HandlerOn.Wait
+		OnInit:          a.dag.HandlerOn.Init,
+		OnExit:          a.dag.HandlerOn.Exit,
+		OnSuccess:       a.dag.HandlerOn.Success,
+		OnFailure:       a.dag.HandlerOn.Failure,
+		OnCancel:        a.dag.HandlerOn.Cancel,
+		OnWait:          a.dag.HandlerOn.Wait,
 	}
 
 	return runtime.New(cfg)

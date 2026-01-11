@@ -58,6 +58,24 @@ type Context struct {
 	Proc execution.ProcHandle
 }
 
+// WithContext returns a new Context with a different underlying context.Context.
+// This is useful for creating a signal-aware context for service operations.
+func (c *Context) WithContext(ctx context.Context) *Context {
+	return &Context{
+		Context:         ctx,
+		Command:         c.Command,
+		Flags:           c.Flags,
+		Config:          c.Config,
+		Quiet:           c.Quiet,
+		DAGRunStore:     c.DAGRunStore,
+		DAGRunMgr:       c.DAGRunMgr,
+		ProcStore:       c.ProcStore,
+		QueueStore:      c.QueueStore,
+		ServiceRegistry: c.ServiceRegistry,
+		Proc:            c.Proc,
+	}
+}
+
 // LogToFile creates a new logger context with a file writer.
 func (c *Context) LogToFile(f *os.File) {
 	var opts []logger.Option
@@ -76,10 +94,12 @@ func (c *Context) LogToFile(f *os.File) {
 	c.Context = logger.WithLogger(c.Context, logger.NewLogger(opts...))
 }
 
-// NewContext initializes the application setup by loading configuration,
 // NewContext creates and initializes an application Context for the given Cobra command.
-// It binds command flags, loads configuration scoped to the command, configures logging (respecting debug, quiet, and log format settings), logs any configuration warnings, and initializes history, DAG run, proc, queue, and service registry stores and managers used by the application.
-// NewContext returns an initialized Context or an error if flag retrieval, configuration loading, or other initialization steps fail.
+// It binds command flags, loads configuration scoped to the command, configures logging
+// (respecting debug, quiet, and log format settings), logs any configuration warnings,
+// and initializes history, DAG run, proc, queue, and service registry stores and managers.
+// Returns an initialized Context or an error if flag retrieval, configuration loading,
+// or other initialization steps fail.
 func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	ctx := cmd.Context()
 
@@ -190,11 +210,8 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	}, nil
 }
 
-// serviceForCommand returns the appropriate config.Service type for a given command name.
 // serviceForCommand determines which config.Service to load for a given command name.
-// "server" -> ServiceServer, "scheduler" -> ServiceScheduler, "worker" -> ServiceWorker,
-// "coordinator" -> ServiceCoordinator, and "start", "restart", "retry", "dry", "exec" -> ServiceAgent.
-// For any other command it returns ServiceNone so all configuration sections are loaded.
+// Returns the appropriate service type for the command, or ServiceNone to load all config.
 func serviceForCommand(cmdName string) config.Service {
 	switch cmdName {
 	case "server":

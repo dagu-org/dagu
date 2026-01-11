@@ -294,14 +294,7 @@ func (a *API) handleError(w http.ResponseWriter, r *http.Request, err error) {
 	httpStatusCode := http.StatusInternalServerError
 
 	var apiErr *Error
-	switch err := err.(type) {
-	case *Error:
-		apiErr = err
-	case Error:
-		apiErr = &err
-	}
-
-	if apiErr != nil {
+	if errors.As(err, &apiErr) {
 		code = apiErr.Code
 		message = apiErr.Message
 		httpStatusCode = apiErr.HTTPStatus
@@ -311,16 +304,14 @@ func (a *API) handleError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, execution.ErrDAGNotFound):
 		code = api.ErrorCodeNotFound
 		message = "DAG not found"
-
 	case errors.Is(err, execution.ErrDAGRunIDNotFound):
 		code = api.ErrorCodeNotFound
 		message = "dag-run ID not found"
-
 	case errors.Is(err, execution.ErrDAGAlreadyExists):
 		code = api.ErrorCodeAlreadyExists
 		message = "DAG already exists"
-
 	}
+
 	if httpStatusCode == http.StatusInternalServerError {
 		logger.Errorf(r.Context(), "Internal server error: %v", err)
 	}

@@ -48,6 +48,10 @@ type Client interface {
 	// StreamLogs returns a log streaming client for sending logs to the coordinator
 	StreamLogs(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error)
 
+	// RequestCancel requests cancellation of a DAG run through the coordinator.
+	// Used in shared-nothing mode for sub-DAG cancellation.
+	RequestCancel(ctx context.Context, dagName, dagRunID string, rootRef *execution.DAGRunRef) error
+
 	// GetDAGRunStatus is inherited from execution.Dispatcher
 
 	// Metrics returns the metrics for the coordinator client
@@ -569,6 +573,36 @@ func (cli *clientImpl) GetDAGRunStatus(ctx context.Context, dagName, dagRunID st
 		return nil
 	})
 	return resp, err
+}
+
+// RequestCancel requests cancellation of a DAG run through the coordinator
+func (cli *clientImpl) RequestCancel(ctx context.Context, dagName, dagRunID string, rootRef *execution.DAGRunRef) error {
+	members, err := cli.getCoordinatorMembers(ctx)
+	if err != nil {
+		return err
+	}
+
+	req := &coordinatorv1.RequestCancelRequest{
+		DagName:  dagName,
+		DagRunId: dagRunID,
+	}
+
+	// Include root reference for sub-DAG cancellation
+	if rootRef != nil {
+		req.RootDagRunName = rootRef.Name
+		req.RootDagRunId = rootRef.ID
+	}
+
+	return cli.attemptCall(ctx, members, func(ctx context.Context, _ execution.HostInfo, client *client) error {
+		resp, callErr := client.client.RequestCancel(ctx, req)
+		if callErr != nil {
+			return fmt.Errorf("request cancel failed: %w", callErr)
+		}
+		if !resp.Accepted {
+			return fmt.Errorf("cancellation not accepted: %s", resp.Error)
+		}
+		return nil
+	})
 }
 
 // getDialOptions returns the appropriate gRPC dial options based on TLS configuration

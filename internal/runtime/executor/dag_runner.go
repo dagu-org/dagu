@@ -532,25 +532,48 @@ func (e *SubDAGExecutor) Kill(sig os.Signal) error {
 	defer e.mu.Unlock()
 
 	var errs []error
+	ctx := context.Background()
 
 	// Cancel distributed runs
-	ctx := context.Background()
 	for runID := range e.distributedRuns {
-		if err := e.dagCtx.DB.RequestChildCancel(ctx, runID, e.dagCtx.RootDAGRun); err != nil {
-			if errors.Is(err, execution.ErrDAGRunIDNotFound) {
-				continue
+		// For distributed runs with coordinator, use coordinator to request cancellation.
+		// This is required for shared-nothing mode where the parent worker cannot
+		// directly access the sub-DAG's attempt on the coordinator's dagRunStore.
+		if e.coordinatorCli != nil {
+			if err := e.coordinatorCli.RequestCancel(ctx, e.DAG.Name, runID, &e.dagCtx.RootDAGRun); err != nil {
+				errs = append(errs, err)
+				logger.Warn(ctx, "Failed to request distributed cancellation via coordinator",
+					tag.RunID(runID),
+					tag.DAG(e.DAG.Name),
+					tag.Error(err),
+				)
+			} else {
+				logger.Info(ctx, "Requested distributed sub DAG cancellation via coordinator",
+					tag.RunID(runID),
+					tag.DAG(e.DAG.Name),
+				)
 			}
-			errs = append(errs, err)
-			logger.Warn(ctx, "Failed to request child cancel",
-				tag.RunID(runID),
-				tag.DAG(e.DAG.Name),
-				tag.Error(err),
-			)
-		} else {
-			logger.Info(ctx, "Requested distributed sub DAG cancellation",
-				tag.RunID(runID),
-				tag.DAG(e.DAG.Name),
-			)
+			continue
+		}
+
+		// Fallback: try local DB (for non-shared-nothing mode with local dagRunStore)
+		if e.dagCtx.DB != nil {
+			if err := e.dagCtx.DB.RequestChildCancel(ctx, runID, e.dagCtx.RootDAGRun); err != nil {
+				if errors.Is(err, execution.ErrDAGRunIDNotFound) {
+					continue
+				}
+				errs = append(errs, err)
+				logger.Warn(ctx, "Failed to request child cancel via local DB",
+					tag.RunID(runID),
+					tag.DAG(e.DAG.Name),
+					tag.Error(err),
+				)
+			} else {
+				logger.Info(ctx, "Requested distributed sub DAG cancellation via local DB",
+					tag.RunID(runID),
+					tag.DAG(e.DAG.Name),
+				)
+			}
 		}
 	}
 

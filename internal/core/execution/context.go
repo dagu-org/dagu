@@ -166,6 +166,11 @@ type Dispatcher interface {
 	// For sub-DAG queries, provide rootRef to look up the status under the root DAG run.
 	// Returns (nil, nil) if the DAG run is not found.
 	GetDAGRunStatus(ctx context.Context, dagName, dagRunID string, rootRef *DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error)
+
+	// RequestCancel requests cancellation of a DAG run through the coordinator.
+	// Used in shared-nothing mode for sub-DAG cancellation where the parent
+	// worker cannot directly access the sub-DAG's attempt.
+	RequestCancel(ctx context.Context, dagName, dagRunID string, rootRef *DAGRunRef) error
 }
 
 // contextOptions holds optional configuration for NewContext.

@@ -13,6 +13,14 @@ import (
 	"github.com/dagu-org/dagu/internal/core/execution"
 )
 
+// panicToError converts a panic value to an error.
+func panicToError(r any) error {
+	if err, ok := r.(error); ok {
+		return err
+	}
+	return fmt.Errorf("%v", r)
+}
+
 // ZombieDetector finds and cleans up zombie DAG runs
 type ZombieDetector struct {
 	dagRunStore execution.DAGRunStore
@@ -60,16 +68,7 @@ func (z *ZombieDetector) Start(ctx context.Context) {
 				defer wg.Done()
 				defer func() {
 					if r := recover(); r != nil {
-						var err error
-						switch v := r.(type) {
-						case error:
-							err = v
-						case string:
-							err = fmt.Errorf("%s", v)
-						default:
-							err = fmt.Errorf("%v", v)
-						}
-						logger.Error(ctx, "Zombie detection check panicked", tag.Error(err))
+						logger.Error(ctx, "Zombie detection check panicked", tag.Error(panicToError(r)))
 					}
 				}()
 				z.detectAndCleanZombies(ctx)

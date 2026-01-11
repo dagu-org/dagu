@@ -1956,6 +1956,129 @@ func (x *GetDAGRunStatusResponse) GetError() string {
 	return ""
 }
 
+// Request message for cancelling a DAG run.
+type RequestCancelRequest struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	DagName  string                 `protobuf:"bytes,1,opt,name=dag_name,json=dagName,proto3" json:"dag_name,omitempty"`
+	DagRunId string                 `protobuf:"bytes,2,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"`
+	// Root DAG run info for sub-DAG cancellation
+	RootDagRunName string `protobuf:"bytes,3,opt,name=root_dag_run_name,json=rootDagRunName,proto3" json:"root_dag_run_name,omitempty"`
+	RootDagRunId   string `protobuf:"bytes,4,opt,name=root_dag_run_id,json=rootDagRunId,proto3" json:"root_dag_run_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *RequestCancelRequest) Reset() {
+	*x = RequestCancelRequest{}
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestCancelRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestCancelRequest) ProtoMessage() {}
+
+func (x *RequestCancelRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestCancelRequest.ProtoReflect.Descriptor instead.
+func (*RequestCancelRequest) Descriptor() ([]byte, []int) {
+	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *RequestCancelRequest) GetDagName() string {
+	if x != nil {
+		return x.DagName
+	}
+	return ""
+}
+
+func (x *RequestCancelRequest) GetDagRunId() string {
+	if x != nil {
+		return x.DagRunId
+	}
+	return ""
+}
+
+func (x *RequestCancelRequest) GetRootDagRunName() string {
+	if x != nil {
+		return x.RootDagRunName
+	}
+	return ""
+}
+
+func (x *RequestCancelRequest) GetRootDagRunId() string {
+	if x != nil {
+		return x.RootDagRunId
+	}
+	return ""
+}
+
+// Response message for cancelling a DAG run.
+type RequestCancelResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Accepted      bool                   `protobuf:"varint,1,opt,name=accepted,proto3" json:"accepted,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RequestCancelResponse) Reset() {
+	*x = RequestCancelResponse{}
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestCancelResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestCancelResponse) ProtoMessage() {}
+
+func (x *RequestCancelResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestCancelResponse.ProtoReflect.Descriptor instead.
+func (*RequestCancelResponse) Descriptor() ([]byte, []int) {
+	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *RequestCancelResponse) GetAccepted() bool {
+	if x != nil {
+		return x.Accepted
+	}
+	return false
+}
+
+func (x *RequestCancelResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
 var File_proto_coordinator_v1_coordinator_proto protoreflect.FileDescriptor
 
 const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
@@ -2145,7 +2268,16 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x17GetDAGRunStatusResponse\x12\x14\n" +
 	"\x05found\x18\x01 \x01(\bR\x05found\x129\n" +
 	"\x06status\x18\x02 \x01(\v2!.coordinator.v1.DAGRunStatusProtoR\x06status\x12\x14\n" +
-	"\x05error\x18\x03 \x01(\tR\x05error*P\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\"\xa1\x01\n" +
+	"\x14RequestCancelRequest\x12\x19\n" +
+	"\bdag_name\x18\x01 \x01(\tR\adagName\x12\x1c\n" +
+	"\n" +
+	"dag_run_id\x18\x02 \x01(\tR\bdagRunId\x12)\n" +
+	"\x11root_dag_run_name\x18\x03 \x01(\tR\x0erootDagRunName\x12%\n" +
+	"\x0froot_dag_run_id\x18\x04 \x01(\tR\frootDagRunId\"I\n" +
+	"\x15RequestCancelResponse\x12\x1a\n" +
+	"\baccepted\x18\x01 \x01(\bR\baccepted\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error*P\n" +
 	"\tOperation\x12\x19\n" +
 	"\x15OPERATION_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fOPERATION_START\x10\x01\x12\x13\n" +
@@ -2158,7 +2290,7 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\rLogStreamType\x12\x1f\n" +
 	"\x1bLOG_STREAM_TYPE_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16LOG_STREAM_TYPE_STDOUT\x10\x01\x12\x1a\n" +
-	"\x16LOG_STREAM_TYPE_STDERR\x10\x022\xda\x04\n" +
+	"\x16LOG_STREAM_TYPE_STDERR\x10\x022\xb8\x05\n" +
 	"\x12CoordinatorService\x12A\n" +
 	"\x04Poll\x12\x1b.coordinator.v1.PollRequest\x1a\x1c.coordinator.v1.PollResponse\x12M\n" +
 	"\bDispatch\x12\x1f.coordinator.v1.DispatchRequest\x1a .coordinator.v1.DispatchResponse\x12S\n" +
@@ -2168,7 +2300,8 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\fReportStatus\x12#.coordinator.v1.ReportStatusRequest\x1a$.coordinator.v1.ReportStatusResponse\x12L\n" +
 	"\n" +
 	"StreamLogs\x12\x18.coordinator.v1.LogChunk\x1a\".coordinator.v1.StreamLogsResponse(\x01\x12b\n" +
-	"\x0fGetDAGRunStatus\x12&.coordinator.v1.GetDAGRunStatusRequest\x1a'.coordinator.v1.GetDAGRunStatusResponseB=Z;github.com/dagu-org/dagu/proto/coordinator/v1;coordinatorv1b\x06proto3"
+	"\x0fGetDAGRunStatus\x12&.coordinator.v1.GetDAGRunStatusRequest\x1a'.coordinator.v1.GetDAGRunStatusResponse\x12\\\n" +
+	"\rRequestCancel\x12$.coordinator.v1.RequestCancelRequest\x1a%.coordinator.v1.RequestCancelResponseB=Z;github.com/dagu-org/dagu/proto/coordinator/v1;coordinatorv1b\x06proto3"
 
 var (
 	file_proto_coordinator_v1_coordinator_proto_rawDescOnce sync.Once
@@ -2183,7 +2316,7 @@ func file_proto_coordinator_v1_coordinator_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_coordinator_v1_coordinator_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_proto_coordinator_v1_coordinator_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_proto_coordinator_v1_coordinator_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_proto_coordinator_v1_coordinator_proto_goTypes = []any{
 	(Operation)(0),                  // 0: coordinator.v1.Operation
 	(WorkerHealthStatus)(0),         // 1: coordinator.v1.WorkerHealthStatus
@@ -2211,24 +2344,26 @@ var file_proto_coordinator_v1_coordinator_proto_goTypes = []any{
 	(*StreamLogsResponse)(nil),      // 23: coordinator.v1.StreamLogsResponse
 	(*GetDAGRunStatusRequest)(nil),  // 24: coordinator.v1.GetDAGRunStatusRequest
 	(*GetDAGRunStatusResponse)(nil), // 25: coordinator.v1.GetDAGRunStatusResponse
-	nil,                             // 26: coordinator.v1.PollRequest.LabelsEntry
-	nil,                             // 27: coordinator.v1.Task.WorkerSelectorEntry
-	nil,                             // 28: coordinator.v1.WorkerInfo.LabelsEntry
-	nil,                             // 29: coordinator.v1.HeartbeatRequest.LabelsEntry
-	nil,                             // 30: coordinator.v1.NodeStatusProto.OutputVariablesEntry
+	(*RequestCancelRequest)(nil),    // 26: coordinator.v1.RequestCancelRequest
+	(*RequestCancelResponse)(nil),   // 27: coordinator.v1.RequestCancelResponse
+	nil,                             // 28: coordinator.v1.PollRequest.LabelsEntry
+	nil,                             // 29: coordinator.v1.Task.WorkerSelectorEntry
+	nil,                             // 30: coordinator.v1.WorkerInfo.LabelsEntry
+	nil,                             // 31: coordinator.v1.HeartbeatRequest.LabelsEntry
+	nil,                             // 32: coordinator.v1.NodeStatusProto.OutputVariablesEntry
 }
 var file_proto_coordinator_v1_coordinator_proto_depIdxs = []int32{
-	26, // 0: coordinator.v1.PollRequest.labels:type_name -> coordinator.v1.PollRequest.LabelsEntry
+	28, // 0: coordinator.v1.PollRequest.labels:type_name -> coordinator.v1.PollRequest.LabelsEntry
 	7,  // 1: coordinator.v1.PollResponse.task:type_name -> coordinator.v1.Task
 	7,  // 2: coordinator.v1.DispatchRequest.task:type_name -> coordinator.v1.Task
 	0,  // 3: coordinator.v1.Task.operation:type_name -> coordinator.v1.Operation
-	27, // 4: coordinator.v1.Task.worker_selector:type_name -> coordinator.v1.Task.WorkerSelectorEntry
+	29, // 4: coordinator.v1.Task.worker_selector:type_name -> coordinator.v1.Task.WorkerSelectorEntry
 	17, // 5: coordinator.v1.Task.previous_status:type_name -> coordinator.v1.DAGRunStatusProto
 	10, // 6: coordinator.v1.GetWorkersResponse.workers:type_name -> coordinator.v1.WorkerInfo
-	28, // 7: coordinator.v1.WorkerInfo.labels:type_name -> coordinator.v1.WorkerInfo.LabelsEntry
+	30, // 7: coordinator.v1.WorkerInfo.labels:type_name -> coordinator.v1.WorkerInfo.LabelsEntry
 	14, // 8: coordinator.v1.WorkerInfo.running_tasks:type_name -> coordinator.v1.RunningTask
 	1,  // 9: coordinator.v1.WorkerInfo.health_status:type_name -> coordinator.v1.WorkerHealthStatus
-	29, // 10: coordinator.v1.HeartbeatRequest.labels:type_name -> coordinator.v1.HeartbeatRequest.LabelsEntry
+	31, // 10: coordinator.v1.HeartbeatRequest.labels:type_name -> coordinator.v1.HeartbeatRequest.LabelsEntry
 	13, // 11: coordinator.v1.HeartbeatRequest.stats:type_name -> coordinator.v1.WorkerStats
 	14, // 12: coordinator.v1.WorkerStats.running_tasks:type_name -> coordinator.v1.RunningTask
 	17, // 13: coordinator.v1.ReportStatusRequest.status:type_name -> coordinator.v1.DAGRunStatusProto
@@ -2242,7 +2377,7 @@ var file_proto_coordinator_v1_coordinator_proto_depIdxs = []int32{
 	19, // 21: coordinator.v1.DAGRunStatusProto.on_cancel:type_name -> coordinator.v1.NodeStatusProto
 	19, // 22: coordinator.v1.DAGRunStatusProto.on_wait:type_name -> coordinator.v1.NodeStatusProto
 	20, // 23: coordinator.v1.NodeStatusProto.sub_runs:type_name -> coordinator.v1.SubDAGRunProto
-	30, // 24: coordinator.v1.NodeStatusProto.output_variables:type_name -> coordinator.v1.NodeStatusProto.OutputVariablesEntry
+	32, // 24: coordinator.v1.NodeStatusProto.output_variables:type_name -> coordinator.v1.NodeStatusProto.OutputVariablesEntry
 	21, // 25: coordinator.v1.NodeStatusProto.step:type_name -> coordinator.v1.StepProto
 	2,  // 26: coordinator.v1.LogChunk.stream_type:type_name -> coordinator.v1.LogStreamType
 	17, // 27: coordinator.v1.GetDAGRunStatusResponse.status:type_name -> coordinator.v1.DAGRunStatusProto
@@ -2253,15 +2388,17 @@ var file_proto_coordinator_v1_coordinator_proto_depIdxs = []int32{
 	15, // 32: coordinator.v1.CoordinatorService.ReportStatus:input_type -> coordinator.v1.ReportStatusRequest
 	22, // 33: coordinator.v1.CoordinatorService.StreamLogs:input_type -> coordinator.v1.LogChunk
 	24, // 34: coordinator.v1.CoordinatorService.GetDAGRunStatus:input_type -> coordinator.v1.GetDAGRunStatusRequest
-	4,  // 35: coordinator.v1.CoordinatorService.Poll:output_type -> coordinator.v1.PollResponse
-	6,  // 36: coordinator.v1.CoordinatorService.Dispatch:output_type -> coordinator.v1.DispatchResponse
-	9,  // 37: coordinator.v1.CoordinatorService.GetWorkers:output_type -> coordinator.v1.GetWorkersResponse
-	12, // 38: coordinator.v1.CoordinatorService.Heartbeat:output_type -> coordinator.v1.HeartbeatResponse
-	16, // 39: coordinator.v1.CoordinatorService.ReportStatus:output_type -> coordinator.v1.ReportStatusResponse
-	23, // 40: coordinator.v1.CoordinatorService.StreamLogs:output_type -> coordinator.v1.StreamLogsResponse
-	25, // 41: coordinator.v1.CoordinatorService.GetDAGRunStatus:output_type -> coordinator.v1.GetDAGRunStatusResponse
-	35, // [35:42] is the sub-list for method output_type
-	28, // [28:35] is the sub-list for method input_type
+	26, // 35: coordinator.v1.CoordinatorService.RequestCancel:input_type -> coordinator.v1.RequestCancelRequest
+	4,  // 36: coordinator.v1.CoordinatorService.Poll:output_type -> coordinator.v1.PollResponse
+	6,  // 37: coordinator.v1.CoordinatorService.Dispatch:output_type -> coordinator.v1.DispatchResponse
+	9,  // 38: coordinator.v1.CoordinatorService.GetWorkers:output_type -> coordinator.v1.GetWorkersResponse
+	12, // 39: coordinator.v1.CoordinatorService.Heartbeat:output_type -> coordinator.v1.HeartbeatResponse
+	16, // 40: coordinator.v1.CoordinatorService.ReportStatus:output_type -> coordinator.v1.ReportStatusResponse
+	23, // 41: coordinator.v1.CoordinatorService.StreamLogs:output_type -> coordinator.v1.StreamLogsResponse
+	25, // 42: coordinator.v1.CoordinatorService.GetDAGRunStatus:output_type -> coordinator.v1.GetDAGRunStatusResponse
+	27, // 43: coordinator.v1.CoordinatorService.RequestCancel:output_type -> coordinator.v1.RequestCancelResponse
+	36, // [36:44] is the sub-list for method output_type
+	28, // [28:36] is the sub-list for method input_type
 	28, // [28:28] is the sub-list for extension type_name
 	28, // [28:28] is the sub-list for extension extendee
 	0,  // [0:28] is the sub-list for field type_name
@@ -2278,7 +2415,7 @@ func file_proto_coordinator_v1_coordinator_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_coordinator_v1_coordinator_proto_rawDesc), len(file_proto_coordinator_v1_coordinator_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   28,
+			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

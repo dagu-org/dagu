@@ -38,9 +38,7 @@ Example:
 	)
 }
 
-var restartFlags = []commandLineFlag{
-	dagRunIDFlagRestart,
-}
+var restartFlags = []commandLineFlag{dagRunIDFlagRestart}
 
 func runRestart(ctx *Context, args []string) error {
 	dagRunID, err := ctx.StringParam("run-id")
@@ -50,21 +48,22 @@ func runRestart(ctx *Context, args []string) error {
 
 	name := args[0]
 
-	var attempt execution.DAGRunAttempt
+	var (
+		attempt execution.DAGRunAttempt
+		err     error
+	)
 	if dagRunID != "" {
 		// Retrieve the previous run for the specified dag-run ID.
 		dagRunRef := execution.NewDAGRunRef(name, dagRunID)
-		att, err := ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
+		attempt, err = ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
 		if err != nil {
 			return fmt.Errorf("failed to find the run for dag-run ID %s: %w", dagRunID, err)
 		}
-		attempt = att
 	} else {
-		att, err := ctx.DAGRunStore.LatestAttempt(ctx, name)
+		attempt, err = ctx.DAGRunStore.LatestAttempt(ctx, name)
 		if err != nil {
 			return fmt.Errorf("failed to find the latest execution history for DAG %s: %w", name, err)
 		}
-		attempt = att
 	}
 
 	dagStatus, err := attempt.ReadStatus(ctx)

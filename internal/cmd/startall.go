@@ -74,32 +74,23 @@ var startAllFlags = []commandLineFlag{
 	peerSkipTLSVerifyFlag,
 }
 
-// runStartAll starts the scheduler, web server, resource monitoring service, and optionally the coordinator in-process, then manages their lifecycles and graceful shutdown.
-// It creates a signal-aware context, decides whether to enable the coordinator based on coordinator host binding, waits for an error or termination signal, shuts down services in order, and returns the first service error encountered (if any).
+// runStartAll starts the scheduler, web server, resource monitoring service, and optionally
+// the coordinator in-process, then manages their lifecycles and graceful shutdown.
+// It creates a signal-aware context, decides whether to enable the coordinator based on
+// coordinator host binding, waits for an error or termination signal, shuts down services
+// in order, and returns the first service error encountered (if any).
 func runStartAll(ctx *Context, _ []string) error {
 	if dagsDir, _ := ctx.Command.Flags().GetString("dags"); dagsDir != "" {
 		ctx.Config.Paths.DAGsDir = dagsDir
 	}
 
-	// Create a context that will be cancelled on interrupt signal
-	// This must be created BEFORE server initialization so OIDC provider init can be cancelled
+	// Create a context that will be cancelled on interrupt signal.
+	// This must be created BEFORE server initialization so OIDC provider init can be cancelled.
 	signalCtx, stop := signal.NotifyContext(ctx.Context, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Create a new context with the signal context for services
-	// This is used for server initialization (OIDC) and all service operations
-	serviceCtx := &Context{
-		Context:         signalCtx,
-		Command:         ctx.Command,
-		Flags:           ctx.Flags,
-		Config:          ctx.Config,
-		Quiet:           ctx.Quiet,
-		DAGRunStore:     ctx.DAGRunStore,
-		DAGRunMgr:       ctx.DAGRunMgr,
-		ProcStore:       ctx.ProcStore,
-		QueueStore:      ctx.QueueStore,
-		ServiceRegistry: ctx.ServiceRegistry,
-	}
+	// Create a signal-aware context for services (used for OIDC init and all service operations)
+	serviceCtx := ctx.WithContext(signalCtx)
 
 	// Initialize all services using the signal-aware context
 	scheduler, err := serviceCtx.NewScheduler()
