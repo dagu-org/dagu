@@ -7,7 +7,7 @@ import (
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	frontendauth "github.com/dagu-org/dagu/internal/service/frontend/auth"
-	"nhooyr.io/websocket"
+	"github.com/coder/websocket"
 )
 
 // Handler handles WebSocket connections for the terminal.

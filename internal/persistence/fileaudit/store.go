@@ -78,7 +78,7 @@ func (s *Store) Append(_ context.Context, entry *audit.Entry) error {
 	if err != nil {
 		return fmt.Errorf("fileaudit: failed to open file %s: %w", filePath, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	// Write JSON line
 	if _, err := f.Write(append(data, '\n')); err != nil {
@@ -166,7 +166,7 @@ func (s *Store) readEntriesFromFile(filePath string, filter audit.QueryFilter) (
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var entries []*audit.Entry
 	scanner := bufio.NewScanner(f)

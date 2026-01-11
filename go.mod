@@ -8,9 +8,11 @@ require (
 	github.com/bmatcuk/doublestar/v4 v4.8.0
 	github.com/charmbracelet/bubbles v0.21.0
 	github.com/charmbracelet/bubbletea v1.3.6
+	github.com/coder/websocket v1.8.14
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/platforms v0.2.1
 	github.com/coreos/go-oidc v2.3.0+incompatible
+	github.com/creack/pty v1.1.24
 	github.com/docker/docker v28.4.0+incompatible
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/getkin/kin-openapi v0.133.0
@@ -81,7 +83,6 @@ require (
 	github.com/clipperhouse/uax29/v2 v2.3.0 // indirect
 	github.com/cloudflare/circl v1.6.1 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
-	github.com/creack/pty v1.1.24 // indirect
 	github.com/cyphar/filepath-securejoin v0.4.1 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/docker/cli v28.4.0+incompatible // indirect
@@ -169,7 +170,6 @@ require (
 	modernc.org/libc v1.66.10 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	nhooyr.io/websocket v1.8.17 // indirect
 )
 
 require (

@@ -13,7 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	"github.com/google/uuid"
-	"nhooyr.io/websocket"
+	"github.com/coder/websocket"
 )
 
 // Session represents an interactive terminal session.
@@ -52,18 +52,18 @@ func NewSession(user *auth.User, shell string, conn *websocket.Conn, ipAddress s
 func (s *Session) Run(ctx context.Context, auditSvc *audit.Service) error {
 	// Log session start
 	if auditSvc != nil {
-		auditSvc.LogTerminalSessionStart(ctx, s.User.ID, s.User.Username, s.ID, s.IPAddress)
+		_ = auditSvc.LogTerminalSessionStart(ctx, s.User.ID, s.User.Username, s.ID, s.IPAddress)
 	}
 
 	// Start PTY with shell
-	cmd := exec.Command(s.Shell)
+	cmd := exec.Command(s.Shell) //nolint:gosec // shell path is from config, not user input
 	cmd.Env = os.Environ()
 
 	ptmx, err := pty.Start(cmd)
 	if err != nil {
 		s.sendError("Failed to start shell: " + err.Error())
 		if auditSvc != nil {
-			auditSvc.LogTerminalSessionEnd(ctx, s.User.ID, s.User.Username, s.ID, "pty_error", s.IPAddress)
+			_ = auditSvc.LogTerminalSessionEnd(ctx, s.User.ID, s.User.Username, s.ID, "pty_error", s.IPAddress)
 		}
 		return err
 	}
@@ -89,7 +89,7 @@ func (s *Session) Run(ctx context.Context, auditSvc *audit.Service) error {
 
 	// Log session end
 	if auditSvc != nil {
-		auditSvc.LogTerminalSessionEnd(ctx, s.User.ID, s.User.Username, s.ID, "closed", s.IPAddress)
+		_ = auditSvc.LogTerminalSessionEnd(ctx, s.User.ID, s.User.Username, s.ID, "closed", s.IPAddress)
 	}
 
 	return nil
@@ -155,16 +155,19 @@ func (s *Session) readFromWebSocket(ctx context.Context, auditSvc *audit.Service
 			}
 
 		case MessageTypeResize:
-			if msg.Cols > 0 && msg.Rows > 0 {
+			if msg.Cols > 0 && msg.Cols <= 500 && msg.Rows > 0 && msg.Rows <= 500 {
 				_ = pty.Setsize(s.ptmx, &pty.Winsize{
-					Rows: uint16(msg.Rows),
-					Cols: uint16(msg.Cols),
+					Rows: uint16(msg.Rows), //nolint:gosec // bounds checked above
+					Cols: uint16(msg.Cols), //nolint:gosec // bounds checked above
 				})
 			}
 
 		case MessageTypeClose:
 			s.Close()
 			return
+
+		case MessageTypeOutput, MessageTypeError:
+			// These are server-to-client message types, ignore if received from client
 		}
 	}
 }
@@ -238,7 +241,7 @@ func (s *Session) accumulateAndLogCommand(ctx context.Context, auditSvc *audit.S
 			// Enter pressed - log the accumulated command
 			if len(s.inputBuffer) > 0 {
 				command := string(s.inputBuffer)
-				auditSvc.LogTerminalCommand(ctx, s.User.ID, s.User.Username, s.ID, command, s.IPAddress)
+				_ = auditSvc.LogTerminalCommand(ctx, s.User.ID, s.User.Username, s.ID, command, s.IPAddress)
 				s.inputBuffer = nil
 			}
 		case 127, '\b':
