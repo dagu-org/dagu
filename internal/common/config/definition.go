@@ -182,17 +182,36 @@ type AuthBuiltinDef struct {
 
 // BuiltinOIDCDef represents the OIDC configuration for builtin auth mode
 type BuiltinOIDCDef struct {
-	Enabled        *bool    `mapstructure:"enabled"`        // Enable OIDC login (default: false)
-	ClientId       string   `mapstructure:"clientId"`       // OIDC client ID
-	ClientSecret   string   `mapstructure:"clientSecret"`   // OIDC client secret
-	ClientUrl      string   `mapstructure:"clientUrl"`      // Application URL for callback
-	Issuer         string   `mapstructure:"issuer"`         // OIDC issuer URL
-	Scopes         []string `mapstructure:"scopes"`         // OIDC scopes (default: openid, profile, email)
-	AutoSignup     *bool    `mapstructure:"autoSignup"`     // Auto-create users on first login (default: false)
-	DefaultRole    string   `mapstructure:"defaultRole"`    // Default role for new users (default: viewer)
-	AllowedDomains []string `mapstructure:"allowedDomains"` // Email domain whitelist
-	Whitelist      []string `mapstructure:"whitelist"`      // Specific email whitelist
-	ButtonLabel    string   `mapstructure:"buttonLabel"`    // Login button text (default: "Login with SSO")
+	Enabled        *bool               `mapstructure:"enabled"`        // Enable OIDC login (default: false)
+	ClientId       string              `mapstructure:"clientId"`       // OIDC client ID
+	ClientSecret   string              `mapstructure:"clientSecret"`   // OIDC client secret
+	ClientUrl      string              `mapstructure:"clientUrl"`      // Application URL for callback
+	Issuer         string              `mapstructure:"issuer"`         // OIDC issuer URL
+	Scopes         []string            `mapstructure:"scopes"`         // OIDC scopes (default: openid, profile, email)
+	AutoSignup     *bool               `mapstructure:"autoSignup"`     // Auto-create users on first login (default: false)
+	DefaultRole    string              `mapstructure:"defaultRole"`    // Default role for new users (default: viewer)
+	AllowedDomains []string            `mapstructure:"allowedDomains"` // Email domain whitelist
+	Whitelist      []string            `mapstructure:"whitelist"`      // Specific email whitelist
+	ButtonLabel    string              `mapstructure:"buttonLabel"`    // Login button text (default: "Login with SSO")
+	RoleMapping    *OIDCRoleMappingDef `mapstructure:"roleMapping"`    // Role mapping configuration
+}
+
+// OIDCRoleMappingDef defines how OIDC claims are mapped to Dagu roles
+type OIDCRoleMappingDef struct {
+	// GroupsClaim specifies the claim name containing groups (default: "groups")
+	// Common values: "groups", "roles", "cognito:groups", "realm_access.roles"
+	GroupsClaim string `mapstructure:"groupsClaim"`
+	// GroupMappings maps IdP group names to Dagu roles
+	// Example: {"admins": "admin", "developers": "manager", "ops": "operator"}
+	GroupMappings map[string]string `mapstructure:"groupMappings"`
+	// RoleAttributePath is a jq expression to extract role from claims (advanced)
+	// Example: 'if (.groups | contains(["admins"])) then "admin" else "viewer" end'
+	RoleAttributePath string `mapstructure:"roleAttributePath"`
+	// RoleAttributeStrict denies login when no valid role is found (default: false)
+	RoleAttributeStrict *bool `mapstructure:"roleAttributeStrict"`
+	// SkipOrgRoleSync skips role sync on subsequent logins (default: false)
+	// When true, roles are only assigned on first login
+	SkipOrgRoleSync *bool `mapstructure:"skipOrgRoleSync"`
 }
 
 // AdminConfigDef represents the initial admin user configuration

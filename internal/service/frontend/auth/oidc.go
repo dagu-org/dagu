@@ -441,13 +441,22 @@ func BuiltinOIDCCallbackHandler(cfg *BuiltinOIDCConfig) http.HandlerFunc {
 			return
 		}
 
-		// Extract claims
+		// Extract typed claims
 		var claims oidcprovision.OIDCClaims
 		if err := idToken.Claims(&claims); err != nil {
 			logger.Error(ctx, "Failed to extract OIDC claims", tag.Error(err))
 			redirectWithError(w, r, cfg.LoginBasePath, "Authentication failed: could not read user info")
 			return
 		}
+
+		// Extract raw claims for role mapping
+		var rawClaims map[string]any
+		if err := idToken.Claims(&rawClaims); err != nil {
+			logger.Error(ctx, "Failed to extract raw OIDC claims", tag.Error(err))
+			redirectWithError(w, r, cfg.LoginBasePath, "Authentication failed: could not read user info")
+			return
+		}
+		claims.RawClaims = rawClaims
 
 		// Get userinfo for email (may not be in ID token)
 		userInfo, err := cfg.Provider.UserInfo(ctx, oauth2.StaticTokenSource(oauth2Token))
@@ -459,13 +468,22 @@ func BuiltinOIDCCallbackHandler(cfg *BuiltinOIDCConfig) http.HandlerFunc {
 			if userInfo.Email != "" {
 				claims.Email = userInfo.Email
 			}
+			// Merge userinfo claims into raw claims for role mapping
+			var userInfoClaims map[string]any
+			if err := userInfo.Claims(&userInfoClaims); err == nil {
+				for k, v := range userInfoClaims {
+					if _, exists := claims.RawClaims[k]; !exists {
+						claims.RawClaims[k] = v
+					}
+				}
+			}
 		}
 
 		// Process login (create/lookup user)
 		user, isNewUser, err := cfg.Provision.ProcessLogin(ctx, claims)
 		if err != nil {
 			logger.Warn(ctx, "OIDC provisioning failed",
-				slog.String("email", claims.Email),
+				slog.String("email_domain", extractEmailDomain(claims.Email)),
 				slog.String("subject", claims.Subject),
 				tag.Error(err))
 			redirectWithError(w, r, cfg.LoginBasePath, err.Error())
@@ -502,4 +520,14 @@ func redirectWithError(w http.ResponseWriter, r *http.Request, basePath, errMsg 
 
 	redirectURL := basePath + "/login?error=" + url.QueryEscape(errMsg)
 	http.Redirect(w, r, redirectURL, http.StatusFound)
+}
+
+// extractEmailDomain extracts the domain part from an email address.
+// Returns empty string if the email format is invalid.
+func extractEmailDomain(email string) string {
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 {
+		return ""
+	}
+	return parts[1]
 }

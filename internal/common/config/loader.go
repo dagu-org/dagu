@@ -468,6 +468,19 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 				cfg.Server.Auth.Builtin.OIDC.AllowedDomains = oidc.AllowedDomains
 				cfg.Server.Auth.Builtin.OIDC.Whitelist = oidc.Whitelist
 				cfg.Server.Auth.Builtin.OIDC.ButtonLabel = oidc.ButtonLabel
+				// Load role mapping configuration
+				if oidc.RoleMapping != nil {
+					rm := oidc.RoleMapping
+					cfg.Server.Auth.Builtin.OIDC.RoleMapping.GroupsClaim = rm.GroupsClaim
+					cfg.Server.Auth.Builtin.OIDC.RoleMapping.GroupMappings = rm.GroupMappings
+					cfg.Server.Auth.Builtin.OIDC.RoleMapping.RoleAttributePath = rm.RoleAttributePath
+					if rm.RoleAttributeStrict != nil {
+						cfg.Server.Auth.Builtin.OIDC.RoleMapping.RoleAttributeStrict = *rm.RoleAttributeStrict
+					}
+					if rm.SkipOrgRoleSync != nil {
+						cfg.Server.Auth.Builtin.OIDC.RoleMapping.SkipOrgRoleSync = *rm.SkipOrgRoleSync
+					}
+				}
 			}
 		}
 
@@ -1133,6 +1146,11 @@ var envBindings = []envBinding{
 	{key: "auth.builtin.oidc.allowedDomains", env: "AUTH_BUILTIN_OIDC_ALLOWED_DOMAINS"},
 	{key: "auth.builtin.oidc.whitelist", env: "AUTH_BUILTIN_OIDC_WHITELIST"},
 	{key: "auth.builtin.oidc.buttonLabel", env: "AUTH_BUILTIN_OIDC_BUTTON_LABEL"},
+	// OIDC Role Mapping configuration
+	{key: "auth.builtin.oidc.roleMapping.groupsClaim", env: "AUTH_BUILTIN_OIDC_GROUPS_CLAIM"},
+	{key: "auth.builtin.oidc.roleMapping.roleAttributePath", env: "AUTH_BUILTIN_OIDC_ROLE_ATTRIBUTE_PATH"},
+	{key: "auth.builtin.oidc.roleMapping.roleAttributeStrict", env: "AUTH_BUILTIN_OIDC_ROLE_ATTRIBUTE_STRICT"},
+	{key: "auth.builtin.oidc.roleMapping.skipOrgRoleSync", env: "AUTH_BUILTIN_OIDC_SKIP_ORG_ROLE_SYNC"},
 
 	// TLS configurations
 	{key: "tls.certFile", env: "CERT_FILE"},

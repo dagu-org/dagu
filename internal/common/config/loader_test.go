@@ -178,6 +178,11 @@ func TestLoad_Env(t *testing.T) {
 				Builtin: AuthBuiltin{
 					Admin: AdminConfig{Username: "admin"},
 					Token: TokenConfig{TTL: 24 * time.Hour},
+					OIDC: BuiltinOIDC{
+						Scopes:      []string{"openid", "profile", "email"},
+						DefaultRole: "viewer",
+						ButtonLabel: "Login with SSO",
+					},
 				},
 			},
 			TLS: &TLSConfig{
@@ -395,6 +400,11 @@ scheduler:
 				Builtin: AuthBuiltin{
 					Admin: AdminConfig{Username: "admin"},
 					Token: TokenConfig{TTL: 24 * time.Hour},
+					OIDC: BuiltinOIDC{
+						Scopes:      []string{"openid", "profile", "email"},
+						DefaultRole: "viewer",
+						ButtonLabel: "Login with SSO",
+					},
 				},
 			},
 			TLS: &TLSConfig{

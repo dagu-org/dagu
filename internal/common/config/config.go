@@ -175,17 +175,32 @@ type AuthBuiltin struct {
 
 // BuiltinOIDC represents the OIDC configuration for builtin auth mode
 type BuiltinOIDC struct {
-	Enabled        bool     // Enable OIDC login (default: false)
-	ClientId       string   // OIDC client ID
-	ClientSecret   string   // OIDC client secret
-	ClientUrl      string   // Application URL for callback
-	Issuer         string   // OIDC issuer URL
-	Scopes         []string // OIDC scopes (default: openid, profile, email)
-	AutoSignup     bool     // Auto-create users on first login (default: false)
-	DefaultRole    string   // Default role for new users (default: viewer)
-	AllowedDomains []string // Email domain whitelist
-	Whitelist      []string // Specific email whitelist
-	ButtonLabel    string   // Login button text (default: "Login with SSO")
+	Enabled        bool            // Enable OIDC login (default: false)
+	ClientId       string          // OIDC client ID
+	ClientSecret   string          // OIDC client secret
+	ClientUrl      string          // Application URL for callback
+	Issuer         string          // OIDC issuer URL
+	Scopes         []string        // OIDC scopes (default: openid, profile, email)
+	AutoSignup     bool            // Auto-create users on first login (default: false)
+	DefaultRole    string          // Default role for new users (default: viewer)
+	AllowedDomains []string        // Email domain whitelist
+	Whitelist      []string        // Specific email whitelist
+	ButtonLabel    string          // Login button text (default: "Login with SSO")
+	RoleMapping    OIDCRoleMapping // Role mapping configuration
+}
+
+// OIDCRoleMapping defines how OIDC claims are mapped to Dagu roles
+type OIDCRoleMapping struct {
+	// GroupsClaim specifies the claim name containing groups (default: "groups")
+	GroupsClaim string
+	// GroupMappings maps IdP group names to Dagu roles
+	GroupMappings map[string]string
+	// RoleAttributePath is a jq expression to extract role from claims
+	RoleAttributePath string
+	// RoleAttributeStrict denies login when no valid role is found
+	RoleAttributeStrict bool
+	// SkipOrgRoleSync skips role sync on subsequent logins
+	SkipOrgRoleSync bool
 }
 
 // AdminConfig represents the initial admin user configuration
@@ -443,8 +458,8 @@ func (c *Config) validateBuiltinOIDC() error {
 		}
 	}
 	if !hasEmailScope {
-		// This is a warning, not an error - we'll add it to warnings in the loader
-		// For now, just allow it since email might come from userinfo endpoint
+		c.Warnings = append(c.Warnings,
+			"OIDC scopes do not include 'email'; access control features may not work correctly")
 	}
 
 	return nil

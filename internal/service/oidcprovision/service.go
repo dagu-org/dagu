@@ -41,6 +41,8 @@ type Config struct {
 	// Whitelist is a list of specific email addresses always allowed.
 	// Takes precedence over AllowedDomains.
 	Whitelist []string
+	// RoleMapping holds the role mapping configuration.
+	RoleMapping RoleMapperConfig
 }
 
 // OIDCClaims contains the claims extracted from an OIDC ID token.
@@ -53,22 +55,31 @@ type OIDCClaims struct {
 	PreferredUsername string `json:"preferred_username"`
 	// Name is the user's display name.
 	Name string `json:"name"`
+	// RawClaims contains all claims from the ID token for role mapping.
+	RawClaims map[string]any `json:"-"`
 }
 
 // Service provides OIDC user provisioning functionality.
 type Service struct {
-	userStore auth.UserStore
-	config    Config
-	logger    *slog.Logger
+	userStore  auth.UserStore
+	config     Config
+	roleMapper *RoleMapper
+	logger     *slog.Logger
 }
 
 // New creates a new OIDC provisioning service.
-func New(userStore auth.UserStore, config Config) *Service {
-	return &Service{
-		userStore: userStore,
-		config:    config,
-		logger:    slog.Default().With(slog.String("service", "oidcprovision")),
+func New(userStore auth.UserStore, config Config) (*Service, error) {
+	roleMapper, err := NewRoleMapper(config.RoleMapping)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create role mapper: %w", err)
 	}
+
+	return &Service{
+		userStore:  userStore,
+		config:     config,
+		roleMapper: roleMapper,
+		logger:     slog.Default().With(slog.String("service", "oidcprovision")),
+	}, nil
 }
 
 // ProcessLogin handles OIDC authentication with auto-provisioning.
@@ -82,7 +93,7 @@ func (s *Service) ProcessLogin(ctx context.Context, claims OIDCClaims) (*auth.Us
 	// 1. Check access control (whitelist + allowedDomains)
 	if !s.isEmailAllowed(claims.Email) {
 		s.logger.Warn("OIDC login rejected: email not allowed",
-			slog.String("email", claims.Email),
+			slog.String("email_domain", s.extractDomain(claims.Email)),
 			slog.String("subject", claims.Subject))
 		return nil, false, ErrEmailNotAllowed
 	}
@@ -97,6 +108,17 @@ func (s *Service) ProcessLogin(ctx context.Context, claims OIDCClaims) (*auth.Us
 				slog.String("username", user.Username))
 			return nil, false, authservice.ErrUserDisabled
 		}
+
+		// Sync roles on re-login (unless skipOrgRoleSync is true)
+		if !s.config.RoleMapping.SkipOrgRoleSync {
+			if err := s.syncUserRole(ctx, user, claims); err != nil {
+				s.logger.Warn("failed to sync user role",
+					slog.String("user_id", user.ID),
+					slog.String("error", err.Error()))
+				// Continue with login even if role sync fails (non-fatal)
+			}
+		}
+
 		s.logger.Debug("OIDC login: existing user",
 			slog.String("user_id", user.ID),
 			slog.String("username", user.Username))
@@ -111,39 +133,109 @@ func (s *Service) ProcessLogin(ctx context.Context, claims OIDCClaims) (*auth.Us
 	// 4. Check if auto-signup is enabled
 	if !s.config.AutoSignup {
 		s.logger.Info("OIDC login rejected: auto-signup disabled",
-			slog.String("email", claims.Email),
+			slog.String("email_domain", s.extractDomain(claims.Email)),
 			slog.String("subject", claims.Subject))
 		return nil, false, ErrAutoSignupDisabled
 	}
 
-	// 5. Generate unique username (avoid conflicts with builtin users)
-	username := s.generateUniqueUsername(ctx, claims)
-
-	// 6. Create new user
-	now := time.Now().UTC()
-	user = &auth.User{
-		ID:           uuid.New().String(),
-		Username:     username,
-		Role:         s.config.DefaultRole,
-		AuthProvider: "oidc",
-		OIDCIssuer:   s.config.Issuer,
-		OIDCSubject:  claims.Subject,
-		CreatedAt:    now,
-		UpdatedAt:    now,
+	// 5. Determine role for new user
+	role, err := s.determineRole(claims)
+	if err != nil {
+		s.logger.Warn("OIDC login rejected: role mapping failed",
+			slog.String("email_domain", s.extractDomain(claims.Email)),
+			slog.String("error", err.Error()))
+		return nil, false, err
 	}
 
-	if err := s.userStore.Create(ctx, user); err != nil {
-		return nil, false, fmt.Errorf("failed to create OIDC user: %w", err)
+	// 6. Generate unique username and create user with retry for race conditions
+	const maxRetries = 3
+	var username string
+	now := time.Now().UTC()
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		username = s.generateUniqueUsername(ctx, claims)
+
+		user = &auth.User{
+			ID:           uuid.New().String(),
+			Username:     username,
+			Role:         role,
+			AuthProvider: "oidc",
+			OIDCIssuer:   s.config.Issuer,
+			OIDCSubject:  claims.Subject,
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}
+
+		if err := s.userStore.Create(ctx, user); err != nil {
+			// Handle race condition: another request created a user with same username
+			if errors.Is(err, auth.ErrUserAlreadyExists) && attempt < maxRetries-1 {
+				s.logger.Debug("username collision during OIDC signup, retrying",
+					slog.String("username", username),
+					slog.Int("attempt", attempt+1))
+				continue
+			}
+			return nil, false, fmt.Errorf("failed to create OIDC user: %w", err)
+		}
+		break
 	}
 
 	// Log audit event
 	s.logger.Info("OIDC user created",
 		slog.String("user_id", user.ID),
 		slog.String("username", username),
-		slog.String("email", claims.Email),
+		slog.String("email_domain", s.extractDomain(claims.Email)),
 		slog.String("role", string(user.Role)))
 
 	return user, true, nil // New user created
+}
+
+// determineRole determines the role for a user based on their OIDC claims.
+func (s *Service) determineRole(claims OIDCClaims) (auth.Role, error) {
+	// Use role mapper if configured
+	if s.roleMapper.IsConfigured() {
+		return s.roleMapper.MapRole(claims.RawClaims)
+	}
+
+	// Fall back to default role
+	return s.config.DefaultRole, nil
+}
+
+// syncUserRole updates the user's role based on current OIDC claims.
+func (s *Service) syncUserRole(ctx context.Context, user *auth.User, claims OIDCClaims) error {
+	// Only sync if role mapper is configured
+	if !s.roleMapper.IsConfigured() {
+		return nil
+	}
+
+	newRole, err := s.roleMapper.MapRole(claims.RawClaims)
+	if err != nil {
+		// In strict mode, this is an error; otherwise, keep current role
+		if errors.Is(err, ErrNoRoleFound) {
+			return nil // Keep current role
+		}
+		return err
+	}
+
+	// Check if role changed
+	if user.Role == newRole {
+		return nil
+	}
+
+	oldRole := user.Role
+	user.Role = newRole
+	user.UpdatedAt = time.Now().UTC()
+
+	if err := s.userStore.Update(ctx, user); err != nil {
+		return fmt.Errorf("failed to update user role: %w", err)
+	}
+
+	s.logger.Info("OIDC user role updated",
+		slog.String("user_id", user.ID),
+		slog.String("username", user.Username),
+		slog.String("old_role", string(oldRole)),
+		slog.String("new_role", string(newRole)))
+
+	return nil
 }
 
 // isEmailAllowed checks if an email is allowed based on whitelist and allowedDomains.

@@ -98,8 +98,19 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 				DefaultRole:    authmodel.Role(oidcCfg.DefaultRole),
 				AllowedDomains: oidcCfg.AllowedDomains,
 				Whitelist:      oidcCfg.Whitelist,
+				RoleMapping: oidcprovision.RoleMapperConfig{
+					GroupsClaim:         oidcCfg.RoleMapping.GroupsClaim,
+					GroupMappings:       oidcCfg.RoleMapping.GroupMappings,
+					RoleAttributePath:   oidcCfg.RoleMapping.RoleAttributePath,
+					RoleAttributeStrict: oidcCfg.RoleMapping.RoleAttributeStrict,
+					SkipOrgRoleSync:     oidcCfg.RoleMapping.SkipOrgRoleSync,
+					DefaultRole:         authmodel.Role(oidcCfg.DefaultRole),
+				},
 			}
-			provisionSvc := oidcprovision.New(result.UserStore, provisionCfg)
+			provisionSvc, err := oidcprovision.New(result.UserStore, provisionCfg)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create OIDC provisioning service: %w", err)
+			}
 
 			// Initialize OIDC provider
 			builtinOIDCCfg, err = auth.InitBuiltinOIDCConfig(

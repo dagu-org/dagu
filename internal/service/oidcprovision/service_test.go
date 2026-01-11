@@ -118,11 +118,12 @@ func (m *mockUserStore) Count(_ context.Context) (int64, error) {
 
 func TestProcessLogin_NewUser(t *testing.T) {
 	store := newMockUserStore()
-	svc := New(store, Config{
+	svc, err := New(store, Config{
 		Issuer:      "https://issuer.example.com",
 		AutoSignup:  true,
 		DefaultRole: auth.RoleViewer,
 	})
+	require.NoError(t, err)
 
 	claims := OIDCClaims{
 		Subject:           "sub123",
@@ -153,11 +154,12 @@ func TestProcessLogin_ExistingUser(t *testing.T) {
 	}
 	_ = store.Create(context.Background(), existingUser)
 
-	svc := New(store, Config{
+	svc, err := New(store, Config{
 		Issuer:      "https://issuer.example.com",
 		AutoSignup:  true,
 		DefaultRole: auth.RoleViewer,
 	})
+	require.NoError(t, err)
 
 	claims := OIDCClaims{
 		Subject:           "sub123",
@@ -187,11 +189,12 @@ func TestProcessLogin_DisabledUser(t *testing.T) {
 	}
 	_ = store.Create(context.Background(), existingUser)
 
-	svc := New(store, Config{
+	svc, err := New(store, Config{
 		Issuer:      "https://issuer.example.com",
 		AutoSignup:  true,
 		DefaultRole: auth.RoleViewer,
 	})
+	require.NoError(t, err)
 
 	claims := OIDCClaims{
 		Subject:           "sub123",
@@ -260,7 +263,8 @@ func TestProcessLogin_ErrorCases(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			store := newMockUserStore()
-			svc := New(store, tc.config)
+			svc, err := New(store, tc.config)
+			require.NoError(t, err)
 
 			user, isNew, err := svc.ProcessLogin(context.Background(), tc.claims)
 			assert.ErrorIs(t, err, tc.expectedError)
@@ -340,11 +344,12 @@ func TestGenerateUniqueUsername(t *testing.T) {
 				_ = store.Create(context.Background(), user)
 			}
 
-			svc := New(store, Config{
+			svc, err := New(store, Config{
 				Issuer:      "https://issuer.example.com",
 				AutoSignup:  true,
 				DefaultRole: auth.RoleViewer,
 			})
+			require.NoError(t, err)
 
 			username := svc.generateUniqueUsername(context.Background(), tc.claims)
 			assert.Equal(t, tc.expectedResult, username)
@@ -383,11 +388,12 @@ func TestGenerateUniqueUsername_FallbackToSubject(t *testing.T) {
 		})
 	}
 
-	svc := New(store, Config{
+	svc, err := New(store, Config{
 		Issuer:      "https://issuer.example.com",
 		AutoSignup:  true,
 		DefaultRole: auth.RoleViewer,
 	})
+	require.NoError(t, err)
 
 	claims := OIDCClaims{
 		Subject:           "abcd1234efgh5678",
@@ -499,11 +505,12 @@ func TestProcessLogin_OIDCIdentityLookupError(t *testing.T) {
 	store := newMockUserStore()
 	store.getByOIDCIdentityErr = errors.New("database connection failed")
 
-	svc := New(store, Config{
+	svc, err := New(store, Config{
 		Issuer:      "https://issuer.example.com",
 		AutoSignup:  true,
 		DefaultRole: auth.RoleViewer,
 	})
+	require.NoError(t, err)
 
 	claims := OIDCClaims{
 		Subject:           "sub123",
@@ -522,11 +529,12 @@ func TestProcessLogin_UserCreationError(t *testing.T) {
 	store := newMockUserStore()
 	store.createErr = errors.New("database write failed")
 
-	svc := New(store, Config{
+	svc, err := New(store, Config{
 		Issuer:      "https://issuer.example.com",
 		AutoSignup:  true,
 		DefaultRole: auth.RoleViewer,
 	})
+	require.NoError(t, err)
 
 	claims := OIDCClaims{
 		Subject:           "sub123",
@@ -586,11 +594,12 @@ func TestEmailLocalPart(t *testing.T) {
 
 func TestGenerateUniqueUsername_SanitizedToEmpty(t *testing.T) {
 	store := newMockUserStore()
-	svc := New(store, Config{
+	svc, err := New(store, Config{
 		Issuer:      "https://issuer.example.com",
 		AutoSignup:  true,
 		DefaultRole: auth.RoleViewer,
 	})
+	require.NoError(t, err)
 
 	// Both preferred_username and email local part sanitize to empty
 	claims := OIDCClaims{
@@ -605,11 +614,12 @@ func TestGenerateUniqueUsername_SanitizedToEmpty(t *testing.T) {
 
 func TestGenerateUniqueUsername_ShortSubject(t *testing.T) {
 	store := newMockUserStore()
-	svc := New(store, Config{
+	svc, err := New(store, Config{
 		Issuer:      "https://issuer.example.com",
 		AutoSignup:  true,
 		DefaultRole: auth.RoleViewer,
 	})
+	require.NoError(t, err)
 
 	// Subject is less than 8 characters
 	claims := OIDCClaims{
@@ -637,11 +647,12 @@ func TestGenerateUniqueUsername_SSONumberedFallback(t *testing.T) {
 		AuthProvider: "oidc",
 	})
 
-	svc := New(store, Config{
+	svc, err := New(store, Config{
 		Issuer:      "https://issuer.example.com",
 		AutoSignup:  true,
 		DefaultRole: auth.RoleViewer,
 	})
+	require.NoError(t, err)
 
 	claims := OIDCClaims{
 		Subject:           "sub123",

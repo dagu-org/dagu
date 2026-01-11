@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
@@ -43,8 +44,9 @@ type Store struct {
 }
 
 // oidcIdentityKey creates a composite key for the OIDC identity index.
+// Uses URL encoding to prevent collisions when issuer contains ports or subject contains colons.
 func oidcIdentityKey(issuer, subject string) string {
-	return issuer + ":" + subject
+	return url.QueryEscape(issuer) + ":" + url.QueryEscape(subject)
 }
 
 var _ auth.UserStore = (*Store)(nil)
@@ -174,6 +176,14 @@ func (s *Store) Create(_ context.Context, user *auth.User) error {
 	// Check if ID already exists (shouldn't happen with UUIDs, but be safe)
 	if _, exists := s.byID[user.ID]; exists {
 		return auth.ErrUserAlreadyExists
+	}
+
+	// Check if OIDC identity already exists
+	if user.OIDCIssuer != "" && user.OIDCSubject != "" {
+		key := oidcIdentityKey(user.OIDCIssuer, user.OIDCSubject)
+		if _, exists := s.byOIDCIdentity[key]; exists {
+			return auth.ErrOIDCIdentityAlreadyExists
+		}
 	}
 
 	// Write user to file
@@ -339,14 +349,45 @@ func (s *Store) Update(_ context.Context, user *auth.User) error {
 		s.byUsername[user.Username] = user.ID
 	}
 
+	// Handle OIDC identity changes
+	oldOIDCKey := oidcIdentityKey(existingUser.OIDCIssuer, existingUser.OIDCSubject)
+	newOIDCKey := oidcIdentityKey(user.OIDCIssuer, user.OIDCSubject)
+	oidcChanged := oldOIDCKey != newOIDCKey
+
+	if oidcChanged {
+		// Check if new OIDC identity already exists (and belongs to a different user)
+		if user.OIDCIssuer != "" && user.OIDCSubject != "" {
+			if existingID, taken := s.byOIDCIdentity[newOIDCKey]; taken && existingID != user.ID {
+				// Rollback username change if needed
+				if existingUser.Username != user.Username {
+					delete(s.byUsername, user.Username)
+					s.byUsername[existingUser.Username] = user.ID
+				}
+				return auth.ErrOIDCIdentityAlreadyExists
+			}
+		}
+	}
+
 	// Write updated user
 	if err := s.writeUserToFile(filePath, user); err != nil {
-		// Rollback index change on failure
+		// Rollback index changes on failure
 		if existingUser.Username != user.Username {
 			delete(s.byUsername, user.Username)
 			s.byUsername[existingUser.Username] = user.ID
 		}
 		return err
+	}
+
+	// Update OIDC index after successful write
+	if oidcChanged {
+		// Remove old OIDC identity index (if it was set)
+		if existingUser.OIDCIssuer != "" && existingUser.OIDCSubject != "" {
+			delete(s.byOIDCIdentity, oldOIDCKey)
+		}
+		// Add new OIDC identity index (if it is set)
+		if user.OIDCIssuer != "" && user.OIDCSubject != "" {
+			s.byOIDCIdentity[newOIDCKey] = user.ID
+		}
 	}
 
 	return nil
@@ -381,11 +422,23 @@ func (s *Store) Delete(_ context.Context, id string) error {
 	delete(s.byID, id)
 	if user != nil {
 		delete(s.byUsername, user.Username)
+		// Remove OIDC identity index if present
+		if user.OIDCIssuer != "" && user.OIDCSubject != "" {
+			key := oidcIdentityKey(user.OIDCIssuer, user.OIDCSubject)
+			delete(s.byOIDCIdentity, key)
+		}
 	} else {
 		// File was already gone; remove any username entry that still points to this ID.
 		for username, userID := range s.byUsername {
 			if userID == id {
 				delete(s.byUsername, username)
+				break
+			}
+		}
+		// Also clean up any OIDC identity entry that points to this ID
+		for key, userID := range s.byOIDCIdentity {
+			if userID == id {
+				delete(s.byOIDCIdentity, key)
 				break
 			}
 		}

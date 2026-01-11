@@ -18,6 +18,9 @@ var (
 	ErrInvalidUserID = errors.New("invalid user ID")
 	// ErrOIDCIdentityNotFound is returned when an OIDC identity cannot be found.
 	ErrOIDCIdentityNotFound = errors.New("OIDC identity not found")
+	// ErrOIDCIdentityAlreadyExists is returned when attempting to create a user
+	// with an OIDC identity that already exists.
+	ErrOIDCIdentityAlreadyExists = errors.New("OIDC identity already exists")
 )
 
 // Common errors for API key store operations.
