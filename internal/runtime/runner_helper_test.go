@@ -333,7 +333,7 @@ func (rr runResult) nodeByName(t *testing.T, stepName string) *runtime.Node {
 		return rr.runner.HandlerNode(core.HandlerOnCancel)
 	}
 
-	t.Fatalf("step %s not found", stepName)
+	require.FailNow(t, "step not found", "step %s not found in nodes", stepName)
 	return nil
 }
 

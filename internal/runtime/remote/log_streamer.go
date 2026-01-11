@@ -15,6 +15,10 @@ import (
 const (
 	// logBufferSize is the size of the buffer for accumulating log data before flushing.
 	logBufferSize = 32 * 1024 // 32KB
+
+	// maxChunkSize is the maximum size of a single log chunk sent via gRPC.
+	// Keep below 4MB to leave room for proto overhead and stay within gRPC limits.
+	maxChunkSize = 3 * 1024 * 1024 // 3MB
 )
 
 // LogStreamer streams logs to coordinator via gRPC
@@ -75,15 +79,16 @@ func (s *LogStreamer) NewStepWriter(ctx context.Context, stepName string, stream
 
 // stepLogWriter implements io.WriteCloser for streaming logs
 type stepLogWriter struct {
-	ctx        context.Context
-	streamer   *LogStreamer
-	stepName   string
-	streamType int
-	buffer     []byte
-	sequence   uint64
-	stream     coordinatorv1.CoordinatorService_StreamLogsClient
-	mu         sync.Mutex
-	closed     bool
+	ctx              context.Context
+	streamer         *LogStreamer
+	stepName         string
+	streamType       int
+	buffer           []byte
+	sequence         uint64
+	stream           coordinatorv1.CoordinatorService_StreamLogsClient
+	mu               sync.Mutex
+	closed           bool
+	streamInitFailed bool // Tracks permanent stream initialization failure
 }
 
 // Write implements io.Writer
@@ -112,10 +117,19 @@ func (w *stepLogWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// flush sends buffered data to coordinator
+// flush sends buffered data to coordinator.
+// Implements chunk splitting for large buffers to stay within gRPC message size limits.
+// Sequence numbers are only incremented after successful Send to avoid gaps.
 func (w *stepLogWriter) flush() error {
 	if len(w.buffer) == 0 {
 		return nil
+	}
+
+	// Check for permanent stream initialization failure
+	if w.streamInitFailed {
+		// Clear buffer to prevent memory growth on permanent failure
+		w.buffer = w.buffer[:0]
+		return nil // Silently fail - already logged on first failure
 	}
 
 	// Initialize stream if needed
@@ -123,30 +137,54 @@ func (w *stepLogWriter) flush() error {
 		var err error
 		w.stream, err = w.streamer.client.StreamLogs(w.ctx)
 		if err != nil {
+			// Mark as permanently failed to prevent tight retry loop
+			w.streamInitFailed = true
+			logger.Error(w.ctx, "Stream initialization failed permanently",
+				tag.Error(err),
+				tag.Step(w.stepName),
+			)
+			w.buffer = w.buffer[:0] // Discard to prevent memory growth
 			return err
 		}
 	}
 
-	// Copy buffer to avoid data corruption if Send buffers the message
-	dataCopy := make([]byte, len(w.buffer))
-	copy(dataCopy, w.buffer)
+	// Split buffer into chunks if necessary to stay within gRPC limits
+	data := w.buffer
+	w.buffer = w.buffer[:0]
 
-	w.sequence++
-	chunk := &coordinatorv1.LogChunk{
-		WorkerId:       w.streamer.workerID,
-		DagRunId:       w.streamer.dagRunID,
-		DagName:        w.streamer.dagName,
-		StepName:       w.stepName,
-		StreamType:     toProtoStreamType(w.streamType),
-		Data:           dataCopy,
-		Sequence:       w.sequence,
-		RootDagRunName: w.streamer.rootRef.Name,
-		RootDagRunId:   w.streamer.rootRef.ID,
-		AttemptId:      w.streamer.getAttemptID(),
+	for len(data) > 0 {
+		chunkSize := len(data)
+		if chunkSize > maxChunkSize {
+			chunkSize = maxChunkSize
+		}
+
+		// Copy chunk data to avoid corruption if Send buffers the message
+		chunkData := make([]byte, chunkSize)
+		copy(chunkData, data[:chunkSize])
+		data = data[chunkSize:]
+
+		// Use peek value for sequence - only increment after successful Send
+		nextSeq := w.sequence + 1
+		chunk := &coordinatorv1.LogChunk{
+			WorkerId:       w.streamer.workerID,
+			DagRunId:       w.streamer.dagRunID,
+			DagName:        w.streamer.dagName,
+			StepName:       w.stepName,
+			StreamType:     toProtoStreamType(w.streamType),
+			Data:           chunkData,
+			Sequence:       nextSeq,
+			RootDagRunName: w.streamer.rootRef.Name,
+			RootDagRunId:   w.streamer.rootRef.ID,
+			AttemptId:      w.streamer.getAttemptID(),
+		}
+
+		if err := w.stream.Send(chunk); err != nil {
+			return err // Return error without incrementing sequence
+		}
+		w.sequence = nextSeq // Only increment after successful Send
 	}
 
-	w.buffer = w.buffer[:0]
-	return w.stream.Send(chunk)
+	return nil
 }
 
 // Close implements io.Closer
@@ -169,7 +207,8 @@ func (w *stepLogWriter) Close() error {
 
 	// Send final marker
 	if w.stream != nil {
-		w.sequence++
+		// Use peek value for sequence - only increment after successful Send
+		nextSeq := w.sequence + 1
 		finalChunk := &coordinatorv1.LogChunk{
 			WorkerId:       w.streamer.workerID,
 			DagRunId:       w.streamer.dagRunID,
@@ -177,7 +216,7 @@ func (w *stepLogWriter) Close() error {
 			StepName:       w.stepName,
 			StreamType:     toProtoStreamType(w.streamType),
 			IsFinal:        true,
-			Sequence:       w.sequence,
+			Sequence:       nextSeq,
 			RootDagRunName: w.streamer.rootRef.Name,
 			RootDagRunId:   w.streamer.rootRef.ID,
 			AttemptId:      w.streamer.getAttemptID(),
@@ -187,6 +226,8 @@ func (w *stepLogWriter) Close() error {
 			if firstErr == nil {
 				firstErr = err
 			}
+		} else {
+			w.sequence = nextSeq // Only increment after successful Send
 		}
 
 		// Close and receive response

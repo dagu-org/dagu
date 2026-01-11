@@ -246,12 +246,12 @@ func streamTypeToExtension(streamType coordinatorv1.LogStreamType) string {
 	return "log"
 }
 
-// Close closes all open writers
-func (h *logHandler) Close() {
+// Close closes all open writers using the provided context for logging.
+// This preserves trace context for observability.
+func (h *logHandler) Close(ctx context.Context) {
 	h.writersMu.Lock()
 	defer h.writersMu.Unlock()
 
-	ctx := context.Background()
 	for _, w := range h.writers {
 		w.close(ctx)
 	}

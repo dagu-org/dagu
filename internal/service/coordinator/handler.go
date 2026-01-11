@@ -33,8 +33,8 @@ type heartbeatInfo struct {
 	lastHeartbeatAt time.Time
 }
 
-// staleHeartbeatThreshold is the duration after which a worker's heartbeat is considered stale.
-const staleHeartbeatThreshold = 30 * time.Second
+// defaultStaleHeartbeatThreshold is the default duration after which a worker's heartbeat is considered stale.
+const defaultStaleHeartbeatThreshold = 30 * time.Second
 
 type Handler struct {
 	coordinatorv1.UnimplementedCoordinatorServiceServer
@@ -50,6 +50,14 @@ type Handler struct {
 	// Open attempts cache for status persistence
 	attemptsMu   sync.RWMutex
 	openAttempts map[string]execution.DAGRunAttempt // dagRunID -> open attempt
+
+	// Per-run mutexes to prevent concurrent access to the same DAG run
+	// This prevents races between ReportStatus and markRunFailed
+	runMutexesMu sync.Mutex
+	runMutexes   map[string]*sync.Mutex // dagRunID -> per-run mutex
+
+	// Stale heartbeat threshold - configurable
+	staleHeartbeatThreshold time.Duration
 
 	// Zombie detector shutdown synchronization
 	zombieDetectorMu      sync.Mutex
@@ -74,11 +82,21 @@ func WithLogDir(dir string) HandlerOption {
 	}
 }
 
+// WithStaleHeartbeatThreshold sets the threshold for considering a worker's heartbeat stale.
+// Workers that haven't sent a heartbeat within this duration are considered dead.
+func WithStaleHeartbeatThreshold(d time.Duration) HandlerOption {
+	return func(h *Handler) {
+		h.staleHeartbeatThreshold = d
+	}
+}
+
 func NewHandler(opts ...HandlerOption) *Handler {
 	h := &Handler{
-		waitingPollers: make(map[string]*workerInfo),
-		heartbeats:     make(map[string]*heartbeatInfo),
-		openAttempts:   make(map[string]execution.DAGRunAttempt),
+		waitingPollers:          make(map[string]*workerInfo),
+		heartbeats:              make(map[string]*heartbeatInfo),
+		openAttempts:            make(map[string]execution.DAGRunAttempt),
+		runMutexes:              make(map[string]*sync.Mutex),
+		staleHeartbeatThreshold: defaultStaleHeartbeatThreshold,
 	}
 	for _, opt := range opts {
 		opt(h)
@@ -99,6 +117,22 @@ func (h *Handler) Close(ctx context.Context) {
 		}
 		delete(h.openAttempts, dagRunID)
 	}
+}
+
+// getRunMutex returns a mutex for the given DAG run ID.
+// This ensures serialized access to operations on the same DAG run
+// across ReportStatus and zombie cleanup to prevent data races.
+func (h *Handler) getRunMutex(dagRunID string) *sync.Mutex {
+	h.runMutexesMu.Lock()
+	defer h.runMutexesMu.Unlock()
+
+	if mu, ok := h.runMutexes[dagRunID]; ok {
+		return mu
+	}
+
+	mu := &sync.Mutex{}
+	h.runMutexes[dagRunID] = mu
+	return mu
 }
 
 // Poll implements long polling - workers wait until a task is available
@@ -260,7 +294,8 @@ func (h *Handler) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatReq
 	}, nil
 }
 
-// getCancelledRunsForWorker checks which of the worker's running tasks have been cancelled
+// getCancelledRunsForWorker checks which of the worker's running tasks have been cancelled.
+// It first checks the local cache to avoid unnecessary database lookups on every heartbeat.
 func (h *Handler) getCancelledRunsForWorker(ctx context.Context, stats *coordinatorv1.WorkerStats) []string {
 	if h.dagRunStore == nil || stats == nil || len(stats.RunningTasks) == 0 {
 		return nil
@@ -268,6 +303,21 @@ func (h *Handler) getCancelledRunsForWorker(ctx context.Context, stats *coordina
 
 	var cancelledRuns []string
 	for _, task := range stats.RunningTasks {
+		// First check local cache (no I/O required)
+		h.attemptsMu.RLock()
+		cachedAttempt, ok := h.openAttempts[task.DagRunId]
+		h.attemptsMu.RUnlock()
+
+		if ok {
+			// Use cached attempt - no additional I/O
+			aborting, err := cachedAttempt.IsAborting(ctx)
+			if err == nil && aborting {
+				cancelledRuns = append(cancelledRuns, task.DagRunId)
+			}
+			continue
+		}
+
+		// Only fall back to FindAttempt if not in cache
 		ref := execution.DAGRunRef{Name: task.DagName, ID: task.DagRunId}
 		attempt, err := h.dagRunStore.FindAttempt(ctx, ref)
 		if err != nil {
@@ -293,7 +343,7 @@ func (h *Handler) getCancelledRunsForWorker(ctx context.Context, stats *coordina
 // This is used in shared-nothing architecture where workers don't have filesystem access.
 func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
 	if h.dagRunStore == nil {
-		return nil, status.Error(codes.FailedPrecondition, "status reporting not configured: dagRunStore is nil")
+		return nil, status.Error(codes.FailedPrecondition, "status reporting not configured: DAG run storage not available")
 	}
 
 	if req.Status == nil {
@@ -316,18 +366,12 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 	}
 
 	if err != nil {
-		return &coordinatorv1.ReportStatusResponse{
-			Accepted: false,
-			Error:    err.Error(),
-		}, nil
+		return nil, status.Error(codes.Internal, "failed to get/open attempt: "+err.Error())
 	}
 
 	// Write the status
 	if err := attempt.Write(ctx, *dagRunStatus); err != nil {
-		return &coordinatorv1.ReportStatusResponse{
-			Accepted: false,
-			Error:    "failed to write status: " + err.Error(),
-		}, nil
+		return nil, status.Error(codes.Internal, "failed to write status: "+err.Error())
 	}
 
 	// Note: We don't close the attempt immediately on terminal status because
@@ -356,9 +400,10 @@ func (h *Handler) getOrOpenSubAttempt(ctx context.Context, rootRef execution.DAG
 
 // getOrOpenAttemptWithFinder is a generic helper that retrieves an open attempt from cache
 // or uses the provided finder function to locate and open a new one.
-// Uses double-check locking to avoid holding the mutex during blocking I/O.
+// Uses per-run mutex to prevent concurrent I/O operations on the same DAG run,
+// avoiding races between ReportStatus and markRunFailed.
 func (h *Handler) getOrOpenAttemptWithFinder(ctx context.Context, cacheKey string, finder func() (execution.DAGRunAttempt, error)) (execution.DAGRunAttempt, error) {
-	// First check: fast path with read lock
+	// First check: fast path with read lock (no per-run mutex needed for cache hit)
 	h.attemptsMu.RLock()
 	if attempt, ok := h.openAttempts[cacheKey]; ok {
 		h.attemptsMu.RUnlock()
@@ -366,7 +411,20 @@ func (h *Handler) getOrOpenAttemptWithFinder(ctx context.Context, cacheKey strin
 	}
 	h.attemptsMu.RUnlock()
 
-	// Perform I/O without lock to avoid blocking other goroutines
+	// Acquire per-run mutex to serialize I/O operations for this DAG run
+	runMu := h.getRunMutex(cacheKey)
+	runMu.Lock()
+	defer runMu.Unlock()
+
+	// Re-check cache after acquiring per-run mutex (another goroutine may have opened it)
+	h.attemptsMu.RLock()
+	if attempt, ok := h.openAttempts[cacheKey]; ok {
+		h.attemptsMu.RUnlock()
+		return attempt, nil
+	}
+	h.attemptsMu.RUnlock()
+
+	// Perform I/O with per-run mutex held
 	attempt, err := finder()
 	if err != nil {
 		return nil, err
@@ -376,13 +434,15 @@ func (h *Handler) getOrOpenAttemptWithFinder(ctx context.Context, cacheKey strin
 		return nil, err
 	}
 
-	// Second check: acquire write lock and verify no race
+	// Add to cache under write lock
 	h.attemptsMu.Lock()
 	defer h.attemptsMu.Unlock()
 
+	// Final check: if somehow another goroutine got through, use theirs
 	if existing, ok := h.openAttempts[cacheKey]; ok {
-		// Another goroutine opened it first, close ours and use theirs
-		_ = attempt.Close(ctx)
+		if err := attempt.Close(ctx); err != nil {
+			logger.Warn(ctx, "Failed to close duplicate opened attempt", tag.Error(err))
+		}
 		return existing, nil
 	}
 
@@ -399,7 +459,7 @@ func (h *Handler) StreamLogs(stream coordinatorv1.CoordinatorService_StreamLogsS
 
 	// Delegate to the log handler
 	logHandler := newLogHandler(h.logDir)
-	defer logHandler.Close() // Ensure file handles are closed on stream end or error
+	defer logHandler.Close(stream.Context()) // Ensure file handles are closed on stream end or error
 	return logHandler.handleStream(stream)
 }
 
@@ -510,7 +570,7 @@ func (h *Handler) collectAndRemoveStaleHeartbeats() []*heartbeatInfo {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	staleThreshold := time.Now().Add(-staleHeartbeatThreshold)
+	staleThreshold := time.Now().Add(-h.staleHeartbeatThreshold)
 	var stale []*heartbeatInfo
 
 	for workerID, info := range h.heartbeats {
@@ -539,15 +599,38 @@ func (h *Handler) markWorkerTasksFailed(ctx context.Context, info *heartbeatInfo
 // This is used to clean up zombie runs when their worker becomes unresponsive.
 // Uses context.WithoutCancel to ensure cleanup I/O completes even if the
 // zombie detector context is canceled mid-flight.
+// Uses per-run mutex to prevent races with concurrent ReportStatus calls.
 func (h *Handler) markRunFailed(ctx context.Context, dagName, dagRunID, reason string) {
 	// Use non-cancelable context for store operations to ensure cleanup completes
 	storeCtx := context.WithoutCancel(ctx)
-	ref := execution.DAGRunRef{Name: dagName, ID: dagRunID}
-	attempt, err := h.dagRunStore.FindAttempt(storeCtx, ref)
-	if err != nil {
-		logger.Error(ctx, "Failed to find attempt for zombie cleanup",
-			tag.DAG(dagName), tag.RunID(dagRunID), tag.Error(err))
-		return
+
+	// Acquire per-run mutex to prevent races with ReportStatus
+	runMu := h.getRunMutex(dagRunID)
+	runMu.Lock()
+	defer runMu.Unlock()
+
+	// Try to use cached attempt first (prevents race with ReportStatus)
+	var attempt execution.DAGRunAttempt
+	var needsOpen bool
+
+	h.attemptsMu.RLock()
+	cachedAttempt, ok := h.openAttempts[dagRunID]
+	h.attemptsMu.RUnlock()
+
+	if ok {
+		attempt = cachedAttempt
+		needsOpen = false
+	} else {
+		// Not in cache, find it
+		ref := execution.DAGRunRef{Name: dagName, ID: dagRunID}
+		foundAttempt, err := h.dagRunStore.FindAttempt(storeCtx, ref)
+		if err != nil {
+			logger.Error(ctx, "Failed to find attempt for zombie cleanup",
+				tag.DAG(dagName), tag.RunID(dagRunID), tag.Error(err))
+			return
+		}
+		attempt = foundAttempt
+		needsOpen = true
 	}
 
 	dagRunStatus, err := attempt.ReadStatus(storeCtx)
@@ -577,13 +660,20 @@ func (h *Handler) markRunFailed(ctx context.Context, dagName, dagRunID, reason s
 		}
 	}
 
-	// Persist the failed status
-	if err := attempt.Open(storeCtx); err != nil {
-		logger.Error(ctx, "Failed to open attempt for zombie cleanup",
-			tag.DAG(dagName), tag.RunID(dagRunID), tag.Error(err))
-		return
+	// Only open if we didn't get from cache
+	if needsOpen {
+		if err := attempt.Open(storeCtx); err != nil {
+			logger.Error(ctx, "Failed to open attempt for zombie cleanup",
+				tag.DAG(dagName), tag.RunID(dagRunID), tag.Error(err))
+			return
+		}
+		defer func() {
+			if err := attempt.Close(storeCtx); err != nil {
+				logger.Warn(ctx, "Failed to close attempt in markRunFailed",
+					tag.DAG(dagName), tag.RunID(dagRunID), tag.Error(err))
+			}
+		}()
 	}
-	defer func() { _ = attempt.Close(storeCtx) }()
 
 	if err := attempt.Write(storeCtx, *dagRunStatus); err != nil {
 		logger.Error(ctx, "Failed to write failed status for zombie cleanup",

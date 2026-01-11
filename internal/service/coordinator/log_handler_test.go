@@ -175,7 +175,7 @@ func TestLogHandler_GetOrCreateWriter(t *testing.T) {
 
 		logDir := t.TempDir()
 		h := newLogHandler(logDir)
-		defer h.Close()
+		defer h.Close(context.Background())
 
 		chunk := &coordinatorv1.LogChunk{
 			DagName:    "test-dag",
@@ -197,7 +197,7 @@ func TestLogHandler_GetOrCreateWriter(t *testing.T) {
 
 		logDir := t.TempDir()
 		h := newLogHandler(logDir)
-		defer h.Close()
+		defer h.Close(context.Background())
 
 		chunk := &coordinatorv1.LogChunk{
 			DagName:    "test-dag",
@@ -222,7 +222,7 @@ func TestLogHandler_GetOrCreateWriter(t *testing.T) {
 
 		logDir := t.TempDir()
 		h := newLogHandler(logDir)
-		defer h.Close()
+		defer h.Close(context.Background())
 
 		chunk := &coordinatorv1.LogChunk{
 			DagName:    "nested-dag",
@@ -246,7 +246,7 @@ func TestLogHandler_GetOrCreateWriter(t *testing.T) {
 
 		logDir := t.TempDir()
 		h := newLogHandler(logDir)
-		defer h.Close()
+		defer h.Close(context.Background())
 
 		chunk1 := &coordinatorv1.LogChunk{
 			DagName:    "dag1",
@@ -376,7 +376,7 @@ func TestLogHandler_Close(t *testing.T) {
 		h.writersMu.Unlock()
 
 		// Close all
-		h.Close()
+		h.Close(context.Background())
 
 		// Verify all are removed
 		h.writersMu.Lock()
@@ -393,7 +393,7 @@ func TestLogWriter_WriteAndFlush(t *testing.T) {
 
 		logDir := t.TempDir()
 		h := newLogHandler(logDir)
-		defer h.Close()
+		defer h.Close(context.Background())
 
 		chunk := &coordinatorv1.LogChunk{
 			DagName:    "test-dag",
@@ -429,7 +429,7 @@ func TestLogHandler_ConcurrentAccess(t *testing.T) {
 
 	logDir := t.TempDir()
 	h := newLogHandler(logDir)
-	defer h.Close()
+	defer h.Close(context.Background())
 
 	// Launch multiple goroutines accessing the handler concurrently
 	done := make(chan bool)
@@ -477,7 +477,7 @@ func TestLogHandler_HandleStream(t *testing.T) {
 
 		logDir := t.TempDir()
 		h := newLogHandler(logDir)
-		defer h.Close()
+		defer h.Close(context.Background())
 
 		chunks := []*coordinatorv1.LogChunk{
 			{
@@ -529,7 +529,7 @@ func TestLogHandler_HandleStream(t *testing.T) {
 
 		logDir := t.TempDir()
 		h := newLogHandler(logDir)
-		defer h.Close()
+		defer h.Close(context.Background())
 
 		chunks := []*coordinatorv1.LogChunk{
 			{
@@ -566,7 +566,7 @@ func TestLogHandler_HandleStream(t *testing.T) {
 
 		logDir := t.TempDir()
 		h := newLogHandler(logDir)
-		defer h.Close()
+		defer h.Close(context.Background())
 
 		chunks := []*coordinatorv1.LogChunk{
 			{
@@ -608,7 +608,7 @@ func TestLogHandler_HandleStream(t *testing.T) {
 
 		logDir := t.TempDir()
 		h := newLogHandler(logDir)
-		defer h.Close()
+		defer h.Close(context.Background())
 
 		chunks := []*coordinatorv1.LogChunk{
 			// Stream 1 - stdout

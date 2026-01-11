@@ -769,10 +769,7 @@ func isReady(ctx context.Context, plan *Plan, node *Node) bool {
 		dep := plan.GetNode(depID)
 
 		switch dep.State().Status {
-		case core.NodeSucceeded:
-			continue
-
-		case core.NodePartiallySucceeded:
+		case core.NodeSucceeded, core.NodePartiallySucceeded:
 			// Partial success is treated like success for dependencies
 			continue
 
@@ -1100,22 +1097,17 @@ func (r *Runner) finishNode(node *Node, wg *sync.WaitGroup) {
 	defer r.mu.Unlock()
 
 	switch node.State().Status {
-	case core.NodeSucceeded:
+	case core.NodeSucceeded, core.NodePartiallySucceeded:
 		r.metrics.completedNodes++
-	case core.NodeFailed:
+	case core.NodeFailed, core.NodeRejected:
 		r.metrics.failedNodes++
 	case core.NodeSkipped:
 		r.metrics.skippedNodes++
 	case core.NodeAborted:
 		r.metrics.canceledNodes++
-	case core.NodePartiallySucceeded:
-		r.metrics.completedNodes++ // Count partial success as completed
-	case core.NodeWaiting:
-		// Waiting nodes are counted when they complete after approval
-	case core.NodeRejected:
-		r.metrics.failedNodes++ // Rejected nodes are counted as failed
-	case core.NodeNotStarted, core.NodeRunning:
-		// Should not happen at this point
+	case core.NodeWaiting, core.NodeNotStarted, core.NodeRunning:
+		// Waiting nodes are counted when they complete after approval.
+		// NotStarted/Running should not happen at this point.
 	}
 
 	node.Finish()

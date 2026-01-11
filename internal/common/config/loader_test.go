@@ -1139,43 +1139,55 @@ func TestParseCoordinatorAddresses(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		input    interface{}
-		expected []string
+		name             string
+		input            interface{}
+		expectedAddrs    []string
+		expectedWarnings int // Number of expected warnings
 	}{
-		// String input tests
-		{"empty string", "", nil},
-		{"single address string", "host:8080", []string{"host:8080"}},
-		{"multiple addresses string", "host1:8080,host2:9090", []string{"host1:8080", "host2:9090"}},
-		{"whitespace trimmed string", " host1:8080 , host2:9090 ", []string{"host1:8080", "host2:9090"}},
-		{"empty parts filtered", "host1:8080,,host2:9090", []string{"host1:8080", "host2:9090"}},
-		{"trailing comma", "host:8080,", []string{"host:8080"}},
-		{"leading comma", ",host:8080", []string{"host:8080"}},
+		// Valid string input tests
+		{"empty string", "", nil, 0},
+		{"single address string", "host:8080", []string{"host:8080"}, 0},
+		{"multiple addresses string", "host1:8080,host2:9090", []string{"host1:8080", "host2:9090"}, 0},
+		{"whitespace trimmed string", " host1:8080 , host2:9090 ", []string{"host1:8080", "host2:9090"}, 0},
+		{"empty parts filtered", "host1:8080,,host2:9090", []string{"host1:8080", "host2:9090"}, 0},
+		{"trailing comma", "host:8080,", []string{"host:8080"}, 0},
+		{"leading comma", ",host:8080", []string{"host:8080"}, 0},
+		{"IPv6 address", "[::1]:8080", []string{"[::1]:8080"}, 0},
 
-		// []interface{} input tests (YAML)
-		{"empty interface slice", []interface{}{}, nil},
-		{"interface slice with addresses", []interface{}{"host1:8080", "host2:9090"}, []string{"host1:8080", "host2:9090"}},
-		{"interface slice filters non-strings", []interface{}{"host:8080", 123, "host2:9090"}, []string{"host:8080", "host2:9090"}},
-		{"interface slice filters empty strings", []interface{}{"host:8080", "", "host2:9090"}, []string{"host:8080", "host2:9090"}},
-		{"interface slice trims whitespace", []interface{}{" host1:8080 ", " host2:9090 "}, []string{"host1:8080", "host2:9090"}},
+		// Valid []interface{} input tests (YAML)
+		{"empty interface slice", []interface{}{}, nil, 0},
+		{"interface slice with addresses", []interface{}{"host1:8080", "host2:9090"}, []string{"host1:8080", "host2:9090"}, 0},
+		{"interface slice filters non-strings", []interface{}{"host:8080", 123, "host2:9090"}, []string{"host:8080", "host2:9090"}, 0},
+		{"interface slice filters empty strings", []interface{}{"host:8080", "", "host2:9090"}, []string{"host:8080", "host2:9090"}, 0},
+		{"interface slice trims whitespace", []interface{}{" host1:8080 ", " host2:9090 "}, []string{"host1:8080", "host2:9090"}, 0},
 
-		// []string input tests
-		{"empty string slice", []string{}, nil},
-		{"string slice with addresses", []string{"host1:8080", "host2:9090"}, []string{"host1:8080", "host2:9090"}},
-		{"string slice trims whitespace", []string{" host1:8080 ", " host2:9090 "}, []string{"host1:8080", "host2:9090"}},
-		{"string slice filters empty", []string{"host:8080", "", "host2:9090"}, []string{"host:8080", "host2:9090"}},
+		// Valid []string input tests
+		{"empty string slice", []string{}, nil, 0},
+		{"string slice with addresses", []string{"host1:8080", "host2:9090"}, []string{"host1:8080", "host2:9090"}, 0},
+		{"string slice trims whitespace", []string{" host1:8080 ", " host2:9090 "}, []string{"host1:8080", "host2:9090"}, 0},
+		{"string slice filters empty", []string{"host:8080", "", "host2:9090"}, []string{"host:8080", "host2:9090"}, 0},
 
 		// Edge cases
-		{"nil input", nil, nil},
-		{"unsupported type int", 12345, nil},
-		{"unsupported type map", map[string]string{"key": "value"}, nil},
+		{"nil input", nil, nil, 0},
+		{"unsupported type int", 12345, nil, 0},
+		{"unsupported type map", map[string]string{"key": "value"}, nil, 0},
+
+		// Invalid addresses - should generate warnings
+		{"missing port", "host", nil, 1},
+		{"invalid port", "host:abc", nil, 1},
+		{"port out of range", "host:70000", nil, 1},
+		{"port zero", "host:0", nil, 1},
+		{"empty host", ":8080", nil, 1},
+		{"mixed valid and invalid", "host1:8080,invalid,host2:9090", []string{"host1:8080", "host2:9090"}, 1},
+		{"all invalid", []string{"invalid1", "invalid2"}, nil, 2},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := parseCoordinatorAddresses(tt.input)
-			assert.Equal(t, tt.expected, result)
+			result, warnings := parseCoordinatorAddresses(tt.input)
+			assert.Equal(t, tt.expectedAddrs, result)
+			assert.Len(t, warnings, tt.expectedWarnings)
 		})
 	}
 }

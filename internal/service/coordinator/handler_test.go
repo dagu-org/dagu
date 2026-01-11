@@ -73,17 +73,18 @@ func (m *mockDAGRunStore) FindAttempt(_ context.Context, dagRun execution.DAGRun
 }
 
 // Implement other required interface methods (unused in tests)
+// These methods return sentinel errors or panic to make test failures obvious if accidentally called.
 func (m *mockDAGRunStore) CreateAttempt(_ context.Context, _ *core.DAG, _ time.Time, _ string, _ execution.NewDAGRunAttemptOptions) (execution.DAGRunAttempt, error) {
-	return nil, nil
+	panic("CreateAttempt not implemented in mock")
 }
 func (m *mockDAGRunStore) RecentAttempts(_ context.Context, _ string, _ int) []execution.DAGRunAttempt {
-	return nil
+	return nil // Empty slice is valid
 }
 func (m *mockDAGRunStore) LatestAttempt(_ context.Context, _ string) (execution.DAGRunAttempt, error) {
-	return nil, nil
+	return nil, execution.ErrDAGRunIDNotFound
 }
 func (m *mockDAGRunStore) ListStatuses(_ context.Context, _ ...execution.ListDAGRunStatusesOption) ([]*execution.DAGRunStatus, error) {
-	return nil, nil
+	return nil, nil // Empty list is valid
 }
 func (m *mockDAGRunStore) FindSubAttempt(_ context.Context, rootRef execution.DAGRunRef, subDAGRunID string) (execution.DAGRunAttempt, error) {
 	m.mu.Lock()
