@@ -666,6 +666,16 @@ func (r *Runner) execNode(ctx context.Context, node *Node) error {
 func (r *Runner) Signal(
 	ctx context.Context, plan *Plan, sig os.Signal, done chan bool, allowOverride bool,
 ) {
+	isTermination := signal.IsTerminationSignalOS(sig)
+
+	// Set canceled flag FIRST so execution loops see it immediately.
+	// This prevents a race where the execution loop checks isCanceled()
+	// before we've set the flag, causing it to mark nodes as Succeeded
+	// instead of Aborted.
+	if !r.isCanceled() && isTermination {
+		r.setCanceled()
+	}
+
 	for _, node := range plan.Nodes() {
 		// for a repetitive task, we'll wait for the job to finish
 		// until time reaches max wait time
@@ -676,11 +686,6 @@ func (r *Runner) Signal(
 			continue
 		}
 		node.Signal(ctx, sig, allowOverride)
-	}
-
-	isTermination := signal.IsTerminationSignalOS(sig)
-	if !r.isCanceled() && isTermination {
-		r.setCanceled()
 	}
 
 	if done != nil && isTermination {
