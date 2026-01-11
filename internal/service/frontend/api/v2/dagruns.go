@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
@@ -353,6 +354,12 @@ func (a *API) GetDAGRunLog(ctx context.Context, request api.GetDAGRunLogRequestO
 	// Use the new log utility function
 	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(dagStatus.Log, options)
 	if err != nil {
+		if strings.Contains(err.Error(), "file not found") {
+			return api.GetDAGRunLog404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("log file not found for dag-run %s", dagRunId),
+			}, nil
+		}
 		return nil, fmt.Errorf("error reading %s: %w", dagStatus.Log, err)
 	}
 
@@ -469,7 +476,13 @@ func (a *API) GetDAGRunStepLog(ctx context.Context, request api.GetDAGRunStepLog
 	// Use the new log utility function
 	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(logFile, options)
 	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %w", node.Stdout, err)
+		if strings.Contains(err.Error(), "file not found") {
+			return api.GetDAGRunStepLog404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("log file not found for step %s", request.StepName),
+			}, nil
+		}
+		return nil, fmt.Errorf("error reading %s: %w", logFile, err)
 	}
 
 	return api.GetDAGRunStepLog200JSONResponse{
@@ -1150,6 +1163,12 @@ func (a *API) GetSubDAGRunLog(ctx context.Context, request api.GetSubDAGRunLogRe
 	// Use the new log utility function
 	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(dagStatus.Log, options)
 	if err != nil {
+		if strings.Contains(err.Error(), "file not found") {
+			return &api.GetSubDAGRunLog404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("log file not found for sub dag-run %s", request.SubDAGRunId),
+			}, nil
+		}
 		return nil, fmt.Errorf("error reading %s: %w", dagStatus.Log, err)
 	}
 
@@ -1198,7 +1217,13 @@ func (a *API) GetSubDAGRunStepLog(ctx context.Context, request api.GetSubDAGRunS
 	// Use the new log utility function
 	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(logFile, options)
 	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %w", node.Stdout, err)
+		if strings.Contains(err.Error(), "file not found") {
+			return &api.GetSubDAGRunStepLog404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("log file not found for step %s", request.StepName),
+			}, nil
+		}
+		return nil, fmt.Errorf("error reading %s: %w", logFile, err)
 	}
 
 	return &api.GetSubDAGRunStepLog200JSONResponse{
@@ -1333,7 +1358,8 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 		return nil, err
 	}
 
-	attempt, err := a.dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef(request.Name, request.DagRunId))
+	ref := execution.NewDAGRunRef(request.Name, request.DagRunId)
+	attempt, err := a.dagRunStore.FindAttempt(ctx, ref)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
@@ -1347,25 +1373,52 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 		return nil, fmt.Errorf("error reading DAG: %w", err)
 	}
 
-	dagStatus, err := a.dagRunMgr.GetCurrentStatus(ctx, dag, request.DagRunId)
+	// Get saved status to check if it's a distributed DAG
+	savedStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
 			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG %s not found", request.Name),
+			Message:    fmt.Sprintf("DAG status not found for %s", request.Name),
 		}
 	}
 
-	if dagStatus.Status != core.Running {
-		return nil, &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeNotRunning,
-			Message:    "DAG is not running",
+	// Check if it's a distributed DAG (has WorkerID)
+	if savedStatus.WorkerID != "" {
+		// For distributed DAGs, use saved status for running check
+		if savedStatus.Status != core.Running {
+			return nil, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeNotRunning,
+				Message:    "DAG is not running",
+			}
 		}
-	}
+		// Send cancel request via coordinator
+		if err := a.coordinatorCli.RequestCancel(ctx, request.Name, request.DagRunId, nil); err != nil {
+			return nil, fmt.Errorf("error requesting cancel: %w", err)
+		}
+	} else {
+		// For local DAGs, use existing logic with GetCurrentStatus and socket
+		dagStatus, err := a.dagRunMgr.GetCurrentStatus(ctx, dag, request.DagRunId)
+		if err != nil {
+			return nil, &Error{
+				HTTPStatus: http.StatusNotFound,
+				Code:       api.ErrorCodeNotFound,
+				Message:    fmt.Sprintf("DAG %s not found", request.Name),
+			}
+		}
 
-	if err := a.dagRunMgr.Stop(ctx, dag, dagStatus.DAGRunID); err != nil {
-		return nil, fmt.Errorf("error stopping DAG: %w", err)
+		if dagStatus.Status != core.Running {
+			return nil, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeNotRunning,
+				Message:    "DAG is not running",
+			}
+		}
+
+		if err := a.dagRunMgr.Stop(ctx, dag, dagStatus.DAGRunID); err != nil {
+			return nil, fmt.Errorf("error stopping DAG: %w", err)
+		}
 	}
 
 	// Log DAG termination

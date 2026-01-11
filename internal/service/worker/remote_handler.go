@@ -91,6 +91,9 @@ func (h *remoteTaskHandler) Handle(ctx context.Context, task *coordinatorv1.Task
 		}
 		return h.handleRetry(ctx, task)
 
+	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
+		return fmt.Errorf("unspecified operation")
+
 	default:
 		return fmt.Errorf("unsupported operation: %v", task.Operation)
 	}
@@ -272,6 +275,20 @@ func (h *remoteTaskHandler) executeDAGRun(
 		return err
 	}
 	defer env.cleanup()
+
+	// Open scheduler log file for writing
+	logFile, err := os.OpenFile(env.logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to create scheduler log file: %w", err)
+	}
+	defer func() {
+		if closeErr := logFile.Close(); closeErr != nil {
+			logger.Warn(ctx, "Failed to close scheduler log file", tag.Error(closeErr))
+		}
+	}()
+
+	// Configure logger to write to the scheduler log file
+	ctx = logger.WithLogger(ctx, logger.NewLogger(logger.WithWriter(logFile)))
 
 	// Build agent options
 	opts := agent.Options{

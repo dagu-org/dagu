@@ -130,6 +130,7 @@ const (
 	LogStreamType_LOG_STREAM_TYPE_UNSPECIFIED LogStreamType = 0
 	LogStreamType_LOG_STREAM_TYPE_STDOUT      LogStreamType = 1
 	LogStreamType_LOG_STREAM_TYPE_STDERR      LogStreamType = 2
+	LogStreamType_LOG_STREAM_TYPE_SCHEDULER   LogStreamType = 3 // Scheduler/DAG run log
 )
 
 // Enum value maps for LogStreamType.
@@ -138,11 +139,13 @@ var (
 		0: "LOG_STREAM_TYPE_UNSPECIFIED",
 		1: "LOG_STREAM_TYPE_STDOUT",
 		2: "LOG_STREAM_TYPE_STDERR",
+		3: "LOG_STREAM_TYPE_SCHEDULER",
 	}
 	LogStreamType_value = map[string]int32{
 		"LOG_STREAM_TYPE_UNSPECIFIED": 0,
 		"LOG_STREAM_TYPE_STDOUT":      1,
 		"LOG_STREAM_TYPE_STDERR":      2,
+		"LOG_STREAM_TYPE_SCHEDULER":   3,
 	}
 )
 
@@ -2286,11 +2289,12 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	" WORKER_HEALTH_STATUS_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cWORKER_HEALTH_STATUS_HEALTHY\x10\x01\x12 \n" +
 	"\x1cWORKER_HEALTH_STATUS_WARNING\x10\x02\x12\"\n" +
-	"\x1eWORKER_HEALTH_STATUS_UNHEALTHY\x10\x03*h\n" +
+	"\x1eWORKER_HEALTH_STATUS_UNHEALTHY\x10\x03*\x87\x01\n" +
 	"\rLogStreamType\x12\x1f\n" +
 	"\x1bLOG_STREAM_TYPE_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16LOG_STREAM_TYPE_STDOUT\x10\x01\x12\x1a\n" +
-	"\x16LOG_STREAM_TYPE_STDERR\x10\x022\xb8\x05\n" +
+	"\x16LOG_STREAM_TYPE_STDERR\x10\x02\x12\x1d\n" +
+	"\x19LOG_STREAM_TYPE_SCHEDULER\x10\x032\xb8\x05\n" +
 	"\x12CoordinatorService\x12A\n" +
 	"\x04Poll\x12\x1b.coordinator.v1.PollRequest\x1a\x1c.coordinator.v1.PollResponse\x12M\n" +
 	"\bDispatch\x12\x1f.coordinator.v1.DispatchRequest\x1a .coordinator.v1.DispatchResponse\x12S\n" +

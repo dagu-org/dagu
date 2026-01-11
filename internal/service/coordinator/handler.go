@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
@@ -443,6 +445,9 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 	// Convert proto to execution.DAGRunStatus
 	dagRunStatus := convert.ProtoToDAGRunStatus(req.Status)
 
+	// Transform worker-local log paths to coordinator paths (shared-nothing mode)
+	h.transformLogPaths(dagRunStatus)
+
 	// Get or create an open attempt for this dag run
 	// Check if this is a sub-DAG (has root that differs from self)
 	var attempt execution.DAGRunAttempt
@@ -469,6 +474,73 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 	// code paths. Attempts are cleaned up during coordinator shutdown.
 
 	return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
+}
+
+// transformLogPaths rewrites worker-local log paths to coordinator paths.
+// This is called when logDir is configured (shared-nothing mode).
+func (h *Handler) transformLogPaths(status *execution.DAGRunStatus) {
+	if h.logDir == "" {
+		return // Not in shared-nothing mode, keep original paths
+	}
+
+	dagName := status.Name
+	dagRunID := status.DAGRunID
+	attemptID := status.AttemptID
+
+	// For sub-DAGs, logs are stored under root DAG's directory
+	if status.Root.ID != "" && status.Root.ID != dagRunID {
+		dagName = status.Root.Name
+		dagRunID = status.Root.ID
+	}
+
+	// Use dagRunID as attemptID if not set (matches log_handler.go logic)
+	if attemptID == "" {
+		attemptID = status.DAGRunID
+	}
+
+	// Helper to compute coordinator log path
+	computePath := func(stepName string, streamType coordinatorv1.LogStreamType) string {
+		ext := StreamTypeToExtension(streamType)
+		filename := fmt.Sprintf("%s.%s", fileutil.SafeName(stepName), ext)
+		return filepath.Join(
+			h.logDir,
+			fileutil.SafeName(dagName),
+			fileutil.SafeName(dagRunID),
+			fileutil.SafeName(attemptID),
+			filename,
+		)
+	}
+
+	// Transform node log paths
+	transformNode := func(node *execution.Node) {
+		if node == nil {
+			return
+		}
+		node.Stdout = computePath(node.Step.Name, coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDOUT)
+		node.Stderr = computePath(node.Step.Name, coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDERR)
+	}
+
+	// Transform all regular nodes
+	for _, node := range status.Nodes {
+		transformNode(node)
+	}
+
+	// Transform handler nodes
+	transformNode(status.OnInit)
+	transformNode(status.OnExit)
+	transformNode(status.OnSuccess)
+	transformNode(status.OnFailure)
+	transformNode(status.OnCancel)
+	transformNode(status.OnWait)
+
+	// Transform scheduler log path
+	status.Log = filepath.Join(
+		h.logDir,
+		fileutil.SafeName(dagName),
+		fileutil.SafeName(dagRunID),
+		fileutil.SafeName(attemptID),
+		"scheduler.log",
+	)
 }
 
 // getOrOpenAttempt retrieves an open attempt from cache or opens a new one.

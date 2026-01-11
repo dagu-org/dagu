@@ -101,6 +101,7 @@ type mockRemoteCoordinatorClient struct {
 	GetWorkersFunc      func(ctx context.Context) ([]*coordinatorv1.WorkerInfo, error)
 	CleanupFunc         func(ctx context.Context) error
 	MetricsFunc         func() coordinator.Metrics
+	RequestCancelFunc   func(ctx context.Context, dagName, dagRunID string, rootRef *execution.DAGRunRef) error
 }
 
 func newMockRemoteCoordinatorClient() *mockRemoteCoordinatorClient {
@@ -181,6 +182,13 @@ func (m *mockRemoteCoordinatorClient) Metrics() coordinator.Metrics {
 		return m.MetricsFunc()
 	}
 	return coordinator.Metrics{IsConnected: true}
+}
+
+func (m *mockRemoteCoordinatorClient) RequestCancel(ctx context.Context, dagName, dagRunID string, rootRef *execution.DAGRunRef) error {
+	if m.RequestCancelFunc != nil {
+		return m.RequestCancelFunc(ctx, dagName, dagRunID, rootRef)
+	}
+	return nil
 }
 
 // mockRemoteDAGRunAttempt implements execution.DAGRunAttempt for testing
@@ -352,6 +360,21 @@ func (m *mockRemoteDAGRunStore) FindSubAttempt(_ context.Context, rootRef execut
 	if !ok {
 		return nil, execution.ErrDAGRunIDNotFound
 	}
+	return attempt, nil
+}
+
+func (m *mockRemoteDAGRunStore) CreateSubAttempt(_ context.Context, rootRef execution.DAGRunRef, subDAGRunID string) (execution.DAGRunAttempt, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.createErr != nil {
+		return nil, m.createErr
+	}
+	key := fmt.Sprintf("%s:%s", rootRef.ID, subDAGRunID)
+	attempt := &mockRemoteDAGRunAttempt{
+		id:     subDAGRunID,
+		status: &execution.DAGRunStatus{},
+	}
+	m.subAttempts[key] = attempt
 	return attempt, nil
 }
 

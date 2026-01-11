@@ -33,6 +33,8 @@ type RemoteProgressDisplay struct {
 	spinnerIndex int
 	lastStatus   *execution.DAGRunStatus
 	stopped      bool
+	stopCh       chan struct{}
+	wg           sync.WaitGroup
 }
 
 // NewRemoteProgressDisplay creates a new remote progress display.
@@ -49,12 +51,39 @@ func NewRemoteProgressDisplay(dag *core.DAG, dagRunID string) *RemoteProgressDis
 		colorEnabled: isTTY,
 		isTTY:        isTTY,
 		startTime:    time.Now(),
+		stopCh:       make(chan struct{}),
 	}
 }
 
-// Start prints the initial header.
+// Start prints the initial header and starts the animation loop.
 func (p *RemoteProgressDisplay) Start() {
 	p.printHeader()
+
+	if p.isTTY {
+		p.wg.Add(1)
+		go p.animationLoop()
+	}
+}
+
+// animationLoop runs a fast ticker to update the spinner animation.
+func (p *RemoteProgressDisplay) animationLoop() {
+	defer p.wg.Done()
+
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-p.stopCh:
+			return
+		case <-ticker.C:
+			p.mu.Lock()
+			if !p.stopped {
+				p.render()
+			}
+			p.mu.Unlock()
+		}
+	}
 }
 
 // Update updates the display with new status from coordinator.
@@ -77,8 +106,6 @@ func (p *RemoteProgressDisplay) Update(protoStatus *coordinatorv1.DAGRunStatusPr
 			p.completed++
 		}
 	}
-
-	p.render()
 }
 
 // Stop stops the display and prints final status.
@@ -92,6 +119,10 @@ func (p *RemoteProgressDisplay) Stop() {
 	status := p.lastStatus
 	p.mu.Unlock()
 
+	// Stop the animation loop
+	close(p.stopCh)
+	p.wg.Wait()
+
 	p.printFinal(status)
 }
 
@@ -100,6 +131,15 @@ func (p *RemoteProgressDisplay) GetLastStatus() *execution.DAGRunStatus {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.lastStatus
+}
+
+// SetCancelled updates the status to Aborted when cancellation is requested.
+func (p *RemoteProgressDisplay) SetCancelled() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.lastStatus != nil {
+		p.lastStatus.Status = core.Aborted
+	}
 }
 
 // PrintSummary prints the final tree summary.
@@ -113,14 +153,10 @@ func (p *RemoteProgressDisplay) PrintSummary() {
 		return
 	}
 
-	// Create renderer with remote-appropriate config (no stdout/stderr since logs are remote)
-	config := output.Config{
-		ColorEnabled:   term.IsTerminal(int(os.Stdout.Fd())),
-		ShowStdout:     false, // No remote log access
-		ShowStderr:     false, // No remote log access
-		MaxOutputLines: 0,
-		MaxWidth:       output.DefaultMaxWidth,
-	}
+	// Create renderer config - logs are synced from remote workers
+	config := output.DefaultConfig()
+	config.ColorEnabled = term.IsTerminal(int(os.Stdout.Fd()))
+	config.MaxOutputLines = 10
 
 	renderer := output.NewRenderer(config)
 	summary := renderer.RenderDAGStatus(dag, status)
@@ -144,6 +180,7 @@ func (p *RemoteProgressDisplay) printHeader() {
 	}
 }
 
+// render must be called with mu held.
 func (p *RemoteProgressDisplay) render() {
 	if !p.isTTY {
 		return // No inline updates for non-TTY

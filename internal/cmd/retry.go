@@ -1,9 +1,13 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+	"os/signal"
 	"path/filepath"
+	"syscall"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
@@ -177,6 +181,28 @@ func executeRetry(ctx *Context, dag *core.DAG, status *execution.DAGRunStatus, r
 
 // dispatchRetryToCoordinatorAndWait dispatches a retry to coordinator and waits for completion.
 func dispatchRetryToCoordinatorAndWait(ctx *Context, dag *core.DAG, dagRunID, stepName string, prevStatus *execution.DAGRunStatus, coordinatorCli coordinator.Client) error {
+	// Set up signal-aware context so Ctrl+C cancels the operation
+	signalCtx, stop := signal.NotifyContext(ctx.Context, syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	signalAwareCtx := ctx.WithContext(signalCtx)
+
+	// Set up progress display early so user sees feedback immediately
+	showProgress := shouldEnableProgress(ctx)
+	var progress *RemoteProgressDisplay
+	if showProgress {
+		progress = NewRemoteProgressDisplay(dag, dagRunID)
+		progress.Start()
+	}
+
+	defer func() {
+		if progress != nil {
+			progress.Stop()
+			if !ctx.Quiet {
+				progress.PrintSummary()
+			}
+		}
+	}()
+
 	logger.Info(ctx, "Dispatching retry for distributed execution",
 		slog.Any("worker-selector", dag.WorkerSelector),
 	)
@@ -197,10 +223,46 @@ func dispatchRetryToCoordinatorAndWait(ctx *Context, dag *core.DAG, dagRunID, st
 		opts...,
 	)
 
-	if err := coordinatorCli.Dispatch(ctx, task); err != nil {
+	if err := coordinatorCli.Dispatch(signalAwareCtx, task); err != nil {
 		return fmt.Errorf("failed to dispatch retry task: %w", err)
 	}
 
 	logger.Info(ctx, "Retry dispatched to coordinator; awaiting completion")
-	return waitForDAGCompletion(ctx, dag, dagRunID, coordinatorCli)
+	err := waitForDAGCompletionWithProgress(signalAwareCtx, dag, dagRunID, coordinatorCli, progress)
+
+	// If context was cancelled (e.g., Ctrl+C), request cancellation on coordinator
+	if signalCtx.Err() != nil {
+		logger.Info(ctx, "Requesting cancellation of distributed DAG run", tag.RunID(dagRunID))
+		cancelCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if cancelErr := coordinatorCli.RequestCancel(cancelCtx, dag.Name, dagRunID, nil); cancelErr != nil {
+			logger.Warn(ctx, "Failed to request cancellation", tag.Error(cancelErr))
+		}
+
+		// Poll for up to 5 seconds until status reflects cancellation
+		if progress != nil {
+			ticker := time.NewTicker(500 * time.Millisecond)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-cancelCtx.Done():
+					// Timeout - set cancelled status manually
+					progress.SetCancelled()
+					return err
+				case <-ticker.C:
+					if resp, fetchErr := coordinatorCli.GetDAGRunStatus(cancelCtx, dag.Name, dagRunID, nil); fetchErr == nil && resp != nil && resp.Status != nil {
+						progress.Update(resp.Status)
+						status := core.Status(resp.Status.Status)
+						if !status.IsActive() {
+							// Status is no longer running, we're done
+							return err
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return err
 }

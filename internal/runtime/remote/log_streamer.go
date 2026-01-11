@@ -2,7 +2,9 @@ package remote
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"os"
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
@@ -75,6 +77,83 @@ func (s *LogStreamer) NewStepWriter(ctx context.Context, stepName string, stream
 		streamType: streamType,
 		buffer:     make([]byte, 0, logBufferSize),
 	}
+}
+
+// StreamSchedulerLog reads the local scheduler.log file and streams it to the coordinator.
+// This should be called after DAG execution completes.
+func (s *LogStreamer) StreamSchedulerLog(ctx context.Context, logFilePath string) error {
+	// Read the scheduler.log file
+	// #nosec G304 - logFilePath is a controlled internal path from createAgentEnv
+	data, err := os.ReadFile(logFilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil // No scheduler log, nothing to stream
+		}
+		return fmt.Errorf("failed to read scheduler log: %w", err)
+	}
+
+	if len(data) == 0 {
+		return nil // Empty file, nothing to stream
+	}
+
+	// Create a stream to the coordinator
+	stream, err := s.client.StreamLogs(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create log stream: %w", err)
+	}
+
+	// Split into chunks if necessary (scheduler logs can be large)
+	var sequence uint64 = 0
+	for len(data) > 0 {
+		chunkSize := len(data)
+		if chunkSize > maxChunkSize {
+			chunkSize = maxChunkSize
+		}
+
+		chunkData := make([]byte, chunkSize)
+		copy(chunkData, data[:chunkSize])
+		data = data[chunkSize:]
+
+		sequence++
+		chunk := &coordinatorv1.LogChunk{
+			WorkerId:       s.workerID,
+			DagRunId:       s.dagRunID,
+			DagName:        s.dagName,
+			StepName:       "scheduler",
+			StreamType:     coordinatorv1.LogStreamType_LOG_STREAM_TYPE_SCHEDULER,
+			Data:           chunkData,
+			Sequence:       sequence,
+			RootDagRunName: s.rootRef.Name,
+			RootDagRunId:   s.rootRef.ID,
+			AttemptId:      s.getAttemptID(),
+		}
+
+		if err := stream.Send(chunk); err != nil {
+			return fmt.Errorf("failed to send scheduler log chunk: %w", err)
+		}
+	}
+
+	// Send final marker
+	finalChunk := &coordinatorv1.LogChunk{
+		WorkerId:       s.workerID,
+		DagRunId:       s.dagRunID,
+		DagName:        s.dagName,
+		StepName:       "scheduler",
+		StreamType:     coordinatorv1.LogStreamType_LOG_STREAM_TYPE_SCHEDULER,
+		IsFinal:        true,
+		Sequence:       sequence + 1,
+		RootDagRunName: s.rootRef.Name,
+		RootDagRunId:   s.rootRef.ID,
+		AttemptId:      s.getAttemptID(),
+	}
+
+	if err := stream.Send(finalChunk); err != nil {
+		return fmt.Errorf("failed to send final marker: %w", err)
+	}
+
+	// Close and get response
+	_, err = stream.CloseAndRecv()
+	return err
 }
 
 // stepLogWriter implements io.WriteCloser for streaming logs

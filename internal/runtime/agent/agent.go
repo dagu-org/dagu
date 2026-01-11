@@ -38,6 +38,7 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/docker"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/ssh"
+	"github.com/dagu-org/dagu/internal/runtime/remote"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 
@@ -644,6 +645,15 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Finalize status (after outputs are written)
 	a.writeStatus(ctx, attempt, a.Status(ctx))
+
+	// Stream scheduler log to coordinator if using remote logging (shared-nothing mode)
+	if a.logWriterFactory != nil {
+		if streamer, ok := a.logWriterFactory.(*remote.LogStreamer); ok {
+			if err := streamer.StreamSchedulerLog(ctx, a.logFile); err != nil {
+				logger.Warn(ctx, "Failed to stream scheduler log", tag.Error(err))
+			}
+		}
+	}
 
 	// Send the execution report if necessary.
 	a.lastErr = lastErr

@@ -471,6 +471,10 @@ func (m *mockCoordinatorCli) GetDAGRunStatus(_ context.Context, _, _ string, _ *
 	return &coordinatorv1.GetDAGRunStatusResponse{Found: false}, nil
 }
 
+func (m *mockCoordinatorCli) RequestCancel(_ context.Context, _, _ string, _ *execution.DAGRunRef) error {
+	return nil
+}
+
 func (m *mockCoordinatorCli) updateState(err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

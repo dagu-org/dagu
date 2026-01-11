@@ -221,8 +221,15 @@ func (h *logHandler) logFilePath(chunk *coordinatorv1.LogChunk) string {
 		attemptDir = dagRunID
 	}
 
-	ext := streamTypeToExtension(chunk.StreamType)
-	filename := fmt.Sprintf("%s.%s", fileutil.SafeName(chunk.StepName), ext)
+	ext := StreamTypeToExtension(chunk.StreamType)
+
+	// For scheduler logs, use just "scheduler.log" without stepName prefix
+	var filename string
+	if chunk.StreamType == coordinatorv1.LogStreamType_LOG_STREAM_TYPE_SCHEDULER {
+		filename = "scheduler.log"
+	} else {
+		filename = fmt.Sprintf("%s.%s", fileutil.SafeName(chunk.StepName), ext)
+	}
 
 	return filepath.Join(
 		h.logDir,
@@ -233,13 +240,15 @@ func (h *logHandler) logFilePath(chunk *coordinatorv1.LogChunk) string {
 	)
 }
 
-// streamTypeToExtension returns the file extension for a given stream type.
-func streamTypeToExtension(streamType coordinatorv1.LogStreamType) string {
+// StreamTypeToExtension returns the file extension for a given stream type.
+func StreamTypeToExtension(streamType coordinatorv1.LogStreamType) string {
 	switch streamType {
 	case coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDOUT:
 		return "stdout.log"
 	case coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDERR:
 		return "stderr.log"
+	case coordinatorv1.LogStreamType_LOG_STREAM_TYPE_SCHEDULER:
+		return "scheduler.log"
 	case coordinatorv1.LogStreamType_LOG_STREAM_TYPE_UNSPECIFIED:
 		return "log"
 	}

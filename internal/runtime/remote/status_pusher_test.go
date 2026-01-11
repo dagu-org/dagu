@@ -63,6 +63,10 @@ func (m *mockCoordinatorClient) GetDAGRunStatus(_ context.Context, _, _ string, 
 	panic("GetDAGRunStatus not implemented in mock")
 }
 
+func (m *mockCoordinatorClient) RequestCancel(_ context.Context, _, _ string, _ *execution.DAGRunRef) error {
+	panic("RequestCancel not implemented in mock")
+}
+
 func TestNewStatusPusher(t *testing.T) {
 	t.Parallel()
 

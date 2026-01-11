@@ -253,6 +253,7 @@ enum LogStreamType {
   LOG_STREAM_TYPE_UNSPECIFIED = 0;
   LOG_STREAM_TYPE_STDOUT = 1;
   LOG_STREAM_TYPE_STDERR = 2;
+  LOG_STREAM_TYPE_SCHEDULER = 3;  // Scheduler/DAG run log
 }
 
 // Response message for log streaming.

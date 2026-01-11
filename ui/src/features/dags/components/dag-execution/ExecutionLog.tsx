@@ -274,15 +274,18 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
   // Use cached data if available, otherwise use current data
   const logData = (data || cachedData) as LogWithPagination;
 
-  // Handle error state
+  // Handle error state (but not 404 - that just means no log file exists yet)
   if (error && !logData) {
-    return (
-      <div className="w-full h-full flex items-center justify-center">
-        <div className="text-error">
-          Error loading log data: {error.message || 'Unknown error'}
+    const isNotFound = error.message?.includes('not found');
+    if (!isNotFound) {
+      return (
+        <div className="w-full h-full flex items-center justify-center">
+          <div className="text-error">
+            Error loading log data: {error.message || 'Unknown error'}
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
   }
 
   // Process log data

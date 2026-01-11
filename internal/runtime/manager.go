@@ -395,6 +395,13 @@ func (m *Manager) checkAndUpdateStaleRunningStatus(
 	att execution.DAGRunAttempt,
 	st *execution.DAGRunStatus,
 ) error {
+	// Skip stale check for distributed DAGs - they run on remote workers
+	// and don't have local heartbeat files. The coordinator's zombie detector
+	// handles failure detection for distributed DAGs via worker heartbeats.
+	if st.WorkerID != "" {
+		return nil
+	}
+
 	dag, err := att.ReadDAG(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read DAG for stale status check: %w", err)

@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmd/dagpicker"
@@ -476,6 +479,28 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent execution.DAGRunRef, dagRun
 
 // dispatchToCoordinatorAndWait dispatches a DAG to coordinator and waits for completion.
 func dispatchToCoordinatorAndWait(ctx *Context, d *core.DAG, dagRunID string, coordinatorCli coordinator.Client) error {
+	// Set up signal-aware context so Ctrl+C cancels the operation
+	signalCtx, stop := signal.NotifyContext(ctx.Context, syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	signalAwareCtx := ctx.WithContext(signalCtx)
+
+	// Set up progress display early so user sees feedback immediately
+	showProgress := shouldEnableProgress(ctx)
+	var progress *RemoteProgressDisplay
+	if showProgress {
+		progress = NewRemoteProgressDisplay(d, dagRunID)
+		progress.Start()
+	}
+
+	defer func() {
+		if progress != nil {
+			progress.Stop()
+			if !ctx.Quiet {
+				progress.PrintSummary()
+			}
+		}
+	}()
+
 	logger.Info(ctx, "Dispatching DAG for distributed execution",
 		slog.Any("worker-selector", d.WorkerSelector),
 	)
@@ -488,40 +513,53 @@ func dispatchToCoordinatorAndWait(ctx *Context, d *core.DAG, dagRunID string, co
 		executor.WithWorkerSelector(d.WorkerSelector),
 	)
 
-	if err := coordinatorCli.Dispatch(ctx, task); err != nil {
+	if err := coordinatorCli.Dispatch(signalAwareCtx, task); err != nil {
 		return fmt.Errorf("failed to dispatch task: %w", err)
 	}
 
 	logger.Info(ctx, "DAG dispatched to coordinator; awaiting completion")
-	return waitForDAGCompletion(ctx, d, dagRunID, coordinatorCli)
-}
+	err := waitForDAGCompletionWithProgress(signalAwareCtx, d, dagRunID, coordinatorCli, progress)
 
-// waitForDAGCompletion polls the coordinator until the DAG run completes.
-func waitForDAGCompletion(ctx *Context, d *core.DAG, dagRunID string, coordinatorCli coordinator.Client) error {
-	// Set up progress display
-	showProgress := shouldEnableProgress(ctx)
-	var progress *RemoteProgressDisplay
-	if showProgress {
-		progress = NewRemoteProgressDisplay(d, dagRunID)
-		progress.Start()
-	}
+	// If context was cancelled (e.g., Ctrl+C), request cancellation on coordinator
+	if signalCtx.Err() != nil {
+		logger.Info(ctx, "Requesting cancellation of distributed DAG run", tag.RunID(dagRunID))
+		cancelCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if cancelErr := coordinatorCli.RequestCancel(cancelCtx, d.Name, dagRunID, nil); cancelErr != nil {
+			logger.Warn(ctx, "Failed to request cancellation", tag.Error(cancelErr))
+		}
 
-	var finalErr error
-
-	defer func() {
+		// Poll for up to 5 seconds until status reflects cancellation
 		if progress != nil {
-			progress.Stop()
-			if !ctx.Quiet {
-				progress.PrintSummary()
-			}
-			// Print result line like local execution
-			status := progress.GetLastStatus()
-			if status != nil {
-				fmt.Fprintf(os.Stdout, "\nResult: %s\n", status.Status)
+			ticker := time.NewTicker(500 * time.Millisecond)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-cancelCtx.Done():
+					// Timeout - set cancelled status manually
+					progress.SetCancelled()
+					return err
+				case <-ticker.C:
+					if resp, fetchErr := coordinatorCli.GetDAGRunStatus(cancelCtx, d.Name, dagRunID, nil); fetchErr == nil && resp != nil && resp.Status != nil {
+						progress.Update(resp.Status)
+						status := core.Status(resp.Status.Status)
+						if !status.IsActive() {
+							// Status is no longer running, we're done
+							return err
+						}
+					}
+				}
 			}
 		}
-	}()
+	}
 
+	return err
+}
+
+// waitForDAGCompletionWithProgress polls the coordinator until the DAG run completes.
+// Progress display is managed by the caller.
+func waitForDAGCompletionWithProgress(ctx *Context, d *core.DAG, dagRunID string, coordinatorCli coordinator.Client, progress *RemoteProgressDisplay) error {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
@@ -534,11 +572,10 @@ func waitForDAGCompletion(ctx *Context, d *core.DAG, dagRunID string, coordinato
 	for {
 		select {
 		case <-ctx.Done():
-			finalErr = ctx.Err()
-			return finalErr
+			return ctx.Err()
 
 		case <-logTicker.C:
-			if !showProgress {
+			if progress == nil {
 				// Only log if not showing progress (progress display shows its own updates)
 				logger.Info(ctx, "Waiting for DAG completion...", tag.RunID(dagRunID))
 			}
@@ -551,8 +588,7 @@ func waitForDAGCompletion(ctx *Context, d *core.DAG, dagRunID string, coordinato
 					tag.Error(err), slog.Int("consecutive_errors", consecutiveErrors))
 
 				if consecutiveErrors >= maxConsecutiveErrors {
-					finalErr = fmt.Errorf("lost connection to coordinator after %d attempts: %w", consecutiveErrors, err)
-					return finalErr
+					return fmt.Errorf("lost connection to coordinator after %d attempts: %w", consecutiveErrors, err)
 				}
 				continue
 			}
@@ -574,8 +610,7 @@ func waitForDAGCompletion(ctx *Context, d *core.DAG, dagRunID string, coordinato
 					logger.Info(ctx, "DAG completed successfully", tag.RunID(dagRunID))
 					return nil
 				}
-				finalErr = fmt.Errorf("DAG run failed with status: %s", status)
-				return finalErr
+				return fmt.Errorf("DAG run failed with status: %s", status)
 			}
 		}
 	}
