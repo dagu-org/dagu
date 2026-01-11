@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -452,17 +453,17 @@ func (c *Config) validateOIDCForBuiltin() error {
 		return fmt.Errorf("OIDC roleMapping.defaultRole must be one of: admin, manager, operator, viewer (got: %q)", oidc.RoleMapping.DefaultRole)
 	}
 
-	// Warn if email scope is not included (required for access control)
-	hasEmailScope := false
-	for _, scope := range oidc.Scopes {
-		if scope == "email" {
-			hasEmailScope = true
-			break
-		}
-	}
+	// Check if email scope is included
+	hasEmailScope := slices.Contains(oidc.Scopes, "email")
+
+	// Error if access control features require email but scope is missing
 	if !hasEmailScope {
+		if len(oidc.Whitelist) > 0 || len(oidc.AllowedDomains) > 0 {
+			return fmt.Errorf("OIDC scopes must include 'email' when whitelist or allowedDomains is configured")
+		}
+		// Just warn if no access control is configured
 		c.Warnings = append(c.Warnings,
-			"OIDC scopes do not include 'email'; access control features may not work correctly")
+			"OIDC scopes do not include 'email'; access control features will not work if added later")
 	}
 
 	return nil

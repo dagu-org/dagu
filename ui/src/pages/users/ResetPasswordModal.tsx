@@ -74,7 +74,10 @@ export function ResetPasswordModal({ open, user, onClose }: ResetPasswordModalPr
 
     try {
       const token = localStorage.getItem('dagu_auth_token');
-      const remoteNode = appBarContext.selectedRemoteNode || 'local';
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+      const remoteNode = encodeURIComponent(appBarContext.selectedRemoteNode || 'local');
       const response = await fetch(`${config.apiURL}/users/${user.id}/reset-password?remoteNode=${remoteNode}`, {
         method: 'POST',
         headers: {

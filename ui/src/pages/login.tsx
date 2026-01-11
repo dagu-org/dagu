@@ -46,7 +46,8 @@ export default function LoginPage() {
     }
 
     if (errorParam) {
-      setError(decodeURIComponent(errorParam));
+      // Note: searchParams.get() already decodes URL params, no need for decodeURIComponent
+      setError(errorParam);
     }
     if (welcomeParam === 'true') {
       setWelcomeMessage('Welcome! Your account has been created.');

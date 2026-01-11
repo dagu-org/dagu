@@ -514,6 +514,40 @@ func TestConfig_Validate(t *testing.T) {
 		assert.Contains(t, cfg.Warnings[0], "email")
 	})
 
+	t.Run("BuiltinAuth_OIDC_MissingEmailScope_WithWhitelist_ReturnsError", func(t *testing.T) {
+		t.Parallel()
+		cfg := &Config{
+			Server: Server{
+				Port: 8080,
+				Auth: Auth{
+					Mode: AuthModeBuiltin,
+					Builtin: AuthBuiltin{
+						Admin: AdminConfig{Username: "admin"},
+						Token: TokenConfig{Secret: "secret", TTL: 1},
+					},
+					OIDC: AuthOIDC{
+						ClientId:     "client-id",
+						ClientSecret: "secret",
+						ClientUrl:    "https://example.com",
+						Issuer:       "https://issuer.com",
+						Scopes:       []string{"openid", "profile"}, // No email scope
+						Whitelist:    []string{"user@example.com"},  // But whitelist is set
+						RoleMapping:  OIDCRoleMapping{DefaultRole: "viewer"},
+					},
+				},
+			},
+			Paths: PathsConfig{
+				UsersDir: "/tmp/users",
+			},
+			UI: UI{
+				MaxDashboardPageLimit: 1,
+			},
+		}
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "email")
+	})
+
 	t.Run("BuiltinAuth_OIDC_AllValidRoles", func(t *testing.T) {
 		t.Parallel()
 		validRoles := []string{"admin", "manager", "operator", "viewer"}

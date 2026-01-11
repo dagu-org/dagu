@@ -1266,8 +1266,10 @@ func parseStringList(input interface{}) []string {
 		}
 	case []interface{}:
 		for _, item := range v {
-			if s, ok := item.(string); ok && s != "" {
-				result = append(result, s)
+			if s, ok := item.(string); ok {
+				if trimmed := strings.TrimSpace(s); trimmed != "" {
+					result = append(result, trimmed)
+				}
 			}
 		}
 	case []string:

@@ -82,7 +82,10 @@ export function UserFormModal({ open, user, onClose, onSuccess }: UserFormModalP
 
     try {
       const token = localStorage.getItem('dagu_auth_token');
-      const remoteNode = appBarContext.selectedRemoteNode || 'local';
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+      const remoteNode = encodeURIComponent(appBarContext.selectedRemoteNode || 'local');
 
       if (isEditing) {
         // Update user

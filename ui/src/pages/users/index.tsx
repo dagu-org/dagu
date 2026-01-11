@@ -56,7 +56,7 @@ export default function UsersPage() {
   const fetchUsers = useCallback(async () => {
     try {
       const token = localStorage.getItem(TOKEN_KEY);
-      const remoteNode = appBarContext.selectedRemoteNode || 'local';
+      const remoteNode = encodeURIComponent(appBarContext.selectedRemoteNode || 'local');
       const response = await fetch(`${config.apiURL}/users?remoteNode=${remoteNode}`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -85,7 +85,7 @@ export default function UsersPage() {
 
     try {
       const token = localStorage.getItem(TOKEN_KEY);
-      const remoteNode = appBarContext.selectedRemoteNode || 'local';
+      const remoteNode = encodeURIComponent(appBarContext.selectedRemoteNode || 'local');
       const response = await fetch(`${config.apiURL}/users/${deletingUser.id}?remoteNode=${remoteNode}`, {
         method: 'DELETE',
         headers: {
@@ -109,7 +109,7 @@ export default function UsersPage() {
   const handleToggleDisabled = async (user: User) => {
     try {
       const token = localStorage.getItem(TOKEN_KEY);
-      const remoteNode = appBarContext.selectedRemoteNode || 'local';
+      const remoteNode = encodeURIComponent(appBarContext.selectedRemoteNode || 'local');
       const response = await fetch(`${config.apiURL}/users/${user.id}?remoteNode=${remoteNode}`, {
         method: 'PATCH',
         headers: {
