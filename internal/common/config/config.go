@@ -170,23 +170,6 @@ type Auth struct {
 type AuthBuiltin struct {
 	Admin AdminConfig
 	Token TokenConfig
-	OIDC  BuiltinOIDC // OIDC as a login method under builtin auth
-}
-
-// BuiltinOIDC represents the OIDC configuration for builtin auth mode
-type BuiltinOIDC struct {
-	Enabled        bool            // Enable OIDC login (default: false)
-	ClientId       string          // OIDC client ID
-	ClientSecret   string          // OIDC client secret
-	ClientUrl      string          // Application URL for callback
-	Issuer         string          // OIDC issuer URL
-	Scopes         []string        // OIDC scopes (default: openid, profile, email)
-	AutoSignup     bool            // Auto-create users on first login (default: false)
-	DefaultRole    string          // Default role for new users (default: viewer)
-	AllowedDomains []string        // Email domain whitelist
-	Whitelist      []string        // Specific email whitelist
-	ButtonLabel    string          // Login button text (default: "Login with SSO")
-	RoleMapping    OIDCRoleMapping // Role mapping configuration
 }
 
 // OIDCRoleMapping defines how OIDC claims are mapped to Dagu roles
@@ -226,13 +209,26 @@ type AuthToken struct {
 	Value string
 }
 
+// AuthOIDC represents the OIDC authentication configuration.
+// Core fields (ClientId, ClientSecret, etc.) are used by both standalone OIDC mode
+// and builtin auth mode with OIDC login. Builtin-specific fields (Enabled, AutoSignup,
+// DefaultRole, etc.) are only used when auth.mode=builtin.
 type AuthOIDC struct {
-	ClientId     string   //id from the authorization service (OIDC provider)
-	ClientSecret string   //secret from the authorization service (OIDC provider)
-	ClientUrl    string   //your website's/service's URL for example: "http://localhost:8081/" or "https://mydomain.com/
-	Issuer       string   //the URL identifier for the authorization service. for example: "https://accounts.google.com" - try adding "/.well-known/openid-configuration" to the path to make sure it's correct
-	Scopes       []string //OAuth scopes. If you're unsure go with: []string{oidc.ScopeOpenID, "profile", "email"}
-	Whitelist    []string //OAuth User whitelist ref userinfo.email https://github.com/coreos/go-oidc/blob/v2/oidc.go#L199
+	// Core OIDC fields (used by both standalone and builtin modes)
+	ClientId     string   // OIDC client ID from the authorization service
+	ClientSecret string   // OIDC client secret from the authorization service
+	ClientUrl    string   // Application URL for callback (e.g., "https://mydomain.com")
+	Issuer       string   // OIDC provider URL (e.g., "https://accounts.google.com")
+	Scopes       []string // OAuth scopes (default: openid, profile, email)
+	Whitelist    []string // Specific email addresses always allowed
+
+	// Builtin-specific fields (only used when auth.mode=builtin)
+	Enabled        bool            // Enable OIDC login under builtin auth (default: false)
+	AutoSignup     bool            // Auto-create users on first login (default: false)
+	DefaultRole    string          // Default role for new users (default: viewer)
+	AllowedDomains []string        // Email domain whitelist
+	ButtonLabel    string          // Login button text (default: "Login with SSO")
+	RoleMapping    OIDCRoleMapping // Role mapping configuration
 }
 
 // Paths represents the file system paths configuration
@@ -410,9 +406,9 @@ func (c *Config) validateBuiltinAuth() error {
 		return fmt.Errorf("builtin auth requires a positive token TTL")
 	}
 
-	// Validate OIDC configuration if enabled
-	if c.Server.Auth.Builtin.OIDC.Enabled {
-		if err := c.validateBuiltinOIDC(); err != nil {
+	// Validate OIDC configuration if enabled under builtin auth
+	if c.Server.Auth.OIDC.Enabled {
+		if err := c.validateOIDCForBuiltin(); err != nil {
 			return err
 		}
 	}
@@ -420,22 +416,22 @@ func (c *Config) validateBuiltinAuth() error {
 	return nil
 }
 
-// validateBuiltinOIDC validates the OIDC configuration under builtin auth.
-func (c *Config) validateBuiltinOIDC() error {
-	oidc := c.Server.Auth.Builtin.OIDC
+// validateOIDCForBuiltin validates the OIDC configuration when used under builtin auth mode.
+func (c *Config) validateOIDCForBuiltin() error {
+	oidc := c.Server.Auth.OIDC
 
 	// Required fields when OIDC is enabled
 	if oidc.ClientId == "" {
-		return fmt.Errorf("builtin OIDC requires clientId to be set")
+		return fmt.Errorf("OIDC requires clientId to be set (auth.oidc.clientId or AUTH_OIDC_CLIENT_ID)")
 	}
 	if oidc.ClientSecret == "" {
-		return fmt.Errorf("builtin OIDC requires clientSecret to be set")
+		return fmt.Errorf("OIDC requires clientSecret to be set (auth.oidc.clientSecret or AUTH_OIDC_CLIENT_SECRET)")
 	}
 	if oidc.ClientUrl == "" {
-		return fmt.Errorf("builtin OIDC requires clientUrl to be set")
+		return fmt.Errorf("OIDC requires clientUrl to be set (auth.oidc.clientUrl or AUTH_OIDC_CLIENT_URL)")
 	}
 	if oidc.Issuer == "" {
-		return fmt.Errorf("builtin OIDC requires issuer to be set")
+		return fmt.Errorf("OIDC requires issuer to be set (auth.oidc.issuer or AUTH_OIDC_ISSUER)")
 	}
 
 	// Validate defaultRole is a valid role
@@ -446,7 +442,7 @@ func (c *Config) validateBuiltinOIDC() error {
 		"viewer":   true,
 	}
 	if !validRoles[oidc.DefaultRole] {
-		return fmt.Errorf("builtin OIDC defaultRole must be one of: admin, manager, operator, viewer (got: %q)", oidc.DefaultRole)
+		return fmt.Errorf("OIDC defaultRole must be one of: admin, manager, operator, viewer (got: %q)", oidc.DefaultRole)
 	}
 
 	// Warn if email scope is not included (required for access control)

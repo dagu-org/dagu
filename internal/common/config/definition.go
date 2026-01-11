@@ -177,23 +177,6 @@ type AuthDef struct {
 type AuthBuiltinDef struct {
 	Admin *AdminConfigDef `mapstructure:"admin"`
 	Token *TokenConfigDef `mapstructure:"token"`
-	OIDC  *BuiltinOIDCDef `mapstructure:"oidc"` // OIDC as a login method under builtin auth
-}
-
-// BuiltinOIDCDef represents the OIDC configuration for builtin auth mode
-type BuiltinOIDCDef struct {
-	Enabled        *bool               `mapstructure:"enabled"`        // Enable OIDC login (default: false)
-	ClientId       string              `mapstructure:"clientId"`       // OIDC client ID
-	ClientSecret   string              `mapstructure:"clientSecret"`   // OIDC client secret
-	ClientUrl      string              `mapstructure:"clientUrl"`      // Application URL for callback
-	Issuer         string              `mapstructure:"issuer"`         // OIDC issuer URL
-	Scopes         []string            `mapstructure:"scopes"`         // OIDC scopes (default: openid, profile, email)
-	AutoSignup     *bool               `mapstructure:"autoSignup"`     // Auto-create users on first login (default: false)
-	DefaultRole    string              `mapstructure:"defaultRole"`    // Default role for new users (default: viewer)
-	AllowedDomains []string            `mapstructure:"allowedDomains"` // Email domain whitelist
-	Whitelist      []string            `mapstructure:"whitelist"`      // Specific email whitelist
-	ButtonLabel    string              `mapstructure:"buttonLabel"`    // Login button text (default: "Login with SSO")
-	RoleMapping    *OIDCRoleMappingDef `mapstructure:"roleMapping"`    // Role mapping configuration
 }
 
 // OIDCRoleMappingDef defines how OIDC claims are mapped to Dagu roles
@@ -237,13 +220,25 @@ type AuthTokenDef struct {
 	Value string `mapstructure:"value"`
 }
 
+// AuthOIDCDef represents the OIDC authentication configuration.
+// Core fields are used by both standalone OIDC mode and builtin auth mode with OIDC.
+// Builtin-specific fields are only used when auth.mode=builtin.
 type AuthOIDCDef struct {
+	// Core OIDC fields (used by both standalone and builtin modes)
 	ClientId     string   `mapstructure:"clientId"`
 	ClientSecret string   `mapstructure:"clientSecret"`
 	ClientUrl    string   `mapstructure:"clientUrl"`
 	Issuer       string   `mapstructure:"issuer"`
 	Scopes       []string `mapstructure:"scopes"`
 	Whitelist    []string `mapstructure:"whitelist"`
+
+	// Builtin-specific fields (only used when auth.mode=builtin)
+	Enabled        *bool               `mapstructure:"enabled"`        // Enable OIDC login under builtin auth
+	AutoSignup     *bool               `mapstructure:"autoSignup"`     // Auto-create users on first login
+	DefaultRole    string              `mapstructure:"defaultRole"`    // Default role for new users
+	AllowedDomains []string            `mapstructure:"allowedDomains"` // Email domain whitelist
+	ButtonLabel    string              `mapstructure:"buttonLabel"`    // Login button text
+	RoleMapping    *OIDCRoleMappingDef `mapstructure:"roleMapping"`    // Role mapping configuration
 }
 
 // PathsDef represents the file system paths configuration.

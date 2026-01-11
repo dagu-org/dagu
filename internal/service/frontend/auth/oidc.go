@@ -336,7 +336,7 @@ type BuiltinOIDCConfig struct {
 }
 
 // InitBuiltinOIDCConfig initializes OIDC for builtin auth mode.
-func InitBuiltinOIDCConfig(cfg config.BuiltinOIDC, authSvc *authservice.Service, provisionSvc *oidcprovision.Service, basePath string) (*BuiltinOIDCConfig, error) {
+func InitBuiltinOIDCConfig(cfg config.AuthOIDC, authSvc *authservice.Service, provisionSvc *oidcprovision.Service, basePath string) (*BuiltinOIDCConfig, error) {
 	result, err := initOIDCProviderCore(oidcProviderParams{
 		Issuer:       cfg.Issuer,
 		ClientID:     cfg.ClientId,
@@ -521,4 +521,3 @@ func redirectWithError(w http.ResponseWriter, r *http.Request, basePath, errMsg 
 	redirectURL := basePath + "/login?error=" + url.QueryEscape(errMsg)
 	http.Redirect(w, r, redirectURL, http.StatusFound)
 }
-

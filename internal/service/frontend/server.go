@@ -86,7 +86,7 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 		apiOpts = append(apiOpts, apiv2.WithAuthService(result.AuthService))
 
 		// Initialize OIDC if enabled under builtin mode
-		oidcCfg := cfg.Server.Auth.Builtin.OIDC
+		oidcCfg := cfg.Server.Auth.OIDC
 		if oidcCfg.Enabled {
 			oidcEnabled = true
 			oidcButtonLabel = oidcCfg.ButtonLabel
