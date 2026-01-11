@@ -207,7 +207,9 @@ export default function AuditLogsPage() {
               entries.map((entry) => (
                 <TableRow key={entry.id}>
                   <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                    {dayjs.utc(entry.timestamp).format('MMM D, YYYY HH:mm:ss')} UTC
+                    {config.tzOffsetInSec !== undefined
+                      ? dayjs(entry.timestamp).utcOffset(config.tzOffsetInSec / 60).format('MMM D, YYYY HH:mm:ss')
+                      : dayjs(entry.timestamp).format('MMM D, YYYY HH:mm:ss')}
                   </TableCell>
                   <TableCell>
                     <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize">

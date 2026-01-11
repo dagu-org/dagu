@@ -529,8 +529,8 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 		}
 	}
 
-	// Set terminal configuration (default: enabled when using builtin auth)
-	cfg.Server.Terminal.Enabled = cfg.Server.Auth.Mode == AuthModeBuiltin
+	// Set terminal configuration (default: disabled)
+	cfg.Server.Terminal.Enabled = false
 	if def.Terminal != nil && def.Terminal.Enabled != nil {
 		cfg.Server.Terminal.Enabled = *def.Terminal.Enabled
 	}
@@ -1083,6 +1083,9 @@ var envBindings = []envBinding{
 	{key: "latestStatusToday", env: "LATEST_STATUS_TODAY"},
 	{key: "metrics", env: "SERVER_METRICS"},
 	{key: "cache", env: "CACHE"},
+
+	// Terminal configuration
+	{key: "terminal.enabled", env: "TERMINAL_ENABLED"},
 
 	// Core configurations
 	{key: "workDir", env: "WORK_DIR", isPath: true},

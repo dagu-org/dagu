@@ -151,7 +151,8 @@ type Definition struct {
 // TerminalDef represents the terminal configuration.
 type TerminalDef struct {
 	// Enabled determines if the terminal feature is available.
-	// Default: true (when using builtin auth mode)
+	// Default: false
+	// Env: DAGU_TERMINAL_ENABLED
 	Enabled *bool `mapstructure:"enabled"`
 }
 

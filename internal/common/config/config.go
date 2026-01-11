@@ -134,7 +134,8 @@ type Server struct {
 // TerminalConfig contains configuration for the web-based terminal feature.
 type TerminalConfig struct {
 	// Enabled determines if the terminal feature is available.
-	// Default: true (when using builtin auth mode)
+	// Default: false
+	// Env: DAGU_TERMINAL_ENABLED
 	Enabled bool
 }
 
