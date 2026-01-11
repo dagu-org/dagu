@@ -448,6 +448,22 @@
   animation: fadeIn 0.5s ease-in-out;
 }
 
+@keyframes matrix-glow {
+  0%,
+  100% {
+    text-shadow: 0 0 2px currentColor;
+  }
+  50% {
+    text-shadow:
+      0 0 6px currentColor,
+      0 0 10px currentColor;
+  }
+}
+
+.matrix-glow {
+  animation: matrix-glow 1.5s ease-in-out infinite;
+}
+
 /* Disable text selection for elements with this class */
 .no-text-select {
   -webkit-user-select: none;
