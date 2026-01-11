@@ -12,8 +12,6 @@ import (
 	"golang.org/x/term"
 )
 
-var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-
 // SimpleProgressDisplay provides a minimal inline progress display.
 type SimpleProgressDisplay struct {
 	dag      *core.DAG
@@ -69,9 +67,7 @@ func (p *SimpleProgressDisplay) UpdateNode(node *execution.Node) {
 	defer p.mu.Unlock()
 
 	// Only count completed nodes once
-	if node.Status == core.NodeSucceeded || node.Status == core.NodeFailed ||
-		node.Status == core.NodeSkipped || node.Status == core.NodeAborted ||
-		node.Status == core.NodePartiallySucceeded {
+	if node.Status.IsDone() {
 		if !p.completedNodes[node.Step.Name] {
 			p.completedNodes[node.Step.Name] = true
 			p.completed++
@@ -151,7 +147,7 @@ func (p *SimpleProgressDisplay) render() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	spinner := spinnerFrames[p.spinnerIndex%len(spinnerFrames)]
+	spinner := stringutil.SpinnerFrames[p.spinnerIndex%len(stringutil.SpinnerFrames)]
 	p.spinnerIndex++
 
 	percent := 0

@@ -15,8 +15,6 @@ import (
 	"golang.org/x/term"
 )
 
-var remoteSpinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-
 // RemoteProgressDisplay displays progress for distributed DAG execution.
 // It polls the coordinator for status updates and renders a progress display
 // similar to the local SimpleProgressDisplay.
@@ -102,7 +100,7 @@ func (p *RemoteProgressDisplay) Update(protoStatus *coordinatorv1.DAGRunStatusPr
 	// Count completed nodes
 	p.completed = 0
 	for _, node := range status.Nodes {
-		if isRemoteNodeComplete(node.Status) {
+		if node.Status.IsDone() {
 			p.completed++
 		}
 	}
@@ -186,7 +184,7 @@ func (p *RemoteProgressDisplay) render() {
 		return // No inline updates for non-TTY
 	}
 
-	spinner := remoteSpinnerFrames[p.spinnerIndex%len(remoteSpinnerFrames)]
+	spinner := stringutil.SpinnerFrames[p.spinnerIndex%len(stringutil.SpinnerFrames)]
 	p.spinnerIndex++
 
 	percent := 0
@@ -229,13 +227,4 @@ func (p *RemoteProgressDisplay) gray(s string) string {
 		return s
 	}
 	return "\033[38;5;245m" + s + "\033[0m"
-}
-
-// isRemoteNodeComplete checks if a node has completed (success, failure, or skipped).
-func isRemoteNodeComplete(status core.NodeStatus) bool {
-	return status == core.NodeSucceeded ||
-		status == core.NodeFailed ||
-		status == core.NodeSkipped ||
-		status == core.NodeAborted ||
-		status == core.NodePartiallySucceeded
 }

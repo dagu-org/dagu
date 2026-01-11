@@ -522,39 +522,48 @@ func dispatchToCoordinatorAndWait(ctx *Context, d *core.DAG, dagRunID string, co
 
 	// If context was cancelled (e.g., Ctrl+C), request cancellation on coordinator
 	if signalCtx.Err() != nil {
-		logger.Info(ctx, "Requesting cancellation of distributed DAG run", tag.RunID(dagRunID))
-		cancelCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if cancelErr := coordinatorCli.RequestCancel(cancelCtx, d.Name, dagRunID, nil); cancelErr != nil {
-			logger.Warn(ctx, "Failed to request cancellation", tag.Error(cancelErr))
-		}
+		return handleDistributedCancellation(ctx, d, dagRunID, coordinatorCli, progress, err)
+	}
 
-		// Poll for up to 5 seconds until status reflects cancellation
-		if progress != nil {
-			ticker := time.NewTicker(500 * time.Millisecond)
-			defer ticker.Stop()
+	return err
+}
 
-			for {
-				select {
-				case <-cancelCtx.Done():
-					// Timeout - set cancelled status manually
-					progress.SetCancelled()
-					return err
-				case <-ticker.C:
-					if resp, fetchErr := coordinatorCli.GetDAGRunStatus(cancelCtx, d.Name, dagRunID, nil); fetchErr == nil && resp != nil && resp.Status != nil {
-						progress.Update(resp.Status)
-						status := core.Status(resp.Status.Status)
-						if !status.IsActive() {
-							// Status is no longer running, we're done
-							return err
-						}
+// handleDistributedCancellation handles the cancellation of a distributed DAG run when a signal is received.
+// It requests cancellation from the coordinator and polls for status updates until the DAG is no longer active.
+func handleDistributedCancellation(ctx context.Context, dag *core.DAG, dagRunID string, coordinatorCli coordinator.Client, progress *RemoteProgressDisplay, originalErr error) error {
+	logger.Info(ctx, "Requesting cancellation of distributed DAG run", tag.RunID(dagRunID))
+	cancelCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if cancelErr := coordinatorCli.RequestCancel(cancelCtx, dag.Name, dagRunID, nil); cancelErr != nil {
+		logger.Warn(ctx, "Failed to request cancellation", tag.Error(cancelErr))
+	}
+
+	// Poll for up to 5 seconds until status reflects cancellation
+	if progress != nil {
+		ticker := time.NewTicker(500 * time.Millisecond)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-cancelCtx.Done():
+				// Timeout - set cancelled status manually
+				progress.SetCancelled()
+				return originalErr
+			case <-ticker.C:
+				if resp, fetchErr := coordinatorCli.GetDAGRunStatus(cancelCtx, dag.Name, dagRunID, nil); fetchErr == nil && resp != nil && resp.Status != nil {
+					progress.Update(resp.Status)
+					status := core.Status(resp.Status.Status)
+					if !status.IsActive() {
+						// Status is no longer running, we're done
+						return originalErr
 					}
 				}
 			}
 		}
 	}
 
-	return err
+	return originalErr
 }
 
 // waitForDAGCompletionWithProgress polls the coordinator until the DAG run completes.
