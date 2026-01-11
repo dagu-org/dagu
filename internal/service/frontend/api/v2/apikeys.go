@@ -2,11 +2,15 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/common/logger/tag"
+	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 )
 
@@ -86,6 +90,24 @@ func (a *API) CreateAPIKey(ctx context.Context, request api.CreateAPIKeyRequestO
 			}
 		}
 		return nil, err
+	}
+
+	// Log API key creation
+	if a.auditService != nil {
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		details, err := json.Marshal(map[string]string{
+			"key_id":   result.APIKey.ID,
+			"key_name": result.APIKey.Name,
+			"role":     string(result.APIKey.Role),
+		})
+		if err != nil {
+			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
+			details = []byte("{}")
+		}
+		entry := audit.NewEntry(audit.CategoryAPIKey, "api_key_create", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
 	}
 
 	return api.CreateAPIKey201JSONResponse{
@@ -182,6 +204,32 @@ func (a *API) UpdateAPIKey(ctx context.Context, request api.UpdateAPIKeyRequestO
 		return nil, err
 	}
 
+	// Log API key update
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		changes := make(map[string]any)
+		changes["key_id"] = request.KeyId
+		if input.Name != nil {
+			changes["name"] = *input.Name
+		}
+		if input.Description != nil {
+			changes["description"] = *input.Description
+		}
+		if input.Role != nil {
+			changes["role"] = string(*input.Role)
+		}
+		details, err := json.Marshal(changes)
+		if err != nil {
+			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
+			details = []byte("{}")
+		}
+		entry := audit.NewEntry(audit.CategoryAPIKey, "api_key_update", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
+	}
+
 	return api.UpdateAPIKey200JSONResponse{
 		ApiKey: toAPIKey(key),
 	}, nil
@@ -196,6 +244,9 @@ func (a *API) DeleteAPIKey(ctx context.Context, request api.DeleteAPIKeyRequestO
 		return nil, err
 	}
 
+	// Get API key info before deletion for audit logging
+	targetKey, _ := a.authService.GetAPIKey(ctx, request.KeyId)
+
 	err := a.authService.DeleteAPIKey(ctx, request.KeyId)
 	if err != nil {
 		if errors.Is(err, auth.ErrAPIKeyNotFound) {
@@ -206,6 +257,25 @@ func (a *API) DeleteAPIKey(ctx context.Context, request api.DeleteAPIKeyRequestO
 			}
 		}
 		return nil, err
+	}
+
+	// Log API key deletion
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		detailsMap := map[string]string{"key_id": request.KeyId}
+		if targetKey != nil {
+			detailsMap["key_name"] = targetKey.Name
+		}
+		details, err := json.Marshal(detailsMap)
+		if err != nil {
+			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
+			details = []byte("{}")
+		}
+		entry := audit.NewEntry(audit.CategoryAPIKey, "api_key_delete", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
 	}
 
 	return api.DeleteAPIKey204Response{}, nil

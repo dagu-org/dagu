@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -22,6 +23,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/service/audit"
 )
 
 // ExecuteDAGRunFromSpec implements api.StrictServerInterface.
@@ -77,6 +79,25 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 			Code:       api.ErrorCodeInternalError,
 			Message:    fmt.Sprintf("failed to start dag-run: %s", err.Error()),
 		}
+	}
+
+	// Log DAG run execution from spec
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		detailsMap := map[string]any{
+			"dag_name":   dag.Name,
+			"dag_run_id": dagRunId,
+			"inline":     true,
+		}
+		if params != "" {
+			detailsMap["params"] = params
+		}
+		details, _ := json.Marshal(detailsMap)
+		entry := audit.NewEntry(audit.CategoryDAG, "dag_execute", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
 	}
 
 	return api.ExecuteDAGRunFromSpec200JSONResponse{
@@ -136,6 +157,25 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 
 	if err := a.enqueueDAGRun(ctx, dag, params, dagRunId, valueOf(request.Body.Name)); err != nil {
 		return nil, fmt.Errorf("error enqueuing dag-run: %w", err)
+	}
+
+	// Log DAG run enqueue from spec
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		detailsMap := map[string]any{
+			"dag_name":   dag.Name,
+			"dag_run_id": dagRunId,
+			"inline":     true,
+		}
+		if params != "" {
+			detailsMap["params"] = params
+		}
+		details, _ := json.Marshal(detailsMap)
+		entry := audit.NewEntry(audit.CategoryDAG, "dag_enqueue", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
 	}
 
 	return api.EnqueueDAGRunFromSpec200JSONResponse{
@@ -614,6 +654,22 @@ func (a *API) ApproveDAGRunStep(ctx context.Context, request api.ApproveDAGRunSt
 		)
 	}
 
+	// Log step approval
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		details, _ := json.Marshal(map[string]any{
+			"dag_name":   request.Name,
+			"dag_run_id": request.DagRunId,
+			"step_name":  request.StepName,
+			"resumed":    shouldResume,
+		})
+		entry := audit.NewEntry(audit.CategoryDAG, "dag_step_approve", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
+	}
+
 	return &api.ApproveDAGRunStep200JSONResponse{
 		DagRunId: request.DagRunId,
 		StepName: request.StepName,
@@ -747,6 +803,27 @@ func (a *API) ApproveSubDAGRunStep(ctx context.Context, request api.ApproveSubDA
 		)
 	}
 
+	// Log sub DAG step approval
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		details, err := json.Marshal(map[string]any{
+			"dag_name":       request.Name,
+			"dag_run_id":     request.DagRunId,
+			"sub_dag_run_id": request.SubDAGRunId,
+			"step_name":      request.StepName,
+			"resumed":        shouldResume,
+		})
+		if err != nil {
+			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
+			details = []byte("{}")
+		}
+		entry := audit.NewEntry(audit.CategoryDAG, "sub_dag_step_approve", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
+	}
+
 	return &api.ApproveSubDAGRunStep200JSONResponse{
 		DagRunId: request.SubDAGRunId,
 		StepName: request.StepName,
@@ -823,6 +900,25 @@ func (a *API) RejectDAGRunStep(ctx context.Context, request api.RejectDAGRunStep
 		slog.String("step", request.StepName),
 	)
 
+	// Log step rejection
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		detailsMap := map[string]any{
+			"dag_name":   request.Name,
+			"dag_run_id": request.DagRunId,
+			"step_name":  request.StepName,
+		}
+		if request.Body != nil && request.Body.Reason != nil {
+			detailsMap["reason"] = *request.Body.Reason
+		}
+		details, _ := json.Marshal(detailsMap)
+		entry := audit.NewEntry(audit.CategoryDAG, "dag_step_reject", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
+	}
+
 	return &api.RejectDAGRunStep200JSONResponse{
 		DagRunId: request.DagRunId,
 		StepName: request.StepName,
@@ -898,6 +994,30 @@ func (a *API) RejectSubDAGRunStep(ctx context.Context, request api.RejectSubDAGR
 		slog.String("subDagRunId", request.SubDAGRunId),
 		slog.String("step", request.StepName),
 	)
+
+	// Log sub DAG step rejection
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		detailsMap := map[string]any{
+			"dag_name":       request.Name,
+			"dag_run_id":     request.DagRunId,
+			"sub_dag_run_id": request.SubDAGRunId,
+			"step_name":      request.StepName,
+		}
+		if request.Body != nil && request.Body.Reason != nil {
+			detailsMap["reason"] = *request.Body.Reason
+		}
+		details, err := json.Marshal(detailsMap)
+		if err != nil {
+			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
+			details = []byte("{}")
+		}
+		entry := audit.NewEntry(audit.CategoryDAG, "sub_dag_step_reject", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
+	}
 
 	return &api.RejectSubDAGRunStep200JSONResponse{
 		DagRunId: request.SubDAGRunId,
@@ -1170,17 +1290,36 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 		return nil, fmt.Errorf("error reading DAG: %w", err)
 	}
 
+	var stepName string
 	if request.Body.StepName != nil && *request.Body.StepName != "" {
-		spec := a.subCmdBuilder.Retry(dag, request.Body.DagRunId, *request.Body.StepName)
+		stepName = *request.Body.StepName
+		spec := a.subCmdBuilder.Retry(dag, request.Body.DagRunId, stepName)
 		if err := runtime.Start(ctx, spec); err != nil {
 			return nil, fmt.Errorf("error retrying DAG step: %w", err)
 		}
-		return api.RetryDAGRun200Response{}, nil
+	} else {
+		spec := a.subCmdBuilder.Retry(dag, request.Body.DagRunId, "")
+		if err := runtime.Start(ctx, spec); err != nil {
+			return nil, fmt.Errorf("error retrying DAG: %w", err)
+		}
 	}
 
-	spec := a.subCmdBuilder.Retry(dag, request.Body.DagRunId, "")
-	if err := runtime.Start(ctx, spec); err != nil {
-		return nil, fmt.Errorf("error retrying DAG: %w", err)
+	// Log DAG retry
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		detailsMap := map[string]any{
+			"dag_name":   request.Name,
+			"dag_run_id": request.DagRunId,
+		}
+		if stepName != "" {
+			detailsMap["step_name"] = stepName
+		}
+		details, _ := json.Marshal(detailsMap)
+		entry := audit.NewEntry(audit.CategoryDAG, "dag_retry", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
 	}
 
 	return api.RetryDAGRun200Response{}, nil
@@ -1229,6 +1368,20 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 		return nil, fmt.Errorf("error stopping DAG: %w", err)
 	}
 
+	// Log DAG termination
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		details, _ := json.Marshal(map[string]string{
+			"dag_name":   request.Name,
+			"dag_run_id": request.DagRunId,
+		})
+		entry := audit.NewEntry(audit.CategoryDAG, "dag_terminate", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
+	}
+
 	return api.TerminateDAGRun200Response{}, nil
 }
 
@@ -1271,6 +1424,20 @@ func (a *API) DequeueDAGRun(ctx context.Context, request api.DequeueDAGRunReques
 	spec := a.subCmdBuilder.Dequeue(dag, dagRun)
 	if err := runtime.Run(ctx, spec); err != nil {
 		return nil, fmt.Errorf("error dequeueing dag-run: %w", err)
+	}
+
+	// Log DAG dequeue
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		details, _ := json.Marshal(map[string]string{
+			"dag_name":   request.Name,
+			"dag_run_id": request.DagRunId,
+		})
+		entry := audit.NewEntry(audit.CategoryDAG, "dag_dequeue", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
 	}
 
 	return api.DequeueDAGRun200Response{}, nil
@@ -1360,6 +1527,26 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 	queued := false
 	if dagStatus, _ := a.dagRunMgr.GetCurrentStatus(ctx, dag, newDagRunID); dagStatus != nil {
 		queued = dagStatus.Status == core.Queued
+	}
+
+	// Log DAG reschedule
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		detailsMap := map[string]any{
+			"dag_name":        request.Name,
+			"from_dag_run_id": request.DagRunId,
+			"new_dag_run_id":  newDagRunID,
+			"queued":          queued,
+		}
+		if nameOverride != "" {
+			detailsMap["name_override"] = nameOverride
+		}
+		details, _ := json.Marshal(detailsMap)
+		entry := audit.NewEntry(audit.CategoryDAG, "dag_reschedule", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
 	}
 
 	return api.RescheduleDAGRun200JSONResponse{

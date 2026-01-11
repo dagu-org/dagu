@@ -528,6 +528,18 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 			l.warnings = append(l.warnings, fmt.Sprintf("Invalid server.metrics value: %q, defaulting to 'private'", *def.Metrics))
 		}
 	}
+
+	// Set terminal configuration (default: disabled)
+	cfg.Server.Terminal.Enabled = false
+	if def.Terminal != nil && def.Terminal.Enabled != nil {
+		cfg.Server.Terminal.Enabled = *def.Terminal.Enabled
+	}
+
+	// Set audit configuration (default: enabled)
+	cfg.Server.Audit.Enabled = true
+	if def.Audit != nil && def.Audit.Enabled != nil {
+		cfg.Server.Audit.Enabled = *def.Audit.Enabled
+	}
 }
 
 // validateServerConfig validates the server configuration.
@@ -1077,6 +1089,12 @@ var envBindings = []envBinding{
 	{key: "latestStatusToday", env: "LATEST_STATUS_TODAY"},
 	{key: "metrics", env: "SERVER_METRICS"},
 	{key: "cache", env: "CACHE"},
+
+	// Terminal configuration
+	{key: "terminal.enabled", env: "TERMINAL_ENABLED"},
+
+	// Audit configuration
+	{key: "audit.enabled", env: "AUDIT_ENABLED"},
 
 	// Core configurations
 	{key: "workDir", env: "WORK_DIR", isPath: true},

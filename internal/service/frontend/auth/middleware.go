@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/subtle"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 
@@ -47,6 +48,17 @@ func DefaultOptions() Options {
 		APITokenEnabled:  false,
 		BasicAuthEnabled: false,
 		OIDCAuthEnabled:  false,
+	}
+}
+
+// ClientIPMiddleware creates an HTTP middleware that adds the client IP to the request context.
+// This should be applied before authentication middleware to ensure IP is available for audit logging.
+func ClientIPMiddleware() func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := auth.WithClientIP(r.Context(), GetClientIP(r))
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
 	}
 }
 
@@ -110,8 +122,9 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 				if token := extractBearerToken(r); token != "" {
 					user, err := opts.JWTValidator.GetUserFromToken(r.Context(), token)
 					if err == nil {
-						// JWT token valid - inject user into context
+						// JWT token valid - inject user and client IP into context
 						ctx := auth.WithUser(r.Context(), user)
+						ctx = auth.WithClientIP(ctx, GetClientIP(r))
 						next.ServeHTTP(w, r.WithContext(ctx))
 						return
 					}
@@ -132,6 +145,7 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 							Role:     apiKey.Role,
 						}
 						ctx := auth.WithUser(r.Context(), syntheticUser)
+						ctx = auth.WithClientIP(ctx, GetClientIP(r))
 						next.ServeHTTP(w, r.WithContext(ctx))
 						return
 					}
@@ -150,6 +164,7 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 					Role:     auth.RoleAdmin,
 				}
 				ctx := auth.WithUser(r.Context(), adminUser)
+				ctx = auth.WithClientIP(ctx, GetClientIP(r))
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
@@ -166,6 +181,7 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 							Role:     auth.RoleAdmin,
 						}
 						ctx := auth.WithUser(r.Context(), basicUser)
+						ctx = auth.WithClientIP(ctx, GetClientIP(r))
 						next.ServeHTTP(w, r.WithContext(ctx))
 						return
 					}
@@ -244,4 +260,30 @@ func requireBasicAuth(w http.ResponseWriter, realm string) {
 func requireBearerAuth(w http.ResponseWriter, realm string) {
 	w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm="%s"`, realm))
 	w.WriteHeader(http.StatusUnauthorized)
+}
+
+// GetClientIP extracts the client IP address from the request.
+// It checks X-Forwarded-For and X-Real-IP headers for proxied requests.
+func GetClientIP(r *http.Request) string {
+	// Check X-Forwarded-For header first (for proxies)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// Take the first IP in the chain
+		if idx := strings.Index(xff, ","); idx != -1 {
+			return strings.TrimSpace(xff[:idx])
+		}
+		return strings.TrimSpace(xff)
+	}
+
+	// Check X-Real-IP header
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return strings.TrimSpace(xri)
+	}
+
+	// Fall back to RemoteAddr - use net.SplitHostPort for proper IPv6 handling
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		// Return as-is if parsing fails (e.g., no port present)
+		return r.RemoteAddr
+	}
+	return host
 }

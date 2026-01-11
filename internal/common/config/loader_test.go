@@ -115,6 +115,12 @@ func TestLoad_Env(t *testing.T) {
 		// UI DAGs configuration
 		"DAGU_UI_DAGS_SORT_FIELD": "status",
 		"DAGU_UI_DAGS_SORT_ORDER": "desc",
+
+		// Terminal configuration
+		"DAGU_TERMINAL_ENABLED": "true",
+
+		// Audit configuration
+		"DAGU_AUDIT_ENABLED": "false",
 	}
 
 	// Save and clear existing environment variables
@@ -191,6 +197,8 @@ func TestLoad_Env(t *testing.T) {
 			LatestStatusToday: true,
 			StrictValidation:  false,
 			Metrics:           MetricsAccessPrivate,
+			Terminal:          TerminalConfig{Enabled: true},
+			Audit:             AuditConfig{Enabled: false},
 		},
 		Paths: PathsConfig{
 			DAGsDir:            filepath.Join(testPaths, "dags"),
@@ -428,7 +436,9 @@ scheduler:
 				PermissionWriteDAGs: false,
 				PermissionRunDAGs:   false,
 			},
-			Metrics: MetricsAccessPrivate,
+			Metrics:  MetricsAccessPrivate,
+			Terminal: TerminalConfig{Enabled: false},
+			Audit:    AuditConfig{Enabled: true},
 		},
 		Paths: PathsConfig{
 			DAGsDir:            "/var/dagu/dags",
@@ -1196,4 +1206,98 @@ func TestParseCoordinatorAddresses(t *testing.T) {
 			assert.Len(t, warnings, tt.expectedWarnings)
 		})
 	}
+}
+
+func TestLoad_Terminal(t *testing.T) {
+	t.Run("TerminalDefault", func(t *testing.T) {
+		cfg := loadFromYAML(t, "# empty")
+		assert.False(t, cfg.Server.Terminal.Enabled)
+	})
+
+	t.Run("TerminalEnabled", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+terminal:
+  enabled: true
+`)
+		assert.True(t, cfg.Server.Terminal.Enabled)
+	})
+
+	t.Run("TerminalDisabled", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+terminal:
+  enabled: false
+`)
+		assert.False(t, cfg.Server.Terminal.Enabled)
+	})
+
+	t.Run("TerminalEnabledFromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_TERMINAL_ENABLED": "true",
+		})
+		assert.True(t, cfg.Server.Terminal.Enabled)
+	})
+
+	t.Run("TerminalDisabledFromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_TERMINAL_ENABLED": "false",
+		})
+		assert.False(t, cfg.Server.Terminal.Enabled)
+	})
+
+	t.Run("TerminalEnvOverridesYAML", func(t *testing.T) {
+		cfg := loadWithEnv(t, `
+terminal:
+  enabled: false
+`, map[string]string{
+			"DAGU_TERMINAL_ENABLED": "true",
+		})
+		assert.True(t, cfg.Server.Terminal.Enabled)
+	})
+}
+
+func TestLoad_Audit(t *testing.T) {
+	t.Run("AuditDefault", func(t *testing.T) {
+		cfg := loadFromYAML(t, "# empty")
+		assert.True(t, cfg.Server.Audit.Enabled)
+	})
+
+	t.Run("AuditEnabled", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+audit:
+  enabled: true
+`)
+		assert.True(t, cfg.Server.Audit.Enabled)
+	})
+
+	t.Run("AuditDisabled", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+audit:
+  enabled: false
+`)
+		assert.False(t, cfg.Server.Audit.Enabled)
+	})
+
+	t.Run("AuditEnabledFromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_AUDIT_ENABLED": "true",
+		})
+		assert.True(t, cfg.Server.Audit.Enabled)
+	})
+
+	t.Run("AuditDisabledFromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_AUDIT_ENABLED": "false",
+		})
+		assert.False(t, cfg.Server.Audit.Enabled)
+	})
+
+	t.Run("AuditEnvOverridesYAML", func(t *testing.T) {
+		cfg := loadWithEnv(t, `
+audit:
+  enabled: true
+`, map[string]string{
+			"DAGU_AUDIT_ENABLED": "false",
+		})
+		assert.False(t, cfg.Server.Audit.Enabled)
+	})
 }

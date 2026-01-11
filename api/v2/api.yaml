@@ -41,6 +41,8 @@ tags:
     description: "API key management operations (admin only)"
   - name: "webhooks"
     description: "Webhook endpoints for triggering DAG execution"
+  - name: "audit"
+    description: "Audit log operations (admin only)"
 
 paths:
   /health:
@@ -2775,6 +2777,84 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /audit:
+    get:
+      summary: "List audit log entries"
+      description: "Returns audit log entries matching the filter criteria. Admin only."
+      operationId: "listAuditLogs"
+      tags:
+        - "audit"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: category
+          in: query
+          description: "Filter by audit category (e.g., terminal, user, dag)"
+          required: false
+          schema:
+            type: string
+        - name: userId
+          in: query
+          description: "Filter by user ID"
+          required: false
+          schema:
+            type: string
+        - name: startTime
+          in: query
+          description: "Filter entries after this time (ISO 8601 format)"
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: endTime
+          in: query
+          description: "Filter entries before this time (ISO 8601 format)"
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          description: "Maximum number of entries to return (default 100)"
+          required: false
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 1000
+        - name: offset
+          in: query
+          description: "Number of entries to skip (for pagination)"
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        "200":
+          description: "List of audit log entries"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogsResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   securitySchemes:
     basicAuth:
@@ -2952,6 +3032,59 @@ components:
         $ref: "#/components/schemas/Stream"
 
   schemas:
+    AuditEntry:
+      type: object
+      description: "A single audit log entry"
+      properties:
+        id:
+          type: string
+          description: "Unique identifier for this entry"
+        timestamp:
+          type: string
+          format: date-time
+          description: "When the event occurred"
+        category:
+          type: string
+          description: "Category of the audit event (e.g., terminal, user, dag)"
+        action:
+          type: string
+          description: "The action that was performed (e.g., session_start, command, login)"
+        userId:
+          type: string
+          description: "ID of the user who performed the action"
+        username:
+          type: string
+          description: "Username of the user who performed the action"
+        details:
+          type: string
+          description: "JSON-encoded action-specific details"
+        ipAddress:
+          type: string
+          description: "Client IP address if available"
+      required:
+        - id
+        - timestamp
+        - category
+        - action
+        - userId
+        - username
+
+    AuditLogsResponse:
+      type: object
+      description: "Response containing audit log entries"
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEntry"
+          description: "List of audit log entries"
+        total:
+          type: integer
+          description: "Total number of entries matching the filter (before pagination)"
+      required:
+        - entries
+        - total
+
     ApproveStepRequest:
       type: object
       description: "Request body for approving a waiting step"

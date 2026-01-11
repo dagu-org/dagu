@@ -343,6 +343,13 @@ When `DAGU_AUTH_MODE=builtin`, a file-based user management system with role-bas
 | `DAGU_UI_DAGS_SORT_FIELD` | `name` | Default DAGs sort field |
 | `DAGU_UI_DAGS_SORT_ORDER` | `asc` | Default DAGs sort order |
 
+### Features Configuration
+
+| Environment Variable | Default | Description |
+|---------------------|---------|-------------|
+| `DAGU_TERMINAL_ENABLED` | `false` | Enable web-based terminal |
+| `DAGU_AUDIT_ENABLED` | `true` | Enable audit logging for security events |
+
 ### Scheduler Configuration
 
 | Environment Variable | Default | Description |
@@ -478,6 +485,8 @@ This section outlines the current capabilities of Dagu.
 |                             | Authentication                  | Basic auth / OIDC / Builtin (JWT) support for Web UI and API             | <a href="https://docs.dagu.cloud/configurations/authentication">Authentication</a> |
 |                             | Role-based access control       | Builtin RBAC with admin, manager, operator, viewer roles                 | |
 |                             | User management                 | Create, update, delete users with role assignment                        | |
+|                             | Audit logging                   | Security event logging for authentication, user, and API key operations  | <a href="https://docs.dagu.cloud/configurations/server#audit-logging">Audit Logging</a> |
+|                             | Web terminal                    | Web-based terminal for shell access (disabled by default)                | <a href="https://docs.dagu.cloud/configurations/server#terminal">Terminal</a> |
 |                             | HA (High availability) mode     | Control-plane with failover for scheduler / Web UI / Coordinator         | <a href="https://docs.dagu.cloud/features/scheduling#high-availability">High Availability</a> |
 | Executor types              | `jq`                            | JSON processing with jq queries                                          | <a href="https://docs.dagu.cloud/features/executors/jq">JQ Executor</a> |
 |                             | `ssh`                           | Remote command execution via SSH                                         | <a href="https://docs.dagu.cloud/features/executors/ssh">SSH Executor</a> |

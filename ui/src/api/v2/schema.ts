@@ -1175,10 +1175,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List audit log entries
+         * @description Returns audit log entries matching the filter criteria. Admin only.
+         */
+        get: operations["listAuditLogs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description A single audit log entry */
+        AuditEntry: {
+            /** @description Unique identifier for this entry */
+            id: string;
+            /**
+             * Format: date-time
+             * @description When the event occurred
+             */
+            timestamp: string;
+            /** @description Category of the audit event (e.g., terminal, user, dag) */
+            category: string;
+            /** @description The action that was performed (e.g., session_start, command, login) */
+            action: string;
+            /** @description ID of the user who performed the action */
+            userId: string;
+            /** @description Username of the user who performed the action */
+            username: string;
+            /** @description JSON-encoded action-specific details */
+            details?: string;
+            /** @description Client IP address if available */
+            ipAddress?: string;
+        };
+        /** @description Response containing audit log entries */
+        AuditLogsResponse: {
+            /** @description List of audit log entries */
+            entries: components["schemas"]["AuditEntry"][];
+            /** @description Total number of entries matching the filter (before pagination) */
+            total: number;
+        };
         /** @description Request body for approving a waiting step */
         ApproveStepRequest: {
             /** @description Key-value parameters to provide. These will be available as environment variables in subsequent steps. */
@@ -5457,6 +5506,68 @@ export interface operations {
             };
             /** @description No webhook configured for this DAG */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listAuditLogs: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Filter by audit category (e.g., terminal, user, dag) */
+                category?: string;
+                /** @description Filter by user ID */
+                userId?: string;
+                /** @description Filter entries after this time (ISO 8601 format) */
+                startTime?: string;
+                /** @description Filter entries before this time (ISO 8601 format) */
+                endTime?: string;
+                /** @description Maximum number of entries to return (default 100) */
+                limit?: number;
+                /** @description Number of entries to skip (for pagination) */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of audit log entries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLogsResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden - requires admin role */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

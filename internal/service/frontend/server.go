@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -24,15 +25,18 @@ import (
 	"github.com/dagu-org/dagu/internal/common/telemetry"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/persistence/fileapikey"
+	"github.com/dagu-org/dagu/internal/persistence/fileaudit"
 	"github.com/dagu-org/dagu/internal/persistence/fileuser"
 	"github.com/dagu-org/dagu/internal/persistence/filewebhook"
 	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	apiv1 "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
 	apiv2 "github.com/dagu-org/dagu/internal/service/frontend/api/v2"
 	"github.com/dagu-org/dagu/internal/service/frontend/auth"
 	"github.com/dagu-org/dagu/internal/service/frontend/metrics"
+	"github.com/dagu-org/dagu/internal/service/frontend/terminal"
 	"github.com/dagu-org/dagu/internal/service/oidcprovision"
 	"github.com/dagu-org/dagu/internal/service/resource"
 	"github.com/go-chi/chi/v5"
@@ -50,6 +54,8 @@ type Server struct {
 	httpServer     *http.Server
 	funcsConfig    funcsConfig
 	builtinOIDCCfg *auth.BuiltinOIDCConfig // OIDC config for builtin auth mode
+	authService    *authservice.Service
+	auditService   *audit.Service
 }
 
 // NewServer constructs a Server configured from cfg and the provided stores, managers, and services.
@@ -75,7 +81,17 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 	var oidcEnabled bool
 	var oidcButtonLabel string
 
+	// Initialize audit service
+	auditSvc, err := initAuditService(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize audit service: %w", err)
+	}
+	if auditSvc != nil {
+		apiOpts = append(apiOpts, apiv2.WithAuditService(auditSvc))
+	}
+
 	// Initialize auth service if builtin mode is enabled
+	var authSvc *authservice.Service
 	if cfg.Server.Auth.Mode == config.AuthModeBuiltin {
 		result, err := initBuiltinAuthService(cfg, collector)
 		if err != nil {
@@ -83,6 +99,7 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 			// to prevent server from running without expected authentication
 			return nil, fmt.Errorf("failed to initialize builtin auth service: %w", err)
 		}
+		authSvc = result.AuthService
 		apiOpts = append(apiOpts, apiv2.WithAuthService(result.AuthService))
 
 		// Initialize OIDC if configured under builtin mode
@@ -135,6 +152,8 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 		apiV2:          apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, apiOpts...),
 		config:         cfg,
 		builtinOIDCCfg: builtinOIDCCfg,
+		authService:    authSvc,
+		auditService:   auditSvc,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,
 			NavbarTitle:           cfg.UI.NavbarTitle,
@@ -244,6 +263,25 @@ func initBuiltinAuthService(cfg *config.Config, collector *telemetry.Collector) 
 	}, nil
 }
 
+// initAuditService creates a file-based audit store and service.
+// Returns nil service if audit logging is disabled or cannot be configured.
+func initAuditService(cfg *config.Config) (*audit.Service, error) {
+	// Check if audit logging is enabled
+	if !cfg.Server.Audit.Enabled {
+		return nil, nil
+	}
+
+	// Use AdminLogsDir for audit logs
+	auditDir := filepath.Join(cfg.Paths.AdminLogsDir, "audit")
+
+	store, err := fileaudit.New(auditDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create audit store: %w", err)
+	}
+
+	return audit.New(store), nil
+}
+
 // Serve starts the HTTP server and configures routes
 func (srv *Server) Serve(ctx context.Context) error {
 	// Setup logger for HTTP requests
@@ -283,6 +321,11 @@ func (srv *Server) Serve(ctx context.Context) error {
 	// Configure API routes
 	if err := srv.setupAPIRoutes(ctx, r, apiV1BasePath, apiV2BasePath, schema); err != nil {
 		return err
+	}
+
+	// Configure terminal WebSocket route (admin-only, requires builtin auth)
+	if srv.config.Server.Terminal.Enabled && srv.authService != nil {
+		srv.setupTerminalRoute(ctx, r, apiV2BasePath)
 	}
 
 	// Configure and start the server
@@ -433,6 +476,20 @@ func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath
 	})
 
 	return setupErr
+}
+
+// setupTerminalRoute configures the terminal WebSocket route
+func (srv *Server) setupTerminalRoute(ctx context.Context, r *chi.Mux, apiV2BasePath string) {
+	termHandler := terminal.NewHandler(
+		srv.authService,
+		srv.auditService,
+		terminal.GetDefaultShell(),
+	)
+
+	wsPath := path.Join(apiV2BasePath, "terminal/ws")
+	r.Get(wsPath, termHandler.ServeHTTP)
+
+	logger.Info(ctx, "Terminal WebSocket route configured", slog.String("path", wsPath))
 }
 
 // startServer starts the HTTP server with or without TLS
