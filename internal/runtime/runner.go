@@ -461,17 +461,12 @@ ExecRepeat: // repeat execution
 		break ExecRepeat
 	}
 
-	// If node is still in running state by now, check if it was canceled.
-	// If canceled, mark as aborted; otherwise, it completed successfully.
-	// Exception: Repetitive tasks complete their current run naturally even when
-	// canceled (signal is not sent to them - see runner.Signal), so they should
-	// be marked as succeeded.
+	// Determine final status for nodes still in running state.
+	// Repetitive tasks complete naturally (signal not sent - see runner.Signal).
+	// Only mark as aborted if: not a repetitive task AND runner was canceled.
 	if node.State().Status == core.NodeRunning {
-		step := node.Step()
-		if step.RepeatPolicy.RepeatMode != "" {
-			// Repetitive task completed its current run naturally
-			node.SetStatus(core.NodeSucceeded)
-		} else if r.isCanceled() {
+		isRepetitive := node.Step().RepeatPolicy.RepeatMode != ""
+		if !isRepetitive && r.isCanceled() {
 			node.SetStatus(core.NodeAborted)
 		} else {
 			node.SetStatus(core.NodeSucceeded)
