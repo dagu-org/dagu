@@ -437,6 +437,7 @@ steps:
 
 	t.Run("ConcurrentWorkerCancellation", func(t *testing.T) {
 		// Test cancellation with high concurrency across multiple workers
+		// Use shorter sleep times so some tasks can complete before cancellation
 		yamlContent := `
 steps:
   - name: high-concurrency
@@ -459,7 +460,7 @@ steps:
   - name: process
     command: |
       echo "Starting task $1"
-      sleep 1
+      sleep 0.3
       echo "Completed task $1"
 `
 		// Setup and start coordinator
@@ -483,7 +484,8 @@ steps:
 			close(done)
 		}()
 
-		// Wait for the step to be running
+		// Wait for at least one sub-DAG run to complete before cancelling
+		// This ensures we get NodePartiallySucceeded (some completed, some cancelled)
 		require.Eventually(t, func() bool {
 			st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
 			if err != nil || !st.Status.IsActive() {
@@ -493,8 +495,26 @@ steps:
 				return false
 			}
 			concurrentNode := st.Nodes[0]
-			return concurrentNode.Status == core.NodeRunning
-		}, 5*time.Second, 100*time.Millisecond)
+			if concurrentNode.Status != core.NodeRunning {
+				return false
+			}
+			// Check if at least one sub-DAG run has completed
+			for _, subRun := range concurrentNode.SubRuns {
+				subStatus, err := coord.DAGRunMgr.FindSubDAGRunStatus(
+					coord.Context,
+					execution.NewDAGRunRef(dagWrapper.DAG.Name, st.DAGRunID),
+					subRun.DAGRunID,
+				)
+				if err != nil {
+					continue
+				}
+				// If sub-DAG has completed (succeeded or failed), we can cancel
+				if !subStatus.Status.IsActive() {
+					return true
+				}
+			}
+			return false
+		}, 10*time.Second, 100*time.Millisecond)
 
 		// Cancel the execution
 		agent.Signal(coord.Context, os.Signal(syscall.SIGTERM))
@@ -502,7 +522,7 @@ steps:
 		// Wait for the agent to finish
 		<-done
 
-		// Get the latest st
+		// Get the latest status
 		st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
 		require.NoError(t, err)
 		require.NotNil(t, st)
