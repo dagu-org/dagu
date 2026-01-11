@@ -521,8 +521,8 @@ func BuiltinOIDCCallbackHandler(cfg *BuiltinOIDCConfig) http.HandlerFunc {
 		// Redirect to login page with token in URL for frontend to store in localStorage
 		// This is secure because:
 		// 1. It's a one-time redirect (not a shareable link)
-		// 2. Frontend immediately clears the URL with history.replaceState
-		// 3. Token won't appear in browser history after page load
+		// 2. Frontend stores the token and navigates away with replace:true (React Router)
+		// 3. Token won't appear in browser history after navigation completes
 		redirectURL := strings.TrimSuffix(cfg.LoginBasePath, "/") + "/login?token=" + url.QueryEscape(tokenResult.Token)
 		if isNewUser {
 			redirectURL += "&welcome=true"

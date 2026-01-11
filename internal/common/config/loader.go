@@ -1273,7 +1273,11 @@ func parseStringList(input interface{}) []string {
 			}
 		}
 	case []string:
-		result = v
+		for _, s := range v {
+			if trimmed := strings.TrimSpace(s); trimmed != "" {
+				result = append(result, trimmed)
+			}
+		}
 	}
 	return result
 }
