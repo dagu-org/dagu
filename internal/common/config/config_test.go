@@ -338,4 +338,316 @@ func TestConfig_Validate(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("InvalidAuthMode", func(t *testing.T) {
+		t.Parallel()
+		cfg := &Config{
+			Server: Server{
+				Port: 8080,
+				Auth: Auth{
+					Mode: "invalid",
+				},
+			},
+			UI: UI{
+				MaxDashboardPageLimit: 1,
+			},
+		}
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid auth mode")
+	})
+
+	t.Run("BuiltinAuth_InvalidTokenTTL", func(t *testing.T) {
+		t.Parallel()
+		cfg := &Config{
+			Server: Server{
+				Port: 8080,
+				Auth: Auth{
+					Mode: AuthModeBuiltin,
+					Builtin: AuthBuiltin{
+						Admin: AdminConfig{Username: "admin"},
+						Token: TokenConfig{Secret: "secret", TTL: 0},
+					},
+				},
+			},
+			Paths: PathsConfig{
+				UsersDir: "/tmp/users",
+			},
+			UI: UI{
+				MaxDashboardPageLimit: 1,
+			},
+		}
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "positive token TTL")
+	})
+
+	t.Run("BuiltinAuth_OIDC_MissingClientId", func(t *testing.T) {
+		t.Parallel()
+		cfg := &Config{
+			Server: Server{
+				Port: 8080,
+				Auth: Auth{
+					Mode: AuthModeBuiltin,
+					Builtin: AuthBuiltin{
+						Admin: AdminConfig{Username: "admin"},
+						Token: TokenConfig{Secret: "secret", TTL: 1},
+					},
+					OIDC: AuthOIDC{
+						Enabled:      true,
+						ClientId:     "",
+						ClientSecret: "secret",
+						ClientUrl:    "https://example.com",
+						Issuer:       "https://issuer.com",
+						DefaultRole:  "viewer",
+					},
+				},
+			},
+			Paths: PathsConfig{
+				UsersDir: "/tmp/users",
+			},
+			UI: UI{
+				MaxDashboardPageLimit: 1,
+			},
+		}
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "clientId")
+	})
+
+	t.Run("BuiltinAuth_OIDC_MissingClientSecret", func(t *testing.T) {
+		t.Parallel()
+		cfg := &Config{
+			Server: Server{
+				Port: 8080,
+				Auth: Auth{
+					Mode: AuthModeBuiltin,
+					Builtin: AuthBuiltin{
+						Admin: AdminConfig{Username: "admin"},
+						Token: TokenConfig{Secret: "secret", TTL: 1},
+					},
+					OIDC: AuthOIDC{
+						Enabled:      true,
+						ClientId:     "client-id",
+						ClientSecret: "",
+						ClientUrl:    "https://example.com",
+						Issuer:       "https://issuer.com",
+						DefaultRole:  "viewer",
+					},
+				},
+			},
+			Paths: PathsConfig{
+				UsersDir: "/tmp/users",
+			},
+			UI: UI{
+				MaxDashboardPageLimit: 1,
+			},
+		}
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "clientSecret")
+	})
+
+	t.Run("BuiltinAuth_OIDC_MissingClientUrl", func(t *testing.T) {
+		t.Parallel()
+		cfg := &Config{
+			Server: Server{
+				Port: 8080,
+				Auth: Auth{
+					Mode: AuthModeBuiltin,
+					Builtin: AuthBuiltin{
+						Admin: AdminConfig{Username: "admin"},
+						Token: TokenConfig{Secret: "secret", TTL: 1},
+					},
+					OIDC: AuthOIDC{
+						Enabled:      true,
+						ClientId:     "client-id",
+						ClientSecret: "secret",
+						ClientUrl:    "",
+						Issuer:       "https://issuer.com",
+						DefaultRole:  "viewer",
+					},
+				},
+			},
+			Paths: PathsConfig{
+				UsersDir: "/tmp/users",
+			},
+			UI: UI{
+				MaxDashboardPageLimit: 1,
+			},
+		}
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "clientUrl")
+	})
+
+	t.Run("BuiltinAuth_OIDC_MissingIssuer", func(t *testing.T) {
+		t.Parallel()
+		cfg := &Config{
+			Server: Server{
+				Port: 8080,
+				Auth: Auth{
+					Mode: AuthModeBuiltin,
+					Builtin: AuthBuiltin{
+						Admin: AdminConfig{Username: "admin"},
+						Token: TokenConfig{Secret: "secret", TTL: 1},
+					},
+					OIDC: AuthOIDC{
+						Enabled:      true,
+						ClientId:     "client-id",
+						ClientSecret: "secret",
+						ClientUrl:    "https://example.com",
+						Issuer:       "",
+						DefaultRole:  "viewer",
+					},
+				},
+			},
+			Paths: PathsConfig{
+				UsersDir: "/tmp/users",
+			},
+			UI: UI{
+				MaxDashboardPageLimit: 1,
+			},
+		}
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "issuer")
+	})
+
+	t.Run("BuiltinAuth_OIDC_InvalidDefaultRole", func(t *testing.T) {
+		t.Parallel()
+		cfg := &Config{
+			Server: Server{
+				Port: 8080,
+				Auth: Auth{
+					Mode: AuthModeBuiltin,
+					Builtin: AuthBuiltin{
+						Admin: AdminConfig{Username: "admin"},
+						Token: TokenConfig{Secret: "secret", TTL: 1},
+					},
+					OIDC: AuthOIDC{
+						Enabled:      true,
+						ClientId:     "client-id",
+						ClientSecret: "secret",
+						ClientUrl:    "https://example.com",
+						Issuer:       "https://issuer.com",
+						DefaultRole:  "invalid-role",
+					},
+				},
+			},
+			Paths: PathsConfig{
+				UsersDir: "/tmp/users",
+			},
+			UI: UI{
+				MaxDashboardPageLimit: 1,
+			},
+		}
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "defaultRole")
+	})
+
+	t.Run("BuiltinAuth_OIDC_ValidConfig", func(t *testing.T) {
+		t.Parallel()
+		cfg := &Config{
+			Server: Server{
+				Port: 8080,
+				Auth: Auth{
+					Mode: AuthModeBuiltin,
+					Builtin: AuthBuiltin{
+						Admin: AdminConfig{Username: "admin"},
+						Token: TokenConfig{Secret: "secret", TTL: 1},
+					},
+					OIDC: AuthOIDC{
+						Enabled:      true,
+						ClientId:     "client-id",
+						ClientSecret: "secret",
+						ClientUrl:    "https://example.com",
+						Issuer:       "https://issuer.com",
+						DefaultRole:  "viewer",
+						Scopes:       []string{"openid", "profile", "email"},
+					},
+				},
+			},
+			Paths: PathsConfig{
+				UsersDir: "/tmp/users",
+			},
+			UI: UI{
+				MaxDashboardPageLimit: 1,
+			},
+		}
+		err := cfg.Validate()
+		require.NoError(t, err)
+	})
+
+	t.Run("BuiltinAuth_OIDC_MissingEmailScope_AddsWarning", func(t *testing.T) {
+		t.Parallel()
+		cfg := &Config{
+			Server: Server{
+				Port: 8080,
+				Auth: Auth{
+					Mode: AuthModeBuiltin,
+					Builtin: AuthBuiltin{
+						Admin: AdminConfig{Username: "admin"},
+						Token: TokenConfig{Secret: "secret", TTL: 1},
+					},
+					OIDC: AuthOIDC{
+						Enabled:      true,
+						ClientId:     "client-id",
+						ClientSecret: "secret",
+						ClientUrl:    "https://example.com",
+						Issuer:       "https://issuer.com",
+						DefaultRole:  "viewer",
+						Scopes:       []string{"openid", "profile"}, // No email scope
+					},
+				},
+			},
+			Paths: PathsConfig{
+				UsersDir: "/tmp/users",
+			},
+			UI: UI{
+				MaxDashboardPageLimit: 1,
+			},
+		}
+		err := cfg.Validate()
+		require.NoError(t, err)
+		assert.Len(t, cfg.Warnings, 1)
+		assert.Contains(t, cfg.Warnings[0], "email")
+	})
+
+	t.Run("BuiltinAuth_OIDC_AllValidRoles", func(t *testing.T) {
+		t.Parallel()
+		validRoles := []string{"admin", "manager", "operator", "viewer"}
+		for _, role := range validRoles {
+			cfg := &Config{
+				Server: Server{
+					Port: 8080,
+					Auth: Auth{
+						Mode: AuthModeBuiltin,
+						Builtin: AuthBuiltin{
+							Admin: AdminConfig{Username: "admin"},
+							Token: TokenConfig{Secret: "secret", TTL: 1},
+						},
+						OIDC: AuthOIDC{
+							Enabled:      true,
+							ClientId:     "client-id",
+							ClientSecret: "secret",
+							ClientUrl:    "https://example.com",
+							Issuer:       "https://issuer.com",
+							DefaultRole:  role,
+							Scopes:       []string{"openid", "email"},
+						},
+					},
+				},
+				Paths: PathsConfig{
+					UsersDir: "/tmp/users",
+				},
+				UI: UI{
+					MaxDashboardPageLimit: 1,
+				},
+			}
+			err := cfg.Validate()
+			require.NoError(t, err, "role %s should be valid", role)
+		}
+	})
+
 }
