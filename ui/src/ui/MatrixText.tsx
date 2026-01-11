@@ -56,17 +56,27 @@ function MatrixText({ text, className, glowSpeed = 175 }: Props) {
       <span className="sr-only">{text}</span>
       {/* Visible text with glow effect */}
       <span aria-hidden="true">
-        {textChars.map((char, index) => (
-          <span
-            key={index}
-            className="inline-block transition-colors duration-100"
-            style={
-              index === glowPosition ? { color: '#90ee90' } : undefined
-            }
-          >
-            {char}
-          </span>
-        ))}
+        {textChars.map((char, index) => {
+          const isLeading = index === glowPosition;
+          const isTrailing = index === (glowPosition - 1 + textChars.length) % textChars.length;
+
+          let style: React.CSSProperties | undefined;
+          if (isLeading) {
+            style = { color: '#8bc48b' }; // Subtle bright
+          } else if (isTrailing) {
+            style = { color: '#7db07d' }; // Subtle dim
+          }
+
+          return (
+            <span
+              key={index}
+              className="inline-block transition-colors duration-150"
+              style={style}
+            >
+              {char}
+            </span>
+          );
+        })}
       </span>
     </span>
   );
