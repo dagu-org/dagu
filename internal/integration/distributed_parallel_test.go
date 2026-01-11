@@ -484,32 +484,21 @@ steps:
 			close(done)
 		}()
 
-		// Wait for at least one sub-DAG run to complete before cancelling
-		// This ensures we get NodePartiallySucceeded (some completed, some cancelled)
+		// Wait for at least one sub-DAG run to complete before cancelling.
+		// This ensures we get NodePartiallySucceeded (some completed, some cancelled).
 		require.Eventually(t, func() bool {
 			st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
-			if err != nil || !st.Status.IsActive() {
-				return false
-			}
-			if len(st.Nodes) == 0 {
+			if err != nil || !st.Status.IsActive() || len(st.Nodes) == 0 {
 				return false
 			}
 			concurrentNode := st.Nodes[0]
 			if concurrentNode.Status != core.NodeRunning {
 				return false
 			}
-			// Check if at least one sub-DAG run has completed
+			rootRef := execution.NewDAGRunRef(dagWrapper.DAG.Name, st.DAGRunID)
 			for _, subRun := range concurrentNode.SubRuns {
-				subStatus, err := coord.DAGRunMgr.FindSubDAGRunStatus(
-					coord.Context,
-					execution.NewDAGRunRef(dagWrapper.DAG.Name, st.DAGRunID),
-					subRun.DAGRunID,
-				)
-				if err != nil {
-					continue
-				}
-				// If sub-DAG has completed (succeeded or failed), we can cancel
-				if !subStatus.Status.IsActive() {
+				subStatus, err := coord.DAGRunMgr.FindSubDAGRunStatus(coord.Context, rootRef, subRun.DAGRunID)
+				if err == nil && !subStatus.Status.IsActive() {
 					return true
 				}
 			}
