@@ -211,8 +211,9 @@ type AuthToken struct {
 
 // AuthOIDC represents the OIDC authentication configuration.
 // Core fields (ClientId, ClientSecret, etc.) are used by both standalone OIDC mode
-// and builtin auth mode with OIDC login. Builtin-specific fields (Enabled, AutoSignup,
+// and builtin auth mode with OIDC login. Builtin-specific fields (AutoSignup,
 // DefaultRole, etc.) are only used when auth.mode=builtin.
+// OIDC is automatically enabled when all required fields are configured.
 type AuthOIDC struct {
 	// Core OIDC fields (used by both standalone and builtin modes)
 	ClientId     string   // OIDC client ID from the authorization service
@@ -223,12 +224,17 @@ type AuthOIDC struct {
 	Whitelist    []string // Specific email addresses always allowed
 
 	// Builtin-specific fields (only used when auth.mode=builtin)
-	Enabled        bool            // Enable OIDC login under builtin auth (default: false)
 	AutoSignup     bool            // Auto-create users on first login (default: false)
 	DefaultRole    string          // Default role for new users (default: viewer)
 	AllowedDomains []string        // Email domain whitelist
 	ButtonLabel    string          // Login button text (default: "Login with SSO")
 	RoleMapping    OIDCRoleMapping // Role mapping configuration
+}
+
+// IsConfigured returns true if all required OIDC fields are set.
+// When true, OIDC login is automatically enabled under builtin auth mode.
+func (o AuthOIDC) IsConfigured() bool {
+	return o.ClientId != "" && o.ClientSecret != "" && o.ClientUrl != "" && o.Issuer != ""
 }
 
 // Paths represents the file system paths configuration
@@ -406,8 +412,8 @@ func (c *Config) validateBuiltinAuth() error {
 		return fmt.Errorf("builtin auth requires a positive token TTL")
 	}
 
-	// Validate OIDC configuration if enabled under builtin auth
-	if c.Server.Auth.OIDC.Enabled {
+	// Validate OIDC configuration if configured under builtin auth
+	if c.Server.Auth.OIDC.IsConfigured() {
 		if err := c.validateOIDCForBuiltin(); err != nil {
 			return err
 		}

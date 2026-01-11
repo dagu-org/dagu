@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, TOKEN_KEY } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,10 +18,10 @@ import { AlertCircle, LogIn, KeyRound, CheckCircle } from 'lucide-react';
  */
 export default function LoginPage() {
   const config = useConfig();
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, refreshUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -31,10 +31,21 @@ export default function LoginPage() {
 
   const from = (location.state as { from?: Location })?.from?.pathname || '/';
 
-  // Check for error or welcome messages from URL params (set by OIDC callback)
+  // Handle OIDC callback token and messages from URL params
   useEffect(() => {
+    const tokenParam = searchParams.get('token');
     const errorParam = searchParams.get('error');
     const welcomeParam = searchParams.get('welcome');
+
+    // Handle OIDC callback token - store in localStorage and refresh auth
+    if (tokenParam) {
+      localStorage.setItem(TOKEN_KEY, tokenParam);
+      // Clear URL params to prevent token exposure in browser history
+      setSearchParams({}, { replace: true });
+      // Trigger auth refresh to validate token and set user
+      refreshUser();
+      return;
+    }
 
     if (errorParam) {
       setError(decodeURIComponent(errorParam));
@@ -42,7 +53,7 @@ export default function LoginPage() {
     if (welcomeParam === 'true') {
       setWelcomeMessage('Welcome! Your account has been created.');
     }
-  }, [searchParams]);
+  }, [searchParams, setSearchParams, refreshUser]);
 
   // Redirect if already authenticated - use useEffect to avoid render-phase side effects
   useEffect(() => {

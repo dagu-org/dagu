@@ -437,9 +437,6 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 			cfg.Server.Auth.OIDC.Scopes = oidc.Scopes
 			cfg.Server.Auth.OIDC.Whitelist = oidc.Whitelist
 			// Builtin-specific fields (only used when auth.mode=builtin)
-			if oidc.Enabled != nil {
-				cfg.Server.Auth.OIDC.Enabled = *oidc.Enabled
-			}
 			if oidc.AutoSignup != nil {
 				cfg.Server.Auth.OIDC.AutoSignup = *oidc.AutoSignup
 			}
@@ -1117,7 +1114,6 @@ var envBindings = []envBinding{
 	{key: "auth.oidc.scopes", env: "AUTH_OIDC_SCOPES"},
 	{key: "auth.oidc.whitelist", env: "AUTH_OIDC_WHITELIST"},
 	// Builtin-specific OIDC fields (only used when auth.mode=builtin)
-	{key: "auth.oidc.enabled", env: "AUTH_OIDC_ENABLED"},
 	{key: "auth.oidc.autoSignup", env: "AUTH_OIDC_AUTO_SIGNUP"},
 	{key: "auth.oidc.defaultRole", env: "AUTH_OIDC_DEFAULT_ROLE"},
 	{key: "auth.oidc.allowedDomains", env: "AUTH_OIDC_ALLOWED_DOMAINS"},
