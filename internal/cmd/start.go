@@ -498,6 +498,30 @@ func dispatchToCoordinatorAndWait(ctx *Context, d *core.DAG, dagRunID string, co
 
 // waitForDAGCompletion polls the coordinator until the DAG run completes.
 func waitForDAGCompletion(ctx *Context, d *core.DAG, dagRunID string, coordinatorCli coordinator.Client) error {
+	// Set up progress display
+	showProgress := shouldEnableProgress(ctx)
+	var progress *RemoteProgressDisplay
+	if showProgress {
+		progress = NewRemoteProgressDisplay(d, dagRunID)
+		progress.Start()
+	}
+
+	var finalErr error
+
+	defer func() {
+		if progress != nil {
+			progress.Stop()
+			if !ctx.Quiet {
+				progress.PrintSummary()
+			}
+			// Print result line like local execution
+			status := progress.GetLastStatus()
+			if status != nil {
+				fmt.Fprintf(os.Stdout, "\nResult: %s\n", status.Status)
+			}
+		}
+	}()
+
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
@@ -510,10 +534,14 @@ func waitForDAGCompletion(ctx *Context, d *core.DAG, dagRunID string, coordinato
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			finalErr = ctx.Err()
+			return finalErr
 
 		case <-logTicker.C:
-			logger.Info(ctx, "Waiting for DAG completion...", tag.RunID(dagRunID))
+			if !showProgress {
+				// Only log if not showing progress (progress display shows its own updates)
+				logger.Info(ctx, "Waiting for DAG completion...", tag.RunID(dagRunID))
+			}
 
 		case <-ticker.C:
 			resp, err := coordinatorCli.GetDAGRunStatus(ctx, d.Name, dagRunID, nil)
@@ -523,7 +551,8 @@ func waitForDAGCompletion(ctx *Context, d *core.DAG, dagRunID string, coordinato
 					tag.Error(err), slog.Int("consecutive_errors", consecutiveErrors))
 
 				if consecutiveErrors >= maxConsecutiveErrors {
-					return fmt.Errorf("lost connection to coordinator after %d attempts: %w", consecutiveErrors, err)
+					finalErr = fmt.Errorf("lost connection to coordinator after %d attempts: %w", consecutiveErrors, err)
+					return finalErr
 				}
 				continue
 			}
@@ -533,6 +562,11 @@ func waitForDAGCompletion(ctx *Context, d *core.DAG, dagRunID string, coordinato
 				continue
 			}
 
+			// Update progress display with current status
+			if progress != nil {
+				progress.Update(resp.Status)
+			}
+
 			// Check status
 			status := core.Status(resp.Status.Status)
 			if !status.IsActive() {
@@ -540,7 +574,8 @@ func waitForDAGCompletion(ctx *Context, d *core.DAG, dagRunID string, coordinato
 					logger.Info(ctx, "DAG completed successfully", tag.RunID(dagRunID))
 					return nil
 				}
-				return fmt.Errorf("DAG run failed with status: %s", status)
+				finalErr = fmt.Errorf("DAG run failed with status: %s", status)
+				return finalErr
 			}
 		}
 	}

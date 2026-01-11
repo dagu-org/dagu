@@ -48,10 +48,7 @@ func runRestart(ctx *Context, args []string) error {
 
 	name := args[0]
 
-	var (
-		attempt execution.DAGRunAttempt
-		err     error
-	)
+	var attempt execution.DAGRunAttempt
 	if dagRunID != "" {
 		// Retrieve the previous run for the specified dag-run ID.
 		dagRunRef := execution.NewDAGRunRef(name, dagRunID)
