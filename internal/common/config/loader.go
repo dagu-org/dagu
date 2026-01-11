@@ -528,6 +528,12 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 			l.warnings = append(l.warnings, fmt.Sprintf("Invalid server.metrics value: %q, defaulting to 'private'", *def.Metrics))
 		}
 	}
+
+	// Set terminal configuration (default: enabled when using builtin auth)
+	cfg.Server.Terminal.Enabled = cfg.Server.Auth.Mode == AuthModeBuiltin
+	if def.Terminal != nil && def.Terminal.Enabled != nil {
+		cfg.Server.Terminal.Enabled = *def.Terminal.Enabled
+	}
 }
 
 // validateServerConfig validates the server configuration.

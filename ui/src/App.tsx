@@ -24,6 +24,8 @@ import LoginPage from './pages/login';
 import UsersPage from './pages/users';
 import APIKeysPage from './pages/api-keys';
 import WebhooksPage from './pages/webhooks';
+import TerminalPage from './pages/terminal';
+import AuditLogsPage from './pages/audit-logs';
 
 type Props = {
   config: Config;
@@ -160,6 +162,22 @@ function App({ config }: Props) {
                                   element={
                                     <ProtectedRoute requiredRole="admin">
                                       <WebhooksPage />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/terminal"
+                                  element={
+                                    <ProtectedRoute requiredRole="admin">
+                                      <TerminalPage />
+                                    </ProtectedRoute>
+                                  }
+                                />
+                                <Route
+                                  path="/audit-logs"
+                                  element={
+                                    <ProtectedRoute requiredRole="admin">
+                                      <AuditLogsPage />
                                     </ProtectedRoute>
                                   }
                                 />

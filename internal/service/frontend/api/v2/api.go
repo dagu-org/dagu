@@ -18,6 +18,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/frontend/api/pathutil"
@@ -48,6 +49,7 @@ type API struct {
 	subCmdBuilder      *runtime.SubCmdBuilder
 	resourceService    *resource.Service
 	authService        AuthService
+	auditService       *audit.Service
 }
 
 // AuthService defines the interface for authentication operations.
@@ -90,6 +92,13 @@ type APIOption func(*API)
 func WithAuthService(as AuthService) APIOption {
 	return func(a *API) {
 		a.authService = as
+	}
+}
+
+// WithAuditService returns an APIOption that sets the API's AuditService.
+func WithAuditService(as *audit.Service) APIOption {
+	return func(a *API) {
+		a.auditService = as
 	}
 }
 
@@ -262,6 +271,8 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 	}
 
 	r.Group(func(r chi.Router) {
+		// Add client IP to context for audit logging (must be before auth middleware)
+		r.Use(frontendauth.ClientIPMiddleware())
 		// Use the unified middleware that handles all auth methods:
 		// - Basic auth (if configured)
 		// - API token (if configured)

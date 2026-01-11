@@ -3,10 +3,12 @@ package api
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 )
 
@@ -26,9 +28,19 @@ func (a *API) Login(ctx context.Context, request api.LoginRequestObject) (api.Lo
 		}, nil
 	}
 
+	clientIP, _ := auth.ClientIPFromContext(ctx)
+
 	user, err := a.authService.Authenticate(ctx, request.Body.Username, request.Body.Password)
 	if err != nil {
 		if errors.Is(err, authservice.ErrInvalidCredentials) {
+			// Log failed login attempt
+			if a.auditService != nil {
+				details, _ := json.Marshal(map[string]string{"reason": "invalid_credentials"})
+				entry := audit.NewEntry(audit.CategoryUser, "login_failed", "", request.Body.Username).
+					WithDetails(string(details)).
+					WithIPAddress(clientIP)
+				_ = a.auditService.Log(ctx, entry)
+			}
 			return api.Login401JSONResponse{
 				Code:    api.ErrorCodeUnauthorized,
 				Message: "Invalid username or password",
@@ -40,6 +52,13 @@ func (a *API) Login(ctx context.Context, request api.LoginRequestObject) (api.Lo
 	tokenResult, err := a.authService.GenerateToken(user)
 	if err != nil {
 		return nil, err
+	}
+
+	// Log successful login
+	if a.auditService != nil {
+		entry := audit.NewEntry(audit.CategoryUser, "login", user.ID, user.Username).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
 	}
 
 	return api.Login200JSONResponse{
@@ -103,6 +122,14 @@ func (a *API) ChangePassword(ctx context.Context, request api.ChangePasswordRequ
 			}, nil
 		}
 		return nil, err
+	}
+
+	// Log successful password change
+	if a.auditService != nil {
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		entry := audit.NewEntry(audit.CategoryUser, "password_change", user.ID, user.Username).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
 	}
 
 	return api.ChangePassword200JSONResponse{

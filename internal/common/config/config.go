@@ -126,6 +126,16 @@ type Server struct {
 	// Metrics controls access to the /api/v2/metrics endpoint.
 	// "private" (default) requires authentication, "public" allows unauthenticated access.
 	Metrics MetricsAccess
+
+	// Terminal contains configuration for the web-based terminal feature.
+	Terminal TerminalConfig
+}
+
+// TerminalConfig contains configuration for the web-based terminal feature.
+type TerminalConfig struct {
+	// Enabled determines if the terminal feature is available.
+	// Default: true (when using builtin auth mode)
+	Enabled bool
 }
 
 // Permission represents a permission string used in the application.

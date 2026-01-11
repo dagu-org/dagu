@@ -143,6 +143,16 @@ type Definition struct {
 	// Cache specifies the cache mode preset.
 	// Valid values: "low", "normal", "high" (default: "normal")
 	Cache *string `mapstructure:"cache"`
+
+	// Terminal contains configuration for the web-based terminal feature.
+	Terminal *TerminalDef `mapstructure:"terminal"`
+}
+
+// TerminalDef represents the terminal configuration.
+type TerminalDef struct {
+	// Enabled determines if the terminal feature is available.
+	// Default: true (when using builtin auth mode)
+	Enabled *bool `mapstructure:"enabled"`
 }
 
 // PeerDef holds the certificate and TLS configuration for peer connections over gRPC.

@@ -255,8 +255,9 @@ func checkOIDCAuth(next http.Handler, provider *oidc.Provider, verifier *oidc.ID
 	// Fast-path: already authenticated and not hitting the callback endpoint.
 	if authorized, err := r.Cookie(cookieOIDCToken); err == nil && authorized.Value != "" && !strings.HasSuffix(config.RedirectURL, r.URL.Path) {
 		if user, err := verifyAndExtractUser(verifier, authorized.Value); err == nil {
-			// Add user to context
+			// Add user and client IP to context
 			ctx = auth.WithUser(ctx, user)
+			ctx = auth.WithClientIP(ctx, getClientIP(r))
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
@@ -306,8 +307,9 @@ func checkOIDCToken(next http.Handler, verifier *oidc.IDTokenVerifier, w http.Re
 		http.Error(w, "Authentication failed: invalid or expired OIDC token", http.StatusUnauthorized)
 		return
 	}
-	// Add user to context
+	// Add user and client IP to context
 	ctx = auth.WithUser(ctx, user)
+	ctx = auth.WithClientIP(ctx, getClientIP(r))
 	next.ServeHTTP(w, r.WithContext(ctx))
 }
 

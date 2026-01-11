@@ -14,6 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/google/uuid"
 	openapitypes "github.com/oapi-codegen/runtime/types"
@@ -117,6 +118,20 @@ func (a *API) CreateDAGWebhook(ctx context.Context, request api.CreateDAGWebhook
 
 	logger.Info(ctx, "Webhook created", tag.Name(request.FileName))
 
+	// Log webhook creation
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		details, _ := json.Marshal(map[string]string{
+			"dag_name":   request.FileName,
+			"webhook_id": result.Webhook.ID,
+		})
+		entry := audit.NewEntry(audit.CategoryWebhook, "webhook_create", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
+	}
+
 	return api.CreateDAGWebhook201JSONResponse{
 		Webhook: toWebhookDetails(result.Webhook),
 		Token:   result.FullToken,
@@ -129,6 +144,9 @@ func (a *API) DeleteDAGWebhook(ctx context.Context, request api.DeleteDAGWebhook
 	if err := a.requireWebhookManagement(ctx); err != nil {
 		return nil, err
 	}
+
+	// Get webhook info before deletion for audit logging
+	targetWebhook, _ := a.authService.GetWebhookByDAGName(ctx, request.FileName)
 
 	err := a.authService.DeleteWebhook(ctx, request.FileName)
 	if err != nil {
@@ -148,6 +166,21 @@ func (a *API) DeleteDAGWebhook(ctx context.Context, request api.DeleteDAGWebhook
 	}
 
 	logger.Info(ctx, "Webhook deleted", tag.Name(request.FileName))
+
+	// Log webhook deletion
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		detailsMap := map[string]string{"dag_name": request.FileName}
+		if targetWebhook != nil {
+			detailsMap["webhook_id"] = targetWebhook.ID
+		}
+		details, _ := json.Marshal(detailsMap)
+		entry := audit.NewEntry(audit.CategoryWebhook, "webhook_delete", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
+	}
 
 	return api.DeleteDAGWebhook204Response{}, nil
 }
@@ -177,6 +210,20 @@ func (a *API) RegenerateDAGWebhookToken(ctx context.Context, request api.Regener
 	}
 
 	logger.Info(ctx, "Webhook token regenerated", tag.Name(request.FileName))
+
+	// Log webhook token regeneration
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		details, _ := json.Marshal(map[string]string{
+			"dag_name":   request.FileName,
+			"webhook_id": result.Webhook.ID,
+		})
+		entry := audit.NewEntry(audit.CategoryWebhook, "webhook_token_regenerate", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
+	}
 
 	return api.RegenerateDAGWebhookToken200JSONResponse{
 		Webhook: toWebhookDetails(result.Webhook),
@@ -212,6 +259,21 @@ func (a *API) ToggleDAGWebhook(ctx context.Context, request api.ToggleDAGWebhook
 		tag.Name(request.FileName),
 		tag.Key("enabled"), tag.Value(request.Body.Enabled),
 	)
+
+	// Log webhook toggle
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		details, _ := json.Marshal(map[string]any{
+			"dag_name":   request.FileName,
+			"webhook_id": webhook.ID,
+			"enabled":    request.Body.Enabled,
+		})
+		entry := audit.NewEntry(audit.CategoryWebhook, "webhook_toggle", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
+	}
 
 	return api.ToggleDAGWebhook200JSONResponse(toWebhookDetails(webhook)), nil
 }
