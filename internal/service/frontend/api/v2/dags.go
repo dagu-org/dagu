@@ -793,8 +793,9 @@ func (a *API) ExecuteDAGSync(ctx context.Context, request api.ExecuteDAGSyncRequ
 		// Check if it's a timeout error
 		if errors.Is(err, context.DeadlineExceeded) {
 			return api.ExecuteDAGSync408JSONResponse{
-				Code:    api.ErrorCodeTimeout,
-				Message: fmt.Sprintf("timeout waiting for DAG %s to complete after %d seconds", dag.Name, timeout),
+				Code:     api.ErrorCodeTimeout,
+				Message:  fmt.Sprintf("timeout waiting for DAG %s to complete after %d seconds; DAG run continues in background", dag.Name, timeout),
+				DagRunId: dagRunId,
 			}, nil
 		}
 		return nil, err
@@ -833,10 +834,10 @@ func (a *API) waitForDAGCompletion(
 			return lastStatus, waitCtx.Err()
 
 		case <-ticker.C:
-			status, err := a.dagRunMgr.GetCurrentStatus(ctx, dag, dagRunId)
+			status, err := a.dagRunMgr.GetCurrentStatus(waitCtx, dag, dagRunId)
 			if err != nil {
 				// Log error but continue polling - DAG might still be initializing
-				logger.Debug(ctx, "Error getting DAG status during wait", tag.Error(err))
+				logger.Debug(waitCtx, "Error getting DAG status during wait", tag.Error(err))
 				continue
 			}
 
@@ -846,7 +847,10 @@ func (a *API) waitForDAGCompletion(
 
 			lastStatus = status
 
-			// Check if execution is complete (not active) or waiting for human approval
+			// Check if execution is complete (not active) or waiting for human approval.
+			// We return on "waiting" status because HITL (Human-In-The-Loop) workflows
+			// require external intervention that would cause indefinite blocking otherwise.
+			// The client can poll the status endpoint or use callbacks to resume monitoring.
 			if !status.Status.IsActive() || status.Status.IsWaiting() {
 				return status, nil
 			}

@@ -988,7 +988,12 @@ paths:
   /dags/{fileName}/start-sync:
     post:
       summary: "Execute DAG synchronously and wait for completion"
-      description: "Creates a DAG-run from the DAG definition, starts its execution, waits for it to complete (or timeout), and returns the full execution details including node statuses"
+      description: |
+        Creates a DAG-run from the DAG definition, starts its execution, waits for it to complete (or timeout), and returns the full execution details including node statuses.
+
+        **Important behaviors:**
+        - If the timeout is exceeded, the DAG run continues executing in the background. The 408 response includes the `dagRunId` so clients can monitor or cancel the run.
+        - If the DAG reaches a 'waiting' status (human-in-the-loop approval needed), the endpoint returns immediately with 200 and the current status.
       operationId: "executeDAGSync"
       tags:
         - "dags"
@@ -1036,11 +1041,11 @@ paths:
                   dagRun:
                     $ref: "#/components/schemas/DAGRunDetails"
         "408":
-          description: "Timeout waiting for DAG execution to complete"
+          description: "Timeout waiting for DAG execution to complete. The DAG run continues executing in the background."
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
+                $ref: "#/components/schemas/TimeoutError"
         "409":
           description: "DAG is already running (singleton mode) or dagRunId already exists"
           content:
@@ -3219,6 +3224,20 @@ components:
       required:
         - code
         - message
+
+    TimeoutError:
+      type: object
+      description: "Timeout error response with DAG run tracking information"
+      allOf:
+        - $ref: "#/components/schemas/Error"
+        - type: object
+          properties:
+            dagRunId:
+              allOf:
+                - $ref: "#/components/schemas/DAGRunId"
+                - description: "ID of the DAG run that continues executing in background"
+          required:
+            - dagRunId
 
     ErrorCode:
       type: string

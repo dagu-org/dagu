@@ -539,10 +539,12 @@ func TestExecuteDAGSyncTimeout(t *testing.T) {
 		Timeout: timeout,
 	}).ExpectStatus(http.StatusRequestTimeout).Send(t)
 
-	var errBody api.Error
+	var errBody api.TimeoutError
 	syncResp.Unmarshal(t, &errBody)
 	require.Equal(t, api.ErrorCodeTimeout, errBody.Code)
 	require.Contains(t, errBody.Message, "timeout")
+	require.Contains(t, errBody.Message, "DAG run continues in background")
+	require.NotEmpty(t, errBody.DagRunId, "408 response should include dagRunId for tracking")
 }
 
 func TestExecuteDAGSyncWithWaitingStatus(t *testing.T) {
