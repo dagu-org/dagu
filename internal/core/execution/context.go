@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/common/config"
@@ -22,9 +23,28 @@ type Context struct {
 	Envs               map[string]string
 	SecretEnvs         map[string]string // Secret environment variables (highest priority)
 	CoordinatorCli     Dispatcher
-	Shell              string // Default shell for this DAG (from DAG.Shell)
-	LogEncodingCharset string // Character encoding for log files (e.g., "utf-8", "shift_jis", "euc-jp")
+	Shell              string           // Default shell for this DAG (from DAG.Shell)
+	LogEncodingCharset string           // Character encoding for log files (e.g., "utf-8", "shift_jis", "euc-jp")
+	LogWriterFactory   LogWriterFactory // For remote log streaming (nil = use local files)
 }
+
+// LogWriterFactory creates log writers for step stdout/stderr.
+// It abstracts where logs are written, allowing for:
+// - Local file-based storage (default)
+// - Remote streaming to coordinator (shared-nothing mode)
+type LogWriterFactory interface {
+	// NewStepWriter creates a writer for a step's log output.
+	// stepName identifies the step, streamType should be StreamTypeStdout or StreamTypeStderr.
+	NewStepWriter(ctx context.Context, stepName string, streamType int) io.WriteCloser
+}
+
+// Stream type constants for LogWriterFactory.NewStepWriter
+const (
+	// StreamTypeStdout indicates stdout stream
+	StreamTypeStdout = 1
+	// StreamTypeStderr indicates stderr stream
+	StreamTypeStderr = 2
+)
 
 // UserEnvsMap returns only user-defined environment variables as a map,
 // excluding OS environment (BaseEnv). Use this for isolated execution environments.
@@ -140,6 +160,12 @@ type Dispatcher interface {
 
 	// Cleanup cleans up any resources used by the coordinator client
 	Cleanup(ctx context.Context) error
+
+	// GetDAGRunStatus retrieves the status of a DAG run from the coordinator.
+	// Used by parent DAGs to poll status of remote sub-DAGs.
+	// For sub-DAG queries, provide rootRef to look up the status under the root DAG run.
+	// Returns (nil, nil) if the DAG run is not found.
+	GetDAGRunStatus(ctx context.Context, dagName, dagRunID string, rootRef *DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error)
 }
 
 // contextOptions holds optional configuration for NewContext.
@@ -150,6 +176,7 @@ type contextOptions struct {
 	coordinator        Dispatcher
 	secretEnvs         []string
 	logEncodingCharset string
+	logWriterFactory   LogWriterFactory
 }
 
 // ContextOption configures optional parameters for NewContext.
@@ -197,6 +224,14 @@ func WithLogEncoding(charset string) ContextOption {
 	}
 }
 
+// WithLogWriterFactory sets the log writer factory for remote log streaming.
+// When set, logs are streamed to the coordinator instead of written to local files.
+func WithLogWriterFactory(factory LogWriterFactory) ContextOption {
+	return func(o *contextOptions) {
+		o.logWriterFactory = factory
+	}
+}
+
 // NewContext creates a new context with DAG execution metadata.
 // Required: ctx, dag, dagRunID, logFile
 // Optional: use ContextOption functions (WithDatabase, WithParams, etc.)
@@ -237,6 +272,7 @@ func NewContext(
 		CoordinatorCli:     options.coordinator,
 		Shell:              dag.Shell,
 		LogEncodingCharset: options.logEncodingCharset,
+		LogWriterFactory:   options.logWriterFactory,
 	})
 }
 

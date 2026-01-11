@@ -103,7 +103,7 @@ func (e *DAGExecutor) HandleJob(
 	}
 
 	// For all other cases (local execution or non-START operations), use ExecuteDAG
-	return e.ExecuteDAG(ctx, dag, operation, runID)
+	return e.ExecuteDAG(ctx, dag, operation, runID, nil)
 }
 
 // ExecuteDAG executes or dispatches an already-persisted DAG.
@@ -120,6 +120,7 @@ func (e *DAGExecutor) ExecuteDAG(
 	dag *core.DAG,
 	operation coordinatorv1.Operation,
 	runID string,
+	previousStatus *execution.DAGRunStatus,
 ) error {
 	if e.shouldUseDistributedExecution(dag) {
 		// Distributed execution: dispatch to coordinator
@@ -129,6 +130,7 @@ func (e *DAGExecutor) ExecuteDAG(
 			operation,
 			runID,
 			executor.WithWorkerSelector(dag.WorkerSelector),
+			executor.WithPreviousStatus(previousStatus),
 		)
 		return e.dispatchToCoordinator(ctx, task)
 	}

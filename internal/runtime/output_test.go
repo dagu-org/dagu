@@ -1,12 +1,16 @@
 package runtime
 
 import (
+	"bytes"
 	"context"
+	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -285,4 +289,357 @@ func TestNode_ConcurrentOutputCapture(t *testing.T) {
 	assert.Contains(t, output, "Process", "output should contain process output")
 
 	_ = node.Teardown()
+}
+
+func TestOutputCapture_BasicCapture(t *testing.T) {
+	t.Parallel()
+
+	t.Run("CapturesSmallOutput", func(t *testing.T) {
+		t.Parallel()
+
+		oc := newOutputCapture(1024 * 1024) // 1MB limit
+
+		// Create a pipe to simulate output
+		reader, writer, err := os.Pipe()
+		require.NoError(t, err)
+
+		ctx := context.Background()
+		oc.start(ctx, reader)
+
+		// Write test data
+		testData := "Hello, World!"
+		_, err = writer.WriteString(testData)
+		require.NoError(t, err)
+		_ = writer.Close()
+
+		// Wait for capture
+		output, err := oc.wait()
+		assert.NoError(t, err)
+		assert.Equal(t, testData, output)
+	})
+
+	t.Run("CapturesLargeOutput", func(t *testing.T) {
+		t.Parallel()
+
+		oc := newOutputCapture(1024 * 1024) // 1MB limit
+
+		reader, writer, err := os.Pipe()
+		require.NoError(t, err)
+
+		ctx := context.Background()
+		oc.start(ctx, reader)
+
+		// Write 100KB of data
+		testData := strings.Repeat("x", 100*1024)
+		_, err = writer.WriteString(testData)
+		require.NoError(t, err)
+		_ = writer.Close()
+
+		output, err := oc.wait()
+		assert.NoError(t, err)
+		assert.Equal(t, testData, output)
+	})
+
+	t.Run("TruncatesExcessOutput", func(t *testing.T) {
+		t.Parallel()
+
+		maxSize := int64(1024) // 1KB limit
+		oc := newOutputCapture(maxSize)
+
+		reader, writer, err := os.Pipe()
+		require.NoError(t, err)
+
+		ctx := context.Background()
+		oc.start(ctx, reader)
+
+		// Write data larger than limit
+		testData := strings.Repeat("x", 2048) // 2KB
+		_, err = writer.WriteString(testData)
+		require.NoError(t, err)
+		_ = writer.Close()
+
+		output, err := oc.wait()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "exceeded maximum size limit")
+		assert.Equal(t, int(maxSize), len(output))
+	})
+
+	t.Run("HandlesEmptyOutput", func(t *testing.T) {
+		t.Parallel()
+
+		oc := newOutputCapture(1024)
+
+		reader, writer, err := os.Pipe()
+		require.NoError(t, err)
+
+		ctx := context.Background()
+		oc.start(ctx, reader)
+
+		// Close writer immediately with no data
+		_ = writer.Close()
+
+		output, err := oc.wait()
+		assert.NoError(t, err)
+		assert.Empty(t, output)
+	})
+}
+
+func TestOutputCoordinator_StdoutFile(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ReturnsFileName", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{
+			stdoutFileName: "/var/log/test.stdout.log",
+		}
+
+		result := oc.StdoutFile()
+		assert.Equal(t, "/var/log/test.stdout.log", result)
+	})
+
+	t.Run("ReturnsEmptyWhenNotSet", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{}
+
+		result := oc.StdoutFile()
+		assert.Empty(t, result)
+	})
+}
+
+func TestOutputCoordinator_FlushWriters(t *testing.T) {
+	t.Parallel()
+
+	t.Run("NoErrorWhenClosed", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{
+			closed: true,
+		}
+
+		err := oc.flushWriters()
+		assert.NoError(t, err)
+	})
+
+	t.Run("NoErrorWithNilWriters", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{}
+
+		err := oc.flushWriters()
+		assert.NoError(t, err)
+	})
+}
+
+func TestOutputCoordinator_CloseResources(t *testing.T) {
+	t.Parallel()
+
+	t.Run("NoErrorWhenAlreadyClosed", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{
+			closed: true,
+		}
+
+		err := oc.closeResources()
+		assert.NoError(t, err)
+	})
+
+	t.Run("MarksAsClosed", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{}
+
+		_ = oc.closeResources()
+		assert.True(t, oc.closed)
+	})
+}
+
+// mockWriteCloser is a test implementation of io.WriteCloser
+type mockWriteCloser struct {
+	buf    *bytes.Buffer
+	closed bool
+}
+
+func newMockWriteCloser() *mockWriteCloser {
+	return &mockWriteCloser{buf: &bytes.Buffer{}}
+}
+
+func (m *mockWriteCloser) Write(p []byte) (int, error) {
+	return m.buf.Write(p)
+}
+
+func (m *mockWriteCloser) Close() error {
+	m.closed = true
+	return nil
+}
+
+// mockLogWriterFactory is a test implementation of LogWriterFactory
+type mockLogWriterFactory struct {
+	stdoutWriter *mockWriteCloser
+	stderrWriter *mockWriteCloser
+}
+
+func newMockLogWriterFactory() *mockLogWriterFactory {
+	return &mockLogWriterFactory{
+		stdoutWriter: newMockWriteCloser(),
+		stderrWriter: newMockWriteCloser(),
+	}
+}
+
+func (m *mockLogWriterFactory) NewStepWriter(_ context.Context, _ string, streamType int) io.WriteCloser {
+	if streamType == execution.StreamTypeStdout {
+		return m.stdoutWriter
+	}
+	return m.stderrWriter
+}
+
+func TestOutputCoordinator_SetupRemoteWriters(t *testing.T) {
+	t.Parallel()
+
+	t.Run("CreatesSeparateWritersForStdoutAndStderr", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{}
+		factory := newMockLogWriterFactory()
+		ctx := context.Background()
+
+		data := NodeData{
+			Step: core.Step{Name: "test-step"},
+			State: NodeState{
+				Stdout: "/path/to/stdout.log",
+				Stderr: "/path/to/stderr.log",
+			},
+		}
+
+		err := oc.setupRemoteWriters(ctx, data, factory)
+		require.NoError(t, err)
+
+		// Verify writers were created
+		assert.NotNil(t, oc.stdoutWriter)
+		assert.NotNil(t, oc.stderrWriter)
+		assert.Equal(t, "/path/to/stdout.log", oc.stdoutFileName)
+		assert.Equal(t, "/path/to/stderr.log", oc.stderrFileName)
+
+		// Verify stdout and stderr writers are different
+		assert.NotSame(t, oc.stdoutWriter, oc.stderrWriter)
+	})
+
+	t.Run("MergesWritersWhenPathsMatch", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{}
+		factory := newMockLogWriterFactory()
+		ctx := context.Background()
+
+		// Same path for both stdout and stderr
+		data := NodeData{
+			Step: core.Step{Name: "test-step"},
+			State: NodeState{
+				Stdout: "/path/to/combined.log",
+				Stderr: "/path/to/combined.log",
+			},
+		}
+
+		err := oc.setupRemoteWriters(ctx, data, factory)
+		require.NoError(t, err)
+
+		// When paths are the same, stderr should use the same writer as stdout
+		assert.Same(t, oc.stdoutWriter, oc.stderrWriter)
+	})
+}
+
+func TestOutputCoordinator_CapturedOutput(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ReturnsCachedResult", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{
+			outputCaptured: true,
+			outputData:     "cached output",
+		}
+		ctx := context.Background()
+
+		output, err := oc.capturedOutput(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, "cached output", output)
+	})
+
+	t.Run("ReturnsEmptyWhenNoCapture", func(t *testing.T) {
+		t.Parallel()
+
+		oc := &OutputCoordinator{}
+		ctx := context.Background()
+
+		output, err := oc.capturedOutput(ctx)
+		assert.NoError(t, err)
+		assert.Empty(t, output)
+	})
+
+	t.Run("CapturesFromOutputCapture", func(t *testing.T) {
+		t.Parallel()
+
+		// Create a pipe for output
+		reader, writer, err := os.Pipe()
+		require.NoError(t, err)
+
+		oc := &OutputCoordinator{
+			outputCapture: newOutputCapture(1024 * 1024),
+			outputReader:  reader,
+			outputWriter:  writer,
+		}
+
+		ctx := context.Background()
+
+		// Start capturing
+		oc.outputCapture.start(ctx, reader)
+
+		// Write test data
+		testData := "captured test output"
+		_, err = writer.WriteString(testData)
+		require.NoError(t, err)
+
+		// Get captured output (this will close the writer)
+		output, err := oc.capturedOutput(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, testData, output)
+
+		// Verify caching works
+		assert.True(t, oc.outputCaptured)
+	})
+
+	t.Run("AccumulatesOutputOnRetry", func(t *testing.T) {
+		t.Parallel()
+
+		// Create a pipe for output
+		reader, writer, err := os.Pipe()
+		require.NoError(t, err)
+
+		oc := &OutputCoordinator{
+			outputCapture: newOutputCapture(1024 * 1024),
+			outputReader:  reader,
+			outputWriter:  writer,
+			outputData:    "previous output", // Simulating previous attempt
+		}
+
+		ctx := context.Background()
+
+		// Start capturing
+		oc.outputCapture.start(ctx, reader)
+
+		// Write test data
+		testData := "new output"
+		_, err = writer.WriteString(testData)
+		require.NoError(t, err)
+
+		// Get captured output
+		output, err := oc.capturedOutput(ctx)
+		assert.NoError(t, err)
+
+		// Should contain both previous and new output
+		assert.Contains(t, output, "previous output")
+		assert.Contains(t, output, "new output")
+	})
 }

@@ -16,6 +16,8 @@ coverage:
     - "internal/llm/providers"
     # HTTP client wrapper - requires HTTP mocking
     - "internal/llm/http.go"
+    # Protobuf generated code
+    - "proto"
   status:
     project:
       default:

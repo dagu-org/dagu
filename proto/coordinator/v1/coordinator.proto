@@ -16,6 +16,18 @@ service CoordinatorService {
   rpc GetWorkers (GetWorkersRequest) returns (GetWorkersResponse);
   // Heartbeat is called by workers to report their status.
   rpc Heartbeat (HeartbeatRequest) returns (HeartbeatResponse);
+
+  // ReportStatus is called by workers to push DAG run status updates.
+  // Used in shared-nothing architecture where workers don't have filesystem access.
+  rpc ReportStatus (ReportStatusRequest) returns (ReportStatusResponse);
+
+  // StreamLogs is called by workers to stream step logs to the coordinator.
+  // Uses client streaming for efficient log transmission.
+  rpc StreamLogs (stream LogChunk) returns (StreamLogsResponse);
+
+  // GetDAGRunStatus retrieves the status of a DAG run from the coordinator.
+  // Used by parent DAGs to poll status of remote sub-DAGs in shared-nothing mode.
+  rpc GetDAGRunStatus (GetDAGRunStatusRequest) returns (GetDAGRunStatusResponse);
 }
 
 // Request message for polling a task.
@@ -54,6 +66,9 @@ message Task {
   map<string, string> worker_selector = 10; // Required worker labels for execution
   string definition = 11; // Optional: DAG definition (YAML) for local DAGs
   string worker_id = 12; // ID of the worker that will execute this task
+  // Previous status for OPERATION_RETRY in shared-nothing mode.
+  // When set, workers can retry without needing local DAGRunStore access.
+  DAGRunStatusProto previous_status = 13;
 }
 
 enum Operation {
@@ -103,7 +118,9 @@ message HeartbeatRequest {
 
 // Response message for heartbeat.
 message HeartbeatResponse {
-  // Empty for now
+  // List of DAG run IDs that should be cancelled by the worker.
+  // Workers check this on each heartbeat and cancel matching running tasks.
+  repeated string cancelled_runs = 1;
 }
 
 // Worker statistics reported via heartbeat.
@@ -122,4 +139,137 @@ message RunningTask {
   string root_dag_run_id = 5;
   string parent_dag_run_name = 6;
   string parent_dag_run_id = 7;
+}
+
+// Request message for reporting DAG run status.
+message ReportStatusRequest {
+  string worker_id = 1;
+  DAGRunStatusProto status = 2;
+}
+
+// Response message for reporting DAG run status.
+message ReportStatusResponse {
+  bool accepted = 1;
+  string error = 2;
+}
+
+// Full DAG run status (mirrors execution.DAGRunStatus).
+message DAGRunStatusProto {
+  DAGRunRefProto root = 1;
+  DAGRunRefProto parent = 2;
+  string name = 3;
+  string dag_run_id = 4;
+  string attempt_id = 5;
+  int32 status = 6;  // core.Status enum value
+  string worker_id = 7;
+  int32 pid = 8;
+  repeated NodeStatusProto nodes = 9;
+  NodeStatusProto on_init = 10;
+  NodeStatusProto on_exit = 11;
+  NodeStatusProto on_success = 12;
+  NodeStatusProto on_failure = 13;
+  NodeStatusProto on_cancel = 14;
+  NodeStatusProto on_wait = 15;
+  int64 created_at = 16;
+  string queued_at = 17;
+  string started_at = 18;
+  string finished_at = 19;
+  string log = 20;
+  string error = 21;
+  string params = 22;
+  // protolint:disable:next REPEATED_FIELD_NAMES_PLURALIZED
+  repeated string params_list = 23; // Matches execution.DAGRunStatus.ParamsList
+}
+
+// Reference to a DAG run.
+message DAGRunRefProto {
+  string name = 1;
+  string id = 2;
+}
+
+// Status of a single node/step in a DAG run.
+message NodeStatusProto {
+  string step_name = 1;
+  int32 status = 2;  // core.NodeStatus enum value
+  string stdout = 3;  // Log file path (set by coordinator)
+  string stderr = 4;
+  string started_at = 5;
+  string finished_at = 6;
+  string error = 7;
+  int32 retry_count = 8;
+  int32 done_count = 9;
+  repeated SubDAGRunProto sub_runs = 10;
+  map<string, string> output_variables = 11;
+  string retried_at = 12;
+  // HITL (Human-in-the-loop) fields
+  string approved_at = 13;
+  string approved_by = 14;
+  string rejected_at = 15;
+  string rejected_by = 16;
+  string rejection_reason = 17;
+  // Step definition (needed for reconstruction)
+  StepProto step = 18;
+}
+
+// Reference to a sub-DAG run.
+message SubDAGRunProto {
+  string dag_run_id = 1;
+  string params = 2;
+}
+
+// Step definition (subset of core.Step needed for status).
+message StepProto {
+  string name = 1;
+  string description = 2;
+  string executor_type = 3;
+}
+
+// Log chunk sent from worker to coordinator.
+message LogChunk {
+  string worker_id = 1;
+  string dag_run_id = 2;
+  string dag_name = 3;
+  string step_name = 4;
+  LogStreamType stream_type = 5;
+  bytes data = 6;
+  uint64 sequence = 7;  // For ordering
+  bool is_final = 8;    // Last chunk for this step
+
+  // Root DAG info for sub-DAGs
+  string root_dag_run_name = 9;
+  string root_dag_run_id = 10;
+
+  // Attempt ID for the DAG run
+  string attempt_id = 11;
+}
+
+// Type of log stream.
+enum LogStreamType {
+  LOG_STREAM_TYPE_UNSPECIFIED = 0;
+  LOG_STREAM_TYPE_STDOUT = 1;
+  LOG_STREAM_TYPE_STDERR = 2;
+}
+
+// Response message for log streaming.
+message StreamLogsResponse {
+  uint64 chunks_received = 1;
+  uint64 bytes_written = 2;
+  string error = 3;
+}
+
+// Request message for getting DAG run status.
+message GetDAGRunStatusRequest {
+  string dag_name = 1;      // Name of the DAG
+  string dag_run_id = 2;    // ID of the DAG run
+  // Root DAG run info for sub-DAG queries (optional).
+  // When set, the coordinator looks up the status as a sub-DAG.
+  string root_dag_run_name = 3;
+  string root_dag_run_id = 4;
+}
+
+// Response message for getting DAG run status.
+message GetDAGRunStatusResponse {
+  bool found = 1;                   // Whether the DAG run was found
+  DAGRunStatusProto status = 2;     // The status (only set if found)
+  string error = 3;                 // Error message if any
 }

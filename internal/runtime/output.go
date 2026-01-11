@@ -15,6 +15,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/masking"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
@@ -201,6 +202,23 @@ func (oc *OutputCoordinator) closeResources() error {
 
 	var lastErr error
 
+	// Close stdout/stderr writers if they implement io.Closer.
+	// This is needed for remote log streaming where the writers need
+	// to flush their buffers and send final markers.
+	// NOTE: Close errors are logged by the writer but not propagated here.
+	// Log streaming failures are non-fatal - they shouldn't fail an otherwise
+	// successful step execution. Lost logs are unfortunate but acceptable.
+	closedWriters := make(map[io.Writer]bool)
+	for _, w := range []io.Writer{oc.stdoutWriter, oc.stderrWriter, oc.stdoutRedirectWriter, oc.stderrRedirectWriter} {
+		if w == nil || closedWriters[w] {
+			continue
+		}
+		closedWriters[w] = true
+		if closer, ok := w.(io.Closer); ok {
+			_ = closer.Close()
+		}
+	}
+
 	// Close the output writer first to signal EOF to any readers
 	if oc.outputWriter != nil {
 		_ = oc.outputWriter.Close()
@@ -273,10 +291,41 @@ func (oc *OutputCoordinator) setupStderrRedirect(ctx context.Context, data NodeD
 	return nil
 }
 
-func (oc *OutputCoordinator) setupWriters(_ context.Context, data NodeData) error {
+func (oc *OutputCoordinator) setupWriters(ctx context.Context, data NodeData) error {
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
+	// Check if remote log streaming is available
+	rCtx := GetDAGContext(ctx)
+	if rCtx.LogWriterFactory != nil {
+		return oc.setupRemoteWriters(ctx, data, rCtx.LogWriterFactory)
+	}
+
+	// Local file-based writers (default)
+	return oc.setupLocalWriters(ctx, data)
+}
+
+// setupRemoteWriters creates writers that stream to coordinator
+func (oc *OutputCoordinator) setupRemoteWriters(ctx context.Context, data NodeData, factory LogWriterFactory) error {
+	stepName := data.Step.Name
+
+	// Create streaming writers for stdout and stderr
+	oc.stdoutWriter = factory.NewStepWriter(ctx, stepName, execution.StreamTypeStdout)
+	oc.stdoutFileName = data.State.Stdout // Keep path for status reporting
+
+	// Check if stdout and stderr should be merged
+	if data.State.Stdout == data.State.Stderr {
+		oc.stderrWriter = oc.stdoutWriter
+	} else {
+		oc.stderrWriter = factory.NewStepWriter(ctx, stepName, execution.StreamTypeStderr)
+	}
+	oc.stderrFileName = data.State.Stderr
+
+	return nil
+}
+
+// setupLocalWriters creates file-based writers (original behavior)
+func (oc *OutputCoordinator) setupLocalWriters(_ context.Context, data NodeData) error {
 	// Check if stdout and stderr should be merged (same file path)
 	isMerged := data.State.Stdout == data.State.Stderr
 

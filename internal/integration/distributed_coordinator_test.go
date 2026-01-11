@@ -15,7 +15,7 @@ import (
 func TestCoordinatorGetWorkers(t *testing.T) {
 	t.Run("GetWorkersE2E", func(t *testing.T) {
 		// Setup coordinator
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 
 		// Create gRPC client to coordinator
 		conn, err := grpc.NewClient(
@@ -104,7 +104,7 @@ func TestCoordinatorGetWorkers(t *testing.T) {
 func TestCoordinatorHeartbeat(t *testing.T) {
 	t.Run("HeartbeatE2E", func(t *testing.T) {
 		// Setup coordinator
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 
 		// Create gRPC client to coordinator
 		conn, err := grpc.NewClient(

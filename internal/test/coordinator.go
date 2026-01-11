@@ -24,11 +24,18 @@ type Coordinator struct {
 	grpcServer   *grpc.Server
 	healthServer *health.Server
 	listener     net.Listener
+	logDir       string // Log directory for remote log streaming
 }
 
 // SetupCoordinator creates and starts a test coordinator instance
 func SetupCoordinator(t *testing.T, opts ...HelperOption) *Coordinator {
 	t.Helper()
+
+	// Parse options to access coordinator-specific settings
+	var options Options
+	for _, opt := range opts {
+		opt(&options)
+	}
 
 	// Find an available port for the gRPC server
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -48,11 +55,20 @@ func SetupCoordinator(t *testing.T, opts ...HelperOption) *Coordinator {
 	healthServer := health.NewServer()
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
 
-	// Create handler
-	handler := coordinator.NewHandler()
+	// Build handler options based on coordinator test options
+	var handlerOpts []coordinator.HandlerOption
+	if options.WithStatusPersistence {
+		handlerOpts = append(handlerOpts, coordinator.WithDAGRunStore(helper.DAGRunStore))
+	}
+	if options.WithLogPersistence {
+		handlerOpts = append(handlerOpts, coordinator.WithLogDir(helper.Config.Paths.LogDir))
+	}
+
+	// Create handler with options
+	handler := coordinator.NewHandler(handlerOpts...)
 
 	// Create service with ServiceMonitor from helper
-	service := coordinator.NewService(grpcServer, handler, listener, healthServer, helper.ServiceRegistry, "test-coordinator", "127.0.0.1")
+	service := coordinator.NewService(grpcServer, handler, listener, healthServer, helper.ServiceRegistry, helper.Config, "test-coordinator", "127.0.0.1")
 
 	coord := &Coordinator{
 		Helper:       helper,
@@ -61,6 +77,7 @@ func SetupCoordinator(t *testing.T, opts ...HelperOption) *Coordinator {
 		grpcServer:   grpcServer,
 		healthServer: healthServer,
 		listener:     listener,
+		logDir:       helper.Config.Paths.LogDir,
 	}
 
 	// Start the coordinator
@@ -123,6 +140,16 @@ func (c *Coordinator) GetCoordinatorClient(t *testing.T) coordinator.Client {
 
 	// Create coordinator client - cast to Client interface
 	return coordinator.New(c.ServiceRegistry, config)
+}
+
+// Handler returns the coordinator handler for direct testing
+func (c *Coordinator) Handler() *coordinator.Handler {
+	return c.handler
+}
+
+// LogDir returns the log directory path for verifying log persistence
+func (c *Coordinator) LogDir() string {
+	return c.logDir
 }
 
 // WithCoordinatorConfig creates a coordinator configuration option

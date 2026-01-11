@@ -84,6 +84,7 @@ steps:
 				dag,
 				coordinatorv1.Operation_OPERATION_START,
 				runID,
+				nil,
 			)
 
 			// This fails because no worker is connected, but the important

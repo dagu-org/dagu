@@ -309,10 +309,7 @@ func (rr runResult) assertNodeStatus(t *testing.T, stepName string, expected cor
 		}
 	}
 
-	if target == nil {
-		t.Fatalf("step %s not found", stepName)
-	}
-
+	require.NotNil(t, target, "step %s not found", stepName)
 	require.Equal(t, expected.String(), target.State().Status.String(), "expected status %q, got %q", expected.String(), target.State().Status.String())
 }
 
@@ -336,7 +333,7 @@ func (rr runResult) nodeByName(t *testing.T, stepName string) *runtime.Node {
 		return rr.runner.HandlerNode(core.HandlerOnCancel)
 	}
 
-	t.Fatalf("step %s not found", stepName)
+	require.FailNow(t, "step not found", "step %s not found in nodes", stepName)
 	return nil
 }
 

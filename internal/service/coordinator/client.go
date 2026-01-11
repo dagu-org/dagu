@@ -38,8 +38,17 @@ type Client interface {
 	// GetWorkers retrieves the list of workers from the coordinator
 	GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerInfo, error)
 
-	// Heartbeat sends a heartbeat to the coordinator
-	Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) error
+	// Heartbeat sends a heartbeat to the coordinator and returns the response
+	// which may include cancellation directives
+	Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error)
+
+	// ReportStatus sends a status update to the coordinator (for shared-nothing workers)
+	ReportStatus(ctx context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error)
+
+	// StreamLogs returns a log streaming client for sending logs to the coordinator
+	StreamLogs(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error)
+
+	// GetDAGRunStatus is inherited from execution.Dispatcher
 
 	// Metrics returns the metrics for the coordinator client
 	Metrics() Metrics
@@ -53,7 +62,10 @@ type Metrics struct {
 	LastError        error // Last error encountered
 }
 
-var _ Client = (*clientImpl)(nil)
+var (
+	_ Client               = (*clientImpl)(nil)
+	_ execution.Dispatcher = (*clientImpl)(nil)
+)
 
 // clientImpl is the concrete implementation
 type clientImpl struct {
@@ -108,14 +120,9 @@ func (cli *clientImpl) Dispatch(ctx context.Context, task *coordinatorv1.Task) e
 			return ctx.Err()
 		}
 
-		// Get all available coordinators from registry
-		members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+		members, err := cli.getCoordinatorMembers(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to get coordinator members: %w", err)
-		}
-
-		if len(members) == 0 {
-			return fmt.Errorf("no coordinator instances available")
+			return err
 		}
 
 		return cli.attemptCall(ctx, members, func(ctx context.Context, member execution.HostInfo, client *client) error {
@@ -154,14 +161,9 @@ func (cli *clientImpl) Dispatch(ctx context.Context, task *coordinatorv1.Task) e
 func (cli *clientImpl) Poll(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
 	var task *coordinatorv1.Task
 	err := backoff.Retry(ctx, func(ctx context.Context) error {
-		// Get all available coordinators from registry
-		members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+		members, err := cli.getCoordinatorMembers(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to get coordinator members: %w", err)
-		}
-
-		if len(members) == 0 {
-			return fmt.Errorf("no coordinator instances available")
+			return err
 		}
 
 		return cli.attemptCall(ctx, members, func(ctx context.Context, member execution.HostInfo, client *client) error {
@@ -215,6 +217,7 @@ func (cli *clientImpl) attemptCall(ctx context.Context, members []execution.Host
 				tag.Error(err))
 			cli.removeClient(member.ID) // Remove failed client
 			cli.recordFailure(err)
+			lastErr = err
 			continue
 		}
 
@@ -226,6 +229,7 @@ func (cli *clientImpl) attemptCall(ctx context.Context, members []execution.Host
 				tag.Port(member.Port),
 				tag.Error(err))
 			cli.recordFailure(err)
+			lastErr = err
 			continue
 		}
 
@@ -381,6 +385,19 @@ func (cli *clientImpl) recordSuccess(ctx context.Context) {
 	cli.state.LastError = nil
 }
 
+// getCoordinatorMembers discovers available coordinators from the service registry.
+// Returns an error if discovery fails or no coordinators are available.
+func (cli *clientImpl) getCoordinatorMembers(ctx context.Context) ([]execution.HostInfo, error) {
+	members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	if err != nil {
+		return nil, fmt.Errorf("failed to discover coordinators: %w", err)
+	}
+	if len(members) == 0 {
+		return nil, fmt.Errorf("no coordinators available")
+	}
+	return members, nil
+}
+
 // GetWorkers retrieves the list of workers from all coordinators
 func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerInfo, error) {
 	// Get all available coordinators from discovery
@@ -442,32 +459,121 @@ func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerI
 	return allWorkers, nil
 }
 
-// Heartbeat sends a heartbeat to coordinators
-func (cli *clientImpl) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) error {
-	// Get all available coordinators from discovery
-	members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+// Heartbeat sends a heartbeat to coordinators and returns the response
+func (cli *clientImpl) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
+	members, err := cli.getCoordinatorMembers(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to discover coordinators: %w", err)
+		return nil, err
 	}
 
-	if len(members) == 0 {
-		return fmt.Errorf("no coordinators available")
-	}
-
-	// Use attemptCall to send heartbeat to any available coordinator
-	return cli.attemptCall(ctx, members, func(ctx context.Context, _ execution.HostInfo, client *client) error {
-		// Send heartbeat
-		_, err := client.client.Heartbeat(ctx, req)
-		if err != nil {
-			return fmt.Errorf("heartbeat failed: %w", err)
+	var resp *coordinatorv1.HeartbeatResponse
+	err = cli.attemptCall(ctx, members, func(ctx context.Context, _ execution.HostInfo, client *client) error {
+		var callErr error
+		resp, callErr = client.client.Heartbeat(ctx, req)
+		if callErr != nil {
+			return fmt.Errorf("heartbeat failed: %w", callErr)
 		}
 		return nil
 	})
+	return resp, err
+}
+
+// ReportStatus sends a status update to the coordinator
+func (cli *clientImpl) ReportStatus(ctx context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+	members, err := cli.getCoordinatorMembers(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp *coordinatorv1.ReportStatusResponse
+	err = cli.attemptCall(ctx, members, func(ctx context.Context, _ execution.HostInfo, client *client) error {
+		var callErr error
+		resp, callErr = client.client.ReportStatus(ctx, req)
+		if callErr != nil {
+			return fmt.Errorf("report status failed: %w", callErr)
+		}
+		return nil
+	})
+	return resp, err
+}
+
+// StreamLogs returns a log streaming client for sending logs to the coordinator.
+// It performs health checks and tries multiple coordinators for failover.
+func (cli *clientImpl) StreamLogs(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+	members, err := cli.getCoordinatorMembers(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Shuffle members to distribute load evenly
+	rand.Shuffle(len(members), func(i, j int) {
+		members[i], members[j] = members[j], members[i]
+	})
+
+	// Try each coordinator until one works
+	var lastErr error
+	for _, member := range members {
+		client, err := cli.getOrCreateClient(member)
+		if err != nil {
+			cli.recordFailure(err)
+			lastErr = err
+			continue
+		}
+
+		// Check if the coordinator is healthy before streaming
+		if err := cli.isHealthy(ctx, member); err != nil {
+			cli.recordFailure(err)
+			lastErr = err
+			continue
+		}
+
+		stream, err := client.client.StreamLogs(ctx)
+		if err != nil {
+			cli.recordFailure(err)
+			lastErr = err
+			continue
+		}
+
+		cli.recordSuccess(ctx)
+		return stream, nil
+	}
+
+	return nil, fmt.Errorf("failed to create log stream: %w", lastErr)
+}
+
+// GetDAGRunStatus retrieves the status of a DAG run from the coordinator
+func (cli *clientImpl) GetDAGRunStatus(ctx context.Context, dagName, dagRunID string, rootRef *execution.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error) {
+	members, err := cli.getCoordinatorMembers(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	req := &coordinatorv1.GetDAGRunStatusRequest{
+		DagName:  dagName,
+		DagRunId: dagRunID,
+	}
+
+	// Include root reference for sub-DAG queries
+	if rootRef != nil {
+		req.RootDagRunName = rootRef.Name
+		req.RootDagRunId = rootRef.ID
+	}
+
+	var resp *coordinatorv1.GetDAGRunStatusResponse
+	err = cli.attemptCall(ctx, members, func(ctx context.Context, _ execution.HostInfo, client *client) error {
+		var callErr error
+		resp, callErr = client.client.GetDAGRunStatus(ctx, req)
+		if callErr != nil {
+			return fmt.Errorf("get DAG run status failed: %w", callErr)
+		}
+		return nil
+	})
+	return resp, err
 }
 
 // getDialOptions returns the appropriate gRPC dial options based on TLS configuration
 func getDialOptions(config *Config) ([]grpc.DialOption, error) {
-	opts := []grpc.DialOption{}
+	var opts []grpc.DialOption
 
 	if config.Insecure {
 		// Use insecure connection (h2c)

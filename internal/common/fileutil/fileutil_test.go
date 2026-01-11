@@ -10,7 +10,11 @@ import (
 )
 
 func TestCreateFile(t *testing.T) {
+	t.Parallel()
+
 	t.Run("FileCreationAndPermissions", func(t *testing.T) {
+		t.Parallel()
+
 		dir := t.TempDir()
 		filePath := filepath.Join(dir, "test.log")
 
@@ -29,7 +33,13 @@ func TestCreateFile(t *testing.T) {
 	})
 
 	t.Run("InvalidPath", func(t *testing.T) {
-		_, err := OpenOrCreateFile("/nonexistent/directory/test.log")
+		t.Parallel()
+
+		// Create a temp directory and remove it to get a guaranteed invalid path
+		dir := t.TempDir()
+		invalidPath := filepath.Join(dir, "removed", "test.log")
+
+		_, err := OpenOrCreateFile(invalidPath)
 		assert.Error(t, err)
 	})
 }
@@ -217,5 +227,98 @@ func TestIsFile(t *testing.T) {
 		t.Parallel()
 
 		require.False(t, IsFile(filepath.Join(tmpDir, "nonexistent")))
+	})
+}
+
+func TestCreateTempDAGFile(t *testing.T) {
+	t.Parallel()
+
+	t.Run("BasicFile", func(t *testing.T) {
+		t.Parallel()
+		yamlData := []byte("name: test-dag\nsteps:\n  - name: step1\n    command: echo test")
+		path, err := CreateTempDAGFile("test-subdir", "test-dag", yamlData)
+		require.NoError(t, err)
+		require.NotEmpty(t, path)
+		t.Cleanup(func() { _ = os.Remove(path) })
+
+		// Verify file exists
+		assert.FileExists(t, path)
+
+		// Verify content
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.Equal(t, yamlData, content)
+
+		// Verify path contains expected components
+		assert.Contains(t, path, "test-dag")
+		assert.Contains(t, path, ".yaml")
+		assert.Contains(t, path, filepath.Join("dagu", "test-subdir"))
+	})
+
+	t.Run("WithExtraDocs", func(t *testing.T) {
+		t.Parallel()
+
+		primaryDoc := []byte("name: parent-dag\nsteps:\n  - name: step1")
+		extraDoc1 := []byte("name: child1\nsteps:\n  - name: s1")
+		extraDoc2 := []byte("name: child2\nsteps:\n  - name: s2")
+
+		path, err := CreateTempDAGFile("test-subdir", "parent-dag", primaryDoc, extraDoc1, extraDoc2)
+		require.NoError(t, err)
+		require.NotEmpty(t, path)
+		t.Cleanup(func() { _ = os.Remove(path) })
+
+		// Verify file exists
+		assert.FileExists(t, path)
+
+		// Verify content has all docs separated by ---
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		contentStr := string(content)
+
+		assert.Contains(t, contentStr, "name: parent-dag")
+		assert.Contains(t, contentStr, "name: child1")
+		assert.Contains(t, contentStr, "name: child2")
+
+		// Verify YAML separators appear on their own line (not appended to previous content)
+		// The separator should be "\n---\n" format per YAML spec
+		assert.Contains(t, contentStr, "\n---\n", "YAML separator should appear on its own line")
+		assert.NotContains(t, contentStr, "step1---", "separator should not be appended directly to content")
+	})
+
+	t.Run("WithExtraDocs_NoTrailingNewline", func(t *testing.T) {
+		t.Parallel()
+
+		// Primary doc without trailing newline - should still produce valid YAML
+		primaryDoc := []byte("name: parent-dag")
+		extraDoc := []byte("name: child-dag")
+
+		path, err := CreateTempDAGFile("test-subdir", "no-newline-dag", primaryDoc, extraDoc)
+		require.NoError(t, err)
+		require.NotEmpty(t, path)
+		t.Cleanup(func() { _ = os.Remove(path) })
+
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		contentStr := string(content)
+
+		// Should have newline inserted before separator
+		assert.Contains(t, contentStr, "name: parent-dag\n---\n", "newline should be inserted before separator when missing")
+	})
+
+	t.Run("EmptyExtraDocs", func(t *testing.T) {
+		t.Parallel()
+
+		primaryDoc := []byte("name: solo-dag")
+
+		path, err := CreateTempDAGFile("test-subdir", "solo-dag", primaryDoc)
+		require.NoError(t, err)
+		require.NotEmpty(t, path)
+		t.Cleanup(func() { _ = os.Remove(path) })
+
+		// Verify content has only the primary doc (no separators)
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.Equal(t, primaryDoc, content)
+		assert.NotContains(t, string(content), "---")
 	})
 }

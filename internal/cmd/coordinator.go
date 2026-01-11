@@ -79,12 +79,18 @@ var coordinatorFlags = []commandLineFlag{
 }
 
 func runCoordinator(ctx *Context, _ []string) error {
-	coordinator, err := newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry)
+	svc, handler, err := newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry, ctx.DAGRunStore)
 	if err != nil {
 		return fmt.Errorf("failed to initialize coordinator: %w", err)
 	}
 
-	if err := coordinator.Start(ctx); err != nil {
+	// Ensure handler resources are cleaned up on shutdown
+	defer func() {
+		handler.WaitZombieDetector()
+		handler.Close(ctx)
+	}()
+
+	if err := svc.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start coordinator: %w", err)
 	}
 
@@ -92,7 +98,7 @@ func runCoordinator(ctx *Context, _ []string) error {
 	<-ctx.Done()
 	logger.Info(ctx, "Coordinator shutting down")
 
-	if err := coordinator.Stop(ctx); err != nil {
+	if err := svc.Stop(ctx); err != nil {
 		return fmt.Errorf("failed to stop coordinator: %w", err)
 	}
 
@@ -109,7 +115,7 @@ func runCoordinator(ctx *Context, _ []string) error {
 // cfg.Core.Peer, it loads TLS credentials for the gRPC server. It binds a TCP listener
 // to cfg.Coordinator.Host:cfg.Coordinator.Port and returns an initialized coordinator.Service.
 // It returns an error if any part of setup (TLS loading, listener binding, etc.) fails.
-func newCoordinator(ctx context.Context, cfg *config.Config, registry execution.ServiceRegistry) (*coordinator.Service, error) {
+func newCoordinator(ctx context.Context, cfg *config.Config, registry execution.ServiceRegistry, dagRunStore execution.DAGRunStore) (*coordinator.Service, *coordinator.Handler, error) {
 	// Generate instance ID
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -159,7 +165,7 @@ func newCoordinator(ctx context.Context, cfg *config.Config, registry execution.
 			CAFile:   cfg.Core.Peer.ClientCaFile,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to load TLS credentials: %w", err)
+			return nil, nil, fmt.Errorf("failed to load TLS credentials: %w", err)
 		}
 		serverOpts = append(serverOpts, grpc.Creds(creds))
 	}
@@ -175,14 +181,17 @@ func newCoordinator(ctx context.Context, cfg *config.Config, registry execution.
 	addr := fmt.Sprintf("%s:%d", cfg.Coordinator.Host, cfg.Coordinator.Port)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create listener on %s: %w", addr, err)
+		return nil, nil, fmt.Errorf("failed to create listener on %s: %w", addr, err)
 	}
 
-	// Create handler
-	handler := coordinator.NewHandler()
+	// Create handler with DAGRunStore for status persistence and LogDir for log streaming
+	handler := coordinator.NewHandler(
+		coordinator.WithDAGRunStore(dagRunStore),
+		coordinator.WithLogDir(cfg.Paths.LogDir),
+	)
 
 	// Create and return service with advertise address for service registry
-	return coordinator.NewService(grpcServer, handler, listener, healthServer, registry, instanceID, advertiseAddr), nil
+	return coordinator.NewService(grpcServer, handler, listener, healthServer, registry, cfg, instanceID, advertiseAddr), handler, nil
 }
 
 // loadCoordinatorTLSCredentials loads TLS credentials for the coordinator server.

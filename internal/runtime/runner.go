@@ -226,8 +226,8 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 
 				// Ensure node is finished and wg is decremented
 				defer r.finishNode(n, &wg)
-				// Recover from panics
-				defer r.recoverNodePanic(ctx, n)
+				// Recover from panics and signal progress for status updates
+				defer r.recoverNodePanic(ctx, n, progressCh)
 				// Signal completion to runner loop
 				defer func() {
 					doneCh <- n
@@ -461,10 +461,16 @@ ExecRepeat: // repeat execution
 		break ExecRepeat
 	}
 
-	// If node is still in running state by now, it means it was not canceled
-	// and it has completed its execution without errors.
+	// Determine final status for nodes still in running state.
+	// Repetitive tasks complete naturally (signal not sent - see runner.Signal).
+	// Only mark as aborted if: not a repetitive task AND runner was canceled.
 	if node.State().Status == core.NodeRunning {
-		node.SetStatus(core.NodeSucceeded)
+		isRepetitive := node.Step().RepeatPolicy.RepeatMode != ""
+		if !isRepetitive && r.isCanceled() {
+			node.SetStatus(core.NodeAborted)
+		} else {
+			node.SetStatus(core.NodeSucceeded)
+		}
 	}
 
 	// Save chat messages after successful execution
@@ -763,10 +769,7 @@ func isReady(ctx context.Context, plan *Plan, node *Node) bool {
 		dep := plan.GetNode(depID)
 
 		switch dep.State().Status {
-		case core.NodeSucceeded:
-			continue
-
-		case core.NodePartiallySucceeded:
+		case core.NodeSucceeded, core.NodePartiallySucceeded:
 			// Partial success is treated like success for dependencies
 			continue
 
@@ -1063,7 +1066,8 @@ func (r *Runner) shouldRetryNode(ctx context.Context, node *Node, execErr error)
 }
 
 // recoverNodePanic handles panic recovery for a node goroutine.
-func (r *Runner) recoverNodePanic(ctx context.Context, node *Node) {
+// It signals progressCh so the agent can write the updated status to storage.
+func (r *Runner) recoverNodePanic(ctx context.Context, node *Node, progressCh chan *Node) {
 	if panicObj := recover(); panicObj != nil {
 		stack := string(debug.Stack())
 		err := fmt.Errorf("panic recovered in node %s: %v\n%s", node.Name(), panicObj, stack)
@@ -1079,6 +1083,11 @@ func (r *Runner) recoverNodePanic(ctx context.Context, node *Node) {
 		r.mu.Lock()
 		r.metrics.failedNodes++
 		r.mu.Unlock()
+
+		// Signal progress so status is written to storage
+		if progressCh != nil {
+			progressCh <- node
+		}
 	}
 }
 
@@ -1088,22 +1097,17 @@ func (r *Runner) finishNode(node *Node, wg *sync.WaitGroup) {
 	defer r.mu.Unlock()
 
 	switch node.State().Status {
-	case core.NodeSucceeded:
+	case core.NodeSucceeded, core.NodePartiallySucceeded:
 		r.metrics.completedNodes++
-	case core.NodeFailed:
+	case core.NodeFailed, core.NodeRejected:
 		r.metrics.failedNodes++
 	case core.NodeSkipped:
 		r.metrics.skippedNodes++
 	case core.NodeAborted:
 		r.metrics.canceledNodes++
-	case core.NodePartiallySucceeded:
-		r.metrics.completedNodes++ // Count partial success as completed
-	case core.NodeWaiting:
-		// Waiting nodes are counted when they complete after approval
-	case core.NodeRejected:
-		r.metrics.failedNodes++ // Rejected nodes are counted as failed
-	case core.NodeNotStarted, core.NodeRunning:
-		// Should not happen at this point
+	case core.NodeWaiting, core.NodeNotStarted, core.NodeRunning:
+		// Waiting nodes are counted when they complete after approval.
+		// NotStarted/Running should not happen at this point.
 	}
 
 	node.Finish()

@@ -2,6 +2,7 @@ package executor
 
 import (
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/proto/convert"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -74,5 +75,15 @@ func WithWorkerSelector(selector map[string]string) TaskOption {
 func WithStep(step string) TaskOption {
 	return func(task *coordinatorv1.Task) {
 		task.Step = step
+	}
+}
+
+// WithPreviousStatus sets the previous status for retry operations in shared-nothing mode.
+// When set, workers can retry without needing local DAGRunStore access.
+func WithPreviousStatus(status *execution.DAGRunStatus) TaskOption {
+	return func(task *coordinatorv1.Task) {
+		if status != nil {
+			task.PreviousStatus = convert.DAGRunStatusToProto(status)
+		}
 	}
 }

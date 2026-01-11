@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/backoff"
+	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/worker"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -20,7 +21,10 @@ import (
 
 // TestPollerStateTracking tests that the poller correctly tracks connection state via coordinator client
 func TestPollerStateTracking(t *testing.T) {
+	t.Parallel()
+
 	t.Run("InitialStateIsConnected", func(t *testing.T) {
+		t.Parallel()
 		mockCoordinatorCli := newMockCoordinatorCli()
 		mockHandler := &mockHandler{}
 		labels := make(map[string]string)
@@ -35,6 +39,8 @@ func TestPollerStateTracking(t *testing.T) {
 	})
 
 	t.Run("StateReflectsDispatcherMetrics", func(t *testing.T) {
+		t.Parallel()
+
 		mockCoordinatorCli := newMockCoordinatorCli()
 		connectionError := status.Error(codes.Unavailable, "connection refused")
 
@@ -60,7 +66,10 @@ func TestPollerStateTracking(t *testing.T) {
 }
 
 func TestPollerTaskDispatch(t *testing.T) {
+	t.Parallel()
+
 	t.Run("DispatchTaskToExecutor", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -103,6 +112,8 @@ func TestPollerTaskDispatch(t *testing.T) {
 	})
 
 	t.Run("ContinuePollingAfterTaskExecution", func(t *testing.T) {
+		t.Parallel()
+
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -153,7 +164,10 @@ func TestPollerTaskDispatch(t *testing.T) {
 }
 
 func TestPollerErrorHandling(t *testing.T) {
+	t.Parallel()
+
 	t.Run("HandleExecutorError", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -196,6 +210,8 @@ func TestPollerErrorHandling(t *testing.T) {
 	})
 
 	t.Run("ContinueOnPollError", func(t *testing.T) {
+		t.Parallel()
+
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -237,7 +253,10 @@ func TestPollerErrorHandling(t *testing.T) {
 }
 
 func TestPollerContextCancellation(t *testing.T) {
+	t.Parallel()
+
 	t.Run("StopOnContextCancel", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithCancel(context.Background())
 
 		var pollStarted atomic.Bool
@@ -271,6 +290,8 @@ func TestPollerContextCancellation(t *testing.T) {
 	})
 
 	t.Run("StopExecutionOnContextCancel", func(t *testing.T) {
+		t.Parallel()
+
 		ctx, cancel := context.WithCancel(context.Background())
 
 		mockCoordinatorCli := newMockCoordinatorCli()
@@ -314,7 +335,10 @@ func TestPollerContextCancellation(t *testing.T) {
 }
 
 func TestPollerWithLabels(t *testing.T) {
+	t.Parallel()
+
 	t.Run("SendLabelsInPollRequest", func(t *testing.T) {
+		t.Parallel()
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -348,10 +372,11 @@ var _ coordinator.Client = (*mockCoordinatorCli)(nil)
 
 // mockCoordinatorCli is a mock implementation of coordinator.Client
 type mockCoordinatorCli struct {
-	PollFunc     func(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error)
-	DispatchFunc func(ctx context.Context, task *coordinatorv1.Task) error
-	MetricsFunc  func() coordinator.Metrics
-	CleanupFunc  func(ctx context.Context) error
+	PollFunc      func(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error)
+	DispatchFunc  func(ctx context.Context, task *coordinatorv1.Task) error
+	MetricsFunc   func() coordinator.Metrics
+	CleanupFunc   func(ctx context.Context) error
+	HeartbeatFunc func(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error)
 
 	// Internal state tracking
 	mu               sync.Mutex
@@ -367,8 +392,12 @@ func newMockCoordinatorCli() *mockCoordinatorCli {
 }
 
 func (m *mockCoordinatorCli) Poll(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
-	if m.PollFunc != nil {
-		task, err := m.PollFunc(ctx, policy, req)
+	m.mu.Lock()
+	pollFunc := m.PollFunc
+	m.mu.Unlock()
+
+	if pollFunc != nil {
+		task, err := pollFunc(ctx, policy, req)
 		m.updateState(err)
 		return task, err
 	}
@@ -376,20 +405,25 @@ func (m *mockCoordinatorCli) Poll(ctx context.Context, policy backoff.RetryPolic
 }
 
 func (m *mockCoordinatorCli) Dispatch(ctx context.Context, task *coordinatorv1.Task) error {
-	if m.DispatchFunc != nil {
-		return m.DispatchFunc(ctx, task)
+	m.mu.Lock()
+	dispatchFunc := m.DispatchFunc
+	m.mu.Unlock()
+
+	if dispatchFunc != nil {
+		return dispatchFunc(ctx, task)
 	}
 	return nil
 }
 
 func (m *mockCoordinatorCli) Metrics() coordinator.Metrics {
-	if m.MetricsFunc != nil {
-		return m.MetricsFunc()
+	m.mu.Lock()
+	metricsFunc := m.MetricsFunc
+	if metricsFunc != nil {
+		m.mu.Unlock()
+		return metricsFunc()
 	}
 
-	m.mu.Lock()
 	defer m.mu.Unlock()
-
 	return coordinator.Metrics{
 		IsConnected:      m.isConnected,
 		ConsecutiveFails: m.consecutiveFails,
@@ -398,8 +432,12 @@ func (m *mockCoordinatorCli) Metrics() coordinator.Metrics {
 }
 
 func (m *mockCoordinatorCli) Cleanup(ctx context.Context) error {
-	if m.CleanupFunc != nil {
-		return m.CleanupFunc(ctx)
+	m.mu.Lock()
+	cleanupFunc := m.CleanupFunc
+	m.mu.Unlock()
+
+	if cleanupFunc != nil {
+		return cleanupFunc(ctx)
 	}
 	return nil
 }
@@ -409,9 +447,28 @@ func (m *mockCoordinatorCli) GetWorkers(_ context.Context) ([]*coordinatorv1.Wor
 	return []*coordinatorv1.WorkerInfo{}, nil
 }
 
-func (m *mockCoordinatorCli) Heartbeat(_ context.Context, _ *coordinatorv1.HeartbeatRequest) error {
+func (m *mockCoordinatorCli) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
+	m.mu.Lock()
+	heartbeatFunc := m.HeartbeatFunc
+	m.mu.Unlock()
+
+	if heartbeatFunc != nil {
+		return heartbeatFunc(ctx, req)
+	}
 	// Return success by default for tests
-	return nil
+	return &coordinatorv1.HeartbeatResponse{}, nil
+}
+
+func (m *mockCoordinatorCli) ReportStatus(_ context.Context, _ *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+	return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
+}
+
+func (m *mockCoordinatorCli) StreamLogs(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+	return nil, nil
+}
+
+func (m *mockCoordinatorCli) GetDAGRunStatus(_ context.Context, _, _ string, _ *execution.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error) {
+	return &coordinatorv1.GetDAGRunStatusResponse{Found: false}, nil
 }
 
 func (m *mockCoordinatorCli) updateState(err error) {
@@ -427,4 +484,18 @@ func (m *mockCoordinatorCli) updateState(err error) {
 		m.consecutiveFails = 0
 		m.lastError = nil
 	}
+}
+
+// SetPollFunc safely sets the PollFunc for concurrent access
+func (m *mockCoordinatorCli) SetPollFunc(f func(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.PollFunc = f
+}
+
+// SetHeartbeatFunc safely sets the HeartbeatFunc for concurrent access
+func (m *mockCoordinatorCli) SetHeartbeatFunc(f func(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.HeartbeatFunc = f
 }

@@ -102,7 +102,7 @@ func runStartAll(ctx *Context, _ []string) error {
 	}
 
 	// Only start coordinator if not bound to localhost
-	coordinator, err := newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry)
+	coordinator, coordHandler, err := newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry, ctx.DAGRunStore)
 	if err != nil {
 		return fmt.Errorf("failed to initialize coordinator: %w", err)
 	}
@@ -195,6 +195,9 @@ func runStartAll(ctx *Context, _ []string) error {
 			tag.Error(err),
 		)
 	}
+	// Clean up coordinator handler resources
+	coordHandler.WaitZombieDetector()
+	coordHandler.Close(ctx)
 
 	// Stop resource service
 	if err := resourceService.Stop(ctx); err != nil {

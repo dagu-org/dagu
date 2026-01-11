@@ -48,6 +48,9 @@ type Options struct {
 	ConfigMutators       []func(*config.Config)
 	CoordinatorHost      string
 	CoordinatorPort      int
+	// Coordinator handler options for shared-nothing worker tests
+	WithStatusPersistence bool // Enable status persistence via DAGRunStore
+	WithLogPersistence    bool // Enable log persistence to filesystem
 }
 
 // WithCaptureLoggingOutput creates a logging capture option
@@ -73,6 +76,22 @@ func WithServerConfig(cfg *config.Server) HelperOption {
 func WithConfigMutator(mutator func(*config.Config)) HelperOption {
 	return func(opts *Options) {
 		opts.ConfigMutators = append(opts.ConfigMutators, mutator)
+	}
+}
+
+// WithStatusPersistence enables status persistence via DAGRunStore on the coordinator handler.
+// Use this for testing remote status pushing from workers.
+func WithStatusPersistence() HelperOption {
+	return func(opts *Options) {
+		opts.WithStatusPersistence = true
+	}
+}
+
+// WithLogPersistence enables log persistence to filesystem on the coordinator handler.
+// Use this for testing remote log streaming from workers.
+func WithLogPersistence() HelperOption {
+	return func(opts *Options) {
+		opts.WithLogPersistence = true
 	}
 }
 

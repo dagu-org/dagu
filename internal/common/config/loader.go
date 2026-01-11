@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"path"
 	"path/filepath"
@@ -602,7 +603,74 @@ func (l *ConfigLoader) loadWorkerConfig(cfg *Config, def Definition) {
 				}
 			}
 		}
+
+		// Parse coordinators for static service discovery
+		if def.Worker.Coordinators != nil {
+			addresses, addrWarnings := parseCoordinatorAddresses(def.Worker.Coordinators)
+			cfg.Worker.Coordinators = addresses
+			l.warnings = append(l.warnings, addrWarnings...)
+		}
 	}
+}
+
+// parseCoordinatorAddresses parses and validates coordinator addresses from various input formats.
+// It accepts either a comma-separated string or a list of strings.
+// Returns the list of valid addresses and any warnings for invalid ones.
+func parseCoordinatorAddresses(input interface{}) ([]string, []string) {
+	var addresses []string
+	var warnings []string
+
+	processAddr := func(addr string) {
+		addr = strings.TrimSpace(addr)
+		if addr == "" {
+			return
+		}
+
+		// Validate host:port format using net.SplitHostPort
+		host, portStr, err := net.SplitHostPort(addr)
+		if err != nil {
+			warnings = append(warnings, fmt.Sprintf("Invalid coordinator address %q: %v", addr, err))
+			return
+		}
+
+		port, err := strconv.Atoi(portStr)
+		if err != nil || port <= 0 || port > 65535 {
+			warnings = append(warnings, fmt.Sprintf("Invalid coordinator address %q: port must be between 1 and 65535", addr))
+			return
+		}
+
+		if host == "" {
+			warnings = append(warnings, fmt.Sprintf("Invalid coordinator address %q: empty host", addr))
+			return
+		}
+
+		addresses = append(addresses, addr)
+	}
+
+	switch v := input.(type) {
+	case string:
+		// Parse comma-separated string: "host1:port1,host2:port2"
+		if v != "" {
+			parts := strings.Split(v, ",")
+			for _, part := range parts {
+				processAddr(part)
+			}
+		}
+	case []interface{}:
+		// Parse list from YAML
+		for _, item := range v {
+			if addr, ok := item.(string); ok {
+				processAddr(addr)
+			}
+		}
+	case []string:
+		// Already a string slice
+		for _, addr := range v {
+			processAddr(addr)
+		}
+	}
+
+	return addresses, warnings
 }
 
 // loadSchedulerConfig loads the scheduler configuration.
@@ -1054,6 +1122,7 @@ var envBindings = []envBinding{
 	{key: "worker.id", env: "WORKER_ID"},
 	{key: "worker.maxActiveRuns", env: "WORKER_MAX_ACTIVE_RUNS"},
 	{key: "worker.labels", env: "WORKER_LABELS"},
+	{key: "worker.coordinators", env: "WORKER_COORDINATORS"},
 
 	// Peer configuration
 	{key: "peer.certFile", env: "PEER_CERT_FILE"},

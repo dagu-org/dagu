@@ -38,7 +38,7 @@ steps:
     output: RESULT
 `
 		// Setup and start coordinator
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 
 		// Create and start multiple workers to handle parallel execution
 		setupWorkers(t, coord, 2, map[string]string{"type": "test-worker"})
@@ -116,7 +116,7 @@ steps:
     output: RESULT
 `
 		// Setup and start coordinator
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 
 		// Create multiple workers of the same type
 		setupWorkers(t, coord, 3, map[string]string{"type": "test-worker"})
@@ -175,7 +175,7 @@ steps:
       fi
       echo "Processed $1"
 `
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 
 		setupWorker(t, coord, "test-worker-failure", 10, map[string]string{"type": "test-worker"})
 
@@ -214,7 +214,7 @@ steps:
     command: echo "Should not run"
 `
 		// Setup coordinator without matching workers
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -258,7 +258,7 @@ steps:
 `
 		// Setup and start coordinator
 		tmpDir := t.TempDir()
-		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir))
+		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir), test.WithStatusPersistence())
 
 		// Get dispatcher client from coordinator
 		coordinatorClient := coord.GetCoordinatorClient(t)
@@ -327,14 +327,13 @@ steps:
 		runRef := execution.NewDAGRunRef(st.Name, st.DAGRunID)
 		var canceled bool
 		for _, child := range parallelNode.SubRuns {
-			att, _ := coord.DAGRunStore.FindSubAttempt(coord.Context, runRef, child.DAGRunID)
-			if att == nil {
+			att, findErr := coord.DAGRunStore.FindSubAttempt(coord.Context, runRef, child.DAGRunID)
+			if findErr != nil || att == nil {
 				continue
 			}
-			require.NoError(t, err)
 
-			status, err := att.ReadStatus(coord.Context)
-			require.NoError(t, err)
+			status, readErr := att.ReadStatus(coord.Context)
+			require.NoError(t, readErr)
 			require.Equal(t, core.Aborted, status.Status)
 			canceled = true
 		}
@@ -382,7 +381,7 @@ steps:
 `
 		// Setup and start coordinator
 		tmpDir := t.TempDir()
-		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir))
+		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir), test.WithStatusPersistence())
 
 		// Create worker for distributed execution
 		setupWorker(t, coord, "test-worker-1", 10, map[string]string{"type": "test-worker"})
@@ -465,7 +464,7 @@ steps:
 `
 		// Setup and start coordinator
 		tmpDir := t.TempDir()
-		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir))
+		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir), test.WithStatusPersistence())
 
 		// Create multiple workers using the helper
 		setupWorkers(t, coord, 3, map[string]string{"type": "test-worker"})

@@ -280,6 +280,7 @@ type Worker struct {
 	ID            string            // Worker instance ID (default: hostname@PID)
 	MaxActiveRuns int               // Maximum number of active runs (default: 100)
 	Labels        map[string]string // Worker labels for capability matching
+	Coordinators  []string          // Coordinator addresses for static discovery (host:port)
 }
 
 // Scheduler represents the scheduler configuration

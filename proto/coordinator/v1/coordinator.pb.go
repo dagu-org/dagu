@@ -123,6 +123,56 @@ func (WorkerHealthStatus) EnumDescriptor() ([]byte, []int) {
 	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{1}
 }
 
+// Type of log stream.
+type LogStreamType int32
+
+const (
+	LogStreamType_LOG_STREAM_TYPE_UNSPECIFIED LogStreamType = 0
+	LogStreamType_LOG_STREAM_TYPE_STDOUT      LogStreamType = 1
+	LogStreamType_LOG_STREAM_TYPE_STDERR      LogStreamType = 2
+)
+
+// Enum value maps for LogStreamType.
+var (
+	LogStreamType_name = map[int32]string{
+		0: "LOG_STREAM_TYPE_UNSPECIFIED",
+		1: "LOG_STREAM_TYPE_STDOUT",
+		2: "LOG_STREAM_TYPE_STDERR",
+	}
+	LogStreamType_value = map[string]int32{
+		"LOG_STREAM_TYPE_UNSPECIFIED": 0,
+		"LOG_STREAM_TYPE_STDOUT":      1,
+		"LOG_STREAM_TYPE_STDERR":      2,
+	}
+)
+
+func (x LogStreamType) Enum() *LogStreamType {
+	p := new(LogStreamType)
+	*p = x
+	return p
+}
+
+func (x LogStreamType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (LogStreamType) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_coordinator_v1_coordinator_proto_enumTypes[2].Descriptor()
+}
+
+func (LogStreamType) Type() protoreflect.EnumType {
+	return &file_proto_coordinator_v1_coordinator_proto_enumTypes[2]
+}
+
+func (x LogStreamType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use LogStreamType.Descriptor instead.
+func (LogStreamType) EnumDescriptor() ([]byte, []int) {
+	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{2}
+}
+
 // Request message for polling a task.
 type PollRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -326,8 +376,11 @@ type Task struct {
 	WorkerSelector   map[string]string      `protobuf:"bytes,10,rep,name=worker_selector,json=workerSelector,proto3" json:"worker_selector,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Required worker labels for execution
 	Definition       string                 `protobuf:"bytes,11,opt,name=definition,proto3" json:"definition,omitempty"`                                                                                                         // Optional: DAG definition (YAML) for local DAGs
 	WorkerId         string                 `protobuf:"bytes,12,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`                                                                                             // ID of the worker that will execute this task
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Previous status for OPERATION_RETRY in shared-nothing mode.
+	// When set, workers can retry without needing local DAGRunStore access.
+	PreviousStatus *DAGRunStatusProto `protobuf:"bytes,13,opt,name=previous_status,json=previousStatus,proto3" json:"previous_status,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Task) Reset() {
@@ -442,6 +495,13 @@ func (x *Task) GetWorkerId() string {
 		return x.WorkerId
 	}
 	return ""
+}
+
+func (x *Task) GetPreviousStatus() *DAGRunStatusProto {
+	if x != nil {
+		return x.PreviousStatus
+	}
+	return nil
 }
 
 // Request message for getting workers.
@@ -699,7 +759,10 @@ func (x *HeartbeatRequest) GetStats() *WorkerStats {
 
 // Response message for heartbeat.
 type HeartbeatResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// List of DAG run IDs that should be cancelled by the worker.
+	// Workers check this on each heartbeat and cancel matching running tasks.
+	CancelledRuns []string `protobuf:"bytes,1,rep,name=cancelled_runs,json=cancelledRuns,proto3" json:"cancelled_runs,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -732,6 +795,13 @@ func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
 // Deprecated: Use HeartbeatResponse.ProtoReflect.Descriptor instead.
 func (*HeartbeatResponse) Descriptor() ([]byte, []int) {
 	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *HeartbeatResponse) GetCancelledRuns() []string {
+	if x != nil {
+		return x.CancelledRuns
+	}
+	return nil
 }
 
 // Worker statistics reported via heartbeat.
@@ -888,6 +958,1004 @@ func (x *RunningTask) GetParentDagRunId() string {
 	return ""
 }
 
+// Request message for reporting DAG run status.
+type ReportStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
+	Status        *DAGRunStatusProto     `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportStatusRequest) Reset() {
+	*x = ReportStatusRequest{}
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportStatusRequest) ProtoMessage() {}
+
+func (x *ReportStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportStatusRequest.ProtoReflect.Descriptor instead.
+func (*ReportStatusRequest) Descriptor() ([]byte, []int) {
+	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ReportStatusRequest) GetWorkerId() string {
+	if x != nil {
+		return x.WorkerId
+	}
+	return ""
+}
+
+func (x *ReportStatusRequest) GetStatus() *DAGRunStatusProto {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+// Response message for reporting DAG run status.
+type ReportStatusResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Accepted      bool                   `protobuf:"varint,1,opt,name=accepted,proto3" json:"accepted,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportStatusResponse) Reset() {
+	*x = ReportStatusResponse{}
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportStatusResponse) ProtoMessage() {}
+
+func (x *ReportStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportStatusResponse.ProtoReflect.Descriptor instead.
+func (*ReportStatusResponse) Descriptor() ([]byte, []int) {
+	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ReportStatusResponse) GetAccepted() bool {
+	if x != nil {
+		return x.Accepted
+	}
+	return false
+}
+
+func (x *ReportStatusResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+// Full DAG run status (mirrors execution.DAGRunStatus).
+type DAGRunStatusProto struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Root       *DAGRunRefProto        `protobuf:"bytes,1,opt,name=root,proto3" json:"root,omitempty"`
+	Parent     *DAGRunRefProto        `protobuf:"bytes,2,opt,name=parent,proto3" json:"parent,omitempty"`
+	Name       string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	DagRunId   string                 `protobuf:"bytes,4,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"`
+	AttemptId  string                 `protobuf:"bytes,5,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
+	Status     int32                  `protobuf:"varint,6,opt,name=status,proto3" json:"status,omitempty"` // core.Status enum value
+	WorkerId   string                 `protobuf:"bytes,7,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
+	Pid        int32                  `protobuf:"varint,8,opt,name=pid,proto3" json:"pid,omitempty"`
+	Nodes      []*NodeStatusProto     `protobuf:"bytes,9,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	OnInit     *NodeStatusProto       `protobuf:"bytes,10,opt,name=on_init,json=onInit,proto3" json:"on_init,omitempty"`
+	OnExit     *NodeStatusProto       `protobuf:"bytes,11,opt,name=on_exit,json=onExit,proto3" json:"on_exit,omitempty"`
+	OnSuccess  *NodeStatusProto       `protobuf:"bytes,12,opt,name=on_success,json=onSuccess,proto3" json:"on_success,omitempty"`
+	OnFailure  *NodeStatusProto       `protobuf:"bytes,13,opt,name=on_failure,json=onFailure,proto3" json:"on_failure,omitempty"`
+	OnCancel   *NodeStatusProto       `protobuf:"bytes,14,opt,name=on_cancel,json=onCancel,proto3" json:"on_cancel,omitempty"`
+	OnWait     *NodeStatusProto       `protobuf:"bytes,15,opt,name=on_wait,json=onWait,proto3" json:"on_wait,omitempty"`
+	CreatedAt  int64                  `protobuf:"varint,16,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	QueuedAt   string                 `protobuf:"bytes,17,opt,name=queued_at,json=queuedAt,proto3" json:"queued_at,omitempty"`
+	StartedAt  string                 `protobuf:"bytes,18,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	FinishedAt string                 `protobuf:"bytes,19,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
+	Log        string                 `protobuf:"bytes,20,opt,name=log,proto3" json:"log,omitempty"`
+	Error      string                 `protobuf:"bytes,21,opt,name=error,proto3" json:"error,omitempty"`
+	Params     string                 `protobuf:"bytes,22,opt,name=params,proto3" json:"params,omitempty"`
+	// protolint:disable:next REPEATED_FIELD_NAMES_PLURALIZED
+	ParamsList    []string `protobuf:"bytes,23,rep,name=params_list,json=paramsList,proto3" json:"params_list,omitempty"` // Matches execution.DAGRunStatus.ParamsList
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DAGRunStatusProto) Reset() {
+	*x = DAGRunStatusProto{}
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DAGRunStatusProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DAGRunStatusProto) ProtoMessage() {}
+
+func (x *DAGRunStatusProto) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DAGRunStatusProto.ProtoReflect.Descriptor instead.
+func (*DAGRunStatusProto) Descriptor() ([]byte, []int) {
+	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *DAGRunStatusProto) GetRoot() *DAGRunRefProto {
+	if x != nil {
+		return x.Root
+	}
+	return nil
+}
+
+func (x *DAGRunStatusProto) GetParent() *DAGRunRefProto {
+	if x != nil {
+		return x.Parent
+	}
+	return nil
+}
+
+func (x *DAGRunStatusProto) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *DAGRunStatusProto) GetDagRunId() string {
+	if x != nil {
+		return x.DagRunId
+	}
+	return ""
+}
+
+func (x *DAGRunStatusProto) GetAttemptId() string {
+	if x != nil {
+		return x.AttemptId
+	}
+	return ""
+}
+
+func (x *DAGRunStatusProto) GetStatus() int32 {
+	if x != nil {
+		return x.Status
+	}
+	return 0
+}
+
+func (x *DAGRunStatusProto) GetWorkerId() string {
+	if x != nil {
+		return x.WorkerId
+	}
+	return ""
+}
+
+func (x *DAGRunStatusProto) GetPid() int32 {
+	if x != nil {
+		return x.Pid
+	}
+	return 0
+}
+
+func (x *DAGRunStatusProto) GetNodes() []*NodeStatusProto {
+	if x != nil {
+		return x.Nodes
+	}
+	return nil
+}
+
+func (x *DAGRunStatusProto) GetOnInit() *NodeStatusProto {
+	if x != nil {
+		return x.OnInit
+	}
+	return nil
+}
+
+func (x *DAGRunStatusProto) GetOnExit() *NodeStatusProto {
+	if x != nil {
+		return x.OnExit
+	}
+	return nil
+}
+
+func (x *DAGRunStatusProto) GetOnSuccess() *NodeStatusProto {
+	if x != nil {
+		return x.OnSuccess
+	}
+	return nil
+}
+
+func (x *DAGRunStatusProto) GetOnFailure() *NodeStatusProto {
+	if x != nil {
+		return x.OnFailure
+	}
+	return nil
+}
+
+func (x *DAGRunStatusProto) GetOnCancel() *NodeStatusProto {
+	if x != nil {
+		return x.OnCancel
+	}
+	return nil
+}
+
+func (x *DAGRunStatusProto) GetOnWait() *NodeStatusProto {
+	if x != nil {
+		return x.OnWait
+	}
+	return nil
+}
+
+func (x *DAGRunStatusProto) GetCreatedAt() int64 {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return 0
+}
+
+func (x *DAGRunStatusProto) GetQueuedAt() string {
+	if x != nil {
+		return x.QueuedAt
+	}
+	return ""
+}
+
+func (x *DAGRunStatusProto) GetStartedAt() string {
+	if x != nil {
+		return x.StartedAt
+	}
+	return ""
+}
+
+func (x *DAGRunStatusProto) GetFinishedAt() string {
+	if x != nil {
+		return x.FinishedAt
+	}
+	return ""
+}
+
+func (x *DAGRunStatusProto) GetLog() string {
+	if x != nil {
+		return x.Log
+	}
+	return ""
+}
+
+func (x *DAGRunStatusProto) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+func (x *DAGRunStatusProto) GetParams() string {
+	if x != nil {
+		return x.Params
+	}
+	return ""
+}
+
+func (x *DAGRunStatusProto) GetParamsList() []string {
+	if x != nil {
+		return x.ParamsList
+	}
+	return nil
+}
+
+// Reference to a DAG run.
+type DAGRunRefProto struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Id            string                 `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DAGRunRefProto) Reset() {
+	*x = DAGRunRefProto{}
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DAGRunRefProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DAGRunRefProto) ProtoMessage() {}
+
+func (x *DAGRunRefProto) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DAGRunRefProto.ProtoReflect.Descriptor instead.
+func (*DAGRunRefProto) Descriptor() ([]byte, []int) {
+	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *DAGRunRefProto) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *DAGRunRefProto) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+// Status of a single node/step in a DAG run.
+type NodeStatusProto struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	StepName        string                 `protobuf:"bytes,1,opt,name=step_name,json=stepName,proto3" json:"step_name,omitempty"`
+	Status          int32                  `protobuf:"varint,2,opt,name=status,proto3" json:"status,omitempty"` // core.NodeStatus enum value
+	Stdout          string                 `protobuf:"bytes,3,opt,name=stdout,proto3" json:"stdout,omitempty"`  // Log file path (set by coordinator)
+	Stderr          string                 `protobuf:"bytes,4,opt,name=stderr,proto3" json:"stderr,omitempty"`
+	StartedAt       string                 `protobuf:"bytes,5,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	FinishedAt      string                 `protobuf:"bytes,6,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
+	Error           string                 `protobuf:"bytes,7,opt,name=error,proto3" json:"error,omitempty"`
+	RetryCount      int32                  `protobuf:"varint,8,opt,name=retry_count,json=retryCount,proto3" json:"retry_count,omitempty"`
+	DoneCount       int32                  `protobuf:"varint,9,opt,name=done_count,json=doneCount,proto3" json:"done_count,omitempty"`
+	SubRuns         []*SubDAGRunProto      `protobuf:"bytes,10,rep,name=sub_runs,json=subRuns,proto3" json:"sub_runs,omitempty"`
+	OutputVariables map[string]string      `protobuf:"bytes,11,rep,name=output_variables,json=outputVariables,proto3" json:"output_variables,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	RetriedAt       string                 `protobuf:"bytes,12,opt,name=retried_at,json=retriedAt,proto3" json:"retried_at,omitempty"`
+	// HITL (Human-in-the-loop) fields
+	ApprovedAt      string `protobuf:"bytes,13,opt,name=approved_at,json=approvedAt,proto3" json:"approved_at,omitempty"`
+	ApprovedBy      string `protobuf:"bytes,14,opt,name=approved_by,json=approvedBy,proto3" json:"approved_by,omitempty"`
+	RejectedAt      string `protobuf:"bytes,15,opt,name=rejected_at,json=rejectedAt,proto3" json:"rejected_at,omitempty"`
+	RejectedBy      string `protobuf:"bytes,16,opt,name=rejected_by,json=rejectedBy,proto3" json:"rejected_by,omitempty"`
+	RejectionReason string `protobuf:"bytes,17,opt,name=rejection_reason,json=rejectionReason,proto3" json:"rejection_reason,omitempty"`
+	// Step definition (needed for reconstruction)
+	Step          *StepProto `protobuf:"bytes,18,opt,name=step,proto3" json:"step,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NodeStatusProto) Reset() {
+	*x = NodeStatusProto{}
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodeStatusProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodeStatusProto) ProtoMessage() {}
+
+func (x *NodeStatusProto) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodeStatusProto.ProtoReflect.Descriptor instead.
+func (*NodeStatusProto) Descriptor() ([]byte, []int) {
+	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *NodeStatusProto) GetStepName() string {
+	if x != nil {
+		return x.StepName
+	}
+	return ""
+}
+
+func (x *NodeStatusProto) GetStatus() int32 {
+	if x != nil {
+		return x.Status
+	}
+	return 0
+}
+
+func (x *NodeStatusProto) GetStdout() string {
+	if x != nil {
+		return x.Stdout
+	}
+	return ""
+}
+
+func (x *NodeStatusProto) GetStderr() string {
+	if x != nil {
+		return x.Stderr
+	}
+	return ""
+}
+
+func (x *NodeStatusProto) GetStartedAt() string {
+	if x != nil {
+		return x.StartedAt
+	}
+	return ""
+}
+
+func (x *NodeStatusProto) GetFinishedAt() string {
+	if x != nil {
+		return x.FinishedAt
+	}
+	return ""
+}
+
+func (x *NodeStatusProto) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+func (x *NodeStatusProto) GetRetryCount() int32 {
+	if x != nil {
+		return x.RetryCount
+	}
+	return 0
+}
+
+func (x *NodeStatusProto) GetDoneCount() int32 {
+	if x != nil {
+		return x.DoneCount
+	}
+	return 0
+}
+
+func (x *NodeStatusProto) GetSubRuns() []*SubDAGRunProto {
+	if x != nil {
+		return x.SubRuns
+	}
+	return nil
+}
+
+func (x *NodeStatusProto) GetOutputVariables() map[string]string {
+	if x != nil {
+		return x.OutputVariables
+	}
+	return nil
+}
+
+func (x *NodeStatusProto) GetRetriedAt() string {
+	if x != nil {
+		return x.RetriedAt
+	}
+	return ""
+}
+
+func (x *NodeStatusProto) GetApprovedAt() string {
+	if x != nil {
+		return x.ApprovedAt
+	}
+	return ""
+}
+
+func (x *NodeStatusProto) GetApprovedBy() string {
+	if x != nil {
+		return x.ApprovedBy
+	}
+	return ""
+}
+
+func (x *NodeStatusProto) GetRejectedAt() string {
+	if x != nil {
+		return x.RejectedAt
+	}
+	return ""
+}
+
+func (x *NodeStatusProto) GetRejectedBy() string {
+	if x != nil {
+		return x.RejectedBy
+	}
+	return ""
+}
+
+func (x *NodeStatusProto) GetRejectionReason() string {
+	if x != nil {
+		return x.RejectionReason
+	}
+	return ""
+}
+
+func (x *NodeStatusProto) GetStep() *StepProto {
+	if x != nil {
+		return x.Step
+	}
+	return nil
+}
+
+// Reference to a sub-DAG run.
+type SubDAGRunProto struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DagRunId      string                 `protobuf:"bytes,1,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"`
+	Params        string                 `protobuf:"bytes,2,opt,name=params,proto3" json:"params,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SubDAGRunProto) Reset() {
+	*x = SubDAGRunProto{}
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubDAGRunProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubDAGRunProto) ProtoMessage() {}
+
+func (x *SubDAGRunProto) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubDAGRunProto.ProtoReflect.Descriptor instead.
+func (*SubDAGRunProto) Descriptor() ([]byte, []int) {
+	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *SubDAGRunProto) GetDagRunId() string {
+	if x != nil {
+		return x.DagRunId
+	}
+	return ""
+}
+
+func (x *SubDAGRunProto) GetParams() string {
+	if x != nil {
+		return x.Params
+	}
+	return ""
+}
+
+// Step definition (subset of core.Step needed for status).
+type StepProto struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	ExecutorType  string                 `protobuf:"bytes,3,opt,name=executor_type,json=executorType,proto3" json:"executor_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StepProto) Reset() {
+	*x = StepProto{}
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StepProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StepProto) ProtoMessage() {}
+
+func (x *StepProto) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StepProto.ProtoReflect.Descriptor instead.
+func (*StepProto) Descriptor() ([]byte, []int) {
+	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *StepProto) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *StepProto) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *StepProto) GetExecutorType() string {
+	if x != nil {
+		return x.ExecutorType
+	}
+	return ""
+}
+
+// Log chunk sent from worker to coordinator.
+type LogChunk struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	WorkerId   string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
+	DagRunId   string                 `protobuf:"bytes,2,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"`
+	DagName    string                 `protobuf:"bytes,3,opt,name=dag_name,json=dagName,proto3" json:"dag_name,omitempty"`
+	StepName   string                 `protobuf:"bytes,4,opt,name=step_name,json=stepName,proto3" json:"step_name,omitempty"`
+	StreamType LogStreamType          `protobuf:"varint,5,opt,name=stream_type,json=streamType,proto3,enum=coordinator.v1.LogStreamType" json:"stream_type,omitempty"`
+	Data       []byte                 `protobuf:"bytes,6,opt,name=data,proto3" json:"data,omitempty"`
+	Sequence   uint64                 `protobuf:"varint,7,opt,name=sequence,proto3" json:"sequence,omitempty"`              // For ordering
+	IsFinal    bool                   `protobuf:"varint,8,opt,name=is_final,json=isFinal,proto3" json:"is_final,omitempty"` // Last chunk for this step
+	// Root DAG info for sub-DAGs
+	RootDagRunName string `protobuf:"bytes,9,opt,name=root_dag_run_name,json=rootDagRunName,proto3" json:"root_dag_run_name,omitempty"`
+	RootDagRunId   string `protobuf:"bytes,10,opt,name=root_dag_run_id,json=rootDagRunId,proto3" json:"root_dag_run_id,omitempty"`
+	// Attempt ID for the DAG run
+	AttemptId     string `protobuf:"bytes,11,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LogChunk) Reset() {
+	*x = LogChunk{}
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LogChunk) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LogChunk) ProtoMessage() {}
+
+func (x *LogChunk) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LogChunk.ProtoReflect.Descriptor instead.
+func (*LogChunk) Descriptor() ([]byte, []int) {
+	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *LogChunk) GetWorkerId() string {
+	if x != nil {
+		return x.WorkerId
+	}
+	return ""
+}
+
+func (x *LogChunk) GetDagRunId() string {
+	if x != nil {
+		return x.DagRunId
+	}
+	return ""
+}
+
+func (x *LogChunk) GetDagName() string {
+	if x != nil {
+		return x.DagName
+	}
+	return ""
+}
+
+func (x *LogChunk) GetStepName() string {
+	if x != nil {
+		return x.StepName
+	}
+	return ""
+}
+
+func (x *LogChunk) GetStreamType() LogStreamType {
+	if x != nil {
+		return x.StreamType
+	}
+	return LogStreamType_LOG_STREAM_TYPE_UNSPECIFIED
+}
+
+func (x *LogChunk) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *LogChunk) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *LogChunk) GetIsFinal() bool {
+	if x != nil {
+		return x.IsFinal
+	}
+	return false
+}
+
+func (x *LogChunk) GetRootDagRunName() string {
+	if x != nil {
+		return x.RootDagRunName
+	}
+	return ""
+}
+
+func (x *LogChunk) GetRootDagRunId() string {
+	if x != nil {
+		return x.RootDagRunId
+	}
+	return ""
+}
+
+func (x *LogChunk) GetAttemptId() string {
+	if x != nil {
+		return x.AttemptId
+	}
+	return ""
+}
+
+// Response message for log streaming.
+type StreamLogsResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ChunksReceived uint64                 `protobuf:"varint,1,opt,name=chunks_received,json=chunksReceived,proto3" json:"chunks_received,omitempty"`
+	BytesWritten   uint64                 `protobuf:"varint,2,opt,name=bytes_written,json=bytesWritten,proto3" json:"bytes_written,omitempty"`
+	Error          string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *StreamLogsResponse) Reset() {
+	*x = StreamLogsResponse{}
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamLogsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamLogsResponse) ProtoMessage() {}
+
+func (x *StreamLogsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamLogsResponse.ProtoReflect.Descriptor instead.
+func (*StreamLogsResponse) Descriptor() ([]byte, []int) {
+	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *StreamLogsResponse) GetChunksReceived() uint64 {
+	if x != nil {
+		return x.ChunksReceived
+	}
+	return 0
+}
+
+func (x *StreamLogsResponse) GetBytesWritten() uint64 {
+	if x != nil {
+		return x.BytesWritten
+	}
+	return 0
+}
+
+func (x *StreamLogsResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+// Request message for getting DAG run status.
+type GetDAGRunStatusRequest struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	DagName  string                 `protobuf:"bytes,1,opt,name=dag_name,json=dagName,proto3" json:"dag_name,omitempty"`      // Name of the DAG
+	DagRunId string                 `protobuf:"bytes,2,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"` // ID of the DAG run
+	// Root DAG run info for sub-DAG queries (optional).
+	// When set, the coordinator looks up the status as a sub-DAG.
+	RootDagRunName string `protobuf:"bytes,3,opt,name=root_dag_run_name,json=rootDagRunName,proto3" json:"root_dag_run_name,omitempty"`
+	RootDagRunId   string `protobuf:"bytes,4,opt,name=root_dag_run_id,json=rootDagRunId,proto3" json:"root_dag_run_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *GetDAGRunStatusRequest) Reset() {
+	*x = GetDAGRunStatusRequest{}
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetDAGRunStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetDAGRunStatusRequest) ProtoMessage() {}
+
+func (x *GetDAGRunStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetDAGRunStatusRequest.ProtoReflect.Descriptor instead.
+func (*GetDAGRunStatusRequest) Descriptor() ([]byte, []int) {
+	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *GetDAGRunStatusRequest) GetDagName() string {
+	if x != nil {
+		return x.DagName
+	}
+	return ""
+}
+
+func (x *GetDAGRunStatusRequest) GetDagRunId() string {
+	if x != nil {
+		return x.DagRunId
+	}
+	return ""
+}
+
+func (x *GetDAGRunStatusRequest) GetRootDagRunName() string {
+	if x != nil {
+		return x.RootDagRunName
+	}
+	return ""
+}
+
+func (x *GetDAGRunStatusRequest) GetRootDagRunId() string {
+	if x != nil {
+		return x.RootDagRunId
+	}
+	return ""
+}
+
+// Response message for getting DAG run status.
+type GetDAGRunStatusResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Found         bool                   `protobuf:"varint,1,opt,name=found,proto3" json:"found,omitempty"`  // Whether the DAG run was found
+	Status        *DAGRunStatusProto     `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"` // The status (only set if found)
+	Error         string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`   // Error message if any
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetDAGRunStatusResponse) Reset() {
+	*x = GetDAGRunStatusResponse{}
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetDAGRunStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetDAGRunStatusResponse) ProtoMessage() {}
+
+func (x *GetDAGRunStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_coordinator_v1_coordinator_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetDAGRunStatusResponse.ProtoReflect.Descriptor instead.
+func (*GetDAGRunStatusResponse) Descriptor() ([]byte, []int) {
+	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *GetDAGRunStatusResponse) GetFound() bool {
+	if x != nil {
+		return x.Found
+	}
+	return false
+}
+
+func (x *GetDAGRunStatusResponse) GetStatus() *DAGRunStatusProto {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+func (x *GetDAGRunStatusResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
 var File_proto_coordinator_v1_coordinator_proto protoreflect.FileDescriptor
 
 const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
@@ -904,7 +1972,7 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\";\n" +
 	"\x0fDispatchRequest\x12(\n" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\"\x12\n" +
-	"\x10DispatchResponse\"\xa0\x04\n" +
+	"\x10DispatchResponse\"\xec\x04\n" +
 	"\x04Task\x127\n" +
 	"\toperation\x18\x06 \x01(\x0e2\x19.coordinator.v1.OperationR\toperation\x12)\n" +
 	"\x11root_dag_run_name\x18\x01 \x01(\tR\x0erootDagRunName\x12%\n" +
@@ -921,7 +1989,8 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\n" +
 	"definition\x18\v \x01(\tR\n" +
 	"definition\x12\x1b\n" +
-	"\tworker_id\x18\f \x01(\tR\bworkerId\x1aA\n" +
+	"\tworker_id\x18\f \x01(\tR\bworkerId\x12J\n" +
+	"\x0fprevious_status\x18\r \x01(\v2!.coordinator.v1.DAGRunStatusProtoR\x0epreviousStatus\x1aA\n" +
 	"\x13WorkerSelectorEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x13\n" +
@@ -948,8 +2017,9 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x05stats\x18\x03 \x01(\v2\x1b.coordinator.v1.WorkerStatsR\x05stats\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x13\n" +
-	"\x11HeartbeatResponse\"\x97\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\":\n" +
+	"\x11HeartbeatResponse\x12%\n" +
+	"\x0ecancelled_runs\x18\x01 \x03(\tR\rcancelledRuns\"\x97\x01\n" +
 	"\vWorkerStats\x12#\n" +
 	"\rtotal_pollers\x18\x01 \x01(\x05R\ftotalPollers\x12!\n" +
 	"\fbusy_pollers\x18\x02 \x01(\x05R\vbusyPollers\x12@\n" +
@@ -963,7 +2033,119 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x11root_dag_run_name\x18\x04 \x01(\tR\x0erootDagRunName\x12%\n" +
 	"\x0froot_dag_run_id\x18\x05 \x01(\tR\frootDagRunId\x12-\n" +
 	"\x13parent_dag_run_name\x18\x06 \x01(\tR\x10parentDagRunName\x12)\n" +
-	"\x11parent_dag_run_id\x18\a \x01(\tR\x0eparentDagRunId*P\n" +
+	"\x11parent_dag_run_id\x18\a \x01(\tR\x0eparentDagRunId\"m\n" +
+	"\x13ReportStatusRequest\x12\x1b\n" +
+	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x129\n" +
+	"\x06status\x18\x02 \x01(\v2!.coordinator.v1.DAGRunStatusProtoR\x06status\"H\n" +
+	"\x14ReportStatusResponse\x12\x1a\n" +
+	"\baccepted\x18\x01 \x01(\bR\baccepted\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"\x97\a\n" +
+	"\x11DAGRunStatusProto\x122\n" +
+	"\x04root\x18\x01 \x01(\v2\x1e.coordinator.v1.DAGRunRefProtoR\x04root\x126\n" +
+	"\x06parent\x18\x02 \x01(\v2\x1e.coordinator.v1.DAGRunRefProtoR\x06parent\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x1c\n" +
+	"\n" +
+	"dag_run_id\x18\x04 \x01(\tR\bdagRunId\x12\x1d\n" +
+	"\n" +
+	"attempt_id\x18\x05 \x01(\tR\tattemptId\x12\x16\n" +
+	"\x06status\x18\x06 \x01(\x05R\x06status\x12\x1b\n" +
+	"\tworker_id\x18\a \x01(\tR\bworkerId\x12\x10\n" +
+	"\x03pid\x18\b \x01(\x05R\x03pid\x125\n" +
+	"\x05nodes\x18\t \x03(\v2\x1f.coordinator.v1.NodeStatusProtoR\x05nodes\x128\n" +
+	"\aon_init\x18\n" +
+	" \x01(\v2\x1f.coordinator.v1.NodeStatusProtoR\x06onInit\x128\n" +
+	"\aon_exit\x18\v \x01(\v2\x1f.coordinator.v1.NodeStatusProtoR\x06onExit\x12>\n" +
+	"\n" +
+	"on_success\x18\f \x01(\v2\x1f.coordinator.v1.NodeStatusProtoR\tonSuccess\x12>\n" +
+	"\n" +
+	"on_failure\x18\r \x01(\v2\x1f.coordinator.v1.NodeStatusProtoR\tonFailure\x12<\n" +
+	"\ton_cancel\x18\x0e \x01(\v2\x1f.coordinator.v1.NodeStatusProtoR\bonCancel\x128\n" +
+	"\aon_wait\x18\x0f \x01(\v2\x1f.coordinator.v1.NodeStatusProtoR\x06onWait\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\x10 \x01(\x03R\tcreatedAt\x12\x1b\n" +
+	"\tqueued_at\x18\x11 \x01(\tR\bqueuedAt\x12\x1d\n" +
+	"\n" +
+	"started_at\x18\x12 \x01(\tR\tstartedAt\x12\x1f\n" +
+	"\vfinished_at\x18\x13 \x01(\tR\n" +
+	"finishedAt\x12\x10\n" +
+	"\x03log\x18\x14 \x01(\tR\x03log\x12\x14\n" +
+	"\x05error\x18\x15 \x01(\tR\x05error\x12\x16\n" +
+	"\x06params\x18\x16 \x01(\tR\x06params\x12\x1f\n" +
+	"\vparams_list\x18\x17 \x03(\tR\n" +
+	"paramsList\"4\n" +
+	"\x0eDAGRunRefProto\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x0e\n" +
+	"\x02id\x18\x02 \x01(\tR\x02id\"\xe9\x05\n" +
+	"\x0fNodeStatusProto\x12\x1b\n" +
+	"\tstep_name\x18\x01 \x01(\tR\bstepName\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\x05R\x06status\x12\x16\n" +
+	"\x06stdout\x18\x03 \x01(\tR\x06stdout\x12\x16\n" +
+	"\x06stderr\x18\x04 \x01(\tR\x06stderr\x12\x1d\n" +
+	"\n" +
+	"started_at\x18\x05 \x01(\tR\tstartedAt\x12\x1f\n" +
+	"\vfinished_at\x18\x06 \x01(\tR\n" +
+	"finishedAt\x12\x14\n" +
+	"\x05error\x18\a \x01(\tR\x05error\x12\x1f\n" +
+	"\vretry_count\x18\b \x01(\x05R\n" +
+	"retryCount\x12\x1d\n" +
+	"\n" +
+	"done_count\x18\t \x01(\x05R\tdoneCount\x129\n" +
+	"\bsub_runs\x18\n" +
+	" \x03(\v2\x1e.coordinator.v1.SubDAGRunProtoR\asubRuns\x12_\n" +
+	"\x10output_variables\x18\v \x03(\v24.coordinator.v1.NodeStatusProto.OutputVariablesEntryR\x0foutputVariables\x12\x1d\n" +
+	"\n" +
+	"retried_at\x18\f \x01(\tR\tretriedAt\x12\x1f\n" +
+	"\vapproved_at\x18\r \x01(\tR\n" +
+	"approvedAt\x12\x1f\n" +
+	"\vapproved_by\x18\x0e \x01(\tR\n" +
+	"approvedBy\x12\x1f\n" +
+	"\vrejected_at\x18\x0f \x01(\tR\n" +
+	"rejectedAt\x12\x1f\n" +
+	"\vrejected_by\x18\x10 \x01(\tR\n" +
+	"rejectedBy\x12)\n" +
+	"\x10rejection_reason\x18\x11 \x01(\tR\x0frejectionReason\x12-\n" +
+	"\x04step\x18\x12 \x01(\v2\x19.coordinator.v1.StepProtoR\x04step\x1aB\n" +
+	"\x14OutputVariablesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"F\n" +
+	"\x0eSubDAGRunProto\x12\x1c\n" +
+	"\n" +
+	"dag_run_id\x18\x01 \x01(\tR\bdagRunId\x12\x16\n" +
+	"\x06params\x18\x02 \x01(\tR\x06params\"f\n" +
+	"\tStepProto\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12#\n" +
+	"\rexecutor_type\x18\x03 \x01(\tR\fexecutorType\"\xf9\x02\n" +
+	"\bLogChunk\x12\x1b\n" +
+	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12\x1c\n" +
+	"\n" +
+	"dag_run_id\x18\x02 \x01(\tR\bdagRunId\x12\x19\n" +
+	"\bdag_name\x18\x03 \x01(\tR\adagName\x12\x1b\n" +
+	"\tstep_name\x18\x04 \x01(\tR\bstepName\x12>\n" +
+	"\vstream_type\x18\x05 \x01(\x0e2\x1d.coordinator.v1.LogStreamTypeR\n" +
+	"streamType\x12\x12\n" +
+	"\x04data\x18\x06 \x01(\fR\x04data\x12\x1a\n" +
+	"\bsequence\x18\a \x01(\x04R\bsequence\x12\x19\n" +
+	"\bis_final\x18\b \x01(\bR\aisFinal\x12)\n" +
+	"\x11root_dag_run_name\x18\t \x01(\tR\x0erootDagRunName\x12%\n" +
+	"\x0froot_dag_run_id\x18\n" +
+	" \x01(\tR\frootDagRunId\x12\x1d\n" +
+	"\n" +
+	"attempt_id\x18\v \x01(\tR\tattemptId\"x\n" +
+	"\x12StreamLogsResponse\x12'\n" +
+	"\x0fchunks_received\x18\x01 \x01(\x04R\x0echunksReceived\x12#\n" +
+	"\rbytes_written\x18\x02 \x01(\x04R\fbytesWritten\x12\x14\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\"\xa3\x01\n" +
+	"\x16GetDAGRunStatusRequest\x12\x19\n" +
+	"\bdag_name\x18\x01 \x01(\tR\adagName\x12\x1c\n" +
+	"\n" +
+	"dag_run_id\x18\x02 \x01(\tR\bdagRunId\x12)\n" +
+	"\x11root_dag_run_name\x18\x03 \x01(\tR\x0erootDagRunName\x12%\n" +
+	"\x0froot_dag_run_id\x18\x04 \x01(\tR\frootDagRunId\"\x80\x01\n" +
+	"\x17GetDAGRunStatusResponse\x12\x14\n" +
+	"\x05found\x18\x01 \x01(\bR\x05found\x129\n" +
+	"\x06status\x18\x02 \x01(\v2!.coordinator.v1.DAGRunStatusProtoR\x06status\x12\x14\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error*P\n" +
 	"\tOperation\x12\x19\n" +
 	"\x15OPERATION_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fOPERATION_START\x10\x01\x12\x13\n" +
@@ -972,13 +2154,21 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	" WORKER_HEALTH_STATUS_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cWORKER_HEALTH_STATUS_HEALTHY\x10\x01\x12 \n" +
 	"\x1cWORKER_HEALTH_STATUS_WARNING\x10\x02\x12\"\n" +
-	"\x1eWORKER_HEALTH_STATUS_UNHEALTHY\x10\x032\xcd\x02\n" +
+	"\x1eWORKER_HEALTH_STATUS_UNHEALTHY\x10\x03*h\n" +
+	"\rLogStreamType\x12\x1f\n" +
+	"\x1bLOG_STREAM_TYPE_UNSPECIFIED\x10\x00\x12\x1a\n" +
+	"\x16LOG_STREAM_TYPE_STDOUT\x10\x01\x12\x1a\n" +
+	"\x16LOG_STREAM_TYPE_STDERR\x10\x022\xda\x04\n" +
 	"\x12CoordinatorService\x12A\n" +
 	"\x04Poll\x12\x1b.coordinator.v1.PollRequest\x1a\x1c.coordinator.v1.PollResponse\x12M\n" +
 	"\bDispatch\x12\x1f.coordinator.v1.DispatchRequest\x1a .coordinator.v1.DispatchResponse\x12S\n" +
 	"\n" +
 	"GetWorkers\x12!.coordinator.v1.GetWorkersRequest\x1a\".coordinator.v1.GetWorkersResponse\x12P\n" +
-	"\tHeartbeat\x12 .coordinator.v1.HeartbeatRequest\x1a!.coordinator.v1.HeartbeatResponseB=Z;github.com/dagu-org/dagu/proto/coordinator/v1;coordinatorv1b\x06proto3"
+	"\tHeartbeat\x12 .coordinator.v1.HeartbeatRequest\x1a!.coordinator.v1.HeartbeatResponse\x12Y\n" +
+	"\fReportStatus\x12#.coordinator.v1.ReportStatusRequest\x1a$.coordinator.v1.ReportStatusResponse\x12L\n" +
+	"\n" +
+	"StreamLogs\x12\x18.coordinator.v1.LogChunk\x1a\".coordinator.v1.StreamLogsResponse(\x01\x12b\n" +
+	"\x0fGetDAGRunStatus\x12&.coordinator.v1.GetDAGRunStatusRequest\x1a'.coordinator.v1.GetDAGRunStatusResponseB=Z;github.com/dagu-org/dagu/proto/coordinator/v1;coordinatorv1b\x06proto3"
 
 var (
 	file_proto_coordinator_v1_coordinator_proto_rawDescOnce sync.Once
@@ -992,54 +2182,89 @@ func file_proto_coordinator_v1_coordinator_proto_rawDescGZIP() []byte {
 	return file_proto_coordinator_v1_coordinator_proto_rawDescData
 }
 
-var file_proto_coordinator_v1_coordinator_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_proto_coordinator_v1_coordinator_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_proto_coordinator_v1_coordinator_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_proto_coordinator_v1_coordinator_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_proto_coordinator_v1_coordinator_proto_goTypes = []any{
-	(Operation)(0),             // 0: coordinator.v1.Operation
-	(WorkerHealthStatus)(0),    // 1: coordinator.v1.WorkerHealthStatus
-	(*PollRequest)(nil),        // 2: coordinator.v1.PollRequest
-	(*PollResponse)(nil),       // 3: coordinator.v1.PollResponse
-	(*DispatchRequest)(nil),    // 4: coordinator.v1.DispatchRequest
-	(*DispatchResponse)(nil),   // 5: coordinator.v1.DispatchResponse
-	(*Task)(nil),               // 6: coordinator.v1.Task
-	(*GetWorkersRequest)(nil),  // 7: coordinator.v1.GetWorkersRequest
-	(*GetWorkersResponse)(nil), // 8: coordinator.v1.GetWorkersResponse
-	(*WorkerInfo)(nil),         // 9: coordinator.v1.WorkerInfo
-	(*HeartbeatRequest)(nil),   // 10: coordinator.v1.HeartbeatRequest
-	(*HeartbeatResponse)(nil),  // 11: coordinator.v1.HeartbeatResponse
-	(*WorkerStats)(nil),        // 12: coordinator.v1.WorkerStats
-	(*RunningTask)(nil),        // 13: coordinator.v1.RunningTask
-	nil,                        // 14: coordinator.v1.PollRequest.LabelsEntry
-	nil,                        // 15: coordinator.v1.Task.WorkerSelectorEntry
-	nil,                        // 16: coordinator.v1.WorkerInfo.LabelsEntry
-	nil,                        // 17: coordinator.v1.HeartbeatRequest.LabelsEntry
+	(Operation)(0),                  // 0: coordinator.v1.Operation
+	(WorkerHealthStatus)(0),         // 1: coordinator.v1.WorkerHealthStatus
+	(LogStreamType)(0),              // 2: coordinator.v1.LogStreamType
+	(*PollRequest)(nil),             // 3: coordinator.v1.PollRequest
+	(*PollResponse)(nil),            // 4: coordinator.v1.PollResponse
+	(*DispatchRequest)(nil),         // 5: coordinator.v1.DispatchRequest
+	(*DispatchResponse)(nil),        // 6: coordinator.v1.DispatchResponse
+	(*Task)(nil),                    // 7: coordinator.v1.Task
+	(*GetWorkersRequest)(nil),       // 8: coordinator.v1.GetWorkersRequest
+	(*GetWorkersResponse)(nil),      // 9: coordinator.v1.GetWorkersResponse
+	(*WorkerInfo)(nil),              // 10: coordinator.v1.WorkerInfo
+	(*HeartbeatRequest)(nil),        // 11: coordinator.v1.HeartbeatRequest
+	(*HeartbeatResponse)(nil),       // 12: coordinator.v1.HeartbeatResponse
+	(*WorkerStats)(nil),             // 13: coordinator.v1.WorkerStats
+	(*RunningTask)(nil),             // 14: coordinator.v1.RunningTask
+	(*ReportStatusRequest)(nil),     // 15: coordinator.v1.ReportStatusRequest
+	(*ReportStatusResponse)(nil),    // 16: coordinator.v1.ReportStatusResponse
+	(*DAGRunStatusProto)(nil),       // 17: coordinator.v1.DAGRunStatusProto
+	(*DAGRunRefProto)(nil),          // 18: coordinator.v1.DAGRunRefProto
+	(*NodeStatusProto)(nil),         // 19: coordinator.v1.NodeStatusProto
+	(*SubDAGRunProto)(nil),          // 20: coordinator.v1.SubDAGRunProto
+	(*StepProto)(nil),               // 21: coordinator.v1.StepProto
+	(*LogChunk)(nil),                // 22: coordinator.v1.LogChunk
+	(*StreamLogsResponse)(nil),      // 23: coordinator.v1.StreamLogsResponse
+	(*GetDAGRunStatusRequest)(nil),  // 24: coordinator.v1.GetDAGRunStatusRequest
+	(*GetDAGRunStatusResponse)(nil), // 25: coordinator.v1.GetDAGRunStatusResponse
+	nil,                             // 26: coordinator.v1.PollRequest.LabelsEntry
+	nil,                             // 27: coordinator.v1.Task.WorkerSelectorEntry
+	nil,                             // 28: coordinator.v1.WorkerInfo.LabelsEntry
+	nil,                             // 29: coordinator.v1.HeartbeatRequest.LabelsEntry
+	nil,                             // 30: coordinator.v1.NodeStatusProto.OutputVariablesEntry
 }
 var file_proto_coordinator_v1_coordinator_proto_depIdxs = []int32{
-	14, // 0: coordinator.v1.PollRequest.labels:type_name -> coordinator.v1.PollRequest.LabelsEntry
-	6,  // 1: coordinator.v1.PollResponse.task:type_name -> coordinator.v1.Task
-	6,  // 2: coordinator.v1.DispatchRequest.task:type_name -> coordinator.v1.Task
+	26, // 0: coordinator.v1.PollRequest.labels:type_name -> coordinator.v1.PollRequest.LabelsEntry
+	7,  // 1: coordinator.v1.PollResponse.task:type_name -> coordinator.v1.Task
+	7,  // 2: coordinator.v1.DispatchRequest.task:type_name -> coordinator.v1.Task
 	0,  // 3: coordinator.v1.Task.operation:type_name -> coordinator.v1.Operation
-	15, // 4: coordinator.v1.Task.worker_selector:type_name -> coordinator.v1.Task.WorkerSelectorEntry
-	9,  // 5: coordinator.v1.GetWorkersResponse.workers:type_name -> coordinator.v1.WorkerInfo
-	16, // 6: coordinator.v1.WorkerInfo.labels:type_name -> coordinator.v1.WorkerInfo.LabelsEntry
-	13, // 7: coordinator.v1.WorkerInfo.running_tasks:type_name -> coordinator.v1.RunningTask
-	1,  // 8: coordinator.v1.WorkerInfo.health_status:type_name -> coordinator.v1.WorkerHealthStatus
-	17, // 9: coordinator.v1.HeartbeatRequest.labels:type_name -> coordinator.v1.HeartbeatRequest.LabelsEntry
-	12, // 10: coordinator.v1.HeartbeatRequest.stats:type_name -> coordinator.v1.WorkerStats
-	13, // 11: coordinator.v1.WorkerStats.running_tasks:type_name -> coordinator.v1.RunningTask
-	2,  // 12: coordinator.v1.CoordinatorService.Poll:input_type -> coordinator.v1.PollRequest
-	4,  // 13: coordinator.v1.CoordinatorService.Dispatch:input_type -> coordinator.v1.DispatchRequest
-	7,  // 14: coordinator.v1.CoordinatorService.GetWorkers:input_type -> coordinator.v1.GetWorkersRequest
-	10, // 15: coordinator.v1.CoordinatorService.Heartbeat:input_type -> coordinator.v1.HeartbeatRequest
-	3,  // 16: coordinator.v1.CoordinatorService.Poll:output_type -> coordinator.v1.PollResponse
-	5,  // 17: coordinator.v1.CoordinatorService.Dispatch:output_type -> coordinator.v1.DispatchResponse
-	8,  // 18: coordinator.v1.CoordinatorService.GetWorkers:output_type -> coordinator.v1.GetWorkersResponse
-	11, // 19: coordinator.v1.CoordinatorService.Heartbeat:output_type -> coordinator.v1.HeartbeatResponse
-	16, // [16:20] is the sub-list for method output_type
-	12, // [12:16] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	27, // 4: coordinator.v1.Task.worker_selector:type_name -> coordinator.v1.Task.WorkerSelectorEntry
+	17, // 5: coordinator.v1.Task.previous_status:type_name -> coordinator.v1.DAGRunStatusProto
+	10, // 6: coordinator.v1.GetWorkersResponse.workers:type_name -> coordinator.v1.WorkerInfo
+	28, // 7: coordinator.v1.WorkerInfo.labels:type_name -> coordinator.v1.WorkerInfo.LabelsEntry
+	14, // 8: coordinator.v1.WorkerInfo.running_tasks:type_name -> coordinator.v1.RunningTask
+	1,  // 9: coordinator.v1.WorkerInfo.health_status:type_name -> coordinator.v1.WorkerHealthStatus
+	29, // 10: coordinator.v1.HeartbeatRequest.labels:type_name -> coordinator.v1.HeartbeatRequest.LabelsEntry
+	13, // 11: coordinator.v1.HeartbeatRequest.stats:type_name -> coordinator.v1.WorkerStats
+	14, // 12: coordinator.v1.WorkerStats.running_tasks:type_name -> coordinator.v1.RunningTask
+	17, // 13: coordinator.v1.ReportStatusRequest.status:type_name -> coordinator.v1.DAGRunStatusProto
+	18, // 14: coordinator.v1.DAGRunStatusProto.root:type_name -> coordinator.v1.DAGRunRefProto
+	18, // 15: coordinator.v1.DAGRunStatusProto.parent:type_name -> coordinator.v1.DAGRunRefProto
+	19, // 16: coordinator.v1.DAGRunStatusProto.nodes:type_name -> coordinator.v1.NodeStatusProto
+	19, // 17: coordinator.v1.DAGRunStatusProto.on_init:type_name -> coordinator.v1.NodeStatusProto
+	19, // 18: coordinator.v1.DAGRunStatusProto.on_exit:type_name -> coordinator.v1.NodeStatusProto
+	19, // 19: coordinator.v1.DAGRunStatusProto.on_success:type_name -> coordinator.v1.NodeStatusProto
+	19, // 20: coordinator.v1.DAGRunStatusProto.on_failure:type_name -> coordinator.v1.NodeStatusProto
+	19, // 21: coordinator.v1.DAGRunStatusProto.on_cancel:type_name -> coordinator.v1.NodeStatusProto
+	19, // 22: coordinator.v1.DAGRunStatusProto.on_wait:type_name -> coordinator.v1.NodeStatusProto
+	20, // 23: coordinator.v1.NodeStatusProto.sub_runs:type_name -> coordinator.v1.SubDAGRunProto
+	30, // 24: coordinator.v1.NodeStatusProto.output_variables:type_name -> coordinator.v1.NodeStatusProto.OutputVariablesEntry
+	21, // 25: coordinator.v1.NodeStatusProto.step:type_name -> coordinator.v1.StepProto
+	2,  // 26: coordinator.v1.LogChunk.stream_type:type_name -> coordinator.v1.LogStreamType
+	17, // 27: coordinator.v1.GetDAGRunStatusResponse.status:type_name -> coordinator.v1.DAGRunStatusProto
+	3,  // 28: coordinator.v1.CoordinatorService.Poll:input_type -> coordinator.v1.PollRequest
+	5,  // 29: coordinator.v1.CoordinatorService.Dispatch:input_type -> coordinator.v1.DispatchRequest
+	8,  // 30: coordinator.v1.CoordinatorService.GetWorkers:input_type -> coordinator.v1.GetWorkersRequest
+	11, // 31: coordinator.v1.CoordinatorService.Heartbeat:input_type -> coordinator.v1.HeartbeatRequest
+	15, // 32: coordinator.v1.CoordinatorService.ReportStatus:input_type -> coordinator.v1.ReportStatusRequest
+	22, // 33: coordinator.v1.CoordinatorService.StreamLogs:input_type -> coordinator.v1.LogChunk
+	24, // 34: coordinator.v1.CoordinatorService.GetDAGRunStatus:input_type -> coordinator.v1.GetDAGRunStatusRequest
+	4,  // 35: coordinator.v1.CoordinatorService.Poll:output_type -> coordinator.v1.PollResponse
+	6,  // 36: coordinator.v1.CoordinatorService.Dispatch:output_type -> coordinator.v1.DispatchResponse
+	9,  // 37: coordinator.v1.CoordinatorService.GetWorkers:output_type -> coordinator.v1.GetWorkersResponse
+	12, // 38: coordinator.v1.CoordinatorService.Heartbeat:output_type -> coordinator.v1.HeartbeatResponse
+	16, // 39: coordinator.v1.CoordinatorService.ReportStatus:output_type -> coordinator.v1.ReportStatusResponse
+	23, // 40: coordinator.v1.CoordinatorService.StreamLogs:output_type -> coordinator.v1.StreamLogsResponse
+	25, // 41: coordinator.v1.CoordinatorService.GetDAGRunStatus:output_type -> coordinator.v1.GetDAGRunStatusResponse
+	35, // [35:42] is the sub-list for method output_type
+	28, // [28:35] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_proto_coordinator_v1_coordinator_proto_init() }
@@ -1052,8 +2277,8 @@ func file_proto_coordinator_v1_coordinator_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_coordinator_v1_coordinator_proto_rawDesc), len(file_proto_coordinator_v1_coordinator_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   16,
+			NumEnums:      3,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

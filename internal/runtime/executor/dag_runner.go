@@ -8,17 +8,19 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/telemetry"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/proto/convert"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -62,8 +64,16 @@ func NewSubDAGExecutor(ctx context.Context, childName string) (*SubDAGExecutor, 
 	// First, check if it's a local DAG in the parent
 	if rCtx.DAG != nil && rCtx.DAG.LocalDAGs != nil {
 		if localDAG, ok := rCtx.DAG.LocalDAGs[childName]; ok {
+			// Collect extra docs from other local DAGs
+			var extraDocs [][]byte
+			for _, otherDAG := range rCtx.DAG.LocalDAGs {
+				if otherDAG.Name != childName {
+					extraDocs = append(extraDocs, otherDAG.YamlData)
+				}
+			}
+
 			// Create a temporary file for the local DAG
-			tempFile, err := createTempDAGFile(childName, localDAG.YamlData, rCtx.DAG.LocalDAGs)
+			tempFile, err := fileutil.CreateTempDAGFile("local-dags", childName, localDAG.YamlData, extraDocs...)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create temp file for local DAG: %w", err)
 			}
@@ -336,7 +346,6 @@ func (e *SubDAGExecutor) dispatchToCoordinator(ctx context.Context, runParams Ru
 }
 
 func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*execution.RunStatus, error) {
-	rCtx := execution.GetContext(ctx)
 	waitCtx := logger.WithValues(ctx,
 		tag.RunID(dagRunID),
 		tag.DAG(e.DAG.Name),
@@ -370,9 +379,13 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 
 			var status *execution.RunStatus
 
+			// Use a fresh context for status queries during cancellation wait
+			// since the original context may be canceled
+			cancelWaitCtx := context.WithoutCancel(ctx)
+
 			for {
 				var err error
-				status, err = rCtx.DB.GetSubDAGRunStatus(ctx, dagRunID, rCtx.RootDAGRun)
+				status, err = e.getSubDAGRunStatus(cancelWaitCtx, dagRunID)
 				if err != nil {
 					logger.Warn(waitCtx, "Failed to get sub DAG run status during cancellation wait",
 						tag.Error(err),
@@ -403,22 +416,8 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 			}
 
 		case <-ticker.C:
-			// Check if the sub DAG run has completed
-			isCompleted, err := rCtx.DB.IsSubDAGRunCompleted(ctx, dagRunID, rCtx.RootDAGRun)
-			if err != nil {
-				logger.Warn(waitCtx, "Failed to check sub DAG run completion",
-					tag.Error(err),
-				)
-				continue // Retry on error
-			}
-
-			if !isCompleted {
-				logger.Debug(waitCtx, "Sub DAG run not completed yet")
-				continue // Not completed, keep polling
-			}
-
-			// Check the final status of the sub DAG run
-			result, err := rCtx.DB.GetSubDAGRunStatus(ctx, dagRunID, rCtx.RootDAGRun)
+			// Get sub DAG run status (single RPC call)
+			result, err := e.getSubDAGRunStatus(ctx, dagRunID)
 			if err != nil {
 				// Not found yet, continue polling
 				logger.Debug(waitCtx, "Sub DAG run status not available yet",
@@ -427,7 +426,13 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 				continue
 			}
 
-			// If we got a result, the sub DAG has completed
+			// Check if completed based on status
+			if result.Status.IsActive() {
+				logger.Debug(waitCtx, "Sub DAG run not completed yet")
+				continue // Not completed, keep polling
+			}
+
+			// Sub DAG has completed
 			logger.Info(waitCtx, "Distributed execution completed",
 				tag.Name(result.Name),
 			)
@@ -440,6 +445,85 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 			)
 		}
 	}
+}
+
+// getSubDAGRunStatus retrieves the status of a sub-DAG run.
+// For distributed runs, it queries the coordinator; otherwise, it uses the local DB.
+func (e *SubDAGExecutor) getSubDAGRunStatus(ctx context.Context, dagRunID string) (*execution.RunStatus, error) {
+	rCtx := execution.GetContext(ctx)
+
+	if e.coordinatorCli != nil {
+		return e.getStatusFromCoordinator(ctx, dagRunID, rCtx.RootDAGRun)
+	}
+
+	if rCtx.DB != nil {
+		return rCtx.DB.GetSubDAGRunStatus(ctx, dagRunID, rCtx.RootDAGRun)
+	}
+
+	return nil, fmt.Errorf("no coordinator or database available to get sub-DAG status")
+}
+
+// getStatusFromCoordinator queries the coordinator for sub-DAG run status.
+func (e *SubDAGExecutor) getStatusFromCoordinator(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) (*execution.RunStatus, error) {
+	rootRef := &rootDAGRun
+	resp, err := e.coordinatorCli.GetDAGRunStatus(ctx, e.DAG.Name, dagRunID, rootRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get DAG run status from coordinator: %w", err)
+	}
+	if resp == nil {
+		return nil, fmt.Errorf("no response from coordinator")
+	}
+	if !resp.Found {
+		return nil, fmt.Errorf("DAG run not found in coordinator")
+	}
+
+	dagRunStatus := convert.ProtoToDAGRunStatus(resp.Status)
+	outputs := extractOutputsFromNodes(dagRunStatus.Nodes)
+
+	return &execution.RunStatus{
+		Name:     dagRunStatus.Name,
+		DAGRunID: dagRunID,
+		Params:   dagRunStatus.Params,
+		Outputs:  outputs,
+		Status:   dagRunStatus.Status,
+	}, nil
+}
+
+// extractOutputsFromNodes extracts output variables from nodes.
+// Output variables may be stored in two formats:
+// 1. Local format: key="VAR", value="VAR=actual_value" (KeyValue string)
+// 2. Proto format: key="VAR", value="actual_value" (direct value)
+// This function normalizes both formats to extract the actual value.
+func extractOutputsFromNodes(nodes []*execution.Node) map[string]string {
+	outputs := make(map[string]string)
+	for _, node := range nodes {
+		if node.OutputVariables == nil {
+			continue
+		}
+		node.OutputVariables.Range(func(key, value any) bool {
+			k, ok := key.(string)
+			if !ok {
+				return true
+			}
+			v, ok := value.(string)
+			if !ok {
+				return true
+			}
+
+			// Handle both local format (KEY=value) and proto format (just value)
+			// Local format stores "KEY=value" as the value string
+			// Proto format stores just "value" directly
+			if strings.HasPrefix(v, k+"=") {
+				// Local format: extract value after "KEY="
+				outputs[k] = strings.TrimPrefix(v, k+"=")
+			} else {
+				// Proto format or already normalized: use value directly
+				outputs[k] = v
+			}
+			return true
+		})
+	}
+	return outputs
 }
 
 // Kill terminates all running sub DAG processes (both local and distributed)
@@ -497,53 +581,6 @@ func (e *SubDAGExecutor) Kill(sig os.Signal) error {
 		return errs[0]
 	}
 	return nil
-}
-
-// createTempDAGFile creates a temporary file with the DAG YAML content.
-func createTempDAGFile(dagName string, yamlData []byte, localDAGs map[string]*core.DAG) (string, error) {
-	// Create a temporary directory if it doesn't exist
-	tempDir := filepath.Join(os.TempDir(), "dagu", "local-dags")
-	if err := os.MkdirAll(tempDir, 0750); err != nil {
-		return "", fmt.Errorf("failed to create temp directory: %w", err)
-	}
-
-	// Create a temporary file with a meaningful name
-	pattern := fmt.Sprintf("%s-*.yaml", dagName)
-	tempFile, err := os.CreateTemp(tempDir, pattern)
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp file: %w", err)
-	}
-	defer func() {
-		_ = tempFile.Close()
-	}()
-
-	// Write the YAML data
-	var writeErr error
-	if _, err := tempFile.Write(yamlData); err != nil {
-		writeErr = err
-		goto Fail
-	}
-
-	// Add other local DAG data to the temporary file
-	for _, localDAG := range localDAGs {
-		if localDAG.Name == dagName {
-			continue
-		}
-		if _, err := tempFile.WriteString("---\n"); err != nil {
-			writeErr = err
-			goto Fail
-		}
-		if _, err := tempFile.Write(localDAG.YamlData); err != nil {
-			writeErr = err
-			goto Fail
-		}
-	}
-
-	return tempFile.Name(), nil
-
-Fail:
-	_ = os.Remove(tempFile.Name())
-	return "", fmt.Errorf("failed to write YAML data: %w", writeErr)
 }
 
 // executablePath returns the path to the dagu executable.

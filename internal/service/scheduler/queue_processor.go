@@ -353,7 +353,6 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 
 	runRef := *data
 	runID := runRef.ID
-	_ = runID // used below
 	logger.Debug(ctx, "Processing queue item",
 		tag.Name(runRef.Name),
 	)
@@ -420,10 +419,8 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 		queue.setMaxConc(dag.MaxActiveRuns)
 	}
 
-	errCh := make(chan error, 1)
-	if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID); err != nil {
+	if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID, st); err != nil {
 		logger.Error(ctx, "Failed to execute DAG", tag.Error(err))
-		errCh <- err
 		return false
 	}
 
@@ -434,7 +431,7 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 
 	var started bool
 	operation := func(ctx context.Context) error {
-		started, err = p.monitorStartup(ctx, queueName, runRef, errCh)
+		started, err = p.monitorStartup(ctx, queueName, runRef)
 		return err
 	}
 
@@ -453,7 +450,7 @@ func (p *QueueProcessor) wakeUp() {
 	}
 }
 
-func (p *QueueProcessor) monitorStartup(ctx context.Context, queueName string, runRef execution.DAGRunRef, errCh chan error) (bool, error) {
+func (p *QueueProcessor) monitorStartup(ctx context.Context, queueName string, runRef execution.DAGRunRef) (bool, error) {
 	select {
 	case <-ctx.Done():
 		logger.Debug(ctx, "Context canceled")
@@ -461,9 +458,6 @@ func (p *QueueProcessor) monitorStartup(ctx context.Context, queueName string, r
 	case <-p.quit:
 		logger.Info(ctx, "Processor is closed")
 		return false, backoff.PermanentError(errProcessorClosed)
-	case err := <-errCh:
-		logger.Info(ctx, "Failed to execute the DAG", tag.Error(err))
-		return false, backoff.PermanentError(err)
 	default:
 	}
 

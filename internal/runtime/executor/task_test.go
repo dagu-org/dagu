@@ -297,4 +297,38 @@ func TestTaskOption_Functions(t *testing.T) {
 
 		assert.Equal(t, "step-name", task.Step)
 	})
+
+	t.Run("WithPreviousStatus", func(t *testing.T) {
+		t.Parallel()
+
+		task := &coordinatorv1.Task{}
+		status := &execution.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: "run-123",
+			Status:   core.Running,
+			Nodes: []*execution.Node{
+				{Step: core.Step{Name: "step1"}, Status: core.NodeSucceeded},
+				{Step: core.Step{Name: "step2"}, Status: core.NodeFailed},
+			},
+		}
+
+		executor.WithPreviousStatus(status)(task)
+
+		assert.NotNil(t, task.PreviousStatus)
+		assert.Equal(t, "test-dag", task.PreviousStatus.Name)
+		assert.Equal(t, "run-123", task.PreviousStatus.DagRunId)
+		assert.Equal(t, int32(core.Running), task.PreviousStatus.Status)
+		assert.Len(t, task.PreviousStatus.Nodes, 2)
+	})
+
+	t.Run("WithPreviousStatusNil", func(t *testing.T) {
+		t.Parallel()
+
+		task := &coordinatorv1.Task{}
+
+		// Should not panic with nil status
+		executor.WithPreviousStatus(nil)(task)
+
+		assert.Nil(t, task.PreviousStatus)
+	})
 }

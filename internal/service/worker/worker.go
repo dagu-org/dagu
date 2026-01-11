@@ -28,6 +28,14 @@ type Worker struct {
 	// For tracking poller states and heartbeats
 	pollersMu    sync.Mutex
 	runningTasks map[string]*coordinatorv1.RunningTask // pollerID -> running task
+
+	// For cancellation support
+	cancelFuncs map[string]context.CancelFunc // dagRunID -> cancel function
+
+	// For graceful shutdown
+	stopOnce   sync.Once
+	stopCancel context.CancelFunc // Cancels the worker's internal context
+	stopDone   chan struct{}      // Signals when all goroutines have stopped
 }
 
 // SetHandler sets a custom task executor for testing or custom execution logic
@@ -53,6 +61,7 @@ func NewWorker(workerID string, maxActiveRuns int, coordinatorClient coordinator
 		handler:        &taskHandler{subCmdBuilder: runtime.NewSubCmdBuilder(cfg)},
 		labels:         labels,
 		runningTasks:   make(map[string]*coordinatorv1.RunningTask),
+		cancelFuncs:    make(map[string]context.CancelFunc),
 	}
 }
 
@@ -61,6 +70,12 @@ func (w *Worker) Start(ctx context.Context) error {
 	logger.Info(ctx, "Starting worker",
 		tag.WorkerID(w.id),
 		tag.MaxConcurrency(w.maxActiveRuns))
+
+	// Create an internal context that can be cancelled by Stop()
+	// This context is cancelled when either the parent context is done OR Stop() is called
+	internalCtx, cancel := context.WithCancel(ctx)
+	w.stopCancel = cancel
+	w.stopDone = make(chan struct{})
 
 	// Create a wait group to track all polling goroutines
 	var wg sync.WaitGroup
@@ -77,7 +92,7 @@ func (w *Worker) Start(ctx context.Context) error {
 				handler:     w.handler,
 			}
 			poller := NewPoller(w.id, w.coordinatorCli, wrappedHandler, pollerIndex, w.labels)
-			poller.Run(ctx)
+			poller.Run(internalCtx)
 		}(i)
 	}
 
@@ -85,25 +100,50 @@ func (w *Worker) Start(ctx context.Context) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		w.sendHeartbeats(ctx)
+		w.sendHeartbeats(internalCtx)
 	}()
 
-	// Wait for all goroutines to complete
-	wg.Wait()
+	// Wait for all goroutines to complete, then signal done
+	go func() {
+		wg.Wait()
+		close(w.stopDone)
+	}()
+
+	// Block until all goroutines complete
+	<-w.stopDone
 
 	return nil
 }
 
 // Stop gracefully shuts down the worker.
 func (w *Worker) Stop(ctx context.Context) error {
-	logger.Info(ctx, "Worker stopping", tag.WorkerID(w.id))
+	var err error
+	w.stopOnce.Do(func() {
+		logger.Info(ctx, "Worker stopping", tag.WorkerID(w.id))
 
-	// Cleanup coordinator client connections
-	if err := w.coordinatorCli.Cleanup(ctx); err != nil {
-		return fmt.Errorf("failed to cleanup coordinator client: %w", err)
-	}
+		// Cancel the internal context to signal all goroutines to stop
+		if w.stopCancel != nil {
+			w.stopCancel()
+		}
 
-	return nil
+		// Wait for all goroutines to complete (with timeout from ctx)
+		if w.stopDone != nil {
+			select {
+			case <-w.stopDone:
+				// All goroutines have stopped
+			case <-ctx.Done():
+				logger.Warn(ctx, "Worker stop timed out waiting for goroutines",
+					tag.WorkerID(w.id))
+			}
+		}
+
+		// Cleanup coordinator client connections
+		if cleanupErr := w.coordinatorCli.Cleanup(ctx); cleanupErr != nil {
+			err = fmt.Errorf("failed to cleanup coordinator client: %w", cleanupErr)
+		}
+	})
+
+	return err
 }
 
 // trackingHandler wraps a TaskHandler to track running task state
@@ -117,7 +157,11 @@ type trackingHandler struct {
 func (t *trackingHandler) Handle(ctx context.Context, task *coordinatorv1.Task) error {
 	pollerID := fmt.Sprintf("poller-%d", t.pollerIndex)
 
-	// Mark task as running
+	// Create a cancellable context for this task
+	taskCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Mark task as running and register cancel function
 	t.worker.pollersMu.Lock()
 	t.worker.runningTasks[pollerID] = &coordinatorv1.RunningTask{
 		DagRunId:         task.DagRunId,
@@ -128,14 +172,16 @@ func (t *trackingHandler) Handle(ctx context.Context, task *coordinatorv1.Task) 
 		ParentDagRunName: task.ParentDagRunName,
 		ParentDagRunId:   task.ParentDagRunId,
 	}
+	t.worker.cancelFuncs[task.DagRunId] = cancel
 	t.worker.pollersMu.Unlock()
 
-	// Execute the task
-	err := t.handler.Handle(ctx, task)
+	// Execute the task with cancellable context
+	err := t.handler.Handle(taskCtx, task)
 
-	// Remove from running tasks
+	// Remove from running tasks and cancel registry
 	t.worker.pollersMu.Lock()
 	delete(t.worker.runningTasks, pollerID)
+	delete(t.worker.cancelFuncs, task.DagRunId)
 	t.worker.pollersMu.Unlock()
 
 	return err
@@ -170,10 +216,6 @@ func (w *Worker) sendHeartbeats(ctx context.Context) {
 
 	for {
 		if !waitWithContext(ctx, nextDelay) {
-			return
-		}
-
-		if ctx.Err() != nil {
 			return
 		}
 
@@ -215,15 +257,8 @@ func (w *Worker) sendHeartbeat(ctx context.Context) error {
 	w.pollersMu.Unlock()
 
 	// Safely convert to int32, capping at max int32 if needed
-	totalPollers := int32(math.MaxInt32)
-	if w.maxActiveRuns <= math.MaxInt32 {
-		totalPollers = int32(w.maxActiveRuns) //nolint:gosec // Already checked above
-	}
-
-	busyCount32 := int32(math.MaxInt32)
-	if busyCount <= math.MaxInt32 {
-		busyCount32 = int32(busyCount) //nolint:gosec // Already checked above
-	}
+	totalPollers := int32(min(w.maxActiveRuns, math.MaxInt32)) //nolint:gosec
+	busyCount32 := int32(min(busyCount, math.MaxInt32))        //nolint:gosec
 
 	req := &coordinatorv1.HeartbeatRequest{
 		WorkerId: w.id,
@@ -235,5 +270,30 @@ func (w *Worker) sendHeartbeat(ctx context.Context) error {
 		},
 	}
 
-	return w.coordinatorCli.Heartbeat(ctx, req)
+	resp, err := w.coordinatorCli.Heartbeat(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	// Process cancellation directives from the coordinator
+	if resp != nil && len(resp.CancelledRuns) > 0 {
+		w.processCancellations(ctx, resp.CancelledRuns)
+	}
+
+	return nil
+}
+
+// processCancellations cancels tasks that the coordinator has marked for cancellation
+func (w *Worker) processCancellations(ctx context.Context, cancelledRunIDs []string) {
+	w.pollersMu.Lock()
+	defer w.pollersMu.Unlock()
+
+	for _, dagRunID := range cancelledRunIDs {
+		if cancelFunc, exists := w.cancelFuncs[dagRunID]; exists {
+			logger.Info(ctx, "Cancelling task per coordinator directive",
+				tag.RunID(dagRunID),
+				tag.WorkerID(w.id))
+			cancelFunc()
+		}
+	}
 }

@@ -35,7 +35,7 @@ steps:
 `
 
 		// Setup coordinator
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 		coord.Config.Queues.Enabled = true
 
 		// Get dispatcher client from coordinator
@@ -148,7 +148,7 @@ steps:
   - name: task
     command: echo "Direct execution"
 `
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 		ctx := coord.Context
 
 		// Load the DAG
@@ -192,7 +192,7 @@ steps:
 `
 
 		// Setup coordinator
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 		coord.Config.Queues.Enabled = true
 
 		// Get dispatcher client from coordinator

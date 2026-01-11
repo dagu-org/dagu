@@ -16,6 +16,8 @@ import (
 )
 
 func TestNewSubDAGExecutor_LocalDAG(t *testing.T) {
+	t.Parallel()
+
 	// Create a context with environment
 	ctx := context.Background()
 
@@ -70,6 +72,8 @@ func TestNewSubDAGExecutor_LocalDAG(t *testing.T) {
 }
 
 func TestNewSubDAGExecutor_RegularDAG(t *testing.T) {
+	t.Parallel()
+
 	// Create a context with environment
 	ctx := context.Background()
 
@@ -113,6 +117,8 @@ func TestNewSubDAGExecutor_RegularDAG(t *testing.T) {
 }
 
 func TestNewSubDAGExecutor_NotFound(t *testing.T) {
+	t.Parallel()
+
 	// Create a context with environment
 	ctx := context.Background()
 
@@ -148,6 +154,8 @@ func TestNewSubDAGExecutor_NotFound(t *testing.T) {
 }
 
 func TestBuildCommand(t *testing.T) {
+	t.Parallel()
+
 	// Create a context with environment
 	ctx := context.Background()
 
@@ -199,6 +207,8 @@ func TestBuildCommand(t *testing.T) {
 }
 
 func TestBuildCommand_NoRunID(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	// Set up the DAG context
@@ -229,6 +239,8 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 }
 
 func TestBuildCommand_NoRootDAGRun(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	// Set up the DAG context without RootDAGRun
@@ -255,16 +267,14 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 }
 
 func TestCleanup_LocalDAG(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
-	// Create a temporary file
-	tempDir := filepath.Join(os.TempDir(), "dagu-test")
-	err := os.MkdirAll(tempDir, 0750)
-	require.NoError(t, err)
-	defer func() { _ = os.RemoveAll(tempDir) }()
-
+	// Create a temporary file using t.TempDir() for automatic cleanup
+	tempDir := t.TempDir()
 	tempFile := filepath.Join(tempDir, "test.yaml")
-	err = os.WriteFile(tempFile, []byte("test content"), 0600)
+	err := os.WriteFile(tempFile, []byte("test content"), 0600)
 	require.NoError(t, err)
 
 	executor := &SubDAGExecutor{
@@ -285,6 +295,8 @@ func TestCleanup_LocalDAG(t *testing.T) {
 }
 
 func TestCleanup_NonExistentFile(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	executor := &SubDAGExecutor{
@@ -296,67 +308,6 @@ func TestCleanup_NonExistentFile(t *testing.T) {
 	// Cleanup should not error on non-existent file
 	err := executor.Cleanup(ctx)
 	assert.NoError(t, err)
-}
-
-func TestCreateTempDAGFile(t *testing.T) {
-	dagName := "test-dag"
-	yamlData := []byte("name: test-dag\nsteps:\n  - name: step1\n    command: echo test")
-
-	// Pass nil for localDAGs since we're testing with a single DAG
-	tempFile, err := createTempDAGFile(dagName, yamlData, nil)
-	require.NoError(t, err)
-	require.NotEmpty(t, tempFile)
-	defer func() { _ = os.Remove(tempFile) }()
-
-	// Verify file exists and has correct content
-	assert.FileExists(t, tempFile)
-	content, err := os.ReadFile(tempFile)
-	require.NoError(t, err)
-	assert.Equal(t, yamlData, content)
-
-	// Verify file name pattern
-	assert.Contains(t, tempFile, "test-dag")
-	assert.Contains(t, tempFile, ".yaml")
-}
-
-func TestCreateTempDAGFile_WithLocalDAGs(t *testing.T) {
-	dagName := "parent-dag"
-	yamlData := []byte("name: parent-dag\nsteps:\n  - name: step1\n    call: child-dag")
-
-	// Create local DAGs map with additional DAGs
-	localDAGs := map[string]*core.DAG{
-		"parent-dag": {
-			Name:     "parent-dag",
-			YamlData: yamlData,
-		},
-		"child-dag": {
-			Name:     "child-dag",
-			YamlData: []byte("name: child-dag\nsteps:\n  - name: step1\n    command: echo child"),
-		},
-	}
-
-	tempFile, err := createTempDAGFile(dagName, yamlData, localDAGs)
-	require.NoError(t, err)
-	require.NotEmpty(t, tempFile)
-	defer func() { _ = os.Remove(tempFile) }()
-
-	// Verify file exists
-	assert.FileExists(t, tempFile)
-
-	// Read content and verify it contains both DAGs separated by ---
-	content, err := os.ReadFile(tempFile)
-	require.NoError(t, err)
-
-	contentStr := string(content)
-	// Should contain the parent DAG data
-	assert.Contains(t, contentStr, "name: parent-dag")
-	// Should contain separator and child DAG data
-	assert.Contains(t, contentStr, "---")
-	assert.Contains(t, contentStr, "name: child-dag")
-
-	// Verify file name pattern
-	assert.Contains(t, tempFile, "parent-dag")
-	assert.Contains(t, tempFile, ".yaml")
 }
 
 func TestExecutablePath(t *testing.T) {
@@ -377,6 +328,8 @@ func TestExecutablePath(t *testing.T) {
 }
 
 func TestSubDAGExecutor_Kill_MixedProcesses(t *testing.T) {
+	t.Parallel()
+
 	// Create a mock database
 	mockDB := new(mockDatabase)
 
@@ -423,6 +376,8 @@ func TestSubDAGExecutor_Kill_MixedProcesses(t *testing.T) {
 }
 
 func TestSubDAGExecutor_Kill_OnlyDistributed(t *testing.T) {
+	t.Parallel()
+
 	// Create a mock database
 	mockDB := new(mockDatabase)
 
@@ -465,6 +420,8 @@ func TestSubDAGExecutor_Kill_OnlyDistributed(t *testing.T) {
 }
 
 func TestSubDAGExecutor_Kill_OnlyLocal(t *testing.T) {
+	t.Parallel()
+
 	// Create a mock database
 	mockDB := new(mockDatabase)
 
@@ -502,6 +459,8 @@ func TestSubDAGExecutor_Kill_OnlyLocal(t *testing.T) {
 }
 
 func TestSubDAGExecutor_Kill_Empty(t *testing.T) {
+	t.Parallel()
+
 	// Create a mock database
 	mockDB := new(mockDatabase)
 
