@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils';
 import React from 'react';
 import { Status } from '../api/v2/schema';
+import MatrixText from './MatrixText';
 
 type Props = {
   status?: Status;
@@ -13,6 +14,8 @@ function StatusChip({ status, children, size = 'md' }: Props) {
   let bgColorClass = '';
   let textColorClass = '';
   let borderColorClass = '';
+  const isRunning = status === Status.Running;
+
   switch (status) {
     case Status.Success: // done -> muted green (sepia-compatible)
       bgColorClass = 'bg-[rgba(107,168,107,0.12)]';
@@ -90,7 +93,11 @@ function StatusChip({ status, children, size = 'md' }: Props) {
           textColorClass
         )}
       >
-        {children}
+        {isRunning && typeof children === 'string' ? (
+          <MatrixText text={children} className={textColorClass} />
+        ) : (
+          children
+        )}
       </span>
     </div>
   );

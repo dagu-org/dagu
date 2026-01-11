@@ -4,6 +4,7 @@
  * @module features/dags/components/common
  */
 import { cn } from '@/lib/utils';
+import MatrixText from '@/ui/MatrixText';
 import React from 'react';
 import { NodeStatus } from '../../../../api/v2/schema';
 
@@ -105,6 +106,8 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
     lg: 'text-base py-1.5 px-4',
   };
 
+  const isRunning = status === NodeStatus.Running;
+
   // Render a pill-shaped badge with icon and text
   return (
     <div
@@ -128,7 +131,11 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
           textColorClass
         )}
       >
-        {children}
+        {isRunning && typeof children === 'string' ? (
+          <MatrixText text={children} className={textColorClass} />
+        ) : (
+          children
+        )}
       </span>
     </div>
   );
