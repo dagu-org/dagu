@@ -341,6 +341,9 @@ func (srv *Server) Serve(ctx context.Context) error {
 	// Start metrics collection
 	metrics.StartUptime(ctx)
 
+	// Log before starting goroutine to avoid race condition in tests
+	logger.Info(ctx, "Server is starting", tag.Addr(addr))
+
 	// Start the server in a goroutine
 	go srv.startServer(ctx, addr)
 
@@ -494,8 +497,6 @@ func (srv *Server) setupTerminalRoute(ctx context.Context, r *chi.Mux, apiV2Base
 
 // startServer starts the HTTP server with or without TLS
 func (srv *Server) startServer(ctx context.Context, addr string) {
-	logger.Info(ctx, "Server is starting", tag.Addr(addr))
-
 	var err error
 	if srv.config.Server.TLS != nil {
 		// Use TLS configuration
