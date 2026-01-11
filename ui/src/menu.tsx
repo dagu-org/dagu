@@ -10,6 +10,7 @@ import { useIsAdmin } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils';
 import {
+  Activity,
   BarChart2,
   Globe,
   History,
@@ -195,6 +196,15 @@ export const mainListItems = React.forwardRef<
             isOpen={isOpen}
             onClick={onNavItemClick}
           />
+          {isAdmin && (
+            <NavItem
+              to="/system-status"
+              text="System Status"
+              icon={<Activity size={16} />}
+              isOpen={isOpen}
+              onClick={onNavItemClick}
+            />
+          )}
         </div>
 
         {/* Workflows Section */}

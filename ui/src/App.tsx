@@ -26,6 +26,7 @@ import APIKeysPage from './pages/api-keys';
 import WebhooksPage from './pages/webhooks';
 import TerminalPage from './pages/terminal';
 import AuditLogsPage from './pages/audit-logs';
+import SystemStatus from './pages/system-status';
 
 type Props = {
   config: Config;
@@ -127,6 +128,14 @@ function App({ config }: Props) {
                               <Routes>
                                 <Route path="/" element={<Dashboard />} />
                                 <Route path="/dashboard" element={<Dashboard />} />
+                                <Route
+                                  path="/system-status"
+                                  element={
+                                    <ProtectedRoute requiredRole="admin">
+                                      <SystemStatus />
+                                    </ProtectedRoute>
+                                  }
+                                />
                                 <Route path="/dags/" element={<DAGs />} />
                                 <Route
                                   path="/dags/:fileName/:tab"

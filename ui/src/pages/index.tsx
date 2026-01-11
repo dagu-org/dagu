@@ -17,8 +17,6 @@ import { useConfig } from '../contexts/ConfigContext';
 import { useSearchState } from '../contexts/SearchStateContext';
 import { DAGRunDetailsModal } from '../features/dag-runs/components/dag-run-details';
 import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
-import MiniResourceChart from '../features/dashboard/components/MiniResourceChart';
-import WorkersSummary from '../features/dashboard/components/WorkersSummary';
 import PathsCard from '../features/system-status/components/PathsCard';
 import { useQuery } from '../hooks/api';
 import dayjs from '../lib/dayjs';
@@ -183,118 +181,9 @@ function Dashboard(): React.ReactElement | null {
     }
   );
 
-  // System status data
-  const {
-    data: schedulerData,
-    error: schedulerError,
-    mutate: mutateScheduler,
-  } = useQuery(
-    '/services/scheduler',
-    {
-      params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-        },
-      },
-    },
-    {
-      refreshInterval: 5000,
-    }
-  );
-
-  const {
-    data: coordinatorData,
-    error: coordinatorError,
-    mutate: mutateCoordinator,
-  } = useQuery(
-    '/services/coordinator',
-    {
-      params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-        },
-      },
-    },
-    {
-      refreshInterval: 5000,
-    }
-  );
-
-  const {
-    data: resourceData,
-    error: resourceError,
-    mutate: mutateResource,
-  } = useQuery(
-    '/services/resources/history',
-    {
-      params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-        },
-      },
-    },
-    {
-      refreshInterval: 5000,
-    }
-  );
-
-  // Workers data
-  const {
-    data: workersData,
-    error: workersError,
-    isLoading: workersLoading,
-    mutate: mutateWorkers,
-  } = useQuery(
-    '/workers',
-    {
-      params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-        },
-      },
-    },
-    {
-      refreshInterval: 1000,
-    }
-  );
-
   const handleRefreshAll = async () => {
-    await Promise.all([
-      mutate(),
-      mutateResource(),
-      mutateScheduler(),
-      mutateCoordinator(),
-      mutateWorkers(),
-    ]);
+    await mutate();
   };
-
-  // Handle task click from workers
-  const handleTaskClick = React.useCallback(
-    (task: components['schemas']['RunningTask']) => {
-      if (task.parentDagRunName && task.parentDagRunId) {
-        const searchParams = new URLSearchParams();
-        searchParams.set('subDAGRunId', task.dagRunId);
-        searchParams.set('dagRunId', task.parentDagRunId);
-        searchParams.set('dagRunName', task.parentDagRunName);
-        window.history.pushState(
-          {},
-          '',
-          `${window.location.pathname}?${searchParams.toString()}`
-        );
-
-        setModalDAGRun({
-          name: task.parentDagRunName,
-          dagRunId: task.parentDagRunId,
-        });
-      } else {
-        setModalDAGRun({
-          name: task.dagName,
-          dagRunId: task.dagRunId,
-        });
-      }
-    },
-    []
-  );
 
   const dagRunsList: DAGRunSummary[] = data?.dagRuns || [];
 
@@ -451,7 +340,7 @@ function Dashboard(): React.ReactElement | null {
         </div>
 
         {/* Timeline Visualization - Hero */}
-        <div className="flex-[2] min-h-[250px] rounded-xl border border-border bg-surface overflow-hidden">
+        <div className="flex-1 min-h-[250px] rounded-xl border border-border bg-surface overflow-hidden">
           <DashboardTimeChart
             data={dagRunsList}
             selectedDate={{
@@ -459,47 +348,6 @@ function Dashboard(): React.ReactElement | null {
               endTimestamp: dateRange.endDate,
             }}
           />
-        </div>
-
-        {/* Live Workers */}
-        <div className="flex-1 min-h-[120px] rounded-xl border border-border bg-surface overflow-hidden">
-          <WorkersSummary
-            workers={workersData?.workers || []}
-            isLoading={workersLoading && !workersData}
-            errors={workersData?.errors}
-            onTaskClick={handleTaskClick}
-          />
-        </div>
-
-        {/* System Resources - Full Width Row */}
-        <div className="h-24 flex-shrink-0 rounded-xl border border-border bg-surface p-3">
-          <div className="grid grid-cols-4 gap-4 h-full">
-            <MiniResourceChart
-              title="CPU"
-              data={resourceData?.cpu}
-              isLoading={!resourceData && !resourceError}
-              error={resourceError ? String(resourceError) : undefined}
-            />
-            <MiniResourceChart
-              title="Memory"
-              data={resourceData?.memory}
-              isLoading={!resourceData && !resourceError}
-              error={resourceError ? String(resourceError) : undefined}
-            />
-            <MiniResourceChart
-              title="Disk"
-              data={resourceData?.disk}
-              isLoading={!resourceData && !resourceError}
-              error={resourceError ? String(resourceError) : undefined}
-            />
-            <MiniResourceChart
-              title="Load"
-              data={resourceData?.load}
-              unit=""
-              isLoading={!resourceData && !resourceError}
-              error={resourceError ? String(resourceError) : undefined}
-            />
-          </div>
         </div>
       </div>
 
