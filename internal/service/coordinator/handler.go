@@ -178,9 +178,21 @@ func (h *Handler) Poll(ctx context.Context, req *coordinatorv1.PollRequest) (*co
 
 // Dispatch tries to send a task to a waiting poller
 // It fails if no pollers are available or no workers match the selector
-func (h *Handler) Dispatch(_ context.Context, req *coordinatorv1.DispatchRequest) (*coordinatorv1.DispatchResponse, error) {
+func (h *Handler) Dispatch(ctx context.Context, req *coordinatorv1.DispatchRequest) (*coordinatorv1.DispatchResponse, error) {
 	if req.Task == nil {
 		return nil, status.Error(codes.InvalidArgument, "task is required")
+	}
+
+	// For root-level DAG runs (no parent), create the attempt before dispatching
+	// This ensures the coordinator has a place to store status updates from the worker
+	isRootRun := req.Task.ParentDagRunId == "" &&
+		(req.Task.RootDagRunId == "" || req.Task.RootDagRunId == req.Task.DagRunId)
+
+	if isRootRun && req.Task.Definition != "" && h.dagRunStore != nil {
+		if err := h.createAttemptForTask(ctx, req.Task); err != nil {
+			logger.Warn(ctx, "Failed to create attempt for task", tag.Error(err), tag.RunID(req.Task.DagRunId))
+			// Don't fail dispatch - the task can still run, status just won't be stored
+		}
 	}
 
 	h.mu.Lock()
@@ -225,6 +237,44 @@ func matchesSelector(workerLabels, selector map[string]string) bool {
 		}
 	}
 	return true
+}
+
+// createAttemptForTask creates a DAGRun attempt for a root-level task.
+// This is called when the coordinator receives a dispatch for a root-level DAG run
+// (not a sub-DAG), so it has a place to store status updates from the worker.
+func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.Task) error {
+	// Create a minimal DAG object with just the name
+	// The full DAG definition is passed to the worker, not stored here
+	dag := &core.DAG{
+		Name: task.Target,
+	}
+
+	// Determine if this is a retry operation
+	isRetry := task.Operation == coordinatorv1.Operation_OPERATION_RETRY
+	opts := execution.NewDAGRunAttemptOptions{Retry: isRetry}
+
+	// Create the attempt
+	attempt, err := h.dagRunStore.CreateAttempt(ctx, dag, time.Now(), task.DagRunId, opts)
+	if err != nil {
+		return fmt.Errorf("failed to create attempt: %w", err)
+	}
+
+	// Open the attempt for writing
+	if err := attempt.Open(ctx); err != nil {
+		return fmt.Errorf("failed to open attempt: %w", err)
+	}
+
+	// Cache the open attempt so ReportStatus can find it
+	h.attemptsMu.Lock()
+	h.openAttempts[task.DagRunId] = attempt
+	h.attemptsMu.Unlock()
+
+	logger.Info(ctx, "Created DAGRun attempt for dispatched task",
+		tag.RunID(task.DagRunId),
+		tag.Target(task.Target),
+	)
+
+	return nil
 }
 
 // GetWorkers returns the list of currently connected workers

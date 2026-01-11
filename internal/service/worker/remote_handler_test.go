@@ -684,7 +684,7 @@ steps:
 `
 
 		task := &coordinatorv1.Task{
-			Target:     "inline.yaml",
+			Target:     "inline-dag", // Target is the DAG name, not filename
 			Definition: dagDefinition,
 		}
 
@@ -692,7 +692,7 @@ steps:
 
 		require.NoError(t, err)
 		require.NotNil(t, dag)
-		assert.Equal(t, "inline-dag", dag.Name)
+		assert.Equal(t, "inline-dag", dag.Name) // Name comes from task.Target when Definition is provided
 		require.NotNil(t, cleanup, "cleanup should be set for inline definitions")
 
 		// Call cleanup to remove temp file

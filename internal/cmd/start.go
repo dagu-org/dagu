@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmd/dagpicker"
 	"github.com/dagu-org/dagu/internal/common/logger"
@@ -15,6 +16,9 @@ import (
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
+	"github.com/dagu-org/dagu/internal/runtime/executor"
+	"github.com/dagu-org/dagu/internal/service/coordinator"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -420,6 +424,15 @@ func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string
 // It returns an error if log file initialization, DAG store setup, agent creation, or
 // execution fails.
 func executeDAGRun(ctx *Context, d *core.DAG, parent execution.DAGRunRef, dagRunID string, root execution.DAGRunRef, workerID string) error {
+	// Check if this DAG needs distributed execution
+	if len(d.WorkerSelector) > 0 {
+		coordinatorCli := ctx.NewCoordinatorClient()
+		if coordinatorCli == nil {
+			return fmt.Errorf("workerSelector requires a coordinator to be configured")
+		}
+		return dispatchToCoordinatorAndWait(ctx, d, dagRunID, coordinatorCli)
+	}
+
 	// Open the log file for the scheduler. The log file will be used for future
 	// execution for the same DAG/dag-run ID between attempts.
 	logFile, err := ctx.OpenLogFile(d, dagRunID)
@@ -459,4 +472,76 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent execution.DAGRunRef, dagRun
 
 	// Use the shared agent execution function
 	return ExecuteAgent(ctx, agentInstance, d, dagRunID, logFile)
+}
+
+// dispatchToCoordinatorAndWait dispatches a DAG to coordinator and waits for completion.
+func dispatchToCoordinatorAndWait(ctx *Context, d *core.DAG, dagRunID string, coordinatorCli coordinator.Client) error {
+	logger.Info(ctx, "Dispatching DAG for distributed execution",
+		slog.Any("worker-selector", d.WorkerSelector),
+	)
+
+	task := executor.CreateTask(
+		d.Name,
+		string(d.YamlData),
+		coordinatorv1.Operation_OPERATION_START,
+		dagRunID,
+		executor.WithWorkerSelector(d.WorkerSelector),
+	)
+
+	if err := coordinatorCli.Dispatch(ctx, task); err != nil {
+		return fmt.Errorf("failed to dispatch task: %w", err)
+	}
+
+	logger.Info(ctx, "DAG dispatched to coordinator; awaiting completion")
+	return waitForDAGCompletion(ctx, d, dagRunID, coordinatorCli)
+}
+
+// waitForDAGCompletion polls the coordinator until the DAG run completes.
+func waitForDAGCompletion(ctx *Context, d *core.DAG, dagRunID string, coordinatorCli coordinator.Client) error {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	logTicker := time.NewTicker(15 * time.Second)
+	defer logTicker.Stop()
+
+	var consecutiveErrors int
+	const maxConsecutiveErrors = 10 // Fail after 10 consecutive errors (10 seconds)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+
+		case <-logTicker.C:
+			logger.Info(ctx, "Waiting for DAG completion...", tag.RunID(dagRunID))
+
+		case <-ticker.C:
+			resp, err := coordinatorCli.GetDAGRunStatus(ctx, d.Name, dagRunID, nil)
+			if err != nil {
+				consecutiveErrors++
+				logger.Debug(ctx, "Failed to get status from coordinator",
+					tag.Error(err), slog.Int("consecutive_errors", consecutiveErrors))
+
+				if consecutiveErrors >= maxConsecutiveErrors {
+					return fmt.Errorf("lost connection to coordinator after %d attempts: %w", consecutiveErrors, err)
+				}
+				continue
+			}
+			consecutiveErrors = 0 // Reset on success
+
+			if resp == nil || resp.Status == nil {
+				continue
+			}
+
+			// Check status
+			status := core.Status(resp.Status.Status)
+			if !status.IsActive() {
+				if status.IsSuccess() {
+					logger.Info(ctx, "DAG completed successfully", tag.RunID(dagRunID))
+					return nil
+				}
+				return fmt.Errorf("DAG run failed with status: %s", status)
+			}
+		}
+	}
 }

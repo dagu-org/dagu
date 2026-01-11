@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 	"path/filepath"
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
@@ -10,6 +11,9 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
+	"github.com/dagu-org/dagu/internal/runtime/executor"
+	"github.com/dagu-org/dagu/internal/service/coordinator"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/spf13/cobra"
 )
 
@@ -113,6 +117,15 @@ func runRetry(ctx *Context, args []string) error {
 // for retry (including step-level retry if provided), and invoking the shared agent executor.
 // It returns an error if any setup step fails or if the agent execution fails.
 func executeRetry(ctx *Context, dag *core.DAG, status *execution.DAGRunStatus, rootRun execution.DAGRunRef, stepName string, workerID string) error {
+	// Check if this DAG needs distributed execution
+	if len(dag.WorkerSelector) > 0 {
+		coordinatorCli := ctx.NewCoordinatorClient()
+		if coordinatorCli == nil {
+			return fmt.Errorf("workerSelector requires a coordinator to be configured")
+		}
+		return dispatchRetryToCoordinatorAndWait(ctx, dag, status.DAGRunID, stepName, status, coordinatorCli)
+	}
+
 	// Set step context if specified
 	if stepName != "" {
 		ctx.Context = logger.WithValues(ctx.Context, tag.Step(stepName))
@@ -160,4 +173,34 @@ func executeRetry(ctx *Context, dag *core.DAG, status *execution.DAGRunStatus, r
 
 	// Use the shared agent execution function
 	return ExecuteAgent(ctx, agentInstance, dag, status.DAGRunID, logFile)
+}
+
+// dispatchRetryToCoordinatorAndWait dispatches a retry to coordinator and waits for completion.
+func dispatchRetryToCoordinatorAndWait(ctx *Context, dag *core.DAG, dagRunID, stepName string, prevStatus *execution.DAGRunStatus, coordinatorCli coordinator.Client) error {
+	logger.Info(ctx, "Dispatching retry for distributed execution",
+		slog.Any("worker-selector", dag.WorkerSelector),
+	)
+
+	opts := []executor.TaskOption{
+		executor.WithWorkerSelector(dag.WorkerSelector),
+		executor.WithPreviousStatus(prevStatus),
+	}
+	if stepName != "" {
+		opts = append(opts, executor.WithStep(stepName))
+	}
+
+	task := executor.CreateTask(
+		dag.Name,
+		string(dag.YamlData),
+		coordinatorv1.Operation_OPERATION_RETRY,
+		dagRunID,
+		opts...,
+	)
+
+	if err := coordinatorCli.Dispatch(ctx, task); err != nil {
+		return fmt.Errorf("failed to dispatch retry task: %w", err)
+	}
+
+	logger.Info(ctx, "Retry dispatched to coordinator; awaiting completion")
+	return waitForDAGCompletion(ctx, dag, dagRunID, coordinatorCli)
 }

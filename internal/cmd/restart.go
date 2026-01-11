@@ -133,6 +133,15 @@ func handleRestartProcess(ctx *Context, d *core.DAG, oldDagRunID string) error {
 // executeDAGWithRunID executes a DAG with a pre-generated run ID.
 // It returns an error if log or DAG store initialization, or agent execution fails.
 func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRunID string) error {
+	// Check if this DAG needs distributed execution
+	if len(dag.WorkerSelector) > 0 {
+		coordinatorCli := ctx.NewCoordinatorClient()
+		if coordinatorCli == nil {
+			return fmt.Errorf("workerSelector requires a coordinator to be configured")
+		}
+		return dispatchToCoordinatorAndWait(ctx, dag, dagRunID, coordinatorCli)
+	}
+
 	logFile, err := ctx.OpenLogFile(dag, dagRunID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file: %w", err)

@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"log/slog"
+	"os"
 
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
@@ -76,6 +77,11 @@ var workerFlags = []commandLineFlag{
 
 func runWorker(ctx *Context, _ []string) error {
 	workerID := ctx.Config.Worker.ID
+	// Default to hostname@PID if not configured
+	if workerID == "" {
+		hostname, _ := os.Hostname()
+		workerID = fmt.Sprintf("%s@%d", hostname, os.Getpid())
+	}
 	maxActiveRuns := ctx.Config.Worker.MaxActiveRuns
 	labels := ctx.Config.Worker.Labels
 	if labels == nil {

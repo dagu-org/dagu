@@ -1277,6 +1277,13 @@ func (a *Agent) setupDefaultRetryPlan(ctx context.Context, nodes []*runtime.Node
 }
 
 func (a *Agent) setupDAGRunAttempt(ctx context.Context) (execution.DAGRunAttempt, error) {
+	// In shared-nothing mode, dagRunStore is nil - return no-op attempt
+	// Status updates are handled by statusPusher instead
+	if a.dagRunStore == nil {
+		logger.Debug(ctx, "Using no-op DAGRunAttempt in shared-nothing mode")
+		return execution.NewNoopDAGRunAttempt(a.dagRunID, a.dag), nil
+	}
+
 	retentionDays := a.dag.HistRetentionDays
 	if _, err := a.dagRunStore.RemoveOldDAGRuns(ctx, a.dag.Name, retentionDays); err != nil {
 		logger.Error(ctx, "DAG runs data cleanup failed", tag.Error(err))

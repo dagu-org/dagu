@@ -210,6 +210,11 @@ func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Tas
 		spec.WithDAGsDir(h.config.Paths.DAGsDir),
 	}
 
+	// When loading from task definition, use the original DAG name (not temp filename)
+	if task.Definition != "" {
+		loadOpts = append(loadOpts, spec.WithName(task.Target))
+	}
+
 	// Load the DAG
 	dag, err := spec.Load(ctx, target, loadOpts...)
 	if err != nil {
