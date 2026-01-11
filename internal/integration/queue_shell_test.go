@@ -38,6 +38,7 @@ func TestQueueShellConfig(t *testing.T) {
 
 		// Start the frontend server
 		server, err := frontend.NewServer(
+			th.Context,
 			th.Config,
 			th.DAGStore,
 			th.DAGRunStore,

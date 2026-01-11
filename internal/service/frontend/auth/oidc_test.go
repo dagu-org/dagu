@@ -20,7 +20,7 @@ func TestInitVerifierAndConfigRecoversFromPanic(t *testing.T) {
 		panic("boom")
 	}
 
-	_, err := InitVerifierAndConfig(config.AuthOIDC{
+	_, err := InitVerifierAndConfig(context.Background(), config.AuthOIDC{
 		ClientId:     "client",
 		ClientSecret: "secret",
 		ClientUrl:    "http://localhost",
@@ -40,7 +40,7 @@ func TestInitVerifierAndConfigHandlesNilProvider(t *testing.T) {
 		return nil, nil
 	}
 
-	_, err := InitVerifierAndConfig(config.AuthOIDC{
+	_, err := InitVerifierAndConfig(context.Background(), config.AuthOIDC{
 		ClientId:     "client",
 		ClientSecret: "secret",
 		ClientUrl:    "http://localhost",
@@ -66,7 +66,7 @@ func TestInitVerifierAndConfigKeepsProviderContextAlive(t *testing.T) {
 		return originalFactory(ctx, issuer)
 	}
 
-	cfg, err := InitVerifierAndConfig(config.AuthOIDC{
+	cfg, err := InitVerifierAndConfig(context.Background(), config.AuthOIDC{
 		ClientId:     "client",
 		ClientSecret: "secret",
 		ClientUrl:    "http://localhost",

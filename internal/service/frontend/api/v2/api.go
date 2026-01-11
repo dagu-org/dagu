@@ -245,7 +245,7 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 	// Initialize OIDC if enabled
 	authOIDC := authConfig.OIDC
 	if authOIDC.ClientId != "" && authOIDC.ClientSecret != "" && authOIDC.Issuer != "" {
-		oidcCfg, err := frontendauth.InitVerifierAndConfig(authOIDC)
+		oidcCfg, err := frontendauth.InitVerifierAndConfig(ctx, authOIDC)
 		if err != nil {
 			return fmt.Errorf("failed to initialize OIDC: %w", err)
 		}

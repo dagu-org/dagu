@@ -67,7 +67,9 @@ type Server struct {
 // cfg.Server.Auth.Mode is set to builtin.
 // Returns the constructed *Server, or an error if initialization fails (for example,
 // when the configured builtin auth service fails to initialize).
-func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunStore, qs execution.QueueStore, ps execution.ProcStore, drm runtime.Manager, cc coordinator.Client, sr execution.ServiceRegistry, mr *prometheus.Registry, collector *telemetry.Collector, rs *resource.Service) (*Server, error) {
+// The context is used for OIDC provider initialization and should be cancellable
+// to allow graceful shutdown during startup.
+func NewServer(ctx context.Context, cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunStore, qs execution.QueueStore, ps execution.ProcStore, drm runtime.Manager, cc coordinator.Client, sr execution.ServiceRegistry, mr *prometheus.Registry, collector *telemetry.Collector, rs *resource.Service) (*Server, error) {
 	var remoteNodes []string
 	for _, n := range cfg.Server.RemoteNodes {
 		remoteNodes = append(remoteNodes, n.Name)
@@ -131,6 +133,7 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 
 			// Initialize OIDC provider
 			builtinOIDCCfg, err = auth.InitBuiltinOIDCConfig(
+				ctx,
 				oidcCfg,
 				result.AuthService,
 				provisionSvc,
@@ -422,7 +425,7 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 
 	var oidcAuthOptions *auth.Options
 	if authConfig.Mode == config.AuthModeOIDC && authConfig.OIDC.ClientId != "" && authConfig.OIDC.ClientSecret != "" && authOIDC.Issuer != "" {
-		oidcCfg, err := auth.InitVerifierAndConfig(authOIDC)
+		oidcCfg, err := auth.InitVerifierAndConfig(ctx, authOIDC)
 		if err != nil {
 			return fmt.Errorf("failed to initialize OIDC: %w", err)
 		}

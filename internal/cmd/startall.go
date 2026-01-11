@@ -82,32 +82,12 @@ func runStartAll(ctx *Context, _ []string) error {
 	}
 
 	// Create a context that will be cancelled on interrupt signal
+	// This must be created BEFORE server initialization so OIDC provider init can be cancelled
 	signalCtx, stop := signal.NotifyContext(ctx.Context, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Initialize all services
-	scheduler, err := ctx.NewScheduler()
-	if err != nil {
-		return fmt.Errorf("failed to initialize scheduler: %w", err)
-	}
-	// Disable health server when running from start-all
-	scheduler.DisableHealthServer()
-
-	// Initialize resource monitoring service
-	resourceService := resource.NewService(ctx.Config)
-
-	server, err := ctx.NewServer(resourceService)
-	if err != nil {
-		return fmt.Errorf("failed to initialize server: %w", err)
-	}
-
-	// Only start coordinator if not bound to localhost
-	coordinator, coordHandler, err := newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry, ctx.DAGRunStore)
-	if err != nil {
-		return fmt.Errorf("failed to initialize coordinator: %w", err)
-	}
-
 	// Create a new context with the signal context for services
+	// This is used for server initialization (OIDC) and all service operations
 	serviceCtx := &Context{
 		Context:         signalCtx,
 		Command:         ctx.Command,
@@ -119,6 +99,29 @@ func runStartAll(ctx *Context, _ []string) error {
 		ProcStore:       ctx.ProcStore,
 		QueueStore:      ctx.QueueStore,
 		ServiceRegistry: ctx.ServiceRegistry,
+	}
+
+	// Initialize all services using the signal-aware context
+	scheduler, err := serviceCtx.NewScheduler()
+	if err != nil {
+		return fmt.Errorf("failed to initialize scheduler: %w", err)
+	}
+	// Disable health server when running from start-all
+	scheduler.DisableHealthServer()
+
+	// Initialize resource monitoring service
+	resourceService := resource.NewService(ctx.Config)
+
+	// Use serviceCtx so OIDC initialization can respond to termination signals
+	server, err := serviceCtx.NewServer(resourceService)
+	if err != nil {
+		return fmt.Errorf("failed to initialize server: %w", err)
+	}
+
+	// Only start coordinator if not bound to localhost
+	coordinator, coordHandler, err := newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry, ctx.DAGRunStore)
+	if err != nil {
+		return fmt.Errorf("failed to initialize coordinator: %w", err)
 	}
 
 	// Start resource monitoring service (starts its own goroutine internally)

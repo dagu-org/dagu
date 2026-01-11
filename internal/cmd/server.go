@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"os/signal"
+	"syscall"
 
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
@@ -42,14 +44,33 @@ var serverFlags = []commandLineFlag{dagsFlag, hostFlag, portFlag}
 // constructs the server with that resource service, and then begins serving.
 // It returns an error if the resource service fails to start, the server fails to initialize, or serving fails.
 func runServer(ctx *Context, _ []string) error {
-	logger.Info(ctx, "Server initialization",
-		tag.Host(ctx.Config.Server.Host),
-		tag.Port(ctx.Config.Server.Port),
+	// Create a context that will be cancelled on interrupt signal
+	// This must be created BEFORE server initialization so OIDC provider init can be cancelled
+	signalCtx, stop := signal.NotifyContext(ctx.Context, syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// Create a new context with the signal context for services
+	serviceCtx := &Context{
+		Context:         signalCtx,
+		Command:         ctx.Command,
+		Flags:           ctx.Flags,
+		Config:          ctx.Config,
+		Quiet:           ctx.Quiet,
+		DAGRunStore:     ctx.DAGRunStore,
+		DAGRunMgr:       ctx.DAGRunMgr,
+		ProcStore:       ctx.ProcStore,
+		QueueStore:      ctx.QueueStore,
+		ServiceRegistry: ctx.ServiceRegistry,
+	}
+
+	logger.Info(serviceCtx, "Server initialization",
+		tag.Host(serviceCtx.Config.Server.Host),
+		tag.Port(serviceCtx.Config.Server.Port),
 	)
 
 	// Initialize resource monitoring service
 	resourceService := resource.NewService(ctx.Config)
-	if err := resourceService.Start(ctx); err != nil {
+	if err := resourceService.Start(serviceCtx); err != nil {
 		return fmt.Errorf("failed to start resource service: %w", err)
 	}
 	defer func() {
@@ -58,12 +79,13 @@ func runServer(ctx *Context, _ []string) error {
 		}
 	}()
 
-	server, err := ctx.NewServer(resourceService)
+	// Use serviceCtx so OIDC initialization can respond to termination signals
+	server, err := serviceCtx.NewServer(resourceService)
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}
 
-	if err := server.Serve(ctx); err != nil {
+	if err := server.Serve(serviceCtx); err != nil {
 		return fmt.Errorf("failed to start server: %w", err)
 	}
 
