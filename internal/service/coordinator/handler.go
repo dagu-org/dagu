@@ -183,15 +183,23 @@ func (h *Handler) Dispatch(ctx context.Context, req *coordinatorv1.DispatchReque
 		return nil, status.Error(codes.InvalidArgument, "task is required")
 	}
 
-	// For root-level DAG runs (no parent), create the attempt before dispatching
-	// This ensures the coordinator has a place to store status updates from the worker
+	// Create attempt before dispatching to ensure coordinator has a place to store status updates
 	isRootRun := req.Task.ParentDagRunId == "" &&
 		(req.Task.RootDagRunId == "" || req.Task.RootDagRunId == req.Task.DagRunId)
 
-	if isRootRun && req.Task.Definition != "" && h.dagRunStore != nil {
-		if err := h.createAttemptForTask(ctx, req.Task); err != nil {
-			logger.Warn(ctx, "Failed to create attempt for task", tag.Error(err), tag.RunID(req.Task.DagRunId))
-			// Don't fail dispatch - the task can still run, status just won't be stored
+	if h.dagRunStore != nil && req.Task.Definition != "" {
+		if isRootRun {
+			// For root-level DAG runs (no parent), create the attempt
+			if err := h.createAttemptForTask(ctx, req.Task); err != nil {
+				logger.Warn(ctx, "Failed to create attempt for task", tag.Error(err), tag.RunID(req.Task.DagRunId))
+				// Don't fail dispatch - the task can still run, status just won't be stored
+			}
+		} else if req.Task.ParentDagRunId != "" {
+			// For sub-DAG runs, create the attempt under the root DAG run
+			if err := h.createSubAttemptForTask(ctx, req.Task); err != nil {
+				logger.Warn(ctx, "Failed to create sub-attempt for task", tag.Error(err), tag.RunID(req.Task.DagRunId))
+				// Don't fail dispatch - the task can still run, status just won't be stored
+			}
 		}
 	}
 
@@ -272,6 +280,38 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 	logger.Info(ctx, "Created DAGRun attempt for dispatched task",
 		tag.RunID(task.DagRunId),
 		tag.Target(task.Target),
+	)
+
+	return nil
+}
+
+// createSubAttemptForTask creates a sub-DAG attempt under the root DAG run.
+// This is called when the coordinator receives a dispatch for a sub-DAG
+// (dispatched from a parent DAG), so it has a place to store status updates from the worker.
+func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinatorv1.Task) error {
+	rootRef := execution.DAGRunRef{
+		Name: task.RootDagRunName,
+		ID:   task.RootDagRunId,
+	}
+
+	attempt, err := h.dagRunStore.CreateSubAttempt(ctx, rootRef, task.DagRunId)
+	if err != nil {
+		return fmt.Errorf("failed to create sub-attempt: %w", err)
+	}
+
+	if err := attempt.Open(ctx); err != nil {
+		return fmt.Errorf("failed to open sub-attempt: %w", err)
+	}
+
+	// Cache the open attempt for ReportStatus calls
+	h.attemptsMu.Lock()
+	h.openAttempts[task.DagRunId] = attempt
+	h.attemptsMu.Unlock()
+
+	logger.Info(ctx, "Created sub-DAG attempt for distributed execution",
+		tag.RunID(task.DagRunId),
+		tag.DAG(task.Target),
+		slog.String("root-dag-run-id", task.RootDagRunId),
 	)
 
 	return nil

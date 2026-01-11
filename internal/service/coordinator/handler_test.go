@@ -95,6 +95,16 @@ func (m *mockDAGRunStore) FindSubAttempt(_ context.Context, rootRef execution.DA
 	}
 	return nil, execution.ErrDAGRunIDNotFound
 }
+func (m *mockDAGRunStore) CreateSubAttempt(_ context.Context, rootRef execution.DAGRunRef, subDAGRunID string) (execution.DAGRunAttempt, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	key := rootRef.ID + ":" + subDAGRunID
+	attempt := &mockDAGRunAttempt{
+		status: &execution.DAGRunStatus{},
+	}
+	m.subAttempts[key] = attempt
+	return attempt, nil
+}
 func (m *mockDAGRunStore) RemoveOldDAGRuns(_ context.Context, _ string, _ int, _ ...execution.RemoveOldDAGRunsOption) ([]string, error) {
 	return nil, nil
 }

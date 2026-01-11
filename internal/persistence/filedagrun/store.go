@@ -432,6 +432,30 @@ func (store *Store) FindSubAttempt(ctx context.Context, ref execution.DAGRunRef,
 	return subDAGRun.LatestAttempt(ctx, store.cache)
 }
 
+// CreateSubAttempt creates a new sub dag-run attempt under the root dag-run.
+// This is used for distributed sub-DAG execution where the coordinator needs
+// to create the attempt directory before the worker reports status.
+func (store *Store) CreateSubAttempt(ctx context.Context, rootRef execution.DAGRunRef, subDAGRunID string) (execution.DAGRunAttempt, error) {
+	if rootRef.ID == "" {
+		return nil, ErrDAGRunIDEmpty
+	}
+
+	root := NewDataRoot(store.baseDir, rootRef.Name)
+	dagRun, err := root.FindByDAGRunID(ctx, rootRef.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find root dag-run: %w", err)
+	}
+
+	// Create the sub-DAG run directory
+	subDAGRun, err := dagRun.CreateSubDAGRun(ctx, subDAGRunID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create sub dag-run directory: %w", err)
+	}
+
+	// Create an attempt within the sub-DAG run
+	return subDAGRun.CreateAttempt(ctx, execution.NewUTC(time.Now()), store.cache)
+}
+
 // RemoveOldDAGRuns removes old history records older than the specified retention days.
 // It only removes records older than the specified retention days.
 // If retentionDays is negative, no files will be removed.

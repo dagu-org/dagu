@@ -33,6 +33,10 @@ type DAGRunStore interface {
 	FindAttempt(ctx context.Context, dagRun DAGRunRef) (DAGRunAttempt, error)
 	// FindSubAttempt finds a sub dag-run record by dag-run ID.
 	FindSubAttempt(ctx context.Context, dagRun DAGRunRef, subDAGRunID string) (DAGRunAttempt, error)
+	// CreateSubAttempt creates a new sub dag-run attempt under the root dag-run.
+	// This is used for distributed sub-DAG execution where the coordinator needs
+	// to create the attempt directory before the worker reports status.
+	CreateSubAttempt(ctx context.Context, rootRef DAGRunRef, subDAGRunID string) (DAGRunAttempt, error)
 	// RemoveOldDAGRuns deletes dag-run records older than retentionDays.
 	// If retentionDays is negative, it won't delete any records.
 	// If retentionDays is zero, it will delete all records for the DAG name.
