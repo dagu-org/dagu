@@ -9,11 +9,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/coder/websocket"
 	"github.com/creack/pty"
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	"github.com/google/uuid"
-	"github.com/coder/websocket"
 )
 
 // Session represents an interactive terminal session.
