@@ -461,10 +461,14 @@ ExecRepeat: // repeat execution
 		break ExecRepeat
 	}
 
-	// If node is still in running state by now, it means it was not canceled
-	// and it has completed its execution without errors.
+	// If node is still in running state by now, check if it was canceled.
+	// If canceled, mark as aborted; otherwise, it completed successfully.
 	if node.State().Status == core.NodeRunning {
-		node.SetStatus(core.NodeSucceeded)
+		if r.isCanceled() {
+			node.SetStatus(core.NodeAborted)
+		} else {
+			node.SetStatus(core.NodeSucceeded)
+		}
 	}
 
 	// Save chat messages after successful execution
