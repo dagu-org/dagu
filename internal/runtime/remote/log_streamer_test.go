@@ -16,10 +16,6 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-// =============================================================================
-// Mock Infrastructure
-// =============================================================================
-
 // logStreamerMockClient implements coordinator.Client for testing log streamer
 type logStreamerMockClient struct {
 	coordinator.Client // Embed to satisfy interface (unused methods will panic)
@@ -101,10 +97,6 @@ func (m *mockStreamLogsClient) getSentChunks() []*coordinatorv1.LogChunk {
 	return append([]*coordinatorv1.LogChunk(nil), m.sentChunks...)
 }
 
-// =============================================================================
-// toProtoStreamType Tests
-// =============================================================================
-
 func TestToProtoStreamType_Stdout(t *testing.T) {
 	t.Parallel()
 	result := toProtoStreamType(execution.StreamTypeStdout)
@@ -122,10 +114,6 @@ func TestToProtoStreamType_Unknown(t *testing.T) {
 	result := toProtoStreamType(999) // Unknown type
 	assert.Equal(t, coordinatorv1.LogStreamType_LOG_STREAM_TYPE_UNSPECIFIED, result)
 }
-
-// =============================================================================
-// LogStreamer Constructor & Methods Tests
-// =============================================================================
 
 func TestNewLogStreamer(t *testing.T) {
 	t.Parallel()
@@ -214,10 +202,6 @@ func TestNewStepWriter(t *testing.T) {
 	assert.False(t, stepWriter.closed)
 	assert.False(t, stepWriter.streamInitFailed)
 }
-
-// =============================================================================
-// Write() Method Tests
-// =============================================================================
 
 func TestWrite_SmallData(t *testing.T) {
 	t.Parallel()
@@ -391,10 +375,6 @@ func TestWrite_FlushError_ClearsBuffer(t *testing.T) {
 	assert.Equal(t, 0, bufLen)
 }
 
-// =============================================================================
-// flush() Core Logic Tests
-// =============================================================================
-
 func TestFlush_EmptyBuffer(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
@@ -536,10 +516,6 @@ func TestFlush_SendFailure(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, initialSeq, finalSeq, "sequence should NOT increment on failure")
 }
-
-// =============================================================================
-// flush() Chunk Splitting Tests
-// =============================================================================
 
 func TestFlush_SingleChunk(t *testing.T) {
 	t.Parallel()
@@ -747,10 +723,6 @@ func TestFlush_DataCopied(t *testing.T) {
 	require.Len(t, chunks, 1)
 	assert.Equal(t, byte('o'), chunks[0].Data[0], "sent data should not be affected by buffer modification")
 }
-
-// =============================================================================
-// Close() Method Tests
-// =============================================================================
 
 func TestClose_NoData(t *testing.T) {
 	t.Parallel()
@@ -995,10 +967,6 @@ func TestClose_FlushErrorThenSendSuccess(t *testing.T) {
 	assert.Contains(t, err.Error(), "flush send failed")
 }
 
-// =============================================================================
-// Concurrency Tests
-// =============================================================================
-
 func TestConcurrentWrites(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
@@ -1102,10 +1070,6 @@ func TestConcurrentSetAttemptID(t *testing.T) {
 
 	wg.Wait()
 }
-
-// =============================================================================
-// Integration-Style Lifecycle Tests
-// =============================================================================
 
 func TestLogStreamer_FullLifecycle(t *testing.T) {
 	t.Parallel()

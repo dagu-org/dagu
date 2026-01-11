@@ -23,10 +23,6 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-// =============================================================================
-// Mock Infrastructure
-// =============================================================================
-
 // mockStreamLogsClient implements coordinatorv1.CoordinatorService_StreamLogsClient
 type mockStreamLogsClient struct {
 	chunks   []*coordinatorv1.LogChunk
@@ -424,10 +420,6 @@ func (m *mockRemoteDAGRunStore) RemoveDAGRun(ctx context.Context, dagRun executi
 	return nil
 }
 
-// =============================================================================
-// Test: NewRemoteTaskHandler
-// =============================================================================
-
 func TestNewRemoteTaskHandler(t *testing.T) {
 	t.Parallel()
 
@@ -492,10 +484,6 @@ func TestNewRemoteTaskHandler(t *testing.T) {
 	})
 }
 
-// =============================================================================
-// Test: createRemoteHandlers
-// =============================================================================
-
 func TestCreateRemoteHandlers(t *testing.T) {
 	t.Parallel()
 
@@ -546,10 +534,6 @@ func TestCreateRemoteHandlers(t *testing.T) {
 		require.NotNil(t, logStreamer)
 	})
 }
-
-// =============================================================================
-// Test: createAgentEnv
-// =============================================================================
 
 func TestCreateAgentEnv(t *testing.T) {
 	t.Parallel()
@@ -690,10 +674,6 @@ func TestCreateAgentEnv(t *testing.T) {
 		assert.Equal(t, expectedPath, env.logDir)
 	})
 }
-
-// =============================================================================
-// Test: loadDAG
-// =============================================================================
 
 func TestLoadDAG(t *testing.T) {
 	t.Parallel()
@@ -850,10 +830,6 @@ steps:
 	})
 }
 
-// =============================================================================
-// Test: Handle (operation dispatch)
-// =============================================================================
-
 func TestHandle(t *testing.T) {
 	t.Parallel()
 
@@ -895,10 +871,6 @@ func TestHandle(t *testing.T) {
 		require.Contains(t, err.Error(), "unsupported operation")
 	})
 }
-
-// =============================================================================
-// Test: handleRetry
-// =============================================================================
 
 func TestHandleRetry(t *testing.T) {
 	t.Parallel()
@@ -1038,10 +1010,6 @@ steps:
 	})
 }
 
-// =============================================================================
-// Test: handleStart
-// =============================================================================
-
 func TestHandleStart(t *testing.T) {
 	t.Parallel()
 
@@ -1068,10 +1036,6 @@ func TestHandleStart(t *testing.T) {
 		require.Contains(t, err.Error(), "failed to load DAG")
 	})
 }
-
-// =============================================================================
-// Integration-style tests
-// =============================================================================
 
 func TestRemoteHandler_UniqueLogDirs(t *testing.T) {
 	t.Parallel()
@@ -1547,10 +1511,6 @@ steps:
 	})
 }
 
-// =============================================================================
-// Test: executeDAGRun error paths
-// =============================================================================
-
 func TestExecuteDAGRun_CreateAgentEnvError(t *testing.T) {
 	t.Parallel()
 
@@ -1645,4 +1605,3 @@ steps:
 	// Should succeed for simple echo command
 	require.NoError(t, err, "executeDAGRun should succeed for simple echo command")
 }
-

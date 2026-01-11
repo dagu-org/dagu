@@ -36,9 +36,6 @@ func TestAuth_Combinations(t *testing.T) {
 		config   authConfig
 		requests []request
 	}{
-		// ===========================================
-		// No auth configured (mode not set)
-		// ===========================================
 		{
 			name:   "default_no_auth",
 			config: authConfig{},
@@ -48,9 +45,6 @@ func TestAuth_Combinations(t *testing.T) {
 				{name: "random_basic", basicUser: "user", basicPass: "pass", wantStatus: http.StatusOK},
 			},
 		},
-		// ===========================================
-		// No auth configured (mode=none)
-		// ===========================================
 		{
 			name:   "mode_none_no_auth",
 			config: authConfig{mode: config.AuthModeNone},
@@ -61,9 +55,6 @@ func TestAuth_Combinations(t *testing.T) {
 			},
 		},
 
-		// ===========================================
-		// Token only (mode not set)
-		// ===========================================
 		{
 			name:   "default_token",
 			config: authConfig{token: "secret-token"},
@@ -73,9 +64,6 @@ func TestAuth_Combinations(t *testing.T) {
 				{name: "wrong_token", token: "wrong", wantStatus: http.StatusUnauthorized},
 			},
 		},
-		// ===========================================
-		// Token only (mode=none)
-		// ===========================================
 		{
 			name:   "mode_none_token",
 			config: authConfig{mode: config.AuthModeNone, token: "secret-token"},
@@ -86,9 +74,6 @@ func TestAuth_Combinations(t *testing.T) {
 			},
 		},
 
-		// ===========================================
-		// Basic auth only (mode not set)
-		// ===========================================
 		{
 			name:   "default_basic",
 			config: authConfig{basicUser: "admin", basicPass: "secret"},
@@ -99,9 +84,6 @@ func TestAuth_Combinations(t *testing.T) {
 				{name: "wrong_pass", basicUser: "admin", basicPass: "wrong", wantStatus: http.StatusUnauthorized},
 			},
 		},
-		// ===========================================
-		// Basic auth only (mode=none)
-		// ===========================================
 		{
 			name:   "mode_none_basic",
 			config: authConfig{mode: config.AuthModeNone, basicUser: "admin", basicPass: "secret"},
@@ -113,9 +95,6 @@ func TestAuth_Combinations(t *testing.T) {
 			},
 		},
 
-		// ===========================================
-		// Basic auth with special chars (mode not set)
-		// ===========================================
 		{
 			name:   "default_basic_special_chars",
 			config: authConfig{basicUser: "admin", basicPass: "p@ss$word&with`special"},
@@ -125,9 +104,6 @@ func TestAuth_Combinations(t *testing.T) {
 				{name: "wrong_pass", basicUser: "admin", basicPass: "wrong", wantStatus: http.StatusUnauthorized},
 			},
 		},
-		// ===========================================
-		// Basic auth with special chars (mode=none)
-		// ===========================================
 		{
 			name:   "mode_none_basic_special_chars",
 			config: authConfig{mode: config.AuthModeNone, basicUser: "admin", basicPass: "p@ss$word&with`special"},
@@ -138,9 +114,6 @@ func TestAuth_Combinations(t *testing.T) {
 			},
 		},
 
-		// ===========================================
-		// Both token and basic auth (mode not set)
-		// ===========================================
 		{
 			name:   "default_token_and_basic",
 			config: authConfig{token: "my-token", basicUser: "admin", basicPass: "secret"},
@@ -152,9 +125,6 @@ func TestAuth_Combinations(t *testing.T) {
 				{name: "wrong_basic", basicUser: "wrong", basicPass: "wrong", wantStatus: http.StatusUnauthorized},
 			},
 		},
-		// ===========================================
-		// Both token and basic auth (mode=none)
-		// ===========================================
 		{
 			name:   "mode_none_token_and_basic",
 			config: authConfig{mode: config.AuthModeNone, token: "my-token", basicUser: "admin", basicPass: "secret"},

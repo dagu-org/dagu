@@ -141,10 +141,6 @@ message RunningTask {
   string parent_dag_run_id = 7;
 }
 
-// ============================================================================
-// Status Reporting Messages (for shared-nothing worker architecture)
-// ============================================================================
-
 // Request message for reporting DAG run status.
 message ReportStatusRequest {
   string worker_id = 1;
@@ -228,10 +224,6 @@ message StepProto {
   string executor_type = 3;
 }
 
-// ============================================================================
-// Log Streaming Messages (for shared-nothing worker architecture)
-// ============================================================================
-
 // Log chunk sent from worker to coordinator.
 message LogChunk {
   string worker_id = 1;
@@ -264,10 +256,6 @@ message StreamLogsResponse {
   uint64 bytes_written = 2;
   string error = 3;
 }
-
-// ============================================================================
-// DAG Run Status Query Messages (for sub-DAG status polling in shared-nothing mode)
-// ============================================================================
 
 // Request message for getting DAG run status.
 message GetDAGRunStatusRequest {

@@ -240,10 +240,9 @@ func streamTypeToExtension(streamType coordinatorv1.LogStreamType) string {
 		return "stdout.log"
 	case coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDERR:
 		return "stderr.log"
-	case coordinatorv1.LogStreamType_LOG_STREAM_TYPE_UNSPECIFIED:
+	default:
 		return "log"
 	}
-	return "log"
 }
 
 // Close closes all open writers using the provided context for logging.
