@@ -142,7 +142,16 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, st *execution.
 		return fmt.Errorf("read dag: %w", err)
 	}
 
-	// Check if process is alive
+	// Skip zombie detection for distributed runs - they're monitored by coordinator's heartbeat detector
+	if st.WorkerID != "" && st.WorkerID != "local" {
+		logger.Debug(ctx, "Skipping zombie detection for distributed run",
+			tag.Queue(dag.ProcGroup()),
+			tag.WorkerID(st.WorkerID),
+		)
+		return nil
+	}
+
+	// Check if process is alive (only for local runs)
 	alive, err := z.procStore.IsRunAlive(ctx, dag.ProcGroup(), execution.DAGRunRef{Name: dag.Name, ID: st.DAGRunID})
 	if err != nil {
 		logger.Warn(ctx, "Failed to check process liveness for dag-run",
