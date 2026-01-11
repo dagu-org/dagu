@@ -4,6 +4,7 @@ import type { components } from '../../api/v2/schema';
 import { Button } from '../../components/ui/button';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useConfig } from '../../contexts/ConfigContext';
+import WorkersSummary from '../../features/dashboard/components/WorkersSummary';
 import PathsCard from '../../features/system-status/components/PathsCard';
 import ResourceChart from '../../features/system-status/components/ResourceChart';
 import ServiceCard from '../../features/system-status/components/ServiceCard';
@@ -88,6 +89,24 @@ function SystemStatus() {
     }
   );
 
+  const {
+    data: workersData,
+    error: workersError,
+    mutate: mutateWorkers,
+  } = useQuery(
+    '/workers',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
+      },
+    },
+    {
+      refreshInterval: autoRefresh ? 1000 : 0,
+    }
+  );
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
@@ -95,6 +114,7 @@ function SystemStatus() {
         mutateResource(),
         mutateScheduler(),
         mutateCoordinator(),
+        mutateWorkers(),
       ]);
       setLastUpdateTime(new Date());
     } finally {
@@ -145,8 +165,8 @@ function SystemStatus() {
         </div>
       </div>
 
-      {/* Services Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Services */}
+      <div className="flex flex-col gap-4">
         {/* Scheduler Service */}
         <ServiceCard
           title="Scheduler Service"
@@ -178,6 +198,16 @@ function SystemStatus() {
           icon={<Server className="h-4 w-4" />}
           isLoading={!coordinatorData && !coordinatorError}
           error={coordinatorError ? String(coordinatorError) : undefined}
+        />
+      </div>
+
+      {/* Workers Status */}
+      <h2 className="text-xl font-semibold mt-8 mb-4">Workers</h2>
+      <div className="rounded-xl border border-border bg-surface overflow-hidden" style={{ minHeight: '200px' }}>
+        <WorkersSummary
+          workers={workersData?.workers || []}
+          isLoading={!workersData && !workersError}
+          errors={workersData?.errors}
         />
       </div>
 
