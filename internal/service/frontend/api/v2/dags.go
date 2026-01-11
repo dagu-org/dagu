@@ -855,12 +855,9 @@ func (a *API) waitForDAGCompletion(
 				return status, nil
 			}
 
-			// Adaptive polling: increase interval (up to max)
+			// Adaptive polling: increase interval up to max
 			if pollInterval < maxPollInterval {
-				pollInterval = time.Duration(float64(pollInterval) * 1.5)
-				if pollInterval > maxPollInterval {
-					pollInterval = maxPollInterval
-				}
+				pollInterval = min(time.Duration(float64(pollInterval)*1.5), maxPollInterval)
 				ticker.Reset(pollInterval)
 			}
 		}
