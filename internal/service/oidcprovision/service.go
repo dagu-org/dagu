@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/common/stringutil"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/google/uuid"
 )
@@ -93,7 +94,7 @@ func (s *Service) ProcessLogin(ctx context.Context, claims OIDCClaims) (*auth.Us
 	// 1. Check access control (whitelist + allowedDomains)
 	if !s.isEmailAllowed(claims.Email) {
 		s.logger.Warn("OIDC login rejected: email not allowed",
-			slog.String("email_domain", s.extractDomain(claims.Email)),
+			slog.String("email_domain", stringutil.ExtractEmailDomain(claims.Email)),
 			slog.String("subject", claims.Subject))
 		return nil, false, ErrEmailNotAllowed
 	}
@@ -133,7 +134,7 @@ func (s *Service) ProcessLogin(ctx context.Context, claims OIDCClaims) (*auth.Us
 	// 4. Check if auto-signup is enabled
 	if !s.config.AutoSignup {
 		s.logger.Info("OIDC login rejected: auto-signup disabled",
-			slog.String("email_domain", s.extractDomain(claims.Email)),
+			slog.String("email_domain", stringutil.ExtractEmailDomain(claims.Email)),
 			slog.String("subject", claims.Subject))
 		return nil, false, ErrAutoSignupDisabled
 	}
@@ -142,7 +143,7 @@ func (s *Service) ProcessLogin(ctx context.Context, claims OIDCClaims) (*auth.Us
 	role, err := s.determineRole(claims)
 	if err != nil {
 		s.logger.Warn("OIDC login rejected: role mapping failed",
-			slog.String("email_domain", s.extractDomain(claims.Email)),
+			slog.String("email_domain", stringutil.ExtractEmailDomain(claims.Email)),
 			slog.String("error", err.Error()))
 		return nil, false, err
 	}
@@ -183,7 +184,7 @@ func (s *Service) ProcessLogin(ctx context.Context, claims OIDCClaims) (*auth.Us
 	s.logger.Info("OIDC user created",
 		slog.String("user_id", user.ID),
 		slog.String("username", username),
-		slog.String("email_domain", s.extractDomain(claims.Email)),
+		slog.String("email_domain", stringutil.ExtractEmailDomain(claims.Email)),
 		slog.String("role", string(user.Role)))
 
 	return user, true, nil // New user created
@@ -258,7 +259,7 @@ func (s *Service) isEmailAllowed(email string) bool {
 
 	// Check allowed domains
 	if len(s.config.AllowedDomains) > 0 {
-		domain := s.extractDomain(email)
+		domain := stringutil.ExtractEmailDomain(email)
 		for _, allowed := range s.config.AllowedDomains {
 			if strings.EqualFold(domain, allowed) {
 				return true
@@ -270,15 +271,6 @@ func (s *Service) isEmailAllowed(email string) bool {
 
 	// No restrictions configured
 	return true
-}
-
-// extractDomain extracts the domain part from an email address.
-func (s *Service) extractDomain(email string) string {
-	parts := strings.Split(email, "@")
-	if len(parts) != 2 {
-		return ""
-	}
-	return parts[1]
 }
 
 // generateUniqueUsername creates a username avoiding conflicts with existing users.

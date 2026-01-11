@@ -549,27 +549,6 @@ func TestProcessLogin_UserCreationError(t *testing.T) {
 	assert.False(t, isNew)
 }
 
-func TestExtractDomain(t *testing.T) {
-	svc := &Service{}
-
-	tests := []struct {
-		email    string
-		expected string
-	}{
-		{"user@example.com", "example.com"},
-		{"invalid-email", ""},
-		{"multiple@at@signs.com", ""},
-		{"", ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.email, func(t *testing.T) {
-			result := svc.extractDomain(tt.email)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 func TestEmailLocalPart(t *testing.T) {
 	svc := &Service{}
 

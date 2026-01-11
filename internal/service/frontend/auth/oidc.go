@@ -483,7 +483,7 @@ func BuiltinOIDCCallbackHandler(cfg *BuiltinOIDCConfig) http.HandlerFunc {
 		user, isNewUser, err := cfg.Provision.ProcessLogin(ctx, claims)
 		if err != nil {
 			logger.Warn(ctx, "OIDC provisioning failed",
-				slog.String("email_domain", extractEmailDomain(claims.Email)),
+				slog.String("email_domain", stringutil.ExtractEmailDomain(claims.Email)),
 				slog.String("subject", claims.Subject),
 				tag.Error(err))
 			redirectWithError(w, r, cfg.LoginBasePath, err.Error())
@@ -522,12 +522,3 @@ func redirectWithError(w http.ResponseWriter, r *http.Request, basePath, errMsg 
 	http.Redirect(w, r, redirectURL, http.StatusFound)
 }
 
-// extractEmailDomain extracts the domain part from an email address.
-// Returns empty string if the email format is invalid.
-func extractEmailDomain(email string) string {
-	parts := strings.Split(email, "@")
-	if len(parts) != 2 {
-		return ""
-	}
-	return parts[1]
-}
