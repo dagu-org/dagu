@@ -62,7 +62,10 @@ type Metrics struct {
 	LastError        error // Last error encountered
 }
 
-var _ Client = (*clientImpl)(nil)
+var (
+	_ Client              = (*clientImpl)(nil)
+	_ execution.Dispatcher = (*clientImpl)(nil)
+)
 
 // clientImpl is the concrete implementation
 type clientImpl struct {

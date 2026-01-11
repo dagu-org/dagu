@@ -11,8 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestAuth_Combinations tests all auth mode and configuration combinations
-// in a table-driven format for easy verification of correctness.
 func TestAuth_Combinations(t *testing.T) {
 	t.Parallel()
 
@@ -25,9 +23,9 @@ func TestAuth_Combinations(t *testing.T) {
 
 	type request struct {
 		name       string
-		token      string // bearer token to send
-		basicUser  string // basic auth username
-		basicPass  string // basic auth password
+		token      string
+		basicUser  string
+		basicPass  string
 		wantStatus int
 	}
 
@@ -165,7 +163,6 @@ func TestAuth_Combinations(t *testing.T) {
 	}
 }
 
-// TestAuth_BuiltinMode tests builtin auth mode with JWT login
 func TestAuth_BuiltinMode(t *testing.T) {
 	t.Parallel()
 

@@ -467,19 +467,13 @@ func TestClientCleanup(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestClientDispatcherInterface(t *testing.T) {
+func TestClientDispatch_NoCoordinators(t *testing.T) {
 	t.Parallel()
 
-	// Verify that clientImpl implements the execution.Dispatcher interface
 	config := coordinator.DefaultConfig()
 	monitor := &mockServiceMonitor{}
-
 	client := coordinator.New(monitor, config)
 
-	// This should compile if the interface is implemented correctly
-	var _ execution.Dispatcher = client
-
-	// Test the Dispatch method from the interface
 	task := &coordinatorv1.Task{
 		DagRunId: "test-dag-run",
 		Target:   "test.yaml",

@@ -82,13 +82,12 @@ func (m *mockStreamLogsClient) CloseAndRecv() (*coordinatorv1.StreamLogsResponse
 	return m.response, nil
 }
 
-// Required gRPC stream interface methods
 func (m *mockStreamLogsClient) Header() (metadata.MD, error) { return nil, nil }
 func (m *mockStreamLogsClient) Trailer() metadata.MD         { return nil }
 func (m *mockStreamLogsClient) CloseSend() error             { return nil }
 func (m *mockStreamLogsClient) Context() context.Context     { return context.Background() }
-func (m *mockStreamLogsClient) SendMsg(msg any) error        { return nil }
-func (m *mockStreamLogsClient) RecvMsg(msg any) error        { return nil }
+func (m *mockStreamLogsClient) SendMsg(_ any) error { return nil }
+func (m *mockStreamLogsClient) RecvMsg(_ any) error { return nil }
 
 // getSentChunks returns a copy of sent chunks for thread-safe access
 func (m *mockStreamLogsClient) getSentChunks() []*coordinatorv1.LogChunk {
@@ -97,22 +96,23 @@ func (m *mockStreamLogsClient) getSentChunks() []*coordinatorv1.LogChunk {
 	return append([]*coordinatorv1.LogChunk(nil), m.sentChunks...)
 }
 
-func TestToProtoStreamType_Stdout(t *testing.T) {
+func TestToProtoStreamType(t *testing.T) {
 	t.Parallel()
-	result := toProtoStreamType(execution.StreamTypeStdout)
-	assert.Equal(t, coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDOUT, result)
-}
-
-func TestToProtoStreamType_Stderr(t *testing.T) {
-	t.Parallel()
-	result := toProtoStreamType(execution.StreamTypeStderr)
-	assert.Equal(t, coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDERR, result)
-}
-
-func TestToProtoStreamType_Unknown(t *testing.T) {
-	t.Parallel()
-	result := toProtoStreamType(999) // Unknown type
-	assert.Equal(t, coordinatorv1.LogStreamType_LOG_STREAM_TYPE_UNSPECIFIED, result)
+	tests := []struct {
+		name     string
+		input    int
+		expected coordinatorv1.LogStreamType
+	}{
+		{"stdout", execution.StreamTypeStdout, coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDOUT},
+		{"stderr", execution.StreamTypeStderr, coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDERR},
+		{"unknown", 999, coordinatorv1.LogStreamType_LOG_STREAM_TYPE_UNSPECIFIED},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, toProtoStreamType(tt.input))
+		})
+	}
 }
 
 func TestNewLogStreamer(t *testing.T) {
@@ -143,11 +143,7 @@ func TestSetAttemptID(t *testing.T) {
 func TestGetAttemptID(t *testing.T) {
 	t.Parallel()
 	streamer := NewLogStreamer(&logStreamerMockClient{}, "w", "r", "d", "test-attempt", execution.DAGRunRef{})
-
-	// Multiple reads should return same value
-	for i := 0; i < 100; i++ {
-		assert.Equal(t, "test-attempt", streamer.getAttemptID())
-	}
+	assert.Equal(t, "test-attempt", streamer.getAttemptID())
 }
 
 func TestSetAttemptID_Concurrent(t *testing.T) {
@@ -185,7 +181,7 @@ func TestNewStepWriter(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -207,7 +203,7 @@ func TestWrite_SmallData(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -228,7 +224,7 @@ func TestWrite_ExactThreshold(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -256,7 +252,7 @@ func TestWrite_LargeData(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -282,7 +278,7 @@ func TestWrite_MultipleSmallWrites(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -311,7 +307,7 @@ func TestWrite_AfterClose(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -334,7 +330,7 @@ func TestWrite_FlushError_Continues(t *testing.T) {
 		sendErr: errors.New("send failed"),
 	}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -356,7 +352,7 @@ func TestWrite_FlushError_ClearsBuffer(t *testing.T) {
 		sendErr: errors.New("send failed"),
 	}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -379,7 +375,7 @@ func TestFlush_EmptyBuffer(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -400,7 +396,7 @@ func TestFlush_StreamInitSuccess(t *testing.T) {
 	streamInitCalled := false
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			streamInitCalled = true
 			return mockStream, nil
 		},
@@ -422,7 +418,7 @@ func TestFlush_StreamInitFailure(t *testing.T) {
 	t.Parallel()
 	initErr := errors.New("connection refused")
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return nil, initErr
 		},
 	}
@@ -445,7 +441,7 @@ func TestFlush_AfterInitFailure(t *testing.T) {
 	t.Parallel()
 	callCount := 0
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			callCount++
 			return nil, errors.New("init failed")
 		},
@@ -475,7 +471,7 @@ func TestFlush_SendSuccess(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -499,7 +495,7 @@ func TestFlush_SendFailure(t *testing.T) {
 		sendErr: errors.New("send failed"),
 	}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -521,7 +517,7 @@ func TestFlush_SingleChunk(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -549,7 +545,7 @@ func TestFlush_ExactMaxChunkSize(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -577,7 +573,7 @@ func TestFlush_TwoChunks(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -606,7 +602,7 @@ func TestFlush_MultipleChunks(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -637,7 +633,7 @@ func TestFlush_ChunkSequences(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -662,7 +658,7 @@ func TestFlush_ChunkSequences(t *testing.T) {
 func TestFlush_PartialFailure(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{
-		sendFunc: func(idx int, chunk *coordinatorv1.LogChunk) error {
+		sendFunc: func(idx int, _ *coordinatorv1.LogChunk) error {
 			// First chunk succeeds, second fails
 			if idx == 1 {
 				return errors.New("send failed on chunk 2")
@@ -671,7 +667,7 @@ func TestFlush_PartialFailure(t *testing.T) {
 		},
 	}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -699,7 +695,7 @@ func TestFlush_DataCopied(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -728,7 +724,7 @@ func TestClose_NoData(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -746,7 +742,7 @@ func TestClose_WithUnflushedData(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -770,7 +766,7 @@ func TestClose_Idempotent(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -796,7 +792,7 @@ func TestClose_FinalChunkSequence(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -825,7 +821,7 @@ func TestClose_FinalSendSuccess(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -847,7 +843,7 @@ func TestClose_FinalSendSuccess(t *testing.T) {
 func TestClose_FinalSendFailure(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{
-		sendFunc: func(idx int, chunk *coordinatorv1.LogChunk) error {
+		sendFunc: func(_ int, chunk *coordinatorv1.LogChunk) error {
 			// Fail on final chunk
 			if chunk.IsFinal {
 				return errors.New("final send failed")
@@ -856,7 +852,7 @@ func TestClose_FinalSendFailure(t *testing.T) {
 		},
 	}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -876,7 +872,7 @@ func TestClose_CloseAndRecvError(t *testing.T) {
 		closeErr: errors.New("close failed"),
 	}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -893,7 +889,7 @@ func TestClose_CloseAndRecvError(t *testing.T) {
 func TestClose_MultipleErrors(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{
-		sendFunc: func(idx int, chunk *coordinatorv1.LogChunk) error {
+		sendFunc: func(_ int, chunk *coordinatorv1.LogChunk) error {
 			if chunk.IsFinal {
 				return errors.New("final send error")
 			}
@@ -902,7 +898,7 @@ func TestClose_MultipleErrors(t *testing.T) {
 		closeErr: errors.New("close error"),
 	}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -921,7 +917,7 @@ func TestClose_NoStream(t *testing.T) {
 	t.Parallel()
 	// Client that returns error on stream init
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return nil, errors.New("init failed")
 		},
 	}
@@ -942,7 +938,7 @@ func TestClose_FlushErrorThenSendSuccess(t *testing.T) {
 	t.Parallel()
 	firstFlushDone := false
 	mockStream := &mockStreamLogsClient{
-		sendFunc: func(idx int, chunk *coordinatorv1.LogChunk) error {
+		sendFunc: func(_ int, chunk *coordinatorv1.LogChunk) error {
 			// First flush chunk fails, final succeeds
 			if !chunk.IsFinal && !firstFlushDone {
 				firstFlushDone = true
@@ -952,7 +948,7 @@ func TestClose_FlushErrorThenSendSuccess(t *testing.T) {
 		},
 	}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -971,7 +967,7 @@ func TestConcurrentWrites(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -984,13 +980,13 @@ func TestConcurrentWrites(t *testing.T) {
 
 	for i := 0; i < goroutines; i++ {
 		wg.Add(1)
-		go func(id int) {
+		go func() {
 			defer wg.Done()
 			for j := 0; j < writesPerGoroutine; j++ {
 				_, err := writer.Write([]byte("data"))
 				assert.NoError(t, err)
 			}
-		}(i)
+		}()
 	}
 
 	wg.Wait()
@@ -1001,7 +997,7 @@ func TestConcurrentWriteAndClose(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -1040,7 +1036,7 @@ func TestConcurrentSetAttemptID(t *testing.T) {
 	t.Parallel()
 	// Each flush gets its own stream to avoid races
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return &mockStreamLogsClient{}, nil
 		},
 	}
@@ -1075,7 +1071,7 @@ func TestLogStreamer_FullLifecycle(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -1124,7 +1120,7 @@ func TestLogStreamer_MultipleSteps(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -1154,7 +1150,7 @@ func TestLogStreamer_StdoutAndStderr(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -1189,7 +1185,7 @@ func TestLogStreamer_LargeOutput(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -1229,7 +1225,7 @@ func TestLogStreamer_AttemptIDUpdatedDuringStream(t *testing.T) {
 	t.Parallel()
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -1264,7 +1260,7 @@ func TestLogStreamer_SequenceContinuity(t *testing.T) {
 
 	mockStream := &mockStreamLogsClient{}
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return mockStream, nil
 		},
 	}
@@ -1291,7 +1287,7 @@ func TestLogStreamer_RaceDetector(t *testing.T) {
 
 	// Each writer gets its own mock stream to avoid races between writers
 	client := &logStreamerMockClient{
-		streamLogsFunc: func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		streamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return &mockStreamLogsClient{}, nil
 		},
 	}
