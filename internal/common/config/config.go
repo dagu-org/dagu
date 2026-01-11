@@ -174,6 +174,8 @@ type AuthBuiltin struct {
 
 // OIDCRoleMapping defines how OIDC claims are mapped to Dagu roles
 type OIDCRoleMapping struct {
+	// DefaultRole is the role assigned to new OIDC users when no mapping matches (default: "viewer")
+	DefaultRole string
 	// GroupsClaim specifies the claim name containing groups (default: "groups")
 	GroupsClaim string
 	// GroupMappings maps IdP group names to Dagu roles
@@ -224,8 +226,7 @@ type AuthOIDC struct {
 	Whitelist    []string // Specific email addresses always allowed
 
 	// Builtin-specific fields (only used when auth.mode=builtin)
-	AutoSignup     bool            // Auto-create users on first login (default: false)
-	DefaultRole    string          // Default role for new users (default: viewer)
+	AutoSignup     bool            // Auto-create users on first login (default: true)
 	AllowedDomains []string        // Email domain whitelist
 	ButtonLabel    string          // Login button text (default: "Login with SSO")
 	RoleMapping    OIDCRoleMapping // Role mapping configuration
@@ -447,8 +448,8 @@ func (c *Config) validateOIDCForBuiltin() error {
 		"operator": true,
 		"viewer":   true,
 	}
-	if !validRoles[oidc.DefaultRole] {
-		return fmt.Errorf("OIDC defaultRole must be one of: admin, manager, operator, viewer (got: %q)", oidc.DefaultRole)
+	if !validRoles[oidc.RoleMapping.DefaultRole] {
+		return fmt.Errorf("OIDC roleMapping.defaultRole must be one of: admin, manager, operator, viewer (got: %q)", oidc.RoleMapping.DefaultRole)
 	}
 
 	// Warn if email scope is not included (required for access control)

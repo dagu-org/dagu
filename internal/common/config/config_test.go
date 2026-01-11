@@ -381,8 +381,11 @@ func TestConfig_Validate(t *testing.T) {
 		assert.Contains(t, err.Error(), "positive token TTL")
 	})
 
-	t.Run("BuiltinAuth_OIDC_MissingClientId", func(t *testing.T) {
+	// Tests for incomplete OIDC config - with auto-detection, missing required fields
+	// means OIDC is simply not enabled (no error). This is intentional.
+	t.Run("BuiltinAuth_OIDC_IncompleteConfig_NoError", func(t *testing.T) {
 		t.Parallel()
+		// Missing clientId - OIDC is not enabled, no error
 		cfg := &Config{
 			Server: Server{
 				Port: 8080,
@@ -393,12 +396,11 @@ func TestConfig_Validate(t *testing.T) {
 						Token: TokenConfig{Secret: "secret", TTL: 1},
 					},
 					OIDC: AuthOIDC{
-						Enabled:      true,
-						ClientId:     "",
+						ClientId:     "", // Missing
 						ClientSecret: "secret",
 						ClientUrl:    "https://example.com",
 						Issuer:       "https://issuer.com",
-						DefaultRole:  "viewer",
+						RoleMapping:  OIDCRoleMapping{DefaultRole: "viewer"},
 					},
 				},
 			},
@@ -410,107 +412,8 @@ func TestConfig_Validate(t *testing.T) {
 			},
 		}
 		err := cfg.Validate()
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "clientId")
-	})
-
-	t.Run("BuiltinAuth_OIDC_MissingClientSecret", func(t *testing.T) {
-		t.Parallel()
-		cfg := &Config{
-			Server: Server{
-				Port: 8080,
-				Auth: Auth{
-					Mode: AuthModeBuiltin,
-					Builtin: AuthBuiltin{
-						Admin: AdminConfig{Username: "admin"},
-						Token: TokenConfig{Secret: "secret", TTL: 1},
-					},
-					OIDC: AuthOIDC{
-						Enabled:      true,
-						ClientId:     "client-id",
-						ClientSecret: "",
-						ClientUrl:    "https://example.com",
-						Issuer:       "https://issuer.com",
-						DefaultRole:  "viewer",
-					},
-				},
-			},
-			Paths: PathsConfig{
-				UsersDir: "/tmp/users",
-			},
-			UI: UI{
-				MaxDashboardPageLimit: 1,
-			},
-		}
-		err := cfg.Validate()
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "clientSecret")
-	})
-
-	t.Run("BuiltinAuth_OIDC_MissingClientUrl", func(t *testing.T) {
-		t.Parallel()
-		cfg := &Config{
-			Server: Server{
-				Port: 8080,
-				Auth: Auth{
-					Mode: AuthModeBuiltin,
-					Builtin: AuthBuiltin{
-						Admin: AdminConfig{Username: "admin"},
-						Token: TokenConfig{Secret: "secret", TTL: 1},
-					},
-					OIDC: AuthOIDC{
-						Enabled:      true,
-						ClientId:     "client-id",
-						ClientSecret: "secret",
-						ClientUrl:    "",
-						Issuer:       "https://issuer.com",
-						DefaultRole:  "viewer",
-					},
-				},
-			},
-			Paths: PathsConfig{
-				UsersDir: "/tmp/users",
-			},
-			UI: UI{
-				MaxDashboardPageLimit: 1,
-			},
-		}
-		err := cfg.Validate()
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "clientUrl")
-	})
-
-	t.Run("BuiltinAuth_OIDC_MissingIssuer", func(t *testing.T) {
-		t.Parallel()
-		cfg := &Config{
-			Server: Server{
-				Port: 8080,
-				Auth: Auth{
-					Mode: AuthModeBuiltin,
-					Builtin: AuthBuiltin{
-						Admin: AdminConfig{Username: "admin"},
-						Token: TokenConfig{Secret: "secret", TTL: 1},
-					},
-					OIDC: AuthOIDC{
-						Enabled:      true,
-						ClientId:     "client-id",
-						ClientSecret: "secret",
-						ClientUrl:    "https://example.com",
-						Issuer:       "",
-						DefaultRole:  "viewer",
-					},
-				},
-			},
-			Paths: PathsConfig{
-				UsersDir: "/tmp/users",
-			},
-			UI: UI{
-				MaxDashboardPageLimit: 1,
-			},
-		}
-		err := cfg.Validate()
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "issuer")
+		require.NoError(t, err, "incomplete OIDC config should not error - OIDC is simply not enabled")
+		assert.False(t, cfg.Server.Auth.OIDC.IsConfigured(), "OIDC should not be configured")
 	})
 
 	t.Run("BuiltinAuth_OIDC_InvalidDefaultRole", func(t *testing.T) {
@@ -525,12 +428,11 @@ func TestConfig_Validate(t *testing.T) {
 						Token: TokenConfig{Secret: "secret", TTL: 1},
 					},
 					OIDC: AuthOIDC{
-						Enabled:      true,
 						ClientId:     "client-id",
 						ClientSecret: "secret",
 						ClientUrl:    "https://example.com",
 						Issuer:       "https://issuer.com",
-						DefaultRole:  "invalid-role",
+						RoleMapping:  OIDCRoleMapping{DefaultRole: "invalid-role"},
 					},
 				},
 			},
@@ -558,13 +460,12 @@ func TestConfig_Validate(t *testing.T) {
 						Token: TokenConfig{Secret: "secret", TTL: 1},
 					},
 					OIDC: AuthOIDC{
-						Enabled:      true,
 						ClientId:     "client-id",
 						ClientSecret: "secret",
 						ClientUrl:    "https://example.com",
 						Issuer:       "https://issuer.com",
-						DefaultRole:  "viewer",
 						Scopes:       []string{"openid", "profile", "email"},
+						RoleMapping:  OIDCRoleMapping{DefaultRole: "viewer"},
 					},
 				},
 			},
@@ -591,13 +492,12 @@ func TestConfig_Validate(t *testing.T) {
 						Token: TokenConfig{Secret: "secret", TTL: 1},
 					},
 					OIDC: AuthOIDC{
-						Enabled:      true,
 						ClientId:     "client-id",
 						ClientSecret: "secret",
 						ClientUrl:    "https://example.com",
 						Issuer:       "https://issuer.com",
-						DefaultRole:  "viewer",
 						Scopes:       []string{"openid", "profile"}, // No email scope
+						RoleMapping:  OIDCRoleMapping{DefaultRole: "viewer"},
 					},
 				},
 			},
@@ -628,13 +528,12 @@ func TestConfig_Validate(t *testing.T) {
 							Token: TokenConfig{Secret: "secret", TTL: 1},
 						},
 						OIDC: AuthOIDC{
-							Enabled:      true,
 							ClientId:     "client-id",
 							ClientSecret: "secret",
 							ClientUrl:    "https://example.com",
 							Issuer:       "https://issuer.com",
-							DefaultRole:  role,
 							Scopes:       []string{"openid", "email"},
+							RoleMapping:  OIDCRoleMapping{DefaultRole: role},
 						},
 					},
 				},

@@ -174,8 +174,9 @@ func TestLoad_Env(t *testing.T) {
 					ClientSecret: "test-secret",
 					Issuer:       "https://auth.example.com",
 					Scopes:       []string{"openid", "profile", "email"},
-					DefaultRole:  "viewer",
+					AutoSignup:   true, // Defaults to true
 					ButtonLabel:  "Login with SSO",
+					RoleMapping:  OIDCRoleMapping{DefaultRole: "viewer"},
 				},
 				Builtin: AuthBuiltin{
 					Admin: AdminConfig{Username: "admin"},
@@ -393,8 +394,9 @@ scheduler:
 					Issuer:       "https://accounts.example.com",
 					Scopes:       []string{"openid", "profile", "email"},
 					Whitelist:    []string{"user@example.com"},
-					DefaultRole:  "viewer",
+					AutoSignup:   true, // Defaults to true
 					ButtonLabel:  "Login with SSO",
+					RoleMapping:  OIDCRoleMapping{DefaultRole: "viewer"},
 				},
 				Builtin: AuthBuiltin{
 					Admin: AdminConfig{Username: "admin"},

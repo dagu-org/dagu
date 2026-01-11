@@ -506,7 +506,7 @@ func BuiltinOIDCCallbackHandler(cfg *BuiltinOIDCConfig) http.HandlerFunc {
 		// 1. It's a one-time redirect (not a shareable link)
 		// 2. Frontend immediately clears the URL with history.replaceState
 		// 3. Token won't appear in browser history after page load
-		redirectURL := cfg.LoginBasePath + "/login?token=" + url.QueryEscape(tokenResult.Token)
+		redirectURL := strings.TrimSuffix(cfg.LoginBasePath, "/") + "/login?token=" + url.QueryEscape(tokenResult.Token)
 		if isNewUser {
 			redirectURL += "&welcome=true"
 		}
@@ -518,6 +518,6 @@ func BuiltinOIDCCallbackHandler(cfg *BuiltinOIDCConfig) http.HandlerFunc {
 func redirectWithError(w http.ResponseWriter, r *http.Request, basePath, errMsg string) {
 	clearOIDCStateCookies(w, r)
 
-	redirectURL := basePath + "/login?error=" + url.QueryEscape(errMsg)
+	redirectURL := strings.TrimSuffix(basePath, "/") + "/login?error=" + url.QueryEscape(errMsg)
 	http.Redirect(w, r, redirectURL, http.StatusFound)
 }

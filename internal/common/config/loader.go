@@ -439,13 +439,16 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 			// Builtin-specific fields (only used when auth.mode=builtin)
 			if oidc.AutoSignup != nil {
 				cfg.Server.Auth.OIDC.AutoSignup = *oidc.AutoSignup
+			} else {
+				// Default to true - if OIDC is configured, auto-signup is expected
+				cfg.Server.Auth.OIDC.AutoSignup = true
 			}
-			cfg.Server.Auth.OIDC.DefaultRole = oidc.DefaultRole
 			cfg.Server.Auth.OIDC.AllowedDomains = oidc.AllowedDomains
 			cfg.Server.Auth.OIDC.ButtonLabel = oidc.ButtonLabel
 			// Load role mapping configuration
 			if oidc.RoleMapping != nil {
 				rm := oidc.RoleMapping
+				cfg.Server.Auth.OIDC.RoleMapping.DefaultRole = rm.DefaultRole
 				cfg.Server.Auth.OIDC.RoleMapping.GroupsClaim = rm.GroupsClaim
 				cfg.Server.Auth.OIDC.RoleMapping.GroupMappings = rm.GroupMappings
 				cfg.Server.Auth.OIDC.RoleMapping.RoleAttributePath = rm.RoleAttributePath
@@ -504,8 +507,8 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 	if len(cfg.Server.Auth.OIDC.Scopes) == 0 {
 		cfg.Server.Auth.OIDC.Scopes = []string{"openid", "profile", "email"}
 	}
-	if cfg.Server.Auth.OIDC.DefaultRole == "" {
-		cfg.Server.Auth.OIDC.DefaultRole = "viewer"
+	if cfg.Server.Auth.OIDC.RoleMapping.DefaultRole == "" {
+		cfg.Server.Auth.OIDC.RoleMapping.DefaultRole = "viewer"
 	}
 	if cfg.Server.Auth.OIDC.ButtonLabel == "" {
 		cfg.Server.Auth.OIDC.ButtonLabel = "Login with SSO"
@@ -1115,10 +1118,10 @@ var envBindings = []envBinding{
 	{key: "auth.oidc.whitelist", env: "AUTH_OIDC_WHITELIST"},
 	// Builtin-specific OIDC fields (only used when auth.mode=builtin)
 	{key: "auth.oidc.autoSignup", env: "AUTH_OIDC_AUTO_SIGNUP"},
-	{key: "auth.oidc.defaultRole", env: "AUTH_OIDC_DEFAULT_ROLE"},
 	{key: "auth.oidc.allowedDomains", env: "AUTH_OIDC_ALLOWED_DOMAINS"},
 	{key: "auth.oidc.buttonLabel", env: "AUTH_OIDC_BUTTON_LABEL"},
 	// OIDC Role Mapping configuration (builtin-specific)
+	{key: "auth.oidc.roleMapping.defaultRole", env: "AUTH_OIDC_DEFAULT_ROLE"},
 	{key: "auth.oidc.roleMapping.groupsClaim", env: "AUTH_OIDC_GROUPS_CLAIM"},
 	{key: "auth.oidc.roleMapping.groupMappings", env: "AUTH_OIDC_GROUP_MAPPINGS"},
 	{key: "auth.oidc.roleMapping.roleAttributePath", env: "AUTH_OIDC_ROLE_ATTRIBUTE_PATH"},

@@ -18,10 +18,10 @@ import { AlertCircle, LogIn, KeyRound, CheckCircle } from 'lucide-react';
  */
 export default function LoginPage() {
   const config = useConfig();
-  const { login, isAuthenticated, refreshUser } = useAuth();
+  const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -37,13 +37,11 @@ export default function LoginPage() {
     const errorParam = searchParams.get('error');
     const welcomeParam = searchParams.get('welcome');
 
-    // Handle OIDC callback token - store in localStorage and refresh auth
+    // Handle OIDC callback token - store in localStorage and navigate to home
     if (tokenParam) {
       localStorage.setItem(TOKEN_KEY, tokenParam);
-      // Clear URL params to prevent token exposure in browser history
-      setSearchParams({}, { replace: true });
-      // Trigger auth refresh to validate token and set user
-      refreshUser();
+      // Navigate to home immediately - AuthProvider will validate token on next page load
+      navigate(from, { replace: true });
       return;
     }
 
@@ -53,7 +51,7 @@ export default function LoginPage() {
     if (welcomeParam === 'true') {
       setWelcomeMessage('Welcome! Your account has been created.');
     }
-  }, [searchParams, setSearchParams, refreshUser]);
+  }, [searchParams, navigate, from]);
 
   // Redirect if already authenticated - use useEffect to avoid render-phase side effects
   useEffect(() => {
@@ -83,7 +81,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="min-h-screen flex items-center justify-center bg-muted/50">
       <div className="w-full max-w-sm p-6 space-y-6">
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-bold">{config.title || 'Dagu'}</h1>
