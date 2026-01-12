@@ -477,7 +477,10 @@ func (e *SubDAGExecutor) getStatusFromCoordinator(ctx context.Context, dagRunID 
 		return nil, fmt.Errorf("DAG run not found in coordinator")
 	}
 
-	dagRunStatus := convert.ProtoToDAGRunStatus(resp.Status)
+	dagRunStatus, convErr := convert.ProtoToDAGRunStatus(resp.Status)
+	if convErr != nil {
+		return nil, fmt.Errorf("failed to convert status: %w", convErr)
+	}
 	outputs := extractOutputsFromNodes(dagRunStatus.Nodes)
 
 	return &exec1.RunStatus{

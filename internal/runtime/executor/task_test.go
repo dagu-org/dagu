@@ -9,6 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDAG_CreateTask(t *testing.T) {
@@ -317,7 +318,8 @@ func TestTaskOption_Functions(t *testing.T) {
 
 		assert.NotNil(t, task.PreviousStatus)
 		// Verify via JSON conversion
-		s := convert.ProtoToDAGRunStatus(task.PreviousStatus)
+		s, convErr := convert.ProtoToDAGRunStatus(task.PreviousStatus)
+		require.NoError(t, convErr)
 		assert.NotNil(t, s)
 		assert.Equal(t, "test-dag", s.Name)
 		assert.Equal(t, "run-123", s.DAGRunID)

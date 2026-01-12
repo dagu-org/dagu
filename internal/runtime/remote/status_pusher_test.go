@@ -108,7 +108,8 @@ func TestPush(t *testing.T) {
 		assert.NotNil(t, capturedReq.Status)
 		assert.NotEmpty(t, capturedReq.Status.JsonData)
 		// Verify the JSON contains the expected data
-		s := convert.ProtoToDAGRunStatus(capturedReq.Status)
+		s, convErr := convert.ProtoToDAGRunStatus(capturedReq.Status)
+		require.NoError(t, convErr)
 		require.NotNil(t, s)
 		assert.Equal(t, "run-123", s.DAGRunID)
 	})
@@ -242,7 +243,8 @@ func TestPush(t *testing.T) {
 		require.NotNil(t, capturedReq.Status)
 
 		// Verify complex fields were converted via JSON
-		s := convert.ProtoToDAGRunStatus(capturedReq.Status)
+		s, convErr := convert.ProtoToDAGRunStatus(capturedReq.Status)
+		require.NoError(t, convErr)
 		require.NotNil(t, s)
 		assert.Equal(t, "complex-dag", s.Name)
 		assert.Equal(t, "attempt-1", s.AttemptID)

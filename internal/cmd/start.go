@@ -500,8 +500,8 @@ func handleDistributedCancellation(ctx context.Context, dag *core.DAG, dagRunID 
 			case <-ticker.C:
 				if resp, fetchErr := coordinatorCli.GetDAGRunStatus(cancelCtx, dag.Name, dagRunID, nil); fetchErr == nil && resp != nil && resp.Status != nil {
 					progress.Update(resp.Status)
-					dagStatus := convert.ProtoToDAGRunStatus(resp.Status)
-					if dagStatus != nil && !dagStatus.Status.IsActive() {
+					dagStatus, convErr := convert.ProtoToDAGRunStatus(resp.Status)
+					if convErr == nil && dagStatus != nil && !dagStatus.Status.IsActive() {
 						// Status is no longer running, we're done
 						return originalErr
 					}
@@ -560,8 +560,8 @@ func waitForDAGCompletionWithProgress(ctx *Context, d *core.DAG, dagRunID string
 			}
 
 			// Check status
-			dagStatus := convert.ProtoToDAGRunStatus(resp.Status)
-			if dagStatus == nil {
+			dagStatus, convErr := convert.ProtoToDAGRunStatus(resp.Status)
+			if convErr != nil || dagStatus == nil {
 				continue
 			}
 			if !dagStatus.Status.IsActive() {

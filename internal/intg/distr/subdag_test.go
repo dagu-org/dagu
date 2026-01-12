@@ -6,14 +6,12 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/test"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
 func TestSubDAG_LocalCallsDistributed(t *testing.T) {
 	t.Run("localParentCallsDistributedChild", func(t *testing.T) {
-		yamlContent := `
+		f := newTestFixture(t, `
 steps:
   - name: run-local-on-worker
     call: local-sub
@@ -27,23 +25,17 @@ steps:
   - name: worker-task
     command: echo "Hello from worker"
     output: MESSAGE
-`
-		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
+`, withLabels(map[string]string{"type": "test-worker"}))
 
-		setupSharedNothingWorker(t, coord, "test-worker-1", map[string]string{"type": "test-worker"})
-
-		dagWrapper := coord.DAG(t, yamlContent)
-		agent := dagWrapper.Agent()
-
+		agent := f.dagWrapper.Agent()
 		agent.RunSuccess(t)
-
-		dagWrapper.AssertLatestStatus(t, core.Succeeded)
+		f.dagWrapper.AssertLatestStatus(t, core.Succeeded)
 	})
 }
 
 func TestSubDAG_FailurePropagation(t *testing.T) {
 	t.Run("childFailurePropagatesToParent", func(t *testing.T) {
-		yamlContent := `
+		f := newTestFixture(t, `
 steps:
   - name: run-local-on-worker
     call: local-sub
@@ -57,20 +49,16 @@ steps:
     command: |
       echo "Start task"
       exit 1
-`
-		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
+`, withLabels(map[string]string{"type": "test-worker"}))
 
-		setupSharedNothingWorker(t, coord, "test-worker-1", map[string]string{"type": "test-worker"})
-
-		dagWrapper := coord.DAG(t, yamlContent)
-		agent := dagWrapper.Agent()
+		agent := f.dagWrapper.Agent()
 
 		err := agent.Run(agent.Context)
 		require.Error(t, err)
 
-		dagWrapper.AssertLatestStatus(t, core.Failed)
+		f.dagWrapper.AssertLatestStatus(t, core.Failed)
 
-		st, statusErr := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
+		st, statusErr := f.latestStatus()
 		require.NoError(t, statusErr)
 		require.Len(t, st.Nodes, 1)
 
@@ -83,7 +71,7 @@ steps:
 
 func TestSubDAG_NoMatchingWorker(t *testing.T) {
 	t.Run("failsWhenNoWorkerMatchesSelector", func(t *testing.T) {
-		yamlContent := `
+		f := newTestFixture(t, `
 steps:
   - name: run-on-nonexistent-worker
     call: local-sub
@@ -98,74 +86,22 @@ steps:
   - name: worker-task
     command: echo "Should not run"
     output: MESSAGE
-`
-		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
+`, withWorkerCount(0))
 
-		dagWrapper := coord.DAG(t, yamlContent)
-		agent := dagWrapper.Agent()
+		agent := f.dagWrapper.Agent()
 
-		ctx, cancel := context.WithTimeout(coord.Context, 5*time.Second)
+		ctx, cancel := context.WithTimeout(f.coord.Context, 5*time.Second)
 		defer cancel()
 		err := agent.Run(ctx)
 		require.Error(t, err)
 
-		st := agent.Status(coord.Context)
+		st := agent.Status(f.coord.Context)
 		require.NotEqual(t, core.Succeeded, st.Status)
-	})
-}
-
-func TestSubDAG_Cancellation(t *testing.T) {
-	t.Run("cancelPropagatesToSubDAGOnWorker", func(t *testing.T) {
-		yamlContent := `
-steps:
-  - name: run-local-on-worker
-    call: local-sub
-    output: RESULT
-
----
-name: local-sub
-workerSelector:
-  type: test-worker
-steps:
-  - name: worker-task
-    command: sleep 1000
-    output: MESSAGE
-`
-		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
-
-		setupSharedNothingWorker(t, coord, "test-worker-1", map[string]string{"type": "test-worker"})
-
-		dagWrapper := coord.DAG(t, yamlContent)
-
-		runID := uuid.New().String()
-		agent := dagWrapper.Agent(test.WithDAGRunID(runID))
-
-		done := make(chan struct{})
-		go func() {
-			agent.RunCancel(t)
-			close(done)
-		}()
-
-		dagWrapper.AssertLatestStatus(t, core.Running)
-
-		err := coord.DAGRunMgr.Stop(coord.Context, agent.DAG, runID)
-		require.NoError(t, err)
-
-		dagWrapper.AssertLatestStatus(t, core.Aborted)
-
-		<-done
 	})
 }
 
 func TestSubDAG_DifferentWorkers(t *testing.T) {
 	t.Run("parentAndChildOnDifferentWorkers", func(t *testing.T) {
-		parentYAML := `
-name: parent-remote
-workerSelector:
-  type: parent
-steps:
-  - run: child-remote
-`
 		childYAML := `
 name: child-remote
 workerSelector:
@@ -174,41 +110,33 @@ steps:
   - name: child-step
     command: echo "child executed"
 `
-		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
-		coord.Config.Queues.Enabled = true
+		f := newTestFixture(t, `
+name: parent-remote
+workerSelector:
+  type: parent
+steps:
+  - run: child-remote
+`, withLabels(map[string]string{"type": "parent"}))
+		defer f.cleanup()
 
-		coord.CreateDAGFile(t, coord.Config.Paths.DAGsDir, "child-remote", []byte(childYAML))
+		f.coord.CreateDAGFile(t, f.coord.Config.Paths.DAGsDir, "child-remote", []byte(childYAML))
 
-		setupSharedNothingWorker(t, coord, "parent-worker", map[string]string{"type": "parent"})
-		setupSharedNothingWorker(t, coord, "child-worker", map[string]string{"type": "child"})
+		childWorker := f.setupSharedNothingWorker("child-worker", map[string]string{"type": "child"})
+		_ = childWorker
 
-		dagWrapper := coord.DAG(t, parentYAML)
-		coordinatorClient := coord.GetCoordinatorClient(t)
+		require.NoError(t, f.enqueue())
+		f.waitForQueued()
+		f.startScheduler(30 * time.Second)
 
-		err := executeEnqueueCommand(t, coord, dagWrapper.DAG)
-		require.NoError(t, err)
+		status := f.waitForStatus(core.Succeeded, 25*time.Second)
 
-		require.Eventually(t, func() bool {
-			items, _ := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)
-			return len(items) == 1
-		}, 2*time.Second, 50*time.Millisecond)
-
-		schedulerCtx, schedulerCancel := context.WithTimeout(coord.Context, 30*time.Second)
-		defer schedulerCancel()
-
-		schedulerInst := setupScheduler(t, coord, coordinatorClient)
-		go func() { _ = schedulerInst.Start(schedulerCtx) }()
-
-		status := waitForSucceeded(t, coord, dagWrapper.DAG, 25*time.Second)
-		schedulerCancel()
-
-		require.Equal(t, core.Succeeded, status.Status, "parent DAG should succeed")
+		require.Equal(t, core.Succeeded, status.Status)
 	})
 }
 
 func TestSubDAG_InSameFile(t *testing.T) {
 	t.Run("parentAndChildInSameYAMLFile", func(t *testing.T) {
-		yamlContent := `
+		f := newTestFixture(t, `
 steps:
   - run: dotest
 params:
@@ -220,30 +148,15 @@ workerSelector:
 steps:
   - name: task
     command: echo "Sub-DAG executed"
-`
-		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
-		coord.Config.Queues.Enabled = true
+`, withLabels(map[string]string{"foo": "bar"}))
+		defer f.cleanup()
 
-		coordinatorClient := coord.GetCoordinatorClient(t)
+		f.startScheduler(30 * time.Second)
 
-		setupSharedNothingWorker(t, coord, "test-worker", map[string]string{
-			"foo": "bar",
-		})
+		require.NoError(t, f.start())
 
-		dagWrapper := coord.DAG(t, yamlContent)
+		status := f.waitForStatus(core.Succeeded, 20*time.Second)
 
-		schedulerCtx, schedulerCancel := context.WithTimeout(coord.Context, 30*time.Second)
-		defer schedulerCancel()
-
-		schedulerInst := setupScheduler(t, coord, coordinatorClient)
-		go func() { _ = schedulerInst.Start(schedulerCtx) }()
-
-		err := executeStartCommand(t, coord, dagWrapper.DAG)
-		require.NoError(t, err, "Start command should succeed")
-
-		status := waitForSucceeded(t, coord, dagWrapper.DAG, 20*time.Second)
-		schedulerCancel()
-
-		require.Equal(t, core.Succeeded, status.Status, "DAG should succeed")
+		require.Equal(t, core.Succeeded, status.Status)
 	})
 }

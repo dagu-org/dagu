@@ -118,7 +118,11 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 	var status *exec.DAGRunStatus
 	if task.PreviousStatus != nil {
 		// Shared-nothing mode: status is provided in the task
-		status = convert.ProtoToDAGRunStatus(task.PreviousStatus)
+		var convErr error
+		status, convErr = convert.ProtoToDAGRunStatus(task.PreviousStatus)
+		if convErr != nil {
+			return fmt.Errorf("failed to convert previous status: %w", convErr)
+		}
 		logger.Info(ctx, "Using previous status from task for retry",
 			tag.RunID(task.DagRunId),
 			slog.Int("nodes", len(status.Nodes)))

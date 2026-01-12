@@ -13,7 +13,8 @@ import (
 
 func TestDAGRunStatusToProto(t *testing.T) {
 	t.Run("nil status", func(t *testing.T) {
-		result := DAGRunStatusToProto(nil)
+		result, err := DAGRunStatusToProto(nil)
+		require.NoError(t, err)
 		assert.Nil(t, result)
 	})
 
@@ -24,7 +25,8 @@ func TestDAGRunStatusToProto(t *testing.T) {
 			Status:   core.Running,
 		}
 
-		result := DAGRunStatusToProto(status)
+		result, err := DAGRunStatusToProto(status)
+		require.NoError(t, err)
 		require.NotNil(t, result)
 		assert.NotEmpty(t, result.JsonData)
 	})
@@ -32,14 +34,24 @@ func TestDAGRunStatusToProto(t *testing.T) {
 
 func TestProtoToDAGRunStatus(t *testing.T) {
 	t.Run("nil proto", func(t *testing.T) {
-		result := ProtoToDAGRunStatus(nil)
+		result, err := ProtoToDAGRunStatus(nil)
+		require.NoError(t, err)
 		assert.Nil(t, result)
 	})
 
 	t.Run("empty json_data", func(t *testing.T) {
 		proto := &coordinatorv1.DAGRunStatusProto{JsonData: ""}
-		result := ProtoToDAGRunStatus(proto)
+		result, err := ProtoToDAGRunStatus(proto)
+		require.NoError(t, err)
 		assert.Nil(t, result)
+	})
+
+	t.Run("invalid json_data", func(t *testing.T) {
+		proto := &coordinatorv1.DAGRunStatusProto{JsonData: "not valid json"}
+		result, err := ProtoToDAGRunStatus(proto)
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "failed to unmarshal")
 	})
 }
 
@@ -98,8 +110,10 @@ func TestRoundTrip(t *testing.T) {
 		}
 
 		// Convert to proto and back
-		proto := DAGRunStatusToProto(original)
-		result := ProtoToDAGRunStatus(proto)
+		proto, err := DAGRunStatusToProto(original)
+		require.NoError(t, err)
+		result, err := ProtoToDAGRunStatus(proto)
+		require.NoError(t, err)
 
 		// Verify all fields are preserved
 		require.NotNil(t, result)

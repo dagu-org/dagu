@@ -1,4 +1,4 @@
-import { Calendar, Terminal, Timer, RefreshCw } from 'lucide-react';
+import { Calendar, Server, Terminal, Timer, RefreshCw } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { components, Status } from '../../../../api/v2/schema';
@@ -219,6 +219,15 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
                 )}
               </span>
             </div>
+
+            {dagRunToDisplay.workerId && (
+              <div className="flex items-center gap-1.5 text-foreground bg-accent rounded-md px-2 py-1 border">
+                <Server className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="font-medium text-xs font-mono">
+                  {dagRunToDisplay.workerId}
+                </span>
+              </div>
+            )}
 
             <div className="flex items-center gap-1.5 text-muted-foreground">
               <span className="font-medium text-xs uppercase tracking-wide">Run ID</span>

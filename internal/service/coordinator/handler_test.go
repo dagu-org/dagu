@@ -830,12 +830,15 @@ func TestHandler_ReportStatus(t *testing.T) {
 		})
 
 		// Report status
+		protoStatus, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: "run-123",
+			Status:   core.Running,
+		})
+		require.NoError(t, convErr)
+
 		req := &coordinatorv1.ReportStatusRequest{
-			Status: convert.DAGRunStatusToProto(&exec.DAGRunStatus{
-				Name:     "test-dag",
-				DAGRunID: "run-123",
-				Status:   core.Running,
-			}),
+			Status: protoStatus,
 		}
 
 		resp, err := h.ReportStatus(ctx, req)
@@ -868,12 +871,15 @@ func TestHandler_ReportStatus(t *testing.T) {
 		h := NewHandler() // No dagRunStore
 		ctx := context.Background()
 
+		protoStatus, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: "run-123",
+			Status:   core.Running,
+		})
+		require.NoError(t, convErr)
+
 		req := &coordinatorv1.ReportStatusRequest{
-			Status: convert.DAGRunStatusToProto(&exec.DAGRunStatus{
-				Name:     "test-dag",
-				DAGRunID: "run-123",
-				Status:   core.Running,
-			}),
+			Status: protoStatus,
 		}
 
 		_, err := h.ReportStatus(ctx, req)

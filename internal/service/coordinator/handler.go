@@ -487,7 +487,10 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 	}
 
 	// Convert proto to execution.DAGRunStatus
-	dagRunStatus := convert.ProtoToDAGRunStatus(req.Status)
+	dagRunStatus, convErr := convert.ProtoToDAGRunStatus(req.Status)
+	if convErr != nil {
+		return nil, status.Error(codes.InvalidArgument, "failed to convert status: "+convErr.Error())
+	}
 
 	// Transform worker-local log paths to coordinator paths (shared-nothing mode)
 	h.transformLogPaths(dagRunStatus)
@@ -727,9 +730,17 @@ func (h *Handler) GetDAGRunStatus(ctx context.Context, req *coordinatorv1.GetDAG
 		}, nil
 	}
 
+	protoStatus, convErr := convert.DAGRunStatusToProto(runStatus)
+	if convErr != nil {
+		return &coordinatorv1.GetDAGRunStatusResponse{
+			Found: false,
+			Error: fmt.Sprintf("failed to convert status: %v", convErr),
+		}, nil
+	}
+
 	return &coordinatorv1.GetDAGRunStatusResponse{
 		Found:  true,
-		Status: convert.DAGRunStatusToProto(runStatus),
+		Status: protoStatus,
 	}, nil
 }
 

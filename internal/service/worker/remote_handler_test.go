@@ -967,11 +967,12 @@ steps:
 		}
 
 		// Create a previous status proto
-		previousStatus := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+		previousStatus, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
 			Name:   "retry-dag",
 			Status: core.Succeeded,
 			Nodes:  []*exec.Node{},
 		})
+		require.NoError(t, convErr)
 
 		task := &coordinatorv1.Task{
 			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
@@ -1294,11 +1295,12 @@ steps:
 	err := os.WriteFile(dagFile, []byte(dagContent), 0644)
 	require.NoError(t, err)
 
-	previousStatus := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+	previousStatus, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
 		Name:   "exec-retry-dag",
 		Status: core.Succeeded,
 		Nodes:  []*exec.Node{},
 	})
+	require.NoError(t, convErr)
 
 	handler := &remoteTaskHandler{
 		workerID:          "test-worker",
@@ -1352,11 +1354,12 @@ func TestHandleRetry_LoadDAGErrorPath(t *testing.T) {
 	t.Parallel()
 
 	// Test the path where handleRetry fails at loadDAG after getting status
-	previousStatus := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+	previousStatus, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
 		Name:   "loaddag-error-dag",
 		Status: core.Succeeded,
 		Nodes:  []*exec.Node{},
 	})
+	require.NoError(t, convErr)
 
 	handler := &remoteTaskHandler{
 		workerID:          "test-worker",
@@ -1388,11 +1391,12 @@ func TestHandleRetry_WithDefinitionAndCleanup(t *testing.T) {
 	t.Parallel()
 
 	// Test handleRetry with inline definition to trigger cleanup path
-	previousStatus := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+	previousStatus, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
 		Name:   "def-cleanup-dag",
 		Status: core.Succeeded,
 		Nodes:  []*exec.Node{},
 	})
+	require.NoError(t, convErr)
 
 	handler := &remoteTaskHandler{
 		workerID:          "test-worker",

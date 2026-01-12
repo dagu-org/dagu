@@ -1,6 +1,8 @@
 package executor
 
 import (
+	"log/slog"
+
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/proto/convert"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -83,7 +85,12 @@ func WithStep(step string) TaskOption {
 func WithPreviousStatus(status *exec.DAGRunStatus) TaskOption {
 	return func(task *coordinatorv1.Task) {
 		if status != nil {
-			task.PreviousStatus = convert.DAGRunStatusToProto(status)
+			protoStatus, err := convert.DAGRunStatusToProto(status)
+			if err != nil {
+				slog.Error("failed to convert previous status to proto", "error", err)
+				return
+			}
+			task.PreviousStatus = protoStatus
 		}
 	}
 }

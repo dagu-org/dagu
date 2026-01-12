@@ -96,7 +96,10 @@ func (p *RemoteProgressDisplay) Update(protoStatus *coordinatorv1.DAGRunStatusPr
 	defer p.mu.Unlock()
 
 	// Convert proto to execution status
-	status := convert.ProtoToDAGRunStatus(protoStatus)
+	status, err := convert.ProtoToDAGRunStatus(protoStatus)
+	if err != nil || status == nil {
+		return
+	}
 	p.lastStatus = status
 
 	// Capture worker ID if available and update header

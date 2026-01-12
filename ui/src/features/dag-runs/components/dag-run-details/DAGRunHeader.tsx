@@ -1,4 +1,4 @@
-import { Calendar, Terminal, Timer, RefreshCw } from 'lucide-react';
+import { Calendar, Server, Terminal, Timer, RefreshCw } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { components, Status } from '../../../../api/v2/schema';
@@ -178,6 +178,15 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
                     : '--'}
               </span>
             </div>
+
+            {dagRun.workerId && (
+              <div className="flex items-center gap-2 text-foreground bg-accent rounded-md px-3 py-1.5 border">
+                <Server className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium text-xs font-mono">
+                  {dagRun.workerId}
+                </span>
+              </div>
+            )}
 
             <div className="flex items-center gap-2 text-muted-foreground ml-auto">
               <span className="font-medium text-xs text-muted-foreground uppercase tracking-wide">

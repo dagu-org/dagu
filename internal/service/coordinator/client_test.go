@@ -277,13 +277,16 @@ func TestClientReportStatus(t *testing.T) {
 
 		client := coordinator.New(monitor, config)
 
+		protoStatus, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+			DAGRunID:  "test-run-123",
+			Status:    1, // Running status
+			StartedAt: "2024-01-01T00:00:00Z",
+		})
+		require.NoError(t, convErr)
+
 		req := &coordinatorv1.ReportStatusRequest{
 			WorkerId: "test-worker",
-			Status: convert.DAGRunStatusToProto(&exec.DAGRunStatus{
-				DAGRunID:  "test-run-123",
-				Status:    1, // Running status
-				StartedAt: "2024-01-01T00:00:00Z",
-			}),
+			Status:   protoStatus,
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
@@ -298,7 +301,8 @@ func TestClientReportStatus(t *testing.T) {
 		assert.Equal(t, "test-worker", receivedReq.WorkerId)
 		require.NotNil(t, receivedReq.Status)
 		// Verify via JSON conversion
-		s := convert.ProtoToDAGRunStatus(receivedReq.Status)
+		s, convErr := convert.ProtoToDAGRunStatus(receivedReq.Status)
+		require.NoError(t, convErr)
 		require.NotNil(t, s)
 		assert.Equal(t, "test-run-123", s.DAGRunID)
 	})
@@ -325,12 +329,15 @@ func TestClientReportStatus(t *testing.T) {
 
 		client := coordinator.New(monitor, config)
 
+		protoStatus, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+			DAGRunID: "test-run-456",
+			Status:   2, // Success status
+		})
+		require.NoError(t, convErr)
+
 		req := &coordinatorv1.ReportStatusRequest{
 			WorkerId: "test-worker",
-			Status: convert.DAGRunStatusToProto(&exec.DAGRunStatus{
-				DAGRunID: "test-run-456",
-				Status:   2, // Success status
-			}),
+			Status:   protoStatus,
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
@@ -365,12 +372,15 @@ func TestClientReportStatus(t *testing.T) {
 
 		client := coordinator.New(monitor, config)
 
+		protoStatus, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+			DAGRunID: "test-run-789",
+			Status:   3, // Failed status
+		})
+		require.NoError(t, convErr)
+
 		req := &coordinatorv1.ReportStatusRequest{
 			WorkerId: "test-worker",
-			Status: convert.DAGRunStatusToProto(&exec.DAGRunStatus{
-				DAGRunID: "test-run-789",
-				Status:   3, // Failed status
-			}),
+			Status:   protoStatus,
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
