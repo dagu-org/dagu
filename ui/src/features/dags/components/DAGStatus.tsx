@@ -365,7 +365,6 @@ function DAGStatus({ dagRun, fileName }: Props) {
                   <div className="bg-surface border border-border rounded-lg p-4">
                     <DAGStatusOverview
                       status={dagRun}
-                      fileName={fileName}
                       onViewLog={(dagRunId) => {
                         setLogViewer({
                           isOpen: true,

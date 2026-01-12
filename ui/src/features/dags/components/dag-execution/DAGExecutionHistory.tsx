@@ -354,8 +354,6 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
               <div className="bg-surface border border-border rounded-lg p-4">
                 <DAGStatusOverview
                   status={reversedDAGRuns[idx]}
-                  dagRunId={reversedDAGRuns[idx].dagRunId}
-                  {...props}
                   onViewLog={(dagRunId) => {
                     setLogViewer({
                       isOpen: true,
