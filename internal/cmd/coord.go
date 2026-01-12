@@ -21,6 +21,11 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
+// grpcMaxMsgSize is the maximum message size for gRPC calls.
+// Default gRPC limit is 4 MB; we increase to 16 MB to handle large status
+// payloads that include LLM conversation messages in shared-nothing mode.
+const grpcMaxMsgSize = 16 * 1024 * 1024
+
 func CmdCoordinator() *cobra.Command {
 	return NewCommand(
 		&cobra.Command{
@@ -156,11 +161,9 @@ func newCoordinator(ctx context.Context, cfg *config.Config, registry exec.Servi
 	// Create gRPC server options
 	var serverOpts []grpc.ServerOption
 
-	// Add message size limits for large status payloads (includes chat messages)
-	// Default gRPC limit is 4 MB; we increase to 16 MB to handle LLM conversations
 	serverOpts = append(serverOpts,
-		grpc.MaxRecvMsgSize(16*1024*1024), // 16 MB receive
-		grpc.MaxSendMsgSize(16*1024*1024), // 16 MB send
+		grpc.MaxRecvMsgSize(grpcMaxMsgSize),
+		grpc.MaxSendMsgSize(grpcMaxMsgSize),
 	)
 
 	// Configure TLS using global peer config
