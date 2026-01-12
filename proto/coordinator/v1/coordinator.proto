@@ -74,6 +74,8 @@ message Task {
   // Previous status for OPERATION_RETRY in shared-nothing mode.
   // When set, workers can retry without needing local DAGRunStore access.
   DAGRunStatusProto previous_status = 13;
+  // Attempt ID created by coordinator. Workers use this to create attempts with the same ID.
+  string attempt_id = 14;
 }
 
 enum Operation {

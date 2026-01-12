@@ -84,10 +84,15 @@ func NewDAGRun(dir string) (*DAGRun, error) {
 
 // CreateAttempt creates a new Attempt for the dag-run with the given timestamp.
 // It creates a new Attempt directory and initializes a record within it.
-func (dr DAGRun) CreateAttempt(_ context.Context, ts execution.TimeInUTC, cache *fileutil.Cache[*execution.DAGRunStatus], opts ...AttemptOption) (*Attempt, error) {
-	attID, err := genAttemptID()
-	if err != nil {
-		return nil, err
+// If attemptID is provided, it uses that ID instead of generating a new one.
+func (dr DAGRun) CreateAttempt(_ context.Context, ts execution.TimeInUTC, cache *fileutil.Cache[*execution.DAGRunStatus], attemptID string, opts ...AttemptOption) (*Attempt, error) {
+	attID := attemptID
+	if attID == "" {
+		var err error
+		attID, err = genAttemptID()
+		if err != nil {
+			return nil, err
+		}
 	}
 	dir := filepath.Join(dr.baseDir, AttemptDirPrefix+formatAttemptTimestamp(ts)+"_"+attID)
 	// Error if the directory already exists

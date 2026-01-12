@@ -382,8 +382,10 @@ type Task struct {
 	// Previous status for OPERATION_RETRY in shared-nothing mode.
 	// When set, workers can retry without needing local DAGRunStore access.
 	PreviousStatus *DAGRunStatusProto `protobuf:"bytes,13,opt,name=previous_status,json=previousStatus,proto3" json:"previous_status,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Attempt ID created by coordinator. Workers use this to create attempts with the same ID.
+	AttemptId     string `protobuf:"bytes,14,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Task) Reset() {
@@ -505,6 +507,13 @@ func (x *Task) GetPreviousStatus() *DAGRunStatusProto {
 		return x.PreviousStatus
 	}
 	return nil
+}
+
+func (x *Task) GetAttemptId() string {
+	if x != nil {
+		return x.AttemptId
+	}
+	return ""
 }
 
 // Request message for getting workers.
@@ -1571,7 +1580,7 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\";\n" +
 	"\x0fDispatchRequest\x12(\n" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\"\x12\n" +
-	"\x10DispatchResponse\"\xec\x04\n" +
+	"\x10DispatchResponse\"\x8b\x05\n" +
 	"\x04Task\x127\n" +
 	"\toperation\x18\x06 \x01(\x0e2\x19.coordinator.v1.OperationR\toperation\x12)\n" +
 	"\x11root_dag_run_name\x18\x01 \x01(\tR\x0erootDagRunName\x12%\n" +
@@ -1589,7 +1598,9 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"definition\x18\v \x01(\tR\n" +
 	"definition\x12\x1b\n" +
 	"\tworker_id\x18\f \x01(\tR\bworkerId\x12J\n" +
-	"\x0fprevious_status\x18\r \x01(\v2!.coordinator.v1.DAGRunStatusProtoR\x0epreviousStatus\x1aA\n" +
+	"\x0fprevious_status\x18\r \x01(\v2!.coordinator.v1.DAGRunStatusProtoR\x0epreviousStatus\x12\x1d\n" +
+	"\n" +
+	"attempt_id\x18\x0e \x01(\tR\tattemptId\x1aA\n" +
 	"\x13WorkerSelectorEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x13\n" +

@@ -279,6 +279,9 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 		return fmt.Errorf("failed to create attempt: %w", err)
 	}
 
+	// Set the attempt ID in the task so workers can use the same ID
+	task.AttemptId = attempt.ID()
+
 	// Open the attempt for writing
 	if err := attempt.Open(ctx); err != nil {
 		return fmt.Errorf("failed to open attempt: %w", err)
@@ -292,6 +295,7 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 	logger.Info(ctx, "Created DAGRun attempt for dispatched task",
 		tag.RunID(task.DagRunId),
 		tag.Target(task.Target),
+		slog.String("attempt-id", task.AttemptId),
 	)
 
 	return nil

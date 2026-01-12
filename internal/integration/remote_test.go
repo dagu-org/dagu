@@ -427,7 +427,7 @@ steps:
 				return true
 			}
 			return false
-		}, 10*time.Second, 200*time.Millisecond, "DAG should start running")
+		}, 10*time.Second, 1000*time.Millisecond, "DAG should start running")
 
 		// Send cancellation signal
 		t.Log("Sending cancellation signal...")

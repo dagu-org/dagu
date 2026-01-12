@@ -13,6 +13,10 @@ type NewDAGRunAttemptOptions struct {
 	RootDAGRun *DAGRunRef
 	// Retry indicates whether this is a retry of a previous run.
 	Retry bool
+	// AttemptID is an optional attempt ID. If set, this ID is used instead of generating a new one.
+	// This is used when the coordinator has already created an attempt and wants the worker
+	// to use the same ID for consistency.
+	AttemptID string
 }
 
 // DAGRunAttempt represents a single execution of a dag-run to record the status and execution details.

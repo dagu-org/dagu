@@ -156,7 +156,7 @@ func TestDataRootRemoveOld(t *testing.T) {
 
 		// Create actual attempts with status data using old timestamps
 		createAttemptWithStatus := func(dagRunTest DAGRunTest, ts time.Time) *Attempt {
-			attempt, err := dagRunTest.CreateAttempt(root.Context, execution.NewUTC(ts), nil)
+			attempt, err := dagRunTest.CreateAttempt(root.Context, execution.NewUTC(ts), nil, "")
 			require.NoError(t, err)
 			require.NoError(t, attempt.Open(root.Context))
 			status := execution.DAGRunStatus{
@@ -203,7 +203,7 @@ func TestDataRootRemoveOld(t *testing.T) {
 
 		// Create actual attempts with status data
 		createAttemptWithStatus := func(dagRunTest DAGRunTest, ts time.Time) *Attempt {
-			attempt, err := dagRunTest.CreateAttempt(root.Context, execution.NewUTC(ts), nil)
+			attempt, err := dagRunTest.CreateAttempt(root.Context, execution.NewUTC(ts), nil, "")
 			require.NoError(t, err)
 			require.NoError(t, attempt.Open(root.Context))
 			status := execution.DAGRunStatus{
@@ -250,7 +250,7 @@ func TestDataRootRemoveOld(t *testing.T) {
 
 		// Create actual attempts with status data
 		createAttemptWithStatus := func(dagRunTest DAGRunTest, ts time.Time) *Attempt {
-			attempt, err := dagRunTest.CreateAttempt(root.Context, execution.NewUTC(ts), nil)
+			attempt, err := dagRunTest.CreateAttempt(root.Context, execution.NewUTC(ts), nil, "")
 			require.NoError(t, err)
 			require.NoError(t, attempt.Open(root.Context))
 			status := execution.DAGRunStatus{
@@ -300,7 +300,7 @@ func TestDataRootRemoveOld(t *testing.T) {
 
 		// Create attempts with different statuses
 		createAttemptWithStatusType := func(dagRunTest DAGRunTest, ts time.Time, status core.Status) *Attempt {
-			attempt, err := dagRunTest.CreateAttempt(root.Context, execution.NewUTC(ts), nil)
+			attempt, err := dagRunTest.CreateAttempt(root.Context, execution.NewUTC(ts), nil, "")
 			require.NoError(t, err)
 			require.NoError(t, attempt.Open(root.Context))
 			dagStatus := execution.DAGRunStatus{

@@ -1080,17 +1080,17 @@ steps:
 	require.NotContains(t, err.Error(), "unsupported operation")
 }
 
-func TestHandle_OperationRetryWithoutStep(t *testing.T) {
+func TestHandle_OperationRetryWithoutStatusSource(t *testing.T) {
 	t.Parallel()
 
-	// When OPERATION_RETRY is used without PreviousStatus (queue dispatch),
-	// it should call handleStart with queuedRun=true for a fresh start.
+	// OPERATION_RETRY requires either previous_status in the task (shared-nothing mode)
+	// or a local dagRunStore. Without either, handleRetry returns an error.
 	tempDir := t.TempDir()
-	dagFile := filepath.Join(tempDir, "queued.yaml")
-	dagContent := `name: queued-dag
+	dagFile := filepath.Join(tempDir, "retry.yaml")
+	dagContent := `name: retry-dag
 steps:
   - name: step1
-    command: echo queued
+    command: echo retry
 `
 	err := os.WriteFile(dagFile, []byte(dagContent), 0644)
 	require.NoError(t, err)
@@ -1098,6 +1098,7 @@ steps:
 	handler := &remoteTaskHandler{
 		workerID:          "test-worker",
 		coordinatorClient: newMockRemoteCoordinatorClient(),
+		dagRunStore:       nil, // No local store
 		config: &config.Config{
 			Paths: config.PathsConfig{
 				DAGsDir: tempDir,
@@ -1109,18 +1110,16 @@ steps:
 		Operation:      coordinatorv1.Operation_OPERATION_RETRY,
 		Step:           "", // No step
 		Target:         dagFile,
-		DagRunId:       "run-queued-1",
+		DagRunId:       "run-retry-1",
 		RootDagRunName: "root",
 		RootDagRunId:   "root-1",
-		PreviousStatus: nil, // No PreviousStatus = queue dispatch path
+		PreviousStatus: nil, // No PreviousStatus either
 	}
 
-	// This will fail at agent creation, but proves the queuedRun path is taken
+	// Without either status source, retry should fail with a clear error
 	err = handler.Handle(context.Background(), task)
 	require.Error(t, err)
-	// The error should be from execution, not unsupported operation or "retry requires"
-	require.NotContains(t, err.Error(), "unsupported operation")
-	require.NotContains(t, err.Error(), "retry requires")
+	require.Contains(t, err.Error(), "retry requires either previous_status in task or local dagRunStore")
 }
 
 func TestHandle_OperationRetryWithStep(t *testing.T) {
@@ -1152,86 +1151,6 @@ func TestHandle_OperationRetryWithStep(t *testing.T) {
 	require.Error(t, err)
 	// Should fail with "retry requires" error from handleRetry
 	require.Contains(t, err.Error(), "retry requires either previous_status")
-}
-
-func TestIsQueueDispatch(t *testing.T) {
-	t.Parallel()
-
-	handler := &remoteTaskHandler{}
-
-	t.Run("NoPreviousStatusNoStep_IsQueueDispatch", func(t *testing.T) {
-		t.Parallel()
-		task := &coordinatorv1.Task{
-			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
-			Step:           "",
-			PreviousStatus: nil,
-		}
-		assert.True(t, handler.isQueueDispatch(task), "nil PreviousStatus with no Step should be queue dispatch")
-	})
-
-	t.Run("QueuedStatusNoStep_IsQueueDispatch", func(t *testing.T) {
-		t.Parallel()
-		task := &coordinatorv1.Task{
-			Operation: coordinatorv1.Operation_OPERATION_RETRY,
-			Step:      "",
-			PreviousStatus: convert.DAGRunStatusToProto(&execution.DAGRunStatus{
-				Status: core.Queued,
-				Nodes:  []*execution.Node{},
-			}),
-		}
-		assert.True(t, handler.isQueueDispatch(task), "Queued status should be queue dispatch")
-	})
-
-	t.Run("FailedStatusNoStep_IsActualRetry", func(t *testing.T) {
-		t.Parallel()
-		task := &coordinatorv1.Task{
-			Operation: coordinatorv1.Operation_OPERATION_RETRY,
-			Step:      "",
-			PreviousStatus: convert.DAGRunStatusToProto(&execution.DAGRunStatus{
-				Status: core.Failed,
-				Nodes: []*execution.Node{
-					{Step: core.Step{Name: "step1"}, Status: core.NodeSucceeded},
-					{Step: core.Step{Name: "step2"}, Status: core.NodeFailed},
-				},
-			}),
-		}
-		assert.False(t, handler.isQueueDispatch(task), "Failed status should be actual retry")
-	})
-
-	t.Run("SucceededStatusNoStep_IsActualRetry", func(t *testing.T) {
-		t.Parallel()
-		task := &coordinatorv1.Task{
-			Operation: coordinatorv1.Operation_OPERATION_RETRY,
-			Step:      "",
-			PreviousStatus: convert.DAGRunStatusToProto(&execution.DAGRunStatus{
-				Status: core.Succeeded,
-				Nodes:  []*execution.Node{},
-			}),
-		}
-		assert.False(t, handler.isQueueDispatch(task), "Succeeded status should be actual retry")
-	})
-
-	t.Run("WithStepAndNilStatus_IsActualRetry", func(t *testing.T) {
-		t.Parallel()
-		task := &coordinatorv1.Task{
-			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
-			Step:           "step1", // Step is set
-			PreviousStatus: nil,
-		}
-		assert.False(t, handler.isQueueDispatch(task), "Step set should be actual retry")
-	})
-
-	t.Run("WithStepAndQueuedStatus_IsActualRetry", func(t *testing.T) {
-		t.Parallel()
-		task := &coordinatorv1.Task{
-			Operation: coordinatorv1.Operation_OPERATION_RETRY,
-			Step:      "step1", // Step is set
-			PreviousStatus: convert.DAGRunStatusToProto(&execution.DAGRunStatus{
-				Status: core.Queued,
-			}),
-		}
-		assert.False(t, handler.isQueueDispatch(task), "Step set should override status check")
-	})
 }
 
 func TestHandleRetry_LocalStoreMode(t *testing.T) {
@@ -1622,7 +1541,7 @@ steps:
 	statusPusher, logStreamer := handler.createRemoteHandlers("run-error", dag.Name, root)
 
 	// Call executeDAGRun directly - should fail at createAgentEnv
-	err = handler.executeDAGRun(context.Background(), dag, "run-error", root, parent, statusPusher, logStreamer, false, nil)
+	err = handler.executeDAGRun(context.Background(), dag, "run-error", "", root, parent, statusPusher, logStreamer, false, nil)
 
 	// On systems where null byte in path fails, we should get an error
 	if err != nil {
@@ -1666,7 +1585,7 @@ steps:
 
 	// Call executeDAGRun - this should succeed and log completion
 	// For top-level runs, pass empty parent and ensure root matches dagRunID
-	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, root, execution.DAGRunRef{}, statusPusher, logStreamer, false, nil)
+	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, "", root, execution.DAGRunRef{}, statusPusher, logStreamer, false, nil)
 
 	// Should succeed for simple echo command
 	require.NoError(t, err, "executeDAGRun should succeed for simple echo command")

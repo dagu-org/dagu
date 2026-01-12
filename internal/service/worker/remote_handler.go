@@ -85,15 +85,6 @@ func (h *remoteTaskHandler) Handle(ctx context.Context, task *coordinatorv1.Task
 		return h.handleStart(ctx, task, false)
 
 	case coordinatorv1.Operation_OPERATION_RETRY:
-		// OPERATION_RETRY is used in multiple scenarios:
-		// 1. Queue dispatch: PreviousStatus is nil, or PreviousStatus.Status == Queued → fresh start (queuedRun=true)
-		// 2. Actual retry (all failed): Has PreviousStatus with completed status, no Step → retry all failed steps
-		// 3. Actual retry (specific step): Has Step → retry that specific step
-		if h.isQueueDispatch(task) {
-			// Queue dispatch - fresh start from queue
-			return h.handleStart(ctx, task, true)
-		}
-		// Actual retry - uses PreviousStatus (or local store) to determine which steps to re-run
 		return h.handleRetry(ctx, task)
 
 	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
@@ -102,24 +93,6 @@ func (h *remoteTaskHandler) Handle(ctx context.Context, task *coordinatorv1.Task
 	default:
 		return fmt.Errorf("unsupported operation: %v", task.Operation)
 	}
-}
-
-// isQueueDispatch checks if this is a fresh run from queue (vs an actual retry).
-// Queue dispatch has no Step and either no PreviousStatus or PreviousStatus with Queued status.
-func (h *remoteTaskHandler) isQueueDispatch(task *coordinatorv1.Task) bool {
-	// If Step is set, it's always an actual retry of that specific step
-	if task.Step != "" {
-		return false
-	}
-
-	// No PreviousStatus means queue dispatch
-	if task.PreviousStatus == nil {
-		return true
-	}
-
-	// Check if PreviousStatus indicates a queued run (not a completed/failed run)
-	status := convert.ProtoToDAGRunStatus(task.PreviousStatus)
-	return status == nil || status.Status == core.Queued
 }
 
 func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1.Task, queuedRun bool) error {
@@ -135,7 +108,7 @@ func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1
 	parent := execution.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
 	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
 
-	return h.executeDAGRun(ctx, dag, task.DagRunId, root, parent, statusPusher, logStreamer, queuedRun, nil)
+	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, root, parent, statusPusher, logStreamer, queuedRun, nil)
 }
 
 func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1.Task) error {
@@ -177,7 +150,7 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 	parent := execution.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
 	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
 
-	return h.executeDAGRun(ctx, dag, task.DagRunId, root, parent, statusPusher, logStreamer, false, &retryConfig{
+	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, root, parent, statusPusher, logStreamer, false, &retryConfig{
 		target:   status,
 		stepName: task.Step,
 	})
@@ -290,6 +263,7 @@ func (h *remoteTaskHandler) executeDAGRun(
 	ctx context.Context,
 	dag *core.DAG,
 	dagRunID string,
+	attemptID string,
 	root execution.DAGRunRef,
 	parent execution.DAGRunRef,
 	statusPusher *remote.StatusPusher,
@@ -338,6 +312,7 @@ func (h *remoteTaskHandler) executeDAGRun(
 		StatusPusher:     statusPusher,
 		LogWriterFactory: logStreamer,
 		QueuedRun:        queuedRun,
+		AttemptID:        attemptID,
 	}
 
 	// Add retry configuration if present

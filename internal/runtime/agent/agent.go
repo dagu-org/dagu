@@ -148,6 +148,10 @@ type Agent struct {
 	// queuedRun indicates this execution is from a queued item.
 	// The dag-run was already created by the enqueue command.
 	queuedRun bool
+
+	// attemptID is the attempt ID from the coordinator.
+	// When set, the agent creates an attempt with this ID instead of generating a new one.
+	attemptID string
 }
 
 // StatusPusher is an interface for pushing status updates remotely.
@@ -187,6 +191,9 @@ type Options struct {
 	// instead of creating a new one. This is used for distributed execution
 	// where the dag-run directory was already created by the scheduler.
 	QueuedRun bool
+	// AttemptID is the attempt ID from the coordinator.
+	// When set, the agent creates an attempt with this ID instead of generating a new one.
+	AttemptID string
 }
 
 // New creates a new Agent.
@@ -222,6 +229,7 @@ func New(
 		statusPusher:     opts.StatusPusher,
 		logWriterFactory: opts.LogWriterFactory,
 		queuedRun:        opts.QueuedRun,
+		attemptID:        opts.AttemptID,
 	}
 
 	// Initialize progress display if enabled
@@ -1293,7 +1301,10 @@ func (a *Agent) setupDAGRunAttempt(ctx context.Context) (execution.DAGRunAttempt
 	// Retry is true when:
 	// 1. Retrying a failed execution (retryTarget != nil)
 	// 2. Running from queue (queuedRun = true) - the dag-run was already created by enqueue
-	opts := execution.NewDAGRunAttemptOptions{Retry: a.retryTarget != nil || a.queuedRun}
+	opts := execution.NewDAGRunAttemptOptions{
+		Retry:     a.retryTarget != nil || a.queuedRun,
+		AttemptID: a.attemptID,
+	}
 	if a.isSubDAGRun.Load() {
 		opts.RootDAGRun = &a.rootDAGRun
 	}

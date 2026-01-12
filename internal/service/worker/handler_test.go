@@ -24,7 +24,8 @@ func TestTaskHandler(t *testing.T) {
 
 	t.Run("HandleQueueDispatch", func(t *testing.T) {
 		// This test simulates the queue dispatch scenario:
-		// OPERATION_RETRY with no Step is treated as a fresh start (queue dispatch case)
+		// Coordinator first creates a dag-run (during enqueue), then sends OPERATION_RETRY
+		// to dispatch it to a worker.
 		dag := th.DAG(t, `steps:
   - name: "1"
     command: echo step1
@@ -32,10 +33,22 @@ func TestTaskHandler(t *testing.T) {
     command: echo step2
 `)
 
-		// Generate a new dag-run ID (simulating queue dispatch with fresh ID)
-		dagRunID := uuid.New().String()
+		// First, create an initial dag-run (simulating what coordinator does during enqueue)
+		// This creates the status record that retry will use
+		spec := th.SubCmdBuilder.Start(dag.DAG, runtime1.StartOptions{})
+		err := runtime1.Start(th.Context, spec)
+		require.NoError(t, err)
+
+		// Wait for the initial run to complete
+		dag.AssertLatestStatus(t, core.Succeeded)
+
+		// Get the dag-run ID from the completed run
+		st, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+		require.NoError(t, err)
+		dagRunID := st.DAGRunID
 
 		// Create a task with OPERATION_RETRY but no Step (queue dispatch case)
+		// This simulates coordinator dispatching a queued task
 		task := &coordinatorv1.Task{
 			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
 			DagRunId:       dagRunID,
@@ -48,12 +61,12 @@ func TestTaskHandler(t *testing.T) {
 		taskCtx, cancel := context.WithTimeout(th.Context, 30*time.Second)
 		defer cancel()
 
-		// Execute the task
+		// Execute the task (retry without step re-runs all steps)
 		handler := NewTaskHandler(th.Config)
-		err := handler.Handle(taskCtx, task)
+		err = handler.Handle(taskCtx, task)
 		require.NoError(t, err)
 
-		// Verify the DAG ran successfully
+		// Verify the DAG ran successfully again
 		dag.AssertLatestStatus(t, core.Succeeded)
 	})
 

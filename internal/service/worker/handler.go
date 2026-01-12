@@ -90,10 +90,6 @@ func (e *taskHandler) buildCommandSpec(task *coordinatorv1.Task) (runtime.CmdSpe
 		return e.subCmdBuilder.TaskStart(task), nil
 
 	case coordinatorv1.Operation_OPERATION_RETRY:
-		// If no specific step is targeted, retry behaves like start
-		if task.Step == "" {
-			return e.subCmdBuilder.TaskStart(task), nil
-		}
 		return e.subCmdBuilder.TaskRetry(task), nil
 
 	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:

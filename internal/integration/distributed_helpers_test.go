@@ -28,7 +28,7 @@ func setupRemoteWorker(t *testing.T, coord *test.Coordinator, workerID string, m
 	handlerCfg := worker.RemoteTaskHandlerConfig{
 		WorkerID:          workerID,
 		CoordinatorClient: coordinatorClient,
-		DAGRunStore:       coord.DAGRunStore,
+		DAGRunStore:       nil,
 		DAGStore:          coord.DAGStore,
 		DAGRunMgr:         coord.DAGRunMgr,
 		ServiceRegistry:   coord.ServiceRegistry,

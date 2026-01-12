@@ -52,7 +52,7 @@ func (dr DAGRunTest) WriteStatus(t *testing.T, ts execution.TimeInUTC, s core.St
 	dagRunStatus.DAGRunID = "test-id-1"
 	dagRunStatus.Status = s
 
-	run, err := dr.CreateAttempt(dr.Context, ts, nil)
+	run, err := dr.CreateAttempt(dr.Context, ts, nil, "")
 	require.NoError(t, err)
 	err = run.Open(dr.Context)
 	require.NoError(t, err)
@@ -134,7 +134,7 @@ func TestListLogFiles(t *testing.T) {
 		}
 
 		ts := execution.NewUTC(time.Now())
-		att, err := run.CreateAttempt(run.Context, ts, nil)
+		att, err := run.CreateAttempt(run.Context, ts, nil, "")
 		require.NoError(t, err)
 		require.NoError(t, att.Open(run.Context))
 		require.NoError(t, att.Write(run.Context, dagRunStatus))
@@ -189,7 +189,7 @@ func TestRemoveLogFiles(t *testing.T) {
 		}
 
 		ts := execution.NewUTC(time.Now())
-		att, err := run.CreateAttempt(run.Context, ts, nil)
+		att, err := run.CreateAttempt(run.Context, ts, nil, "")
 		require.NoError(t, err)
 		require.NoError(t, att.Open(run.Context))
 		require.NoError(t, att.Write(run.Context, dagRunStatus))
@@ -244,7 +244,7 @@ func TestRemoveLogFiles(t *testing.T) {
 		}}
 
 		ts := execution.NewUTC(time.Now())
-		att, err := run.CreateAttempt(run.Context, ts, nil)
+		att, err := run.CreateAttempt(run.Context, ts, nil, "")
 		require.NoError(t, err)
 		require.NoError(t, att.Open(run.Context))
 		require.NoError(t, att.Write(run.Context, dagRunStatus))
@@ -269,7 +269,7 @@ func TestRemoveLogFiles(t *testing.T) {
 			Stdout: subRunLogFiles[1],
 		}}
 
-		subRun, err := subDAGRun.CreateAttempt(run.Context, ts, nil)
+		subRun, err := subDAGRun.CreateAttempt(run.Context, ts, nil, "")
 		require.NoError(t, err)
 		require.NoError(t, subRun.Open(run.Context))
 		require.NoError(t, subRun.Write(run.Context, subStatus))
@@ -326,7 +326,7 @@ func TestDAGRunRemove(t *testing.T) {
 		}
 
 		ts := execution.NewUTC(time.Now())
-		att, err := run.CreateAttempt(run.Context, ts, nil)
+		att, err := run.CreateAttempt(run.Context, ts, nil, "")
 		require.NoError(t, err)
 		require.NoError(t, att.Open(run.Context))
 		require.NoError(t, att.Write(run.Context, dagRunStatus))
@@ -392,7 +392,7 @@ func TestDAGRunRemove(t *testing.T) {
 		}}
 
 		ts := execution.NewUTC(time.Now())
-		att, err := run.CreateAttempt(run.Context, ts, nil)
+		att, err := run.CreateAttempt(run.Context, ts, nil, "")
 		require.NoError(t, err)
 		require.NoError(t, att.Open(run.Context))
 		require.NoError(t, att.Write(run.Context, dagRunStatus))
@@ -426,7 +426,7 @@ func TestDAGRunRemove(t *testing.T) {
 				Stdout: subRun.logFiles[1],
 			}}
 
-			subRunAttempt, err := subDAGRun.CreateAttempt(run.Context, ts, nil)
+			subRunAttempt, err := subDAGRun.CreateAttempt(run.Context, ts, nil, "")
 			require.NoError(t, err)
 			require.NoError(t, subRunAttempt.Open(run.Context))
 			require.NoError(t, subRunAttempt.Write(run.Context, subStatus))
@@ -472,7 +472,7 @@ func TestDAGRunRemove(t *testing.T) {
 		}
 
 		ts := execution.NewUTC(time.Now())
-		att, err := run.CreateAttempt(run.Context, ts, nil)
+		att, err := run.CreateAttempt(run.Context, ts, nil, "")
 		require.NoError(t, err)
 		require.NoError(t, att.Open(run.Context))
 		require.NoError(t, att.Write(run.Context, dagRunStatus))

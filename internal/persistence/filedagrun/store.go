@@ -301,7 +301,7 @@ func (store *Store) CreateAttempt(ctx context.Context, dag *core.DAG, timestamp 
 		run = r
 	}
 
-	record, err := run.CreateAttempt(ctx, ts, store.cache, WithDAG(dag))
+	record, err := run.CreateAttempt(ctx, ts, store.cache, opts.AttemptID, WithDAG(dag))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create record: %w", err)
 	}
@@ -334,7 +334,7 @@ func (b *Store) newChildRecord(ctx context.Context, dag *core.DAG, timestamp tim
 		run = r
 	}
 
-	record, err := run.CreateAttempt(ctx, ts, b.cache, WithDAG(dag))
+	record, err := run.CreateAttempt(ctx, ts, b.cache, opts.AttemptID, WithDAG(dag))
 	if err != nil {
 		logger.Error(ctx, "Failed to create sub dag-run record", tag.Error(err))
 		return nil, err
@@ -466,8 +466,8 @@ func (store *Store) CreateSubAttempt(ctx context.Context, rootRef execution.DAGR
 		return nil, fmt.Errorf("failed to create sub dag-run directory: %w", err)
 	}
 
-	// Create an attempt within the sub-DAG run
-	return subDAGRun.CreateAttempt(ctx, execution.NewUTC(time.Now()), store.cache)
+	// Create an attempt within the sub-DAG run (no preset attemptID)
+	return subDAGRun.CreateAttempt(ctx, execution.NewUTC(time.Now()), store.cache, "")
 }
 
 // RemoveOldDAGRuns removes old history records older than the specified retention days.
