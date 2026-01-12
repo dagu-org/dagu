@@ -461,6 +461,19 @@ func TestToThinkingRequest(t *testing.T) {
 	})
 }
 
+// createContextWithSecrets creates a test context with the given secrets.
+func createContextWithSecrets(secrets map[string]string) context.Context {
+	if secrets == nil {
+		return context.Background()
+	}
+	secretEnvs := make([]string, 0, len(secrets))
+	for k, v := range secrets {
+		secretEnvs = append(secretEnvs, k+"="+v)
+	}
+	return exec.NewContext(context.Background(), &core.DAG{Name: "test"}, "run-1", "/tmp/log",
+		exec.WithSecrets(secretEnvs))
+}
+
 func TestMaskSecretsForProvider(t *testing.T) {
 	t.Parallel()
 
@@ -527,16 +540,7 @@ func TestMaskSecretsForProvider(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
-			if tt.secrets != nil {
-				var secretEnvs []string
-				for k, v := range tt.secrets {
-					secretEnvs = append(secretEnvs, k+"="+v)
-				}
-				ctx = exec.NewContext(ctx, &core.DAG{Name: "test"}, "run-1", "/tmp/log",
-					exec.WithSecrets(secretEnvs))
-			}
-
+			ctx := createContextWithSecrets(tt.secrets)
 			result := maskSecretsForProvider(ctx, tt.messages)
 
 			require.Len(t, result, len(tt.wantMasked))

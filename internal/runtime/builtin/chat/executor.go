@@ -249,17 +249,17 @@ func evalMessages(ctx context.Context, msgs []exec.LLMMessage) ([]exec.LLMMessag
 // maskSecretsForProvider masks secret values in messages before sending to LLM provider.
 // This prevents secrets from being leaked to external LLM APIs.
 func maskSecretsForProvider(ctx context.Context, msgs []exec.LLMMessage) []exec.LLMMessage {
-	rCtx := runtime.GetDAGContext(ctx)
-	if rCtx.SecretEnvs == nil || len(rCtx.SecretEnvs) == 0 {
+	secrets := runtime.GetDAGContext(ctx).SecretEnvs
+	if len(secrets) == 0 {
 		return msgs
 	}
 
-	secretEnvs := make([]string, 0, len(rCtx.SecretEnvs))
-	for k, v := range rCtx.SecretEnvs {
-		secretEnvs = append(secretEnvs, k+"="+v)
+	envPairs := make([]string, 0, len(secrets))
+	for k, v := range secrets {
+		envPairs = append(envPairs, k+"="+v)
 	}
 
-	masker := masking.NewMasker(masking.SourcedEnvVars{Secrets: secretEnvs})
+	masker := masking.NewMasker(masking.SourcedEnvVars{Secrets: envPairs})
 
 	result := make([]exec.LLMMessage, len(msgs))
 	for i, msg := range msgs {
