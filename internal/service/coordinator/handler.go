@@ -269,8 +269,16 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 		return fmt.Errorf("failed to parse DAG definition: %w", err)
 	}
 
-	// Determine if this is a retry operation
+	// Check if this is a retry OR if dag-run already exists (dispatch retry scenario).
+	// When dispatch fails and is retried, the dag-run may already exist from a previous
+	// dispatch attempt. In that case, we should add a new attempt to the existing dag-run.
 	isRetry := task.Operation == coordinatorv1.Operation_OPERATION_RETRY
+	if !isRetry {
+		ref := execution.DAGRunRef{Name: dag.Name, ID: task.DagRunId}
+		if _, findErr := h.dagRunStore.FindAttempt(ctx, ref); findErr == nil {
+			isRetry = true // dag-run exists, use retry mode to add new attempt
+		}
+	}
 	opts := execution.NewDAGRunAttemptOptions{Retry: isRetry}
 
 	// Create the attempt

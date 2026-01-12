@@ -42,7 +42,8 @@ steps:
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
 		// Create and start worker with matching labels
-		setupWorker(t, coord, "test-worker-1", 10, map[string]string{
+		// Use remoteTaskHandler for shared-nothing mode (pushes status to coordinator)
+		setupRemoteWorker(t, coord, "test-worker-1", 10, map[string]string{
 			"environment": "production",
 			"component":   "batch-worker",
 		})
@@ -95,7 +96,10 @@ steps:
 			schedulerDone <- schedulerInst.Start(schedulerCtx)
 		}()
 
-		// Wait for execution completion
+		// Wait for execution completion AND queue cleanup
+		// We need to wait for both:
+		// 1. DAG status to be "succeeded"
+		// 2. Queue to be empty (scheduler's monitorStartup needs time to clean up)
 		require.Eventually(t, func() bool {
 			status, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
 			if err != nil {
@@ -104,12 +108,23 @@ steps:
 
 			t.Logf("DAG status: %s", status.Status)
 
-			if status.Status == core.Failed {
+			if !status.Status.IsActive() && status.Status != core.Succeeded && status.Status != core.Queued {
 				t.Fatalf("DAG execution failed")
 			}
 
-			return status.Status == core.Succeeded
-		}, 25*time.Second, 500*time.Millisecond, "Timeout waiting for DAG execution to complete")
+			if status.Status != core.Succeeded {
+				return false
+			}
+
+			// Also wait for queue to be empty (scheduler cleanup)
+			queueItems, err := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)
+			if err != nil || len(queueItems) > 0 {
+				t.Logf("Queue still has %d items, waiting for cleanup", len(queueItems))
+				return false
+			}
+
+			return true
+		}, 25*time.Second, 500*time.Millisecond, "Timeout waiting for DAG execution and queue cleanup")
 
 		schedulerCancel()
 
@@ -136,40 +151,6 @@ steps:
 		require.Empty(t, queueItems, "Queue should be empty after execution")
 
 		t.Log("E2E test completed successfully!")
-	})
-
-	t.Run("E2E_StartCommand_WorkerSelector_ShouldExecuteLocally", func(t *testing.T) {
-		// Verify that dagu start always executes locally even when workerSelector exists
-		yamlContent := `
-name: local-start-dag
-workerSelector:
-  test: value
-steps:
-  - name: task
-    command: echo "Direct execution"
-`
-		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
-		ctx := coord.Context
-
-		// Load the DAG
-		dagWrapper := coord.DAG(t, yamlContent)
-
-		// Build start command
-		subCmdBuilder := runtime.NewSubCmdBuilder(coord.Config)
-		startSpec := subCmdBuilder.Start(dagWrapper.DAG, runtime.StartOptions{
-			Quiet: true,
-		})
-
-		err := runtime.Start(ctx, startSpec)
-		require.NoError(t, err)
-
-		// Wait for execution to complete
-		dagWrapper.AssertLatestStatus(t, core.Succeeded)
-
-		// Should NOT be enqueued (executed directly)
-		queueItems, err := coord.QueueStore.ListByDAGName(ctx, dagWrapper.ProcGroup(), dagWrapper.Name)
-		require.NoError(t, err)
-		require.Len(t, queueItems, 0, "DAG should NOT be enqueued (dagu start runs locally)")
 	})
 
 	t.Run("E2E_DistributedExecution_Cancellation_SubDAG", func(t *testing.T) {

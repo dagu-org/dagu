@@ -196,15 +196,15 @@ steps:
 // TestRemote_SubDAG verifies sub-DAG status propagation through coordinator
 func TestRemote_SubDAG(t *testing.T) {
 	t.Run("sub-DAG execution via coordinator", func(t *testing.T) {
-		// Multi-document YAML with parent and child DAGs
-		// Both parent and child have workerSelector so they run on workers
-		yamlContent := `
+		// Parent and child DAGs must be in separate files so the child can be found
+		parentYAML := `
 name: parent-remote
 workerSelector:
   type: parent
 steps:
   - run: child-remote
----
+`
+		childYAML := `
 name: child-remote
 workerSelector:
   type: child
@@ -216,12 +216,15 @@ steps:
 		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 		coord.Config.Queues.Enabled = true
 
+		// Create the child DAG file first (parent references it)
+		coord.CreateDAGFile(t, coord.Config.Paths.DAGsDir, "child-remote", []byte(childYAML))
+
 		// Setup workers - one for parent and one for child
 		setupRemoteWorker(t, coord, "parent-worker", 10, map[string]string{"type": "parent"})
 		setupRemoteWorker(t, coord, "child-worker", 10, map[string]string{"type": "child"})
 
-		// Load the DAG
-		dagWrapper := coord.DAG(t, yamlContent)
+		// Load the parent DAG
+		dagWrapper := coord.DAG(t, parentYAML)
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
 		// Enqueue the parent DAG to coordinator (runs on worker with coordinator client)

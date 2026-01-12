@@ -42,15 +42,6 @@ func setupRemoteWorker(t *testing.T, coord *test.Coordinator, workerID string, m
 	return startAndCleanupWorker(t, coord, workerInst)
 }
 
-// setupWorker creates and starts a single worker with the given labels.
-// It automatically stops the worker when the test completes.
-func setupWorker(t *testing.T, coord *test.Coordinator, workerID string, maxActiveRuns int, labels map[string]string) *worker.Worker {
-	t.Helper()
-	coordinatorClient := coord.GetCoordinatorClient(t)
-	workerInst := worker.NewWorker(workerID, maxActiveRuns, coordinatorClient, labels, coord.Config)
-	return startAndCleanupWorker(t, coord, workerInst)
-}
-
 // startAndCleanupWorker starts a worker and registers cleanup.
 func startAndCleanupWorker(t *testing.T, coord *test.Coordinator, workerInst *worker.Worker) *worker.Worker {
 	t.Helper()
