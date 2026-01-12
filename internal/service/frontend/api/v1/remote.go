@@ -148,6 +148,10 @@ func (h *remoteNodeProxy) doRequest(body any, r *http.Request, node config.Remot
 
 	// Set the Accept-Encoding header to handle gzip and deflate responses
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
+	// Add application/json content type
+	if req.Header.Get("Content-Type") == "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
 
 	// Create a custom transport that skips certificate verification
 	transport := &http.Transport{
