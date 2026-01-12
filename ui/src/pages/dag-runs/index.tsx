@@ -763,7 +763,7 @@ function DAGRuns() {
             {/* Tags filter */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-8 px-3">
+                <Button variant="outline" size="default" className="px-3">
                   <Tag size={14} className="mr-1.5" />
                   Tags
                   {selectedTags.length > 0 && (
