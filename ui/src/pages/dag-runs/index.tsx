@@ -300,7 +300,7 @@ function DAGRuns() {
     if (params.has('tags')) {
       const tagsParam = params.get('tags') ?? '';
       urlFilters.tags = tagsParam
-        ? tagsParam.split(',').filter((t) => t.trim() !== '')
+        ? tagsParam.split(',').map((t) => t.trim()).filter((t) => t !== '')
         : [];
       hasUrlFilters = true;
     }
@@ -498,21 +498,22 @@ function DAGRuns() {
     handleSearch(value);
   };
 
-  const handleTagToggle = (tag: string) => {
-    const newTags = selectedTags.includes(tag)
-      ? selectedTags.filter((t) => t !== tag)
-      : [...selectedTags, tag];
+  const updateTags = (newTags: string[]) => {
     setSelectedTags(newTags);
     setApiTags(newTags);
     addSearchParam('tags', newTags.length > 0 ? newTags.join(',') : undefined);
     mutate();
   };
 
+  const handleTagToggle = (tag: string) => {
+    const newTags = selectedTags.includes(tag)
+      ? selectedTags.filter((t) => t !== tag)
+      : [...selectedTags, tag];
+    updateTags(newTags);
+  };
+
   const handleClearTags = () => {
-    setSelectedTags([]);
-    setApiTags([]);
-    addSearchParam('tags', undefined);
-    mutate();
+    updateTags([]);
   };
 
   const handleViewModeChange = (value: string) => {
