@@ -11,6 +11,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/masking"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	llmpkg "github.com/dagu-org/dagu/internal/llm"
@@ -245,6 +246,32 @@ func evalMessages(ctx context.Context, msgs []exec.LLMMessage) ([]exec.LLMMessag
 	return result, nil
 }
 
+// maskSecretsForProvider masks secret values in messages before sending to LLM provider.
+// This prevents secrets from being leaked to external LLM APIs.
+func maskSecretsForProvider(ctx context.Context, msgs []exec.LLMMessage) []exec.LLMMessage {
+	rCtx := runtime.GetDAGContext(ctx)
+	if rCtx.SecretEnvs == nil || len(rCtx.SecretEnvs) == 0 {
+		return msgs
+	}
+
+	secretEnvs := make([]string, 0, len(rCtx.SecretEnvs))
+	for k, v := range rCtx.SecretEnvs {
+		secretEnvs = append(secretEnvs, k+"="+v)
+	}
+
+	masker := masking.NewMasker(masking.SourcedEnvVars{Secrets: secretEnvs})
+
+	result := make([]exec.LLMMessage, len(msgs))
+	for i, msg := range msgs {
+		result[i] = exec.LLMMessage{
+			Role:     msg.Role,
+			Content:  masker.MaskString(msg.Content),
+			Metadata: msg.Metadata,
+		}
+	}
+	return result
+}
+
 // Run executes the chat request.
 func (e *Executor) Run(ctx context.Context) error {
 	cfg := e.step.LLM
@@ -261,10 +288,11 @@ func (e *Executor) Run(ctx context.Context) error {
 	}
 
 	allMessages := buildMessageList(evaluatedMessages, e.contextMessages)
+	maskedForProvider := maskSecretsForProvider(ctx, allMessages)
 
 	req := &llmpkg.ChatRequest{
 		Model:       cfg.Model,
-		Messages:    toLLMMessages(allMessages),
+		Messages:    toLLMMessages(maskedForProvider),
 		Temperature: cfg.Temperature,
 		MaxTokens:   cfg.MaxTokens,
 		TopP:        cfg.TopP,

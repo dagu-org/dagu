@@ -460,3 +460,95 @@ func TestToThinkingRequest(t *testing.T) {
 		assert.False(t, result.IncludeInOutput)
 	})
 }
+
+func TestMaskSecretsForProvider(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		secrets    map[string]string
+		messages   []exec.LLMMessage
+		wantMasked []string
+	}{
+		{
+			name:    "no secrets in context",
+			secrets: nil,
+			messages: []exec.LLMMessage{
+				{Role: exec.RoleUser, Content: "Hello"},
+			},
+			wantMasked: []string{"Hello"},
+		},
+		{
+			name:    "empty secrets",
+			secrets: map[string]string{},
+			messages: []exec.LLMMessage{
+				{Role: exec.RoleUser, Content: "Hello"},
+			},
+			wantMasked: []string{"Hello"},
+		},
+		{
+			name:    "masks secret in content",
+			secrets: map[string]string{"API_KEY": "secret123"},
+			messages: []exec.LLMMessage{
+				{Role: exec.RoleUser, Content: "My key is secret123"},
+			},
+			wantMasked: []string{"My key is *******"},
+		},
+		{
+			name: "masks multiple secrets",
+			secrets: map[string]string{
+				"DB_PASS": "dbpass",
+				"API_KEY": "apikey",
+			},
+			messages: []exec.LLMMessage{
+				{Role: exec.RoleSystem, Content: "Use dbpass for DB"},
+				{Role: exec.RoleUser, Content: "Key is apikey"},
+			},
+			wantMasked: []string{
+				"Use ******* for DB",
+				"Key is *******",
+			},
+		},
+		{
+			name:    "preserves role and metadata",
+			secrets: map[string]string{"SECRET": "xyz"},
+			messages: []exec.LLMMessage{
+				{
+					Role:     exec.RoleAssistant,
+					Content:  "Value: xyz",
+					Metadata: &exec.LLMMessageMetadata{Model: "gpt-4"},
+				},
+			},
+			wantMasked: []string{"Value: *******"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			if tt.secrets != nil {
+				var secretEnvs []string
+				for k, v := range tt.secrets {
+					secretEnvs = append(secretEnvs, k+"="+v)
+				}
+				ctx = exec.NewContext(ctx, &core.DAG{Name: "test"}, "run-1", "/tmp/log",
+					exec.WithSecrets(secretEnvs))
+			}
+
+			result := maskSecretsForProvider(ctx, tt.messages)
+
+			require.Len(t, result, len(tt.wantMasked))
+			for i, want := range tt.wantMasked {
+				assert.Equal(t, want, result[i].Content)
+				assert.Equal(t, tt.messages[i].Role, result[i].Role)
+			}
+
+			// Verify metadata is preserved
+			if len(tt.messages) > 0 && tt.messages[0].Metadata != nil {
+				assert.Equal(t, tt.messages[0].Metadata, result[0].Metadata)
+			}
+		})
+	}
+}
