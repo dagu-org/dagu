@@ -460,3 +460,106 @@ func TestToThinkingRequest(t *testing.T) {
 		assert.False(t, result.IncludeInOutput)
 	})
 }
+
+// createContextWithSecrets creates a test context with the given secrets.
+func createContextWithSecrets(secrets map[string]string) context.Context {
+	if secrets == nil {
+		return context.Background()
+	}
+	secretEnvs := make([]string, 0, len(secrets))
+	for k, v := range secrets {
+		secretEnvs = append(secretEnvs, k+"="+v)
+	}
+	return exec.NewContext(context.Background(), &core.DAG{Name: "test"}, "run-1", "/tmp/log",
+		exec.WithSecrets(secretEnvs))
+}
+
+func TestMaskSecretsForProvider(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		secrets    map[string]string
+		messages   []exec.LLMMessage
+		wantMasked []string
+	}{
+		{
+			name:    "no secrets in context",
+			secrets: nil,
+			messages: []exec.LLMMessage{
+				{Role: exec.RoleUser, Content: "Hello"},
+			},
+			wantMasked: []string{"Hello"},
+		},
+		{
+			name:    "empty secrets",
+			secrets: map[string]string{},
+			messages: []exec.LLMMessage{
+				{Role: exec.RoleUser, Content: "Hello"},
+			},
+			wantMasked: []string{"Hello"},
+		},
+		{
+			name:    "masks secret in content",
+			secrets: map[string]string{"API_KEY": "secret123"},
+			messages: []exec.LLMMessage{
+				{Role: exec.RoleUser, Content: "My key is secret123"},
+			},
+			wantMasked: []string{"My key is *******"},
+		},
+		{
+			name: "masks multiple secrets",
+			secrets: map[string]string{
+				"DB_PASS": "dbpass",
+				"API_KEY": "apikey",
+			},
+			messages: []exec.LLMMessage{
+				{Role: exec.RoleSystem, Content: "Use dbpass for DB"},
+				{Role: exec.RoleUser, Content: "Key is apikey"},
+			},
+			wantMasked: []string{
+				"Use ******* for DB",
+				"Key is *******",
+			},
+		},
+		{
+			name:    "preserves role and metadata for multiple messages",
+			secrets: map[string]string{"SECRET": "xyz"},
+			messages: []exec.LLMMessage{
+				{
+					Role:     exec.RoleUser,
+					Content:  "Value: xyz",
+					Metadata: nil,
+				},
+				{
+					Role:     exec.RoleAssistant,
+					Content:  "Response with xyz",
+					Metadata: &exec.LLMMessageMetadata{Model: "gpt-4", PromptTokens: 10, CompletionTokens: 5},
+				},
+				{
+					Role:     exec.RoleUser,
+					Content:  "Another xyz message",
+					Metadata: &exec.LLMMessageMetadata{Provider: "openai"},
+				},
+			},
+			wantMasked: []string{"Value: *******", "Response with *******", "Another ******* message"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := createContextWithSecrets(tt.secrets)
+			result := maskSecretsForProvider(ctx, tt.messages)
+
+			require.Len(t, result, len(tt.wantMasked))
+			for i, want := range tt.wantMasked {
+				assert.Equal(t, want, result[i].Content)
+				assert.Equal(t, tt.messages[i].Role, result[i].Role)
+				// Verify metadata is preserved for each message
+				assert.Equal(t, tt.messages[i].Metadata, result[i].Metadata)
+			}
+		})
+	}
+}
