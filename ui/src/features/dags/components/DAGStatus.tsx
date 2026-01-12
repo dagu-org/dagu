@@ -9,6 +9,7 @@ import {
   ActivitySquare,
   FileCode,
   GanttChart,
+  MessageSquare,
   MousePointerClick,
   Package,
 } from 'lucide-react';
@@ -32,13 +33,14 @@ import {
 } from './dag-execution';
 import { DAGSpecReadOnly } from './dag-editor';
 import { FlowchartType, Graph, TimelineChart } from './visualization';
+import { ChatHistoryTab } from './chat-history';
 
 type Props = {
   dagRun: components['schemas']['DAGRunDetails'];
   fileName: string;
 };
 
-type StatusTab = 'status' | 'timeline' | 'outputs' | 'spec';
+type StatusTab = 'status' | 'timeline' | 'outputs' | 'chat' | 'spec';
 
 function DAGStatus({ dagRun, fileName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
@@ -272,12 +274,20 @@ function DAGStatus({ dagRun, fileName }: Props) {
   // Check if timeline should be shown (any status except not started)
   const showTimeline = dagRun.status !== Status.NotStarted;
 
-  // Reset to status tab if timeline tab is selected but not available
+  // Check if there are any chat steps
+  const hasChatSteps = dagRun.nodes?.some(
+    (node) => node.step.executorConfig?.type === 'chat'
+  );
+
+  // Reset to status tab if selected tab is not available
   useEffect(() => {
     if (activeTab === 'timeline' && !showTimeline) {
       setActiveTab('status');
     }
-  }, [showTimeline, activeTab]);
+    if (activeTab === 'chat' && !hasChatSteps) {
+      setActiveTab('status');
+    }
+  }, [showTimeline, hasChatSteps, activeTab]);
 
   return (
     <div className="space-y-4">
@@ -309,6 +319,16 @@ function DAGStatus({ dagRun, fileName }: Props) {
           <Package className="h-4 w-4" />
           Outputs
         </Tab>
+        {hasChatSteps && (
+          <Tab
+            isActive={activeTab === 'chat'}
+            onClick={() => setActiveTab('chat')}
+            className="flex items-center gap-2 cursor-pointer"
+          >
+            <MessageSquare className="h-4 w-4" />
+            Chat
+          </Tab>
+        )}
         <Tab
           isActive={activeTab === 'spec'}
           onClick={() => setActiveTab('spec')}
@@ -415,6 +435,9 @@ function DAGStatus({ dagRun, fileName }: Props) {
       {activeTab === 'outputs' && (
         <DAGRunOutputs dagName={dagRun.name} dagRunId={dagRun.dagRunId} />
       )}
+
+      {/* Chat Tab Content */}
+      {activeTab === 'chat' && <ChatHistoryTab dagRun={dagRun} />}
 
       {/* Spec Tab Content */}
       {activeTab === 'spec' && (

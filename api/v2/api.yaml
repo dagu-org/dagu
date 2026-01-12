@@ -2040,6 +2040,38 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dag-runs/{name}/{dagRunId}/steps/{stepName}/messages:
+    get:
+      summary: "Retrieve chat messages for a step"
+      description: "Fetches the LLM chat message history for a chat step. Returns empty array for non-chat steps."
+      operationId: "getDAGRunStepMessages"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - $ref: "#/components/parameters/StepName"
+      responses:
+        "200":
+          description: "Chat messages retrieved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessagesResponse"
+        "404":
+          description: "DAG-run or step not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dag-runs/{name}/{dagRunId}/steps/{stepName}/status:
     patch:
       summary: "Manually update a step's execution status"
@@ -2288,6 +2320,44 @@ paths:
                 $ref: "#/components/schemas/Log"
         "404":
           description: "Log file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/messages:
+    get:
+      summary: "Retrieve chat messages for a step in a sub DAG-run"
+      description: "Fetches the LLM chat message history for a chat step in a sub DAG-run"
+      operationId: "getSubDAGRunStepMessages"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run"
+        - $ref: "#/components/parameters/StepName"
+      responses:
+        "200":
+          description: "Chat messages retrieved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessagesResponse"
+        "404":
+          description: "Sub DAG-run or step not found"
           content:
             application/json:
               schema:
@@ -3186,6 +3256,65 @@ components:
         - dagRunId
         - stepName
         - resumed
+
+    ChatMessage:
+      type: object
+      description: "A single chat message in an LLM conversation"
+      properties:
+        role:
+          type: string
+          enum: [system, user, assistant, tool]
+          description: "Message role in the conversation"
+        content:
+          type: string
+          description: "Message content"
+        metadata:
+          $ref: "#/components/schemas/ChatMessageMetadata"
+      required:
+        - role
+        - content
+
+    ChatMessageMetadata:
+      type: object
+      description: "Metadata about an LLM API call"
+      properties:
+        provider:
+          type: string
+          description: "LLM provider (openai, anthropic, gemini, etc.)"
+        model:
+          type: string
+          description: "Model identifier used"
+        promptTokens:
+          type: integer
+          description: "Number of tokens in the prompt"
+        completionTokens:
+          type: integer
+          description: "Number of tokens in the completion"
+        totalTokens:
+          type: integer
+          description: "Total tokens (prompt + completion)"
+
+    ChatMessagesResponse:
+      type: object
+      description: "Response containing chat messages for a step"
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatMessage"
+          description: "List of chat messages"
+        stepStatus:
+          $ref: "#/components/schemas/NodeStatus"
+        stepStatusLabel:
+          $ref: "#/components/schemas/NodeStatusLabel"
+        hasMore:
+          type: boolean
+          description: "True if step is still running and more messages may arrive"
+      required:
+        - messages
+        - stepStatus
+        - stepStatusLabel
+        - hasMore
 
     RejectStepRequest:
       type: object
