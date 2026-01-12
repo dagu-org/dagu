@@ -605,13 +605,18 @@ func (h *Handler) transformLogPaths(status *exec.DAGRunStatus) {
 // Errors are logged but don't fail the status update since messages are auxiliary data.
 func (h *Handler) persistChatMessages(ctx context.Context, attempt exec.DAGRunAttempt, status *exec.DAGRunStatus) {
 	// Helper to persist messages for a single node
-	persistNode := func(node *exec.Node) {
+	persistNode := func(node *exec.Node, fallbackName string) {
 		if node == nil || len(node.ChatMessages) == 0 {
 			return
 		}
-		if err := attempt.WriteStepMessages(ctx, node.Step.Name, node.ChatMessages); err != nil {
+		// Use step name, or fallback for handler nodes with empty names
+		stepName := node.Step.Name
+		if stepName == "" {
+			stepName = fallbackName
+		}
+		if err := attempt.WriteStepMessages(ctx, stepName, node.ChatMessages); err != nil {
 			logger.Warn(ctx, "Failed to persist chat messages",
-				tag.Step(node.Step.Name),
+				tag.Step(stepName),
 				tag.Error(err),
 			)
 		}
@@ -619,16 +624,16 @@ func (h *Handler) persistChatMessages(ctx context.Context, attempt exec.DAGRunAt
 
 	// Persist messages for regular nodes
 	for _, node := range status.Nodes {
-		persistNode(node)
+		persistNode(node, "step")
 	}
 
-	// Persist messages for handler nodes
-	persistNode(status.OnInit)
-	persistNode(status.OnExit)
-	persistNode(status.OnSuccess)
-	persistNode(status.OnFailure)
-	persistNode(status.OnCancel)
-	persistNode(status.OnWait)
+	// Persist messages for handler nodes with explicit fallback names
+	persistNode(status.OnInit, "on_init")
+	persistNode(status.OnExit, "on_exit")
+	persistNode(status.OnSuccess, "on_success")
+	persistNode(status.OnFailure, "on_failure")
+	persistNode(status.OnCancel, "on_cancel")
+	persistNode(status.OnWait, "on_wait")
 }
 
 // getOrOpenAttempt retrieves an open attempt from cache or opens a new one.

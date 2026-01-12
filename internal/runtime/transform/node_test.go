@@ -10,6 +10,7 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNodeFieldsRoundTrip(t *testing.T) {
@@ -80,7 +81,7 @@ func TestNodeChatMessagesRoundTrip(t *testing.T) {
 	state := runtimeNode.State()
 
 	// Verify ChatMessages are preserved in runtime.NodeState
-	assert.Len(t, state.ChatMessages, 3)
+	require.Len(t, state.ChatMessages, 3)
 	assert.Equal(t, exec.RoleSystem, state.ChatMessages[0].Role)
 	assert.Equal(t, "You are helpful.", state.ChatMessages[0].Content)
 	assert.Nil(t, state.ChatMessages[0].Metadata)
@@ -105,7 +106,7 @@ func TestNodeChatMessagesRoundTrip(t *testing.T) {
 	result := status.Nodes[0]
 
 	// Verify ChatMessages are preserved in exec.Node
-	assert.Len(t, result.ChatMessages, 3)
+	require.Len(t, result.ChatMessages, 3)
 	assert.Equal(t, original.ChatMessages[0].Role, result.ChatMessages[0].Role)
 	assert.Equal(t, original.ChatMessages[0].Content, result.ChatMessages[0].Content)
 	assert.Equal(t, original.ChatMessages[1].Role, result.ChatMessages[1].Role)
