@@ -523,16 +523,26 @@ func TestMaskSecretsForProvider(t *testing.T) {
 			},
 		},
 		{
-			name:    "preserves role and metadata",
+			name:    "preserves role and metadata for multiple messages",
 			secrets: map[string]string{"SECRET": "xyz"},
 			messages: []exec.LLMMessage{
 				{
-					Role:     exec.RoleAssistant,
+					Role:     exec.RoleUser,
 					Content:  "Value: xyz",
-					Metadata: &exec.LLMMessageMetadata{Model: "gpt-4"},
+					Metadata: nil,
+				},
+				{
+					Role:     exec.RoleAssistant,
+					Content:  "Response with xyz",
+					Metadata: &exec.LLMMessageMetadata{Model: "gpt-4", PromptTokens: 10, CompletionTokens: 5},
+				},
+				{
+					Role:     exec.RoleUser,
+					Content:  "Another xyz message",
+					Metadata: &exec.LLMMessageMetadata{Provider: "openai"},
 				},
 			},
-			wantMasked: []string{"Value: *******"},
+			wantMasked: []string{"Value: *******", "Response with *******", "Another ******* message"},
 		},
 	}
 
@@ -547,11 +557,8 @@ func TestMaskSecretsForProvider(t *testing.T) {
 			for i, want := range tt.wantMasked {
 				assert.Equal(t, want, result[i].Content)
 				assert.Equal(t, tt.messages[i].Role, result[i].Role)
-			}
-
-			// Verify metadata is preserved
-			if len(tt.messages) > 0 && tt.messages[0].Metadata != nil {
-				assert.Equal(t, tt.messages[0].Metadata, result[0].Metadata)
+				// Verify metadata is preserved for each message
+				assert.Equal(t, tt.messages[i].Metadata, result[i].Metadata)
 			}
 		})
 	}

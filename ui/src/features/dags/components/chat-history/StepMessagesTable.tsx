@@ -83,9 +83,9 @@ export function StepMessagesTable({
 
   const messages = data?.messages || [];
 
-  // Only last message expanded by default
+  // Start with empty set; useEffect will expand the last message when data arrives
   const [expandedIndexes, setExpandedIndexes] = useState<Set<number>>(
-    new Set([messages.length - 1])
+    new Set()
   );
 
   // Update expanded state when messages change (expand new last message)
@@ -113,8 +113,8 @@ export function StepMessagesTable({
       await navigator.clipboard.writeText(content);
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex(null), 2000);
-    } catch {
-      // Clipboard access denied
+    } catch (err) {
+      console.warn('Clipboard access denied:', err);
     }
   };
 

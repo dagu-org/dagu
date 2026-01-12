@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { components, NodeStatus } from '@/api/v2/schema';
 import { StepMessagesTable } from './StepMessagesTable';
@@ -43,6 +43,13 @@ export function ChatHistoryTab({ dagRun }: ChatHistoryTabProps) {
     defaultStep
   );
 
+  // Update selectedStep when defaultStep changes (e.g., when nodes arrive or runs switch)
+  useEffect(() => {
+    if (defaultStep) {
+      setSelectedStep(defaultStep);
+    }
+  }, [defaultStep]);
+
   // Get selected node info
   const selectedNode = chatSteps.find((n) => n.step.name === selectedStep);
   const isSelectedRunning = selectedNode?.status === NodeStatus.Running;
@@ -65,11 +72,12 @@ export function ChatHistoryTab({ dagRun }: ChatHistoryTabProps) {
     <div className="space-y-2">
       {/* Step selector dropdown */}
       <div className="flex items-center gap-2 text-xs">
-        <span className="text-muted-foreground">Step:</span>
+        <label htmlFor="chat-step-select" className="text-muted-foreground">Step:</label>
         <select
+          id="chat-step-select"
           value={selectedStep || ''}
           onChange={(e) => setSelectedStep(e.target.value)}
-          className="h-6 px-2 text-xs border rounded bg-white"
+          className="h-6 px-2 text-xs border rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
         >
           {chatSteps.map((node) => (
             <option key={node.step.name} value={node.step.name}>

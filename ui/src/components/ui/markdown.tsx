@@ -12,7 +12,7 @@ export function Markdown({ content, className }: MarkdownProps) {
   return (
     <div
       className={cn(
-        'text-xs prose prose-sm prose-slate dark:prose-invert max-w-none',
+        'text-xs prose prose-sm prose-slate dark:prose-invert max-w-none break-words',
         // Compact spacing
         'prose-p:my-1 prose-p:leading-relaxed',
         'prose-pre:my-1 prose-pre:p-2 prose-pre:text-xs prose-pre:bg-muted prose-pre:rounded',

@@ -275,7 +275,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
   const showTimeline = dagRun.status !== Status.NotStarted;
 
   // Check if there are any chat steps
-  const hasChatSteps = dagRun.nodes?.some(
+  const hasChatSteps = !!dagRun.nodes?.some(
     (node) => node.step.executorConfig?.type === 'chat'
   );
 

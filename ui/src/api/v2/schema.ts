@@ -950,7 +950,7 @@ export interface paths {
         };
         /**
          * Retrieve chat messages for a step in a sub DAG-run
-         * @description Fetches the LLM chat message history for a chat step in a sub DAG-run
+         * @description Fetches the LLM chat message history for a chat step in a sub DAG-run. Returns empty array for non-chat steps.
          */
         get: operations["getSubDAGRunStepMessages"];
         put?: never;
