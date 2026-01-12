@@ -1473,6 +1473,12 @@ paths:
           schema:
             type: "string"
           description: "Filter DAG-runs by name"
+        - name: "tags"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAG-runs by DAG tags (comma-separated). Returns runs from DAGs that have ALL specified tags."
       responses:
         "200":
           description: "A successful response"

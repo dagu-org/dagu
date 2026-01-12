@@ -3946,6 +3946,8 @@ export interface operations {
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description Filter DAG-runs by name */
                 name?: string;
+                /** @description Filter DAG-runs by DAG tags (comma-separated). Returns runs from DAGs that have ALL specified tags. */
+                tags?: string;
             };
             header?: never;
             path?: never;

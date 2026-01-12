@@ -60,6 +60,7 @@ type ListDAGRunStatusesOptions struct {
 	To        TimeInUTC
 	Statuses  []core.Status
 	Limit     int
+	Tags      []string // Filter by DAG tags (AND logic - all tags must match)
 }
 
 // ListRunsOption is a functional option for configuring ListRunsOptions
@@ -104,6 +105,13 @@ func WithName(name string) ListDAGRunStatusesOption {
 func WithDAGRunID(dagRunID string) ListDAGRunStatusesOption {
 	return func(o *ListDAGRunStatusesOptions) {
 		o.DAGRunID = dagRunID
+	}
+}
+
+// WithTags sets the tags filter for listing dag-runs (AND logic - all tags must match)
+func WithTags(tags []string) ListDAGRunStatusesOption {
+	return func(o *ListDAGRunStatusesOptions) {
+		o.Tags = tags
 	}
 }
 

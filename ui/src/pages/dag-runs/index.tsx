@@ -1,10 +1,20 @@
 import dayjs from 'dayjs';
-import { Layers, List, Search } from 'lucide-react';
+import { ChevronDown, Layers, List, Search, Tag, X } from 'lucide-react';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { Status } from '../../api/v2/schema';
+import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { DateRangePicker } from '../../components/ui/date-range-picker';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../../components/ui/dropdown-menu';
 import { Input } from '../../components/ui/input';
 import {
   Select,
@@ -29,6 +39,7 @@ type DAGRunsFilters = {
   searchText: string;
   dagRunId: string;
   status: string;
+  tags: string[];
   fromDate?: string;
   toDate?: string;
   dateRangeMode: 'preset' | 'specific' | 'custom';
@@ -37,10 +48,52 @@ type DAGRunsFilters = {
   specificValue: string;
 };
 
-const areFiltersEqual = (a: DAGRunsFilters, b: DAGRunsFilters) =>
+const areTagsEqual = (a: string[], b: string[]): boolean => {
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].sort();
+  const sortedB = [...b].sort();
+  return sortedA.every((tag, i) => tag === sortedB[i]);
+};
+
+const STATUS_CONFIG: Record<Status, string> = {
+  [Status.NotStarted]: 'not_started',
+  [Status.Running]: 'running',
+  [Status.Failed]: 'failed',
+  [Status.Aborted]: 'aborted',
+  [Status.Success]: 'succeeded',
+  [Status.Queued]: 'queued',
+  [Status.PartialSuccess]: 'partially_succeeded',
+  [Status.Waiting]: 'waiting',
+  [Status.Rejected]: 'rejected',
+};
+
+function StatusSelectDisplay({ status }: { status: string }): React.ReactNode {
+  if (status === 'all') {
+    return (
+      <div className="inline-flex items-center rounded-full border bg-muted border-border text-foreground py-0.5 px-2 text-xs font-medium">
+        All
+      </div>
+    );
+  }
+
+  const statusNum = parseInt(status) as Status;
+  const label = STATUS_CONFIG[statusNum];
+  if (label) {
+    return (
+      <StatusChip status={statusNum} size="sm">
+        {label}
+      </StatusChip>
+    );
+  }
+
+  return null;
+}
+
+const areFiltersEqual = (a: DAGRunsFilters, b: DAGRunsFilters): boolean =>
   a.searchText === b.searchText &&
   a.dagRunId === b.dagRunId &&
   a.status === b.status &&
+  areTagsEqual(a.tags, b.tags) &&
   a.fromDate === b.fromDate &&
   a.toDate === b.toDate &&
   a.dateRangeMode === b.dateRangeMode &&
@@ -123,6 +176,7 @@ function DAGRuns() {
       searchText: '',
       dagRunId: '',
       status: 'all',
+      tags: [],
       fromDate: getDefaultFromDate(),
       toDate: undefined,
       dateRangeMode: 'preset',
@@ -133,10 +187,13 @@ function DAGRuns() {
     [getDefaultFromDate]
   );
 
-  // State for search input, dagRun ID, status, and date ranges
+  // State for search input, dagRun ID, status, tags, and date ranges
   const [searchText, setSearchText] = React.useState(defaultFilters.searchText);
   const [dagRunId, setDagRunId] = React.useState(defaultFilters.dagRunId);
   const [status, setStatus] = React.useState<string>(defaultFilters.status);
+  const [selectedTags, setSelectedTags] = React.useState<string[]>(
+    defaultFilters.tags
+  );
   const [fromDate, setFromDate] = React.useState<string | undefined>(
     defaultFilters.fromDate
   );
@@ -150,6 +207,7 @@ function DAGRuns() {
   );
   const [apiDagRunId, setApiDagRunId] = React.useState(defaultFilters.dagRunId);
   const [apiStatus, setApiStatus] = React.useState(defaultFilters.status);
+  const [apiTags, setApiTags] = React.useState<string[]>(defaultFilters.tags);
   const [apiFromDate, setApiFromDate] = React.useState<string | undefined>(
     defaultFilters.fromDate
   );
@@ -185,6 +243,7 @@ function DAGRuns() {
       searchText,
       dagRunId,
       status,
+      tags: selectedTags,
       fromDate,
       toDate,
       dateRangeMode,
@@ -196,6 +255,7 @@ function DAGRuns() {
       searchText,
       dagRunId,
       status,
+      selectedTags,
       fromDate,
       toDate,
       dateRangeMode,
@@ -235,6 +295,14 @@ function DAGRuns() {
 
     if (params.has('status')) {
       urlFilters.status = params.get('status') || 'all';
+      hasUrlFilters = true;
+    }
+
+    if (params.has('tags')) {
+      const tagsParam = params.get('tags') ?? '';
+      urlFilters.tags = tagsParam
+        ? tagsParam.split(',').map((t) => t.trim().toLowerCase()).filter((t) => t !== '')
+        : [];
       hasUrlFilters = true;
     }
 
@@ -293,6 +361,7 @@ function DAGRuns() {
     setSearchText(next.searchText);
     setDagRunId(next.dagRunId);
     setStatus(next.status);
+    setSelectedTags(next.tags);
     setFromDate(next.fromDate);
     setToDate(next.toDate);
     setDateRangeMode(next.dateRangeMode);
@@ -303,6 +372,7 @@ function DAGRuns() {
     setAPISearchText(next.searchText);
     setApiDagRunId(next.dagRunId);
     setApiStatus(next.status);
+    setApiTags(next.tags);
     setApiFromDate(next.fromDate);
     setApiToDate(next.toDate);
 
@@ -329,6 +399,23 @@ function DAGRuns() {
     appBarContext.setTitle('DAG Runs');
   }, [appBarContext]);
 
+  // Fetch available tags for the filter dropdown
+  const { data: tagsData } = useQuery(
+    '/dags/tags',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
+      },
+    },
+    {
+      revalidateOnFocus: false,
+      revalidateIfStale: false,
+    }
+  );
+  const availableTags = tagsData?.tags ?? [];
+
   const { data, mutate } = useQuery(
     '/dag-runs',
     {
@@ -339,6 +426,7 @@ function DAGRuns() {
           dagRunId: apiDagRunId ? apiDagRunId : undefined,
           status:
             apiStatus && apiStatus !== 'all' ? parseInt(apiStatus) : undefined,
+          tags: apiTags.length > 0 ? apiTags.join(',') : undefined,
           fromDate: formatDateForApi(apiFromDate),
           toDate: formatDateForApi(apiToDate),
         },
@@ -375,6 +463,7 @@ function DAGRuns() {
     setAPISearchText(searchText);
     setApiDagRunId(dagRunId);
     setApiStatus(statusToUse);
+    setApiTags(selectedTags);
     setApiFromDate(fromDate);
     setApiToDate(toDate);
 
@@ -382,6 +471,7 @@ function DAGRuns() {
     addSearchParam('name', searchText);
     addSearchParam('dagRunId', dagRunId);
     addSearchParam('status', statusToUse);
+    addSearchParam('tags', selectedTags.length > 0 ? selectedTags.join(',') : undefined);
     addSearchParam('fromDate', fromDate);
     addSearchParam('toDate', toDate);
     addSearchParam('dateMode', dateRangeMode);
@@ -407,6 +497,24 @@ function DAGRuns() {
     setStatus(value);
     // Automatically trigger search when status changes
     handleSearch(value);
+  };
+
+  const updateTags = (newTags: string[]) => {
+    setSelectedTags(newTags);
+    setApiTags(newTags);
+    addSearchParam('tags', newTags.length > 0 ? newTags.join(',') : undefined);
+    mutate();
+  };
+
+  const handleTagToggle = (tag: string) => {
+    const newTags = selectedTags.includes(tag)
+      ? selectedTags.filter((t) => t !== tag)
+      : [...selectedTags, tag];
+    updateTags(newTags);
+  };
+
+  const handleClearTags = () => {
+    updateTags([]);
   };
 
   const handleViewModeChange = (value: string) => {
@@ -634,47 +742,7 @@ function DAGRuns() {
             <Select value={status} onValueChange={handleStatusChange}>
               <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="Status">
-                  {status === 'all' ? (
-                    <div className="inline-flex items-center rounded-full border bg-muted border-border text-foreground py-0.5 px-2 text-xs font-medium">
-                      All
-                    </div>
-                  ) : status === String(Status.NotStarted) ? (
-                    <StatusChip status={Status.NotStarted} size="sm">
-                      not_started
-                    </StatusChip>
-                  ) : status === String(Status.Running) ? (
-                    <StatusChip status={Status.Running} size="sm">
-                      running
-                    </StatusChip>
-                  ) : status === String(Status.Failed) ? (
-                    <StatusChip status={Status.Failed} size="sm">
-                      failed
-                    </StatusChip>
-                  ) : status === String(Status.Aborted) ? (
-                    <StatusChip status={Status.Aborted} size="sm">
-                      aborted
-                    </StatusChip>
-                  ) : status === String(Status.Success) ? (
-                    <StatusChip status={Status.Success} size="sm">
-                      succeeded
-                    </StatusChip>
-                  ) : status === String(Status.Queued) ? (
-                    <StatusChip status={Status.Queued} size="sm">
-                      queued
-                    </StatusChip>
-                  ) : status === String(Status.PartialSuccess) ? (
-                    <StatusChip status={Status.PartialSuccess} size="sm">
-                      partially_succeeded
-                    </StatusChip>
-                  ) : status === String(Status.Waiting) ? (
-                    <StatusChip status={Status.Waiting} size="sm">
-                      waiting
-                    </StatusChip>
-                  ) : status === String(Status.Rejected) ? (
-                    <StatusChip status={Status.Rejected} size="sm">
-                      rejected
-                    </StatusChip>
-                  ) : null}
+                  <StatusSelectDisplay status={status} />
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -683,53 +751,92 @@ function DAGRuns() {
                     All Statuses
                   </div>
                 </SelectItem>
-                <SelectItem value={String(Status.NotStarted)}>
-                  <StatusChip status={Status.NotStarted} size="sm">
-                    not_started
-                  </StatusChip>
-                </SelectItem>
-                <SelectItem value={String(Status.Running)}>
-                  <StatusChip status={Status.Running} size="sm">
-                    running
-                  </StatusChip>
-                </SelectItem>
-                <SelectItem value={String(Status.Failed)}>
-                  <StatusChip status={Status.Failed} size="sm">
-                    failed
-                  </StatusChip>
-                </SelectItem>
-                <SelectItem value={String(Status.Aborted)}>
-                  <StatusChip status={Status.Aborted} size="sm">
-                    aborted
-                  </StatusChip>
-                </SelectItem>
-                <SelectItem value={String(Status.Success)}>
-                  <StatusChip status={Status.Success} size="sm">
-                    succeeded
-                  </StatusChip>
-                </SelectItem>
-                <SelectItem value={String(Status.Queued)}>
-                  <StatusChip status={Status.Queued} size="sm">
-                    queued
-                  </StatusChip>
-                </SelectItem>
-                <SelectItem value={String(Status.PartialSuccess)}>
-                  <StatusChip status={Status.PartialSuccess} size="sm">
-                    partially_succeeded
-                  </StatusChip>
-                </SelectItem>
-                <SelectItem value={String(Status.Waiting)}>
-                  <StatusChip status={Status.Waiting} size="sm">
-                    waiting
-                  </StatusChip>
-                </SelectItem>
-                <SelectItem value={String(Status.Rejected)}>
-                  <StatusChip status={Status.Rejected} size="sm">
-                    rejected
-                  </StatusChip>
-                </SelectItem>
+                {Object.entries(STATUS_CONFIG).map(([statusValue, label]) => (
+                  <SelectItem key={statusValue} value={statusValue}>
+                    <StatusChip status={Number(statusValue) as Status} size="sm">
+                      {label}
+                    </StatusChip>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            {/* Tags filter */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="default" className="px-3">
+                  <Tag size={14} className="mr-1.5" />
+                  Tags
+                  {selectedTags.length > 0 && (
+                    <Badge
+                      variant="secondary"
+                      className="ml-1.5 h-5 px-1.5 text-xs"
+                    >
+                      {selectedTags.length}
+                    </Badge>
+                  )}
+                  <ChevronDown size={14} className="ml-1.5 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-[200px]">
+                <DropdownMenuLabel className="text-xs text-muted-foreground">
+                  Filter by tags (AND)
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {availableTags.length === 0 ? (
+                  <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                    No tags available
+                  </div>
+                ) : (
+                  availableTags.map((tag) => (
+                    <DropdownMenuCheckboxItem
+                      key={tag}
+                      checked={selectedTags.includes(tag)}
+                      onCheckedChange={() => handleTagToggle(tag)}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      {tag}
+                    </DropdownMenuCheckboxItem>
+                  ))
+                )}
+                {selectedTags.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onSelect={() => handleClearTags()}
+                    >
+                      <X size={14} className="mr-1.5" />
+                      Clear all
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {/* Selected tags display */}
+            {selectedTags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {selectedTags.map((tag) => (
+                  <Badge
+                    key={tag}
+                    variant="secondary"
+                    className="text-xs cursor-pointer hover:bg-destructive/20"
+                    onClick={() => handleTagToggle(tag)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleTagToggle(tag);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`Remove tag ${tag}`}
+                  >
+                    {tag}
+                    <X size={12} className="ml-1" />
+                  </Badge>
+                ))}
+              </div>
+            )}
             <Button
               onClick={() => handleSearch()}
               size="default"

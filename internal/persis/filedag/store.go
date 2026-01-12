@@ -540,7 +540,7 @@ func (store *Storage) TagList(ctx context.Context) ([]string, []string, error) {
 		}
 
 		for _, tag := range parsedDAG.Tags {
-			tagSet[tag] = struct{}{}
+			tagSet[strings.ToLower(tag)] = struct{}{}
 		}
 	}
 
