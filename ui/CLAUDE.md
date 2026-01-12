@@ -390,6 +390,8 @@ This document outlines the design principles and guidelines for the Dagu UI base
 
 ## Development Workflow
 
+**IMPORTANT: DO NOT run `make ui`, `pnpm build`, or any build commands unless explicitly asked by the user.**
+
 **Before committing:**
 - Run `make ui` to ensure frontend builds without errors
 - Use pnpm for frontend package management

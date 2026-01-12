@@ -69,7 +69,7 @@ export function ChatHistoryTab({ dagRun }: ChatHistoryTabProps) {
         <select
           value={selectedStep || ''}
           onChange={(e) => setSelectedStep(e.target.value)}
-          className="h-6 px-2 text-xs border rounded bg-background"
+          className="h-6 px-2 text-xs border rounded bg-white"
         >
           {chatSteps.map((node) => (
             <option key={node.step.name} value={node.step.name}>

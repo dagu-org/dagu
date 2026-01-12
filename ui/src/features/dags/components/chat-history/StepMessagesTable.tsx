@@ -136,7 +136,7 @@ export function StepMessagesTable({
   }
 
   return (
-    <div className="border rounded">
+    <div className="border rounded bg-white">
       {messages.map((msg, i) => {
         const isExpanded = expandedIndexes.has(i);
         const config = roleConfig[msg.role] || defaultRoleConfig;
@@ -145,7 +145,7 @@ export function StepMessagesTable({
           <div
             key={i}
             className={cn(
-              'border-l-2 border-b last:border-b-0',
+              'border-l-2 border-b last:border-b-0 bg-white',
               config.borderColor
             )}
           >
@@ -165,23 +165,25 @@ export function StepMessagesTable({
                 {config.label}
               </span>
               {!isExpanded && (
-                <span className="text-xs text-muted-foreground truncate flex-1">
-                  {msg.content.slice(0, 80)}
-                  {msg.content.length > 80 && '...'}
-                </span>
-              )}
-              {msg.metadata && (
-                <span className="ml-auto text-xs text-muted-foreground font-mono shrink-0">
-                  {msg.metadata.model} {msg.metadata.totalTokens}t
-                </span>
+                <>
+                  <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">
+                    {msg.content.slice(0, 80)}
+                    {msg.content.length > 80 && '...'}
+                  </span>
+                  {msg.metadata && (
+                    <span className="text-xs text-muted-foreground font-mono shrink-0">
+                      {msg.metadata.model} {msg.metadata.totalTokens}t
+                    </span>
+                  )}
+                </>
               )}
             </button>
 
             {/* Expanded content */}
             {isExpanded && (
               <div className="px-2 pb-2 pl-7">
-                <div className="flex gap-2">
-                  <div className="flex-1 max-w-2xl">
+                <div className="flex gap-4 items-start">
+                  <div className="flex-1 min-w-0">
                     <Markdown content={msg.content} />
                   </div>
                   <div className="shrink-0 flex flex-col items-end gap-1">
@@ -191,14 +193,15 @@ export function StepMessagesTable({
                           {msg.metadata.provider}/{msg.metadata.model}
                         </div>
                         <div>
-                          {msg.metadata.promptTokens}+
-                          {msg.metadata.completionTokens}=
-                          {msg.metadata.totalTokens}
+                          in:{msg.metadata.promptTokens} out:{msg.metadata.completionTokens}
                         </div>
                       </div>
                     )}
                     <button
-                      onClick={() => handleCopy(msg.content, i)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCopy(msg.content, i);
+                      }}
                       className="p-1 hover:bg-accent rounded"
                       type="button"
                       title="Copy message"
