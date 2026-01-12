@@ -5,13 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmd/dagpicker"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
@@ -24,7 +22,6 @@ import (
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 // Errors for start command
@@ -59,7 +56,7 @@ Examples:
 
 This command parses the DAG definition, resolves parameters, and initiates the DAG-run execution.
 `,
-			Args: cobra.ArbitraryArgs,
+			Args: cobra.MinimumNArgs(1),
 		}, startFlags, runStart,
 	)
 }
@@ -257,36 +254,7 @@ func getDAGRunInfo(ctx *Context) (dagRunID, rootDAGRun, parentDAGRun string, isS
 
 // loadDAGWithParams loads the DAG and its parameters from command arguments.
 func loadDAGWithParams(ctx *Context, args []string, isSubDAGRun bool) (*core.DAG, string, error) {
-	var dagPath string
-	var interactiveParams string
-
-	if len(args) == 0 {
-		if !term.IsTerminal(int(os.Stdin.Fd())) {
-			return nil, "", fmt.Errorf("DAG file path is required")
-		}
-
-		logger.Info(ctx, "No DAG specified, opening interactive selector")
-
-		dagStore, err := ctx.dagStore(nil, nil)
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to initialize DAG store: %w", err)
-		}
-
-		result, err := dagpicker.PickDAGInteractive(ctx, dagStore, nil)
-		if err != nil {
-			return nil, "", err
-		}
-
-		if result.Cancelled {
-			fmt.Println("DAG execution aborted.")
-			os.Exit(0)
-		}
-
-		dagPath = result.DAGPath
-		interactiveParams = result.Params
-	} else {
-		dagPath = args[0]
-	}
+	dagPath := args[0]
 
 	loadOpts := []spec.LoadOption{
 		spec.WithBaseConfig(ctx.Config.Paths.BaseConfig),
@@ -318,9 +286,6 @@ func loadDAGWithParams(ctx *Context, args []string, isSubDAGRun bool) (*core.DAG
 	switch {
 	case ctx.Command.ArgsLenAtDash() != -1 && len(args) > 0:
 		loadOpts = append(loadOpts, spec.WithParams(args[ctx.Command.ArgsLenAtDash():]))
-	case interactiveParams != "":
-		loadOpts = append(loadOpts, spec.WithParams(stringutil.RemoveQuotes(interactiveParams)))
-		params = interactiveParams
 	default:
 		params, err = ctx.Command.Flags().GetString("params")
 		if err != nil {

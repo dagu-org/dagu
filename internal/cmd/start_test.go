@@ -3,7 +3,6 @@ package cmd_test
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/term"
 )
 
 func TestStartCommand(t *testing.T) {
@@ -67,38 +65,6 @@ steps:
 			th.RunCommand(t, cmd.Start(), tc)
 		})
 	}
-}
-
-func TestCmdStart_InteractiveMode(t *testing.T) {
-	t.Run("WorksWithExplicitDAGPath", func(t *testing.T) {
-		// Create a test DAG
-		th := test.SetupCommand(t)
-		dagContent := `
-steps:
-  - name: step1
-    command: echo test
-`
-		dagFile := th.CreateDAGFile(t, "test.yaml", dagContent)
-
-		// Providing a DAG path should work
-		cli := cmd.Start()
-		cli.SetArgs([]string{dagFile})
-		// The actual execution might fail for other reasons in test environment,
-		// but it should accept the DAG file argument
-		_ = cli.Execute()
-	})
-
-	t.Run("TerminalDetectionFunctionAvailable", func(t *testing.T) {
-		// Verify that term.IsTerminal is available and doesn't panic
-		isTTY := term.IsTerminal(int(os.Stdin.Fd()))
-		require.False(t, isTTY, "Tests should not run in a TTY")
-	})
-
-	t.Run("InteractiveModeInfoMessage", func(t *testing.T) {
-		// Verify the info message is appropriate
-		expectedMsg := "No DAG specified, opening interactive selector..."
-		require.Contains(t, expectedMsg, "interactive selector")
-	})
 }
 
 func TestCmdStart_BackwardCompatibility(t *testing.T) {
