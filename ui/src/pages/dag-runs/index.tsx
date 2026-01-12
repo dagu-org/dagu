@@ -47,14 +47,48 @@ type DAGRunsFilters = {
   specificValue: string;
 };
 
-const areTagsEqual = (a: string[], b: string[]) => {
+const areTagsEqual = (a: string[], b: string[]): boolean => {
   if (a.length !== b.length) return false;
   const sortedA = [...a].sort();
   const sortedB = [...b].sort();
   return sortedA.every((tag, i) => tag === sortedB[i]);
 };
 
-const areFiltersEqual = (a: DAGRunsFilters, b: DAGRunsFilters) =>
+const STATUS_CONFIG: Record<Status, string> = {
+  [Status.NotStarted]: 'not_started',
+  [Status.Running]: 'running',
+  [Status.Failed]: 'failed',
+  [Status.Aborted]: 'aborted',
+  [Status.Success]: 'succeeded',
+  [Status.Queued]: 'queued',
+  [Status.PartialSuccess]: 'partially_succeeded',
+  [Status.Waiting]: 'waiting',
+  [Status.Rejected]: 'rejected',
+};
+
+function StatusSelectDisplay({ status }: { status: string }): React.ReactNode {
+  if (status === 'all') {
+    return (
+      <div className="inline-flex items-center rounded-full border bg-muted border-border text-foreground py-0.5 px-2 text-xs font-medium">
+        All
+      </div>
+    );
+  }
+
+  const statusNum = parseInt(status) as Status;
+  const label = STATUS_CONFIG[statusNum];
+  if (label) {
+    return (
+      <StatusChip status={statusNum} size="sm">
+        {label}
+      </StatusChip>
+    );
+  }
+
+  return null;
+}
+
+const areFiltersEqual = (a: DAGRunsFilters, b: DAGRunsFilters): boolean =>
   a.searchText === b.searchText &&
   a.dagRunId === b.dagRunId &&
   a.status === b.status &&
@@ -706,47 +740,7 @@ function DAGRuns() {
             <Select value={status} onValueChange={handleStatusChange}>
               <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="Status">
-                  {status === 'all' ? (
-                    <div className="inline-flex items-center rounded-full border bg-muted border-border text-foreground py-0.5 px-2 text-xs font-medium">
-                      All
-                    </div>
-                  ) : status === String(Status.NotStarted) ? (
-                    <StatusChip status={Status.NotStarted} size="sm">
-                      not_started
-                    </StatusChip>
-                  ) : status === String(Status.Running) ? (
-                    <StatusChip status={Status.Running} size="sm">
-                      running
-                    </StatusChip>
-                  ) : status === String(Status.Failed) ? (
-                    <StatusChip status={Status.Failed} size="sm">
-                      failed
-                    </StatusChip>
-                  ) : status === String(Status.Aborted) ? (
-                    <StatusChip status={Status.Aborted} size="sm">
-                      aborted
-                    </StatusChip>
-                  ) : status === String(Status.Success) ? (
-                    <StatusChip status={Status.Success} size="sm">
-                      succeeded
-                    </StatusChip>
-                  ) : status === String(Status.Queued) ? (
-                    <StatusChip status={Status.Queued} size="sm">
-                      queued
-                    </StatusChip>
-                  ) : status === String(Status.PartialSuccess) ? (
-                    <StatusChip status={Status.PartialSuccess} size="sm">
-                      partially_succeeded
-                    </StatusChip>
-                  ) : status === String(Status.Waiting) ? (
-                    <StatusChip status={Status.Waiting} size="sm">
-                      waiting
-                    </StatusChip>
-                  ) : status === String(Status.Rejected) ? (
-                    <StatusChip status={Status.Rejected} size="sm">
-                      rejected
-                    </StatusChip>
-                  ) : null}
+                  <StatusSelectDisplay status={status} />
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -755,51 +749,13 @@ function DAGRuns() {
                     All Statuses
                   </div>
                 </SelectItem>
-                <SelectItem value={String(Status.NotStarted)}>
-                  <StatusChip status={Status.NotStarted} size="sm">
-                    not_started
-                  </StatusChip>
-                </SelectItem>
-                <SelectItem value={String(Status.Running)}>
-                  <StatusChip status={Status.Running} size="sm">
-                    running
-                  </StatusChip>
-                </SelectItem>
-                <SelectItem value={String(Status.Failed)}>
-                  <StatusChip status={Status.Failed} size="sm">
-                    failed
-                  </StatusChip>
-                </SelectItem>
-                <SelectItem value={String(Status.Aborted)}>
-                  <StatusChip status={Status.Aborted} size="sm">
-                    aborted
-                  </StatusChip>
-                </SelectItem>
-                <SelectItem value={String(Status.Success)}>
-                  <StatusChip status={Status.Success} size="sm">
-                    succeeded
-                  </StatusChip>
-                </SelectItem>
-                <SelectItem value={String(Status.Queued)}>
-                  <StatusChip status={Status.Queued} size="sm">
-                    queued
-                  </StatusChip>
-                </SelectItem>
-                <SelectItem value={String(Status.PartialSuccess)}>
-                  <StatusChip status={Status.PartialSuccess} size="sm">
-                    partially_succeeded
-                  </StatusChip>
-                </SelectItem>
-                <SelectItem value={String(Status.Waiting)}>
-                  <StatusChip status={Status.Waiting} size="sm">
-                    waiting
-                  </StatusChip>
-                </SelectItem>
-                <SelectItem value={String(Status.Rejected)}>
-                  <StatusChip status={Status.Rejected} size="sm">
-                    rejected
-                  </StatusChip>
-                </SelectItem>
+                {Object.entries(STATUS_CONFIG).map(([statusValue, label]) => (
+                  <SelectItem key={statusValue} value={statusValue}>
+                    <StatusChip status={Number(statusValue) as Status} size="sm">
+                      {label}
+                    </StatusChip>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             {/* Tags filter */}

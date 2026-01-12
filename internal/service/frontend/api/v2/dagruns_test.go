@@ -606,3 +606,146 @@ func TestExecuteDAGSyncSingleton(t *testing.T) {
 		Singleton: &singleton,
 	}).ExpectStatus(http.StatusConflict).Send(t)
 }
+
+func TestListDAGRunsFilterByTags(t *testing.T) {
+	server := test.SetupServer(t)
+
+	// Create DAGs with different tags
+	dagSpecProd := `tags:
+  - prod
+  - critical
+steps:
+  - name: main
+    command: "echo prod-critical"`
+
+	dagSpecDev := `tags:
+  - dev
+  - critical
+steps:
+  - name: main
+    command: "echo dev-critical"`
+
+	dagSpecTest := `tags:
+  - test
+steps:
+  - name: main
+    command: "echo test-only"`
+
+	// Create the DAGs
+	_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+		Name: "tag_filter_prod",
+		Spec: &dagSpecProd,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+		Name: "tag_filter_dev",
+		Spec: &dagSpecDev,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	_ = server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+		Name: "tag_filter_test",
+		Spec: &dagSpecTest,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	// Start DAG runs for each
+	var prodRunId, devRunId, testRunId string
+
+	startResp := server.Client().Post("/api/v2/dags/tag_filter_prod/start", api.ExecuteDAGJSONRequestBody{}).
+		ExpectStatus(http.StatusOK).Send(t)
+	var startBody api.ExecuteDAG200JSONResponse
+	startResp.Unmarshal(t, &startBody)
+	prodRunId = startBody.DagRunId
+
+	startResp = server.Client().Post("/api/v2/dags/tag_filter_dev/start", api.ExecuteDAGJSONRequestBody{}).
+		ExpectStatus(http.StatusOK).Send(t)
+	startResp.Unmarshal(t, &startBody)
+	devRunId = startBody.DagRunId
+
+	startResp = server.Client().Post("/api/v2/dags/tag_filter_test/start", api.ExecuteDAGJSONRequestBody{}).
+		ExpectStatus(http.StatusOK).Send(t)
+	startResp.Unmarshal(t, &startBody)
+	testRunId = startBody.DagRunId
+
+	// Wait for all runs to complete
+	for _, pair := range []struct {
+		name  string
+		runId string
+	}{
+		{"tag_filter_prod", prodRunId},
+		{"tag_filter_dev", devRunId},
+		{"tag_filter_test", testRunId},
+	} {
+		require.Eventually(t, func() bool {
+			url := fmt.Sprintf("/api/v2/dags/%s/dag-runs/%s", pair.name, pair.runId)
+			statusResp := server.Client().Get(url).Send(t)
+			if statusResp.Response.StatusCode() != http.StatusOK {
+				return false
+			}
+			var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
+			statusResp.Unmarshal(t, &dagRunStatus)
+			return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
+		}, 10*time.Second, 200*time.Millisecond)
+	}
+
+	// Test 1: Filter by single tag "critical" - should return prod and dev runs
+	listResp := server.Client().Get("/api/v2/dag-runs?tags=critical").
+		ExpectStatus(http.StatusOK).Send(t)
+	var listBody api.ListDAGRuns200JSONResponse
+	listResp.Unmarshal(t, &listBody)
+
+	criticalNames := make(map[string]bool)
+	for _, run := range listBody.DagRuns {
+		criticalNames[run.Name] = true
+	}
+	require.True(t, criticalNames["tag_filter_prod"], "prod DAG should be in critical filter results")
+	require.True(t, criticalNames["tag_filter_dev"], "dev DAG should be in critical filter results")
+	require.False(t, criticalNames["tag_filter_test"], "test DAG should NOT be in critical filter results")
+
+	// Test 2: Filter by multiple tags "prod,critical" (AND logic) - should return only prod run
+	listResp = server.Client().Get("/api/v2/dag-runs?tags=prod,critical").
+		ExpectStatus(http.StatusOK).Send(t)
+	listResp.Unmarshal(t, &listBody)
+
+	prodCriticalNames := make(map[string]bool)
+	for _, run := range listBody.DagRuns {
+		prodCriticalNames[run.Name] = true
+	}
+	require.True(t, prodCriticalNames["tag_filter_prod"], "prod DAG should be in prod+critical filter results")
+	require.False(t, prodCriticalNames["tag_filter_dev"], "dev DAG should NOT be in prod+critical filter results")
+	require.False(t, prodCriticalNames["tag_filter_test"], "test DAG should NOT be in prod+critical filter results")
+
+	// Test 3: Filter by non-existent tag - should return empty
+	listResp = server.Client().Get("/api/v2/dag-runs?tags=nonexistent").
+		ExpectStatus(http.StatusOK).Send(t)
+	listResp.Unmarshal(t, &listBody)
+
+	for _, run := range listBody.DagRuns {
+		require.NotContains(t, []string{"tag_filter_prod", "tag_filter_dev", "tag_filter_test"}, run.Name,
+			"non-existent tag filter should not return any of our test DAGs")
+	}
+
+	// Test 4: Filter by single tag "test" - should return only test run
+	listResp = server.Client().Get("/api/v2/dag-runs?tags=test").
+		ExpectStatus(http.StatusOK).Send(t)
+	listResp.Unmarshal(t, &listBody)
+
+	testNames := make(map[string]bool)
+	for _, run := range listBody.DagRuns {
+		testNames[run.Name] = true
+	}
+	require.True(t, testNames["tag_filter_test"], "test DAG should be in test filter results")
+	require.False(t, testNames["tag_filter_prod"], "prod DAG should NOT be in test filter results")
+	require.False(t, testNames["tag_filter_dev"], "dev DAG should NOT be in test filter results")
+
+	// Test 5: Case-insensitive tag matching
+	listResp = server.Client().Get("/api/v2/dag-runs?tags=CRITICAL").
+		ExpectStatus(http.StatusOK).Send(t)
+	listResp.Unmarshal(t, &listBody)
+
+	caseInsensitiveNames := make(map[string]bool)
+	for _, run := range listBody.DagRuns {
+		caseInsensitiveNames[run.Name] = true
+	}
+	require.True(t, caseInsensitiveNames["tag_filter_prod"], "case-insensitive: prod DAG should be in CRITICAL filter results")
+	require.True(t, caseInsensitiveNames["tag_filter_dev"], "case-insensitive: dev DAG should be in CRITICAL filter results")
+}
