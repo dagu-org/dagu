@@ -1,4 +1,4 @@
-package integration_test
+package distributed_test
 
 import (
 	"context"
@@ -11,13 +11,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestWorkerLabelMatching(t *testing.T) {
-	t.Run("TaskRoutedToMatchingWorker", func(t *testing.T) {
-		// Create coordinator handler
+// =============================================================================
+// Worker Routing Tests
+// =============================================================================
+// These tests verify worker label matching and task routing.
+
+func TestWorkerRouting_ExactLabelMatch(t *testing.T) {
+	t.Run("taskRoutedToMatchingWorker", func(t *testing.T) {
 		handler := coordinator.NewHandler()
 		ctx := context.Background()
 
-		// Simulate worker with GPU label polling
 		pollReq := &coordinatorv1.PollRequest{
 			WorkerId: "gpu-worker",
 			PollerId: "poller-1",
@@ -27,7 +30,6 @@ func TestWorkerLabelMatching(t *testing.T) {
 			},
 		}
 
-		// Start polling in background
 		pollDone := make(chan *coordinatorv1.Task)
 		go func() {
 			resp, err := handler.Poll(ctx, pollReq)
@@ -37,7 +39,6 @@ func TestWorkerLabelMatching(t *testing.T) {
 			close(pollDone)
 		}()
 
-		// Dispatch task with matching selector
 		task := &coordinatorv1.Task{
 			Operation: coordinatorv1.Operation_OPERATION_START,
 			DagRunId:  "test-run-1",
@@ -47,7 +48,6 @@ func TestWorkerLabelMatching(t *testing.T) {
 			},
 		}
 
-		// Wait for worker to register and dispatch successfully
 		dispatchReq := &coordinatorv1.DispatchRequest{Task: task}
 		var err error
 		require.Eventually(t, func() bool {
@@ -55,7 +55,6 @@ func TestWorkerLabelMatching(t *testing.T) {
 			return err == nil
 		}, 2*time.Second, 10*time.Millisecond, "Dispatch should succeed once worker is registered")
 
-		// Verify worker received the task
 		select {
 		case receivedTask := <-pollDone:
 			assert.Equal(t, task.DagRunId, receivedTask.DagRunId)
@@ -64,13 +63,13 @@ func TestWorkerLabelMatching(t *testing.T) {
 			t.Fatal("Worker did not receive task within timeout")
 		}
 	})
+}
 
-	t.Run("TaskNotRoutedToNonMatchingWorker", func(t *testing.T) {
-		// Create coordinator handler
+func TestWorkerRouting_NoMatchingWorker(t *testing.T) {
+	t.Run("taskNotRoutedToNonMatchingWorker", func(t *testing.T) {
 		handler := coordinator.NewHandler()
 		ctx := context.Background()
 
-		// Simulate CPU-only worker polling
 		pollReq := &coordinatorv1.PollRequest{
 			WorkerId: "cpu-worker",
 			PollerId: "poller-2",
@@ -80,14 +79,12 @@ func TestWorkerLabelMatching(t *testing.T) {
 			},
 		}
 
-		// Start polling in background
 		pollDone := make(chan bool)
 		go func() {
 			resp, _ := handler.Poll(ctx, pollReq)
 			pollDone <- resp.Task != nil
 		}()
 
-		// Dispatch task requiring GPU (should fail - no matching worker)
 		task := &coordinatorv1.Task{
 			Operation: coordinatorv1.Operation_OPERATION_START,
 			DagRunId:  "test-run-2",
@@ -97,35 +94,30 @@ func TestWorkerLabelMatching(t *testing.T) {
 			},
 		}
 
-		// Wait for worker to register, then dispatch should fail with proper error
 		dispatchReq := &coordinatorv1.DispatchRequest{Task: task}
 		var err error
 		require.Eventually(t, func() bool {
 			_, err = handler.Dispatch(ctx, dispatchReq)
-			// We expect an error, but it should be "no workers match" not "no available workers"
-			// The latter means no workers are registered yet
 			if err != nil {
 				return err.Error() != "rpc error: code = FailedPrecondition desc = no available workers"
 			}
 			return false
 		}, 2*time.Second, 10*time.Millisecond, "Worker should register before dispatch")
-		assert.Error(t, err) // Should fail as no matching worker
+		assert.Error(t, err)
 
-		// Verify worker did not receive the task
 		select {
 		case received := <-pollDone:
 			assert.False(t, received, "CPU worker should not receive GPU task")
 		case <-time.After(200 * time.Millisecond):
-			// Expected - worker should not receive task
 		}
 	})
+}
 
-	t.Run("EmptySelectorMatchesAnyWorker", func(t *testing.T) {
-		// Create coordinator handler
+func TestWorkerRouting_EmptySelector(t *testing.T) {
+	t.Run("emptySelectorMatchesAnyWorker", func(t *testing.T) {
 		handler := coordinator.NewHandler()
 		ctx := context.Background()
 
-		// Simulate worker with labels polling
 		pollReq := &coordinatorv1.PollRequest{
 			WorkerId: "labeled-worker",
 			PollerId: "poller-3",
@@ -135,7 +127,6 @@ func TestWorkerLabelMatching(t *testing.T) {
 			},
 		}
 
-		// Start polling in background
 		pollDone := make(chan *coordinatorv1.Task)
 		go func() {
 			resp, err := handler.Poll(ctx, pollReq)
@@ -145,15 +136,13 @@ func TestWorkerLabelMatching(t *testing.T) {
 			close(pollDone)
 		}()
 
-		// Dispatch task without selector (can run anywhere)
 		task := &coordinatorv1.Task{
 			Operation:      coordinatorv1.Operation_OPERATION_START,
 			DagRunId:       "test-run-3",
 			Target:         "general-task",
-			WorkerSelector: nil, // No selector - matches any worker
+			WorkerSelector: nil,
 		}
 
-		// Wait for worker to register and dispatch successfully
 		dispatchReq := &coordinatorv1.DispatchRequest{Task: task}
 		var err error
 		require.Eventually(t, func() bool {
@@ -161,7 +150,6 @@ func TestWorkerLabelMatching(t *testing.T) {
 			return err == nil
 		}, 2*time.Second, 10*time.Millisecond, "Dispatch should succeed once worker is registered")
 
-		// Verify worker received the task
 		select {
 		case receivedTask := <-pollDone:
 			assert.Equal(t, task.DagRunId, receivedTask.DagRunId)

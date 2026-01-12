@@ -269,19 +269,40 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 		return fmt.Errorf("failed to parse DAG definition: %w", err)
 	}
 
-	// Check if this is a retry OR if dag-run already exists (dispatch retry scenario).
-	// When dispatch fails and is retried, the dag-run may already exist from a previous
-	// dispatch attempt. In that case, we should add a new attempt to the existing dag-run.
-	isRetry := task.Operation == coordinatorv1.Operation_OPERATION_RETRY
-	if !isRetry {
-		ref := execution.DAGRunRef{Name: dag.Name, ID: task.DagRunId}
-		if _, findErr := h.dagRunStore.FindAttempt(ctx, ref); findErr == nil {
-			isRetry = true // dag-run exists, use retry mode to add new attempt
+	ref := execution.DAGRunRef{Name: dag.Name, ID: task.DagRunId}
+
+	// Check if dag-run already exists
+	existingAttempt, findErr := h.dagRunStore.FindAttempt(ctx, ref)
+	if findErr == nil {
+		// Dag-run exists - check if we should reuse it or create new attempt
+		existingStatus, readErr := existingAttempt.ReadStatus(ctx)
+		if readErr == nil && existingStatus.Status == core.Queued {
+			// Dag-run exists with queued status (from enqueue command)
+			// Reuse the existing attempt instead of creating a new one
+			task.AttemptId = existingAttempt.ID()
+
+			if err := existingAttempt.Open(ctx); err != nil {
+				return fmt.Errorf("failed to open existing attempt: %w", err)
+			}
+
+			h.attemptsMu.Lock()
+			h.openAttempts[task.DagRunId] = existingAttempt
+			h.attemptsMu.Unlock()
+
+			logger.Info(ctx, "Reusing existing queued attempt for dispatched task",
+				tag.RunID(task.DagRunId),
+				tag.Target(task.Target),
+				slog.String("attempt-id", task.AttemptId),
+			)
+			return nil
 		}
+		// Existing attempt is not queued, create a new retry attempt
 	}
+
+	// Create new attempt (either first attempt or retry)
+	isRetry := task.Operation == coordinatorv1.Operation_OPERATION_RETRY || findErr == nil
 	opts := execution.NewDAGRunAttemptOptions{Retry: isRetry}
 
-	// Create the attempt
 	attempt, err := h.dagRunStore.CreateAttempt(ctx, dag, time.Now(), task.DagRunId, opts)
 	if err != nil {
 		return fmt.Errorf("failed to create attempt: %w", err)

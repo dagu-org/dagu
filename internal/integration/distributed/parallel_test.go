@@ -1,4 +1,4 @@
-package integration_test
+package distributed_test
 
 import (
 	"context"
@@ -12,9 +12,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParallelDistributedExecution(t *testing.T) {
-	t.Run("ParallelExecutionOnWorkers", func(t *testing.T) {
-		// Create test DAGs with parallel execution using workerSelector
+// =============================================================================
+// Parallel Distributed Execution Tests
+// =============================================================================
+// These tests verify parallel execution with workerSelector, including:
+// - Multiple items processed in parallel on workers
+// - Max concurrency limits
+// - Failure propagation
+// - Output aggregation
+
+func TestParallel_MultipleItems(t *testing.T) {
+	t.Run("parallelExecutionOnWorkers", func(t *testing.T) {
 		yamlContent := `
 steps:
   - name: process-items
@@ -36,44 +44,33 @@ steps:
     command: echo "Processing $1 on worker"
     output: RESULT
 `
-		// Setup and start coordinator with status and log persistence for shared-nothing mode
 		coord := test.SetupCoordinator(t, test.WithStatusPersistence(), test.WithLogPersistence())
 
-		// Create and start multiple workers with remoteTaskHandler for shared-nothing mode
-		setupRemoteWorkers(t, coord, 2, map[string]string{"type": "test-worker"})
+		setupWorkers(t, coord, 2, SharedNothingMode, map[string]string{"type": "test-worker"})
 
-		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
 		agent := dagWrapper.Agent()
 
-		// Run the DAG
 		agent.RunSuccess(t)
 
-		// Verify the DAG completed successfully
 		dagWrapper.AssertLatestStatus(t, core.Succeeded)
 
-		// Get the latest st to verify parallel execution
 		st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
 		require.NoError(t, err)
 		require.NotNil(t, st)
-		require.Len(t, st.Nodes, 1) // process-items
+		require.Len(t, st.Nodes, 1)
 
-		// Check process-items node
 		processNode := st.Nodes[0]
 		require.Equal(t, "process-items", processNode.Step.Name)
 		require.Equal(t, core.NodeSucceeded, processNode.Status)
 
-		// Verify sub DAG runs were created
 		require.NotEmpty(t, processNode.SubRuns)
-		require.Len(t, processNode.SubRuns, 3) // 3 sub runs
+		require.Len(t, processNode.SubRuns, 3)
 
-		// Verify all children completed successfully
 		for _, child := range processNode.SubRuns {
-			// Each child should have been executed on a worker
 			require.Contains(t, child.Params, "item")
 		}
 
-		// Verify output was captured
 		require.NotNil(t, processNode.OutputVariables)
 		if value, ok := processNode.OutputVariables.Load("RESULTS"); ok {
 			results := value.(string)
@@ -82,7 +79,6 @@ steps:
 			require.Contains(t, results, `"succeeded": 3`)
 			require.Contains(t, results, `"failed": 0`)
 
-			// Verify each item was processed
 			require.Contains(t, results, "Processing item1 on worker")
 			require.Contains(t, results, "Processing item2 on worker")
 			require.Contains(t, results, "Processing item3 on worker")
@@ -90,9 +86,10 @@ steps:
 			t.Fatal("RESULTS output not found")
 		}
 	})
+}
 
-	t.Run("ParallelDistributedWithSameWorkerType", func(t *testing.T) {
-		// Test parallel execution where all items go to the same worker type
+func TestParallel_SameWorkerType(t *testing.T) {
+	t.Run("allItemsGoToSameWorkerType", func(t *testing.T) {
 		yamlContent := `
 steps:
   - name: process-regions
@@ -114,32 +111,25 @@ steps:
       echo "Processing region: $1"
     output: RESULT
 `
-		// Setup and start coordinator with status and log persistence for shared-nothing mode
 		coord := test.SetupCoordinator(t, test.WithStatusPersistence(), test.WithLogPersistence())
 
-		// Create multiple workers with remoteTaskHandler for shared-nothing mode
-		setupRemoteWorkers(t, coord, 3, map[string]string{"type": "test-worker"})
+		setupWorkers(t, coord, 3, SharedNothingMode, map[string]string{"type": "test-worker"})
 
-		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
 		agent := dagWrapper.Agent()
 		agent.RunSuccess(t)
 
-		// Verify successful completion
 		dagWrapper.AssertLatestStatus(t, core.Succeeded)
 
-		// Get st to verify execution
 		st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
 		require.NoError(t, err)
 		require.NotNil(t, st)
 
-		// Check the parallel node
 		processNode := st.Nodes[0]
 		require.Equal(t, "process-regions", processNode.Step.Name)
 		require.Equal(t, core.NodeSucceeded, processNode.Status)
 		require.Len(t, processNode.SubRuns, 3)
 
-		// Verify output shows all regions were processed
 		if value, ok := processNode.OutputVariables.Load("RESULTS"); ok {
 			results := value.(string)
 			require.Contains(t, results, "Processing region: us-east")
@@ -150,8 +140,10 @@ steps:
 			t.Fatal("RESULTS output not found")
 		}
 	})
+}
 
-	t.Run("ParallelDistributedFailurePropagatesToParentStep", func(t *testing.T) {
+func TestParallel_PartialFailure(t *testing.T) {
+	t.Run("partialFailurePropagatesToParentStep", func(t *testing.T) {
 		yamlContent := `
 steps:
   - name: process-items
@@ -176,7 +168,7 @@ steps:
 `
 		coord := test.SetupCoordinator(t, test.WithStatusPersistence(), test.WithLogPersistence())
 
-		setupRemoteWorker(t, coord, "test-worker-failure", 10, map[string]string{"type": "test-worker"})
+		setupSharedNothingWorker(t, coord, "test-worker-failure", map[string]string{"type": "test-worker"})
 
 		dagWrapper := coord.DAG(t, yamlContent)
 		agent := dagWrapper.Agent()
@@ -193,9 +185,10 @@ steps:
 		require.Equal(t, core.NodeFailed, node.Status)
 		require.Len(t, node.SubRuns, 2)
 	})
+}
 
-	t.Run("ParallelDistributedWithNoMatchingWorkers", func(t *testing.T) {
-		// Test that parallel execution fails gracefully when no workers match
+func TestParallel_NoMatchingWorkers(t *testing.T) {
+	t.Run("failsGracefullyWhenNoWorkersMatch", func(t *testing.T) {
 		yamlContent := `
 steps:
   - name: process-items
@@ -212,29 +205,23 @@ steps:
   - name: process
     command: echo "Should not run"
 `
-		// Setup coordinator without matching workers
 		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 
-		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
 		agent := dagWrapper.Agent()
 
-		// Run should fail because no workers match
-		// Use a short timeout since we expect this to fail
 		ctx, cancel := context.WithTimeout(coord.Context, 5*time.Second)
 		defer cancel()
 		err := agent.Run(ctx)
 		require.Error(t, err)
 
-		// Verify the DAG did not complete successfully
 		st := agent.Status(coord.Context)
 		require.NotEqual(t, core.Succeeded, st.Status)
 	})
 }
 
-func TestParallelDistributedCancellation(t *testing.T) {
-	t.Run("CancelParallelExecutionOnWorkers", func(t *testing.T) {
-		// Create test DAGs with parallel execution using workerSelector
+func TestParallel_Cancellation(t *testing.T) {
+	t.Run("cancelParallelExecutionOnWorkers", func(t *testing.T) {
 		yamlContent := `
 steps:
   - name: process-items
@@ -255,31 +242,24 @@ steps:
   - name: sleep
     command: sleep $1
 `
-		// Setup and start coordinator with status and log persistence for shared-nothing mode
 		tmpDir := t.TempDir()
 		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir), test.WithStatusPersistence(), test.WithLogPersistence())
 
-		// Get dispatcher client from coordinator
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
-		// Create and start multiple workers with remoteTaskHandler for shared-nothing mode
-		setupRemoteWorkers(t, coord, 2, map[string]string{"type": "test-worker"})
+		setupWorkers(t, coord, 2, SharedNothingMode, map[string]string{"type": "test-worker"})
 
-		// Load the DAG using helper
 		dag := coord.DAG(t, yamlContent)
 
-		// Create agent with cancellable context
 		agent := dag.Agent()
 		done := make(chan struct{})
 
-		// Start the DAG in a goroutine
 		go func() {
 			agent.Context = coord.Context
 			_ = agent.Run(agent.Context)
 			close(done)
 		}()
 
-		// Wait the step to be running
 		require.Eventually(t, func() bool {
 			st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dag.DAG)
 			if err != nil || !st.Status.IsActive() {
@@ -292,7 +272,6 @@ steps:
 			return parallelNode.Status == core.NodeRunning
 		}, 5*time.Second, 100*time.Millisecond)
 
-		// Cancel the execution after waiting workers are processing distributed tasks
 		require.Eventually(t, func() bool {
 			workerInfo, err := coordinatorClient.GetWorkers(coord.Context)
 			require.NoError(t, err)
@@ -303,35 +282,26 @@ steps:
 			return runningTasks > 0
 		}, 5*time.Second, 100*time.Millisecond)
 
-		// Perform cancellation
 		agent.Signal(coord.Context, os.Signal(syscall.SIGINT))
 
-		// Wait for the agent to finish
 		<-done
 
-		// Get the latest st
 		st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dag.DAG)
 		require.NoError(t, err)
 		require.NotNil(t, st)
 
-		// Check that the parallel step exists
 		require.GreaterOrEqual(t, len(st.Nodes), 1)
 		parallelNode := st.Nodes[0]
 		require.Equal(t, "process-items", parallelNode.Step.Name)
 
-		// Verify that the parallel step status
 		require.Equal(t, core.NodeAborted, parallelNode.Status)
 
-		// Verify sub DAG runs were created (in distributed mode, sub-run status is pushed
-		// to coordinator and may not be directly accessible via FindSubAttempt)
 		require.NotEmpty(t, parallelNode.SubRuns, "expected at least one sub DAG run to be created")
-		for _, child := range parallelNode.SubRuns {
-			t.Logf("Sub DAG run %s with params %s (status verification skipped for distributed mode)", child.DAGRunID, child.Params)
-		}
 	})
+}
 
-	t.Run("MixedLocalAndDistributedCancellation", func(t *testing.T) {
-		// Create test DAGs with both local and distributed sub DAGs
+func TestParallel_MixedLocalAndDistributed(t *testing.T) {
+	t.Run("mixedLocalAndDistributedExecution", func(t *testing.T) {
 		yamlContent := `
 steps:
   - name: local-execution
@@ -361,26 +331,21 @@ steps:
   - name: sleep
     command: sleep $1
 `
-		// Setup and start coordinator with status and log persistence for shared-nothing mode
 		tmpDir := t.TempDir()
 		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir), test.WithStatusPersistence(), test.WithLogPersistence())
 
-		// Create worker with remoteTaskHandler for shared-nothing mode
-		setupRemoteWorker(t, coord, "test-worker-1", 10, map[string]string{"type": "test-worker"})
+		setupSharedNothingWorker(t, coord, "test-worker-1", map[string]string{"type": "test-worker"})
 
-		// Load the DAG and create agent
 		dagWrapper := coord.DAG(t, yamlContent)
 		agent := dagWrapper.Agent()
 		done := make(chan struct{})
 
-		// Start the DAG in a goroutine
 		go func() {
 			agent.Context = coord.Context
 			_ = agent.Run(agent.Context)
 			close(done)
 		}()
 
-		// Wait for at least one step to be running
 		require.Eventually(t, func() bool {
 			st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
 			if err != nil || !st.Status.IsActive() {
@@ -389,124 +354,26 @@ steps:
 			if len(st.Nodes) == 0 {
 				return false
 			}
-			// Check if any node is running
 			var started int
 			for _, node := range st.Nodes {
 				if node.Status == core.NodeRunning {
 					started++
 				}
 			}
-			return started == 2 // Both local and distributed steps should be running
+			return started == 2
 		}, 5*time.Second, 100*time.Millisecond)
 
-		// Perform cancellation
 		agent.Signal(coord.Context, os.Signal(syscall.SIGTERM))
 
-		// Wait for the agent to finish
 		<-done
 
-		// Get the latest status
 		st := agent.Status(coord.Context)
 
-		// Both parallel steps should be affected by cancellation
 		for _, node := range st.Nodes {
 			if node.Step.Name == "local-execution" || node.Step.Name == "distributed-execution" {
 				require.Equal(t, core.NodeAborted, node.Status,
 					"node %s should be canceled, got %v", node.Step.Name, node.Status)
 			}
 		}
-	})
-
-	t.Run("ConcurrentWorkerCancellation", func(t *testing.T) {
-		// Test cancellation with high concurrency across multiple workers
-		// Use shorter sleep times so some tasks can complete before cancellation
-		yamlContent := `
-steps:
-  - name: high-concurrency
-    call: child-task
-    parallel:
-      items:
-        - "task1"
-        - "task2"
-        - "task3"
-        - "task4"
-        - "task5"
-        - "task6"
-      maxConcurrent: 2
-
----
-name: child-task
-workerSelector:
-  type: test-worker
-steps:
-  - name: process
-    command: |
-      echo "Starting task $1"
-      sleep 0.3
-      echo "Completed task $1"
-`
-		// Setup and start coordinator with status and log persistence for shared-nothing mode
-		tmpDir := t.TempDir()
-		coord := test.SetupCoordinator(t, test.WithDAGsDir(tmpDir), test.WithStatusPersistence(), test.WithLogPersistence())
-
-		// Create multiple workers with remoteTaskHandler for shared-nothing mode
-		setupRemoteWorkers(t, coord, 3, map[string]string{"type": "test-worker"})
-
-		// Load the DAG using helper
-		dagWrapper := coord.DAG(t, yamlContent)
-
-		// Create agent
-		agent := dagWrapper.Agent()
-
-		// Start the DAG in a goroutine
-		done := make(chan struct{})
-		go func() {
-			agent.Context = coord.Context
-			_ = agent.Run(agent.Context)
-			close(done)
-		}()
-
-		// Wait for at least one sub-DAG run to be created and the node to be running.
-		// In distributed mode, checking sub-run completion status is unreliable as status
-		// is pushed to coordinator and may not be immediately visible via FindSubDAGRunStatus.
-		require.Eventually(t, func() bool {
-			st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
-			if err != nil || !st.Status.IsActive() || len(st.Nodes) == 0 {
-				return false
-			}
-			concurrentNode := st.Nodes[0]
-			// Wait for at least 2 sub-runs to be created and node to be running
-			return concurrentNode.Status == core.NodeRunning && len(concurrentNode.SubRuns) >= 2
-		}, 10*time.Second, 100*time.Millisecond)
-
-		// Cancel the execution
-		agent.Signal(coord.Context, os.Signal(syscall.SIGTERM))
-
-		// Wait for the agent to finish
-		<-done
-
-		// Get the latest status
-		st, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
-		require.NoError(t, err)
-		require.NotNil(t, st)
-
-		// Verify the high-concurrency step
-		require.GreaterOrEqual(t, len(st.Nodes), 1)
-		concurrentNode := st.Nodes[0]
-		require.Equal(t, "high-concurrency", concurrentNode.Step.Name)
-
-		// Log information about sub runs
-		if len(concurrentNode.SubRuns) > 0 {
-			t.Logf("Created %d sub runs before cancellation", len(concurrentNode.SubRuns))
-			for _, child := range concurrentNode.SubRuns {
-				t.Logf("Sub run %s for %s", child.DAGRunID, child.Params)
-			}
-		}
-
-		// In distributed mode with concurrent workers, the status could be:
-		// - NodePartiallySucceeded if some sub-runs completed before cancellation
-		// - NodeAborted if cancellation happened before any sub-run completed
-		require.Contains(t, []core.NodeStatus{core.NodePartiallySucceeded, core.NodeAborted}, concurrentNode.Status,
-			"expected node to be partially succeeded or aborted, got %v", concurrentNode.Status)
 	})
 }

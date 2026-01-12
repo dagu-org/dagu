@@ -70,7 +70,9 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read DAG from record: %w", err)
 	}
 
-	if len(dag.WorkerSelector) > 0 {
+	// Block retry via CLI for DAGs with workerSelector, UNLESS this is a distributed worker execution
+	// (indicated by --worker-id being set to something other than "local")
+	if len(dag.WorkerSelector) > 0 && workerID == "local" {
 		return fmt.Errorf("cannot retry DAG %q with workerSelector via CLI; use 'dagu enqueue' for distributed execution", dag.Name)
 	}
 

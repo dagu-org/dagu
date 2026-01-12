@@ -1,4 +1,4 @@
-package integration_test
+package distributed_test
 
 import (
 	"context"
@@ -12,12 +12,15 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-func TestCoordinatorGetWorkers(t *testing.T) {
-	t.Run("GetWorkersE2E", func(t *testing.T) {
-		// Setup coordinator
+// =============================================================================
+// Coordinator API Tests
+// =============================================================================
+// These tests verify the coordinator gRPC API functionality.
+
+func TestCoordinator_GetWorkers(t *testing.T) {
+	t.Run("returnsRegisteredWorkers", func(t *testing.T) {
 		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 
-		// Create gRPC client to coordinator
 		conn, err := grpc.NewClient(
 			coord.Address(),
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -31,12 +34,10 @@ func TestCoordinatorGetWorkers(t *testing.T) {
 
 		client := coordinatorv1.NewCoordinatorServiceClient(conn)
 
-		// Initially should have no workers
 		resp, err := client.GetWorkers(context.Background(), &coordinatorv1.GetWorkersRequest{})
 		require.NoError(t, err)
 		require.Empty(t, resp.Workers)
 
-		// Send heartbeats from two workers
 		_, err = client.Heartbeat(context.Background(), &coordinatorv1.HeartbeatRequest{
 			WorkerId: "test-worker-1",
 			Labels:   map[string]string{"type": "compute", "region": "us-east"},
@@ -64,18 +65,15 @@ func TestCoordinatorGetWorkers(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// Get workers list
 		resp, err = client.GetWorkers(context.Background(), &coordinatorv1.GetWorkersRequest{})
 		require.NoError(t, err)
-		require.Len(t, resp.Workers, 2) // 2 workers
+		require.Len(t, resp.Workers, 2)
 
-		// Verify worker details
 		workerMap := make(map[string]*coordinatorv1.WorkerInfo)
 		for _, w := range resp.Workers {
 			workerMap[w.WorkerId] = w
 		}
 
-		// Check worker 1
 		w1, ok := workerMap["test-worker-1"]
 		require.True(t, ok)
 		require.Equal(t, map[string]string{"type": "compute", "region": "us-east"}, w1.Labels)
@@ -83,7 +81,6 @@ func TestCoordinatorGetWorkers(t *testing.T) {
 		require.Equal(t, int32(0), w1.BusyPollers)
 		require.Empty(t, w1.RunningTasks)
 
-		// Check worker 2
 		w2, ok := workerMap["test-worker-2"]
 		require.True(t, ok)
 		require.Equal(t, map[string]string{"type": "storage", "region": "us-west"}, w2.Labels)
@@ -92,21 +89,16 @@ func TestCoordinatorGetWorkers(t *testing.T) {
 		require.Len(t, w2.RunningTasks, 1)
 		require.Equal(t, "run-456", w2.RunningTasks[0].DagRunId)
 
-		// Wait for heartbeats to become stale (>30 seconds)
-		// In a real test we wouldn't wait this long, but for now we'll
-		// just verify that the workers are still there
 		resp, err = client.GetWorkers(context.Background(), &coordinatorv1.GetWorkersRequest{})
 		require.NoError(t, err)
 		require.Len(t, resp.Workers, 2)
 	})
 }
 
-func TestCoordinatorHeartbeat(t *testing.T) {
-	t.Run("HeartbeatE2E", func(t *testing.T) {
-		// Setup coordinator
+func TestCoordinator_Heartbeat(t *testing.T) {
+	t.Run("updatesWorkerStats", func(t *testing.T) {
 		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 
-		// Create gRPC client to coordinator
 		conn, err := grpc.NewClient(
 			coord.Address(),
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -120,12 +112,10 @@ func TestCoordinatorHeartbeat(t *testing.T) {
 
 		client := coordinatorv1.NewCoordinatorServiceClient(conn)
 
-		// Initially no workers
 		resp, err := client.GetWorkers(context.Background(), &coordinatorv1.GetWorkersRequest{})
 		require.NoError(t, err)
 		require.Empty(t, resp.Workers)
 
-		// Send heartbeat from worker
 		_, err = client.Heartbeat(context.Background(), &coordinatorv1.HeartbeatRequest{
 			WorkerId: "test-worker-1",
 			Labels:   map[string]string{"type": "compute", "region": "us-east"},
@@ -143,7 +133,6 @@ func TestCoordinatorHeartbeat(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// Get workers should now show the worker
 		resp, err = client.GetWorkers(context.Background(), &coordinatorv1.GetWorkersRequest{})
 		require.NoError(t, err)
 		require.Len(t, resp.Workers, 1)
@@ -157,19 +146,17 @@ func TestCoordinatorHeartbeat(t *testing.T) {
 		require.Equal(t, "run-123", worker.RunningTasks[0].DagRunId)
 		require.Greater(t, worker.LastHeartbeatAt, int64(0))
 
-		// Send another heartbeat with updated stats
 		_, err = client.Heartbeat(context.Background(), &coordinatorv1.HeartbeatRequest{
 			WorkerId: "test-worker-1",
 			Labels:   map[string]string{"type": "compute", "region": "us-east"},
 			Stats: &coordinatorv1.WorkerStats{
 				TotalPollers: 10,
-				BusyPollers:  0, // All tasks completed
+				BusyPollers:  0,
 				RunningTasks: []*coordinatorv1.RunningTask{},
 			},
 		})
 		require.NoError(t, err)
 
-		// Verify updated stats
 		resp, err = client.GetWorkers(context.Background(), &coordinatorv1.GetWorkersRequest{})
 		require.NoError(t, err)
 		require.Len(t, resp.Workers, 1)

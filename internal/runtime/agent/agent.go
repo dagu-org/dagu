@@ -1363,7 +1363,6 @@ func execWithRecovery(ctx context.Context, fn func()) {
 				slog.String("err", err.Error()),
 				slog.String("errType", fmt.Sprintf("%T", panicObj)),
 				slog.String("stackTrace", string(stack)),
-				slog.String("fullStack", string(stack)),
 			)
 		}
 	}()
@@ -1385,7 +1384,7 @@ func encodeError(w http.ResponseWriter, err error) {
 	var httpErr *httpError
 	if errors.As(err, &httpErr) {
 		http.Error(w, httpErr.Error(), httpErr.Code)
-	} else {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
