@@ -36,6 +36,7 @@ func NewHTTPClient(cfg Config) *HTTPClient {
 func (c *HTTPClient) Do(ctx context.Context, url string, body []byte, headers map[string]string) (io.ReadCloser, error) {
 	req := c.client.R().
 		SetContext(ctx).
+		SetHeader("Content-Type", "application/json").
 		SetHeaders(headers).
 		SetBody(body).
 		SetDoNotParseResponse(true) // Return raw response for streaming
