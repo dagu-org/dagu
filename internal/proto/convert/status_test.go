@@ -165,4 +165,67 @@ func TestRoundTrip(t *testing.T) {
 		require.NotNil(t, result.OnWait)
 		assert.Equal(t, "on-wait", result.OnWait.Step.Name)
 	})
+
+	t.Run("roundtrip with ChatMessages", func(t *testing.T) {
+		original := &exec.DAGRunStatus{
+			Name:     "chat-dag",
+			DAGRunID: "chat-run-123",
+			Status:   core.Succeeded,
+			Nodes: []*exec.Node{
+				{
+					Step:   core.Step{Name: "chat-step"},
+					Status: core.NodeSucceeded,
+					ChatMessages: []exec.LLMMessage{
+						{Role: exec.RoleSystem, Content: "You are a helpful assistant."},
+						{Role: exec.RoleUser, Content: "Hello!"},
+						{Role: exec.RoleAssistant, Content: "Hi there! How can I help?", Metadata: &exec.LLMMessageMetadata{
+							Provider:         "openai",
+							Model:            "gpt-4",
+							PromptTokens:     10,
+							CompletionTokens: 8,
+							TotalTokens:      18,
+						}},
+					},
+				},
+				{
+					Step:   core.Step{Name: "no-messages-step"},
+					Status: core.NodeSucceeded,
+					// No ChatMessages - tests omitempty behavior
+				},
+			},
+		}
+
+		// Convert to proto and back
+		proto, err := DAGRunStatusToProto(original)
+		require.NoError(t, err)
+		result, err := ProtoToDAGRunStatus(proto)
+		require.NoError(t, err)
+
+		// Verify ChatMessages are preserved
+		require.NotNil(t, result)
+		require.Len(t, result.Nodes, 2)
+
+		// First node with messages
+		chatNode := result.Nodes[0]
+		require.Len(t, chatNode.ChatMessages, 3)
+		assert.Equal(t, exec.RoleSystem, chatNode.ChatMessages[0].Role)
+		assert.Equal(t, "You are a helpful assistant.", chatNode.ChatMessages[0].Content)
+		assert.Nil(t, chatNode.ChatMessages[0].Metadata)
+
+		assert.Equal(t, exec.RoleUser, chatNode.ChatMessages[1].Role)
+		assert.Equal(t, "Hello!", chatNode.ChatMessages[1].Content)
+
+		assert.Equal(t, exec.RoleAssistant, chatNode.ChatMessages[2].Role)
+		assert.Equal(t, "Hi there! How can I help?", chatNode.ChatMessages[2].Content)
+		require.NotNil(t, chatNode.ChatMessages[2].Metadata)
+		assert.Equal(t, "openai", chatNode.ChatMessages[2].Metadata.Provider)
+		assert.Equal(t, "gpt-4", chatNode.ChatMessages[2].Metadata.Model)
+		assert.Equal(t, 10, chatNode.ChatMessages[2].Metadata.PromptTokens)
+		assert.Equal(t, 8, chatNode.ChatMessages[2].Metadata.CompletionTokens)
+		assert.Equal(t, 18, chatNode.ChatMessages[2].Metadata.TotalTokens)
+
+		// Second node without messages
+		noMsgNode := result.Nodes[1]
+		assert.Nil(t, noMsgNode.ChatMessages)
+	})
 }

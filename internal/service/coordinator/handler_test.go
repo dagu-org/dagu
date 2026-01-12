@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"context"
+	"errors"
 	"io"
 	"sync"
 	"testing"
@@ -116,12 +117,14 @@ func (m *mockDAGRunStore) RemoveDAGRun(_ context.Context, _ exec.DAGRunRef) erro
 
 // mockDAGRunAttempt is a test implementation of execution.DAGRunAttempt
 type mockDAGRunAttempt struct {
-	status   *exec.DAGRunStatus
-	opened   bool
-	closed   bool
-	written  bool
-	aborting bool
-	mu       sync.Mutex
+	status                 *exec.DAGRunStatus
+	opened                 bool
+	closed                 bool
+	written                bool
+	aborting               bool
+	stepMessages           map[string][]exec.LLMMessage // stepName -> messages
+	writeStepMessagesError error                        // injected error for WriteStepMessages
+	mu                     sync.Mutex
 }
 
 func (m *mockDAGRunAttempt) ID() string { return "test-attempt" }
@@ -170,11 +173,35 @@ func (m *mockDAGRunAttempt) WriteOutputs(_ context.Context, _ *exec.DAGRunOutput
 func (m *mockDAGRunAttempt) ReadOutputs(_ context.Context) (*exec.DAGRunOutputs, error) {
 	return nil, nil
 }
-func (m *mockDAGRunAttempt) WriteStepMessages(_ context.Context, _ string, _ []exec.LLMMessage) error {
+func (m *mockDAGRunAttempt) WriteStepMessages(_ context.Context, stepName string, messages []exec.LLMMessage) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.writeStepMessagesError != nil {
+		return m.writeStepMessagesError
+	}
+	if m.stepMessages == nil {
+		m.stepMessages = make(map[string][]exec.LLMMessage)
+	}
+	m.stepMessages[stepName] = messages
 	return nil
 }
-func (m *mockDAGRunAttempt) ReadStepMessages(_ context.Context, _ string) ([]exec.LLMMessage, error) {
-	return nil, nil
+func (m *mockDAGRunAttempt) ReadStepMessages(_ context.Context, stepName string) ([]exec.LLMMessage, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.stepMessages == nil {
+		return nil, nil
+	}
+	return m.stepMessages[stepName], nil
+}
+
+// GetStepMessages returns the messages written for a step (for test assertions)
+func (m *mockDAGRunAttempt) GetStepMessages(stepName string) []exec.LLMMessage {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.stepMessages == nil {
+		return nil
+	}
+	return m.stepMessages[stepName]
 }
 
 // Thread-safe getters for test assertions
@@ -887,6 +914,188 @@ func TestHandler_ReportStatus(t *testing.T) {
 		st, ok := status.FromError(err)
 		require.True(t, ok)
 		require.Equal(t, codes.FailedPrecondition, st.Code())
+	})
+
+	t.Run("ChatMessagesPersistence", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		// Create an attempt for the DAG run
+		ref := exec.DAGRunRef{Name: "chat-dag", ID: "chat-run-123"}
+		attempt := store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:     "chat-dag",
+			DAGRunID: "chat-run-123",
+			Status:   core.Running,
+		})
+
+		// Create status with ChatMessages
+		statusWithMessages := &exec.DAGRunStatus{
+			Name:     "chat-dag",
+			DAGRunID: "chat-run-123",
+			Status:   core.Running,
+			Nodes: []*exec.Node{
+				{
+					Step:   core.Step{Name: "chat-step"},
+					Status: core.NodeSucceeded,
+					ChatMessages: []exec.LLMMessage{
+						{Role: exec.RoleUser, Content: "Hello!"},
+						{Role: exec.RoleAssistant, Content: "Hi there!", Metadata: &exec.LLMMessageMetadata{
+							Provider:    "openai",
+							Model:       "gpt-4",
+							TotalTokens: 10,
+						}},
+					},
+				},
+				{
+					Step:   core.Step{Name: "no-messages-step"},
+					Status: core.NodeSucceeded,
+					// No ChatMessages
+				},
+			},
+		}
+
+		protoStatus, convErr := convert.DAGRunStatusToProto(statusWithMessages)
+		require.NoError(t, convErr)
+
+		req := &coordinatorv1.ReportStatusRequest{
+			Status: protoStatus,
+		}
+
+		resp, err := h.ReportStatus(ctx, req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.True(t, resp.Accepted)
+
+		// Verify ChatMessages were persisted via WriteStepMessages
+		chatStepMessages := attempt.GetStepMessages("chat-step")
+		require.Len(t, chatStepMessages, 2)
+		assert.Equal(t, exec.RoleUser, chatStepMessages[0].Role)
+		assert.Equal(t, "Hello!", chatStepMessages[0].Content)
+		assert.Equal(t, exec.RoleAssistant, chatStepMessages[1].Role)
+		assert.Equal(t, "Hi there!", chatStepMessages[1].Content)
+		require.NotNil(t, chatStepMessages[1].Metadata)
+		assert.Equal(t, "openai", chatStepMessages[1].Metadata.Provider)
+		assert.Equal(t, "gpt-4", chatStepMessages[1].Metadata.Model)
+		assert.Equal(t, 10, chatStepMessages[1].Metadata.TotalTokens)
+
+		// Verify no messages were written for step without ChatMessages
+		noMsgStepMessages := attempt.GetStepMessages("no-messages-step")
+		assert.Nil(t, noMsgStepMessages)
+	})
+
+	t.Run("ChatMessagesPersistence_HandlerNodesFallbackNames", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		// Create an existing attempt
+		ref := exec.DAGRunRef{Name: "handler-dag", ID: "handler-run-123"}
+		attempt := store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:     "handler-dag",
+			DAGRunID: "handler-run-123",
+			Status:   core.Running,
+		})
+
+		// Create status with handler nodes that have empty step names
+		statusWithHandlers := &exec.DAGRunStatus{
+			Name:     "handler-dag",
+			DAGRunID: "handler-run-123",
+			Status:   core.Succeeded,
+			// OnInit handler with empty step name - should use "on_init" fallback
+			OnInit: &exec.Node{
+				Step:   core.Step{}, // Empty name
+				Status: core.NodeSucceeded,
+				ChatMessages: []exec.LLMMessage{
+					{Role: exec.RoleAssistant, Content: "Init completed"},
+				},
+			},
+			// OnSuccess handler with explicit name - should use explicit name
+			OnSuccess: &exec.Node{
+				Step:   core.Step{Name: "my-success-handler"},
+				Status: core.NodeSucceeded,
+				ChatMessages: []exec.LLMMessage{
+					{Role: exec.RoleAssistant, Content: "Success!"},
+				},
+			},
+		}
+
+		protoStatus, convErr := convert.DAGRunStatusToProto(statusWithHandlers)
+		require.NoError(t, convErr)
+
+		req := &coordinatorv1.ReportStatusRequest{
+			Status: protoStatus,
+		}
+
+		resp, err := h.ReportStatus(ctx, req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.True(t, resp.Accepted)
+
+		// Verify OnInit messages were persisted with fallback name "on_init"
+		onInitMessages := attempt.GetStepMessages("on_init")
+		require.Len(t, onInitMessages, 1)
+		assert.Equal(t, "Init completed", onInitMessages[0].Content)
+
+		// Verify OnSuccess messages were persisted with explicit name
+		onSuccessMessages := attempt.GetStepMessages("my-success-handler")
+		require.Len(t, onSuccessMessages, 1)
+		assert.Equal(t, "Success!", onSuccessMessages[0].Content)
+	})
+
+	t.Run("ChatMessagesPersistence_WriteErrorDoesNotFailStatus", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(WithDAGRunStore(store))
+		ctx := context.Background()
+
+		// Create an existing attempt with error injection
+		ref := exec.DAGRunRef{Name: "error-dag", ID: "error-run-123"}
+		attempt := store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:     "error-dag",
+			DAGRunID: "error-run-123",
+			Status:   core.Running,
+		})
+
+		// Inject error for WriteStepMessages
+		attempt.writeStepMessagesError = errors.New("simulated write failure")
+
+		// Create status with ChatMessages
+		statusWithMessages := &exec.DAGRunStatus{
+			Name:     "error-dag",
+			DAGRunID: "error-run-123",
+			Status:   core.Succeeded,
+			Nodes: []*exec.Node{
+				{
+					Step:   core.Step{Name: "chat-step"},
+					Status: core.NodeSucceeded,
+					ChatMessages: []exec.LLMMessage{
+						{Role: exec.RoleUser, Content: "Hello!"},
+					},
+				},
+			},
+		}
+
+		protoStatus, convErr := convert.DAGRunStatusToProto(statusWithMessages)
+		require.NoError(t, convErr)
+
+		req := &coordinatorv1.ReportStatusRequest{
+			Status: protoStatus,
+		}
+
+		// ReportStatus should succeed even when WriteStepMessages fails
+		resp, err := h.ReportStatus(ctx, req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.True(t, resp.Accepted)
+
+		// Verify the main status was still written
+		require.True(t, attempt.WasWritten())
 	})
 }
 

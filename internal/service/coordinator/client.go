@@ -92,6 +92,11 @@ type client struct {
 	healthClient grpc_health_v1.HealthClient
 }
 
+// grpcMaxMsgSize is the maximum message size for gRPC calls.
+// Default gRPC limit is 4 MB; we increase to 16 MB to handle large status
+// payloads that include LLM conversation messages in shared-nothing mode.
+const grpcMaxMsgSize = 16 * 1024 * 1024
+
 // Errors
 var (
 	ErrMissingTLSConfig = fmt.Errorf("TLS enabled but no certificates provided")
@@ -614,6 +619,11 @@ func (cli *clientImpl) RequestCancel(ctx context.Context, dagName, dagRunID stri
 // getDialOptions returns the appropriate gRPC dial options based on TLS configuration
 func getDialOptions(config *Config) ([]grpc.DialOption, error) {
 	var opts []grpc.DialOption
+
+	opts = append(opts, grpc.WithDefaultCallOptions(
+		grpc.MaxCallRecvMsgSize(grpcMaxMsgSize),
+		grpc.MaxCallSendMsgSize(grpcMaxMsgSize),
+	))
 
 	if config.Insecure {
 		// Use insecure connection (h2c)
