@@ -9,7 +9,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
@@ -234,7 +234,7 @@ func TestDequeue(t *testing.T) {
 
 	t.Run("BasicDequeue", func(t *testing.T) {
 		t.Parallel()
-		dagRun := execution.NewDAGRunRef("test-dag", "run-123")
+		dagRun := exec.NewDAGRunRef("test-dag", "run-123")
 		spec := builder.Dequeue(dag, dagRun)
 
 		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
@@ -256,7 +256,7 @@ func TestDequeue(t *testing.T) {
 			},
 		}
 		builderNoFile := runtime.NewSubCmdBuilder(cfgNoFile)
-		dagRun := execution.NewDAGRunRef("test-dag", "run-456")
+		dagRun := exec.NewDAGRunRef("test-dag", "run-456")
 		spec := builderNoFile.Dequeue(dag, dagRun)
 
 		assert.NotContains(t, spec.Args, "--config")
@@ -273,7 +273,7 @@ func TestDequeue(t *testing.T) {
 			Location:   "/path/to/dag.yaml",
 			WorkingDir: "/path/to",
 		}
-		dagRun := execution.NewDAGRunRef("test-dag", "run-789")
+		dagRun := exec.NewDAGRunRef("test-dag", "run-789")
 		spec := builder.Dequeue(dagWithQueue, dagRun)
 
 		// Queue name should be the custom queue, not the DAG name

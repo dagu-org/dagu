@@ -23,7 +23,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/telemetry"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/persistence/fileapikey"
 	"github.com/dagu-org/dagu/internal/persistence/fileaudit"
 	"github.com/dagu-org/dagu/internal/persistence/fileuser"
@@ -69,7 +69,7 @@ type Server struct {
 // when the configured builtin auth service fails to initialize).
 // The context is used for OIDC provider initialization and should be cancellable
 // to allow graceful shutdown during startup.
-func NewServer(ctx context.Context, cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunStore, qs execution.QueueStore, ps execution.ProcStore, drm runtime.Manager, cc coordinator.Client, sr execution.ServiceRegistry, mr *prometheus.Registry, collector *telemetry.Collector, rs *resource.Service) (*Server, error) {
+func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs exec.DAGRunStore, qs exec.QueueStore, ps exec.ProcStore, drm runtime.Manager, cc coordinator.Client, sr exec.ServiceRegistry, mr *prometheus.Registry, collector *telemetry.Collector, rs *resource.Service) (*Server, error) {
 	// Defensive nil-context guard to prevent surprising crashes from older call sites
 	if ctx == nil {
 		ctx = context.Background()

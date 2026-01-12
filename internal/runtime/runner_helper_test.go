@@ -10,7 +10,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/chat"
 	"github.com/dagu-org/dagu/internal/test"
@@ -339,7 +339,7 @@ func (rr runResult) nodeByName(t *testing.T, stepName string) *runtime.Node {
 
 // mockMessagesHandler is a mock implementation of ChatMessagesHandler for testing.
 type mockMessagesHandler struct {
-	messages   map[string][]execution.LLMMessage
+	messages   map[string][]exec.LLMMessage
 	readErr    error
 	writeErr   error
 	writeCalls int
@@ -349,18 +349,18 @@ var _ runtime.ChatMessagesHandler = (*mockMessagesHandler)(nil)
 
 func newMockMessagesHandler() *mockMessagesHandler {
 	return &mockMessagesHandler{
-		messages: make(map[string][]execution.LLMMessage),
+		messages: make(map[string][]exec.LLMMessage),
 	}
 }
 
-func (m *mockMessagesHandler) ReadStepMessages(_ context.Context, stepName string) ([]execution.LLMMessage, error) {
+func (m *mockMessagesHandler) ReadStepMessages(_ context.Context, stepName string) ([]exec.LLMMessage, error) {
 	if m.readErr != nil {
 		return nil, m.readErr
 	}
 	return m.messages[stepName], nil
 }
 
-func (m *mockMessagesHandler) WriteStepMessages(_ context.Context, stepName string, messages []execution.LLMMessage) error {
+func (m *mockMessagesHandler) WriteStepMessages(_ context.Context, stepName string, messages []exec.LLMMessage) error {
 	m.writeCalls++
 	if m.writeErr != nil {
 		return m.writeErr

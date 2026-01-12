@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
-var _ execution.QueuedItemData = (*QueuedFile)(nil)
+var _ exec.QueuedItemData = (*QueuedFile)(nil)
 
 type QueuedFile struct {
 	id   string
@@ -39,7 +39,7 @@ func (j *QueuedFile) ID() string {
 }
 
 // Data implements execution.QueuedItemData.
-func (j *QueuedFile) Data() (*execution.DAGRunRef, error) {
+func (j *QueuedFile) Data() (*exec.DAGRunRef, error) {
 	itemData, err := j.loadData()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load job data: %w", err)
@@ -84,7 +84,7 @@ func (j *QueuedFile) ExtractJob() (*Job, error) {
 	}, nil
 }
 
-var _ execution.QueuedItemData = (*Job)(nil)
+var _ exec.QueuedItemData = (*Job)(nil)
 
 // Job implements execution.QueuedItemData for a job stored in a file.
 type Job struct {
@@ -96,6 +96,6 @@ func (j *Job) ID() string {
 	return j.id
 }
 
-func (j *Job) Data() (*execution.DAGRunRef, error) {
+func (j *Job) Data() (*exec.DAGRunRef, error) {
 	return &j.DAGRun, nil
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -23,7 +23,7 @@ type Service struct {
 	handler        *Handler
 	grpcListener   net.Listener
 	healthServer   *health.Server
-	registry       execution.ServiceRegistry
+	registry       exec.ServiceRegistry
 	cfg            *config.Config
 	instanceID     string
 	hostPort       string
@@ -38,7 +38,7 @@ func NewService(
 	handler *Handler,
 	grpcListener net.Listener,
 	healthServer *health.Server,
-	registry execution.ServiceRegistry,
+	registry exec.ServiceRegistry,
 	cfg *config.Config,
 	instanceID string,
 	configuredHost string,
@@ -89,13 +89,13 @@ func (srv *Service) Start(ctx context.Context) error {
 			return fmt.Errorf("failed to parse port number: %w", err)
 		}
 
-		hostInfo := execution.HostInfo{
+		hostInfo := exec.HostInfo{
 			ID:     srv.instanceID,
 			Host:   srv.configuredHost,
 			Port:   port,
-			Status: execution.ServiceStatusActive, // Coordinator is active when serving
+			Status: exec.ServiceStatusActive, // Coordinator is active when serving
 		}
-		if err := srv.registry.Register(ctx, execution.ServiceNameCoordinator, hostInfo); err != nil {
+		if err := srv.registry.Register(ctx, exec.ServiceNameCoordinator, hostInfo); err != nil {
 			return fmt.Errorf("failed to register with service registry: %w", err)
 		}
 		logger.Info(ctx, "Registered with service registry",

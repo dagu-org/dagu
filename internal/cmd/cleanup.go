@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/spf13/cobra"
 )
 
@@ -74,9 +74,9 @@ func runCleanup(ctx *Context, args []string) error {
 	}
 
 	// Build options for RemoveOldDAGRuns
-	var opts []execution.RemoveOldDAGRunsOption
+	var opts []exec.RemoveOldDAGRunsOption
 	if dryRun {
-		opts = append(opts, execution.WithDryRun())
+		opts = append(opts, exec.WithDryRun())
 	}
 
 	// Dry run mode - show what would be deleted

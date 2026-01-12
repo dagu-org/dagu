@@ -18,7 +18,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/dirlock"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 )
 
@@ -43,14 +43,14 @@ type Scheduler struct {
 	quit                chan any
 	running             atomic.Bool
 	location            *time.Location
-	dagRunStore         execution.DAGRunStore
-	queueStore          execution.QueueStore
-	procStore           execution.ProcStore
+	dagRunStore         exec.DAGRunStore
+	queueStore          exec.QueueStore
+	procStore           exec.ProcStore
 	config              *config.Config
 	dirLock             dirlock.DirLock // File-based lock to prevent multiple scheduler instances
 	dagExecutor         *DAGExecutor
 	healthServer        *HealthServer // Health check server for monitoring
-	serviceRegistry     execution.ServiceRegistry
+	serviceRegistry     exec.ServiceRegistry
 	disableHealthServer bool            // Disable health server when running from start-all
 	zombieDetector      *ZombieDetector // Zombie DAG run detector
 	instanceID          string          // Unique instance identifier for service registry
@@ -74,11 +74,11 @@ func New(
 	cfg *config.Config,
 	er EntryReader,
 	drm runtime.Manager,
-	dagRunStore execution.DAGRunStore,
-	queueStore execution.QueueStore,
-	procStore execution.ProcStore,
-	reg execution.ServiceRegistry,
-	coordinatorCli execution.Dispatcher,
+	dagRunStore exec.DAGRunStore,
+	queueStore exec.QueueStore,
+	procStore exec.ProcStore,
+	reg exec.ServiceRegistry,
+	coordinatorCli exec.Dispatcher,
 ) (*Scheduler, error) {
 	timeLoc := cfg.Core.Location
 	if timeLoc == nil {
@@ -143,14 +143,14 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	// Register with service registry as inactive initially
 	if s.serviceRegistry != nil {
 		hostname, _ := os.Hostname()
-		hostInfo := execution.HostInfo{
+		hostInfo := exec.HostInfo{
 			ID:        s.instanceID,
 			Host:      hostname,
 			Port:      s.config.Scheduler.Port, // Health check port (0 if disabled)
-			Status:    execution.ServiceStatusInactive,
+			Status:    exec.ServiceStatusInactive,
 			StartedAt: time.Now(),
 		}
-		if err := s.serviceRegistry.Register(ctx, execution.ServiceNameScheduler, hostInfo); err != nil {
+		if err := s.serviceRegistry.Register(ctx, exec.ServiceNameScheduler, hostInfo); err != nil {
 			logger.Error(ctx, "Failed to register with service registry", tag.Error(err))
 			// Continue anyway - service registry is not critical
 		} else {
@@ -179,7 +179,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	// Update status to active after acquiring lock
 	if s.serviceRegistry != nil {
-		if err := s.serviceRegistry.UpdateStatus(ctx, execution.ServiceNameScheduler, execution.ServiceStatusActive); err != nil {
+		if err := s.serviceRegistry.UpdateStatus(ctx, exec.ServiceNameScheduler, exec.ServiceStatusActive); err != nil {
 			logger.Error(ctx, "Failed to update status to active", tag.Error(err))
 		} else {
 			logger.Info(ctx, "Updated scheduler status to active")
@@ -356,7 +356,7 @@ func (s *Scheduler) Stop(ctx context.Context) {
 func (s *Scheduler) stopCron(ctx context.Context) {
 	// Update status to inactive before stopping
 	if s.serviceRegistry != nil {
-		if err := s.serviceRegistry.UpdateStatus(ctx, execution.ServiceNameScheduler, execution.ServiceStatusInactive); err != nil {
+		if err := s.serviceRegistry.UpdateStatus(ctx, exec.ServiceNameScheduler, exec.ServiceStatusInactive); err != nil {
 			logger.Error(ctx, "Failed to update status to inactive", tag.Error(err))
 		}
 	}

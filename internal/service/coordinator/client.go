@@ -14,7 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -27,7 +27,7 @@ import (
 // Client abstracts handling communication with the coordinator service using
 // service registry and gRPC.
 type Client interface {
-	execution.Dispatcher
+	exec.Dispatcher
 
 	// Dispatch sends a task to the coordinator
 	Dispatch(ctx context.Context, task *coordinatorv1.Task) error
@@ -50,7 +50,7 @@ type Client interface {
 
 	// RequestCancel requests cancellation of a DAG run through the coordinator.
 	// Used in shared-nothing mode for sub-DAG cancellation.
-	RequestCancel(ctx context.Context, dagName, dagRunID string, rootRef *execution.DAGRunRef) error
+	RequestCancel(ctx context.Context, dagName, dagRunID string, rootRef *exec.DAGRunRef) error
 
 	// GetDAGRunStatus is inherited from execution.Dispatcher
 
@@ -68,13 +68,13 @@ type Metrics struct {
 
 var (
 	_ Client               = (*clientImpl)(nil)
-	_ execution.Dispatcher = (*clientImpl)(nil)
+	_ exec.Dispatcher = (*clientImpl)(nil)
 )
 
 // clientImpl is the concrete implementation
 type clientImpl struct {
 	config   *Config
-	registry execution.ServiceRegistry
+	registry exec.ServiceRegistry
 
 	clientsMu sync.RWMutex
 	clients   map[string]*client // Cache of gRPC clients by coordinator ID
@@ -98,7 +98,7 @@ var (
 )
 
 // New creates a new coordinator client with the given configuration
-func New(registry execution.ServiceRegistry, config *Config) Client {
+func New(registry exec.ServiceRegistry, config *Config) Client {
 	return &clientImpl{
 		config:   config,
 		registry: registry,
@@ -135,7 +135,7 @@ func (cli *clientImpl) Dispatch(ctx context.Context, task *coordinatorv1.Task) e
 			return err
 		}
 
-		return cli.attemptCall(ctx, members, func(ctx context.Context, member execution.HostInfo, client *client) error {
+		return cli.attemptCall(ctx, members, func(ctx context.Context, member exec.HostInfo, client *client) error {
 			// Create request
 			req := &coordinatorv1.DispatchRequest{Task: task}
 
@@ -176,7 +176,7 @@ func (cli *clientImpl) Poll(ctx context.Context, policy backoff.RetryPolicy, req
 			return err
 		}
 
-		return cli.attemptCall(ctx, members, func(ctx context.Context, member execution.HostInfo, client *client) error {
+		return cli.attemptCall(ctx, members, func(ctx context.Context, member exec.HostInfo, client *client) error {
 			resp, err := client.client.Poll(ctx, req)
 			if err != nil {
 				return fmt.Errorf("failed to poll task from coordinator %s: %w", member.ID, err)
@@ -208,7 +208,7 @@ func (cli *clientImpl) Metrics() Metrics {
 	return *cli.state
 }
 
-func (cli *clientImpl) attemptCall(ctx context.Context, members []execution.HostInfo, callback func(ctx context.Context, member execution.HostInfo, client *client) error) error {
+func (cli *clientImpl) attemptCall(ctx context.Context, members []exec.HostInfo, callback func(ctx context.Context, member exec.HostInfo, client *client) error) error {
 	// Shuffle members to distribute load evenly
 	rand.Shuffle(len(members), func(i, j int) {
 		members[i], members[j] = members[j], members[i]
@@ -262,7 +262,7 @@ func (cli *clientImpl) attemptCall(ctx context.Context, members []execution.Host
 	return lastErr
 }
 
-func (cli *clientImpl) isHealthy(ctx context.Context, member execution.HostInfo) error {
+func (cli *clientImpl) isHealthy(ctx context.Context, member exec.HostInfo) error {
 	// Get or create client for this coordinator
 	client, err := cli.getOrCreateClient(member)
 	if err != nil {
@@ -287,7 +287,7 @@ func (cli *clientImpl) isHealthy(ctx context.Context, member execution.HostInfo)
 }
 
 // getOrCreateClient gets an existing client or creates a new one for the given member
-func (cli *clientImpl) getOrCreateClient(member execution.HostInfo) (*client, error) {
+func (cli *clientImpl) getOrCreateClient(member exec.HostInfo) (*client, error) {
 	// Try to get existing client with read lock
 	cli.clientsMu.RLock()
 	if c, exists := cli.clients[member.ID]; exists {
@@ -317,7 +317,7 @@ func (cli *clientImpl) getOrCreateClient(member execution.HostInfo) (*client, er
 }
 
 // createClient creates a new gRPC client for the given coordinator
-func (cli *clientImpl) createClient(member execution.HostInfo) (*client, error) {
+func (cli *clientImpl) createClient(member exec.HostInfo) (*client, error) {
 	// Get dial options based on TLS configuration
 	dialOpts, err := getDialOptions(cli.config)
 	if err != nil {
@@ -397,8 +397,8 @@ func (cli *clientImpl) recordSuccess(ctx context.Context) {
 
 // getCoordinatorMembers discovers available coordinators from the service registry.
 // Returns an error if discovery fails or no coordinators are available.
-func (cli *clientImpl) getCoordinatorMembers(ctx context.Context) ([]execution.HostInfo, error) {
-	members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+func (cli *clientImpl) getCoordinatorMembers(ctx context.Context) ([]exec.HostInfo, error) {
+	members, err := cli.registry.GetServiceMembers(ctx, exec.ServiceNameCoordinator)
 	if err != nil {
 		return nil, fmt.Errorf("failed to discover coordinators: %w", err)
 	}
@@ -411,7 +411,7 @@ func (cli *clientImpl) getCoordinatorMembers(ctx context.Context) ([]execution.H
 // GetWorkers retrieves the list of workers from all coordinators
 func (cli *clientImpl) GetWorkers(ctx context.Context) ([]*coordinatorv1.WorkerInfo, error) {
 	// Get all available coordinators from discovery
-	members, err := cli.registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	members, err := cli.registry.GetServiceMembers(ctx, exec.ServiceNameCoordinator)
 	if err != nil {
 		return nil, fmt.Errorf("failed to discover coordinators: %w", err)
 	}
@@ -477,7 +477,7 @@ func (cli *clientImpl) Heartbeat(ctx context.Context, req *coordinatorv1.Heartbe
 	}
 
 	var resp *coordinatorv1.HeartbeatResponse
-	err = cli.attemptCall(ctx, members, func(ctx context.Context, _ execution.HostInfo, client *client) error {
+	err = cli.attemptCall(ctx, members, func(ctx context.Context, _ exec.HostInfo, client *client) error {
 		var callErr error
 		resp, callErr = client.client.Heartbeat(ctx, req)
 		if callErr != nil {
@@ -496,7 +496,7 @@ func (cli *clientImpl) ReportStatus(ctx context.Context, req *coordinatorv1.Repo
 	}
 
 	var resp *coordinatorv1.ReportStatusResponse
-	err = cli.attemptCall(ctx, members, func(ctx context.Context, _ execution.HostInfo, client *client) error {
+	err = cli.attemptCall(ctx, members, func(ctx context.Context, _ exec.HostInfo, client *client) error {
 		var callErr error
 		resp, callErr = client.client.ReportStatus(ctx, req)
 		if callErr != nil {
@@ -552,7 +552,7 @@ func (cli *clientImpl) StreamLogs(ctx context.Context) (coordinatorv1.Coordinato
 }
 
 // GetDAGRunStatus retrieves the status of a DAG run from the coordinator
-func (cli *clientImpl) GetDAGRunStatus(ctx context.Context, dagName, dagRunID string, rootRef *execution.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error) {
+func (cli *clientImpl) GetDAGRunStatus(ctx context.Context, dagName, dagRunID string, rootRef *exec.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error) {
 	members, err := cli.getCoordinatorMembers(ctx)
 	if err != nil {
 		return nil, err
@@ -570,7 +570,7 @@ func (cli *clientImpl) GetDAGRunStatus(ctx context.Context, dagName, dagRunID st
 	}
 
 	var resp *coordinatorv1.GetDAGRunStatusResponse
-	err = cli.attemptCall(ctx, members, func(ctx context.Context, _ execution.HostInfo, client *client) error {
+	err = cli.attemptCall(ctx, members, func(ctx context.Context, _ exec.HostInfo, client *client) error {
 		var callErr error
 		resp, callErr = client.client.GetDAGRunStatus(ctx, req)
 		if callErr != nil {
@@ -582,7 +582,7 @@ func (cli *clientImpl) GetDAGRunStatus(ctx context.Context, dagName, dagRunID st
 }
 
 // RequestCancel requests cancellation of a DAG run through the coordinator
-func (cli *clientImpl) RequestCancel(ctx context.Context, dagName, dagRunID string, rootRef *execution.DAGRunRef) error {
+func (cli *clientImpl) RequestCancel(ctx context.Context, dagName, dagRunID string, rootRef *exec.DAGRunRef) error {
 	members, err := cli.getCoordinatorMembers(ctx)
 	if err != nil {
 		return err
@@ -599,7 +599,7 @@ func (cli *clientImpl) RequestCancel(ctx context.Context, dagName, dagRunID stri
 		req.RootDagRunId = rootRef.ID
 	}
 
-	return cli.attemptCall(ctx, members, func(ctx context.Context, _ execution.HostInfo, client *client) error {
+	return cli.attemptCall(ctx, members, func(ctx context.Context, _ exec.HostInfo, client *client) error {
 		resp, callErr := client.client.RequestCancel(ctx, req)
 		if callErr != nil {
 			return fmt.Errorf("request cancel failed: %w", callErr)

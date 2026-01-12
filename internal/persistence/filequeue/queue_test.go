@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/persistence/filequeue"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -25,14 +25,14 @@ func TestQueue(t *testing.T) {
 	require.Equal(t, 0, queueLen, "expected queue length to be 0")
 
 	// Add a low priority job to the queue
-	err = queue.Enqueue(th.Context, execution.QueuePriorityLow, execution.DAGRunRef{
+	err = queue.Enqueue(th.Context, exec.QueuePriorityLow, exec.DAGRunRef{
 		Name: "test-name",
 		ID:   "low-priority-dag-run",
 	})
 	require.NoError(t, err, "expected no error when adding job to queue")
 
 	// Add a high priority job to the queue
-	err = queue.Enqueue(th.Context, execution.QueuePriorityHigh, execution.DAGRunRef{
+	err = queue.Enqueue(th.Context, exec.QueuePriorityHigh, exec.DAGRunRef{
 		Name: "test-name",
 		ID:   "high-priority-dag-run",
 	})
@@ -72,14 +72,14 @@ func TestQueue_FindByDAGRunID(t *testing.T) {
 	queue := filequeue.NewDualQueue(queueDir, "test-name")
 
 	// Add a low priority job to the queue
-	err := queue.Enqueue(th.Context, execution.QueuePriorityLow, execution.DAGRunRef{
+	err := queue.Enqueue(th.Context, exec.QueuePriorityLow, exec.DAGRunRef{
 		Name: "test-name",
 		ID:   "low-priority-dag-run",
 	})
 	require.NoError(t, err, "expected no error when adding job to queue")
 
 	// Add a high priority job to the queue
-	err = queue.Enqueue(th.Context, execution.QueuePriorityHigh, execution.DAGRunRef{
+	err = queue.Enqueue(th.Context, exec.QueuePriorityHigh, exec.DAGRunRef{
 		Name: "test-name",
 		ID:   "high-priority-dag-run",
 	})
@@ -115,7 +115,7 @@ func TestQueue_OrderingHighFrequency(t *testing.T) {
 	// Enqueue items very quickly
 	numItems := 10
 	for i := 0; i < numItems; i++ {
-		err := queue.Enqueue(th.Context, execution.QueuePriorityLow, execution.DAGRunRef{
+		err := queue.Enqueue(th.Context, exec.QueuePriorityLow, exec.DAGRunRef{
 			Name: "test-ordering",
 			ID:   fmt.Sprintf("run-%d", i),
 		})

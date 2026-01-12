@@ -11,17 +11,17 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
-func New(baseDir string) execution.QueueStore {
+func New(baseDir string) exec.QueueStore {
 	return &Store{
 		baseDir: baseDir,
 		queues:  make(map[string]*DualQueue),
 	}
 }
 
-var _ execution.QueueStore = (*Store)(nil)
+var _ exec.QueueStore = (*Store)(nil)
 
 // Store implements models.QueueStore.
 // It provides a dead-simple queue implementation using files.
@@ -35,7 +35,7 @@ type Store struct {
 }
 
 // QueueWatcher implements execution.QueueStore.
-func (s *Store) QueueWatcher(_ context.Context) execution.QueueWatcher {
+func (s *Store) QueueWatcher(_ context.Context) exec.QueueWatcher {
 	return newWatcher(s.baseDir)
 }
 
@@ -76,11 +76,11 @@ func (s *Store) QueueList(ctx context.Context) ([]string, error) {
 }
 
 // All implements models.QueueStore.
-func (s *Store) All(ctx context.Context) ([]execution.QueuedItemData, error) {
+func (s *Store) All(ctx context.Context) ([]exec.QueuedItemData, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	var items []execution.QueuedItemData
+	var items []exec.QueuedItemData
 
 	patterns := []string{
 		filepath.Join(s.baseDir, "*", "item_high_*.json"),
@@ -107,7 +107,7 @@ func (s *Store) All(ctx context.Context) ([]execution.QueuedItemData, error) {
 }
 
 // DequeueByName implements models.QueueStore.
-func (s *Store) DequeueByName(ctx context.Context, name string) (execution.QueuedItemData, error) {
+func (s *Store) DequeueByName(ctx context.Context, name string) (exec.QueuedItemData, error) {
 	ctx = logger.WithValues(ctx, tag.Queue(name))
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -131,7 +131,7 @@ func (s *Store) DequeueByName(ctx context.Context, name string) (execution.Queue
 	q := s.queues[name]
 	item, err := q.Dequeue(ctx)
 	if errors.Is(err, ErrQueueEmpty) {
-		return nil, execution.ErrQueueEmpty
+		return nil, exec.ErrQueueEmpty
 	}
 
 	if err != nil {
@@ -156,7 +156,7 @@ func (s *Store) Len(ctx context.Context, name string) (int, error) {
 }
 
 // List implements models.QueueStore.
-func (s *Store) List(ctx context.Context, name string) ([]execution.QueuedItemData, error) {
+func (s *Store) List(ctx context.Context, name string) ([]exec.QueuedItemData, error) {
 	ctx = logger.WithValues(ctx, tag.Queue(name))
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -175,12 +175,12 @@ func (s *Store) List(ctx context.Context, name string) ([]execution.QueuedItemDa
 	return items, nil
 }
 
-func (s *Store) ListByDAGName(ctx context.Context, name, dagName string) ([]execution.QueuedItemData, error) {
+func (s *Store) ListByDAGName(ctx context.Context, name, dagName string) ([]exec.QueuedItemData, error) {
 	items, err := s.List(ctx, name)
 	if err != nil {
 		return nil, err
 	}
-	var ret []execution.QueuedItemData
+	var ret []exec.QueuedItemData
 	for _, item := range items {
 		data, err := item.Data()
 		if err != nil {
@@ -195,7 +195,7 @@ func (s *Store) ListByDAGName(ctx context.Context, name, dagName string) ([]exec
 }
 
 // DequeueByDAGRunID implements models.QueueStore.
-func (s *Store) DequeueByDAGRunID(ctx context.Context, name string, dagRun execution.DAGRunRef) ([]execution.QueuedItemData, error) {
+func (s *Store) DequeueByDAGRunID(ctx context.Context, name string, dagRun exec.DAGRunRef) ([]exec.QueuedItemData, error) {
 	ctx = logger.WithValues(ctx,
 		tag.Queue(name),
 		tag.DAG(dagRun.Name),
@@ -204,7 +204,7 @@ func (s *Store) DequeueByDAGRunID(ctx context.Context, name string, dagRun execu
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	var items []execution.QueuedItemData
+	var items []exec.QueuedItemData
 	if _, ok := s.queues[name]; !ok {
 		s.queues[name] = s.createDualQueue(name)
 	}
@@ -230,14 +230,14 @@ func (s *Store) DequeueByDAGRunID(ctx context.Context, name string, dagRun execu
 	items = append(items, item...)
 
 	if len(items) == 0 {
-		return nil, execution.ErrQueueItemNotFound
+		return nil, exec.ErrQueueItemNotFound
 	}
 
 	return items, nil
 }
 
 // Enqueue implements models.QueueStore.
-func (s *Store) Enqueue(ctx context.Context, name string, p execution.QueuePriority, dagRun execution.DAGRunRef) error {
+func (s *Store) Enqueue(ctx context.Context, name string, p exec.QueuePriority, dagRun exec.DAGRunRef) error {
 	ctx = logger.WithValues(ctx,
 		tag.Queue(name),
 		tag.DAG(dagRun.Name),

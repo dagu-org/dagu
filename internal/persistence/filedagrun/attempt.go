@@ -19,7 +19,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
 // Error definitions for common issues
@@ -44,7 +44,7 @@ const MessagesDir = "messages"
 // CancelRequestedFlag is a special flag used to indicate that a cancel request has been made.
 const CancelRequestedFlag = "CANCEL_REQUESTED"
 
-var _ execution.DAGRunAttempt = (*Attempt)(nil)
+var _ exec.DAGRunAttempt = (*Attempt)(nil)
 
 // Attempt manages an append-only status file with read, write, and compaction capabilities.
 // It provides thread-safe operations and supports metrics collection.
@@ -53,7 +53,7 @@ type Attempt struct {
 	file      string                                   // Path to the status file
 	writer    *Writer                                  // Writer for appending status updates
 	mu        sync.RWMutex                             // Mutex for thread safety
-	cache     *fileutil.Cache[*execution.DAGRunStatus] // Optional cache for read operations
+	cache     *fileutil.Cache[*exec.DAGRunStatus] // Optional cache for read operations
 	isClosing atomic.Bool                              // Flag to prevent writes during Close/Compact
 	dag       *core.DAG                                // DAG associated with the status file
 }
@@ -80,7 +80,7 @@ func (att *Attempt) SetDAG(dag *core.DAG) {
 }
 
 // NewAttempt creates a new Run for the specified file.
-func NewAttempt(file string, cache *fileutil.Cache[*execution.DAGRunStatus], opts ...AttemptOption) (*Attempt, error) {
+func NewAttempt(file string, cache *fileutil.Cache[*exec.DAGRunStatus], opts ...AttemptOption) (*Attempt, error) {
 	dirName := filepath.Base(filepath.Dir(file))
 	matches := reAttemptDir.FindStringSubmatch(dirName)
 	if len(matches) != 3 {
@@ -181,7 +181,7 @@ func (att *Attempt) Open(ctx context.Context) error {
 
 // Write adds a new status to the file. It returns an error if the file is not open
 // or is currently being closed. The context can be used to cancel the operation.
-func (att *Attempt) Write(ctx context.Context, status execution.DAGRunStatus) error {
+func (att *Attempt) Write(ctx context.Context, status exec.DAGRunStatus) error {
 	// Check if we're closing before acquiring the mutex to reduce contention
 	if att.isClosing.Load() {
 		return fmt.Errorf("cannot write while file is closing: %w", ErrStatusFileNotOpen)
@@ -335,10 +335,10 @@ func safeRename(source, target string) error {
 
 // ReadStatus reads the latest status from the file, using cache if available.
 // The context can be used to cancel the operation.
-func (att *Attempt) ReadStatus(_ context.Context) (*execution.DAGRunStatus, error) {
+func (att *Attempt) ReadStatus(_ context.Context) (*exec.DAGRunStatus, error) {
 	// Try to use cache first if available
 	if att.cache != nil {
-		status, cacheErr := att.cache.LoadLatest(att.file, func() (*execution.DAGRunStatus, error) {
+		status, cacheErr := att.cache.LoadLatest(att.file, func() (*exec.DAGRunStatus, error) {
 			att.mu.RLock()
 			defer att.mu.RUnlock()
 			return att.parseLocked()
@@ -356,7 +356,7 @@ func (att *Attempt) ReadStatus(_ context.Context) (*execution.DAGRunStatus, erro
 
 	if parseErr != nil {
 		if errors.Is(parseErr, io.EOF) {
-			return nil, execution.ErrCorruptedStatusFile // This means no valid status was found in the file
+			return nil, exec.ErrCorruptedStatusFile // This means no valid status was found in the file
 		}
 		return nil, fmt.Errorf("failed to parse status file: %w", parseErr)
 	}
@@ -367,13 +367,13 @@ func (att *Attempt) ReadStatus(_ context.Context) (*execution.DAGRunStatus, erro
 
 // parseLocked reads the status file and returns the last valid status.
 // Must be called with a lock (read or write) already held.
-func (att *Attempt) parseLocked() (*execution.DAGRunStatus, error) {
+func (att *Attempt) parseLocked() (*exec.DAGRunStatus, error) {
 	return ParseStatusFile(att.file)
 }
 
 // ParseStatusFile reads the status file and returns the last valid status.
 // The bufferSize parameter controls the size of the read buffer.
-func ParseStatusFile(file string) (*execution.DAGRunStatus, error) {
+func ParseStatusFile(file string) (*exec.DAGRunStatus, error) {
 	f, err := os.Open(file) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrReadFailed, err)
@@ -384,7 +384,7 @@ func ParseStatusFile(file string) (*execution.DAGRunStatus, error) {
 
 	var (
 		offset int64
-		result *execution.DAGRunStatus
+		result *exec.DAGRunStatus
 	)
 
 	// Read append-only file from the beginning and find the last status
@@ -401,7 +401,7 @@ func ParseStatusFile(file string) (*execution.DAGRunStatus, error) {
 
 		offset = nextOffset
 		if len(line) > 0 {
-			status, err := execution.StatusFromJSON(string(line))
+			status, err := exec.StatusFromJSON(string(line))
 			if err == nil {
 				result = status
 			}
@@ -538,7 +538,7 @@ func readLineFrom(f *os.File, offset int64) ([]byte, int64, error) {
 
 // WriteOutputs writes the collected step outputs to outputs.json.
 // If outputs is nil or has no output entries, no file is created.
-func (att *Attempt) WriteOutputs(_ context.Context, outputs *execution.DAGRunOutputs) error {
+func (att *Attempt) WriteOutputs(_ context.Context, outputs *exec.DAGRunOutputs) error {
 	if outputs == nil || len(outputs.Outputs) == 0 {
 		return nil
 	}
@@ -560,7 +560,7 @@ func (att *Attempt) WriteOutputs(_ context.Context, outputs *execution.DAGRunOut
 
 // ReadOutputs reads the collected step outputs from outputs.json.
 // Returns nil if the file does not exist or if the file is in old format (no metadata field).
-func (att *Attempt) ReadOutputs(_ context.Context) (*execution.DAGRunOutputs, error) {
+func (att *Attempt) ReadOutputs(_ context.Context) (*exec.DAGRunOutputs, error) {
 	dir := filepath.Dir(att.file)
 	outputsFile := filepath.Join(dir, OutputsFile)
 
@@ -572,7 +572,7 @@ func (att *Attempt) ReadOutputs(_ context.Context) (*execution.DAGRunOutputs, er
 		return nil, fmt.Errorf("failed to read outputs file: %w", err)
 	}
 
-	var outputs execution.DAGRunOutputs
+	var outputs exec.DAGRunOutputs
 	if err := json.Unmarshal(data, &outputs); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal outputs: %w", err)
 	}
@@ -587,7 +587,7 @@ func (att *Attempt) ReadOutputs(_ context.Context) (*execution.DAGRunOutputs, er
 
 // WriteStepMessages writes LLM messages for a single step.
 // Messages are stored at the dag-run level in a messages/ directory for retry persistence.
-func (att *Attempt) WriteStepMessages(_ context.Context, stepName string, messages []execution.LLMMessage) error {
+func (att *Attempt) WriteStepMessages(_ context.Context, stepName string, messages []exec.LLMMessage) error {
 	if len(messages) == 0 {
 		return nil
 	}
@@ -616,7 +616,7 @@ func (att *Attempt) WriteStepMessages(_ context.Context, stepName string, messag
 // ReadStepMessages reads LLM messages for a single step.
 // Messages are stored at the dag-run level in a messages/ directory for retry persistence.
 // Returns nil if no messages exist for the step.
-func (att *Attempt) ReadStepMessages(_ context.Context, stepName string) ([]execution.LLMMessage, error) {
+func (att *Attempt) ReadStepMessages(_ context.Context, stepName string) ([]exec.LLMMessage, error) {
 	// Read from dag-run level (parent of attempt directory) for retry persistence
 	dagRunDir := filepath.Dir(filepath.Dir(att.file))
 	file := filepath.Join(dagRunDir, MessagesDir, stepName+".json")
@@ -629,7 +629,7 @@ func (att *Attempt) ReadStepMessages(_ context.Context, stepName string) ([]exec
 		return nil, fmt.Errorf("failed to read messages file: %w", err)
 	}
 
-	var messages []execution.LLMMessage
+	var messages []exec.LLMMessage
 	if err := json.Unmarshal(data, &messages); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal messages: %w", err)
 	}

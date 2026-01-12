@@ -13,7 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
 // WriterState represents the current state of a writer
@@ -89,7 +89,7 @@ func (w *Writer) Open() error {
 
 // Write serializes the status to JSON and appends it to the file.
 // It automatically flushes data to ensure durability.
-func (w *Writer) Write(ctx context.Context, st execution.DAGRunStatus) error {
+func (w *Writer) Write(ctx context.Context, st exec.DAGRunStatus) error {
 	// Add context info to logs if write fails
 	if err := w.write(st); err != nil {
 		logger.Error(ctx, "Failed to write status", tag.Error(err))
@@ -99,7 +99,7 @@ func (w *Writer) Write(ctx context.Context, st execution.DAGRunStatus) error {
 	return nil
 }
 
-func (w *Writer) write(st execution.DAGRunStatus) error {
+func (w *Writer) write(st exec.DAGRunStatus) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 

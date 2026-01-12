@@ -12,7 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	llmpkg "github.com/dagu-org/dagu/internal/llm"
 
 	// Import all providers to register them
@@ -31,9 +31,9 @@ type Executor struct {
 	step            core.Step
 	providerType    llmpkg.ProviderType
 	apiKeyEnvVar    string
-	messages        []execution.LLMMessage
-	contextMessages []execution.LLMMessage
-	savedMessages   []execution.LLMMessage
+	messages        []exec.LLMMessage
+	contextMessages []exec.LLMMessage
+	savedMessages   []exec.LLMMessage
 }
 
 // newChatExecutor creates a new chat executor from a step configuration.
@@ -58,11 +58,11 @@ func newChatExecutor(_ context.Context, step core.Step) (executor.Executor, erro
 
 	// Convert messages from core.LLMMessage to execution.LLMMessage
 	// Messages are now at step level, not inside LLM config
-	messages := make([]execution.LLMMessage, 0, len(step.Messages)+1)
+	messages := make([]exec.LLMMessage, 0, len(step.Messages)+1)
 
 	// Add system message from config if specified
 	if cfg.System != "" {
-		messages = append(messages, execution.LLMMessage{
+		messages = append(messages, exec.LLMMessage{
 			Role:    core.LLMRoleSystem,
 			Content: cfg.System,
 		})
@@ -70,7 +70,7 @@ func newChatExecutor(_ context.Context, step core.Step) (executor.Executor, erro
 
 	// Add step-level messages
 	for _, msg := range step.Messages {
-		messages = append(messages, execution.LLMMessage{
+		messages = append(messages, exec.LLMMessage{
 			Role:    msg.Role,
 			Content: msg.Content,
 		})
@@ -102,24 +102,24 @@ func (e *Executor) Kill(_ os.Signal) error {
 }
 
 // SetContext sets the conversation context from prior steps.
-func (e *Executor) SetContext(messages []execution.LLMMessage) {
+func (e *Executor) SetContext(messages []exec.LLMMessage) {
 	e.contextMessages = messages
 }
 
 // GetMessages returns the complete conversation messages after execution.
 // This includes inherited messages, step messages, and the assistant response.
-func (e *Executor) GetMessages() []execution.LLMMessage {
+func (e *Executor) GetMessages() []exec.LLMMessage {
 	return e.savedMessages
 }
 
 // buildMessageList orders messages so step's system message takes precedence over context.
-func buildMessageList(stepMsgs, contextMsgs []execution.LLMMessage) []execution.LLMMessage {
-	var result []execution.LLMMessage
-	var stepSystemMsg *execution.LLMMessage
-	var stepOtherMsgs []execution.LLMMessage
+func buildMessageList(stepMsgs, contextMsgs []exec.LLMMessage) []exec.LLMMessage {
+	var result []exec.LLMMessage
+	var stepSystemMsg *exec.LLMMessage
+	var stepOtherMsgs []exec.LLMMessage
 
 	for i := range stepMsgs {
-		if stepMsgs[i].Role == execution.RoleSystem {
+		if stepMsgs[i].Role == exec.RoleSystem {
 			stepSystemMsg = &stepMsgs[i]
 		} else {
 			stepOtherMsgs = append(stepOtherMsgs, stepMsgs[i])
@@ -132,11 +132,11 @@ func buildMessageList(stepMsgs, contextMsgs []execution.LLMMessage) []execution.
 	result = append(result, contextMsgs...)
 	result = append(result, stepOtherMsgs...)
 
-	return execution.DeduplicateSystemMessages(result)
+	return exec.DeduplicateSystemMessages(result)
 }
 
 // toLLMMessages converts execution.LLMMessage to llmpkg.Message for provider calls.
-func toLLMMessages(msgs []execution.LLMMessage) []llmpkg.Message {
+func toLLMMessages(msgs []exec.LLMMessage) []llmpkg.Message {
 	result := make([]llmpkg.Message, len(msgs))
 	for i, msg := range msgs {
 		result[i] = llmpkg.Message{
@@ -230,14 +230,14 @@ func (e *Executor) createProvider(ctx context.Context) (llmpkg.Provider, error) 
 }
 
 // evalMessages evaluates variable substitution in message content.
-func evalMessages(ctx context.Context, msgs []execution.LLMMessage) ([]execution.LLMMessage, error) {
-	result := make([]execution.LLMMessage, len(msgs))
+func evalMessages(ctx context.Context, msgs []exec.LLMMessage) ([]exec.LLMMessage, error) {
+	result := make([]exec.LLMMessage, len(msgs))
 	for i, msg := range msgs {
 		content, err := runtime.EvalString(ctx, msg.Content)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate message content: %w", err)
 		}
-		result[i] = execution.LLMMessage{
+		result[i] = exec.LLMMessage{
 			Role:    msg.Role,
 			Content: content,
 		}
@@ -314,7 +314,7 @@ func (e *Executor) Run(ctx context.Context) error {
 	}
 
 	// Build metadata for the assistant response
-	metadata := &execution.LLMMessageMetadata{
+	metadata := &exec.LLMMessageMetadata{
 		Provider: cfg.Provider,
 		Model:    cfg.Model,
 	}
@@ -325,8 +325,8 @@ func (e *Executor) Run(ctx context.Context) error {
 	}
 
 	// Save full conversation (inherited + step messages + response)
-	e.savedMessages = append(allMessages, execution.LLMMessage{
-		Role:     execution.RoleAssistant,
+	e.savedMessages = append(allMessages, exec.LLMMessage{
+		Role:     exec.RoleAssistant,
 		Content:  responseContent,
 		Metadata: metadata,
 	})

@@ -8,7 +8,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -210,11 +210,11 @@ func TestCleanupCommandDirectStore(t *testing.T) {
 			testDAG,
 			oldTime,
 			"old-run-id",
-			execution.NewDAGRunAttemptOptions{},
+			exec.NewDAGRunAttemptOptions{},
 		)
 		require.NoError(t, err)
 		require.NoError(t, oldAttempt.Open(th.Context))
-		require.NoError(t, oldAttempt.Write(th.Context, execution.DAGRunStatus{
+		require.NoError(t, oldAttempt.Write(th.Context, exec.DAGRunStatus{
 			Name:     dagName,
 			DAGRunID: "old-run-id",
 			Status:   core.Succeeded,
@@ -227,11 +227,11 @@ func TestCleanupCommandDirectStore(t *testing.T) {
 			testDAG,
 			recentTime,
 			"recent-run-id",
-			execution.NewDAGRunAttemptOptions{},
+			exec.NewDAGRunAttemptOptions{},
 		)
 		require.NoError(t, err)
 		require.NoError(t, recentAttempt.Open(th.Context))
-		require.NoError(t, recentAttempt.Write(th.Context, execution.DAGRunStatus{
+		require.NoError(t, recentAttempt.Write(th.Context, exec.DAGRunStatus{
 			Name:     dagName,
 			DAGRunID: "recent-run-id",
 			Status:   core.Succeeded,

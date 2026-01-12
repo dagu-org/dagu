@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
 // instanceInfo represents the information stored for each service instance
@@ -17,7 +17,7 @@ type instanceInfo struct {
 	Host      string                  `json:"host"`
 	Port      int                     `json:"port"`
 	PID       int                     `json:"pid"`
-	Status    execution.ServiceStatus `json:"status"`
+	Status    exec.ServiceStatus `json:"status"`
 	StartedAt time.Time               `json:"startedAt"`
 }
 

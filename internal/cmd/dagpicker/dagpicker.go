@@ -13,7 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
 var docStyle = lipgloss.NewStyle().Margin(1, 2)
@@ -306,12 +306,12 @@ func (m Model) viewConfirmation() string {
 // pickerModel holds context data for the picker
 type pickerModel struct {
 	ctx      context.Context
-	dagStore execution.DAGStore
+	dagStore exec.DAGStore
 	dagMap   map[string]*core.DAG
 }
 
 // PickDAGInteractive shows a unified fullscreen UI for DAG selection, parameter input, and confirmation
-func PickDAGInteractive(ctx context.Context, dagStore execution.DAGStore, dag *core.DAG) (Result, error) {
+func PickDAGInteractive(ctx context.Context, dagStore exec.DAGStore, dag *core.DAG) (Result, error) {
 	// Create an internal picker model
 	pickerModel := &pickerModel{
 		ctx:      ctx,
@@ -320,7 +320,7 @@ func PickDAGInteractive(ctx context.Context, dagStore execution.DAGStore, dag *c
 	}
 
 	// Get list of DAGs
-	result, errs, err := dagStore.List(ctx, execution.ListDAGsOptions{})
+	result, errs, err := dagStore.List(ctx, exec.ListDAGsOptions{})
 	if err != nil {
 		return Result{}, fmt.Errorf("failed to list DAGs: %w", err)
 	}
@@ -420,7 +420,7 @@ func PickDAGInteractive(ctx context.Context, dagStore execution.DAGStore, dag *c
 
 // PickDAG shows an interactive DAG picker and returns the selected DAG path
 // Deprecated: Use PickDAGInteractive instead for a better user experience
-func PickDAG(ctx context.Context, dagStore execution.DAGStore) (string, error) {
+func PickDAG(ctx context.Context, dagStore exec.DAGStore) (string, error) {
 	result, err := PickDAGInteractive(ctx, dagStore, nil)
 	if err != nil {
 		return "", err

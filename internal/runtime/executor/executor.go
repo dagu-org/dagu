@@ -9,7 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
 // Executor is an interface for executing steps in a DAG.
@@ -82,6 +82,6 @@ type RunParams struct {
 
 // ChatMessageHandler is an interface for executors that handle chat conversation messages.
 type ChatMessageHandler interface {
-	SetContext([]execution.LLMMessage)
-	GetMessages() []execution.LLMMessage
+	SetContext([]exec.LLMMessage)
+	GetMessages() []exec.LLMMessage
 }

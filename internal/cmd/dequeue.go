@@ -7,7 +7,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/spf13/cobra"
 )
 
@@ -38,7 +38,7 @@ func runDequeue(ctx *Context, args []string) error {
 		return dequeueFirst(ctx, queueName)
 	}
 
-	dagRun, err := execution.ParseDAGRunRef(dagRunRef)
+	dagRun, err := exec.ParseDAGRunRef(dagRunRef)
 	if err != nil {
 		return fmt.Errorf("failed to parse dag-run reference %s: %w", dagRunRef, err)
 	}
@@ -71,7 +71,7 @@ func dequeueFirst(ctx *Context, queueName string) error {
 }
 
 // dequeueDAGRun dequeues a dag-run from the queue.
-func dequeueDAGRun(ctx *Context, queueName string, dagRun execution.DAGRunRef, alreadyDequeued bool) error {
+func dequeueDAGRun(ctx *Context, queueName string, dagRun exec.DAGRunRef, alreadyDequeued bool) error {
 	// Check if queues are enabled
 	if !ctx.Config.Queues.Enabled {
 		return fmt.Errorf("queues are disabled in configuration")
@@ -136,7 +136,7 @@ func dequeueDAGRun(ctx *Context, queueName string, dagRun execution.DAGRunRef, a
 	// Read the latest attempt and if it's NotStarted, we can remove the DAGRun from the store
 	// as it only has the queued status and no other attempts.
 	_, err = ctx.DAGRunStore.FindAttempt(ctx, dagRun)
-	if errors.Is(err, execution.ErrNoStatusData) {
+	if errors.Is(err, exec.ErrNoStatusData) {
 		if err := ctx.DAGRunStore.RemoveDAGRun(ctx, dagRun); err != nil {
 			return fmt.Errorf("failed to remove dag-run %s from store: %w", dagRun.ID, err)
 		}

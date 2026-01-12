@@ -14,7 +14,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
 // Errors for the queue file
@@ -62,13 +62,13 @@ type queuedItem struct {
 // ItemData represents the data stored in the queue file
 type ItemData struct {
 	FileName string              `json:"fileName"`
-	DAGRun   execution.DAGRunRef `json:"dagRun"`
+	DAGRun   exec.DAGRunRef `json:"dagRun"`
 	QueuedAt time.Time           `json:"queuedAt"`
 }
 
 // Push adds a job to the queue
 // Since it's a prototype, it just create a json file with the job ID and dag-run reference
-func (q *QueueFile) Push(ctx context.Context, dagRun execution.DAGRunRef) error {
+func (q *QueueFile) Push(ctx context.Context, dagRun exec.DAGRunRef) error {
 	ctx = logger.WithValues(ctx,
 		tag.Queue(filepath.Base(q.baseDir)),
 		tag.DAG(dagRun.Name),
@@ -77,7 +77,7 @@ func (q *QueueFile) Push(ctx context.Context, dagRun execution.DAGRunRef) error 
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	timestamp := execution.NewUTC(time.Now())
+	timestamp := exec.NewUTC(time.Now())
 
 	// Create the queue file name
 	fileName := queueFileName(q.prefix, dagRun.ID, timestamp)
@@ -148,7 +148,7 @@ func (q *QueueFile) Push(ctx context.Context, dagRun execution.DAGRunRef) error 
 }
 
 // PopByDAGRunID removes jobs from the queue by dag-run ID
-func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRun execution.DAGRunRef) ([]execution.QueuedItemData, error) {
+func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRun exec.DAGRunRef) ([]exec.QueuedItemData, error) {
 	ctx = logger.WithValues(ctx,
 		tag.Queue(filepath.Base(q.baseDir)),
 		tag.DAG(dagRun.Name),
@@ -168,7 +168,7 @@ func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRun execution.DAGRunRe
 		return nil, fmt.Errorf("failed to list jobs: %w", err)
 	}
 
-	var removedJobs []execution.QueuedItemData
+	var removedJobs []exec.QueuedItemData
 	for _, item := range items {
 		job := NewQueuedFile(item.file)
 		data, err := job.Data()
@@ -230,7 +230,7 @@ func (q *QueueFile) List(ctx context.Context) ([]*QueuedFile, error) {
 	return jobs, nil
 }
 
-func (q *QueueFile) Pop(ctx context.Context) (execution.QueuedItemData, error) {
+func (q *QueueFile) Pop(ctx context.Context) (exec.QueuedItemData, error) {
 	ctx = logger.WithValues(ctx, tag.Queue(filepath.Base(q.baseDir)))
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -399,7 +399,7 @@ func parseQueueFileName(path, fileName string) (ItemData, error) {
 	// Create the ItemData struct
 	data := ItemData{
 		FileName: fileName,
-		DAGRun: execution.DAGRunRef{
+		DAGRun: exec.DAGRunRef{
 			Name: filepath.Base(filepath.Dir(path)),
 			ID:   matches[4],
 		},
@@ -412,7 +412,7 @@ func parseQueueFileName(path, fileName string) (ItemData, error) {
 // parseRegex is the regex used to parse the queue file name
 var parseRegex = regexp.MustCompile(`^item_(high|low)_(\d{8}_\d{6})_(\d{9})Z_(.*)\.json$`)
 
-func queueFileName(priority, dagRunID string, t execution.TimeInUTC) string {
+func queueFileName(priority, dagRunID string, t exec.TimeInUTC) string {
 	nanos := t.UnixNano()
 	timestamp := t.Format(dateTimeFormatUTC) + "_" + fmt.Sprintf("%09d", nanos%1e9) + "Z"
 	return itemPrefix + priority + timestamp + "_" + dagRunID + ".json"

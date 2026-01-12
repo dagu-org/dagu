@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/spf13/cobra"
@@ -91,7 +91,7 @@ func runDry(ctx *Context, args []string) error {
 		return err
 	}
 
-	root := execution.NewDAGRunRef(dag.Name, dagRunID)
+	root := exec.NewDAGRunRef(dag.Name, dagRunID)
 
 	agentInstance := agent.New(
 		dagRunID,

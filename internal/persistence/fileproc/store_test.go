@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,7 +19,7 @@ func TestStore(t *testing.T) {
 	store := New(baseDir)
 
 	// Create a dagRun reference
-	dagRun := execution.DAGRunRef{
+	dagRun := exec.DAGRunRef{
 		Name: "test_dag",
 		ID:   "test_id",
 	}
@@ -45,7 +45,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 	store := New(baseDir)
 
 	t.Run("NoProcessFile", func(t *testing.T) {
-		dagRun := execution.DAGRunRef{
+		dagRun := exec.DAGRunRef{
 			Name: "test-dag",
 			ID:   "run-123",
 		}
@@ -57,7 +57,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 	})
 
 	t.Run("AliveProcess", func(t *testing.T) {
-		dagRun := execution.DAGRunRef{
+		dagRun := exec.DAGRunRef{
 			Name: "test-dag",
 			ID:   "run-456",
 		}
@@ -78,7 +78,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 
 	t.Run("DifferentRunID", func(t *testing.T) {
 		// Create a process for one run ID
-		dagRun1 := execution.DAGRunRef{
+		dagRun1 := exec.DAGRunRef{
 			Name: "test-dag-3",
 			ID:   "run-789",
 		}
@@ -88,7 +88,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 		requireRunAliveState(t, ctx, store, "queue-3", dagRun1, true)
 
 		// Check for a different run ID
-		dagRun2 := execution.DAGRunRef{
+		dagRun2 := exec.DAGRunRef{
 			Name: "test-dag-3",
 			ID:   "run-999",
 		}
@@ -111,7 +111,7 @@ func TestStore_IsRunAlive(t *testing.T) {
 			staleTime: time.Millisecond * 100,
 		}
 
-		dagRun := execution.DAGRunRef{
+		dagRun := exec.DAGRunRef{
 			Name: "test-dag-stale",
 			ID:   "run-stale",
 		}
@@ -150,11 +150,11 @@ func TestStore_ListAllAlive(t *testing.T) {
 
 	t.Run("SingleGroup", func(t *testing.T) {
 		// Create processes in a single group
-		dagRun1 := execution.DAGRunRef{
+		dagRun1 := exec.DAGRunRef{
 			Name: "dag1",
 			ID:   "run1",
 		}
-		dagRun2 := execution.DAGRunRef{
+		dagRun2 := exec.DAGRunRef{
 			Name: "dag2",
 			ID:   "run2",
 		}
@@ -167,7 +167,7 @@ func TestStore_ListAllAlive(t *testing.T) {
 		require.NoError(t, err)
 		defer func() { _ = proc2.Stop(ctx) }()
 
-		requireListAllAlive(t, ctx, store, func(result map[string][]execution.DAGRunRef) bool {
+		requireListAllAlive(t, ctx, store, func(result map[string][]exec.DAGRunRef) bool {
 			queueRuns, ok := result["queue1"]
 			return ok && len(result) == 1 && len(queueRuns) == 2
 		}, "expected queue1 to contain both runs")
@@ -189,15 +189,15 @@ func TestStore_ListAllAlive(t *testing.T) {
 
 	t.Run("MultipleGroups", func(t *testing.T) {
 		// Create processes in multiple groups
-		dagRun1 := execution.DAGRunRef{
+		dagRun1 := exec.DAGRunRef{
 			Name: "dag-a",
 			ID:   "run-a1",
 		}
-		dagRun2 := execution.DAGRunRef{
+		dagRun2 := exec.DAGRunRef{
 			Name: "dag-b",
 			ID:   "run-b1",
 		}
-		dagRun3 := execution.DAGRunRef{
+		dagRun3 := exec.DAGRunRef{
 			Name: "dag-c",
 			ID:   "run-c1",
 		}
@@ -214,7 +214,7 @@ func TestStore_ListAllAlive(t *testing.T) {
 		require.NoError(t, err)
 		defer func() { _ = proc3.Stop(ctx) }()
 
-		requireListAllAlive(t, ctx, store, func(result map[string][]execution.DAGRunRef) bool {
+		requireListAllAlive(t, ctx, store, func(result map[string][]exec.DAGRunRef) bool {
 			queueAlpha, alphaOK := result["queue-alpha"]
 			queueBeta, betaOK := result["queue-beta"]
 			return len(result) == 2 && alphaOK && betaOK && len(queueAlpha) == 2 && len(queueBeta) == 1
@@ -234,15 +234,15 @@ func TestStore_ListAllAlive(t *testing.T) {
 
 	t.Run("MixedAliveAndStopped", func(t *testing.T) {
 		// Create some processes and stop some
-		dagRun1 := execution.DAGRunRef{
+		dagRun1 := exec.DAGRunRef{
 			Name: "dag-x",
 			ID:   "run-x1",
 		}
-		dagRun2 := execution.DAGRunRef{
+		dagRun2 := exec.DAGRunRef{
 			Name: "dag-y",
 			ID:   "run-y1",
 		}
-		dagRun3 := execution.DAGRunRef{
+		dagRun3 := exec.DAGRunRef{
 			Name: "dag-z",
 			ID:   "run-z1",
 		}
@@ -260,7 +260,7 @@ func TestStore_ListAllAlive(t *testing.T) {
 		err = proc2.Stop(ctx)
 		require.NoError(t, err)
 
-		requireListAllAlive(t, ctx, store, func(result map[string][]execution.DAGRunRef) bool {
+		requireListAllAlive(t, ctx, store, func(result map[string][]exec.DAGRunRef) bool {
 			queueRuns, ok := result["mixed-queue"]
 			if !ok || len(result) != 1 || len(queueRuns) != 2 {
 				return false
@@ -331,7 +331,7 @@ func requireCountAlive(t *testing.T, ctx context.Context, store *Store, queue st
 	}, heartbeatWait, heartbeatPoll, message)
 }
 
-func requireRunAliveState(t *testing.T, ctx context.Context, store *Store, queue string, dagRun execution.DAGRunRef, expected bool) {
+func requireRunAliveState(t *testing.T, ctx context.Context, store *Store, queue string, dagRun exec.DAGRunRef, expected bool) {
 	t.Helper()
 	message := fmt.Sprintf("expected run %s/%s alive=%t", dagRun.Name, dagRun.ID, expected)
 	require.Eventually(t, func() bool {
@@ -341,7 +341,7 @@ func requireRunAliveState(t *testing.T, ctx context.Context, store *Store, queue
 	}, heartbeatWait, heartbeatPoll, message)
 }
 
-func requireListAllAlive(t *testing.T, ctx context.Context, store *Store, predicate func(map[string][]execution.DAGRunRef) bool, message string) {
+func requireListAllAlive(t *testing.T, ctx context.Context, store *Store, predicate func(map[string][]exec.DAGRunRef) bool, message string) {
 	t.Helper()
 	require.Eventually(t, func() bool {
 		result, err := store.ListAllAlive(ctx)

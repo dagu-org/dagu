@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/proto/convert"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -61,7 +61,7 @@ steps:
 			Name: "sub-dag",
 		}
 
-		rootRef := execution.DAGRunRef{
+		rootRef := exec.DAGRunRef{
 			Name: "root-dag",
 			ID:   "root-run-123",
 		}
@@ -83,7 +83,7 @@ steps:
 	t.Run("WithParentDagRunOption", func(t *testing.T) {
 		t.Parallel()
 
-		parentRef := execution.DAGRunRef{
+		parentRef := exec.DAGRunRef{
 			Name: "parent-dag",
 			ID:   "parent-run-789",
 		}
@@ -105,11 +105,11 @@ steps:
 	t.Run("WithMultipleOptions", func(t *testing.T) {
 		t.Parallel()
 
-		rootRef := execution.DAGRunRef{
+		rootRef := exec.DAGRunRef{
 			Name: "root-dag",
 			ID:   "root-run-123",
 		}
-		parentRef := execution.DAGRunRef{
+		parentRef := exec.DAGRunRef{
 			Name: "parent-dag",
 			ID:   "parent-run-456",
 		}
@@ -152,8 +152,8 @@ steps:
 		t.Parallel()
 
 		// Test that empty refs don't modify the task
-		emptyRootRef := execution.DAGRunRef{}
-		emptyParentRef := execution.DAGRunRef{Name: "", ID: ""}
+		emptyRootRef := exec.DAGRunRef{}
+		emptyParentRef := exec.DAGRunRef{Name: "", ID: ""}
 
 		task := executor.CreateTask(
 			"test-dag",
@@ -176,8 +176,8 @@ steps:
 		t.Parallel()
 
 		// Test refs with only one field set
-		partialRootRef := execution.DAGRunRef{Name: "root-dag", ID: ""}
-		partialParentRef := execution.DAGRunRef{Name: "", ID: "parent-id"}
+		partialRootRef := exec.DAGRunRef{Name: "root-dag", ID: ""}
+		partialParentRef := exec.DAGRunRef{Name: "", ID: "parent-id"}
 
 		task := executor.CreateTask(
 			"test-dag",
@@ -245,7 +245,7 @@ func TestTaskOption_Functions(t *testing.T) {
 		t.Parallel()
 
 		task := &coordinatorv1.Task{}
-		ref := execution.DAGRunRef{Name: "root", ID: "123"}
+		ref := exec.DAGRunRef{Name: "root", ID: "123"}
 
 		executor.WithRootDagRun(ref)(task)
 
@@ -257,7 +257,7 @@ func TestTaskOption_Functions(t *testing.T) {
 		t.Parallel()
 
 		task := &coordinatorv1.Task{}
-		ref := execution.DAGRunRef{Name: "parent", ID: "456"}
+		ref := exec.DAGRunRef{Name: "parent", ID: "456"}
 
 		executor.WithParentDagRun(ref)(task)
 
@@ -303,11 +303,11 @@ func TestTaskOption_Functions(t *testing.T) {
 		t.Parallel()
 
 		task := &coordinatorv1.Task{}
-		status := &execution.DAGRunStatus{
+		status := &exec.DAGRunStatus{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
 			Status:   core.Running,
-			Nodes: []*execution.Node{
+			Nodes: []*exec.Node{
 				{Step: core.Step{Name: "step1"}, Status: core.NodeSucceeded},
 				{Step: core.Step{Name: "step2"}, Status: core.NodeFailed},
 			},

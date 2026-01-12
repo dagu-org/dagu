@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,13 +18,13 @@ func TestRegistry_RegisterUnregister(t *testing.T) {
 	registry := New(tmpDir)
 
 	ctx := context.Background()
-	hostInfo := execution.HostInfo{
+	hostInfo := exec.HostInfo{
 		ID:     "test-instance",
 		Host:   "localhost",
 		Port:   8080,
-		Status: execution.ServiceStatusActive,
+		Status: exec.ServiceStatusActive,
 	}
-	err := registry.Register(ctx, execution.ServiceNameCoordinator, hostInfo)
+	err := registry.Register(ctx, exec.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
 
 	// Check that service registry directory was created
@@ -41,23 +41,23 @@ func TestRegistry_GetServiceMembers(t *testing.T) {
 	ctx := context.Background()
 
 	// Test getting members for empty service
-	members, err := registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	members, err := registry.GetServiceMembers(ctx, exec.ServiceNameCoordinator)
 	require.NoError(t, err)
 	assert.Empty(t, members)
 
 	// Register a service
-	hostInfo := execution.HostInfo{
+	hostInfo := exec.HostInfo{
 		ID:     "test-instance",
 		Host:   "localhost",
 		Port:   8080,
-		Status: execution.ServiceStatusActive,
+		Status: exec.ServiceStatusActive,
 	}
-	err = registry.Register(ctx, execution.ServiceNameCoordinator, hostInfo)
+	err = registry.Register(ctx, exec.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
 	defer registry.Unregister(ctx)
 
 	// Now should find the registered member
-	members, err = registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	members, err = registry.GetServiceMembers(ctx, exec.ServiceNameCoordinator)
 	require.NoError(t, err)
 	assert.Len(t, members, 1)
 	assert.Equal(t, "localhost:8080", fmt.Sprintf("%s:%d", members[0].Host, members[0].Port))
@@ -68,24 +68,24 @@ func TestRegistry_RegisterInstance(t *testing.T) {
 	registry := New(tmpDir)
 
 	ctx := context.Background()
-	hostInfo := execution.HostInfo{
+	hostInfo := exec.HostInfo{
 		ID:     "test-coordinator",
 		Host:   "localhost",
 		Port:   8080,
-		Status: execution.ServiceStatusActive,
+		Status: exec.ServiceStatusActive,
 	}
-	err := registry.Register(ctx, execution.ServiceNameCoordinator, hostInfo)
+	err := registry.Register(ctx, exec.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
 	defer registry.Unregister(ctx)
 
 	// Check that instance file was created
-	serviceDir := filepath.Join(tmpDir, string(execution.ServiceNameCoordinator))
+	serviceDir := filepath.Join(tmpDir, string(exec.ServiceNameCoordinator))
 	entries, err := os.ReadDir(serviceDir)
 	require.NoError(t, err)
 	assert.Len(t, entries, 1)
 
 	// Verify registry can find the registered instance
-	members, err := registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	members, err := registry.GetServiceMembers(ctx, exec.ServiceNameCoordinator)
 	require.NoError(t, err)
 	require.Len(t, members, 1)
 	assert.Equal(t, "localhost:8080", fmt.Sprintf("%s:%d", members[0].Host, members[0].Port))
@@ -97,18 +97,18 @@ func TestRegistry_Heartbeat(t *testing.T) {
 	registry.heartbeatInterval = 100 * time.Millisecond // Short interval for testing
 
 	ctx := context.Background()
-	hostInfo := execution.HostInfo{
+	hostInfo := exec.HostInfo{
 		ID:     "test-heartbeat",
 		Host:   "localhost",
 		Port:   8080,
-		Status: execution.ServiceStatusActive,
+		Status: exec.ServiceStatusActive,
 	}
-	err := registry.Register(ctx, execution.ServiceNameCoordinator, hostInfo)
+	err := registry.Register(ctx, exec.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
 	defer registry.Unregister(ctx)
 
 	// Get initial heartbeat time
-	members1, err := registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	members1, err := registry.GetServiceMembers(ctx, exec.ServiceNameCoordinator)
 	require.NoError(t, err)
 	require.Len(t, members1, 1)
 
@@ -118,7 +118,7 @@ func TestRegistry_Heartbeat(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Verify heartbeat was updated
-	members2, err := registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	members2, err := registry.GetServiceMembers(ctx, exec.ServiceNameCoordinator)
 	require.NoError(t, err)
 	require.Len(t, members2, 1)
 	assert.Equal(t, members1[0].ID, members2[0].ID)
@@ -129,17 +129,17 @@ func TestRegistry_UnregisterRemovesInstance(t *testing.T) {
 	registry := New(tmpDir)
 
 	ctx := context.Background()
-	hostInfo := execution.HostInfo{
+	hostInfo := exec.HostInfo{
 		ID:     "test-stop",
 		Host:   "localhost",
 		Port:   8080,
-		Status: execution.ServiceStatusActive,
+		Status: exec.ServiceStatusActive,
 	}
-	err := registry.Register(ctx, execution.ServiceNameCoordinator, hostInfo)
+	err := registry.Register(ctx, exec.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
 
 	// Verify it exists
-	members, err := registry.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	members, err := registry.GetServiceMembers(ctx, exec.ServiceNameCoordinator)
 	require.NoError(t, err)
 	assert.Len(t, members, 1)
 
@@ -147,7 +147,7 @@ func TestRegistry_UnregisterRemovesInstance(t *testing.T) {
 	registry.Unregister(ctx)
 
 	// Verify instance file was removed
-	serviceDir := filepath.Join(tmpDir, string(execution.ServiceNameCoordinator))
+	serviceDir := filepath.Join(tmpDir, string(exec.ServiceNameCoordinator))
 	entries, err := os.ReadDir(serviceDir)
 	if err == nil {
 		assert.Empty(t, entries)
@@ -159,13 +159,13 @@ func TestRegistry_ConcurrentAccess(t *testing.T) {
 	registry := New(tmpDir)
 
 	ctx := context.Background()
-	hostInfo := execution.HostInfo{
+	hostInfo := exec.HostInfo{
 		ID:     "test-concurrent",
 		Host:   "localhost",
 		Port:   8080,
-		Status: execution.ServiceStatusActive,
+		Status: exec.ServiceStatusActive,
 	}
-	err := registry.Register(ctx, execution.ServiceNameCoordinator, hostInfo)
+	err := registry.Register(ctx, exec.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
 	defer registry.Unregister(ctx)
 
@@ -173,7 +173,7 @@ func TestRegistry_ConcurrentAccess(t *testing.T) {
 	done := make(chan bool)
 	for i := 0; i < 10; i++ {
 		go func(i int) {
-			serviceName := execution.ServiceName(fmt.Sprintf("%s-%d", execution.ServiceNameCoordinator, i))
+			serviceName := exec.ServiceName(fmt.Sprintf("%s-%d", exec.ServiceNameCoordinator, i))
 			// Just verify we can get members without error
 			_, err := registry.GetServiceMembers(context.Background(), serviceName)
 			assert.NoError(t, err)
@@ -193,18 +193,18 @@ func TestRegistry_HeartbeatRecreatesFile(t *testing.T) {
 	registry.heartbeatInterval = 100 * time.Millisecond // Short interval for testing
 
 	ctx := context.Background()
-	hostInfo := execution.HostInfo{
+	hostInfo := exec.HostInfo{
 		ID:     "test-recreate",
 		Host:   "localhost",
 		Port:   8080,
-		Status: execution.ServiceStatusActive,
+		Status: exec.ServiceStatusActive,
 	}
-	err := registry.Register(ctx, execution.ServiceNameCoordinator, hostInfo)
+	err := registry.Register(ctx, exec.ServiceNameCoordinator, hostInfo)
 	require.NoError(t, err)
 	defer registry.Unregister(ctx)
 
 	// Verify file exists
-	instanceFile := filepath.Join(tmpDir, string(execution.ServiceNameCoordinator), "test-recreate.json")
+	instanceFile := filepath.Join(tmpDir, string(exec.ServiceNameCoordinator), "test-recreate.json")
 	assert.FileExists(t, instanceFile)
 
 	// Delete the file to simulate accidental deletion
@@ -231,34 +231,34 @@ func TestRegistry_MultipleInstances(t *testing.T) {
 
 	// Create multiple monitors for different instances
 	instances := []struct {
-		serviceName execution.ServiceName
-		hostInfo    execution.HostInfo
+		serviceName exec.ServiceName
+		hostInfo    exec.HostInfo
 	}{
 		{
-			serviceName: execution.ServiceNameCoordinator,
-			hostInfo: execution.HostInfo{
+			serviceName: exec.ServiceNameCoordinator,
+			hostInfo: exec.HostInfo{
 				ID:     "coord-1",
 				Host:   "coord1.example.com",
 				Port:   9090,
-				Status: execution.ServiceStatusActive,
+				Status: exec.ServiceStatusActive,
 			},
 		},
 		{
-			serviceName: execution.ServiceNameCoordinator,
-			hostInfo: execution.HostInfo{
+			serviceName: exec.ServiceNameCoordinator,
+			hostInfo: exec.HostInfo{
 				ID:     "coord-2",
 				Host:   "coord2.example.com",
 				Port:   9090,
-				Status: execution.ServiceStatusActive,
+				Status: exec.ServiceStatusActive,
 			},
 		},
 		{
 			serviceName: "worker",
-			hostInfo: execution.HostInfo{
+			hostInfo: exec.HostInfo{
 				ID:     "worker-1",
 				Host:   "worker1.example.com",
 				Port:   8080,
-				Status: execution.ServiceStatusActive,
+				Status: exec.ServiceStatusActive,
 			},
 		},
 	}
@@ -277,7 +277,7 @@ func TestRegistry_MultipleInstances(t *testing.T) {
 	resolver := registries[0]
 
 	// Check coordinator service has 2 instances
-	coordMembers, err := resolver.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	coordMembers, err := resolver.GetServiceMembers(ctx, exec.ServiceNameCoordinator)
 	require.NoError(t, err)
 	assert.Len(t, coordMembers, 2)
 
@@ -294,21 +294,21 @@ func TestRegistry_CleanupOnlyEnabledForCoordinator(t *testing.T) {
 
 	// Test 1: Registry without coordinator registration - cleanup disabled
 	registryScheduler := New(tmpDir)
-	hostInfoScheduler := execution.HostInfo{
+	hostInfoScheduler := exec.HostInfo{
 		ID:     "scheduler-1",
 		Host:   "localhost",
 		Port:   8080,
-		Status: execution.ServiceStatusActive,
+		Status: exec.ServiceStatusActive,
 	}
-	err := registryScheduler.Register(ctx, execution.ServiceNameScheduler, hostInfoScheduler)
+	err := registryScheduler.Register(ctx, exec.ServiceNameScheduler, hostInfoScheduler)
 	require.NoError(t, err)
 
 	// Get finder - should have cleanup disabled
-	_, err = registryScheduler.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	_, err = registryScheduler.GetServiceMembers(ctx, exec.ServiceNameCoordinator)
 	require.NoError(t, err)
 
 	registryScheduler.mu.RLock()
-	finder := registryScheduler.finders[execution.ServiceNameCoordinator]
+	finder := registryScheduler.finders[exec.ServiceNameCoordinator]
 	registryScheduler.mu.RUnlock()
 
 	assert.NotNil(t, finder)
@@ -318,21 +318,21 @@ func TestRegistry_CleanupOnlyEnabledForCoordinator(t *testing.T) {
 
 	// Test 2: Registry with coordinator registration - cleanup enabled
 	registryCoordinator := New(tmpDir)
-	hostInfoCoordinator := execution.HostInfo{
+	hostInfoCoordinator := exec.HostInfo{
 		ID:     "coordinator-1",
 		Host:   "localhost",
 		Port:   9090,
-		Status: execution.ServiceStatusActive,
+		Status: exec.ServiceStatusActive,
 	}
-	err = registryCoordinator.Register(ctx, execution.ServiceNameCoordinator, hostInfoCoordinator)
+	err = registryCoordinator.Register(ctx, exec.ServiceNameCoordinator, hostInfoCoordinator)
 	require.NoError(t, err)
 
 	// Get finder - should have cleanup enabled
-	_, err = registryCoordinator.GetServiceMembers(ctx, execution.ServiceNameCoordinator)
+	_, err = registryCoordinator.GetServiceMembers(ctx, exec.ServiceNameCoordinator)
 	require.NoError(t, err)
 
 	registryCoordinator.mu.RLock()
-	finderCoord := registryCoordinator.finders[execution.ServiceNameCoordinator]
+	finderCoord := registryCoordinator.finders[exec.ServiceNameCoordinator]
 	registryCoordinator.mu.RUnlock()
 
 	assert.NotNil(t, finderCoord)

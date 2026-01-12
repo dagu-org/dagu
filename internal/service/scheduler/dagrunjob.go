@@ -10,7 +10,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/robfig/cron/v3"
@@ -68,7 +68,7 @@ func (j *DAGRunJob) Start(ctx context.Context) error {
 }
 
 // Ready checks whether the job can be safely started based on the latest status.
-func (j *DAGRunJob) Ready(ctx context.Context, latestStatus execution.DAGRunStatus) error {
+func (j *DAGRunJob) Ready(ctx context.Context, latestStatus exec.DAGRunStatus) error {
 	ctx = logger.WithValues(ctx,
 		tag.DAG(j.DAG.Name),
 	)
@@ -104,7 +104,7 @@ func (j *DAGRunJob) Ready(ctx context.Context, latestStatus execution.DAGRunStat
 
 // skipIfSuccessful checks if the DAG has already run successfully in the window since the last scheduled time.
 // If so, the current run is skipped.
-func (j *DAGRunJob) skipIfSuccessful(ctx context.Context, latestStatus execution.DAGRunStatus, latestStartedAt time.Time) error {
+func (j *DAGRunJob) skipIfSuccessful(ctx context.Context, latestStatus exec.DAGRunStatus, latestStartedAt time.Time) error {
 	// If skip is not configured, or the DAG is not currently successful, do nothing.
 	if !j.DAG.SkipIfSuccessful || latestStatus.Status != core.Succeeded {
 		return nil

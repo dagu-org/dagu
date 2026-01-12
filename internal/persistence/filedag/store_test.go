@@ -10,7 +10,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -87,7 +87,7 @@ steps:
 	require.NoError(t, err)
 
 	// List all DAGs
-	opts := execution.ListDAGsOptions{}
+	opts := exec.ListDAGsOptions{}
 	result, errList, err := store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)
@@ -184,7 +184,7 @@ steps:
 	// Test DAG not found
 	_, err = store.GetSpec(ctx, "non-existent")
 	require.Error(t, err)
-	assert.Equal(t, execution.ErrDAGNotFound, err)
+	assert.Equal(t, exec.ErrDAGNotFound, err)
 }
 
 func TestCreate(t *testing.T) {
@@ -216,7 +216,7 @@ steps:
 	// Test creating duplicate DAG
 	err = store.Create(ctx, "new-dag", []byte(dagContent))
 	require.Error(t, err)
-	assert.Equal(t, execution.ErrDAGAlreadyExists, err)
+	assert.Equal(t, exec.ErrDAGAlreadyExists, err)
 }
 
 func TestUpdateSpec(t *testing.T) {
@@ -337,7 +337,7 @@ steps:
 	require.NoError(t, err)
 	err = store.Rename(ctx, "new-name", "another-dag")
 	require.Error(t, err)
-	assert.Equal(t, execution.ErrDAGAlreadyExists, err)
+	assert.Equal(t, exec.ErrDAGAlreadyExists, err)
 }
 
 func TestGrep(t *testing.T) {
@@ -496,8 +496,8 @@ steps:
 	}
 
 	// Test pagination
-	paginator := execution.NewPaginator(2, 2) // limit=2, offset=2
-	opts := execution.ListDAGsOptions{Paginator: &paginator}
+	paginator := exec.NewPaginator(2, 2) // limit=2, offset=2
+	opts := exec.ListDAGsOptions{Paginator: &paginator}
 	result, errList, err := store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)
@@ -539,7 +539,7 @@ steps:
 	}
 
 	// List all DAGs
-	opts := execution.ListDAGsOptions{}
+	opts := exec.ListDAGsOptions{}
 	result, errList, err := store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)
@@ -588,7 +588,7 @@ steps:
 	require.NoError(t, err)
 
 	// Test name filtering
-	opts := execution.ListDAGsOptions{Name: "web"}
+	opts := exec.ListDAGsOptions{Name: "web"}
 	result, errList, err := store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)
@@ -596,7 +596,7 @@ steps:
 	assert.Equal(t, "filter-web-dag", result.Items[0].Name)
 
 	// Test tag filtering
-	opts = execution.ListDAGsOptions{Tag: "frontend"}
+	opts = exec.ListDAGsOptions{Tag: "frontend"}
 	result, errList, err = store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)
@@ -604,7 +604,7 @@ steps:
 	assert.Equal(t, "filter-web-dag", result.Items[0].Name)
 
 	// Test case-insensitive tag filtering
-	opts = execution.ListDAGsOptions{Tag: "FRONTEND"}
+	opts = exec.ListDAGsOptions{Tag: "FRONTEND"}
 	result, errList, err = store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)
@@ -648,7 +648,7 @@ steps:
 	}
 
 	// Test 1: Sort by name ascending (default)
-	opts := execution.ListDAGsOptions{
+	opts := exec.ListDAGsOptions{
 		Sort:  "name",
 		Order: "asc",
 	}
@@ -663,7 +663,7 @@ steps:
 	assert.Equal(t, "zebra-dag", result.Items[3].Name)
 
 	// Test 2: Sort by name descending
-	opts = execution.ListDAGsOptions{
+	opts = exec.ListDAGsOptions{
 		Sort:  "name",
 		Order: "desc",
 	}
@@ -678,7 +678,7 @@ steps:
 	assert.Equal(t, "alpha-dag", result.Items[3].Name)
 
 	// Test 3: Sort by updated_at should fall back to name sorting in storage layer
-	opts = execution.ListDAGsOptions{
+	opts = exec.ListDAGsOptions{
 		Sort:  "updated_at",
 		Order: "asc",
 	}
@@ -694,7 +694,7 @@ steps:
 	assert.Equal(t, "zebra-dag", result.Items[3].Name)
 
 	// Test 4: Sort by updated_at desc should also fall back to name
-	opts = execution.ListDAGsOptions{
+	opts = exec.ListDAGsOptions{
 		Sort:  "updated_at",
 		Order: "desc",
 	}
@@ -710,7 +710,7 @@ steps:
 	assert.Equal(t, "alpha-dag", result.Items[3].Name)
 
 	// Test 5: Default sort (empty sort field) should sort by name
-	opts = execution.ListDAGsOptions{
+	opts = exec.ListDAGsOptions{
 		Sort:  "",
 		Order: "asc",
 	}
@@ -725,7 +725,7 @@ steps:
 	assert.Equal(t, "zebra-dag", result.Items[3].Name)
 
 	// Test 6: Unknown sort field falls back to name
-	opts = execution.ListDAGsOptions{
+	opts = exec.ListDAGsOptions{
 		Sort:  "unknown",
 		Order: "asc",
 	}
@@ -772,8 +772,8 @@ steps:
 
 	// Test 1: Name sort ascending with pagination
 	// Page 1
-	paginator := execution.NewPaginator(1, 5) // page=1, perPage=5
-	opts := execution.ListDAGsOptions{
+	paginator := exec.NewPaginator(1, 5) // page=1, perPage=5
+	opts := exec.ListDAGsOptions{
 		Paginator: &paginator,
 		Sort:      "name",
 		Order:     "asc",
@@ -793,7 +793,7 @@ steps:
 	}
 
 	// Page 2
-	paginator = execution.NewPaginator(2, 5) // page=2, perPage=5
+	paginator = exec.NewPaginator(2, 5) // page=2, perPage=5
 	opts.Paginator = &paginator
 	result, errList, err = store.List(ctx, opts)
 	require.NoError(t, err)
@@ -809,7 +809,7 @@ steps:
 	}
 
 	// Page 3
-	paginator = execution.NewPaginator(3, 5) // page=3, perPage=5
+	paginator = exec.NewPaginator(3, 5) // page=3, perPage=5
 	opts.Paginator = &paginator
 	result, errList, err = store.List(ctx, opts)
 	require.NoError(t, err)
@@ -823,8 +823,8 @@ steps:
 	assert.Equal(t, "zulu-dag", result.Items[1].Name)
 
 	// Test 2: Name sort descending with pagination
-	paginator = execution.NewPaginator(1, 5) // page=1, perPage=5
-	opts = execution.ListDAGsOptions{
+	paginator = exec.NewPaginator(1, 5) // page=1, perPage=5
+	opts = exec.ListDAGsOptions{
 		Paginator: &paginator,
 		Sort:      "name",
 		Order:     "desc",
@@ -841,8 +841,8 @@ steps:
 	}
 
 	// Test 3: Non-name sort fields fall back to name sorting in storage layer
-	paginator = execution.NewPaginator(1, 5) // page=1, perPage=5
-	opts = execution.ListDAGsOptions{
+	paginator = exec.NewPaginator(1, 5) // page=1, perPage=5
+	opts = exec.ListDAGsOptions{
 		Paginator: &paginator,
 		Sort:      "updated_at",
 		Order:     "desc", // This will fall back to name desc
@@ -884,7 +884,7 @@ steps:
 	require.NoError(t, err)
 
 	// List all DAGs
-	result, errList, err := store.List(ctx, execution.ListDAGsOptions{})
+	result, errList, err := store.List(ctx, exec.ListDAGsOptions{})
 	require.NoError(t, err)
 
 	// Should include both DAGs
@@ -940,7 +940,7 @@ func TestListWithNextRunSorting(t *testing.T) {
 	fixedTime := time.Date(2024, 1, 15, 1, 30, 0, 0, time.UTC)
 
 	// Test ascending order
-	result, _, err := store.List(ctx, execution.ListDAGsOptions{
+	result, _, err := store.List(ctx, exec.ListDAGsOptions{
 		Sort:  "nextRun",
 		Order: "asc",
 		Time:  &fixedTime,
@@ -954,7 +954,7 @@ func TestListWithNextRunSorting(t *testing.T) {
 	assert.Equal(t, "no-schedule", result.Items[2].Name)
 
 	// Test descending order
-	result, _, err = store.List(ctx, execution.ListDAGsOptions{
+	result, _, err = store.List(ctx, exec.ListDAGsOptions{
 		Sort:  "nextRun",
 		Order: "desc",
 		Time:  &fixedTime,

@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
@@ -20,7 +20,7 @@ const MockEmptyExecutorType = "mock-empty-chat"
 type MockExecutor struct {
 	stdout   io.Writer
 	stderr   io.Writer
-	messages []execution.LLMMessage
+	messages []exec.LLMMessage
 }
 
 var _ executor.Executor = (*MockExecutor)(nil)
@@ -31,9 +31,9 @@ func NewMockExecutor(_ context.Context, _ core.Step) (executor.Executor, error) 
 	return &MockExecutor{
 		stdout: os.Stdout,
 		stderr: os.Stderr,
-		messages: []execution.LLMMessage{
-			{Role: execution.RoleUser, Content: "test message"},
-			{Role: execution.RoleAssistant, Content: "test response"},
+		messages: []exec.LLMMessage{
+			{Role: exec.RoleUser, Content: "test message"},
+			{Role: exec.RoleAssistant, Content: "test response"},
 		},
 	}, nil
 }
@@ -45,10 +45,10 @@ func (m *MockExecutor) Run(_ context.Context) error {
 	_, _ = m.stdout.Write([]byte("mock chat response\n"))
 	return nil
 }
-func (m *MockExecutor) SetContext(msgs []execution.LLMMessage) {
+func (m *MockExecutor) SetContext(msgs []exec.LLMMessage) {
 	m.messages = append(msgs, m.messages...)
 }
-func (m *MockExecutor) GetMessages() []execution.LLMMessage { return m.messages }
+func (m *MockExecutor) GetMessages() []exec.LLMMessage { return m.messages }
 
 // MockEmptyExecutor is a mock implementation that returns no messages.
 type MockEmptyExecutor struct{}
@@ -67,8 +67,8 @@ func (m *MockEmptyExecutor) Kill(_ os.Signal) error { return nil }
 func (m *MockEmptyExecutor) Run(_ context.Context) error {
 	return nil
 }
-func (m *MockEmptyExecutor) SetContext(_ []execution.LLMMessage) {}
-func (m *MockEmptyExecutor) GetMessages() []execution.LLMMessage { return nil }
+func (m *MockEmptyExecutor) SetContext(_ []exec.LLMMessage) {}
+func (m *MockEmptyExecutor) GetMessages() []exec.LLMMessage { return nil }
 
 // RegisterMockExecutors registers mock executors for testing.
 func RegisterMockExecutors() {

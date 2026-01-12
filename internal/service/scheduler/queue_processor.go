@@ -11,7 +11,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -38,9 +38,9 @@ func DefaultBackoffConfig() BackoffConfig {
 
 // QueueProcessor is responsible for processing queued DAG runs.
 type QueueProcessor struct {
-	queueStore    execution.QueueStore
-	dagRunStore   execution.DAGRunStore
-	procStore     execution.ProcStore
+	queueStore    exec.QueueStore
+	dagRunStore   exec.DAGRunStore
+	procStore     exec.ProcStore
 	dagExecutor   *DAGExecutor
 	queues        sync.Map // map[string]*queue
 	wakeUpCh      chan struct{}
@@ -88,9 +88,9 @@ func WithBackoffConfig(cfg BackoffConfig) QueueProcessorOption {
 
 // NewQueueProcessor creates a new QueueProcessor.
 func NewQueueProcessor(
-	queueStore execution.QueueStore,
-	dagRunStore execution.DAGRunStore,
-	procStore execution.ProcStore,
+	queueStore exec.QueueStore,
+	dagRunStore exec.DAGRunStore,
+	procStore exec.ProcStore,
 	dagExecutor *DAGExecutor,
 	queuesConfig config.Queues,
 	opts ...QueueProcessorOption,
@@ -320,7 +320,7 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 	var wg sync.WaitGroup
 	for _, item := range runnableItems {
 		wg.Add(1)
-		go func(ctx context.Context, item execution.QueuedItemData) {
+		go func(ctx context.Context, item exec.QueuedItemData) {
 			defer wg.Done()
 			if p.processDAG(ctx, item, queueName) {
 				// Remove the item from the queue
@@ -338,7 +338,7 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 	wg.Wait()
 }
 
-func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedItemData, queueName string) bool {
+func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemData, queueName string) bool {
 	if p.isClosed() {
 		return false
 	}
@@ -371,7 +371,7 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 	if err != nil {
 		logger.Error(ctx, "Failed to find run", tag.Error(err))
 		// If the attempt doesn't exist at all, mark as discard
-		if errors.Is(err, execution.ErrDAGRunIDNotFound) {
+		if errors.Is(err, exec.ErrDAGRunIDNotFound) {
 			logger.Error(ctx, "DAG run not found, discarding")
 			return true
 		}
@@ -385,7 +385,7 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item execution.QueuedIt
 
 	st, err := attempt.ReadStatus(ctx)
 	if err != nil {
-		if errors.Is(err, execution.ErrCorruptedStatusFile) {
+		if errors.Is(err, exec.ErrCorruptedStatusFile) {
 			logger.Error(ctx, "Status file is corrupted, marking as invalid", tag.Error(err))
 			return true
 		} else {
@@ -450,7 +450,7 @@ func (p *QueueProcessor) wakeUp() {
 	}
 }
 
-func (p *QueueProcessor) monitorStartup(ctx context.Context, queueName string, runRef execution.DAGRunRef) (bool, error) {
+func (p *QueueProcessor) monitorStartup(ctx context.Context, queueName string, runRef exec.DAGRunRef) (bool, error) {
 	select {
 	case <-ctx.Done():
 		logger.Debug(ctx, "Context canceled")
@@ -500,7 +500,7 @@ func (p *QueueProcessor) monitorStartup(ctx context.Context, queueName string, r
 // the queue's maxConcurrency based on the DAG's MaxActiveRuns setting.
 // This is used to initialize non-global queues with the correct concurrency
 // before calculating how many items to process.
-func (p *QueueProcessor) updateQueueMaxConcurrency(ctx context.Context, q *queue, item execution.QueuedItemData) error {
+func (p *QueueProcessor) updateQueueMaxConcurrency(ctx context.Context, q *queue, item exec.QueuedItemData) error {
 	data, err := item.Data()
 	if err != nil {
 		return err

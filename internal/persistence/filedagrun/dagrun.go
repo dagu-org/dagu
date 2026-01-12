@@ -16,7 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
 // Error definitions for directory structure validation
@@ -85,7 +85,7 @@ func NewDAGRun(dir string) (*DAGRun, error) {
 // CreateAttempt creates a new Attempt for the dag-run with the given timestamp.
 // It creates a new Attempt directory and initializes a record within it.
 // If attemptID is provided, it uses that ID instead of generating a new one.
-func (dr DAGRun) CreateAttempt(_ context.Context, ts execution.TimeInUTC, cache *fileutil.Cache[*execution.DAGRunStatus], attemptID string, opts ...AttemptOption) (*Attempt, error) {
+func (dr DAGRun) CreateAttempt(_ context.Context, ts exec.TimeInUTC, cache *fileutil.Cache[*exec.DAGRunStatus], attemptID string, opts ...AttemptOption) (*Attempt, error) {
 	attID := attemptID
 	if attID == "" {
 		var err error
@@ -123,7 +123,7 @@ func (dr DAGRun) FindSubDAGRun(_ context.Context, dagRunID string) (*DAGRun, err
 		return nil, fmt.Errorf("failed to list sub dag-runs: %w", err)
 	}
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("no matching sub dag-run found for ID %s (glob=%s): %w", dagRunID, globPattern, execution.ErrDAGRunIDNotFound)
+		return nil, fmt.Errorf("no matching sub dag-run found for ID %s (glob=%s): %w", dagRunID, globPattern, exec.ErrDAGRunIDNotFound)
 	}
 	// Sort the matches by timestamp
 	sort.Slice(matches, func(i, j int) bool {
@@ -169,7 +169,7 @@ func (dr DAGRun) ListSubDAGRuns(ctx context.Context) ([]*DAGRun, error) {
 // LatestAttempt returns the most recent Attempt for the dag-run.
 // It searches through all run directories and returns the first valid Attempt found.
 // It skips hidden attempts (dequeued ones).
-func (dr DAGRun) LatestAttempt(ctx context.Context, cache *fileutil.Cache[*execution.DAGRunStatus]) (*Attempt, error) {
+func (dr DAGRun) LatestAttempt(ctx context.Context, cache *fileutil.Cache[*exec.DAGRunStatus]) (*Attempt, error) {
 	attDirs, err := listDirsSorted(dr.baseDir, true, reAttemptDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list run directories: %w", err)
@@ -188,7 +188,7 @@ func (dr DAGRun) LatestAttempt(ctx context.Context, cache *fileutil.Cache[*execu
 			return att, nil
 		}
 	}
-	return nil, execution.ErrNoStatusData
+	return nil, exec.ErrNoStatusData
 }
 
 // Remove deletes the entire dag-run directory and all its contents.
@@ -316,7 +316,7 @@ func (dr DAGRun) listLogFiles(ctx context.Context) ([]string, error) {
 		for _, n := range status.Nodes {
 			logFiles = append(logFiles, n.Stdout, n.Stderr)
 		}
-		for _, n := range []*execution.Node{
+		for _, n := range []*exec.Node{
 			status.OnSuccess, status.OnExit, status.OnFailure, status.OnCancel,
 		} {
 			if n == nil {
@@ -337,7 +337,7 @@ var reSubDAGRunDir = regexp.MustCompile(`^` + SubDAGRunDirPrefix + `(.*)$`)     
 // formatDAGRunTimestamp formats a models.TimeInUTC instance into a string representation (without milliseconds).
 // The format is "YYYYMMDD_HHMMSSZ".
 // This is used for generating 'run' directory names.
-func formatDAGRunTimestamp(t execution.TimeInUTC) string {
+func formatDAGRunTimestamp(t exec.TimeInUTC) string {
 	return t.Format(dateTimeFormatUTC)
 }
 
@@ -356,7 +356,7 @@ const dateTimeFormatUTC = "20060102_150405Z"
 
 // formatAttemptTimestamp formats a models.TimeInUTC instance into a string representation with milliseconds.
 // The format is "YYYYMMDD_HHMMSS_mmmZ" where "mmm" is the milliseconds part.
-func formatAttemptTimestamp(t execution.TimeInUTC) string {
+func formatAttemptTimestamp(t exec.TimeInUTC) string {
 	const format = "20060102_150405"
 	mill := t.UnixMilli()
 	return t.Format(format) + "_" + fmt.Sprintf("%03d", mill%1000) + "Z"

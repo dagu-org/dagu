@@ -10,14 +10,14 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/stretchr/testify/require"
 )
 
 func TestReporter(t *testing.T) {
 	for scenario, fn := range map[string]func(
-		t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*execution.Node,
+		t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*exec.Node,
 	){
 		"create error mail":   testErrorMail,
 		"no error mail":       testNoErrorMail,
@@ -57,7 +57,7 @@ func TestReporter(t *testing.T) {
 				},
 			}
 
-			nodes := []*execution.Node{
+			nodes := []*exec.Node{
 				{
 					Step: core.Step{
 						Name:     "test-step",
@@ -79,14 +79,14 @@ func TestReporter(t *testing.T) {
 
 func TestRenderHTMLWithDAGInfo(t *testing.T) {
 	// Create a test DAGRunStatus
-	status := execution.DAGRunStatus{
+	status := exec.DAGRunStatus{
 		Name:       "test-workflow",
 		DAGRunID:   "01975986-c13d-7b6d-b75e-abf4380a03fc",
 		Status:     core.Succeeded,
 		StartedAt:  "2025-01-15T10:30:00Z",
 		FinishedAt: "2025-01-15T10:35:00Z",
 		Params:     "env=production batch_size=1000",
-		Nodes: []*execution.Node{
+		Nodes: []*exec.Node{
 			{
 				Step: core.Step{
 					Name: "setup-database",
@@ -184,11 +184,11 @@ func TestRenderHTMLWithDAGInfo(t *testing.T) {
 	})
 }
 
-func testErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*execution.Node) {
+func testErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*exec.Node) {
 	dag.MailOn.Failure = true
 	dag.MailOn.Success = false
 
-	_ = rp.send(context.Background(), dag, execution.DAGRunStatus{
+	_ = rp.send(context.Background(), dag, exec.DAGRunStatus{
 		Status: core.Failed,
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
@@ -198,11 +198,11 @@ func testErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, 
 	require.Equal(t, 1, mock.count)
 }
 
-func testNoErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*execution.Node) {
+func testNoErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*exec.Node) {
 	dag.MailOn.Failure = false
 	dag.MailOn.Success = true
 
-	err := rp.send(context.Background(), dag, execution.DAGRunStatus{
+	err := rp.send(context.Background(), dag, exec.DAGRunStatus{
 		Status: core.Failed,
 		Nodes:  nodes,
 	}, nil)
@@ -210,11 +210,11 @@ func testNoErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG
 	require.Equal(t, 0, mock.count)
 }
 
-func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*execution.Node) {
+func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*exec.Node) {
 	dag.MailOn.Failure = true
 	dag.MailOn.Success = true
 
-	err := rp.send(context.Background(), dag, execution.DAGRunStatus{
+	err := rp.send(context.Background(), dag, exec.DAGRunStatus{
 		Status: core.Succeeded,
 		Nodes:  nodes,
 	}, nil)
@@ -225,12 +225,12 @@ func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG
 	require.Equal(t, 1, mock.count)
 }
 
-func testWaitMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*execution.Node) {
+func testWaitMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*exec.Node) {
 	dag.MailOn.Failure = false
 	dag.MailOn.Success = false
 	dag.MailOn.Wait = true
 
-	err := rp.send(context.Background(), dag, execution.DAGRunStatus{
+	err := rp.send(context.Background(), dag, exec.DAGRunStatus{
 		Status: core.Waiting,
 		Nodes:  nodes,
 	}, nil)
@@ -241,12 +241,12 @@ func testWaitMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, n
 	require.Equal(t, 1, mock.count)
 }
 
-func testNoWaitMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*execution.Node) {
+func testNoWaitMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG, nodes []*exec.Node) {
 	dag.MailOn.Failure = false
 	dag.MailOn.Success = false
 	dag.MailOn.Wait = false
 
-	err := rp.send(context.Background(), dag, execution.DAGRunStatus{
+	err := rp.send(context.Background(), dag, exec.DAGRunStatus{
 		Status: core.Waiting,
 		Nodes:  nodes,
 	}, nil)
@@ -254,14 +254,14 @@ func testNoWaitMail(t *testing.T, rp *reporter, mock *mockSender, dag *core.DAG,
 	require.Equal(t, 0, mock.count)
 }
 
-func testRenderSummary(t *testing.T, _ *reporter, _ *mockSender, dag *core.DAG, _ []*execution.Node) {
+func testRenderSummary(t *testing.T, _ *reporter, _ *mockSender, dag *core.DAG, _ []*exec.Node) {
 	status := transform.NewStatusBuilder(dag).Create("run-id", core.Failed, 0, time.Now())
 	summary := renderDAGSummary(status, errors.New("test error"))
 	require.Contains(t, summary, "test error")
 	require.Contains(t, summary, dag.Name)
 }
 
-func testRenderTable(t *testing.T, _ *reporter, _ *mockSender, _ *core.DAG, nodes []*execution.Node) {
+func testRenderTable(t *testing.T, _ *reporter, _ *mockSender, _ *core.DAG, nodes []*exec.Node) {
 	summary := renderStepSummary(nodes)
 	require.Contains(t, summary, nodes[0].Step.Name)
 	require.Len(t, nodes[0].Step.Commands, 1)
@@ -291,7 +291,7 @@ func (m *mockSender) Send(_ context.Context, from string, to []string, subject, 
 // to ensure the format is correct and prevent regressions
 func TestRenderHTMLComprehensive(t *testing.T) {
 	// Create comprehensive test data with various scenarios
-	nodes := []*execution.Node{
+	nodes := []*exec.Node{
 		{
 			Step: core.Step{
 				Name:     "setup-database",

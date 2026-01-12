@@ -12,7 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
 const (
@@ -28,14 +28,14 @@ const (
 // Uses randomized intervals to avoid conflicts when many processes clean simultaneously.
 type cleaner struct {
 	baseDir     string
-	serviceName execution.ServiceName
+	serviceName exec.ServiceName
 	stopCh      chan struct{}
 	stopOnce    sync.Once
 }
 
 // newCleaner creates a new cleaner that runs with randomized intervals
 // to avoid conflicts between multiple coordinator processes
-func newCleaner(baseDir string, serviceName execution.ServiceName) *cleaner {
+func newCleaner(baseDir string, serviceName exec.ServiceName) *cleaner {
 	c := &cleaner{
 		baseDir:     baseDir,
 		serviceName: serviceName,

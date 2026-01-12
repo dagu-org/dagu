@@ -15,7 +15,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/masking"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
@@ -310,14 +310,14 @@ func (oc *OutputCoordinator) setupRemoteWriters(ctx context.Context, data NodeDa
 	stepName := data.Step.Name
 
 	// Create streaming writers for stdout and stderr
-	oc.stdoutWriter = factory.NewStepWriter(ctx, stepName, execution.StreamTypeStdout)
+	oc.stdoutWriter = factory.NewStepWriter(ctx, stepName, exec.StreamTypeStdout)
 	oc.stdoutFileName = data.State.Stdout // Keep path for status reporting
 
 	// Check if stdout and stderr should be merged
 	if data.State.Stdout == data.State.Stderr {
 		oc.stderrWriter = oc.stdoutWriter
 	} else {
-		oc.stderrWriter = factory.NewStepWriter(ctx, stepName, execution.StreamTypeStderr)
+		oc.stderrWriter = factory.NewStepWriter(ctx, stepName, exec.StreamTypeStderr)
 	}
 	oc.stderrFileName = data.State.Stderr
 

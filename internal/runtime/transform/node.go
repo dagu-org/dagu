@@ -4,12 +4,12 @@ import (
 	"errors"
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 )
 
 // ToNode converts a persistence Node back to a runtime Node
-func ToNode(n *execution.Node) *runtime.Node {
+func ToNode(n *exec.Node) *runtime.Node {
 	startedAt, _ := stringutil.ParseTime(n.StartedAt)
 	finishedAt, _ := stringutil.ParseTime(n.FinishedAt)
 	retriedAt, _ := stringutil.ParseTime(n.RetriedAt)
@@ -49,20 +49,20 @@ func ToNode(n *execution.Node) *runtime.Node {
 }
 
 // newNode converts a single runtime NodeData to a persistence Node
-func newNode(node runtime.NodeData) *execution.Node {
-	children := make([]execution.SubDAGRun, len(node.State.SubRuns))
+func newNode(node runtime.NodeData) *exec.Node {
+	children := make([]exec.SubDAGRun, len(node.State.SubRuns))
 	for i, child := range node.State.SubRuns {
-		children[i] = execution.SubDAGRun(child)
+		children[i] = exec.SubDAGRun(child)
 	}
 	var errText string
 	if node.State.Error != nil {
 		errText = node.State.Error.Error()
 	}
-	childrenRepeated := make([]execution.SubDAGRun, len(node.State.SubRunsRepeated))
+	childrenRepeated := make([]exec.SubDAGRun, len(node.State.SubRunsRepeated))
 	for i, child := range node.State.SubRunsRepeated {
-		childrenRepeated[i] = execution.SubDAGRun(child)
+		childrenRepeated[i] = exec.SubDAGRun(child)
 	}
-	return &execution.Node{
+	return &exec.Node{
 		Step:            node.Step,
 		Stdout:          node.State.Stdout,
 		Stderr:          node.State.Stderr,

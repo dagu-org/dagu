@@ -8,7 +8,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/output"
 	"github.com/dagu-org/dagu/internal/proto/convert"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -29,7 +29,7 @@ type RemoteProgressDisplay struct {
 	mu                      sync.Mutex
 	completed               int
 	spinnerIndex            int
-	lastStatus              *execution.DAGRunStatus
+	lastStatus              *exec.DAGRunStatus
 	workerID                string
 	headerUpdatedWithWorker bool
 	stopped                 bool
@@ -137,7 +137,7 @@ func (p *RemoteProgressDisplay) Stop() {
 }
 
 // GetLastStatus returns the last known status.
-func (p *RemoteProgressDisplay) GetLastStatus() *execution.DAGRunStatus {
+func (p *RemoteProgressDisplay) GetLastStatus() *exec.DAGRunStatus {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.lastStatus
@@ -243,7 +243,7 @@ func (p *RemoteProgressDisplay) render() {
 	fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps) %s%s   ", spinner, percent, completed, p.total, p.gray(elapsed), p.gray(workerInfo))
 }
 
-func (p *RemoteProgressDisplay) printFinal(status *execution.DAGRunStatus) {
+func (p *RemoteProgressDisplay) printFinal(status *exec.DAGRunStatus) {
 	p.mu.Lock()
 	completed, percent := p.completedAndPercent()
 	workerID := p.workerID

@@ -16,7 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/proto/convert"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
@@ -116,7 +116,7 @@ func runStart(ctx *Context, args []string) error {
 			return fmt.Errorf("failed to resolve DAG name: %w", err)
 		}
 
-		attempt, err := ctx.DAGRunStore.FindAttempt(ctx, execution.NewDAGRunRef(dagName, fromRunID))
+		attempt, err := ctx.DAGRunStore.FindAttempt(ctx, exec.NewDAGRunRef(dagName, fromRunID))
 		if err != nil {
 			return fmt.Errorf("failed to find historic dag-run %s for DAG %s: %w", fromRunID, dagName, err)
 		}
@@ -161,7 +161,7 @@ func runStart(ctx *Context, args []string) error {
 	ctx.Context = logger.WithValues(ctx.Context, tag.DAG(dag.Name), tag.RunID(dagRunID))
 
 	if isSubDAGRun {
-		parent, err := execution.ParseDAGRunRef(parentRef)
+		parent, err := exec.ParseDAGRunRef(parentRef)
 		if err != nil {
 			return fmt.Errorf("failed to parse parent dag-run reference: %w", err)
 		}
@@ -191,7 +191,7 @@ func runStart(ctx *Context, args []string) error {
 var errProcAcquisitionFailed = errors.New("failed to acquire process handle")
 
 // tryExecuteDAG acquires a process handle and executes the DAG.
-func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root execution.DAGRunRef, workerID string) error {
+func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root exec.DAGRunRef, workerID string) error {
 	// Check for workerSelector - dispatch to coordinator for distributed execution
 	if len(dag.WorkerSelector) > 0 {
 		coordinatorCli := ctx.NewCoordinatorClient()
@@ -207,7 +207,7 @@ func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root execution.
 		return errProcAcquisitionFailed
 	}
 
-	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), execution.NewDAGRunRef(dag.Name, dagRunID))
+	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), exec.NewDAGRunRef(dag.Name, dagRunID))
 	if err != nil {
 		ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 		logger.Debug(ctx, "Failed to acquire process handle", tag.Error(err))
@@ -221,7 +221,7 @@ func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root execution.
 
 	ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 
-	return executeDAGRun(ctx, dag, execution.DAGRunRef{}, dagRunID, root, workerID)
+	return executeDAGRun(ctx, dag, exec.DAGRunRef{}, dagRunID, root, workerID)
 }
 
 // getDAGRunInfo extracts and validates dag-run ID and references from command flags.
@@ -337,19 +337,19 @@ func loadDAGWithParams(ctx *Context, args []string, isSubDAGRun bool) (*core.DAG
 }
 
 // determineRootDAGRun creates or parses the root execution reference.
-func determineRootDAGRun(isSubDAGRun bool, rootDAGRun string, dag *core.DAG, dagRunID string) (execution.DAGRunRef, error) {
+func determineRootDAGRun(isSubDAGRun bool, rootDAGRun string, dag *core.DAG, dagRunID string) (exec.DAGRunRef, error) {
 	if isSubDAGRun {
-		ref, err := execution.ParseDAGRunRef(rootDAGRun)
+		ref, err := exec.ParseDAGRunRef(rootDAGRun)
 		if err != nil {
-			return execution.DAGRunRef{}, fmt.Errorf("failed to parse root exec ref: %w", err)
+			return exec.DAGRunRef{}, fmt.Errorf("failed to parse root exec ref: %w", err)
 		}
 		return ref, nil
 	}
-	return execution.NewDAGRunRef(dag.Name, dagRunID), nil
+	return exec.NewDAGRunRef(dag.Name, dagRunID), nil
 }
 
 // handleSubDAGRun processes a sub dag-run, checking for previous runs.
-func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string, root execution.DAGRunRef, parent execution.DAGRunRef, workerID string) error {
+func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string, root exec.DAGRunRef, parent exec.DAGRunRef, workerID string) error {
 	logger.Info(ctx, "Executing sub dag-run",
 		slog.String("params", params),
 		slog.Any("root", root),
@@ -369,7 +369,7 @@ func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string
 	logger.Debug(ctx, "Checking for previous sub dag-run with the dag-run ID")
 
 	subAttempt, err := ctx.DAGRunStore.FindSubAttempt(ctx, root, dagRunID)
-	if errors.Is(err, execution.ErrDAGRunIDNotFound) {
+	if errors.Is(err, exec.ErrDAGRunIDNotFound) {
 		return executeDAGRun(ctx, dag, parent, dagRunID, root, workerID)
 	}
 	if err != nil {
@@ -385,7 +385,7 @@ func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string
 }
 
 // executeDAGRun initializes execution state for a DAG run and invokes the shared agent executor.
-func executeDAGRun(ctx *Context, d *core.DAG, parent execution.DAGRunRef, dagRunID string, root execution.DAGRunRef, workerID string) error {
+func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID string, root exec.DAGRunRef, workerID string) error {
 	logFile, err := ctx.OpenLogFile(d, dagRunID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", d.Name, err)

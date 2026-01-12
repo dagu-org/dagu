@@ -11,7 +11,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,7 +39,7 @@ func TestEnv_AllEnvsMap(t *testing.T) {
 				"VAR2":                         "value2",
 				"ENV1":                         "env1",
 				"ENV2":                         "env2",
-				execution.EnvKeyDAGRunStepName: "test-step",
+				exec.EnvKeyDAGRunStepName: "test-step",
 			},
 		},
 		{
@@ -53,7 +53,7 @@ func TestEnv_AllEnvsMap(t *testing.T) {
 				// Variables (output from previous steps) are added last in AllEnvs(),
 				// so they override Envs when there's a key conflict
 				"SAME_KEY":                     "from_variables",
-				execution.EnvKeyDAGRunStepName: "test-step",
+				exec.EnvKeyDAGRunStepName: "test-step",
 			},
 		},
 		{
@@ -62,7 +62,7 @@ func TestEnv_AllEnvsMap(t *testing.T) {
 				return env
 			},
 			expected: map[string]string{
-				execution.EnvKeyDAGRunStepName: "test-step",
+				exec.EnvKeyDAGRunStepName: "test-step",
 			},
 		},
 		{
@@ -75,7 +75,7 @@ func TestEnv_AllEnvsMap(t *testing.T) {
 			expected: map[string]string{
 				"VAR1":                         "value1",
 				"VAR2":                         "value2",
-				execution.EnvKeyDAGRunStepName: "test-step",
+				exec.EnvKeyDAGRunStepName: "test-step",
 			},
 		},
 		{
@@ -88,7 +88,7 @@ func TestEnv_AllEnvsMap(t *testing.T) {
 			expected: map[string]string{
 				"ENV1":                         "env1",
 				"ENV2":                         "env2",
-				execution.EnvKeyDAGRunStepName: "test-step",
+				exec.EnvKeyDAGRunStepName: "test-step",
 			},
 		},
 	}
@@ -105,7 +105,7 @@ func TestEnv_AllEnvsMap(t *testing.T) {
 				Name:       "test-dag",
 				WorkingDir: tempDir,
 			}
-			ctx := execution.NewContext(context.Background(), dag, "", "")
+			ctx := exec.NewContext(context.Background(), dag, "", "")
 
 			env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
 			env = tt.setupEnv(env)
@@ -243,7 +243,7 @@ func TestNewEnvForStep_WorkingDirectory(t *testing.T) {
 				Name:       "test-dag",
 				WorkingDir: tt.dagWorkDir,
 			}
-			dagCtx := execution.Context{
+			dagCtx := exec.Context{
 				DAG: dag,
 			}
 			ctx := runtime.WithDAGContext(context.Background(), dagCtx)
@@ -251,7 +251,7 @@ func TestNewEnvForStep_WorkingDirectory(t *testing.T) {
 			env := runtime.NewEnv(ctx, tt.step)
 
 			// Check that DAG_RUN_STEP_NAME is always set
-			assert.Equal(t, tt.step.Name, env.Envs[execution.EnvKeyDAGRunStepName])
+			assert.Equal(t, tt.step.Name, env.Envs[exec.EnvKeyDAGRunStepName])
 
 			// Resolve symlinks for comparison (macOS /var vs /private/var)
 			expectedResolved, _ := filepath.EvalSymlinks(tt.expectedDir)
@@ -274,7 +274,7 @@ func TestNewEnvForStep_BasicFields(t *testing.T) {
 		Name:       "test-dag",
 		WorkingDir: tempDir,
 	}
-	dagCtx := execution.Context{
+	dagCtx := exec.Context{
 		DAG: dag,
 	}
 	ctx := runtime.WithDAGContext(context.Background(), dagCtx)
@@ -295,7 +295,7 @@ func TestNewEnvForStep_BasicFields(t *testing.T) {
 	assert.NotNil(t, env.Variables)
 	assert.NotNil(t, env.Envs)
 	assert.NotNil(t, env.StepMap)
-	assert.Equal(t, "test-step", env.Envs[execution.EnvKeyDAGRunStepName])
+	assert.Equal(t, "test-step", env.Envs[exec.EnvKeyDAGRunStepName])
 
 	// Check that PWD is set to DAG's WorkingDir
 	assert.Equal(t, tempDir, env.Envs["PWD"])
@@ -317,7 +317,7 @@ func TestNewEnvForStep_WorkingDirectory_DAGEnvExpansion(t *testing.T) {
 		WorkingDir: tempDir,
 		Env:        []string{"MY_SUBDIR=subdir"},
 	}
-	dagCtx := execution.Context{
+	dagCtx := exec.Context{
 		DAG: dag,
 	}
 	ctx := runtime.WithDAGContext(context.Background(), dagCtx)

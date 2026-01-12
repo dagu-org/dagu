@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/output"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -82,7 +82,7 @@ func runStatus(ctx *Context, args []string) error {
 }
 
 // displayTreeStatus renders a tree-structured output with DAG run information
-func displayTreeStatus(dag *core.DAG, dagStatus *execution.DAGRunStatus) {
+func displayTreeStatus(dag *core.DAG, dagStatus *exec.DAGRunStatus) {
 	config := output.DefaultConfig()
 	config.ColorEnabled = term.IsTerminal(int(os.Stdout.Fd()))
 
@@ -110,10 +110,10 @@ func extractDAGName(ctx *Context, name string) (string, error) {
 	return name, nil
 }
 
-func extractAttemptID(ctx *Context, name, dagRunID string) (execution.DAGRunAttempt, error) {
+func extractAttemptID(ctx *Context, name, dagRunID string) (exec.DAGRunAttempt, error) {
 	if dagRunID != "" {
 		// Retrieve the previous run's record for the specified dag-run ID.
-		dagRunRef := execution.NewDAGRunRef(name, dagRunID)
+		dagRunRef := exec.NewDAGRunRef(name, dagRunID)
 		att, err := ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find run data for dag-run ID %s: %w", dagRunID, err)

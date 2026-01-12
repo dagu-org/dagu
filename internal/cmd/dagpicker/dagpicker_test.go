@@ -11,7 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -167,7 +167,7 @@ func TestModel(t *testing.T) {
 	})
 }
 
-var _ execution.DAGStore = (*mockDAGStore)(nil)
+var _ exec.DAGStore = (*mockDAGStore)(nil)
 
 // mockDAGStore is a mock implementation of models.DAGStore
 type mockDAGStore struct {
@@ -184,9 +184,9 @@ func (m *mockDAGStore) Delete(ctx context.Context, fileName string) error {
 	return args.Error(0)
 }
 
-func (m *mockDAGStore) List(ctx context.Context, params execution.ListDAGsOptions) (execution.PaginatedResult[*core.DAG], []string, error) {
+func (m *mockDAGStore) List(ctx context.Context, params exec.ListDAGsOptions) (exec.PaginatedResult[*core.DAG], []string, error) {
 	args := m.Called(ctx, params)
-	return args.Get(0).(execution.PaginatedResult[*core.DAG]), args.Get(1).([]string), args.Error(2)
+	return args.Get(0).(exec.PaginatedResult[*core.DAG]), args.Get(1).([]string), args.Error(2)
 }
 
 func (m *mockDAGStore) GetMetadata(ctx context.Context, fileName string) (*core.DAG, error) {
@@ -205,9 +205,9 @@ func (m *mockDAGStore) GetDetails(ctx context.Context, fileName string, opts ...
 	return args.Get(0).(*core.DAG), args.Error(1)
 }
 
-func (m *mockDAGStore) Grep(ctx context.Context, pattern string) ([]*execution.GrepDAGsResult, []string, error) {
+func (m *mockDAGStore) Grep(ctx context.Context, pattern string) ([]*exec.GrepDAGsResult, []string, error) {
 	args := m.Called(ctx, pattern)
-	return args.Get(0).([]*execution.GrepDAGsResult), args.Get(1).([]string), args.Error(2)
+	return args.Get(0).([]*exec.GrepDAGsResult), args.Get(1).([]string), args.Error(2)
 }
 
 func (m *mockDAGStore) Rename(ctx context.Context, oldID, newID string) error {
@@ -253,8 +253,8 @@ func TestPickDAG(t *testing.T) {
 		mockStore := new(mockDAGStore)
 		ctx := context.Background()
 
-		mockStore.On("List", ctx, execution.ListDAGsOptions{}).Return(
-			execution.PaginatedResult[*core.DAG]{},
+		mockStore.On("List", ctx, exec.ListDAGsOptions{}).Return(
+			exec.PaginatedResult[*core.DAG]{},
 			[]string{},
 			errors.New("database error"),
 		)
@@ -269,8 +269,8 @@ func TestPickDAG(t *testing.T) {
 		mockStore := new(mockDAGStore)
 		ctx := context.Background()
 
-		mockStore.On("List", ctx, execution.ListDAGsOptions{}).Return(
-			execution.PaginatedResult[*core.DAG]{
+		mockStore.On("List", ctx, exec.ListDAGsOptions{}).Return(
+			exec.PaginatedResult[*core.DAG]{
 				Items: []*core.DAG{},
 			},
 			[]string{},

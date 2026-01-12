@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 )
 
@@ -19,11 +19,11 @@ func NewStatusBuilder(dag *core.DAG) *StatusBuilder {
 }
 
 // StatusOption is a functional option pattern for configuring Status objects
-type StatusOption func(*execution.DAGRunStatus)
+type StatusOption func(*exec.DAGRunStatus)
 
 // WithHierarchyRefs returns a StatusOption that sets the root DAG information
-func WithHierarchyRefs(root execution.DAGRunRef, parent execution.DAGRunRef) StatusOption {
-	return func(s *execution.DAGRunStatus) {
+func WithHierarchyRefs(root exec.DAGRunRef, parent exec.DAGRunRef) StatusOption {
+	return func(s *exec.DAGRunStatus) {
 		s.Root = root
 		s.Parent = parent
 	}
@@ -31,8 +31,8 @@ func WithHierarchyRefs(root execution.DAGRunRef, parent execution.DAGRunRef) Sta
 
 // WithNodes returns a StatusOption that sets the node data for the status
 func WithNodes(nodes []runtime.NodeData) StatusOption {
-	return func(s *execution.DAGRunStatus) {
-		convertedNode := make([]*execution.Node, len(nodes))
+	return func(s *exec.DAGRunStatus) {
+		convertedNode := make([]*exec.Node, len(nodes))
 		for i, n := range nodes {
 			convertedNode[i] = newNode(n)
 		}
@@ -41,21 +41,21 @@ func WithNodes(nodes []runtime.NodeData) StatusOption {
 }
 
 func WithAttemptID(attemptID string) StatusOption {
-	return func(s *execution.DAGRunStatus) {
+	return func(s *exec.DAGRunStatus) {
 		s.AttemptID = attemptID
 	}
 }
 
 // WithQueuedAt returns a StatusOption that sets the finished time
 func WithQueuedAt(formattedTime string) StatusOption {
-	return func(s *execution.DAGRunStatus) {
+	return func(s *exec.DAGRunStatus) {
 		s.QueuedAt = formattedTime
 	}
 }
 
 // WithCreatedAt returns a StatusOption that sets the created time
 func WithCreatedAt(t int64) StatusOption {
-	return func(s *execution.DAGRunStatus) {
+	return func(s *exec.DAGRunStatus) {
 		if t == 0 {
 			t = time.Now().UnixMilli()
 		}
@@ -65,14 +65,14 @@ func WithCreatedAt(t int64) StatusOption {
 
 // WithFinishedAt returns a StatusOption that sets the finished time
 func WithFinishedAt(t time.Time) StatusOption {
-	return func(s *execution.DAGRunStatus) {
-		s.FinishedAt = execution.FormatTime(t)
+	return func(s *exec.DAGRunStatus) {
+		s.FinishedAt = exec.FormatTime(t)
 	}
 }
 
 // WithOnInitNode returns a StatusOption that sets the init handler node
 func WithOnInitNode(node *runtime.Node) StatusOption {
-	return func(s *execution.DAGRunStatus) {
+	return func(s *exec.DAGRunStatus) {
 		if node != nil {
 			s.OnInit = newNode(node.NodeData())
 		}
@@ -81,7 +81,7 @@ func WithOnInitNode(node *runtime.Node) StatusOption {
 
 // WithOnExitNode returns a StatusOption that sets the exit handler node
 func WithOnExitNode(node *runtime.Node) StatusOption {
-	return func(s *execution.DAGRunStatus) {
+	return func(s *exec.DAGRunStatus) {
 		if node != nil {
 			s.OnExit = newNode(node.NodeData())
 		}
@@ -90,7 +90,7 @@ func WithOnExitNode(node *runtime.Node) StatusOption {
 
 // WithOnSuccessNode returns a StatusOption that sets the success handler node
 func WithOnSuccessNode(node *runtime.Node) StatusOption {
-	return func(s *execution.DAGRunStatus) {
+	return func(s *exec.DAGRunStatus) {
 		if node != nil {
 			s.OnSuccess = newNode(node.NodeData())
 		}
@@ -99,7 +99,7 @@ func WithOnSuccessNode(node *runtime.Node) StatusOption {
 
 // WithOnFailureNode returns a StatusOption that sets the failure handler node
 func WithOnFailureNode(node *runtime.Node) StatusOption {
-	return func(s *execution.DAGRunStatus) {
+	return func(s *exec.DAGRunStatus) {
 		if node != nil {
 			s.OnFailure = newNode(node.NodeData())
 		}
@@ -108,7 +108,7 @@ func WithOnFailureNode(node *runtime.Node) StatusOption {
 
 // WithOnCancelNode returns a StatusOption that sets the cancel handler node
 func WithOnCancelNode(node *runtime.Node) StatusOption {
-	return func(s *execution.DAGRunStatus) {
+	return func(s *exec.DAGRunStatus) {
 		if node != nil {
 			s.OnCancel = newNode(node.NodeData())
 		}
@@ -117,7 +117,7 @@ func WithOnCancelNode(node *runtime.Node) StatusOption {
 
 // WithOnWaitNode returns a StatusOption that sets the wait handler node
 func WithOnWaitNode(node *runtime.Node) StatusOption {
-	return func(s *execution.DAGRunStatus) {
+	return func(s *exec.DAGRunStatus) {
 		if node != nil {
 			s.OnWait = newNode(node.NodeData())
 		}
@@ -126,28 +126,28 @@ func WithOnWaitNode(node *runtime.Node) StatusOption {
 
 // WithLogFilePath returns a StatusOption that sets the log file path
 func WithLogFilePath(logFilePath string) StatusOption {
-	return func(s *execution.DAGRunStatus) {
+	return func(s *exec.DAGRunStatus) {
 		s.Log = logFilePath
 	}
 }
 
 // WithError returns a StatusOption that sets the top-level error message
 func WithError(err string) StatusOption {
-	return func(s *execution.DAGRunStatus) {
+	return func(s *exec.DAGRunStatus) {
 		s.Error = err
 	}
 }
 
 // WithPreconditions returns a StatusOption that sets the preconditions
 func WithPreconditions(conditions []*core.Condition) StatusOption {
-	return func(s *execution.DAGRunStatus) {
+	return func(s *exec.DAGRunStatus) {
 		s.Preconditions = conditions
 	}
 }
 
 // WithWorkerID returns a StatusOption that sets the worker ID
 func WithWorkerID(workerID string) StatusOption {
-	return func(s *execution.DAGRunStatus) {
+	return func(s *exec.DAGRunStatus) {
 		s.WorkerID = workerID
 	}
 }
@@ -159,12 +159,12 @@ func (f *StatusBuilder) Create(
 	pid int,
 	startedAt time.Time,
 	opts ...StatusOption,
-) execution.DAGRunStatus {
-	statusObj := execution.InitialStatus(f.dag)
+) exec.DAGRunStatus {
+	statusObj := exec.InitialStatus(f.dag)
 	statusObj.DAGRunID = dagRunID
 	statusObj.Status = status
-	statusObj.PID = execution.PID(pid)
-	statusObj.StartedAt = execution.FormatTime(startedAt)
+	statusObj.PID = exec.PID(pid)
+	statusObj.StartedAt = exec.FormatTime(startedAt)
 	statusObj.CreatedAt = time.Now().UnixMilli()
 
 	for _, opt := range opts {

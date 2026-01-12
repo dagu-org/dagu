@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -90,7 +90,7 @@ func TestJSONDB(t *testing.T) {
 		th.CreateAttempt(t, ts3, "dagrun-id-3", core.Succeeded)
 
 		// Find the record with dag-run ID "dagrun-id-2"
-		ref := execution.NewDAGRunRef("test_DAG", "dagrun-id-2")
+		ref := exec.NewDAGRunRef("test_DAG", "dagrun-id-2")
 		attempt, err := th.Store.FindAttempt(th.Context, ref)
 		require.NoError(t, err)
 
@@ -100,9 +100,9 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, "dagrun-id-2", dagRunStatus.DAGRunID)
 
 		// Verify an error is returned if the dag-run ID does not exist
-		refNonExist := execution.NewDAGRunRef("test_DAG", "nonexistent-id")
+		refNonExist := exec.NewDAGRunRef("test_DAG", "nonexistent-id")
 		_, err = th.Store.FindAttempt(th.Context, refNonExist)
-		assert.ErrorIs(t, err, execution.ErrDAGRunIDNotFound)
+		assert.ErrorIs(t, err, exec.ErrDAGRunIDNotFound)
 	})
 	t.Run("RemoveOld", func(t *testing.T) {
 		th := setupTestStore(t)
@@ -147,9 +147,9 @@ func TestJSONDB(t *testing.T) {
 		_ = th.CreateAttempt(t, ts, "parent-id", core.Running)
 
 		// Create a child attempt
-		rootDAGRun := execution.NewDAGRunRef("test_DAG", "parent-id")
+		rootDAGRun := exec.NewDAGRunRef("test_DAG", "parent-id")
 		subDAG := th.DAG("child")
-		subAttempt, err := th.Store.CreateAttempt(th.Context, subDAG.DAG, ts, "sub-id", execution.NewDAGRunAttemptOptions{
+		subAttempt, err := th.Store.CreateAttempt(th.Context, subDAG.DAG, ts, "sub-id", exec.NewDAGRunAttemptOptions{
 			RootDAGRun: &rootDAGRun,
 		})
 		require.NoError(t, err)
@@ -161,13 +161,13 @@ func TestJSONDB(t *testing.T) {
 			_ = subAttempt.Close(th.Context)
 		}()
 
-		statusToWrite := execution.InitialStatus(subDAG.DAG)
+		statusToWrite := exec.InitialStatus(subDAG.DAG)
 		statusToWrite.DAGRunID = "sub-id"
 		err = subAttempt.Write(th.Context, statusToWrite)
 		require.NoError(t, err)
 
 		// Verify record is created
-		dagRunRef := execution.NewDAGRunRef("test_DAG", "parent-id")
+		dagRunRef := exec.NewDAGRunRef("test_DAG", "parent-id")
 		existingAttempt, err := th.Store.FindSubAttempt(th.Context, dagRunRef, "sub-id")
 		require.NoError(t, err)
 
@@ -188,9 +188,9 @@ func TestJSONDB(t *testing.T) {
 		const subDAGRunID = "sub-dagrun-id"
 		const parentDAGRunID = "parent-id"
 
-		rootDAGRun := execution.NewDAGRunRef("test_DAG", parentDAGRunID)
+		rootDAGRun := exec.NewDAGRunRef("test_DAG", parentDAGRunID)
 		subDAG := th.DAG("child")
-		attempt, err := th.Store.CreateAttempt(th.Context, subDAG.DAG, ts, subDAGRunID, execution.NewDAGRunAttemptOptions{
+		attempt, err := th.Store.CreateAttempt(th.Context, subDAG.DAG, ts, subDAGRunID, exec.NewDAGRunAttemptOptions{
 			RootDAGRun: &rootDAGRun,
 		})
 		require.NoError(t, err)
@@ -202,7 +202,7 @@ func TestJSONDB(t *testing.T) {
 			_ = attempt.Close(th.Context)
 		}()
 
-		statusToWrite := execution.InitialStatus(subDAG.DAG)
+		statusToWrite := exec.InitialStatus(subDAG.DAG)
 		statusToWrite.DAGRunID = subDAGRunID
 		statusToWrite.Status = core.Running
 		err = attempt.Write(th.Context, statusToWrite)
@@ -210,7 +210,7 @@ func TestJSONDB(t *testing.T) {
 
 		// Find the sub dag-run record
 		ts = time.Date(2021, 1, 2, 0, 0, 0, 0, time.UTC)
-		dagRunRef := execution.NewDAGRunRef("test_DAG", parentDAGRunID)
+		dagRunRef := exec.NewDAGRunRef("test_DAG", parentDAGRunID)
 		existingAttempt, err := th.Store.FindSubAttempt(th.Context, dagRunRef, subDAGRunID)
 		require.NoError(t, err)
 		existingAttemptStatus, err := existingAttempt.ReadStatus(th.Context)
@@ -219,7 +219,7 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, core.Running.String(), existingAttemptStatus.Status.String())
 
 		// Create a retry record and write different status
-		retryAttempt, err := th.Store.CreateAttempt(th.Context, subDAG.DAG, ts, subDAGRunID, execution.NewDAGRunAttemptOptions{
+		retryAttempt, err := th.Store.CreateAttempt(th.Context, subDAG.DAG, ts, subDAGRunID, exec.NewDAGRunAttemptOptions{
 			RootDAGRun: &rootDAGRun,
 			Retry:      true,
 		})
@@ -253,7 +253,7 @@ func TestJSONDB(t *testing.T) {
 			_ = rec.Close(th.Context)
 		}()
 
-		statusToWrite := execution.InitialStatus(rec.dag)
+		statusToWrite := exec.InitialStatus(rec.dag)
 		statusToWrite.DAGRunID = "parent-id"
 
 		err = rec.Write(th.Context, statusToWrite)
@@ -402,12 +402,12 @@ func TestListStatuses(t *testing.T) {
 		th.CreateAttempt(t, ts3, "dagrun-id-3", core.Succeeded)
 
 		// Filter by time range (only ts2 should be included)
-		from := execution.NewUTC(time.Date(2021, 1, 1, 12, 0, 0, 0, time.UTC))
-		to := execution.NewUTC(time.Date(2021, 1, 2, 12, 0, 0, 0, time.UTC))
+		from := exec.NewUTC(time.Date(2021, 1, 1, 12, 0, 0, 0, time.UTC))
+		to := exec.NewUTC(time.Date(2021, 1, 2, 12, 0, 0, 0, time.UTC))
 
 		statuses, err := th.Store.ListStatuses(th.Context,
-			execution.WithFrom(from),
-			execution.WithTo(to),
+			exec.WithFrom(from),
+			exec.WithTo(to),
 		)
 
 		require.NoError(t, err)
@@ -426,8 +426,8 @@ func TestListStatuses(t *testing.T) {
 
 		// Filter by status (only StatusError should be included)
 		statuses, err := th.Store.ListStatuses(th.Context,
-			execution.WithStatuses([]core.Status{core.Failed}),
-			execution.WithFrom(execution.NewUTC(ts)),
+			exec.WithStatuses([]core.Status{core.Failed}),
+			exec.WithFrom(exec.NewUTC(ts)),
 		)
 
 		require.NoError(t, err)
@@ -446,10 +446,10 @@ func TestListStatuses(t *testing.T) {
 		}
 
 		// Limit to 3 results
-		options := &execution.ListDAGRunStatusesOptions{Limit: 3}
-		statuses, err := th.Store.ListStatuses(th.Context, func(o *execution.ListDAGRunStatusesOptions) {
+		options := &exec.ListDAGRunStatusesOptions{Limit: 3}
+		statuses, err := th.Store.ListStatuses(th.Context, func(o *exec.ListDAGRunStatusesOptions) {
 			o.Limit = options.Limit
-		}, execution.WithFrom(execution.NewUTC(ts)))
+		}, exec.WithFrom(exec.NewUTC(ts)))
 
 		require.NoError(t, err)
 		require.Len(t, statuses, 3)
@@ -469,7 +469,7 @@ func TestListStatuses(t *testing.T) {
 
 		// Get all statuses
 		statuses, err := th.Store.ListStatuses(
-			th.Context, execution.WithFrom(execution.NewUTC(ts1)),
+			th.Context, exec.WithFrom(exec.NewUTC(ts1)),
 		)
 
 		require.NoError(t, err)

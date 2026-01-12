@@ -6,7 +6,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/stretchr/testify/assert"
@@ -16,7 +16,7 @@ func TestNodeFieldsRoundTrip(t *testing.T) {
 	outputVars := &collections.SyncMap{}
 	outputVars.Store("KEY", "KEY=value")
 
-	original := &execution.Node{
+	original := &exec.Node{
 		Step:            core.Step{Name: "test-step"},
 		Status:          core.NodeSucceeded,
 		Stdout:          "/tmp/stdout.log",
@@ -28,8 +28,8 @@ func TestNodeFieldsRoundTrip(t *testing.T) {
 		DoneCount:       3,
 		Repeated:        true,
 		Error:           "test error",
-		SubRuns:         []execution.SubDAGRun{{DAGRunID: "sub-1", Params: "p1"}},
-		SubRunsRepeated: []execution.SubDAGRun{{DAGRunID: "sub-2", Params: "p2"}},
+		SubRuns:         []exec.SubDAGRun{{DAGRunID: "sub-1", Params: "p1"}},
+		SubRunsRepeated: []exec.SubDAGRun{{DAGRunID: "sub-2", Params: "p2"}},
 		OutputVariables: outputVars,
 		ApprovalInputs:  map[string]string{"input1": "value1"},
 		ApprovedAt:      "2024-01-15T10:02:00Z",

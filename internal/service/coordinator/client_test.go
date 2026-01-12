@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/common/backoff"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/proto/convert"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -70,8 +70,8 @@ func TestClientDispatch(t *testing.T) {
 
 		host, port := parseHostPort(addr)
 		monitor := &mockServiceMonitor{
-			members: []execution.HostInfo{
-				{ID: "coord-1", Host: host, Port: port, Status: execution.ServiceStatusActive},
+			members: []exec.HostInfo{
+				{ID: "coord-1", Host: host, Port: port, Status: exec.ServiceStatusActive},
 			},
 		}
 
@@ -97,7 +97,7 @@ func TestClientDispatch(t *testing.T) {
 		config.RequestTimeout = 100 * time.Millisecond
 
 		monitor := &mockServiceMonitor{
-			members: []execution.HostInfo{}, // No coordinators
+			members: []exec.HostInfo{}, // No coordinators
 		}
 
 		client := coordinator.New(monitor, config)
@@ -142,7 +142,7 @@ func TestClientPoll(t *testing.T) {
 
 	host, port := parseHostPort(addr)
 	monitor := &mockServiceMonitor{
-		members: []execution.HostInfo{{Host: host, Port: port, Status: execution.ServiceStatusActive}},
+		members: []exec.HostInfo{{Host: host, Port: port, Status: exec.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -190,7 +190,7 @@ func TestClientGetWorkers(t *testing.T) {
 
 	host, port := parseHostPort(addr)
 	monitor := &mockServiceMonitor{
-		members: []execution.HostInfo{{Host: host, Port: port, Status: execution.ServiceStatusActive}},
+		members: []exec.HostInfo{{Host: host, Port: port, Status: exec.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -224,7 +224,7 @@ func TestClientHeartbeat(t *testing.T) {
 
 	host, port := parseHostPort(addr)
 	monitor := &mockServiceMonitor{
-		members: []execution.HostInfo{{Host: host, Port: port, Status: execution.ServiceStatusActive}},
+		members: []exec.HostInfo{{Host: host, Port: port, Status: exec.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -272,14 +272,14 @@ func TestClientReportStatus(t *testing.T) {
 
 		host, port := parseHostPort(addr)
 		monitor := &mockServiceMonitor{
-			members: []execution.HostInfo{{Host: host, Port: port, Status: execution.ServiceStatusActive}},
+			members: []exec.HostInfo{{Host: host, Port: port, Status: exec.ServiceStatusActive}},
 		}
 
 		client := coordinator.New(monitor, config)
 
 		req := &coordinatorv1.ReportStatusRequest{
 			WorkerId: "test-worker",
-			Status: convert.DAGRunStatusToProto(&execution.DAGRunStatus{
+			Status: convert.DAGRunStatusToProto(&exec.DAGRunStatus{
 				DAGRunID:  "test-run-123",
 				Status:    1, // Running status
 				StartedAt: "2024-01-01T00:00:00Z",
@@ -320,14 +320,14 @@ func TestClientReportStatus(t *testing.T) {
 
 		host, port := parseHostPort(addr)
 		monitor := &mockServiceMonitor{
-			members: []execution.HostInfo{{Host: host, Port: port, Status: execution.ServiceStatusActive}},
+			members: []exec.HostInfo{{Host: host, Port: port, Status: exec.ServiceStatusActive}},
 		}
 
 		client := coordinator.New(monitor, config)
 
 		req := &coordinatorv1.ReportStatusRequest{
 			WorkerId: "test-worker",
-			Status: convert.DAGRunStatusToProto(&execution.DAGRunStatus{
+			Status: convert.DAGRunStatusToProto(&exec.DAGRunStatus{
 				DAGRunID: "test-run-456",
 				Status:   2, // Success status
 			}),
@@ -360,14 +360,14 @@ func TestClientReportStatus(t *testing.T) {
 
 		host, port := parseHostPort(addr)
 		monitor := &mockServiceMonitor{
-			members: []execution.HostInfo{{Host: host, Port: port, Status: execution.ServiceStatusActive}},
+			members: []exec.HostInfo{{Host: host, Port: port, Status: exec.ServiceStatusActive}},
 		}
 
 		client := coordinator.New(monitor, config)
 
 		req := &coordinatorv1.ReportStatusRequest{
 			WorkerId: "test-worker",
-			Status: convert.DAGRunStatusToProto(&execution.DAGRunStatus{
+			Status: convert.DAGRunStatusToProto(&exec.DAGRunStatus{
 				DAGRunID: "test-run-789",
 				Status:   3, // Failed status
 			}),
@@ -402,7 +402,7 @@ func TestClientMetrics(t *testing.T) {
 
 	host, port := parseHostPort(addr)
 	monitor := &mockServiceMonitor{
-		members: []execution.HostInfo{{Host: host, Port: port, Status: execution.ServiceStatusActive}},
+		members: []exec.HostInfo{{Host: host, Port: port, Status: exec.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -445,7 +445,7 @@ func TestClientCleanup(t *testing.T) {
 
 	host, port := parseHostPort(addr)
 	monitor := &mockServiceMonitor{
-		members: []execution.HostInfo{{Host: host, Port: port, Status: execution.ServiceStatusActive}},
+		members: []exec.HostInfo{{Host: host, Port: port, Status: exec.ServiceStatusActive}},
 	}
 
 	client := coordinator.New(monitor, config)
@@ -484,7 +484,7 @@ func TestClientDispatch_NoCoordinators(t *testing.T) {
 	}
 
 	// Should fail gracefully with no coordinators
-	monitor.members = []execution.HostInfo{}
+	monitor.members = []exec.HostInfo{}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
@@ -498,19 +498,19 @@ func TestClientDispatch_NoCoordinators(t *testing.T) {
 
 // Mock implementations
 
-var _ execution.ServiceRegistry = (*mockServiceMonitor)(nil)
+var _ exec.ServiceRegistry = (*mockServiceMonitor)(nil)
 
 type mockServiceMonitor struct {
-	members   []execution.HostInfo
+	members   []exec.HostInfo
 	err       error
 	onMembers func()
 }
 
-func (m *mockServiceMonitor) Register(_ context.Context, _ execution.ServiceName, _ execution.HostInfo) error {
+func (m *mockServiceMonitor) Register(_ context.Context, _ exec.ServiceName, _ exec.HostInfo) error {
 	return nil
 }
 
-func (m *mockServiceMonitor) GetServiceMembers(_ context.Context, _ execution.ServiceName) ([]execution.HostInfo, error) {
+func (m *mockServiceMonitor) GetServiceMembers(_ context.Context, _ exec.ServiceName) ([]exec.HostInfo, error) {
 	if m.onMembers != nil {
 		m.onMembers()
 	}
@@ -524,7 +524,7 @@ func (m *mockServiceMonitor) Unregister(_ context.Context) {
 	// No-op
 }
 
-func (m *mockServiceMonitor) UpdateStatus(_ context.Context, _ execution.ServiceName, _ execution.ServiceStatus) error {
+func (m *mockServiceMonitor) UpdateStatus(_ context.Context, _ exec.ServiceName, _ exec.ServiceStatus) error {
 	return nil
 }
 

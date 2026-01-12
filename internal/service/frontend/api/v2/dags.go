@@ -17,7 +17,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	runtime1 "github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/audit"
@@ -116,7 +116,7 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 	}
 
 	if err := a.dagStore.Create(ctx, request.Body.Name, yamlSpec); err != nil {
-		if errors.Is(err, execution.ErrDAGAlreadyExists) {
+		if errors.Is(err, exec.ErrDAGAlreadyExists) {
 			return nil, &Error{
 				HTTPStatus: http.StatusConflict,
 				Code:       api.ErrorCodeAlreadyExists,
@@ -408,7 +408,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 func (a *API) readHistoryData(
 	_ context.Context,
-	statusList []execution.DAGRunStatus,
+	statusList []exec.DAGRunStatus,
 ) []api.DAGGridItem {
 	data := map[string][]core.NodeStatus{}
 
@@ -503,10 +503,10 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	}
 
 	// Use paginator from request
-	pg := execution.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
+	pg := exec.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
 
 	// Let persistence layer handle sorting and pagination
-	result, errList, err := a.dagStore.List(ctx, execution.ListDAGsOptions{
+	result, errList, err := a.dagStore.List(ctx, exec.ListDAGsOptions{
 		Paginator: &pg,
 		Name:      valueOf(request.Params.Name),
 		Tag:       valueOf(request.Params.Tag),
@@ -597,7 +597,7 @@ func (a *API) GetDAGDAGRunDetails(ctx context.Context, request api.GetDAGDAGRunD
 
 	dagStatus, err := a.dagRunMgr.GetCurrentStatus(ctx, dag, dagRunId)
 	if err != nil {
-		if errors.Is(err, execution.ErrNoStatusData) {
+		if errors.Is(err, exec.ErrNoStatusData) {
 			return nil, &Error{
 				HTTPStatus: http.StatusNotFound,
 				Code:       api.ErrorCodeNotFound,
@@ -813,7 +813,7 @@ func (a *API) waitForDAGCompletion(
 	dag *core.DAG,
 	dagRunId string,
 	timeoutSeconds int,
-) (*execution.DAGRunStatus, error) {
+) (*exec.DAGRunStatus, error) {
 	// Create context with timeout
 	waitCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
 	defer cancel()
@@ -825,7 +825,7 @@ func (a *API) waitForDAGCompletion(
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 
-	var lastStatus *execution.DAGRunStatus
+	var lastStatus *exec.DAGRunStatus
 
 	for {
 		select {
@@ -894,13 +894,13 @@ func (a *API) ensureDAGRunIDUnique(ctx context.Context, dag *core.DAG, dagRunID 
 	if dagRunID == "" {
 		return fmt.Errorf("dagRunID must be non-empty")
 	}
-	if _, err := a.dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef(dag.Name, dagRunID)); err == nil {
+	if _, err := a.dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(dag.Name, dagRunID)); err == nil {
 		return &Error{
 			HTTPStatus: http.StatusConflict,
 			Code:       api.ErrorCodeAlreadyExists,
 			Message:    fmt.Sprintf("dag-run ID %s already exists for DAG %s", dagRunID, dag.Name),
 		}
-	} else if !errors.Is(err, execution.ErrDAGRunIDNotFound) {
+	} else if !errors.Is(err, exec.ErrDAGRunIDNotFound) {
 		return fmt.Errorf("failed to verify dag-run ID uniqueness: %w", err)
 	}
 	return nil
@@ -1223,8 +1223,8 @@ func (a *API) StopAllDAGRuns(ctx context.Context, request api.StopAllDAGRunsRequ
 
 	// Get all running DAG-runs for this DAG
 	runningStatuses, err := a.dagRunStore.ListStatuses(ctx,
-		execution.WithExactName(dag.Name),
-		execution.WithStatuses([]core.Status{core.Running}),
+		exec.WithExactName(dag.Name),
+		exec.WithStatuses([]core.Status{core.Running}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error listing running DAG-runs: %w", err)

@@ -8,14 +8,14 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type StoreTest struct {
 	Context context.Context
-	Store   execution.DAGRunStore
+	Store   exec.DAGRunStore
 	TmpDir  string
 }
 
@@ -39,7 +39,7 @@ func (th StoreTest) CreateAttempt(t *testing.T, ts time.Time, dagRunID string, s
 	t.Helper()
 
 	dag := th.DAG("test_DAG")
-	attempt, err := th.Store.CreateAttempt(th.Context, dag.DAG, ts, dagRunID, execution.NewDAGRunAttemptOptions{})
+	attempt, err := th.Store.CreateAttempt(th.Context, dag.DAG, ts, dagRunID, exec.NewDAGRunAttemptOptions{})
 	require.NoError(t, err)
 
 	err = attempt.Open(th.Context)
@@ -49,7 +49,7 @@ func (th StoreTest) CreateAttempt(t *testing.T, ts time.Time, dagRunID string, s
 		_ = attempt.Close(th.Context)
 	}()
 
-	dagRunStatus := execution.InitialStatus(dag.DAG)
+	dagRunStatus := exec.InitialStatus(dag.DAG)
 	dagRunStatus.DAGRunID = dagRunID
 	dagRunStatus.Status = s
 
@@ -78,11 +78,11 @@ func (d DAGTest) Writer(t *testing.T, dagRunID string, startedAt time.Time) Writ
 	t.Helper()
 
 	root := NewDataRoot(d.th.TmpDir, d.Name)
-	dagRun, err := root.CreateDAGRun(execution.NewUTC(startedAt), dagRunID)
+	dagRun, err := root.CreateDAGRun(exec.NewUTC(startedAt), dagRunID)
 	require.NoError(t, err)
 
 	store := d.th.Store.(*Store)
-	attempt, err := dagRun.CreateAttempt(d.th.Context, execution.NewUTC(startedAt), store.cache, "", WithDAG(d.DAG))
+	attempt, err := dagRun.CreateAttempt(d.th.Context, exec.NewUTC(startedAt), store.cache, "", WithDAG(d.DAG))
 	require.NoError(t, err)
 
 	writer := NewWriter(attempt.file)
@@ -101,7 +101,7 @@ func (d DAGTest) Writer(t *testing.T, dagRunID string, startedAt time.Time) Writ
 	}
 }
 
-func (w WriterTest) Write(t *testing.T, dagRunStatus execution.DAGRunStatus) {
+func (w WriterTest) Write(t *testing.T, dagRunStatus exec.DAGRunStatus) {
 	t.Helper()
 
 	err := w.Writer.write(dagRunStatus)

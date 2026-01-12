@@ -17,12 +17,12 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/persistence/filedag/grep"
 )
 
-var _ execution.DAGStore = (*Storage)(nil)
+var _ exec.DAGStore = (*Storage)(nil)
 
 // Option is a functional option for configuring the DAG repository
 type Option func(*Options)
@@ -64,7 +64,7 @@ func WithSkipExamples(skip bool) Option {
 }
 
 // New creates a new DAG store implementation using the local filesystem
-func New(baseDir string, opts ...Option) execution.DAGStore {
+func New(baseDir string, opts ...Option) exec.DAGStore {
 	options := &Options{}
 	for _, opt := range opts {
 		opt(options)
@@ -149,7 +149,7 @@ func (store *Storage) GetDetails(ctx context.Context, name string, opts ...spec.
 func (store *Storage) GetSpec(_ context.Context, name string) (string, error) {
 	filePath, err := store.locateDAG(name)
 	if err != nil {
-		return "", execution.ErrDAGNotFound
+		return "", exec.ErrDAGNotFound
 	}
 	dat, err := os.ReadFile(filePath) // nolint:gosec
 	if err != nil {
@@ -201,7 +201,7 @@ func (store *Storage) Create(_ context.Context, name string, spec []byte) error 
 	}
 	filePath := store.generateFilePath(name)
 	if fileExists(filePath) {
-		return execution.ErrDAGAlreadyExists
+		return exec.ErrDAGAlreadyExists
 	}
 	if err := os.WriteFile(filePath, spec, defaultPerm); err != nil {
 		return fmt.Errorf("failed to write DAG %s: %w", name, err)
@@ -245,26 +245,26 @@ func (store *Storage) ensureDirExist() error {
 }
 
 // List lists DAGs with pagination support.
-func (store *Storage) List(ctx context.Context, opts execution.ListDAGsOptions) (execution.PaginatedResult[*core.DAG], []string, error) {
+func (store *Storage) List(ctx context.Context, opts exec.ListDAGsOptions) (exec.PaginatedResult[*core.DAG], []string, error) {
 	var allDags []*core.DAG
 	var errList []string
 
 	if opts.Paginator == nil {
-		p := execution.DefaultPaginator()
+		p := exec.DefaultPaginator()
 		opts.Paginator = &p
 	}
 
 	entries, err := os.ReadDir(store.baseDir)
 	if err != nil {
 		errList = append(errList, fmt.Sprintf("failed to read directory %s: %s", store.baseDir, err))
-		return execution.NewPaginatedResult([]*core.DAG{}, 0, *opts.Paginator), errList, err
+		return exec.NewPaginatedResult([]*core.DAG{}, 0, *opts.Paginator), errList, err
 	}
 
 	// First, collect all matching DAGs
 	for _, entry := range entries {
 		// Check context cancellation
 		if ctx.Err() != nil {
-			return execution.NewPaginatedResult([]*core.DAG{}, 0, *opts.Paginator), nil, ctx.Err()
+			return exec.NewPaginatedResult([]*core.DAG{}, 0, *opts.Paginator), nil, ctx.Err()
 		}
 
 		if entry.IsDir() || !fileutil.IsYAMLFile(entry.Name()) {
@@ -377,7 +377,7 @@ func (store *Storage) List(ctx context.Context, opts execution.ListDAGsOptions) 
 		paginatedDags = allDags[start:end]
 	}
 
-	result := execution.NewPaginatedResult(
+	result := exec.NewPaginatedResult(
 		paginatedDags, totalCount, *opts.Paginator,
 	)
 
@@ -386,7 +386,7 @@ func (store *Storage) List(ctx context.Context, opts execution.ListDAGsOptions) 
 
 // Grep searches for a pattern in all DAGs.
 func (store *Storage) Grep(ctx context.Context, pattern string) (
-	ret []*execution.GrepDAGsResult, errs []string, err error,
+	ret []*exec.GrepDAGsResult, errs []string, err error,
 ) {
 	if pattern == "" {
 		// return empty result if pattern is empty
@@ -433,7 +433,7 @@ func (store *Storage) Grep(ctx context.Context, pattern string) (
 				errs = append(errs, fmt.Sprintf("check %s failed: %s", entry.Name(), err))
 				continue
 			}
-			ret = append(ret, &execution.GrepDAGsResult{
+			ret = append(ret, &exec.GrepDAGsResult{
 				Name:    strings.TrimSuffix(entry.Name(), path.Ext(entry.Name())),
 				DAG:     dag,
 				Matches: matches,
@@ -470,7 +470,7 @@ func (store *Storage) Rename(_ context.Context, oldID, newID string) error {
 	}
 	newFilePath := store.generateFilePath(newID)
 	if fileExists(newFilePath) {
-		return execution.ErrDAGAlreadyExists
+		return exec.ErrDAGAlreadyExists
 	}
 	return os.Rename(oldFilePath, newFilePath)
 }

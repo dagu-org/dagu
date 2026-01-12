@@ -21,7 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/signal"
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
@@ -533,8 +533,8 @@ func (n *Node) SetupEnv(ctx context.Context) context.Context {
 	defer n.mu.RUnlock()
 	env := GetEnv(ctx)
 	env = env.WithVariables(
-		execution.EnvKeyDAGRunStepStdoutFile, n.GetStdout(),
-		execution.EnvKeyDAGRunStepStderrFile, n.GetStderr(),
+		exec.EnvKeyDAGRunStepStdoutFile, n.GetStdout(),
+		exec.EnvKeyDAGRunStepStderrFile, n.GetStderr(),
 	)
 	ctx = logger.WithValues(ctx, tag.Step(n.Name()))
 	return WithEnv(ctx, env)

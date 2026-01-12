@@ -10,7 +10,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/spf13/cobra"
@@ -48,10 +48,10 @@ func runRestart(ctx *Context, args []string) error {
 
 	name := args[0]
 
-	var attempt execution.DAGRunAttempt
+	var attempt exec.DAGRunAttempt
 	if dagRunID != "" {
 		// Retrieve the previous run for the specified dag-run ID.
-		dagRunRef := execution.NewDAGRunRef(name, dagRunID)
+		dagRunRef := exec.NewDAGRunRef(name, dagRunID)
 		attempt, err = ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
 		if err != nil {
 			return fmt.Errorf("failed to find the run for dag-run ID %s: %w", dagRunID, err)
@@ -104,7 +104,7 @@ func handleRestartProcess(ctx *Context, d *core.DAG, oldDagRunID string) error {
 		return errProcAcquisitionFailed
 	}
 
-	proc, err := ctx.ProcStore.Acquire(ctx, d.ProcGroup(), execution.NewDAGRunRef(d.Name, newDagRunID))
+	proc, err := ctx.ProcStore.Acquire(ctx, d.ProcGroup(), exec.NewDAGRunRef(d.Name, newDagRunID))
 	if err != nil {
 		ctx.ProcStore.Unlock(ctx, d.ProcGroup())
 		logger.Debug(ctx, "Failed to acquire process handle", tag.Error(err))
@@ -150,7 +150,7 @@ func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRu
 		dr,
 		ctx.DAGRunStore,
 		ctx.ServiceRegistry,
-		execution.NewDAGRunRef(dag.Name, dagRunID),
+		exec.NewDAGRunRef(dag.Name, dagRunID),
 		ctx.Config.Core.Peer,
 		agent.Options{Dry: false})
 

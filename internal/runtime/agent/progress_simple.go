@@ -8,7 +8,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"golang.org/x/term"
 )
 
@@ -62,7 +62,7 @@ func (p *SimpleProgressDisplay) Stop() {
 }
 
 // UpdateNode updates the progress for a specific node.
-func (p *SimpleProgressDisplay) UpdateNode(node *execution.Node) {
+func (p *SimpleProgressDisplay) UpdateNode(node *exec.Node) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -76,7 +76,7 @@ func (p *SimpleProgressDisplay) UpdateNode(node *execution.Node) {
 }
 
 // UpdateStatus updates the overall DAG status.
-func (p *SimpleProgressDisplay) UpdateStatus(status *execution.DAGRunStatus) {
+func (p *SimpleProgressDisplay) UpdateStatus(status *exec.DAGRunStatus) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.status = status.Status

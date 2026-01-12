@@ -13,7 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/proto/convert"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -32,13 +32,13 @@ type RemoteTaskHandlerConfig struct {
 	// CoordinatorClient is the coordinator client with load balancing support
 	CoordinatorClient coordinator.Client
 	// DAGRunStore is the store for DAG run status (may be nil for fully remote mode)
-	DAGRunStore execution.DAGRunStore
+	DAGRunStore exec.DAGRunStore
 	// DAGStore is the store for DAG definitions
-	DAGStore execution.DAGStore
+	DAGStore exec.DAGStore
 	// DAGRunMgr is the manager for DAG runs
 	DAGRunMgr runtime.Manager
 	// ServiceRegistry is the service registry
-	ServiceRegistry execution.ServiceRegistry
+	ServiceRegistry exec.ServiceRegistry
 	// PeerConfig is the peer configuration
 	PeerConfig config.Peer
 	// Config is the main application configuration
@@ -63,10 +63,10 @@ func NewRemoteTaskHandler(cfg RemoteTaskHandlerConfig) TaskHandler {
 type remoteTaskHandler struct {
 	workerID          string
 	coordinatorClient coordinator.Client
-	dagRunStore       execution.DAGRunStore
-	dagStore          execution.DAGStore
+	dagRunStore       exec.DAGRunStore
+	dagStore          exec.DAGStore
 	dagRunMgr         runtime.Manager
-	serviceRegistry   execution.ServiceRegistry
+	serviceRegistry   exec.ServiceRegistry
 	peerConfig        config.Peer
 	config            *config.Config
 }
@@ -104,18 +104,18 @@ func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1
 		defer cleanup()
 	}
 
-	root := execution.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
-	parent := execution.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
+	root := exec.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
+	parent := exec.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
 	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
 
 	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, root, parent, statusPusher, logStreamer, queuedRun, nil)
 }
 
 func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1.Task) error {
-	root := execution.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
+	root := exec.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
 
 	// Get previous status - prefer from task (shared-nothing mode), fallback to local store
-	var status *execution.DAGRunStatus
+	var status *exec.DAGRunStatus
 	if task.PreviousStatus != nil {
 		// Shared-nothing mode: status is provided in the task
 		status = convert.ProtoToDAGRunStatus(task.PreviousStatus)
@@ -124,7 +124,7 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 			slog.Int("nodes", len(status.Nodes)))
 	} else if h.dagRunStore != nil {
 		// Fallback: read from local store
-		attempt, err := h.dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef(task.RootDagRunName, task.DagRunId))
+		attempt, err := h.dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(task.RootDagRunName, task.DagRunId))
 		if err != nil {
 			return fmt.Errorf("failed to find previous run: %w", err)
 		}
@@ -147,7 +147,7 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 		defer cleanup()
 	}
 
-	parent := execution.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
+	parent := exec.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
 	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
 
 	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, root, parent, statusPusher, logStreamer, false, &retryConfig{
@@ -158,12 +158,12 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 
 // retryConfig holds retry-specific configuration
 type retryConfig struct {
-	target   *execution.DAGRunStatus
+	target   *exec.DAGRunStatus
 	stepName string
 }
 
 // createRemoteHandlers creates the status pusher and log streamer for remote execution.
-func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root execution.DAGRunRef) (*remote.StatusPusher, *remote.LogStreamer) {
+func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root exec.DAGRunRef) (*remote.StatusPusher, *remote.LogStreamer) {
 	statusPusher := remote.NewStatusPusher(h.coordinatorClient, h.workerID)
 	logStreamer := remote.NewLogStreamer(
 		h.coordinatorClient,
@@ -264,8 +264,8 @@ func (h *remoteTaskHandler) executeDAGRun(
 	dag *core.DAG,
 	dagRunID string,
 	attemptID string,
-	root execution.DAGRunRef,
-	parent execution.DAGRunRef,
+	root exec.DAGRunRef,
+	parent exec.DAGRunRef,
 	statusPusher *remote.StatusPusher,
 	logStreamer *remote.LogStreamer,
 	queuedRun bool,

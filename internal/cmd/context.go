@@ -23,7 +23,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/common/telemetry"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
 	"github.com/dagu-org/dagu/internal/persistence/fileproc"
@@ -49,13 +49,13 @@ type Context struct {
 	Config  *config.Config
 	Quiet   bool
 
-	DAGRunStore     execution.DAGRunStore
+	DAGRunStore     exec.DAGRunStore
 	DAGRunMgr       runtime.Manager
-	ProcStore       execution.ProcStore
-	QueueStore      execution.QueueStore
-	ServiceRegistry execution.ServiceRegistry
+	ProcStore       exec.ProcStore
+	QueueStore      exec.QueueStore
+	ServiceRegistry exec.ServiceRegistry
 
-	Proc execution.ProcHandle
+	Proc exec.ProcHandle
 }
 
 // WithContext returns a new Context with a different underlying context.Context.
@@ -174,7 +174,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	case "server", "scheduler", "start-all", "coordinator":
 		// For long-running process, we setup file cache for better performance
 		limits := cfg.Cache.Limits()
-		hc := fileutil.NewCache[*execution.DAGRunStatus]("dag_run_status", limits.DAGRun.Limit, limits.DAGRun.TTL)
+		hc := fileutil.NewCache[*exec.DAGRunStatus]("dag_run_status", limits.DAGRun.Limit, limits.DAGRun.TTL)
 		hc.StartEviction(ctx)
 		hrOpts = append(hrOpts, filedagrun.WithHistoryFileCache(hc))
 	}
@@ -321,7 +321,7 @@ func (c *Context) StringParam(name string) (string, error) {
 
 // dagStore returns a new DAGRepository instance. It ensures that the directory exists
 // (creating it if necessary) before returning the store.
-func (c *Context) dagStore(cache *fileutil.Cache[*core.DAG], searchPaths []string) (execution.DAGStore, error) {
+func (c *Context) dagStore(cache *fileutil.Cache[*core.DAG], searchPaths []string) (exec.DAGStore, error) {
 	dir := c.Config.Paths.DAGsDir
 	_, err := os.Stat(dir)
 	if os.IsNotExist(err) {
@@ -539,15 +539,15 @@ func (c *Context) RecordEarlyFailure(dag *core.DAG, dagRunID string, err error) 
 	}
 
 	// 1. Check if a DAGRunAttempt already exists for the given run-id.
-	ref := execution.NewDAGRunRef(dag.Name, dagRunID)
+	ref := exec.NewDAGRunRef(dag.Name, dagRunID)
 	attempt, findErr := c.DAGRunStore.FindAttempt(c, ref)
-	if findErr != nil && !errors.Is(findErr, execution.ErrDAGRunIDNotFound) {
+	if findErr != nil && !errors.Is(findErr, exec.ErrDAGRunIDNotFound) {
 		return fmt.Errorf("failed to check for existing attempt: %w", findErr)
 	}
 
 	if attempt == nil {
 		// 2. Create the attempt if not exists
-		att, createErr := c.DAGRunStore.CreateAttempt(c, dag, time.Now(), dagRunID, execution.NewDAGRunAttemptOptions{})
+		att, createErr := c.DAGRunStore.CreateAttempt(c, dag, time.Now(), dagRunID, exec.NewDAGRunAttemptOptions{})
 		if createErr != nil {
 			return fmt.Errorf("failed to create run to record failure: %w", createErr)
 		}

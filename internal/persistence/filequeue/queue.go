@@ -10,7 +10,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/dirlock"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
 // Errors for the queue
@@ -20,8 +20,8 @@ var (
 )
 
 // priorities is a list of queue priorities
-var priorities = []execution.QueuePriority{
-	execution.QueuePriorityHigh, execution.QueuePriorityLow,
+var priorities = []exec.QueuePriority{
+	exec.QueuePriorityHigh, exec.QueuePriorityLow,
 }
 
 // DualQueue represents a queue for storing dag-runs with two priorities:
@@ -34,7 +34,7 @@ type DualQueue struct {
 	// name is the name of the DAGs that this queue is for
 	name string
 	// queueFiles is a map of queue files, where the key is the priority
-	files map[execution.QueuePriority]*QueueFile
+	files map[exec.QueuePriority]*QueueFile
 	// mu is the mutex for synchronizing access to the queue
 	mu sync.Mutex
 }
@@ -50,9 +50,9 @@ func NewDualQueue(baseDir, name string) *DualQueue {
 		DirLock: dirLock,
 		baseDir: baseDir,
 		name:    name,
-		files: map[execution.QueuePriority]*QueueFile{
-			execution.QueuePriorityHigh: NewQueueFile(baseDir, "high_"),
-			execution.QueuePriorityLow:  NewQueueFile(baseDir, "low_"),
+		files: map[exec.QueuePriority]*QueueFile{
+			exec.QueuePriorityHigh: NewQueueFile(baseDir, "high_"),
+			exec.QueuePriorityLow:  NewQueueFile(baseDir, "low_"),
 		},
 	}
 }
@@ -60,7 +60,7 @@ func NewDualQueue(baseDir, name string) *DualQueue {
 // FindByDAGRunID retrieves a dag-run from the queue by its dag-run ID
 // without removing it. It returns the first found item in the queue files.
 // If the item is not found in any of the queue files, it returns ErrQueueItemNotFound.
-func (q *DualQueue) FindByDAGRunID(ctx context.Context, dagRunID string) (execution.QueuedItemData, error) {
+func (q *DualQueue) FindByDAGRunID(ctx context.Context, dagRunID string) (exec.QueuedItemData, error) {
 	for _, priority := range priorities {
 		qf := q.files[priority]
 		item, err := qf.FindByDAGRunID(ctx, dagRunID)
@@ -76,7 +76,7 @@ func (q *DualQueue) FindByDAGRunID(ctx context.Context, dagRunID string) (execut
 }
 
 // DequeueByDAGRunID retrieves a dag-run from the queue by its dag-run ID
-func (q *DualQueue) DequeueByDAGRunID(ctx context.Context, dagRun execution.DAGRunRef) ([]execution.QueuedItemData, error) {
+func (q *DualQueue) DequeueByDAGRunID(ctx context.Context, dagRun exec.DAGRunRef) ([]exec.QueuedItemData, error) {
 	ctx = logger.WithValues(ctx,
 		tag.Queue(q.name),
 		tag.DAG(dagRun.Name),
@@ -85,7 +85,7 @@ func (q *DualQueue) DequeueByDAGRunID(ctx context.Context, dagRun execution.DAGR
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	var items []execution.QueuedItemData
+	var items []exec.QueuedItemData
 	for _, priority := range priorities {
 		qf := q.files[priority]
 		popped, err := qf.PopByDAGRunID(ctx, dagRun)
@@ -106,9 +106,9 @@ func (q *DualQueue) DequeueByDAGRunID(ctx context.Context, dagRun execution.DAGR
 }
 
 // List returns all items in the queue
-func (q *DualQueue) List(ctx context.Context) ([]execution.QueuedItemData, error) {
+func (q *DualQueue) List(ctx context.Context) ([]exec.QueuedItemData, error) {
 	ctx = logger.WithValues(ctx, tag.Queue(q.name))
-	var items []execution.QueuedItemData
+	var items []exec.QueuedItemData
 	for _, priority := range priorities {
 		qf := q.files[priority]
 		qItems, err := qf.List(ctx)
@@ -138,7 +138,7 @@ func (q *DualQueue) Len(ctx context.Context) (int, error) {
 }
 
 // Enqueue adds a dag-run to the queue with the specified priority
-func (q *DualQueue) Enqueue(ctx context.Context, priority execution.QueuePriority, dagRun execution.DAGRunRef) error {
+func (q *DualQueue) Enqueue(ctx context.Context, priority exec.QueuePriority, dagRun exec.DAGRunRef) error {
 	ctx = logger.WithValues(ctx,
 		tag.Queue(q.name),
 		tag.DAG(dagRun.Name),
@@ -163,7 +163,7 @@ func (q *DualQueue) Enqueue(ctx context.Context, priority execution.QueuePriorit
 
 // Dequeue retrieves a dag-run from the queue and removes it.
 // It checks the high-priority queue first, then the low-priority queue
-func (q *DualQueue) Dequeue(ctx context.Context) (execution.QueuedItemData, error) {
+func (q *DualQueue) Dequeue(ctx context.Context) (exec.QueuedItemData, error) {
 	ctx = logger.WithValues(ctx, tag.Queue(q.name))
 	q.mu.Lock()
 	defer q.mu.Unlock()

@@ -21,7 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	exec1 "github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/persistence/filedag"
 	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
@@ -362,12 +362,12 @@ type Helper struct {
 	Cancel          context.CancelFunc
 	Config          *config.Config
 	LoggingOutput   *SyncBuffer
-	DAGStore        execution.DAGStore
-	DAGRunStore     execution.DAGRunStore
+	DAGStore        exec1.DAGStore
+	DAGRunStore     exec1.DAGRunStore
 	DAGRunMgr       runtimepkg.Manager
-	ProcStore       execution.ProcStore
-	QueueStore      execution.QueueStore
-	ServiceRegistry execution.ServiceRegistry
+	ProcStore       exec1.ProcStore
+	QueueStore      exec1.QueueStore
+	ServiceRegistry exec1.ServiceRegistry
 	SubCmdBuilder   *runtimepkg.SubCmdBuilder
 
 	tmpDir string
@@ -566,7 +566,7 @@ func (d *DAG) ReadOutputs(t *testing.T) map[string]string {
 	data, err := os.ReadFile(outputsPath) //nolint:gosec // path is constructed from test config
 	require.NoError(t, err)
 
-	var outputs execution.DAGRunOutputs
+	var outputs exec1.DAGRunOutputs
 	require.NoError(t, json.Unmarshal(data, &outputs))
 
 	return outputs.Outputs
@@ -608,7 +608,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 
 	logDir := d.Config.Paths.LogDir
 	logFile := filepath.Join(d.Config.Paths.LogDir, dagRunID+".log")
-	root := execution.NewDAGRunRef(d.Name, dagRunID)
+	root := exec1.NewDAGRunRef(d.Name, dagRunID)
 
 	helper.Agent = agent.New(
 		dagRunID,
@@ -648,7 +648,7 @@ func (a *Agent) RunError(t *testing.T) {
 func (a *Agent) RunCancel(t *testing.T) {
 	t.Helper()
 
-	proc, err := a.ProcStore.Acquire(a.Context, a.ProcGroup(), execution.DAGRunRef{
+	proc, err := a.ProcStore.Acquire(a.Context, a.ProcGroup(), exec1.DAGRunRef{
 		Name: a.Name,
 		ID:   a.dagRunID,
 	})

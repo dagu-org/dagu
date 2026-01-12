@@ -8,7 +8,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -22,9 +22,9 @@ func TestDBClient_GetSubDAGRunStatus(t *testing.T) {
 		// Setup mocks
 		mockDAGStore := new(mockDAGStore)
 		mockDAGRunStore := new(mockDAGRunStore)
-		mockAttempt := new(execution.MockDAGRunAttempt)
+		mockAttempt := new(exec.MockDAGRunAttempt)
 
-		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-123")
+		rootRef := exec.NewDAGRunRef("parent-dag", "parent-run-123")
 		subRunID := "child-run-123"
 
 		// Setup outputs
@@ -34,12 +34,12 @@ func TestDBClient_GetSubDAGRunStatus(t *testing.T) {
 
 		// Setup expectations
 		mockDAGRunStore.On("FindSubAttempt", ctx, rootRef, subRunID).Return(mockAttempt, nil)
-		mockAttempt.On("ReadStatus", ctx).Return(&execution.DAGRunStatus{
+		mockAttempt.On("ReadStatus", ctx).Return(&exec.DAGRunStatus{
 			Name:     "sub-dag",
 			DAGRunID: subRunID,
 			Status:   core.Succeeded,
 			Params:   "param1=value1",
-			Nodes: []*execution.Node{
+			Nodes: []*exec.Node{
 				{OutputVariables: outputs},
 			},
 		}, nil)
@@ -68,7 +68,7 @@ func TestDBClient_GetSubDAGRunStatus(t *testing.T) {
 		mockDAGStore := new(mockDAGStore)
 		mockDAGRunStore := new(mockDAGRunStore)
 
-		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-notfound")
+		rootRef := exec.NewDAGRunRef("parent-dag", "parent-run-notfound")
 		subRunID := "non-existent-child"
 
 		mockDAGRunStore.On("FindSubAttempt", ctx, rootRef, subRunID).Return(nil, errors.New("not found"))
@@ -90,13 +90,13 @@ func TestDBClient_IsSubDAGRunCompleted(t *testing.T) {
 
 		mockDAGStore := new(mockDAGStore)
 		mockDAGRunStore := new(mockDAGRunStore)
-		mockAttempt := new(execution.MockDAGRunAttempt)
+		mockAttempt := new(exec.MockDAGRunAttempt)
 
-		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-completed")
+		rootRef := exec.NewDAGRunRef("parent-dag", "parent-run-completed")
 		subRunID := "child-completed-success"
 
 		mockDAGRunStore.On("FindSubAttempt", ctx, rootRef, subRunID).Return(mockAttempt, nil)
-		mockAttempt.On("ReadStatus", ctx).Return(&execution.DAGRunStatus{
+		mockAttempt.On("ReadStatus", ctx).Return(&exec.DAGRunStatus{
 			Name:     "sub-dag",
 			DAGRunID: subRunID,
 			Status:   core.Succeeded,
@@ -117,13 +117,13 @@ func TestDBClient_IsSubDAGRunCompleted(t *testing.T) {
 
 		mockDAGStore := new(mockDAGStore)
 		mockDAGRunStore := new(mockDAGRunStore)
-		mockAttempt := new(execution.MockDAGRunAttempt)
+		mockAttempt := new(exec.MockDAGRunAttempt)
 
-		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-error")
+		rootRef := exec.NewDAGRunRef("parent-dag", "parent-run-error")
 		subRunID := "child-completed-error"
 
 		mockDAGRunStore.On("FindSubAttempt", ctx, rootRef, subRunID).Return(mockAttempt, nil)
-		mockAttempt.On("ReadStatus", ctx).Return(&execution.DAGRunStatus{
+		mockAttempt.On("ReadStatus", ctx).Return(&exec.DAGRunStatus{
 			Name:     "sub-dag",
 			DAGRunID: subRunID,
 			Status:   core.Failed,
@@ -144,7 +144,7 @@ func TestDBClient_IsSubDAGRunCompleted(t *testing.T) {
 		mockDAGStore := new(mockDAGStore)
 		mockDAGRunStore := new(mockDAGRunStore)
 
-		rootRef := execution.NewDAGRunRef("parent-dag", "parent-run-notfound")
+		rootRef := exec.NewDAGRunRef("parent-dag", "parent-run-notfound")
 		subRunID := "non-existent-child"
 
 		mockDAGRunStore.On("FindSubAttempt", ctx, rootRef, subRunID).Return(nil, errors.New("not found"))
@@ -160,7 +160,7 @@ func TestDBClient_IsSubDAGRunCompleted(t *testing.T) {
 	})
 }
 
-var _ execution.DAGStore = (*mockDAGStore)(nil)
+var _ exec.DAGStore = (*mockDAGStore)(nil)
 
 // mockDAGStore implements models.DAGStore
 type mockDAGStore struct {
@@ -177,9 +177,9 @@ func (m *mockDAGStore) Delete(ctx context.Context, fileName string) error {
 	return args.Error(0)
 }
 
-func (m *mockDAGStore) List(ctx context.Context, params execution.ListDAGsOptions) (execution.PaginatedResult[*core.DAG], []string, error) {
+func (m *mockDAGStore) List(ctx context.Context, params exec.ListDAGsOptions) (exec.PaginatedResult[*core.DAG], []string, error) {
 	args := m.Called(ctx, params)
-	return args.Get(0).(execution.PaginatedResult[*core.DAG]), args.Get(1).([]string), args.Error(2)
+	return args.Get(0).(exec.PaginatedResult[*core.DAG]), args.Get(1).([]string), args.Error(2)
 }
 
 func (m *mockDAGStore) GetMetadata(ctx context.Context, fileName string) (*core.DAG, error) {
@@ -198,9 +198,9 @@ func (m *mockDAGStore) GetDetails(ctx context.Context, fileName string, opts ...
 	return args.Get(0).(*core.DAG), args.Error(1)
 }
 
-func (m *mockDAGStore) Grep(ctx context.Context, pattern string) ([]*execution.GrepDAGsResult, []string, error) {
+func (m *mockDAGStore) Grep(ctx context.Context, pattern string) ([]*exec.GrepDAGsResult, []string, error) {
 	args := m.Called(ctx, pattern)
-	return args.Get(0).([]*execution.GrepDAGsResult), args.Get(1).([]string), args.Error(2)
+	return args.Get(0).([]*exec.GrepDAGsResult), args.Get(1).([]string), args.Error(2)
 }
 
 func (m *mockDAGStore) Rename(ctx context.Context, oldID, newID string) error {
@@ -241,7 +241,7 @@ func (m *mockDAGStore) IsSuspended(ctx context.Context, fileName string) bool {
 	return args.Bool(0)
 }
 
-var _ execution.DAGRunStore = (*mockDAGRunStore)(nil)
+var _ exec.DAGRunStore = (*mockDAGRunStore)(nil)
 
 // mockDAGRunStore implements models.DAGRunStore
 type mockDAGRunStore struct {
@@ -249,64 +249,64 @@ type mockDAGRunStore struct {
 }
 
 // RemoveDAGRun implements models.DAGRunStore.
-func (m *mockDAGRunStore) RemoveDAGRun(ctx context.Context, dagRun execution.DAGRunRef) error {
+func (m *mockDAGRunStore) RemoveDAGRun(ctx context.Context, dagRun exec.DAGRunRef) error {
 	panic("unimplemented")
 }
 
-func (m *mockDAGRunStore) CreateAttempt(ctx context.Context, dag *core.DAG, ts time.Time, dagRunID string, opts execution.NewDAGRunAttemptOptions) (execution.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) CreateAttempt(ctx context.Context, dag *core.DAG, ts time.Time, dagRunID string, opts exec.NewDAGRunAttemptOptions) (exec.DAGRunAttempt, error) {
 	args := m.Called(ctx, dag, ts, dagRunID, opts)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
+	return args.Get(0).(exec.DAGRunAttempt), args.Error(1)
 }
 
-func (m *mockDAGRunStore) RecentAttempts(ctx context.Context, name string, itemLimit int) []execution.DAGRunAttempt {
+func (m *mockDAGRunStore) RecentAttempts(ctx context.Context, name string, itemLimit int) []exec.DAGRunAttempt {
 	args := m.Called(ctx, name, itemLimit)
-	return args.Get(0).([]execution.DAGRunAttempt)
+	return args.Get(0).([]exec.DAGRunAttempt)
 }
 
-func (m *mockDAGRunStore) LatestAttempt(ctx context.Context, name string) (execution.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) LatestAttempt(ctx context.Context, name string) (exec.DAGRunAttempt, error) {
 	args := m.Called(ctx, name)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
+	return args.Get(0).(exec.DAGRunAttempt), args.Error(1)
 }
 
-func (m *mockDAGRunStore) ListStatuses(ctx context.Context, opts ...execution.ListDAGRunStatusesOption) ([]*execution.DAGRunStatus, error) {
+func (m *mockDAGRunStore) ListStatuses(ctx context.Context, opts ...exec.ListDAGRunStatusesOption) ([]*exec.DAGRunStatus, error) {
 	args := m.Called(ctx, opts)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*execution.DAGRunStatus), args.Error(1)
+	return args.Get(0).([]*exec.DAGRunStatus), args.Error(1)
 }
 
-func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun execution.DAGRunRef) (execution.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) FindAttempt(ctx context.Context, dagRun exec.DAGRunRef) (exec.DAGRunAttempt, error) {
 	args := m.Called(ctx, dagRun)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
+	return args.Get(0).(exec.DAGRunAttempt), args.Error(1)
 }
 
-func (m *mockDAGRunStore) FindSubAttempt(ctx context.Context, rootDAGRun execution.DAGRunRef, dagRunID string) (execution.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) FindSubAttempt(ctx context.Context, rootDAGRun exec.DAGRunRef, dagRunID string) (exec.DAGRunAttempt, error) {
 	args := m.Called(ctx, rootDAGRun, dagRunID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
+	return args.Get(0).(exec.DAGRunAttempt), args.Error(1)
 }
 
-func (m *mockDAGRunStore) CreateSubAttempt(ctx context.Context, rootRef execution.DAGRunRef, subDAGRunID string) (execution.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) CreateSubAttempt(ctx context.Context, rootRef exec.DAGRunRef, subDAGRunID string) (exec.DAGRunAttempt, error) {
 	args := m.Called(ctx, rootRef, subDAGRunID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(execution.DAGRunAttempt), args.Error(1)
+	return args.Get(0).(exec.DAGRunAttempt), args.Error(1)
 }
 
-func (m *mockDAGRunStore) RemoveOldDAGRuns(ctx context.Context, name string, retentionDays int, opts ...execution.RemoveOldDAGRunsOption) ([]string, error) {
+func (m *mockDAGRunStore) RemoveOldDAGRuns(ctx context.Context, name string, retentionDays int, opts ...exec.RemoveOldDAGRunsOption) ([]string, error) {
 	args := m.Called(ctx, name, retentionDays, opts)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

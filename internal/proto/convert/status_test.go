@@ -5,7 +5,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/collections"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,7 +18,7 @@ func TestDAGRunStatusToProto(t *testing.T) {
 	})
 
 	t.Run("basic status", func(t *testing.T) {
-		status := &execution.DAGRunStatus{
+		status := &exec.DAGRunStatus{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
 			Status:   core.Running,
@@ -49,15 +49,15 @@ func TestRoundTrip(t *testing.T) {
 		outputVars.Store("key1", "value1")
 		outputVars.Store("key2", "value2")
 
-		original := &execution.DAGRunStatus{
+		original := &exec.DAGRunStatus{
 			Name:       "test-dag",
 			DAGRunID:   "run-123",
 			AttemptID:  "attempt-1",
 			Status:     core.Running,
 			WorkerID:   "worker-1",
 			PID:        12345,
-			Root:       execution.DAGRunRef{Name: "root-dag", ID: "root-run"},
-			Parent:     execution.DAGRunRef{Name: "parent-dag", ID: "parent-run"},
+			Root:       exec.DAGRunRef{Name: "root-dag", ID: "root-run"},
+			Parent:     exec.DAGRunRef{Name: "parent-dag", ID: "parent-run"},
 			CreatedAt:  1234567890,
 			QueuedAt:   "2024-01-01T00:00:00Z",
 			StartedAt:  "2024-01-01T00:01:00Z",
@@ -66,7 +66,7 @@ func TestRoundTrip(t *testing.T) {
 			Error:      "test error",
 			Params:     "key=value",
 			ParamsList: []string{"key=value"},
-			Nodes: []*execution.Node{
+			Nodes: []*exec.Node{
 				{
 					Step: core.Step{
 						Name:           "step-1",
@@ -83,18 +83,18 @@ func TestRoundTrip(t *testing.T) {
 					DoneCount:       3,
 					RetriedAt:       "2024-01-01T00:00:30Z",
 					OutputVariables: outputVars,
-					SubRuns: []execution.SubDAGRun{
+					SubRuns: []exec.SubDAGRun{
 						{DAGRunID: "sub-run-1", Params: "p1=v1"},
 						{DAGRunID: "sub-run-2", Params: "p2=v2"},
 					},
 				},
 			},
-			OnInit:    &execution.Node{Step: core.Step{Name: "on-init"}, Status: core.NodeSucceeded},
-			OnExit:    &execution.Node{Step: core.Step{Name: "on-exit"}, Status: core.NodeSucceeded},
-			OnSuccess: &execution.Node{Step: core.Step{Name: "on-success"}, Status: core.NodeSucceeded},
-			OnFailure: &execution.Node{Step: core.Step{Name: "on-failure"}, Status: core.NodeNotStarted},
-			OnCancel:  &execution.Node{Step: core.Step{Name: "on-cancel"}, Status: core.NodeNotStarted},
-			OnWait:    &execution.Node{Step: core.Step{Name: "on-wait"}, Status: core.NodeNotStarted},
+			OnInit:    &exec.Node{Step: core.Step{Name: "on-init"}, Status: core.NodeSucceeded},
+			OnExit:    &exec.Node{Step: core.Step{Name: "on-exit"}, Status: core.NodeSucceeded},
+			OnSuccess: &exec.Node{Step: core.Step{Name: "on-success"}, Status: core.NodeSucceeded},
+			OnFailure: &exec.Node{Step: core.Step{Name: "on-failure"}, Status: core.NodeNotStarted},
+			OnCancel:  &exec.Node{Step: core.Step{Name: "on-cancel"}, Status: core.NodeNotStarted},
+			OnWait:    &exec.Node{Step: core.Step{Name: "on-wait"}, Status: core.NodeNotStarted},
 		}
 
 		// Convert to proto and back

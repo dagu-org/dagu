@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,7 +20,7 @@ func TestQueuedFile(t *testing.T) {
 	testFilePath := filepath.Join(tmpDir, "test-file.json")
 	itemData := ItemData{
 		FileName: "test-file.json",
-		DAGRun: execution.DAGRunRef{
+		DAGRun: exec.DAGRunRef{
 			Name: "test-name",
 			ID:   "test-dag",
 		},
@@ -64,7 +64,7 @@ func TestQueuedFile_ExtractJob(t *testing.T) {
 	testFilePath := filepath.Join(tmpDir, "test-file.json")
 	itemData := ItemData{
 		FileName: "test-file.json",
-		DAGRun: execution.DAGRunRef{
+		DAGRun: exec.DAGRunRef{
 			Name: "test-name",
 			ID:   "test-dag",
 		},
@@ -100,7 +100,7 @@ func TestQueuedFile_Caching(t *testing.T) {
 	testFilePath := filepath.Join(tmpDir, "test-file.json")
 	itemData := ItemData{
 		FileName: "test-file.json",
-		DAGRun: execution.DAGRunRef{
+		DAGRun: exec.DAGRunRef{
 			Name: "test-name",
 			ID:   "test-dag",
 		},

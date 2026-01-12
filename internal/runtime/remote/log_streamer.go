@@ -9,7 +9,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
@@ -30,7 +30,7 @@ type LogStreamer struct {
 	dagRunID  string
 	dagName   string
 	attemptID string
-	rootRef   execution.DAGRunRef
+	rootRef   exec.DAGRunRef
 	mu        sync.RWMutex
 }
 
@@ -41,7 +41,7 @@ func NewLogStreamer(
 	dagRunID string,
 	dagName string,
 	attemptID string,
-	rootRef execution.DAGRunRef,
+	rootRef exec.DAGRunRef,
 ) *LogStreamer {
 	return &LogStreamer{
 		client:    client,
@@ -338,9 +338,9 @@ func (w *stepLogWriter) Close() error {
 // toProtoStreamType converts streamType int to proto LogStreamType
 func toProtoStreamType(streamType int) coordinatorv1.LogStreamType {
 	switch streamType {
-	case execution.StreamTypeStdout:
+	case exec.StreamTypeStdout:
 		return coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDOUT
-	case execution.StreamTypeStderr:
+	case exec.StreamTypeStderr:
 		return coordinatorv1.LogStreamType_LOG_STREAM_TYPE_STDERR
 	default:
 		return coordinatorv1.LogStreamType_LOG_STREAM_TYPE_UNSPECIFIED

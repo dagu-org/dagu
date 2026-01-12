@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/jedib0t/go-pretty/v6/table"
 )
@@ -41,7 +41,7 @@ func newReporter(f SenderFn) *reporter {
 
 // reportStep is a function that reports the status of a step.
 func (r *reporter) reportStep(
-	ctx context.Context, dag *core.DAG, dagStatus execution.DAGRunStatus, node *runtime.Node,
+	ctx context.Context, dag *core.DAG, dagStatus exec.DAGRunStatus, node *runtime.Node,
 ) error {
 	nodeStatus := node.State().Status
 	if nodeStatus == core.NodeFailed && node.NodeData().Step.MailOnError && dag.ErrorMail != nil {
@@ -56,7 +56,7 @@ func (r *reporter) reportStep(
 }
 
 // send is a function that sends a report mail.
-func (r *reporter) send(ctx context.Context, dag *core.DAG, dagStatus execution.DAGRunStatus, err error) error {
+func (r *reporter) send(ctx context.Context, dag *core.DAG, dagStatus exec.DAGRunStatus, err error) error {
 	if err != nil || dagStatus.Status == core.Failed {
 		if dag.MailOn != nil && dag.MailOn.Failure && dag.ErrorMail != nil {
 			fromAddress := dag.ErrorMail.From
@@ -98,7 +98,7 @@ var dagHeader = table.Row{
 	"Error",
 }
 
-func renderDAGSummary(dagStatus execution.DAGRunStatus, err error) string {
+func renderDAGSummary(dagStatus exec.DAGRunStatus, err error) string {
 	dataRow := table.Row{
 		dagStatus.DAGRunID,
 		dagStatus.Name,
@@ -129,7 +129,7 @@ var stepHeader = table.Row{
 	"Error",
 }
 
-func renderStepSummary(nodes []*execution.Node) string {
+func renderStepSummary(nodes []*exec.Node) string {
 	stepTable := table.NewWriter()
 	stepTable.AppendHeader(stepHeader)
 
@@ -150,7 +150,7 @@ func renderStepSummary(nodes []*execution.Node) string {
 	return stepTable.Render()
 }
 
-func renderHTML(nodes []*execution.Node) string {
+func renderHTML(nodes []*exec.Node) string {
 	var buffer bytes.Buffer
 
 	// Start with basic HTML structure with improved styling
@@ -287,7 +287,7 @@ func renderHTML(nodes []*execution.Node) string {
 	return buffer.String()
 }
 
-func renderHTMLWithDAGInfo(dagStatus execution.DAGRunStatus) string {
+func renderHTMLWithDAGInfo(dagStatus exec.DAGRunStatus) string {
 	var buffer bytes.Buffer
 
 	// Start with enhanced HTML structure and styling
@@ -628,7 +628,7 @@ func renderHTMLWithDAGInfo(dagStatus execution.DAGRunStatus) string {
 }
 
 func addAttachments(
-	trigger bool, nodes []*execution.Node,
+	trigger bool, nodes []*exec.Node,
 ) (attachments []string) {
 	if trigger {
 		for _, n := range nodes {

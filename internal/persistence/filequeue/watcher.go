@@ -12,14 +12,14 @@ import (
 	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/common/logger"
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/service/scheduler/filenotify"
 	"github.com/fsnotify/fsnotify"
 )
 
 var pollingInterval = 2 * time.Second // For filenotify poller fallback
 
-var _ execution.QueueWatcher = (*watcher)(nil)
+var _ exec.QueueWatcher = (*watcher)(nil)
 
 type watcher struct {
 	baseDir     string
@@ -29,7 +29,7 @@ type watcher struct {
 	wg          sync.WaitGroup
 }
 
-func newWatcher(baseDir string) execution.QueueWatcher {
+func newWatcher(baseDir string) exec.QueueWatcher {
 	w := &watcher{
 		baseDir:  baseDir,
 		quit:     make(chan struct{}),

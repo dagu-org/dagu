@@ -10,7 +10,7 @@ import (
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/common/config"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/frontend/api/pathutil"
 	"github.com/dagu-org/dagu/internal/service/frontend/auth"
@@ -23,8 +23,8 @@ import (
 var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
-	dagStore           execution.DAGStore
-	dagRunStore        execution.DAGRunStore
+	dagStore           exec.DAGStore
+	dagRunStore        exec.DAGRunStore
 	dagRunManager      runtime.Manager
 	remoteNodes        map[string]config.RemoteNode
 	apiBasePath        string
@@ -34,8 +34,8 @@ type API struct {
 }
 
 func New(
-	dr execution.DAGStore,
-	drs execution.DAGRunStore,
+	dr exec.DAGStore,
+	drs exec.DAGRunStore,
 	drm runtime.Manager,
 	cfg *config.Config,
 ) *API {
@@ -132,7 +132,7 @@ func (a *API) handleError(w http.ResponseWriter, _ *http.Request, err error) {
 	}
 
 	switch {
-	case errors.Is(err, execution.ErrDAGRunIDNotFound):
+	case errors.Is(err, exec.ErrDAGRunIDNotFound):
 		code = api.ErrorCodeNotFound
 		message = "dag-run not found"
 	}

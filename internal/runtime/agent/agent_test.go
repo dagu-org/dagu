@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/dagu-org/dagu/internal/test"
 
@@ -394,7 +394,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		require.Equal(t, http.StatusOK, mockResponseWriter.status)
 
 		// Check if the status is returned correctly
-		dagRunStatus, err := execution.StatusFromJSON(mockResponseWriter.body)
+		dagRunStatus, err := exec.StatusFromJSON(mockResponseWriter.body)
 		require.NoError(t, err)
 		require.Equal(t, core.Running, dagRunStatus.Status)
 

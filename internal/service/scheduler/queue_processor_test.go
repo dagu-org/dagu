@@ -7,7 +7,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
@@ -50,27 +50,27 @@ func TestQueueProcessor_StrictFIFO(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create 2 DAG runs and initialize them
-	run1, err := th.DAGRunStore.CreateAttempt(th.Context, dag, time.Now(), "run-1", execution.NewDAGRunAttemptOptions{})
+	run1, err := th.DAGRunStore.CreateAttempt(th.Context, dag, time.Now(), "run-1", exec.NewDAGRunAttemptOptions{})
 	require.NoError(t, err)
 	require.NoError(t, run1.Open(th.Context))
-	st1 := execution.InitialStatus(dag)
+	st1 := exec.InitialStatus(dag)
 	st1.Status = core.Queued
 	require.NoError(t, run1.Write(th.Context, st1))
 	require.NoError(t, run1.Close(th.Context))
 
-	run2, err := th.DAGRunStore.CreateAttempt(th.Context, dag, time.Now(), "run-2", execution.NewDAGRunAttemptOptions{})
+	run2, err := th.DAGRunStore.CreateAttempt(th.Context, dag, time.Now(), "run-2", exec.NewDAGRunAttemptOptions{})
 	require.NoError(t, err)
 	require.NoError(t, run2.Open(th.Context))
-	st2 := execution.InitialStatus(dag)
+	st2 := exec.InitialStatus(dag)
 	st2.Status = core.Queued
 	require.NoError(t, run2.Write(th.Context, st2))
 	require.NoError(t, run2.Close(th.Context))
 
 	// Enqueue items
-	err = th.QueueStore.Enqueue(th.Context, "test-dag", execution.QueuePriorityHigh, execution.NewDAGRunRef("test-dag", "run-1"))
+	err = th.QueueStore.Enqueue(th.Context, "test-dag", exec.QueuePriorityHigh, exec.NewDAGRunRef("test-dag", "run-1"))
 	require.NoError(t, err)
 
-	err = th.QueueStore.Enqueue(th.Context, "test-dag", execution.QueuePriorityHigh, execution.NewDAGRunRef("test-dag", "run-2"))
+	err = th.QueueStore.Enqueue(th.Context, "test-dag", exec.QueuePriorityHigh, exec.NewDAGRunRef("test-dag", "run-2"))
 	require.NoError(t, err)
 
 	// Create DAGExecutor (no dispatcher, so it will use local execution)
