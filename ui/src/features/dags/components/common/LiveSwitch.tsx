@@ -4,8 +4,8 @@
  * @module features/dags/components/common
  */
 import { useErrorModal } from '@/components/ui/error-modal';
-import { Switch } from '@/components/ui/switch'; // Import Shadcn Switch
-import React from 'react';
+import { Switch } from '@/components/ui/switch';
+import { useCallback, useContext, useState } from 'react';
 import { components } from '../../../../api/v2/schema';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient } from '../../../../hooks/api';
@@ -32,17 +32,11 @@ function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
   const client = useClient();
   const config = useConfig();
   const { showError } = useErrorModal();
-
-  // Initialize state based on DAG suspension state
-  const [checked, setChecked] = React.useState(!dag.suspended);
-
-  const appBarContext = React.useContext(AppBarContext);
+  const [checked, setChecked] = useState(!dag.suspended);
+  const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
-  /**
-   * Submit the suspension state change to the API
-   */
-  const onSubmit = React.useCallback(
+  const onSubmit = useCallback(
     async (suspend: boolean) => {
       const { error } = await client.POST('/dags/{fileName}/suspend', {
         params: {
@@ -68,21 +62,15 @@ function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
         refresh();
       }
     },
-    [client, dag.fileName, refresh, remoteNode] // Include remoteNode in dependencies
+    [client, dag.fileName, refresh, remoteNode, showError]
   );
 
-  /**
-   * Handle switch toggle
-   */
-  /**
-   * Handle switch toggle using onCheckedChange
-   */
-  const handleCheckedChange = React.useCallback(
+  const handleCheckedChange = useCallback(
     (newCheckedState: boolean) => {
       setChecked(newCheckedState);
-      onSubmit(!newCheckedState); // onSubmit expects the 'suspend' value
+      onSubmit(!newCheckedState);
     },
-    [onSubmit] // checked is implicitly handled by newCheckedState
+    [onSubmit]
   );
 
   return (

@@ -15,8 +15,7 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
   const navigate = useNavigate();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
 
-  // Format duration utility function
-  const formatDuration = (startDate: string, endDate: string): string => {
+  function formatDuration(startDate: string, endDate: string): string {
     if (!startDate || !endDate) return '--';
 
     const duration = dayjs.duration(dayjs(endDate).diff(dayjs(startDate)));
@@ -27,7 +26,17 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
     if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
     if (minutes > 0) return `${minutes}m ${seconds}s`;
     return `${seconds}s`;
-  };
+  }
+
+  function getDurationDisplay(startedAt: string, finishedAt: string): string {
+    if (finishedAt) {
+      return formatDuration(startedAt, finishedAt);
+    }
+    if (startedAt) {
+      return formatDuration(startedAt, dayjs().toISOString());
+    }
+    return '--';
+  }
 
   const handleRootDAGRunClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -171,11 +180,7 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
             <div className="flex items-center gap-2 text-foreground bg-accent rounded-md px-3 py-1.5 border">
               <Timer className="h-4 w-4 text-muted-foreground" />
               <span className="font-medium text-xs">
-                {dagRun.finishedAt
-                  ? formatDuration(dagRun.startedAt, dagRun.finishedAt)
-                  : dagRun.startedAt
-                    ? formatDuration(dagRun.startedAt, dayjs().toISOString())
-                    : '--'}
+                {getDurationDisplay(dagRun.startedAt, dagRun.finishedAt)}
               </span>
             </div>
 

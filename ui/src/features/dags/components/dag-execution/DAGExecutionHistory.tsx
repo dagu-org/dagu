@@ -37,7 +37,6 @@ function DAGExecutionHistory({
   fileName,
 }: Omit<Props, 'isInModal' | 'activeTab'>) {
   const appBarContext = React.useContext(AppBarContext);
-  const { showError } = useErrorModal();
 
   // Fetch execution history data
   const { data } = useQuery(
@@ -93,6 +92,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
   const navigate = useNavigate();
+  const { showError } = useErrorModal();
   const [modal, setModal] = React.useState(false);
 
   // State for log viewer

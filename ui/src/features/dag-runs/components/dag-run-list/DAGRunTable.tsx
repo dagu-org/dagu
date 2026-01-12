@@ -99,15 +99,22 @@ function DAGRunTable({
         }
       } else if (event.key === 'ArrowUp') {
         event.preventDefault();
-        const newIndex = currentIdx > 0 ? currentIdx - 1 : currentIdx === -1 ? 0 : currentIdx;
+        let newIndex: number;
+        if (currentIdx > 0) {
+          newIndex = currentIdx - 1;
+        } else if (currentIdx === -1) {
+          newIndex = 0;
+        } else {
+          newIndex = currentIdx;
+        }
         if (newIndex !== currentIdx || currentIdx === -1) {
           setSelectedIndex(newIndex);
           scrollToSelectedRow(newIndex);
-          // If panel is open, navigate to new item
-          if (selectedDAGRun && dagRuns[newIndex]) {
+          const dagRunAtNewIndex = dagRuns[newIndex];
+          if (selectedDAGRun && dagRunAtNewIndex) {
             onSelectDAGRun({
-              name: dagRuns[newIndex].name,
-              dagRunId: dagRuns[newIndex].dagRunId,
+              name: dagRunAtNewIndex.name,
+              dagRunId: dagRunAtNewIndex.dagRunId,
             });
           }
         }

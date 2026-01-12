@@ -7,7 +7,8 @@ import {
   DialogTitle,
 } from '@/ui/CustomDialog';
 import { AlertTriangle, X } from 'lucide-react';
-import React, { useState } from 'react';
+import { createContext, useContext, useState } from 'react';
+import type { FC, ReactNode } from 'react';
 
 interface ErrorModalProps {
   title?: string;
@@ -17,7 +18,7 @@ interface ErrorModalProps {
   onClose: () => void;
 }
 
-export const ErrorModal: React.FC<ErrorModalProps> = ({
+export const ErrorModal: FC<ErrorModalProps> = ({
   title = 'Error',
   message,
   hint,
@@ -64,15 +65,15 @@ interface ErrorModalContextType {
   showError: (message: string, hint?: string, title?: string) => void;
 }
 
-export const ErrorModalContext = React.createContext<ErrorModalContextType>({
+export const ErrorModalContext = createContext<ErrorModalContextType>({
   showError: () => {},
 });
 
 interface ErrorModalProviderProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
-export const ErrorModalProvider: React.FC<ErrorModalProviderProps> = ({
+export const ErrorModalProvider: FC<ErrorModalProviderProps> = ({
   children,
 }) => {
   const [error, setError] = useState<ErrorState | null>(null);
@@ -101,10 +102,10 @@ export const ErrorModalProvider: React.FC<ErrorModalProviderProps> = ({
   );
 };
 
-export const useErrorModal = () => {
-  const context = React.useContext(ErrorModalContext);
+export function useErrorModal(): ErrorModalContextType {
+  const context = useContext(ErrorModalContext);
   if (context === undefined) {
     throw new Error('useErrorModal must be used within an ErrorModalProvider');
   }
   return context;
-};
+}
