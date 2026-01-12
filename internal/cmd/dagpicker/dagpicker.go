@@ -217,9 +217,10 @@ func (m Model) View() string {
 		return m.viewParamInput()
 	case StateConfirming:
 		return m.viewConfirmation()
-	default:
+	case StateDone:
 		return ""
 	}
+	return ""
 }
 
 func (m Model) viewDAGSelection() string {
