@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
-	"github.com/dagu-org/dagu/internal/common/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

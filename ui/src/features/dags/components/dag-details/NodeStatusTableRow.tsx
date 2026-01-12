@@ -5,6 +5,7 @@
  */
 import { Button } from '@/components/ui/button';
 import { CommandDisplay } from '@/components/ui/command-display';
+import { useErrorModal } from '@/components/ui/error-modal';
 import { ScriptBadge } from '@/components/ui/script-dialog';
 import { TableCell } from '@/components/ui/table';
 import {
@@ -261,6 +262,7 @@ function NodeStatusTableRow({
   const client = useClient();
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const { showError } = useErrorModal();
   // State to store the current duration for running tasks
   const [currentDuration, setCurrentDuration] = useState<string>('-');
   // State for expanding/collapsing parallel executions
@@ -477,7 +479,10 @@ function NodeStatusTableRow({
     });
 
     if (error) {
-      alert(error.message || 'An error occurred');
+      showError(
+        error.message || 'Failed to update status',
+        'Please try again or check the server connection.'
+      );
       return;
     }
 

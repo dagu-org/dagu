@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/chat"
 	"github.com/dagu-org/dagu/internal/test"
@@ -2888,9 +2888,9 @@ func TestRunner_ChatMessagesHandler(t *testing.T) {
 
 		handler := newMockMessagesHandler()
 		// Pre-populate handler with messages for dependency
-		handler.messages["step1"] = []execution.LLMMessage{
-			{Role: execution.RoleSystem, Content: "be helpful"},
-			{Role: execution.RoleUser, Content: "hello"},
+		handler.messages["step1"] = []exec.LLMMessage{
+			{Role: exec.RoleSystem, Content: "be helpful"},
+			{Role: exec.RoleUser, Content: "hello"},
 		}
 
 		r := setupRunner(t, withMessagesHandler(handler))
@@ -2927,13 +2927,13 @@ func TestRunner_ChatMessagesHandler(t *testing.T) {
 
 		handler := newMockMessagesHandler()
 		// Multiple system messages from different dependencies
-		handler.messages["step1"] = []execution.LLMMessage{
-			{Role: execution.RoleSystem, Content: "first system"},
-			{Role: execution.RoleUser, Content: "msg1"},
+		handler.messages["step1"] = []exec.LLMMessage{
+			{Role: exec.RoleSystem, Content: "first system"},
+			{Role: exec.RoleUser, Content: "msg1"},
 		}
-		handler.messages["step2"] = []execution.LLMMessage{
-			{Role: execution.RoleSystem, Content: "second system"},
-			{Role: execution.RoleUser, Content: "msg2"},
+		handler.messages["step2"] = []exec.LLMMessage{
+			{Role: exec.RoleSystem, Content: "second system"},
+			{Role: exec.RoleUser, Content: "msg2"},
 		}
 
 		r := setupRunner(t, withMessagesHandler(handler))
@@ -2978,8 +2978,8 @@ func TestRunner_ChatMessagesHandler(t *testing.T) {
 		t.Parallel()
 
 		handler := newMockMessagesHandler()
-		handler.messages["step1"] = []execution.LLMMessage{
-			{Role: execution.RoleSystem, Content: "be helpful"},
+		handler.messages["step1"] = []exec.LLMMessage{
+			{Role: exec.RoleSystem, Content: "be helpful"},
 		}
 
 		r := setupRunner(t, withMessagesHandler(handler))

@@ -4,6 +4,8 @@
  * @module features/dagRuns/components/common
  */
 import { Checkbox } from '@/components/ui/checkbox';
+import { useErrorModal } from '@/components/ui/error-modal';
+import { useSimpleToast } from '@/components/ui/simple-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -56,6 +58,8 @@ function DAGRunActions({
 }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
+  const { showError } = useErrorModal();
+  const { showToast } = useSimpleToast();
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
   const [isDequeueModal, setIsDequeueModal] = React.useState(false);
@@ -192,7 +196,10 @@ function DAGRunActions({
             );
             if (error) {
               console.error('Stop API error:', error);
-              alert(error.message || 'An error occurred');
+              showError(
+                error.message || 'Failed to stop DAG run',
+                'The DAG run may have already completed or the worker is unavailable.'
+              );
               return;
             }
             reloadData();
@@ -237,7 +244,10 @@ function DAGRunActions({
                 }
               );
               if (error) {
-                alert(error.message || 'An error occurred');
+                showError(
+                  error.message || 'Failed to reschedule DAG run',
+                  'Check if the worker is running and the DAG definition is valid.'
+                );
                 // Reset state on error
                 setRetryAsNew(false);
                 setNewRunId('');
@@ -246,9 +256,7 @@ function DAGRunActions({
               }
               // Show success message with new run ID
               if (data?.dagRunId) {
-                alert(
-                  `New DAG run created with ID: ${data.dagRunId}${data.queued ? ' (queued)' : ''}`
-                );
+                showToast(`New DAG run created: ${data.dagRunId}`);
               }
               // Reset state after success
               setRetryAsNew(false);
@@ -274,7 +282,10 @@ function DAGRunActions({
                 }
               );
               if (error) {
-                alert(error.message || 'An error occurred');
+                showError(
+                  error.message || 'Failed to retry DAG run',
+                  'Check if the worker is running and accessible.'
+                );
                 return;
               }
             }
@@ -378,7 +389,10 @@ function DAGRunActions({
               }
             );
             if (error) {
-              alert(error.message || 'An error occurred');
+              showError(
+                error.message || 'Failed to dequeue DAG run',
+                'The DAG run may have already started or been removed from the queue.'
+              );
               return;
             }
             reloadData();

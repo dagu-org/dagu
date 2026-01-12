@@ -83,6 +83,16 @@ func (s NodeStatus) IsWaiting() bool {
 	return s == NodeWaiting
 }
 
+// IsDone checks if the node has completed (success, failure, skipped, aborted, rejected, or partially succeeded).
+func (s NodeStatus) IsDone() bool {
+	return s == NodeSucceeded ||
+		s == NodeFailed ||
+		s == NodeSkipped ||
+		s == NodeAborted ||
+		s == NodePartiallySucceeded ||
+		s == NodeRejected
+}
+
 // String returns the canonical lowercase token for the node lifecycle phase.
 func (s NodeStatus) String() string {
 	switch s {

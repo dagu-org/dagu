@@ -11,9 +11,9 @@ import (
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/google/uuid"
@@ -86,7 +86,7 @@ func (a *API) CreateDAGWebhook(ctx context.Context, request api.CreateDAGWebhook
 
 	// Check if DAG exists
 	if _, err := a.dagStore.GetDetails(ctx, request.FileName); err != nil {
-		if errors.Is(err, execution.ErrDAGNotFound) {
+		if errors.Is(err, exec.ErrDAGNotFound) {
 			return nil, &Error{
 				HTTPStatus: http.StatusNotFound,
 				Code:       api.ErrorCodeNotFound,
@@ -416,7 +416,7 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 	if request.Body != nil && request.Body.DagRunId != nil && *request.Body.DagRunId != "" {
 		dagRunID = *request.Body.DagRunId
 		// Check if a dag-run with this ID already exists
-		statuses, err := a.dagRunStore.ListStatuses(ctx, execution.WithDAGRunID(dagRunID))
+		statuses, err := a.dagRunStore.ListStatuses(ctx, exec.WithDAGRunID(dagRunID))
 		if err == nil && len(statuses) > 0 {
 			// DAG run already exists - return 409 Conflict
 			logger.Info(ctx, "Webhook: DAG run already exists (idempotency)",

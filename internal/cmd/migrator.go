@@ -10,25 +10,25 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/common/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
-	legacymodel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
+	"github.com/dagu-org/dagu/internal/core/exec"
+	legacymodel "github.com/dagu-org/dagu/internal/persis/legacy/model"
 )
 
 // historyMigrator handles migration from legacy history format to new format
 type historyMigrator struct {
-	dagRunStore execution.DAGRunStore
-	dagStore    execution.DAGStore
+	dagRunStore exec.DAGRunStore
+	dagStore    exec.DAGStore
 	dataDir     string
 	dagsDir     string
 }
 
 // newHistoryMigrator creates a new history migrator
 func newHistoryMigrator(
-	dagRunStore execution.DAGRunStore,
-	dagStore execution.DAGStore,
+	dagRunStore exec.DAGRunStore,
+	dagStore exec.DAGStore,
 	dataDir string,
 	dagsDir string,
 ) *historyMigrator {
@@ -211,7 +211,7 @@ func (m *historyMigrator) migrateRun(ctx context.Context, legacyStatusFile *lega
 	}
 
 	// Create attempt in new store
-	attempt, err := m.dagRunStore.CreateAttempt(ctx, dag, startedAt, newStatus.DAGRunID, execution.NewDAGRunAttemptOptions{
+	attempt, err := m.dagRunStore.CreateAttempt(ctx, dag, startedAt, newStatus.DAGRunID, exec.NewDAGRunAttemptOptions{
 		RootDAGRun: nil, // No hierarchy info in legacy format
 		Retry:      false,
 	})
@@ -243,7 +243,7 @@ func (m *historyMigrator) migrateRun(ctx context.Context, legacyStatusFile *lega
 }
 
 // convertStatus converts legacy status to new DAGRunStatus format
-func (m *historyMigrator) convertStatus(legacy *legacymodel.Status, dag *core.DAG) *execution.DAGRunStatus {
+func (m *historyMigrator) convertStatus(legacy *legacymodel.Status, dag *core.DAG) *exec.DAGRunStatus {
 	// Convert timestamps
 	startedAt, _ := m.parseTime(legacy.StartedAt)
 	finishedAt, _ := m.parseTime(legacy.FinishedAt)
@@ -254,13 +254,13 @@ func (m *historyMigrator) convertStatus(legacy *legacymodel.Status, dag *core.DA
 		createdAt = startedAt.UnixMilli()
 	}
 
-	status := &execution.DAGRunStatus{
+	status := &exec.DAGRunStatus{
 		Name:       legacy.Name,
 		DAGRunID:   legacy.RequestID,
 		Status:     legacy.Status,
-		PID:        execution.PID(legacy.PID),
+		PID:        exec.PID(legacy.PID),
 		Log:        legacy.Log,
-		Nodes:      make([]*execution.Node, 0),
+		Nodes:      make([]*exec.Node, 0),
 		Params:     legacy.Params,
 		ParamsList: legacy.ParamsList,
 		CreatedAt:  createdAt,
@@ -297,8 +297,8 @@ func (m *historyMigrator) convertStatus(legacy *legacymodel.Status, dag *core.DA
 }
 
 // convertNode converts legacy node to new Node format
-func (m *historyMigrator) convertNode(legacy *legacymodel.Node) *execution.Node {
-	node := &execution.Node{
+func (m *historyMigrator) convertNode(legacy *legacymodel.Node) *exec.Node {
+	node := &exec.Node{
 		Step:       legacy.Step,
 		Status:     legacy.Status,
 		Error:      legacy.Error,
@@ -396,7 +396,7 @@ func (m *historyMigrator) readLegacyStatusFile(filePath string) (*legacymodel.St
 
 // isAlreadyMigrated checks if a run has already been migrated
 func (m *historyMigrator) isAlreadyMigrated(ctx context.Context, dagName, requestID string) bool {
-	attempt, err := m.dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef(dagName, requestID))
+	attempt, err := m.dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(dagName, requestID))
 	if err != nil || attempt == nil {
 		return false
 	}

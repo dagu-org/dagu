@@ -5,9 +5,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/common/backoff"
+	"github.com/dagu-org/dagu/internal/cmn/backoff"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/proto/convert"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
@@ -59,8 +60,12 @@ func (m *mockCoordinatorClient) Cleanup(_ context.Context) error {
 	return nil
 }
 
-func (m *mockCoordinatorClient) GetDAGRunStatus(_ context.Context, _, _ string, _ *execution.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error) {
+func (m *mockCoordinatorClient) GetDAGRunStatus(_ context.Context, _, _ string, _ *exec.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error) {
 	panic("GetDAGRunStatus not implemented in mock")
+}
+
+func (m *mockCoordinatorClient) RequestCancel(_ context.Context, _, _ string, _ *exec.DAGRunRef) error {
+	panic("RequestCancel not implemented in mock")
 }
 
 func TestNewStatusPusher(t *testing.T) {
@@ -89,7 +94,7 @@ func TestPush(t *testing.T) {
 		}
 
 		pusher := NewStatusPusher(client, "worker-1")
-		status := execution.DAGRunStatus{
+		status := exec.DAGRunStatus{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
 			Status:   core.Running,
@@ -101,7 +106,12 @@ func TestPush(t *testing.T) {
 		require.NotNil(t, capturedReq)
 		assert.Equal(t, "worker-1", capturedReq.WorkerId)
 		assert.NotNil(t, capturedReq.Status)
-		assert.Equal(t, "run-123", capturedReq.Status.DagRunId)
+		assert.NotEmpty(t, capturedReq.Status.JsonData)
+		// Verify the JSON contains the expected data
+		s, convErr := convert.ProtoToDAGRunStatus(capturedReq.Status)
+		require.NoError(t, convErr)
+		require.NotNil(t, s)
+		assert.Equal(t, "run-123", s.DAGRunID)
 	})
 
 	t.Run("Rejected", func(t *testing.T) {
@@ -117,7 +127,7 @@ func TestPush(t *testing.T) {
 		}
 
 		pusher := NewStatusPusher(client, "worker-1")
-		status := execution.DAGRunStatus{Name: "test-dag", DAGRunID: "run-123"}
+		status := exec.DAGRunStatus{Name: "test-dag", DAGRunID: "run-123"}
 
 		err := pusher.Push(context.Background(), status)
 
@@ -136,7 +146,7 @@ func TestPush(t *testing.T) {
 		}
 
 		pusher := NewStatusPusher(client, "worker-1")
-		err := pusher.Push(context.Background(), execution.DAGRunStatus{})
+		err := pusher.Push(context.Background(), exec.DAGRunStatus{})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "status rejected")
@@ -152,7 +162,7 @@ func TestPush(t *testing.T) {
 		}
 
 		pusher := NewStatusPusher(client, "worker-1")
-		err := pusher.Push(context.Background(), execution.DAGRunStatus{})
+		err := pusher.Push(context.Background(), exec.DAGRunStatus{})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "nil response")
@@ -168,7 +178,7 @@ func TestPush(t *testing.T) {
 		}
 
 		pusher := NewStatusPusher(client, "worker-1")
-		err := pusher.Push(context.Background(), execution.DAGRunStatus{})
+		err := pusher.Push(context.Background(), exec.DAGRunStatus{})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to report status")
@@ -188,7 +198,7 @@ func TestPush(t *testing.T) {
 		cancel() // Cancel immediately
 
 		pusher := NewStatusPusher(client, "worker-1")
-		err := pusher.Push(ctx, execution.DAGRunStatus{})
+		err := pusher.Push(ctx, exec.DAGRunStatus{})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "context canceled")
@@ -205,7 +215,7 @@ func TestPush(t *testing.T) {
 			},
 		}
 
-		status := execution.DAGRunStatus{
+		status := exec.DAGRunStatus{
 			Name:       "complex-dag",
 			DAGRunID:   "run-456",
 			AttemptID:  "attempt-1",
@@ -215,9 +225,9 @@ func TestPush(t *testing.T) {
 			StartedAt:  "2024-01-01T00:00:00Z",
 			FinishedAt: "2024-01-01T00:05:00Z",
 			Params:     "key=value",
-			Root:       execution.DAGRunRef{Name: "root", ID: "root-id"},
-			Parent:     execution.DAGRunRef{Name: "parent", ID: "parent-id"},
-			Nodes: []*execution.Node{
+			Root:       exec.DAGRunRef{Name: "root", ID: "root-id"},
+			Parent:     exec.DAGRunRef{Name: "parent", ID: "parent-id"},
+			Nodes: []*exec.Node{
 				{
 					Step:   core.Step{Name: "step-1"},
 					Status: core.NodeSucceeded,
@@ -232,12 +242,15 @@ func TestPush(t *testing.T) {
 		require.NotNil(t, capturedReq)
 		require.NotNil(t, capturedReq.Status)
 
-		// Verify complex fields were converted
-		assert.Equal(t, "complex-dag", capturedReq.Status.Name)
-		assert.Equal(t, "attempt-1", capturedReq.Status.AttemptId)
-		assert.Equal(t, int32(core.Succeeded), capturedReq.Status.Status)
-		assert.NotNil(t, capturedReq.Status.Root)
-		assert.NotNil(t, capturedReq.Status.Parent)
-		assert.Len(t, capturedReq.Status.Nodes, 1)
+		// Verify complex fields were converted via JSON
+		s, convErr := convert.ProtoToDAGRunStatus(capturedReq.Status)
+		require.NoError(t, convErr)
+		require.NotNil(t, s)
+		assert.Equal(t, "complex-dag", s.Name)
+		assert.Equal(t, "attempt-1", s.AttemptID)
+		assert.Equal(t, core.Succeeded, s.Status)
+		assert.False(t, s.Root.Zero())
+		assert.False(t, s.Parent.Zero())
+		assert.Len(t, s.Nodes, 1)
 	})
 }

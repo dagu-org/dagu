@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/backoff"
-	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/cmn/backoff"
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/service/worker"
 	"github.com/dagu-org/dagu/internal/test"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"

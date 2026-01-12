@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/persistence/fileapikey"
-	"github.com/dagu-org/dagu/internal/persistence/fileuser"
+	"github.com/dagu-org/dagu/internal/persis/fileapikey"
+	"github.com/dagu-org/dagu/internal/persis/fileuser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

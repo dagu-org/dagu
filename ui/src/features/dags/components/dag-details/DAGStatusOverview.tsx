@@ -19,7 +19,6 @@ import {
 import React from 'react';
 import { components, Status } from '../../../../api/v2/schema';
 import LabeledItem from '../../../../ui/LabeledItem';
-import StatusChip from '../../../../ui/StatusChip';
 
 /**
  * Props for the DAGStatusOverview component
@@ -27,10 +26,6 @@ import StatusChip from '../../../../ui/StatusChip';
 type Props = {
   /** DAG dagRun details */
   status?: components['schemas']['DAGRunDetails'];
-  /** DAG file name */
-  fileName: string;
-  /** DAGRun ID of the execution */
-  dagRunId?: string;
   /** Function to open log viewer */
   onViewLog?: (dagRunId: string) => void;
 };
@@ -39,18 +34,7 @@ type Props = {
  * DAGStatusOverview displays summary information about a DAG run
  * including status, request ID, timestamps, and parameters
  */
-function DAGStatusOverview({
-  status,
-  fileName,
-  dagRunId = '',
-  onViewLog,
-}: Props) {
-  // Build URL for log viewing
-  const searchParams = new URLSearchParams();
-  if (dagRunId) {
-    searchParams.set('dagRunId', dagRunId);
-  }
-  const url = `/dags/${fileName}/dagRun-log?${searchParams.toString()}`;
+function DAGStatusOverview({ status, onViewLog }: Props) {
 
   // State to store current duration for live updates
   const [currentDuration, setCurrentDuration] = React.useState<string>('-');
@@ -143,81 +127,10 @@ function DAGStatusOverview({
         </div>
       </div>
 
-      {/* Status Section - Desktop */}
-      <div className="hidden md:flex items-center justify-between pb-2">
-        <div className="flex items-center gap-2">
-          <StatusChip status={status.status} size="md">
-            {status.statusLabel}
-          </StatusChip>
-        </div>
-
-        {status.dagRunId && (
-          <div className="flex items-center gap-1.5">
-            <div className="flex items-center">
-              <Hash className="h-3 w-3 mr-0.5 text-muted-foreground" />
-              <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded text-foreground/90">
-                {status.dagRunId}
-              </span>
-            </div>
-
-            <a
-              href={url}
-              onClick={(e) => {
-                if (!(e.metaKey || e.ctrlKey) && onViewLog) {
-                  e.preventDefault();
-                  onViewLog(status.dagRunId);
-                }
-              }}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border border-border shadow-sm bg-card hover:bg-muted transition-colors duration-200 cursor-pointer"
-              title="View Scheduler Log (Cmd/Ctrl+Click for new tab)"
-            >
-              <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>Scheduler Log</span>
-            </a>
-          </div>
-        )}
-      </div>
-
-      {/* Status Section - Mobile */}
-      <div className="md:hidden pb-2 space-y-2">
-        <div>
-          <StatusChip status={status.status} size="md">
-            {status.statusLabel}
-          </StatusChip>
-        </div>
-
-        {status.dagRunId && (
-          <div className="space-y-1">
-            <div className="flex items-center">
-              <Hash className="h-3 w-3 mr-0.5 text-muted-foreground" />
-              <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded text-foreground/90">
-                {status.dagRunId}
-              </span>
-            </div>
-
-            <div>
-              <a
-                href={url}
-                onClick={(e) => {
-                  if (!(e.metaKey || e.ctrlKey) && onViewLog) {
-                    e.preventDefault();
-                    onViewLog(status.dagRunId);
-                  }
-                }}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-border shadow-sm bg-card hover:bg-muted transition-colors duration-200 cursor-pointer"
-                title="View Scheduler Log (Cmd/Ctrl+Click for new tab)"
-              >
-                <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
-                <span>Scheduler Log</span>
-              </a>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Timing Information */}
-      <div className="pb-2">
-        <div className="flex flex-col md:flex-row flex-wrap items-start gap-1">
+      <div className="pb-2 space-y-2">
+        {/* Row 1: Time info */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           {status.queuedAt && (
             <div className="flex items-center">
               <Clock className="w-3.5 mr-1 text-muted-foreground" />
@@ -258,16 +171,44 @@ function DAGStatusOverview({
               </span>
             </LabeledItem>
           </div>
+        </div>
 
+        {/* Row 2: Worker and Run ID */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           {status.workerId && (
             <div className="flex items-center">
               <Server className="w-3.5 mr-1 text-muted-foreground" />
               <LabeledItem label="Worker">
-                <span className="font-medium text-foreground/90 text-xs">
+                <span
+                  className="font-medium text-foreground/90 text-xs truncate inline-block max-w-[250px]"
+                  title={status.workerId}
+                >
                   {status.workerId}
                 </span>
               </LabeledItem>
             </div>
+          )}
+
+          {status.dagRunId && (
+            <div className="flex items-center">
+              <Hash className="w-3.5 mr-1 text-muted-foreground" />
+              <LabeledItem label="Run ID">
+                <span className="font-medium text-foreground/90 text-xs">
+                  {status.dagRunId}
+                </span>
+              </LabeledItem>
+            </div>
+          )}
+
+          {status.dagRunId && onViewLog && (
+            <button
+              onClick={() => onViewLog(status.dagRunId)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border border-border shadow-sm bg-card hover:bg-muted transition-colors duration-200 cursor-pointer"
+              title="View Scheduler Log"
+            >
+              <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
+              <span>Scheduler Log</span>
+            </button>
           )}
         </div>
       </div>

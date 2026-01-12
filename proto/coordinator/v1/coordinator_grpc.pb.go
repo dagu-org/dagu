@@ -26,6 +26,7 @@ const (
 	CoordinatorService_ReportStatus_FullMethodName    = "/coordinator.v1.CoordinatorService/ReportStatus"
 	CoordinatorService_StreamLogs_FullMethodName      = "/coordinator.v1.CoordinatorService/StreamLogs"
 	CoordinatorService_GetDAGRunStatus_FullMethodName = "/coordinator.v1.CoordinatorService/GetDAGRunStatus"
+	CoordinatorService_RequestCancel_FullMethodName   = "/coordinator.v1.CoordinatorService/RequestCancel"
 )
 
 // CoordinatorServiceClient is the client API for CoordinatorService service.
@@ -51,6 +52,10 @@ type CoordinatorServiceClient interface {
 	// GetDAGRunStatus retrieves the status of a DAG run from the coordinator.
 	// Used by parent DAGs to poll status of remote sub-DAGs in shared-nothing mode.
 	GetDAGRunStatus(ctx context.Context, in *GetDAGRunStatusRequest, opts ...grpc.CallOption) (*GetDAGRunStatusResponse, error)
+	// RequestCancel is called to request cancellation of a DAG run.
+	// Used in shared-nothing mode for sub-DAG cancellation where the parent
+	// cannot directly access the sub-DAG's attempt.
+	RequestCancel(ctx context.Context, in *RequestCancelRequest, opts ...grpc.CallOption) (*RequestCancelResponse, error)
 }
 
 type coordinatorServiceClient struct {
@@ -134,6 +139,16 @@ func (c *coordinatorServiceClient) GetDAGRunStatus(ctx context.Context, in *GetD
 	return out, nil
 }
 
+func (c *coordinatorServiceClient) RequestCancel(ctx context.Context, in *RequestCancelRequest, opts ...grpc.CallOption) (*RequestCancelResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RequestCancelResponse)
+	err := c.cc.Invoke(ctx, CoordinatorService_RequestCancel_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CoordinatorServiceServer is the server API for CoordinatorService service.
 // All implementations must embed UnimplementedCoordinatorServiceServer
 // for forward compatibility.
@@ -157,6 +172,10 @@ type CoordinatorServiceServer interface {
 	// GetDAGRunStatus retrieves the status of a DAG run from the coordinator.
 	// Used by parent DAGs to poll status of remote sub-DAGs in shared-nothing mode.
 	GetDAGRunStatus(context.Context, *GetDAGRunStatusRequest) (*GetDAGRunStatusResponse, error)
+	// RequestCancel is called to request cancellation of a DAG run.
+	// Used in shared-nothing mode for sub-DAG cancellation where the parent
+	// cannot directly access the sub-DAG's attempt.
+	RequestCancel(context.Context, *RequestCancelRequest) (*RequestCancelResponse, error)
 	mustEmbedUnimplementedCoordinatorServiceServer()
 }
 
@@ -187,6 +206,9 @@ func (UnimplementedCoordinatorServiceServer) StreamLogs(grpc.ClientStreamingServ
 }
 func (UnimplementedCoordinatorServiceServer) GetDAGRunStatus(context.Context, *GetDAGRunStatusRequest) (*GetDAGRunStatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetDAGRunStatus not implemented")
+}
+func (UnimplementedCoordinatorServiceServer) RequestCancel(context.Context, *RequestCancelRequest) (*RequestCancelResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RequestCancel not implemented")
 }
 func (UnimplementedCoordinatorServiceServer) mustEmbedUnimplementedCoordinatorServiceServer() {}
 func (UnimplementedCoordinatorServiceServer) testEmbeddedByValue()                            {}
@@ -324,6 +346,24 @@ func _CoordinatorService_GetDAGRunStatus_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CoordinatorService_RequestCancel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestCancelRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoordinatorServiceServer).RequestCancel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoordinatorService_RequestCancel_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoordinatorServiceServer).RequestCancel(ctx, req.(*RequestCancelRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CoordinatorService_ServiceDesc is the grpc.ServiceDesc for CoordinatorService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -354,6 +394,10 @@ var CoordinatorService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetDAGRunStatus",
 			Handler:    _CoordinatorService_GetDAGRunStatus_Handler,
+		},
+		{
+			MethodName: "RequestCancel",
+			Handler:    _CoordinatorService_RequestCancel_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

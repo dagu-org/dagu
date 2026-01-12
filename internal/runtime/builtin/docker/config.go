@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/common/stringutil"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"

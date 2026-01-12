@@ -3,16 +3,17 @@ package worker
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 
-	"github.com/dagu-org/dagu/internal/common/config"
-	"github.com/dagu-org/dagu/internal/common/fileutil"
-	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/common/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/proto/convert"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -31,13 +32,13 @@ type RemoteTaskHandlerConfig struct {
 	// CoordinatorClient is the coordinator client with load balancing support
 	CoordinatorClient coordinator.Client
 	// DAGRunStore is the store for DAG run status (may be nil for fully remote mode)
-	DAGRunStore execution.DAGRunStore
+	DAGRunStore exec.DAGRunStore
 	// DAGStore is the store for DAG definitions
-	DAGStore execution.DAGStore
+	DAGStore exec.DAGStore
 	// DAGRunMgr is the manager for DAG runs
 	DAGRunMgr runtime.Manager
 	// ServiceRegistry is the service registry
-	ServiceRegistry execution.ServiceRegistry
+	ServiceRegistry exec.ServiceRegistry
 	// PeerConfig is the peer configuration
 	PeerConfig config.Peer
 	// Config is the main application configuration
@@ -62,10 +63,10 @@ func NewRemoteTaskHandler(cfg RemoteTaskHandlerConfig) TaskHandler {
 type remoteTaskHandler struct {
 	workerID          string
 	coordinatorClient coordinator.Client
-	dagRunStore       execution.DAGRunStore
-	dagStore          execution.DAGStore
+	dagRunStore       exec.DAGRunStore
+	dagStore          exec.DAGStore
 	dagRunMgr         runtime.Manager
-	serviceRegistry   execution.ServiceRegistry
+	serviceRegistry   exec.ServiceRegistry
 	peerConfig        config.Peer
 	config            *config.Config
 }
@@ -84,17 +85,14 @@ func (h *remoteTaskHandler) Handle(ctx context.Context, task *coordinatorv1.Task
 		return h.handleStart(ctx, task, false)
 
 	case coordinatorv1.Operation_OPERATION_RETRY:
-		// Without a Step, it's a fresh start from the queue (queuedRun = true).
-		// With a Step, it's an actual step retry.
-		if task.Step == "" {
-			return h.handleStart(ctx, task, true)
-		}
 		return h.handleRetry(ctx, task)
 
 	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
+		return fmt.Errorf("unsupported operation: unspecified")
+
+	default:
 		return fmt.Errorf("unsupported operation: %v", task.Operation)
 	}
-	return fmt.Errorf("unsupported operation: %v", task.Operation)
 }
 
 func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1.Task, queuedRun bool) error {
@@ -106,27 +104,31 @@ func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1
 		defer cleanup()
 	}
 
-	root := execution.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
-	parent := execution.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
+	root := exec.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
+	parent := exec.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
 	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
 
-	return h.executeDAGRun(ctx, dag, task.DagRunId, root, parent, statusPusher, logStreamer, queuedRun, nil)
+	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, root, parent, statusPusher, logStreamer, queuedRun, nil)
 }
 
 func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1.Task) error {
-	root := execution.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
+	root := exec.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
 
 	// Get previous status - prefer from task (shared-nothing mode), fallback to local store
-	var status *execution.DAGRunStatus
+	var status *exec.DAGRunStatus
 	if task.PreviousStatus != nil {
 		// Shared-nothing mode: status is provided in the task
-		status = convert.ProtoToDAGRunStatus(task.PreviousStatus)
+		var convErr error
+		status, convErr = convert.ProtoToDAGRunStatus(task.PreviousStatus)
+		if convErr != nil {
+			return fmt.Errorf("failed to convert previous status: %w", convErr)
+		}
 		logger.Info(ctx, "Using previous status from task for retry",
 			tag.RunID(task.DagRunId),
 			slog.Int("nodes", len(status.Nodes)))
 	} else if h.dagRunStore != nil {
 		// Fallback: read from local store
-		attempt, err := h.dagRunStore.FindAttempt(ctx, execution.NewDAGRunRef(task.RootDagRunName, task.DagRunId))
+		attempt, err := h.dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(task.RootDagRunName, task.DagRunId))
 		if err != nil {
 			return fmt.Errorf("failed to find previous run: %w", err)
 		}
@@ -149,10 +151,10 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 		defer cleanup()
 	}
 
-	parent := execution.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
+	parent := exec.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
 	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
 
-	return h.executeDAGRun(ctx, dag, task.DagRunId, root, parent, statusPusher, logStreamer, false, &retryConfig{
+	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, root, parent, statusPusher, logStreamer, false, &retryConfig{
 		target:   status,
 		stepName: task.Step,
 	})
@@ -160,12 +162,12 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 
 // retryConfig holds retry-specific configuration
 type retryConfig struct {
-	target   *execution.DAGRunStatus
+	target   *exec.DAGRunStatus
 	stepName string
 }
 
 // createRemoteHandlers creates the status pusher and log streamer for remote execution.
-func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root execution.DAGRunRef) (*remote.StatusPusher, *remote.LogStreamer) {
+func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root exec.DAGRunRef) (*remote.StatusPusher, *remote.LogStreamer) {
 	statusPusher := remote.NewStatusPusher(h.coordinatorClient, h.workerID)
 	logStreamer := remote.NewLogStreamer(
 		h.coordinatorClient,
@@ -208,6 +210,16 @@ func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Tas
 	loadOpts := []spec.LoadOption{
 		spec.WithBaseConfig(h.config.Paths.BaseConfig),
 		spec.WithDAGsDir(h.config.Paths.DAGsDir),
+	}
+
+	// When loading from task definition, use the original DAG name (not temp filename)
+	if task.Definition != "" {
+		loadOpts = append(loadOpts, spec.WithName(task.Target))
+	}
+
+	// Pass task params to the DAG (e.g., from parallel execution items)
+	if task.Params != "" {
+		loadOpts = append(loadOpts, spec.WithParams(task.Params))
 	}
 
 	// Load the DAG
@@ -255,8 +267,9 @@ func (h *remoteTaskHandler) executeDAGRun(
 	ctx context.Context,
 	dag *core.DAG,
 	dagRunID string,
-	root execution.DAGRunRef,
-	parent execution.DAGRunRef,
+	attemptID string,
+	root exec.DAGRunRef,
+	parent exec.DAGRunRef,
 	statusPusher *remote.StatusPusher,
 	logStreamer *remote.LogStreamer,
 	queuedRun bool,
@@ -269,6 +282,33 @@ func (h *remoteTaskHandler) executeDAGRun(
 	}
 	defer env.cleanup()
 
+	// Open scheduler log file for writing
+	logFile, err := os.OpenFile(env.logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to create scheduler log file: %w", err)
+	}
+	defer func() {
+		if closeErr := logFile.Close(); closeErr != nil {
+			logger.Warn(ctx, "Failed to close scheduler log file", tag.Error(closeErr))
+		}
+	}()
+
+	// Create a writer that writes to both local file AND streams to coordinator in real-time.
+	// This enables viewing scheduler logs while the DAG is still running.
+	var logWriter io.Writer = logFile
+	if logStreamer != nil {
+		streamingWriter := logStreamer.NewSchedulerLogWriter(ctx, logFile)
+		defer func() {
+			if closeErr := streamingWriter.Close(); closeErr != nil {
+				logger.Warn(ctx, "Failed to close scheduler log streamer", tag.Error(closeErr))
+			}
+		}()
+		logWriter = streamingWriter
+	}
+
+	// Configure logger to use the streaming writer
+	ctx = logger.WithLogger(ctx, logger.NewLogger(logger.WithWriter(logWriter)))
+
 	// Build agent options
 	opts := agent.Options{
 		ParentDAGRun:     parent,
@@ -276,6 +316,11 @@ func (h *remoteTaskHandler) executeDAGRun(
 		StatusPusher:     statusPusher,
 		LogWriterFactory: logStreamer,
 		QueuedRun:        queuedRun,
+		AttemptID:        attemptID,
+		DAGRunStore:      h.dagRunStore,
+		ServiceRegistry:  h.serviceRegistry,
+		RootDAGRun:       root,
+		PeerConfig:       h.peerConfig,
 	}
 
 	// Add retry configuration if present
@@ -292,10 +337,6 @@ func (h *remoteTaskHandler) executeDAGRun(
 		env.logFile,
 		h.dagRunMgr,
 		h.dagStore,
-		h.dagRunStore,
-		h.serviceRegistry,
-		root,
-		h.peerConfig,
 		opts,
 	)
 

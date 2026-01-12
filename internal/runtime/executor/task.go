@@ -1,7 +1,9 @@
 package executor
 
 import (
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"log/slog"
+
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/proto/convert"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
@@ -36,7 +38,7 @@ func CreateTask(
 type TaskOption func(*coordinatorv1.Task)
 
 // WithRootDagRun sets the root DAG run name and ID in the task.
-func WithRootDagRun(ref execution.DAGRunRef) TaskOption {
+func WithRootDagRun(ref exec.DAGRunRef) TaskOption {
 	return func(task *coordinatorv1.Task) {
 		if ref.Name == "" || ref.ID == "" {
 			return // No root DAG run reference provided
@@ -47,7 +49,7 @@ func WithRootDagRun(ref execution.DAGRunRef) TaskOption {
 }
 
 // WithParentDagRun sets the parent DAG run name and ID in the task.
-func WithParentDagRun(ref execution.DAGRunRef) TaskOption {
+func WithParentDagRun(ref exec.DAGRunRef) TaskOption {
 	return func(task *coordinatorv1.Task) {
 		if ref.Name == "" || ref.ID == "" {
 			return // No parent DAG run reference provided
@@ -80,10 +82,15 @@ func WithStep(step string) TaskOption {
 
 // WithPreviousStatus sets the previous status for retry operations in shared-nothing mode.
 // When set, workers can retry without needing local DAGRunStore access.
-func WithPreviousStatus(status *execution.DAGRunStatus) TaskOption {
+func WithPreviousStatus(status *exec.DAGRunStatus) TaskOption {
 	return func(task *coordinatorv1.Task) {
 		if status != nil {
-			task.PreviousStatus = convert.DAGRunStatusToProto(status)
+			protoStatus, err := convert.DAGRunStatusToProto(status)
+			if err != nil {
+				slog.Error("failed to convert previous status to proto", "error", err)
+				return
+			}
+			task.PreviousStatus = protoStatus
 		}
 	}
 }

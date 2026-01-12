@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/config"
-	"github.com/dagu-org/dagu/internal/common/telemetry"
+	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/telemetry"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/frontend"
 	"github.com/go-resty/resty/v2"
@@ -77,7 +77,7 @@ func (srv *Server) runServer(t *testing.T, errChan chan<- error) {
 	)
 	mr := telemetry.NewRegistry(collector)
 
-	server, err := frontend.NewServer(srv.Config, srv.DAGStore, srv.DAGRunStore, srv.QueueStore, srv.ProcStore, srv.DAGRunMgr, cc, srv.ServiceRegistry, mr, collector, nil)
+	server, err := frontend.NewServer(srv.Context, srv.Config, srv.DAGStore, srv.DAGRunStore, srv.QueueStore, srv.ProcStore, srv.DAGRunMgr, cc, srv.ServiceRegistry, mr, collector, nil)
 	if err != nil {
 		errChan <- fmt.Errorf("failed to create server: %w", err)
 		return

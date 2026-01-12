@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/common/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/spf13/cobra"
@@ -38,9 +38,7 @@ Example:
 	)
 }
 
-var restartFlags = []commandLineFlag{
-	dagRunIDFlagRestart,
-}
+var restartFlags = []commandLineFlag{dagRunIDFlagRestart}
 
 func runRestart(ctx *Context, args []string) error {
 	dagRunID, err := ctx.StringParam("run-id")
@@ -50,21 +48,19 @@ func runRestart(ctx *Context, args []string) error {
 
 	name := args[0]
 
-	var attempt execution.DAGRunAttempt
+	var attempt exec.DAGRunAttempt
 	if dagRunID != "" {
 		// Retrieve the previous run for the specified dag-run ID.
-		dagRunRef := execution.NewDAGRunRef(name, dagRunID)
-		att, err := ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
+		dagRunRef := exec.NewDAGRunRef(name, dagRunID)
+		attempt, err = ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
 		if err != nil {
 			return fmt.Errorf("failed to find the run for dag-run ID %s: %w", dagRunID, err)
 		}
-		attempt = att
 	} else {
-		att, err := ctx.DAGRunStore.LatestAttempt(ctx, name)
+		attempt, err = ctx.DAGRunStore.LatestAttempt(ctx, name)
 		if err != nil {
 			return fmt.Errorf("failed to find the latest execution history for DAG %s: %w", name, err)
 		}
-		attempt = att
 	}
 
 	dagStatus, err := attempt.ReadStatus(ctx)
@@ -88,32 +84,27 @@ func runRestart(ctx *Context, args []string) error {
 }
 
 func handleRestartProcess(ctx *Context, d *core.DAG, oldDagRunID string) error {
-	// Stop if running
 	if err := stopDAGIfRunning(ctx, ctx.DAGRunMgr, d, oldDagRunID); err != nil {
 		return err
 	}
 
-	// Wait before restart if configured
 	if d.RestartWait > 0 {
 		logger.Info(ctx, "Waiting for restart", tag.Duration(d.RestartWait))
 		time.Sleep(d.RestartWait)
 	}
 
-	// Generate new dag-run ID for the restart
 	newDagRunID, err := genRunID()
 	if err != nil {
 		return fmt.Errorf("failed to generate dag-run ID: %w", err)
 	}
 
-	// Execute the exact same DAG with the same parameters but a new dag-run ID
 	if err := ctx.ProcStore.Lock(ctx, d.ProcGroup()); err != nil {
 		logger.Debug(ctx, "Failed to lock process group", tag.Error(err))
 		_ = ctx.RecordEarlyFailure(d, newDagRunID, err)
 		return errProcAcquisitionFailed
 	}
 
-	// Acquire process handle
-	proc, err := ctx.ProcStore.Acquire(ctx, d.ProcGroup(), execution.NewDAGRunRef(d.Name, newDagRunID))
+	proc, err := ctx.ProcStore.Acquire(ctx, d.ProcGroup(), exec.NewDAGRunRef(d.Name, newDagRunID))
 	if err != nil {
 		ctx.ProcStore.Unlock(ctx, d.ProcGroup())
 		logger.Debug(ctx, "Failed to acquire process handle", tag.Error(err))
@@ -124,14 +115,12 @@ func handleRestartProcess(ctx *Context, d *core.DAG, oldDagRunID string) error {
 		_ = proc.Stop(ctx)
 	}()
 
-	// Unlock the process group immediately after acquiring the handle
 	ctx.ProcStore.Unlock(ctx, d.ProcGroup())
 
 	return executeDAGWithRunID(ctx, ctx.DAGRunMgr, d, newDagRunID)
 }
 
 // executeDAGWithRunID executes a DAG with a pre-generated run ID.
-// It returns an error if log or DAG store initialization, or agent execution fails.
 func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRunID string) error {
 	logFile, err := ctx.OpenLogFile(dag, dagRunID)
 	if err != nil {
@@ -159,11 +148,13 @@ func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRu
 		logFile.Name(),
 		cli,
 		dr,
-		ctx.DAGRunStore,
-		ctx.ServiceRegistry,
-		execution.NewDAGRunRef(dag.Name, dagRunID),
-		ctx.Config.Core.Peer,
-		agent.Options{Dry: false})
+		agent.Options{
+			Dry:             false,
+			DAGRunStore:     ctx.DAGRunStore,
+			ServiceRegistry: ctx.ServiceRegistry,
+			RootDAGRun:      exec.NewDAGRunRef(dag.Name, dagRunID),
+			PeerConfig:      ctx.Config.Core.Peer,
+		})
 
 	listenSignals(ctx, agentInstance)
 	if err := agentInstance.Run(ctx); err != nil {

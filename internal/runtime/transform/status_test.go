@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/stringutil"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/google/uuid"
@@ -39,7 +39,7 @@ func TestStatusSerialization(t *testing.T) {
 	rawJSON, err := json.Marshal(statusToPersist)
 	require.NoError(t, err)
 
-	statusObject, err := execution.StatusFromJSON(string(rawJSON))
+	statusObject, err := exec.StatusFromJSON(string(rawJSON))
 	require.NoError(t, err)
 
 	require.Equal(t, statusToPersist.Name, statusObject.Name)
@@ -78,7 +78,7 @@ func TestStatusBuilder(t *testing.T) {
 	assert.Equal(t, dag.Name, result.Name)
 	assert.Equal(t, dagRunID, result.DAGRunID)
 	assert.Equal(t, s, result.Status)
-	assert.Equal(t, execution.PID(pid), result.PID)
+	assert.Equal(t, exec.PID(pid), result.PID)
 	assert.NotEmpty(t, result.StartedAt)
 	assert.Equal(t, 2, len(result.Nodes))
 	assert.NotNil(t, result.OnExit)
@@ -122,8 +122,8 @@ func TestStatusBuilderWithOptions(t *testing.T) {
 	failureNode := runtime.NewNode(core.Step{Name: "failure-step"}, runtime.NodeState{})
 	cancelNode := runtime.NewNode(core.Step{Name: "cancel-step"}, runtime.NodeState{})
 
-	rootRef := execution.NewDAGRunRef("root-dag", "root-run-123")
-	parentRef := execution.NewDAGRunRef("parent-dag", "parent-run-456")
+	rootRef := exec.NewDAGRunRef("root-dag", "root-run-123")
+	parentRef := exec.NewDAGRunRef("parent-dag", "parent-run-456")
 
 	// Test with all options
 	result := builder.Create(
@@ -181,11 +181,11 @@ func TestInitialStatus(t *testing.T) {
 		},
 	}
 
-	st := execution.InitialStatus(dag)
+	st := exec.InitialStatus(dag)
 
 	assert.Equal(t, dag.Name, st.Name)
 	assert.Equal(t, core.NotStarted, st.Status)
-	assert.Equal(t, execution.PID(0), st.PID)
+	assert.Equal(t, exec.PID(0), st.PID)
 	assert.Equal(t, 2, len(st.Nodes))
 	assert.NotNil(t, st.OnExit)
 	assert.NotNil(t, st.OnSuccess)
@@ -201,16 +201,16 @@ func TestInitialStatus(t *testing.T) {
 
 func TestStatusFromJSONError(t *testing.T) {
 	// Test with invalid JSON
-	_, err := execution.StatusFromJSON("invalid json")
+	_, err := exec.StatusFromJSON("invalid json")
 	assert.Error(t, err)
 
 	// Test with empty string
-	_, err = execution.StatusFromJSON("")
+	_, err = exec.StatusFromJSON("")
 	assert.Error(t, err)
 }
 
 func TestDAGRunStatus_DAGRun(t *testing.T) {
-	dagRunStatus := &execution.DAGRunStatus{
+	dagRunStatus := &exec.DAGRunStatus{
 		Name:     "test-dag",
 		DAGRunID: "run-123",
 	}
@@ -221,16 +221,16 @@ func TestDAGRunStatus_DAGRun(t *testing.T) {
 }
 
 func TestDAGRunStatus_Errors(t *testing.T) {
-	dagRunStatus := &execution.DAGRunStatus{
-		Nodes: []*execution.Node{
+	dagRunStatus := &exec.DAGRunStatus{
+		Nodes: []*exec.Node{
 			{Step: core.Step{Name: "step1"}, Error: "error1"},
 			{Step: core.Step{Name: "step2"}, Error: ""},
 			{Step: core.Step{Name: "step3"}, Error: "error3"},
 		},
-		OnExit:    &execution.Node{Step: core.Step{Name: "exit"}, Error: "exit error"},
-		OnSuccess: &execution.Node{Step: core.Step{Name: "success"}, Error: ""},
-		OnFailure: &execution.Node{Step: core.Step{Name: "failure"}, Error: "failure error"},
-		OnCancel:  &execution.Node{Step: core.Step{Name: "cancel"}, Error: "cancel error"},
+		OnExit:    &exec.Node{Step: core.Step{Name: "exit"}, Error: "exit error"},
+		OnSuccess: &exec.Node{Step: core.Step{Name: "success"}, Error: ""},
+		OnFailure: &exec.Node{Step: core.Step{Name: "failure"}, Error: "failure error"},
+		OnCancel:  &exec.Node{Step: core.Step{Name: "cancel"}, Error: "cancel error"},
 	}
 
 	errors := dagRunStatus.Errors()
@@ -243,15 +243,15 @@ func TestDAGRunStatus_Errors(t *testing.T) {
 }
 
 func TestDAGRunStatus_NodeByName(t *testing.T) {
-	dagRunStatus := &execution.DAGRunStatus{
-		Nodes: []*execution.Node{
+	dagRunStatus := &exec.DAGRunStatus{
+		Nodes: []*exec.Node{
 			{Step: core.Step{Name: "step1"}},
 			{Step: core.Step{Name: "step2"}},
 		},
-		OnExit:    &execution.Node{Step: core.Step{Name: "exit"}},
-		OnSuccess: &execution.Node{Step: core.Step{Name: "success"}},
-		OnFailure: &execution.Node{Step: core.Step{Name: "failure"}},
-		OnCancel:  &execution.Node{Step: core.Step{Name: "cancel"}},
+		OnExit:    &exec.Node{Step: core.Step{Name: "exit"}},
+		OnSuccess: &exec.Node{Step: core.Step{Name: "success"}},
+		OnFailure: &exec.Node{Step: core.Step{Name: "failure"}},
+		OnCancel:  &exec.Node{Step: core.Step{Name: "cancel"}},
 	}
 
 	// Test finding regular nodes
@@ -277,22 +277,22 @@ func TestDAGRunStatus_NodeByName(t *testing.T) {
 func TestPID_String(t *testing.T) {
 	tests := []struct {
 		name     string
-		pid      execution.PID
+		pid      exec.PID
 		expected string
 	}{
 		{
 			name:     "PositivePID",
-			pid:      execution.PID(12345),
+			pid:      exec.PID(12345),
 			expected: "12345",
 		},
 		{
 			name:     "ZeroPID",
-			pid:      execution.PID(0),
+			pid:      exec.PID(0),
 			expected: "",
 		},
 		{
 			name:     "NegativePID",
-			pid:      execution.PID(-1),
+			pid:      exec.PID(-1),
 			expected: "",
 		},
 	}
@@ -318,7 +318,7 @@ func TestNewNodesFromSteps(t *testing.T) {
 		},
 	}
 
-	nodes := execution.NewNodesFromSteps(steps)
+	nodes := exec.NewNodesFromSteps(steps)
 
 	assert.Equal(t, 2, len(nodes))
 	assert.Equal(t, "step1", nodes[0].Step.Name)
@@ -329,7 +329,7 @@ func TestNewNodesFromSteps(t *testing.T) {
 
 func TestWithCreatedAtDefaultTime(t *testing.T) {
 	dag := &core.DAG{Name: "test"}
-	dagRunStatus := execution.InitialStatus(dag)
+	dagRunStatus := exec.InitialStatus(dag)
 
 	// Test WithCreatedAt with 0 - should use current time
 	beforeTime := time.Now().UnixMilli()

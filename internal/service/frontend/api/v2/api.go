@@ -12,11 +12,11 @@ import (
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
-	"github.com/dagu-org/dagu/internal/common/config"
-	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
@@ -34,18 +34,18 @@ import (
 var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
-	dagStore           execution.DAGStore
-	dagRunStore        execution.DAGRunStore
+	dagStore           exec.DAGStore
+	dagRunStore        exec.DAGRunStore
 	dagRunMgr          runtime.Manager
-	queueStore         execution.QueueStore
-	procStore          execution.ProcStore
+	queueStore         exec.QueueStore
+	procStore          exec.ProcStore
 	remoteNodes        map[string]config.RemoteNode
 	apiBasePath        string
 	logEncodingCharset string
 	config             *config.Config
 	metricsRegistry    *prometheus.Registry
 	coordinatorCli     coordinator.Client
-	serviceRegistry    execution.ServiceRegistry
+	serviceRegistry    exec.ServiceRegistry
 	subCmdBuilder      *runtime.SubCmdBuilder
 	resourceService    *resource.Service
 	authService        AuthService
@@ -113,14 +113,14 @@ func WithAuditService(as *audit.Service) APIOption {
 // applies any supplied APIOption functions to customize the instance before
 // returning it.
 func New(
-	dr execution.DAGStore,
-	drs execution.DAGRunStore,
-	qs execution.QueueStore,
-	ps execution.ProcStore,
+	dr exec.DAGStore,
+	drs exec.DAGRunStore,
+	qs exec.QueueStore,
+	ps exec.ProcStore,
 	drm runtime.Manager,
 	cfg *config.Config,
 	cc coordinator.Client,
-	sr execution.ServiceRegistry,
+	sr exec.ServiceRegistry,
 	mr *prometheus.Registry,
 	rs *resource.Service,
 	opts ...APIOption,
@@ -245,7 +245,7 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 	// Initialize OIDC if enabled
 	authOIDC := authConfig.OIDC
 	if authOIDC.ClientId != "" && authOIDC.ClientSecret != "" && authOIDC.Issuer != "" {
-		oidcCfg, err := frontendauth.InitVerifierAndConfig(authOIDC)
+		oidcCfg, err := frontendauth.InitVerifierAndConfig(ctx, authOIDC)
 		if err != nil {
 			return fmt.Errorf("failed to initialize OIDC: %w", err)
 		}
@@ -294,33 +294,24 @@ func (a *API) handleError(w http.ResponseWriter, r *http.Request, err error) {
 	httpStatusCode := http.StatusInternalServerError
 
 	var apiErr *Error
-	switch err := err.(type) {
-	case *Error:
-		apiErr = err
-	case Error:
-		apiErr = &err
-	}
-
-	if apiErr != nil {
+	if errors.As(err, &apiErr) {
 		code = apiErr.Code
 		message = apiErr.Message
 		httpStatusCode = apiErr.HTTPStatus
 	}
 
 	switch {
-	case errors.Is(err, execution.ErrDAGNotFound):
+	case errors.Is(err, exec.ErrDAGNotFound):
 		code = api.ErrorCodeNotFound
 		message = "DAG not found"
-
-	case errors.Is(err, execution.ErrDAGRunIDNotFound):
+	case errors.Is(err, exec.ErrDAGRunIDNotFound):
 		code = api.ErrorCodeNotFound
 		message = "dag-run ID not found"
-
-	case errors.Is(err, execution.ErrDAGAlreadyExists):
+	case errors.Is(err, exec.ErrDAGAlreadyExists):
 		code = api.ErrorCodeAlreadyExists
 		message = "DAG already exists"
-
 	}
+
 	if httpStatusCode == http.StatusInternalServerError {
 		logger.Errorf(r.Context(), "Internal server error: %v", err)
 	}
@@ -446,7 +437,7 @@ func valueOf[T any](ptr *T) T {
 }
 
 // toPagination converts a paginated result to an API pagination object.
-func toPagination[T any](paginatedResult execution.PaginatedResult[T]) api.Pagination {
+func toPagination[T any](paginatedResult exec.PaginatedResult[T]) api.Pagination {
 	return api.Pagination{
 		CurrentPage:  paginatedResult.CurrentPage,
 		NextPage:     paginatedResult.NextPage,

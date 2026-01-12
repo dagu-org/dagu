@@ -9,9 +9,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dagu-org/dagu/internal/common/sock"
+	"github.com/dagu-org/dagu/internal/cmn/sock"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/dagu-org/dagu/internal/test"
@@ -67,7 +67,7 @@ func TestManager(t *testing.T) {
 		cli := th.DAGRunMgr
 
 		// Open the Attempt data and write a status before updating it.
-		att, err := th.DAGRunStore.CreateAttempt(ctx, dag.DAG, now, dagRunID, execution.NewDAGRunAttemptOptions{})
+		att, err := th.DAGRunStore.CreateAttempt(ctx, dag.DAG, now, dagRunID, exec.NewDAGRunAttemptOptions{})
 		require.NoError(t, err)
 
 		err = att.Open(ctx)
@@ -80,7 +80,7 @@ func TestManager(t *testing.T) {
 		_ = att.Close(ctx)
 
 		// Get the status and check if it is the same as the one we wrote.
-		ref := execution.NewDAGRunRef(dag.Name, dagRunID)
+		ref := exec.NewDAGRunRef(dag.Name, dagRunID)
 		statusToCheck, err := cli.GetSavedStatus(ctx, ref)
 		require.NoError(t, err)
 		require.Equal(t, core.NodeSucceeded, statusToCheck.Nodes[0].Status)
@@ -89,7 +89,7 @@ func TestManager(t *testing.T) {
 		newStatus := core.NodeFailed
 		dagRunStatus.Nodes[0].Status = newStatus
 
-		root := execution.NewDAGRunRef(dag.Name, dagRunID)
+		root := exec.NewDAGRunRef(dag.Name, dagRunID)
 		err = cli.UpdateStatus(ctx, root, dagRunStatus)
 		require.NoError(t, err)
 
@@ -124,7 +124,7 @@ steps:
 		dagRunID := dagRunStatus.DAGRunID
 		subDAGRun := dagRunStatus.Nodes[0].SubRuns[0]
 
-		root := execution.NewDAGRunRef(dag.Name, dagRunID)
+		root := exec.NewDAGRunRef(dag.Name, dagRunID)
 		subDAGRunStatus, err := th.DAGRunMgr.FindSubDAGRunStatus(th.Context, root, subDAGRun.DAGRunID)
 		require.NoError(t, err)
 		require.Equal(t, core.Succeeded.String(), subDAGRunStatus.Status.String())
@@ -151,13 +151,13 @@ steps:
 		status := testNewStatus(dag.DAG, "unknown-req-id", core.Failed, core.NodeFailed)
 
 		// Check if the update fails.
-		root := execution.NewDAGRunRef(dag.Name, "unknown-req-id")
+		root := exec.NewDAGRunRef(dag.Name, "unknown-req-id")
 		err := cli.UpdateStatus(ctx, root, status)
 		require.Error(t, err)
 	})
 }
 
-func testNewStatus(dag *core.DAG, dagRunID string, dagStatus core.Status, nodeStatus core.NodeStatus) execution.DAGRunStatus {
+func testNewStatus(dag *core.DAG, dagRunID string, dagStatus core.Status, nodeStatus core.NodeStatus) exec.DAGRunStatus {
 	nodes := []runtime.NodeData{{State: runtime.NodeState{Status: nodeStatus}}}
 	tm := time.Now()
 	startedAt := &tm

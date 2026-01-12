@@ -21,9 +21,12 @@ import {
   Filter,
   Search,
 } from 'lucide-react';
-import React, { useMemo } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { components } from '../../../../api/v2/schema';
+import type { Config } from '../../../../contexts/ConfigContext';
+
+declare const getConfig: () => Config;
+import { components, Status } from '../../../../api/v2/schema';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
 import Ticker from '../../../../ui/Ticker';
@@ -110,11 +113,7 @@ function DAGCard({ dag, isSelected, onSelect, onTagClick, refreshFn, className =
 
   return (
     <div
-      className={`p-2.5 rounded-md border cursor-pointer overflow-hidden ${
-        isSelected
-          ? 'bg-primary/10 border-primary'
-          : 'bg-card border-border hover:bg-muted/50'
-      } ${className}`}
+      className={`p-2.5 rounded-md border cursor-pointer overflow-hidden bg-card border-border hover:bg-muted/50 ${isSelected ? 'shadow-[inset_3px_0_0_0_rgba(0,0,0,0.2)]' : ''} ${status === Status.Running ? 'animate-running-row' : ''} ${className}`}
       onClick={handleCardClick}
     >
       {/* Header: Name + Status */}
@@ -552,8 +551,7 @@ const defaultColumns = [
             );
           }
         }
-      } else if (status === 1) {
-        // Status 1 typically means "Running"
+      } else if (status === Status.Running) {
         durationContent = (
           <div className="text-[10px] text-muted-foreground">(Running)</div>
         );
@@ -824,11 +822,9 @@ function DAGTable({
   onSelectDAG,
 }: Props) {
   const navigate = useNavigate();
-  const [columns] = React.useState(() => [...defaultColumns]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
-  );
-  const [expanded, setExpanded] = React.useState<ExpandedState>(() => {
+  const [columns] = useState(() => [...defaultColumns]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [expanded, setExpanded] = useState<ExpandedState>(() => {
     try {
       const saved = localStorage.getItem('dagu_dag_table_expanded');
       return saved ? JSON.parse(saved) : {};
@@ -837,7 +833,7 @@ function DAGTable({
     }
   });
 
-  const handleExpandedChange = React.useCallback(
+  const handleExpandedChange = useCallback(
     (updater: Updater<ExpandedState>) => {
       setExpanded((prev) => {
         const next = typeof updater === 'function' ? updater(prev) : updater;
@@ -848,9 +844,8 @@ function DAGTable({
     []
   );
 
-  // State for client-side sorting
-  const [clientSort, setClientSort] = React.useState<string>('');
-  const [clientOrder, setClientOrder] = React.useState<string>('asc');
+  const [clientSort, setClientSort] = useState<string>('');
+  const [clientOrder, setClientOrder] = useState<string>('asc');
 
   // Handler for client-side sorting
   const handleClientSort = (field: string, order: string) => {
@@ -872,9 +867,7 @@ function DAGTable({
     }
   };
 
-  // Update column filters based on external search props
-  // Tags filtering is combined with Name filter since Name column's filterFn searches in tags too
-  React.useEffect(() => {
+  useEffect(() => {
     const nameFilter = columnFilters.find((f) => f.id === 'Name');
 
     // Combine searchText and searchTag for the Name filter
@@ -990,15 +983,11 @@ function DAGTable({
         });
       });
     return hierarchicalData;
-  }, [dags, clientSort, clientOrder]); // Added client sort dependencies
+  }, [dags, clientSort, clientOrder]);
 
-  // Create a ref to store the table instance for external access
-  const tableInstanceRef = React.useRef<ReturnType<
-    typeof useReactTable
-  > | null>(null);
+  const tableInstanceRef = useRef<ReturnType<typeof useReactTable> | null>(null);
 
-  // Expose navigation function for external keyboard handling
-  React.useEffect(() => {
+  useEffect(() => {
     if (!selectedDAG || !tableInstanceRef.current || !onSelectDAG) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1049,32 +1038,28 @@ function DAGTable({
         : `dag:${(row as DAGRow).dag.fileName}`,
     getSubRows: (row) => row.subRows,
     getCoreRowModel: getCoreRowModel<Data>(),
-    // Disable client-side sorting as we're using server-side sorting
     manualSorting: true,
     getFilteredRowModel: getFilteredRowModel<Data>(),
-    onColumnFiltersChange: setColumnFilters, // Let table manage internal filter state
+    onColumnFiltersChange: setColumnFilters,
     getExpandedRowModel: getExpandedRowModel<Data>(),
-    autoResetExpanded: false, // Keep expanded state on data change
+    autoResetExpanded: false,
     state: {
       expanded,
-      columnFilters, // Pass filters to table state
+      columnFilters,
     },
     onExpandedChange: handleExpandedChange,
-    // Pass handlers via meta
     meta: {
-      group, // Pass group if needed elsewhere
+      group,
       refreshFn,
-      handleSearchTagChange, // Pass tag handler
+      handleSearchTagChange,
     },
   });
 
-  // Store the table instance in the ref with type assertion
   tableInstanceRef.current = instance as ReturnType<typeof useReactTable>;
 
-  const appBarContext = React.useContext(AppBarContext);
-  const panelWidth = React.useContext(PanelWidthContext);
+  const appBarContext = useContext(AppBarContext);
+  const panelWidth = useContext(PanelWidthContext);
 
-  // Use card view when panel is narrow (below threshold) on desktop
   const useCardView = panelWidth !== null && panelWidth < CARD_VIEW_THRESHOLD;
 
   const { data: uniqueTags } = useQuery('/dags/tags', {
@@ -1232,14 +1217,11 @@ function DAGTable({
                     data-state={row.getIsSelected() && 'selected'}
                     className={`text-[0.8125rem] ${
                       row.original?.kind === ItemKind.Group
-                        ? 'bg-muted/50 font-semibold cursor-pointer hover:bg-muted/70 border-l-4 border-transparent' // Make group rows clickable
-                        : isDAGRow &&
-                            'dag' in row.original &&
-                            selectedDAG ===
-                              (row.original as DAGRow).dag.fileName
-                          ? 'cursor-pointer bg-primary/10 hover:bg-primary/15 border-l-4 border-primary' // Highlight selected DAG
-                          : 'cursor-pointer hover:bg-muted/50 border-l-4 border-transparent'
-                    }`}
+                        ? 'bg-muted/50 font-semibold cursor-pointer hover:bg-muted/70'
+                        : isDAGRow && 'dag' in row.original && selectedDAG === (row.original as DAGRow).dag.fileName
+                          ? 'cursor-pointer hover:bg-muted/50 shadow-[inset_3px_0_0_0_rgba(0,0,0,0.2)]'
+                          : 'cursor-pointer hover:bg-muted/50'
+                    } ${isDAGRow && 'dag' in row.original && (row.original as DAGRow).dag.latestDAGRun?.status === Status.Running ? 'animate-running-row' : ''}`}
                     onClick={(e) => {
                       // Handle group row clicks - toggle expanded state
                       if ((row.original as Data)?.kind === ItemKind.Group) {

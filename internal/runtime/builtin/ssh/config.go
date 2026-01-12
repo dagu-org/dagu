@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/google/jsonschema-go/jsonschema"

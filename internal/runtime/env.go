@@ -8,14 +8,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
-	"github.com/dagu-org/dagu/internal/common/collections"
-	"github.com/dagu-org/dagu/internal/common/fileutil"
-	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/common/mailer"
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/collections"
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/mailer"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
 // Env holds information about the DAG and the current step to execute
@@ -116,8 +116,8 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 	workingDir := resolveWorkingDir(ctx, step, rCtx)
 
 	envs := map[string]string{
-		execution.EnvKeyDAGRunStepName: step.Name,
-		"PWD":                          workingDir,
+		exec.EnvKeyDAGRunStepName: step.Name,
+		"PWD":                     workingDir,
 	}
 
 	variables := &collections.SyncMap{}
@@ -250,8 +250,8 @@ func (e Env) Shell(ctx context.Context) []string {
 }
 
 // DAGRunRef returns the DAGRunRef for the current execution context.
-func (e Env) DAGRunRef() execution.DAGRunRef {
-	return execution.NewDAGRunRef(e.DAG.Name, e.DAGRunID)
+func (e Env) DAGRunRef() exec.DAGRunRef {
+	return exec.NewDAGRunRef(e.DAG.Name, e.DAGRunID)
 }
 
 // LoadOutputVariables loads the output variables from the given DAG into the

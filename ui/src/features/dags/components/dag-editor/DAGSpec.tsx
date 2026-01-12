@@ -9,6 +9,7 @@ import React, { useEffect } from 'react';
 import { useCookies } from 'react-cookie';
 import { components } from '../../../../api/v2/schema';
 import { Button } from '../../../../components/ui/button';
+import { useErrorModal } from '../../../../components/ui/error-modal';
 import { useSimpleToast } from '../../../../components/ui/simple-toast';
 import { Tab, Tabs } from '../../../../components/ui/tabs';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
@@ -38,6 +39,7 @@ function DAGSpec({ fileName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
   const config = useConfig();
+  const { showError } = useErrorModal();
   const { showToast } = useSimpleToast();
   const { hasUnsavedChanges, setHasUnsavedChanges } = useUnsavedChanges();
 
@@ -155,7 +157,7 @@ function DAGSpec({ fileName }: Props) {
   // Save handler function
   const handleSave = React.useCallback(async () => {
     if (!currentValue) {
-      alert('No changes to save');
+      showError('No changes to save', 'Make some edits before saving.');
       return;
     }
 
@@ -180,14 +182,26 @@ function DAGSpec({ fileName }: Props) {
     );
 
     if (error) {
-      alert(error.message || 'Failed to save spec');
+      showError(
+        error.message || 'Failed to save spec',
+        'Please check the YAML syntax and try again.'
+      );
       return;
     }
 
     if (responseData?.errors) {
-      alert(responseData.errors.join('\n'));
+      showError(
+        'Validation errors',
+        responseData.errors.join('\n')
+      );
       return;
     }
+
+    // Update the ref to prevent stale comparison until SWR refreshes
+    lastFetchedSpecRef.current = currentValue;
+
+    // Clear unsaved changes immediately after successful save
+    setHasUnsavedChanges(false);
 
     // Show success toast notification
     showToast('Changes saved successfully');
@@ -198,6 +212,7 @@ function DAGSpec({ fileName }: Props) {
     client,
     saveScrollPosition,
     showToast,
+    setHasUnsavedChanges,
   ]);
 
   // Restore scroll position after render

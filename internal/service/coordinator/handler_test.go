@@ -8,7 +8,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/proto/convert"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,7 +32,7 @@ func newMockDAGRunStore() *mockDAGRunStore {
 	}
 }
 
-func (m *mockDAGRunStore) addSubAttempt(rootRef execution.DAGRunRef, subDAGRunID string, status *execution.DAGRunStatus) *mockDAGRunAttempt {
+func (m *mockDAGRunStore) addSubAttempt(rootRef exec.DAGRunRef, subDAGRunID string, status *exec.DAGRunStatus) *mockDAGRunAttempt {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	attempt := &mockDAGRunAttempt{
@@ -42,7 +43,7 @@ func (m *mockDAGRunStore) addSubAttempt(rootRef execution.DAGRunRef, subDAGRunID
 	return attempt
 }
 
-func (m *mockDAGRunStore) addAttempt(ref execution.DAGRunRef, status *execution.DAGRunStatus) *mockDAGRunAttempt {
+func (m *mockDAGRunStore) addAttempt(ref exec.DAGRunRef, status *exec.DAGRunStatus) *mockDAGRunAttempt {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	attempt := &mockDAGRunAttempt{
@@ -52,7 +53,7 @@ func (m *mockDAGRunStore) addAttempt(ref execution.DAGRunRef, status *execution.
 	return attempt
 }
 
-func (m *mockDAGRunStore) addAbortingAttempt(ref execution.DAGRunRef, status *execution.DAGRunStatus) *mockDAGRunAttempt {
+func (m *mockDAGRunStore) addAbortingAttempt(ref exec.DAGRunRef, status *exec.DAGRunStatus) *mockDAGRunAttempt {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	attempt := &mockDAGRunAttempt{
@@ -63,49 +64,59 @@ func (m *mockDAGRunStore) addAbortingAttempt(ref execution.DAGRunRef, status *ex
 	return attempt
 }
 
-func (m *mockDAGRunStore) FindAttempt(_ context.Context, dagRun execution.DAGRunRef) (execution.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) FindAttempt(_ context.Context, dagRun exec.DAGRunRef) (exec.DAGRunAttempt, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if attempt, ok := m.attempts[dagRun.ID]; ok {
 		return attempt, nil
 	}
-	return nil, execution.ErrDAGRunIDNotFound
+	return nil, exec.ErrDAGRunIDNotFound
 }
 
 // Implement other required interface methods (unused in tests)
 // These methods return sentinel errors or panic to make test failures obvious if accidentally called.
-func (m *mockDAGRunStore) CreateAttempt(_ context.Context, _ *core.DAG, _ time.Time, _ string, _ execution.NewDAGRunAttemptOptions) (execution.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) CreateAttempt(_ context.Context, _ *core.DAG, _ time.Time, _ string, _ exec.NewDAGRunAttemptOptions) (exec.DAGRunAttempt, error) {
 	panic("CreateAttempt not implemented in mock")
 }
-func (m *mockDAGRunStore) RecentAttempts(_ context.Context, _ string, _ int) []execution.DAGRunAttempt {
+func (m *mockDAGRunStore) RecentAttempts(_ context.Context, _ string, _ int) []exec.DAGRunAttempt {
 	return nil // Empty slice is valid
 }
-func (m *mockDAGRunStore) LatestAttempt(_ context.Context, _ string) (execution.DAGRunAttempt, error) {
-	return nil, execution.ErrDAGRunIDNotFound
+func (m *mockDAGRunStore) LatestAttempt(_ context.Context, _ string) (exec.DAGRunAttempt, error) {
+	return nil, exec.ErrDAGRunIDNotFound
 }
-func (m *mockDAGRunStore) ListStatuses(_ context.Context, _ ...execution.ListDAGRunStatusesOption) ([]*execution.DAGRunStatus, error) {
+func (m *mockDAGRunStore) ListStatuses(_ context.Context, _ ...exec.ListDAGRunStatusesOption) ([]*exec.DAGRunStatus, error) {
 	return nil, nil // Empty list is valid
 }
-func (m *mockDAGRunStore) FindSubAttempt(_ context.Context, rootRef execution.DAGRunRef, subDAGRunID string) (execution.DAGRunAttempt, error) {
+func (m *mockDAGRunStore) FindSubAttempt(_ context.Context, rootRef exec.DAGRunRef, subDAGRunID string) (exec.DAGRunAttempt, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	key := rootRef.ID + ":" + subDAGRunID
 	if attempt, ok := m.subAttempts[key]; ok {
 		return attempt, nil
 	}
-	return nil, execution.ErrDAGRunIDNotFound
+	return nil, exec.ErrDAGRunIDNotFound
 }
-func (m *mockDAGRunStore) RemoveOldDAGRuns(_ context.Context, _ string, _ int, _ ...execution.RemoveOldDAGRunsOption) ([]string, error) {
+func (m *mockDAGRunStore) CreateSubAttempt(_ context.Context, rootRef exec.DAGRunRef, subDAGRunID string) (exec.DAGRunAttempt, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	key := rootRef.ID + ":" + subDAGRunID
+	attempt := &mockDAGRunAttempt{
+		status: &exec.DAGRunStatus{},
+	}
+	m.subAttempts[key] = attempt
+	return attempt, nil
+}
+func (m *mockDAGRunStore) RemoveOldDAGRuns(_ context.Context, _ string, _ int, _ ...exec.RemoveOldDAGRunsOption) ([]string, error) {
 	return nil, nil
 }
 func (m *mockDAGRunStore) RenameDAGRuns(_ context.Context, _, _ string) error { return nil }
-func (m *mockDAGRunStore) RemoveDAGRun(_ context.Context, _ execution.DAGRunRef) error {
+func (m *mockDAGRunStore) RemoveDAGRun(_ context.Context, _ exec.DAGRunRef) error {
 	return nil
 }
 
 // mockDAGRunAttempt is a test implementation of execution.DAGRunAttempt
 type mockDAGRunAttempt struct {
-	status   *execution.DAGRunStatus
+	status   *exec.DAGRunStatus
 	opened   bool
 	closed   bool
 	written  bool
@@ -120,7 +131,7 @@ func (m *mockDAGRunAttempt) Open(_ context.Context) error {
 	m.opened = true
 	return nil
 }
-func (m *mockDAGRunAttempt) Write(_ context.Context, s execution.DAGRunStatus) error {
+func (m *mockDAGRunAttempt) Write(_ context.Context, s exec.DAGRunStatus) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.status = &s
@@ -133,17 +144,18 @@ func (m *mockDAGRunAttempt) Close(_ context.Context) error {
 	m.closed = true
 	return nil
 }
-func (m *mockDAGRunAttempt) ReadStatus(_ context.Context) (*execution.DAGRunStatus, error) {
+func (m *mockDAGRunAttempt) ReadStatus(_ context.Context) (*exec.DAGRunStatus, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.status == nil {
-		return nil, execution.ErrNoStatusData
+		return nil, exec.ErrNoStatusData
 	}
 	// Return a copy to avoid pointer races
 	statusCopy := *m.status
 	return &statusCopy, nil
 }
 func (m *mockDAGRunAttempt) ReadDAG(_ context.Context) (*core.DAG, error) { return nil, nil }
+func (m *mockDAGRunAttempt) SetDAG(_ *core.DAG)                           {}
 func (m *mockDAGRunAttempt) Abort(_ context.Context) error                { return nil }
 func (m *mockDAGRunAttempt) IsAborting(_ context.Context) (bool, error) {
 	m.mu.Lock()
@@ -152,16 +164,16 @@ func (m *mockDAGRunAttempt) IsAborting(_ context.Context) (bool, error) {
 }
 func (m *mockDAGRunAttempt) Hide(_ context.Context) error { return nil }
 func (m *mockDAGRunAttempt) Hidden() bool                 { return false }
-func (m *mockDAGRunAttempt) WriteOutputs(_ context.Context, _ *execution.DAGRunOutputs) error {
+func (m *mockDAGRunAttempt) WriteOutputs(_ context.Context, _ *exec.DAGRunOutputs) error {
 	return nil
 }
-func (m *mockDAGRunAttempt) ReadOutputs(_ context.Context) (*execution.DAGRunOutputs, error) {
+func (m *mockDAGRunAttempt) ReadOutputs(_ context.Context) (*exec.DAGRunOutputs, error) {
 	return nil, nil
 }
-func (m *mockDAGRunAttempt) WriteStepMessages(_ context.Context, _ string, _ []execution.LLMMessage) error {
+func (m *mockDAGRunAttempt) WriteStepMessages(_ context.Context, _ string, _ []exec.LLMMessage) error {
 	return nil
 }
-func (m *mockDAGRunAttempt) ReadStepMessages(_ context.Context, _ string) ([]execution.LLMMessage, error) {
+func (m *mockDAGRunAttempt) ReadStepMessages(_ context.Context, _ string) ([]exec.LLMMessage, error) {
 	return nil, nil
 }
 
@@ -560,12 +572,12 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		ctx := context.Background()
 
 		// Create a running DAG run
-		ref := execution.DAGRunRef{Name: "test-dag", ID: "run-123"}
-		initialStatus := &execution.DAGRunStatus{
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		initialStatus := &exec.DAGRunStatus{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
 			Status:   core.Running,
-			Nodes: []*execution.Node{
+			Nodes: []*exec.Node{
 				{Status: core.NodeRunning},
 				{Status: core.NodeSucceeded},
 			},
@@ -602,8 +614,8 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		ctx := context.Background()
 
 		// Create an already completed DAG run
-		ref := execution.DAGRunRef{Name: "test-dag", ID: "run-123"}
-		initialStatus := &execution.DAGRunStatus{
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		initialStatus := &exec.DAGRunStatus{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
 			Status:   core.Succeeded,
@@ -664,8 +676,8 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		ctx := context.Background()
 
 		// Create a running DAG run
-		ref := execution.DAGRunRef{Name: "test-dag", ID: "run-123"}
-		initialStatus := &execution.DAGRunStatus{
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		initialStatus := &exec.DAGRunStatus{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
 			Status:   core.Running,
@@ -705,16 +717,16 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		ctx := context.Background()
 
 		// Create two running DAG runs
-		ref1 := execution.DAGRunRef{Name: "dag1", ID: "run-1"}
-		status1 := &execution.DAGRunStatus{
+		ref1 := exec.DAGRunRef{Name: "dag1", ID: "run-1"}
+		status1 := &exec.DAGRunStatus{
 			Name:     "dag1",
 			DAGRunID: "run-1",
 			Status:   core.Running,
 		}
 		attempt1 := store.addAttempt(ref1, status1)
 
-		ref2 := execution.DAGRunRef{Name: "dag2", ID: "run-2"}
-		status2 := &execution.DAGRunStatus{
+		ref2 := exec.DAGRunRef{Name: "dag2", ID: "run-2"}
+		status2 := &exec.DAGRunStatus{
 			Name:     "dag2",
 			DAGRunID: "run-2",
 			Status:   core.Running,
@@ -761,8 +773,8 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		h := NewHandler(WithDAGRunStore(store))
 
 		// Create a running DAG run
-		ref := execution.DAGRunRef{Name: "test-dag", ID: "run-123"}
-		status := &execution.DAGRunStatus{
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		status := &exec.DAGRunStatus{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
 			Status:   core.Running,
@@ -810,20 +822,23 @@ func TestHandler_ReportStatus(t *testing.T) {
 		ctx := context.Background()
 
 		// Create an attempt for the DAG run
-		ref := execution.DAGRunRef{Name: "test-dag", ID: "run-123"}
-		store.addAttempt(ref, &execution.DAGRunStatus{
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		store.addAttempt(ref, &exec.DAGRunStatus{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
 			Status:   core.Running,
 		})
 
 		// Report status
+		protoStatus, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: "run-123",
+			Status:   core.Running,
+		})
+		require.NoError(t, convErr)
+
 		req := &coordinatorv1.ReportStatusRequest{
-			Status: &coordinatorv1.DAGRunStatusProto{
-				Name:     "test-dag",
-				DagRunId: "run-123",
-				Status:   int32(core.Running),
-			},
+			Status: protoStatus,
 		}
 
 		resp, err := h.ReportStatus(ctx, req)
@@ -856,12 +871,15 @@ func TestHandler_ReportStatus(t *testing.T) {
 		h := NewHandler() // No dagRunStore
 		ctx := context.Background()
 
+		protoStatus, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: "run-123",
+			Status:   core.Running,
+		})
+		require.NoError(t, convErr)
+
 		req := &coordinatorv1.ReportStatusRequest{
-			Status: &coordinatorv1.DAGRunStatusProto{
-				Name:     "test-dag",
-				DagRunId: "run-123",
-				Status:   int32(core.Running),
-			},
+			Status: protoStatus,
 		}
 
 		_, err := h.ReportStatus(ctx, req)
@@ -883,8 +901,8 @@ func TestHandler_GetDAGRunStatus(t *testing.T) {
 		ctx := context.Background()
 
 		// Create an attempt with status
-		ref := execution.DAGRunRef{Name: "test-dag", ID: "run-123"}
-		store.addAttempt(ref, &execution.DAGRunStatus{
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		store.addAttempt(ref, &exec.DAGRunStatus{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
 			Status:   core.Running,
@@ -1104,8 +1122,8 @@ func TestHandler_Close(t *testing.T) {
 		ctx := context.Background()
 
 		// Create and cache an attempt
-		ref := execution.DAGRunRef{Name: "test-dag", ID: "run-123"}
-		attempt := store.addAttempt(ref, &execution.DAGRunStatus{
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		attempt := store.addAttempt(ref, &exec.DAGRunStatus{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
 			Status:   core.Running,
@@ -1306,8 +1324,8 @@ func TestHandler_GetCancelledRunsForWorker_Full(t *testing.T) {
 		ctx := context.Background()
 
 		// Create an attempt that is aborting (cancelled)
-		ref := execution.DAGRunRef{Name: "test-dag", ID: "run-123"}
-		store.addAbortingAttempt(ref, &execution.DAGRunStatus{
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		store.addAbortingAttempt(ref, &exec.DAGRunStatus{
 			Name:     "test-dag",
 			DAGRunID: "run-123",
 			Status:   core.Running, // Status doesn't matter, IsAborting is what's checked
@@ -1331,8 +1349,8 @@ func TestHandler_GetCancelledRunsForWorker_Full(t *testing.T) {
 		ctx := context.Background()
 
 		// Create an attempt that is running (not cancelled)
-		ref := execution.DAGRunRef{Name: "test-dag", ID: "run-456"}
-		store.addAttempt(ref, &execution.DAGRunStatus{
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-456"}
+		store.addAttempt(ref, &exec.DAGRunStatus{
 			Name:     "test-dag",
 			DAGRunID: "run-456",
 			Status:   core.Running,
@@ -1360,9 +1378,9 @@ func TestHandler_GetOrOpenSubAttempt(t *testing.T) {
 		ctx := context.Background()
 
 		// Add a sub-attempt
-		rootRef := execution.DAGRunRef{Name: "parent-dag", ID: "root-123"}
+		rootRef := exec.DAGRunRef{Name: "parent-dag", ID: "root-123"}
 		subDAGRunID := "sub-456"
-		store.addSubAttempt(rootRef, subDAGRunID, &execution.DAGRunStatus{
+		store.addSubAttempt(rootRef, subDAGRunID, &exec.DAGRunStatus{
 			Name:     "child-dag",
 			DAGRunID: subDAGRunID,
 			Status:   core.Running,
@@ -1386,9 +1404,9 @@ func TestHandler_GetOrOpenSubAttempt(t *testing.T) {
 		ctx := context.Background()
 
 		// Add a sub-attempt
-		rootRef := execution.DAGRunRef{Name: "parent-dag", ID: "root-789"}
+		rootRef := exec.DAGRunRef{Name: "parent-dag", ID: "root-789"}
 		subDAGRunID := "sub-101"
-		store.addSubAttempt(rootRef, subDAGRunID, &execution.DAGRunStatus{
+		store.addSubAttempt(rootRef, subDAGRunID, &exec.DAGRunStatus{
 			Name:     "child-dag",
 			DAGRunID: subDAGRunID,
 			Status:   core.Running,
@@ -1412,7 +1430,7 @@ func TestHandler_GetOrOpenSubAttempt(t *testing.T) {
 		h := NewHandler(WithDAGRunStore(store))
 		ctx := context.Background()
 
-		rootRef := execution.DAGRunRef{Name: "parent-dag", ID: "root-999"}
+		rootRef := exec.DAGRunRef{Name: "parent-dag", ID: "root-999"}
 
 		// Try to get a non-existent sub-attempt
 		_, err := h.getOrOpenSubAttempt(ctx, rootRef, "non-existent")

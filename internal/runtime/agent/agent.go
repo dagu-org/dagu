@@ -21,23 +21,24 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/term"
 
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
-	"github.com/dagu-org/dagu/internal/common/config"
-	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/common/mailer"
-	"github.com/dagu-org/dagu/internal/common/masking"
-	"github.com/dagu-org/dagu/internal/common/secrets"
-	"github.com/dagu-org/dagu/internal/common/signal"
-	"github.com/dagu-org/dagu/internal/common/sock"
-	"github.com/dagu-org/dagu/internal/common/stringutil"
-	"github.com/dagu-org/dagu/internal/common/telemetry"
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/mailer"
+	"github.com/dagu-org/dagu/internal/cmn/masking"
+	"github.com/dagu-org/dagu/internal/cmn/secrets"
+	"github.com/dagu-org/dagu/internal/cmn/signal"
+	"github.com/dagu-org/dagu/internal/cmn/sock"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
+	"github.com/dagu-org/dagu/internal/cmn/telemetry"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/output"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/docker"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/ssh"
+	"github.com/dagu-org/dagu/internal/runtime/remote"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 
@@ -58,16 +59,16 @@ type Agent struct {
 
 	// retryTarget is the target status to retry the DAG.
 	// It is nil if it's not a retry execution.
-	retryTarget *execution.DAGRunStatus
+	retryTarget *exec.DAGRunStatus
 
 	// dagStore is the database to store the DAG definitions.
-	dagStore execution.DAGStore
+	dagStore exec.DAGStore
 
 	// dagRunStore is the database to store the run history.
-	dagRunStore execution.DAGRunStore
+	dagRunStore exec.DAGRunStore
 
 	// registry is the service registry to find the coordinator service.
-	registry execution.ServiceRegistry
+	registry exec.ServiceRegistry
 
 	// peerConfig is the configuration for the peer connections.
 	peerConfig config.Peer
@@ -100,10 +101,10 @@ type Agent struct {
 	// rootDAGRun indicates the root dag-run of the current dag-run.
 	// If the current dag-run is the root dag-run, it is the same as the current
 	// DAG name and dag-run ID.
-	rootDAGRun execution.DAGRunRef
+	rootDAGRun exec.DAGRunRef
 
 	// parentDAGRun is the execution reference of the parent dag-run.
-	parentDAGRun execution.DAGRunRef
+	parentDAGRun exec.DAGRunRef
 
 	// dagRunID is the ID for the current dag-run.
 	dagRunID string
@@ -142,16 +143,20 @@ type Agent struct {
 
 	// logWriterFactory is used to create log writers for step output.
 	// When nil, logs are written to local filesystem.
-	logWriterFactory execution.LogWriterFactory
+	logWriterFactory exec.LogWriterFactory
 
 	// queuedRun indicates this execution is from a queued item.
 	// The dag-run was already created by the enqueue command.
 	queuedRun bool
+
+	// attemptID is the attempt ID from the coordinator.
+	// When set, the agent creates an attempt with this ID instead of generating a new one.
+	attemptID string
 }
 
 // StatusPusher is an interface for pushing status updates remotely.
 type StatusPusher interface {
-	Push(ctx context.Context, status execution.DAGRunStatus) error
+	Push(ctx context.Context, status exec.DAGRunStatus) error
 }
 
 // Options is the configuration for the Agent.
@@ -162,10 +167,10 @@ type Options struct {
 	// RetryTarget is the target status (runstore of execution) to retry.
 	// If it's specified the agent will execute the DAG with the same
 	// configuration as the specified history.
-	RetryTarget *execution.DAGRunStatus
+	RetryTarget *exec.DAGRunStatus
 	// ParentDAGRun is the dag-run reference of the parent dag-run.
 	// It is required for sub dag-runs to identify the parent dag-run.
-	ParentDAGRun execution.DAGRunRef
+	ParentDAGRun exec.DAGRunRef
 	// ProgressDisplay indicates if the progress display should be shown.
 	// This is typically enabled for CLI execution in a TTY environment.
 	ProgressDisplay bool
@@ -180,12 +185,23 @@ type Options struct {
 	StatusPusher StatusPusher
 	// LogWriterFactory is used to create log writers for step output.
 	// When nil, logs are written to local filesystem.
-	LogWriterFactory execution.LogWriterFactory
+	LogWriterFactory exec.LogWriterFactory
 	// QueuedRun indicates this execution is from a queued item.
 	// When true, the agent will find the existing dag-run (created by enqueue)
 	// instead of creating a new one. This is used for distributed execution
 	// where the dag-run directory was already created by the scheduler.
 	QueuedRun bool
+	// AttemptID is the attempt ID from the coordinator.
+	// When set, the agent creates an attempt with this ID instead of generating a new one.
+	AttemptID string
+	// DAGRunStore is the store for dag-run data. Nil in shared-nothing mode.
+	DAGRunStore exec.DAGRunStore
+	// ServiceRegistry is the registry for service discovery.
+	ServiceRegistry exec.ServiceRegistry
+	// RootDAGRun is the root dag-run reference for sub-DAG runs.
+	RootDAGRun exec.DAGRunRef
+	// PeerConfig is the configuration for peer communication.
+	PeerConfig config.Peer
 }
 
 // New creates a new Agent.
@@ -195,15 +211,11 @@ func New(
 	logDir string,
 	logFile string,
 	drm runtime.Manager,
-	ds execution.DAGStore,
-	drs execution.DAGRunStore,
-	reg execution.ServiceRegistry,
-	root execution.DAGRunRef,
-	peerConfig config.Peer,
+	ds exec.DAGStore,
 	opts Options,
 ) *Agent {
 	a := &Agent{
-		rootDAGRun:       root,
+		rootDAGRun:       opts.RootDAGRun,
 		parentDAGRun:     opts.ParentDAGRun,
 		dagRunID:         dagRunID,
 		dag:              dag,
@@ -213,14 +225,15 @@ func New(
 		logFile:          logFile,
 		dagRunMgr:        drm,
 		dagStore:         ds,
-		dagRunStore:      drs,
-		registry:         reg,
+		dagRunStore:      opts.DAGRunStore,
+		registry:         opts.ServiceRegistry,
 		stepRetry:        opts.StepRetry,
-		peerConfig:       peerConfig,
+		peerConfig:       opts.PeerConfig,
 		workerID:         opts.WorkerID,
 		statusPusher:     opts.StatusPusher,
 		logWriterFactory: opts.LogWriterFactory,
 		queuedRun:        opts.QueuedRun,
+		attemptID:        opts.AttemptID,
 	}
 
 	// Initialize progress display if enabled
@@ -319,7 +332,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 	}
 
-	var attempt execution.DAGRunAttempt
+	var attempt exec.DAGRunAttempt
 
 	// Check if the DAG is already running.
 	if err := a.checkIsAlreadyRunning(ctx); err != nil {
@@ -645,6 +658,15 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Finalize status (after outputs are written)
 	a.writeStatus(ctx, attempt, a.Status(ctx))
 
+	// Stream scheduler log to coordinator if using remote logging (shared-nothing mode)
+	if a.logWriterFactory != nil {
+		if streamer, ok := a.logWriterFactory.(*remote.LogStreamer); ok {
+			if err := streamer.StreamSchedulerLog(ctx, a.logFile); err != nil {
+				logger.Warn(ctx, "Failed to stream scheduler log", tag.Error(err))
+			}
+		}
+	}
+
 	// Send the execution report if necessary.
 	a.lastErr = lastErr
 	if err := a.reporter.send(ctx, a.dag, finishedStatus, lastErr); err != nil {
@@ -659,10 +681,10 @@ func (a *Agent) Run(ctx context.Context) error {
 }
 
 // nodeToModelNode converts a runner NodeData to a models.Node
-func (a *Agent) nodeToModelNode(nodeData runtime.NodeData) *execution.Node {
-	subRuns := make([]execution.SubDAGRun, len(nodeData.State.SubRuns))
+func (a *Agent) nodeToModelNode(nodeData runtime.NodeData) *exec.Node {
+	subRuns := make([]exec.SubDAGRun, len(nodeData.State.SubRuns))
 	for i, child := range nodeData.State.SubRuns {
-		subRuns[i] = execution.SubDAGRun(child)
+		subRuns[i] = exec.SubDAGRun(child)
 	}
 
 	var errText string
@@ -670,7 +692,7 @@ func (a *Agent) nodeToModelNode(nodeData runtime.NodeData) *execution.Node {
 		errText = nodeData.State.Error.Error()
 	}
 
-	return &execution.Node{
+	return &exec.Node{
 		Step:            nodeData.Step,
 		Stdout:          nodeData.State.Stdout,
 		Stderr:          nodeData.State.Stderr,
@@ -759,7 +781,7 @@ func (a *Agent) collectOutputs(ctx context.Context) map[string]string {
 
 // buildOutputs creates the full DAGRunOutputs structure with metadata.
 // Returns nil if no outputs were collected.
-func (a *Agent) buildOutputs(ctx context.Context, finalStatus core.Status) *execution.DAGRunOutputs {
+func (a *Agent) buildOutputs(ctx context.Context, finalStatus core.Status) *exec.DAGRunOutputs {
 	outputs := a.collectOutputs(ctx)
 
 	if len(outputs) == 0 {
@@ -792,8 +814,8 @@ func (a *Agent) buildOutputs(ctx context.Context, finalStatus core.Status) *exec
 		}
 	}
 
-	return &execution.DAGRunOutputs{
-		Metadata: execution.OutputsMetadata{
+	return &exec.DAGRunOutputs{
+		Metadata: exec.OutputsMetadata{
 			DAGName:     a.dag.Name,
 			DAGRunID:    a.dagRunID,
 			AttemptID:   a.dagRunAttemptID,
@@ -826,10 +848,19 @@ func (a *Agent) PrintSummary(ctx context.Context) {
 }
 
 // Status collects the current running status of the DAG and returns it.
-func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
+func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 	// Lock to avoid race condition.
 	a.lock.RLock()
 	defer a.lock.RUnlock()
+
+	// Handle case where runner wasn't initialized (early failure in Run())
+	if a.runner == nil {
+		return transform.NewStatusBuilder(a.dag).
+			Create(a.dagRunID, core.Failed, os.Getpid(), time.Time{},
+				transform.WithAttemptID(a.dagRunAttemptID),
+				transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
+			)
+	}
 
 	runnerStatus := a.runner.Status(ctx, a.plan)
 	if a.initFailed.Load() {
@@ -876,7 +907,7 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 // writeStatus writes the current status to storage.
 // In shared-nothing mode (statusPusher is set), it only pushes to the coordinator.
 // In local mode, it writes to local storage via attempt.Write.
-func (a *Agent) writeStatus(ctx context.Context, attempt execution.DAGRunAttempt, status execution.DAGRunStatus) {
+func (a *Agent) writeStatus(ctx context.Context, attempt exec.DAGRunAttempt, status exec.DAGRunStatus) {
 	// In shared-nothing mode, only push to coordinator (coordinator writes to its storage)
 	if a.statusPusher != nil {
 		// Use a context that won't be cancelled, so final status is always pushed
@@ -897,7 +928,7 @@ func (a *Agent) writeStatus(ctx context.Context, attempt execution.DAGRunAttempt
 }
 
 // watchCancelRequested is a goroutine that watches for cancel requests
-func (a *Agent) watchCancelRequested(ctx context.Context, attempt execution.DAGRunAttempt) {
+func (a *Agent) watchCancelRequested(ctx context.Context, attempt exec.DAGRunAttempt) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
@@ -994,7 +1025,7 @@ func (a *Agent) setupReporter(ctx context.Context) {
 }
 
 // newRunner creates a runner instance for the dag-run.
-func (a *Agent) newRunner(attempt execution.DAGRunAttempt) *runtime.Runner {
+func (a *Agent) newRunner(attempt exec.DAGRunAttempt) *runtime.Runner {
 	// runnerLogDir is the directory to store the log files for each node in the dag-run.
 	const dateTimeFormatUTC = "20060102_150405Z"
 	ts := time.Now().UTC().Format(dateTimeFormatUTC)
@@ -1008,30 +1039,12 @@ func (a *Agent) newRunner(attempt execution.DAGRunAttempt) *runtime.Runner {
 		Dry:             a.dry,
 		DAGRunID:        a.dagRunID,
 		MessagesHandler: attempt, // Attempt implements ChatMessagesHandler
-	}
-
-	if a.dag.HandlerOn.Init != nil {
-		cfg.OnInit = a.dag.HandlerOn.Init
-	}
-
-	if a.dag.HandlerOn.Exit != nil {
-		cfg.OnExit = a.dag.HandlerOn.Exit
-	}
-
-	if a.dag.HandlerOn.Success != nil {
-		cfg.OnSuccess = a.dag.HandlerOn.Success
-	}
-
-	if a.dag.HandlerOn.Failure != nil {
-		cfg.OnFailure = a.dag.HandlerOn.Failure
-	}
-
-	if a.dag.HandlerOn.Cancel != nil {
-		cfg.OnCancel = a.dag.HandlerOn.Cancel
-	}
-
-	if a.dag.HandlerOn.Wait != nil {
-		cfg.OnWait = a.dag.HandlerOn.Wait
+		OnInit:          a.dag.HandlerOn.Init,
+		OnExit:          a.dag.HandlerOn.Exit,
+		OnSuccess:       a.dag.HandlerOn.Success,
+		OnFailure:       a.dag.HandlerOn.Failure,
+		OnCancel:        a.dag.HandlerOn.Cancel,
+		OnWait:          a.dag.HandlerOn.Wait,
 	}
 
 	return runtime.New(cfg)
@@ -1276,7 +1289,14 @@ func (a *Agent) setupDefaultRetryPlan(ctx context.Context, nodes []*runtime.Node
 	return nil
 }
 
-func (a *Agent) setupDAGRunAttempt(ctx context.Context) (execution.DAGRunAttempt, error) {
+func (a *Agent) setupDAGRunAttempt(ctx context.Context) (exec.DAGRunAttempt, error) {
+	// In shared-nothing mode, dagRunStore is nil - return no-op attempt
+	// Status updates are handled by statusPusher instead
+	if a.dagRunStore == nil {
+		logger.Debug(ctx, "Using no-op DAGRunAttempt in shared-nothing mode")
+		return exec.NewNoopDAGRunAttempt(a.dagRunID, a.dag), nil
+	}
+
 	retentionDays := a.dag.HistRetentionDays
 	if _, err := a.dagRunStore.RemoveOldDAGRuns(ctx, a.dag.Name, retentionDays); err != nil {
 		logger.Error(ctx, "DAG runs data cleanup failed", tag.Error(err))
@@ -1285,7 +1305,10 @@ func (a *Agent) setupDAGRunAttempt(ctx context.Context) (execution.DAGRunAttempt
 	// Retry is true when:
 	// 1. Retrying a failed execution (retryTarget != nil)
 	// 2. Running from queue (queuedRun = true) - the dag-run was already created by enqueue
-	opts := execution.NewDAGRunAttemptOptions{Retry: a.retryTarget != nil || a.queuedRun}
+	opts := exec.NewDAGRunAttemptOptions{
+		Retry:     a.retryTarget != nil || a.queuedRun,
+		AttemptID: a.attemptID,
+	}
 	if a.isSubDAGRun.Load() {
 		opts.RootDAGRun = &a.rootDAGRun
 	}
@@ -1344,7 +1367,6 @@ func execWithRecovery(ctx context.Context, fn func()) {
 				slog.String("err", err.Error()),
 				slog.String("errType", fmt.Sprintf("%T", panicObj)),
 				slog.String("stackTrace", string(stack)),
-				slog.String("fullStack", string(stack)),
 			)
 		}
 	}()
@@ -1366,7 +1388,7 @@ func encodeError(w http.ResponseWriter, err error) {
 	var httpErr *httpError
 	if errors.As(err, &httpErr) {
 		http.Error(w, httpErr.Error(), httpErr.Code)
-	} else {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+	http.Error(w, err.Error(), http.StatusInternalServerError)
 }

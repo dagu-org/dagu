@@ -8,8 +8,8 @@ import (
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/common/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 )

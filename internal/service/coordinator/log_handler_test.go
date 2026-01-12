@@ -30,6 +30,11 @@ func TestStreamTypeToExtension(t *testing.T) {
 			expected:   "stderr.log",
 		},
 		{
+			name:       "SCHEDULER",
+			streamType: coordinatorv1.LogStreamType_LOG_STREAM_TYPE_SCHEDULER,
+			expected:   "scheduler.log",
+		},
+		{
 			name:       "UNSPECIFIED",
 			streamType: coordinatorv1.LogStreamType_LOG_STREAM_TYPE_UNSPECIFIED,
 			expected:   "log",
@@ -39,7 +44,7 @@ func TestStreamTypeToExtension(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := streamTypeToExtension(tt.streamType)
+			result := StreamTypeToExtension(tt.streamType)
 			require.Equal(t, tt.expected, result)
 		})
 	}

@@ -10,10 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/backoff"
-	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/cmn/backoff"
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/proto/convert"
 	"github.com/dagu-org/dagu/internal/runtime/remote"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/test"
@@ -94,13 +95,14 @@ func (m *mockStreamLogsClient) RecvMsg(any) error {
 type mockRemoteCoordinatorClient struct {
 	ReportStatusFunc    func(ctx context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error)
 	StreamLogsFunc      func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error)
-	GetDAGRunStatusFunc func(ctx context.Context, dagName, dagRunID string, rootRef *execution.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error)
+	GetDAGRunStatusFunc func(ctx context.Context, dagName, dagRunID string, rootRef *exec.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error)
 	DispatchFunc        func(ctx context.Context, task *coordinatorv1.Task) error
 	PollFunc            func(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error)
 	HeartbeatFunc       func(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error)
 	GetWorkersFunc      func(ctx context.Context) ([]*coordinatorv1.WorkerInfo, error)
 	CleanupFunc         func(ctx context.Context) error
 	MetricsFunc         func() coordinator.Metrics
+	RequestCancelFunc   func(ctx context.Context, dagName, dagRunID string, rootRef *exec.DAGRunRef) error
 }
 
 func newMockRemoteCoordinatorClient() *mockRemoteCoordinatorClient {
@@ -111,7 +113,7 @@ func newMockRemoteCoordinatorClient() *mockRemoteCoordinatorClient {
 		StreamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return newMockStreamLogsClient(), nil
 		},
-		GetDAGRunStatusFunc: func(_ context.Context, _, _ string, _ *execution.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error) {
+		GetDAGRunStatusFunc: func(_ context.Context, _, _ string, _ *exec.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error) {
 			return &coordinatorv1.GetDAGRunStatusResponse{Found: false}, nil
 		},
 		MetricsFunc: func() coordinator.Metrics {
@@ -134,7 +136,7 @@ func (m *mockRemoteCoordinatorClient) StreamLogs(ctx context.Context) (coordinat
 	return newMockStreamLogsClient(), nil
 }
 
-func (m *mockRemoteCoordinatorClient) GetDAGRunStatus(ctx context.Context, dagName, dagRunID string, rootRef *execution.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error) {
+func (m *mockRemoteCoordinatorClient) GetDAGRunStatus(ctx context.Context, dagName, dagRunID string, rootRef *exec.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error) {
 	if m.GetDAGRunStatusFunc != nil {
 		return m.GetDAGRunStatusFunc(ctx, dagName, dagRunID, rootRef)
 	}
@@ -183,10 +185,17 @@ func (m *mockRemoteCoordinatorClient) Metrics() coordinator.Metrics {
 	return coordinator.Metrics{IsConnected: true}
 }
 
+func (m *mockRemoteCoordinatorClient) RequestCancel(ctx context.Context, dagName, dagRunID string, rootRef *exec.DAGRunRef) error {
+	if m.RequestCancelFunc != nil {
+		return m.RequestCancelFunc(ctx, dagName, dagRunID, rootRef)
+	}
+	return nil
+}
+
 // mockRemoteDAGRunAttempt implements execution.DAGRunAttempt for testing
 type mockRemoteDAGRunAttempt struct {
 	id       string
-	status   *execution.DAGRunStatus
+	status   *exec.DAGRunStatus
 	dag      *core.DAG
 	readErr  error
 	openErr  error
@@ -200,7 +209,7 @@ type mockRemoteDAGRunAttempt struct {
 	mu       sync.Mutex
 }
 
-func newMockRemoteDAGRunAttempt(id string, status *execution.DAGRunStatus) *mockRemoteDAGRunAttempt {
+func newMockRemoteDAGRunAttempt(id string, status *exec.DAGRunStatus) *mockRemoteDAGRunAttempt {
 	return &mockRemoteDAGRunAttempt{
 		id:     id,
 		status: status,
@@ -221,7 +230,7 @@ func (m *mockRemoteDAGRunAttempt) Open(_ context.Context) error {
 	return nil
 }
 
-func (m *mockRemoteDAGRunAttempt) Write(_ context.Context, status execution.DAGRunStatus) error {
+func (m *mockRemoteDAGRunAttempt) Write(_ context.Context, status exec.DAGRunStatus) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.writeErr != nil {
@@ -242,7 +251,7 @@ func (m *mockRemoteDAGRunAttempt) Close(_ context.Context) error {
 	return nil
 }
 
-func (m *mockRemoteDAGRunAttempt) ReadStatus(_ context.Context) (*execution.DAGRunStatus, error) {
+func (m *mockRemoteDAGRunAttempt) ReadStatus(_ context.Context) (*exec.DAGRunStatus, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.readErr != nil {
@@ -255,6 +264,12 @@ func (m *mockRemoteDAGRunAttempt) ReadDAG(_ context.Context) (*core.DAG, error) 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.dag, nil
+}
+
+func (m *mockRemoteDAGRunAttempt) SetDAG(dag *core.DAG) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.dag = dag
 }
 
 func (m *mockRemoteDAGRunAttempt) Abort(_ context.Context) error {
@@ -283,26 +298,26 @@ func (m *mockRemoteDAGRunAttempt) Hidden() bool {
 	return m.hidden
 }
 
-func (m *mockRemoteDAGRunAttempt) WriteOutputs(_ context.Context, _ *execution.DAGRunOutputs) error {
+func (m *mockRemoteDAGRunAttempt) WriteOutputs(_ context.Context, _ *exec.DAGRunOutputs) error {
 	return nil
 }
 
-func (m *mockRemoteDAGRunAttempt) ReadOutputs(_ context.Context) (*execution.DAGRunOutputs, error) {
+func (m *mockRemoteDAGRunAttempt) ReadOutputs(_ context.Context) (*exec.DAGRunOutputs, error) {
 	return nil, nil
 }
 
-func (m *mockRemoteDAGRunAttempt) WriteStepMessages(_ context.Context, _ string, _ []execution.LLMMessage) error {
+func (m *mockRemoteDAGRunAttempt) WriteStepMessages(_ context.Context, _ string, _ []exec.LLMMessage) error {
 	return nil
 }
 
-func (m *mockRemoteDAGRunAttempt) ReadStepMessages(_ context.Context, _ string) ([]execution.LLMMessage, error) {
+func (m *mockRemoteDAGRunAttempt) ReadStepMessages(_ context.Context, _ string) ([]exec.LLMMessage, error) {
 	return nil, nil
 }
 
 // mockRemoteDAGRunStore implements execution.DAGRunStore for testing
 type mockRemoteDAGRunStore struct {
-	attempts    map[string]execution.DAGRunAttempt
-	subAttempts map[string]execution.DAGRunAttempt
+	attempts    map[string]exec.DAGRunAttempt
+	subAttempts map[string]exec.DAGRunAttempt
 	findErr     error
 	createErr   error
 	mu          sync.Mutex
@@ -310,25 +325,25 @@ type mockRemoteDAGRunStore struct {
 
 func newMockRemoteDAGRunStore() *mockRemoteDAGRunStore {
 	return &mockRemoteDAGRunStore{
-		attempts:    make(map[string]execution.DAGRunAttempt),
-		subAttempts: make(map[string]execution.DAGRunAttempt),
+		attempts:    make(map[string]exec.DAGRunAttempt),
+		subAttempts: make(map[string]exec.DAGRunAttempt),
 	}
 }
 
-func (m *mockRemoteDAGRunStore) SetAttempt(ref execution.DAGRunRef, attempt execution.DAGRunAttempt) {
+func (m *mockRemoteDAGRunStore) SetAttempt(ref exec.DAGRunRef, attempt exec.DAGRunAttempt) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.attempts[ref.ID] = attempt
 }
 
-func (m *mockRemoteDAGRunStore) SetSubAttempt(rootRef execution.DAGRunRef, subID string, attempt execution.DAGRunAttempt) {
+func (m *mockRemoteDAGRunStore) SetSubAttempt(rootRef exec.DAGRunRef, subID string, attempt exec.DAGRunAttempt) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	key := fmt.Sprintf("%s:%s", rootRef.ID, subID)
 	m.subAttempts[key] = attempt
 }
 
-func (m *mockRemoteDAGRunStore) FindAttempt(_ context.Context, ref execution.DAGRunRef) (execution.DAGRunAttempt, error) {
+func (m *mockRemoteDAGRunStore) FindAttempt(_ context.Context, ref exec.DAGRunRef) (exec.DAGRunAttempt, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.findErr != nil {
@@ -336,12 +351,12 @@ func (m *mockRemoteDAGRunStore) FindAttempt(_ context.Context, ref execution.DAG
 	}
 	attempt, ok := m.attempts[ref.ID]
 	if !ok {
-		return nil, execution.ErrDAGRunIDNotFound
+		return nil, exec.ErrDAGRunIDNotFound
 	}
 	return attempt, nil
 }
 
-func (m *mockRemoteDAGRunStore) FindSubAttempt(_ context.Context, rootRef execution.DAGRunRef, subDAGRunID string) (execution.DAGRunAttempt, error) {
+func (m *mockRemoteDAGRunStore) FindSubAttempt(_ context.Context, rootRef exec.DAGRunRef, subDAGRunID string) (exec.DAGRunAttempt, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.findErr != nil {
@@ -350,31 +365,46 @@ func (m *mockRemoteDAGRunStore) FindSubAttempt(_ context.Context, rootRef execut
 	key := fmt.Sprintf("%s:%s", rootRef.ID, subDAGRunID)
 	attempt, ok := m.subAttempts[key]
 	if !ok {
-		return nil, execution.ErrDAGRunIDNotFound
+		return nil, exec.ErrDAGRunIDNotFound
 	}
 	return attempt, nil
 }
 
-func (m *mockRemoteDAGRunStore) CreateAttempt(_ context.Context, _ *core.DAG, _ time.Time, _ string, _ execution.NewDAGRunAttemptOptions) (execution.DAGRunAttempt, error) {
+func (m *mockRemoteDAGRunStore) CreateSubAttempt(_ context.Context, rootRef exec.DAGRunRef, subDAGRunID string) (exec.DAGRunAttempt, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.createErr != nil {
+		return nil, m.createErr
+	}
+	key := fmt.Sprintf("%s:%s", rootRef.ID, subDAGRunID)
+	attempt := &mockRemoteDAGRunAttempt{
+		id:     subDAGRunID,
+		status: &exec.DAGRunStatus{},
+	}
+	m.subAttempts[key] = attempt
+	return attempt, nil
+}
+
+func (m *mockRemoteDAGRunStore) CreateAttempt(_ context.Context, _ *core.DAG, _ time.Time, _ string, _ exec.NewDAGRunAttemptOptions) (exec.DAGRunAttempt, error) {
 	if m.createErr != nil {
 		return nil, m.createErr
 	}
 	panic("CreateAttempt not implemented in mock")
 }
 
-func (m *mockRemoteDAGRunStore) RecentAttempts(_ context.Context, _ string, _ int) []execution.DAGRunAttempt {
+func (m *mockRemoteDAGRunStore) RecentAttempts(_ context.Context, _ string, _ int) []exec.DAGRunAttempt {
 	return nil
 }
 
-func (m *mockRemoteDAGRunStore) LatestAttempt(_ context.Context, _ string) (execution.DAGRunAttempt, error) {
-	return nil, execution.ErrDAGRunIDNotFound
+func (m *mockRemoteDAGRunStore) LatestAttempt(_ context.Context, _ string) (exec.DAGRunAttempt, error) {
+	return nil, exec.ErrDAGRunIDNotFound
 }
 
-func (m *mockRemoteDAGRunStore) ListStatuses(_ context.Context, _ ...execution.ListDAGRunStatusesOption) ([]*execution.DAGRunStatus, error) {
+func (m *mockRemoteDAGRunStore) ListStatuses(_ context.Context, _ ...exec.ListDAGRunStatusesOption) ([]*exec.DAGRunStatus, error) {
 	return nil, nil
 }
 
-func (m *mockRemoteDAGRunStore) RemoveOldDAGRuns(_ context.Context, _ string, _ int, _ ...execution.RemoveOldDAGRunsOption) ([]string, error) {
+func (m *mockRemoteDAGRunStore) RemoveOldDAGRuns(_ context.Context, _ string, _ int, _ ...exec.RemoveOldDAGRunsOption) ([]string, error) {
 	return nil, nil
 }
 
@@ -382,7 +412,7 @@ func (m *mockRemoteDAGRunStore) RenameDAGRuns(_ context.Context, _, _ string) er
 	return nil
 }
 
-func (m *mockRemoteDAGRunStore) RemoveDAGRun(_ context.Context, _ execution.DAGRunRef) error {
+func (m *mockRemoteDAGRunStore) RemoveDAGRun(_ context.Context, _ exec.DAGRunRef) error {
 	return nil
 }
 
@@ -449,7 +479,7 @@ func TestCreateRemoteHandlers(t *testing.T) {
 			coordinatorClient: client,
 		}
 
-		root := execution.DAGRunRef{Name: "root-dag", ID: "root-123"}
+		root := exec.DAGRunRef{Name: "root-dag", ID: "root-123"}
 		statusPusher, _ := handler.createRemoteHandlers("run-1", "test-dag", root)
 
 		require.NotNil(t, statusPusher)
@@ -464,7 +494,7 @@ func TestCreateRemoteHandlers(t *testing.T) {
 			coordinatorClient: client,
 		}
 
-		root := execution.DAGRunRef{Name: "root-dag", ID: "root-123"}
+		root := exec.DAGRunRef{Name: "root-dag", ID: "root-123"}
 		_, logStreamer := handler.createRemoteHandlers("run-1", "test-dag", root)
 
 		require.NotNil(t, logStreamer)
@@ -479,7 +509,7 @@ func TestCreateRemoteHandlers(t *testing.T) {
 			coordinatorClient: client,
 		}
 
-		root := execution.DAGRunRef{Name: "my-root", ID: "root-xyz"}
+		root := exec.DAGRunRef{Name: "my-root", ID: "root-xyz"}
 		statusPusher, logStreamer := handler.createRemoteHandlers("my-run-id", "my-dag", root)
 
 		// Both should be created
@@ -684,7 +714,7 @@ steps:
 `
 
 		task := &coordinatorv1.Task{
-			Target:     "inline.yaml",
+			Target:     "inline-dag", // Target is the DAG name, not filename
 			Definition: dagDefinition,
 		}
 
@@ -692,7 +722,7 @@ steps:
 
 		require.NoError(t, err)
 		require.NotNil(t, dag)
-		assert.Equal(t, "inline-dag", dag.Name)
+		assert.Equal(t, "inline-dag", dag.Name) // Name comes from task.Target when Definition is provided
 		require.NotNil(t, cleanup, "cleanup should be set for inline definitions")
 
 		// Call cleanup to remove temp file
@@ -888,7 +918,7 @@ func TestHandleRetry(t *testing.T) {
 		attempt.readErr = errors.New("status file corrupted")
 
 		store := newMockRemoteDAGRunStore()
-		store.SetAttempt(execution.DAGRunRef{Name: "root", ID: "run-123"}, attempt)
+		store.SetAttempt(exec.DAGRunRef{Name: "root", ID: "run-123"}, attempt)
 
 		handler := &remoteTaskHandler{
 			workerID:          "test-worker",
@@ -937,11 +967,12 @@ steps:
 		}
 
 		// Create a previous status proto
-		previousStatus := &coordinatorv1.DAGRunStatusProto{
+		previousStatus, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
 			Name:   "retry-dag",
-			Status: int32(core.Succeeded),
-			Nodes:  []*coordinatorv1.NodeStatusProto{},
-		}
+			Status: core.Succeeded,
+			Nodes:  []*exec.Node{},
+		})
+		require.NoError(t, convErr)
 
 		task := &coordinatorv1.Task{
 			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
@@ -1050,16 +1081,17 @@ steps:
 	require.NotContains(t, err.Error(), "unsupported operation")
 }
 
-func TestHandle_OperationRetryWithoutStep(t *testing.T) {
+func TestHandle_OperationRetryWithoutStatusSource(t *testing.T) {
 	t.Parallel()
 
-	// When OPERATION_RETRY is used without a step, it should call handleStart with queuedRun=true
+	// OPERATION_RETRY requires either previous_status in the task (shared-nothing mode)
+	// or a local dagRunStore. Without either, handleRetry returns an error.
 	tempDir := t.TempDir()
-	dagFile := filepath.Join(tempDir, "queued.yaml")
-	dagContent := `name: queued-dag
+	dagFile := filepath.Join(tempDir, "retry.yaml")
+	dagContent := `name: retry-dag
 steps:
   - name: step1
-    command: echo queued
+    command: echo retry
 `
 	err := os.WriteFile(dagFile, []byte(dagContent), 0644)
 	require.NoError(t, err)
@@ -1067,6 +1099,7 @@ steps:
 	handler := &remoteTaskHandler{
 		workerID:          "test-worker",
 		coordinatorClient: newMockRemoteCoordinatorClient(),
+		dagRunStore:       nil, // No local store
 		config: &config.Config{
 			Paths: config.PathsConfig{
 				DAGsDir: tempDir,
@@ -1076,18 +1109,18 @@ steps:
 
 	task := &coordinatorv1.Task{
 		Operation:      coordinatorv1.Operation_OPERATION_RETRY,
-		Step:           "", // No step = queuedRun path
+		Step:           "", // No step
 		Target:         dagFile,
-		DagRunId:       "run-queued-1",
+		DagRunId:       "run-retry-1",
 		RootDagRunName: "root",
 		RootDagRunId:   "root-1",
+		PreviousStatus: nil, // No PreviousStatus either
 	}
 
-	// This will fail at agent creation, but proves the queuedRun path is taken
+	// Without either status source, retry should fail with a clear error
 	err = handler.Handle(context.Background(), task)
 	require.Error(t, err)
-	// The error should be from execution, not unsupported operation
-	require.NotContains(t, err.Error(), "unsupported operation")
+	require.Contains(t, err.Error(), "retry requires either previous_status in task or local dagRunStore")
 }
 
 func TestHandle_OperationRetryWithStep(t *testing.T) {
@@ -1135,15 +1168,15 @@ steps:
 	require.NoError(t, err)
 
 	// Create a mock attempt with status
-	status := &execution.DAGRunStatus{
+	status := &exec.DAGRunStatus{
 		Name:   "local-retry-dag",
 		Status: core.Succeeded,
-		Nodes:  []*execution.Node{},
+		Nodes:  []*exec.Node{},
 	}
 	attempt := newMockRemoteDAGRunAttempt("attempt-local", status)
 
 	store := newMockRemoteDAGRunStore()
-	store.SetAttempt(execution.DAGRunRef{Name: "root", ID: "run-local-1"}, attempt)
+	store.SetAttempt(exec.DAGRunRef{Name: "root", ID: "run-local-1"}, attempt)
 
 	handler := &remoteTaskHandler{
 		workerID:          "test-worker",
@@ -1262,11 +1295,12 @@ steps:
 	err := os.WriteFile(dagFile, []byte(dagContent), 0644)
 	require.NoError(t, err)
 
-	previousStatus := &coordinatorv1.DAGRunStatusProto{
+	previousStatus, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
 		Name:   "exec-retry-dag",
-		Status: int32(core.Succeeded),
-		Nodes:  []*coordinatorv1.NodeStatusProto{},
-	}
+		Status: core.Succeeded,
+		Nodes:  []*exec.Node{},
+	})
+	require.NoError(t, convErr)
 
 	handler := &remoteTaskHandler{
 		workerID:          "test-worker",
@@ -1320,11 +1354,12 @@ func TestHandleRetry_LoadDAGErrorPath(t *testing.T) {
 	t.Parallel()
 
 	// Test the path where handleRetry fails at loadDAG after getting status
-	previousStatus := &coordinatorv1.DAGRunStatusProto{
+	previousStatus, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
 		Name:   "loaddag-error-dag",
-		Status: int32(core.Succeeded),
-		Nodes:  []*coordinatorv1.NodeStatusProto{},
-	}
+		Status: core.Succeeded,
+		Nodes:  []*exec.Node{},
+	})
+	require.NoError(t, convErr)
 
 	handler := &remoteTaskHandler{
 		workerID:          "test-worker",
@@ -1356,11 +1391,12 @@ func TestHandleRetry_WithDefinitionAndCleanup(t *testing.T) {
 	t.Parallel()
 
 	// Test handleRetry with inline definition to trigger cleanup path
-	previousStatus := &coordinatorv1.DAGRunStatusProto{
+	previousStatus, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
 		Name:   "def-cleanup-dag",
-		Status: int32(core.Succeeded),
-		Nodes:  []*coordinatorv1.NodeStatusProto{},
-	}
+		Status: core.Succeeded,
+		Nodes:  []*exec.Node{},
+	})
+	require.NoError(t, convErr)
 
 	handler := &remoteTaskHandler{
 		workerID:          "test-worker",
@@ -1504,12 +1540,12 @@ steps:
 	}
 
 	// Create remote handlers
-	root := execution.DAGRunRef{Name: "root", ID: "root-1"}
-	parent := execution.DAGRunRef{Name: "parent", ID: "parent-1"}
+	root := exec.DAGRunRef{Name: "root", ID: "root-1"}
+	parent := exec.DAGRunRef{Name: "parent", ID: "parent-1"}
 	statusPusher, logStreamer := handler.createRemoteHandlers("run-error", dag.Name, root)
 
 	// Call executeDAGRun directly - should fail at createAgentEnv
-	err = handler.executeDAGRun(context.Background(), dag, "run-error", root, parent, statusPusher, logStreamer, false, nil)
+	err = handler.executeDAGRun(context.Background(), dag, "run-error", "", root, parent, statusPusher, logStreamer, false, nil)
 
 	// On systems where null byte in path fails, we should get an error
 	if err != nil {
@@ -1547,13 +1583,13 @@ steps:
 
 	// For a top-level run, root ID should match the dagRunID
 	dagRunID := "run-success-1"
-	root := execution.DAGRunRef{Name: dag.Name, ID: dagRunID}
+	root := exec.DAGRunRef{Name: dag.Name, ID: dagRunID}
 	statusPusher := remote.NewStatusPusher(client, "integration-test-worker")
 	logStreamer := remote.NewLogStreamer(client, "integration-test-worker", dagRunID, dag.Name, "", root)
 
 	// Call executeDAGRun - this should succeed and log completion
 	// For top-level runs, pass empty parent and ensure root matches dagRunID
-	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, root, execution.DAGRunRef{}, statusPusher, logStreamer, false, nil)
+	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, "", root, exec.DAGRunRef{}, statusPusher, logStreamer, false, nil)
 
 	// Should succeed for simple echo command
 	require.NoError(t, err, "executeDAGRun should succeed for simple echo command")

@@ -13,15 +13,15 @@ import (
 
 	"syscall"
 
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
-	"github.com/dagu-org/dagu/internal/common/collections"
-	"github.com/dagu-org/dagu/internal/common/fileutil"
-	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/common/signal"
-	"github.com/dagu-org/dagu/internal/common/stringutil"
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/collections"
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/signal"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
@@ -533,8 +533,8 @@ func (n *Node) SetupEnv(ctx context.Context) context.Context {
 	defer n.mu.RUnlock()
 	env := GetEnv(ctx)
 	env = env.WithVariables(
-		execution.EnvKeyDAGRunStepStdoutFile, n.GetStdout(),
-		execution.EnvKeyDAGRunStepStderrFile, n.GetStderr(),
+		exec.EnvKeyDAGRunStepStdoutFile, n.GetStdout(),
+		exec.EnvKeyDAGRunStepStderrFile, n.GetStderr(),
 	)
 	ctx = logger.WithValues(ctx, tag.Step(n.Name()))
 	return WithEnv(ctx, env)

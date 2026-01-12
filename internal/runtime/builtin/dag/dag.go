@@ -8,11 +8,11 @@ import (
 	"os"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/common/fileutil"
-	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/common/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
@@ -28,7 +28,7 @@ type dagExecutor struct {
 	stderr    io.Writer
 	runParams executor.RunParams
 	step      core.Step
-	result    *execution.RunStatus
+	result    *exec.RunStatus
 	cancel    context.CancelFunc
 }
 

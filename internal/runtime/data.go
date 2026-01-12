@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
-	"github.com/dagu-org/dagu/internal/common/collections"
-	"github.com/dagu-org/dagu/internal/common/stringutil"
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/collections"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
 // Data is a thread-safe wrapper around NodeData.
@@ -64,7 +64,7 @@ type NodeState struct {
 	// It only contains the local output variables.
 	OutputVariables *collections.SyncMap
 	// ChatMessages stores the chat conversation messages for message passing between steps.
-	ChatMessages []execution.LLMMessage
+	ChatMessages []exec.LLMMessage
 	// ApprovalInputs stores key-value parameters provided during HITL approval.
 	// These are available as environment variables in subsequent steps.
 	ApprovalInputs map[string]string
@@ -492,14 +492,14 @@ func (d *Data) MarkError(err error) {
 }
 
 // SetChatMessages sets the chat conversation messages for the node.
-func (d *Data) SetChatMessages(messages []execution.LLMMessage) {
+func (d *Data) SetChatMessages(messages []exec.LLMMessage) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.inner.State.ChatMessages = messages
 }
 
 // GetChatMessages returns the chat conversation messages for the node.
-func (d *Data) GetChatMessages() []execution.LLMMessage {
+func (d *Data) GetChatMessages() []exec.LLMMessage {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return d.inner.State.ChatMessages

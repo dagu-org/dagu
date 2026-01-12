@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/config"
-	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
 	runtime1 "github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/test"
@@ -22,47 +22,51 @@ import (
 func TestTaskHandler(t *testing.T) {
 	th := test.Setup(t)
 
-	t.Run("HandleTaskRetry", func(t *testing.T) {
+	t.Run("HandleQueueDispatch", func(t *testing.T) {
+		// This test simulates the queue dispatch scenario:
+		// Coordinator first creates a dag-run (during enqueue), then sends OPERATION_RETRY
+		// to dispatch it to a worker.
 		dag := th.DAG(t, `steps:
   - name: "1"
     command: echo step1
   - name: "2"
     command: echo step2
 `)
-		ctx := th.Context
 
-		// First, start a DAG run
+		// First, create an initial dag-run (simulating what coordinator does during enqueue)
+		// This creates the status record that retry will use
 		spec := th.SubCmdBuilder.Start(dag.DAG, runtime1.StartOptions{})
 		err := runtime1.Start(th.Context, spec)
 		require.NoError(t, err)
 
-		// Wait for the DAG to finish
+		// Wait for the initial run to complete
 		dag.AssertLatestStatus(t, core.Succeeded)
 
-		// Get the st to get the dag-run ID
-		st, err := th.DAGRunMgr.GetLatestStatus(ctx, dag.DAG)
+		// Get the dag-run ID from the completed run
+		st, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 		require.NoError(t, err)
 		dagRunID := st.DAGRunID
 
-		// Create a retry task
+		// Create a task with OPERATION_RETRY but no Step (queue dispatch case)
+		// This simulates coordinator dispatching a queued task
 		task := &coordinatorv1.Task{
 			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
 			DagRunId:       dagRunID,
-			Target:         dag.Name,
+			Target:         dag.Location,
 			RootDagRunName: dag.Name,
 			RootDagRunId:   dagRunID,
 		}
 
 		// Create a context with timeout for the task execution
-		taskCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		taskCtx, cancel := context.WithTimeout(th.Context, 30*time.Second)
 		defer cancel()
 
-		// Execute the task
+		// Execute the task (retry without step re-runs all steps)
 		handler := NewTaskHandler(th.Config)
 		err = handler.Handle(taskCtx, task)
 		require.NoError(t, err)
 
-		// Verify the DAG ran again successfully
+		// Verify the DAG ran successfully again
 		dag.AssertLatestStatus(t, core.Succeeded)
 	})
 

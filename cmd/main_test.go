@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/cmd"
-	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )

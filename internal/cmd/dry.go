@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/dagu-org/dagu/internal/common/stringutil"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/spf13/cobra"
@@ -91,8 +91,6 @@ func runDry(ctx *Context, args []string) error {
 		return err
 	}
 
-	root := execution.NewDAGRunRef(dag.Name, dagRunID)
-
 	agentInstance := agent.New(
 		dagRunID,
 		dag,
@@ -100,11 +98,13 @@ func runDry(ctx *Context, args []string) error {
 		logFile.Name(),
 		ctx.DAGRunMgr,
 		dr,
-		ctx.DAGRunStore,
-		ctx.ServiceRegistry,
-		root,
-		ctx.Config.Core.Peer,
-		agent.Options{Dry: true},
+		agent.Options{
+			Dry:             true,
+			DAGRunStore:     ctx.DAGRunStore,
+			ServiceRegistry: ctx.ServiceRegistry,
+			RootDAGRun:      exec.NewDAGRunRef(dag.Name, dagRunID),
+			PeerConfig:      ctx.Config.Core.Peer,
+		},
 	)
 
 	listenSignals(ctx, agentInstance)

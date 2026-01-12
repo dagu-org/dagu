@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/fileutil"
-	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/common/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/scheduler/filenotify"
@@ -56,7 +56,7 @@ type entryReaderImpl struct {
 	targetDir   string
 	registry    map[string]*core.DAG
 	lock        sync.Mutex
-	dagStore    execution.DAGStore
+	dagStore    exec.DAGStore
 	dagRunMgr   runtime.Manager
 	executable  string
 	dagExecutor *DAGExecutor
@@ -66,7 +66,7 @@ type entryReaderImpl struct {
 }
 
 // NewEntryReader creates a new DAG manager with the given configuration.
-func NewEntryReader(dir string, dagCli execution.DAGStore, drm runtime.Manager, de *DAGExecutor, executable string) EntryReader {
+func NewEntryReader(dir string, dagCli exec.DAGStore, drm runtime.Manager, de *DAGExecutor, executable string) EntryReader {
 	return &entryReaderImpl{
 		targetDir:   dir,
 		lock:        sync.Mutex{},

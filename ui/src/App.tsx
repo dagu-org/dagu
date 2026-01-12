@@ -3,6 +3,7 @@ import '@radix-ui/themes/styles.css';
 import React from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { SWRConfig } from 'swr';
+import { ErrorModalProvider } from './components/ui/error-modal';
 import { ToastProvider } from './components/ui/simple-toast';
 import { AppBarContext } from './contexts/AppBarContext';
 import { Config, ConfigContext } from './contexts/ConfigContext';
@@ -113,6 +114,7 @@ function App({ config }: Props) {
             <AuthProvider>
               <SearchStateProvider>
                 <SchemaProvider>
+                <ErrorModalProvider>
                 <ToastProvider>
                   <BrowserRouter basename={config.basePath}>
                     <Routes>
@@ -198,6 +200,7 @@ function App({ config }: Props) {
                     </Routes>
                   </BrowserRouter>
                 </ToastProvider>
+                </ErrorModalProvider>
                 </SchemaProvider>
               </SearchStateProvider>
             </AuthProvider>

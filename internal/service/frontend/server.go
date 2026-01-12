@@ -17,17 +17,17 @@ import (
 	"time"
 
 	authmodel "github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
-	"github.com/dagu-org/dagu/internal/common/config"
-	"github.com/dagu-org/dagu/internal/common/fileutil"
-	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/common/telemetry"
-	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/persistence/fileapikey"
-	"github.com/dagu-org/dagu/internal/persistence/fileaudit"
-	"github.com/dagu-org/dagu/internal/persistence/fileuser"
-	"github.com/dagu-org/dagu/internal/persistence/filewebhook"
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/telemetry"
+	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/persis/fileapikey"
+	"github.com/dagu-org/dagu/internal/persis/fileaudit"
+	"github.com/dagu-org/dagu/internal/persis/fileuser"
+	"github.com/dagu-org/dagu/internal/persis/filewebhook"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
@@ -67,7 +67,14 @@ type Server struct {
 // cfg.Server.Auth.Mode is set to builtin.
 // Returns the constructed *Server, or an error if initialization fails (for example,
 // when the configured builtin auth service fails to initialize).
-func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunStore, qs execution.QueueStore, ps execution.ProcStore, drm runtime.Manager, cc coordinator.Client, sr execution.ServiceRegistry, mr *prometheus.Registry, collector *telemetry.Collector, rs *resource.Service) (*Server, error) {
+// The context is used for OIDC provider initialization and should be cancellable
+// to allow graceful shutdown during startup.
+func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs exec.DAGRunStore, qs exec.QueueStore, ps exec.ProcStore, drm runtime.Manager, cc coordinator.Client, sr exec.ServiceRegistry, mr *prometheus.Registry, collector *telemetry.Collector, rs *resource.Service) (*Server, error) {
+	// Defensive nil-context guard to prevent surprising crashes from older call sites
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	var remoteNodes []string
 	for _, n := range cfg.Server.RemoteNodes {
 		remoteNodes = append(remoteNodes, n.Name)
@@ -131,6 +138,7 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 
 			// Initialize OIDC provider
 			builtinOIDCCfg, err = auth.InitBuiltinOIDCConfig(
+				ctx,
 				oidcCfg,
 				result.AuthService,
 				provisionSvc,
@@ -140,7 +148,7 @@ func NewServer(cfg *config.Config, dr execution.DAGStore, drs execution.DAGRunSt
 				return nil, fmt.Errorf("failed to initialize builtin OIDC: %w", err)
 			}
 
-			logger.Info(context.Background(), "OIDC enabled for builtin auth mode",
+			logger.Info(ctx, "OIDC enabled for builtin auth mode",
 				slog.String("issuer", oidcCfg.Issuer),
 				slog.Bool("autoSignup", oidcCfg.AutoSignup),
 				slog.String("defaultRole", oidcCfg.RoleMapping.DefaultRole))
@@ -422,7 +430,7 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 
 	var oidcAuthOptions *auth.Options
 	if authConfig.Mode == config.AuthModeOIDC && authConfig.OIDC.ClientId != "" && authConfig.OIDC.ClientSecret != "" && authOIDC.Issuer != "" {
-		oidcCfg, err := auth.InitVerifierAndConfig(authOIDC)
+		oidcCfg, err := auth.InitVerifierAndConfig(ctx, authOIDC)
 		if err != nil {
 			return fmt.Errorf("failed to initialize OIDC: %w", err)
 		}

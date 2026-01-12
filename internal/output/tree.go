@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/stringutil"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
 // Tree drawing characters using Unicode box-drawing characters.
@@ -99,7 +99,7 @@ func NewRenderer(config Config) *Renderer {
 //	  └─npm test
 //	    ├─stdout: All tests passed
 //	    └─stderr:
-func (r *Renderer) RenderDAGStatus(dag *core.DAG, status *execution.DAGRunStatus) string {
+func (r *Renderer) RenderDAGStatus(dag *core.DAG, status *exec.DAGRunStatus) string {
 	var buf strings.Builder
 
 	// Header line
@@ -129,7 +129,7 @@ func (r *Renderer) RenderDAGStatus(dag *core.DAG, status *execution.DAGRunStatus
 
 // renderHeader renders the status header line with status text and timestamp.
 // White color (default).
-func (r *Renderer) renderHeader(status *execution.DAGRunStatus) string {
+func (r *Renderer) renderHeader(status *exec.DAGRunStatus) string {
 	statusText := StatusText(status.Status)
 
 	// Parse start time, fallback to current time if not set
@@ -143,7 +143,7 @@ func (r *Renderer) renderHeader(status *execution.DAGRunStatus) string {
 
 // renderDAGLine renders the DAG name with total duration.
 // White color (default) - root of the tree.
-func (r *Renderer) renderDAGLine(dag *core.DAG, status *execution.DAGRunStatus) string {
+func (r *Renderer) renderDAGLine(dag *core.DAG, status *exec.DAGRunStatus) string {
 	duration := r.calculateDuration(status.StartedAt, status.FinishedAt, status.Status)
 
 	if duration != "" {
@@ -153,7 +153,7 @@ func (r *Renderer) renderDAGLine(dag *core.DAG, status *execution.DAGRunStatus) 
 }
 
 // renderStep renders a single step with its commands and output content.
-func (r *Renderer) renderStep(node *execution.Node, isLast bool, prefix string) string {
+func (r *Renderer) renderStep(node *exec.Node, isLast bool, prefix string) string {
 	var buf strings.Builder
 
 	// Determine branch character based on position
@@ -293,7 +293,7 @@ func (r *Renderer) getStatusLabel(status core.NodeStatus) string {
 }
 
 // hasOutput checks if the node has any stdout or stderr content.
-func (r *Renderer) hasOutput(node *execution.Node) bool {
+func (r *Renderer) hasOutput(node *exec.Node) bool {
 	if !r.config.ShowStdout && !r.config.ShowStderr {
 		return false
 	}
@@ -410,7 +410,7 @@ func wrapText(text string, maxWidth int) []string {
 }
 
 // getLegacyCommand extracts command string from legacy step format.
-func (r *Renderer) getLegacyCommand(node *execution.Node) string {
+func (r *Renderer) getLegacyCommand(node *exec.Node) string {
 	if node.Step.CmdWithArgs != "" {
 		return node.Step.CmdWithArgs
 	}
@@ -425,7 +425,7 @@ func (r *Renderer) getLegacyCommand(node *execution.Node) string {
 }
 
 // renderOutputs renders stdout and stderr for a node.
-func (r *Renderer) renderOutputs(node *execution.Node, isLast bool, prefix string) string {
+func (r *Renderer) renderOutputs(node *exec.Node, isLast bool, prefix string) string {
 	var buf strings.Builder
 
 	// Check which outputs have content
@@ -532,7 +532,7 @@ func (r *Renderer) renderOutput(label string, filePath string, isLast bool, pref
 }
 
 // renderSubRuns renders references to sub-DAG runs.
-func (r *Renderer) renderSubRuns(subRuns []execution.SubDAGRun, isLastSection bool, prefix string) string {
+func (r *Renderer) renderSubRuns(subRuns []exec.SubDAGRun, isLastSection bool, prefix string) string {
 	var buf strings.Builder
 
 	for i, sub := range subRuns {
@@ -602,7 +602,7 @@ func cleanErrorMessage(errMsg string) string {
 
 // renderFinalStatus renders the final result line at the bottom of the tree.
 // White color (default).
-func (r *Renderer) renderFinalStatus(status *execution.DAGRunStatus) string {
+func (r *Renderer) renderFinalStatus(status *exec.DAGRunStatus) string {
 	prefix := "Result"
 	if status.Status == core.Running {
 		prefix = "Status"
@@ -637,7 +637,7 @@ func (r *Renderer) calculateDuration(startedAt, finishedAt string, status core.S
 }
 
 // calculateNodeDuration calculates duration for a specific node.
-func (r *Renderer) calculateNodeDuration(node *execution.Node) string {
+func (r *Renderer) calculateNodeDuration(node *exec.Node) string {
 	nodeStatus := nodeStatusToStatus(node.Status)
 	return r.calculateDuration(node.StartedAt, node.FinishedAt, nodeStatus)
 }

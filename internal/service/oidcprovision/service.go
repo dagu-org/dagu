@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/common/stringutil"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/google/uuid"
 )

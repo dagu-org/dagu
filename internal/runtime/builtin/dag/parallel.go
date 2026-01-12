@@ -11,11 +11,11 @@ import (
 	"os/exec"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/common/fileutil"
-	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/common/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	exec1 "github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
@@ -35,9 +35,9 @@ type parallelExecutor struct {
 	maxConcurrent int
 
 	// Runtime state
-	running map[string]*exec.Cmd            // Maps DAG run ID to running command
-	results map[string]*execution.RunStatus // Maps DAG run ID to result
-	errors  []error                         // Collects errors from failed executions
+	running map[string]*exec.Cmd        // Maps DAG run ID to running command
+	results map[string]*exec1.RunStatus // Maps DAG run ID to result
+	errors  []error                     // Collects errors from failed executions
 
 	cancel     chan struct{}
 	cancelOnce sync.Once
@@ -78,7 +78,7 @@ func newParallelExecutor(
 		workDir:       dir,
 		maxConcurrent: maxConcurrent,
 		running:       make(map[string]*exec.Cmd),
-		results:       make(map[string]*execution.RunStatus),
+		results:       make(map[string]*exec1.RunStatus),
 		errors:        make([]error, 0),
 		cancel:        make(chan struct{}),
 	}, nil
@@ -268,12 +268,12 @@ func (e *parallelExecutor) outputResults() error {
 			Succeeded int `json:"succeeded"`
 			Failed    int `json:"failed"`
 		} `json:"summary"`
-		Results []execution.RunStatus `json:"results"`
-		Outputs []map[string]string   `json:"outputs"`
+		Results []exec1.RunStatus   `json:"results"`
+		Outputs []map[string]string `json:"outputs"`
 	}{}
 
 	output.Summary.Total = len(e.runParamsList)
-	output.Results = make([]execution.RunStatus, 0, len(e.results))
+	output.Results = make([]exec1.RunStatus, 0, len(e.results))
 	output.Outputs = make([]map[string]string, 0, len(e.results))
 
 	// Collect results in order of runParamsList for consistency

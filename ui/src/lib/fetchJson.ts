@@ -1,14 +1,7 @@
+declare const getConfig: () => { apiURL: string };
+
 /**
  * Fetches JSON from the configured API base URL and returns the parsed response body.
- *
- * This function appends `input` to `getConfig().apiURL`, merges any provided `init.headers`
- * with `Accept: application/json`, and, if present, adds an `Authorization: Bearer <token>`
- * header using the token stored in localStorage under `dagu_auth_token`.
- *
- * @param input - The request URL or RequestInfo which will be appended to the API base URL
- * @param init - Optional fetch init options; provided headers are merged with the function's headers
- * @returns The parsed response body as JSON
- * @throws FetchError when the response has a non-OK status; the error includes the original `Response` and the parsed response body
  */
 export default async function fetchJson<JSON = unknown>(
   input: RequestInfo,

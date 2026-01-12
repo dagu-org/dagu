@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
-	legacymodel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
+	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/persis/filedagrun"
+	legacymodel "github.com/dagu-org/dagu/internal/persis/legacy/model"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -85,7 +85,7 @@ func TestMigrateHistoryCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify migration
-		attempt, err := dagRunStore.FindAttempt(context.Background(), execution.NewDAGRunRef("test-dag", "req123"))
+		attempt, err := dagRunStore.FindAttempt(context.Background(), exec.NewDAGRunRef("test-dag", "req123"))
 		require.NoError(t, err)
 		require.NotNil(t, attempt)
 

@@ -12,10 +12,10 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
+	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/persis/filedagrun"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/samber/lo/mutable"
 	"golang.org/x/text/encoding"
@@ -60,7 +60,7 @@ func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject)
 
 	_, err := a.dagStore.GetMetadata(ctx, request.Name)
 	if err != nil {
-		if errors.Is(err, execution.ErrDAGNotFound) {
+		if errors.Is(err, exec.ErrDAGNotFound) {
 			return nil, &Error{
 				HTTPStatus: http.StatusNotFound,
 				Code:       api.ErrorCodeNotFound,
@@ -88,7 +88,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 	dag, err := a.dagStore.GetDetails(ctx, name)
 	if err != nil {
-		if errors.Is(err, execution.ErrDAGNotFound) {
+		if errors.Is(err, exec.ErrDAGNotFound) {
 			return nil, &Error{
 				HTTPStatus: http.StatusNotFound,
 				Code:       api.ErrorCodeNotFound,
@@ -351,7 +351,7 @@ func (a *API) readStepLog(
 	stepName string,
 	statusFile string,
 ) (*api.StepLog, error) {
-	var status *execution.DAGRunStatus
+	var status *exec.DAGRunStatus
 
 	if statusFile != "" {
 		parsedStatus, err := filedagrun.ParseStatusFile(statusFile)
@@ -370,7 +370,7 @@ func (a *API) readStepLog(
 	}
 
 	// Find the step in the status to get the log file.
-	var node *execution.Node
+	var node *exec.Node
 	for _, n := range status.Nodes {
 		if n.Step.Name == stepName {
 			node = n
@@ -436,8 +436,8 @@ func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 
 // ListDAGs implements api.StrictServerInterface.
 func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
-	pg := execution.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.Limit))
-	result, errList, err := a.dagStore.List(ctx, execution.ListDAGsOptions{
+	pg := exec.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.Limit))
+	result, errList, err := a.dagStore.List(ctx, exec.ListDAGsOptions{
 		Paginator: &pg,
 		Name:      valueOf(request.Params.SearchName),
 		Tag:       valueOf(request.Params.SearchTag),
@@ -448,7 +448,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	}
 
 	// Get status for each DAG
-	dagStatuses := make([]execution.DAGRunStatus, len(result.Items))
+	dagStatuses := make([]exec.DAGRunStatus, len(result.Items))
 	for _, item := range result.Items {
 		status, err := a.dagRunManager.GetLatestStatus(ctx, item)
 		if err != nil {
@@ -505,7 +505,7 @@ func (a *API) ListTags(ctx context.Context, _ api.ListTagsRequestObject) (api.Li
 func (a *API) PostDAGAction(ctx context.Context, request api.PostDAGActionRequestObject) (api.PostDAGActionResponseObject, error) {
 	action := request.Body.Action
 
-	var status execution.DAGRunStatus
+	var status exec.DAGRunStatus
 	var dag *core.DAG
 
 	if action != api.DAGActionSave {
@@ -749,7 +749,7 @@ func (a *API) updateStatus(
 
 	status.Nodes[idxToUpdate].Status = to
 
-	root := execution.NewDAGRunRef(dag.Name, dagRunID)
+	root := exec.NewDAGRunRef(dag.Name, dagRunID)
 	if err := a.dagRunManager.UpdateStatus(ctx, root, *status); err != nil {
 		return fmt.Errorf("error updating status: %w", err)
 	}
@@ -863,7 +863,7 @@ func toPrecondition(obj *core.Condition) api.Precondition {
 	}
 }
 
-func toStatus(s execution.DAGRunStatus) api.DAGStatusDetails {
+func toStatus(s exec.DAGRunStatus) api.DAGStatusDetails {
 	status := api.DAGStatusDetails{
 		Log:        s.Log,
 		Name:       s.Name,
@@ -892,7 +892,7 @@ func toStatus(s execution.DAGRunStatus) api.DAGStatusDetails {
 	return status
 }
 
-func toNode(node *execution.Node) api.Node {
+func toNode(node *exec.Node) api.Node {
 	return api.Node{
 		DoneCount:  node.DoneCount,
 		FinishedAt: node.FinishedAt,

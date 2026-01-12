@@ -5,13 +5,13 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/stretchr/testify/assert"
 )
 
 func setupTestContext() context.Context {
-	return execution.NewContext(
+	return exec.NewContext(
 		context.Background(),
 		&core.DAG{Name: "test-dag"},
 		"", // dagRunID

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -489,7 +489,7 @@ func newMockLogWriterFactory() *mockLogWriterFactory {
 }
 
 func (m *mockLogWriterFactory) NewStepWriter(_ context.Context, _ string, streamType int) io.WriteCloser {
-	if streamType == execution.StreamTypeStdout {
+	if streamType == exec.StreamTypeStdout {
 		return m.stdoutWriter
 	}
 	return m.stderrWriter

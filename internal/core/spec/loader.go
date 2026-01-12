@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"dario.cat/mergo"
-	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec/types"
 	"github.com/go-viper/mapstructure/v2"

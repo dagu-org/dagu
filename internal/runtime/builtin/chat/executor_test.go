@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	llmpkg "github.com/dagu-org/dagu/internal/llm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,35 +26,35 @@ func TestExecutor_MessageSaving(t *testing.T) {
 					Model:    "gpt-4o",
 				},
 			},
-			messages: []execution.LLMMessage{
-				{Role: execution.RoleUser, Content: "Hello"},
+			messages: []exec.LLMMessage{
+				{Role: exec.RoleUser, Content: "Hello"},
 			},
-			contextMessages: []execution.LLMMessage{
-				{Role: execution.RoleSystem, Content: "You are helpful"},
-				{Role: execution.RoleUser, Content: "Previous question"},
-				{Role: execution.RoleAssistant, Content: "Previous answer"},
+			contextMessages: []exec.LLMMessage{
+				{Role: exec.RoleSystem, Content: "You are helpful"},
+				{Role: exec.RoleUser, Content: "Previous question"},
+				{Role: exec.RoleAssistant, Content: "Previous answer"},
 			},
 		}
 
 		// Simulate what happens after Run() completes
 		allMessages := append(executor.contextMessages, executor.messages...)
-		metadata := &execution.LLMMessageMetadata{
+		metadata := &exec.LLMMessageMetadata{
 			Provider:         "openai",
 			Model:            "gpt-4o",
 			PromptTokens:     10,
 			CompletionTokens: 5,
 			TotalTokens:      15,
 		}
-		executor.savedMessages = append(allMessages, execution.LLMMessage{
-			Role:     execution.RoleAssistant,
+		executor.savedMessages = append(allMessages, exec.LLMMessage{
+			Role:     exec.RoleAssistant,
 			Content:  "Hello there!",
 			Metadata: metadata,
 		})
 
 		saved := executor.GetMessages()
 		assert.Len(t, saved, 5) // 3 inherited + 1 user + 1 assistant
-		assert.Equal(t, execution.RoleSystem, saved[0].Role)
-		assert.Equal(t, execution.RoleAssistant, saved[4].Role)
+		assert.Equal(t, exec.RoleSystem, saved[0].Role)
+		assert.Equal(t, exec.RoleAssistant, saved[4].Role)
 		assert.NotNil(t, saved[4].Metadata)
 		assert.Equal(t, 15, saved[4].Metadata.TotalTokens)
 	})
@@ -69,20 +69,20 @@ func TestExecutor_MessageSaving(t *testing.T) {
 					Model:    "gemini-pro",
 				},
 			},
-			messages: []execution.LLMMessage{
-				{Role: execution.RoleUser, Content: "Test"},
+			messages: []exec.LLMMessage{
+				{Role: exec.RoleUser, Content: "Test"},
 			},
 		}
 
-		metadata := &execution.LLMMessageMetadata{
+		metadata := &exec.LLMMessageMetadata{
 			Provider:         "gemini",
 			Model:            "gemini-pro",
 			PromptTokens:     5,
 			CompletionTokens: 3,
 			TotalTokens:      8,
 		}
-		executor.savedMessages = append(executor.messages, execution.LLMMessage{
-			Role:     execution.RoleAssistant,
+		executor.savedMessages = append(executor.messages, exec.LLMMessage{
+			Role:     exec.RoleAssistant,
 			Content:  "Response",
 			Metadata: metadata,
 		})
@@ -91,7 +91,7 @@ func TestExecutor_MessageSaving(t *testing.T) {
 		assert.Len(t, saved, 2)
 
 		assistantMsg := saved[1]
-		assert.Equal(t, execution.RoleAssistant, assistantMsg.Role)
+		assert.Equal(t, exec.RoleAssistant, assistantMsg.Role)
 		assert.NotNil(t, assistantMsg.Metadata)
 		assert.Equal(t, "gemini", assistantMsg.Metadata.Provider)
 		assert.Equal(t, "gemini-pro", assistantMsg.Metadata.Model)
@@ -106,10 +106,10 @@ func TestExecutor_SetContext(t *testing.T) {
 
 	executor := &Executor{}
 
-	messages := []execution.LLMMessage{
-		{Role: execution.RoleSystem, Content: "System prompt"},
-		{Role: execution.RoleUser, Content: "User message"},
-		{Role: execution.RoleAssistant, Content: "Assistant response"},
+	messages := []exec.LLMMessage{
+		{Role: exec.RoleSystem, Content: "System prompt"},
+		{Role: exec.RoleUser, Content: "User message"},
+		{Role: exec.RoleAssistant, Content: "Assistant response"},
 	}
 
 	executor.SetContext(messages)
@@ -131,16 +131,16 @@ func TestExecutor_GetMessages(t *testing.T) {
 		t.Parallel()
 
 		executor := &Executor{
-			savedMessages: []execution.LLMMessage{
-				{Role: execution.RoleUser, Content: "Hello"},
-				{Role: execution.RoleAssistant, Content: "Hi"},
+			savedMessages: []exec.LLMMessage{
+				{Role: exec.RoleUser, Content: "Hello"},
+				{Role: exec.RoleAssistant, Content: "Hi"},
 			},
 		}
 
 		saved := executor.GetMessages()
 		assert.Len(t, saved, 2)
-		assert.Equal(t, execution.RoleUser, saved[0].Role)
-		assert.Equal(t, execution.RoleAssistant, saved[1].Role)
+		assert.Equal(t, exec.RoleUser, saved[0].Role)
+		assert.Equal(t, exec.RoleAssistant, saved[1].Role)
 	})
 }
 
@@ -346,10 +346,10 @@ func TestToLLMMessages(t *testing.T) {
 	t.Run("ConvertMessages", func(t *testing.T) {
 		t.Parallel()
 
-		msgs := []execution.LLMMessage{
-			{Role: execution.RoleSystem, Content: "System prompt"},
-			{Role: execution.RoleUser, Content: "User message"},
-			{Role: execution.RoleAssistant, Content: "Assistant response"},
+		msgs := []exec.LLMMessage{
+			{Role: exec.RoleSystem, Content: "System prompt"},
+			{Role: exec.RoleUser, Content: "User message"},
+			{Role: exec.RoleAssistant, Content: "Assistant response"},
 		}
 		result := toLLMMessages(msgs)
 
@@ -368,36 +368,36 @@ func TestBuildMessageList(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		stepMsgs        []execution.LLMMessage
-		contextMsgs     []execution.LLMMessage
+		stepMsgs        []exec.LLMMessage
+		contextMsgs     []exec.LLMMessage
 		wantFirstSystem string
 		wantLen         int
 	}{
 		{
 			name: "step system takes precedence",
-			stepMsgs: []execution.LLMMessage{
-				{Role: execution.RoleSystem, Content: "step system"},
-				{Role: execution.RoleUser, Content: "user"},
+			stepMsgs: []exec.LLMMessage{
+				{Role: exec.RoleSystem, Content: "step system"},
+				{Role: exec.RoleUser, Content: "user"},
 			},
-			contextMsgs: []execution.LLMMessage{
-				{Role: execution.RoleSystem, Content: "context system"},
+			contextMsgs: []exec.LLMMessage{
+				{Role: exec.RoleSystem, Content: "context system"},
 			},
 			wantFirstSystem: "step system",
 			wantLen:         2,
 		},
 		{
 			name:     "context system used when step has none",
-			stepMsgs: []execution.LLMMessage{{Role: execution.RoleUser, Content: "user"}},
-			contextMsgs: []execution.LLMMessage{
-				{Role: execution.RoleSystem, Content: "context system"},
+			stepMsgs: []exec.LLMMessage{{Role: exec.RoleUser, Content: "user"}},
+			contextMsgs: []exec.LLMMessage{
+				{Role: exec.RoleSystem, Content: "context system"},
 			},
 			wantFirstSystem: "context system",
 			wantLen:         2,
 		},
 		{
 			name: "no context",
-			stepMsgs: []execution.LLMMessage{
-				{Role: execution.RoleSystem, Content: "step system"},
+			stepMsgs: []exec.LLMMessage{
+				{Role: exec.RoleSystem, Content: "step system"},
 			},
 			contextMsgs:     nil,
 			wantFirstSystem: "step system",
@@ -412,7 +412,7 @@ func TestBuildMessageList(t *testing.T) {
 			result := buildMessageList(tt.stepMsgs, tt.contextMsgs)
 
 			require.Len(t, result, tt.wantLen)
-			assert.Equal(t, execution.RoleSystem, result[0].Role)
+			assert.Equal(t, exec.RoleSystem, result[0].Role)
 			assert.Equal(t, tt.wantFirstSystem, result[0].Content)
 		})
 	}

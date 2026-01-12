@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/common/config"
-	"github.com/dagu-org/dagu/internal/common/stringutil"
+	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/service/frontend/metrics"
 )
 

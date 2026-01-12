@@ -13,12 +13,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/collections"
-	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/common/signal"
+	"github.com/dagu-org/dagu/internal/cmn/collections"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/signal"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -34,9 +34,9 @@ var (
 // ChatMessagesHandler handles chat conversation messages for persistence.
 type ChatMessagesHandler interface {
 	// WriteStepMessages writes messages for a single step.
-	WriteStepMessages(ctx context.Context, stepName string, messages []execution.LLMMessage) error
+	WriteStepMessages(ctx context.Context, stepName string, messages []exec.LLMMessage) error
 	// ReadStepMessages reads messages for a single step.
-	ReadStepMessages(ctx context.Context, stepName string) ([]execution.LLMMessage, error)
+	ReadStepMessages(ctx context.Context, stepName string) ([]exec.LLMMessage, error)
 }
 
 // Runner runs a plan of steps.
@@ -525,7 +525,7 @@ func (r *Runner) setupChatMessages(ctx context.Context, node *Node) {
 	}
 
 	// Read messages from each dependency step
-	var inherited []execution.LLMMessage
+	var inherited []exec.LLMMessage
 	for _, dep := range step.Depends {
 		msgs, err := r.messagesHandler.ReadStepMessages(ctx, dep)
 		if err != nil {
@@ -537,7 +537,7 @@ func (r *Runner) setupChatMessages(ctx context.Context, node *Node) {
 	}
 
 	// Deduplicate system messages (keep only first)
-	inherited = execution.DeduplicateSystemMessages(inherited)
+	inherited = exec.DeduplicateSystemMessages(inherited)
 	if len(inherited) > 0 {
 		node.SetChatMessages(inherited)
 	}
@@ -631,7 +631,7 @@ func (r *Runner) setupEnvironEventHandler(ctx context.Context, plan *Plan, node 
 	existingEnv := GetEnv(ctx)
 
 	env := NewPlanEnv(ctx, node.Step(), plan)
-	env.Envs[execution.EnvKeyDAGRunStatus] = r.Status(ctx, plan).String()
+	env.Envs[exec.EnvKeyDAGRunStatus] = r.Status(ctx, plan).String()
 
 	// Copy extra env vars from existing context that aren't standard step envs
 	for k, v := range existingEnv.Envs {

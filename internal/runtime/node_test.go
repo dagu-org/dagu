@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
@@ -767,8 +767,8 @@ func TestNodeSetupContextBeforeExec(t *testing.T) {
 	// Verify environment variables were set
 	newEnv := runtime.GetEnv(newCtx)
 
-	stdoutVar, _ := newEnv.Variables.Load(execution.EnvKeyDAGRunStepStdoutFile)
-	stderrVar, _ := newEnv.Variables.Load(execution.EnvKeyDAGRunStepStderrFile)
+	stdoutVar, _ := newEnv.Variables.Load(exec.EnvKeyDAGRunStepStdoutFile)
+	stderrVar, _ := newEnv.Variables.Load(exec.EnvKeyDAGRunStepStderrFile)
 
 	assert.Equal(t, "DAG_RUN_STEP_STDOUT_FILE=/tmp/stdout.log", stdoutVar)
 	assert.Equal(t, "DAG_RUN_STEP_STDERR_FILE=/tmp/stderr.log", stderrVar)
@@ -1591,10 +1591,10 @@ func TestNodeChatMessages(t *testing.T) {
 		assert.Empty(t, node.GetChatMessages())
 
 		// Set messages
-		messages := []execution.LLMMessage{
-			{Role: execution.RoleSystem, Content: "be helpful"},
-			{Role: execution.RoleUser, Content: "hello"},
-			{Role: execution.RoleAssistant, Content: "hi there"},
+		messages := []exec.LLMMessage{
+			{Role: exec.RoleSystem, Content: "be helpful"},
+			{Role: exec.RoleUser, Content: "hello"},
+			{Role: exec.RoleAssistant, Content: "hi there"},
 		}
 		node.SetChatMessages(messages)
 
@@ -1609,7 +1609,7 @@ func TestNodeChatMessages(t *testing.T) {
 		node := runtime.NewNode(step, runtime.NodeState{})
 
 		// Set empty messages
-		node.SetChatMessages([]execution.LLMMessage{})
+		node.SetChatMessages([]exec.LLMMessage{})
 		assert.Empty(t, node.GetChatMessages())
 	})
 
@@ -1634,8 +1634,8 @@ func TestNodeChatMessages(t *testing.T) {
 		done := make(chan bool)
 		for i := 0; i < 10; i++ {
 			go func(id int) {
-				messages := []execution.LLMMessage{
-					{Role: execution.RoleUser, Content: fmt.Sprintf("message %d", id)},
+				messages := []exec.LLMMessage{
+					{Role: exec.RoleUser, Content: fmt.Sprintf("message %d", id)},
 				}
 				node.SetChatMessages(messages)
 				_ = node.GetChatMessages()

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
 )

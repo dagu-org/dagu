@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core/execution"
-	"github.com/dagu-org/dagu/internal/persistence/filedag"
-	"github.com/dagu-org/dagu/internal/persistence/filedagrun"
-	"github.com/dagu-org/dagu/internal/persistence/fileproc"
-	"github.com/dagu-org/dagu/internal/persistence/filequeue"
+	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/persis/filedag"
+	"github.com/dagu-org/dagu/internal/persis/filedagrun"
+	"github.com/dagu-org/dagu/internal/persis/fileproc"
+	"github.com/dagu-org/dagu/internal/persis/filequeue"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/scheduler"
@@ -21,8 +21,8 @@ import (
 type Scheduler struct {
 	Helper
 	EntryReader    scheduler.EntryReader
-	QueueStore     execution.QueueStore
-	CoordinatorCli execution.Dispatcher
+	QueueStore     exec.QueueStore
+	CoordinatorCli exec.Dispatcher
 }
 
 // SetupScheduler creates a test scheduler instance with all dependencies

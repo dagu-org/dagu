@@ -8,8 +8,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/common/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/resource"
 	"github.com/spf13/cobra"
 )
@@ -74,19 +74,26 @@ var startAllFlags = []commandLineFlag{
 	peerSkipTLSVerifyFlag,
 }
 
-// runStartAll starts the scheduler, web server, resource monitoring service, and optionally the coordinator in-process, then manages their lifecycles and graceful shutdown.
-// It creates a signal-aware context, decides whether to enable the coordinator based on coordinator host binding, waits for an error or termination signal, shuts down services in order, and returns the first service error encountered (if any).
+// runStartAll starts the scheduler, web server, resource monitoring service, and optionally
+// the coordinator in-process, then manages their lifecycles and graceful shutdown.
+// It creates a signal-aware context, decides whether to enable the coordinator based on
+// coordinator host binding, waits for an error or termination signal, shuts down services
+// in order, and returns the first service error encountered (if any).
 func runStartAll(ctx *Context, _ []string) error {
 	if dagsDir, _ := ctx.Command.Flags().GetString("dags"); dagsDir != "" {
 		ctx.Config.Paths.DAGsDir = dagsDir
 	}
 
-	// Create a context that will be cancelled on interrupt signal
+	// Create a context that will be cancelled on interrupt signal.
+	// This must be created BEFORE server initialization so OIDC provider init can be cancelled.
 	signalCtx, stop := signal.NotifyContext(ctx.Context, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Initialize all services
-	scheduler, err := ctx.NewScheduler()
+	// Create a signal-aware context for services (used for OIDC init and all service operations)
+	serviceCtx := ctx.WithContext(signalCtx)
+
+	// Initialize all services using the signal-aware context
+	scheduler, err := serviceCtx.NewScheduler()
 	if err != nil {
 		return fmt.Errorf("failed to initialize scheduler: %w", err)
 	}
@@ -96,7 +103,8 @@ func runStartAll(ctx *Context, _ []string) error {
 	// Initialize resource monitoring service
 	resourceService := resource.NewService(ctx.Config)
 
-	server, err := ctx.NewServer(resourceService)
+	// Use serviceCtx so OIDC initialization can respond to termination signals
+	server, err := serviceCtx.NewServer(resourceService)
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}
@@ -105,20 +113,6 @@ func runStartAll(ctx *Context, _ []string) error {
 	coordinator, coordHandler, err := newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry, ctx.DAGRunStore)
 	if err != nil {
 		return fmt.Errorf("failed to initialize coordinator: %w", err)
-	}
-
-	// Create a new context with the signal context for services
-	serviceCtx := &Context{
-		Context:         signalCtx,
-		Command:         ctx.Command,
-		Flags:           ctx.Flags,
-		Config:          ctx.Config,
-		Quiet:           ctx.Quiet,
-		DAGRunStore:     ctx.DAGRunStore,
-		DAGRunMgr:       ctx.DAGRunMgr,
-		ProcStore:       ctx.ProcStore,
-		QueueStore:      ctx.QueueStore,
-		ServiceRegistry: ctx.ServiceRegistry,
 	}
 
 	// Start resource monitoring service (starts its own goroutine internally)

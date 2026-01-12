@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/dagu-org/dagu/internal/common/fileutil"
-	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/common/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/spf13/cobra"
 )
@@ -42,13 +42,9 @@ var retryWorkerIDFlag = commandLineFlag{
 }
 
 func runRetry(ctx *Context, args []string) error {
-	// Extract retry details
 	dagRunID, _ := ctx.StringParam("run-id")
 	stepName, _ := ctx.StringParam("step")
-
-	// Get worker-id for tracking which worker executes this DAG run
 	workerID, _ := ctx.StringParam("worker-id")
-	// Default to "local" for non-distributed execution
 	if workerID == "" {
 		workerID = "local"
 	}
@@ -58,35 +54,35 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to extract DAG name: %w", err)
 	}
 
-	// Retrieve the previous run data for specified dag-run ID.
-	ref := execution.NewDAGRunRef(name, dagRunID)
+	ref := exec.NewDAGRunRef(name, dagRunID)
 	attempt, err := ctx.DAGRunStore.FindAttempt(ctx, ref)
 	if err != nil {
 		return fmt.Errorf("failed to find the record for dag-run ID %s: %w", dagRunID, err)
 	}
 
-	// Read the detailed status of the previous status.
 	status, err := attempt.ReadStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read status: %w", err)
 	}
 
-	// Get the DAG instance from the execution history.
 	dag, err := attempt.ReadDAG(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read DAG from record: %w", err)
 	}
 
-	// Set DAG context for all logs
+	// Block retry via CLI for DAGs with workerSelector, UNLESS this is a distributed worker execution
+	// (indicated by --worker-id being set to something other than "local")
+	if len(dag.WorkerSelector) > 0 && workerID == "local" {
+		return fmt.Errorf("cannot retry DAG %q with workerSelector via CLI; use 'dagu enqueue' for distributed execution", dag.Name)
+	}
+
 	ctx.Context = logger.WithValues(ctx.Context, tag.DAG(dag.Name), tag.RunID(dagRunID))
 
-	// Try lock proc store to avoid race
 	if err := ctx.ProcStore.Lock(ctx, dag.ProcGroup()); err != nil {
 		return fmt.Errorf("failed to lock process group: %w", err)
 	}
 
-	// Acquire process handle
-	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), execution.NewDAGRunRef(dag.Name, dagRunID))
+	proc, err := ctx.ProcStore.Acquire(ctx, dag.ProcGroup(), exec.NewDAGRunRef(dag.Name, dagRunID))
 	if err != nil {
 		ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 		logger.Debug(ctx, "Failed to acquire process handle", tag.Error(err))
@@ -97,10 +93,8 @@ func runRetry(ctx *Context, args []string) error {
 		_ = proc.Stop(ctx)
 	}()
 
-	// Unlock the process group before start DAG
 	ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 
-	// The retry command is currently only supported for root DAGs.
 	if err := executeRetry(ctx, dag, status, status.DAGRun(), stepName, workerID); err != nil {
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
@@ -108,18 +102,13 @@ func runRetry(ctx *Context, args []string) error {
 	return nil
 }
 
-// executeRetry prepares and runs a retry of a DAG run by opening the original run's log,
-// loading the DAG environment, initializing the DAG store, creating an agent configured
-// for retry (including step-level retry if provided), and invoking the shared agent executor.
-// It returns an error if any setup step fails or if the agent execution fails.
-func executeRetry(ctx *Context, dag *core.DAG, status *execution.DAGRunStatus, rootRun execution.DAGRunRef, stepName string, workerID string) error {
-	// Set step context if specified
+// executeRetry prepares and runs a retry of a DAG run using the original run's log file.
+func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRun exec.DAGRunRef, stepName string, workerID string) error {
 	if stepName != "" {
 		ctx.Context = logger.WithValues(ctx.Context, tag.Step(stepName))
 	}
 	logger.Debug(ctx, "Executing dag-run retry")
 
-	// We use the same log file for the retry as the original run.
 	logFile, err := fileutil.OpenOrCreateFile(status.Log)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
@@ -130,7 +119,6 @@ func executeRetry(ctx *Context, dag *core.DAG, status *execution.DAGRunStatus, r
 
 	logger.Info(ctx, "Dag-run retry initiated", tag.File(logFile.Name()))
 
-	// Load environment variable
 	dag.LoadDotEnv(ctx)
 
 	dr, err := ctx.dagStore(nil, []string{filepath.Dir(dag.Location)})
@@ -145,16 +133,16 @@ func executeRetry(ctx *Context, dag *core.DAG, status *execution.DAGRunStatus, r
 		logFile.Name(),
 		ctx.DAGRunMgr,
 		dr,
-		ctx.DAGRunStore,
-		ctx.ServiceRegistry,
-		rootRun,
-		ctx.Config.Core.Peer,
 		agent.Options{
 			RetryTarget:     status,
 			ParentDAGRun:    status.Parent,
 			ProgressDisplay: shouldEnableProgress(ctx),
 			StepRetry:       stepName,
 			WorkerID:        workerID,
+			DAGRunStore:     ctx.DAGRunStore,
+			ServiceRegistry: ctx.ServiceRegistry,
+			RootDAGRun:      rootRun,
+			PeerConfig:      ctx.Config.Core.Peer,
 		},
 	)
 

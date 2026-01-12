@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
-	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec/types"
 	"github.com/go-viper/mapstructure/v2"

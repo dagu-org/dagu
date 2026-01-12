@@ -13,11 +13,11 @@ import (
 
 	oidc "github.com/coreos/go-oidc"
 	"github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/common/backoff"
-	"github.com/dagu-org/dagu/internal/common/config"
-	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/common/stringutil"
+	"github.com/dagu-org/dagu/internal/cmn/backoff"
+	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/dagu-org/dagu/internal/service/oidcprovision"
 	"golang.org/x/oauth2"
@@ -69,7 +69,9 @@ type oidcProviderResult struct {
 }
 
 // initOIDCProviderCore initializes the common OIDC provider components.
-func initOIDCProviderCore(params oidcProviderParams) (*oidcProviderResult, error) {
+// The passed context is used for the OIDC provider initialization and retry loop,
+// allowing the initialization to be cancelled (e.g., on SIGINT/SIGTERM).
+func initOIDCProviderCore(ctx context.Context, params oidcProviderParams) (*oidcProviderResult, error) {
 	// Basic input validation
 	if params.Issuer == "" {
 		return nil, errors.New("failed to init OIDC provider: issuer is empty")
@@ -81,9 +83,10 @@ func initOIDCProviderCore(params oidcProviderParams) (*oidcProviderResult, error
 		return nil, errors.New("failed to init OIDC provider: client url is empty")
 	}
 
-	// Create a background context with the HTTP client for OIDC operations
+	// Create context with the HTTP client for OIDC operations
+	// Use the passed context to allow cancellation (e.g., on SIGINT/SIGTERM)
 	httpClient := &http.Client{Timeout: oidcProviderInitTimeout}
-	ctx := oidc.ClientContext(context.Background(), httpClient)
+	oidcCtx := oidc.ClientContext(ctx, httpClient)
 
 	// Create retry policy with exponential backoff for transient network errors
 	policy := backoff.NewExponentialBackoffPolicy(oidcProviderInitialInterval)
@@ -91,10 +94,22 @@ func initOIDCProviderCore(params oidcProviderParams) (*oidcProviderResult, error
 	policy.MaxRetries = oidcProviderMaxRetries
 
 	var provider *oidc.Provider
-	err := backoff.Retry(ctx, func(ctx context.Context) error {
+	err := backoff.Retry(oidcCtx, func(retryCtx context.Context) error {
 		var providerErr error
-		provider, providerErr = oidcProviderFactory(ctx, params.Issuer)
+		provider, providerErr = oidcProviderFactory(retryCtx, params.Issuer)
 		if providerErr != nil {
+			// Check for permanent errors that shouldn't be retried
+			// (e.g., invalid URL format, unsupported scheme)
+			errStr := providerErr.Error()
+			if strings.Contains(errStr, "unsupported protocol scheme") ||
+				strings.Contains(errStr, "invalid URI") ||
+				strings.Contains(errStr, "invalid URL") {
+				slog.Error("OIDC provider init failed with permanent error",
+					tag.Error(providerErr),
+					slog.String("issuer", params.Issuer))
+				return backoff.PermanentError(providerErr)
+			}
+
 			slog.Warn("OIDC provider init failed, will retry",
 				tag.Error(providerErr),
 				slog.String("issuer", params.Issuer))
@@ -131,14 +146,14 @@ func initOIDCProviderCore(params oidcProviderParams) (*oidcProviderResult, error
 	}, nil
 }
 
-func InitVerifierAndConfig(i config.AuthOIDC) (_ *OIDCConfig, err error) {
+func InitVerifierAndConfig(ctx context.Context, i config.AuthOIDC) (_ *OIDCConfig, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("failed to init OIDC provider: %v", r)
 		}
 	}()
 
-	result, err := initOIDCProviderCore(oidcProviderParams{
+	result, err := initOIDCProviderCore(ctx, oidcProviderParams{
 		Issuer:       i.Issuer,
 		ClientID:     i.ClientId,
 		ClientSecret: i.ClientSecret,
@@ -359,8 +374,8 @@ type BuiltinOIDCConfig struct {
 }
 
 // InitBuiltinOIDCConfig initializes OIDC for builtin auth mode.
-func InitBuiltinOIDCConfig(cfg config.AuthOIDC, authSvc *authservice.Service, provisionSvc *oidcprovision.Service, basePath string) (*BuiltinOIDCConfig, error) {
-	result, err := initOIDCProviderCore(oidcProviderParams{
+func InitBuiltinOIDCConfig(ctx context.Context, cfg config.AuthOIDC, authSvc *authservice.Service, provisionSvc *oidcprovision.Service, basePath string) (*BuiltinOIDCConfig, error) {
+	result, err := initOIDCProviderCore(ctx, oidcProviderParams{
 		Issuer:       cfg.Issuer,
 		ClientID:     cfg.ClientId,
 		ClientSecret: cfg.ClientSecret,

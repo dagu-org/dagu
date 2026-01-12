@@ -5,7 +5,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/common/fileutil"
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 )
 
 // defaultStderrTailLimit is the fallback maximum number of bytes

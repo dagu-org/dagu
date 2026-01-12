@@ -6,18 +6,18 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 )
 
 var _ runtime.Database = &dbClient{}
 
 type dbClient struct {
-	ds  execution.DAGStore
-	drs execution.DAGRunStore
+	ds  exec.DAGStore
+	drs exec.DAGRunStore
 }
 
-func newDBClient(drs execution.DAGRunStore, ds execution.DAGStore) *dbClient {
+func newDBClient(drs exec.DAGRunStore, ds exec.DAGStore) *dbClient {
 	return &dbClient{drs: drs, ds: ds}
 }
 
@@ -26,7 +26,7 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*core.DAG, error) {
 	return o.ds.GetDetails(ctx, name)
 }
 
-func (o *dbClient) GetSubDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) (*runtime.RunStatus, error) {
+func (o *dbClient) GetSubDAGRunStatus(ctx context.Context, dagRunID string, rootDAGRun exec.DAGRunRef) (*runtime.RunStatus, error) {
 	subAttempt, err := o.drs.FindSubAttempt(ctx, rootDAGRun, dagRunID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find run for dag-run ID %s: %w", dagRunID, err)
@@ -59,7 +59,7 @@ func (o *dbClient) GetSubDAGRunStatus(ctx context.Context, dagRunID string, root
 	}, nil
 }
 
-func (o *dbClient) IsSubDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) (bool, error) {
+func (o *dbClient) IsSubDAGRunCompleted(ctx context.Context, dagRunID string, rootDAGRun exec.DAGRunRef) (bool, error) {
 	subAttempt, err := o.drs.FindSubAttempt(ctx, rootDAGRun, dagRunID)
 	if err != nil {
 		return false, fmt.Errorf("failed to find run for dag-run ID %s: %w", dagRunID, err)
@@ -72,7 +72,7 @@ func (o *dbClient) IsSubDAGRunCompleted(ctx context.Context, dagRunID string, ro
 	return !status.Status.IsActive(), nil
 }
 
-func (o *dbClient) RequestChildCancel(ctx context.Context, dagRunID string, rootDAGRun execution.DAGRunRef) error {
+func (o *dbClient) RequestChildCancel(ctx context.Context, dagRunID string, rootDAGRun exec.DAGRunRef) error {
 	subAttempt, err := o.drs.FindSubAttempt(ctx, rootDAGRun, dagRunID)
 	if err != nil {
 		return fmt.Errorf("failed to find child attempt for dag-run ID %s: %w", dagRunID, err)

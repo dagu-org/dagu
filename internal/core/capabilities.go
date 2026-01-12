@@ -3,7 +3,7 @@ package core
 import (
 	"context"
 
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 )
 
 // ExecutorCapabilities defines what an executor can do.

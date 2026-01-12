@@ -3,6 +3,7 @@
  *
  * @module features/dags/components/dag-execution
  */
+import { useErrorModal } from '@/components/ui/error-modal';
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { components, NodeStatus, Status, Stream } from '../../../../api/v2/schema';
@@ -91,6 +92,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
   const navigate = useNavigate();
+  const { showError } = useErrorModal();
   const [modal, setModal] = React.useState(false);
 
   // State for log viewer
@@ -259,7 +261,10 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
     );
 
     if (error) {
-      alert(error.message || 'An error occurred');
+      showError(
+        error.message || 'Failed to update status',
+        'Please try again or check the server connection.'
+      );
       return;
     }
 
@@ -354,8 +359,6 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
               <div className="bg-surface border border-border rounded-lg p-4">
                 <DAGStatusOverview
                   status={reversedDAGRuns[idx]}
-                  dagRunId={reversedDAGRuns[idx].dagRunId}
-                  {...props}
                   onViewLog={(dagRunId) => {
                     setLogViewer({
                       isOpen: true,

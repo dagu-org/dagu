@@ -1,16 +1,18 @@
 package runtime
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
-	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	exec1 "github.com/dagu-org/dagu/internal/core/exec"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -102,7 +104,7 @@ func (b *SubCmdBuilder) Enqueue(dag *core.DAG, opts EnqueueOptions) CmdSpec {
 }
 
 // Dequeue creates a dequeue command spec.
-func (b *SubCmdBuilder) Dequeue(dag *core.DAG, dagRun execution.DAGRunRef) CmdSpec {
+func (b *SubCmdBuilder) Dequeue(dag *core.DAG, dagRun exec1.DAGRunRef) CmdSpec {
 	queueName := dag.ProcGroup()
 	args := []string{"dequeue", queueName, fmt.Sprintf("--dag-run=%s", dagRun.String())}
 
@@ -172,7 +174,16 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 
 	args = append(args, fmt.Sprintf("--run-id=%s", task.DagRunId))
 
+	// CRITICAL: Use original DAG name, not temp filename
+	// The temp file doesn't have a 'name:' field, so without this flag the subprocess
+	// would derive the name from the temp filename (e.g., "distributed_exec-12345")
+	// instead of using the original name ("distributed_exec"), causing dag-run lookup to fail.
+	if task.RootDagRunName != "" {
+		args = append(args, fmt.Sprintf("--name=%s", task.RootDagRunName))
+	}
+
 	// Pass worker ID for tracking which worker executes this DAG run
+	// CRITICAL: This prevents subprocess from re-dispatching to coordinator
 	if task.WorkerId != "" {
 		args = append(args, fmt.Sprintf("--worker-id=%s", task.WorkerId))
 	}
@@ -255,48 +266,37 @@ type RestartOptions struct {
 }
 
 // Run executes the command and waits for it to complete.
+// If the command fails, stdout/stderr output is included in the error for debugging.
 func Run(ctx context.Context, spec CmdSpec) error {
-	// nolint:gosec
-	cmd := exec.CommandContext(ctx, spec.Executable, spec.Args...)
-	cmdutil.SetupCommand(cmd)
-	cmd.Env = spec.Env
+	var stdout, stderr bytes.Buffer
 
-	if spec.Stdout != nil {
-		cmd.Stdout = spec.Stdout
-	} else {
-		cmd.Stdout = os.Stdout
+	cmd := newCommand(ctx, spec, true)
+	// Capture output for error reporting while also writing to original destinations
+	if cmd.Stdout == nil {
+		cmd.Stdout = &stdout
 	}
-
-	if spec.Stderr != nil {
-		cmd.Stderr = spec.Stderr
-	} else {
-		cmd.Stderr = os.Stderr
+	if cmd.Stderr == nil {
+		cmd.Stderr = &stderr
 	}
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("command failed: %w", err)
+		// Build error message with captured output
+		var parts []string
+		parts = append(parts, fmt.Sprintf("command failed: %v", err))
+		if stdout.Len() > 0 {
+			parts = append(parts, fmt.Sprintf("stdout: %s", strings.TrimSpace(stdout.String())))
+		}
+		if stderr.Len() > 0 {
+			parts = append(parts, fmt.Sprintf("stderr: %s", strings.TrimSpace(stderr.String())))
+		}
+		return fmt.Errorf("%s", strings.Join(parts, "\n"))
 	}
 	return nil
 }
 
 // Start executes the command without waiting for it to complete.
 func Start(ctx context.Context, spec CmdSpec) error {
-	// nolint:gosec
-	cmd := exec.Command(spec.Executable, spec.Args...)
-	cmdutil.SetupCommand(cmd)
-	cmd.Env = spec.Env
-
-	if spec.Stdout != nil {
-		cmd.Stdout = spec.Stdout
-	} else {
-		cmd.Stdout = os.Stdout
-	}
-	if spec.Stderr != nil {
-		cmd.Stderr = spec.Stderr
-	} else {
-		cmd.Stderr = os.Stderr
-	}
-
+	cmd := newCommand(ctx, spec, false)
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start command: %w", err)
 	}
@@ -306,4 +306,26 @@ func Start(ctx context.Context, spec CmdSpec) error {
 	})
 
 	return nil
+}
+
+// newCommand creates an exec.Cmd from the spec with proper configuration.
+// nolint:gosec
+func newCommand(ctx context.Context, spec CmdSpec, withContext bool) *exec.Cmd {
+	var cmd *exec.Cmd
+	if withContext {
+		cmd = exec.CommandContext(ctx, spec.Executable, spec.Args...)
+	} else {
+		cmd = exec.Command(spec.Executable, spec.Args...)
+	}
+	cmdutil.SetupCommand(cmd)
+	cmd.Env = spec.Env
+	cmd.Stdout = spec.Stdout
+	cmd.Stderr = spec.Stderr
+	if cmd.Stdout == nil {
+		cmd.Stdout = os.Stdout
+	}
+	if cmd.Stderr == nil {
+		cmd.Stderr = os.Stderr
+	}
+	return cmd
 }

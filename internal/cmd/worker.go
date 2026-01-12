@@ -3,10 +3,11 @@ package cmd
 import (
 	"fmt"
 	"log/slog"
+	"os"
 
-	"github.com/dagu-org/dagu/internal/common/config"
-	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/common/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/worker"
 	"github.com/spf13/cobra"
@@ -76,11 +77,17 @@ var workerFlags = []commandLineFlag{
 
 func runWorker(ctx *Context, _ []string) error {
 	workerID := ctx.Config.Worker.ID
+	// Default to hostname@PID if not configured
+	if workerID == "" {
+		hostname, err := os.Hostname()
+		if err != nil || hostname == "" {
+			hostname = "unknown"
+		}
+		workerID = fmt.Sprintf("%s@%d", hostname, os.Getpid())
+	}
+
 	maxActiveRuns := ctx.Config.Worker.MaxActiveRuns
 	labels := ctx.Config.Worker.Labels
-	if labels == nil {
-		labels = make(map[string]string)
-	}
 
 	coordinatorCli, useRemoteHandler, err := createCoordinatorClient(ctx)
 	if err != nil {

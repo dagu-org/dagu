@@ -3,7 +3,7 @@ package api
 import (
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
 func toDAG(dag *core.DAG) api.DAG {
@@ -131,7 +131,7 @@ func toPrecondition(obj *core.Condition) api.Condition {
 	}
 }
 
-func toDAGRunSummary(s execution.DAGRunStatus) api.DAGRunSummary {
+func toDAGRunSummary(s exec.DAGRunStatus) api.DAGRunSummary {
 	return api.DAGRunSummary{
 		RootDAGRunName:   s.Root.Name,
 		RootDAGRunId:     s.Root.ID,
@@ -150,7 +150,7 @@ func toDAGRunSummary(s execution.DAGRunStatus) api.DAGRunSummary {
 	}
 }
 
-func toDAGRunDetails(s execution.DAGRunStatus) api.DAGRunDetails {
+func toDAGRunDetails(s exec.DAGRunStatus) api.DAGRunDetails {
 	preconditions := make([]api.Condition, len(s.Preconditions))
 	for i, p := range s.Preconditions {
 		preconditions[i] = toPrecondition(p)
@@ -182,7 +182,7 @@ func toDAGRunDetails(s execution.DAGRunStatus) api.DAGRunDetails {
 	}
 }
 
-func toNode(node *execution.Node) api.Node {
+func toNode(node *exec.Node) api.Node {
 	if node == nil {
 		return api.Node{}
 	}
@@ -208,7 +208,7 @@ func toNode(node *execution.Node) api.Node {
 	}
 }
 
-func toSubDAGRuns(subDAGRuns []execution.SubDAGRun) []api.SubDAGRun {
+func toSubDAGRuns(subDAGRuns []exec.SubDAGRun) []api.SubDAGRun {
 	var result []api.SubDAGRun
 	for _, w := range subDAGRuns {
 		subDAGRun := api.SubDAGRun{

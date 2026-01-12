@@ -5,10 +5,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/common/fileutil"
-	"github.com/dagu-org/dagu/internal/common/logger"
-	"github.com/dagu-org/dagu/internal/common/logger/tag"
-	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/spf13/cobra"
 )
 
@@ -191,7 +191,7 @@ func runExec(ctx *Context, args []string) error {
 		return err
 	}
 
-	dagRunRef := execution.NewDAGRunRef(dag.Name, runID)
+	dagRunRef := exec.NewDAGRunRef(dag.Name, runID)
 
 	attempt, _ := ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
 	if attempt != nil {

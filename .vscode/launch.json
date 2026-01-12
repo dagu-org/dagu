@@ -34,7 +34,7 @@
       "request": "launch",
       "mode": "auto",
       "program": "${workspaceFolder}/cmd/",
-      "args": ["worker", "--worker.labels", "xxx:yyy"]
+      "args": ["worker", "--worker.labels", "foo=bar"]
     },
     {
       "name": "Start",
