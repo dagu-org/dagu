@@ -349,6 +349,45 @@ steps:
 		require.Equal(t, core.Succeeded, finalStatus.Status)
 		f.assertAllNodesSucceeded(finalStatus)
 	})
+
+	t.Run("retryDispatchesToCoordinator_NoNameField", func(t *testing.T) {
+		f := newTestFixture(t, `
+workerSelector:
+  test: "true"
+steps:
+  - name: task1
+    command: echo "task1 executed"
+  - name: task2
+    command: echo "task2 executed"
+    depends: [task1]
+`)
+		defer f.cleanup()
+
+		require.NoError(t, f.enqueue())
+		f.waitForQueued()
+		f.startScheduler(30 * time.Second)
+
+		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		dagRunID := status.DAGRunID
+		f.cleanup()
+
+		f.startScheduler(30 * time.Second)
+
+		require.NoError(t, f.retry(dagRunID))
+
+		require.Eventually(t, func() bool {
+			status, err := f.latestStatus()
+			if err != nil {
+				return false
+			}
+			return status.Status == core.Succeeded && status.DAGRunID == dagRunID
+		}, 25*time.Second, 200*time.Millisecond, "Retry should complete successfully")
+
+		finalStatus, err := f.latestStatus()
+		require.NoError(t, err)
+		require.Equal(t, core.Succeeded, finalStatus.Status)
+		f.assertAllNodesSucceeded(finalStatus)
+	})
 }
 
 func TestRetry_PartialRetry(t *testing.T) {
@@ -397,6 +436,42 @@ func TestRetry_SharedFSMode(t *testing.T) {
 	t.Run("retryWorksWithSharedFSWorker", func(t *testing.T) {
 		f := newTestFixture(t, `
 name: retry-sharedfs-test
+workerSelector:
+  test: "true"
+steps:
+  - name: task1
+    command: echo "sharedfs task1"
+`, withWorkerMode(sharedFSMode))
+		defer f.cleanup()
+
+		require.NoError(t, f.enqueue())
+		f.waitForQueued()
+		f.startScheduler(30 * time.Second)
+
+		status := f.waitForStatus(core.Succeeded, 25*time.Second)
+		dagRunID := status.DAGRunID
+		f.cleanup()
+
+		ctx, cancel := context.WithTimeout(f.coord.Context, 30*time.Second)
+		defer cancel()
+
+		f.schedulerCtx = ctx
+		f.schedulerCancel = cancel
+		f.startScheduler(30 * time.Second)
+
+		require.NoError(t, f.retry(dagRunID))
+
+		require.Eventually(t, func() bool {
+			status, err := f.latestStatus()
+			if err != nil {
+				return false
+			}
+			return status.Status == core.Succeeded
+		}, 25*time.Second, 200*time.Millisecond)
+	})
+
+	t.Run("retryWorksWithSharedFSWorker_NoNameField", func(t *testing.T) {
+		f := newTestFixture(t, `
 workerSelector:
   test: "true"
 steps:
