@@ -14,7 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
-	legacymodel "github.com/dagu-org/dagu/internal/persistence/legacy/model"
+	legacymodel "github.com/dagu-org/dagu/internal/persis/legacy/model"
 )
 
 // historyMigrator handles migration from legacy history format to new format
