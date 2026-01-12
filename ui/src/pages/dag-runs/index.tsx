@@ -10,6 +10,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -762,7 +763,7 @@ function DAGRuns() {
             {/* Tags filter */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-9 px-3">
+                <Button variant="outline" className="h-8 px-3">
                   <Tag size={14} className="mr-1.5" />
                   Tags
                   {selectedTags.length > 0 && (
@@ -800,16 +801,13 @@ function DAGRuns() {
                 {selectedTags.length > 0 && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuCheckboxItem
+                    <DropdownMenuItem
                       className="text-destructive focus:text-destructive"
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        handleClearTags();
-                      }}
+                      onSelect={() => handleClearTags()}
                     >
                       <X size={14} className="mr-1.5" />
                       Clear all
-                    </DropdownMenuCheckboxItem>
+                    </DropdownMenuItem>
                   </>
                 )}
               </DropdownMenuContent>
@@ -823,6 +821,15 @@ function DAGRuns() {
                     variant="secondary"
                     className="text-xs cursor-pointer hover:bg-destructive/20"
                     onClick={() => handleTagToggle(tag)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleTagToggle(tag);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`Remove tag ${tag}`}
                   >
                     {tag}
                     <X size={12} className="ml-1" />

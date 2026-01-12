@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -378,7 +379,9 @@ func (a *API) buildAllowedDAGNames(ctx context.Context, tagsFilter []string) (ma
 		return nil, nil
 	}
 
-	result, _, err := a.dagStore.List(ctx, exec.ListDAGsOptions{})
+	// Use a large page size to get all DAGs in one request
+	paginator := exec.NewPaginator(1, math.MaxInt)
+	result, _, err := a.dagStore.List(ctx, exec.ListDAGsOptions{Paginator: &paginator})
 	if err != nil {
 		return nil, fmt.Errorf("error getting DAGs for tag filter: %w", err)
 	}
@@ -407,17 +410,22 @@ func hasAllTags(dagTags, requiredTags []string) bool {
 }
 
 // parseCommaSeparatedTags parses a comma-separated string of tags into a slice.
-// Empty strings and whitespace-only values are filtered out.
+// Tags are normalized to lowercase and deduplicated.
 func parseCommaSeparatedTags(tagsParam *string) []string {
 	if tagsParam == nil || *tagsParam == "" {
 		return nil
 	}
 
 	parts := strings.Split(*tagsParam, ",")
+	seen := make(map[string]struct{}, len(parts))
 	tags := make([]string, 0, len(parts))
 	for _, tag := range parts {
-		if trimmed := strings.TrimSpace(tag); trimmed != "" {
-			tags = append(tags, trimmed)
+		normalized := strings.ToLower(strings.TrimSpace(tag))
+		if normalized != "" {
+			if _, exists := seen[normalized]; !exists {
+				seen[normalized] = struct{}{}
+				tags = append(tags, normalized)
+			}
 		}
 	}
 	return tags
