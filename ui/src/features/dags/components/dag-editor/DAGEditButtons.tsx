@@ -4,6 +4,7 @@
  * @module features/dags/components/dag-editor
  */
 import { Button } from '@/components/ui/button';
+import { useErrorModal } from '@/components/ui/error-modal';
 import { PencilLine, Trash2 } from 'lucide-react';
 import React from 'react';
 import { DAGNameInputModal } from '../../../../components/DAGNameInputModal';
@@ -26,6 +27,7 @@ function DAGEditButtons({ fileName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
   const config = useConfig();
+  const { showError } = useErrorModal();
   const [isRenameModalOpen, setIsRenameModalOpen] = React.useState(false);
   const [renameError, setRenameError] = React.useState<string | null>(null);
   const [isRenameLoading, setIsRenameLoading] = React.useState(false);
@@ -100,7 +102,10 @@ function DAGEditButtons({ fileName }: Props) {
             },
           });
           if (error) {
-            alert(error.message || 'An error occurred');
+            showError(
+              error.message || 'Failed to delete DAG',
+              'Please try again or check the server connection.'
+            );
             return;
           }
           // Redirect to the DAGs list page

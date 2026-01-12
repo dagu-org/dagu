@@ -3,6 +3,7 @@
  *
  * @module features/dags/components/dag-execution
  */
+import { useErrorModal } from '@/components/ui/error-modal';
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { components, NodeStatus, Status, Stream } from '../../../../api/v2/schema';
@@ -36,6 +37,7 @@ function DAGExecutionHistory({
   fileName,
 }: Omit<Props, 'isInModal' | 'activeTab'>) {
   const appBarContext = React.useContext(AppBarContext);
+  const { showError } = useErrorModal();
 
   // Fetch execution history data
   const { data } = useQuery(
@@ -259,7 +261,10 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
     );
 
     if (error) {
-      alert(error.message || 'An error occurred');
+      showError(
+        error.message || 'Failed to update status',
+        'Please try again or check the server connection.'
+      );
       return;
     }
 

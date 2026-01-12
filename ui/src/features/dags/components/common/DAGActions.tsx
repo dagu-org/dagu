@@ -4,6 +4,8 @@
  * @module features/dags/components/common
  */
 import { Checkbox } from '@/components/ui/checkbox';
+import { useErrorModal } from '@/components/ui/error-modal';
+import { useSimpleToast } from '@/components/ui/simple-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -62,6 +64,8 @@ function DAGActions({
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
   const { hasUnsavedChanges } = useUnsavedChanges();
+  const { showError } = useErrorModal();
+  const { showToast } = useSimpleToast();
   const [isEnqueueModal, setIsEnqueueModal] = React.useState(false);
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
@@ -243,9 +247,9 @@ function DAGActions({
               });
               if (error) {
                 console.error('Stop all API error:', error);
-                alert(
-                  error.message ||
-                    'An error occurred while stopping all instances'
+                showError(
+                  error.message || 'Failed to stop all DAG instances',
+                  'Some instances may have already completed or the worker is unavailable.'
                 );
                 return;
               }
@@ -270,13 +274,19 @@ function DAGActions({
                 );
                 if (error) {
                   console.error('Stop dag-run API error:', error);
-                  alert(error.message || 'An error occurred');
+                  showError(
+                    error.message || 'Failed to stop DAG run',
+                    'The DAG run may have already completed or the worker is unavailable.'
+                  );
                   return;
                 }
                 reloadData();
               } else {
                 console.error('Cannot stop DAG: missing DAG name or run ID');
-                alert('Cannot stop DAG: missing DAG name or run ID');
+                showError(
+                  'Cannot stop DAG: missing DAG name or run ID',
+                  'Please ensure you have selected a valid DAG run.'
+                );
               }
             }
           }}
@@ -368,7 +378,10 @@ function DAGActions({
                   }
                 );
                 if (error) {
-                  alert(error.message || 'An error occurred');
+                  showError(
+                    error.message || 'Failed to reschedule DAG run',
+                    'Check if the worker is running and the DAG definition is valid.'
+                  );
                   // Reset state on error
                   setRetryAsNew(false);
                   setNewRunId('');
@@ -377,9 +390,7 @@ function DAGActions({
                 }
                 // Show success message with new run ID
                 if (data?.dagRunId) {
-                  alert(
-                    `New DAG run created with ID: ${data.dagRunId}${data.queued ? ' (queued)' : ''}`
-                  );
+                  showToast(`New DAG run created: ${data.dagRunId}`);
                 }
                 // Reset state after success
                 setRetryAsNew(false);
@@ -405,14 +416,20 @@ function DAGActions({
                   }
                 );
                 if (error) {
-                  alert(error.message || 'An error occurred');
+                  showError(
+                    error.message || 'Failed to retry DAG run',
+                    'Check if the worker is running and accessible.'
+                  );
                   return;
                 }
               }
               reloadData();
             } else {
               console.error('Cannot retry DAG: missing DAG name or run ID');
-              alert('Cannot retry DAG: missing DAG name or run ID');
+              showError(
+                'Cannot retry DAG: missing DAG name or run ID',
+                'Please ensure you have selected a valid DAG run.'
+              );
             }
           }}
         >
@@ -529,7 +546,10 @@ function DAGActions({
                   body,
                 }));
             if (error) {
-              alert(error.message || 'An error occurred');
+              showError(
+                error.message || 'Failed to start DAG',
+                'Check if the worker is running and the DAG definition is valid.'
+              );
               return;
             }
 

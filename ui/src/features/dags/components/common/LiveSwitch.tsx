@@ -3,6 +3,7 @@
  *
  * @module features/dags/components/common
  */
+import { useErrorModal } from '@/components/ui/error-modal';
 import { Switch } from '@/components/ui/switch'; // Import Shadcn Switch
 import React from 'react';
 import { components } from '../../../../api/v2/schema';
@@ -30,6 +31,7 @@ type Props = {
 function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
   const client = useClient();
   const config = useConfig();
+  const { showError } = useErrorModal();
 
   // Initialize state based on DAG suspension state
   const [checked, setChecked] = React.useState(!dag.suspended);
@@ -56,7 +58,10 @@ function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
         },
       });
       if (error) {
-        alert(error.message || 'Error occurred');
+        showError(
+          error.message || 'Failed to update DAG status',
+          'Please try again or check the server connection.'
+        );
         return;
       }
       if (refresh) {

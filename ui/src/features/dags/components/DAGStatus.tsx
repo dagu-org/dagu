@@ -1,3 +1,4 @@
+import { useErrorModal } from '@/components/ui/error-modal';
 import { Tab, Tabs } from '@/components/ui/tabs';
 import {
   Tooltip,
@@ -43,6 +44,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
   const navigate = useNavigate();
+  const { showError } = useErrorModal();
   const [modal, setModal] = useState(false);
   const [activeTab, setActiveTab] = useState<StatusTab>('status');
 
@@ -126,7 +128,10 @@ function DAGStatus({ dagRun, fileName }: Props) {
       },
     });
     if (error) {
-      alert(error.message || 'An error occurred');
+      showError(
+        error.message || 'Failed to update status',
+        'Please try again or check the server connection.'
+      );
       return;
     }
     dismissModal();
