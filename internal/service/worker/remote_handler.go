@@ -93,7 +93,7 @@ func (h *remoteTaskHandler) Handle(ctx context.Context, task *coordinatorv1.Task
 		return h.handleRetry(ctx, task)
 
 	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
-		return fmt.Errorf("unspecified operation")
+		return fmt.Errorf("unsupported operation: unspecified")
 
 	default:
 		return fmt.Errorf("unsupported operation: %v", task.Operation)

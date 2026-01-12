@@ -24,7 +24,9 @@ import (
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/dagu-org/dagu/internal/service/audit"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
 // ExecuteDAGRunFromSpec implements api.StrictServerInterface.
@@ -1056,30 +1058,81 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 	}
 
 	stepName := valueOf(request.Body.StepName)
+
+	// Check for workerSelector - dispatch to coordinator for distributed execution
+	if len(dag.WorkerSelector) > 0 {
+		if a.coordinatorCli == nil {
+			return nil, &Error{
+				HTTPStatus: http.StatusServiceUnavailable,
+				Code:       api.ErrorCodeInternalError,
+				Message:    "coordinator not configured for distributed DAG retry",
+			}
+		}
+
+		// Get previous status for retry context
+		prevStatus, err := attempt.ReadStatus(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("error reading status: %w", err)
+		}
+
+		// Create and dispatch retry task to coordinator
+		opts := []executor.TaskOption{
+			executor.WithWorkerSelector(dag.WorkerSelector),
+			executor.WithPreviousStatus(prevStatus),
+		}
+		if stepName != "" {
+			opts = append(opts, executor.WithStep(stepName))
+		}
+
+		task := executor.CreateTask(
+			dag.Name,
+			string(dag.YamlData),
+			coordinatorv1.Operation_OPERATION_RETRY,
+			request.Body.DagRunId,
+			opts...,
+		)
+
+		if err := a.coordinatorCli.Dispatch(ctx, task); err != nil {
+			return nil, fmt.Errorf("error dispatching retry to coordinator: %w", err)
+		}
+
+		// Log distributed DAG retry
+		a.logRetryAudit(ctx, request.Name, request.DagRunId, stepName, true)
+		return api.RetryDAGRun200Response{}, nil
+	}
+
+	// Local retry path
 	spec := a.subCmdBuilder.Retry(dag, request.Body.DagRunId, stepName)
 	if err := runtime.Start(ctx, spec); err != nil {
 		return nil, fmt.Errorf("error retrying DAG: %w", err)
 	}
 
-	// Log DAG retry
-	if a.auditService != nil {
-		currentUser, _ := auth.UserFromContext(ctx)
-		clientIP, _ := auth.ClientIPFromContext(ctx)
-		detailsMap := map[string]any{
-			"dag_name":   request.Name,
-			"dag_run_id": request.DagRunId,
-		}
-		if stepName != "" {
-			detailsMap["step_name"] = stepName
-		}
-		details, _ := json.Marshal(detailsMap)
-		entry := audit.NewEntry(audit.CategoryDAG, "dag_retry", currentUser.ID, currentUser.Username).
-			WithDetails(string(details)).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
+	// Log local DAG retry
+	a.logRetryAudit(ctx, request.Name, request.DagRunId, stepName, false)
+	return api.RetryDAGRun200Response{}, nil
+}
+
+// logRetryAudit logs a retry audit event.
+func (a *API) logRetryAudit(ctx context.Context, dagName, dagRunID, stepName string, distributed bool) {
+	if a.auditService == nil {
+		return
 	}
 
-	return api.RetryDAGRun200Response{}, nil
+	currentUser, _ := auth.UserFromContext(ctx)
+	clientIP, _ := auth.ClientIPFromContext(ctx)
+	detailsMap := map[string]any{
+		"dag_name":    dagName,
+		"dag_run_id":  dagRunID,
+		"distributed": distributed,
+	}
+	if stepName != "" {
+		detailsMap["step_name"] = stepName
+	}
+	details, _ := json.Marshal(detailsMap)
+	entry := audit.NewEntry(audit.CategoryDAG, "dag_retry", currentUser.ID, currentUser.Username).
+		WithDetails(string(details)).
+		WithIPAddress(clientIP)
+	_ = a.auditService.Log(ctx, entry)
 }
 
 func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRequestObject) (api.TerminateDAGRunResponseObject, error) {

@@ -841,6 +841,15 @@ func (a *Agent) Status(ctx context.Context) execution.DAGRunStatus {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
+	// Handle case where runner wasn't initialized (early failure in Run())
+	if a.runner == nil {
+		return transform.NewStatusBuilder(a.dag).
+			Create(a.dagRunID, core.Failed, os.Getpid(), time.Time{},
+				transform.WithAttemptID(a.dagRunAttemptID),
+				transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
+			)
+	}
+
 	runnerStatus := a.runner.Status(ctx, a.plan)
 	if a.initFailed.Load() {
 		runnerStatus = core.Failed

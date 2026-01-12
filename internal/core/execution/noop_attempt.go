@@ -49,6 +49,10 @@ func (n *noopDAGRunAttempt) ReadDAG(_ context.Context) (*core.DAG, error) {
 	return n.dag, nil
 }
 
+func (n *noopDAGRunAttempt) SetDAG(dag *core.DAG) {
+	n.dag = dag
+}
+
 func (n *noopDAGRunAttempt) Abort(_ context.Context) error {
 	return nil
 }

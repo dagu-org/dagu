@@ -30,7 +30,8 @@ steps:
 `
 		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 
-		setupWorker(t, coord, "test-worker-1", 10, map[string]string{"type": "test-worker"})
+		// Use remoteTaskHandler for distributed execution (pushes status to coordinator)
+		setupRemoteWorker(t, coord, "test-worker-1", 10, map[string]string{"type": "test-worker"})
 
 		dagWrapper := coord.DAG(t, yamlContent)
 		agent := dagWrapper.Agent()
@@ -70,7 +71,8 @@ steps:
 		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 
 		// Create and start worker with selector labels
-		setupWorker(t, coord, "test-worker-1", 10, map[string]string{"type": "test-worker"})
+		// Use remoteTaskHandler for distributed execution (pushes status to coordinator)
+		setupRemoteWorker(t, coord, "test-worker-1", 10, map[string]string{"type": "test-worker"})
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)
@@ -140,7 +142,8 @@ steps:
 		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 
 		// Create and start worker with selector labels
-		setupWorker(t, coord, "test-worker-1", 10, map[string]string{"type": "test-worker"})
+		// Use remoteTaskHandler for distributed execution (pushes status to coordinator)
+		setupRemoteWorker(t, coord, "test-worker-1", 10, map[string]string{"type": "test-worker"})
 
 		// Load the DAG using helper
 		dagWrapper := coord.DAG(t, yamlContent)

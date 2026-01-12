@@ -26,13 +26,15 @@ type RemoteProgressDisplay struct {
 	colorEnabled bool
 	isTTY        bool
 
-	mu           sync.Mutex
-	completed    int
-	spinnerIndex int
-	lastStatus   *execution.DAGRunStatus
-	stopped      bool
-	stopCh       chan struct{}
-	wg           sync.WaitGroup
+	mu                      sync.Mutex
+	completed               int
+	spinnerIndex            int
+	lastStatus              *execution.DAGRunStatus
+	workerID                string
+	headerUpdatedWithWorker bool
+	stopped                 bool
+	stopCh                  chan struct{}
+	wg                      sync.WaitGroup
 }
 
 // NewRemoteProgressDisplay creates a new remote progress display.
@@ -96,6 +98,16 @@ func (p *RemoteProgressDisplay) Update(protoStatus *coordinatorv1.DAGRunStatusPr
 	// Convert proto to execution status
 	status := convert.ProtoToDAGRunStatus(protoStatus)
 	p.lastStatus = status
+
+	// Capture worker ID if available and update header
+	if status.WorkerID != "" && p.workerID == "" {
+		p.workerID = status.WorkerID
+		// Update header to show worker assignment
+		if p.isTTY && !p.headerUpdatedWithWorker {
+			p.updateHeaderWithWorker()
+			p.headerUpdatedWithWorker = true
+		}
+	}
 
 	// Count completed nodes
 	p.completed = 0
@@ -178,6 +190,24 @@ func (p *RemoteProgressDisplay) printHeader() {
 	}
 }
 
+// updateHeaderWithWorker reprints the header line with worker info.
+// Must be called with mu held and only in TTY mode.
+func (p *RemoteProgressDisplay) updateHeaderWithWorker() {
+	dagName := "unknown"
+	if p.dag != nil {
+		dagName = p.dag.Name
+	}
+
+	// ANSI escape sequences:
+	// \r       - move to beginning of current line
+	// \033[K   - clear from cursor to end of line
+	// \033[1A  - move cursor up 1 line
+	// \033[1B  - move cursor down 1 line
+
+	// Clear current progress line, move up to header, clear header, print new header, move back down
+	fmt.Fprintf(os.Stderr, "\r\033[K\033[1A\r\033[K▶ %s %s %s\n", dagName, p.gray("("+p.dagRunID+")"), p.gray("→ "+p.workerID))
+}
+
 // completedAndPercent returns capped completed count and percentage.
 // Must be called with mu held.
 func (p *RemoteProgressDisplay) completedAndPercent() (completed, percent int) {
@@ -203,13 +233,20 @@ func (p *RemoteProgressDisplay) render() {
 	completed, percent := p.completedAndPercent()
 	elapsed := stringutil.FormatDuration(time.Since(p.startTime))
 
+	// Build worker info if available
+	workerInfo := ""
+	if p.workerID != "" {
+		workerInfo = " → " + p.workerID
+	}
+
 	// Use \r to overwrite the line, pad with spaces to clear previous content
-	fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps) %s   ", spinner, percent, completed, p.total, p.gray(elapsed))
+	fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps) %s%s   ", spinner, percent, completed, p.total, p.gray(elapsed), p.gray(workerInfo))
 }
 
 func (p *RemoteProgressDisplay) printFinal(status *execution.DAGRunStatus) {
 	p.mu.Lock()
 	completed, percent := p.completedAndPercent()
+	workerID := p.workerID
 	p.mu.Unlock()
 
 	icon := "✓"
@@ -221,10 +258,20 @@ func (p *RemoteProgressDisplay) printFinal(status *execution.DAGRunStatus) {
 
 	elapsed := stringutil.FormatDuration(time.Since(p.startTime))
 
+	// Build worker info if available
+	workerInfo := ""
+	if workerID != "" {
+		workerInfo = " → " + workerID
+	}
+
 	if p.isTTY {
-		fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps) %s   \n", icon, percent, completed, p.total, p.gray(elapsed))
+		fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps) %s%s   \n", icon, percent, completed, p.total, p.gray(elapsed), p.gray(workerInfo))
 	} else {
-		fmt.Fprintf(os.Stderr, "Finished: %s (%d/%d steps) [%s]\n", statusText, completed, p.total, elapsed)
+		if workerID != "" {
+			fmt.Fprintf(os.Stderr, "Finished: %s (%d/%d steps) [%s] worker=%s\n", statusText, completed, p.total, elapsed, workerID)
+		} else {
+			fmt.Fprintf(os.Stderr, "Finished: %s (%d/%d steps) [%s]\n", statusText, completed, p.total, elapsed)
+		}
 	}
 }
 

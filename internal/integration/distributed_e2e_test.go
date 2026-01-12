@@ -199,7 +199,8 @@ steps:
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
 		// Create and start worker with matching labels (matching the sub-DAG's workerSelector)
-		setupWorker(t, coord, "test-worker-cancel", 10, map[string]string{
+		// Use remoteTaskHandler for distributed execution (pushes status to coordinator and supports cancellation)
+		setupRemoteWorker(t, coord, "test-worker-cancel", 10, map[string]string{
 			"foo": "bar", // Match the sub-DAG's workerSelector
 		})
 

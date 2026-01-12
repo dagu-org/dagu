@@ -84,31 +84,26 @@ func runRestart(ctx *Context, args []string) error {
 }
 
 func handleRestartProcess(ctx *Context, d *core.DAG, oldDagRunID string) error {
-	// Stop if running
 	if err := stopDAGIfRunning(ctx, ctx.DAGRunMgr, d, oldDagRunID); err != nil {
 		return err
 	}
 
-	// Wait before restart if configured
 	if d.RestartWait > 0 {
 		logger.Info(ctx, "Waiting for restart", tag.Duration(d.RestartWait))
 		time.Sleep(d.RestartWait)
 	}
 
-	// Generate new dag-run ID for the restart
 	newDagRunID, err := genRunID()
 	if err != nil {
 		return fmt.Errorf("failed to generate dag-run ID: %w", err)
 	}
 
-	// Execute the exact same DAG with the same parameters but a new dag-run ID
 	if err := ctx.ProcStore.Lock(ctx, d.ProcGroup()); err != nil {
 		logger.Debug(ctx, "Failed to lock process group", tag.Error(err))
 		_ = ctx.RecordEarlyFailure(d, newDagRunID, err)
 		return errProcAcquisitionFailed
 	}
 
-	// Acquire process handle
 	proc, err := ctx.ProcStore.Acquire(ctx, d.ProcGroup(), execution.NewDAGRunRef(d.Name, newDagRunID))
 	if err != nil {
 		ctx.ProcStore.Unlock(ctx, d.ProcGroup())
@@ -120,27 +115,13 @@ func handleRestartProcess(ctx *Context, d *core.DAG, oldDagRunID string) error {
 		_ = proc.Stop(ctx)
 	}()
 
-	// Unlock the process group immediately after acquiring the handle
 	ctx.ProcStore.Unlock(ctx, d.ProcGroup())
 
 	return executeDAGWithRunID(ctx, ctx.DAGRunMgr, d, newDagRunID)
 }
 
 // executeDAGWithRunID executes a DAG with a pre-generated run ID.
-// It returns an error if log or DAG store initialization, or agent execution fails.
 func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRunID string) error {
-	// Check if this DAG needs distributed execution
-	if len(dag.WorkerSelector) > 0 {
-		coordinatorCli := ctx.NewCoordinatorClient()
-		if coordinatorCli == nil {
-			return fmt.Errorf("workerSelector requires a coordinator to be configured")
-		}
-		// Add context tagging for observability parity with local path
-		ctx.Context = logger.WithValues(ctx.Context, tag.DAG(dag.Name), tag.RunID(dagRunID))
-		logger.Info(ctx, "Dag-run restart initiated (distributed)")
-		return dispatchToCoordinatorAndWait(ctx, dag, dagRunID, coordinatorCli)
-	}
-
 	logFile, err := ctx.OpenLogFile(dag, dagRunID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file: %w", err)

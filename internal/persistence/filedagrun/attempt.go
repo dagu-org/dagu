@@ -74,6 +74,11 @@ func (att *Attempt) ID() string {
 	return att.id
 }
 
+// SetDAG sets the DAG for this attempt. Must be called before Open for DAG to be persisted.
+func (att *Attempt) SetDAG(dag *core.DAG) {
+	att.dag = dag
+}
+
 // NewAttempt creates a new Run for the specified file.
 func NewAttempt(file string, cache *fileutil.Cache[*execution.DAGRunStatus], opts ...AttemptOption) (*Attempt, error) {
 	dirName := filepath.Base(filepath.Dir(file))

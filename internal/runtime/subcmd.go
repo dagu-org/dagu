@@ -173,6 +173,7 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 	args = append(args, fmt.Sprintf("--run-id=%s", task.DagRunId))
 
 	// Pass worker ID for tracking which worker executes this DAG run
+	// CRITICAL: This prevents subprocess from re-dispatching to coordinator
 	if task.WorkerId != "" {
 		args = append(args, fmt.Sprintf("--worker-id=%s", task.WorkerId))
 	}
@@ -256,23 +257,7 @@ type RestartOptions struct {
 
 // Run executes the command and waits for it to complete.
 func Run(ctx context.Context, spec CmdSpec) error {
-	// nolint:gosec
-	cmd := exec.CommandContext(ctx, spec.Executable, spec.Args...)
-	cmdutil.SetupCommand(cmd)
-	cmd.Env = spec.Env
-
-	if spec.Stdout != nil {
-		cmd.Stdout = spec.Stdout
-	} else {
-		cmd.Stdout = os.Stdout
-	}
-
-	if spec.Stderr != nil {
-		cmd.Stderr = spec.Stderr
-	} else {
-		cmd.Stderr = os.Stderr
-	}
-
+	cmd := newCommand(ctx, spec, true)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("command failed: %w", err)
 	}
@@ -281,22 +266,7 @@ func Run(ctx context.Context, spec CmdSpec) error {
 
 // Start executes the command without waiting for it to complete.
 func Start(ctx context.Context, spec CmdSpec) error {
-	// nolint:gosec
-	cmd := exec.Command(spec.Executable, spec.Args...)
-	cmdutil.SetupCommand(cmd)
-	cmd.Env = spec.Env
-
-	if spec.Stdout != nil {
-		cmd.Stdout = spec.Stdout
-	} else {
-		cmd.Stdout = os.Stdout
-	}
-	if spec.Stderr != nil {
-		cmd.Stderr = spec.Stderr
-	} else {
-		cmd.Stderr = os.Stderr
-	}
-
+	cmd := newCommand(ctx, spec, false)
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start command: %w", err)
 	}
@@ -306,4 +276,26 @@ func Start(ctx context.Context, spec CmdSpec) error {
 	})
 
 	return nil
+}
+
+// newCommand creates an exec.Cmd from the spec with proper configuration.
+// nolint:gosec
+func newCommand(ctx context.Context, spec CmdSpec, withContext bool) *exec.Cmd {
+	var cmd *exec.Cmd
+	if withContext {
+		cmd = exec.CommandContext(ctx, spec.Executable, spec.Args...)
+	} else {
+		cmd = exec.Command(spec.Executable, spec.Args...)
+	}
+	cmdutil.SetupCommand(cmd)
+	cmd.Env = spec.Env
+	cmd.Stdout = spec.Stdout
+	cmd.Stderr = spec.Stderr
+	if cmd.Stdout == nil {
+		cmd.Stdout = os.Stdout
+	}
+	if cmd.Stderr == nil {
+		cmd.Stderr = os.Stderr
+	}
+	return cmd
 }

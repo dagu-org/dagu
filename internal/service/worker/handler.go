@@ -30,55 +30,41 @@ func NewTaskHandler(cfg *config.Config) TaskHandler {
 
 type taskHandler struct{ subCmdBuilder *runtime.SubCmdBuilder }
 
-// Handle runs the task using the dagrun.Manager
+// Handle runs the task using the dagrun.Manager.
 func (e *taskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) error {
 	logger.Info(ctx, "Executing task",
 		slog.String("operation", task.Operation.String()),
 		tag.Target(task.Target),
 		tag.RunID(task.DagRunId),
 		slog.String("root-dag-run-id", task.RootDagRunId),
-		slog.String("parent-dag-run-id", task.ParentDagRunId))
+		slog.String("parent-dag-run-id", task.ParentDagRunId),
+		slog.String("worker-id", task.WorkerId))
 
-	var tempFile string
-
-	// If definition is provided, create a temporary DAG file
 	if task.Definition != "" {
 		logger.Info(ctx, "Creating temporary DAG file from definition",
 			tag.DAG(task.Target),
 			tag.Size(len(task.Definition)))
 
-		tf, err := fileutil.CreateTempDAGFile("worker-dags", task.Target, []byte(task.Definition))
+		tempFile, err := fileutil.CreateTempDAGFile("worker-dags", task.Target, []byte(task.Definition))
 		if err != nil {
 			return fmt.Errorf("failed to create temp DAG file: %w", err)
 		}
-		tempFile = tf
 		defer func() {
-			// Clean up the temporary file
 			if err := os.Remove(tempFile); err != nil && !os.IsNotExist(err) {
 				logger.Errorf(ctx, "Failed to remove temp DAG file: %v", err)
 			}
 		}()
-		// Update the target to use the temp file
+
 		originalTarget := task.Target
 		task.Target = tempFile
-
 		logger.Info(ctx, "Created temporary DAG file",
 			tag.File(tempFile),
 			slog.String("original-target", originalTarget))
 	}
 
-	// Build command spec based on operation
-	var spec runtime.CmdSpec
-
-	switch task.Operation {
-	case coordinatorv1.Operation_OPERATION_START:
-		spec = e.subCmdBuilder.TaskStart(task)
-	case coordinatorv1.Operation_OPERATION_RETRY:
-		spec = e.subCmdBuilder.TaskRetry(task)
-	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
-		return fmt.Errorf("operation not specified")
-	default:
-		return fmt.Errorf("unknown operation: %v", task.Operation)
+	spec, err := e.buildCommandSpec(task)
+	if err != nil {
+		return err
 	}
 
 	if err := runtime.Run(ctx, spec); err != nil {
@@ -96,4 +82,20 @@ func (e *taskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) erro
 		tag.RunID(task.DagRunId))
 
 	return nil
+}
+
+func (e *taskHandler) buildCommandSpec(task *coordinatorv1.Task) (runtime.CmdSpec, error) {
+	switch task.Operation {
+	case coordinatorv1.Operation_OPERATION_START:
+		return e.subCmdBuilder.TaskStart(task), nil
+	case coordinatorv1.Operation_OPERATION_RETRY:
+		if task.Step == "" {
+			return e.subCmdBuilder.TaskStart(task), nil
+		}
+		return e.subCmdBuilder.TaskRetry(task), nil
+	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
+		return runtime.CmdSpec{}, fmt.Errorf("operation not specified")
+	default:
+		return runtime.CmdSpec{}, fmt.Errorf("unknown operation: %v", task.Operation)
+	}
 }

@@ -29,6 +29,8 @@ type DAGRunAttempt interface {
 	ReadStatus(ctx context.Context) (*DAGRunStatus, error)
 	// ReadDAG reads the DAG associated with this run attempt
 	ReadDAG(ctx context.Context) (*core.DAG, error)
+	// SetDAG sets the DAG for this attempt (must be called before Open for DAG to be persisted)
+	SetDAG(dag *core.DAG)
 	// Abort requests aborting the attempt
 	Abort(ctx context.Context) error
 	// IsAborting checks if an abort has been requested for the attempt
@@ -97,6 +99,10 @@ func (m *MockDAGRunAttempt) ReadDAG(ctx context.Context) (*core.DAG, error) {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*core.DAG), args.Error(1)
+}
+
+func (m *MockDAGRunAttempt) SetDAG(dag *core.DAG) {
+	m.Called(dag)
 }
 
 func (m *MockDAGRunAttempt) Abort(ctx context.Context) error {

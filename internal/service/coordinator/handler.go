@@ -14,6 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/proto/convert"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"google.golang.org/grpc/codes"
@@ -185,6 +186,12 @@ func (h *Handler) Dispatch(ctx context.Context, req *coordinatorv1.DispatchReque
 		return nil, status.Error(codes.InvalidArgument, "task is required")
 	}
 
+	logger.Info(ctx, "Handler Dispatch called",
+		tag.RunID(req.Task.DagRunId),
+		tag.Target(req.Task.Target),
+		slog.String("operation", req.Task.Operation.String()),
+	)
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -255,10 +262,11 @@ func matchesSelector(workerLabels, selector map[string]string) bool {
 // This is called when the coordinator receives a dispatch for a root-level DAG run
 // (not a sub-DAG), so it has a place to store status updates from the worker.
 func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.Task) error {
-	// Create a minimal DAG object with just the name
-	// The full DAG definition is passed to the worker, not stored here
-	dag := &core.DAG{
-		Name: task.Target,
+	// Parse the full DAG from the definition to preserve all metadata
+	// (including workerSelector, steps, etc.) for retry operations
+	dag, err := spec.LoadYAML(ctx, []byte(task.Definition), spec.WithName(task.Target))
+	if err != nil {
+		return fmt.Errorf("failed to parse DAG definition: %w", err)
 	}
 
 	// Determine if this is a retry operation
@@ -301,6 +309,16 @@ func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinator
 	attempt, err := h.dagRunStore.CreateSubAttempt(ctx, rootRef, task.DagRunId)
 	if err != nil {
 		return fmt.Errorf("failed to create sub-attempt: %w", err)
+	}
+
+	// Parse and set the DAG from the definition to preserve all metadata
+	// (including workerSelector, steps, etc.) for retry operations
+	if task.Definition != "" {
+		dag, err := spec.LoadYAML(ctx, []byte(task.Definition), spec.WithName(task.Target))
+		if err != nil {
+			return fmt.Errorf("failed to parse DAG definition: %w", err)
+		}
+		attempt.SetDAG(dag)
 	}
 
 	if err := attempt.Open(ctx); err != nil {
@@ -351,23 +369,27 @@ func (h *Handler) GetWorkers(_ context.Context, _ *coordinatorv1.GetWorkersReque
 
 // calculateHealthStatus determines worker health based on time since last heartbeat.
 func calculateHealthStatus(sinceLastHeartbeat time.Duration) coordinatorv1.WorkerHealthStatus {
+	const (
+		healthyThreshold = 5 * time.Second
+		warningThreshold = 15 * time.Second
+	)
+
 	switch {
-	case sinceLastHeartbeat < 5*time.Second:
+	case sinceLastHeartbeat < healthyThreshold:
 		return coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_HEALTHY
-	case sinceLastHeartbeat < 15*time.Second:
+	case sinceLastHeartbeat < warningThreshold:
 		return coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_WARNING
 	default:
 		return coordinatorv1.WorkerHealthStatus_WORKER_HEALTH_STATUS_UNHEALTHY
 	}
 }
 
-// Heartbeat receives periodic status updates from workers
+// Heartbeat receives periodic status updates from workers.
 func (h *Handler) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
 	if req.WorkerId == "" {
 		return nil, status.Error(codes.InvalidArgument, "worker_id is required")
 	}
 
-	// Update heartbeat under lock
 	h.mu.Lock()
 	h.heartbeats[req.WorkerId] = &heartbeatInfo{
 		workerID:        req.WorkerId,
@@ -377,10 +399,6 @@ func (h *Handler) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatReq
 	}
 	h.mu.Unlock()
 
-	// Note: Zombie detection is handled by StartZombieDetector's periodic ticker,
-	// not on every heartbeat, to avoid O(n²) complexity with many workers.
-
-	// Check for cancelled runs among the worker's running tasks
 	cancelledRuns := h.getCancelledRunsForWorker(ctx, req.Stats)
 
 	return &coordinatorv1.HeartbeatResponse{
@@ -389,7 +407,6 @@ func (h *Handler) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatReq
 }
 
 // getCancelledRunsForWorker checks which of the worker's running tasks have been cancelled.
-// It first checks the local cache to avoid unnecessary database lookups on every heartbeat.
 func (h *Handler) getCancelledRunsForWorker(ctx context.Context, stats *coordinatorv1.WorkerStats) []string {
 	if h.dagRunStore == nil || stats == nil || len(stats.RunningTasks) == 0 {
 		return nil
@@ -397,40 +414,32 @@ func (h *Handler) getCancelledRunsForWorker(ctx context.Context, stats *coordina
 
 	var cancelledRuns []string
 	for _, task := range stats.RunningTasks {
-		// First check local cache (no I/O required)
-		h.attemptsMu.RLock()
-		cachedAttempt, ok := h.openAttempts[task.DagRunId]
-		h.attemptsMu.RUnlock()
-
-		if ok {
-			// Use cached attempt - no additional I/O
-			aborting, err := cachedAttempt.IsAborting(ctx)
-			if err == nil && aborting {
-				cancelledRuns = append(cancelledRuns, task.DagRunId)
-			}
-			continue
-		}
-
-		// Only fall back to FindAttempt if not in cache
-		ref := execution.DAGRunRef{Name: task.DagName, ID: task.DagRunId}
-		attempt, err := h.dagRunStore.FindAttempt(ctx, ref)
-		if err != nil {
-			// Attempt not found, skip
-			continue
-		}
-
-		// Check if the attempt has been marked for cancellation
-		aborting, err := attempt.IsAborting(ctx)
-		if err != nil {
-			continue
-		}
-
-		if aborting {
+		if h.isTaskCancelled(ctx, task) {
 			cancelledRuns = append(cancelledRuns, task.DagRunId)
 		}
 	}
-
 	return cancelledRuns
+}
+
+// isTaskCancelled checks if a task has been marked for cancellation.
+func (h *Handler) isTaskCancelled(ctx context.Context, task *coordinatorv1.RunningTask) bool {
+	h.attemptsMu.RLock()
+	cachedAttempt, ok := h.openAttempts[task.DagRunId]
+	h.attemptsMu.RUnlock()
+
+	if ok {
+		aborting, err := cachedAttempt.IsAborting(ctx)
+		return err == nil && aborting
+	}
+
+	ref := execution.DAGRunRef{Name: task.DagName, ID: task.DagRunId}
+	attempt, err := h.dagRunStore.FindAttempt(ctx, ref)
+	if err != nil {
+		return false
+	}
+
+	aborting, err := attempt.IsAborting(ctx)
+	return err == nil && aborting
 }
 
 // ReportStatus receives status updates from workers and persists them.

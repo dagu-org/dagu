@@ -111,6 +111,12 @@ func New(registry execution.ServiceRegistry, config *Config) Client {
 
 // Dispatch sends a task to the coordinator
 func (cli *clientImpl) Dispatch(ctx context.Context, task *coordinatorv1.Task) error {
+	logger.Info(ctx, "Client dispatching task",
+		slog.String("operation", task.Operation.String()),
+		tag.RunID(task.DagRunId),
+		tag.Target(task.Target),
+	)
+
 	// Set up retry policy
 	basePolicy := backoff.NewExponentialBackoffPolicy(cli.config.RetryInterval)
 	basePolicy.BackoffFactor = 2.0
