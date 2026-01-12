@@ -210,6 +210,29 @@ steps:
 			require.NotEmpty(t, node.FinishedAt, "node %s should have finished", node.Step.Name)
 		}
 	})
+
+	t.Run("directStartWithSharedFS", func(t *testing.T) {
+		f := newTestFixture(t, `
+name: sharedfs-direct-start-test
+workerSelector:
+  test: "true"
+steps:
+  - name: step1
+    command: echo "direct start"
+  - name: step2
+    command: sleep 0.1
+    depends: [step1]
+`, withWorkerMode(sharedFSMode))
+		defer f.cleanup()
+
+		f.startScheduler(30 * time.Second)
+		require.NoError(t, f.start())
+
+		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		require.Equal(t, core.Succeeded, status.Status)
+		require.Len(t, status.Nodes, 2)
+		f.assertAllNodesSucceeded(status)
+	})
 }
 
 func TestExecution_QueueLifecycle(t *testing.T) {

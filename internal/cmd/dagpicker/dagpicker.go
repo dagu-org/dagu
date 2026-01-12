@@ -141,19 +141,13 @@ func (m Model) updateDAGSelection(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if item, ok := m.list.SelectedItem().(DAGItem); ok {
 				m.choice = &item
 
-				// Check if the selected DAG has parameters
-				hasParams := item.Params != ""
-
-				if hasParams {
+				if item.Params != "" {
 					m.state = StateEnteringParams
-					// Initialize parameter input with the display params
 					m.paramInput.SetValue(item.Params)
 					return m, textinput.Blink
-				} else {
-					// Skip to confirmation if no params needed
-					m.state = StateConfirming
-					return m, nil
 				}
+				m.state = StateConfirming
+				return m, nil
 			}
 		}
 	}
@@ -216,10 +210,6 @@ func (m Model) updateConfirmation(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the UI
 func (m Model) View() string {
-	if m.state == StateDone {
-		return ""
-	}
-
 	switch m.state {
 	case StateSelectingDAG:
 		return m.viewDAGSelection()
@@ -227,8 +217,6 @@ func (m Model) View() string {
 		return m.viewParamInput()
 	case StateConfirming:
 		return m.viewConfirmation()
-	case StateDone:
-		return ""
 	default:
 		return ""
 	}
@@ -303,22 +291,8 @@ func (m Model) viewConfirmation() string {
 	return docStyle.Render(lipgloss.JoinVertical(lipgloss.Left, content...))
 }
 
-// pickerModel holds context data for the picker
-type pickerModel struct {
-	ctx      context.Context
-	dagStore exec.DAGStore
-	dagMap   map[string]*core.DAG
-}
-
 // PickDAGInteractive shows a unified fullscreen UI for DAG selection, parameter input, and confirmation
 func PickDAGInteractive(ctx context.Context, dagStore exec.DAGStore, dag *core.DAG) (Result, error) {
-	// Create an internal picker model
-	pickerModel := &pickerModel{
-		ctx:      ctx,
-		dagStore: dagStore,
-		dagMap:   make(map[string]*core.DAG),
-	}
-
 	// Get list of DAGs
 	result, errs, err := dagStore.List(ctx, exec.ListDAGsOptions{})
 	if err != nil {
@@ -348,15 +322,13 @@ func PickDAGInteractive(ctx context.Context, dagStore exec.DAGStore, dag *core.D
 			params = strings.Join(d.Params, " ")
 		}
 
-		item := DAGItem{
+		items = append(items, DAGItem{
 			Name:   d.Name,
 			Path:   d.Location,
 			Desc:   d.Description,
 			Tags:   d.Tags,
 			Params: params,
-		}
-		items = append(items, item)
-		pickerModel.dagMap[d.Name] = d
+		})
 	}
 
 	// Create list with custom delegate for better rendering

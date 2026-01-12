@@ -1,11 +1,13 @@
 package runtime
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 
 	"github.com/dagu-org/dagu/internal/common/cmdutil"
 	"github.com/dagu-org/dagu/internal/common/config"
@@ -172,6 +174,14 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 
 	args = append(args, fmt.Sprintf("--run-id=%s", task.DagRunId))
 
+	// CRITICAL: Use original DAG name, not temp filename
+	// The temp file doesn't have a 'name:' field, so without this flag the subprocess
+	// would derive the name from the temp filename (e.g., "distributed_exec-12345")
+	// instead of using the original name ("distributed_exec"), causing dag-run lookup to fail.
+	if task.RootDagRunName != "" {
+		args = append(args, fmt.Sprintf("--name=%s", task.RootDagRunName))
+	}
+
 	// Pass worker ID for tracking which worker executes this DAG run
 	// CRITICAL: This prevents subprocess from re-dispatching to coordinator
 	if task.WorkerId != "" {
@@ -256,10 +266,30 @@ type RestartOptions struct {
 }
 
 // Run executes the command and waits for it to complete.
+// If the command fails, stdout/stderr output is included in the error for debugging.
 func Run(ctx context.Context, spec CmdSpec) error {
+	var stdout, stderr bytes.Buffer
+
 	cmd := newCommand(ctx, spec, true)
+	// Capture output for error reporting while also writing to original destinations
+	if cmd.Stdout == nil {
+		cmd.Stdout = &stdout
+	}
+	if cmd.Stderr == nil {
+		cmd.Stderr = &stderr
+	}
+
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("command failed: %w", err)
+		// Build error message with captured output
+		var parts []string
+		parts = append(parts, fmt.Sprintf("command failed: %v", err))
+		if stdout.Len() > 0 {
+			parts = append(parts, fmt.Sprintf("stdout: %s", strings.TrimSpace(stdout.String())))
+		}
+		if stderr.Len() > 0 {
+			parts = append(parts, fmt.Sprintf("stderr: %s", strings.TrimSpace(stderr.String())))
+		}
+		return fmt.Errorf("%s", strings.Join(parts, "\n"))
 	}
 	return nil
 }

@@ -193,7 +193,8 @@ var errProcAcquisitionFailed = errors.New("failed to acquire process handle")
 // tryExecuteDAG acquires a process handle and executes the DAG.
 func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root exec.DAGRunRef, workerID string) error {
 	// Check for workerSelector - dispatch to coordinator for distributed execution
-	if len(dag.WorkerSelector) > 0 {
+	// Skip if already running on a worker (workerID is set via --worker-id flag to a value other than "local")
+	if len(dag.WorkerSelector) > 0 && workerID == "local" {
 		coordinatorCli := ctx.NewCoordinatorClient()
 		if coordinatorCli == nil {
 			return fmt.Errorf("coordinator required for DAG with workerSelector; configure peer settings")
