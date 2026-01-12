@@ -11,14 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// =============================================================================
-// Sub-DAG Execution Tests
-// =============================================================================
-// These tests verify sub-DAG execution in distributed mode, including:
-// - Local parent calling distributed child
-// - Failure propagation from child to parent
-// - Output collection from sub-DAGs
-
 func TestSubDAG_LocalCallsDistributed(t *testing.T) {
 	t.Run("localParentCallsDistributedChild", func(t *testing.T) {
 		yamlContent := `

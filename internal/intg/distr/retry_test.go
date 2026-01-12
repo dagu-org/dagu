@@ -10,12 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// =============================================================================
-// Retry Command Tests
-// =============================================================================
-// These tests verify the behavior of `dagu retry` command with workerSelector.
-// When a DAG has workerSelector, retry command should dispatch to coordinator.
-
 func TestRetryCommand_WithWorkerSelector(t *testing.T) {
 	t.Run("retryDispatchesToCoordinator", func(t *testing.T) {
 		yamlContent := `
@@ -37,7 +31,6 @@ steps:
 		dagWrapper := coord.DAG(t, yamlContent)
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
-		// First run: execute the DAG
 		err := executeEnqueueCommand(t, coord, dagWrapper.DAG)
 		require.NoError(t, err, "enqueue should succeed")
 
@@ -58,7 +51,6 @@ steps:
 		require.Equal(t, core.Succeeded, status.Status)
 		dagRunID := status.DAGRunID
 
-		// Second run: retry the DAG
 		schedulerCtx2, schedulerCancel2 := context.WithTimeout(coord.Context, 30*time.Second)
 		defer schedulerCancel2()
 
@@ -68,13 +60,11 @@ steps:
 		err = executeRetryCommand(t, coord, dagWrapper.DAG, dagRunID)
 		require.NoError(t, err, "retry command should succeed")
 
-		// Wait for retry to complete
 		require.Eventually(t, func() bool {
 			status, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
 			if err != nil {
 				return false
 			}
-			// After retry, we should have a new succeeded run
 			return status.Status == core.Succeeded && status.DAGRunID == dagRunID
 		}, 25*time.Second, 200*time.Millisecond, "Retry should complete successfully")
 
@@ -89,7 +79,6 @@ steps:
 
 func TestRetryCommand_PartialRetry(t *testing.T) {
 	t.Run("retryReusesSameRunID", func(t *testing.T) {
-		// Test that retry command correctly dispatches and maintains run ID
 		yamlContent := `
 name: partial-retry-test
 workerSelector:
@@ -109,7 +98,6 @@ steps:
 		dagWrapper := coord.DAG(t, yamlContent)
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
-		// First run
 		err := executeEnqueueCommand(t, coord, dagWrapper.DAG)
 		require.NoError(t, err)
 
@@ -130,7 +118,6 @@ steps:
 		require.Equal(t, core.Succeeded, status.Status)
 		originalRunID := status.DAGRunID
 
-		// Retry the DAG - should reuse the same run ID
 		schedulerCtx2, schedulerCancel2 := context.WithTimeout(coord.Context, 30*time.Second)
 		defer schedulerCancel2()
 
@@ -140,7 +127,6 @@ steps:
 		err = executeRetryCommand(t, coord, dagWrapper.DAG, originalRunID)
 		require.NoError(t, err)
 
-		// Wait for retry to complete
 		require.Eventually(t, func() bool {
 			status, err := coord.DAGRunMgr.GetLatestStatus(coord.Context, dagWrapper.DAG)
 			if err != nil {
@@ -176,7 +162,6 @@ steps:
 		dagWrapper := coord.DAG(t, yamlContent)
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
-		// First run
 		err := executeEnqueueCommand(t, coord, dagWrapper.DAG)
 		require.NoError(t, err)
 
@@ -197,7 +182,6 @@ steps:
 		require.Equal(t, core.Succeeded, status.Status)
 		dagRunID := status.DAGRunID
 
-		// Retry
 		schedulerCtx2, schedulerCancel2 := context.WithTimeout(coord.Context, 30*time.Second)
 		defer schedulerCancel2()
 

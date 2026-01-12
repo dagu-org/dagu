@@ -13,12 +13,12 @@ import (
 
 // instanceInfo represents the information stored for each service instance
 type instanceInfo struct {
-	ID        string                  `json:"id"`
-	Host      string                  `json:"host"`
-	Port      int                     `json:"port"`
-	PID       int                     `json:"pid"`
+	ID        string             `json:"id"`
+	Host      string             `json:"host"`
+	Port      int                `json:"port"`
+	PID       int                `json:"pid"`
 	Status    exec.ServiceStatus `json:"status"`
-	StartedAt time.Time               `json:"startedAt"`
+	StartedAt time.Time          `json:"startedAt"`
 }
 
 // instanceFilePath returns the file path for an instance

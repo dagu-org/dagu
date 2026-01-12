@@ -48,7 +48,7 @@ type Handler struct {
 
 	// Optional: for shared-nothing worker architecture
 	dagRunStore exec.DAGRunStore // For status persistence
-	logDir      string                // For log storage
+	logDir      string           // For log storage
 
 	// Open attempts cache for status persistence
 	attemptsMu   sync.RWMutex

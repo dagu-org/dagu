@@ -32,7 +32,7 @@ func NewManager(drs exec.DAGRunStore, ps exec.ProcStore, cfg *config.Config) Man
 type Manager struct {
 	dagRunStore   exec.DAGRunStore // Store interface for persisting run data
 	procStore     exec.ProcStore   // Store interface for process management
-	subCmdBuilder *SubCmdBuilder        // Command builder for constructing command specs
+	subCmdBuilder *SubCmdBuilder   // Command builder for constructing command specs
 }
 
 // Stop stops a running DAG by sending a stop request to its socket.

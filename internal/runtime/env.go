@@ -117,7 +117,7 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 
 	envs := map[string]string{
 		exec.EnvKeyDAGRunStepName: step.Name,
-		"PWD":                          workingDir,
+		"PWD":                     workingDir,
 	}
 
 	variables := &collections.SyncMap{}

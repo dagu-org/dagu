@@ -17,25 +17,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// =============================================================================
-// Worker Mode Constants
-// =============================================================================
-
 type WorkerMode int
 
 const (
-	// SharedNothingMode - Worker has NO filesystem access to coordinator.
-	// Uses RemoteTaskHandler that pushes status and streams logs to coordinator via gRPC.
 	SharedNothingMode WorkerMode = iota
 )
 
-// =============================================================================
-// Worker Setup Helpers
-// =============================================================================
-
-// setupSharedNothingWorker creates and starts a worker with RemoteTaskHandler.
-// This worker runs tasks in-process and pushes status/logs to the coordinator via gRPC.
-// Use this for shared-nothing mode where worker has no filesystem access.
 func setupSharedNothingWorker(t *testing.T, coord *test.Coordinator, workerID string, labels map[string]string) *worker.Worker {
 	t.Helper()
 	coordinatorClient := coord.GetCoordinatorClient(t)
@@ -43,7 +30,7 @@ func setupSharedNothingWorker(t *testing.T, coord *test.Coordinator, workerID st
 	handlerCfg := worker.RemoteTaskHandlerConfig{
 		WorkerID:          workerID,
 		CoordinatorClient: coordinatorClient,
-		DAGRunStore:       nil, // No local store in shared-nothing mode
+		DAGRunStore:       nil,
 		DAGStore:          coord.DAGStore,
 		DAGRunMgr:         coord.DAGRunMgr,
 		ServiceRegistry:   coord.ServiceRegistry,
@@ -57,7 +44,6 @@ func setupSharedNothingWorker(t *testing.T, coord *test.Coordinator, workerID st
 	return startAndCleanupWorkerWithID(t, coord, workerInst, workerID)
 }
 
-// setupWorker creates a worker with the specified mode.
 func setupWorker(t *testing.T, coord *test.Coordinator, workerID string, mode WorkerMode, labels map[string]string) *worker.Worker {
 	t.Helper()
 	switch mode {
@@ -69,7 +55,6 @@ func setupWorker(t *testing.T, coord *test.Coordinator, workerID string, mode Wo
 	}
 }
 
-// setupWorkers creates and starts multiple workers with the specified mode.
 func setupWorkers(t *testing.T, coord *test.Coordinator, count int, mode WorkerMode, labels map[string]string) []*worker.Worker {
 	t.Helper()
 	workers := make([]*worker.Worker, count)
@@ -79,8 +64,6 @@ func setupWorkers(t *testing.T, coord *test.Coordinator, count int, mode WorkerM
 	return workers
 }
 
-// startAndCleanupWorkerWithID starts a worker and registers cleanup.
-// It waits for the worker to register with the coordinator before returning.
 func startAndCleanupWorkerWithID(t *testing.T, coord *test.Coordinator, workerInst *worker.Worker, workerID string) *worker.Worker {
 	t.Helper()
 
@@ -90,7 +73,6 @@ func startAndCleanupWorkerWithID(t *testing.T, coord *test.Coordinator, workerIn
 		}
 	}()
 
-	// Wait for the worker to register with the coordinator
 	waitForWorkerRegistration(t, coord, workerID, 5*time.Second)
 
 	t.Cleanup(func() {
@@ -102,7 +84,6 @@ func startAndCleanupWorkerWithID(t *testing.T, coord *test.Coordinator, workerIn
 	return workerInst
 }
 
-// waitForWorkerRegistration waits for a worker to register with the coordinator.
 func waitForWorkerRegistration(t *testing.T, coord *test.Coordinator, workerID string, timeout time.Duration) {
 	t.Helper()
 	coordinatorClient := coord.GetCoordinatorClient(t)
@@ -120,11 +101,6 @@ func waitForWorkerRegistration(t *testing.T, coord *test.Coordinator, workerID s
 	}, timeout, 50*time.Millisecond, "worker %s should register with coordinator", workerID)
 }
 
-// =============================================================================
-// Scheduler Setup Helpers
-// =============================================================================
-
-// setupScheduler creates and configures a scheduler instance for distributed execution.
 func setupScheduler(t *testing.T, coord *test.Coordinator, coordinatorClient exec.Dispatcher) *scheduler.Scheduler {
 	t.Helper()
 
@@ -146,11 +122,6 @@ func setupScheduler(t *testing.T, coord *test.Coordinator, coordinatorClient exe
 	return schedulerInst
 }
 
-// =============================================================================
-// Status Wait Helpers
-// =============================================================================
-
-// waitForStatus waits for DAG to reach expected status within timeout.
 func waitForStatus(t *testing.T, coord *test.Coordinator, dag *core.DAG, expected core.Status, timeout time.Duration) exec.DAGRunStatus {
 	t.Helper()
 	var status exec.DAGRunStatus
@@ -166,7 +137,6 @@ func waitForStatus(t *testing.T, coord *test.Coordinator, dag *core.DAG, expecte
 	return status
 }
 
-// waitForStatusIn waits for DAG to reach any of the expected statuses within timeout.
 func waitForStatusIn(t *testing.T, coord *test.Coordinator, dag *core.DAG, expected []core.Status, timeout time.Duration) exec.DAGRunStatus {
 	t.Helper()
 	var status exec.DAGRunStatus
@@ -186,23 +156,16 @@ func waitForStatusIn(t *testing.T, coord *test.Coordinator, dag *core.DAG, expec
 	return status
 }
 
-// waitForRunning waits for DAG to reach Running status.
 func waitForRunning(t *testing.T, coord *test.Coordinator, dag *core.DAG, timeout time.Duration) exec.DAGRunStatus {
 	t.Helper()
 	return waitForStatus(t, coord, dag, core.Running, timeout)
 }
 
-// waitForSucceeded waits for DAG to reach Succeeded status.
 func waitForSucceeded(t *testing.T, coord *test.Coordinator, dag *core.DAG, timeout time.Duration) exec.DAGRunStatus {
 	t.Helper()
 	return waitForStatus(t, coord, dag, core.Succeeded, timeout)
 }
 
-// =============================================================================
-// Assertion Helpers
-// =============================================================================
-
-// assertAllNodesSucceeded asserts that all nodes in the DAG succeeded.
 func assertAllNodesSucceeded(t *testing.T, status exec.DAGRunStatus) {
 	t.Helper()
 	for _, node := range status.Nodes {
@@ -210,17 +173,11 @@ func assertAllNodesSucceeded(t *testing.T, status exec.DAGRunStatus) {
 	}
 }
 
-// assertWorkerID asserts that the status has the expected worker ID.
 func assertWorkerID(t *testing.T, status exec.DAGRunStatus, expected string) {
 	t.Helper()
 	require.Equal(t, expected, status.WorkerID, "unexpected worker ID")
 }
 
-// =============================================================================
-// Log File Helpers
-// =============================================================================
-
-// findLogFiles finds all log files matching the pattern in logDir.
 func findLogFiles(t *testing.T, logDir, dagName, dagRunID, stepName, suffix string) []string {
 	t.Helper()
 
@@ -246,7 +203,6 @@ func findLogFiles(t *testing.T, logDir, dagName, dagRunID, stepName, suffix stri
 	return matches
 }
 
-// assertLogContains verifies log file exists and contains expected content.
 func assertLogContains(t *testing.T, logDir, dagName, dagRunID, stepName, expected string) {
 	t.Helper()
 
@@ -258,7 +214,6 @@ func assertLogContains(t *testing.T, logDir, dagName, dagRunID, stepName, expect
 	assert.Contains(t, string(content), expected, "log file should contain expected content")
 }
 
-// assertLogExists verifies that a log file exists for the given step.
 func assertLogExists(t *testing.T, logDir, dagName, dagRunID, stepName string) string {
 	t.Helper()
 
@@ -267,7 +222,6 @@ func assertLogExists(t *testing.T, logDir, dagName, dagRunID, stepName string) s
 	return matches[0]
 }
 
-// getLogContent reads and returns the content of a log file.
 func getLogContent(t *testing.T, logPath string) string {
 	t.Helper()
 	content, err := os.ReadFile(logPath)
@@ -275,11 +229,6 @@ func getLogContent(t *testing.T, logPath string) string {
 	return string(content)
 }
 
-// =============================================================================
-// Command Execution Helpers
-// =============================================================================
-
-// executeStartCommand runs the dagu start command for a DAG.
 func executeStartCommand(t *testing.T, coord *test.Coordinator, dag *core.DAG) error {
 	t.Helper()
 	subCmdBuilder := runtime.NewSubCmdBuilder(coord.Config)
@@ -287,7 +236,6 @@ func executeStartCommand(t *testing.T, coord *test.Coordinator, dag *core.DAG) e
 	return runtime.Start(coord.Context, startSpec)
 }
 
-// executeRetryCommand runs the dagu retry command for a DAG run.
 func executeRetryCommand(t *testing.T, coord *test.Coordinator, dag *core.DAG, dagRunID string) error {
 	t.Helper()
 	subCmdBuilder := runtime.NewSubCmdBuilder(coord.Config)
@@ -295,7 +243,6 @@ func executeRetryCommand(t *testing.T, coord *test.Coordinator, dag *core.DAG, d
 	return runtime.Start(coord.Context, retrySpec)
 }
 
-// executeEnqueueCommand runs the dagu enqueue command for a DAG.
 func executeEnqueueCommand(t *testing.T, coord *test.Coordinator, dag *core.DAG) error {
 	t.Helper()
 	subCmdBuilder := runtime.NewSubCmdBuilder(coord.Config)

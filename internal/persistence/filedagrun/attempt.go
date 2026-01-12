@@ -49,13 +49,13 @@ var _ exec.DAGRunAttempt = (*Attempt)(nil)
 // Attempt manages an append-only status file with read, write, and compaction capabilities.
 // It provides thread-safe operations and supports metrics collection.
 type Attempt struct {
-	id        string                                   // Attempt ID, extracted from the file path
-	file      string                                   // Path to the status file
-	writer    *Writer                                  // Writer for appending status updates
-	mu        sync.RWMutex                             // Mutex for thread safety
+	id        string                              // Attempt ID, extracted from the file path
+	file      string                              // Path to the status file
+	writer    *Writer                             // Writer for appending status updates
+	mu        sync.RWMutex                        // Mutex for thread safety
 	cache     *fileutil.Cache[*exec.DAGRunStatus] // Optional cache for read operations
-	isClosing atomic.Bool                              // Flag to prevent writes during Close/Compact
-	dag       *core.DAG                                // DAG associated with the status file
+	isClosing atomic.Bool                         // Flag to prevent writes during Close/Compact
+	dag       *core.DAG                           // DAG associated with the status file
 }
 
 // AttemptOption defines a functional option for configuring an Attempt.

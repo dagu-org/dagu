@@ -12,11 +12,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// =============================================================================
-// Coordinator API Tests
-// =============================================================================
-// These tests verify the coordinator gRPC API functionality.
-
 func TestCoordinator_GetWorkers(t *testing.T) {
 	t.Run("returnsRegisteredWorkers", func(t *testing.T) {
 		coord := test.SetupCoordinator(t, test.WithStatusPersistence())

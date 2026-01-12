@@ -12,15 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// =============================================================================
-// Parallel Distributed Execution Tests
-// =============================================================================
-// These tests verify parallel execution with workerSelector, including:
-// - Multiple items processed in parallel on workers
-// - Max concurrency limits
-// - Failure propagation
-// - Output aggregation
-
 func TestParallel_MultipleItems(t *testing.T) {
 	t.Run("parallelExecutionOnWorkers", func(t *testing.T) {
 		yamlContent := `

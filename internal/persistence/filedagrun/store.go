@@ -30,11 +30,11 @@ var _ exec.DAGRunStore = (*Store)(nil)
 
 // Store manages DAGs status files in local Store with high performance and reliability.
 type Store struct {
-	baseDir           string                                   // Base directory for all status files
-	latestStatusToday bool                                     // Whether to only return today's status
+	baseDir           string                              // Base directory for all status files
+	latestStatusToday bool                                // Whether to only return today's status
 	cache             *fileutil.Cache[*exec.DAGRunStatus] // Optional cache for read operations
-	maxWorkers        int                                      // Maximum number of parallel workers
-	location          *time.Location                           // Timezone location for date calculations
+	maxWorkers        int                                 // Maximum number of parallel workers
+	location          *time.Location                      // Timezone location for date calculations
 }
 
 // DAGRunStoreOption defines functional options for configuring local.
@@ -43,10 +43,10 @@ type DAGRunStoreOption func(*DAGRunStoreOptions)
 // DAGRunStoreOptions holds configuration options for local.
 type DAGRunStoreOptions struct {
 	FileCache         *fileutil.Cache[*exec.DAGRunStatus] // Optional cache for status files
-	LatestStatusToday bool                                     // Whether to only return today's status
-	MaxWorkers        int                                      // Maximum number of parallel workers
-	OperationTimeout  time.Duration                            // Timeout for operations
-	Location          *time.Location                           // Timezone location for date calculations
+	LatestStatusToday bool                                // Whether to only return today's status
+	MaxWorkers        int                                 // Maximum number of parallel workers
+	OperationTimeout  time.Duration                       // Timeout for operations
+	Location          *time.Location                      // Timezone location for date calculations
 }
 
 // WithHistoryFileCache sets the file cache for local.

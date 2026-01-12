@@ -13,12 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// =============================================================================
-// Cancellation Tests
-// =============================================================================
-// These tests verify cancellation propagation in distributed execution,
-// including single tasks, sub-DAGs, and parallel execution.
-
 func TestCancellation_SingleTask(t *testing.T) {
 	t.Run("cancellationPropagatesToRemoteWorker", func(t *testing.T) {
 		yamlContent := `
@@ -273,7 +267,6 @@ steps:
 
 		require.Contains(t, []core.Status{core.Aborted, core.Failed}, finalStatus.Status)
 
-		// Task2 should not have started
 		for _, node := range finalStatus.Nodes {
 			if node.Step.Name == "task2" {
 				require.NotEqual(t, core.NodeSucceeded, node.Status, "task2 should not have succeeded")

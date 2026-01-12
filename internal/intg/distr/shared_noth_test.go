@@ -13,14 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// =============================================================================
-// Shared-Nothing Mode Tests
-// =============================================================================
-// These tests verify distributed execution where workers have NO filesystem access
-// to the coordinator. Workers use RemoteTaskHandler to:
-// - Push status updates to coordinator via gRPC
-// - Stream logs to coordinator via gRPC
-
 func TestSharedNothing_StatusPushing(t *testing.T) {
 	t.Run("statusUpdatesPersistedToCoordinatorStore", func(t *testing.T) {
 		yamlContent := `
@@ -214,17 +206,17 @@ steps:
 	})
 }
 
-func TestSharedNothing_PreviousStatusPassing(t *testing.T) {
-	t.Run("queuedDAGReceivesPreviousStatusOnDispatch", func(t *testing.T) {
+func TestSharedNothing_StartCommand(t *testing.T) {
+	t.Run("directStartCommandExecution", func(t *testing.T) {
 		yamlContent := `
-name: queue-status-test
+name: direct-start-test
 workerSelector:
   test: "true"
 steps:
   - name: step1
-    command: echo "step1 executed"
+    command: echo "step1 output"
   - name: step2
-    command: echo "step2 executed"
+    command: echo "step2 output"
     depends: [step1]
 `
 		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
@@ -235,25 +227,20 @@ steps:
 		dagWrapper := coord.DAG(t, yamlContent)
 		coordinatorClient := coord.GetCoordinatorClient(t)
 
-		err := executeEnqueueCommand(t, coord, dagWrapper.DAG)
-		require.NoError(t, err, "enqueue should succeed")
-
-		require.Eventually(t, func() bool {
-			items, _ := coord.QueueStore.ListByDAGName(coord.Context, dagWrapper.ProcGroup(), dagWrapper.Name)
-			return len(items) == 1
-		}, 2*time.Second, 50*time.Millisecond, "DAG should be enqueued")
-
 		schedulerCtx, schedulerCancel := context.WithTimeout(coord.Context, 30*time.Second)
 		defer schedulerCancel()
 
 		schedulerInst := setupScheduler(t, coord, coordinatorClient)
 		go func() { _ = schedulerInst.Start(schedulerCtx) }()
 
+		err := executeStartCommand(t, coord, dagWrapper.DAG)
+		require.NoError(t, err, "Start command should succeed")
+
 		status := waitForSucceeded(t, coord, dagWrapper.DAG, 20*time.Second)
 		schedulerCancel()
 
-		require.Equal(t, core.Succeeded, status.Status, "DAG should succeed")
-		require.Len(t, status.Nodes, 2, "should have 2 nodes")
+		require.Equal(t, core.Succeeded, status.Status)
+		require.Len(t, status.Nodes, 2)
 		assertAllNodesSucceeded(t, status)
 	})
 }

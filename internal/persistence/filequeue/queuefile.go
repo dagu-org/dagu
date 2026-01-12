@@ -61,9 +61,9 @@ type queuedItem struct {
 
 // ItemData represents the data stored in the queue file
 type ItemData struct {
-	FileName string              `json:"fileName"`
+	FileName string         `json:"fileName"`
 	DAGRun   exec.DAGRunRef `json:"dagRun"`
-	QueuedAt time.Time           `json:"queuedAt"`
+	QueuedAt time.Time      `json:"queuedAt"`
 }
 
 // Push adds a job to the queue

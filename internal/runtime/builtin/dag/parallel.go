@@ -35,9 +35,9 @@ type parallelExecutor struct {
 	maxConcurrent int
 
 	// Runtime state
-	running map[string]*exec.Cmd            // Maps DAG run ID to running command
+	running map[string]*exec.Cmd        // Maps DAG run ID to running command
 	results map[string]*exec1.RunStatus // Maps DAG run ID to result
-	errors  []error                         // Collects errors from failed executions
+	errors  []error                     // Collects errors from failed executions
 
 	cancel     chan struct{}
 	cancelOnce sync.Once
@@ -268,8 +268,8 @@ func (e *parallelExecutor) outputResults() error {
 			Succeeded int `json:"succeeded"`
 			Failed    int `json:"failed"`
 		} `json:"summary"`
-		Results []exec1.RunStatus `json:"results"`
-		Outputs []map[string]string   `json:"outputs"`
+		Results []exec1.RunStatus   `json:"results"`
+		Outputs []map[string]string `json:"outputs"`
 	}{}
 
 	output.Summary.Total = len(e.runParamsList)

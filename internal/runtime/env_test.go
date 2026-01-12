@@ -35,10 +35,10 @@ func TestEnv_AllEnvsMap(t *testing.T) {
 				return env
 			},
 			expected: map[string]string{
-				"VAR1":                         "value1",
-				"VAR2":                         "value2",
-				"ENV1":                         "env1",
-				"ENV2":                         "env2",
+				"VAR1":                    "value1",
+				"VAR2":                    "value2",
+				"ENV1":                    "env1",
+				"ENV2":                    "env2",
 				exec.EnvKeyDAGRunStepName: "test-step",
 			},
 		},
@@ -52,7 +52,7 @@ func TestEnv_AllEnvsMap(t *testing.T) {
 			expected: map[string]string{
 				// Variables (output from previous steps) are added last in AllEnvs(),
 				// so they override Envs when there's a key conflict
-				"SAME_KEY":                     "from_variables",
+				"SAME_KEY":                "from_variables",
 				exec.EnvKeyDAGRunStepName: "test-step",
 			},
 		},
@@ -73,8 +73,8 @@ func TestEnv_AllEnvsMap(t *testing.T) {
 				return env
 			},
 			expected: map[string]string{
-				"VAR1":                         "value1",
-				"VAR2":                         "value2",
+				"VAR1":                    "value1",
+				"VAR2":                    "value2",
 				exec.EnvKeyDAGRunStepName: "test-step",
 			},
 		},
@@ -86,8 +86,8 @@ func TestEnv_AllEnvsMap(t *testing.T) {
 				return env
 			},
 			expected: map[string]string{
-				"ENV1":                         "env1",
-				"ENV2":                         "env2",
+				"ENV1":                    "env1",
+				"ENV2":                    "env2",
 				exec.EnvKeyDAGRunStepName: "test-step",
 			},
 		},
