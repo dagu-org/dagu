@@ -615,6 +615,13 @@ func (cli *clientImpl) RequestCancel(ctx context.Context, dagName, dagRunID stri
 func getDialOptions(config *Config) ([]grpc.DialOption, error) {
 	var opts []grpc.DialOption
 
+	// Add message size limits for large status payloads (includes chat messages)
+	// Default gRPC limit is 4 MB; we increase to 16 MB to handle LLM conversations
+	opts = append(opts, grpc.WithDefaultCallOptions(
+		grpc.MaxCallRecvMsgSize(16*1024*1024), // 16 MB receive
+		grpc.MaxCallSendMsgSize(16*1024*1024), // 16 MB send
+	))
+
 	if config.Insecure {
 		// Use insecure connection (h2c)
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))

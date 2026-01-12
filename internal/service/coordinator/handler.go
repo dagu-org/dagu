@@ -516,6 +516,10 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 		return nil, status.Error(codes.Internal, "failed to write status: "+err.Error())
 	}
 
+	// Persist chat messages for each node (shared-nothing mode)
+	// This enables message persistence when workers don't have filesystem access
+	h.persistChatMessages(ctx, attempt, dagRunStatus)
+
 	// Note: We don't close the attempt immediately on terminal status because
 	// the agent may push the same terminal status multiple times from different
 	// code paths. Attempts are cleaned up during coordinator shutdown.
@@ -593,6 +597,38 @@ func (h *Handler) transformLogPaths(status *exec.DAGRunStatus) {
 		fileutil.SafeName(attemptID),
 		"scheduler.log",
 	)
+}
+
+// persistChatMessages writes chat messages from status to the attempt.
+// This enables message persistence in shared-nothing mode where workers
+// don't have filesystem access to the coordinator's storage.
+// Errors are logged but don't fail the status update since messages are auxiliary data.
+func (h *Handler) persistChatMessages(ctx context.Context, attempt exec.DAGRunAttempt, status *exec.DAGRunStatus) {
+	// Helper to persist messages for a single node
+	persistNode := func(node *exec.Node) {
+		if node == nil || len(node.ChatMessages) == 0 {
+			return
+		}
+		if err := attempt.WriteStepMessages(ctx, node.Step.Name, node.ChatMessages); err != nil {
+			logger.Warn(ctx, "Failed to persist chat messages",
+				tag.Step(node.Step.Name),
+				tag.Error(err),
+			)
+		}
+	}
+
+	// Persist messages for regular nodes
+	for _, node := range status.Nodes {
+		persistNode(node)
+	}
+
+	// Persist messages for handler nodes
+	persistNode(status.OnInit)
+	persistNode(status.OnExit)
+	persistNode(status.OnSuccess)
+	persistNode(status.OnFailure)
+	persistNode(status.OnCancel)
+	persistNode(status.OnWait)
 }
 
 // getOrOpenAttempt retrieves an open attempt from cache or opens a new one.

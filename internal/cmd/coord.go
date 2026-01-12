@@ -156,6 +156,13 @@ func newCoordinator(ctx context.Context, cfg *config.Config, registry exec.Servi
 	// Create gRPC server options
 	var serverOpts []grpc.ServerOption
 
+	// Add message size limits for large status payloads (includes chat messages)
+	// Default gRPC limit is 4 MB; we increase to 16 MB to handle LLM conversations
+	serverOpts = append(serverOpts,
+		grpc.MaxRecvMsgSize(16*1024*1024), // 16 MB receive
+		grpc.MaxSendMsgSize(16*1024*1024), // 16 MB send
+	)
+
 	// Configure TLS using global peer config
 	if cfg.Core.Peer.CertFile != "" && cfg.Core.Peer.KeyFile != "" {
 		// Load server certificates
