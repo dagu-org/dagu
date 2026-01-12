@@ -277,6 +277,20 @@ func (a *API) ListDAGRuns(ctx context.Context, request api.ListDAGRunsRequestObj
 		opts = append(opts, exec.WithDAGRunID(*request.Params.DagRunId))
 	}
 
+	// Parse comma-separated tags
+	var tags []string
+	if request.Params.Tags != nil && *request.Params.Tags != "" {
+		for _, tag := range strings.Split(*request.Params.Tags, ",") {
+			trimmed := strings.TrimSpace(tag)
+			if trimmed != "" {
+				tags = append(tags, trimmed)
+			}
+		}
+	}
+	if len(tags) > 0 {
+		opts = append(opts, exec.WithTags(tags))
+	}
+
 	dagRuns, err := a.listDAGRuns(ctx, opts)
 	if err != nil {
 		return nil, fmt.Errorf("error listing dag-runs: %w", err)
@@ -320,15 +334,73 @@ func (a *API) ListDAGRunsByName(ctx context.Context, request api.ListDAGRunsByNa
 }
 
 func (a *API) listDAGRuns(ctx context.Context, opts []exec.ListDAGRunStatusesOption) ([]api.DAGRunSummary, error) {
-	statuses, err := a.dagRunStore.ListStatuses(ctx, opts...)
+	// Extract tags from options and build filtered options for the store
+	var tagsFilter []string
+	var filteredOpts []exec.ListDAGRunStatusesOption
+	for _, opt := range opts {
+		// Apply option to temp struct to check if it sets tags
+		tempOpts := exec.ListDAGRunStatusesOptions{}
+		opt(&tempOpts)
+		if len(tempOpts.Tags) > 0 {
+			tagsFilter = tempOpts.Tags
+		} else {
+			filteredOpts = append(filteredOpts, opt)
+		}
+	}
+
+	// If tags filter is specified, get matching DAG names (AND logic)
+	var allowedDAGNames map[string]struct{}
+	if len(tagsFilter) > 0 {
+		// Get all DAGs to filter by tags
+		result, _, err := a.dagStore.List(ctx, exec.ListDAGsOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("error getting DAGs for tag filter: %w", err)
+		}
+
+		allowedDAGNames = make(map[string]struct{})
+		for _, dag := range result.Items {
+			// Check if DAG has ALL requested tags (AND logic)
+			if hasAllTags(dag.Tags, tagsFilter) {
+				allowedDAGNames[dag.Name] = struct{}{}
+			}
+		}
+
+		// If no DAGs match all tags, return empty result
+		if len(allowedDAGNames) == 0 {
+			return []api.DAGRunSummary{}, nil
+		}
+	}
+
+	statuses, err := a.dagRunStore.ListStatuses(ctx, filteredOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("error listing dag-runs: %w", err)
 	}
+
 	var dagRuns []api.DAGRunSummary
 	for _, status := range statuses {
+		// Filter by tags if specified
+		if allowedDAGNames != nil {
+			if _, ok := allowedDAGNames[status.Name]; !ok {
+				continue
+			}
+		}
 		dagRuns = append(dagRuns, toDAGRunSummary(*status))
 	}
 	return dagRuns, nil
+}
+
+// hasAllTags checks if dagTags contains all requiredTags (case-insensitive)
+func hasAllTags(dagTags []string, requiredTags []string) bool {
+	tagSet := make(map[string]struct{})
+	for _, t := range dagTags {
+		tagSet[strings.ToLower(t)] = struct{}{}
+	}
+	for _, req := range requiredTags {
+		if _, ok := tagSet[strings.ToLower(req)]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func (a *API) GetDAGRunLog(ctx context.Context, request api.GetDAGRunLogRequestObject) (api.GetDAGRunLogResponseObject, error) {
