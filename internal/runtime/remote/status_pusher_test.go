@@ -8,6 +8,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/proto/convert"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
@@ -105,7 +106,11 @@ func TestPush(t *testing.T) {
 		require.NotNil(t, capturedReq)
 		assert.Equal(t, "worker-1", capturedReq.WorkerId)
 		assert.NotNil(t, capturedReq.Status)
-		assert.Equal(t, "run-123", capturedReq.Status.DagRunId)
+		assert.NotEmpty(t, capturedReq.Status.JsonData)
+		// Verify the JSON contains the expected data
+		s := convert.ProtoToDAGRunStatus(capturedReq.Status)
+		require.NotNil(t, s)
+		assert.Equal(t, "run-123", s.DAGRunID)
 	})
 
 	t.Run("Rejected", func(t *testing.T) {
@@ -236,12 +241,14 @@ func TestPush(t *testing.T) {
 		require.NotNil(t, capturedReq)
 		require.NotNil(t, capturedReq.Status)
 
-		// Verify complex fields were converted
-		assert.Equal(t, "complex-dag", capturedReq.Status.Name)
-		assert.Equal(t, "attempt-1", capturedReq.Status.AttemptId)
-		assert.Equal(t, int32(core.Succeeded), capturedReq.Status.Status)
-		assert.NotNil(t, capturedReq.Status.Root)
-		assert.NotNil(t, capturedReq.Status.Parent)
-		assert.Len(t, capturedReq.Status.Nodes, 1)
+		// Verify complex fields were converted via JSON
+		s := convert.ProtoToDAGRunStatus(capturedReq.Status)
+		require.NotNil(t, s)
+		assert.Equal(t, "complex-dag", s.Name)
+		assert.Equal(t, "attempt-1", s.AttemptID)
+		assert.Equal(t, core.Succeeded, s.Status)
+		assert.False(t, s.Root.Zero())
+		assert.False(t, s.Parent.Zero())
+		assert.Len(t, s.Nodes, 1)
 	})
 }

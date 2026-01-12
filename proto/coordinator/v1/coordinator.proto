@@ -158,75 +158,9 @@ message ReportStatusResponse {
   string error = 2;
 }
 
-// Full DAG run status (mirrors execution.DAGRunStatus).
+// Full DAG run status (JSON-serialized execution.DAGRunStatus).
 message DAGRunStatusProto {
-  DAGRunRefProto root = 1;
-  DAGRunRefProto parent = 2;
-  string name = 3;
-  string dag_run_id = 4;
-  string attempt_id = 5;
-  int32 status = 6;  // core.Status enum value
-  string worker_id = 7;
-  int32 pid = 8;
-  repeated NodeStatusProto nodes = 9;
-  NodeStatusProto on_init = 10;
-  NodeStatusProto on_exit = 11;
-  NodeStatusProto on_success = 12;
-  NodeStatusProto on_failure = 13;
-  NodeStatusProto on_cancel = 14;
-  NodeStatusProto on_wait = 15;
-  int64 created_at = 16;
-  string queued_at = 17;
-  string started_at = 18;
-  string finished_at = 19;
-  string log = 20;
-  string error = 21;
-  string params = 22;
-  // protolint:disable:next REPEATED_FIELD_NAMES_PLURALIZED
-  repeated string params_list = 23; // Matches execution.DAGRunStatus.ParamsList
-}
-
-// Reference to a DAG run.
-message DAGRunRefProto {
-  string name = 1;
-  string id = 2;
-}
-
-// Status of a single node/step in a DAG run.
-message NodeStatusProto {
-  string step_name = 1;
-  int32 status = 2;  // core.NodeStatus enum value
-  string stdout = 3;  // Log file path (set by coordinator)
-  string stderr = 4;
-  string started_at = 5;
-  string finished_at = 6;
-  string error = 7;
-  int32 retry_count = 8;
-  int32 done_count = 9;
-  repeated SubDAGRunProto sub_runs = 10;
-  map<string, string> output_variables = 11;
-  string retried_at = 12;
-  // HITL (Human-in-the-loop) fields
-  string approved_at = 13;
-  string approved_by = 14;
-  string rejected_at = 15;
-  string rejected_by = 16;
-  string rejection_reason = 17;
-  // Step definition (needed for reconstruction)
-  StepProto step = 18;
-}
-
-// Reference to a sub-DAG run.
-message SubDAGRunProto {
-  string dag_run_id = 1;
-  string params = 2;
-}
-
-// Step definition (subset of core.Step needed for status).
-message StepProto {
-  string name = 1;
-  string description = 2;
-  string executor_type = 3;
+  string json_data = 1;
 }
 
 // Log chunk sent from worker to coordinator.

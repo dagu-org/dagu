@@ -18,6 +18,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/core/spec"
+	"github.com/dagu-org/dagu/internal/proto/convert"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
@@ -499,8 +500,8 @@ func handleDistributedCancellation(ctx context.Context, dag *core.DAG, dagRunID 
 			case <-ticker.C:
 				if resp, fetchErr := coordinatorCli.GetDAGRunStatus(cancelCtx, dag.Name, dagRunID, nil); fetchErr == nil && resp != nil && resp.Status != nil {
 					progress.Update(resp.Status)
-					status := core.Status(resp.Status.Status)
-					if !status.IsActive() {
+					dagStatus := convert.ProtoToDAGRunStatus(resp.Status)
+					if dagStatus != nil && !dagStatus.Status.IsActive() {
 						// Status is no longer running, we're done
 						return originalErr
 					}
@@ -559,17 +560,20 @@ func waitForDAGCompletionWithProgress(ctx *Context, d *core.DAG, dagRunID string
 			}
 
 			// Check status
-			status := core.Status(resp.Status.Status)
-			if !status.IsActive() {
-				if status.IsSuccess() {
+			dagStatus := convert.ProtoToDAGRunStatus(resp.Status)
+			if dagStatus == nil {
+				continue
+			}
+			if !dagStatus.Status.IsActive() {
+				if dagStatus.Status.IsSuccess() {
 					logger.Info(ctx, "DAG completed successfully", tag.RunID(dagRunID))
 					return nil
 				}
 				// Include error details from response if available
 				if resp.Error != "" {
-					return fmt.Errorf("DAG run failed with status %s: %s", status, resp.Error)
+					return fmt.Errorf("DAG run failed with status %s: %s", dagStatus.Status, resp.Error)
 				}
-				return fmt.Errorf("DAG run failed with status: %s", status)
+				return fmt.Errorf("DAG run failed with status: %s", dagStatus.Status)
 			}
 		}
 	}

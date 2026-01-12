@@ -2,10 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"log/slog"
-	"os/signal"
 	"path/filepath"
-	"syscall"
 
 	"github.com/dagu-org/dagu/internal/common/fileutil"
 	"github.com/dagu-org/dagu/internal/common/logger"
@@ -13,9 +10,6 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
-	"github.com/dagu-org/dagu/internal/runtime/executor"
-	"github.com/dagu-org/dagu/internal/service/coordinator"
-	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/spf13/cobra"
 )
 
@@ -152,63 +146,4 @@ func executeRetry(ctx *Context, dag *core.DAG, status *execution.DAGRunStatus, r
 
 	// Use the shared agent execution function
 	return ExecuteAgent(ctx, agentInstance, dag, status.DAGRunID, logFile)
-}
-
-// dispatchRetryToCoordinatorAndWait dispatches a retry to coordinator and waits for completion.
-func dispatchRetryToCoordinatorAndWait(ctx *Context, dag *core.DAG, dagRunID, stepName string, prevStatus *execution.DAGRunStatus, coordinatorCli coordinator.Client) error {
-	// Set up signal-aware context so Ctrl+C cancels the operation
-	signalCtx, stop := signal.NotifyContext(ctx.Context, syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-	signalAwareCtx := ctx.WithContext(signalCtx)
-
-	// Set up progress display early so user sees feedback immediately
-	showProgress := shouldEnableProgress(ctx)
-	var progress *RemoteProgressDisplay
-	if showProgress {
-		progress = NewRemoteProgressDisplay(dag, dagRunID)
-		progress.Start()
-	}
-
-	defer func() {
-		if progress != nil {
-			progress.Stop()
-			if !ctx.Quiet {
-				progress.PrintSummary()
-			}
-		}
-	}()
-
-	logger.Info(ctx, "Dispatching retry for distributed execution",
-		slog.Any("worker-selector", dag.WorkerSelector),
-	)
-
-	opts := []executor.TaskOption{
-		executor.WithWorkerSelector(dag.WorkerSelector),
-		executor.WithPreviousStatus(prevStatus),
-	}
-	if stepName != "" {
-		opts = append(opts, executor.WithStep(stepName))
-	}
-
-	task := executor.CreateTask(
-		dag.Name,
-		string(dag.YamlData),
-		coordinatorv1.Operation_OPERATION_RETRY,
-		dagRunID,
-		opts...,
-	)
-
-	if err := coordinatorCli.Dispatch(signalAwareCtx, task); err != nil {
-		return fmt.Errorf("failed to dispatch retry task: %w", err)
-	}
-
-	logger.Info(ctx, "Retry dispatched to coordinator; awaiting completion")
-	err := waitForDAGCompletionWithProgress(signalAwareCtx, dag, dagRunID, coordinatorCli, progress)
-
-	// If context was cancelled (e.g., Ctrl+C), request cancellation on coordinator
-	if signalCtx.Err() != nil {
-		return handleDistributedCancellation(ctx, dag, dagRunID, coordinatorCli, progress, err)
-	}
-
-	return err
 }

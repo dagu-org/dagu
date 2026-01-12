@@ -14,6 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/common/config"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/proto/convert"
 	"github.com/dagu-org/dagu/internal/runtime/remote"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/test"
@@ -263,6 +264,12 @@ func (m *mockRemoteDAGRunAttempt) ReadDAG(_ context.Context) (*core.DAG, error) 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.dag, nil
+}
+
+func (m *mockRemoteDAGRunAttempt) SetDAG(dag *core.DAG) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.dag = dag
 }
 
 func (m *mockRemoteDAGRunAttempt) Abort(_ context.Context) error {
@@ -960,11 +967,11 @@ steps:
 		}
 
 		// Create a previous status proto
-		previousStatus := &coordinatorv1.DAGRunStatusProto{
+		previousStatus := convert.DAGRunStatusToProto(&execution.DAGRunStatus{
 			Name:   "retry-dag",
-			Status: int32(core.Succeeded),
-			Nodes:  []*coordinatorv1.NodeStatusProto{},
-		}
+			Status: core.Succeeded,
+			Nodes:  []*execution.Node{},
+		})
 
 		task := &coordinatorv1.Task{
 			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
@@ -1076,7 +1083,8 @@ steps:
 func TestHandle_OperationRetryWithoutStep(t *testing.T) {
 	t.Parallel()
 
-	// When OPERATION_RETRY is used without a step, it should call handleStart with queuedRun=true
+	// When OPERATION_RETRY is used without PreviousStatus (queue dispatch),
+	// it should call handleStart with queuedRun=true for a fresh start.
 	tempDir := t.TempDir()
 	dagFile := filepath.Join(tempDir, "queued.yaml")
 	dagContent := `name: queued-dag
@@ -1099,18 +1107,20 @@ steps:
 
 	task := &coordinatorv1.Task{
 		Operation:      coordinatorv1.Operation_OPERATION_RETRY,
-		Step:           "", // No step = queuedRun path
+		Step:           "", // No step
 		Target:         dagFile,
 		DagRunId:       "run-queued-1",
 		RootDagRunName: "root",
 		RootDagRunId:   "root-1",
+		PreviousStatus: nil, // No PreviousStatus = queue dispatch path
 	}
 
 	// This will fail at agent creation, but proves the queuedRun path is taken
 	err = handler.Handle(context.Background(), task)
 	require.Error(t, err)
-	// The error should be from execution, not unsupported operation
+	// The error should be from execution, not unsupported operation or "retry requires"
 	require.NotContains(t, err.Error(), "unsupported operation")
+	require.NotContains(t, err.Error(), "retry requires")
 }
 
 func TestHandle_OperationRetryWithStep(t *testing.T) {
@@ -1142,6 +1152,86 @@ func TestHandle_OperationRetryWithStep(t *testing.T) {
 	require.Error(t, err)
 	// Should fail with "retry requires" error from handleRetry
 	require.Contains(t, err.Error(), "retry requires either previous_status")
+}
+
+func TestIsQueueDispatch(t *testing.T) {
+	t.Parallel()
+
+	handler := &remoteTaskHandler{}
+
+	t.Run("NoPreviousStatusNoStep_IsQueueDispatch", func(t *testing.T) {
+		t.Parallel()
+		task := &coordinatorv1.Task{
+			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
+			Step:           "",
+			PreviousStatus: nil,
+		}
+		assert.True(t, handler.isQueueDispatch(task), "nil PreviousStatus with no Step should be queue dispatch")
+	})
+
+	t.Run("QueuedStatusNoStep_IsQueueDispatch", func(t *testing.T) {
+		t.Parallel()
+		task := &coordinatorv1.Task{
+			Operation: coordinatorv1.Operation_OPERATION_RETRY,
+			Step:      "",
+			PreviousStatus: convert.DAGRunStatusToProto(&execution.DAGRunStatus{
+				Status: core.Queued,
+				Nodes:  []*execution.Node{},
+			}),
+		}
+		assert.True(t, handler.isQueueDispatch(task), "Queued status should be queue dispatch")
+	})
+
+	t.Run("FailedStatusNoStep_IsActualRetry", func(t *testing.T) {
+		t.Parallel()
+		task := &coordinatorv1.Task{
+			Operation: coordinatorv1.Operation_OPERATION_RETRY,
+			Step:      "",
+			PreviousStatus: convert.DAGRunStatusToProto(&execution.DAGRunStatus{
+				Status: core.Failed,
+				Nodes: []*execution.Node{
+					{Step: core.Step{Name: "step1"}, Status: core.NodeSucceeded},
+					{Step: core.Step{Name: "step2"}, Status: core.NodeFailed},
+				},
+			}),
+		}
+		assert.False(t, handler.isQueueDispatch(task), "Failed status should be actual retry")
+	})
+
+	t.Run("SucceededStatusNoStep_IsActualRetry", func(t *testing.T) {
+		t.Parallel()
+		task := &coordinatorv1.Task{
+			Operation: coordinatorv1.Operation_OPERATION_RETRY,
+			Step:      "",
+			PreviousStatus: convert.DAGRunStatusToProto(&execution.DAGRunStatus{
+				Status: core.Succeeded,
+				Nodes:  []*execution.Node{},
+			}),
+		}
+		assert.False(t, handler.isQueueDispatch(task), "Succeeded status should be actual retry")
+	})
+
+	t.Run("WithStepAndNilStatus_IsActualRetry", func(t *testing.T) {
+		t.Parallel()
+		task := &coordinatorv1.Task{
+			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
+			Step:           "step1", // Step is set
+			PreviousStatus: nil,
+		}
+		assert.False(t, handler.isQueueDispatch(task), "Step set should be actual retry")
+	})
+
+	t.Run("WithStepAndQueuedStatus_IsActualRetry", func(t *testing.T) {
+		t.Parallel()
+		task := &coordinatorv1.Task{
+			Operation: coordinatorv1.Operation_OPERATION_RETRY,
+			Step:      "step1", // Step is set
+			PreviousStatus: convert.DAGRunStatusToProto(&execution.DAGRunStatus{
+				Status: core.Queued,
+			}),
+		}
+		assert.False(t, handler.isQueueDispatch(task), "Step set should override status check")
+	})
 }
 
 func TestHandleRetry_LocalStoreMode(t *testing.T) {
@@ -1285,11 +1375,11 @@ steps:
 	err := os.WriteFile(dagFile, []byte(dagContent), 0644)
 	require.NoError(t, err)
 
-	previousStatus := &coordinatorv1.DAGRunStatusProto{
+	previousStatus := convert.DAGRunStatusToProto(&execution.DAGRunStatus{
 		Name:   "exec-retry-dag",
-		Status: int32(core.Succeeded),
-		Nodes:  []*coordinatorv1.NodeStatusProto{},
-	}
+		Status: core.Succeeded,
+		Nodes:  []*execution.Node{},
+	})
 
 	handler := &remoteTaskHandler{
 		workerID:          "test-worker",
@@ -1343,11 +1433,11 @@ func TestHandleRetry_LoadDAGErrorPath(t *testing.T) {
 	t.Parallel()
 
 	// Test the path where handleRetry fails at loadDAG after getting status
-	previousStatus := &coordinatorv1.DAGRunStatusProto{
+	previousStatus := convert.DAGRunStatusToProto(&execution.DAGRunStatus{
 		Name:   "loaddag-error-dag",
-		Status: int32(core.Succeeded),
-		Nodes:  []*coordinatorv1.NodeStatusProto{},
-	}
+		Status: core.Succeeded,
+		Nodes:  []*execution.Node{},
+	})
 
 	handler := &remoteTaskHandler{
 		workerID:          "test-worker",
@@ -1379,11 +1469,11 @@ func TestHandleRetry_WithDefinitionAndCleanup(t *testing.T) {
 	t.Parallel()
 
 	// Test handleRetry with inline definition to trigger cleanup path
-	previousStatus := &coordinatorv1.DAGRunStatusProto{
+	previousStatus := convert.DAGRunStatusToProto(&execution.DAGRunStatus{
 		Name:   "def-cleanup-dag",
-		Status: int32(core.Succeeded),
-		Nodes:  []*coordinatorv1.NodeStatusProto{},
-	}
+		Status: core.Succeeded,
+		Nodes:  []*execution.Node{},
+	})
 
 	handler := &remoteTaskHandler{
 		workerID:          "test-worker",

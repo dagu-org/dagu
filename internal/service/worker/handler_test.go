@@ -39,7 +39,7 @@ func TestTaskHandler(t *testing.T) {
 		task := &coordinatorv1.Task{
 			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
 			DagRunId:       dagRunID,
-			Target:         dag.DAG.Location,
+			Target:         dag.Location,
 			RootDagRunName: dag.Name,
 			RootDagRunId:   dagRunID,
 		}

@@ -88,13 +88,17 @@ func (e *taskHandler) buildCommandSpec(task *coordinatorv1.Task) (runtime.CmdSpe
 	switch task.Operation {
 	case coordinatorv1.Operation_OPERATION_START:
 		return e.subCmdBuilder.TaskStart(task), nil
+
 	case coordinatorv1.Operation_OPERATION_RETRY:
+		// If no specific step is targeted, retry behaves like start
 		if task.Step == "" {
 			return e.subCmdBuilder.TaskStart(task), nil
 		}
 		return e.subCmdBuilder.TaskRetry(task), nil
+
 	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
 		return runtime.CmdSpec{}, fmt.Errorf("operation not specified")
+
 	default:
 		return runtime.CmdSpec{}, fmt.Errorf("unknown operation: %v", task.Operation)
 	}

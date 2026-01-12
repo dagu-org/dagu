@@ -247,6 +247,8 @@ func (p *RemoteProgressDisplay) printFinal(status *execution.DAGRunStatus) {
 	p.mu.Lock()
 	completed, percent := p.completedAndPercent()
 	workerID := p.workerID
+	isTTY := p.isTTY
+	total := p.total
 	p.mu.Unlock()
 
 	icon := "✓"
@@ -257,21 +259,20 @@ func (p *RemoteProgressDisplay) printFinal(status *execution.DAGRunStatus) {
 	}
 
 	elapsed := stringutil.FormatDuration(time.Since(p.startTime))
-
-	// Build worker info if available
 	workerInfo := ""
 	if workerID != "" {
 		workerInfo = " → " + workerID
 	}
 
-	if p.isTTY {
-		fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps) %s%s   \n", icon, percent, completed, p.total, p.gray(elapsed), p.gray(workerInfo))
+	if isTTY {
+		fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps) %s%s   \n", icon, percent, completed, total, p.gray(elapsed), p.gray(workerInfo))
+		return
+	}
+
+	if workerID != "" {
+		fmt.Fprintf(os.Stderr, "Finished: %s (%d/%d steps) [%s] worker=%s\n", statusText, completed, total, elapsed, workerID)
 	} else {
-		if workerID != "" {
-			fmt.Fprintf(os.Stderr, "Finished: %s (%d/%d steps) [%s] worker=%s\n", statusText, completed, p.total, elapsed, workerID)
-		} else {
-			fmt.Fprintf(os.Stderr, "Finished: %s (%d/%d steps) [%s]\n", statusText, completed, p.total, elapsed)
-		}
+		fmt.Fprintf(os.Stderr, "Finished: %s (%d/%d steps) [%s]\n", statusText, completed, total, elapsed)
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/common/backoff"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/proto/convert"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
@@ -278,11 +279,11 @@ func TestClientReportStatus(t *testing.T) {
 
 		req := &coordinatorv1.ReportStatusRequest{
 			WorkerId: "test-worker",
-			Status: &coordinatorv1.DAGRunStatusProto{
-				DagRunId:  "test-run-123",
+			Status: convert.DAGRunStatusToProto(&execution.DAGRunStatus{
+				DAGRunID:  "test-run-123",
 				Status:    1, // Running status
 				StartedAt: "2024-01-01T00:00:00Z",
-			},
+			}),
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
@@ -296,7 +297,10 @@ func TestClientReportStatus(t *testing.T) {
 		require.NotNil(t, receivedReq)
 		assert.Equal(t, "test-worker", receivedReq.WorkerId)
 		require.NotNil(t, receivedReq.Status)
-		assert.Equal(t, "test-run-123", receivedReq.Status.DagRunId)
+		// Verify via JSON conversion
+		s := convert.ProtoToDAGRunStatus(receivedReq.Status)
+		require.NotNil(t, s)
+		assert.Equal(t, "test-run-123", s.DAGRunID)
 	})
 
 	t.Run("NotAccepted", func(t *testing.T) {
@@ -323,10 +327,10 @@ func TestClientReportStatus(t *testing.T) {
 
 		req := &coordinatorv1.ReportStatusRequest{
 			WorkerId: "test-worker",
-			Status: &coordinatorv1.DAGRunStatusProto{
-				DagRunId: "test-run-456",
+			Status: convert.DAGRunStatusToProto(&execution.DAGRunStatus{
+				DAGRunID: "test-run-456",
 				Status:   2, // Success status
-			},
+			}),
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
@@ -363,10 +367,10 @@ func TestClientReportStatus(t *testing.T) {
 
 		req := &coordinatorv1.ReportStatusRequest{
 			WorkerId: "test-worker",
-			Status: &coordinatorv1.DAGRunStatusProto{
-				DagRunId: "test-run-789",
+			Status: convert.DAGRunStatusToProto(&execution.DAGRunStatus{
+				DAGRunID: "test-run-789",
 				Status:   3, // Failed status
-			},
+			}),
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)

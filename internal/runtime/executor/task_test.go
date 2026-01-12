@@ -5,6 +5,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/proto/convert"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
@@ -315,10 +316,13 @@ func TestTaskOption_Functions(t *testing.T) {
 		executor.WithPreviousStatus(status)(task)
 
 		assert.NotNil(t, task.PreviousStatus)
-		assert.Equal(t, "test-dag", task.PreviousStatus.Name)
-		assert.Equal(t, "run-123", task.PreviousStatus.DagRunId)
-		assert.Equal(t, int32(core.Running), task.PreviousStatus.Status)
-		assert.Len(t, task.PreviousStatus.Nodes, 2)
+		// Verify via JSON conversion
+		s := convert.ProtoToDAGRunStatus(task.PreviousStatus)
+		assert.NotNil(t, s)
+		assert.Equal(t, "test-dag", s.Name)
+		assert.Equal(t, "run-123", s.DAGRunID)
+		assert.Equal(t, core.Running, s.Status)
+		assert.Len(t, s.Nodes, 2)
 	})
 
 	t.Run("WithPreviousStatusNil", func(t *testing.T) {

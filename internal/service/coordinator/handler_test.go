@@ -9,6 +9,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/execution"
+	"github.com/dagu-org/dagu/internal/proto/convert"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -154,6 +155,7 @@ func (m *mockDAGRunAttempt) ReadStatus(_ context.Context) (*execution.DAGRunStat
 	return &statusCopy, nil
 }
 func (m *mockDAGRunAttempt) ReadDAG(_ context.Context) (*core.DAG, error) { return nil, nil }
+func (m *mockDAGRunAttempt) SetDAG(_ *core.DAG)                           {}
 func (m *mockDAGRunAttempt) Abort(_ context.Context) error                { return nil }
 func (m *mockDAGRunAttempt) IsAborting(_ context.Context) (bool, error) {
 	m.mu.Lock()
@@ -829,11 +831,11 @@ func TestHandler_ReportStatus(t *testing.T) {
 
 		// Report status
 		req := &coordinatorv1.ReportStatusRequest{
-			Status: &coordinatorv1.DAGRunStatusProto{
+			Status: convert.DAGRunStatusToProto(&execution.DAGRunStatus{
 				Name:     "test-dag",
-				DagRunId: "run-123",
-				Status:   int32(core.Running),
-			},
+				DAGRunID: "run-123",
+				Status:   core.Running,
+			}),
 		}
 
 		resp, err := h.ReportStatus(ctx, req)
@@ -867,11 +869,11 @@ func TestHandler_ReportStatus(t *testing.T) {
 		ctx := context.Background()
 
 		req := &coordinatorv1.ReportStatusRequest{
-			Status: &coordinatorv1.DAGRunStatusProto{
+			Status: convert.DAGRunStatusToProto(&execution.DAGRunStatus{
 				Name:     "test-dag",
-				DagRunId: "run-123",
-				Status:   int32(core.Running),
-			},
+				DAGRunID: "run-123",
+				Status:   core.Running,
+			}),
 		}
 
 		_, err := h.ReportStatus(ctx, req)
