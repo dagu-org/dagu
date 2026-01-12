@@ -197,6 +197,12 @@ function DAGSpec({ fileName }: Props) {
       return;
     }
 
+    // Update the ref to prevent stale comparison until SWR refreshes
+    lastFetchedSpecRef.current = currentValue;
+
+    // Clear unsaved changes immediately after successful save
+    setHasUnsavedChanges(false);
+
     // Show success toast notification
     showToast('Changes saved successfully');
   }, [
@@ -206,6 +212,7 @@ function DAGSpec({ fileName }: Props) {
     client,
     saveScrollPosition,
     showToast,
+    setHasUnsavedChanges,
   ]);
 
   // Restore scroll position after render

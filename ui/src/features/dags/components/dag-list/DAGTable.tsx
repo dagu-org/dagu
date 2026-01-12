@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { components } from '../../../../api/v2/schema';
+import { components, Status } from '../../../../api/v2/schema';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
 import Ticker from '../../../../ui/Ticker';
@@ -110,11 +110,7 @@ function DAGCard({ dag, isSelected, onSelect, onTagClick, refreshFn, className =
 
   return (
     <div
-      className={`p-2.5 rounded-md border cursor-pointer overflow-hidden ${
-        isSelected
-          ? 'bg-primary/10 border-primary'
-          : 'bg-card border-border hover:bg-muted/50'
-      } ${className}`}
+      className={`p-2.5 rounded-md border cursor-pointer overflow-hidden bg-card border-border hover:bg-muted/50 ${isSelected ? 'shadow-[inset_3px_0_0_0_rgba(0,0,0,0.2)]' : ''} ${status === Status.Running ? 'animate-running-row' : ''} ${className}`}
       onClick={handleCardClick}
     >
       {/* Header: Name + Status */}
@@ -552,8 +548,7 @@ const defaultColumns = [
             );
           }
         }
-      } else if (status === 1) {
-        // Status 1 typically means "Running"
+      } else if (status === Status.Running) {
         durationContent = (
           <div className="text-[10px] text-muted-foreground">(Running)</div>
         );
@@ -1232,14 +1227,11 @@ function DAGTable({
                     data-state={row.getIsSelected() && 'selected'}
                     className={`text-[0.8125rem] ${
                       row.original?.kind === ItemKind.Group
-                        ? 'bg-muted/50 font-semibold cursor-pointer hover:bg-muted/70 border-l-4 border-transparent' // Make group rows clickable
-                        : isDAGRow &&
-                            'dag' in row.original &&
-                            selectedDAG ===
-                              (row.original as DAGRow).dag.fileName
-                          ? 'cursor-pointer bg-primary/10 hover:bg-primary/15 border-l-4 border-primary' // Highlight selected DAG
-                          : 'cursor-pointer hover:bg-muted/50 border-l-4 border-transparent'
-                    }`}
+                        ? 'bg-muted/50 font-semibold cursor-pointer hover:bg-muted/70'
+                        : isDAGRow && 'dag' in row.original && selectedDAG === (row.original as DAGRow).dag.fileName
+                          ? 'cursor-pointer hover:bg-muted/50 shadow-[inset_3px_0_0_0_rgba(0,0,0,0.2)]'
+                          : 'cursor-pointer hover:bg-muted/50'
+                    } ${isDAGRow && 'dag' in row.original && (row.original as DAGRow).dag.latestDAGRun?.status === Status.Running ? 'animate-running-row' : ''}`}
                     onClick={(e) => {
                       // Handle group row clicks - toggle expanded state
                       if ((row.original as Data)?.kind === ItemKind.Group) {

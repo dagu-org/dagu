@@ -235,11 +235,7 @@ function DAGRunTable({
         {dagRuns.map((dagRun, index) => (
           <div
             key={dagRun.dagRunId}
-            className={`p-3 rounded-lg border min-h-[80px] flex flex-col ${
-              selectedIndex === index
-                ? 'bg-primary/10 border-primary'
-                : 'bg-card border-border'
-            } cursor-pointer`}
+            className={`p-3 rounded-lg border border-l-4 min-h-[80px] flex flex-col bg-card border-border ${selectedIndex === index ? 'border-l-border' : 'border-l-transparent'} ${dagRun.status === Status.Running ? 'animate-running-row' : ''} cursor-pointer`}
             onClick={(e) => {
               // Navigate directly to DAG-run page with correct URL pattern
               if (e.metaKey || e.ctrlKey) {
@@ -353,11 +349,9 @@ function DAGRunTable({
           {dagRuns.map((dagRun, index) => (
             <TableRow
               key={dagRun.dagRunId}
-              className={`cursor-pointer ${
-                selectedIndex === index
-                  ? 'bg-primary/10 hover:bg-primary/15 border-l-4 border-primary border-b-0 border-t-0'
-                  : 'hover:bg-muted/50 border-0'
-              }`}
+              className={`cursor-pointer hover:bg-muted/50 border-l-4 ${
+                selectedIndex === index ? 'border-l-border' : 'border-l-transparent'
+              } ${dagRun.status === Status.Running ? 'animate-running-row' : ''}`}
               style={{ fontSize: '0.8125rem' }}
               onClick={(e) => {
                 if (e.ctrlKey || e.metaKey) {

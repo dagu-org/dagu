@@ -674,3 +674,31 @@
   outline: 2px solid rgba(var(--primary), 0.5);
   outline-offset: 2px;
 }
+
+/* =============================================================================
+   RUNNING STATE ANIMATION
+   Futuristic soft shimmer effect for running DAG rows
+   ============================================================================= */
+
+@keyframes running-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-running-row {
+  position: relative;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(34, 197, 94, 0.03) 25%,
+    rgba(34, 197, 94, 0.06) 50%,
+    rgba(34, 197, 94, 0.03) 75%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: running-shimmer 5s ease-in-out infinite;
+}

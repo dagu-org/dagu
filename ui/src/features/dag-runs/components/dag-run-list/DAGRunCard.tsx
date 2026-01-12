@@ -1,6 +1,6 @@
 import { Server } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { components } from '../../../../api/v2/schema';
+import { components, Status } from '../../../../api/v2/schema';
 import {
   Card,
   CardContent,
@@ -36,7 +36,7 @@ function DAGRunCard({ dagRun, timezoneInfo }: DAGRunCardProps) {
     };
   }, [isModalOpen]);
   return (
-    <Card className="h-full hover:">
+    <Card className={`h-full hover: ${dagRun.status === Status.Running ? 'animate-running-row' : ''}`}>
       <div
         className="block h-full no-underline text-inherit cursor-pointer"
         onClick={(e) => {
