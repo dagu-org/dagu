@@ -91,8 +91,6 @@ func runDry(ctx *Context, args []string) error {
 		return err
 	}
 
-	root := exec.NewDAGRunRef(dag.Name, dagRunID)
-
 	agentInstance := agent.New(
 		dagRunID,
 		dag,
@@ -100,11 +98,13 @@ func runDry(ctx *Context, args []string) error {
 		logFile.Name(),
 		ctx.DAGRunMgr,
 		dr,
-		ctx.DAGRunStore,
-		ctx.ServiceRegistry,
-		root,
-		ctx.Config.Core.Peer,
-		agent.Options{Dry: true},
+		agent.Options{
+			Dry:             true,
+			DAGRunStore:     ctx.DAGRunStore,
+			ServiceRegistry: ctx.ServiceRegistry,
+			RootDAGRun:      exec.NewDAGRunRef(dag.Name, dagRunID),
+			PeerConfig:      ctx.Config.Core.Peer,
+		},
 	)
 
 	listenSignals(ctx, agentInstance)

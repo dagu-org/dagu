@@ -317,6 +317,10 @@ func (h *remoteTaskHandler) executeDAGRun(
 		LogWriterFactory: logStreamer,
 		QueuedRun:        queuedRun,
 		AttemptID:        attemptID,
+		DAGRunStore:      h.dagRunStore,
+		ServiceRegistry:  h.serviceRegistry,
+		RootDAGRun:       root,
+		PeerConfig:       h.peerConfig,
 	}
 
 	// Add retry configuration if present
@@ -333,10 +337,6 @@ func (h *remoteTaskHandler) executeDAGRun(
 		env.logFile,
 		h.dagRunMgr,
 		h.dagStore,
-		h.dagRunStore,
-		h.serviceRegistry,
-		root,
-		h.peerConfig,
 		opts,
 	)
 

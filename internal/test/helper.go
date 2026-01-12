@@ -610,6 +610,11 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 	logFile := filepath.Join(d.Config.Paths.LogDir, dagRunID+".log")
 	root := exec1.NewDAGRunRef(d.Name, dagRunID)
 
+	helper.opts.DAGRunStore = d.DAGRunStore
+	helper.opts.ServiceRegistry = d.ServiceRegistry
+	helper.opts.RootDAGRun = root
+	helper.opts.PeerConfig = d.Config.Core.Peer
+
 	helper.Agent = agent.New(
 		dagRunID,
 		d.DAG,
@@ -617,10 +622,6 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		logFile,
 		d.DAGRunMgr,
 		d.DAGStore,
-		d.DAGRunStore,
-		d.ServiceRegistry,
-		root,
-		d.Config.Core.Peer,
 		helper.opts,
 	)
 

@@ -237,6 +237,46 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, subDAGRunID, existingAttemptStatus.DAGRunID)
 		assert.Equal(t, core.Succeeded.String(), existingAttemptStatus.Status.String())
 	})
+	t.Run("CreateSubAttempt", func(t *testing.T) {
+		th := setupTestStore(t)
+
+		// Create a parent record first
+		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+		th.CreateAttempt(t, ts, "parent-id", core.Running)
+
+		// Create sub-attempt using CreateSubAttempt
+		rootRef := exec.NewDAGRunRef("test_DAG", "parent-id")
+		subAttempt, err := th.Store.CreateSubAttempt(th.Context, rootRef, "sub-id")
+		require.NoError(t, err)
+
+		// Write status to the sub-attempt
+		subDAG := th.DAG("child")
+		subAttempt.SetDAG(subDAG.DAG)
+		err = subAttempt.Open(th.Context)
+		require.NoError(t, err)
+		defer func() { _ = subAttempt.Close(th.Context) }()
+
+		statusToWrite := exec.InitialStatus(subDAG.DAG)
+		statusToWrite.DAGRunID = "sub-id"
+		err = subAttempt.Write(th.Context, statusToWrite)
+		require.NoError(t, err)
+
+		// Verify sub-attempt can be found
+		foundAttempt, err := th.Store.FindSubAttempt(th.Context, rootRef, "sub-id")
+		require.NoError(t, err)
+
+		status, err := foundAttempt.ReadStatus(th.Context)
+		require.NoError(t, err)
+		assert.Equal(t, "sub-id", status.DAGRunID)
+	})
+	t.Run("CreateSubAttemptEmptyRootID", func(t *testing.T) {
+		th := setupTestStore(t)
+
+		// Try to create sub-attempt with empty root ID
+		rootRef := exec.NewDAGRunRef("test_DAG", "")
+		_, err := th.Store.CreateSubAttempt(th.Context, rootRef, "sub-id")
+		require.ErrorIs(t, err, ErrDAGRunIDEmpty)
+	})
 	t.Run("ReadDAG", func(t *testing.T) {
 		th := setupTestStore(t)
 

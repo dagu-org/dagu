@@ -377,15 +377,15 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID st
 		logFile.Name(),
 		ctx.DAGRunMgr,
 		dr,
-		ctx.DAGRunStore,
-		ctx.ServiceRegistry,
-		root,
-		ctx.Config.Core.Peer,
 		agent.Options{
 			ParentDAGRun:    parent,
 			ProgressDisplay: shouldEnableProgress(ctx),
 			WorkerID:        workerID,
 			QueuedRun:       queuedRun,
+			DAGRunStore:     ctx.DAGRunStore,
+			ServiceRegistry: ctx.ServiceRegistry,
+			RootDAGRun:      root,
+			PeerConfig:      ctx.Config.Core.Peer,
 		},
 	)
 

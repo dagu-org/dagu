@@ -97,3 +97,28 @@ func TestNodeStatusString(t *testing.T) {
 		})
 	}
 }
+
+func TestNodeStatus_IsDone(t *testing.T) {
+	tests := []struct {
+		status   NodeStatus
+		expected bool
+	}{
+		{NodeNotStarted, false},
+		{NodeRunning, false},
+		{NodeWaiting, false},
+		{NodeSucceeded, true},
+		{NodeFailed, true},
+		{NodeSkipped, true},
+		{NodeAborted, true},
+		{NodePartiallySucceeded, true},
+		{NodeRejected, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.status.String(), func(t *testing.T) {
+			if got := tt.status.IsDone(); got != tt.expected {
+				t.Errorf("NodeStatus(%d).IsDone() = %v, want %v", tt.status, got, tt.expected)
+			}
+		})
+	}
+}

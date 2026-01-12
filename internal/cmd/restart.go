@@ -148,11 +148,13 @@ func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRu
 		logFile.Name(),
 		cli,
 		dr,
-		ctx.DAGRunStore,
-		ctx.ServiceRegistry,
-		exec.NewDAGRunRef(dag.Name, dagRunID),
-		ctx.Config.Core.Peer,
-		agent.Options{Dry: false})
+		agent.Options{
+			Dry:             false,
+			DAGRunStore:     ctx.DAGRunStore,
+			ServiceRegistry: ctx.ServiceRegistry,
+			RootDAGRun:      exec.NewDAGRunRef(dag.Name, dagRunID),
+			PeerConfig:      ctx.Config.Core.Peer,
+		})
 
 	listenSignals(ctx, agentInstance)
 	if err := agentInstance.Run(ctx); err != nil {

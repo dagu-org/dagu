@@ -66,11 +66,12 @@ func TestBaseDAGSpecialEnvVarsInHandler(t *testing.T) {
 		logFile,
 		drm,
 		th.DAGStore,
-		th.DAGRunStore,
-		th.ServiceRegistry,
-		root,
-		th.Config.Core.Peer,
-		agent.Options{},
+		agent.Options{
+			DAGRunStore:     th.DAGRunStore,
+			ServiceRegistry: th.ServiceRegistry,
+			RootDAGRun:      root,
+			PeerConfig:      th.Config.Core.Peer,
+		},
 	)
 
 	// Run the agent - expect failure
@@ -180,11 +181,12 @@ steps:
 		logFile,
 		drm,
 		th.DAGStore,
-		th.DAGRunStore,
-		th.ServiceRegistry,
-		root,
-		th.Config.Core.Peer,
-		agent.Options{},
+		agent.Options{
+			DAGRunStore:     th.DAGRunStore,
+			ServiceRegistry: th.ServiceRegistry,
+			RootDAGRun:      root,
+			PeerConfig:      th.Config.Core.Peer,
+		},
 	)
 
 	// Run the agent - expect failure

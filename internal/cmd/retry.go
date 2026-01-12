@@ -133,16 +133,16 @@ func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRu
 		logFile.Name(),
 		ctx.DAGRunMgr,
 		dr,
-		ctx.DAGRunStore,
-		ctx.ServiceRegistry,
-		rootRun,
-		ctx.Config.Core.Peer,
 		agent.Options{
 			RetryTarget:     status,
 			ParentDAGRun:    status.Parent,
 			ProgressDisplay: shouldEnableProgress(ctx),
 			StepRetry:       stepName,
 			WorkerID:        workerID,
+			DAGRunStore:     ctx.DAGRunStore,
+			ServiceRegistry: ctx.ServiceRegistry,
+			RootDAGRun:      rootRun,
+			PeerConfig:      ctx.Config.Core.Peer,
 		},
 	)
 

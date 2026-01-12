@@ -194,6 +194,14 @@ type Options struct {
 	// AttemptID is the attempt ID from the coordinator.
 	// When set, the agent creates an attempt with this ID instead of generating a new one.
 	AttemptID string
+	// DAGRunStore is the store for dag-run data. Nil in shared-nothing mode.
+	DAGRunStore exec.DAGRunStore
+	// ServiceRegistry is the registry for service discovery.
+	ServiceRegistry exec.ServiceRegistry
+	// RootDAGRun is the root dag-run reference for sub-DAG runs.
+	RootDAGRun exec.DAGRunRef
+	// PeerConfig is the configuration for peer communication.
+	PeerConfig config.Peer
 }
 
 // New creates a new Agent.
@@ -204,14 +212,10 @@ func New(
 	logFile string,
 	drm runtime.Manager,
 	ds exec.DAGStore,
-	drs exec.DAGRunStore,
-	reg exec.ServiceRegistry,
-	root exec.DAGRunRef,
-	peerConfig config.Peer,
 	opts Options,
 ) *Agent {
 	a := &Agent{
-		rootDAGRun:       root,
+		rootDAGRun:       opts.RootDAGRun,
 		parentDAGRun:     opts.ParentDAGRun,
 		dagRunID:         dagRunID,
 		dag:              dag,
@@ -221,10 +225,10 @@ func New(
 		logFile:          logFile,
 		dagRunMgr:        drm,
 		dagStore:         ds,
-		dagRunStore:      drs,
-		registry:         reg,
+		dagRunStore:      opts.DAGRunStore,
+		registry:         opts.ServiceRegistry,
 		stepRetry:        opts.StepRetry,
-		peerConfig:       peerConfig,
+		peerConfig:       opts.PeerConfig,
 		workerID:         opts.WorkerID,
 		statusPusher:     opts.StatusPusher,
 		logWriterFactory: opts.LogWriterFactory,
