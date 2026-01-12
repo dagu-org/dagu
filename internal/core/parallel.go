@@ -1,6 +1,6 @@
 package core
 
-import "github.com/dagu-org/dagu/internal/common/collections"
+import "github.com/dagu-org/dagu/internal/cmn/collections"
 
 // ParallelConfig contains the configuration for parallel execution of a step.
 // MVP version supports basic parallel execution with maxConcurrent control.

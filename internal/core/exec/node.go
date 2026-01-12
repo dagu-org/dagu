@@ -1,7 +1,7 @@
 package exec
 
 import (
-	"github.com/dagu-org/dagu/internal/common/collections"
+	"github.com/dagu-org/dagu/internal/cmn/collections"
 	"github.com/dagu-org/dagu/internal/core"
 )
 

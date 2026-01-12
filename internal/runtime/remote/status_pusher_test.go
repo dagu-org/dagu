@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/common/backoff"
+	"github.com/dagu-org/dagu/internal/cmn/backoff"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/proto/convert"

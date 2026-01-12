@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"slices"
 
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 )
 
 // unixShell handles standard Unix shells (sh, bash, zsh, etc.).

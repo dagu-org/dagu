@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/common/mailer"
+	"github.com/dagu-org/dagu/internal/cmn/mailer"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"

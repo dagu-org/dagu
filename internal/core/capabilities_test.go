@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/common/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/stretchr/testify/assert"
 )
 

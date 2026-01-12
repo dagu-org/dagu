@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	oidc "github.com/coreos/go-oidc"
-	"github.com/dagu-org/dagu/internal/common/config"
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/stretchr/testify/require"
 )
 
