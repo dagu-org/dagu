@@ -801,6 +801,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dag-runs/{name}/{dagRunId}/steps/{stepName}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve chat messages for a step
+         * @description Fetches the LLM chat message history for a chat step. Returns empty array for non-chat steps.
+         */
+        get: operations["getDAGRunStepMessages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dag-runs/{name}/{dagRunId}/steps/{stepName}/status": {
         parameters: {
             query?: never;
@@ -913,6 +933,26 @@ export interface paths {
          * @description Fetches the log for an individual step in a sub DAG-run
          */
         get: operations["getSubDAGRunStepLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve chat messages for a step in a sub DAG-run
+         * @description Fetches the LLM chat message history for a chat step in a sub DAG-run. Returns empty array for non-chat steps.
+         */
+        get: operations["getSubDAGRunStepMessages"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1268,6 +1308,39 @@ export interface components {
             stepName: string;
             /** @description Whether the DAG run was re-enqueued for execution */
             resumed: boolean;
+        };
+        /** @description A single chat message in an LLM conversation */
+        ChatMessage: {
+            /**
+             * @description Message role in the conversation
+             * @enum {string}
+             */
+            role: ChatMessageRole;
+            /** @description Message content */
+            content: string;
+            metadata?: components["schemas"]["ChatMessageMetadata"];
+        };
+        /** @description Metadata about an LLM API call */
+        ChatMessageMetadata: {
+            /** @description LLM provider (openai, anthropic, gemini, etc.) */
+            provider?: string;
+            /** @description Model identifier used */
+            model?: string;
+            /** @description Number of tokens in the prompt */
+            promptTokens?: number;
+            /** @description Number of tokens in the completion */
+            completionTokens?: number;
+            /** @description Total tokens (prompt + completion) */
+            totalTokens?: number;
+        };
+        /** @description Response containing chat messages for a step */
+        ChatMessagesResponse: {
+            /** @description List of chat messages */
+            messages: components["schemas"]["ChatMessage"][];
+            stepStatus: components["schemas"]["NodeStatus"];
+            stepStatusLabel: components["schemas"]["NodeStatusLabel"];
+            /** @description True if step is still running and more messages may arrive */
+            hasMore: boolean;
         };
         /** @description Request body for rejecting a waiting step */
         RejectStepRequest: {
@@ -4587,6 +4660,54 @@ export interface operations {
             };
         };
     };
+    getDAGRunStepMessages: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+                /** @description name of the step */
+                stepName: components["parameters"]["StepName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chat messages retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessagesResponse"];
+                };
+            };
+            /** @description DAG-run or step not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     updateDAGRunStepStatus: {
         parameters: {
             query?: {
@@ -4917,6 +5038,56 @@ export interface operations {
                 };
             };
             /** @description Log file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getSubDAGRunStepMessages: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+                /** @description ID of the sub DAG-run */
+                subDAGRunId: string;
+                /** @description name of the step */
+                stepName: components["parameters"]["StepName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chat messages retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessagesResponse"];
+                };
+            };
+            /** @description Sub DAG-run or step not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -5695,6 +5866,12 @@ export enum PathsDagsGetParametersQuerySort {
 export enum PathsDagsGetParametersQueryOrder {
     asc = "asc",
     desc = "desc"
+}
+export enum ChatMessageRole {
+    system = "system",
+    user = "user",
+    assistant = "assistant",
+    tool = "tool"
 }
 export enum ErrorCode {
     forbidden = "forbidden",

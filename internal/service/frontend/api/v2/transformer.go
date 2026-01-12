@@ -300,3 +300,32 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 
 	return ret
 }
+
+// toChatMessages converts exec.LLMMessage slice to api.ChatMessage slice.
+func toChatMessages(messages []exec.LLMMessage) []api.ChatMessage {
+	if messages == nil {
+		return []api.ChatMessage{}
+	}
+
+	result := make([]api.ChatMessage, 0, len(messages))
+	for _, msg := range messages {
+		apiMsg := api.ChatMessage{
+			Role:    api.ChatMessageRole(msg.Role),
+			Content: msg.Content,
+		}
+
+		if msg.Metadata != nil {
+			apiMsg.Metadata = &api.ChatMessageMetadata{
+				Provider:         ptrOf(msg.Metadata.Provider),
+				Model:            ptrOf(msg.Metadata.Model),
+				PromptTokens:     ptrOf(msg.Metadata.PromptTokens),
+				CompletionTokens: ptrOf(msg.Metadata.CompletionTokens),
+				TotalTokens:      ptrOf(msg.Metadata.TotalTokens),
+			}
+		}
+
+		result = append(result, apiMsg)
+	}
+
+	return result
+}

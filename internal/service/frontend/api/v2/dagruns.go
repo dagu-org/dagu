@@ -674,6 +674,105 @@ func (a *API) ApproveSubDAGRunStep(ctx context.Context, request api.ApproveSubDA
 	}, nil
 }
 
+// GetDAGRunStepMessages retrieves chat messages for a specific step.
+func (a *API) GetDAGRunStepMessages(ctx context.Context, request api.GetDAGRunStepMessagesRequestObject) (api.GetDAGRunStepMessagesResponseObject, error) {
+	dagName := request.Name
+	dagRunId := request.DagRunId
+
+	ref := exec.NewDAGRunRef(dagName, dagRunId)
+	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
+	if err != nil {
+		return api.GetDAGRunStepMessages404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
+		}, nil
+	}
+
+	node, err := dagStatus.NodeByName(request.StepName)
+	if err != nil {
+		return api.GetDAGRunStepMessages404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, dagName),
+		}, nil
+	}
+
+	// Get the attempt to read messages
+	attempt, err := a.dagRunStore.FindAttempt(ctx, ref)
+	if err != nil {
+		return api.GetDAGRunStepMessages404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("dag-run attempt not found for %s/%s", dagName, dagRunId),
+		}, nil
+	}
+
+	// Read messages for the step
+	messages, err := attempt.ReadStepMessages(ctx, request.StepName)
+	if err != nil {
+		return nil, fmt.Errorf("error reading messages: %w", err)
+	}
+
+	// Convert to API types
+	apiMessages := toChatMessages(messages)
+
+	// Determine if more messages might arrive
+	hasMore := node.Status == core.NodeRunning
+
+	return api.GetDAGRunStepMessages200JSONResponse{
+		Messages:        apiMessages,
+		StepStatus:      api.NodeStatus(node.Status),
+		StepStatusLabel: api.NodeStatusLabel(node.Status.String()),
+		HasMore:         hasMore,
+	}, nil
+}
+
+// GetSubDAGRunStepMessages retrieves chat messages for a step in a sub DAG-run.
+func (a *API) GetSubDAGRunStepMessages(ctx context.Context, request api.GetSubDAGRunStepMessagesRequestObject) (api.GetSubDAGRunStepMessagesResponseObject, error) {
+	rootRef := exec.NewDAGRunRef(request.Name, request.DagRunId)
+	dagStatus, err := a.dagRunMgr.FindSubDAGRunStatus(ctx, rootRef, request.SubDAGRunId)
+	if err != nil {
+		return api.GetSubDAGRunStepMessages404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("sub dag-run ID %s not found for DAG %s", request.SubDAGRunId, request.Name),
+		}, nil
+	}
+
+	node, err := dagStatus.NodeByName(request.StepName)
+	if err != nil {
+		return api.GetSubDAGRunStepMessages404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("step %s not found in sub DAG-run %s", request.StepName, request.SubDAGRunId),
+		}, nil
+	}
+
+	// Get the sub-attempt to read messages
+	attempt, err := a.dagRunStore.FindSubAttempt(ctx, rootRef, request.SubDAGRunId)
+	if err != nil {
+		return api.GetSubDAGRunStepMessages404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("sub dag-run attempt not found for %s", request.SubDAGRunId),
+		}, nil
+	}
+
+	// Read messages for the step
+	messages, err := attempt.ReadStepMessages(ctx, request.StepName)
+	if err != nil {
+		return nil, fmt.Errorf("error reading messages: %w", err)
+	}
+
+	// Convert to API types
+	apiMessages := toChatMessages(messages)
+
+	// Determine if more messages might arrive
+	hasMore := node.Status == core.NodeRunning
+
+	return api.GetSubDAGRunStepMessages200JSONResponse{
+		Messages:        apiMessages,
+		StepStatus:      api.NodeStatus(node.Status),
+		StepStatusLabel: api.NodeStatusLabel(node.Status.String()),
+		HasMore:         hasMore,
+	}, nil
+}
+
 // RejectDAGRunStep rejects a waiting step for HITL (Human-in-the-Loop).
 func (a *API) RejectDAGRunStep(ctx context.Context, request api.RejectDAGRunStepRequestObject) (api.RejectDAGRunStepResponseObject, error) {
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
