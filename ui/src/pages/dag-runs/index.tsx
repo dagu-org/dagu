@@ -301,7 +301,7 @@ function DAGRuns() {
     if (params.has('tags')) {
       const tagsParam = params.get('tags') ?? '';
       urlFilters.tags = tagsParam
-        ? tagsParam.split(',').map((t) => t.trim()).filter((t) => t !== '')
+        ? tagsParam.split(',').map((t) => t.trim().toLowerCase()).filter((t) => t !== '')
         : [];
       hasUrlFilters = true;
     }
