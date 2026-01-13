@@ -307,6 +307,14 @@ func (c *Context) NewCoordinatorClient() coordinator.Client {
 	coordinatorCliCfg.SkipTLSVerify = c.Config.Core.Peer.SkipTLSVerify
 	coordinatorCliCfg.Insecure = c.Config.Core.Peer.Insecure
 
+	// Use config values for retry if provided
+	if c.Config.Core.Peer.MaxRetries > 0 {
+		coordinatorCliCfg.MaxRetries = c.Config.Core.Peer.MaxRetries
+	}
+	if c.Config.Core.Peer.RetryInterval > 0 {
+		coordinatorCliCfg.RetryInterval = c.Config.Core.Peer.RetryInterval
+	}
+
 	if err := coordinatorCliCfg.Validate(); err != nil {
 		logger.Error(c.Context, "Invalid coordinator client configuration", tag.Error(err))
 		return nil

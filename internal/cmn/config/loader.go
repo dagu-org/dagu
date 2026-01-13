@@ -279,17 +279,7 @@ func (l *ConfigLoader) loadCoreConfig(cfg *Config, def Definition) error {
 		DefaultShell: def.DefaultShell,
 		SkipExamples: l.v.GetBool("skipExamples"),
 		BaseEnv:      baseEnv,
-	}
-
-	// Set Peer configuration if provided
-	if def.Peer.CertFile != "" || def.Peer.KeyFile != "" || def.Peer.ClientCaFile != "" || def.Peer.SkipTLSVerify || def.Peer.Insecure {
-		cfg.Core.Peer = Peer{
-			CertFile:      def.Peer.CertFile,
-			KeyFile:       def.Peer.KeyFile,
-			ClientCaFile:  def.Peer.ClientCaFile,
-			SkipTLSVerify: def.Peer.SkipTLSVerify,
-			Insecure:      def.Peer.Insecure,
-		}
+		Peer:         l.loadPeerConfig(def.Peer),
 	}
 
 	// Initialize the timezone
@@ -298,6 +288,26 @@ func (l *ConfigLoader) loadCoreConfig(cfg *Config, def Definition) error {
 	}
 
 	return nil
+}
+
+// loadPeerConfig converts PeerDef to Peer configuration.
+func (l *ConfigLoader) loadPeerConfig(def PeerDef) Peer {
+	peer := Peer{
+		CertFile:      def.CertFile,
+		KeyFile:       def.KeyFile,
+		ClientCaFile:  def.ClientCaFile,
+		SkipTLSVerify: def.SkipTLSVerify,
+		Insecure:      def.Insecure,
+		MaxRetries:    def.MaxRetries,
+	}
+
+	if def.RetryInterval != "" {
+		if d, err := time.ParseDuration(def.RetryInterval); err == nil {
+			peer.RetryInterval = d
+		}
+	}
+
+	return peer
 }
 
 // loadPathsConfig loads the file system paths configuration.

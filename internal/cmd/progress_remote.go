@@ -210,28 +210,29 @@ func (p *RemoteProgressDisplay) updateHeaderWithWorker() {
 	}
 
 	// Build the base header to calculate remaining width
-	// Format: "▶ {dagName} ({dagRunID}) → {workerID}"
 	baseHeader := fmt.Sprintf("▶ %s (%s) → ", dagName, p.dagRunID)
 	remainingWidth := p.termWidth - len(baseHeader) - 1
 
-	workerDisplay := p.workerID
-	if len(workerDisplay) > remainingWidth && remainingWidth > 3 {
-		workerDisplay = workerDisplay[:remainingWidth-1] + "…"
-	} else if remainingWidth <= 3 {
-		workerDisplay = ""
-	}
+	workerDisplay := p.truncateWorkerDisplay(remainingWidth)
 
-	// ANSI escape sequences:
-	// \r       - move to beginning of current line
-	// \033[K   - clear from cursor to end of line
-	// \033[1A  - move cursor up 1 line
-
-	// Clear current progress line, move up to header, clear header, print new header, move back down
+	// ANSI: clear line, move up, clear header, print new header
 	if workerDisplay != "" {
 		fmt.Fprintf(os.Stderr, "\r\033[K\033[1A\r\033[K▶ %s %s %s\n", dagName, p.gray("("+p.dagRunID+")"), p.gray("→ "+workerDisplay))
 	} else {
 		fmt.Fprintf(os.Stderr, "\r\033[K\033[1A\r\033[K▶ %s %s\n", dagName, p.gray("("+p.dagRunID+")"))
 	}
+}
+
+// truncateWorkerDisplay truncates the worker ID for header display.
+// Returns the truncated worker ID without the arrow prefix.
+func (p *RemoteProgressDisplay) truncateWorkerDisplay(maxWidth int) string {
+	if p.workerID == "" || maxWidth <= 3 {
+		return ""
+	}
+	if len(p.workerID) > maxWidth {
+		return p.workerID[:maxWidth-1] + "…"
+	}
+	return p.workerID
 }
 
 // completedAndPercent returns capped completed count and percentage.
@@ -245,6 +246,20 @@ func (p *RemoteProgressDisplay) completedAndPercent() (completed, percent int) {
 		percent = (completed * 100) / p.total
 	}
 	return completed, percent
+}
+
+// truncateWorkerID truncates the worker ID to fit within the available width.
+// Returns empty string if insufficient space, otherwise returns " -> " + workerID (possibly truncated).
+func (p *RemoteProgressDisplay) truncateWorkerID(availableWidth int) string {
+	if p.workerID == "" || availableWidth <= 5 {
+		return ""
+	}
+
+	workerSuffix := " → " + p.workerID
+	if len(workerSuffix) > availableWidth {
+		return workerSuffix[:availableWidth-1] + "…"
+	}
+	return workerSuffix
 }
 
 // render must be called with mu held.
@@ -262,18 +277,9 @@ func (p *RemoteProgressDisplay) render() {
 	// Build the base progress text (without worker info)
 	baseText := fmt.Sprintf("%s %d%% (%d/%d steps) %s", spinner, percent, completed, p.total, elapsed)
 
-	// Calculate remaining space for worker info (account for padding spaces)
-	// termWidth - len(baseText) - 3 (padding spaces) - 1 (safety margin)
+	// Calculate remaining space for worker info (account for padding spaces and safety margin)
 	remainingWidth := p.termWidth - len(baseText) - 4
-	workerInfo := ""
-	if p.workerID != "" && remainingWidth > 5 {
-		workerSuffix := " → " + p.workerID
-		if len(workerSuffix) > remainingWidth {
-			// Truncate worker ID to fit
-			workerSuffix = workerSuffix[:remainingWidth-1] + "…"
-		}
-		workerInfo = workerSuffix
-	}
+	workerInfo := p.truncateWorkerID(remainingWidth)
 
 	// Use \r to overwrite the line, pad with spaces to clear previous content
 	fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps) %s%s   ", spinner, percent, completed, p.total, p.gray(elapsed), p.gray(workerInfo))
@@ -301,14 +307,7 @@ func (p *RemoteProgressDisplay) printFinal(status *exec.DAGRunStatus) {
 		// Build the base text to calculate remaining width
 		baseText := fmt.Sprintf("%s %d%% (%d/%d steps) %s", icon, percent, completed, total, elapsed)
 		remainingWidth := termWidth - len(baseText) - 4
-		workerInfo := ""
-		if workerID != "" && remainingWidth > 5 {
-			workerSuffix := " → " + workerID
-			if len(workerSuffix) > remainingWidth {
-				workerSuffix = workerSuffix[:remainingWidth-1] + "…"
-			}
-			workerInfo = workerSuffix
-		}
+		workerInfo := p.truncateWorkerID(remainingWidth)
 		fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps) %s%s   \n", icon, percent, completed, total, p.gray(elapsed), p.gray(workerInfo))
 		return
 	}
