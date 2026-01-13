@@ -92,9 +92,10 @@ func TestWorkerStart(t *testing.T) {
 		// For the remaining tasks, we need to allow time for workers to re-poll
 		for i := 0; i < 5; i++ {
 			task := &coordinatorv1.Task{
-				DagRunId:  "run-" + string(rune('a'+i)),
-				Target:    "test.yaml",
-				Operation: coordinatorv1.Operation_OPERATION_START,
+				DagRunId:   "run-" + string(rune('a'+i)),
+				Target:     "test.yaml",
+				Operation:  coordinatorv1.Operation_OPERATION_START,
+				Definition: "name: test\nsteps:\n  - name: step1\n    command: echo hello",
 			}
 			err := coord.DispatchTask(t, task)
 			require.NoError(t, err)
@@ -130,9 +131,10 @@ func TestWorkerTaskExecution(t *testing.T) {
 
 		// Create task
 		expectedTask := &coordinatorv1.Task{
-			DagRunId:  "test-run-123",
-			Target:    "test.yaml",
-			Operation: coordinatorv1.Operation_OPERATION_START,
+			DagRunId:   "test-run-123",
+			Target:     "test.yaml",
+			Operation:  coordinatorv1.Operation_OPERATION_START,
+			Definition: "name: test\nsteps:\n  - name: step1\n    command: echo hello",
 		}
 
 		// Create worker
@@ -200,9 +202,10 @@ func TestWorkerTaskExecution(t *testing.T) {
 
 		// Create task
 		task := &coordinatorv1.Task{
-			DagRunId:  "error-run-123",
-			Target:    "test.yaml",
-			Operation: coordinatorv1.Operation_OPERATION_START,
+			DagRunId:   "error-run-123",
+			Target:     "test.yaml",
+			Operation:  coordinatorv1.Operation_OPERATION_START,
+			Definition: "name: test\nsteps:\n  - name: step1\n    command: echo hello",
 		}
 
 		// Create worker with failing executor
@@ -258,6 +261,7 @@ func TestWorkerWithLabels(t *testing.T) {
 			Target:         "test.yaml",
 			Operation:      coordinatorv1.Operation_OPERATION_START,
 			WorkerSelector: map[string]string{"type": "special", "region": "us-east"},
+			Definition:     "name: test\nsteps:\n  - name: step1\n    command: echo hello",
 		}
 
 		// Create worker WITHOUT matching labels
@@ -448,6 +452,7 @@ func TestRunningTaskTracking(t *testing.T) {
 				Target:         "test.yaml",
 				RootDagRunName: "root-dag",
 				RootDagRunId:   "root-123",
+				Definition:     "name: test\nsteps:\n  - name: step1\n    command: echo hello",
 			}
 			err := coord.DispatchTask(t, task)
 			require.NoError(t, err)
@@ -478,6 +483,7 @@ func TestRunningTaskTracking(t *testing.T) {
 				Target:         "test.yaml",
 				RootDagRunName: "root-dag",
 				RootDagRunId:   "root-123",
+				Definition:     "name: test\nsteps:\n  - name: step1\n    command: echo hello",
 			}
 			err := coord.DispatchTask(t, task)
 			require.NoError(t, err)
@@ -629,8 +635,9 @@ func TestWorkerCancellation(t *testing.T) {
 				return nil, ctx.Err()
 			default:
 				return &coordinatorv1.Task{
-					DagRunId: cancelledRunID,
-					Target:   "test.yaml",
+					DagRunId:   cancelledRunID,
+					Target:     "test.yaml",
+					Definition: "name: test\nsteps:\n  - name: step1\n    command: echo hello",
 				}, nil
 			}
 		})
@@ -690,8 +697,9 @@ func TestWorkerCancellation(t *testing.T) {
 				return nil, ctx.Err()
 			default:
 				return &coordinatorv1.Task{
-					DagRunId: "different-task-id",
-					Target:   "test.yaml",
+					DagRunId:   "different-task-id",
+					Target:     "test.yaml",
+					Definition: "name: test\nsteps:\n  - name: step1\n    command: echo hello",
 				}, nil
 			}
 		})
@@ -761,8 +769,9 @@ func TestWorkerCancellation(t *testing.T) {
 			idx := taskIndex.Add(1)
 			if idx <= 3 {
 				return &coordinatorv1.Task{
-					DagRunId: fmt.Sprintf("task-%d", idx),
-					Target:   "test.yaml",
+					DagRunId:   fmt.Sprintf("task-%d", idx),
+					Target:     "test.yaml",
+					Definition: "name: test\nsteps:\n  - name: step1\n    command: echo hello",
 				}, nil
 			}
 			select {

@@ -228,7 +228,7 @@ func TestHandler_Poll(t *testing.T) {
 
 	t.Run("PollWithoutPollerID", func(t *testing.T) {
 		t.Parallel()
-		h := NewHandler()
+		h := NewHandler(HandlerConfig{})
 		ctx := context.Background()
 
 		_, err := h.Poll(ctx, &coordinatorv1.PollRequest{
@@ -245,7 +245,7 @@ func TestHandler_Poll(t *testing.T) {
 	t.Run("PollAndDispatch", func(t *testing.T) {
 		t.Parallel()
 
-		h := NewHandler()
+		h := NewHandler(HandlerConfig{})
 		ctx := context.Background()
 
 		// Start polling in a goroutine
@@ -277,6 +277,7 @@ func TestHandler_Poll(t *testing.T) {
 			ParentDagRunName: "",
 			ParentDagRunId:   "",
 			DagRunId:         "run-123",
+			Definition:       "name: test-dag\nsteps:\n  - name: step1\n    command: echo hello",
 		}
 
 		_, err := h.Dispatch(ctx, &coordinatorv1.DispatchRequest{
@@ -301,13 +302,14 @@ func TestHandler_Poll(t *testing.T) {
 	t.Run("DispatchWithNoWaitingPollers", func(t *testing.T) {
 		t.Parallel()
 
-		h := NewHandler()
+		h := NewHandler(HandlerConfig{})
 		ctx := context.Background()
 
 		task := &coordinatorv1.Task{
 			RootDagRunName: "test-dag",
 			RootDagRunId:   "run-123",
 			DagRunId:       "run-123",
+			Definition:     "name: test-dag\nsteps:\n  - name: step1\n    command: echo hello",
 		}
 
 		_, err := h.Dispatch(ctx, &coordinatorv1.DispatchRequest{
@@ -324,7 +326,7 @@ func TestHandler_Poll(t *testing.T) {
 	t.Run("PollContextCancellation", func(t *testing.T) {
 		t.Parallel()
 
-		h := NewHandler()
+		h := NewHandler(HandlerConfig{})
 		ctx, cancel := context.WithCancel(context.Background())
 
 		// Start polling
@@ -363,7 +365,7 @@ func TestHandler_Heartbeat(t *testing.T) {
 
 	t.Run("ValidHeartbeat", func(t *testing.T) {
 		t.Parallel()
-		h := NewHandler()
+		h := NewHandler(HandlerConfig{})
 		ctx := context.Background()
 
 		req := &coordinatorv1.HeartbeatRequest{
@@ -390,7 +392,7 @@ func TestHandler_Heartbeat(t *testing.T) {
 	t.Run("MissingWorkerID", func(t *testing.T) {
 		t.Parallel()
 
-		h := NewHandler()
+		h := NewHandler(HandlerConfig{})
 		ctx := context.Background()
 
 		req := &coordinatorv1.HeartbeatRequest{
@@ -407,7 +409,7 @@ func TestHandler_Heartbeat(t *testing.T) {
 	t.Run("HeartbeatUpdatesWorkerInfo", func(t *testing.T) {
 		t.Parallel()
 
-		h := NewHandler()
+		h := NewHandler(HandlerConfig{})
 		ctx := context.Background()
 
 		// Send heartbeat
@@ -439,7 +441,7 @@ func TestHandler_Heartbeat(t *testing.T) {
 	t.Run("StaleHeartbeatCleanup", func(t *testing.T) {
 		t.Parallel()
 
-		h := NewHandler()
+		h := NewHandler(HandlerConfig{})
 		ctx := context.Background()
 
 		// Manually add a stale heartbeat
@@ -479,7 +481,7 @@ func TestHandler_GetWorkers(t *testing.T) {
 
 	t.Run("NoWorkers", func(t *testing.T) {
 		t.Parallel()
-		h := NewHandler()
+		h := NewHandler(HandlerConfig{})
 		ctx := context.Background()
 
 		resp, err := h.GetWorkers(ctx, &coordinatorv1.GetWorkersRequest{})
@@ -491,7 +493,7 @@ func TestHandler_GetWorkers(t *testing.T) {
 	t.Run("WorkersFromHeartbeats", func(t *testing.T) {
 		t.Parallel()
 
-		h := NewHandler()
+		h := NewHandler(HandlerConfig{})
 		ctx := context.Background()
 
 		// Send heartbeats from multiple workers
@@ -542,7 +544,7 @@ func TestHandler_GetWorkers(t *testing.T) {
 	t.Run("RunningTasksInHeartbeat", func(t *testing.T) {
 		t.Parallel()
 
-		h := NewHandler()
+		h := NewHandler(HandlerConfig{})
 		ctx := context.Background()
 
 		// Send heartbeat with running tasks
@@ -595,7 +597,7 @@ func TestHandler_ZombieDetection(t *testing.T) {
 	t.Run("MarkRunFailedUpdatesStatus", func(t *testing.T) {
 		t.Parallel()
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		// Create a running DAG run
@@ -637,7 +639,7 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		// Create an already completed DAG run
@@ -663,7 +665,7 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		t.Parallel()
 
 		// Handler without dagRunStore
-		h := NewHandler()
+		h := NewHandler(HandlerConfig{})
 		ctx := context.Background()
 
 		info := &heartbeatInfo{
@@ -683,7 +685,7 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		info := &heartbeatInfo{
@@ -699,7 +701,7 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		// Create a running DAG run
@@ -740,7 +742,7 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		// Create two running DAG runs
@@ -797,7 +799,7 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 
 		// Create a running DAG run
 		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
@@ -845,7 +847,7 @@ func TestHandler_ReportStatus(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		// Create an attempt for the DAG run
@@ -878,7 +880,7 @@ func TestHandler_ReportStatus(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		req := &coordinatorv1.ReportStatusRequest{
@@ -895,7 +897,7 @@ func TestHandler_ReportStatus(t *testing.T) {
 	t.Run("NilDAGRunStoreReturnsError", func(t *testing.T) {
 		t.Parallel()
 
-		h := NewHandler() // No dagRunStore
+		h := NewHandler(HandlerConfig{}) // No dagRunStore
 		ctx := context.Background()
 
 		protoStatus, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
@@ -920,7 +922,7 @@ func TestHandler_ReportStatus(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		// Create an attempt for the DAG run
@@ -990,7 +992,7 @@ func TestHandler_ReportStatus(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		// Create an existing attempt
@@ -1051,7 +1053,7 @@ func TestHandler_ReportStatus(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		// Create an existing attempt with error injection
@@ -1106,7 +1108,7 @@ func TestHandler_GetDAGRunStatus(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		// Create an attempt with status
@@ -1133,7 +1135,7 @@ func TestHandler_GetDAGRunStatus(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		req := &coordinatorv1.GetDAGRunStatusRequest{
@@ -1150,7 +1152,7 @@ func TestHandler_GetDAGRunStatus(t *testing.T) {
 	t.Run("NilDAGRunStoreReturnsError", func(t *testing.T) {
 		t.Parallel()
 
-		h := NewHandler() // No dagRunStore
+		h := NewHandler(HandlerConfig{}) // No dagRunStore
 		ctx := context.Background()
 
 		req := &coordinatorv1.GetDAGRunStatusRequest{
@@ -1169,7 +1171,7 @@ func TestHandler_GetDAGRunStatus(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		// Missing DagName
@@ -1191,7 +1193,7 @@ func TestHandler_StreamLogs(t *testing.T) {
 	t.Run("EmptyLogDirReturnsError", func(t *testing.T) {
 		t.Parallel()
 
-		h := NewHandler() // No logDir
+		h := NewHandler(HandlerConfig{}) // No logDir
 		// StreamLogs requires a mock stream, but we can test the precondition check
 		// by checking that logDir is empty
 		require.Empty(t, h.logDir)
@@ -1201,7 +1203,7 @@ func TestHandler_StreamLogs(t *testing.T) {
 		t.Parallel()
 
 		logDir := t.TempDir()
-		h := NewHandler(WithLogDir(logDir))
+		h := NewHandler(HandlerConfig{LogDir: logDir})
 		require.Equal(t, logDir, h.logDir)
 	})
 }
@@ -1327,7 +1329,7 @@ func TestHandler_Close(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		// Create and cache an attempt
@@ -1362,7 +1364,7 @@ func TestHandler_GetCancelledRunsForWorker(t *testing.T) {
 	t.Run("ReturnsNilWithNilStore", func(t *testing.T) {
 		t.Parallel()
 
-		h := NewHandler() // No dagRunStore
+		h := NewHandler(HandlerConfig{}) // No dagRunStore
 		ctx := context.Background()
 
 		stats := &coordinatorv1.WorkerStats{
@@ -1379,7 +1381,7 @@ func TestHandler_GetCancelledRunsForWorker(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		result := h.getCancelledRunsForWorker(ctx, nil)
@@ -1390,7 +1392,7 @@ func TestHandler_GetCancelledRunsForWorker(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		stats := &coordinatorv1.WorkerStats{
@@ -1409,7 +1411,7 @@ func TestHandlerOptions(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 
 		require.Same(t, store, h.dagRunStore)
 	})
@@ -1418,7 +1420,7 @@ func TestHandlerOptions(t *testing.T) {
 		t.Parallel()
 
 		logDir := "/var/log/test"
-		h := NewHandler(WithLogDir(logDir))
+		h := NewHandler(HandlerConfig{LogDir: logDir})
 
 		require.Equal(t, logDir, h.logDir)
 	})
@@ -1428,7 +1430,7 @@ func TestHandlerOptions(t *testing.T) {
 
 		store := newMockDAGRunStore()
 		logDir := "/var/log/test"
-		h := NewHandler(WithDAGRunStore(store), WithLogDir(logDir))
+		h := NewHandler(HandlerConfig{DAGRunStore: store, LogDir: logDir})
 
 		require.Same(t, store, h.dagRunStore)
 		require.Equal(t, logDir, h.logDir)
@@ -1470,7 +1472,7 @@ func TestHandler_StreamLogs_Full(t *testing.T) {
 	t.Run("ReturnsErrorWhenLogDirEmpty", func(t *testing.T) {
 		t.Parallel()
 
-		h := NewHandler() // No logDir
+		h := NewHandler(HandlerConfig{}) // No logDir
 		stream := &mockStreamLogsServer{
 			chunks: []*coordinatorv1.LogChunk{},
 			ctx:    context.Background(),
@@ -1488,7 +1490,7 @@ func TestHandler_StreamLogs_Full(t *testing.T) {
 		t.Parallel()
 
 		logDir := t.TempDir()
-		h := NewHandler(WithLogDir(logDir))
+		h := NewHandler(HandlerConfig{LogDir: logDir})
 
 		chunks := []*coordinatorv1.LogChunk{
 			{
@@ -1529,7 +1531,7 @@ func TestHandler_GetCancelledRunsForWorker_Full(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		// Create an attempt that is aborting (cancelled)
@@ -1554,7 +1556,7 @@ func TestHandler_GetCancelledRunsForWorker_Full(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		// Create an attempt that is running (not cancelled)
@@ -1583,7 +1585,7 @@ func TestHandler_GetOrOpenSubAttempt(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		// Add a sub-attempt
@@ -1609,7 +1611,7 @@ func TestHandler_GetOrOpenSubAttempt(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		// Add a sub-attempt
@@ -1636,7 +1638,7 @@ func TestHandler_GetOrOpenSubAttempt(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
-		h := NewHandler(WithDAGRunStore(store))
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
 		ctx := context.Background()
 
 		rootRef := exec.DAGRunRef{Name: "parent-dag", ID: "root-999"}
