@@ -25,6 +25,7 @@ type RemoteProgressDisplay struct {
 	total        int
 	colorEnabled bool
 	isTTY        bool
+	termWidth    int
 
 	mu                      sync.Mutex
 	completed               int
@@ -44,12 +45,19 @@ func NewRemoteProgressDisplay(dag *core.DAG, dagRunID string) *RemoteProgressDis
 		total = len(dag.Steps)
 	}
 	isTTY := term.IsTerminal(int(os.Stderr.Fd()))
+	termWidth := 80 // default
+	if isTTY {
+		if w, _, err := term.GetSize(int(os.Stderr.Fd())); err == nil && w > 0 {
+			termWidth = w
+		}
+	}
 	return &RemoteProgressDisplay{
 		dag:          dag,
 		dagRunID:     dagRunID,
 		total:        total,
 		colorEnabled: isTTY,
 		isTTY:        isTTY,
+		termWidth:    termWidth,
 		startTime:    time.Now(),
 		stopCh:       make(chan struct{}),
 	}
@@ -201,14 +209,29 @@ func (p *RemoteProgressDisplay) updateHeaderWithWorker() {
 		dagName = p.dag.Name
 	}
 
+	// Build the base header to calculate remaining width
+	// Format: "▶ {dagName} ({dagRunID}) → {workerID}"
+	baseHeader := fmt.Sprintf("▶ %s (%s) → ", dagName, p.dagRunID)
+	remainingWidth := p.termWidth - len(baseHeader) - 1
+
+	workerDisplay := p.workerID
+	if len(workerDisplay) > remainingWidth && remainingWidth > 3 {
+		workerDisplay = workerDisplay[:remainingWidth-1] + "…"
+	} else if remainingWidth <= 3 {
+		workerDisplay = ""
+	}
+
 	// ANSI escape sequences:
 	// \r       - move to beginning of current line
 	// \033[K   - clear from cursor to end of line
 	// \033[1A  - move cursor up 1 line
-	// \033[1B  - move cursor down 1 line
 
 	// Clear current progress line, move up to header, clear header, print new header, move back down
-	fmt.Fprintf(os.Stderr, "\r\033[K\033[1A\r\033[K▶ %s %s %s\n", dagName, p.gray("("+p.dagRunID+")"), p.gray("→ "+p.workerID))
+	if workerDisplay != "" {
+		fmt.Fprintf(os.Stderr, "\r\033[K\033[1A\r\033[K▶ %s %s %s\n", dagName, p.gray("("+p.dagRunID+")"), p.gray("→ "+workerDisplay))
+	} else {
+		fmt.Fprintf(os.Stderr, "\r\033[K\033[1A\r\033[K▶ %s %s\n", dagName, p.gray("("+p.dagRunID+")"))
+	}
 }
 
 // completedAndPercent returns capped completed count and percentage.
@@ -236,10 +259,20 @@ func (p *RemoteProgressDisplay) render() {
 	completed, percent := p.completedAndPercent()
 	elapsed := stringutil.FormatDuration(time.Since(p.startTime))
 
-	// Build worker info if available
+	// Build the base progress text (without worker info)
+	baseText := fmt.Sprintf("%s %d%% (%d/%d steps) %s", spinner, percent, completed, p.total, elapsed)
+
+	// Calculate remaining space for worker info (account for padding spaces)
+	// termWidth - len(baseText) - 3 (padding spaces) - 1 (safety margin)
+	remainingWidth := p.termWidth - len(baseText) - 4
 	workerInfo := ""
-	if p.workerID != "" {
-		workerInfo = " → " + p.workerID
+	if p.workerID != "" && remainingWidth > 5 {
+		workerSuffix := " → " + p.workerID
+		if len(workerSuffix) > remainingWidth {
+			// Truncate worker ID to fit
+			workerSuffix = workerSuffix[:remainingWidth-1] + "…"
+		}
+		workerInfo = workerSuffix
 	}
 
 	// Use \r to overwrite the line, pad with spaces to clear previous content
@@ -252,6 +285,7 @@ func (p *RemoteProgressDisplay) printFinal(status *exec.DAGRunStatus) {
 	workerID := p.workerID
 	isTTY := p.isTTY
 	total := p.total
+	termWidth := p.termWidth
 	p.mu.Unlock()
 
 	icon := "✓"
@@ -262,12 +296,19 @@ func (p *RemoteProgressDisplay) printFinal(status *exec.DAGRunStatus) {
 	}
 
 	elapsed := stringutil.FormatDuration(time.Since(p.startTime))
-	workerInfo := ""
-	if workerID != "" {
-		workerInfo = " → " + workerID
-	}
 
 	if isTTY {
+		// Build the base text to calculate remaining width
+		baseText := fmt.Sprintf("%s %d%% (%d/%d steps) %s", icon, percent, completed, total, elapsed)
+		remainingWidth := termWidth - len(baseText) - 4
+		workerInfo := ""
+		if workerID != "" && remainingWidth > 5 {
+			workerSuffix := " → " + workerID
+			if len(workerSuffix) > remainingWidth {
+				workerSuffix = workerSuffix[:remainingWidth-1] + "…"
+			}
+			workerInfo = workerSuffix
+		}
 		fmt.Fprintf(os.Stderr, "\r%s %d%% (%d/%d steps) %s%s   \n", icon, percent, completed, total, p.gray(elapsed), p.gray(workerInfo))
 		return
 	}
