@@ -103,36 +103,34 @@ func (w *Writer) write(st exec.DAGRunStatus) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	var err error
-
 	if w.state != WriterStateOpen {
-		err = ErrWriterNotOpen
-		return err
+		return ErrWriterNotOpen
 	}
 
 	// Marshal status to JSON
-	jsonBytes, jsonErr := json.Marshal(st)
-	if jsonErr != nil {
-		err = fmt.Errorf("failed to marshal status: %w", jsonErr)
-		return err
+	jsonBytes, err := json.Marshal(st)
+	if err != nil {
+		return fmt.Errorf("failed to marshal status: %w", err)
 	}
 
 	// Write JSON line
-	if _, writeErr := w.writer.Write(jsonBytes); writeErr != nil {
-		err = fmt.Errorf("failed to write JSON: %w", writeErr)
-		return err
+	if _, err := w.writer.Write(jsonBytes); err != nil {
+		return fmt.Errorf("failed to write JSON: %w", err)
 	}
 
 	// Add newline
-	if nlErr := w.writer.WriteByte('\n'); nlErr != nil {
-		err = fmt.Errorf("failed to write newline: %w", nlErr)
-		return err
+	if err := w.writer.WriteByte('\n'); err != nil {
+		return fmt.Errorf("failed to write newline: %w", err)
 	}
 
 	// Flush to ensure data is written to the underlying file
-	if flushErr := w.writer.Flush(); flushErr != nil {
-		err = fmt.Errorf("failed to flush data: %w", flushErr)
-		return err
+	if err := w.writer.Flush(); err != nil {
+		return fmt.Errorf("failed to flush data: %w", err)
+	}
+
+	// Sync to ensure data is persisted to disk (important for multi-coordinator visibility)
+	if err := w.file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync data: %w", err)
 	}
 
 	return nil

@@ -362,6 +362,10 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 	defer logTicker.Stop()
 	start := time.Now()
 
+	// Track consecutive errors to detect connection loss
+	const maxConsecutiveErrors = 10
+	var consecutiveErrors int
+
 	for {
 		select {
 		case <-e.killed:
@@ -419,12 +423,17 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 			// Get sub DAG run status (single RPC call)
 			result, err := e.getSubDAGRunStatus(ctx, dagRunID)
 			if err != nil {
-				// Not found yet, continue polling
-				logger.Debug(waitCtx, "Sub DAG run status not available yet",
+				consecutiveErrors++
+				logger.Warn(waitCtx, "Failed to get sub DAG status",
 					tag.Error(err),
+					slog.Int("consecutive_errors", consecutiveErrors),
 				)
+				if consecutiveErrors >= maxConsecutiveErrors {
+					return nil, fmt.Errorf("lost connection to coordinator after %d attempts: %w", consecutiveErrors, err)
+				}
 				continue
 			}
+			consecutiveErrors = 0 // Reset on success
 
 			// Check if completed based on status
 			if result.Status.IsActive() {
