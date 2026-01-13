@@ -43,7 +43,7 @@ function NodeStatusTable({ nodes, status, fileName, onViewLog }: Props) {
   return (
     <div>
       {/* Desktop view - Table with horizontal scroll for intermediate sizes */}
-      <div className="hidden md:block w-full overflow-x-auto p-px">
+      <div className="hidden md:block w-full overflow-x-auto">
         <div className="min-w-[900px]">
           <Table className="w-full">
             <TableHeader>
