@@ -164,6 +164,23 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		logger.Warn(ctx, w)
 	}
 
+	// For shared-nothing workers, skip creating file-based stores
+	// as they only use temporary directories and push status to coordinator
+	if isSharedNothingWorker(cmd, cfg) {
+		logger.Debug(ctx, "Shared-nothing worker mode: skipping file-based stores",
+			slog.Any("coordinators", cfg.Worker.Coordinators),
+		)
+		return &Context{
+			Context: ctx,
+			Command: cmd,
+			Config:  cfg,
+			Quiet:   quiet,
+			Flags:   flags,
+			// All stores are nil - shared-nothing workers don't need local storage
+			// Status is pushed to coordinator, DAG definitions come from task payload
+		}, nil
+	}
+
 	// Initialize history repository and history manager
 	hrOpts := []filedagrun.DAGRunStoreOption{
 		filedagrun.WithLatestStatusToday(cfg.Server.LatestStatusToday),
@@ -239,6 +256,15 @@ func isAgentCommand(cmdName string) bool {
 	default:
 		return false
 	}
+}
+
+// isSharedNothingWorker checks if the current command is a worker with static coordinators
+// configured, indicating shared-nothing mode where no local storage is needed.
+func isSharedNothingWorker(cmd *cobra.Command, cfg *config.Config) bool {
+	if cmd.Name() != "worker" {
+		return false
+	}
+	return len(cfg.Worker.Coordinators) > 0
 }
 
 // NewServer creates and returns a new web UI NewServer.

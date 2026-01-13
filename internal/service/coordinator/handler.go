@@ -316,6 +316,9 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 		return fmt.Errorf("failed to open attempt: %w", err)
 	}
 
+	// Write initial status to prevent "corrupted status file" errors
+	h.writeInitialStatus(ctx, attempt, dag.Name, task.DagRunId)
+
 	// Cache the open attempt so ReportStatus can find it
 	h.attemptsMu.Lock()
 	h.openAttempts[task.DagRunId] = attempt
@@ -358,6 +361,9 @@ func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinator
 		return fmt.Errorf("failed to open sub-attempt: %w", err)
 	}
 
+	// Write initial status to prevent "corrupted status file" errors
+	h.writeInitialStatus(ctx, attempt, task.Target, task.DagRunId)
+
 	// Cache the open attempt for ReportStatus calls
 	h.attemptsMu.Lock()
 	h.openAttempts[task.DagRunId] = attempt
@@ -370,6 +376,21 @@ func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinator
 	)
 
 	return nil
+}
+
+// writeInitialStatus writes an initial NotStarted status to the attempt.
+// This ensures the status file is not empty when read before the worker reports its first status.
+func (h *Handler) writeInitialStatus(ctx context.Context, attempt exec.DAGRunAttempt, dagName, dagRunID string) {
+	initialStatus := exec.DAGRunStatus{
+		Name:      dagName,
+		DAGRunID:  dagRunID,
+		AttemptID: attempt.ID(),
+		Status:    core.NotStarted,
+		StartedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+	if err := attempt.Write(ctx, initialStatus); err != nil {
+		logger.Warn(ctx, "Failed to write initial status", tag.Error(err), tag.RunID(dagRunID))
+	}
 }
 
 // GetWorkers returns the list of currently connected workers

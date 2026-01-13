@@ -207,12 +207,15 @@ func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Tas
 	}
 
 	// Prepare load options
+	// Note: DAGsDir is intentionally NOT included because:
+	// 1. Remote handlers always receive DAG definitions from the coordinator
+	// 2. Shared-nothing workers should not access local DAG directories
 	loadOpts := []spec.LoadOption{
 		spec.WithBaseConfig(h.config.Paths.BaseConfig),
-		spec.WithDAGsDir(h.config.Paths.DAGsDir),
 	}
 
-	// When loading from task definition, use the original DAG name (not temp filename)
+	// When loading from task definition (temp file), use the original DAG name
+	// (task.Target) instead of deriving name from the temp file path
 	if task.Definition != "" {
 		loadOpts = append(loadOpts, spec.WithName(task.Target))
 	}

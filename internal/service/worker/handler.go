@@ -55,11 +55,10 @@ func (e *taskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) erro
 			}
 		}()
 
-		originalTarget := task.Target
 		task.Target = tempFile
+
 		logger.Info(ctx, "Created temporary DAG file",
-			tag.File(tempFile),
-			slog.String("original-target", originalTarget))
+			tag.File(tempFile))
 	}
 
 	spec, err := e.buildCommandSpec(task)
