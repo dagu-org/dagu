@@ -292,8 +292,8 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 			logger.Info(ctx, "Reusing existing queued attempt for dispatched task",
 				tag.RunID(task.DagRunId),
 				tag.Target(task.Target),
-				slog.String("attempt-id", task.AttemptId),
-				slog.String("attempt-key", task.AttemptKey),
+				tag.AttemptID(task.AttemptId),
+				tag.AttemptKey(task.AttemptKey),
 			)
 			return nil
 		}
@@ -324,8 +324,8 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 	logger.Info(ctx, "Created DAGRun attempt for dispatched task",
 		tag.RunID(task.DagRunId),
 		tag.Target(task.Target),
-		slog.String("attempt-id", task.AttemptId),
-		slog.String("attempt-key", task.AttemptKey),
+		tag.AttemptID(task.AttemptId),
+		tag.AttemptKey(task.AttemptKey),
 	)
 
 	return nil
@@ -377,7 +377,7 @@ func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinator
 		tag.RunID(task.DagRunId),
 		tag.DAG(task.Target),
 		slog.String("root-dag-run-id", task.RootDagRunId),
-		slog.String("attempt-key", task.AttemptKey),
+		tag.AttemptKey(task.AttemptKey),
 	)
 
 	return nil

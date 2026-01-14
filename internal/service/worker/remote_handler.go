@@ -114,35 +114,18 @@ func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1
 func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1.Task) error {
 	root := exec.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
 
-	// Get previous status - prefer from task (shared-nothing mode), fallback to local store
-	var status *exec.DAGRunStatus
-	if task.PreviousStatus != nil {
-		// Shared-nothing mode: status is provided in the task
-		var convErr error
-		status, convErr = convert.ProtoToDAGRunStatus(task.PreviousStatus)
-		if convErr != nil {
-			return fmt.Errorf("failed to convert previous status: %w", convErr)
-		}
-		logger.Info(ctx, "Using previous status from task for retry",
-			tag.RunID(task.DagRunId),
-			slog.Int("nodes", len(status.Nodes)))
-	} else if h.dagRunStore != nil {
-		// Fallback: read from local store
-		attempt, err := h.dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(task.RootDagRunName, task.DagRunId))
-		if err != nil {
-			return fmt.Errorf("failed to find previous run: %w", err)
-		}
-
-		var readErr error
-		status, readErr = attempt.ReadStatus(ctx)
-		if readErr != nil {
-			return fmt.Errorf("failed to read previous status: %w", readErr)
-		}
-	} else {
-		return fmt.Errorf("retry requires either previous_status in task or local dagRunStore")
+	if task.PreviousStatus == nil {
+		return fmt.Errorf("retry requires previous_status in task for shared-nothing mode")
 	}
 
-	// Load the DAG - use task definition if provided, otherwise load from store
+	status, convErr := convert.ProtoToDAGRunStatus(task.PreviousStatus)
+	if convErr != nil {
+		return fmt.Errorf("failed to convert previous status: %w", convErr)
+	}
+	logger.Info(ctx, "Using previous status from task for retry",
+		tag.RunID(task.DagRunId),
+		slog.Int("nodes", len(status.Nodes)))
+
 	dag, cleanup, err := h.loadDAG(ctx, task)
 	if err != nil {
 		return fmt.Errorf("failed to load DAG: %w", err)
@@ -211,7 +194,6 @@ func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Tas
 		loadOpts = append(loadOpts, spec.WithParams(task.Params))
 	}
 
-	// Load the DAG
 	dag, err := spec.Load(ctx, tempFile, loadOpts...)
 	if err != nil {
 		cleanupFunc()

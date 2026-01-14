@@ -2,7 +2,6 @@ package worker
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -773,14 +772,13 @@ func TestHandleRetry(t *testing.T) {
 		handler := &remoteTaskHandler{
 			workerID:          "test-worker",
 			coordinatorClient: newMockRemoteCoordinatorClient(),
-			dagRunStore:       nil, // No local store
 			config:            &config.Config{},
 		}
 
 		task := &coordinatorv1.Task{
 			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
 			Step:           "step1",
-			PreviousStatus: nil, // No embedded status either
+			PreviousStatus: nil, // Missing - should error
 			RootDagRunName: "root",
 			RootDagRunId:   "root-123",
 			DagRunId:       "run-123",
@@ -789,66 +787,7 @@ func TestHandleRetry(t *testing.T) {
 		err := handler.handleRetry(context.Background(), task)
 
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "retry requires either previous_status in task or local dagRunStore")
-	})
-
-	t.Run("FindAttemptError", func(t *testing.T) {
-		t.Parallel()
-
-		store := newMockRemoteDAGRunStore()
-		store.findErr = errors.New("database connection failed")
-
-		handler := &remoteTaskHandler{
-			workerID:          "test-worker",
-			coordinatorClient: newMockRemoteCoordinatorClient(),
-			dagRunStore:       store,
-			config:            &config.Config{},
-		}
-
-		task := &coordinatorv1.Task{
-			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
-			Step:           "step1",
-			PreviousStatus: nil, // Will try to use local store
-			RootDagRunName: "root",
-			RootDagRunId:   "root-123",
-			DagRunId:       "run-123",
-		}
-
-		err := handler.handleRetry(context.Background(), task)
-
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "failed to find previous run")
-	})
-
-	t.Run("ReadStatusError", func(t *testing.T) {
-		t.Parallel()
-
-		attempt := newMockRemoteDAGRunAttempt("attempt-1", nil)
-		attempt.readErr = errors.New("status file corrupted")
-
-		store := newMockRemoteDAGRunStore()
-		store.SetAttempt(exec.DAGRunRef{Name: "root", ID: "run-123"}, attempt)
-
-		handler := &remoteTaskHandler{
-			workerID:          "test-worker",
-			coordinatorClient: newMockRemoteCoordinatorClient(),
-			dagRunStore:       store,
-			config:            &config.Config{},
-		}
-
-		task := &coordinatorv1.Task{
-			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
-			Step:           "step1",
-			PreviousStatus: nil,
-			RootDagRunName: "root",
-			RootDagRunId:   "root-123",
-			DagRunId:       "run-123",
-		}
-
-		err := handler.handleRetry(context.Background(), task)
-
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "failed to read previous status")
+		require.Contains(t, err.Error(), "retry requires previous_status in task for shared-nothing mode")
 	})
 
 	t.Run("SharedNothingModeWithEmbeddedStatus", func(t *testing.T) {
@@ -995,43 +934,28 @@ steps:
 func TestHandle_OperationRetryWithoutStatusSource(t *testing.T) {
 	t.Parallel()
 
-	// OPERATION_RETRY requires either previous_status in the task (shared-nothing mode)
-	// or a local dagRunStore. Without either, handleRetry returns an error.
-	tempDir := t.TempDir()
-	dagFile := filepath.Join(tempDir, "retry.yaml")
-	dagContent := `name: retry-dag
-steps:
-  - name: step1
-    command: echo retry
-`
-	err := os.WriteFile(dagFile, []byte(dagContent), 0644)
-	require.NoError(t, err)
-
+	// OPERATION_RETRY requires previous_status in the task for shared-nothing mode.
+	// All retry callers embed status via WithPreviousStatus().
 	handler := &remoteTaskHandler{
 		workerID:          "test-worker",
 		coordinatorClient: newMockRemoteCoordinatorClient(),
-		dagRunStore:       nil, // No local store
-		config: &config.Config{
-			Paths: config.PathsConfig{
-				DAGsDir: tempDir,
-			},
-		},
+		config:            &config.Config{},
 	}
 
 	task := &coordinatorv1.Task{
 		Operation:      coordinatorv1.Operation_OPERATION_RETRY,
-		Step:           "", // No step
-		Target:         dagFile,
+		Step:           "",
+		Target:         "test-dag",
 		DagRunId:       "run-retry-1",
 		RootDagRunName: "root",
 		RootDagRunId:   "root-1",
-		PreviousStatus: nil, // No PreviousStatus either
+		PreviousStatus: nil, // Missing - should error
 	}
 
-	// Without either status source, retry should fail with a clear error
-	err = handler.Handle(context.Background(), task)
+	// Without PreviousStatus, retry should fail with a clear error
+	err := handler.Handle(context.Background(), task)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "retry requires either previous_status in task or local dagRunStore")
+	require.Contains(t, err.Error(), "retry requires previous_status in task for shared-nothing mode")
 }
 
 func TestHandle_OperationRetryWithStep(t *testing.T) {
@@ -1041,82 +965,23 @@ func TestHandle_OperationRetryWithStep(t *testing.T) {
 	handler := &remoteTaskHandler{
 		workerID:          "test-worker",
 		coordinatorClient: newMockRemoteCoordinatorClient(),
-		dagRunStore:       nil, // No store
-		config: &config.Config{
-			Paths: config.PathsConfig{
-				DAGsDir: t.TempDir(),
-			},
-		},
+		config:            &config.Config{},
 	}
 
 	task := &coordinatorv1.Task{
 		Operation:      coordinatorv1.Operation_OPERATION_RETRY,
 		Step:           "step1", // With step = handleRetry path
-		Target:         "/nonexistent.yaml",
+		Target:         "test-dag",
 		DagRunId:       "run-retry-1",
 		RootDagRunName: "root",
 		RootDagRunId:   "root-1",
-		PreviousStatus: nil, // No embedded status and no store
+		PreviousStatus: nil, // No embedded status
 	}
 
 	err := handler.Handle(context.Background(), task)
 	require.Error(t, err)
 	// Should fail with "retry requires" error from handleRetry
-	require.Contains(t, err.Error(), "retry requires either previous_status")
-}
-
-func TestHandleRetry_LocalStoreMode(t *testing.T) {
-	t.Parallel()
-
-	tempDir := t.TempDir()
-	dagFile := filepath.Join(tempDir, "local-retry.yaml")
-	dagContent := `name: local-retry-dag
-steps:
-  - name: step1
-    command: echo local
-`
-	err := os.WriteFile(dagFile, []byte(dagContent), 0644)
-	require.NoError(t, err)
-
-	// Create a mock attempt with status
-	status := &exec.DAGRunStatus{
-		Name:   "local-retry-dag",
-		Status: core.Succeeded,
-		Nodes:  []*exec.Node{},
-	}
-	attempt := newMockRemoteDAGRunAttempt("attempt-local", status)
-
-	store := newMockRemoteDAGRunStore()
-	store.SetAttempt(exec.DAGRunRef{Name: "root", ID: "run-local-1"}, attempt)
-
-	handler := &remoteTaskHandler{
-		workerID:          "test-worker",
-		coordinatorClient: newMockRemoteCoordinatorClient(),
-		dagRunStore:       store, // Has local store
-		config: &config.Config{
-			Paths: config.PathsConfig{
-				DAGsDir: tempDir,
-			},
-		},
-	}
-
-	task := &coordinatorv1.Task{
-		Operation:      coordinatorv1.Operation_OPERATION_RETRY,
-		Step:           "step1",
-		Target:         dagFile,
-		PreviousStatus: nil, // No embedded status - will use local store
-		RootDagRunName: "root",
-		RootDagRunId:   "root-local-1",
-		DagRunId:       "run-local-1",
-	}
-
-	// This should use local store to get status, then fail at execution
-	err = handler.handleRetry(context.Background(), task)
-	require.Error(t, err)
-	// Should NOT fail at status lookup since we have the store
-	require.NotContains(t, err.Error(), "retry requires either previous_status")
-	require.NotContains(t, err.Error(), "failed to find previous run")
-	require.NotContains(t, err.Error(), "failed to read previous status")
+	require.Contains(t, err.Error(), "retry requires previous_status in task for shared-nothing mode")
 }
 
 func TestHandleStart_SuccessPathWithCleanup(t *testing.T) {
