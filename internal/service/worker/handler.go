@@ -40,27 +40,24 @@ func (e *taskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) erro
 		slog.String("parent-dag-run-id", task.ParentDagRunId),
 		slog.String("worker-id", task.WorkerId))
 
-	if task.Definition != "" {
-		logger.Info(ctx, "Creating temporary DAG file from definition",
-			tag.DAG(task.Target),
-			tag.Size(len(task.Definition)))
+	logger.Info(ctx, "Creating temporary DAG file from definition",
+		tag.DAG(task.Target),
+		tag.Size(len(task.Definition)))
 
-		tempFile, err := fileutil.CreateTempDAGFile("worker-dags", task.Target, []byte(task.Definition))
-		if err != nil {
-			return fmt.Errorf("failed to create temp DAG file: %w", err)
-		}
-		defer func() {
-			if err := os.Remove(tempFile); err != nil && !os.IsNotExist(err) {
-				logger.Errorf(ctx, "Failed to remove temp DAG file: %v", err)
-			}
-		}()
-
-		originalTarget := task.Target
-		task.Target = tempFile
-		logger.Info(ctx, "Created temporary DAG file",
-			tag.File(tempFile),
-			slog.String("original-target", originalTarget))
+	tempFile, err := fileutil.CreateTempDAGFile("worker-dags", task.Target, []byte(task.Definition))
+	if err != nil {
+		return fmt.Errorf("failed to create temp DAG file: %w", err)
 	}
+	defer func() {
+		if err := os.Remove(tempFile); err != nil && !os.IsNotExist(err) {
+			logger.Errorf(ctx, "Failed to remove temp DAG file: %v", err)
+		}
+	}()
+
+	task.Target = tempFile
+
+	logger.Info(ctx, "Created temporary DAG file",
+		tag.File(tempFile))
 
 	spec, err := e.buildCommandSpec(task)
 	if err != nil {

@@ -82,7 +82,7 @@ export default function TerminalPage() {
   }, [sendMessage]);
 
   useEffect(() => {
-    if (!termRef.current || !isAdmin) return;
+    if (!termRef.current || !isAdmin || !config.terminalEnabled) return;
 
     // Initialize terminal
     const term = new Terminal({
@@ -202,7 +202,7 @@ export default function TerminalPage() {
       }
       term.dispose();
     };
-  }, [config.basePath, isAdmin]);
+  }, [config.basePath, config.terminalEnabled, isAdmin]);
 
   // Handle window resize
   useEffect(() => {
@@ -215,6 +215,14 @@ export default function TerminalPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-muted-foreground">You do not have permission to access this page.</p>
+      </div>
+    );
+  }
+
+  if (!config.terminalEnabled) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">Terminal is not enabled. Set DAGU_TERMINAL_ENABLED=true to enable.</p>
       </div>
     );
   }

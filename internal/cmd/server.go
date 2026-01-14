@@ -57,21 +57,26 @@ func runServer(ctx *Context, _ []string) error {
 		tag.Port(serviceCtx.Config.Server.Port),
 	)
 
-	// Initialize resource monitoring service
+	// Initialize resource monitoring service (defer cleanup, but don't start yet).
+	// Resource monitoring must start AFTER server init to avoid race condition
+	// with OIDC provider initialization (gopsutil conflicts with net/http dial).
 	resourceService := resource.NewService(ctx.Config)
-	if err := resourceService.Start(serviceCtx); err != nil {
-		return fmt.Errorf("failed to start resource service: %w", err)
-	}
 	defer func() {
 		if err := resourceService.Stop(ctx); err != nil {
 			logger.Error(ctx, "Failed to stop resource service", tag.Error(err))
 		}
 	}()
 
-	// Use serviceCtx so OIDC initialization can respond to termination signals
+	// Initialize server (includes OIDC setup). Use serviceCtx so OIDC can
+	// respond to termination signals during potentially slow network operations.
 	server, err := serviceCtx.NewServer(resourceService)
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %w", err)
+	}
+
+	// Start resource monitoring now that server initialization is complete.
+	if err := resourceService.Start(serviceCtx); err != nil {
+		return fmt.Errorf("failed to start resource service: %w", err)
 	}
 
 	if err := server.Serve(serviceCtx); err != nil {

@@ -29,10 +29,11 @@ type Option func(*Options)
 
 // Options contains configuration options for the DAG repository
 type Options struct {
-	FlagsBaseDir string                     // Base directory for flag store
-	FileCache    *fileutil.Cache[*core.DAG] // Optional cache for DAG objects
-	SearchPaths  []string                   // Additional search paths for DAG files
-	SkipExamples bool                       // Skip creating example DAGs
+	FlagsBaseDir          string                     // Base directory for flag store
+	FileCache             *fileutil.Cache[*core.DAG] // Optional cache for DAG objects
+	SearchPaths           []string                   // Additional search paths for DAG files
+	SkipExamples          bool                       // Skip creating example DAGs
+	SkipDirectoryCreation bool                       // Skip creating base directory (for worker mode)
 }
 
 // WithFileCache returns a DAGRepositoryOption that sets the file cache for DAG objects
@@ -63,6 +64,14 @@ func WithSkipExamples(skip bool) Option {
 	}
 }
 
+// WithSkipDirectoryCreation returns a DAGRepositoryOption that skips base directory creation.
+// This is used for worker mode where the DAGs directory should not be created.
+func WithSkipDirectoryCreation(skip bool) Option {
+	return func(o *Options) {
+		o.SkipDirectoryCreation = skip
+	}
+}
+
 // New creates a new DAG store implementation using the local filesystem
 func New(baseDir string, opts ...Option) exec.DAGStore {
 	options := &Options{}
@@ -84,21 +93,23 @@ func New(baseDir string, opts ...Option) exec.DAGStore {
 	}
 
 	return &Storage{
-		baseDir:      baseDir,
-		flagsBaseDir: options.FlagsBaseDir,
-		fileCache:    options.FileCache,
-		searchPaths:  searchPaths,
-		skipExamples: options.SkipExamples,
+		baseDir:               baseDir,
+		flagsBaseDir:          options.FlagsBaseDir,
+		fileCache:             options.FileCache,
+		searchPaths:           searchPaths,
+		skipExamples:          options.SkipExamples,
+		skipDirectoryCreation: options.SkipDirectoryCreation,
 	}
 }
 
 // Storage implements the DAGRepository interface using the local filesystem
 type Storage struct {
-	baseDir      string                     // Base directory for DAG storage
-	flagsBaseDir string                     // Base directory for flag store
-	fileCache    *fileutil.Cache[*core.DAG] // Optional cache for DAG objects
-	searchPaths  []string                   // Additional search paths for DAG files
-	skipExamples bool                       // Skip creating example DAGs
+	baseDir               string                     // Base directory for DAG storage
+	flagsBaseDir          string                     // Base directory for flag store
+	fileCache             *fileutil.Cache[*core.DAG] // Optional cache for DAG objects
+	searchPaths           []string                   // Additional search paths for DAG files
+	skipExamples          bool                       // Skip creating example DAGs
+	skipDirectoryCreation bool                       // Skip creating base directory (for worker mode)
 }
 
 // Initialize ensures the storage is ready and creates example DAGs if needed
@@ -229,6 +240,10 @@ func (store *Storage) Delete(_ context.Context, name string) error {
 
 // ensureDirExist ensures that the base directory exists.
 func (store *Storage) ensureDirExist() error {
+	// Skip directory creation for worker mode
+	if store.skipDirectoryCreation {
+		return nil
+	}
 	if !fileExists(store.baseDir) {
 		if err := os.MkdirAll(store.baseDir, 0750); err != nil {
 			return err

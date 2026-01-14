@@ -51,6 +51,11 @@ func AttemptID(id string) slog.Attr {
 	return slog.String("attempt-id", id)
 }
 
+// AttemptKey creates a tag for globally unique attempt identifiers.
+func AttemptKey(key string) slog.Attr {
+	return slog.String("attempt-key", key)
+}
+
 // Attempt creates a tag for attempt numbers.
 func Attempt(n int) slog.Attr {
 	return slog.Int("attempt", n)

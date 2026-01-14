@@ -114,35 +114,18 @@ func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1
 func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1.Task) error {
 	root := exec.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
 
-	// Get previous status - prefer from task (shared-nothing mode), fallback to local store
-	var status *exec.DAGRunStatus
-	if task.PreviousStatus != nil {
-		// Shared-nothing mode: status is provided in the task
-		var convErr error
-		status, convErr = convert.ProtoToDAGRunStatus(task.PreviousStatus)
-		if convErr != nil {
-			return fmt.Errorf("failed to convert previous status: %w", convErr)
-		}
-		logger.Info(ctx, "Using previous status from task for retry",
-			tag.RunID(task.DagRunId),
-			slog.Int("nodes", len(status.Nodes)))
-	} else if h.dagRunStore != nil {
-		// Fallback: read from local store
-		attempt, err := h.dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(task.RootDagRunName, task.DagRunId))
-		if err != nil {
-			return fmt.Errorf("failed to find previous run: %w", err)
-		}
-
-		var readErr error
-		status, readErr = attempt.ReadStatus(ctx)
-		if readErr != nil {
-			return fmt.Errorf("failed to read previous status: %w", readErr)
-		}
-	} else {
-		return fmt.Errorf("retry requires either previous_status in task or local dagRunStore")
+	if task.PreviousStatus == nil {
+		return fmt.Errorf("retry requires previous_status in task for shared-nothing mode")
 	}
 
-	// Load the DAG - use task definition if provided, otherwise load from store
+	status, convErr := convert.ProtoToDAGRunStatus(task.PreviousStatus)
+	if convErr != nil {
+		return fmt.Errorf("failed to convert previous status: %w", convErr)
+	}
+	logger.Info(ctx, "Using previous status from task for retry",
+		tag.RunID(task.DagRunId),
+		slog.Int("nodes", len(status.Nodes)))
+
 	dag, cleanup, err := h.loadDAG(ctx, task)
 	if err != nil {
 		return fmt.Errorf("failed to load DAG: %w", err)
@@ -180,41 +163,30 @@ func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root 
 	return statusPusher, logStreamer
 }
 
-// loadDAG loads the DAG from task definition or target path.
+// loadDAG loads the DAG from task definition.
 // Returns the loaded DAG and a cleanup function that should be called after task execution.
 func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Task) (*core.DAG, func(), error) {
-	var target string
-	var cleanupFunc func()
+	logger.Info(ctx, "Creating temporary DAG file from definition",
+		tag.DAG(task.Target),
+		tag.Size(len(task.Definition)))
 
-	// If definition is provided, create a temporary DAG file
-	if task.Definition != "" {
-		logger.Info(ctx, "Creating temporary DAG file from definition",
-			tag.DAG(task.Target),
-			tag.Size(len(task.Definition)))
-
-		tempFile, err := fileutil.CreateTempDAGFile("worker-dags", task.Target, []byte(task.Definition))
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create temp DAG file: %w", err)
+	tempFile, err := fileutil.CreateTempDAGFile("worker-dags", task.Target, []byte(task.Definition))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create temp DAG file: %w", err)
+	}
+	cleanupFunc := func() {
+		if err := os.Remove(tempFile); err != nil && !os.IsNotExist(err) {
+			logger.Errorf(ctx, "Failed to remove temp DAG file: %v", err)
 		}
-		target = tempFile
-		cleanupFunc = func() {
-			if err := os.Remove(tempFile); err != nil && !os.IsNotExist(err) {
-				logger.Errorf(ctx, "Failed to remove temp DAG file: %v", err)
-			}
-		}
-	} else {
-		target = task.Target
 	}
 
 	// Prepare load options
+	// Note: DAGsDir is intentionally NOT included because:
+	// 1. Remote handlers always receive DAG definitions from the coordinator
+	// 2. Shared-nothing workers should not access local DAG directories
 	loadOpts := []spec.LoadOption{
 		spec.WithBaseConfig(h.config.Paths.BaseConfig),
-		spec.WithDAGsDir(h.config.Paths.DAGsDir),
-	}
-
-	// When loading from task definition, use the original DAG name (not temp filename)
-	if task.Definition != "" {
-		loadOpts = append(loadOpts, spec.WithName(task.Target))
+		spec.WithName(task.Target), // Use original DAG name, not temp file path
 	}
 
 	// Pass task params to the DAG (e.g., from parallel execution items)
@@ -222,13 +194,10 @@ func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Tas
 		loadOpts = append(loadOpts, spec.WithParams(task.Params))
 	}
 
-	// Load the DAG
-	dag, err := spec.Load(ctx, target, loadOpts...)
+	dag, err := spec.Load(ctx, tempFile, loadOpts...)
 	if err != nil {
-		if cleanupFunc != nil {
-			cleanupFunc()
-		}
-		return nil, nil, fmt.Errorf("failed to load DAG from %s: %w", target, err)
+		cleanupFunc()
+		return nil, nil, fmt.Errorf("failed to load DAG from %s: %w", tempFile, err)
 	}
 
 	return dag, cleanupFunc, nil

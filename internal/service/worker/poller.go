@@ -114,14 +114,14 @@ func (p *Poller) pollForTask(ctx context.Context, policy backoff.RetryPolicy) (*
 
 		// Check if this was first failure after being connected
 		if beforeMetrics.IsConnected && !afterMetrics.IsConnected {
-			// First failure after being connected - log as ERROR
+			// First failure after being connected
 			logger.Error(ctx, "Poll failed - lost connection to coordinator",
 				tag.Error(err),
 				tag.WorkerID(p.workerID),
 				tag.PollerID(pollerID),
 				tag.PollerIndex(p.index))
 		} else {
-			// Subsequent failures - log as DEBUG
+			// Subsequent failures
 			logger.Debug(ctx, "Poll still failing",
 				tag.Error(err),
 				tag.WorkerID(p.workerID),
@@ -135,7 +135,7 @@ func (p *Poller) pollForTask(ctx context.Context, policy backoff.RetryPolicy) (*
 	// Success - check if we recovered from disconnection
 	afterMetrics := p.coordinatorCli.Metrics()
 	if !beforeMetrics.IsConnected && afterMetrics.IsConnected && beforeMetrics.ConsecutiveFails > 0 {
-		// Recovered from disconnection - log as INFO
+		// Recovered from disconnection
 		logger.Info(ctx, "Poll succeeded - reconnected to coordinator",
 			tag.WorkerID(p.workerID),
 			tag.PollerID(pollerID),

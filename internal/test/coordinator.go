@@ -55,17 +55,17 @@ func SetupCoordinator(t *testing.T, opts ...HelperOption) *Coordinator {
 	healthServer := health.NewServer()
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
 
-	// Build handler options based on coordinator test options
-	var handlerOpts []coordinator.HandlerOption
+	// Build handler config based on coordinator test options
+	cfg := coordinator.HandlerConfig{}
 	if options.WithStatusPersistence {
-		handlerOpts = append(handlerOpts, coordinator.WithDAGRunStore(helper.DAGRunStore))
+		cfg.DAGRunStore = helper.DAGRunStore
 	}
 	if options.WithLogPersistence {
-		handlerOpts = append(handlerOpts, coordinator.WithLogDir(helper.Config.Paths.LogDir))
+		cfg.LogDir = helper.Config.Paths.LogDir
 	}
 
-	// Create handler with options
-	handler := coordinator.NewHandler(handlerOpts...)
+	// Create handler with config
+	handler := coordinator.NewHandler(cfg)
 
 	// Create service with ServiceMonitor from helper
 	service := coordinator.NewService(grpcServer, handler, listener, healthServer, helper.ServiceRegistry, helper.Config, "test-coordinator", "127.0.0.1")

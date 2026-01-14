@@ -183,6 +183,14 @@ type PeerDef struct {
 
 	// Insecure indicates whether to use insecure connection (h2c) instead of TLS.
 	Insecure bool `mapstructure:"insecure"`
+
+	// MaxRetries is the maximum number of retry attempts for coordinator connections.
+	// Default: 10
+	MaxRetries int `mapstructure:"maxRetries"`
+
+	// RetryInterval is the base interval between retry attempts.
+	// Default: 1s
+	RetryInterval string `mapstructure:"retryInterval"`
 }
 
 // AuthDef holds the authentication configuration for the application.

@@ -283,13 +283,15 @@ export const mainListItems = React.forwardRef<
               isOpen={isOpen}
               onClick={onNavItemClick}
             />
-            <NavItem
-              to="/terminal"
-              text="Terminal"
-              icon={<Terminal size={16} />}
-              isOpen={isOpen}
-              onClick={onNavItemClick}
-            />
+            {config.terminalEnabled && (
+              <NavItem
+                to="/terminal"
+                text="Terminal"
+                icon={<Terminal size={16} />}
+                isOpen={isOpen}
+                onClick={onNavItemClick}
+              />
+            )}
             <NavItem
               to="/audit-logs"
               text="Audit Logs"

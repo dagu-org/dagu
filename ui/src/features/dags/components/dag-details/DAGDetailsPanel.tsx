@@ -219,7 +219,7 @@ const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto min-h-0">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
               {displayData.dag && (
                 <DAGDetailsContent
                   fileName={fileName}

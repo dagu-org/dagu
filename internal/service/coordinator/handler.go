@@ -68,43 +68,40 @@ type Handler struct {
 	zombieDetectorDone    chan struct{}
 }
 
-// HandlerOption configures the Handler
-type HandlerOption func(*Handler)
+// HandlerConfig holds configuration for creating a Handler.
+type HandlerConfig struct {
+	// DAGRunStore is the storage backend for DAG run status persistence.
+	// Required for shared-nothing worker architecture.
+	DAGRunStore exec.DAGRunStore
 
-// WithDAGRunStore sets the DAGRunStore for status persistence
-func WithDAGRunStore(store exec.DAGRunStore) HandlerOption {
-	return func(h *Handler) {
-		h.dagRunStore = store
+	// LogDir is the directory for log storage in shared-nothing mode.
+	// Required for shared-nothing worker architecture.
+	LogDir string
+
+	// StaleHeartbeatThreshold is the duration after which a worker's heartbeat
+	// is considered stale. Defaults to 30 seconds if not set.
+	StaleHeartbeatThreshold time.Duration
+}
+
+// applyDefaults sets default values for optional fields.
+func (c *HandlerConfig) applyDefaults() {
+	if c.StaleHeartbeatThreshold == 0 {
+		c.StaleHeartbeatThreshold = defaultStaleHeartbeatThreshold
 	}
 }
 
-// WithLogDir sets the log directory for log storage
-func WithLogDir(dir string) HandlerOption {
-	return func(h *Handler) {
-		h.logDir = dir
-	}
-}
-
-// WithStaleHeartbeatThreshold sets the threshold for considering a worker's heartbeat stale.
-// Workers that haven't sent a heartbeat within this duration are considered dead.
-func WithStaleHeartbeatThreshold(d time.Duration) HandlerOption {
-	return func(h *Handler) {
-		h.staleHeartbeatThreshold = d
-	}
-}
-
-func NewHandler(opts ...HandlerOption) *Handler {
-	h := &Handler{
+// NewHandler creates a new Handler with the given configuration.
+func NewHandler(cfg HandlerConfig) *Handler {
+	cfg.applyDefaults()
+	return &Handler{
 		waitingPollers:          make(map[string]*workerInfo),
 		heartbeats:              make(map[string]*heartbeatInfo),
 		openAttempts:            make(map[string]exec.DAGRunAttempt),
 		runMutexes:              make(map[string]*sync.Mutex),
-		staleHeartbeatThreshold: defaultStaleHeartbeatThreshold,
+		dagRunStore:             cfg.DAGRunStore,
+		logDir:                  cfg.LogDir,
+		staleHeartbeatThreshold: cfg.StaleHeartbeatThreshold,
 	}
-	for _, opt := range opts {
-		opt(h)
-	}
-	return h
 }
 
 // Close cleans up all resources held by the handler.
@@ -186,6 +183,11 @@ func (h *Handler) Dispatch(ctx context.Context, req *coordinatorv1.DispatchReque
 		return nil, status.Error(codes.InvalidArgument, "task is required")
 	}
 
+	// Validate task.Definition is provided - required for distributed execution
+	if req.Task.Definition == "" {
+		return nil, status.Error(codes.InvalidArgument, "task.Definition is required for distributed execution")
+	}
+
 	logger.Info(ctx, "Handler Dispatch called",
 		tag.RunID(req.Task.DagRunId),
 		tag.Target(req.Task.Target),
@@ -201,19 +203,17 @@ func (h *Handler) Dispatch(ctx context.Context, req *coordinatorv1.DispatchReque
 	isRootRun := req.Task.ParentDagRunId == "" &&
 		(req.Task.RootDagRunId == "" || req.Task.RootDagRunId == req.Task.DagRunId)
 
-	if h.dagRunStore != nil && req.Task.Definition != "" {
-		if isRootRun {
-			// For root-level DAG runs (no parent), create the attempt
-			if err := h.createAttemptForTask(ctx, req.Task); err != nil {
-				logger.Warn(ctx, "Failed to create attempt for task", tag.Error(err), tag.RunID(req.Task.DagRunId))
-				// Don't fail dispatch - the task can still run, status just won't be stored
-			}
-		} else if req.Task.ParentDagRunId != "" {
-			// For sub-DAG runs, create the attempt under the root DAG run
-			if err := h.createSubAttemptForTask(ctx, req.Task); err != nil {
-				logger.Warn(ctx, "Failed to create sub-attempt for task", tag.Error(err), tag.RunID(req.Task.DagRunId))
-				// Don't fail dispatch - the task can still run, status just won't be stored
-			}
+	if isRootRun {
+		// For root-level DAG runs (no parent), create the attempt
+		if err := h.createAttemptForTask(ctx, req.Task); err != nil {
+			logger.Warn(ctx, "Failed to create attempt for task", tag.Error(err), tag.RunID(req.Task.DagRunId))
+			// Don't fail dispatch - the task can still run, status just won't be stored
+		}
+	} else if req.Task.ParentDagRunId != "" {
+		// For sub-DAG runs, create the attempt under the root DAG run
+		if err := h.createSubAttemptForTask(ctx, req.Task); err != nil {
+			logger.Warn(ctx, "Failed to create sub-attempt for task", tag.Error(err), tag.RunID(req.Task.DagRunId))
+			// Don't fail dispatch - the task can still run, status just won't be stored
 		}
 	}
 
@@ -262,8 +262,10 @@ func matchesSelector(workerLabels, selector map[string]string) bool {
 // This is called when the coordinator receives a dispatch for a root-level DAG run
 // (not a sub-DAG), so it has a place to store status updates from the worker.
 func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.Task) error {
-	// Parse the full DAG from the definition to preserve all metadata
-	// (including workerSelector, steps, etc.) for retry operations
+	if h.dagRunStore == nil {
+		return nil
+	}
+
 	dag, err := spec.LoadYAML(ctx, []byte(task.Definition), spec.WithName(task.Target))
 	if err != nil {
 		return fmt.Errorf("failed to parse DAG definition: %w", err)
@@ -271,15 +273,13 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 
 	ref := exec.DAGRunRef{Name: dag.Name, ID: task.DagRunId}
 
-	// Check if dag-run already exists
+	// Check if dag-run already exists (e.g., queued via enqueue command)
 	existingAttempt, findErr := h.dagRunStore.FindAttempt(ctx, ref)
 	if findErr == nil {
-		// Dag-run exists - check if we should reuse it or create new attempt
 		existingStatus, readErr := existingAttempt.ReadStatus(ctx)
 		if readErr == nil && existingStatus.Status == core.Queued {
-			// Dag-run exists with queued status (from enqueue command)
-			// Reuse the existing attempt instead of creating a new one
 			task.AttemptId = existingAttempt.ID()
+			task.AttemptKey = generateRootAttemptKey(task)
 
 			if err := existingAttempt.Open(ctx); err != nil {
 				return fmt.Errorf("failed to open existing attempt: %w", err)
@@ -292,11 +292,11 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 			logger.Info(ctx, "Reusing existing queued attempt for dispatched task",
 				tag.RunID(task.DagRunId),
 				tag.Target(task.Target),
-				slog.String("attempt-id", task.AttemptId),
+				tag.AttemptID(task.AttemptId),
+				tag.AttemptKey(task.AttemptKey),
 			)
 			return nil
 		}
-		// Existing attempt is not queued, create a new retry attempt
 	}
 
 	// Create new attempt (either first attempt or retry)
@@ -308,15 +308,15 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 		return fmt.Errorf("failed to create attempt: %w", err)
 	}
 
-	// Set the attempt ID in the task so workers can use the same ID
 	task.AttemptId = attempt.ID()
+	task.AttemptKey = generateRootAttemptKey(task)
 
-	// Open the attempt for writing
 	if err := attempt.Open(ctx); err != nil {
 		return fmt.Errorf("failed to open attempt: %w", err)
 	}
 
-	// Cache the open attempt so ReportStatus can find it
+	h.writeInitialStatus(ctx, attempt, dag.Name, task.DagRunId, task.AttemptKey, exec.DAGRunRef{})
+
 	h.attemptsMu.Lock()
 	h.openAttempts[task.DagRunId] = attempt
 	h.attemptsMu.Unlock()
@@ -324,41 +324,51 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 	logger.Info(ctx, "Created DAGRun attempt for dispatched task",
 		tag.RunID(task.DagRunId),
 		tag.Target(task.Target),
-		slog.String("attempt-id", task.AttemptId),
+		tag.AttemptID(task.AttemptId),
+		tag.AttemptKey(task.AttemptKey),
 	)
 
 	return nil
+}
+
+// generateRootAttemptKey creates an AttemptKey for root-level tasks (self-referential hierarchy).
+func generateRootAttemptKey(task *coordinatorv1.Task) string {
+	return exec.GenerateAttemptKey(task.Target, task.DagRunId, task.Target, task.DagRunId, task.AttemptId)
 }
 
 // createSubAttemptForTask creates a sub-DAG attempt under the root DAG run.
 // This is called when the coordinator receives a dispatch for a sub-DAG
 // (dispatched from a parent DAG), so it has a place to store status updates from the worker.
 func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinatorv1.Task) error {
-	rootRef := exec.DAGRunRef{
-		Name: task.RootDagRunName,
-		ID:   task.RootDagRunId,
+	if h.dagRunStore == nil {
+		return nil
 	}
+
+	rootRef := exec.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
 
 	attempt, err := h.dagRunStore.CreateSubAttempt(ctx, rootRef, task.DagRunId)
 	if err != nil {
 		return fmt.Errorf("failed to create sub-attempt: %w", err)
 	}
 
-	// Parse and set the DAG from the definition to preserve all metadata
-	// (including workerSelector, steps, etc.) for retry operations
-	if task.Definition != "" {
-		dag, err := spec.LoadYAML(ctx, []byte(task.Definition), spec.WithName(task.Target))
-		if err != nil {
-			return fmt.Errorf("failed to parse DAG definition: %w", err)
-		}
-		attempt.SetDAG(dag)
+	dag, err := spec.LoadYAML(ctx, []byte(task.Definition), spec.WithName(task.Target))
+	if err != nil {
+		return fmt.Errorf("failed to parse DAG definition: %w", err)
 	}
+	attempt.SetDAG(dag)
+
+	task.AttemptId = attempt.ID()
+	task.AttemptKey = exec.GenerateAttemptKey(
+		task.RootDagRunName, task.RootDagRunId,
+		task.Target, task.DagRunId, attempt.ID(),
+	)
 
 	if err := attempt.Open(ctx); err != nil {
 		return fmt.Errorf("failed to open sub-attempt: %w", err)
 	}
 
-	// Cache the open attempt for ReportStatus calls
+	h.writeInitialStatus(ctx, attempt, task.Target, task.DagRunId, task.AttemptKey, rootRef)
+
 	h.attemptsMu.Lock()
 	h.openAttempts[task.DagRunId] = attempt
 	h.attemptsMu.Unlock()
@@ -367,9 +377,27 @@ func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinator
 		tag.RunID(task.DagRunId),
 		tag.DAG(task.Target),
 		slog.String("root-dag-run-id", task.RootDagRunId),
+		tag.AttemptKey(task.AttemptKey),
 	)
 
 	return nil
+}
+
+// writeInitialStatus writes an initial NotStarted status to the attempt.
+// This ensures the status file is not empty when read before the worker reports its first status.
+func (h *Handler) writeInitialStatus(ctx context.Context, attempt exec.DAGRunAttempt, dagName, dagRunID, attemptKey string, root exec.DAGRunRef) {
+	initialStatus := exec.DAGRunStatus{
+		Name:       dagName,
+		DAGRunID:   dagRunID,
+		AttemptID:  attempt.ID(),
+		AttemptKey: attemptKey,
+		Status:     core.NotStarted,
+		StartedAt:  time.Now().UTC().Format(time.RFC3339),
+		Root:       root,
+	}
+	if err := attempt.Write(ctx, initialStatus); err != nil {
+		logger.Warn(ctx, "Failed to write initial status", tag.Error(err), tag.RunID(dagRunID))
+	}
 }
 
 // GetWorkers returns the list of currently connected workers
@@ -440,15 +468,17 @@ func (h *Handler) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatReq
 }
 
 // getCancelledRunsForWorker checks which of the worker's running tasks have been cancelled.
-func (h *Handler) getCancelledRunsForWorker(ctx context.Context, stats *coordinatorv1.WorkerStats) []string {
+func (h *Handler) getCancelledRunsForWorker(ctx context.Context, stats *coordinatorv1.WorkerStats) []*coordinatorv1.CancelledRun {
 	if h.dagRunStore == nil || stats == nil || len(stats.RunningTasks) == 0 {
 		return nil
 	}
 
-	var cancelledRuns []string
+	var cancelledRuns []*coordinatorv1.CancelledRun
 	for _, task := range stats.RunningTasks {
 		if h.isTaskCancelled(ctx, task) {
-			cancelledRuns = append(cancelledRuns, task.DagRunId)
+			cancelledRuns = append(cancelledRuns, &coordinatorv1.CancelledRun{
+				AttemptKey: task.AttemptKey,
+			})
 		}
 	}
 	return cancelledRuns

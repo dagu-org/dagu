@@ -362,7 +362,10 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID st
 
 	logger.Debug(ctx, "Dag-run initiated", tag.File(logFile.Name()))
 
-	dr, err := ctx.dagStore(nil, []string{filepath.Dir(d.Location)})
+	dr, err := ctx.dagStore(dagStoreConfig{
+		SearchPaths:           []string{filepath.Dir(d.Location)},
+		SkipDirectoryCreation: workerID != "local",
+	})
 	if err != nil {
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}

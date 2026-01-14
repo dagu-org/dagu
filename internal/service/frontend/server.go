@@ -176,6 +176,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 			AuthMode:              cfg.Server.Auth.Mode,
 			OIDCEnabled:           oidcEnabled,
 			OIDCButtonLabel:       oidcButtonLabel,
+			TerminalEnabled:       cfg.Server.Terminal.Enabled && authSvc != nil,
 		},
 	}, nil
 }

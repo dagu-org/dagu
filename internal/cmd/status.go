@@ -94,7 +94,7 @@ func displayTreeStatus(dag *core.DAG, dagStatus *exec.DAGRunStatus) {
 func extractDAGName(ctx *Context, name string) (string, error) {
 	if strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".yml") {
 		// Read the DAG from the file.
-		dagStore, err := ctx.dagStore(nil, nil)
+		dagStore, err := ctx.dagStore(dagStoreConfig{})
 		if err != nil {
 			return "", fmt.Errorf("failed to initialize DAG store: %w", err)
 		}

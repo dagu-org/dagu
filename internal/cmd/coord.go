@@ -110,7 +110,6 @@ func runCoordinator(ctx *Context, _ []string) error {
 	return nil
 }
 
-// newCoordinator creates a new Coordinator service instance.
 // newCoordinator creates and configures a Coordinator service with its gRPC server,
 // health server, network listener, and handler, ready for registration in the service registry.
 // It derives an instance ID from the host name and configured port and determines an
@@ -195,10 +194,10 @@ func newCoordinator(ctx context.Context, cfg *config.Config, registry exec.Servi
 	}
 
 	// Create handler with DAGRunStore for status persistence and LogDir for log streaming
-	handler := coordinator.NewHandler(
-		coordinator.WithDAGRunStore(dagRunStore),
-		coordinator.WithLogDir(cfg.Paths.LogDir),
-	)
+	handler := coordinator.NewHandler(coordinator.HandlerConfig{
+		DAGRunStore: dagRunStore,
+		LogDir:      cfg.Paths.LogDir,
+	})
 
 	// Create and return service with advertise address for service registry
 	return coordinator.NewService(grpcServer, handler, listener, healthServer, registry, cfg, instanceID, advertiseAddr), handler, nil

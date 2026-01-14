@@ -1294,7 +1294,12 @@ func (a *Agent) setupDAGRunAttempt(ctx context.Context) (exec.DAGRunAttempt, err
 	// Status updates are handled by statusPusher instead
 	if a.dagRunStore == nil {
 		logger.Debug(ctx, "Using no-op DAGRunAttempt in shared-nothing mode")
-		return exec.NewNoopDAGRunAttempt(a.dagRunID, a.dag), nil
+		// Use coordinator-provided attemptID if available, otherwise fall back to dagRunID
+		attemptID := a.attemptID
+		if attemptID == "" {
+			attemptID = a.dagRunID
+		}
+		return exec.NewNoopDAGRunAttempt(attemptID, a.dag), nil
 	}
 
 	retentionDays := a.dag.HistRetentionDays

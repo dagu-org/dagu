@@ -375,6 +375,15 @@ type Peer struct {
 
 	// Insecure indicates whether to use insecure connection (h2c) instead of TLS.
 	Insecure bool
+
+	// MaxRetries is the maximum number of retry attempts for coordinator connections.
+	// Uses exponential backoff: interval * 2^attempt, capped at 30s.
+	// Default is 10 for better resilience during startup.
+	MaxRetries int
+
+	// RetryInterval is the base interval between retry attempts.
+	// Default is 1 second.
+	RetryInterval time.Duration
 }
 
 // Validate performs basic validation on the configuration to ensure required fields are set

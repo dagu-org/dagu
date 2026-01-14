@@ -164,6 +164,23 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		logger.Warn(ctx, w)
 	}
 
+	// For shared-nothing workers, skip creating file-based stores
+	// as they only use temporary directories and push status to coordinator
+	if isSharedNothingWorker(cmd, cfg) {
+		logger.Debug(ctx, "Shared-nothing worker mode: skipping file-based stores",
+			slog.Any("coordinators", cfg.Worker.Coordinators),
+		)
+		return &Context{
+			Context: ctx,
+			Command: cmd,
+			Config:  cfg,
+			Quiet:   quiet,
+			Flags:   flags,
+			// All stores are nil - shared-nothing workers don't need local storage
+			// Status is pushed to coordinator, DAG definitions come from task payload
+		}, nil
+	}
+
 	// Initialize history repository and history manager
 	hrOpts := []filedagrun.DAGRunStoreOption{
 		filedagrun.WithLatestStatusToday(cfg.Server.LatestStatusToday),
@@ -241,6 +258,15 @@ func isAgentCommand(cmdName string) bool {
 	}
 }
 
+// isSharedNothingWorker checks if the current command is a worker with static coordinators
+// configured, indicating shared-nothing mode where no local storage is needed.
+func isSharedNothingWorker(cmd *cobra.Command, cfg *config.Config) bool {
+	if cmd.Name() != "worker" {
+		return false
+	}
+	return len(cfg.Worker.Coordinators) > 0
+}
+
 // NewServer creates and returns a new web UI NewServer.
 // It initializes in-memory caches for DAGs and runstore, and uses them in the client.
 func (c *Context) NewServer(rs *resource.Service) (*frontend.Server, error) {
@@ -248,7 +274,7 @@ func (c *Context) NewServer(rs *resource.Service) (*frontend.Server, error) {
 	dc := fileutil.NewCache[*core.DAG]("dag_definition", limits.DAG.Limit, limits.DAG.TTL)
 	dc.StartEviction(c)
 
-	dr, err := c.dagStore(dc, nil)
+	dr, err := c.dagStore(dagStoreConfig{Cache: dc})
 	if err != nil {
 		return nil, err
 	}
@@ -281,6 +307,14 @@ func (c *Context) NewCoordinatorClient() coordinator.Client {
 	coordinatorCliCfg.SkipTLSVerify = c.Config.Core.Peer.SkipTLSVerify
 	coordinatorCliCfg.Insecure = c.Config.Core.Peer.Insecure
 
+	// Use config values for retry if provided
+	if c.Config.Core.Peer.MaxRetries > 0 {
+		coordinatorCliCfg.MaxRetries = c.Config.Core.Peer.MaxRetries
+	}
+	if c.Config.Core.Peer.RetryInterval > 0 {
+		coordinatorCliCfg.RetryInterval = c.Config.Core.Peer.RetryInterval
+	}
+
 	if err := coordinatorCliCfg.Validate(); err != nil {
 		logger.Error(c.Context, "Invalid coordinator client configuration", tag.Error(err))
 		return nil
@@ -295,7 +329,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	cache := fileutil.NewCache[*core.DAG]("dag_definition", limits.DAG.Limit, limits.DAG.TTL)
 	cache.StartEviction(c)
 
-	dr, err := c.dagStore(cache, nil)
+	dr, err := c.dagStore(dagStoreConfig{Cache: cache})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize DAG client: %w", err)
 	}
@@ -319,27 +353,25 @@ func (c *Context) StringParam(name string) (string, error) {
 	return val, nil
 }
 
-// dagStore returns a new DAGRepository instance. It ensures that the directory exists
-// (creating it if necessary) before returning the store.
-func (c *Context) dagStore(cache *fileutil.Cache[*core.DAG], searchPaths []string) (exec.DAGStore, error) {
-	dir := c.Config.Paths.DAGsDir
-	_, err := os.Stat(dir)
-	if os.IsNotExist(err) {
-		if err := os.MkdirAll(dir, 0750); err != nil {
-			return nil, fmt.Errorf("failed to create DAGs directory %s: %w", dir, err)
-		}
-	}
+// dagStoreConfig contains options for creating a DAG store.
+type dagStoreConfig struct {
+	Cache                 *fileutil.Cache[*core.DAG] // Optional cache for DAG objects
+	SearchPaths           []string                   // Additional search paths for DAG files
+	SkipDirectoryCreation bool                       // Skip directory creation (for distributed worker execution)
+}
 
-	// Create a flag store based on the suspend flags directory.
+// dagStore returns a new DAGRepository instance.
+func (c *Context) dagStore(cfg dagStoreConfig) (exec.DAGStore, error) {
 	store := filedag.New(
 		c.Config.Paths.DAGsDir,
 		filedag.WithFlagsBaseDir(c.Config.Paths.SuspendFlagsDir),
-		filedag.WithSearchPaths(searchPaths),
-		filedag.WithFileCache(cache),
+		filedag.WithSearchPaths(cfg.SearchPaths),
+		filedag.WithFileCache(cfg.Cache),
 		filedag.WithSkipExamples(c.Config.Core.SkipExamples),
+		filedag.WithSkipDirectoryCreation(cfg.SkipDirectoryCreation),
 	)
 
-	// Initialize the store (creates example DAGs if needed)
+	// Initialize the store (creates directory and example DAGs if needed, unless SkipDirectoryCreation is true)
 	if s, ok := store.(*filedag.Storage); ok {
 		if err := s.Initialize(); err != nil {
 			return nil, fmt.Errorf("failed to initialize DAG store: %w", err)
