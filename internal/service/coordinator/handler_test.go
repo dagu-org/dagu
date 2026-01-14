@@ -1542,14 +1542,16 @@ func TestHandler_GetCancelledRunsForWorker_Full(t *testing.T) {
 			Status:   core.Running, // Status doesn't matter, IsAborting is what's checked
 		})
 
+		expectedAttemptKey := "test-attempt-key-123"
 		stats := &coordinatorv1.WorkerStats{
 			RunningTasks: []*coordinatorv1.RunningTask{
-				{DagRunId: "run-123", DagName: "test-dag"},
+				{DagRunId: "run-123", DagName: "test-dag", AttemptKey: expectedAttemptKey},
 			},
 		}
 
 		result := h.getCancelledRunsForWorker(ctx, stats)
-		assert.Contains(t, result, "run-123")
+		require.Len(t, result, 1)
+		assert.Equal(t, expectedAttemptKey, result[0].AttemptKey)
 	})
 
 	t.Run("DoesNotReturnRunningTasks", func(t *testing.T) {
@@ -1574,7 +1576,7 @@ func TestHandler_GetCancelledRunsForWorker_Full(t *testing.T) {
 		}
 
 		result := h.getCancelledRunsForWorker(ctx, stats)
-		assert.NotContains(t, result, "run-456")
+		assert.Empty(t, result)
 	})
 }
 

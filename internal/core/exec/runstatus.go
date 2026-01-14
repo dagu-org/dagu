@@ -39,6 +39,7 @@ type DAGRunStatus struct {
 	Name          string            `json:"name"`
 	DAGRunID      string            `json:"dagRunId"`
 	AttemptID     string            `json:"attemptId"`
+	AttemptKey    string            `json:"attemptKey,omitempty"` // Globally unique attempt identifier
 	Status        core.Status       `json:"status"`
 	WorkerID      string            `json:"workerId,omitempty"`
 	PID           PID               `json:"pid,omitempty"`

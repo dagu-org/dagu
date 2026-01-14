@@ -46,6 +46,13 @@ func WithAttemptID(attemptID string) StatusOption {
 	}
 }
 
+// WithAttemptKey returns a StatusOption that sets the attempt key
+func WithAttemptKey(attemptKey string) StatusOption {
+	return func(s *exec.DAGRunStatus) {
+		s.AttemptKey = attemptKey
+	}
+}
+
 // WithQueuedAt returns a StatusOption that sets the finished time
 func WithQueuedAt(formattedTime string) StatusOption {
 	return func(s *exec.DAGRunStatus) {
@@ -169,6 +176,21 @@ func (f *StatusBuilder) Create(
 
 	for _, opt := range opts {
 		opt(&statusObj)
+	}
+
+	// Generate AttemptKey if not already set and we have all required fields
+	if statusObj.AttemptKey == "" && statusObj.AttemptID != "" {
+		rootName := statusObj.Root.Name
+		rootID := statusObj.Root.ID
+		if rootName == "" {
+			rootName = statusObj.Name // Self-referential for root runs
+			rootID = statusObj.DAGRunID
+		}
+		statusObj.AttemptKey = exec.GenerateAttemptKey(
+			rootName, rootID,
+			statusObj.Name, statusObj.DAGRunID,
+			statusObj.AttemptID,
+		)
 	}
 
 	return statusObj

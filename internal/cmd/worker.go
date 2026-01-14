@@ -139,29 +139,29 @@ func BuildCoordinatorClientConfig(cfg *config.Config) (*coordinator.Config, bool
 		return nil, false, nil // Use service registry discovery
 	}
 
-	coordinatorCliCfg := coordinator.DefaultConfig()
-	coordinatorCliCfg.CAFile = cfg.Core.Peer.ClientCaFile
-	coordinatorCliCfg.CertFile = cfg.Core.Peer.CertFile
-	coordinatorCliCfg.KeyFile = cfg.Core.Peer.KeyFile
-	coordinatorCliCfg.SkipTLSVerify = cfg.Core.Peer.SkipTLSVerify
-	coordinatorCliCfg.Insecure = cfg.Core.Peer.Insecure
+	coordCliCfg := coordinator.DefaultConfig()
+	coordCliCfg.CAFile = cfg.Core.Peer.ClientCaFile
+	coordCliCfg.CertFile = cfg.Core.Peer.CertFile
+	coordCliCfg.KeyFile = cfg.Core.Peer.KeyFile
+	coordCliCfg.SkipTLSVerify = cfg.Core.Peer.SkipTLSVerify
+	coordCliCfg.Insecure = cfg.Core.Peer.Insecure
 
-	if err := coordinatorCliCfg.Validate(); err != nil {
+	if err := coordCliCfg.Validate(); err != nil {
 		return nil, false, fmt.Errorf("invalid coordinator client configuration: %w", err)
 	}
 
-	return coordinatorCliCfg, true, nil
+	return coordCliCfg, true, nil
 }
 
 // createCoordinatorClient creates the appropriate coordinator client based on configuration.
 // Returns the client, whether to use remote handler, and any error.
 func createCoordinatorClient(ctx *Context) (coordinator.Client, bool, error) {
-	coordinatorCliCfg, useRemoteHandler, err := BuildCoordinatorClientConfig(ctx.Config)
+	coordCliCfg, useRemoteHandler, err := BuildCoordinatorClientConfig(ctx.Config)
 	if err != nil {
 		return nil, false, err
 	}
 
-	if coordinatorCliCfg == nil {
+	if coordCliCfg == nil {
 		return ctx.NewCoordinatorClient(), false, nil
 	}
 
@@ -172,5 +172,5 @@ func createCoordinatorClient(ctx *Context) (coordinator.Client, bool, error) {
 	logger.Info(ctx, "Using static coordinator discovery",
 		slog.Any("coordinators", ctx.Config.Worker.Coordinators))
 
-	return coordinator.New(staticRegistry, coordinatorCliCfg), useRemoteHandler, nil
+	return coordinator.New(staticRegistry, coordCliCfg), useRemoteHandler, nil
 }

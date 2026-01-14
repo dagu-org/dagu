@@ -2,7 +2,9 @@ package exec
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
+	"hash/fnv"
 	"strings"
 	"time"
 
@@ -174,3 +176,11 @@ func ParseDAGRunRef(s string) (DAGRunRef, error) {
 
 // zeroRef is a zero value for DAGRunRef.
 var zeroRef DAGRunRef
+
+// GenerateAttemptKey creates a globally unique attempt identifier for cancellation tracking.
+// Format: FNV1a64 hash of hierarchy + ":" + attemptId (e.g., "a1b2c3d4e5f67890:abc123").
+func GenerateAttemptKey(rootName, rootID, dagName, dagRunID, attemptID string) string {
+	h := fnv.New64a()
+	h.Write([]byte(rootName + "\x00" + rootID + "\x00" + dagName + "\x00" + dagRunID))
+	return hex.EncodeToString(h.Sum(nil)) + ":" + attemptID
+}

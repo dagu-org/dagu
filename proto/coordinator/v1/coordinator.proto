@@ -76,6 +76,8 @@ message Task {
   DAGRunStatusProto previous_status = 13;
   // Attempt ID created by coordinator. Workers use this to create attempts with the same ID.
   string attempt_id = 14;
+  // Globally unique attempt identifier for cancellation tracking.
+  string attempt_key = 15;
 }
 
 enum Operation {
@@ -125,9 +127,14 @@ message HeartbeatRequest {
 
 // Response message for heartbeat.
 message HeartbeatResponse {
-  // List of DAG run IDs that should be cancelled by the worker.
+  // List of DAG runs that should be cancelled by the worker.
   // Workers check this on each heartbeat and cancel matching running tasks.
-  repeated string cancelled_runs = 1;
+  repeated CancelledRun cancelled_runs = 1;
+}
+
+// Information about a cancelled DAG run.
+message CancelledRun {
+  string attempt_key = 1; // Globally unique attempt identifier to cancel
 }
 
 // Worker statistics reported via heartbeat.
@@ -146,6 +153,7 @@ message RunningTask {
   string root_dag_run_id = 5;
   string parent_dag_run_name = 6;
   string parent_dag_run_id = 7;
+  string attempt_key = 8;       // Globally unique attempt identifier
 }
 
 // Request message for reporting DAG run status.

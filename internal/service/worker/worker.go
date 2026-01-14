@@ -29,8 +29,8 @@ type Worker struct {
 	pollersMu    sync.Mutex
 	runningTasks map[string]*coordinatorv1.RunningTask // pollerID -> running task
 
-	// For cancellation support
-	cancelFuncs map[string]context.CancelFunc // dagRunID -> cancel function
+	// For cancellation support (key is AttemptKey)
+	cancelFuncs map[string]context.CancelFunc
 
 	// For graceful shutdown
 	stopOnce   sync.Once
@@ -171,8 +171,9 @@ func (t *trackingHandler) Handle(ctx context.Context, task *coordinatorv1.Task) 
 		RootDagRunId:     task.RootDagRunId,
 		ParentDagRunName: task.ParentDagRunName,
 		ParentDagRunId:   task.ParentDagRunId,
+		AttemptKey:       task.AttemptKey,
 	}
-	t.worker.cancelFuncs[task.DagRunId] = cancel
+	t.worker.cancelFuncs[task.AttemptKey] = cancel
 	t.worker.pollersMu.Unlock()
 
 	// Execute the task with cancellable context
@@ -181,7 +182,7 @@ func (t *trackingHandler) Handle(ctx context.Context, task *coordinatorv1.Task) 
 	// Remove from running tasks and cancel registry
 	t.worker.pollersMu.Lock()
 	delete(t.worker.runningTasks, pollerID)
-	delete(t.worker.cancelFuncs, task.DagRunId)
+	delete(t.worker.cancelFuncs, task.AttemptKey)
 	t.worker.pollersMu.Unlock()
 
 	return err
@@ -284,15 +285,15 @@ func (w *Worker) sendHeartbeat(ctx context.Context) error {
 }
 
 // processCancellations cancels tasks that the coordinator has marked for cancellation
-func (w *Worker) processCancellations(ctx context.Context, cancelledRunIDs []string) {
+func (w *Worker) processCancellations(ctx context.Context, cancelledRuns []*coordinatorv1.CancelledRun) {
 	w.pollersMu.Lock()
 	defer w.pollersMu.Unlock()
 
-	for _, dagRunID := range cancelledRunIDs {
-		if cancelFunc, exists := w.cancelFuncs[dagRunID]; exists {
+	for _, run := range cancelledRuns {
+		if cancelFunc, exists := w.cancelFuncs[run.AttemptKey]; exists {
 			logger.Info(ctx, "Cancelling task per coordinator directive",
-				tag.RunID(dagRunID),
-				tag.WorkerID(w.id))
+				tag.WorkerID(w.id),
+				tag.AttemptKey(run.AttemptKey))
 			cancelFunc()
 		}
 	}

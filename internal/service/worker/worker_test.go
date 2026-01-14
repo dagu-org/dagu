@@ -584,13 +584,17 @@ func TestWorkerCancellation(t *testing.T) {
 
 		mockCoordinatorCli := newMockCoordinatorCli()
 
+		cancelledAttemptKey := "test-attempt-key-" + cancelledRunID
+
 		// Track when heartbeat is called and return cancellation directive
 		mockCoordinatorCli.HeartbeatFunc = func(_ context.Context, _ *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
 			count := heartbeatCount.Add(1)
 			// After a few heartbeats, return the cancellation directive
 			if count >= 2 {
 				return &coordinatorv1.HeartbeatResponse{
-					CancelledRuns: []string{cancelledRunID},
+					CancelledRuns: []*coordinatorv1.CancelledRun{
+						{AttemptKey: cancelledAttemptKey},
+					},
 				}, nil
 			}
 			return &coordinatorv1.HeartbeatResponse{}, nil
@@ -638,6 +642,7 @@ func TestWorkerCancellation(t *testing.T) {
 					DagRunId:   cancelledRunID,
 					Target:     "test.yaml",
 					Definition: "name: test\nsteps:\n  - name: step1\n    command: echo hello",
+					AttemptKey: cancelledAttemptKey,
 				}, nil
 			}
 		})
@@ -662,7 +667,9 @@ func TestWorkerCancellation(t *testing.T) {
 		// Return cancellation directive for non-existent task
 		mockCoordinatorCli.HeartbeatFunc = func(_ context.Context, _ *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
 			return &coordinatorv1.HeartbeatResponse{
-				CancelledRuns: []string{"non-existent-task"},
+				CancelledRuns: []*coordinatorv1.CancelledRun{
+					{AttemptKey: "non-existent-attempt-key"},
+				},
 			}, nil
 		}
 
@@ -729,7 +736,11 @@ func TestWorkerCancellation(t *testing.T) {
 			// Return multiple cancellation directives after some heartbeats
 			if count >= 2 {
 				return &coordinatorv1.HeartbeatResponse{
-					CancelledRuns: []string{"task-1", "task-2", "task-3"},
+					CancelledRuns: []*coordinatorv1.CancelledRun{
+						{AttemptKey: "attempt-key-1"},
+						{AttemptKey: "attempt-key-2"},
+						{AttemptKey: "attempt-key-3"},
+					},
 				}, nil
 			}
 			return &coordinatorv1.HeartbeatResponse{}, nil
@@ -772,6 +783,7 @@ func TestWorkerCancellation(t *testing.T) {
 					DagRunId:   fmt.Sprintf("task-%d", idx),
 					Target:     "test.yaml",
 					Definition: "name: test\nsteps:\n  - name: step1\n    command: echo hello",
+					AttemptKey: fmt.Sprintf("attempt-key-%d", idx),
 				}, nil
 			}
 			select {
