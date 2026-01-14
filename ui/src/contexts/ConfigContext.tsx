@@ -28,6 +28,7 @@ export type Config = {
   authMode: AuthMode;
   oidcEnabled: boolean;
   oidcButtonLabel: string;
+  terminalEnabled: boolean;
   permissions: {
     writeDags: boolean;
     runDags: boolean;

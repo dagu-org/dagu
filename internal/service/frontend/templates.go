@@ -64,6 +64,8 @@ type funcsConfig struct {
 	// OIDC configuration for builtin auth mode
 	OIDCEnabled     bool
 	OIDCButtonLabel string
+	// Terminal configuration
+	TerminalEnabled bool
 }
 
 // and simple utility helpers for use inside HTML templates.
@@ -150,6 +152,9 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 		},
 		"oidcButtonLabel": func() string {
 			return cfg.OIDCButtonLabel
+		},
+		"terminalEnabled": func() string {
+			return convertBooleanToString(cfg.TerminalEnabled)
 		},
 	}
 }
