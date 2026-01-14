@@ -661,41 +661,6 @@ func TestCreateAgentEnv(t *testing.T) {
 func TestLoadDAG(t *testing.T) {
 	t.Parallel()
 
-	t.Run("FromTarget", func(t *testing.T) {
-		t.Parallel()
-
-		// Create a temp DAG file
-		tempDir := t.TempDir()
-		dagFile := filepath.Join(tempDir, "test.yaml")
-		dagContent := `name: test-dag
-steps:
-  - name: echo
-    command: echo hello
-`
-		err := os.WriteFile(dagFile, []byte(dagContent), 0644)
-		require.NoError(t, err)
-
-		handler := &remoteTaskHandler{
-			config: &config.Config{
-				Paths: config.PathsConfig{
-					DAGsDir: tempDir,
-				},
-			},
-		}
-
-		task := &coordinatorv1.Task{
-			Target: dagFile,
-		}
-
-		dag, cleanup, loadErr := handler.loadDAG(context.Background(), task)
-
-		require.NoError(t, loadErr)
-		require.NotNil(t, dag)
-		assert.Equal(t, "test-dag", dag.Name)
-		// cleanup should be nil when loading from target (no temp file created)
-		assert.Nil(t, cleanup)
-	})
-
 	t.Run("FromDefinition", func(t *testing.T) {
 		t.Parallel()
 
@@ -753,62 +718,6 @@ steps:
 		require.Error(t, err)
 		require.Nil(t, dag)
 		assert.Nil(t, cleanup, "cleanup should be nil after error (already cleaned up)")
-		require.Contains(t, err.Error(), "failed to load DAG")
-	})
-
-	t.Run("NilCleanupWhenNoTempFile", func(t *testing.T) {
-		t.Parallel()
-
-		tempDir := t.TempDir()
-		dagFile := filepath.Join(tempDir, "notmp.yaml")
-		dagContent := `name: no-temp
-steps:
-  - name: step1
-    command: echo notmp
-`
-		err := os.WriteFile(dagFile, []byte(dagContent), 0644)
-		require.NoError(t, err)
-
-		handler := &remoteTaskHandler{
-			config: &config.Config{
-				Paths: config.PathsConfig{
-					DAGsDir: tempDir,
-				},
-			},
-		}
-
-		task := &coordinatorv1.Task{
-			Target:     dagFile,
-			Definition: "", // No definition = no temp file
-		}
-
-		dag, cleanup, loadErr := handler.loadDAG(context.Background(), task)
-
-		require.NoError(t, loadErr)
-		require.NotNil(t, dag)
-		assert.Nil(t, cleanup, "cleanup should be nil when no temp file is created")
-	})
-
-	t.Run("SpecLoadErrorFromTarget", func(t *testing.T) {
-		t.Parallel()
-
-		handler := &remoteTaskHandler{
-			config: &config.Config{
-				Paths: config.PathsConfig{
-					DAGsDir: t.TempDir(),
-				},
-			},
-		}
-
-		task := &coordinatorv1.Task{
-			Target: "/nonexistent/path/to/dag.yaml",
-		}
-
-		dag, cleanup, err := handler.loadDAG(context.Background(), task)
-
-		require.Error(t, err)
-		require.Nil(t, dag)
-		require.Nil(t, cleanup)
 		require.Contains(t, err.Error(), "failed to load DAG")
 	})
 }
@@ -1010,8 +919,10 @@ func TestHandleStart(t *testing.T) {
 			},
 		}
 
+		// Test with invalid YAML definition
 		task := &coordinatorv1.Task{
-			Target: "/nonexistent/dag.yaml",
+			Target:     "invalid-dag",
+			Definition: `invalid: yaml: content: [[[`,
 		}
 
 		err := handler.handleStart(context.Background(), task, false)
@@ -1248,35 +1159,32 @@ steps:
 func TestHandleStart_QueuedRunFlag(t *testing.T) {
 	t.Parallel()
 
-	tempDir := t.TempDir()
-	dagFile := filepath.Join(tempDir, "queued-flag.yaml")
 	dagContent := `name: queued-flag-dag
 steps:
   - name: step1
     command: echo queued
 `
-	err := os.WriteFile(dagFile, []byte(dagContent), 0644)
-	require.NoError(t, err)
 
 	handler := &remoteTaskHandler{
 		workerID:          "test-worker",
 		coordinatorClient: newMockRemoteCoordinatorClient(),
 		config: &config.Config{
 			Paths: config.PathsConfig{
-				DAGsDir: tempDir,
+				DAGsDir: t.TempDir(),
 			},
 		},
 	}
 
 	task := &coordinatorv1.Task{
-		Target:         dagFile,
+		Target:         "queued-flag",
+		Definition:     dagContent,
 		DagRunId:       "run-queued-flag",
 		RootDagRunName: "root",
 		RootDagRunId:   "root-queued",
 	}
 
 	// Test with queuedRun=true
-	err = handler.handleStart(context.Background(), task, true)
+	err := handler.handleStart(context.Background(), task, true)
 	require.Error(t, err)
 	// Should fail at execution, not DAG loading
 	require.NotContains(t, err.Error(), "failed to load DAG")
@@ -1505,15 +1413,11 @@ func TestExecuteDAGRun_CreateAgentEnvError(t *testing.T) {
 
 	// Test that executeDAGRun returns error when createAgentEnv fails
 	// Use null byte in workerID to trigger MkdirAll error
-	tempDir := t.TempDir()
-	dagFile := filepath.Join(tempDir, "exec-env-error.yaml")
 	dagContent := `name: exec-env-error-dag
 steps:
   - name: step1
     command: echo test
 `
-	err := os.WriteFile(dagFile, []byte(dagContent), 0644)
-	require.NoError(t, err)
 
 	client := newMockRemoteCoordinatorClient()
 
@@ -1523,21 +1427,20 @@ steps:
 		coordinatorClient: client,
 		config: &config.Config{
 			Paths: config.PathsConfig{
-				DAGsDir: tempDir,
+				DAGsDir: t.TempDir(),
 			},
 		},
 	}
 
-	// Load DAG first
+	// Load DAG with definition (required for distributed execution)
 	task := &coordinatorv1.Task{
-		Target: dagFile,
+		Target:     "exec-env-error",
+		Definition: dagContent,
 	}
 	dag, cleanup, loadErr := handler.loadDAG(context.Background(), task)
 	require.NoError(t, loadErr)
 	require.NotNil(t, dag)
-	if cleanup != nil {
-		defer cleanup()
-	}
+	defer cleanup()
 
 	// Create remote handlers
 	root := exec.DAGRunRef{Name: "root", ID: "root-1"}
@@ -1545,7 +1448,7 @@ steps:
 	statusPusher, logStreamer := handler.createRemoteHandlers("run-error", dag.Name, root)
 
 	// Call executeDAGRun directly - should fail at createAgentEnv
-	err = handler.executeDAGRun(context.Background(), dag, "run-error", "", root, parent, statusPusher, logStreamer, false, nil)
+	err := handler.executeDAGRun(context.Background(), dag, "run-error", "", root, parent, statusPusher, logStreamer, false, nil)
 
 	// On systems where null byte in path fails, we should get an error
 	if err != nil {

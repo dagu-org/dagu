@@ -180,30 +180,21 @@ func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root 
 	return statusPusher, logStreamer
 }
 
-// loadDAG loads the DAG from task definition or target path.
+// loadDAG loads the DAG from task definition.
 // Returns the loaded DAG and a cleanup function that should be called after task execution.
 func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Task) (*core.DAG, func(), error) {
-	var target string
-	var cleanupFunc func()
+	logger.Info(ctx, "Creating temporary DAG file from definition",
+		tag.DAG(task.Target),
+		tag.Size(len(task.Definition)))
 
-	// If definition is provided, create a temporary DAG file
-	if task.Definition != "" {
-		logger.Info(ctx, "Creating temporary DAG file from definition",
-			tag.DAG(task.Target),
-			tag.Size(len(task.Definition)))
-
-		tempFile, err := fileutil.CreateTempDAGFile("worker-dags", task.Target, []byte(task.Definition))
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create temp DAG file: %w", err)
+	tempFile, err := fileutil.CreateTempDAGFile("worker-dags", task.Target, []byte(task.Definition))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create temp DAG file: %w", err)
+	}
+	cleanupFunc := func() {
+		if err := os.Remove(tempFile); err != nil && !os.IsNotExist(err) {
+			logger.Errorf(ctx, "Failed to remove temp DAG file: %v", err)
 		}
-		target = tempFile
-		cleanupFunc = func() {
-			if err := os.Remove(tempFile); err != nil && !os.IsNotExist(err) {
-				logger.Errorf(ctx, "Failed to remove temp DAG file: %v", err)
-			}
-		}
-	} else {
-		target = task.Target
 	}
 
 	// Prepare load options
@@ -212,12 +203,7 @@ func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Tas
 	// 2. Shared-nothing workers should not access local DAG directories
 	loadOpts := []spec.LoadOption{
 		spec.WithBaseConfig(h.config.Paths.BaseConfig),
-	}
-
-	// When loading from task definition (temp file), use the original DAG name
-	// (task.Target) instead of deriving name from the temp file path
-	if task.Definition != "" {
-		loadOpts = append(loadOpts, spec.WithName(task.Target))
+		spec.WithName(task.Target), // Use original DAG name, not temp file path
 	}
 
 	// Pass task params to the DAG (e.g., from parallel execution items)
@@ -226,12 +212,10 @@ func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Tas
 	}
 
 	// Load the DAG
-	dag, err := spec.Load(ctx, target, loadOpts...)
+	dag, err := spec.Load(ctx, tempFile, loadOpts...)
 	if err != nil {
-		if cleanupFunc != nil {
-			cleanupFunc()
-		}
-		return nil, nil, fmt.Errorf("failed to load DAG from %s: %w", target, err)
+		cleanupFunc()
+		return nil, nil, fmt.Errorf("failed to load DAG from %s: %w", tempFile, err)
 	}
 
 	return dag, cleanupFunc, nil

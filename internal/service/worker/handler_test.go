@@ -26,12 +26,13 @@ func TestTaskHandler(t *testing.T) {
 		// This test simulates the queue dispatch scenario:
 		// Coordinator first creates a dag-run (during enqueue), then sends OPERATION_RETRY
 		// to dispatch it to a worker.
-		dag := th.DAG(t, `steps:
+		dagContent := `steps:
   - name: "1"
     command: echo step1
   - name: "2"
     command: echo step2
-`)
+`
+		dag := th.DAG(t, dagContent)
 
 		// First, create an initial dag-run (simulating what coordinator does during enqueue)
 		// This creates the status record that retry will use
@@ -52,7 +53,8 @@ func TestTaskHandler(t *testing.T) {
 		task := &coordinatorv1.Task{
 			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
 			DagRunId:       dagRunID,
-			Target:         dag.Location,
+			Target:         dag.Name,
+			Definition:     dagContent,
 			RootDagRunName: dag.Name,
 			RootDagRunId:   dagRunID,
 		}
@@ -71,12 +73,13 @@ func TestTaskHandler(t *testing.T) {
 	})
 
 	t.Run("HandleTaskRetryWithStep", func(t *testing.T) {
-		dag := th.DAG(t, `steps:
+		dagContent := `steps:
   - name: "1"
     command: echo step1
   - name: "2"
     command: echo step2
-`)
+`
+		dag := th.DAG(t, dagContent)
 		ctx := th.Context
 		cli := th.DAGRunMgr
 
@@ -98,6 +101,7 @@ func TestTaskHandler(t *testing.T) {
 			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
 			DagRunId:       dagRunID,
 			Target:         dag.Name,
+			Definition:     dagContent,
 			RootDagRunName: dag.Name,
 			RootDagRunId:   dagRunID,
 			Step:           "1",
@@ -117,10 +121,11 @@ func TestTaskHandler(t *testing.T) {
 	})
 
 	t.Run("HandleTaskStart", func(t *testing.T) {
-		dag := th.DAG(t, `steps:
+		dagContent := `steps:
   - name: "process"
     command: echo processing $1
-`)
+`
+		dag := th.DAG(t, dagContent)
 		ctx := th.Context
 		cli := th.DAGRunMgr
 
@@ -129,10 +134,13 @@ func TestTaskHandler(t *testing.T) {
 
 		// Create a start task
 		task := &coordinatorv1.Task{
-			Operation: coordinatorv1.Operation_OPERATION_START,
-			DagRunId:  dagRunID,
-			Target:    dag.Location,
-			Params:    "param1=value1",
+			Operation:      coordinatorv1.Operation_OPERATION_START,
+			DagRunId:       dagRunID,
+			Target:         dag.Name,
+			Definition:     dagContent,
+			RootDagRunName: dag.Name,
+			RootDagRunId:   dagRunID,
+			Params:         "param1=value1",
 		}
 
 		// Create a context with timeout for the task execution
@@ -159,9 +167,10 @@ func TestTaskHandler(t *testing.T) {
 
 		// Create a task with invalid operation
 		task := &coordinatorv1.Task{
-			Operation: coordinatorv1.Operation_OPERATION_UNSPECIFIED,
-			DagRunId:  "test-id",
-			Target:    "test-dag",
+			Operation:  coordinatorv1.Operation_OPERATION_UNSPECIFIED,
+			DagRunId:   "test-id",
+			Target:     "test-dag",
+			Definition: "steps:\n  - name: step1\n    command: echo test\n",
 		}
 
 		// Execute the task

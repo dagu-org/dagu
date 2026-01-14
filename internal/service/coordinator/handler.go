@@ -361,13 +361,11 @@ func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinator
 
 	// Parse and set the DAG from the definition to preserve all metadata
 	// (including workerSelector, steps, etc.) for retry operations
-	if task.Definition != "" {
-		dag, err := spec.LoadYAML(ctx, []byte(task.Definition), spec.WithName(task.Target))
-		if err != nil {
-			return fmt.Errorf("failed to parse DAG definition: %w", err)
-		}
-		attempt.SetDAG(dag)
+	dag, err := spec.LoadYAML(ctx, []byte(task.Definition), spec.WithName(task.Target))
+	if err != nil {
+		return fmt.Errorf("failed to parse DAG definition: %w", err)
 	}
+	attempt.SetDAG(dag)
 
 	if err := attempt.Open(ctx); err != nil {
 		return fmt.Errorf("failed to open sub-attempt: %w", err)
