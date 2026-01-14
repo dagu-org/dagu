@@ -208,13 +208,6 @@ type mockRemoteDAGRunAttempt struct {
 	mu       sync.Mutex
 }
 
-func newMockRemoteDAGRunAttempt(id string, status *exec.DAGRunStatus) *mockRemoteDAGRunAttempt {
-	return &mockRemoteDAGRunAttempt{
-		id:     id,
-		status: status,
-	}
-}
-
 func (m *mockRemoteDAGRunAttempt) ID() string {
 	return m.id
 }

@@ -181,6 +181,6 @@ var zeroRef DAGRunRef
 // Format: FNV1a64 hash of hierarchy + ":" + attemptId (e.g., "a1b2c3d4e5f67890:abc123").
 func GenerateAttemptKey(rootName, rootID, dagName, dagRunID, attemptID string) string {
 	h := fnv.New64a()
-	h.Write([]byte(rootName + "\x00" + rootID + "\x00" + dagName + "\x00" + dagRunID))
+	_, _ = h.Write([]byte(rootName + "\x00" + rootID + "\x00" + dagName + "\x00" + dagRunID))
 	return hex.EncodeToString(h.Sum(nil)) + ":" + attemptID
 }
