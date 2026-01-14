@@ -136,7 +136,9 @@ func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRu
 
 	logger.Info(ctx, "Dag-run restart initiated", tag.File(logFile.Name()))
 
-	dr, err := ctx.dagStore(nil, []string{filepath.Dir(dag.Location)})
+	dr, err := ctx.dagStore(dagStoreConfig{
+		SearchPaths: []string{filepath.Dir(dag.Location)},
+	})
 	if err != nil {
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}

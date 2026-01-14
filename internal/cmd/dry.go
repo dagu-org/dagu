@@ -86,7 +86,9 @@ func runDry(ctx *Context, args []string) error {
 
 	ctx.LogToFile(logFile)
 
-	dr, err := ctx.dagStore(nil, []string{filepath.Dir(dag.Location)})
+	dr, err := ctx.dagStore(dagStoreConfig{
+		SearchPaths: []string{filepath.Dir(dag.Location)},
+	})
 	if err != nil {
 		return err
 	}

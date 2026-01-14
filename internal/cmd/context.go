@@ -274,7 +274,7 @@ func (c *Context) NewServer(rs *resource.Service) (*frontend.Server, error) {
 	dc := fileutil.NewCache[*core.DAG]("dag_definition", limits.DAG.Limit, limits.DAG.TTL)
 	dc.StartEviction(c)
 
-	dr, err := c.dagStore(dc, nil)
+	dr, err := c.dagStore(dagStoreConfig{Cache: dc})
 	if err != nil {
 		return nil, err
 	}
@@ -329,7 +329,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	cache := fileutil.NewCache[*core.DAG]("dag_definition", limits.DAG.Limit, limits.DAG.TTL)
 	cache.StartEviction(c)
 
-	dr, err := c.dagStore(cache, nil)
+	dr, err := c.dagStore(dagStoreConfig{Cache: cache})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize DAG client: %w", err)
 	}
@@ -353,27 +353,25 @@ func (c *Context) StringParam(name string) (string, error) {
 	return val, nil
 }
 
-// dagStore returns a new DAGRepository instance. It ensures that the directory exists
-// (creating it if necessary) before returning the store.
-func (c *Context) dagStore(cache *fileutil.Cache[*core.DAG], searchPaths []string) (exec.DAGStore, error) {
-	dir := c.Config.Paths.DAGsDir
-	_, err := os.Stat(dir)
-	if os.IsNotExist(err) {
-		if err := os.MkdirAll(dir, 0750); err != nil {
-			return nil, fmt.Errorf("failed to create DAGs directory %s: %w", dir, err)
-		}
-	}
+// dagStoreConfig contains options for creating a DAG store.
+type dagStoreConfig struct {
+	Cache                 *fileutil.Cache[*core.DAG] // Optional cache for DAG objects
+	SearchPaths           []string                   // Additional search paths for DAG files
+	SkipDirectoryCreation bool                       // Skip directory creation (for distributed worker execution)
+}
 
-	// Create a flag store based on the suspend flags directory.
+// dagStore returns a new DAGRepository instance.
+func (c *Context) dagStore(cfg dagStoreConfig) (exec.DAGStore, error) {
 	store := filedag.New(
 		c.Config.Paths.DAGsDir,
 		filedag.WithFlagsBaseDir(c.Config.Paths.SuspendFlagsDir),
-		filedag.WithSearchPaths(searchPaths),
-		filedag.WithFileCache(cache),
+		filedag.WithSearchPaths(cfg.SearchPaths),
+		filedag.WithFileCache(cfg.Cache),
 		filedag.WithSkipExamples(c.Config.Core.SkipExamples),
+		filedag.WithSkipDirectoryCreation(cfg.SkipDirectoryCreation),
 	)
 
-	// Initialize the store (creates example DAGs if needed)
+	// Initialize the store (creates directory and example DAGs if needed, unless SkipDirectoryCreation is true)
 	if s, ok := store.(*filedag.Storage); ok {
 		if err := s.Initialize(); err != nil {
 			return nil, fmt.Errorf("failed to initialize DAG store: %w", err)

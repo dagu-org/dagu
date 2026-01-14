@@ -51,7 +51,7 @@ func runMigration(ctx *Context) error {
 	logger.Info(ctx.Context, "Starting history migration")
 
 	// Create DAG store for loading DAG definitions
-	dagStore, err := ctx.dagStore(nil, nil)
+	dagStore, err := ctx.dagStore(dagStoreConfig{})
 	if err != nil {
 		return fmt.Errorf("failed to create DAG store: %w", err)
 	}
