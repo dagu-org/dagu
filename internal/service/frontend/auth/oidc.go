@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -83,9 +84,22 @@ func initOIDCProviderCore(ctx context.Context, params oidcProviderParams) (*oidc
 		return nil, errors.New("failed to init OIDC provider: client url is empty")
 	}
 
-	// Create context with the HTTP client for OIDC operations
-	// Use the passed context to allow cancellation (e.g., on SIGINT/SIGTERM)
-	httpClient := &http.Client{Timeout: oidcProviderInitTimeout}
+	// Create HTTP client with explicit transport settings to avoid race conditions
+	// with gopsutil resource monitoring during startup (both use net/http dial).
+	httpClient := &http.Client{
+		Timeout: oidcProviderInitTimeout,
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout:   oidcProviderInitTimeout,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          10,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   oidcProviderInitTimeout,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+	}
 	oidcCtx := oidc.ClientContext(ctx, httpClient)
 
 	// Create retry policy with exponential backoff for transient network errors
