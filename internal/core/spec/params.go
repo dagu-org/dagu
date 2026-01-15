@@ -135,11 +135,21 @@ func evalParamValue(ctx BuildContext, raw string, accumulatedVars map[string]str
 		evalOptions = append(evalOptions, cmdutil.WithVariables(accumulatedVars))
 	}
 
-	if ctx.buildEnv != nil {
+	// Use envScope.buildEnv if available (new thread-safe approach),
+	// fall back to ctx.buildEnv for backward compatibility
+	if ctx.envScope != nil && len(ctx.envScope.buildEnv) > 0 {
+		evalOptions = append(evalOptions, cmdutil.WithVariables(ctx.envScope.buildEnv))
+	} else if ctx.buildEnv != nil {
 		evalOptions = append(evalOptions, cmdutil.WithVariables(ctx.buildEnv))
 	}
 
-	return cmdutil.EvalString(ctx.ctx, raw, evalOptions...)
+	// Also set EnvScope on context for command substitution
+	evalCtx := ctx.ctx
+	if ctx.envScope != nil && ctx.envScope.scope != nil {
+		evalCtx = cmdutil.WithEnvScope(evalCtx, ctx.envScope.scope)
+	}
+
+	return cmdutil.EvalString(evalCtx, raw, evalOptions...)
 }
 
 // parseParamValue parses the parameters for the DAG.

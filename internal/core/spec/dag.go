@@ -17,6 +17,16 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 )
 
+// expandEnvWithScope expands ${VAR} and $VAR in s using the EnvScope from BuildContext.
+// Falls back to os.ExpandEnv if no scope is available.
+// This replaces direct os.ExpandEnv calls to avoid race conditions during concurrent DAG loading.
+func expandEnvWithScope(ctx BuildContext, s string) string {
+	if ctx.envScope != nil && ctx.envScope.scope != nil {
+		return ctx.envScope.scope.Expand(s)
+	}
+	return os.ExpandEnv(s)
+}
+
 // dag is the intermediate representation of a DAG specification.
 // It mirrors the YAML structure and gets validated/transformed into core.DAG.
 type dag struct {
@@ -389,6 +399,13 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 		Location: ctx.file,
 	}
 
+	// Initialize shared envScope state for thread-safe env var handling.
+	// Start with OS environment as base layer.
+	ctx.envScope = &envScopeState{
+		scope:    cmdutil.NewEnvScope(nil, true),
+		buildEnv: make(map[string]string),
+	}
+
 	// Run the transformer pipeline
 	errs := runTransformers(ctx, d, result)
 
@@ -584,6 +601,15 @@ func buildEnvs(ctx BuildContext, d *dag) ([]string, error) {
 	vars, err := loadVariablesFromEnvValue(ctx, d.Env)
 	if err != nil {
 		return nil, err
+	}
+
+	// Populate the shared envScope state so subsequent transformers can use it.
+	// This replaces the old pattern of using os.Setenv which caused race conditions.
+	if ctx.envScope != nil && vars != nil {
+		for k, v := range vars {
+			ctx.envScope.scope.Set(k, v, cmdutil.EnvSourceDAGEnv)
+			ctx.envScope.buildEnv[k] = v
+		}
 	}
 
 	var envs []string
@@ -798,12 +824,12 @@ func parseShellInternal(ctx BuildContext, d *dag) (*shellResult, error) {
 			return &shellResult{Shell: cmdutil.GetShellCommand(""), Args: nil}, nil
 		}
 		if !ctx.opts.Has(BuildFlagNoEval) {
-			shell = os.ExpandEnv(shell)
+			shell = expandEnvWithScope(ctx, shell)
 		}
 		args := d.Shell.Arguments()
 		if !ctx.opts.Has(BuildFlagNoEval) {
 			for i, arg := range args {
-				args[i] = os.ExpandEnv(arg)
+				args[i] = expandEnvWithScope(ctx, arg)
 			}
 		}
 		return &shellResult{Shell: shell, Args: args}, nil
@@ -816,7 +842,7 @@ func parseShellInternal(ctx BuildContext, d *dag) (*shellResult, error) {
 	}
 
 	if !ctx.opts.Has(BuildFlagNoEval) {
-		command = os.ExpandEnv(command)
+		command = expandEnvWithScope(ctx, command)
 	}
 
 	shell, args, err := cmdutil.SplitCommand(command)
@@ -847,7 +873,7 @@ func buildWorkingDir(ctx BuildContext, d *dag) (string, error) {
 	case d.WorkingDir != "":
 		wd := d.WorkingDir
 		if !ctx.opts.Has(BuildFlagNoEval) {
-			wd = os.ExpandEnv(wd)
+			wd = expandEnvWithScope(ctx, wd)
 			switch {
 			case filepath.IsAbs(wd) || strings.HasPrefix(wd, "~"):
 				wd = fileutil.ResolvePathOrBlank(wd)
@@ -1155,7 +1181,7 @@ func buildRegistryAuths(ctx BuildContext, d *dag) (map[string]*core.AuthConfig, 
 		if ctx.opts.Has(BuildFlagNoEval) {
 			return s
 		}
-		return os.ExpandEnv(s)
+		return expandEnvWithScope(ctx, s)
 	}
 
 	// parseAuthConfig parses auth config from a map with string keys

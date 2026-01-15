@@ -179,17 +179,17 @@ func EvalString(ctx context.Context, input string, opts ...EvalOption) (string, 
 
 	if options.Substitute {
 		var err error
-		value, err = substituteCommands(value)
+		value, err = substituteCommandsWithContext(ctx, value)
 		if err != nil {
 			return "", fmt.Errorf("failed to substitute string in %q: %w", input, err)
 		}
 	}
 	if options.ExpandEnv {
-		expanded, err := expandWithShell(value, options)
+		expanded, err := expandWithShellContext(ctx, value, options)
 		if err != nil {
-			logger.Debug(ctx, "Shell expansion failed, falling back to os.ExpandEnv",
+			logger.Debug(ctx, "Shell expansion failed, falling back to ExpandEnvContext",
 				tag.Error(err))
-			value = os.ExpandEnv(value)
+			value = ExpandEnvContext(ctx, value)
 		} else {
 			value = expanded
 		}
@@ -208,17 +208,17 @@ func EvalIntString(ctx context.Context, input string, opts ...EvalOption) (int, 
 	value = expandVariables(ctx, value, options)
 
 	if options.ExpandEnv {
-		expanded, err := expandWithShell(value, options)
+		expanded, err := expandWithShellContext(ctx, value, options)
 		if err != nil {
-			logger.Debug(ctx, "Shell expansion failed, falling back to os.ExpandEnv",
+			logger.Debug(ctx, "Shell expansion failed, falling back to ExpandEnvContext",
 				tag.Error(err))
-			value = os.ExpandEnv(value)
+			value = ExpandEnvContext(ctx, value)
 		} else {
 			value = expanded
 		}
 	}
 
-	value, err := substituteCommands(value)
+	value, err := substituteCommandsWithContext(ctx, value)
 	if err != nil {
 		return 0, err
 	}
@@ -290,14 +290,14 @@ func processStructFields(ctx context.Context, v reflect.Value, opts *EvalOptions
 
 			if opts.Substitute {
 				var err error
-				value, err = substituteCommands(value)
+				value, err = substituteCommandsWithContext(ctx, value)
 				if err != nil {
 					return fmt.Errorf("field %q: %w", t.Field(i).Name, err)
 				}
 			}
 
 			if opts.ExpandEnv {
-				value = os.ExpandEnv(value)
+				value = ExpandEnvContext(ctx, value)
 			}
 
 			field.SetString(value)
@@ -349,13 +349,13 @@ func processPointerField(ctx context.Context, field reflect.Value, opts *EvalOpt
 		value = expandVariables(ctx, value, opts)
 		if opts.Substitute {
 			var err error
-			value, err = substituteCommands(value)
+			value, err = substituteCommandsWithContext(ctx, value)
 			if err != nil {
 				return err
 			}
 		}
 		if opts.ExpandEnv {
-			value = os.ExpandEnv(value)
+			value = ExpandEnvContext(ctx, value)
 		}
 		// Create a new string and update the pointer to point to it
 		// This avoids mutating the original value
@@ -418,13 +418,13 @@ func processSliceWithOpts(ctx context.Context, v reflect.Value, opts *EvalOption
 			value = expandVariables(ctx, value, opts)
 			if opts.Substitute {
 				var err error
-				value, err = substituteCommands(value)
+				value, err = substituteCommandsWithContext(ctx, value)
 				if err != nil {
 					return err
 				}
 			}
 			if opts.ExpandEnv {
-				value = os.ExpandEnv(value)
+				value = ExpandEnvContext(ctx, value)
 			}
 			elem.SetString(value)
 
@@ -486,14 +486,14 @@ func processMapWithOpts(ctx context.Context, v reflect.Value, opts *EvalOptions)
 
 			if opts.Substitute {
 				var err error
-				strVal, err = substituteCommands(strVal)
+				strVal, err = substituteCommandsWithContext(ctx, strVal)
 				if err != nil {
 					return v, fmt.Errorf("map value: %w", err)
 				}
 			}
 
 			if opts.ExpandEnv {
-				strVal = os.ExpandEnv(strVal)
+				strVal = ExpandEnvContext(ctx, strVal)
 			}
 
 			newVal = reflect.ValueOf(strVal)
@@ -659,7 +659,14 @@ func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[st
 		// Try regular variable or environment lookup
 		jsonStr, ok := dataMap[varName]
 		if !ok {
-			if envVal, exists := os.LookupEnv(varName); exists {
+			// Try EnvScope from context first, then fall back to os.LookupEnv
+			if scope := GetEnvScope(ctx); scope != nil {
+				if envVal, exists := scope.Get(varName); exists {
+					jsonStr = envVal
+				} else {
+					return match
+				}
+			} else if envVal, exists := os.LookupEnv(varName); exists {
 				jsonStr = envVal
 			} else {
 				return match
@@ -698,11 +705,15 @@ func replaceVars(template string, vars map[string]string) string {
 }
 
 func expandWithShell(input string, opts *EvalOptions) (string, error) {
+	return expandWithShellContext(context.Background(), input, opts)
+}
+
+func expandWithShellContext(ctx context.Context, input string, opts *EvalOptions) (string, error) {
 	if !opts.ExpandShell {
 		if !opts.ExpandEnv {
 			return input, nil
 		}
-		return os.ExpandEnv(input), nil
+		return ExpandEnvContext(ctx, input), nil
 	}
 
 	parser := syntax.NewParser()
@@ -719,6 +730,13 @@ func expandWithShell(input string, opts *EvalOptions) (string, error) {
 			if val, ok := lookupVariable(name, opts.Variables); ok {
 				return val
 			}
+			// Check EnvScope from context first, then fall back to os.Getenv
+			if scope := GetEnvScope(ctx); scope != nil {
+				if val, ok := scope.Get(name); ok {
+					return val
+				}
+				return "" // Not found in scope
+			}
 			return os.Getenv(name)
 		}),
 	}
@@ -727,7 +745,7 @@ func expandWithShell(input string, opts *EvalOptions) (string, error) {
 	if err != nil {
 		var unexpected expand.UnexpectedCommandError
 		if errors.As(err, &unexpected) {
-			return os.ExpandEnv(input), nil
+			return ExpandEnvContext(ctx, input), nil
 		}
 		return "", err
 	}

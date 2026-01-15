@@ -359,18 +359,11 @@ func (d *DAG) LoadDotEnv(ctx context.Context) {
 			continue
 		}
 		// Add dotenv vars to DAG.Env so they're included in AllEnvs()
+		// Note: We no longer call os.Setenv to avoid race conditions when
+		// multiple DAGs are loaded concurrently. The vars are stored in
+		// d.Env and will be passed to step execution via cmd.Env.
 		for k, v := range vars {
 			d.Env = append(d.Env, fmt.Sprintf("%s=%s", k, v))
-		}
-		// Set os environment variables for the current process
-		for k, v := range vars {
-			if err := os.Setenv(k, v); err != nil {
-				logger.Warn(ctx, "Failed to set env var from .env",
-					tag.Key(k),
-					tag.File(resolvedPath),
-					tag.Error(err),
-				)
-			}
 		}
 		logger.Info(ctx, "Loaded dotenv file", tag.File(resolvedPath))
 	}
