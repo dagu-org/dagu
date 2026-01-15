@@ -332,10 +332,10 @@ func (n *Node) determineNodeStatus(cmd executor.Executor) error {
 	return nil
 }
 
+// clearVariable removes a variable from the Node's internal state.
+// Variables are scoped to the Node to avoid race conditions when
+// multiple DAG steps or concurrent tasks run simultaneously.
 func (n *Node) clearVariable(key string) {
-	// Note: We no longer call os.Unsetenv to avoid race conditions when
-	// multiple DAG steps or concurrent tasks modify global environment.
-	// Variables are scoped to the Node's internal state via ClearVariable.
 	n.ClearVariable(key)
 }
 

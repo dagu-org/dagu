@@ -49,15 +49,9 @@ func (r *envResolver) Resolve(ctx context.Context, ref core.SecretRef) (string, 
 	}
 
 	// Fall back to global OS environment
-	value := os.Getenv(ref.Key)
-	if value == "" {
-		// Check if variable exists but is empty, or doesn't exist at all
-		_, exists := os.LookupEnv(ref.Key)
-		if !exists {
-			return "", fmt.Errorf("environment variable %q is not set", ref.Key)
-		}
-		// Variable exists but is empty - this is allowed
-		return "", nil
+	value, exists := os.LookupEnv(ref.Key)
+	if !exists {
+		return "", fmt.Errorf("environment variable %q is not set", ref.Key)
 	}
 	return value, nil
 }

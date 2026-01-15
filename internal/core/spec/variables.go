@@ -32,7 +32,7 @@ func loadVariables(ctx BuildContext, strVariables any) (
 		}
 
 	case []any:
-		// Case 2. env is an array of maps.
+		// Case 2. env is an array of maps or key=value strings.
 		for _, v := range a {
 			switch vv := v.(type) {
 			case map[string]any:
@@ -48,11 +48,6 @@ func loadVariables(ctx BuildContext, strVariables any) (
 				pairs = append(pairs, pair{key: key, val: val})
 			default:
 				return nil, core.NewValidationError("env", &pairs, fmt.Errorf("%w: %s", ErrInvalidEnvValue, v))
-			}
-			if aa, ok := v.(map[string]any); ok {
-				if err := parseKeyValue(aa, &pairs); err != nil {
-					return nil, core.NewValidationError("env", v, err)
-				}
 			}
 		}
 	}
