@@ -70,6 +70,11 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read DAG from record: %w", err)
 	}
 
+	// Restore params from the previous run's status.
+	// This is necessary because Params is excluded from JSON serialization
+	// to prevent secrets from being persisted to dag.json.
+	dag.Params = status.ParamsList
+
 	// Block retry via CLI for DAGs with workerSelector, UNLESS this is a distributed worker execution
 	// (indicated by --worker-id being set to something other than "local")
 	if len(dag.WorkerSelector) > 0 && workerID == "local" {

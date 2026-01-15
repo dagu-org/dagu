@@ -76,6 +76,11 @@ func runRestart(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read DAG from execution history: %w", err)
 	}
 
+	// Restore params from the previous run's status.
+	// This is necessary because Params is excluded from JSON serialization
+	// to prevent secrets from being persisted to dag.json.
+	dag.Params = dagStatus.ParamsList
+
 	if err := handleRestartProcess(ctx, dag, dagRunID); err != nil {
 		return fmt.Errorf("restart process failed for DAG %s: %w", dag.Name, err)
 	}

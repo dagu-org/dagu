@@ -117,6 +117,9 @@ func TestDAGRoundTripMissingFields(t *testing.T) {
 }
 
 // TestHasEvaluatedFields verifies the hasEvaluatedFields() helper works correctly.
+// hasEvaluatedFields() now primarily checks WorkingDir, as it's the key indicator
+// that the DAG was built (not loaded from JSON). Other fields like Params may
+// be populated separately (e.g., via reschedule) without full evaluation.
 func TestHasEvaluatedFields(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -129,39 +132,44 @@ func TestHasEvaluatedFields(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "DAG with Env",
+			name:     "DAG with Env only",
 			dag:      &DAG{Env: []string{"KEY=value"}},
-			expected: true,
+			expected: false, // Env alone doesn't mean fully evaluated
 		},
 		{
-			name:     "DAG with Params",
+			name:     "DAG with Params only",
 			dag:      &DAG{Params: []string{"param=value"}},
-			expected: true,
+			expected: false, // Params may come from reschedule
 		},
 		{
-			name:     "DAG with Shell",
+			name:     "DAG with Shell only",
 			dag:      &DAG{Shell: "/bin/bash"},
-			expected: true,
+			expected: false, // Shell alone doesn't mean fully evaluated
 		},
 		{
 			name:     "DAG with WorkingDir",
 			dag:      &DAG{WorkingDir: "/work"},
-			expected: true,
+			expected: true, // WorkingDir is the key indicator
 		},
 		{
-			name:     "DAG with RegistryAuths",
+			name:     "DAG with RegistryAuths only",
 			dag:      &DAG{RegistryAuths: map[string]*AuthConfig{"docker.io": {}}},
-			expected: true,
+			expected: false, // RegistryAuths alone doesn't mean fully evaluated
 		},
 		{
-			name:     "DAG with Container.Env",
+			name:     "DAG with Container.Env only",
 			dag:      &DAG{Container: &Container{Env: []string{"KEY=value"}}},
-			expected: true,
+			expected: false, // Container.Env alone doesn't mean fully evaluated
 		},
 		{
 			name:     "DAG with only safe fields",
 			dag:      &DAG{Name: "test", YamlData: []byte("test")},
 			expected: false,
+		},
+		{
+			name:     "DAG with WorkingDir and other fields",
+			dag:      &DAG{WorkingDir: "/work", Env: []string{"KEY=value"}, Params: []string{"p=v"}},
+			expected: true,
 		},
 	}
 

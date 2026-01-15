@@ -676,11 +676,17 @@ func (d *DAG) EvaluateFromYamlIfNeeded(ctx context.Context) error {
 }
 
 // hasEvaluatedFields checks if sensitive fields are populated.
-// If any of these are non-empty, the DAG was loaded from build (not from JSON).
+// WorkingDir is particularly important as it's required for execution.
+// We check WorkingDir explicitly because it may need to be computed
+// even when other fields like Params are already populated (e.g., rescheduling).
 func (d *DAG) hasEvaluatedFields() bool {
-	return len(d.Env) > 0 || len(d.Params) > 0 || d.Shell != "" ||
-		d.WorkingDir != "" || len(d.RegistryAuths) > 0 ||
-		(d.Container != nil && len(d.Container.Env) > 0)
+	// WorkingDir must be populated for execution - this is the key indicator
+	// that evaluation has happened. Other fields might be populated through
+	// other means (e.g., Params via reschedule from status).
+	if d.WorkingDir == "" {
+		return false
+	}
+	return true
 }
 
 // rawDAGFields is used to unmarshal sensitive fields from YamlData.
@@ -734,7 +740,8 @@ func (d *DAG) evaluateFromYaml(ctx context.Context) error {
 	}
 
 	// === EVALUATE PARAMS (can reference env) ===
-	if raw.Params != nil {
+	// Only evaluate from YAML if params weren't already provided (e.g., via reschedule)
+	if raw.Params != nil && len(d.Params) == 0 {
 		evaluated, err := d.evaluateParamsFromRaw(ctx, raw.Params, envVars)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate params: %w", err)
@@ -753,6 +760,10 @@ func (d *DAG) evaluateFromYaml(ctx context.Context) error {
 	// === EVALUATE WORKINGDIR ===
 	if raw.WorkingDir != "" {
 		d.WorkingDir = expandWithEnv(ctx, raw.WorkingDir, envVars)
+	} else if d.WorkingDir == "" && d.Location != "" {
+		// Default to the directory containing the DAG file
+		// This mirrors the behavior in spec/dag.go transformer
+		d.WorkingDir = filepath.Dir(d.Location)
 	}
 
 	// === EVALUATE REGISTRY AUTHS (CRITICAL - contains credentials) ===
