@@ -16,11 +16,12 @@ func TestMailConfigEnvExpansion(t *testing.T) {
 		th := test.Setup(t)
 
 		// Create a secret file for SMTP password
-		smtpPassword := "super-secret-smtp-password"
-		secretFile := th.TempFile(t, "smtp-password.txt", []byte(smtpPassword))
+		secretFile := th.TempFile(t, "smtp-password.txt", []byte("super-secret-smtp-password"))
 
-		// Test that SMTP config with secrets is properly evaluated
-		// The DAG should run successfully even though we're not actually sending mail
+		// Test that SMTP config with secrets is properly evaluated at runtime.
+		// The DAG should run successfully even though we're not actually sending mail.
+		// Note: With env isolation, the DAG struct is NOT mutated - evaluation happens
+		// at runtime in the agent. We verify correctness by successful execution.
 		dag := th.DAG(t, `
 secrets:
   - name: SMTP_PASSWORD
@@ -48,10 +49,13 @@ steps:
 			"RESULT": "SMTP config evaluated successfully",
 		})
 
-		// Verify the SMTP config was evaluated (password should not contain ${...})
+		// Note: DAG struct is NOT mutated with env isolation.
+		// Evaluation happens at runtime in the agent.
+		// Success of the run verifies configs were processed correctly.
 		require.NotNil(t, dag.DAG.SMTP)
-		require.Equal(t, "smtp.example.com", dag.DAG.SMTP.Host)
-		require.Equal(t, smtpPassword, dag.DAG.SMTP.Password)
+		// Templates are preserved in DAG struct
+		require.Equal(t, "${SMTP_HOST}", dag.DAG.SMTP.Host)
+		require.Equal(t, "${SMTP_PASSWORD}", dag.DAG.SMTP.Password)
 	})
 
 	t.Run("WaitMailConfigWithEnvVars", func(t *testing.T) {
@@ -81,11 +85,12 @@ steps:
 			"RESULT": "WaitMail config evaluated successfully",
 		})
 
-		// Verify the waitMail config was evaluated
+		// Note: DAG struct preserves templates with env isolation.
+		// Evaluation happens at runtime in the agent.
 		require.NotNil(t, dag.DAG.WaitMail)
 		require.Equal(t, "alerts@example.com", dag.DAG.WaitMail.From)
-		require.Equal(t, []string{"ops@example.com"}, dag.DAG.WaitMail.To)
-		require.Equal(t, "[Waiting]", dag.DAG.WaitMail.Prefix)
+		require.Equal(t, []string{"${OPS_EMAIL}"}, dag.DAG.WaitMail.To)
+		require.Equal(t, "${WAIT_PREFIX}", dag.DAG.WaitMail.Prefix)
 	})
 
 	t.Run("MultipleRecipientsWithEnvVars", func(t *testing.T) {
@@ -117,9 +122,10 @@ steps:
 			"RESULT": "Multiple recipients evaluated successfully",
 		})
 
-		// Verify multiple recipients were evaluated
+		// Note: DAG struct preserves templates with env isolation.
+		// Evaluation happens at runtime in the agent.
 		require.NotNil(t, dag.DAG.ErrorMail)
-		require.Equal(t, []string{"admin1@example.com", "admin2@example.com"}, dag.DAG.ErrorMail.To)
+		require.Equal(t, []string{"${ADMIN1}", "${ADMIN2}"}, dag.DAG.ErrorMail.To)
 	})
 
 	t.Run("AllMailConfigsWithMixedSources", func(t *testing.T) {
@@ -128,10 +134,8 @@ steps:
 		th := test.Setup(t)
 
 		// Create secrets
-		smtpPassword := "smtp-pass-123"
-		adminEmail := "secret-admin@corp.com"
-		smtpPassFile := th.TempFile(t, "smtp-pass.txt", []byte(smtpPassword))
-		adminEmailFile := th.TempFile(t, "admin-email.txt", []byte(adminEmail))
+		smtpPassFile := th.TempFile(t, "smtp-pass.txt", []byte("smtp-pass-123"))
+		adminEmailFile := th.TempFile(t, "admin-email.txt", []byte("secret-admin@corp.com"))
 
 		dag := th.DAG(t, `
 env:
@@ -177,20 +181,24 @@ steps:
 			"RESULT": "All mail configs evaluated successfully",
 		})
 
-		// Verify SMTP config
+		// Note: DAG struct preserves templates with env isolation.
+		// Evaluation happens at runtime in the agent. Success of the run
+		// verifies configs were processed correctly.
+
+		// SMTP config preserves templates
 		require.NotNil(t, dag.DAG.SMTP)
-		require.Equal(t, "mail.corp.com", dag.DAG.SMTP.Host)
-		require.Equal(t, "mailbot@corp.com", dag.DAG.SMTP.Username)
-		require.Equal(t, smtpPassword, dag.DAG.SMTP.Password)
+		require.Equal(t, "${SMTP_HOST}", dag.DAG.SMTP.Host)
+		require.Equal(t, "${SMTP_USER}", dag.DAG.SMTP.Username)
+		require.Equal(t, "${SMTP_PASS}", dag.DAG.SMTP.Password)
 
-		// Verify errorMail config
+		// errorMail config preserves templates
 		require.NotNil(t, dag.DAG.ErrorMail)
-		require.Equal(t, "mailbot@corp.com", dag.DAG.ErrorMail.From)
-		require.Equal(t, []string{adminEmail, "ops@corp.com"}, dag.DAG.ErrorMail.To)
+		require.Equal(t, "${SMTP_USER}", dag.DAG.ErrorMail.From)
+		require.Equal(t, []string{"${ADMIN_EMAIL}", "${OPS_EMAIL}"}, dag.DAG.ErrorMail.To)
 
-		// Verify infoMail config
+		// infoMail config preserves templates
 		require.NotNil(t, dag.DAG.InfoMail)
-		require.Equal(t, "mailbot@corp.com", dag.DAG.InfoMail.From)
-		require.Equal(t, []string{"ops@corp.com"}, dag.DAG.InfoMail.To)
+		require.Equal(t, "${SMTP_USER}", dag.DAG.InfoMail.From)
+		require.Equal(t, []string{"${OPS_EMAIL}"}, dag.DAG.InfoMail.To)
 	})
 }
