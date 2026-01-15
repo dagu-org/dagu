@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -187,6 +188,9 @@ type DAG struct {
 	LLM *LLMConfig `json:"llm,omitempty"`
 	// Secrets contains references to external secrets to be resolved at runtime.
 	Secrets []SecretRef `json:"secrets,omitempty"`
+	// dotenvLoaded tracks whether LoadDotEnv has already been called.
+	// This ensures idempotency - calling LoadDotEnv multiple times is safe.
+	dotenvLoaded bool
 }
 
 // SecretRef represents a reference to an external secret.
@@ -204,12 +208,7 @@ type SecretRef struct {
 
 // HasTag checks if the DAG has the given tag.
 func (d *DAG) HasTag(tag string) bool {
-	for _, t := range d.Tags {
-		if t == tag {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(d.Tags, tag)
 }
 
 // HasHITLSteps returns true if the DAG contains any HITL executor steps.
@@ -242,9 +241,8 @@ func (d *DAG) SockAddrForSubDAGRun(dagRunID string) string {
 // GetName returns the name of the DAG.
 // If the name is not set, it returns the default name (filename without extension).
 func (d *DAG) GetName() string {
-	name := d.Name
-	if name != "" {
-		return name
+	if d.Name != "" {
+		return d.Name
 	}
 	filename := filepath.Base(d.Location)
 	return strings.TrimSuffix(filename, filepath.Ext(filename))
@@ -328,7 +326,14 @@ func deduplicateStrings(input []string) []string {
 }
 
 // LoadDotEnv loads all dotenv files in order, with later files overriding earlier ones.
+// This method is idempotent - calling it multiple times is safe.
 func (d *DAG) LoadDotEnv(ctx context.Context) {
+	// Check if already loaded to ensure idempotency
+	if d.dotenvLoaded {
+		return
+	}
+	d.dotenvLoaded = true
+
 	if len(d.Dotenv) == 0 {
 		return
 	}
@@ -446,7 +451,6 @@ func (d *DAG) ParamsMap() map[string]string {
 // This allows the scheduler to control how many DAGs can run simultaneously
 // within the same process group.
 func (d *DAG) ProcGroup() string {
-	// If the queue is not set, return the default queue name.
 	if d.Queue != "" {
 		return d.Queue
 	}

@@ -16,7 +16,6 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 )
 
-
 // dag is the intermediate representation of a DAG specification.
 // It mirrors the YAML structure and gets validated/transformed into core.DAG.
 type dag struct {
@@ -1365,59 +1364,44 @@ func buildDotenv(_ BuildContext, d *dag) ([]string, error) {
 func buildHandlers(ctx BuildContext, d *dag, result *core.DAG) (core.HandlerOn, error) {
 	buildCtx := StepBuildContext{BuildContext: ctx, dag: result}
 	var handlerOn core.HandlerOn
+
+	// buildHandler is a helper that builds a single handler step.
+	buildHandler := func(s *step, name core.HandlerType) (*core.Step, error) {
+		if s == nil {
+			return nil, nil
+		}
+		s.Name = name.String()
+		return s.build(buildCtx)
+	}
+
 	var err error
-
-	if d.HandlerOn.Init != nil {
-		d.HandlerOn.Init.Name = core.HandlerOnInit.String()
-		if handlerOn.Init, err = d.HandlerOn.Init.build(buildCtx); err != nil {
-			return handlerOn, err
-		}
+	if handlerOn.Init, err = buildHandler(d.HandlerOn.Init, core.HandlerOnInit); err != nil {
+		return handlerOn, err
 	}
-
-	if d.HandlerOn.Exit != nil {
-		d.HandlerOn.Exit.Name = core.HandlerOnExit.String()
-		if handlerOn.Exit, err = d.HandlerOn.Exit.build(buildCtx); err != nil {
-			return handlerOn, err
-		}
+	if handlerOn.Exit, err = buildHandler(d.HandlerOn.Exit, core.HandlerOnExit); err != nil {
+		return handlerOn, err
 	}
-
-	if d.HandlerOn.Success != nil {
-		d.HandlerOn.Success.Name = core.HandlerOnSuccess.String()
-		if handlerOn.Success, err = d.HandlerOn.Success.build(buildCtx); err != nil {
-			return handlerOn, err
-		}
+	if handlerOn.Success, err = buildHandler(d.HandlerOn.Success, core.HandlerOnSuccess); err != nil {
+		return handlerOn, err
 	}
-
-	if d.HandlerOn.Failure != nil {
-		d.HandlerOn.Failure.Name = core.HandlerOnFailure.String()
-		if handlerOn.Failure, err = d.HandlerOn.Failure.build(buildCtx); err != nil {
-			return handlerOn, err
-		}
+	if handlerOn.Failure, err = buildHandler(d.HandlerOn.Failure, core.HandlerOnFailure); err != nil {
+		return handlerOn, err
 	}
 
 	// Handle Abort (canonical) and Cancel (deprecated, for backward compatibility)
 	if d.HandlerOn.Abort != nil && d.HandlerOn.Cancel != nil {
 		return handlerOn, fmt.Errorf("cannot specify both 'abort' and 'cancel' in handlerOn; use 'abort' (cancel is deprecated)")
 	}
-	var abortStep *step
-	switch {
-	case d.HandlerOn.Abort != nil:
-		abortStep = d.HandlerOn.Abort
-	case d.HandlerOn.Cancel != nil:
+	abortStep := d.HandlerOn.Abort
+	if abortStep == nil {
 		abortStep = d.HandlerOn.Cancel
 	}
-	if abortStep != nil {
-		abortStep.Name = core.HandlerOnCancel.String()
-		if handlerOn.Cancel, err = abortStep.build(buildCtx); err != nil {
-			return handlerOn, err
-		}
+	if handlerOn.Cancel, err = buildHandler(abortStep, core.HandlerOnCancel); err != nil {
+		return handlerOn, err
 	}
 
-	if d.HandlerOn.Wait != nil {
-		d.HandlerOn.Wait.Name = core.HandlerOnWait.String()
-		if handlerOn.Wait, err = d.HandlerOn.Wait.build(buildCtx); err != nil {
-			return handlerOn, err
-		}
+	if handlerOn.Wait, err = buildHandler(d.HandlerOn.Wait, core.HandlerOnWait); err != nil {
+		return handlerOn, err
 	}
 
 	return handlerOn, nil

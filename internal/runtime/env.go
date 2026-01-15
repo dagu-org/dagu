@@ -193,7 +193,7 @@ func fallbackWorkingDir(ctx context.Context, stepName string) string {
 func (e Env) Shell(ctx context.Context) []string {
 	// Shell precedence: Step shell -> DAG shell -> Global default
 	if e.Step.Shell != "" {
-		shellCmd, err := e.EvalString(ctx, e.Step.Shell)
+		shell, err := evalShellWithScope(ctx, e.Scope, e.Step.Shell, e.Step.ShellArgs)
 		if err != nil {
 			logger.Error(ctx, "Failed to evaluate step shell",
 				tag.String("shell", e.Step.Shell),
@@ -201,22 +201,11 @@ func (e Env) Shell(ctx context.Context) []string {
 			)
 			return nil
 		}
-		shell := []string{shellCmd}
-		for _, arg := range e.Step.ShellArgs {
-			evaluated, err := e.EvalString(ctx, arg)
-			if err != nil {
-				logger.Error(ctx, "Failed to evaluate step shell argument",
-					tag.String("arg", arg),
-					tag.Error(err),
-				)
-			}
-			shell = append(shell, evaluated)
-		}
 		return shell
 	}
 
-	if e.DAG.Shell != "" {
-		shellCmd, err := e.EvalString(ctx, e.DAG.Shell)
+	if e.DAG != nil && e.DAG.Shell != "" {
+		shell, err := evalShellWithScope(ctx, e.Scope, e.DAG.Shell, e.DAG.ShellArgs)
 		if err != nil {
 			logger.Error(ctx, "Failed to evaluate DAG shell",
 				tag.String("shell", e.DAG.Shell),
@@ -224,20 +213,66 @@ func (e Env) Shell(ctx context.Context) []string {
 			)
 			return nil
 		}
-		shell := []string{shellCmd}
-		for _, arg := range e.DAG.ShellArgs {
-			evaluated, err := e.EvalString(ctx, arg)
-			if err != nil {
-				logger.Error(ctx, "Failed to evaluate DAG shell argument",
-					tag.String("arg", arg),
-					tag.Error(err),
-				)
-			}
-			shell = append(shell, evaluated)
-		}
 		return shell
 	}
 
+	return defaultShell(ctx)
+}
+
+// DAGShell returns the evaluated shell command for DAG-level operations.
+// This is used for preconditions and other operations that run before any steps.
+// Unlike Env.Shell(), this doesn't require a step context.
+func DAGShell(ctx context.Context) []string {
+	rCtx := GetDAGContext(ctx)
+	dag := rCtx.DAG
+
+	if dag == nil || dag.Shell == "" {
+		return defaultShell(ctx)
+	}
+
+	scope := rCtx.EnvScope
+	if scope == nil {
+		scope = cmdutil.NewEnvScope(nil, true) // Fallback: OS layer only
+	}
+
+	shell, err := evalShellWithScope(ctx, scope, dag.Shell, dag.ShellArgs)
+	if err != nil {
+		logger.Error(ctx, "Failed to evaluate DAG shell",
+			tag.String("shell", dag.Shell),
+			tag.Error(err),
+		)
+		return nil
+	}
+	return shell
+}
+
+// evalShellWithScope evaluates shell command and arguments using the given scope.
+func evalShellWithScope(ctx context.Context, scope *cmdutil.EnvScope, shell string, shellArgs []string) ([]string, error) {
+	ctx = cmdutil.WithEnvScope(ctx, scope)
+
+	shellCmd, err := cmdutil.EvalString(ctx, shell)
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate shell: %w", err)
+	}
+
+	result := []string{shellCmd}
+	for _, arg := range shellArgs {
+		evaluated, err := cmdutil.EvalString(ctx, arg)
+		if err != nil {
+			logger.Error(ctx, "Failed to evaluate shell argument",
+				tag.String("arg", arg),
+				tag.Error(err),
+			)
+			// Continue with unevaluated arg rather than failing completely
+			evaluated = arg
+		}
+		result = append(result, evaluated)
+	}
+	return result, nil
+}
+
+// defaultShell returns the global default shell.
+func defaultShell(ctx context.Context) []string {
 	shellCmd := cmdutil.GetShellCommand("")
 	if shellCmd != "" {
 		return []string{shellCmd}
@@ -336,10 +371,9 @@ func AllEnvs(ctx context.Context) []string {
 // entries that do not contain an "=" separator are ignored.
 func AllEnvsMap(ctx context.Context) map[string]string {
 	envs := GetEnv(ctx).AllEnvs()
-	var result = make(map[string]string)
+	result := make(map[string]string)
 	for _, env := range envs {
-		key, value, found := strings.Cut(env, "=")
-		if found {
+		if key, value, found := strings.Cut(env, "="); found {
 			result[key] = value
 		}
 	}

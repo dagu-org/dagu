@@ -70,7 +70,11 @@ func TestReporter(t *testing.T) {
 			}
 
 			mock := &mockSender{}
-			rp := &reporter{senderFn: mock.Send}
+			rp := newReporter(mock.Send, reporterConfig{
+				ErrorMail: d.ErrorMail,
+				InfoMail:  d.InfoMail,
+				WaitMail:  d.WaitMail,
+			})
 
 			fn(t, rp, mock, d, nodes)
 		})
