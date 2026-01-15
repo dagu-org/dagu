@@ -47,7 +47,7 @@ func TestExpandEnvContext(t *testing.T) {
 		require.NoError(t, os.Setenv(key, "nil_ctx_value"))
 		defer func() { _ = os.Unsetenv(key) }()
 
-		result := ExpandEnvContext(nil, "Value is $"+key)
+		result := ExpandEnvContext(nil, "Value is $"+key) //nolint:staticcheck // testing nil context handling
 		assert.Equal(t, "Value is nil_ctx_value", result)
 	})
 

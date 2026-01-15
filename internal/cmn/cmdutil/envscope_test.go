@@ -430,7 +430,7 @@ func TestWithEnvScope(t *testing.T) {
 
 func TestGetEnvScope(t *testing.T) {
 	t.Run("NilContext", func(t *testing.T) {
-		result := GetEnvScope(nil)
+		result := GetEnvScope(nil) //nolint:staticcheck // testing nil context handling
 		assert.Nil(t, result)
 	})
 
