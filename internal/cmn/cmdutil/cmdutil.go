@@ -85,51 +85,6 @@ func getWindowsDefaultShell() string {
 	return ""
 }
 
-func SplitCommandWithSub(cmd string) (string, []string, error) {
-	pipeline, err := ParsePipedCommand(cmd)
-	if err != nil {
-		return "", nil, err
-	}
-
-	for _, command := range pipeline {
-		if len(command) < 2 {
-			continue
-		}
-		for i, arg := range command {
-			command[i] = arg
-			// Escape the command
-			command[i] = escapeReplacer.Replace(command[i])
-			// Substitute command in the command.
-			command[i], err = substituteCommands(command[i])
-			if err != nil {
-				return "", nil, fmt.Errorf("failed to substitute command: %w", err)
-			}
-		}
-	}
-
-	if len(pipeline) > 1 {
-		first := pipeline[0]
-		cmd := first[0]
-		args := first[1:]
-		for _, command := range pipeline[1:] {
-			args = append(args, "|")
-			args = append(args, command...)
-		}
-		return cmd, args, nil
-	}
-
-	if len(pipeline) == 0 {
-		return "", nil, ErrCommandIsEmpty
-	}
-
-	command := pipeline[0]
-	if len(command) == 0 {
-		return "", nil, ErrCommandIsEmpty
-	}
-
-	return command[0], command[1:], nil
-}
-
 var (
 	escapeReplacer = strings.NewReplacer(
 		`\t`, `\\\\t`,
