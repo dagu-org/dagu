@@ -107,8 +107,8 @@ func resolveWorkingDir(ctx context.Context, step core.Step, rCtx Context) string
 			// Check DAG-level env vars
 			if dag != nil {
 				for _, env := range dag.Env {
-					if len(env) > len(key)+1 && env[:len(key)] == key && env[len(key)] == '=' {
-						return env[len(key)+1:]
+					if k, v, ok := strings.Cut(env, "="); ok && k == key {
+						return v
 					}
 				}
 			}

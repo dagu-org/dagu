@@ -1179,6 +1179,13 @@ func TestEvalIntString(t *testing.T) {
 			want:    0,
 			wantErr: true,
 		},
+		{
+			name:    "WithoutSubstitute_SkipsCommandSubstitution",
+			input:   "123",
+			opts:    []EvalOption{WithoutSubstitute()},
+			want:    123,
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1955,25 +1962,6 @@ func TestEvalString_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 	}
 }
 
-// TestExpandReferencesWithSteps_SearchAcrossOutputs tests the specific case where
-// a field is not directly in outputs but needs to be found by parsing JSON in each output
-func TestExpandReferencesWithSteps_SearchAcrossOutputs(t *testing.T) {
-	ctx := context.Background()
-
-	tests := []struct {
-		name    string
-		input   string
-		stepMap map[string]StepInfo
-		want    string
-	}{}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := ExpandReferencesWithSteps(ctx, tt.input, map[string]string{}, tt.stepMap)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
 
 // Helper function to create string pointer
 func ptrString(s string) *string {

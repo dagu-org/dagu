@@ -80,6 +80,12 @@ var reEscapedKeyValue = regexp.MustCompile(`^[^\s=]+="[^"]+"$`)
 // Group 1: ${...} content, Group 2: $VAR content (without braces)
 var reVarSubstitution = regexp.MustCompile(`[']{0,1}\$\{([^}]+)\}[']{0,1}|[']{0,1}\$([a-zA-Z0-9_][a-zA-Z0-9_]*)[']{0,1}`)
 
+// reQuotedJSONRef matches quoted JSON references like "${FOO.bar}" and simple variables like "${VAR}"
+var reQuotedJSONRef = regexp.MustCompile(`"\$\{([A-Za-z0-9_]\w*(?:\.[^}]+)?)\}"`)
+
+// reJSONPathRef matches patterns like ${FOO.bar.baz} or $FOO.bar for JSON path expansion
+var reJSONPathRef = regexp.MustCompile(`\$\{([A-Za-z0-9_]\w*)(\.[^}]+)\}|\$([A-Za-z0-9_]\w*)(\.[^\s]+)`)
+
 // BuildCommandEscapedString constructs a single shell-ready string from a command and its arguments.
 // It assumes that the command and arguments are already escaped.
 func BuildCommandEscapedString(command string, args []string) string {
@@ -159,8 +165,7 @@ func EvalString(ctx context.Context, input string, opts ...EvalOption) (string, 
 	// Expand quoted values first (including JSON paths)
 	for _, vars := range options.Variables {
 		// Handle quoted JSON references like "${FOO.bar}" and simple variables like "${VAR}"
-		quotedRefPattern := regexp.MustCompile(`"\$\{([A-Za-z0-9_]\w*(?:\.[^}]+)?)\}"`)
-		value = quotedRefPattern.ReplaceAllStringFunc(value, func(match string) string {
+		value = reQuotedJSONRef.ReplaceAllStringFunc(value, func(match string) string {
 			// Extract the reference (VAR or VAR.path)
 			ref := match[3 : len(match)-2] // Remove "$ and }"
 
@@ -232,9 +237,12 @@ func EvalIntString(ctx context.Context, input string, opts ...EvalOption) (int, 
 		}
 	}
 
-	value, err := substituteCommandsWithContext(ctx, value)
-	if err != nil {
-		return 0, err
+	if options.Substitute {
+		var err error
+		value, err = substituteCommandsWithContext(ctx, value)
+		if err != nil {
+			return 0, err
+		}
 	}
 	v, err := strconv.Atoi(value)
 	if err != nil {
@@ -645,11 +653,8 @@ func resolveJSONPath(ctx context.Context, varName, jsonStr, path string) (string
 // ExpandReferencesWithSteps is like ExpandReferences but also handles step ID property access
 // like ${step_id.stdout}, ${step_id.stderr}, ${step_id.exit_code}
 func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[string]string, stepMap map[string]StepInfo) string {
-	// Regex to match patterns like ${FOO.bar.baz} or $FOO.bar
-	re := regexp.MustCompile(`\$\{([A-Za-z0-9_]\w*)(\.[^}]+)\}|\$([A-Za-z0-9_]\w*)(\.[^\s]+)`)
-
-	return re.ReplaceAllStringFunc(input, func(match string) string {
-		subMatches := re.FindStringSubmatch(match)
+	return reJSONPathRef.ReplaceAllStringFunc(input, func(match string) string {
+		subMatches := reJSONPathRef.FindStringSubmatch(match)
 		if len(subMatches) < 3 {
 			return match
 		}

@@ -254,6 +254,9 @@ var paramRegex = regexp.MustCompile(
 	`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|` + "`(" + `?:\\"|[^"]*)` + "`" + `|[^"\s]+)`,
 )
 
+// backtickRegex matches backtick-enclosed commands for substitution.
+var backtickRegex = regexp.MustCompile("`[^`]*`")
+
 // tryParseJSONParams attempts to parse the input as JSON and convert it to paramPairs.
 // Returns an error if the input is not valid JSON.
 func tryParseJSONParams(ctx BuildContext, input string) ([]paramPair, error) {
@@ -316,9 +319,7 @@ func parseStringParams(ctx BuildContext, input string) ([]paramPair, error) {
 			}
 
 			if !ctx.opts.Has(BuildFlagNoEval) {
-				// Perform backtick command substitution
-				backtickRegex := regexp.MustCompile("`[^`]*`")
-
+				// Perform backtick command substitution using package-level regex
 				var cmdErr error
 				value = backtickRegex.ReplaceAllStringFunc(
 					value,

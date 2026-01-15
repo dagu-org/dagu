@@ -26,8 +26,14 @@ type Server struct {
 func SetupServer(t *testing.T, opts ...HelperOption) Server {
 	t.Helper()
 
-	// Find an available port for the server to listen on
-	port := findAvailablePort(t)
+	// Create a listener and keep it alive until the server binds.
+	// This prevents race conditions where parallel tests could steal the port
+	// between finding it and binding to it.
+	listener, err := net.Listen("tcp", "localhost:0")
+	require.NoError(t, err, "failed to create listener")
+
+	port := listener.Addr().(*net.TCPAddr).Port
+
 	opts = append(opts, WithServerConfig(
 		&config.Server{
 			Host: "localhost",
@@ -45,25 +51,27 @@ func SetupServer(t *testing.T, opts ...HelperOption) Server {
 
 	// Use error channel to detect server startup failures
 	errChan := make(chan error, 1)
-	go srv.runServer(t, errChan)
+	go srv.runServer(t, listener, errChan)
 
 	// Wait for the server to start or fail
 	select {
 	case err := <-errChan:
 		if err != nil {
+			_ = listener.Close() // Clean up listener on failure
 			t.Fatalf("server failed to start: %v", err)
 		}
 		// Server started successfully, wait for it to be ready
 		waitForServerStart(t, fmt.Sprintf("localhost:%d", port))
 	case <-time.After(10 * time.Second):
+		_ = listener.Close()
 		t.Fatal("server failed to start within timeout")
 	}
 
 	return srv
 }
 
-// runServer starts the HTTP server
-func (srv *Server) runServer(t *testing.T, errChan chan<- error) {
+// runServer starts the HTTP server with the provided listener
+func (srv *Server) runServer(t *testing.T, listener net.Listener, errChan chan<- error) {
 	t.Helper()
 
 	cc := coordinator.New(srv.ServiceRegistry, coordinator.DefaultConfig())
@@ -77,12 +85,18 @@ func (srv *Server) runServer(t *testing.T, errChan chan<- error) {
 	)
 	mr := telemetry.NewRegistry(collector)
 
-	server, err := frontend.NewServer(srv.Context, srv.Config, srv.DAGStore, srv.DAGRunStore, srv.QueueStore, srv.ProcStore, srv.DAGRunMgr, cc, srv.ServiceRegistry, mr, collector, nil)
+	// Pass the pre-bound listener to the server to avoid port race conditions
+	server, err := frontend.NewServer(
+		srv.Context, srv.Config, srv.DAGStore, srv.DAGRunStore,
+		srv.QueueStore, srv.ProcStore, srv.DAGRunMgr, cc,
+		srv.ServiceRegistry, mr, collector, nil,
+		frontend.WithListener(listener),
+	)
 	if err != nil {
 		errChan <- fmt.Errorf("failed to create server: %w", err)
 		return
 	}
-	close(errChan) // Signal that server started successfully
+	close(errChan) // Signal that server created successfully
 	err = server.Serve(srv.Context)
 	if err != nil {
 		// Log but don't fail - context cancellation is expected
@@ -252,18 +266,6 @@ func (r *Response) Unmarshal(t *testing.T, v any) {
 	t.Helper()
 	err := json.Unmarshal([]byte(r.Body), v)
 	require.NoError(t, err, "failed to unmarshal response body")
-}
-
-// findAvailablePort finds an available TCP port
-func findAvailablePort(t *testing.T) int {
-	t.Helper()
-	listener, err := net.Listen("tcp", ":0") // nolint:gosec
-	require.NoError(t, err, "failed to find available port")
-	defer func() {
-		_ = listener.Close()
-	}()
-
-	return listener.Addr().(*net.TCPAddr).Port
 }
 
 // waitForServerStart polls the server until it responds or times out

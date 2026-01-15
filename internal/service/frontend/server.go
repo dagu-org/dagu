@@ -56,6 +56,19 @@ type Server struct {
 	builtinOIDCCfg *auth.BuiltinOIDCConfig // OIDC config for builtin auth mode
 	authService    *authservice.Service
 	auditService   *audit.Service
+	listener       net.Listener // Optional pre-bound listener (for tests)
+}
+
+// ServerOption is a functional option for configuring the Server
+type ServerOption func(*Server)
+
+// WithListener sets a pre-bound listener for the server.
+// When set, the server will use this listener instead of creating its own.
+// This is useful for tests to avoid race conditions with port allocation.
+func WithListener(l net.Listener) ServerOption {
+	return func(s *Server) {
+		s.listener = l
+	}
 }
 
 // NewServer constructs a Server configured from cfg and the provided stores, managers, and services.
@@ -69,7 +82,7 @@ type Server struct {
 // when the configured builtin auth service fails to initialize).
 // The context is used for OIDC provider initialization and should be cancellable
 // to allow graceful shutdown during startup.
-func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs exec.DAGRunStore, qs exec.QueueStore, ps exec.ProcStore, drm runtime.Manager, cc coordinator.Client, sr exec.ServiceRegistry, mr *prometheus.Registry, collector *telemetry.Collector, rs *resource.Service) (*Server, error) {
+func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs exec.DAGRunStore, qs exec.QueueStore, ps exec.ProcStore, drm runtime.Manager, cc coordinator.Client, sr exec.ServiceRegistry, mr *prometheus.Registry, collector *telemetry.Collector, rs *resource.Service, opts ...ServerOption) (*Server, error) {
 	// Defensive nil-context guard to prevent surprising crashes from older call sites
 	if ctx == nil {
 		ctx = context.Background()
@@ -155,7 +168,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		}
 	}
 
-	return &Server{
+	srv := &Server{
 		apiV1:          apiv1.New(dr, drs, drm, cfg),
 		apiV2:          apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, apiOpts...),
 		config:         cfg,
@@ -178,7 +191,14 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 			OIDCButtonLabel:       oidcButtonLabel,
 			TerminalEnabled:       cfg.Server.Terminal.Enabled && authSvc != nil,
 		},
-	}, nil
+	}
+
+	// Apply server options
+	for _, opt := range opts {
+		opt(srv)
+	}
+
+	return srv, nil
 }
 
 // builtinAuthResult holds the result of initializing builtin auth.
@@ -507,15 +527,28 @@ func (srv *Server) setupTerminalRoute(ctx context.Context, r *chi.Mux, apiV2Base
 // startServer starts the HTTP server with or without TLS
 func (srv *Server) startServer(ctx context.Context) {
 	var err error
-	if srv.config.Server.TLS != nil {
-		// Use TLS configuration
-		logger.Info(ctx, "Starting TLS server",
-			tag.Cert(srv.config.Server.TLS.CertFile),
-			slog.String("key", srv.config.Server.TLS.KeyFile))
-		err = srv.httpServer.ListenAndServeTLS(srv.config.Server.TLS.CertFile, srv.config.Server.TLS.KeyFile)
+
+	if srv.listener != nil {
+		// Use pre-bound listener (for tests or external listener management)
+		if srv.config.Server.TLS != nil {
+			logger.Info(ctx, "Starting TLS server on pre-bound listener",
+				tag.Cert(srv.config.Server.TLS.CertFile),
+				slog.String("key", srv.config.Server.TLS.KeyFile))
+			err = srv.httpServer.ServeTLS(srv.listener, srv.config.Server.TLS.CertFile, srv.config.Server.TLS.KeyFile)
+		} else {
+			logger.Info(ctx, "Starting server on pre-bound listener")
+			err = srv.httpServer.Serve(srv.listener)
+		}
 	} else {
-		// Use standard HTTP
-		err = srv.httpServer.ListenAndServe()
+		// Original behavior: create listener internally
+		if srv.config.Server.TLS != nil {
+			logger.Info(ctx, "Starting TLS server",
+				tag.Cert(srv.config.Server.TLS.CertFile),
+				slog.String("key", srv.config.Server.TLS.KeyFile))
+			err = srv.httpServer.ListenAndServeTLS(srv.config.Server.TLS.CertFile, srv.config.Server.TLS.KeyFile)
+		} else {
+			err = srv.httpServer.ListenAndServe()
+		}
 	}
 
 	if err != nil && err != http.ErrServerClosed {

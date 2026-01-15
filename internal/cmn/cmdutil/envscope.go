@@ -186,6 +186,9 @@ func (e *EnvScope) Expand(s string) string {
 
 // Debug returns a string representation for debugging
 func (e *EnvScope) Debug() string {
+	if e == nil {
+		return "EnvScope{nil}"
+	}
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
