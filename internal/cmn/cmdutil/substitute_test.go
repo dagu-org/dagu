@@ -117,11 +117,11 @@ func TestSubstituteCommands(t *testing.T) {
 			}
 
 			// Run test
-			got, err := substituteCommands(tt.input)
+			got, err := substituteCommandsWithContext(context.Background(), tt.input)
 
 			// Check error
 			if (err != nil) != tt.wantErr {
-				t.Errorf("substituteCommands() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("substituteCommandsWithContext(context.Background(),) error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
@@ -132,7 +132,7 @@ func TestSubstituteCommands(t *testing.T) {
 
 			// Compare output
 			if got != tt.want {
-				t.Errorf("substituteCommands() = %q, want %q", got, tt.want)
+				t.Errorf("substituteCommandsWithContext(context.Background(),) = %q, want %q", got, tt.want)
 			}
 		})
 	}
@@ -179,13 +179,13 @@ func TestSubstituteCommandsEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := substituteCommands(tt.input)
+			got, err := substituteCommandsWithContext(context.Background(), tt.input)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("substituteCommands() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("substituteCommandsWithContext(context.Background(),) error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && got != tt.want {
-				t.Errorf("substituteCommands() = %q, want %q", got, tt.want)
+				t.Errorf("substituteCommandsWithContext(context.Background(),) = %q, want %q", got, tt.want)
 			}
 		})
 	}
@@ -274,7 +274,7 @@ func TestSubstituteCommands_Extended(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := substituteCommands(tt.input)
+			got, err := substituteCommandsWithContext(context.Background(), tt.input)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {

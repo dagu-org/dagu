@@ -704,10 +704,6 @@ func replaceVars(template string, vars map[string]string) string {
 	})
 }
 
-func expandWithShell(input string, opts *EvalOptions) (string, error) {
-	return expandWithShellContext(context.Background(), input, opts)
-}
-
 func expandWithShellContext(ctx context.Context, input string, opts *EvalOptions) (string, error) {
 	if !opts.ExpandShell {
 		if !opts.ExpandEnv {

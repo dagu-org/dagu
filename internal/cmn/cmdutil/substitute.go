@@ -10,12 +10,6 @@ import (
 	"strings"
 )
 
-// runCommand executes cmdStr in a shell, capturing stdout (and ignoring stderr).
-// Deprecated: Use runCommandWithContext instead for thread-safe environment handling.
-func runCommand(cmdStr string) (string, error) {
-	return runCommandWithContext(context.Background(), cmdStr)
-}
-
 // buildShellCommand creates an exec.Cmd with appropriate arguments for the shell type
 func buildShellCommand(shell, cmdStr string) *exec.Cmd {
 	if shell == "" {
@@ -43,14 +37,6 @@ func buildShellCommand(shell, cmdStr string) *exec.Cmd {
 		// Unix-like shells (sh, bash, zsh, etc.)
 		return exec.Command(shell, "-c", cmdStr) // nolint:gosec
 	}
-}
-
-// substituteCommands scans for backtick-delimited commands, including "escaped" backticks
-// (i.e. a backslash immediately before a backtick). If we see "\`", we treat it as a real
-// backtick delimiter, not a literal backslash + backtick. Commands are executed via runCommand().
-// Deprecated: Use substituteCommandsWithContext instead for thread-safe environment handling.
-func substituteCommands(input string) (string, error) {
-	return substituteCommandsWithContext(context.Background(), input)
 }
 
 // runCommandWithContext executes cmdStr in a shell using environment from context.
