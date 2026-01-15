@@ -723,3 +723,122 @@ func TestGetScriptExtension(t *testing.T) {
 		})
 	}
 }
+
+// TestJoinCommandArgs tests the JoinCommandArgs function
+func TestJoinCommandArgs(t *testing.T) {
+	tests := []struct {
+		name string
+		cmd  string
+		args []string
+		want string
+	}{
+		{
+			name: "MultipleArgs",
+			cmd:  "echo",
+			args: []string{"hello", "world"},
+			want: "echo hello" + ArgsDelimiter + "world",
+		},
+		{
+			name: "SingleArg",
+			cmd:  "ls",
+			args: []string{"-la"},
+			want: "ls -la",
+		},
+		{
+			name: "NoArgs",
+			cmd:  "pwd",
+			args: []string{},
+			want: "pwd ",
+		},
+		{
+			name: "ArgsWithSpaces",
+			cmd:  "echo",
+			args: []string{"hello world", "foo bar"},
+			want: "echo hello world" + ArgsDelimiter + "foo bar",
+		},
+		{
+			name: "NilArgs",
+			cmd:  "date",
+			args: nil,
+			want: "date ",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := JoinCommandArgs(tt.cmd, tt.args)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestSplitCommandArgs tests the SplitCommandArgs function
+func TestSplitCommandArgs(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantCmd  string
+		wantArgs []string
+	}{
+		{
+			name:     "MultipleArgs",
+			input:    "echo hello" + ArgsDelimiter + "world",
+			wantCmd:  "echo",
+			wantArgs: []string{"hello", "world"},
+		},
+		{
+			name:     "SingleArg",
+			input:    "ls -la",
+			wantCmd:  "ls",
+			wantArgs: []string{"-la"},
+		},
+		{
+			name:     "NoArgs",
+			input:    "pwd",
+			wantCmd:  "pwd",
+			wantArgs: nil,
+		},
+		{
+			name:     "ArgsWithSpaces",
+			input:    "echo hello world" + ArgsDelimiter + "foo bar",
+			wantCmd:  "echo",
+			wantArgs: []string{"hello world", "foo bar"},
+		},
+		{
+			name:     "EmptyInput",
+			input:    "",
+			wantCmd:  "",
+			wantArgs: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotCmd, gotArgs := SplitCommandArgs(tt.input)
+			require.Equal(t, tt.wantCmd, gotCmd)
+			require.Equal(t, tt.wantArgs, gotArgs)
+		})
+	}
+}
+
+// TestJoinSplitCommandArgsRoundTrip tests that JoinCommandArgs and SplitCommandArgs are inverse operations
+func TestJoinSplitCommandArgsRoundTrip(t *testing.T) {
+	tests := []struct {
+		cmd  string
+		args []string
+	}{
+		{"echo", []string{"hello", "world"}},
+		{"ls", []string{"-la", "/tmp"}},
+		{"bash", []string{"-c", "echo test"}},
+		{"python", []string{"-m", "http.server", "8080"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.cmd, func(t *testing.T) {
+			joined := JoinCommandArgs(tt.cmd, tt.args)
+			gotCmd, gotArgs := SplitCommandArgs(joined)
+			require.Equal(t, tt.cmd, gotCmd)
+			require.Equal(t, tt.args, gotArgs)
+		})
+	}
+}
