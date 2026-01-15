@@ -73,30 +73,33 @@ func loadVariablesFromEnvValue(ctx BuildContext, env types.EnvValue) (map[string
 func evaluatePairs(ctx BuildContext, pairs []pair) (map[string]string, error) {
 	vars := make(map[string]string, len(pairs))
 
+	// Build base scope once outside the loop to reduce allocations.
+	// We chain new entries immutably as we evaluate each pair.
+	var scope *cmdutil.EnvScope
+	var evalCtx context.Context
+	if !ctx.opts.Has(BuildFlagNoEval) {
+		scope = cmdutil.NewEnvScope(nil, true)
+		evalCtx = ctx.ctx
+		if evalCtx == nil {
+			evalCtx = context.Background()
+		}
+	}
+
 	for _, p := range pairs {
 		value := p.val
 
 		if !ctx.opts.Has(BuildFlagNoEval) {
-			// Build an EnvScope with OS env + accumulated vars for evaluation.
-			// This ensures command substitution and variable expansion work correctly
-			// without mutating the global OS environment.
-			scope := cmdutil.NewEnvScope(nil, true)
-			if len(vars) > 0 {
-				scope = scope.WithEntries(vars, cmdutil.EnvSourceDAGEnv)
-			}
-
-			// Create evaluation context - handle nil parent context
-			evalCtx := ctx.ctx
-			if evalCtx == nil {
-				evalCtx = context.Background()
-			}
-			evalCtx = cmdutil.WithEnvScope(evalCtx, scope)
+			// Chain the new variable to scope for subsequent evaluations
+			scopeCtx := cmdutil.WithEnvScope(evalCtx, scope)
 
 			var err error
-			value, err = cmdutil.EvalString(evalCtx, value, cmdutil.WithVariables(vars))
+			value, err = cmdutil.EvalString(scopeCtx, value, cmdutil.WithVariables(vars))
 			if err != nil {
 				return nil, core.NewValidationError("env", p.val, fmt.Errorf("%w: %s", ErrInvalidEnvValue, p.val))
 			}
+
+			// Add evaluated value to scope for next iteration
+			scope = scope.WithEntry(p.key, value, cmdutil.EnvSourceDAGEnv)
 		}
 
 		vars[p.key] = value

@@ -28,6 +28,10 @@ func SplitCommandArgs(cmdWithArgs string) (string, []string) {
 		return parts[0], nil
 	}
 	command, args := parts[0], parts[1]
+	// Handle empty args (e.g., "pwd " with trailing space)
+	if args == "" {
+		return command, nil
+	}
 	return command, strings.Split(args, ArgsDelimiter)
 }
 

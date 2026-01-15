@@ -447,10 +447,3 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 		require.NotContains(t, html, "style=")
 	})
 }
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}

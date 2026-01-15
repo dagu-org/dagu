@@ -176,6 +176,7 @@ func Load(ctx context.Context, nameOrPath string, opts ...LoadOption) (*core.DAG
 			DAGsDir:           options.dagsDir,
 			DefaultWorkingDir: options.defaultWorkingDir,
 			Flags:             options.flags,
+			BuildEnv:          options.buildEnv,
 		},
 	}
 	return loadDAG(buildContext, nameOrPath)

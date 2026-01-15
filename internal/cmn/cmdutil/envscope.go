@@ -257,18 +257,12 @@ func (e *EnvScope) collectBySource(source EnvSource, result map[string]string) {
 // AllSecrets returns all entries with EnvSourceSecret.
 // This is a convenience method for output masking.
 func (e *EnvScope) AllSecrets() map[string]string {
-	if e == nil {
-		return make(map[string]string)
-	}
 	return e.AllBySource(EnvSourceSecret)
 }
 
 // AllUserEnvs returns all entries excluding OS environment.
 // This replaces exec.Context.UserEnvsMap().
 func (e *EnvScope) AllUserEnvs() map[string]string {
-	if e == nil {
-		return make(map[string]string)
-	}
 	result := make(map[string]string)
 	e.collectUserEnvs(result)
 	return result

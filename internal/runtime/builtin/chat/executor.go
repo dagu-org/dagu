@@ -250,7 +250,11 @@ func evalMessages(ctx context.Context, msgs []exec.LLMMessage) ([]exec.LLMMessag
 // This prevents secrets from being leaked to external LLM APIs.
 func maskSecretsForProvider(ctx context.Context, msgs []exec.LLMMessage) []exec.LLMMessage {
 	// Use EnvScope.AllSecrets() for unified source tracking
-	secrets := runtime.GetDAGContext(ctx).EnvScope.AllSecrets()
+	rCtx := runtime.GetDAGContext(ctx)
+	if rCtx.EnvScope == nil {
+		return msgs
+	}
+	secrets := rCtx.EnvScope.AllSecrets()
 	if len(secrets) == 0 {
 		return msgs
 	}

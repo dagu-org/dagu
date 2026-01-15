@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"html"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
@@ -105,14 +106,6 @@ func (r *reporter) sendMail(ctx context.Context, mailConfig *core.MailConfig, da
 	html := renderHTMLWithDAGInfo(dagStatus)
 	attachments := addAttachments(mailConfig.AttachLogs, dagStatus.Nodes)
 	return r.senderFn(ctx, mailConfig.From, mailConfig.To, subject, html, attachments)
-}
-
-// escapeHTML escapes special HTML characters in a string.
-func escapeHTML(s string) string {
-	s = strings.ReplaceAll(s, "&", "&amp;")
-	s = strings.ReplaceAll(s, "<", "&lt;")
-	s = strings.ReplaceAll(s, ">", "&gt;")
-	return s
 }
 
 // statusToClass maps a status string to its CSS class.
@@ -285,16 +278,16 @@ func renderHTML(nodes []*exec.Node) string {
 func writeNodeRow(buffer *bytes.Buffer, index int, n *exec.Node) {
 	_, _ = buffer.WriteString("<tr>")
 	_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"row-number\">%d</td>", index+1))
-	_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"step-name\">%s</td>", escapeHTML(n.Step.Name)))
-	_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"timestamp\">%s</td>", n.StartedAt))
-	_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"timestamp\">%s</td>", n.FinishedAt))
+	_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"step-name\">%s</td>", html.EscapeString(n.Step.Name)))
+	_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"timestamp\">%s</td>", html.EscapeString(n.StartedAt)))
+	_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"timestamp\">%s</td>", html.EscapeString(n.FinishedAt)))
 
 	status := n.Status.String()
 	_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"%s\">%s</td>", statusToClass(status), status))
-	_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"command-cell\">%s</td>", escapeHTML(formatCommands(n.Step.Commands))))
+	_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"command-cell\">%s</td>", html.EscapeString(formatCommands(n.Step.Commands))))
 
 	if n.Error != "" {
-		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"error-cell\">%s</td>", escapeHTML(n.Error)))
+		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"error-cell\">%s</td>", html.EscapeString(n.Error)))
 	} else {
 		_, _ = buffer.WriteString("<td></td>")
 	}
@@ -512,7 +505,7 @@ func renderHTMLWithDAGInfo(dagStatus exec.DAGRunStatus) string {
         <div class="dag-name">`)
 
 	// Add DAG name (escaped)
-	_, _ = buffer.WriteString(escapeHTML(dagStatus.Name))
+	_, _ = buffer.WriteString(html.EscapeString(dagStatus.Name))
 
 	_, _ = buffer.WriteString(`</div>
         <div class="dag-info-grid">
@@ -521,7 +514,7 @@ func renderHTMLWithDAGInfo(dagStatus exec.DAGRunStatus) string {
                 <div class="dag-info-value mono">`)
 
 	// Add DAG Run ID (escaped)
-	_, _ = buffer.WriteString(escapeHTML(dagStatus.DAGRunID))
+	_, _ = buffer.WriteString(html.EscapeString(dagStatus.DAGRunID))
 
 	_, _ = buffer.WriteString(`</div>
             </div>
@@ -534,7 +527,7 @@ func renderHTMLWithDAGInfo(dagStatus exec.DAGRunStatus) string {
 	if params == "" {
 		params = "(none)"
 	}
-	params = escapeHTML(params)
+	params = html.EscapeString(params)
 	params = strings.ReplaceAll(params, "\"", "&quot;")
 	_, _ = buffer.WriteString(params)
 

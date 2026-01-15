@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
@@ -188,9 +189,9 @@ type DAG struct {
 	LLM *LLMConfig `json:"llm,omitempty"`
 	// Secrets contains references to external secrets to be resolved at runtime.
 	Secrets []SecretRef `json:"secrets,omitempty"`
-	// dotenvLoaded tracks whether LoadDotEnv has already been called.
-	// This ensures idempotency - calling LoadDotEnv multiple times is safe.
-	dotenvLoaded bool
+	// dotenvOnce ensures LoadDotEnv is called only once, even with concurrent calls.
+	// This provides thread-safe idempotency for dotenv loading.
+	dotenvOnce sync.Once
 }
 
 // SecretRef represents a reference to an external secret.
@@ -209,6 +210,17 @@ type SecretRef struct {
 // HasTag checks if the DAG has the given tag.
 func (d *DAG) HasTag(tag string) bool {
 	return slices.Contains(d.Tags, tag)
+}
+
+// Clone creates a shallow copy of the DAG.
+// The sync.Once field is not copied, allowing LoadDotEnv to be called
+// independently on the clone. This is safe for read-only field modifications
+// like changing Location.
+func (d *DAG) Clone() *DAG {
+	clone := *d
+	// Reset sync.Once so LoadDotEnv can be called on the clone
+	clone.dotenvOnce = sync.Once{}
+	return &clone
 }
 
 // HasHITLSteps returns true if the DAG contains any HITL executor steps.
@@ -326,64 +338,60 @@ func deduplicateStrings(input []string) []string {
 }
 
 // LoadDotEnv loads all dotenv files in order, with later files overriding earlier ones.
-// This method is idempotent - calling it multiple times is safe.
+// This method is thread-safe and idempotent - concurrent calls will only load once.
 func (d *DAG) LoadDotEnv(ctx context.Context) {
-	// Check if already loaded to ensure idempotency
-	if d.dotenvLoaded {
-		return
-	}
-	d.dotenvLoaded = true
+	d.dotenvOnce.Do(func() {
+		if len(d.Dotenv) == 0 {
+			return
+		}
 
-	if len(d.Dotenv) == 0 {
-		return
-	}
+		relativeTos := []string{d.WorkingDir}
+		fileDir := filepath.Dir(d.Location)
+		if d.Location != "" && fileDir != d.WorkingDir {
+			relativeTos = append(relativeTos, fileDir)
+		}
 
-	relativeTos := []string{d.WorkingDir}
-	fileDir := filepath.Dir(d.Location)
-	if d.Location != "" && fileDir != d.WorkingDir {
-		relativeTos = append(relativeTos, fileDir)
-	}
+		resolver := fileutil.NewFileResolver(relativeTos)
+		candidates := deduplicateStrings(append([]string{".env"}, d.Dotenv...))
 
-	resolver := fileutil.NewFileResolver(relativeTos)
-	candidates := deduplicateStrings(append([]string{".env"}, d.Dotenv...))
-
-	for _, filePath := range candidates {
-		if strings.TrimSpace(filePath) == "" {
-			continue
+		for _, filePath := range candidates {
+			if strings.TrimSpace(filePath) == "" {
+				continue
+			}
+			filePath, err := cmdutil.EvalString(ctx, filePath)
+			if err != nil {
+				logger.Warn(ctx, "Failed to evaluate filepath",
+					tag.File(filePath),
+					tag.Error(err),
+				)
+				continue
+			}
+			resolvedPath, err := resolver.ResolveFilePath(filePath)
+			if err != nil {
+				continue
+			}
+			if !fileutil.FileExists(resolvedPath) {
+				continue
+			}
+			// Use godotenv.Read instead of godotenv.Load to avoid os.Setenv
+			vars, err := godotenv.Read(resolvedPath)
+			if err != nil {
+				logger.Warn(ctx, "Failed to load .env file",
+					tag.File(resolvedPath),
+					tag.Error(err),
+				)
+				continue
+			}
+			// Add dotenv vars to DAG.Env so they're included in AllEnvs()
+			// Note: We no longer call os.Setenv to avoid race conditions when
+			// multiple DAGs are loaded concurrently. The vars are stored in
+			// d.Env and will be passed to step execution via cmd.Env.
+			for k, v := range vars {
+				d.Env = append(d.Env, fmt.Sprintf("%s=%s", k, v))
+			}
+			logger.Info(ctx, "Loaded dotenv file", tag.File(resolvedPath))
 		}
-		filePath, err := cmdutil.EvalString(ctx, filePath)
-		if err != nil {
-			logger.Warn(ctx, "Failed to evaluate filepath",
-				tag.File(filePath),
-				tag.Error(err),
-			)
-			continue
-		}
-		resolvedPath, err := resolver.ResolveFilePath(filePath)
-		if err != nil {
-			continue
-		}
-		if !fileutil.FileExists(resolvedPath) {
-			continue
-		}
-		// Use godotenv.Read instead of godotenv.Load to avoid os.Setenv
-		vars, err := godotenv.Read(resolvedPath)
-		if err != nil {
-			logger.Warn(ctx, "Failed to load .env file",
-				tag.File(resolvedPath),
-				tag.Error(err),
-			)
-			continue
-		}
-		// Add dotenv vars to DAG.Env so they're included in AllEnvs()
-		// Note: We no longer call os.Setenv to avoid race conditions when
-		// multiple DAGs are loaded concurrently. The vars are stored in
-		// d.Env and will be passed to step execution via cmd.Env.
-		for k, v := range vars {
-			d.Env = append(d.Env, fmt.Sprintf("%s=%s", k, v))
-		}
-		logger.Info(ctx, "Loaded dotenv file", tag.File(resolvedPath))
-	}
+	})
 }
 
 // initializeDefaults sets the default values for the DAG.

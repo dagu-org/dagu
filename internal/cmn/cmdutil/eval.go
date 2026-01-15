@@ -684,8 +684,19 @@ func replaceVars(template string, vars map[string]string) string {
 }
 
 // replaceVarsWithScope substitutes $VAR and ${VAR} patterns using EnvScope.
-// Only expands USER-defined vars (not OS-sourced), allowing live OS env
-// reads via expandWithShellContext later.
+//
+// This function intentionally skips OS-sourced variables (EnvSourceOS) during
+// early expansion. The rationale is:
+//
+//  1. OS environment variables may change between DAG load time and step execution
+//     (e.g., PATH modifications, dynamic tokens).
+//  2. By deferring OS var expansion to shell execution time (via expandWithShellContext),
+//     we ensure the shell reads the current OS environment when the command runs.
+//  3. User-defined variables (DAG env, step env, secrets, outputs) are stable and
+//     can be safely expanded early.
+//
+// This design allows commands like "echo $PATH" to use the live OS PATH at execution
+// time, rather than a stale value captured when the DAG was loaded.
 func replaceVarsWithScope(template string, scope *EnvScope) string {
 	return reVarSubstitution.ReplaceAllStringFunc(template, func(match string) string {
 		key, ok := extractVarKey(match)
@@ -696,7 +707,7 @@ func replaceVarsWithScope(template string, scope *EnvScope) string {
 		if strings.Contains(key, ".") {
 			return match
 		}
-		// Only expand USER-defined vars, not OS-sourced
+		// Only expand user-defined vars, not OS-sourced (see function doc for rationale)
 		if entry, found := scope.GetEntry(key); found && entry.Source != EnvSourceOS {
 			return entry.Value
 		}

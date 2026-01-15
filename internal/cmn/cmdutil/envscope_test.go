@@ -132,9 +132,17 @@ func TestEnvScope_WithEntries(t *testing.T) {
 				"C": "3",
 			}, EnvSourceDAGEnv)
 
-		assert.Equal(t, "1", must(scope.Get("A")))
-		assert.Equal(t, "2", must(scope.Get("B")))
-		assert.Equal(t, "3", must(scope.Get("C")))
+		val, ok := scope.Get("A")
+		require.True(t, ok, "expected A to be present")
+		assert.Equal(t, "1", val)
+
+		val, ok = scope.Get("B")
+		require.True(t, ok, "expected B to be present")
+		assert.Equal(t, "2", val)
+
+		val, ok = scope.Get("C")
+		require.True(t, ok, "expected C to be present")
+		assert.Equal(t, "3", val)
 	})
 
 	t.Run("EmptyMapReturnsOriginal", func(t *testing.T) {
@@ -714,12 +722,4 @@ func TestEnvScope_AllSecrets_EmptyAndNil(t *testing.T) {
 		assert.Len(t, secrets, 1)
 		assert.Equal(t, "parent_secret_val", secrets["PARENT_SECRET"])
 	})
-}
-
-// Helper function for test assertions
-func must(value string, ok bool) string {
-	if !ok {
-		panic("expected value to be present")
-	}
-	return value
 }

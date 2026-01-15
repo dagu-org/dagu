@@ -78,12 +78,12 @@ func NewSubDAGExecutor(ctx context.Context, childName string) (*SubDAGExecutor, 
 				return nil, fmt.Errorf("failed to create temp file for local DAG: %w", err)
 			}
 
-			// Set the location to the temporary file
-			dag := *localDAG // copy the DAG to avoid modifying the original
+			// Clone the DAG and set the location to the temporary file
+			dag := localDAG.Clone()
 			dag.Location = tempFile
 
 			return &SubDAGExecutor{
-				DAG:             &dag,
+				DAG:             dag,
 				tempFile:        tempFile,
 				coordinatorCli:  rCtx.CoordinatorCli,
 				cmds:            make(map[string]*exec.Cmd),

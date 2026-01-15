@@ -367,15 +367,12 @@ func AllEnvs(ctx context.Context) []string {
 }
 
 // AllEnvsMap builds a map of environment variables from the current Env.
-// It splits each "key=value" entry produced by AllEnvs and maps keys to values;
-// entries that do not contain an "=" separator are ignored.
+// It returns the EnvScope's ToMap directly, avoiding the round-trip through
+// string splitting.
 func AllEnvsMap(ctx context.Context) map[string]string {
-	envs := GetEnv(ctx).AllEnvs()
-	result := make(map[string]string)
-	for _, env := range envs {
-		if key, value, found := strings.Cut(env, "="); found {
-			result[key] = value
-		}
+	env := GetEnv(ctx)
+	if env.Scope == nil {
+		return make(map[string]string)
 	}
-	return result
+	return env.Scope.ToMap()
 }

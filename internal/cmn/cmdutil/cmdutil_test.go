@@ -831,6 +831,7 @@ func TestJoinSplitCommandArgsRoundTrip(t *testing.T) {
 		{"ls", []string{"-la", "/tmp"}},
 		{"bash", []string{"-c", "echo test"}},
 		{"python", []string{"-m", "http.server", "8080"}},
+		{"pwd", nil}, // nil/empty args edge case
 	}
 
 	for _, tt := range tests {
