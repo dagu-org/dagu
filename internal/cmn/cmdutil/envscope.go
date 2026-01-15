@@ -87,22 +87,7 @@ func (e *EnvScope) GetEntry(key string) (EnvEntry, bool) {
 
 // ToSlice returns all variables as KEY=value strings (for cmd.Env)
 func (e *EnvScope) ToSlice() []string {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	// Collect all entries (parent first, then override with this scope)
-	all := make(map[string]string)
-	if e.parent != nil {
-		for _, s := range e.parent.ToSlice() {
-			if k, v, ok := strings.Cut(s, "="); ok {
-				all[k] = v
-			}
-		}
-	}
-	for k, entry := range e.entries {
-		all[k] = entry.Value
-	}
-
+	all := e.ToMap()
 	result := make([]string, 0, len(all))
 	for k, v := range all {
 		result = append(result, k+"="+v)

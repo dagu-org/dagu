@@ -70,20 +70,9 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read DAG from record: %w", err)
 	}
 
-	// Restore params from the previous run's status.
-	// This is necessary because Params is excluded from JSON serialization
-	// to prevent secrets from being persisted to dag.json.
-	dag.Params = status.ParamsList
-
-	// Load dotenv BEFORE rebuild so values are available for YAML evaluation.
-	dag.LoadDotEnv(ctx)
-
-	// Rebuild DAG from YAML to populate fields excluded from JSON serialization
-	// (env, shell, workingDir, registryAuths, etc.). This uses spec.LoadYAML
-	// as the single source of truth for DAG building.
-	dag, err = rebuildDAGFromYAML(ctx.Context, dag)
+	dag, err = restoreDAGFromStatus(ctx.Context, dag, status)
 	if err != nil {
-		return fmt.Errorf("failed to rebuild DAG from YAML: %w", err)
+		return fmt.Errorf("failed to restore DAG from status: %w", err)
 	}
 
 	// Block retry via CLI for DAGs with workerSelector, UNLESS this is a distributed worker execution

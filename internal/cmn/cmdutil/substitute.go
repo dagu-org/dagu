@@ -13,28 +13,17 @@ import (
 // buildShellCommand creates an exec.Cmd with appropriate arguments for the shell type
 func buildShellCommand(shell, cmdStr string) *exec.Cmd {
 	if shell == "" {
-		// Fallback to basic execution
 		return exec.Command("sh", "-c", cmdStr) // nolint:gosec
 	}
 
-	// Extract just the executable name for comparison
 	shellName := strings.ToLower(filepath.Base(shell))
 
 	switch shellName {
-	case "powershell.exe", "powershell":
-		// PowerShell (Windows PowerShell)
+	case "powershell.exe", "powershell", "pwsh.exe", "pwsh":
 		return exec.Command(shell, "-Command", cmdStr) // nolint:gosec
-
-	case "pwsh.exe", "pwsh":
-		// PowerShell Core (cross-platform)
-		return exec.Command(shell, "-Command", cmdStr) // nolint:gosec
-
 	case "cmd.exe", "cmd":
-		// Windows Command Prompt
 		return exec.Command(shell, "/c", cmdStr) // nolint:gosec
-
 	default:
-		// Unix-like shells (sh, bash, zsh, etc.)
 		return exec.Command(shell, "-c", cmdStr) // nolint:gosec
 	}
 }
