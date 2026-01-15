@@ -598,27 +598,36 @@ func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) con
 		}
 	}
 
-	// Add step-level environment variables
+	// Helper to evaluate and store environment variables
 	envVars := &collections.SyncMap{}
-	for _, v := range node.Step().Env {
-		key, value, found := strings.Cut(v, "=")
-		if !found {
-			logger.Error(ctx, "Invalid environment variable format",
-				slog.String("var", v),
-			)
-			continue
+	addEnvVars := func(envList []string) {
+		for _, v := range envList {
+			key, value, found := strings.Cut(v, "=")
+			if !found {
+				logger.Error(ctx, "Invalid environment variable format", slog.String("var", v))
+				continue
+			}
+			evaluatedValue, err := env.EvalString(ctx, value)
+			if err != nil {
+				logger.Error(ctx, "Failed to evaluate environment variable",
+					slog.String("var", v),
+					tag.Error(err),
+				)
+				continue
+			}
+			envVars.Store(key, key+"="+evaluatedValue)
 		}
-		// Evaluate only the value part, not the entire "KEY=value" string
-		evaluatedValue, err := env.EvalString(ctx, value)
-		if err != nil {
-			logger.Error(ctx, "Failed to evaluate environment variable",
-				slog.String("var", v),
-				tag.Error(err),
-			)
-			continue
-		}
-		// Store as "KEY=evaluatedValue" format
-		envVars.Store(key, key+"="+evaluatedValue)
+	}
+
+	// Add step-level environment variables
+	addEnvVars(node.Step().Env)
+
+	// Add container environment variables (step-level takes precedence over DAG-level)
+	// This ensures container env vars are available when evaluating command arguments
+	if ct := node.Step().Container; ct != nil {
+		addEnvVars(ct.Env)
+	} else if dag := env.DAG; dag != nil && dag.Container != nil {
+		addEnvVars(dag.Container.Env)
 	}
 
 	env.ForceLoadOutputVariables(envVars)

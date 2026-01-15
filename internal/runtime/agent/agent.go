@@ -1094,8 +1094,21 @@ func (a *Agent) resolveSecrets(ctx context.Context) ([]string, error) {
 	}
 	secretRegistry := secrets.NewRegistry(baseDirs...)
 
+	// Create an EnvScope with DAG env vars for the env secret provider.
+	// Since we no longer use os.Setenv during DAG loading, env vars from
+	// the DAG's env: field and .env files are in a.dag.Env but NOT in the
+	// global OS environment. Pass them via context so the env provider
+	// can resolve secrets that reference DAG-defined env vars.
+	envScope := cmdutil.NewEnvScope(nil, true) // include OS env as base
+	for _, env := range a.dag.Env {
+		if key, value, found := strings.Cut(env, "="); found {
+			envScope.Set(key, value, cmdutil.EnvSourceDAGEnv)
+		}
+	}
+	secretCtx := cmdutil.WithEnvScope(ctx, envScope)
+
 	// Resolve all secrets - providers handle their own configuration
-	resolvedSecrets, err := secretRegistry.ResolveAll(ctx, a.dag.Secrets)
+	resolvedSecrets, err := secretRegistry.ResolveAll(secretCtx, a.dag.Secrets)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve secrets: %w", err)
 	}
