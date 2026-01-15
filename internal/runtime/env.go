@@ -176,19 +176,15 @@ func fallbackWorkingDir(ctx context.Context, stepName string) string {
 		tag.Step(stepName),
 	)
 
-	if wd, err := os.Getwd(); err == nil {
+	wd, err := os.Getwd()
+	if err == nil {
 		return wd
-	} else {
-		logger.Error(ctx, "Failed to get current working directory",
-			tag.Error(err),
-		)
 	}
+	logger.Error(ctx, "Failed to get current working directory", tag.Error(err))
 
 	dir, err := os.UserHomeDir()
 	if err != nil {
-		logger.Error(ctx, "Failed to get user home directory",
-			tag.Error(err),
-		)
+		logger.Error(ctx, "Failed to get user home directory", tag.Error(err))
 	}
 	return dir
 }

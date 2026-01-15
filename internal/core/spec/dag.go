@@ -1177,37 +1177,34 @@ func parseHealthcheck(h *healthcheck) (*core.Healthcheck, error) {
 	return hc, nil
 }
 
-func buildRegistryAuths(ctx BuildContext, d *dag) (map[string]*core.AuthConfig, error) {
+func buildRegistryAuths(_ BuildContext, d *dag) (map[string]*core.AuthConfig, error) {
 	if d.RegistryAuths == nil {
 		return nil, nil
 	}
 
-	// No expansion at build time - credentials are evaluated at runtime
-	// See runtime/agent/agent.go where RegistryAuths are evaluated before use
-	expand := func(s string) string {
-		return s
-	}
+	// No expansion at build time - credentials are evaluated at runtime.
+	// See runtime/agent/agent.go where RegistryAuths are evaluated before use.
 
-	// parseAuthConfig parses auth config from a map with string keys
+	// parseAuthConfig parses auth config from a map with string keys.
 	parseAuthConfig := func(m map[string]any) *core.AuthConfig {
 		cfg := &core.AuthConfig{}
 		if v, ok := m["username"].(string); ok {
-			cfg.Username = expand(v)
+			cfg.Username = v
 		}
 		if v, ok := m["password"].(string); ok {
-			cfg.Password = expand(v)
+			cfg.Password = v
 		}
 		if v, ok := m["auth"].(string); ok {
-			cfg.Auth = expand(v)
+			cfg.Auth = v
 		}
 		return cfg
 	}
 
-	// parseAuthData parses auth data which can be a string or a map
+	// parseAuthData parses auth data which can be a string or a map.
 	parseAuthData := func(authData any) *core.AuthConfig {
 		switch auth := authData.(type) {
 		case string:
-			return &core.AuthConfig{Auth: expand(auth)}
+			return &core.AuthConfig{Auth: auth}
 		case map[string]any:
 			return parseAuthConfig(auth)
 		case map[any]any:
@@ -1219,15 +1216,16 @@ func buildRegistryAuths(ctx BuildContext, d *dag) (map[string]*core.AuthConfig, 
 				}
 			}
 			return parseAuthConfig(m)
+		default:
+			return &core.AuthConfig{}
 		}
-		return &core.AuthConfig{}
 	}
 
 	registryAuths := make(map[string]*core.AuthConfig)
 
 	switch v := d.RegistryAuths.(type) {
 	case string:
-		registryAuths["_json"] = &core.AuthConfig{Auth: expand(v)}
+		registryAuths["_json"] = &core.AuthConfig{Auth: v}
 
 	case map[string]any:
 		for registry, authData := range v {
