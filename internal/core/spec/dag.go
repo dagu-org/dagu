@@ -401,17 +401,22 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 
 	// Initialize shared envScope state for thread-safe env var handling.
 	// Start with OS environment as base layer.
-	ctx.envScope = &envScopeState{
-		scope:    cmdutil.NewEnvScope(nil, true),
-		buildEnv: make(map[string]string),
-	}
+	baseScope := cmdutil.NewEnvScope(nil, true)
 
 	// Pre-populate with build env from options (for retry with dotenv).
 	// This allows YAML to reference env vars that were loaded from .env files
 	// before the rebuild.
+	buildEnv := make(map[string]string, len(ctx.opts.BuildEnv))
 	for k, v := range ctx.opts.BuildEnv {
-		ctx.envScope.scope.Set(k, v, cmdutil.EnvSourceDAGEnv)
-		ctx.envScope.buildEnv[k] = v
+		buildEnv[k] = v
+	}
+	if len(buildEnv) > 0 {
+		baseScope = baseScope.WithEntries(buildEnv, cmdutil.EnvSourceDotEnv)
+	}
+
+	ctx.envScope = &envScopeState{
+		scope:    baseScope,
+		buildEnv: buildEnv,
 	}
 
 	// Run the transformer pipeline
@@ -611,11 +616,11 @@ func buildEnvs(ctx BuildContext, d *dag) ([]string, error) {
 		return nil, err
 	}
 
-	// Populate the shared envScope state so subsequent transformers can use it.
+	// Add vars to the shared envScope state so subsequent transformers can use it.
 	// This replaces the old pattern of using os.Setenv which caused race conditions.
-	if ctx.envScope != nil && vars != nil {
+	if ctx.envScope != nil && len(vars) > 0 {
+		ctx.envScope.scope = ctx.envScope.scope.WithEntries(vars, cmdutil.EnvSourceDAGEnv)
 		for k, v := range vars {
-			ctx.envScope.scope.Set(k, v, cmdutil.EnvSourceDAGEnv)
 			ctx.envScope.buildEnv[k] = v
 		}
 	}

@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime"
 )
 
-// Note: This test uses execution.SetupDAGContext to set up the DAG context,
+// Note: This test uses runtime.NewContext to set up the DAG context,
 // then uses runtime.GetEnv/WithEnv to manage the runtime Env.
 
 func TestDebugVariables(t *testing.T) {
@@ -17,15 +18,11 @@ func TestDebugVariables(t *testing.T) {
 	ctx := runtime.NewContext(context.Background(), &core.DAG{}, "test-run", "test.log")
 	env := runtime.GetEnv(ctx)
 
-	// Store variable with spaces
-	env.Variables.Store("SPACES", "SPACES=  ")
+	// Store variable with spaces using Scope
+	env.Scope = env.Scope.WithEntry("SPACES", "  ", cmdutil.EnvSourceStepEnv)
 
 	// IMPORTANT: Update the context with the modified env
 	ctx = runtime.WithEnv(ctx, env)
-
-	// Print out what Variables() returns
-	vars := env.Variables.Variables()
-	fmt.Printf("Variables map: %#v\n", vars)
 
 	// Try evaluating directly
 	result, err := runtime.EvalString(ctx, "${SPACES}")
@@ -41,21 +38,20 @@ func TestDebugVariables(t *testing.T) {
 	fmt.Printf("Expected: '  ' (len=2)\n")
 	fmt.Printf("Expected bytes: %v\n", []byte("  "))
 
-	// Let's also check what Envs map has
-	fmt.Printf("\nEnvs map: %#v\n", env.Envs)
+	// Let's also check what Scope has
+	fmt.Printf("\nScope ToMap: %#v\n", env.Scope.ToMap())
 
 	// Let's check what GetEnv returns
 	envFromCtx := runtime.GetEnv(ctx)
-	fmt.Printf("\nEnv from context Variables: %#v\n", envFromCtx.Variables.Variables())
+	fmt.Printf("\nEnv from context Scope ToMap: %#v\n", envFromCtx.Scope.ToMap())
 
 	// Test with special characters too
-	env.Variables.Store("SPECIAL", "SPECIAL=$pecial!@#")
+	env.Scope = env.Scope.WithEntry("SPECIAL", "$pecial!@#", cmdutil.EnvSourceStepEnv)
 
 	// Update context again after adding new variable
 	ctx = runtime.WithEnv(ctx, env)
 
-	vars2 := env.Variables.Variables()
-	fmt.Printf("\nVariables map with special: %#v\n", vars2)
+	fmt.Printf("\nScope ToMap with special: %#v\n", env.Scope.ToMap())
 
 	result2, err := runtime.EvalString(ctx, "${SPECIAL}")
 	if err != nil {
@@ -66,9 +62,11 @@ func TestDebugVariables(t *testing.T) {
 
 	// Let's debug the $pecial issue
 	// Try different patterns
-	env.Variables.Store("DOLLAR", "DOLLAR=$")
-	env.Variables.Store("DOLLAR_P", "DOLLAR_P=$p")
-	env.Variables.Store("ESCAPED", "ESCAPED=\\$pecial")
+	env.Scope = env.Scope.WithEntries(map[string]string{
+		"DOLLAR":   "$",
+		"DOLLAR_P": "$p",
+		"ESCAPED":  "\\$pecial",
+	}, cmdutil.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	r3, _ := runtime.EvalString(ctx, "${DOLLAR}")
@@ -81,7 +79,7 @@ func TestDebugVariables(t *testing.T) {
 
 	// Test without environment expansion
 	fmt.Printf("\n--- Testing without env expansion ---\n")
-	env.Variables.Store("TEST_DOLLAR", "TEST_DOLLAR=$HOME/test")
+	env.Scope = env.Scope.WithEntry("TEST_DOLLAR", "$HOME/test", cmdutil.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	// This should expand $HOME

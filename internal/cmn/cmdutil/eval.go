@@ -76,6 +76,10 @@ func OnlyReplaceVars() EvalOption {
 
 var reEscapedKeyValue = regexp.MustCompile(`^[^\s=]+="[^"]+"$`)
 
+// reVarSubstitution matches $VAR, ${VAR}, '$VAR', '${VAR}' patterns for variable substitution.
+// Group 1: ${...} content, Group 2: $VAR content (without braces)
+var reVarSubstitution = regexp.MustCompile(`[']{0,1}\$\{([^}]+)\}[']{0,1}|[']{0,1}\$([a-zA-Z0-9_][a-zA-Z0-9_]*)[']{0,1}`)
+
 // BuildCommandEscapedString constructs a single shell-ready string from a command and its arguments.
 // It assumes that the command and arguments are already escaped.
 func BuildCommandEscapedString(command string, args []string) string {
@@ -113,12 +117,15 @@ func BuildCommandEscapedString(command string, args []string) string {
 	return fmt.Sprintf("%s %s", command, strings.Join(quotedArgs, " "))
 }
 
-// expandVariables expands variable references in the input string using the provided options
+// expandVariables expands variable references in the input string using the provided options.
+// It uses opts.Variables for explicit variable maps, and falls back to EnvScope from context.
 func expandVariables(ctx context.Context, value string, options *EvalOptions) string {
-	if len(options.Variables) == 0 && options.StepMap != nil {
-		return ExpandReferencesWithSteps(ctx, value, map[string]string{}, options.StepMap)
+	// Handle step references like ${step.stdout} first
+	if options.StepMap != nil {
+		value = ExpandReferencesWithSteps(ctx, value, map[string]string{}, options.StepMap)
 	}
 
+	// Expand from explicit Variables maps
 	for _, vars := range options.Variables {
 		if options.StepMap != nil {
 			value = ExpandReferencesWithSteps(ctx, value, vars, options.StepMap)
@@ -127,6 +134,13 @@ func expandVariables(ctx context.Context, value string, options *EvalOptions) st
 		}
 		value = replaceVars(value, vars)
 	}
+
+	// Also expand from EnvScope if available (for params like $1, $2)
+	// This ensures variables in EnvScope are expanded even when opts.Variables is empty
+	if scope := GetEnvScope(ctx); scope != nil {
+		value = replaceVarsWithScope(value, scope)
+	}
+
 	return value
 }
 
@@ -682,23 +696,48 @@ func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[st
 	})
 }
 
-func replaceVars(template string, vars map[string]string) string {
-	re := regexp.MustCompile(`[']{0,1}\$\{([^}]+)\}[']{0,1}|[']{0,1}\$([a-zA-Z0-9_][a-zA-Z0-9_]*)[']{0,1}`)
+// extractVarKey extracts the variable key from a regex match.
+// Returns the key and false if the match should be skipped (single-quoted).
+func extractVarKey(match string) (string, bool) {
+	if match[0] == '\'' && match[len(match)-1] == '\'' {
+		return "", false // Single-quoted - skip
+	}
+	if strings.HasPrefix(match, "${") {
+		return match[2 : len(match)-1], true
+	}
+	return match[1:], true
+}
 
-	return re.ReplaceAllStringFunc(template, func(match string) string {
-		var key string
-		if match[0] == '\'' && match[len(match)-1] == '\'' {
-			// If the match is surrounded by single quotes, leave it as-is
+// replaceVars substitutes $VAR and ${VAR} patterns using the provided map.
+func replaceVars(template string, vars map[string]string) string {
+	return reVarSubstitution.ReplaceAllStringFunc(template, func(match string) string {
+		key, ok := extractVarKey(match)
+		if !ok {
 			return match
 		}
-		if strings.HasPrefix(match, "${") {
-			key = match[2 : len(match)-1]
-		} else {
-			key = match[1:]
-		}
-
-		if val, ok := vars[key]; ok {
+		if val, found := vars[key]; found {
 			return val
+		}
+		return match
+	})
+}
+
+// replaceVarsWithScope substitutes $VAR and ${VAR} patterns using EnvScope.
+// Only expands USER-defined vars (not OS-sourced), allowing live OS env
+// reads via expandWithShellContext later.
+func replaceVarsWithScope(template string, scope *EnvScope) string {
+	return reVarSubstitution.ReplaceAllStringFunc(template, func(match string) string {
+		key, ok := extractVarKey(match)
+		if !ok {
+			return match
+		}
+		// Skip JSON paths (handled elsewhere)
+		if strings.Contains(key, ".") {
+			return match
+		}
+		// Only expand USER-defined vars, not OS-sourced
+		if entry, found := scope.GetEntry(key); found && entry.Source != EnvSourceOS {
+			return entry.Value
 		}
 		return match
 	})
@@ -728,10 +767,11 @@ func expandWithShellContext(ctx context.Context, input string, opts *EvalOptions
 			}
 			// Check EnvScope from context first, then fall back to os.Getenv
 			if scope := GetEnvScope(ctx); scope != nil {
-				if val, ok := scope.Get(name); ok {
-					return val
+				// Only use USER-defined vars from scope, not OS-sourced vars
+				// This lets us read live OS env values instead of frozen ones
+				if entry, ok := scope.GetEntry(name); ok && entry.Source != EnvSourceOS {
+					return entry.Value
 				}
-				return "" // Not found in scope
 			}
 			return os.Getenv(name)
 		}),

@@ -791,11 +791,13 @@ func (a *Agent) buildOutputs(ctx context.Context, finalStatus core.Status) *exec
 	}
 
 	// Mask any secrets in output values to prevent exposing sensitive data
+	// Use EnvScope.AllSecrets() for unified source tracking
 	rCtx := runtime.GetDAGContext(ctx)
-	if len(rCtx.SecretEnvs) > 0 {
+	secrets := rCtx.EnvScope.AllSecrets()
+	if len(secrets) > 0 {
 		// Convert secret envs map to the format expected by masker
 		var secretEnvs []string
-		for k, v := range rCtx.SecretEnvs {
+		for k, v := range secrets {
 			secretEnvs = append(secretEnvs, k+"="+v)
 		}
 		masker := masking.NewMasker(masking.SourcedEnvVars{
@@ -1102,10 +1104,14 @@ func (a *Agent) resolveSecrets(ctx context.Context) ([]string, error) {
 	// global OS environment. Pass them via context so the env provider
 	// can resolve secrets that reference DAG-defined env vars.
 	envScope := cmdutil.NewEnvScope(nil, true) // include OS env as base
+	dagEnvs := make(map[string]string)
 	for _, env := range a.dag.Env {
 		if key, value, found := strings.Cut(env, "="); found {
-			envScope.Set(key, value, cmdutil.EnvSourceDAGEnv)
+			dagEnvs[key] = value
 		}
+	}
+	if len(dagEnvs) > 0 {
+		envScope = envScope.WithEntries(dagEnvs, cmdutil.EnvSourceDAGEnv)
 	}
 	secretCtx := cmdutil.WithEnvScope(ctx, envScope)
 

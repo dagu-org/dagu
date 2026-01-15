@@ -81,8 +81,8 @@ func evaluatePairs(ctx BuildContext, pairs []pair) (map[string]string, error) {
 			// This ensures command substitution and variable expansion work correctly
 			// without mutating the global OS environment.
 			scope := cmdutil.NewEnvScope(nil, true)
-			for k, v := range vars {
-				scope.Set(k, v, cmdutil.EnvSourceDAGEnv)
+			if len(vars) > 0 {
+				scope = scope.WithEntries(vars, cmdutil.EnvSourceDAGEnv)
 			}
 
 			// Create evaluation context - handle nil parent context

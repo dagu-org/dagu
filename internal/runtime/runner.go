@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/collections"
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/cmn/signal"
@@ -593,13 +593,22 @@ func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) con
 		// Load output variables from this predecessor node
 		// (includes approval inputs which are stored in OutputVariables)
 		predNode := plan.GetNode(predID)
-		if predNode != nil && predNode.inner.State.OutputVariables != nil {
-			env.LoadOutputVariables(predNode.inner.State.OutputVariables)
+		if predNode == nil {
+			continue
+		}
+
+		// Add predecessor outputs to scope
+		if outputs := predNode.OutputVariablesMap(); len(outputs) > 0 {
+			stepID := predNode.Step().ID
+			if stepID == "" {
+				stepID = predNode.Step().Name
+			}
+			env.Scope = env.Scope.WithStepOutputs(outputs, stepID)
 		}
 	}
 
 	// Helper to evaluate and store environment variables
-	envVars := &collections.SyncMap{}
+	evaluatedEnvs := make(map[string]string)
 	addEnvVars := func(envList []string) {
 		for _, v := range envList {
 			key, value, found := strings.Cut(v, "=")
@@ -615,7 +624,7 @@ func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) con
 				)
 				continue
 			}
-			envVars.Store(key, key+"="+evaluatedValue)
+			evaluatedEnvs[key] = evaluatedValue
 		}
 	}
 
@@ -630,7 +639,10 @@ func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) con
 		addEnvVars(dag.Container.Env)
 	}
 
-	env.ForceLoadOutputVariables(envVars)
+	// Update scope with evaluated step env vars
+	if len(evaluatedEnvs) > 0 {
+		env.Scope = env.Scope.WithEntries(evaluatedEnvs, cmdutil.EnvSourceStepEnv)
+	}
 
 	return WithEnv(ctx, env)
 }
@@ -640,19 +652,31 @@ func (r *Runner) setupEnvironEventHandler(ctx context.Context, plan *Plan, node 
 	existingEnv := GetEnv(ctx)
 
 	env := NewPlanEnv(ctx, node.Step(), plan)
-	env.Envs[exec.EnvKeyDAGRunStatus] = r.Status(ctx, plan).String()
 
-	// Copy extra env vars from existing context that aren't standard step envs
-	for k, v := range existingEnv.Envs {
-		if _, exists := env.Envs[k]; !exists {
-			env.Envs[k] = v
+	// Add DAG_RUN_STATUS to scope
+	env.Scope = env.Scope.WithEntry(
+		exec.EnvKeyDAGRunStatus,
+		r.Status(ctx, plan).String(),
+		cmdutil.EnvSourceStepEnv,
+	)
+
+	// Copy extra env vars from existing scope that aren't already set
+	if existingEnv.Scope != nil {
+		for k, v := range existingEnv.Scope.AllBySource(cmdutil.EnvSourceStepEnv) {
+			if _, exists := env.Scope.Get(k); !exists {
+				env.Scope = env.Scope.WithEntry(k, v, cmdutil.EnvSourceStepEnv)
+			}
 		}
 	}
 
-	// get all output variables (includes approval inputs which are stored in OutputVariables)
-	for _, node := range plan.Nodes() {
-		if node.inner.State.OutputVariables != nil {
-			env.LoadOutputVariables(node.inner.State.OutputVariables)
+	// Load all output variables from all nodes
+	for _, n := range plan.Nodes() {
+		if outputs := n.OutputVariablesMap(); len(outputs) > 0 {
+			stepID := n.Step().ID
+			if stepID == "" {
+				stepID = n.Step().Name
+			}
+			env.Scope = env.Scope.WithStepOutputs(outputs, stepID)
 		}
 	}
 
@@ -1233,9 +1257,13 @@ func (r *Runner) shouldRepeatNode(ctx context.Context, node *Node, execErr error
 		// It's a 'while' loop. Repeat while a condition is true.
 		if rp.Condition != nil {
 			// Ensure node's own output variables are reloaded before evaluating the condition.
-			if node.inner.State.OutputVariables != nil {
+			if outputs := node.OutputVariablesMap(); len(outputs) > 0 {
 				env := GetEnv(ctx)
-				env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
+				stepID := node.Step().ID
+				if stepID == "" {
+					stepID = node.Step().Name
+				}
+				env.Scope = env.Scope.WithStepOutputs(outputs, stepID)
 				ctx = WithEnv(ctx, env)
 			}
 			err := EvalCondition(ctx, shell, rp.Condition)
@@ -1252,9 +1280,13 @@ func (r *Runner) shouldRepeatNode(ctx context.Context, node *Node, execErr error
 		// It's an 'until' loop. Repeat until a condition is true.
 		if rp.Condition != nil {
 			// Ensure node's own output variables are reloaded before evaluating the condition.
-			if node.inner.State.OutputVariables != nil {
+			if outputs := node.OutputVariablesMap(); len(outputs) > 0 {
 				env := GetEnv(ctx)
-				env.ForceLoadOutputVariables(node.inner.State.OutputVariables)
+				stepID := node.Step().ID
+				if stepID == "" {
+					stepID = node.Step().Name
+				}
+				env.Scope = env.Scope.WithStepOutputs(outputs, stepID)
 				ctx = WithEnv(ctx, env)
 			}
 			err := EvalCondition(ctx, shell, rp.Condition)

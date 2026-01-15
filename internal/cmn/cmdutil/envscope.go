@@ -12,19 +12,24 @@ import (
 type EnvSource string
 
 const (
-	EnvSourceOS     EnvSource = "os"      // From os.Environ()
-	EnvSourceDAGEnv EnvSource = "dag_env" // From DAG env: field
-	EnvSourceDotEnv EnvSource = "dotenv"  // From .env file
-	EnvSourceParam  EnvSource = "param"   // From params
-	EnvSourceStep   EnvSource = "step"    // From step output
-	EnvSourceSecret EnvSource = "secret"  // From secrets
+	EnvSourceOS      EnvSource = "os"       // From os.Environ()
+	EnvSourceDAGEnv  EnvSource = "dag_env"  // From DAG env: field
+	EnvSourceDotEnv  EnvSource = "dotenv"   // From .env file
+	EnvSourceParam   EnvSource = "param"    // From params
+	EnvSourceOutput  EnvSource = "output"   // From step output (renamed from EnvSourceStep)
+	EnvSourceSecret  EnvSource = "secret"   // From secrets
+	EnvSourceStepEnv EnvSource = "step_env" // From step.env field
 )
+
+// EnvSourceStep is deprecated: use EnvSourceOutput instead
+const EnvSourceStep = EnvSourceOutput
 
 // EnvEntry represents a single environment variable with metadata
 type EnvEntry struct {
 	Key    string
 	Value  string
 	Source EnvSource
+	Origin string // stepID for outputs, filepath for dotenv (optional metadata)
 }
 
 // EnvScope is an isolated, immutable environment scope for DAG loading/execution.
@@ -52,15 +57,60 @@ func NewEnvScope(parent *EnvScope, includeOS bool) *EnvScope {
 	return e
 }
 
-// Set adds or updates a variable in this scope
-func (e *EnvScope) Set(key, value string, source EnvSource) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	e.entries[key] = EnvEntry{Key: key, Value: value, Source: source}
+// WithEntry returns a new EnvScope with the given entry added.
+// The original scope is not modified (immutable).
+func (e *EnvScope) WithEntry(key, value string, source EnvSource) *EnvScope {
+	return e.WithEntryOrigin(key, value, source, "")
+}
+
+// WithEntryOrigin returns a new EnvScope with the given entry and origin metadata.
+// The original scope is not modified (immutable).
+func (e *EnvScope) WithEntryOrigin(key, value string, source EnvSource, origin string) *EnvScope {
+	newScope := &EnvScope{
+		entries: make(map[string]EnvEntry, 1),
+		parent:  e,
+	}
+	newScope.entries[key] = EnvEntry{Key: key, Value: value, Source: source, Origin: origin}
+	return newScope
+}
+
+// WithEntries returns a new EnvScope with the given entries added.
+// The original scope is not modified (immutable).
+func (e *EnvScope) WithEntries(entries map[string]string, source EnvSource) *EnvScope {
+	if len(entries) == 0 {
+		return e
+	}
+	newScope := &EnvScope{
+		entries: make(map[string]EnvEntry, len(entries)),
+		parent:  e,
+	}
+	for k, v := range entries {
+		newScope.entries[k] = EnvEntry{Key: k, Value: v, Source: source}
+	}
+	return newScope
+}
+
+// WithStepOutputs returns a new EnvScope with step output variables added.
+// The stepID is recorded as the origin for debugging.
+func (e *EnvScope) WithStepOutputs(outputs map[string]string, stepID string) *EnvScope {
+	if len(outputs) == 0 {
+		return e
+	}
+	newScope := &EnvScope{
+		entries: make(map[string]EnvEntry, len(outputs)),
+		parent:  e,
+	}
+	for k, v := range outputs {
+		newScope.entries[k] = EnvEntry{Key: k, Value: v, Source: EnvSourceOutput, Origin: stepID}
+	}
+	return newScope
 }
 
 // Get retrieves a variable, checking this scope then parent scopes
 func (e *EnvScope) Get(key string) (string, bool) {
+	if e == nil {
+		return "", false
+	}
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	if entry, ok := e.entries[key]; ok {
@@ -74,6 +124,9 @@ func (e *EnvScope) Get(key string) (string, bool) {
 
 // GetEntry retrieves the full entry with metadata
 func (e *EnvScope) GetEntry(key string) (EnvEntry, bool) {
+	if e == nil {
+		return EnvEntry{}, false
+	}
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	if entry, ok := e.entries[key]; ok {
@@ -87,6 +140,9 @@ func (e *EnvScope) GetEntry(key string) (EnvEntry, bool) {
 
 // ToSlice returns all variables as KEY=value strings (for cmd.Env)
 func (e *EnvScope) ToSlice() []string {
+	if e == nil {
+		return nil
+	}
 	all := e.ToMap()
 	result := make([]string, 0, len(all))
 	for k, v := range all {
@@ -97,6 +153,9 @@ func (e *EnvScope) ToSlice() []string {
 
 // ToMap returns all variables as a map
 func (e *EnvScope) ToMap() map[string]string {
+	if e == nil {
+		return make(map[string]string)
+	}
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
@@ -114,6 +173,9 @@ func (e *EnvScope) ToMap() map[string]string {
 
 // Expand expands ${VAR} and $VAR in s using this scope
 func (e *EnvScope) Expand(s string) string {
+	if e == nil {
+		return s
+	}
 	return os.Expand(s, func(key string) string {
 		if v, ok := e.Get(key); ok {
 			return v
@@ -159,11 +221,87 @@ func GetEnvScope(ctx context.Context) *EnvScope {
 	return nil
 }
 
-// GetEnvScopeOrOS returns the EnvScope from context, or creates one with OS env.
-// If context is nil, returns a new EnvScope with OS environment.
-func GetEnvScopeOrOS(ctx context.Context) *EnvScope {
-	if scope := GetEnvScope(ctx); scope != nil {
-		return scope
+// AllBySource returns all entries with the given source.
+// This is useful for getting all secrets for masking, all params, etc.
+func (e *EnvScope) AllBySource(source EnvSource) map[string]string {
+	if e == nil {
+		return make(map[string]string)
 	}
-	return NewEnvScope(nil, true)
+	result := make(map[string]string)
+	e.collectBySource(source, result)
+	return result
+}
+
+func (e *EnvScope) collectBySource(source EnvSource, result map[string]string) {
+	if e == nil {
+		return
+	}
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	// First collect from parent (so child entries override)
+	if e.parent != nil {
+		e.parent.collectBySource(source, result)
+	}
+	// Then add entries from this scope
+	for k, entry := range e.entries {
+		if entry.Source == source {
+			result[k] = entry.Value
+		}
+	}
+}
+
+// AllSecrets returns all entries with EnvSourceSecret.
+// This is a convenience method for output masking.
+func (e *EnvScope) AllSecrets() map[string]string {
+	if e == nil {
+		return make(map[string]string)
+	}
+	return e.AllBySource(EnvSourceSecret)
+}
+
+// AllUserEnvs returns all entries excluding OS environment.
+// This replaces exec.Context.UserEnvsMap().
+func (e *EnvScope) AllUserEnvs() map[string]string {
+	if e == nil {
+		return make(map[string]string)
+	}
+	result := make(map[string]string)
+	e.collectUserEnvs(result)
+	return result
+}
+
+func (e *EnvScope) collectUserEnvs(result map[string]string) {
+	if e == nil {
+		return
+	}
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	// First collect from parent (so child entries override)
+	if e.parent != nil {
+		e.parent.collectUserEnvs(result)
+	}
+	// Then add entries from this scope (excluding OS source)
+	for k, entry := range e.entries {
+		if entry.Source != EnvSourceOS {
+			result[k] = entry.Value
+		}
+	}
+}
+
+// Provenance returns a human-readable description of where a variable came from.
+// Returns empty string if the variable is not found.
+func (e *EnvScope) Provenance(key string) string {
+	if e == nil {
+		return ""
+	}
+	entry, ok := e.GetEntry(key)
+	if !ok {
+		return ""
+	}
+	if entry.Origin != "" {
+		return fmt.Sprintf("%s (from %s)", entry.Source, entry.Origin)
+	}
+	return string(entry.Source)
 }

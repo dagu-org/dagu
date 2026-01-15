@@ -10,8 +10,8 @@ import (
 
 func TestExpandEnvContext(t *testing.T) {
 	t.Run("WithScopeInContext", func(t *testing.T) {
-		scope := NewEnvScope(nil, false)
-		scope.Set("MY_VAR", "scope_value", EnvSourceDAGEnv)
+		scope := NewEnvScope(nil, false).
+			WithEntry("MY_VAR", "scope_value", EnvSourceDAGEnv)
 
 		ctx := WithEnvScope(context.Background(), scope)
 		result := ExpandEnvContext(ctx, "Value is $MY_VAR")
@@ -23,8 +23,8 @@ func TestExpandEnvContext(t *testing.T) {
 		os.Setenv(key, "os_value")
 		defer os.Unsetenv(key)
 
-		scope := NewEnvScope(nil, false)
-		scope.Set(key, "scope_value", EnvSourceDAGEnv)
+		scope := NewEnvScope(nil, false).
+			WithEntry(key, "scope_value", EnvSourceDAGEnv)
 
 		ctx := WithEnvScope(context.Background(), scope)
 		result := ExpandEnvContext(ctx, "Value is $"+key)
@@ -59,8 +59,8 @@ func TestExpandEnvContext(t *testing.T) {
 	})
 
 	t.Run("BracedVariableSyntax", func(t *testing.T) {
-		scope := NewEnvScope(nil, false)
-		scope.Set("VAR", "value", EnvSourceDAGEnv)
+		scope := NewEnvScope(nil, false).
+			WithEntry("VAR", "value", EnvSourceDAGEnv)
 
 		ctx := WithEnvScope(context.Background(), scope)
 		result := ExpandEnvContext(ctx, "${VAR}Suffix")
@@ -68,9 +68,9 @@ func TestExpandEnvContext(t *testing.T) {
 	})
 
 	t.Run("MultipleVariables", func(t *testing.T) {
-		scope := NewEnvScope(nil, false)
-		scope.Set("FIRST", "Hello", EnvSourceDAGEnv)
-		scope.Set("SECOND", "World", EnvSourceDAGEnv)
+		scope := NewEnvScope(nil, false).
+			WithEntry("FIRST", "Hello", EnvSourceDAGEnv).
+			WithEntry("SECOND", "World", EnvSourceDAGEnv)
 
 		ctx := WithEnvScope(context.Background(), scope)
 		result := ExpandEnvContext(ctx, "$FIRST, $SECOND!")
