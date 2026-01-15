@@ -494,17 +494,17 @@ func (r *Runner) setLastError(err error) {
 }
 
 func (r *Runner) prepareNode(ctx context.Context, node *Node) error {
-	if !r.dry {
-		return node.Prepare(ctx, r.logDir, r.dagRunID)
+	if r.dry {
+		return nil
 	}
-	return nil
+	return node.Prepare(ctx, r.logDir, r.dagRunID)
 }
 
 func (r *Runner) teardownNode(node *Node) error {
-	if !r.dry {
-		return node.Teardown()
+	if r.dry {
+		return nil
 	}
-	return nil
+	return node.Teardown()
 }
 
 // setupChatMessages loads and merges chat messages from dependent steps.
@@ -682,13 +682,10 @@ func (r *Runner) setupEnvironEventHandler(ctx context.Context, plan *Plan, node 
 }
 
 func (r *Runner) execNode(ctx context.Context, node *Node) error {
-	if !r.dry {
-		if err := node.Execute(ctx); err != nil {
-			return fmt.Errorf("failed to execute step %q: %w", node.Name(), err)
-		}
+	if r.dry {
+		return nil
 	}
-
-	return nil
+	return node.Execute(ctx)
 }
 
 // Signal sends a signal to the runner.
@@ -800,160 +797,128 @@ func (r *Runner) isCanceled() bool {
 }
 
 func isReady(ctx context.Context, plan *Plan, node *Node) bool {
-	ready := true
 	for _, depID := range plan.Dependencies(node.id) {
 		dep := plan.GetNode(depID)
+		status := dep.State().Status
 
-		switch dep.State().Status {
+		switch status {
 		case core.NodeSucceeded, core.NodePartiallySucceeded:
-			// Partial success is treated like success for dependencies
 			continue
 
 		case core.NodeFailed:
 			if dep.ShouldContinue(ctx) {
 				logger.Debug(ctx, "Dependency failed but allowed to continue",
-					tag.Step(node.Name()),
-					tag.Dependency(dep.Name()),
-				)
+					tag.Step(node.Name()), tag.Dependency(dep.Name()))
 				continue
 			}
 			logger.Debug(ctx, "Dependency failed",
-				tag.Step(node.Name()),
-				tag.Dependency(dep.Name()),
-			)
-			ready = false
+				tag.Step(node.Name()), tag.Dependency(dep.Name()))
 			node.SetStatus(core.NodeAborted)
 			node.SetError(ErrUpstreamFailed)
+			return false
 
 		case core.NodeSkipped:
 			if dep.ShouldContinue(ctx) {
 				logger.Debug(ctx, "Dependency skipped but allowed to continue",
-					tag.Step(node.Name()),
-					tag.Dependency(dep.Name()),
-				)
+					tag.Step(node.Name()), tag.Dependency(dep.Name()))
 				continue
 			}
 			logger.Debug(ctx, "Dependency skipped",
-				tag.Step(node.Name()),
-				tag.Dependency(dep.Name()),
-			)
-			ready = false
+				tag.Step(node.Name()), tag.Dependency(dep.Name()))
 			node.SetStatus(core.NodeSkipped)
 			node.SetError(ErrUpstreamSkipped)
+			return false
 
 		case core.NodeAborted:
 			logger.Debug(ctx, "Dependency aborted",
-				tag.Step(node.Name()),
-				tag.Dependency(dep.Name()),
-			)
-			ready = false
+				tag.Step(node.Name()), tag.Dependency(dep.Name()))
 			node.SetStatus(core.NodeAborted)
+			return false
+
+		case core.NodeRejected:
+			logger.Debug(ctx, "Dependency rejected",
+				tag.Step(node.Name()), tag.Dependency(dep.Name()))
+			node.SetStatus(core.NodeAborted)
+			node.SetError(ErrUpstreamRejected)
+			return false
 
 		case core.NodeNotStarted, core.NodeRunning:
 			logger.Debug(ctx, "Dependency not finished",
-				tag.Step(node.Name()),
-				tag.Dependency(dep.Name()),
-				tag.Status(dep.State().Status.String()),
-			)
-			ready = false
+				tag.Step(node.Name()), tag.Dependency(dep.Name()),
+				tag.Status(status.String()))
+			return false
 
 		case core.NodeWaiting:
-			// Dependency is waiting for human approval - block dependent nodes
 			logger.Debug(ctx, "Dependency waiting for approval",
-				tag.Step(node.Name()),
-				tag.Dependency(dep.Name()),
-			)
-			ready = false
-
-		case core.NodeRejected:
-			// Dependency was rejected - abort dependent nodes
-			logger.Debug(ctx, "Dependency rejected",
-				tag.Step(node.Name()),
-				tag.Dependency(dep.Name()),
-			)
-			ready = false
-			node.SetStatus(core.NodeAborted)
-			node.SetError(ErrUpstreamRejected)
+				tag.Step(node.Name()), tag.Dependency(dep.Name()))
+			return false
 
 		default:
-			ready = false
-
+			return false
 		}
 	}
-	return ready
+	return true
 }
 
 func (r *Runner) runEventHandler(ctx context.Context, plan *Plan, node *Node) error {
 	defer node.Finish()
 
-	if !r.dry {
-		if err := node.Prepare(ctx, r.logDir, r.dagRunID); err != nil {
-			node.SetStatus(core.NodeFailed)
-			return nil
-		}
-
-		defer func() {
-			_ = node.Teardown()
-		}()
-
-		// Evaluate preconditions for the handler
-		ctx = r.setupEnvironEventHandler(ctx, plan, node)
-		if err := node.evalPreconditions(ctx); err != nil {
-			// Handler precondition not met - skip the handler
-			node.SetStatus(core.NodeSkipped)
-			return nil
-		}
-
-		node.SetStatus(core.NodeRunning)
-
-		if err := node.Execute(ctx); err != nil {
-			node.SetStatus(core.NodeFailed)
-			return err
-		}
-
+	if r.dry {
 		node.SetStatus(core.NodeSucceeded)
-	} else {
-		node.SetStatus(core.NodeSucceeded)
+		return nil
 	}
 
+	if err := node.Prepare(ctx, r.logDir, r.dagRunID); err != nil {
+		node.SetStatus(core.NodeFailed)
+		return nil
+	}
+	defer func() { _ = node.Teardown() }()
+
+	ctx = r.setupEnvironEventHandler(ctx, plan, node)
+	if err := node.evalPreconditions(ctx); err != nil {
+		node.SetStatus(core.NodeSkipped)
+		return nil
+	}
+
+	node.SetStatus(core.NodeRunning)
+
+	if err := node.Execute(ctx); err != nil {
+		node.SetStatus(core.NodeFailed)
+		return err
+	}
+
+	node.SetStatus(core.NodeSucceeded)
 	return nil
 }
 
 func (r *Runner) setup(ctx context.Context) (err error) {
 	if !r.dry {
-		if err = os.MkdirAll(r.logDir, 0750); err != nil {
-			err = fmt.Errorf("failed to create log directory: %w", err)
-			return err
+		if err := os.MkdirAll(r.logDir, 0750); err != nil {
+			return fmt.Errorf("failed to create log directory: %w", err)
 		}
 	}
 
 	// Initialize handlers
 	r.handlerMu.Lock()
 	defer r.handlerMu.Unlock()
-	r.handlers = map[core.HandlerType]*Node{}
-	if r.onInit != nil {
-		r.handlers[core.HandlerOnInit] = &Node{Data: newSafeData(NodeData{Step: *r.onInit})}
+
+	r.handlers = make(map[core.HandlerType]*Node)
+	handlerSteps := map[core.HandlerType]*core.Step{
+		core.HandlerOnInit:    r.onInit,
+		core.HandlerOnExit:    r.onExit,
+		core.HandlerOnSuccess: r.onSuccess,
+		core.HandlerOnFailure: r.onFailure,
+		core.HandlerOnCancel:  r.onCancel,
+		core.HandlerOnWait:    r.onWait,
 	}
-	if r.onExit != nil {
-		r.handlers[core.HandlerOnExit] = &Node{Data: newSafeData(NodeData{Step: *r.onExit})}
-	}
-	if r.onSuccess != nil {
-		r.handlers[core.HandlerOnSuccess] = &Node{Data: newSafeData(NodeData{Step: *r.onSuccess})}
-	}
-	if r.onFailure != nil {
-		r.handlers[core.HandlerOnFailure] = &Node{Data: newSafeData(NodeData{Step: *r.onFailure})}
-	}
-	if r.onCancel != nil {
-		r.handlers[core.HandlerOnCancel] = &Node{Data: newSafeData(NodeData{Step: *r.onCancel})}
-	}
-	if r.onWait != nil {
-		r.handlers[core.HandlerOnWait] = &Node{Data: newSafeData(NodeData{Step: *r.onWait})}
+	for handlerType, step := range handlerSteps {
+		if step != nil {
+			r.handlers[handlerType] = &Node{Data: newSafeData(NodeData{Step: *step})}
+		}
 	}
 
-	// Initialize metrics
 	r.metrics.startTime = time.Now()
 
-	// Log runner setup
 	logger.Debug(ctx, "Runner setup complete",
 		slog.String("dagRunId", r.dagRunID),
 		slog.Int("maxActiveRuns", r.maxActiveRuns),
@@ -961,7 +926,7 @@ func (r *Runner) setup(ctx context.Context) (err error) {
 		slog.Bool("dry", r.dry),
 	)
 
-	return err
+	return nil
 }
 
 func (r *Runner) setCanceled() {
@@ -1167,7 +1132,6 @@ func meetsPreconditions(ctx context.Context, node *Node, progressCh chan *Node) 
 	return true
 }
 
-// handleNodeExecutionError processes execution errors for a node and determines if execution should be retried.
 // handleNodeExecutionError handles the error from node execution and determines if it should be retried.
 func (r *Runner) handleNodeExecutionError(ctx context.Context, plan *Plan, node *Node, execErr error) bool {
 	if execErr == nil {
@@ -1240,66 +1204,66 @@ func (r *Runner) handleNodeExecutionError(ctx context.Context, plan *Plan, node 
 
 // shouldRepeatNode determines if a node should be repeated based on its repeat policy
 func (r *Runner) shouldRepeatNode(ctx context.Context, node *Node, execErr error) bool {
-	step := node.Step()
-	rp := step.RepeatPolicy
+	rp := node.Step().RepeatPolicy
 
-	// First, check the hard limit. This overrides everything.
+	// Check the hard limit first - this overrides everything
 	if rp.Limit > 0 && node.State().DoneCount >= rp.Limit {
 		return false
 	}
 
-	env := GetEnv(ctx)
-	shell := env.Shell(ctx)
+	// Reload output variables into context before evaluating conditions
+	ctx = r.reloadNodeOutputs(ctx, node)
+	shell := GetEnv(ctx).Shell(ctx)
+
 	switch rp.RepeatMode {
 	case core.RepeatModeWhile:
-		// It's a 'while' loop. Repeat while a condition is true.
-		if rp.Condition != nil {
-			// Ensure node's own output variables are reloaded before evaluating the condition.
-			if outputs := node.OutputVariablesMap(); len(outputs) > 0 {
-				env := GetEnv(ctx)
-				stepID := node.Step().ID
-				if stepID == "" {
-					stepID = node.Step().Name
-				}
-				env.Scope = env.Scope.WithStepOutputs(outputs, stepID)
-				ctx = WithEnv(ctx, env)
-			}
-			err := EvalCondition(ctx, shell, rp.Condition)
-			return (err == nil) // Repeat if condition is met (no error)
-		} else if len(rp.ExitCode) > 0 {
-			lastExit := node.State().ExitCode
-			return slices.Contains(rp.ExitCode, lastExit) // Repeat if exit code matches
-		} else {
-			// No specific condition, so it's an unconditional 'while'.
-			// Repeat as long as the step itself succeeds.
-			return (execErr == nil)
-		}
+		return r.evalWhileCondition(ctx, shell, node, rp, execErr)
 	case core.RepeatModeUntil:
-		// It's an 'until' loop. Repeat until a condition is true.
-		if rp.Condition != nil {
-			// Ensure node's own output variables are reloaded before evaluating the condition.
-			if outputs := node.OutputVariablesMap(); len(outputs) > 0 {
-				env := GetEnv(ctx)
-				stepID := node.Step().ID
-				if stepID == "" {
-					stepID = node.Step().Name
-				}
-				env.Scope = env.Scope.WithStepOutputs(outputs, stepID)
-				ctx = WithEnv(ctx, env)
-			}
-			err := EvalCondition(ctx, shell, rp.Condition)
-			return (err != nil) // Repeat if condition is NOT met (error)
-		} else if len(rp.ExitCode) > 0 {
-			lastExit := node.State().ExitCode
-			return !slices.Contains(rp.ExitCode, lastExit) // Repeat if exit code does NOT match
-		} else {
-			// No specific condition, so it's an unconditional 'until'.
-			// Repeat until the step itself succeeds (i.e., repeat on failure).
-			return (execErr != nil)
-		}
+		return r.evalUntilCondition(ctx, shell, node, rp, execErr)
+	default:
+		return false
 	}
+}
 
-	return false
+// reloadNodeOutputs updates the context with the node's current output variables.
+func (r *Runner) reloadNodeOutputs(ctx context.Context, node *Node) context.Context {
+	outputs := node.OutputVariablesMap()
+	if len(outputs) == 0 {
+		return ctx
+	}
+	env := GetEnv(ctx)
+	stepID := node.Step().ID
+	if stepID == "" {
+		stepID = node.Step().Name
+	}
+	env.Scope = env.Scope.WithStepOutputs(outputs, stepID)
+	return WithEnv(ctx, env)
+}
+
+// evalWhileCondition evaluates the repeat condition for a "while" loop.
+func (r *Runner) evalWhileCondition(ctx context.Context, shell []string, node *Node, rp core.RepeatPolicy, execErr error) bool {
+	if rp.Condition != nil {
+		err := EvalCondition(ctx, shell, rp.Condition)
+		return err == nil // Repeat while condition is met
+	}
+	if len(rp.ExitCode) > 0 {
+		return slices.Contains(rp.ExitCode, node.State().ExitCode)
+	}
+	// Unconditional while: repeat as long as the step succeeds
+	return execErr == nil
+}
+
+// evalUntilCondition evaluates the repeat condition for an "until" loop.
+func (r *Runner) evalUntilCondition(ctx context.Context, shell []string, node *Node, rp core.RepeatPolicy, execErr error) bool {
+	if rp.Condition != nil {
+		err := EvalCondition(ctx, shell, rp.Condition)
+		return err != nil // Repeat until condition is met
+	}
+	if len(rp.ExitCode) > 0 {
+		return !slices.Contains(rp.ExitCode, node.State().ExitCode)
+	}
+	// Unconditional until: repeat until the step succeeds
+	return execErr != nil
 }
 
 // prepareNodeForRepeat sets up a node for repetition
