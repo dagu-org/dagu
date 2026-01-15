@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
-	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec/types"
 	"github.com/go-viper/mapstructure/v2"
@@ -836,15 +835,8 @@ func parseShellInternal(ctx BuildContext, d *dag) (*shellResult, error) {
 		if shell == "" {
 			return &shellResult{Shell: cmdutil.GetShellCommand(""), Args: nil}, nil
 		}
-		if !ctx.opts.Has(BuildFlagNoEval) {
-			shell = expandEnvWithScope(ctx, shell)
-		}
+		// Shell expansion is deferred to runtime - see runtime/env.go Shell()
 		args := d.Shell.Arguments()
-		if !ctx.opts.Has(BuildFlagNoEval) {
-			for i, arg := range args {
-				args[i] = expandEnvWithScope(ctx, arg)
-			}
-		}
 		return &shellResult{Shell: shell, Args: args}, nil
 	}
 
@@ -854,10 +846,7 @@ func parseShellInternal(ctx BuildContext, d *dag) (*shellResult, error) {
 		return &shellResult{Shell: cmdutil.GetShellCommand(""), Args: nil}, nil
 	}
 
-	if !ctx.opts.Has(BuildFlagNoEval) {
-		command = expandEnvWithScope(ctx, command)
-	}
-
+	// Shell expansion is deferred to runtime - see runtime/env.go Shell()
 	shell, args, err := cmdutil.SplitCommand(command)
 	if err != nil {
 		return nil, core.NewValidationError("shell", d.Shell.Value(), fmt.Errorf("failed to parse shell command: %w", err))
@@ -885,18 +874,21 @@ func buildWorkingDir(ctx BuildContext, d *dag) (string, error) {
 	switch {
 	case d.WorkingDir != "":
 		wd := d.WorkingDir
-		if !ctx.opts.Has(BuildFlagNoEval) {
-			wd = expandEnvWithScope(ctx, wd)
-			switch {
-			case filepath.IsAbs(wd) || strings.HasPrefix(wd, "~"):
-				wd = fileutil.ResolvePathOrBlank(wd)
-			case ctx.file != "":
-				wd = filepath.Join(filepath.Dir(ctx.file), wd)
-			default:
-				wd = fileutil.ResolvePathOrBlank(wd)
-			}
+		// Path resolution at build time (needs DAG file location for relative paths)
+		// Variable expansion is deferred to runtime - see runtime/env.go resolveWorkingDir()
+		switch {
+		case filepath.IsAbs(wd) || strings.HasPrefix(wd, "~") || strings.HasPrefix(wd, "$"):
+			// Absolute paths, home dir paths, and variable paths: store as-is
+			// Runtime will expand variables and resolve ~ prefix
+			return wd, nil
+		case ctx.file != "":
+			// Relative path: resolve to absolute using DAG file location
+			// This must happen at build time since we have ctx.file here
+			return filepath.Join(filepath.Dir(ctx.file), wd), nil
+		default:
+			// No DAG file context, store as-is
+			return wd, nil
 		}
-		return wd, nil
 
 	case ctx.opts.DefaultWorkingDir != "":
 		return ctx.opts.DefaultWorkingDir, nil
@@ -1190,11 +1182,10 @@ func buildRegistryAuths(ctx BuildContext, d *dag) (map[string]*core.AuthConfig, 
 		return nil, nil
 	}
 
+	// No expansion at build time - credentials are evaluated at runtime
+	// See runtime/agent/agent.go where RegistryAuths are evaluated before use
 	expand := func(s string) string {
-		if ctx.opts.Has(BuildFlagNoEval) {
-			return s
-		}
-		return expandEnvWithScope(ctx, s)
+		return s
 	}
 
 	// parseAuthConfig parses auth config from a map with string keys

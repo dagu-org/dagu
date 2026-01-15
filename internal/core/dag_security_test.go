@@ -11,21 +11,25 @@ import (
 
 // TestDAGJSONSecuritySensitiveFieldsExcluded verifies that sensitive fields
 // with json:"-" tags are NOT serialized to JSON, preventing secret leakage.
+// Note: Shell, ShellArgs, and WorkingDir are now serialized because they store
+// unexpanded templates (e.g., "${MY_SHELL}"), not resolved secrets.
 func TestDAGJSONSecuritySensitiveFieldsExcluded(t *testing.T) {
 	dag := &DAG{
 		Name:        "test-dag",
 		Env:         []string{"SECRET_KEY=super_secret_value", "API_TOKEN=my_token"},
 		Params:      []string{"password=mypassword"},
 		ParamsJSON:  `{"password":"mypassword"}`,
-		Shell:       "/bin/bash",
-		ShellArgs:   []string{"-c"},
-		WorkingDir:  "/secret/path",
+		Shell:       "${MY_SHELL}", // Now stores template, not expanded value
+		ShellArgs:   []string{"${ARG}"},
+		WorkingDir:  "${WORK_DIR}", // Now stores template, not expanded value
 		RegistryAuths: map[string]*AuthConfig{
 			"docker.io": {
 				Username: "user",
 				Password: "docker_secret_password",
 			},
 		},
+		SMTP: &SMTPConfig{Password: "smtp_secret"},
+		SSH:  &SSHConfig{Password: "ssh_secret"},
 		YamlData: []byte("name: test-dag"),
 	}
 
@@ -34,21 +38,24 @@ func TestDAGJSONSecuritySensitiveFieldsExcluded(t *testing.T) {
 
 	jsonStr := string(data)
 
-	// Verify sensitive fields are NOT in JSON
+	// Verify sensitive fields with secrets are NOT in JSON
 	sensitiveFields := map[string]string{
 		"Env":           "super_secret_value",
 		"Params":        "mypassword",
 		"ParamsJSON":    `"password"`,
-		"Shell":         "/bin/bash",
-		"ShellArgs":     `"-c"`,
-		"WorkingDir":    "/secret/path",
 		"RegistryAuths": "docker_secret_password",
+		"SMTP":          "smtp_secret",
+		"SSH":           "ssh_secret",
 	}
 
 	for field, secret := range sensitiveFields {
 		assert.NotContains(t, jsonStr, secret,
 			"SECURITY FAILURE: %s contains secret '%s' in JSON output", field, secret)
 	}
+
+	// Shell, ShellArgs, WorkingDir now contain templates (safe to serialize)
+	assert.Contains(t, jsonStr, "${MY_SHELL}", "Shell template should be preserved in JSON")
+	assert.Contains(t, jsonStr, "${WORK_DIR}", "WorkingDir template should be preserved in JSON")
 
 	// Verify safe fields ARE in JSON
 	assert.Contains(t, jsonStr, "test-dag", "name should be preserved in JSON")
@@ -78,18 +85,22 @@ func TestContainerJSONSecurityEnvExcluded(t *testing.T) {
 
 // TestDAGRoundTripMissingFields verifies that when loading a DAG from JSON,
 // the excluded fields are empty (which triggers re-evaluation from YamlData).
+// Note: Shell, ShellArgs, and WorkingDir are now preserved in JSON since they
+// store templates, not resolved secrets.
 func TestDAGRoundTripMissingFields(t *testing.T) {
 	original := &DAG{
 		Name:        "test-dag",
 		Env:         []string{"SECRET_KEY=value"},
 		Params:      []string{"param1=value1"},
 		ParamsJSON:  `{"param1":"value1"}`,
-		Shell:       "/bin/bash",
-		ShellArgs:   []string{"-c"},
-		WorkingDir:  "/work/dir",
+		Shell:       "${MY_SHELL}",
+		ShellArgs:   []string{"${ARG}"},
+		WorkingDir:  "${WORK_DIR}",
 		RegistryAuths: map[string]*AuthConfig{
 			"docker.io": {Password: "secret"},
 		},
+		SMTP:     &SMTPConfig{Password: "smtp_secret"},
+		SSH:      &SSHConfig{Password: "ssh_secret"},
 		YamlData: []byte("name: test-dag\nenv:\n  SECRET_KEY: value"),
 	}
 
@@ -106,10 +117,14 @@ func TestDAGRoundTripMissingFields(t *testing.T) {
 	assert.Empty(t, loaded.Env, "Env should be empty after JSON round-trip")
 	assert.Empty(t, loaded.Params, "Params should be empty after JSON round-trip")
 	assert.Empty(t, loaded.ParamsJSON, "ParamsJSON should be empty after JSON round-trip")
-	assert.Empty(t, loaded.Shell, "Shell should be empty after JSON round-trip")
-	assert.Empty(t, loaded.ShellArgs, "ShellArgs should be empty after JSON round-trip")
-	assert.Empty(t, loaded.WorkingDir, "WorkingDir should be empty after JSON round-trip")
 	assert.Nil(t, loaded.RegistryAuths, "RegistryAuths should be nil after JSON round-trip")
+	assert.Nil(t, loaded.SMTP, "SMTP should be nil after JSON round-trip")
+	assert.Nil(t, loaded.SSH, "SSH should be nil after JSON round-trip")
+
+	// Template fields are now preserved (they contain templates, not secrets)
+	assert.Equal(t, "${MY_SHELL}", loaded.Shell, "Shell template should be preserved")
+	assert.Equal(t, []string{"${ARG}"}, loaded.ShellArgs, "ShellArgs template should be preserved")
+	assert.Equal(t, "${WORK_DIR}", loaded.WorkingDir, "WorkingDir template should be preserved")
 
 	// Safe fields should be preserved
 	assert.Equal(t, "test-dag", loaded.Name, "Name should be preserved")
@@ -117,6 +132,7 @@ func TestDAGRoundTripMissingFields(t *testing.T) {
 }
 
 // TestJSONFieldTagsPresent verifies all sensitive fields have json:"-" tag.
+// Note: Shell, ShellArgs, and WorkingDir are now serialized (they contain templates).
 func TestJSONFieldTagsPresent(t *testing.T) {
 	dag := &DAG{
 		Env:           []string{"test"},
@@ -126,6 +142,8 @@ func TestJSONFieldTagsPresent(t *testing.T) {
 		ShellArgs:     []string{"test"},
 		WorkingDir:    "test",
 		RegistryAuths: map[string]*AuthConfig{"test": {}},
+		SMTP:          &SMTPConfig{Password: "test"},
+		SSH:           &SSHConfig{Password: "test"},
 	}
 
 	data, err := json.Marshal(dag)
@@ -133,20 +151,30 @@ func TestJSONFieldTagsPresent(t *testing.T) {
 
 	jsonStr := string(data)
 
-	// None of the field names should appear in JSON output
+	// These fields should NOT appear in JSON output (contain secrets)
 	sensitiveFieldNames := []string{
 		`"env"`,
 		`"params"`,
 		`"paramsJSON"`,
-		`"shell"`,
-		`"shellArgs"`,
-		`"workingDir"`,
 		`"registryAuths"`,
+		`"smtp"`,
+		`"ssh"`,
 	}
 
 	for _, fieldName := range sensitiveFieldNames {
 		if strings.Contains(jsonStr, fieldName) {
 			t.Errorf("SECURITY: JSON output contains sensitive field %s: %s", fieldName, jsonStr)
 		}
+	}
+
+	// These fields SHOULD appear in JSON output (contain templates, not secrets)
+	templateFieldNames := []string{
+		`"shell"`,
+		`"shellArgs"`,
+		`"workingDir"`,
+	}
+
+	for _, fieldName := range templateFieldNames {
+		assert.Contains(t, jsonStr, fieldName, "Template field %s should be in JSON output", fieldName)
 	}
 }

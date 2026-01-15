@@ -106,7 +106,26 @@ func resolveWorkingDir(ctx context.Context, step core.Step, rCtx Context) string
 	}
 
 	if dag != nil && dag.WorkingDir != "" {
-		return dag.WorkingDir
+		// Expand environment variables in WorkingDir at runtime
+		wd := dag.WorkingDir
+		if rCtx.EnvScope != nil {
+			wd = rCtx.EnvScope.Expand(wd)
+		} else {
+			wd = os.ExpandEnv(wd)
+		}
+		// Resolve ~ prefix after variable expansion
+		if strings.HasPrefix(wd, "~") {
+			resolved, err := fileutil.ResolvePath(wd)
+			if err != nil {
+				logger.Warn(ctx, "Failed to resolve working directory",
+					tag.Dir(wd),
+					tag.Error(err),
+				)
+			} else {
+				wd = resolved
+			}
+		}
+		return wd
 	}
 
 	return fallbackWorkingDir(ctx, step.Name)
@@ -201,7 +220,26 @@ func (e Env) Shell(ctx context.Context) []string {
 	}
 
 	if e.DAG.Shell != "" {
-		return append([]string{e.DAG.Shell}, e.DAG.ShellArgs...)
+		shellCmd, err := e.EvalString(ctx, e.DAG.Shell)
+		if err != nil {
+			logger.Error(ctx, "Failed to evaluate DAG shell",
+				tag.String("shell", e.DAG.Shell),
+				tag.Error(err),
+			)
+			return nil
+		}
+		shell := []string{shellCmd}
+		for _, arg := range e.DAG.ShellArgs {
+			evaluated, err := e.EvalString(ctx, arg)
+			if err != nil {
+				logger.Error(ctx, "Failed to evaluate DAG shell argument",
+					tag.String("arg", arg),
+					tag.Error(err),
+				)
+			}
+			shell = append(shell, evaluated)
+		}
+		return shell
 	}
 
 	shellCmd := cmdutil.GetShellCommand("")

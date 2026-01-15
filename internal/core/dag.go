@@ -63,10 +63,9 @@ func EffectiveLogOutput(dag *DAG, step *Step) LogOutputMode {
 type DAG struct {
 	// WorkingDir is the working directory to run the DAG.
 	// Default value is the directory of DAG file.
-	// If the source is not a DAG file, current directory when it's created.
-	// Note: This field is evaluated at build time and may contain secrets.
-	// It is excluded from JSON serialization to prevent secret leakage.
-	WorkingDir string `json:"-"`
+	// Relative paths are resolved at build time; variables are expanded at runtime.
+	// Supports environment variable templates (e.g., ${MY_DIR}).
+	WorkingDir string `json:"workingDir,omitempty"`
 	// Location is the absolute path to the DAG file.
 	// It is used to generate unix socket name and can be blank
 	Location string `json:"location,omitempty"`
@@ -79,15 +78,13 @@ type DAG struct {
 	// Shell is the default shell to use for all steps in this DAG.
 	// If not specified, the system default shell is used.
 	// Can be overridden at the step level.
-	// Note: This field is evaluated at build time and may contain secrets.
-	// It is excluded from JSON serialization to prevent secret leakage.
-	Shell string `json:"-"`
+	// Supports environment variable templates (e.g., ${MY_SHELL}).
+	Shell string `json:"shell,omitempty"`
 	// ShellArgs contains additional arguments to pass to the shell.
 	// These are populated when Shell is specified as a string with arguments
 	// (e.g., "bash -e") or as an array (e.g., ["bash", "-e"]).
-	// Note: This field is evaluated at build time and may contain secrets.
-	// It is excluded from JSON serialization to prevent secret leakage.
-	ShellArgs []string `json:"-"`
+	// Supports environment variable templates.
+	ShellArgs []string `json:"shellArgs,omitempty"`
 	// Dotenv is the path to the dotenv file. This is optional.
 	Dotenv []string `json:"dotenv,omitempty"`
 	// Tags contains the list of tags for the DAG. This is optional.
@@ -132,7 +129,8 @@ type DAG struct {
 	// Preconditions contains the conditions to be met before running the DAG.
 	Preconditions []*Condition `json:"preconditions,omitempty"`
 	// SMTP contains the SMTP configuration.
-	SMTP *SMTPConfig `json:"smtp,omitempty"`
+	// Excluded from JSON: may contain password.
+	SMTP *SMTPConfig `json:"-"`
 	// ErrorMail contains the mail configuration for errors.
 	ErrorMail *MailConfig `json:"errorMail,omitempty"`
 	// InfoMail contains the mail configuration for informational messages.
@@ -179,11 +177,11 @@ type DAG struct {
 	RunConfig *RunConfig `json:"runConfig,omitempty"`
 	// RegistryAuths maps registry hostnames to authentication configs.
 	// Optional: If not specified, falls back to DOCKER_AUTH_CONFIG or docker config.
-	// Note: This field contains sensitive credentials and is evaluated at build time.
-	// It is excluded from JSON serialization to prevent secret leakage.
+	// Credentials are evaluated at runtime. Excluded from JSON: may contain passwords.
 	RegistryAuths map[string]*AuthConfig `json:"-"`
 	// SSH contains the default SSH configuration for the DAG.
-	SSH *SSHConfig `json:"ssh,omitempty"`
+	// Excluded from JSON: may contain password.
+	SSH *SSHConfig `json:"-"`
 	// LLM contains the default LLM configuration for the DAG.
 	// Steps with type: chat inherit this configuration if they don't specify their own llm field.
 	LLM *LLMConfig `json:"llm,omitempty"`

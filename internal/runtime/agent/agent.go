@@ -477,7 +477,17 @@ func (a *Agent) Run(ctx context.Context) error {
 			initErr = fmt.Errorf("failed to evaluate container config: %w", err)
 			return initErr
 		}
-		ctCfg, err := docker.LoadConfig(a.dag.WorkingDir, expandedContainer, a.dag.RegistryAuths)
+		// Evaluate registry auth credentials at runtime
+		evaluatedAuths := make(map[string]*core.AuthConfig)
+		for registry, auth := range a.dag.RegistryAuths {
+			evaluatedAuth, err := cmdutil.EvalObject(ctx, *auth, runtime.AllEnvsMap(ctx))
+			if err != nil {
+				initErr = fmt.Errorf("failed to evaluate registry auth for %s: %w", registry, err)
+				return initErr
+			}
+			evaluatedAuths[registry] = &evaluatedAuth
+		}
+		ctCfg, err := docker.LoadConfig(a.dag.WorkingDir, expandedContainer, evaluatedAuths)
 		if err != nil {
 			initErr = fmt.Errorf("failed to load container config: %w", err)
 			return initErr
