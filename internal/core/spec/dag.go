@@ -406,6 +406,14 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 		buildEnv: make(map[string]string),
 	}
 
+	// Pre-populate with build env from options (for retry with dotenv).
+	// This allows YAML to reference env vars that were loaded from .env files
+	// before the rebuild.
+	for k, v := range ctx.opts.BuildEnv {
+		ctx.envScope.scope.Set(k, v, cmdutil.EnvSourceDAGEnv)
+		ctx.envScope.buildEnv[k] = v
+	}
+
 	// Run the transformer pipeline
 	errs := runTransformers(ctx, d, result)
 

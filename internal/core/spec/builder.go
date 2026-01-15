@@ -84,6 +84,11 @@ type BuildOpts struct {
 	DefaultWorkingDir string
 	// Flags stores all boolean options controlling build behaviour.
 	Flags BuildFlag
+	// BuildEnv provides pre-populated environment variables for the build.
+	// These are added to envScope before building, allowing YAML to reference
+	// them via ${VAR}. Used for retry/restart where dotenv values need to be
+	// available during rebuild from YamlData.
+	BuildEnv map[string]string
 }
 
 // Has reports whether the flag is enabled on the current BuildOpts.

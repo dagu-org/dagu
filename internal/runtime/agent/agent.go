@@ -259,15 +259,9 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Initialize propagators for W3C trace context before anything else
 	telemetry.InitializePropagators()
 
-	// Resolve secrets early so they're available for OTel config evaluation
+	// Resolve secrets early so they're available for OTel config evaluation.
+	// LoadDotEnv is idempotent - safe to call even if already loaded by caller.
 	a.dag.LoadDotEnv(ctx)
-
-	// Evaluate sensitive fields if needed (retry case).
-	// For normal execution: fields already populated from build → does nothing.
-	// For retry: fields empty (excluded via json:"-") → re-parses YamlData with dotenv available.
-	if err := a.dag.EvaluateFromYamlIfNeeded(ctx); err != nil {
-		return fmt.Errorf("failed to evaluate dag fields: %w", err)
-	}
 
 	secretEnvs, secretErr := a.resolveSecrets(ctx)
 

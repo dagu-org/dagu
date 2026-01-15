@@ -81,6 +81,17 @@ func runRestart(ctx *Context, args []string) error {
 	// to prevent secrets from being persisted to dag.json.
 	dag.Params = dagStatus.ParamsList
 
+	// Load dotenv BEFORE rebuild so values are available for YAML evaluation.
+	dag.LoadDotEnv(ctx)
+
+	// Rebuild DAG from YAML to populate fields excluded from JSON serialization
+	// (env, shell, workingDir, registryAuths, etc.). This uses spec.LoadYAML
+	// as the single source of truth for DAG building.
+	dag, err = rebuildDAGFromYAML(ctx.Context, dag)
+	if err != nil {
+		return fmt.Errorf("failed to rebuild DAG from YAML: %w", err)
+	}
+
 	if err := handleRestartProcess(ctx, dag, dagRunID); err != nil {
 		return fmt.Errorf("restart process failed for DAG %s: %w", dag.Name, err)
 	}

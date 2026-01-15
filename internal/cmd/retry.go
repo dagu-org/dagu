@@ -75,6 +75,17 @@ func runRetry(ctx *Context, args []string) error {
 	// to prevent secrets from being persisted to dag.json.
 	dag.Params = status.ParamsList
 
+	// Load dotenv BEFORE rebuild so values are available for YAML evaluation.
+	dag.LoadDotEnv(ctx)
+
+	// Rebuild DAG from YAML to populate fields excluded from JSON serialization
+	// (env, shell, workingDir, registryAuths, etc.). This uses spec.LoadYAML
+	// as the single source of truth for DAG building.
+	dag, err = rebuildDAGFromYAML(ctx.Context, dag)
+	if err != nil {
+		return fmt.Errorf("failed to rebuild DAG from YAML: %w", err)
+	}
+
 	// Block retry via CLI for DAGs with workerSelector, UNLESS this is a distributed worker execution
 	// (indicated by --worker-id being set to something other than "local")
 	if len(dag.WorkerSelector) > 0 && workerID == "local" {
@@ -123,8 +134,6 @@ func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRu
 	}()
 
 	logger.Info(ctx, "Dag-run retry initiated", tag.File(logFile.Name()))
-
-	dag.LoadDotEnv(ctx)
 
 	dr, err := ctx.dagStore(dagStoreConfig{
 		SearchPaths:           []string{filepath.Dir(dag.Location)},
