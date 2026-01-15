@@ -287,6 +287,22 @@ func EvalStringFields[T any](ctx context.Context, obj T, opts ...EvalOption) (T,
 	}
 }
 
+// evalStringValue applies variable expansion, substitution, and env expansion to a string.
+func evalStringValue(ctx context.Context, value string, opts *EvalOptions) (string, error) {
+	value = expandVariables(ctx, value, opts)
+	if opts.Substitute {
+		var err error
+		value, err = substituteCommandsWithContext(ctx, value)
+		if err != nil {
+			return "", err
+		}
+	}
+	if opts.ExpandEnv {
+		value = ExpandEnvContext(ctx, value)
+	}
+	return value, nil
+}
+
 func processStructFields(ctx context.Context, v reflect.Value, opts *EvalOptions) error {
 	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
@@ -306,22 +322,10 @@ func processStructFields(ctx context.Context, v reflect.Value, opts *EvalOptions
 			}
 
 		case reflect.String:
-			value := field.String()
-
-			value = expandVariables(ctx, value, opts)
-
-			if opts.Substitute {
-				var err error
-				value, err = substituteCommandsWithContext(ctx, value)
-				if err != nil {
-					return fmt.Errorf("field %q: %w", t.Field(i).Name, err)
-				}
+			value, err := evalStringValue(ctx, field.String(), opts)
+			if err != nil {
+				return fmt.Errorf("field %q: %w", t.Field(i).Name, err)
 			}
-
-			if opts.ExpandEnv {
-				value = ExpandEnvContext(ctx, value)
-			}
-
 			field.SetString(value)
 
 		case reflect.Struct:
@@ -330,23 +334,19 @@ func processStructFields(ctx context.Context, v reflect.Value, opts *EvalOptions
 			}
 
 		case reflect.Map:
-			// Process map fields
 			if field.IsNil() {
 				continue
 			}
-
 			processed, err := processMapWithOpts(ctx, field, opts)
 			if err != nil {
 				return fmt.Errorf("field %q: %w", t.Field(i).Name, err)
 			}
-
 			field.Set(processed)
 
 		case reflect.Slice, reflect.Array:
 			if field.IsNil() {
 				continue
 			}
-			// Create a new slice with new backing array to avoid mutating original
 			newSlice := reflect.MakeSlice(field.Type(), field.Len(), field.Cap())
 			reflect.Copy(newSlice, field)
 			if err := processSliceWithOpts(ctx, newSlice, opts); err != nil {
@@ -367,26 +367,15 @@ func processPointerField(ctx context.Context, field reflect.Value, opts *EvalOpt
 	// nolint:exhaustive
 	switch elem.Kind() {
 	case reflect.String:
-		value := elem.String()
-		value = expandVariables(ctx, value, opts)
-		if opts.Substitute {
-			var err error
-			value, err = substituteCommandsWithContext(ctx, value)
-			if err != nil {
-				return err
-			}
+		value, err := evalStringValue(ctx, elem.String(), opts)
+		if err != nil {
+			return err
 		}
-		if opts.ExpandEnv {
-			value = ExpandEnvContext(ctx, value)
-		}
-		// Create a new string and update the pointer to point to it
-		// This avoids mutating the original value
 		newStr := reflect.New(elem.Type())
 		newStr.Elem().SetString(value)
 		field.Set(newStr)
 
 	case reflect.Struct:
-		// Create a copy of the struct to avoid mutating the original
 		newStruct := reflect.New(elem.Type())
 		newStruct.Elem().Set(elem)
 		if err := processStructFields(ctx, newStruct.Elem(), opts); err != nil {
@@ -402,7 +391,6 @@ func processPointerField(ctx context.Context, field reflect.Value, opts *EvalOpt
 		if err != nil {
 			return err
 		}
-		// Create a new pointer to the processed map
 		newMap := reflect.New(elem.Type())
 		newMap.Elem().Set(processed)
 		field.Set(newMap)
@@ -411,13 +399,11 @@ func processPointerField(ctx context.Context, field reflect.Value, opts *EvalOpt
 		if elem.IsNil() {
 			return nil
 		}
-		// Create a new slice with new backing array to avoid mutating original
 		newSlice := reflect.MakeSlice(elem.Type(), elem.Len(), elem.Cap())
 		reflect.Copy(newSlice, elem)
 		if err := processSliceWithOpts(ctx, newSlice, opts); err != nil {
 			return err
 		}
-		// Create new pointer to the new slice
 		newPtr := reflect.New(elem.Type())
 		newPtr.Elem().Set(newSlice)
 		field.Set(newPtr)
@@ -436,17 +422,9 @@ func processSliceWithOpts(ctx context.Context, v reflect.Value, opts *EvalOption
 		// nolint:exhaustive
 		switch elem.Kind() {
 		case reflect.String:
-			value := elem.String()
-			value = expandVariables(ctx, value, opts)
-			if opts.Substitute {
-				var err error
-				value, err = substituteCommandsWithContext(ctx, value)
-				if err != nil {
-					return err
-				}
-			}
-			if opts.ExpandEnv {
-				value = ExpandEnvContext(ctx, value)
+			value, err := evalStringValue(ctx, elem.String(), opts)
+			if err != nil {
+				return err
 			}
 			elem.SetString(value)
 
@@ -480,70 +458,48 @@ func processSliceWithOpts(ctx context.Context, v reflect.Value, opts *EvalOption
 // processMapWithOpts recursively processes a map, evaluating string values and recursively processing
 // nested maps and structs.
 func processMapWithOpts(ctx context.Context, v reflect.Value, opts *EvalOptions) (reflect.Value, error) {
-	// Create a new map of the same type
 	mapType := v.Type()
 	newMap := reflect.MakeMap(mapType)
 
-	// Iterate over the map entries
 	iter := v.MapRange()
 	for iter.Next() {
 		key := iter.Key()
 		val := iter.Value()
 
-		// Process the value based on its type
-		var newVal reflect.Value
-		var err error
-
 		for (val.Kind() == reflect.Interface || val.Kind() == reflect.Ptr) && !val.IsNil() {
 			val = val.Elem()
 		}
 
+		var newVal reflect.Value
+		var err error
+
 		// nolint:exhaustive
 		switch val.Kind() {
 		case reflect.String:
-			// Evaluate string values
-			strVal := val.String()
-
-			strVal = expandVariables(ctx, strVal, opts)
-
-			if opts.Substitute {
-				var err error
-				strVal, err = substituteCommandsWithContext(ctx, strVal)
-				if err != nil {
-					return v, fmt.Errorf("map value: %w", err)
-				}
+			strVal, err := evalStringValue(ctx, val.String(), opts)
+			if err != nil {
+				return v, fmt.Errorf("map value: %w", err)
 			}
-
-			if opts.ExpandEnv {
-				strVal = ExpandEnvContext(ctx, strVal)
-			}
-
 			newVal = reflect.ValueOf(strVal)
 
 		case reflect.Map:
-			// Recursively process nested maps
 			newVal, err = processMapWithOpts(ctx, val, opts)
 			if err != nil {
 				return v, err
 			}
 
 		case reflect.Struct:
-			// Process structs
 			structCopy := reflect.New(val.Type()).Elem()
 			structCopy.Set(val)
-
 			if err := processStructFields(ctx, structCopy, opts); err != nil {
 				return v, err
 			}
-
 			newVal = structCopy
 
 		default:
-			// Keep other types as is
 			newVal = val
 		}
 
-		// Set the new value in the map
 		newMap.SetMapIndex(key, newVal)
 	}
 
