@@ -1962,7 +1962,6 @@ func TestEvalString_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 	}
 }
 
-
 // Helper function to create string pointer
 func ptrString(s string) *string {
 	return &s
@@ -2225,21 +2224,21 @@ func TestParseStepReference(t *testing.T) {
 			errMsg:  "slice length must be non-negative",
 		},
 		{
-			name:      "ZeroStart",
-			path:      ".exit_code:0:10",
-			wantProp:  ".exit_code",
-			wantHasS:  true,
-			wantStart: 0,
-			wantHasL:  true,
+			name:       "ZeroStart",
+			path:       ".exit_code:0:10",
+			wantProp:   ".exit_code",
+			wantHasS:   true,
+			wantStart:  0,
+			wantHasL:   true,
 			wantLength: 10,
 		},
 		{
-			name:       "EmptyLengthPart",
-			path:       ".stdout:5:",
-			wantProp:   ".stdout",
-			wantHasS:   true,
-			wantStart:  5,
-			wantHasL:   false, // Empty length part means no length specified
+			name:      "EmptyLengthPart",
+			path:      ".stdout:5:",
+			wantProp:  ".stdout",
+			wantHasS:  true,
+			wantStart: 5,
+			wantHasL:  false, // Empty length part means no length specified
 		},
 	}
 
@@ -2387,4 +2386,3 @@ func TestWithoutExpandShell(t *testing.T) {
 		})
 	}
 }
-

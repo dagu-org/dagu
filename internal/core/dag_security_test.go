@@ -15,21 +15,21 @@ import (
 // unexpanded templates (e.g., "${MY_SHELL}"), not resolved secrets.
 func TestDAGJSONSecuritySensitiveFieldsExcluded(t *testing.T) {
 	dag := &DAG{
-		Name:        "test-dag",
-		Env:         []string{"SECRET_KEY=super_secret_value", "API_TOKEN=my_token"},
-		Params:      []string{"password=mypassword"},
-		ParamsJSON:  `{"password":"mypassword"}`,
-		Shell:       "${MY_SHELL}", // Now stores template, not expanded value
-		ShellArgs:   []string{"${ARG}"},
-		WorkingDir:  "${WORK_DIR}", // Now stores template, not expanded value
+		Name:       "test-dag",
+		Env:        []string{"SECRET_KEY=super_secret_value", "API_TOKEN=my_token"},
+		Params:     []string{"password=mypassword"},
+		ParamsJSON: `{"password":"mypassword"}`,
+		Shell:      "${MY_SHELL}", // Now stores template, not expanded value
+		ShellArgs:  []string{"${ARG}"},
+		WorkingDir: "${WORK_DIR}", // Now stores template, not expanded value
 		RegistryAuths: map[string]*AuthConfig{
 			"docker.io": {
 				Username: "user",
 				Password: "docker_secret_password",
 			},
 		},
-		SMTP: &SMTPConfig{Password: "smtp_secret"},
-		SSH:  &SSHConfig{Password: "ssh_secret"},
+		SMTP:     &SMTPConfig{Password: "smtp_secret"},
+		SSH:      &SSHConfig{Password: "ssh_secret"},
 		YamlData: []byte("name: test-dag"),
 	}
 
@@ -89,13 +89,13 @@ func TestContainerJSONSecurityEnvExcluded(t *testing.T) {
 // store templates, not resolved secrets.
 func TestDAGRoundTripMissingFields(t *testing.T) {
 	original := &DAG{
-		Name:        "test-dag",
-		Env:         []string{"SECRET_KEY=value"},
-		Params:      []string{"param1=value1"},
-		ParamsJSON:  `{"param1":"value1"}`,
-		Shell:       "${MY_SHELL}",
-		ShellArgs:   []string{"${ARG}"},
-		WorkingDir:  "${WORK_DIR}",
+		Name:       "test-dag",
+		Env:        []string{"SECRET_KEY=value"},
+		Params:     []string{"param1=value1"},
+		ParamsJSON: `{"param1":"value1"}`,
+		Shell:      "${MY_SHELL}",
+		ShellArgs:  []string{"${ARG}"},
+		WorkingDir: "${WORK_DIR}",
 		RegistryAuths: map[string]*AuthConfig{
 			"docker.io": {Password: "secret"},
 		},

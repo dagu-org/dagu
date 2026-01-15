@@ -652,4 +652,3 @@ func getSocketPath(socketName string) string {
 	// On Unix systems, use /tmp
 	return filepath.Join("/tmp", socketName)
 }
-
