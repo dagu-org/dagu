@@ -16,15 +16,6 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 )
 
-// expandEnvWithScope expands ${VAR} and $VAR in s using the EnvScope from BuildContext.
-// Falls back to os.ExpandEnv if no scope is available.
-// This replaces direct os.ExpandEnv calls to avoid race conditions during concurrent DAG loading.
-func expandEnvWithScope(ctx BuildContext, s string) string {
-	if ctx.envScope != nil && ctx.envScope.scope != nil {
-		return ctx.envScope.scope.Expand(s)
-	}
-	return os.ExpandEnv(s)
-}
 
 // dag is the intermediate representation of a DAG specification.
 // It mirrors the YAML structure and gets validated/transformed into core.DAG.
@@ -823,7 +814,7 @@ type shellResult struct {
 	Args  []string
 }
 
-func parseShellInternal(ctx BuildContext, d *dag) (*shellResult, error) {
+func parseShellInternal(_ BuildContext, d *dag) (*shellResult, error) {
 	if d.Shell.IsZero() {
 		return &shellResult{Shell: cmdutil.GetShellCommand(""), Args: nil}, nil
 	}

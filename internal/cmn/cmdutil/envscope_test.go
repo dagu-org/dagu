@@ -25,8 +25,8 @@ func TestNewEnvScope(t *testing.T) {
 		// Set a test environment variable
 		key := "TEST_ENVSCOPE_VAR"
 		value := "test_value"
-		os.Setenv(key, value)
-		defer os.Unsetenv(key)
+		require.NoError(t, os.Setenv(key, value))
+		defer func() { _ = os.Unsetenv(key) }()
 
 		scope := NewEnvScope(nil, true)
 		require.NotNil(t, scope)

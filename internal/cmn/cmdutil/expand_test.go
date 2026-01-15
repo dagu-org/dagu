@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExpandEnvContext(t *testing.T) {
@@ -20,8 +21,8 @@ func TestExpandEnvContext(t *testing.T) {
 
 	t.Run("ScopeTakesPrecedenceOverOSEnv", func(t *testing.T) {
 		key := "TEST_EXPAND_PRECEDENCE"
-		os.Setenv(key, "os_value")
-		defer os.Unsetenv(key)
+		require.NoError(t, os.Setenv(key, "os_value"))
+		defer func() { _ = os.Unsetenv(key) }()
 
 		scope := NewEnvScope(nil, false).
 			WithEntry(key, "scope_value", EnvSourceDAGEnv)
@@ -33,8 +34,8 @@ func TestExpandEnvContext(t *testing.T) {
 
 	t.Run("WithoutScopeFallsBackToOSExpandEnv", func(t *testing.T) {
 		key := "TEST_EXPAND_OS_FALLBACK"
-		os.Setenv(key, "os_value")
-		defer os.Unsetenv(key)
+		require.NoError(t, os.Setenv(key, "os_value"))
+		defer func() { _ = os.Unsetenv(key) }()
 
 		ctx := context.Background()
 		result := ExpandEnvContext(ctx, "Value is $"+key)
@@ -43,8 +44,8 @@ func TestExpandEnvContext(t *testing.T) {
 
 	t.Run("NilContextFallsBackToOSExpandEnv", func(t *testing.T) {
 		key := "TEST_EXPAND_NIL_CTX"
-		os.Setenv(key, "nil_ctx_value")
-		defer os.Unsetenv(key)
+		require.NoError(t, os.Setenv(key, "nil_ctx_value"))
+		defer func() { _ = os.Unsetenv(key) }()
 
 		result := ExpandEnvContext(nil, "Value is $"+key)
 		assert.Equal(t, "Value is nil_ctx_value", result)

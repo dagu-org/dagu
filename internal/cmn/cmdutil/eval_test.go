@@ -2371,8 +2371,8 @@ func TestWithoutExpandShell(t *testing.T) {
 		},
 	}
 
-	os.Setenv("TEST_VAR", "test_value_for_shell")
-	defer os.Unsetenv("TEST_VAR")
+	require.NoError(t, os.Setenv("TEST_VAR", "test_value_for_shell"))
+	defer func() { _ = os.Unsetenv("TEST_VAR") }()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
