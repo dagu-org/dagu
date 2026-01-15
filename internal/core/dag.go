@@ -15,6 +15,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/goccy/go-yaml"
 	"github.com/joho/godotenv"
 	"github.com/robfig/cron/v3"
 )
@@ -64,7 +65,9 @@ type DAG struct {
 	// WorkingDir is the working directory to run the DAG.
 	// Default value is the directory of DAG file.
 	// If the source is not a DAG file, current directory when it's created.
-	WorkingDir string `json:"workingDir,omitempty"`
+	// Note: This field is evaluated at build time and may contain secrets.
+	// It is excluded from JSON serialization to prevent secret leakage.
+	WorkingDir string `json:"-"`
 	// Location is the absolute path to the DAG file.
 	// It is used to generate unix socket name and can be blank
 	Location string `json:"location,omitempty"`
@@ -77,11 +80,15 @@ type DAG struct {
 	// Shell is the default shell to use for all steps in this DAG.
 	// If not specified, the system default shell is used.
 	// Can be overridden at the step level.
-	Shell string `json:"shell,omitempty"`
+	// Note: This field is evaluated at build time and may contain secrets.
+	// It is excluded from JSON serialization to prevent secret leakage.
+	Shell string `json:"-"`
 	// ShellArgs contains additional arguments to pass to the shell.
 	// These are populated when Shell is specified as a string with arguments
 	// (e.g., "bash -e") or as an array (e.g., ["bash", "-e"]).
-	ShellArgs []string `json:"shellArgs,omitempty"`
+	// Note: This field is evaluated at build time and may contain secrets.
+	// It is excluded from JSON serialization to prevent secret leakage.
+	ShellArgs []string `json:"-"`
 	// Dotenv is the path to the dotenv file. This is optional.
 	Dotenv []string `json:"dotenv,omitempty"`
 	// Tags contains the list of tags for the DAG. This is optional.
@@ -98,7 +105,9 @@ type DAG struct {
 	// E.g., when the DAG has already been executed manually before the scheduled time.
 	SkipIfSuccessful bool `json:"skipIfSuccessful,omitempty"`
 	// Env contains a list of environment variables to be set before running the DAG.
-	Env []string `json:"env,omitempty"`
+	// Note: This field is evaluated at build time and may contain secrets.
+	// It is excluded from JSON serialization to prevent secret leakage.
+	Env []string `json:"-"`
 	// LogDir is the directory where the logs are stored.
 	LogDir string `json:"logDir,omitempty"`
 	// LogOutput specifies how stdout and stderr are handled in log files.
@@ -108,11 +117,15 @@ type DAG struct {
 	// DefaultParams contains the default parameters to be passed to the DAG.
 	DefaultParams string `json:"defaultParams,omitempty"`
 	// Params contains the list of parameters to be passed to the DAG.
-	Params []string `json:"params,omitempty"`
+	// Note: This field is evaluated at build time and may contain secrets.
+	// It is excluded from JSON serialization to prevent secret leakage.
+	Params []string `json:"-"`
 	// ParamsJSON contains the JSON representation of the resolved parameters.
 	// When params were supplied as JSON, the original payload is preserved.
 	// Steps can consume this via the DAGU_PARAMS_JSON environment variable.
-	ParamsJSON string `json:"paramsJSON,omitempty"`
+	// Note: This field is evaluated at build time and may contain secrets.
+	// It is excluded from JSON serialization to prevent secret leakage.
+	ParamsJSON string `json:"-"`
 	// Steps contains the list of steps in the DAG.
 	Steps []Step `json:"steps,omitempty"`
 	// HandlerOn contains the steps to be executed on different events.
@@ -167,7 +180,9 @@ type DAG struct {
 	RunConfig *RunConfig `json:"runConfig,omitempty"`
 	// RegistryAuths maps registry hostnames to authentication configs.
 	// Optional: If not specified, falls back to DOCKER_AUTH_CONFIG or docker config.
-	RegistryAuths map[string]*AuthConfig `json:"registryAuths,omitempty"`
+	// Note: This field contains sensitive credentials and is evaluated at build time.
+	// It is excluded from JSON serialization to prevent secret leakage.
+	RegistryAuths map[string]*AuthConfig `json:"-"`
 	// SSH contains the default SSH configuration for the DAG.
 	SSH *SSHConfig `json:"ssh,omitempty"`
 	// LLM contains the default LLM configuration for the DAG.
@@ -639,4 +654,329 @@ func getSocketPath(socketName string) string {
 	}
 	// On Unix systems, use /tmp
 	return filepath.Join("/tmp", socketName)
+}
+
+// EvaluateFromYamlIfNeeded re-evaluates sensitive fields from YamlData.
+// This is called AFTER LoadDotEnv() to ensure correct precedence.
+//
+// For NORMAL execution: Fields are already populated from build → returns immediately
+// For RETRY: Fields are empty (json:"-") → re-parses YamlData and evaluates
+func (d *DAG) EvaluateFromYamlIfNeeded(ctx context.Context) error {
+	// Check if fields are already populated (normal execution)
+	if d.hasEvaluatedFields() {
+		return nil // Nothing to do - fields already populated from build
+	}
+
+	// Fields are empty (retry case) - re-evaluate from YamlData
+	if len(d.YamlData) == 0 {
+		return nil // No YAML data to evaluate
+	}
+
+	return d.evaluateFromYaml(ctx)
+}
+
+// hasEvaluatedFields checks if sensitive fields are populated.
+// If any of these are non-empty, the DAG was loaded from build (not from JSON).
+func (d *DAG) hasEvaluatedFields() bool {
+	return len(d.Env) > 0 || len(d.Params) > 0 || d.Shell != "" ||
+		d.WorkingDir != "" || len(d.RegistryAuths) > 0 ||
+		(d.Container != nil && len(d.Container.Env) > 0)
+}
+
+// rawDAGFields is used to unmarshal sensitive fields from YamlData.
+type rawDAGFields struct {
+	Env           any    `yaml:"env"`
+	Params        any    `yaml:"params"`
+	Shell         any    `yaml:"shell"`
+	WorkingDir    string `yaml:"workingDir"`
+	RegistryAuths []struct {
+		Host     string `yaml:"host"`
+		Username string `yaml:"username"`
+		Password string `yaml:"password"`
+		Auth     string `yaml:"auth"`
+	} `yaml:"registryAuths"`
+	Container *struct {
+		Env any `yaml:"env"`
+	} `yaml:"container"`
+}
+
+// evaluateFromYaml re-parses YamlData and evaluates all sensitive fields.
+// This is called when loading a DAG from dag.json during retry, where
+// sensitive fields are empty (excluded via json:"-").
+func (d *DAG) evaluateFromYaml(ctx context.Context) error {
+	var raw rawDAGFields
+	if err := yaml.Unmarshal(d.YamlData, &raw); err != nil {
+		return fmt.Errorf("failed to parse yaml: %w", err)
+	}
+
+	// Build env map starting with any dotenv values already in d.Env
+	// (LoadDotEnv was called before EvaluateFromYamlIfNeeded)
+	envVars := make(map[string]string)
+	for _, env := range d.Env {
+		if key, value, found := strings.Cut(env, "="); found {
+			envVars[key] = value
+		}
+	}
+
+	// === EVALUATE ENV ===
+	if raw.Env != nil {
+		evaluated, err := d.evaluateEnvFromRaw(ctx, raw.Env, envVars)
+		if err != nil {
+			return fmt.Errorf("failed to evaluate env: %w", err)
+		}
+		for key, value := range evaluated {
+			if _, exists := envVars[key]; !exists {
+				// Don't override dotenv values
+				d.Env = append(d.Env, key+"="+value)
+				envVars[key] = value
+			}
+		}
+	}
+
+	// === EVALUATE PARAMS (can reference env) ===
+	if raw.Params != nil {
+		evaluated, err := d.evaluateParamsFromRaw(ctx, raw.Params, envVars)
+		if err != nil {
+			return fmt.Errorf("failed to evaluate params: %w", err)
+		}
+		d.Params = evaluated
+		d.ParamsJSON = buildParamsJSON(evaluated)
+	}
+
+	// === EVALUATE SHELL ===
+	if raw.Shell != nil {
+		shell, shellArgs := d.evaluateShellFromRaw(ctx, raw.Shell, envVars)
+		d.Shell = shell
+		d.ShellArgs = shellArgs
+	}
+
+	// === EVALUATE WORKINGDIR ===
+	if raw.WorkingDir != "" {
+		d.WorkingDir = expandWithEnv(ctx, raw.WorkingDir, envVars)
+	}
+
+	// === EVALUATE REGISTRY AUTHS (CRITICAL - contains credentials) ===
+	for _, auth := range raw.RegistryAuths {
+		if d.RegistryAuths == nil {
+			d.RegistryAuths = make(map[string]*AuthConfig)
+		}
+		d.RegistryAuths[auth.Host] = &AuthConfig{
+			Username: expandWithEnv(ctx, auth.Username, envVars),
+			Password: expandWithEnv(ctx, auth.Password, envVars),
+			Auth:     expandWithEnv(ctx, auth.Auth, envVars),
+		}
+	}
+
+	// === EVALUATE CONTAINER ENV ===
+	if d.Container != nil && raw.Container != nil && raw.Container.Env != nil {
+		containerEnv, err := d.evaluateEnvFromRaw(ctx, raw.Container.Env, envVars)
+		if err != nil {
+			return fmt.Errorf("failed to evaluate container env: %w", err)
+		}
+		for key, value := range containerEnv {
+			d.Container.Env = append(d.Container.Env, key+"="+value)
+		}
+	}
+
+	return nil
+}
+
+// expandWithEnv expands ${VAR} and $VAR references using the env map.
+func expandWithEnv(ctx context.Context, s string, envVars map[string]string) string {
+	if s == "" {
+		return s
+	}
+	scope := cmdutil.NewEnvScope(nil, true)
+	for k, v := range envVars {
+		scope.Set(k, v, cmdutil.EnvSourceDAGEnv)
+	}
+	return cmdutil.ExpandEnvContext(cmdutil.WithEnvScope(ctx, scope), s)
+}
+
+// evaluateEnvFromRaw parses raw env (map or array) and evaluates values.
+// Returns a map of key→value with all variables expanded and commands substituted.
+func (d *DAG) evaluateEnvFromRaw(ctx context.Context, raw any, baseVars map[string]string) (map[string]string, error) {
+	result := make(map[string]string)
+
+	// Collect all entries from the raw input
+	var entries []struct{ Key, Value string }
+	switch v := raw.(type) {
+	case []any:
+		for _, item := range v {
+			if m, ok := item.(map[string]any); ok {
+				for k, val := range m {
+					entries = append(entries, struct{ Key, Value string }{k, fmt.Sprintf("%v", val)})
+				}
+			} else if s, ok := item.(string); ok {
+				if key, value, found := strings.Cut(s, "="); found {
+					entries = append(entries, struct{ Key, Value string }{key, value})
+				}
+			}
+		}
+	case map[string]any:
+		for k, val := range v {
+			entries = append(entries, struct{ Key, Value string }{k, fmt.Sprintf("%v", val)})
+		}
+	}
+
+	// Build an env scope with baseVars + accumulated results
+	for _, entry := range entries {
+		if _, exists := baseVars[entry.Key]; exists {
+			// Skip if already set by dotenv
+			continue
+		}
+
+		// Build scope with baseVars + results so far
+		scope := cmdutil.NewEnvScope(nil, true)
+		for k, v := range baseVars {
+			scope.Set(k, v, cmdutil.EnvSourceDotEnv)
+		}
+		for k, v := range result {
+			scope.Set(k, v, cmdutil.EnvSourceDAGEnv)
+		}
+		evalCtx := cmdutil.WithEnvScope(ctx, scope)
+
+		// Merge baseVars and result for variable substitution
+		allVars := make(map[string]string)
+		for k, v := range baseVars {
+			allVars[k] = v
+		}
+		for k, v := range result {
+			allVars[k] = v
+		}
+
+		// Evaluate the value (handles command substitution and variable expansion)
+		evaluated, err := cmdutil.EvalString(evalCtx, entry.Value, cmdutil.WithVariables(allVars))
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate %q: %w", entry.Key, err)
+		}
+		result[entry.Key] = evaluated
+	}
+
+	return result, nil
+}
+
+// evaluateParamsFromRaw parses raw params and evaluates with env available.
+// Returns a slice of "NAME=value" strings.
+func (d *DAG) evaluateParamsFromRaw(ctx context.Context, raw any, envVars map[string]string) ([]string, error) {
+	var params []string
+	accumulatedVars := make(map[string]string)
+
+	// Copy envVars as the base
+	for k, v := range envVars {
+		accumulatedVars[k] = v
+	}
+
+	// Build scope with env vars
+	scope := cmdutil.NewEnvScope(nil, true)
+	for k, v := range envVars {
+		scope.Set(k, v, cmdutil.EnvSourceDAGEnv)
+	}
+	evalCtx := cmdutil.WithEnvScope(ctx, scope)
+
+	// Parse params based on type
+	var entries []struct{ Name, Value string }
+	switch v := raw.(type) {
+	case string:
+		// Space-separated or key=value format
+		entries = parseParamString(v)
+	case []any:
+		for _, item := range v {
+			switch val := item.(type) {
+			case string:
+				entries = append(entries, parseParamString(val)...)
+			case map[string]any:
+				for k, vv := range val {
+					entries = append(entries, struct{ Name, Value string }{k, fmt.Sprintf("%v", vv)})
+				}
+			}
+		}
+	case map[string]any:
+		for k, vv := range v {
+			entries = append(entries, struct{ Name, Value string }{k, fmt.Sprintf("%v", vv)})
+		}
+	}
+
+	// Evaluate each param with accumulated vars
+	for i, entry := range entries {
+		evaluated, err := cmdutil.EvalString(evalCtx, entry.Value, cmdutil.WithVariables(accumulatedVars))
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate param %q: %w", entry.Name, err)
+		}
+
+		paramName := entry.Name
+		if paramName == "" {
+			paramName = fmt.Sprintf("%d", i+1)
+		}
+
+		params = append(params, paramName+"="+evaluated)
+		accumulatedVars[paramName] = evaluated
+	}
+
+	return params, nil
+}
+
+// parseParamString parses a parameter string into name-value pairs.
+func parseParamString(s string) []struct{ Name, Value string } {
+	var result []struct{ Name, Value string }
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return result
+	}
+
+	// Check for key=value format
+	if key, value, found := strings.Cut(s, "="); found {
+		result = append(result, struct{ Name, Value string }{key, value})
+	} else {
+		// Positional parameter
+		result = append(result, struct{ Name, Value string }{"", s})
+	}
+	return result
+}
+
+// evaluateShellFromRaw evaluates the shell field which can be a string or array.
+func (d *DAG) evaluateShellFromRaw(ctx context.Context, raw any, envVars map[string]string) (string, []string) {
+	switch v := raw.(type) {
+	case string:
+		expanded := expandWithEnv(ctx, v, envVars)
+		// Check if shell has arguments (e.g., "bash -e")
+		parts := strings.Fields(expanded)
+		if len(parts) > 1 {
+			return parts[0], parts[1:]
+		}
+		return expanded, nil
+	case []any:
+		var shell string
+		var args []string
+		for i, item := range v {
+			if s, ok := item.(string); ok {
+				expanded := expandWithEnv(ctx, s, envVars)
+				if i == 0 {
+					shell = expanded
+				} else {
+					args = append(args, expanded)
+				}
+			}
+		}
+		return shell, args
+	}
+	return "", nil
+}
+
+// buildParamsJSON creates the JSON representation of params.
+func buildParamsJSON(params []string) string {
+	if len(params) == 0 {
+		return ""
+	}
+	paramMap := make(map[string]string)
+	for _, p := range params {
+		if key, value, found := strings.Cut(p, "="); found {
+			paramMap[key] = value
+		}
+	}
+	data, err := json.Marshal(paramMap)
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }

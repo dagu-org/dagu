@@ -261,6 +261,14 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Resolve secrets early so they're available for OTel config evaluation
 	a.dag.LoadDotEnv(ctx)
+
+	// Evaluate sensitive fields if needed (retry case).
+	// For normal execution: fields already populated from build → does nothing.
+	// For retry: fields empty (excluded via json:"-") → re-parses YamlData with dotenv available.
+	if err := a.dag.EvaluateFromYamlIfNeeded(ctx); err != nil {
+		return fmt.Errorf("failed to evaluate dag fields: %w", err)
+	}
+
 	secretEnvs, secretErr := a.resolveSecrets(ctx)
 
 	// Build variables map for config evaluation (DAG env + secrets)
