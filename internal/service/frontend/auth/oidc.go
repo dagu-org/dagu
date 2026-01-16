@@ -86,13 +86,17 @@ func initOIDCProviderCore(ctx context.Context, params oidcProviderParams) (*oidc
 
 	// Create HTTP client with explicit transport settings to avoid race conditions
 	// with gopsutil resource monitoring during startup (both use net/http dial).
+	// Force IPv4 to avoid "bad file descriptor" errors on macOS with IPv6.
+	dialer := &net.Dialer{
+		Timeout:   oidcProviderInitTimeout,
+		KeepAlive: 30 * time.Second,
+	}
 	httpClient := &http.Client{
 		Timeout: oidcProviderInitTimeout,
 		Transport: &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout:   oidcProviderInitTimeout,
-				KeepAlive: 30 * time.Second,
-			}).DialContext,
+			DialContext: func(ctx context.Context, _, addr string) (net.Conn, error) {
+				return dialer.DialContext(ctx, "tcp4", addr)
+			},
 			ForceAttemptHTTP2:     true,
 			MaxIdleConns:          10,
 			IdleConnTimeout:       90 * time.Second,
