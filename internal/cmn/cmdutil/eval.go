@@ -89,38 +89,38 @@ var reJSONPathRef = regexp.MustCompile(`\$\{([A-Za-z0-9_]\w*)(\.[^}]+)\}|\$([A-Z
 // BuildCommandEscapedString constructs a single shell-ready string from a command and its arguments.
 // It assumes that the command and arguments are already escaped.
 func BuildCommandEscapedString(command string, args []string) string {
-	quotedArgs := make([]string, 0, len(args))
-	for _, arg := range args {
-		// If already quoted, skip
-		if strings.HasPrefix(arg, `"`) && strings.HasSuffix(arg, `"`) {
-			quotedArgs = append(quotedArgs, arg)
-			continue
-		}
-		if strings.HasPrefix(arg, `'`) && strings.HasSuffix(arg, `'`) {
-			quotedArgs = append(quotedArgs, arg)
-			continue
-		}
-		// If the argument contains spaces, quote it.
-		if strings.ContainsAny(arg, " ") {
-			// If it includes '=' and is already quoted, skip
-			if reEscapedKeyValue.MatchString(arg) {
-				quotedArgs = append(quotedArgs, arg)
-				continue
-			}
-			// if it contains double quotes, escape them
-			arg = strings.ReplaceAll(arg, `"`, `\"`)
-			quotedArgs = append(quotedArgs, fmt.Sprintf(`"%s"`, arg))
-		} else {
-			quotedArgs = append(quotedArgs, arg)
-		}
-	}
-
-	// If we have no arguments, just return the command without trailing space.
-	if len(quotedArgs) == 0 {
+	if len(args) == 0 {
 		return command
 	}
 
+	quotedArgs := make([]string, 0, len(args))
+	for _, arg := range args {
+		quotedArgs = append(quotedArgs, quoteArgIfNeeded(arg))
+	}
+
 	return fmt.Sprintf("%s %s", command, strings.Join(quotedArgs, " "))
+}
+
+// quoteArgIfNeeded returns the argument quoted if it contains spaces and is not already quoted.
+func quoteArgIfNeeded(arg string) string {
+	// Already quoted with double or single quotes
+	if (strings.HasPrefix(arg, `"`) && strings.HasSuffix(arg, `"`)) ||
+		(strings.HasPrefix(arg, `'`) && strings.HasSuffix(arg, `'`)) {
+		return arg
+	}
+
+	// No spaces means no quoting needed
+	if !strings.ContainsAny(arg, " ") {
+		return arg
+	}
+
+	// Already escaped key=value format
+	if reEscapedKeyValue.MatchString(arg) {
+		return arg
+	}
+
+	// Escape any existing double quotes and wrap in double quotes
+	return fmt.Sprintf(`"%s"`, strings.ReplaceAll(arg, `"`, `\"`))
 }
 
 // expandVariables expands variable references in the input string using the provided options.

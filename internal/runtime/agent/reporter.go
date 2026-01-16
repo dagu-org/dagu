@@ -110,24 +110,17 @@ func (r *reporter) sendMail(ctx context.Context, mailConfig *core.MailConfig, da
 
 // statusToClass maps a status string to its CSS class.
 func statusToClass(status string) string {
-	switch status {
-	case "finished":
-		return "status-finished"
-	case "failed":
-		return "status-failed"
-	case "running":
-		return "status-running"
-	case "skipped":
-		return "status-skipped"
-	case "partially_succeeded":
-		return "status-partial-success"
-	case "aborted":
-		return "status-aborted"
-	case "waiting":
-		return "status-waiting"
-	default:
-		return ""
+	statusClasses := map[string]string{
+		"finished":            "status-finished",
+		"succeeded":           "status-finished",
+		"failed":              "status-failed",
+		"running":             "status-running",
+		"skipped":             "status-skipped",
+		"partially_succeeded": "status-partial-success",
+		"aborted":             "status-aborted",
+		"waiting":             "status-waiting",
 	}
+	return statusClasses[status]
 }
 
 var dagHeader = table.Row{
@@ -482,22 +475,16 @@ func renderHTMLWithDAGInfo(dagStatus exec.DAGRunStatus) string {
 
 	// Add status class
 	statusStr := dagStatus.Status.String()
-	statusClass := ""
-	switch statusStr {
-	case "finished":
-		statusClass = "success"
-	case "failed":
-		statusClass = "failed"
-	case "running":
-		statusClass = "running"
-	case "skipped":
-		statusClass = "skipped"
-	case "aborted":
-		statusClass = "aborted"
-	case "wait":
-		statusClass = "wait"
+	badgeClasses := map[string]string{
+		"finished":  "success",
+		"succeeded": "success",
+		"failed":    "failed",
+		"running":   "running",
+		"skipped":   "skipped",
+		"aborted":   "aborted",
+		"wait":      "wait",
 	}
-	_, _ = buffer.WriteString(statusClass)
+	_, _ = buffer.WriteString(badgeClasses[statusStr])
 	_, _ = buffer.WriteString(`">`)
 	_, _ = buffer.WriteString(strings.ToUpper(statusStr))
 	_, _ = buffer.WriteString(`</div>

@@ -213,10 +213,11 @@ func (d *DAG) HasTag(tag string) bool {
 }
 
 // Clone creates a shallow copy of the DAG.
-// The sync.Once field is not copied, allowing LoadDotEnv to be called
+// The sync.Once field is reset to zero value, allowing LoadDotEnv to be called
 // independently on the clone. This is safe for read-only field modifications
 // like changing Location.
 func (d *DAG) Clone() *DAG {
+	//nolint:govet // intentional copy; sync.Once is immediately reset below
 	clone := *d
 	// Reset sync.Once so LoadDotEnv can be called on the clone
 	clone.dotenvOnce = sync.Once{}
