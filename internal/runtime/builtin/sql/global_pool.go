@@ -104,13 +104,17 @@ func (m *GlobalPoolManager) GetOrCreatePool(ctx context.Context, driver Driver, 
 
 	// Configure with global limits
 	// Each DSN gets a fraction of the total connections
-	perDSNLimit := m.config.MaxOpenConns
-	if len(m.pools) > 0 {
-		// Distribute connections among existing pools plus this new one
-		perDSNLimit = m.config.MaxOpenConns / (len(m.pools) + 1)
-		if perDSNLimit < 1 {
-			perDSNLimit = 1
-		}
+	// Calculate limit for all pools including this new one
+	poolCount := len(m.pools) + 1
+	perDSNLimit := m.config.MaxOpenConns / poolCount
+	if perDSNLimit < 1 && m.config.MaxOpenConns > 0 {
+		perDSNLimit = 1
+	}
+
+	// Redistribute limits to ALL existing pools
+	// This ensures total connections never exceed MaxOpenConns
+	for _, entry := range m.pools {
+		entry.db.SetMaxOpenConns(perDSNLimit)
 	}
 
 	db.SetMaxOpenConns(perDSNLimit)
