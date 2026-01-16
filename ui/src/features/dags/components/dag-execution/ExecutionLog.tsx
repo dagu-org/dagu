@@ -395,9 +395,6 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
             <option value="1000">1000 lines</option>
             <option value="5000">5000 lines</option>
             <option value="10000">10000 lines</option>
-            <option value="20000">20000 lines</option>
-            <option value="50000">50000 lines</option>
-            <option value="100000">100000 lines</option>
           </select>
 
           {/* Wrap toggle, Live mode toggle and reload button */}
