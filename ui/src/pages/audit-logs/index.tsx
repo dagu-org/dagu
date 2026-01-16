@@ -81,22 +81,22 @@ export default function AuditLogsPage() {
 
     switch (preset) {
       case 'today':
-        return { from: startOfDay.format('YYYY-MM-DDTHH:mm') };
+        return { from: startOfDay.format('YYYY-MM-DDTHH:mm:ss') };
       case 'yesterday':
         return {
-          from: startOfDay.subtract(1, 'day').format('YYYY-MM-DDTHH:mm'),
-          to: startOfDay.format('YYYY-MM-DDTHH:mm'),
+          from: startOfDay.subtract(1, 'day').format('YYYY-MM-DDTHH:mm:ss'),
+          to: startOfDay.format('YYYY-MM-DDTHH:mm:ss'),
         };
       case 'last7days':
-        return { from: startOfDay.subtract(7, 'day').format('YYYY-MM-DDTHH:mm') };
+        return { from: startOfDay.subtract(7, 'day').format('YYYY-MM-DDTHH:mm:ss') };
       case 'last30days':
-        return { from: startOfDay.subtract(30, 'day').format('YYYY-MM-DDTHH:mm') };
+        return { from: startOfDay.subtract(30, 'day').format('YYYY-MM-DDTHH:mm:ss') };
       case 'thisWeek':
-        return { from: startOfDay.startOf('week').format('YYYY-MM-DDTHH:mm') };
+        return { from: startOfDay.startOf('week').format('YYYY-MM-DDTHH:mm:ss') };
       case 'thisMonth':
-        return { from: startOfDay.startOf('month').format('YYYY-MM-DDTHH:mm') };
+        return { from: startOfDay.startOf('month').format('YYYY-MM-DDTHH:mm:ss') };
       default:
-        return { from: startOfDay.subtract(7, 'day').format('YYYY-MM-DDTHH:mm') };
+        return { from: startOfDay.subtract(7, 'day').format('YYYY-MM-DDTHH:mm:ss') };
     }
   }, [config.tzOffsetInSec]);
 

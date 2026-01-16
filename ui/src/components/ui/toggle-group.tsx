@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import React from 'react';
+import React, { useRef, useCallback } from 'react';
 
 type ToggleGroupProps = {
   value: string;
@@ -14,8 +14,54 @@ export const ToggleGroup = ({
   className,
   'aria-label': ariaLabel,
 }: Omit<ToggleGroupProps, 'value' | 'onChange'>) => {
+  const groupRef = useRef<HTMLDivElement>(null);
+
+  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+    if (!groupRef.current) return;
+
+    const buttons = Array.from(
+      groupRef.current.querySelectorAll('button:not([disabled])')
+    ) as HTMLButtonElement[];
+
+    if (buttons.length === 0) return;
+
+    const currentIndex = buttons.findIndex(
+      (btn) => btn === document.activeElement
+    );
+
+    if (currentIndex === -1) return;
+
+    let nextIndex: number | null = null;
+
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        nextIndex = (currentIndex + 1) % buttons.length;
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+        break;
+      case 'Home':
+        nextIndex = 0;
+        break;
+      case 'End':
+        nextIndex = buttons.length - 1;
+        break;
+    }
+
+    if (nextIndex !== null) {
+      const nextButton = buttons[nextIndex];
+      if (nextButton) {
+        event.preventDefault();
+        nextButton.focus();
+      }
+    }
+  }, []);
+
   return (
     <div
+      ref={groupRef}
       className={cn(
         'inline-flex rounded border border-[rgb(var(--btn-secondary-border))] overflow-hidden',
         'bg-gradient-to-b from-[rgb(var(--btn-secondary-top))] to-[rgb(var(--btn-secondary-bottom))]',
@@ -24,6 +70,7 @@ export const ToggleGroup = ({
       )}
       role="group"
       aria-label={ariaLabel}
+      onKeyDown={handleKeyDown}
     >
       {children}
     </div>

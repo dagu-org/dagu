@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -29,6 +30,14 @@ import (
 	"github.com/dagu-org/dagu/internal/service/audit"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
+
+// filenameUnsafeChars matches characters that are unsafe in Content-Disposition filenames.
+var filenameUnsafeChars = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
+
+// sanitizeFilename replaces unsafe characters with underscores for Content-Disposition headers.
+func sanitizeFilename(s string) string {
+	return filenameUnsafeChars.ReplaceAllString(s, "_")
+}
 
 // ExecuteDAGRunFromSpec implements api.StrictServerInterface.
 func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGRunFromSpecRequestObject) (api.ExecuteDAGRunFromSpecResponseObject, error) {
@@ -499,7 +508,7 @@ func (a *API) DownloadDAGRunLog(ctx context.Context, request api.DownloadDAGRunL
 		return nil, fmt.Errorf("error reading %s: %w", dagStatus.Log, err)
 	}
 
-	filename := fmt.Sprintf("%s-%s-scheduler.log", dagName, dagRunId)
+	filename := fmt.Sprintf("%s-%s-scheduler.log", sanitizeFilename(dagName), sanitizeFilename(dagRunId))
 	return api.DownloadDAGRunLog200TextResponse{
 		Body: string(content),
 		Headers: api.DownloadDAGRunLog200ResponseHeaders{
@@ -670,7 +679,7 @@ func (a *API) DownloadDAGRunStepLog(ctx context.Context, request api.DownloadDAG
 		return nil, fmt.Errorf("error reading %s: %w", logFile, err)
 	}
 
-	filename := fmt.Sprintf("%s-%s-%s-%s.log", dagName, dagRunId, request.StepName, streamName)
+	filename := fmt.Sprintf("%s-%s-%s-%s.log", sanitizeFilename(dagName), sanitizeFilename(dagRunId), sanitizeFilename(request.StepName), streamName)
 	return api.DownloadDAGRunStepLog200TextResponse{
 		Body: string(content),
 		Headers: api.DownloadDAGRunStepLog200ResponseHeaders{
@@ -1233,7 +1242,7 @@ func (a *API) DownloadSubDAGRunLog(ctx context.Context, request api.DownloadSubD
 		return nil, fmt.Errorf("error reading %s: %w", dagStatus.Log, err)
 	}
 
-	filename := fmt.Sprintf("%s-%s-sub-%s-scheduler.log", request.Name, request.DagRunId, request.SubDAGRunId)
+	filename := fmt.Sprintf("%s-%s-sub-%s-scheduler.log", sanitizeFilename(request.Name), sanitizeFilename(request.DagRunId), sanitizeFilename(request.SubDAGRunId))
 	return &api.DownloadSubDAGRunLog200TextResponse{
 		Body: string(content),
 		Headers: api.DownloadSubDAGRunLog200ResponseHeaders{
@@ -1333,7 +1342,7 @@ func (a *API) DownloadSubDAGRunStepLog(ctx context.Context, request api.Download
 		return nil, fmt.Errorf("error reading %s: %w", logFile, err)
 	}
 
-	filename := fmt.Sprintf("%s-%s-sub-%s-%s-%s.log", request.Name, request.DagRunId, request.SubDAGRunId, request.StepName, streamName)
+	filename := fmt.Sprintf("%s-%s-sub-%s-%s-%s.log", sanitizeFilename(request.Name), sanitizeFilename(request.DagRunId), sanitizeFilename(request.SubDAGRunId), sanitizeFilename(request.StepName), streamName)
 	return &api.DownloadSubDAGRunStepLog200TextResponse{
 		Body: string(content),
 		Headers: api.DownloadSubDAGRunStepLog200ResponseHeaders{

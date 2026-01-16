@@ -12,6 +12,7 @@ import { ReloadButton } from '../../../../components/ui/reload-button';
 import { Switch } from '../../../../components/ui/switch';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { TOKEN_KEY } from '../../../../contexts/AuthContext';
+import { useConfig } from '../../../../contexts/ConfigContext';
 import { useUserPreferences } from '../../../../contexts/UserPreference';
 import { useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
@@ -57,6 +58,7 @@ const ANSI_CODES_REGEX = [
  */
 function ExecutionLog({ name, dagRunId, dagRun }: Props) {
   const appBarContext = React.useContext(AppBarContext);
+  const config = useConfig();
   const { preferences, updatePreference } = useUserPreferences();
   const [viewMode, setViewMode] = useState<'tail' | 'head' | 'page'>('tail');
   const [pageSize, setPageSize] = useState(1000);
@@ -271,8 +273,8 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
   const handleDownload = useCallback(async () => {
     const token = localStorage.getItem(TOKEN_KEY);
     const endpoint = isSubDAGRun
-      ? `/api/v2/dag-runs/${dagRun?.rootDAGRunName}/${dagRun?.rootDAGRunId}/sub-dag-runs/${dagRun?.dagRunId}/log/download`
-      : `/api/v2/dag-runs/${name}/${dagRunId}/log/download`;
+      ? `${config.apiURL}/dag-runs/${dagRun?.rootDAGRunName}/${dagRun?.rootDAGRunId}/sub-dag-runs/${dagRun?.dagRunId}/log/download`
+      : `${config.apiURL}/dag-runs/${name}/${dagRunId}/log/download`;
 
     const url = new URL(endpoint, window.location.origin);
     url.searchParams.set('remoteNode', remoteNode);
@@ -301,7 +303,7 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
     } catch (err) {
       console.error('Download failed:', err);
     }
-  }, [name, dagRunId, dagRun, isSubDAGRun, remoteNode]);
+  }, [config.apiURL, name, dagRunId, dagRun, isSubDAGRun, remoteNode]);
 
   // Show loading indicator only on initial load
   if (isLoading && !cachedData && isInitialLoad.current) {

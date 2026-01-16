@@ -12,6 +12,7 @@ import { ReloadButton } from '../../../../components/ui/reload-button';
 import { Switch } from '../../../../components/ui/switch';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { TOKEN_KEY } from '../../../../contexts/AuthContext';
+import { useConfig } from '../../../../contexts/ConfigContext';
 import { useUserPreferences } from '../../../../contexts/UserPreference';
 import { useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
@@ -70,6 +71,7 @@ function StepLog({
   node,
 }: Props) {
   const appBarContext = React.useContext(AppBarContext);
+  const config = useConfig();
   const { preferences, updatePreference } = useUserPreferences();
   const [viewMode, setViewMode] = useState<'tail' | 'head' | 'page'>('tail');
   const [pageSize, setPageSize] = useState(1000);
@@ -284,8 +286,8 @@ function StepLog({
   const handleDownload = useCallback(async () => {
     const token = localStorage.getItem(TOKEN_KEY);
     const endpoint = isSubDAGRun
-      ? `/api/v2/dag-runs/${dagRun?.rootDAGRunName}/${dagRun?.rootDAGRunId}/sub-dag-runs/${dagRun?.dagRunId}/steps/${stepName}/log/download`
-      : `/api/v2/dag-runs/${dagName}/${dagRunId}/steps/${stepName}/log/download`;
+      ? `${config.apiURL}/dag-runs/${dagRun?.rootDAGRunName}/${dagRun?.rootDAGRunId}/sub-dag-runs/${dagRun?.dagRunId}/steps/${stepName}/log/download`
+      : `${config.apiURL}/dag-runs/${dagName}/${dagRunId}/steps/${stepName}/log/download`;
 
     const url = new URL(endpoint, window.location.origin);
     url.searchParams.set('remoteNode', remoteNode);
@@ -315,7 +317,7 @@ function StepLog({
     } catch (err) {
       console.error('Download failed:', err);
     }
-  }, [dagName, dagRunId, stepName, stream, dagRun, isSubDAGRun, remoteNode]);
+  }, [config.apiURL, dagName, dagRunId, stepName, stream, dagRun, isSubDAGRun, remoteNode]);
 
   // Show loading indicator only on initial load
   if (isLoading && !cachedData && isInitialLoad.current) {
