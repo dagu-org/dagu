@@ -4,6 +4,9 @@ import { useIsAdmin, TOKEN_KEY } from '@/contexts/AuthContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { components } from '@/api/v2/schema';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
 import {
   Table,
   TableBody,
@@ -48,12 +51,132 @@ export default function AuditLogsPage() {
   const [category, setCategory] = useState('all');
   const [offset, setOffset] = useState(0);
 
+  // Date filter states
+  const [dateRangeMode, setDateRangeMode] = useState<'preset' | 'specific' | 'custom'>('preset');
+  const [datePreset, setDatePreset] = useState('last7days');
+  const [specificPeriod, setSpecificPeriod] = useState<'date' | 'month' | 'year'>('date');
+  const [specificValue, setSpecificValue] = useState(dayjs().format('YYYY-MM-DD'));
+  const [fromDate, setFromDate] = useState<string | undefined>();
+  const [toDate, setToDate] = useState<string | undefined>();
+
+  // API date values
+  const [apiStartTime, setApiStartTime] = useState<string | undefined>();
+  const [apiEndTime, setApiEndTime] = useState<string | undefined>();
+
   // Get selected remote node
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
   // Track previous values to detect filter changes
   const prevCategoryRef = useRef(category);
   const prevRemoteNodeRef = useRef(remoteNode);
+  const prevApiStartTimeRef = useRef(apiStartTime);
+  const prevApiEndTimeRef = useRef(apiEndTime);
+
+  // Helper functions for date calculations
+  const getPresetDates = useCallback((preset: string): { from: string; to?: string } => {
+    const now = dayjs();
+    const startOfDay = config.tzOffsetInSec !== undefined
+      ? now.utcOffset(config.tzOffsetInSec / 60).startOf('day')
+      : now.startOf('day');
+
+    switch (preset) {
+      case 'today':
+        return { from: startOfDay.format('YYYY-MM-DDTHH:mm') };
+      case 'yesterday':
+        return {
+          from: startOfDay.subtract(1, 'day').format('YYYY-MM-DDTHH:mm'),
+          to: startOfDay.format('YYYY-MM-DDTHH:mm'),
+        };
+      case 'last7days':
+        return { from: startOfDay.subtract(7, 'day').format('YYYY-MM-DDTHH:mm') };
+      case 'last30days':
+        return { from: startOfDay.subtract(30, 'day').format('YYYY-MM-DDTHH:mm') };
+      case 'thisWeek':
+        return { from: startOfDay.startOf('week').format('YYYY-MM-DDTHH:mm') };
+      case 'thisMonth':
+        return { from: startOfDay.startOf('month').format('YYYY-MM-DDTHH:mm') };
+      default:
+        return { from: startOfDay.subtract(7, 'day').format('YYYY-MM-DDTHH:mm') };
+    }
+  }, [config.tzOffsetInSec]);
+
+  const getSpecificPeriodDates = useCallback((
+    period: 'date' | 'month' | 'year',
+    value: string
+  ): { from: string; to?: string } => {
+    const parsedDate = dayjs(value);
+    if (!parsedDate.isValid()) {
+      const fallback = config.tzOffsetInSec !== undefined
+        ? dayjs().utcOffset(config.tzOffsetInSec / 60)
+        : dayjs();
+      return { from: fallback.startOf('day').format('YYYY-MM-DDTHH:mm') };
+    }
+
+    // Apply config timezone offset before calculating day/month/year boundaries.
+    // This follows the same pattern as Dashboard (ui/src/pages/index.tsx).
+    const date = config.tzOffsetInSec !== undefined
+      ? parsedDate.utcOffset(config.tzOffsetInSec / 60)
+      : parsedDate;
+
+    switch (period) {
+      case 'date':
+        return {
+          from: date.startOf('day').format('YYYY-MM-DDTHH:mm'),
+          to: date.endOf('day').format('YYYY-MM-DDTHH:mm'),
+        };
+      case 'month':
+        return {
+          from: date.startOf('month').format('YYYY-MM-DDTHH:mm'),
+          to: date.endOf('month').format('YYYY-MM-DDTHH:mm'),
+        };
+      case 'year':
+        return {
+          from: date.startOf('year').format('YYYY-MM-DDTHH:mm'),
+          to: date.endOf('year').format('YYYY-MM-DDTHH:mm'),
+        };
+    }
+  }, [config.tzOffsetInSec]);
+
+  // Convert datetime to ISO 8601 for API calls
+  const formatDateForApi = useCallback((dateString: string | undefined): string | undefined => {
+    if (!dateString) return undefined;
+    // Add seconds if missing
+    const dateWithSeconds = dateString.split(':').length < 3 ? `${dateString}:00` : dateString;
+    // Apply timezone offset and convert to ISO string
+    if (config.tzOffsetInSec !== undefined) {
+      return dayjs(dateWithSeconds).utcOffset(config.tzOffsetInSec / 60, true).toISOString();
+    }
+    return dayjs(dateWithSeconds).toISOString();
+  }, [config.tzOffsetInSec]);
+
+  const getInputTypeForPeriod = (period: 'date' | 'month' | 'year'): string => {
+    switch (period) {
+      case 'date': return 'date';
+      case 'month': return 'month';
+      case 'year': return 'number';
+    }
+  };
+
+  // Format timezone offset for display
+  const formatTimezoneOffset = (): string => {
+    if (config.tzOffsetInSec === undefined) return '';
+    const offsetInMinutes = config.tzOffsetInSec / 60;
+    const hours = Math.floor(Math.abs(offsetInMinutes) / 60);
+    const minutes = Math.abs(offsetInMinutes) % 60;
+    const sign = offsetInMinutes >= 0 ? '+' : '-';
+    return `(${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')})`;
+  };
+
+  const tzLabel = formatTimezoneOffset();
+
+  // Initialize date values on mount
+  useEffect(() => {
+    const dates = getPresetDates('last7days');
+    setFromDate(dates.from);
+    setToDate(dates.to);
+    setApiStartTime(formatDateForApi(dates.from));
+    setApiEndTime(formatDateForApi(dates.to));
+  }, [getPresetDates, formatDateForApi]);
 
   // Set page title on mount
   useEffect(() => {
@@ -64,12 +187,19 @@ export default function AuditLogsPage() {
   const fetchAuditLogs = useCallback(async (resetOffset = false) => {
     // Reset offset if filters changed
     let effectiveOffset = offset;
-    if (resetOffset || prevCategoryRef.current !== category || prevRemoteNodeRef.current !== remoteNode) {
+    const filtersChanged = prevCategoryRef.current !== category ||
+      prevRemoteNodeRef.current !== remoteNode ||
+      prevApiStartTimeRef.current !== apiStartTime ||
+      prevApiEndTimeRef.current !== apiEndTime;
+
+    if (resetOffset || filtersChanged) {
       effectiveOffset = 0;
-      if (prevCategoryRef.current !== category || prevRemoteNodeRef.current !== remoteNode) {
+      if (filtersChanged) {
         setOffset(0);
         prevCategoryRef.current = category;
         prevRemoteNodeRef.current = remoteNode;
+        prevApiStartTimeRef.current = apiStartTime;
+        prevApiEndTimeRef.current = apiEndTime;
       }
     }
 
@@ -82,6 +212,8 @@ export default function AuditLogsPage() {
       if (category && category !== 'all') params.set('category', category);
       params.set('limit', String(PAGE_SIZE));
       params.set('offset', String(effectiveOffset));
+      if (apiStartTime) params.set('startTime', apiStartTime);
+      if (apiEndTime) params.set('endTime', apiEndTime);
 
       const response = await fetch(`${config.apiURL}/audit?${params.toString()}`, {
         headers: {
@@ -105,11 +237,13 @@ export default function AuditLogsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [config.apiURL, category, offset, remoteNode]);
+  }, [config.apiURL, category, offset, remoteNode, apiStartTime, apiEndTime]);
 
   useEffect(() => {
-    fetchAuditLogs();
-  }, [fetchAuditLogs]);
+    if (apiStartTime !== undefined) {
+      fetchAuditLogs();
+    }
+  }, [fetchAuditLogs, apiStartTime]);
 
   const handlePreviousPage = () => {
     setOffset(Math.max(0, offset - PAGE_SIZE));
@@ -119,6 +253,48 @@ export default function AuditLogsPage() {
     if (offset + PAGE_SIZE < total) {
       setOffset(offset + PAGE_SIZE);
     }
+  };
+
+  const handleDatePresetChange = (preset: string) => {
+    setDatePreset(preset);
+    const dates = getPresetDates(preset);
+    setFromDate(dates.from);
+    setToDate(dates.to);
+    setApiStartTime(formatDateForApi(dates.from));
+    setApiEndTime(formatDateForApi(dates.to));
+  };
+
+  const handleSpecificPeriodChange = (value: string, period?: 'date' | 'month' | 'year') => {
+    setSpecificValue(value);
+    const periodToUse = period || specificPeriod;
+    const dates = getSpecificPeriodDates(periodToUse, value);
+    setFromDate(dates.from);
+    setToDate(dates.to);
+    setApiStartTime(formatDateForApi(dates.from));
+    setApiEndTime(formatDateForApi(dates.to));
+  };
+
+  const handleDateRangeModeChange = (newMode: 'preset' | 'specific' | 'custom') => {
+    setDateRangeMode(newMode);
+
+    if (newMode === 'preset') {
+      const dates = getPresetDates(datePreset);
+      setFromDate(dates.from);
+      setToDate(dates.to);
+      setApiStartTime(formatDateForApi(dates.from));
+      setApiEndTime(formatDateForApi(dates.to));
+    } else if (newMode === 'specific') {
+      const dates = getSpecificPeriodDates(specificPeriod, specificValue);
+      setFromDate(dates.from);
+      setToDate(dates.to);
+      setApiStartTime(formatDateForApi(dates.from));
+      setApiEndTime(formatDateForApi(dates.to));
+    }
+  };
+
+  const handleCustomDateSearch = () => {
+    setApiStartTime(formatDateForApi(fromDate));
+    setApiEndTime(formatDateForApi(toDate));
   };
 
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
@@ -180,6 +356,112 @@ export default function AuditLogsPage() {
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
+      </div>
+
+      {/* Date Filter Row */}
+      <div className="flex flex-wrap items-center gap-2">
+        <ToggleGroup aria-label="Date range mode">
+          <ToggleButton
+            value="preset"
+            groupValue={dateRangeMode}
+            onClick={() => handleDateRangeModeChange('preset')}
+            position="first"
+            aria-label="Quick select"
+          >
+            Quick
+          </ToggleButton>
+          <ToggleButton
+            value="specific"
+            groupValue={dateRangeMode}
+            onClick={() => handleDateRangeModeChange('specific')}
+            position="middle"
+            aria-label="Specific date/month/year"
+          >
+            Specific
+          </ToggleButton>
+          <ToggleButton
+            value="custom"
+            groupValue={dateRangeMode}
+            onClick={() => handleDateRangeModeChange('custom')}
+            position="last"
+            aria-label="Custom range"
+          >
+            Custom
+          </ToggleButton>
+        </ToggleGroup>
+
+        {dateRangeMode === 'preset' ? (
+          <Select value={datePreset} onValueChange={handleDatePresetChange}>
+            <SelectTrigger className="w-[180px] h-8">
+              <SelectValue placeholder="Select period" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="yesterday">Yesterday</SelectItem>
+              <SelectItem value="last7days">Last 7 days</SelectItem>
+              <SelectItem value="last30days">Last 30 days</SelectItem>
+              <SelectItem value="thisWeek">This week</SelectItem>
+              <SelectItem value="thisMonth">This month</SelectItem>
+            </SelectContent>
+          </Select>
+        ) : dateRangeMode === 'specific' ? (
+          <>
+            <Select
+              value={specificPeriod}
+              onValueChange={(v) => {
+                const newPeriod = v as 'date' | 'month' | 'year';
+                setSpecificPeriod(newPeriod);
+                let newValue: string;
+                const parsedDate = dayjs(specificValue);
+
+                if (newPeriod === 'date') {
+                  newValue = parsedDate.isValid() ? parsedDate.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD');
+                } else if (newPeriod === 'month') {
+                  newValue = parsedDate.isValid() ? parsedDate.format('YYYY-MM') : dayjs().format('YYYY-MM');
+                } else {
+                  newValue = parsedDate.isValid() ? parsedDate.format('YYYY') : dayjs().format('YYYY');
+                }
+
+                setSpecificValue(newValue);
+                handleSpecificPeriodChange(newValue, newPeriod);
+              }}
+            >
+              <SelectTrigger className="w-[100px] h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="date">Date</SelectItem>
+                <SelectItem value="month">Month</SelectItem>
+                <SelectItem value="year">Year</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              type={getInputTypeForPeriod(specificPeriod)}
+              value={specificValue}
+              onChange={(e) => handleSpecificPeriodChange(e.target.value)}
+              placeholder={specificPeriod === 'year' ? 'YYYY' : undefined}
+              min={specificPeriod === 'year' ? '2000' : undefined}
+              max={specificPeriod === 'year' ? '2100' : undefined}
+              className="w-[140px] h-8"
+            />
+          </>
+        ) : (
+          <>
+            <DateRangePicker
+              fromDate={fromDate}
+              toDate={toDate}
+              onFromDateChange={setFromDate}
+              onToDateChange={setToDate}
+              onEnterPress={handleCustomDateSearch}
+              fromLabel={`From ${tzLabel}`}
+              toLabel={`To ${tzLabel}`}
+              className="w-full md:w-auto"
+            />
+            <Button onClick={handleCustomDateSearch} size="sm" className="h-8">
+              Apply
+            </Button>
+          </>
+        )}
       </div>
 
       {error && (

@@ -111,8 +111,15 @@ func (s *Store) Query(_ context.Context, filter audit.QueryFilter) (*audit.Query
 	// Collect all matching entries
 	var allEntries []*audit.Entry
 
+	// Truncate to day boundaries for file iteration.
+	// This ensures we check all files that might contain matching entries,
+	// even when startDate/endDate are mid-day timestamps.
+	// Individual entries are still filtered by exact timestamps in readEntriesFromFile.
+	fileStartDate := startDate.Truncate(24 * time.Hour)
+	fileEndDate := endDate.Truncate(24 * time.Hour)
+
 	// Iterate through each day in the range
-	for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
+	for d := fileStartDate; !d.After(fileEndDate); d = d.AddDate(0, 0, 1) {
 		filePath := s.auditFilePath(d)
 		entries, err := s.readEntriesFromFile(filePath, filter)
 		if err != nil {
