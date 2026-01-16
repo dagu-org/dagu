@@ -659,7 +659,7 @@ func (a *API) DownloadDAGRunStepLog(ctx context.Context, request api.DownloadDAG
 		streamName = "stderr"
 	}
 
-	content, err := os.ReadFile(logFile)
+	content, err := os.ReadFile(filepath.Clean(logFile))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return api.DownloadDAGRunStepLog404JSONResponse{
@@ -1322,7 +1322,7 @@ func (a *API) DownloadSubDAGRunStepLog(ctx context.Context, request api.Download
 		streamName = "stderr"
 	}
 
-	content, err := os.ReadFile(logFile)
+	content, err := os.ReadFile(filepath.Clean(logFile))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return &api.DownloadSubDAGRunStepLog404JSONResponse{
