@@ -22,7 +22,10 @@ import (
 // File system constants
 const defaultDirPermissions = 0o755
 
-var _ executor.Executor = (*sqlExecutor)(nil)
+var (
+	_ executor.Executor = (*sqlExecutor)(nil)
+	_ io.Closer         = (*sqlExecutor)(nil)
+)
 
 // sqlExecutor implements the Executor interface for SQL operations.
 type sqlExecutor struct {
@@ -31,11 +34,13 @@ type sqlExecutor struct {
 	cfg             *Config
 	driver          Driver
 	connMgr         *ConnectionManager
+	poolManager     *GlobalPoolManager // Reference for cleanup in worker mode
 	stdout          io.Writer
 	stderr          io.Writer
 	cancelFunc      context.CancelFunc
 	advisoryRelease func() error
 	useGlobalPool   bool // true if using global pool manager (shared-nothing mode)
+	closed          bool // guard against double-close
 }
 
 // ExecutionMetrics holds metrics from SQL execution.
@@ -64,6 +69,7 @@ func newSQLExecutor(ctx context.Context, step core.Step, driverName string) (exe
 
 	// Check for global pool manager (shared-nothing mode)
 	var connMgr *ConnectionManager
+	var poolManager *GlobalPoolManager
 	var useGlobalPool bool
 
 	if pm := GetPoolManager(ctx); pm != nil && driverName == "postgres" {
@@ -80,6 +86,7 @@ func newSQLExecutor(ctx context.Context, step core.Step, driverName string) (exe
 			cfg:      cfg,
 			refCount: 1,
 		}
+		poolManager = pm
 		useGlobalPool = true
 	} else {
 		// Use per-step connection manager (non-distributed mode or SQLite)
@@ -94,6 +101,7 @@ func newSQLExecutor(ctx context.Context, step core.Step, driverName string) (exe
 		cfg:           cfg,
 		driver:        driver,
 		connMgr:       connMgr,
+		poolManager:   poolManager,
 		useGlobalPool: useGlobalPool,
 		stdout:        os.Stdout,
 		stderr:        os.Stderr,
@@ -129,6 +137,42 @@ func (e *sqlExecutor) Kill(_ os.Signal) error {
 		e.cancelFunc()
 	}
 	return nil
+}
+
+// Close releases resources held by the SQL executor.
+// In worker mode (global pool), releases the connection back to the pool.
+// In non-worker mode, closes the connection.
+// Implements io.Closer.
+func (e *sqlExecutor) Close() error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	// Guard against double-close
+	if e.closed {
+		return nil
+	}
+	e.closed = true
+
+	if e.connMgr == nil {
+		return nil
+	}
+
+	var err error
+
+	if e.useGlobalPool && e.poolManager != nil {
+		// Worker mode: release connection back to pool
+		// The pool manages the actual connection lifecycle
+		e.poolManager.ReleasePool(e.cfg.DSN)
+		// Don't close the connection - pool owns it
+	} else {
+		// Non-worker mode: close the connection
+		err = e.connMgr.Close()
+	}
+
+	// Clear references to prevent misuse
+	e.connMgr = nil
+	e.poolManager = nil
+	return err
 }
 
 // Run executes the SQL query or script.

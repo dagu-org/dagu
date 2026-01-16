@@ -19,13 +19,20 @@ type ConnectionManager struct {
 	closed   bool
 }
 
-// Connection retry settings
-// These are generous to handle slow container startup in CI environments
+// Connection settings
 const (
+	// Retry settings - generous to handle slow container startup in CI environments
 	maxConnRetries    = 30
 	initialRetryDelay = 500 * time.Millisecond
 	maxRetryDelay     = 2 * time.Second
 	pingTimeout       = 5 * time.Second
+
+	// Default connection pool settings for non-worker mode
+	// These are conservative values suitable for single-step execution.
+	// In worker mode, the global pool manager handles pooling.
+	defaultMaxOpenConns    = 1              // Single connection per step
+	defaultMaxIdleConns    = 1              // Keep the connection ready
+	defaultConnMaxLifetime = 5 * time.Minute
 )
 
 // NewConnectionManager creates a new connection manager.
@@ -56,10 +63,12 @@ func NewConnectionManager(ctx context.Context, driver Driver, cfg *Config) (*Con
 			return nil, fmt.Errorf("failed to connect to database after %d attempts: %w", attempt, lastErr)
 		}
 
-		// Configure connection pool
-		db.SetMaxOpenConns(cfg.MaxOpenConns)
-		db.SetMaxIdleConns(cfg.MaxIdleConns)
-		db.SetConnMaxLifetime(time.Duration(cfg.ConnMaxLifetime) * time.Second)
+		// Configure connection pool with fixed defaults
+		// In non-worker mode, each step has its own isolated connection.
+		// In worker mode, the global pool manager handles pooling.
+		db.SetMaxOpenConns(defaultMaxOpenConns)
+		db.SetMaxIdleConns(defaultMaxIdleConns)
+		db.SetConnMaxLifetime(defaultConnMaxLifetime)
 
 		// Verify connection with ping
 		pingCtx, cancel := context.WithTimeout(ctx, pingTimeout)

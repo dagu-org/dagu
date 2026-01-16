@@ -17,11 +17,6 @@ type Config struct {
 	// - SQLite: "file:./data.db?mode=rw" or ":memory:"
 	DSN string `mapstructure:"dsn"`
 
-	// Connection pool settings
-	MaxOpenConns    int `mapstructure:"maxOpenConns"`    // Maximum open connections (default: 5)
-	MaxIdleConns    int `mapstructure:"maxIdleConns"`    // Maximum idle connections (default: 2)
-	ConnMaxLifetime int `mapstructure:"connMaxLifetime"` // Connection max lifetime in seconds (default: 300)
-
 	// Parameterized queries (SQL injection prevention)
 	// Can be map[string]any for named params or []any for positional params
 	Params any `mapstructure:"params"`
@@ -86,15 +81,11 @@ type ImportConfig struct {
 }
 
 // DefaultConfig returns a Config with default values.
-// These defaults match the JSON schema documentation.
 func DefaultConfig() *Config {
 	return &Config{
-		MaxOpenConns:    5,   // Match schema default
-		MaxIdleConns:    2,   // Match schema default
-		ConnMaxLifetime: 300, // Match schema default (seconds)
-		Timeout:         60,
-		OutputFormat:    "jsonl",
-		NullString:      "null",
+		Timeout:      60,
+		OutputFormat: "jsonl",
+		NullString:   "null",
 	}
 }
 
@@ -138,19 +129,6 @@ func ParseConfig(_ context.Context, mapCfg map[string]any) (*Config, error) {
 		}
 	}
 
-	// Validate connection pool settings
-	if cfg.MaxOpenConns < 0 {
-		return nil, fmt.Errorf("maxOpenConns must be non-negative")
-	}
-	if cfg.MaxIdleConns < 0 {
-		return nil, fmt.Errorf("maxIdleConns must be non-negative")
-	}
-	if cfg.MaxIdleConns > cfg.MaxOpenConns && cfg.MaxOpenConns > 0 {
-		return nil, fmt.Errorf("maxIdleConns (%d) cannot exceed maxOpenConns (%d)", cfg.MaxIdleConns, cfg.MaxOpenConns)
-	}
-	if cfg.ConnMaxLifetime < 0 {
-		return nil, fmt.Errorf("connMaxLifetime must be non-negative")
-	}
 	if cfg.Timeout < 0 {
 		return nil, fmt.Errorf("timeout must be non-negative")
 	}
@@ -277,10 +255,7 @@ var importConfigSchema = &jsonschema.Schema{
 var postgresConfigSchema = &jsonschema.Schema{
 	Type: "object",
 	Properties: map[string]*jsonschema.Schema{
-		"dsn":             {Type: "string", Description: "PostgreSQL connection string (DSN)"},
-		"maxOpenConns":    {Type: "integer", Description: "Maximum open connections"},
-		"maxIdleConns":    {Type: "integer", Description: "Maximum idle connections"},
-		"connMaxLifetime": {Type: "integer", Description: "Connection max lifetime in seconds"},
+		"dsn": {Type: "string", Description: "PostgreSQL connection string (DSN)"},
 		"params": {
 			Description: "Query parameters (map for named, array for positional)",
 			OneOf: []*jsonschema.Schema{
@@ -306,9 +281,7 @@ var postgresConfigSchema = &jsonschema.Schema{
 var sqliteConfigSchema = &jsonschema.Schema{
 	Type: "object",
 	Properties: map[string]*jsonschema.Schema{
-		"dsn":          {Type: "string", Description: "SQLite connection string (file path or :memory:)"},
-		"maxOpenConns": {Type: "integer", Description: "Maximum open connections"},
-		"maxIdleConns": {Type: "integer", Description: "Maximum idle connections"},
+		"dsn": {Type: "string", Description: "SQLite connection string (file path or :memory:)"},
 		"params": {
 			Description: "Query parameters (map for named, array for positional)",
 			OneOf: []*jsonschema.Schema{

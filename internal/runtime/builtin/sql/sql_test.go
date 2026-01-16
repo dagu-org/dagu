@@ -657,23 +657,6 @@ func TestParseConfig_IsolationLevels(t *testing.T) {
 	}
 }
 
-func TestParseConfig_ConnectionPool(t *testing.T) {
-	t.Parallel()
-
-	config := map[string]any{
-		"dsn":             "postgres://localhost/test",
-		"maxOpenConns":    20,
-		"maxIdleConns":    10,
-		"connMaxLifetime": 600,
-	}
-
-	cfg, err := sqlexec.ParseConfig(context.Background(), config)
-	require.NoError(t, err)
-	assert.Equal(t, 20, cfg.MaxOpenConns)
-	assert.Equal(t, 10, cfg.MaxIdleConns)
-	assert.Equal(t, 600, cfg.ConnMaxLifetime)
-}
-
 func TestParseConfig_Streaming(t *testing.T) {
 	t.Parallel()
 
@@ -2031,16 +2014,16 @@ func TestGetQueryExecutor(t *testing.T) {
 	})
 }
 
-func TestConnectionManager_ConnectionPoolSettings(t *testing.T) {
+func TestConnectionManager_FixedConnectionPoolDefaults(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
 
+	// Connection pool settings are now fixed defaults (not configurable per-step)
+	// In non-worker mode: 1 connection per step
+	// In worker mode: global pool manager handles pooling
 	cfg, err := sqlexec.ParseConfig(ctx, map[string]any{
-		"dsn":             ":memory:",
-		"maxOpenConns":    10,
-		"maxIdleConns":    5,
-		"connMaxLifetime": 600,
+		"dsn": ":memory:",
 	})
 	require.NoError(t, err)
 
@@ -2050,10 +2033,9 @@ func TestConnectionManager_ConnectionPoolSettings(t *testing.T) {
 	require.NoError(t, err)
 	defer cm.Close()
 
-	// Verify config is properly set
-	assert.Equal(t, 10, cm.Config().MaxOpenConns)
-	assert.Equal(t, 5, cm.Config().MaxIdleConns)
-	assert.Equal(t, 600, cm.Config().ConnMaxLifetime)
+	// Verify db stats show fixed defaults are applied
+	stats := cm.DB().Stats()
+	assert.Equal(t, 1, stats.MaxOpenConnections, "should use fixed default of 1 max open connection")
 
 	// Connection should be usable
 	_, err = cm.DB().ExecContext(ctx, "SELECT 1")

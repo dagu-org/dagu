@@ -119,7 +119,7 @@ func (m *GlobalPoolManager) GetOrCreatePool(ctx context.Context, driver Driver, 
 	db.SetConnMaxIdleTime(m.config.ConnMaxIdleTime)
 
 	// Verify connection with ping
-	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	pingCtx, cancel := context.WithTimeout(ctx, pingTimeout)
 	defer cancel()
 	if err := db.PingContext(pingCtx); err != nil {
 		if cleanup != nil {
