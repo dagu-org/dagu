@@ -474,6 +474,40 @@ func (a *API) GetDAGRunLog(ctx context.Context, request api.GetDAGRunLogRequestO
 	}, nil
 }
 
+// DownloadDAGRunLog implements api.StrictServerInterface.
+func (a *API) DownloadDAGRunLog(ctx context.Context, request api.DownloadDAGRunLogRequestObject) (api.DownloadDAGRunLogResponseObject, error) {
+	dagName := request.Name
+	dagRunId := request.DagRunId
+
+	ref := exec.NewDAGRunRef(dagName, dagRunId)
+	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
+	if err != nil {
+		return api.DownloadDAGRunLog404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
+		}, nil
+	}
+
+	content, err := os.ReadFile(dagStatus.Log)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return api.DownloadDAGRunLog404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("log file not found for dag-run %s", dagRunId),
+			}, nil
+		}
+		return nil, fmt.Errorf("error reading %s: %w", dagStatus.Log, err)
+	}
+
+	filename := fmt.Sprintf("%s-%s-scheduler.log", dagName, dagRunId)
+	return api.DownloadDAGRunLog200TextResponse{
+		Body: string(content),
+		Headers: api.DownloadDAGRunLog200ResponseHeaders{
+			ContentDisposition: fmt.Sprintf("attachment; filename=\"%s\"", filename),
+		},
+	}, nil
+}
+
 // GetDAGRunOutputs implements api.StrictServerInterface.
 func (a *API) GetDAGRunOutputs(ctx context.Context, request api.GetDAGRunOutputsRequestObject) (api.GetDAGRunOutputsResponseObject, error) {
 	dagName := request.Name
@@ -593,6 +627,55 @@ func (a *API) GetDAGRunStepLog(ctx context.Context, request api.GetDAGRunStepLog
 		TotalLines: ptrOf(totalLines),
 		HasMore:    ptrOf(hasMore),
 		IsEstimate: ptrOf(isEstimate),
+	}, nil
+}
+
+// DownloadDAGRunStepLog implements api.StrictServerInterface.
+func (a *API) DownloadDAGRunStepLog(ctx context.Context, request api.DownloadDAGRunStepLogRequestObject) (api.DownloadDAGRunStepLogResponseObject, error) {
+	dagName := request.Name
+	dagRunId := request.DagRunId
+
+	ref := exec.NewDAGRunRef(dagName, dagRunId)
+	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
+	if err != nil {
+		return api.DownloadDAGRunStepLog404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
+		}, nil
+	}
+
+	node, err := dagStatus.NodeByName(request.StepName)
+	if err != nil {
+		return api.DownloadDAGRunStepLog404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, dagName),
+		}, nil
+	}
+
+	var logFile = node.Stdout
+	streamName := "stdout"
+	if request.Params.Stream != nil && *request.Params.Stream == api.StreamStderr {
+		logFile = node.Stderr
+		streamName = "stderr"
+	}
+
+	content, err := os.ReadFile(logFile)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return api.DownloadDAGRunStepLog404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("log file not found for step %s", request.StepName),
+			}, nil
+		}
+		return nil, fmt.Errorf("error reading %s: %w", logFile, err)
+	}
+
+	filename := fmt.Sprintf("%s-%s-%s-%s.log", dagName, dagRunId, request.StepName, streamName)
+	return api.DownloadDAGRunStepLog200TextResponse{
+		Body: string(content),
+		Headers: api.DownloadDAGRunStepLog200ResponseHeaders{
+			ContentDisposition: fmt.Sprintf("attachment; filename=\"%s\"", filename),
+		},
 	}, nil
 }
 
@@ -1128,6 +1211,37 @@ func (a *API) GetSubDAGRunLog(ctx context.Context, request api.GetSubDAGRunLogRe
 	}, nil
 }
 
+// DownloadSubDAGRunLog implements api.StrictServerInterface.
+func (a *API) DownloadSubDAGRunLog(ctx context.Context, request api.DownloadSubDAGRunLogRequestObject) (api.DownloadSubDAGRunLogResponseObject, error) {
+	root := exec.NewDAGRunRef(request.Name, request.DagRunId)
+	dagStatus, err := a.dagRunMgr.FindSubDAGRunStatus(ctx, root, request.SubDAGRunId)
+	if err != nil {
+		return &api.DownloadSubDAGRunLog404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("sub dag-run ID %s not found for DAG %s", request.SubDAGRunId, request.Name),
+		}, nil
+	}
+
+	content, err := os.ReadFile(dagStatus.Log)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return &api.DownloadSubDAGRunLog404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("log file not found for sub dag-run %s", request.SubDAGRunId),
+			}, nil
+		}
+		return nil, fmt.Errorf("error reading %s: %w", dagStatus.Log, err)
+	}
+
+	filename := fmt.Sprintf("%s-%s-sub-%s-scheduler.log", request.Name, request.DagRunId, request.SubDAGRunId)
+	return &api.DownloadSubDAGRunLog200TextResponse{
+		Body: string(content),
+		Headers: api.DownloadSubDAGRunLog200ResponseHeaders{
+			ContentDisposition: fmt.Sprintf("attachment; filename=\"%s\"", filename),
+		},
+	}, nil
+}
+
 // GetSubDAGRunStepLog implements api.StrictServerInterface.
 func (a *API) GetSubDAGRunStepLog(ctx context.Context, request api.GetSubDAGRunStepLogRequestObject) (api.GetSubDAGRunStepLogResponseObject, error) {
 	root := exec.NewDAGRunRef(request.Name, request.DagRunId)
@@ -1179,6 +1293,52 @@ func (a *API) GetSubDAGRunStepLog(ctx context.Context, request api.GetSubDAGRunS
 		TotalLines: ptrOf(totalLines),
 		HasMore:    ptrOf(hasMore),
 		IsEstimate: ptrOf(isEstimate),
+	}, nil
+}
+
+// DownloadSubDAGRunStepLog implements api.StrictServerInterface.
+func (a *API) DownloadSubDAGRunStepLog(ctx context.Context, request api.DownloadSubDAGRunStepLogRequestObject) (api.DownloadSubDAGRunStepLogResponseObject, error) {
+	root := exec.NewDAGRunRef(request.Name, request.DagRunId)
+	dagStatus, err := a.dagRunMgr.FindSubDAGRunStatus(ctx, root, request.SubDAGRunId)
+	if err != nil {
+		return &api.DownloadSubDAGRunStepLog404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("sub dag-run ID %s not found for DAG %s", request.SubDAGRunId, request.Name),
+		}, nil
+	}
+
+	node, err := dagStatus.NodeByName(request.StepName)
+	if err != nil {
+		return &api.DownloadSubDAGRunStepLog404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, request.Name),
+		}, nil
+	}
+
+	var logFile = node.Stdout
+	streamName := "stdout"
+	if request.Params.Stream != nil && *request.Params.Stream == api.StreamStderr {
+		logFile = node.Stderr
+		streamName = "stderr"
+	}
+
+	content, err := os.ReadFile(logFile)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return &api.DownloadSubDAGRunStepLog404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("log file not found for step %s", request.StepName),
+			}, nil
+		}
+		return nil, fmt.Errorf("error reading %s: %w", logFile, err)
+	}
+
+	filename := fmt.Sprintf("%s-%s-sub-%s-%s-%s.log", request.Name, request.DagRunId, request.SubDAGRunId, request.StepName, streamName)
+	return &api.DownloadSubDAGRunStepLog200TextResponse{
+		Body: string(content),
+		Headers: api.DownloadSubDAGRunStepLog200ResponseHeaders{
+			ContentDisposition: fmt.Sprintf("attachment; filename=\"%s\"", filename),
+		},
 	}, nil
 }
 

@@ -4,12 +4,14 @@
  * @module features/dags/components/dag-execution
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Download } from 'lucide-react';
 import { components, Status } from '../../../../api/v2/schema';
 import { Button } from '../../../../components/ui/button';
 import { Input } from '../../../../components/ui/input';
 import { ReloadButton } from '../../../../components/ui/reload-button';
 import { Switch } from '../../../../components/ui/switch';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { TOKEN_KEY } from '../../../../contexts/AuthContext';
 import { useUserPreferences } from '../../../../contexts/UserPreference';
 import { useQuery } from '../../../../hooks/api';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
@@ -266,6 +268,41 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
     }
   };
 
+  const handleDownload = useCallback(async () => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const endpoint = isSubDAGRun
+      ? `/api/v2/dag-runs/${dagRun?.rootDAGRunName}/${dagRun?.rootDAGRunId}/sub-dag-runs/${dagRun?.dagRunId}/log/download`
+      : `/api/v2/dag-runs/${name}/${dagRunId}/log/download`;
+
+    const url = new URL(endpoint, window.location.origin);
+    url.searchParams.set('remoteNode', remoteNode);
+
+    try {
+      const response = await fetch(url.toString(), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      const filename =
+        response.headers
+          .get('Content-Disposition')
+          ?.match(/filename="(.+)"/)?.[1] ||
+        `${name}-${dagRunId}-scheduler.log`;
+
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (err) {
+      console.error('Download failed:', err);
+    }
+  }, [name, dagRunId, dagRun, isSubDAGRun, remoteNode]);
+
   // Show loading indicator only on initial load
   if (isLoading && !cachedData && isInitialLoad.current) {
     return <LoadingIndicator />;
@@ -358,6 +395,9 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
             <option value="1000">1000 lines</option>
             <option value="5000">5000 lines</option>
             <option value="10000">10000 lines</option>
+            <option value="20000">20000 lines</option>
+            <option value="50000">50000 lines</option>
+            <option value="100000">100000 lines</option>
           </select>
 
           {/* Wrap toggle, Live mode toggle and reload button */}
@@ -381,6 +421,17 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
               isLoading={isNavigating || isLoading}
               title="Reload logs"
             />
+
+            {/* Download button */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleDownload}
+              disabled={isNavigating}
+              title="Download full log"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
 
             {/* Live mode toggle - only show when DAG is running */}
             {isRunningStatus && (
