@@ -19,11 +19,12 @@ func restoreDAGFromStatus(ctx context.Context, dag *core.DAG, status *exec.DAGRu
 }
 
 // rebuildDAGFromYAML rebuilds a DAG from its YamlData using the spec loader.
-// This populates fields that are excluded from JSON serialization (env, shell, etc.)
+// This populates fields that are excluded from JSON serialization (json:"-")
 // and must be called after LoadDotEnv() so dotenv values are available during rebuild.
 //
-// The function preserves Location and YamlData from the original DAG, as these
-// should not be rebuilt from YAML.
+// The function preserves all JSON-serialized fields from the original DAG (Queue,
+// WorkerSelector, HandlerOn, Steps, Tags, etc.) and only copies JSON-excluded
+// fields (Env, Params, ParamsJSON, SMTP, SSH, RegistryAuths) from the rebuilt DAG.
 func rebuildDAGFromYAML(ctx context.Context, dag *core.DAG) (*core.DAG, error) {
 	if len(dag.YamlData) == 0 {
 		return dag, nil
@@ -52,11 +53,17 @@ func rebuildDAGFromYAML(ctx context.Context, dag *core.DAG) (*core.DAG, error) {
 		return nil, err
 	}
 
-	// Preserve fields that should NOT be rebuilt from YAML.
-	fresh.Location = dag.Location
-	fresh.YamlData = dag.YamlData
+	// Copy only fields excluded from JSON serialization (json:"-").
+	// All other fields (Queue, WorkerSelector, HandlerOn, Steps, Tags, etc.)
+	// are already correctly stored in dag.json and must be preserved.
+	dag.Env = fresh.Env
+	dag.Params = fresh.Params
+	dag.ParamsJSON = fresh.ParamsJSON
+	dag.SMTP = fresh.SMTP
+	dag.SSH = fresh.SSH
+	dag.RegistryAuths = fresh.RegistryAuths
 
-	core.InitializeDefaults(fresh)
+	core.InitializeDefaults(dag)
 
-	return fresh, nil
+	return dag, nil
 }
