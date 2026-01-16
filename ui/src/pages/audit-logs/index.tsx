@@ -109,7 +109,7 @@ export default function AuditLogsPage() {
       const fallback = config.tzOffsetInSec !== undefined
         ? dayjs().utcOffset(config.tzOffsetInSec / 60)
         : dayjs();
-      return { from: fallback.startOf('day').format('YYYY-MM-DDTHH:mm') };
+      return { from: fallback.startOf('day').format('YYYY-MM-DDTHH:mm:ss') };
     }
 
     // Apply config timezone offset before calculating day/month/year boundaries.
@@ -121,8 +121,8 @@ export default function AuditLogsPage() {
     // dayjs uses 'day' instead of 'date' for startOf/endOf
     const unit = period === 'date' ? 'day' : period;
     return {
-      from: date.startOf(unit).format('YYYY-MM-DDTHH:mm'),
-      to: date.endOf(unit).format('YYYY-MM-DDTHH:mm'),
+      from: date.startOf(unit).format('YYYY-MM-DDTHH:mm:ss'),
+      to: date.endOf(unit).format('YYYY-MM-DDTHH:mm:ss'),
     };
   }, [config.tzOffsetInSec]);
 
