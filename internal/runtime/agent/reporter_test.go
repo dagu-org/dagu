@@ -416,7 +416,7 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 	t.Run("HTMLEscaping", func(t *testing.T) {
 		// Verify dangerous HTML characters are properly escaped
 		// html.EscapeString escapes: & < > ' "
-		require.NotContains(t, html, "<script>alert('xss')</script>")              // Raw script tag should not exist
+		require.NotContains(t, html, "<script>alert('xss')</script>")                  // Raw script tag should not exist
 		require.Contains(t, html, "&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;") // Should be escaped
 
 		// Check ampersands are escaped
