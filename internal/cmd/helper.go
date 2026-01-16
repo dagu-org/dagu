@@ -19,18 +19,18 @@ func restoreDAGFromStatus(ctx context.Context, dag *core.DAG, status *exec.DAGRu
 }
 
 // rebuildDAGFromYAML rebuilds a DAG from its YamlData using the spec loader.
-// This populates fields that are excluded from JSON serialization (json:"-")
-// and must be called after LoadDotEnv() so dotenv values are available during rebuild.
+// This populates fields excluded from JSON serialization (json:"-") and must be
+// called after LoadDotEnv() so dotenv values are available during rebuild.
 //
-// The function preserves all JSON-serialized fields from the original DAG (Queue,
-// WorkerSelector, HandlerOn, Steps, Tags, etc.) and only copies JSON-excluded
-// fields (Env, Params, ParamsJSON, SMTP, SSH, RegistryAuths) from the rebuilt DAG.
+// The function preserves all JSON-serialized fields from the original DAG and
+// only copies JSON-excluded fields (Env, Params, ParamsJSON, SMTP, SSH,
+// RegistryAuths) from the rebuilt DAG.
 func rebuildDAGFromYAML(ctx context.Context, dag *core.DAG) (*core.DAG, error) {
 	if len(dag.YamlData) == 0 {
 		return dag, nil
 	}
 
-	// Build env map from dag.Env (includes dotenv if LoadDotEnv was called).
+	// Build env map from dag.Env (includes dotenv values if LoadDotEnv was called).
 	buildEnv := make(map[string]string, len(dag.Env))
 	for _, env := range dag.Env {
 		if k, v, ok := strings.Cut(env, "="); ok {
