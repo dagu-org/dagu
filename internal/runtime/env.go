@@ -155,6 +155,7 @@ func resolveExpandedDir(ctx context.Context, expandedDir, stepName string, dag *
 				tag.Dir(expandedDir),
 				tag.Error(err),
 			)
+			return expandedDir
 		}
 		return dir
 	}

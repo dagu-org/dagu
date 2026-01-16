@@ -2,7 +2,6 @@ package cmdutil
 
 import (
 	"context"
-	"os"
 	"runtime"
 	"testing"
 
@@ -17,13 +16,12 @@ func TestSubstituteCommands(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		input      string
-		want       string
-		wantErr    bool
-		setupEnv   map[string]string
-		cleanupEnv []string
-		skipOnOS   []string
+		name     string
+		input    string
+		want     string
+		wantErr  bool
+		setupEnv map[string]string
+		skipOnOS []string
 	}{
 		{
 			name:    "NoCommandSubstitutionNeeded",
@@ -57,7 +55,6 @@ func TestSubstituteCommands(t *testing.T) {
 			setupEnv: map[string]string{
 				"TEST_VAR": "test_value",
 			},
-			cleanupEnv: []string{"TEST_VAR"},
 		},
 		{
 			name:    "CommandWithSpaces",
@@ -106,14 +103,8 @@ func TestSubstituteCommands(t *testing.T) {
 			}
 
 			// Setup environment if needed
-			if tt.setupEnv != nil {
-				for k, v := range tt.setupEnv {
-					oldValue := os.Getenv(k)
-					_ = os.Setenv(k, v)
-					defer func() {
-						_ = os.Setenv(k, oldValue)
-					}()
-				}
+			for k, v := range tt.setupEnv {
+				t.Setenv(k, v)
 			}
 
 			// Run test
@@ -269,11 +260,11 @@ func TestSubstituteCommands_Extended(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := substituteCommandsWithContext(context.Background(), tt.input)
 			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.want, got)
+				require.Error(t, err)
+				return
 			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

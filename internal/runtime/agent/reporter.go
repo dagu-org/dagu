@@ -482,7 +482,7 @@ func renderHTMLWithDAGInfo(dagStatus exec.DAGRunStatus) string {
 		"running":   "running",
 		"skipped":   "skipped",
 		"aborted":   "aborted",
-		"wait":      "wait",
+		"waiting":   "wait",
 	}
 	_, _ = buffer.WriteString(badgeClasses[statusStr])
 	_, _ = buffer.WriteString(`">`)
