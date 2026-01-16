@@ -30,8 +30,8 @@ const (
 	// Default connection pool settings for non-worker mode
 	// These are conservative values suitable for single-step execution.
 	// In worker mode, the global pool manager handles pooling.
-	defaultMaxOpenConns    = 1              // Single connection per step
-	defaultMaxIdleConns    = 1              // Keep the connection ready
+	defaultMaxOpenConns    = 1 // Single connection per step
+	defaultMaxIdleConns    = 1 // Keep the connection ready
 	defaultConnMaxLifetime = 5 * time.Minute
 )
 
