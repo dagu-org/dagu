@@ -118,23 +118,12 @@ export default function AuditLogsPage() {
       ? parsedDate.utcOffset(config.tzOffsetInSec / 60)
       : parsedDate;
 
-    switch (period) {
-      case 'date':
-        return {
-          from: date.startOf('day').format('YYYY-MM-DDTHH:mm'),
-          to: date.endOf('day').format('YYYY-MM-DDTHH:mm'),
-        };
-      case 'month':
-        return {
-          from: date.startOf('month').format('YYYY-MM-DDTHH:mm'),
-          to: date.endOf('month').format('YYYY-MM-DDTHH:mm'),
-        };
-      case 'year':
-        return {
-          from: date.startOf('year').format('YYYY-MM-DDTHH:mm'),
-          to: date.endOf('year').format('YYYY-MM-DDTHH:mm'),
-        };
-    }
+    // dayjs uses 'day' instead of 'date' for startOf/endOf
+    const unit = period === 'date' ? 'day' : period;
+    return {
+      from: date.startOf(unit).format('YYYY-MM-DDTHH:mm'),
+      to: date.endOf(unit).format('YYYY-MM-DDTHH:mm'),
+    };
   }, [config.tzOffsetInSec]);
 
   // Convert datetime to ISO 8601 for API calls
