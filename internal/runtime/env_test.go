@@ -335,6 +335,29 @@ func TestNewEnvForStep_WorkingDirectory(t *testing.T) {
 			dagWorkDir:  subDir,
 			expectedDir: tempDir,
 		},
+		{
+			name: "DAGWorkDirWithTildePrefix",
+			step: core.Step{
+				Name: "test-step",
+				Dir:  "", // Empty - should inherit DAG WorkingDir
+			},
+			dagWorkDir:  "~/dagu_test_workdir",
+			expectedDir: homeTempDir,
+		},
+		{
+			name: "DAGWorkDirWithEnvVarExpandingToHome",
+			step: core.Step{
+				Name: "test-step",
+				Dir:  "", // Empty - should inherit DAG WorkingDir
+			},
+			dagWorkDir: func() string {
+				if goruntime.GOOS == "windows" {
+					return "$USERPROFILE\\dagu_test_workdir"
+				}
+				return "$HOME/dagu_test_workdir"
+			}(),
+			expectedDir: homeTempDir,
+		},
 	}
 
 	for _, tt := range tests {

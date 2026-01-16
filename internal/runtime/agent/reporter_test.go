@@ -181,10 +181,11 @@ func TestRenderHTMLWithDAGInfo(t *testing.T) {
 		htmlEscaped := renderHTMLWithDAGInfo(statusWithSpecialChars)
 
 		// Verify dangerous HTML characters are properly escaped
+		// html.EscapeString escapes: & < > ' "
 		require.NotContains(t, htmlEscaped, "<script>alert('xss')</script>")
-		require.Contains(t, htmlEscaped, "&lt;script&gt;alert('xss')&lt;/script&gt;")
+		require.Contains(t, htmlEscaped, "&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;")
 		require.Contains(t, htmlEscaped, "id&amp;with&amp;ampersands")
-		require.Contains(t, htmlEscaped, "param=&quot;&lt;value&gt;&quot;")
+		require.Contains(t, htmlEscaped, "param=&#34;&lt;value&gt;&#34;")
 	})
 }
 
@@ -408,20 +409,21 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 		require.Contains(t, html, "2025-01-15T10:30:00Z")
 		require.Contains(t, html, "2025-01-15T10:30:45Z")
 
-		// Check error messages are present (single quotes in actual output)
-		require.Contains(t, html, "Migration failed: Table 'users' already exists")
+		// Check error messages are present (single quotes escaped by html.EscapeString)
+		require.Contains(t, html, "Migration failed: Table &#39;users&#39; already exists")
 	})
 
 	t.Run("HTMLEscaping", func(t *testing.T) {
 		// Verify dangerous HTML characters are properly escaped
-		require.NotContains(t, html, "<script>alert('xss')</script>")          // Raw script tag should not exist
-		require.Contains(t, html, "&lt;script&gt;alert('xss')&lt;/script&gt;") // Should be escaped (actual format)
+		// html.EscapeString escapes: & < > ' "
+		require.NotContains(t, html, "<script>alert('xss')</script>")              // Raw script tag should not exist
+		require.Contains(t, html, "&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;") // Should be escaped
 
 		// Check ampersands are escaped
 		require.Contains(t, html, "&amp;") // & should be escaped to &amp;
 
 		// Check quotes are escaped in error messages
-		require.Contains(t, html, "\"special chars\"") // Quotes in actual output
+		require.Contains(t, html, "&#34;special chars&#34;") // Double quotes escaped
 	})
 
 	t.Run("RowCount", func(t *testing.T) {
