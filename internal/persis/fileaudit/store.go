@@ -111,8 +111,18 @@ func (s *Store) Query(_ context.Context, filter audit.QueryFilter) (*audit.Query
 	// Collect all matching entries
 	var allEntries []*audit.Entry
 
+	// Get day boundaries for file iteration, preserving the original timezone.
+	// Using time.Date() instead of Truncate(24h) ensures correct day boundaries
+	// for non-UTC timezones. Convert endDate to the same location as startDate
+	// before extracting date components to ensure consistent day boundaries.
+	// Individual entries are still filtered by exact timestamps in readEntriesFromFile.
+	loc := startDate.Location()
+	endDateInLoc := endDate.In(loc)
+	fileStartDate := time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, loc)
+	fileEndDate := time.Date(endDateInLoc.Year(), endDateInLoc.Month(), endDateInLoc.Day(), 0, 0, 0, 0, loc)
+
 	// Iterate through each day in the range
-	for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
+	for d := fileStartDate; !d.After(fileEndDate); d = d.AddDate(0, 0, 1) {
 		filePath := s.auditFilePath(d)
 		entries, err := s.readEntriesFromFile(filePath, filter)
 		if err != nil {
