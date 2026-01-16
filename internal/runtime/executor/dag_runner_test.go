@@ -42,7 +42,6 @@ func TestNewSubDAGExecutor_LocalDAG(t *testing.T) {
 		DB:         mockDB,
 		RootDAGRun: exec1.NewDAGRunRef("parent", "root-123"),
 		DAGRunID:   "parent-456",
-		Envs:       make(map[string]string),
 	}
 	ctx = exec1.WithContext(ctx, dagCtx)
 
@@ -89,7 +88,6 @@ func TestNewSubDAGExecutor_RegularDAG(t *testing.T) {
 		DB:         mockDB,
 		RootDAGRun: exec1.NewDAGRunRef("parent", "root-123"),
 		DAGRunID:   "parent-456",
-		Envs:       make(map[string]string),
 	}
 	ctx = exec1.WithContext(ctx, dagCtx)
 
@@ -137,7 +135,6 @@ func TestNewSubDAGExecutor_NotFound(t *testing.T) {
 		DB:         mockDB,
 		RootDAGRun: exec1.NewDAGRunRef("parent", "root-123"),
 		DAGRunID:   "parent-456",
-		Envs:       make(map[string]string),
 	}
 	ctx = exec1.WithContext(ctx, dagCtx)
 
@@ -167,7 +164,6 @@ func TestBuildCommand(t *testing.T) {
 		DB:         mockDB,
 		RootDAGRun: exec1.NewDAGRunRef("parent", "root-123"),
 		DAGRunID:   "parent-456",
-		Envs:       map[string]string{"TEST_ENV": "value"},
 		BaseEnv:    &baseEnv,
 	}
 	ctx = exec1.WithContext(ctx, dagCtx)
@@ -193,7 +189,6 @@ func TestBuildCommand(t *testing.T) {
 
 	// Verify command properties
 	assert.Equal(t, "/work/dir", cmd.Dir)
-	assert.Contains(t, cmd.Env, "TEST_ENV=value")
 
 	// Verify args
 	args := cmd.Args
@@ -218,7 +213,6 @@ func TestBuildCommand_NoRunID(t *testing.T) {
 		DB:         mockDB,
 		RootDAGRun: exec1.NewDAGRunRef("parent", "root-123"),
 		DAGRunID:   "parent-456",
-		Envs:       make(map[string]string),
 	}
 	ctx = exec1.WithContext(ctx, dagCtx)
 
@@ -250,7 +244,6 @@ func TestBuildCommand_NoRootDAGRun(t *testing.T) {
 		DB:  mockDB,
 		// RootDAGRun is zero value
 		DAGRunID: "parent-456",
-		Envs:     make(map[string]string),
 	}
 	ctx = exec1.WithContext(ctx, dagCtx)
 

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
-	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec/types"
 	"github.com/go-viper/mapstructure/v2"
@@ -389,6 +388,26 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 		Location: ctx.file,
 	}
 
+	// Initialize shared envScope state for thread-safe env var handling.
+	// Start with OS environment as base layer.
+	baseScope := cmdutil.NewEnvScope(nil, true)
+
+	// Pre-populate with build env from options (for retry with dotenv).
+	// This allows YAML to reference env vars that were loaded from .env files
+	// before the rebuild.
+	buildEnv := make(map[string]string, len(ctx.opts.BuildEnv))
+	for k, v := range ctx.opts.BuildEnv {
+		buildEnv[k] = v
+	}
+	if len(buildEnv) > 0 {
+		baseScope = baseScope.WithEntries(buildEnv, cmdutil.EnvSourceDotEnv)
+	}
+
+	ctx.envScope = &envScopeState{
+		scope:    baseScope,
+		buildEnv: buildEnv,
+	}
+
 	// Run the transformer pipeline
 	errs := runTransformers(ctx, d, result)
 
@@ -584,6 +603,15 @@ func buildEnvs(ctx BuildContext, d *dag) ([]string, error) {
 	vars, err := loadVariablesFromEnvValue(ctx, d.Env)
 	if err != nil {
 		return nil, err
+	}
+
+	// Add vars to the shared envScope state so subsequent transformers can use it.
+	// This replaces the old pattern of using os.Setenv which caused race conditions.
+	if ctx.envScope != nil && len(vars) > 0 {
+		ctx.envScope.scope = ctx.envScope.scope.WithEntries(vars, cmdutil.EnvSourceDAGEnv)
+		for k, v := range vars {
+			ctx.envScope.buildEnv[k] = v
+		}
 	}
 
 	var envs []string
@@ -785,7 +813,7 @@ type shellResult struct {
 	Args  []string
 }
 
-func parseShellInternal(ctx BuildContext, d *dag) (*shellResult, error) {
+func parseShellInternal(_ BuildContext, d *dag) (*shellResult, error) {
 	if d.Shell.IsZero() {
 		return &shellResult{Shell: cmdutil.GetShellCommand(""), Args: nil}, nil
 	}
@@ -797,15 +825,8 @@ func parseShellInternal(ctx BuildContext, d *dag) (*shellResult, error) {
 		if shell == "" {
 			return &shellResult{Shell: cmdutil.GetShellCommand(""), Args: nil}, nil
 		}
-		if !ctx.opts.Has(BuildFlagNoEval) {
-			shell = os.ExpandEnv(shell)
-		}
+		// Shell expansion is deferred to runtime - see runtime/env.go Shell()
 		args := d.Shell.Arguments()
-		if !ctx.opts.Has(BuildFlagNoEval) {
-			for i, arg := range args {
-				args[i] = os.ExpandEnv(arg)
-			}
-		}
 		return &shellResult{Shell: shell, Args: args}, nil
 	}
 
@@ -815,10 +836,7 @@ func parseShellInternal(ctx BuildContext, d *dag) (*shellResult, error) {
 		return &shellResult{Shell: cmdutil.GetShellCommand(""), Args: nil}, nil
 	}
 
-	if !ctx.opts.Has(BuildFlagNoEval) {
-		command = os.ExpandEnv(command)
-	}
-
+	// Shell expansion is deferred to runtime - see runtime/env.go Shell()
 	shell, args, err := cmdutil.SplitCommand(command)
 	if err != nil {
 		return nil, core.NewValidationError("shell", d.Shell.Value(), fmt.Errorf("failed to parse shell command: %w", err))
@@ -846,18 +864,21 @@ func buildWorkingDir(ctx BuildContext, d *dag) (string, error) {
 	switch {
 	case d.WorkingDir != "":
 		wd := d.WorkingDir
-		if !ctx.opts.Has(BuildFlagNoEval) {
-			wd = os.ExpandEnv(wd)
-			switch {
-			case filepath.IsAbs(wd) || strings.HasPrefix(wd, "~"):
-				wd = fileutil.ResolvePathOrBlank(wd)
-			case ctx.file != "":
-				wd = filepath.Join(filepath.Dir(ctx.file), wd)
-			default:
-				wd = fileutil.ResolvePathOrBlank(wd)
-			}
+		// Path resolution at build time (needs DAG file location for relative paths)
+		// Variable expansion is deferred to runtime - see runtime/env.go resolveWorkingDir()
+		switch {
+		case filepath.IsAbs(wd) || strings.HasPrefix(wd, "~") || strings.HasPrefix(wd, "$"):
+			// Absolute paths, home dir paths, and variable paths: store as-is
+			// Runtime will expand variables and resolve ~ prefix
+			return wd, nil
+		case ctx.file != "":
+			// Relative path: resolve to absolute using DAG file location
+			// This must happen at build time since we have ctx.file here
+			return filepath.Join(filepath.Dir(ctx.file), wd), nil
+		default:
+			// No DAG file context, store as-is
+			return wd, nil
 		}
-		return wd, nil
 
 	case ctx.opts.DefaultWorkingDir != "":
 		return ctx.opts.DefaultWorkingDir, nil
@@ -1146,38 +1167,34 @@ func parseHealthcheck(h *healthcheck) (*core.Healthcheck, error) {
 	return hc, nil
 }
 
-func buildRegistryAuths(ctx BuildContext, d *dag) (map[string]*core.AuthConfig, error) {
+func buildRegistryAuths(_ BuildContext, d *dag) (map[string]*core.AuthConfig, error) {
 	if d.RegistryAuths == nil {
 		return nil, nil
 	}
 
-	expand := func(s string) string {
-		if ctx.opts.Has(BuildFlagNoEval) {
-			return s
-		}
-		return os.ExpandEnv(s)
-	}
+	// No expansion at build time - credentials are evaluated at runtime.
+	// See runtime/agent/agent.go where RegistryAuths are evaluated before use.
 
-	// parseAuthConfig parses auth config from a map with string keys
+	// parseAuthConfig parses auth config from a map with string keys.
 	parseAuthConfig := func(m map[string]any) *core.AuthConfig {
 		cfg := &core.AuthConfig{}
 		if v, ok := m["username"].(string); ok {
-			cfg.Username = expand(v)
+			cfg.Username = v
 		}
 		if v, ok := m["password"].(string); ok {
-			cfg.Password = expand(v)
+			cfg.Password = v
 		}
 		if v, ok := m["auth"].(string); ok {
-			cfg.Auth = expand(v)
+			cfg.Auth = v
 		}
 		return cfg
 	}
 
-	// parseAuthData parses auth data which can be a string or a map
+	// parseAuthData parses auth data which can be a string or a map.
 	parseAuthData := func(authData any) *core.AuthConfig {
 		switch auth := authData.(type) {
 		case string:
-			return &core.AuthConfig{Auth: expand(auth)}
+			return &core.AuthConfig{Auth: auth}
 		case map[string]any:
 			return parseAuthConfig(auth)
 		case map[any]any:
@@ -1189,15 +1206,16 @@ func buildRegistryAuths(ctx BuildContext, d *dag) (map[string]*core.AuthConfig, 
 				}
 			}
 			return parseAuthConfig(m)
+		default:
+			return &core.AuthConfig{}
 		}
-		return &core.AuthConfig{}
 	}
 
 	registryAuths := make(map[string]*core.AuthConfig)
 
 	switch v := d.RegistryAuths.(type) {
 	case string:
-		registryAuths["_json"] = &core.AuthConfig{Auth: expand(v)}
+		registryAuths["_json"] = &core.AuthConfig{Auth: v}
 
 	case map[string]any:
 		for registry, authData := range v {
@@ -1346,59 +1364,44 @@ func buildDotenv(_ BuildContext, d *dag) ([]string, error) {
 func buildHandlers(ctx BuildContext, d *dag, result *core.DAG) (core.HandlerOn, error) {
 	buildCtx := StepBuildContext{BuildContext: ctx, dag: result}
 	var handlerOn core.HandlerOn
+
+	// buildHandler is a helper that builds a single handler step.
+	buildHandler := func(s *step, name core.HandlerType) (*core.Step, error) {
+		if s == nil {
+			return nil, nil
+		}
+		s.Name = name.String()
+		return s.build(buildCtx)
+	}
+
 	var err error
-
-	if d.HandlerOn.Init != nil {
-		d.HandlerOn.Init.Name = core.HandlerOnInit.String()
-		if handlerOn.Init, err = d.HandlerOn.Init.build(buildCtx); err != nil {
-			return handlerOn, err
-		}
+	if handlerOn.Init, err = buildHandler(d.HandlerOn.Init, core.HandlerOnInit); err != nil {
+		return handlerOn, err
 	}
-
-	if d.HandlerOn.Exit != nil {
-		d.HandlerOn.Exit.Name = core.HandlerOnExit.String()
-		if handlerOn.Exit, err = d.HandlerOn.Exit.build(buildCtx); err != nil {
-			return handlerOn, err
-		}
+	if handlerOn.Exit, err = buildHandler(d.HandlerOn.Exit, core.HandlerOnExit); err != nil {
+		return handlerOn, err
 	}
-
-	if d.HandlerOn.Success != nil {
-		d.HandlerOn.Success.Name = core.HandlerOnSuccess.String()
-		if handlerOn.Success, err = d.HandlerOn.Success.build(buildCtx); err != nil {
-			return handlerOn, err
-		}
+	if handlerOn.Success, err = buildHandler(d.HandlerOn.Success, core.HandlerOnSuccess); err != nil {
+		return handlerOn, err
 	}
-
-	if d.HandlerOn.Failure != nil {
-		d.HandlerOn.Failure.Name = core.HandlerOnFailure.String()
-		if handlerOn.Failure, err = d.HandlerOn.Failure.build(buildCtx); err != nil {
-			return handlerOn, err
-		}
+	if handlerOn.Failure, err = buildHandler(d.HandlerOn.Failure, core.HandlerOnFailure); err != nil {
+		return handlerOn, err
 	}
 
 	// Handle Abort (canonical) and Cancel (deprecated, for backward compatibility)
 	if d.HandlerOn.Abort != nil && d.HandlerOn.Cancel != nil {
 		return handlerOn, fmt.Errorf("cannot specify both 'abort' and 'cancel' in handlerOn; use 'abort' (cancel is deprecated)")
 	}
-	var abortStep *step
-	switch {
-	case d.HandlerOn.Abort != nil:
-		abortStep = d.HandlerOn.Abort
-	case d.HandlerOn.Cancel != nil:
+	abortStep := d.HandlerOn.Abort
+	if abortStep == nil {
 		abortStep = d.HandlerOn.Cancel
 	}
-	if abortStep != nil {
-		abortStep.Name = core.HandlerOnCancel.String()
-		if handlerOn.Cancel, err = abortStep.build(buildCtx); err != nil {
-			return handlerOn, err
-		}
+	if handlerOn.Cancel, err = buildHandler(abortStep, core.HandlerOnCancel); err != nil {
+		return handlerOn, err
 	}
 
-	if d.HandlerOn.Wait != nil {
-		d.HandlerOn.Wait.Name = core.HandlerOnWait.String()
-		if handlerOn.Wait, err = d.HandlerOn.Wait.build(buildCtx); err != nil {
-			return handlerOn, err
-		}
+	if handlerOn.Wait, err = buildHandler(d.HandlerOn.Wait, core.HandlerOnWait); err != nil {
+		return handlerOn, err
 	}
 
 	return handlerOn, nil

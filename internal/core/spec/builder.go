@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/go-viper/mapstructure/v2"
 )
@@ -19,6 +20,19 @@ type BuildContext struct {
 	// buildEnv is a temporary map used during core.DAG building to pass env vars to params
 	// This is not serialized and is cleared after build completes
 	buildEnv map[string]string
+
+	// envScope is a shared state pointer for thread-safe environment variable handling.
+	// It holds accumulated env vars (OS + DAG env) and is used by transformers
+	// to expand variables without mutating global os.Env.
+	// This is initialized by build() and populated by buildEnvs transformer.
+	envScope *envScopeState
+}
+
+// envScopeState holds mutable state that needs to be shared across transformers.
+// Using a pointer allows value-passed BuildContext to share state.
+type envScopeState struct {
+	scope    *cmdutil.EnvScope
+	buildEnv map[string]string // Also store as map for WithVariables
 }
 
 // StepBuildContext is the context for building a step.
@@ -70,6 +84,11 @@ type BuildOpts struct {
 	DefaultWorkingDir string
 	// Flags stores all boolean options controlling build behaviour.
 	Flags BuildFlag
+	// BuildEnv provides pre-populated environment variables for the build.
+	// These are added to envScope before building, allowing YAML to reference
+	// them via ${VAR}. Used for retry/restart where dotenv values need to be
+	// available during rebuild from YamlData.
+	BuildEnv map[string]string
 }
 
 // Has reports whether the flag is enabled on the current BuildOpts.

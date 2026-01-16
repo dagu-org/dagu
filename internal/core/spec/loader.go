@@ -33,8 +33,9 @@ type LoadOptions struct {
 	params            string   // Parameters to override default parameters in the DAG.
 	paramsList        []string // List of parameters to override default parameters in the DAG.
 	flags             BuildFlag
-	dagsDir           string // Directory containing the core.DAG files.
-	defaultWorkingDir string // Default working directory for DAGs without explicit workingDir.
+	dagsDir           string            // Directory containing the core.DAG files.
+	defaultWorkingDir string            // Default working directory for DAGs without explicit workingDir.
+	buildEnv          map[string]string // Pre-populated env vars for build (used for retry with dotenv).
 }
 
 // LoadOption is a function type for setting LoadOptions.
@@ -132,6 +133,16 @@ func WithDefaultWorkingDir(defaultWorkingDir string) LoadOption {
 	}
 }
 
+// WithBuildEnv provides additional environment variables for the build.
+// These are added to the envScope before building, allowing YAML to
+// reference them via ${VAR}. This is used for retry scenarios where
+// dotenv values need to be available during rebuild from YamlData.
+func WithBuildEnv(env map[string]string) LoadOption {
+	return func(o *LoadOptions) {
+		o.buildEnv = env
+	}
+}
+
 // Load loads a Directed Acyclic Graph (core.DAG) from a file path or name with the given options.
 //
 // The function handles different input formats:
@@ -165,6 +176,7 @@ func Load(ctx context.Context, nameOrPath string, opts ...LoadOption) (*core.DAG
 			DAGsDir:           options.dagsDir,
 			DefaultWorkingDir: options.defaultWorkingDir,
 			Flags:             options.flags,
+			BuildEnv:          options.buildEnv,
 		},
 	}
 	return loadDAG(buildContext, nameOrPath)
@@ -184,6 +196,7 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*core.DAG, 
 		DAGsDir:           options.dagsDir,
 		DefaultWorkingDir: options.defaultWorkingDir,
 		Flags:             options.flags,
+		BuildEnv:          options.buildEnv,
 	})
 }
 

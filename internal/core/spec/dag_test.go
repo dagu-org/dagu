@@ -1017,7 +1017,9 @@ func TestBuildRegistryAuths(t *testing.T) {
 	}
 }
 
-func TestBuildRegistryAuths_EnvExpansion(t *testing.T) {
+func TestBuildRegistryAuths_NoExpansion(t *testing.T) {
+	// RegistryAuths are no longer expanded at build time - expansion happens at runtime
+	// See runtime/agent/agent.go where credentials are evaluated before use
 	t.Setenv("TEST_USER", "testuser")
 	t.Setenv("TEST_PASS", "testpass")
 
@@ -1033,8 +1035,9 @@ func TestBuildRegistryAuths_EnvExpansion(t *testing.T) {
 	result, err := buildRegistryAuths(testBuildContext(), d)
 	require.NoError(t, err)
 
+	// Expects unexpanded values (expansion deferred to runtime)
 	expected := map[string]*core.AuthConfig{
-		"registry.example.com": {Username: "testuser", Password: "testpass"},
+		"registry.example.com": {Username: "$TEST_USER", Password: "$TEST_PASS"},
 	}
 	assert.Equal(t, expected, result)
 }
@@ -1116,7 +1119,9 @@ func TestBuildWorkingDir_Relative(t *testing.T) {
 	assert.Equal(t, filepath.Join(tmpDir, "subdir"), result)
 }
 
-func TestBuildWorkingDir_EnvExpansion(t *testing.T) {
+func TestBuildWorkingDir_NoExpansion(t *testing.T) {
+	// WorkingDir is no longer expanded at build time - expansion happens at runtime
+	// See runtime/env.go resolveWorkingDir()
 	t.Setenv("WORK_DIR", "/expanded/path")
 
 	ctx := testBuildContext()
@@ -1124,7 +1129,8 @@ func TestBuildWorkingDir_EnvExpansion(t *testing.T) {
 
 	result, err := buildWorkingDir(ctx, d)
 	require.NoError(t, err)
-	assert.Equal(t, "/expanded/path", result)
+	// Expects unexpanded value (starts with $, so stored as-is for runtime evaluation)
+	assert.Equal(t, "$WORK_DIR", result)
 }
 
 func TestBuildWorkingDir_NoEval(t *testing.T) {
@@ -1141,7 +1147,9 @@ func TestBuildWorkingDir_NoEval(t *testing.T) {
 	assert.Equal(t, "$TEST_PATH/subdir", result)
 }
 
-func TestBuildWorkingDir_TildeExpansion(t *testing.T) {
+func TestBuildWorkingDir_TildePreserved(t *testing.T) {
+	// ~ prefix is preserved at build time, expansion happens at runtime
+	// See runtime/env.go resolveWorkingDir()
 	t.Parallel()
 
 	ctx := testBuildContext()
@@ -1149,8 +1157,8 @@ func TestBuildWorkingDir_TildeExpansion(t *testing.T) {
 
 	result, err := buildWorkingDir(ctx, d)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result)
-	assert.NotEqual(t, "~/mydir", result) // Should be expanded
+	// ~ prefix is preserved for runtime expansion
+	assert.Equal(t, "~/mydir", result)
 }
 
 func TestBuildWorkingDir_FallbackToCurrentDir(t *testing.T) {
@@ -1180,14 +1188,15 @@ func TestBuildWorkingDir_DefaultWorkingDir(t *testing.T) {
 func TestBuildWorkingDir_RelativeNoFileContext(t *testing.T) {
 	t.Parallel()
 
-	// Relative path without file context should resolve to current directory
+	// Relative path without file context is stored as-is
+	// (no file context means we can't resolve the relative path at build time)
 	ctx := BuildContext{} // No file
 	d := &dag{WorkingDir: "subdir"}
 
 	result, err := buildWorkingDir(ctx, d)
 	require.NoError(t, err)
-	// Should be resolved (not just "subdir")
-	assert.NotEqual(t, "subdir", result)
+	// Without file context, relative path is stored as-is
+	assert.Equal(t, "subdir", result)
 }
 
 func TestBuildWorkingDir_FallbackToFileDir(t *testing.T) {

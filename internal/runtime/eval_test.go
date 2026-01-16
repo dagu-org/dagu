@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -25,8 +26,10 @@ func TestEvalString(t *testing.T) {
 	// Create a test context with environment variables
 	ctx := runtime.NewContext(context.Background(), &core.DAG{Name: "test-dag"}, "", "")
 	env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
-	env.Variables.Store("TEST_VAR", "TEST_VAR=hello")
-	env.Envs["ANOTHER_VAR"] = "world"
+	env.Scope = env.Scope.WithEntries(map[string]string{
+		"TEST_VAR":    "hello",
+		"ANOTHER_VAR": "world",
+	}, cmdutil.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	tests := []struct {
@@ -74,11 +77,13 @@ func TestEvalBool(t *testing.T) {
 	// Create a test context with environment variables
 	ctx := context.Background()
 	env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
-	env.Variables.Store("TRUE_VAR", "TRUE_VAR=true")
-	env.Variables.Store("FALSE_VAR", "FALSE_VAR=false")
-	env.Variables.Store("ONE_VAR", "ONE_VAR=1")
-	env.Variables.Store("ZERO_VAR", "ZERO_VAR=0")
-	env.Variables.Store("INVALID_VAR", "INVALID_VAR=not-a-bool")
+	env.Scope = env.Scope.WithEntries(map[string]string{
+		"TRUE_VAR":    "true",
+		"FALSE_VAR":   "false",
+		"ONE_VAR":     "1",
+		"ZERO_VAR":    "0",
+		"INVALID_VAR": "not-a-bool",
+	}, cmdutil.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	tests := []struct {
@@ -166,9 +171,11 @@ func TestEvalObject(t *testing.T) {
 	// Create a test context with DAGContext and environment variables
 	ctx := setupTestContext()
 	env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
-	env.Variables.Store("NAME_VAR", "NAME_VAR=John")
-	env.Variables.Store("DESC_VAR", "DESC_VAR=Developer")
-	env.Variables.Store("NESTED_VAR", "NESTED_VAR=NestedValue")
+	env.Scope = env.Scope.WithEntries(map[string]string{
+		"NAME_VAR":   "John",
+		"DESC_VAR":   "Developer",
+		"NESTED_VAR": "NestedValue",
+	}, cmdutil.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	// Create a test struct
@@ -208,9 +215,11 @@ func TestEvalObjectWithExecutorConfig(t *testing.T) {
 	// Create a test context with DAGContext and environment variables
 	ctx := setupTestContext()
 	env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
-	env.Variables.Store("EXECUTOR_TYPE", "EXECUTOR_TYPE=docker")
-	env.Variables.Store("HOST_VAR", "HOST_VAR=localhost")
-	env.Variables.Store("PORT_VAR", "PORT_VAR=8080")
+	env.Scope = env.Scope.WithEntries(map[string]string{
+		"EXECUTOR_TYPE": "docker",
+		"HOST_VAR":      "localhost",
+		"PORT_VAR":      "8080",
+	}, cmdutil.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	// Create an ExecutorConfig with variables
@@ -317,9 +326,11 @@ func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
 	// Create a test context with DAGContext and environment variables
 	ctx := setupTestContext()
 	env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
-	env.Variables.Store("VAR1", "VAR1=value1")
-	env.Variables.Store("VAR2", "VAR2=value2")
-	env.Variables.Store("NUM", "NUM=42")
+	env.Scope = env.Scope.WithEntries(map[string]string{
+		"VAR1": "value1",
+		"VAR2": "value2",
+		"NUM":  "42",
+	}, cmdutil.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	tests := []struct {
@@ -477,9 +488,11 @@ func TestEvalStringEdgeCases(t *testing.T) {
 	// Create a test context with environment variables
 	ctx := runtime.NewContext(context.Background(), &core.DAG{}, "test-run", "test.log")
 	env := runtime.GetEnv(ctx)
-	env.Variables.Store("EMPTY", "EMPTY=")
-	env.Variables.Store("SPACES", "SPACES=  ")
-	env.Variables.Store("SPECIAL", "SPECIAL=special!@#")
+	env.Scope = env.Scope.WithEntries(map[string]string{
+		"EMPTY":   "",
+		"SPACES":  "  ",
+		"SPECIAL": "special!@#",
+	}, cmdutil.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	tests := []struct {
@@ -543,9 +556,11 @@ func TestEvalObjectWithDirectStringEvaluation(t *testing.T) {
 	// Create a test context with DAGContext and environment variables
 	ctx := setupTestContext()
 	env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
-	env.Variables.Store("STRING_VAR", "STRING_VAR=evaluated_string")
-	env.Variables.Store("PATH_VAR", "PATH_VAR=/path/to/file")
-	env.Variables.Store("COMBINED", "COMBINED=prefix")
+	env.Scope = env.Scope.WithEntries(map[string]string{
+		"STRING_VAR": "evaluated_string",
+		"PATH_VAR":   "/path/to/file",
+		"COMBINED":   "prefix",
+	}, cmdutil.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	tests := []struct {
@@ -628,12 +643,14 @@ func TestEvalBoolEdgeCases(t *testing.T) {
 	ctx := runtime.NewContext(context.Background(), &core.DAG{}, "test-run", "test.log")
 
 	env := runtime.GetEnv(ctx)
-	env.Variables.Store("YES", "YES=yes")
-	env.Variables.Store("NO", "NO=no")
-	env.Variables.Store("ON", "ON=on")
-	env.Variables.Store("OFF", "OFF=off")
-	env.Variables.Store("T", "T=t")
-	env.Variables.Store("F", "F=f")
+	env.Scope = env.Scope.WithEntries(map[string]string{
+		"YES": "yes",
+		"NO":  "no",
+		"ON":  "on",
+		"OFF": "off",
+		"T":   "t",
+		"F":   "f",
+	}, cmdutil.EnvSourceStepEnv)
 
 	ctx = runtime.WithEnv(ctx, env)
 

@@ -2821,9 +2821,10 @@ steps:
 }
 
 func TestBuildShell(t *testing.T) {
-	// Environment variable tests (cannot use t.Parallel due to t.Setenv)
+	// Shell is no longer expanded at build time - expansion happens at runtime
+	// See runtime/env.go Shell() method
 	// Standard parsing cases are covered by types/shell_test.go
-	t.Run("WithEnvVar", func(t *testing.T) {
+	t.Run("WithEnvVarPreserved", func(t *testing.T) {
 		t.Setenv("MY_SHELL", "/bin/zsh")
 		data := []byte(`
 shell: $MY_SHELL
@@ -2832,11 +2833,12 @@ steps:
 `)
 		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
-		assert.Equal(t, "/bin/zsh", dag.Shell)
+		// Expects unexpanded value (expansion deferred to runtime)
+		assert.Equal(t, "$MY_SHELL", dag.Shell)
 		assert.Empty(t, dag.ShellArgs)
 	})
 
-	t.Run("ArrayWithEnvVar", func(t *testing.T) {
+	t.Run("ArrayWithEnvVarPreserved", func(t *testing.T) {
 		t.Setenv("SHELL_ARG", "-x")
 		data := []byte(`
 shell:
@@ -2848,7 +2850,8 @@ steps:
 		dag, err := spec.LoadYAML(context.Background(), data)
 		require.NoError(t, err)
 		assert.Equal(t, "bash", dag.Shell)
-		assert.Equal(t, []string{"-x"}, dag.ShellArgs)
+		// Expects unexpanded value (expansion deferred to runtime)
+		assert.Equal(t, []string{"$SHELL_ARG"}, dag.ShellArgs)
 	})
 
 	// NoEval tests (cannot use t.Parallel due to t.Setenv)

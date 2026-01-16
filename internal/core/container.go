@@ -18,7 +18,9 @@ type Container struct {
 	// PullPolicy is the policy to pull the image (e.g., "Always", "IfNotPresent").
 	PullPolicy PullPolicy `yaml:"pullPolicy,omitempty"`
 	// Env specifies environment variables for the container.
-	Env []string `yaml:"env,omitempty"` // List of environment variables in "key=value" format
+	// Note: This field is evaluated at build time and may contain secrets.
+	// It is excluded from JSON serialization to prevent secret leakage.
+	Env []string `yaml:"env,omitempty" json:"-"` // List of environment variables in "key=value" format
 	// Volumes specifies the volumes to mount in the container.
 	Volumes []string `yaml:"volumes,omitempty"` // Map of volume names to volume definitions
 	// User is the user to run the container as.

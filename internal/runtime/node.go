@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -56,6 +57,26 @@ func NodeWithData(data NodeData) *Node {
 
 func (n *Node) NodeData() NodeData {
 	return n.Data.Data()
+}
+
+// OutputVariablesMap returns output variables as key->value map.
+// This is used to build the EnvScope chain with predecessor outputs.
+func (n *Node) OutputVariablesMap() map[string]string {
+	result := make(map[string]string)
+	state := n.State()
+	if state.OutputVariables == nil {
+		return result
+	}
+	state.OutputVariables.Range(func(key, value any) bool {
+		// Values are stored as "key=value" format
+		if strVal, ok := value.(string); ok {
+			if _, v, found := strings.Cut(strVal, "="); found {
+				result[key.(string)] = v
+			}
+		}
+		return true
+	})
+	return result
 }
 
 func (n *Node) ID() int {
@@ -332,8 +353,10 @@ func (n *Node) determineNodeStatus(cmd executor.Executor) error {
 	return nil
 }
 
+// clearVariable removes a variable from the Node's internal state.
+// Variables are scoped to the Node to avoid race conditions when
+// multiple DAG steps or concurrent tasks run simultaneously.
 func (n *Node) clearVariable(key string) {
-	_ = os.Unsetenv(key)
 	n.ClearVariable(key)
 }
 
@@ -532,9 +555,10 @@ func (n *Node) SetupEnv(ctx context.Context) context.Context {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	env := GetEnv(ctx)
-	env = env.WithVariables(
-		exec.EnvKeyDAGRunStepStdoutFile, n.GetStdout(),
-		exec.EnvKeyDAGRunStepStderrFile, n.GetStderr(),
+	env.Scope = env.Scope.WithEntry(
+		exec.EnvKeyDAGRunStepStdoutFile, n.GetStdout(), cmdutil.EnvSourceStepEnv,
+	).WithEntry(
+		exec.EnvKeyDAGRunStepStderrFile, n.GetStderr(), cmdutil.EnvSourceStepEnv,
 	)
 	ctx = logger.WithValues(ctx, tag.Step(n.Name()))
 	return WithEnv(ctx, env)

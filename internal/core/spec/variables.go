@@ -1,8 +1,8 @@
 package spec
 
 import (
+	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
@@ -10,34 +10,25 @@ import (
 	"github.com/dagu-org/dagu/internal/core/spec/types"
 )
 
-// loadVariables loads the environment variables from the map.
-// Case 1: env is a map.
-// Case 2: env is an array of maps.
-// Case 3: is recommended because the order of the environment variables is
-// loadVariables loads environment variables from strVariables into the process
-// environment and returns the resulting map of key→value.
+// loadVariables loads environment variables from strVariables and returns the
+// resulting map of key->value without modifying the global OS environment.
 //
 // strVariables may be either a map[string]any or a []any containing maps and/or
 // "key=value" strings; entries are collected in input order. For each pair, the
 // value is optionally evaluated and expanded (including command substitution and
 // references to previously defined variables) unless the BuildFlagNoEval option
-// is set on ctx. Successfully evaluated values are written to the OS environment
-// via os.Setenv and recorded in the returned map. The function returns a
-// validation error if the input is malformed, a value fails to evaluate, or an
-// environment variable cannot be set.
-func loadVariables(ctx BuildContext, strVariables any) (
-	map[string]string, error,
-) {
+// is set on ctx. The environment is passed via context to ensure thread-safety
+// during concurrent DAG loading. The function returns a validation error if the
+// input is malformed or a value fails to evaluate.
+func loadVariables(ctx BuildContext, strVariables any) (map[string]string, error) {
 	var pairs []pair
 	switch a := strVariables.(type) {
 	case map[string]any:
-		// Case 1. env is a map.
 		if err := parseKeyValue(a, &pairs); err != nil {
 			return nil, core.NewValidationError("env", a, err)
 		}
 
 	case []any:
-		// Case 2. env is an array of maps.
 		for _, v := range a {
 			switch vv := v.(type) {
 			case map[string]any:
@@ -45,7 +36,6 @@ func loadVariables(ctx BuildContext, strVariables any) (
 					return nil, core.NewValidationError("env", v, err)
 				}
 			case string:
-				// parse key=value string
 				key, val, found := strings.Cut(vv, "=")
 				if !found {
 					return nil, core.NewValidationError("env", &pairs, fmt.Errorf("%w: %s", ErrInvalidEnvValue, v))
@@ -54,74 +44,65 @@ func loadVariables(ctx BuildContext, strVariables any) (
 			default:
 				return nil, core.NewValidationError("env", &pairs, fmt.Errorf("%w: %s", ErrInvalidEnvValue, v))
 			}
-			if aa, ok := v.(map[string]any); ok {
-				if err := parseKeyValue(aa, &pairs); err != nil {
-					return nil, core.NewValidationError("env", v, err)
-				}
-			}
 		}
 	}
 
-	// Parse each key-value pair and set the environment variable.
-	vars := map[string]string{}
-	for _, pair := range pairs {
-		value := pair.val
-
-		if !ctx.opts.Has(BuildFlagNoEval) {
-			// Evaluate the value of the environment variable.
-			// This also executes command substitution.
-			// Pass accumulated vars so ${VAR} can reference previously defined vars
-			var err error
-
-			value, err = cmdutil.EvalString(ctx.ctx, value, cmdutil.WithVariables(vars))
-			if err != nil {
-				return nil, core.NewValidationError("env", pair.val, fmt.Errorf("%w: %s", ErrInvalidEnvValue, pair.val))
-			}
-
-			// Set the environment variable.
-			if err := os.Setenv(pair.key, value); err != nil {
-				return nil, core.NewValidationError("env", pair.key, fmt.Errorf("%w: %s", err, pair.key))
-			}
-		}
-
-		vars[pair.key] = value
-	}
-
-	return vars, nil
+	return evaluatePairs(ctx, pairs)
 }
 
 // loadVariablesFromEnvValue loads environment variables from a types.EnvValue.
 // This function converts the typed EnvValue entries to the expected format
-// and processes them using the same logic as loadVariables.
-func loadVariablesFromEnvValue(ctx BuildContext, env types.EnvValue) (
-	map[string]string, error,
-) {
+// and processes them using the same logic as loadVariables without modifying
+// the global OS environment.
+func loadVariablesFromEnvValue(ctx BuildContext, env types.EnvValue) (map[string]string, error) {
 	if env.IsZero() {
 		return nil, nil
 	}
 
-	vars := map[string]string{}
-	for _, entry := range env.Entries() {
-		value := entry.Value
+	entries := env.Entries()
+	pairs := make([]pair, len(entries))
+	for i, entry := range entries {
+		pairs[i] = pair{key: entry.Key, val: entry.Value}
+	}
+
+	return evaluatePairs(ctx, pairs)
+}
+
+// evaluatePairs evaluates a list of key-value pairs, expanding environment
+// variables and command substitutions unless BuildFlagNoEval is set.
+func evaluatePairs(ctx BuildContext, pairs []pair) (map[string]string, error) {
+	vars := make(map[string]string, len(pairs))
+
+	// Build base scope once outside the loop to reduce allocations.
+	// We chain new entries immutably as we evaluate each pair.
+	var scope *cmdutil.EnvScope
+	var evalCtx context.Context
+	if !ctx.opts.Has(BuildFlagNoEval) {
+		scope = cmdutil.NewEnvScope(nil, true)
+		evalCtx = ctx.ctx
+		if evalCtx == nil {
+			evalCtx = context.Background()
+		}
+	}
+
+	for _, p := range pairs {
+		value := p.val
 
 		if !ctx.opts.Has(BuildFlagNoEval) {
-			// Evaluate the value of the environment variable.
-			// This also executes command substitution.
-			// Pass accumulated vars so ${VAR} can reference previously defined vars
+			// Chain the new variable to scope for subsequent evaluations
+			scopeCtx := cmdutil.WithEnvScope(evalCtx, scope)
+
 			var err error
-
-			value, err = cmdutil.EvalString(ctx.ctx, value, cmdutil.WithVariables(vars))
+			value, err = cmdutil.EvalString(scopeCtx, value, cmdutil.WithVariables(vars))
 			if err != nil {
-				return nil, core.NewValidationError("env", entry.Value, fmt.Errorf("%w: %s", ErrInvalidEnvValue, entry.Value))
+				return nil, core.NewValidationError("env", p.val, fmt.Errorf("%w: %s", ErrInvalidEnvValue, p.val))
 			}
 
-			// Set the environment variable.
-			if err := os.Setenv(entry.Key, value); err != nil {
-				return nil, core.NewValidationError("env", entry.Key, fmt.Errorf("%w: %s", err, entry.Key))
-			}
+			// Add evaluated value to scope for next iteration
+			scope = scope.WithEntry(p.key, value, cmdutil.EnvSourceDAGEnv)
 		}
 
-		vars[entry.Key] = value
+		vars[p.key] = value
 	}
 
 	return vars, nil

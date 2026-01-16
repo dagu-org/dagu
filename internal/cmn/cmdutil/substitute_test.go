@@ -2,7 +2,6 @@ package cmdutil
 
 import (
 	"context"
-	"os"
 	"runtime"
 	"testing"
 
@@ -17,13 +16,12 @@ func TestSubstituteCommands(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		input      string
-		want       string
-		wantErr    bool
-		setupEnv   map[string]string
-		cleanupEnv []string
-		skipOnOS   []string
+		name     string
+		input    string
+		want     string
+		wantErr  bool
+		setupEnv map[string]string
+		skipOnOS []string
 	}{
 		{
 			name:    "NoCommandSubstitutionNeeded",
@@ -57,7 +55,6 @@ func TestSubstituteCommands(t *testing.T) {
 			setupEnv: map[string]string{
 				"TEST_VAR": "test_value",
 			},
-			cleanupEnv: []string{"TEST_VAR"},
 		},
 		{
 			name:    "CommandWithSpaces",
@@ -106,34 +103,22 @@ func TestSubstituteCommands(t *testing.T) {
 			}
 
 			// Setup environment if needed
-			if tt.setupEnv != nil {
-				for k, v := range tt.setupEnv {
-					oldValue := os.Getenv(k)
-					_ = os.Setenv(k, v)
-					defer func() {
-						_ = os.Setenv(k, oldValue)
-					}()
-				}
+			for k, v := range tt.setupEnv {
+				t.Setenv(k, v)
 			}
 
 			// Run test
-			got, err := substituteCommands(tt.input)
+			got, err := substituteCommandsWithContext(context.Background(), tt.input)
 
 			// Check error
-			if (err != nil) != tt.wantErr {
-				t.Errorf("substituteCommands() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			// If we expect an error, don't check the output
 			if tt.wantErr {
+				require.Error(t, err)
 				return
 			}
+			require.NoError(t, err)
 
 			// Compare output
-			if got != tt.want {
-				t.Errorf("substituteCommands() = %q, want %q", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -179,14 +164,13 @@ func TestSubstituteCommandsEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := substituteCommands(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("substituteCommands() error = %v, wantErr %v", err, tt.wantErr)
+			got, err := substituteCommandsWithContext(context.Background(), tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
 				return
 			}
-			if !tt.wantErr && got != tt.want {
-				t.Errorf("substituteCommands() = %q, want %q", got, tt.want)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -274,13 +258,13 @@ func TestSubstituteCommands_Extended(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := substituteCommands(tt.input)
+			got, err := substituteCommandsWithContext(context.Background(), tt.input)
 			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.want, got)
+				require.Error(t, err)
+				return
 			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

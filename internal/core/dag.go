@@ -8,7 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
@@ -63,7 +65,8 @@ func EffectiveLogOutput(dag *DAG, step *Step) LogOutputMode {
 type DAG struct {
 	// WorkingDir is the working directory to run the DAG.
 	// Default value is the directory of DAG file.
-	// If the source is not a DAG file, current directory when it's created.
+	// Relative paths are resolved at build time; variables are expanded at runtime.
+	// Supports environment variable templates (e.g., ${MY_DIR}).
 	WorkingDir string `json:"workingDir,omitempty"`
 	// Location is the absolute path to the DAG file.
 	// It is used to generate unix socket name and can be blank
@@ -77,10 +80,12 @@ type DAG struct {
 	// Shell is the default shell to use for all steps in this DAG.
 	// If not specified, the system default shell is used.
 	// Can be overridden at the step level.
+	// Supports environment variable templates (e.g., ${MY_SHELL}).
 	Shell string `json:"shell,omitempty"`
 	// ShellArgs contains additional arguments to pass to the shell.
 	// These are populated when Shell is specified as a string with arguments
 	// (e.g., "bash -e") or as an array (e.g., ["bash", "-e"]).
+	// Supports environment variable templates.
 	ShellArgs []string `json:"shellArgs,omitempty"`
 	// Dotenv is the path to the dotenv file. This is optional.
 	Dotenv []string `json:"dotenv,omitempty"`
@@ -98,7 +103,9 @@ type DAG struct {
 	// E.g., when the DAG has already been executed manually before the scheduled time.
 	SkipIfSuccessful bool `json:"skipIfSuccessful,omitempty"`
 	// Env contains a list of environment variables to be set before running the DAG.
-	Env []string `json:"env,omitempty"`
+	// Note: This field is evaluated at build time and may contain secrets.
+	// It is excluded from JSON serialization to prevent secret leakage.
+	Env []string `json:"-"`
 	// LogDir is the directory where the logs are stored.
 	LogDir string `json:"logDir,omitempty"`
 	// LogOutput specifies how stdout and stderr are handled in log files.
@@ -108,11 +115,15 @@ type DAG struct {
 	// DefaultParams contains the default parameters to be passed to the DAG.
 	DefaultParams string `json:"defaultParams,omitempty"`
 	// Params contains the list of parameters to be passed to the DAG.
-	Params []string `json:"params,omitempty"`
+	// Note: This field is evaluated at build time and may contain secrets.
+	// It is excluded from JSON serialization to prevent secret leakage.
+	Params []string `json:"-"`
 	// ParamsJSON contains the JSON representation of the resolved parameters.
 	// When params were supplied as JSON, the original payload is preserved.
 	// Steps can consume this via the DAGU_PARAMS_JSON environment variable.
-	ParamsJSON string `json:"paramsJSON,omitempty"`
+	// Note: This field is evaluated at build time and may contain secrets.
+	// It is excluded from JSON serialization to prevent secret leakage.
+	ParamsJSON string `json:"-"`
 	// Steps contains the list of steps in the DAG.
 	Steps []Step `json:"steps,omitempty"`
 	// HandlerOn contains the steps to be executed on different events.
@@ -120,7 +131,8 @@ type DAG struct {
 	// Preconditions contains the conditions to be met before running the DAG.
 	Preconditions []*Condition `json:"preconditions,omitempty"`
 	// SMTP contains the SMTP configuration.
-	SMTP *SMTPConfig `json:"smtp,omitempty"`
+	// Excluded from JSON: may contain password.
+	SMTP *SMTPConfig `json:"-"`
 	// ErrorMail contains the mail configuration for errors.
 	ErrorMail *MailConfig `json:"errorMail,omitempty"`
 	// InfoMail contains the mail configuration for informational messages.
@@ -167,14 +179,19 @@ type DAG struct {
 	RunConfig *RunConfig `json:"runConfig,omitempty"`
 	// RegistryAuths maps registry hostnames to authentication configs.
 	// Optional: If not specified, falls back to DOCKER_AUTH_CONFIG or docker config.
-	RegistryAuths map[string]*AuthConfig `json:"registryAuths,omitempty"`
+	// Credentials are evaluated at runtime. Excluded from JSON: may contain passwords.
+	RegistryAuths map[string]*AuthConfig `json:"-"`
 	// SSH contains the default SSH configuration for the DAG.
-	SSH *SSHConfig `json:"ssh,omitempty"`
+	// Excluded from JSON: may contain password.
+	SSH *SSHConfig `json:"-"`
 	// LLM contains the default LLM configuration for the DAG.
 	// Steps with type: chat inherit this configuration if they don't specify their own llm field.
 	LLM *LLMConfig `json:"llm,omitempty"`
 	// Secrets contains references to external secrets to be resolved at runtime.
 	Secrets []SecretRef `json:"secrets,omitempty"`
+	// dotenvOnce ensures LoadDotEnv is called only once, even with concurrent calls.
+	// This provides thread-safe idempotency for dotenv loading.
+	dotenvOnce sync.Once
 }
 
 // SecretRef represents a reference to an external secret.
@@ -192,12 +209,19 @@ type SecretRef struct {
 
 // HasTag checks if the DAG has the given tag.
 func (d *DAG) HasTag(tag string) bool {
-	for _, t := range d.Tags {
-		if t == tag {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(d.Tags, tag)
+}
+
+// Clone creates a shallow copy of the DAG.
+// The sync.Once field is reset to zero value, allowing LoadDotEnv to be called
+// independently on the clone. This is safe for read-only field modifications
+// like changing Location.
+func (d *DAG) Clone() *DAG {
+	//nolint:govet // intentional copy; sync.Once is immediately reset below
+	clone := *d
+	// Reset sync.Once so LoadDotEnv can be called on the clone
+	clone.dotenvOnce = sync.Once{}
+	return &clone
 }
 
 // HasHITLSteps returns true if the DAG contains any HITL executor steps.
@@ -230,9 +254,8 @@ func (d *DAG) SockAddrForSubDAGRun(dagRunID string) string {
 // GetName returns the name of the DAG.
 // If the name is not set, it returns the default name (filename without extension).
 func (d *DAG) GetName() string {
-	name := d.Name
-	if name != "" {
-		return name
+	if d.Name != "" {
+		return d.Name
 	}
 	filename := filepath.Base(d.Location)
 	return strings.TrimSuffix(filename, filepath.Ext(filename))
@@ -316,64 +339,60 @@ func deduplicateStrings(input []string) []string {
 }
 
 // LoadDotEnv loads all dotenv files in order, with later files overriding earlier ones.
+// This method is thread-safe and idempotent - concurrent calls will only load once.
 func (d *DAG) LoadDotEnv(ctx context.Context) {
-	if len(d.Dotenv) == 0 {
-		return
-	}
+	d.dotenvOnce.Do(func() {
+		if len(d.Dotenv) == 0 {
+			return
+		}
 
-	relativeTos := []string{d.WorkingDir}
-	fileDir := filepath.Dir(d.Location)
-	if d.Location != "" && fileDir != d.WorkingDir {
-		relativeTos = append(relativeTos, fileDir)
-	}
+		relativeTos := []string{d.WorkingDir}
+		fileDir := filepath.Dir(d.Location)
+		if d.Location != "" && fileDir != d.WorkingDir {
+			relativeTos = append(relativeTos, fileDir)
+		}
 
-	resolver := fileutil.NewFileResolver(relativeTos)
-	candidates := deduplicateStrings(append([]string{".env"}, d.Dotenv...))
+		resolver := fileutil.NewFileResolver(relativeTos)
+		candidates := deduplicateStrings(append([]string{".env"}, d.Dotenv...))
 
-	for _, filePath := range candidates {
-		if strings.TrimSpace(filePath) == "" {
-			continue
-		}
-		filePath, err := cmdutil.EvalString(ctx, filePath)
-		if err != nil {
-			logger.Warn(ctx, "Failed to evaluate filepath",
-				tag.File(filePath),
-				tag.Error(err),
-			)
-			continue
-		}
-		resolvedPath, err := resolver.ResolveFilePath(filePath)
-		if err != nil {
-			continue
-		}
-		if !fileutil.FileExists(resolvedPath) {
-			continue
-		}
-		// Use godotenv.Read instead of godotenv.Load to avoid os.Setenv
-		vars, err := godotenv.Read(resolvedPath)
-		if err != nil {
-			logger.Warn(ctx, "Failed to load .env file",
-				tag.File(resolvedPath),
-				tag.Error(err),
-			)
-			continue
-		}
-		// Add dotenv vars to DAG.Env so they're included in AllEnvs()
-		for k, v := range vars {
-			d.Env = append(d.Env, fmt.Sprintf("%s=%s", k, v))
-		}
-		// Set os environment variables for the current process
-		for k, v := range vars {
-			if err := os.Setenv(k, v); err != nil {
-				logger.Warn(ctx, "Failed to set env var from .env",
-					tag.Key(k),
+		for _, filePath := range candidates {
+			if strings.TrimSpace(filePath) == "" {
+				continue
+			}
+			filePath, err := cmdutil.EvalString(ctx, filePath)
+			if err != nil {
+				logger.Warn(ctx, "Failed to evaluate filepath",
+					tag.File(filePath),
+					tag.Error(err),
+				)
+				continue
+			}
+			resolvedPath, err := resolver.ResolveFilePath(filePath)
+			if err != nil {
+				continue
+			}
+			if !fileutil.FileExists(resolvedPath) {
+				continue
+			}
+			// Use godotenv.Read instead of godotenv.Load to avoid os.Setenv
+			vars, err := godotenv.Read(resolvedPath)
+			if err != nil {
+				logger.Warn(ctx, "Failed to load .env file",
 					tag.File(resolvedPath),
 					tag.Error(err),
 				)
+				continue
 			}
+			// Add dotenv vars to DAG.Env so they're included in AllEnvs()
+			// Note: We no longer call os.Setenv to avoid race conditions when
+			// multiple DAGs are loaded concurrently. The vars are stored in
+			// d.Env and will be passed to step execution via cmd.Env.
+			for k, v := range vars {
+				d.Env = append(d.Env, fmt.Sprintf("%s=%s", k, v))
+			}
+			logger.Info(ctx, "Loaded dotenv file", tag.File(resolvedPath))
 		}
-		logger.Info(ctx, "Loaded dotenv file", tag.File(resolvedPath))
-	}
+	})
 }
 
 // initializeDefaults sets the default values for the DAG.
@@ -441,7 +460,6 @@ func (d *DAG) ParamsMap() map[string]string {
 // This allows the scheduler to control how many DAGs can run simultaneously
 // within the same process group.
 func (d *DAG) ProcGroup() string {
-	// If the queue is not set, return the default queue name.
 	if d.Queue != "" {
 		return d.Queue
 	}

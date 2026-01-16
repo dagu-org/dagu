@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
-	"github.com/dagu-org/dagu/internal/cmn/collections"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
@@ -23,27 +22,22 @@ import (
 // available to the step.
 type Env struct {
 	// Embedded execution metadata from parent DAG run containing DAGRunID,
-	// RootDAGRun reference, DAG configuration, database interface,
-	// DAG-level environment variables, and coordinator dispatcher
+	// RootDAGRun reference, DAG configuration, database interface, and
+	// coordinator dispatcher
 	Context
 
-	// Thread-safe map storing output variables from previously executed steps
-	// in the format "key=value". These variables are populated when a step
-	// completes and has an Output field defined, making the step's stdout
-	// available to subsequent steps via variable substitution
-	Variables *collections.SyncMap
+	// Unified scope chain for ALL environment variable lookups.
+	// This is THE single source of truth for $VAR and ${VAR} expansion.
+	// Layers (highest to lowest precedence): StepEnv > Outputs > Secrets > DAGEnv > OS
+	Scope *cmdutil.EnvScope
 
 	// The current step being executed within this environment context
 	Step core.Step
 
-	// Additional environment variables specific to this step execution,
-	// including DAG_RUN_STEP_NAME and PWD. These take precedence over
-	// Variables and DAG-level Envs during variable evaluation
-	Envs map[string]string
-
 	// Maps step IDs to their execution information (stdout, stderr, exitCode)
 	// allowing steps to reference outputs from other steps using expressions
-	// like ${stepID.stdout} or ${stepID.exitCode} in their configurations
+	// like ${stepID.stdout} or ${stepID.exitCode} in their configurations.
+	// NOTE: This is a SEPARATE system from env var expansion.
 	StepMap map[string]cmdutil.StepInfo
 
 	// Resolved absolute path for the step's working directory, determined by:
@@ -54,87 +48,50 @@ type Env struct {
 }
 
 // AllEnvs returns all environment variables that needs to be passed to the command.
+// Uses EnvScope as THE single source of truth.
 func (e Env) AllEnvs() []string {
-	envs := e.Context.AllEnvs()
-	for k, v := range e.Envs {
-		envs = append(envs, k+"="+v)
+	if e.Scope == nil {
+		return nil
 	}
-	e.Variables.Range(func(_, value any) bool {
-		envs = append(envs, value.(string))
-		return true
-	})
-	return envs
+	return e.Scope.ToSlice()
 }
 
 // UserEnvsMap returns user-defined environment variables as a map,
 // excluding OS environment (BaseEnv). Use this for isolated execution environments.
-// Precedence: Step.Env > Envs > Variables > SecretEnvs > DAGContext.Envs > DAG.Env
+// Uses EnvScope as THE single source of truth.
 func (e Env) UserEnvsMap() map[string]string {
-	result := e.Context.UserEnvsMap() // DAG-level + secrets, no OS env
-
-	// Add variables from previous steps
-	e.Variables.Range(func(_, value any) bool {
-		key, val, found := strings.Cut(value.(string), "=")
-		if found {
-			result[key] = val
-		}
-		return true
-	})
-
-	// Add step-specific envs (PWD, DAG_RUN_STEP_NAME, etc)
-	for k, v := range e.Envs {
-		result[k] = v
+	if e.Scope == nil {
+		return make(map[string]string)
 	}
-
-	// Add step-defined env only if not already set by evaluated Variables.
-	// Variables contains evaluated values (e.g., secrets expanded), while Step.Env
-	// contains raw values (e.g., "${MY_SECRET}"). We don't want to overwrite
-	// the evaluated values with raw placeholders.
-	for _, env := range e.Step.Env {
-		key, value, found := strings.Cut(env, "=")
-		if !found {
-			continue
-		}
-		if _, exists := result[key]; exists {
-			continue
-		}
-		result[key] = value
-	}
-
-	return result
+	return e.Scope.AllUserEnvs()
 }
 
 // NewEnv creates a new Env configured for executing the provided step.
 // It resolves the step's working directory and sets initial per-step environment
 // variables: PWD to the resolved working directory and the DAG run step name.
-// The returned Env embeds the DAG context from ctx, stores the provided step,
-// initializes an empty StepMap, and populates Variables from DAG.Params: for each
-// param containing "=", the text before the first "=" is used as the key and the
-// entire param string is stored as the value.
 func NewEnv(ctx context.Context, step core.Step) Env {
 	rCtx := GetDAGContext(ctx)
 	workingDir := resolveWorkingDir(ctx, step, rCtx)
 
-	envs := map[string]string{
+	// Build step-specific env vars
+	stepEnvs := map[string]string{
 		exec.EnvKeyDAGRunStepName: step.Name,
 		"PWD":                     workingDir,
 	}
 
-	variables := &collections.SyncMap{}
-	if rCtx.DAG != nil {
-		for _, param := range rCtx.DAG.Params {
-			key, _, found := strings.Cut(param, "=")
-			if found {
-				variables.Store(key, param)
-			}
-		}
+	// Build scope from DAG context + step envs
+	// The scope chain inherits from rCtx.EnvScope (which has OS + DAG env + secrets)
+	// and adds step-specific environment variables
+	scope := rCtx.EnvScope
+	if scope == nil {
+		scope = cmdutil.NewEnvScope(nil, true) // Fallback: OS layer only
 	}
+	scope = scope.WithEntries(stepEnvs, cmdutil.EnvSourceStepEnv)
 
 	return Env{
 		Context:    rCtx,
-		Variables:  variables,
+		Scope:      scope,
 		Step:       step,
-		Envs:       envs,
 		StepMap:    make(map[string]cmdutil.StepInfo),
 		WorkingDir: workingDir,
 	}
@@ -144,69 +101,91 @@ func resolveWorkingDir(ctx context.Context, step core.Step, rCtx Context) string
 	dag := rCtx.DAG
 
 	if step.Dir != "" {
-		// Expand environment variables in step.Dir using DAG env vars
-		// Since we no longer use os.Setenv, we need to manually expand using dag.Env
-		expandedDir := os.Expand(step.Dir, func(key string) string {
-			// Check DAG-level env vars
-			if dag != nil {
-				for _, env := range dag.Env {
-					if len(env) > len(key)+1 && env[:len(key)] == key && env[len(key)] == '=' {
-						return env[len(key)+1:]
-					}
-				}
-			}
-			// Fall back to process environment
-			return os.Getenv(key)
-		})
+		expandedDir := expandStepDir(step.Dir, dag)
+		return resolveExpandedDir(ctx, expandedDir, step.Name, dag)
+	}
 
-		if filepath.IsAbs(expandedDir) || strings.HasPrefix(expandedDir, "~") {
-			dir, err := fileutil.ResolvePath(expandedDir)
+	if dag != nil && dag.WorkingDir != "" {
+		// Expand environment variables in WorkingDir at runtime
+		wd := dag.WorkingDir
+		if rCtx.EnvScope != nil {
+			wd = rCtx.EnvScope.Expand(wd)
+		} else {
+			wd = os.ExpandEnv(wd)
+		}
+		// Resolve ~ prefix after variable expansion
+		if strings.HasPrefix(wd, "~") {
+			resolved, err := fileutil.ResolvePath(wd)
 			if err != nil {
-				logger.Warn(ctx, "Failed to resolve working directory for step",
-					tag.Step(step.Name),
-					tag.Dir(expandedDir),
+				logger.Warn(ctx, "Failed to resolve working directory",
+					tag.Dir(wd),
 					tag.Error(err),
 				)
+			} else {
+				wd = resolved
 			}
-			return dir
-		} else if dag != nil && dag.WorkingDir != "" {
-			// use relative path to the DAG's working dir
-			return filepath.Clean(filepath.Join(dag.WorkingDir, expandedDir))
-		} else {
-			// This should not happen normally
+		}
+		return wd
+	}
+
+	return fallbackWorkingDir(ctx, step.Name)
+}
+
+// expandStepDir expands environment variables in step.Dir using DAG env vars.
+func expandStepDir(dir string, dag *core.DAG) string {
+	return os.Expand(dir, func(key string) string {
+		if dag != nil {
+			for _, env := range dag.Env {
+				if k, v, ok := strings.Cut(env, "="); ok && k == key {
+					return v
+				}
+			}
+		}
+		return os.Getenv(key)
+	})
+}
+
+// resolveExpandedDir resolves an expanded directory path to an absolute path.
+func resolveExpandedDir(ctx context.Context, expandedDir, stepName string, dag *core.DAG) string {
+	if filepath.IsAbs(expandedDir) || strings.HasPrefix(expandedDir, "~") {
+		dir, err := fileutil.ResolvePath(expandedDir)
+		if err != nil {
 			logger.Warn(ctx, "Failed to resolve working directory for step",
-				tag.Step(step.Name),
+				tag.Step(stepName),
 				tag.Dir(expandedDir),
+				tag.Error(err),
 			)
 			return expandedDir
 		}
-
+		return dir
 	}
 
-	// Use the DAG level working directory if not specified
 	if dag != nil && dag.WorkingDir != "" {
-		return dag.WorkingDir
+		return filepath.Clean(filepath.Join(dag.WorkingDir, expandedDir))
 	}
 
-	// This should not occur on normal execution
 	logger.Warn(ctx, "Failed to resolve working directory for step",
-		tag.Step(step.Name),
+		tag.Step(stepName),
+		tag.Dir(expandedDir),
+	)
+	return expandedDir
+}
+
+// fallbackWorkingDir returns a fallback working directory when none is specified.
+func fallbackWorkingDir(ctx context.Context, stepName string) string {
+	logger.Warn(ctx, "Failed to resolve working directory for step",
+		tag.Step(stepName),
 	)
 
-	if wd, err := os.Getwd(); err == nil {
+	wd, err := os.Getwd()
+	if err == nil {
 		return wd
-	} else {
-		logger.Error(ctx, "Failed to get current working directory",
-			tag.Error(err),
-		)
 	}
+	logger.Error(ctx, "Failed to get current working directory", tag.Error(err))
 
-	// If still empty, fallback to home directory
 	dir, err := os.UserHomeDir()
 	if err != nil {
-		logger.Error(ctx, "Failed to get user home directory",
-			tag.Error(err),
-		)
+		logger.Error(ctx, "Failed to get user home directory", tag.Error(err))
 	}
 	return dir
 }
@@ -215,7 +194,7 @@ func resolveWorkingDir(ctx context.Context, step core.Step, rCtx Context) string
 func (e Env) Shell(ctx context.Context) []string {
 	// Shell precedence: Step shell -> DAG shell -> Global default
 	if e.Step.Shell != "" {
-		shellCmd, err := e.EvalString(ctx, e.Step.Shell)
+		shell, err := evalShellWithScope(ctx, e.Scope, e.Step.Shell, e.Step.ShellArgs)
 		if err != nil {
 			logger.Error(ctx, "Failed to evaluate step shell",
 				tag.String("shell", e.Step.Shell),
@@ -223,24 +202,78 @@ func (e Env) Shell(ctx context.Context) []string {
 			)
 			return nil
 		}
-		shell := []string{shellCmd}
-		for _, arg := range e.Step.ShellArgs {
-			evaluated, err := e.EvalString(ctx, arg)
-			if err != nil {
-				logger.Error(ctx, "Failed to evaluate step shell argument",
-					tag.String("arg", arg),
-					tag.Error(err),
-				)
-			}
-			shell = append(shell, evaluated)
+		return shell
+	}
+
+	if e.DAG != nil && e.DAG.Shell != "" {
+		shell, err := evalShellWithScope(ctx, e.Scope, e.DAG.Shell, e.DAG.ShellArgs)
+		if err != nil {
+			logger.Error(ctx, "Failed to evaluate DAG shell",
+				tag.String("shell", e.DAG.Shell),
+				tag.Error(err),
+			)
+			return nil
 		}
 		return shell
 	}
 
-	if e.DAG.Shell != "" {
-		return append([]string{e.DAG.Shell}, e.DAG.ShellArgs...)
+	return defaultShell(ctx)
+}
+
+// DAGShell returns the evaluated shell command for DAG-level operations.
+// This is used for preconditions and other operations that run before any steps.
+// Unlike Env.Shell(), this doesn't require a step context.
+func DAGShell(ctx context.Context) []string {
+	rCtx := GetDAGContext(ctx)
+	dag := rCtx.DAG
+
+	if dag == nil || dag.Shell == "" {
+		return defaultShell(ctx)
 	}
 
+	scope := rCtx.EnvScope
+	if scope == nil {
+		scope = cmdutil.NewEnvScope(nil, true) // Fallback: OS layer only
+	}
+
+	shell, err := evalShellWithScope(ctx, scope, dag.Shell, dag.ShellArgs)
+	if err != nil {
+		logger.Error(ctx, "Failed to evaluate DAG shell",
+			tag.String("shell", dag.Shell),
+			tag.Error(err),
+		)
+		return nil
+	}
+	return shell
+}
+
+// evalShellWithScope evaluates shell command and arguments using the given scope.
+func evalShellWithScope(ctx context.Context, scope *cmdutil.EnvScope, shell string, shellArgs []string) ([]string, error) {
+	ctx = cmdutil.WithEnvScope(ctx, scope)
+
+	shellCmd, err := cmdutil.EvalString(ctx, shell)
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate shell: %w", err)
+	}
+
+	result := []string{shellCmd}
+	for _, arg := range shellArgs {
+		evaluated, err := cmdutil.EvalString(ctx, arg)
+		if err != nil {
+			logger.Error(ctx, "Failed to evaluate shell argument",
+				tag.String("arg", arg),
+				tag.Error(err),
+			)
+			// Continue with unevaluated arg rather than failing completely
+			evaluated = arg
+		}
+		result = append(result, evaluated)
+	}
+	return result, nil
+}
+
+// defaultShell returns the global default shell.
+func defaultShell(ctx context.Context) []string {
 	shellCmd := cmdutil.GetShellCommand("")
 	if shellCmd != "" {
 		return []string{shellCmd}
@@ -254,77 +287,29 @@ func (e Env) DAGRunRef() exec.DAGRunRef {
 	return exec.NewDAGRunRef(e.DAG.Name, e.DAGRunID)
 }
 
-// LoadOutputVariables loads the output variables from the given DAG into the
-func (e Env) LoadOutputVariables(vars *collections.SyncMap) {
-	e.loadOutputVariables(vars, false)
-}
-
-// ForceLoadOutputVariables forces loading of output variables into the execution context.
-// This is the same as LoadOutputVariables, but it does not check if the key already exists.
-func (e Env) ForceLoadOutputVariables(vars *collections.SyncMap) {
-	e.loadOutputVariables(vars, true)
-}
-
-// loadOutputVariables loads the output variables from the given SyncMap into the execution context.
-// If force is true, it will overwrite existing variables in the execution context.
-// If force is false, it will only load variables that are not already present in the execution context.
-func (e Env) loadOutputVariables(vars *collections.SyncMap, force bool) {
-	vars.Range(func(key, value any) bool {
-		if !force {
-			if _, ok := e.Variables.Load(key); ok {
-				return true
-			}
-		}
-		e.Variables.Store(key, value)
-		return true
-	})
-}
-
+// MailerConfig returns the SMTP mailer configuration with variables evaluated.
 func (e Env) MailerConfig(ctx context.Context) (mailer.Config, error) {
 	if e.DAG.SMTP == nil {
 		return mailer.Config{}, nil
 	}
+	// Use Scope for variable resolution
+	ctx = cmdutil.WithEnvScope(ctx, e.Scope)
 	return cmdutil.EvalStringFields(ctx, mailer.Config{
 		Host:     e.DAG.SMTP.Host,
 		Port:     e.DAG.SMTP.Port,
 		Username: e.DAG.SMTP.Username,
 		Password: e.DAG.SMTP.Password,
-	}, cmdutil.WithVariables(e.Variables.Variables()))
+	})
 }
 
 // EvalString evaluates the given string with the variables within the execution context.
+// Uses EnvScope as THE single source of truth for $VAR and ${VAR} expansion.
+// StepMap is used separately for ${step.stdout} style references.
 func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
-	option := cmdutil.NewEvalOptions()
-	for _, opt := range opts {
-		opt(option)
-	}
+	// Use EnvScope for variable resolution via context
+	ctx = cmdutil.WithEnvScope(ctx, e.Scope)
 
-	// Collect environment variables for evaluating the string.
-	// Variables are processed sequentially, and once a variable is replaced,
-	// it cannot be overridden by subsequent maps.
-	// Therefore, the effective precedence (highest to lowest) is:
-	// 1. Step level environment variables (e.Envs) - processed first, highest precedence
-	// 2. Output variables from previous steps (e.Variables) - processed second
-	// 3. Secrets (dagEnv.SecretEnvs) - processed third
-	// 4. DAG level environment variables (dagEnv.Envs) - processed fourth
-	// 5. Additional options passed as parameters - processed last
-	//
-	// Example: If step env has FOO="step" and DAG env has FOO="dag",
-	// ${FOO} will be replaced with "step" in the first iteration,
-	// leaving no ${FOO} for the DAG env to replace.
-
-	rCtx := GetDAGContext(ctx)
-	if option.ExpandEnv {
-		opts = append(opts, cmdutil.WithVariables(e.Envs))
-		opts = append(opts, cmdutil.WithVariables(e.Variables.Variables()))
-		opts = append(opts, cmdutil.WithVariables(rCtx.SecretEnvs))
-		opts = append(opts, cmdutil.WithVariables(rCtx.Envs))
-	} else {
-		opts = append(opts, cmdutil.WithVariables(e.Envs))
-		opts = append(opts, cmdutil.WithVariables(e.Variables.Variables()))
-	}
-
-	// Step data for special variables such as step ID and exit code
+	// StepMap for ${step.stdout} syntax (separate system from env vars)
 	opts = append(opts, cmdutil.WithStepMap(e.StepMap))
 
 	return cmdutil.EvalString(ctx, s, opts...)
@@ -346,25 +331,16 @@ func (e Env) EvalBool(ctx context.Context, value any) (bool, error) {
 	}
 }
 
-// WithEnvVars returns a new execution context with the given environment variable(s).
+// WithEnvVars returns a new Env with the given environment variable(s) added to the Scope.
 func (e Env) WithEnvVars(envs ...string) Env {
 	if len(envs)%2 != 0 {
 		panic("invalid number of arguments")
 	}
+	newEnvs := make(map[string]string)
 	for i := 0; i < len(envs); i += 2 {
-		e.Envs[envs[i]] = envs[i+1]
+		newEnvs[envs[i]] = envs[i+1]
 	}
-	return e
-}
-
-// WithVariables returns a new execution context with the given variable(s).
-func (e Env) WithVariables(vars ...string) Env {
-	if len(vars)%2 != 0 {
-		panic("invalid number of arguments")
-	}
-	for i := 0; i < len(vars); i += 2 {
-		e.Variables.Store(vars[i], vars[i]+"="+vars[i+1])
-	}
+	e.Scope = e.Scope.WithEntries(newEnvs, cmdutil.EnvSourceStepEnv)
 	return e
 }
 
@@ -392,16 +368,12 @@ func AllEnvs(ctx context.Context) []string {
 }
 
 // AllEnvsMap builds a map of environment variables from the current Env.
-// It splits each "key=value" entry produced by AllEnvs and maps keys to values;
-// entries that do not contain an "=" separator are ignored.
+// It returns the EnvScope's ToMap directly, avoiding the round-trip through
+// string splitting.
 func AllEnvsMap(ctx context.Context) map[string]string {
-	envs := GetEnv(ctx).AllEnvs()
-	var result = make(map[string]string)
-	for _, env := range envs {
-		key, value, found := strings.Cut(env, "=")
-		if found {
-			result[key] = value
-		}
+	env := GetEnv(ctx)
+	if env.Scope == nil {
+		return make(map[string]string)
 	}
-	return result
+	return env.Scope.ToMap()
 }

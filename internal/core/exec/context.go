@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"strings"
 
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
@@ -20,8 +20,7 @@ type Context struct {
 	DAG                *core.DAG
 	DB                 Database
 	BaseEnv            *config.BaseEnv
-	Envs               map[string]string
-	SecretEnvs         map[string]string // Secret environment variables (highest priority)
+	EnvScope           *cmdutil.EnvScope // Unified environment scope - THE single source for all env vars
 	CoordinatorCli     Dispatcher
 	Shell              string           // Default shell for this DAG (from DAG.Shell)
 	LogEncodingCharset string           // Character encoding for log files (e.g., "utf-8", "shift_jis", "euc-jp")
@@ -48,29 +47,11 @@ const (
 
 // UserEnvsMap returns only user-defined environment variables as a map,
 // excluding OS environment (BaseEnv). Use this for isolated execution environments.
-// Precedence: SecretEnvs > Envs > DAG.Env
 func (e Context) UserEnvsMap() map[string]string {
-	result := make(map[string]string)
-
-	// Parse DAG.Env (lowest priority)
-	for _, env := range e.DAG.Env {
-		key, value, found := strings.Cut(env, "=")
-		if found {
-			result[key] = value
-		}
+	if e.EnvScope == nil {
+		return make(map[string]string)
 	}
-
-	// Add computed envs
-	for k, v := range e.Envs {
-		result[k] = v
-	}
-
-	// Secrets last (highest priority)
-	for k, v := range e.SecretEnvs {
-		result[k] = v
-	}
-
-	return result
+	return e.EnvScope.AllUserEnvs()
 }
 
 // DAGRunRef returns the DAGRunRef for the current DAG context.
@@ -78,35 +59,13 @@ func (e Context) DAGRunRef() DAGRunRef {
 	return NewDAGRunRef(e.DAG.Name, e.DAGRunID)
 }
 
-// AllEnvs returns every environment variable as "key=value" with precedence:
-// BaseEnv < DAG.Env < e.Envs < SecretEnvs < runtime metadata (e.g., DAGU_PARAMS_JSON).
+// AllEnvs returns every environment variable as "key=value" strings.
+// Uses EnvScope as the single source of truth for all env vars.
 func (e Context) AllEnvs() []string {
-	distinctEntries := make(map[string]string)
-
-	for k, v := range stringutil.KeyValuesToMap(e.BaseEnv.AsSlice()) {
-		distinctEntries[k] = v
+	if e.EnvScope == nil {
+		return nil
 	}
-	for k, v := range stringutil.KeyValuesToMap(e.DAG.Env) {
-		distinctEntries[k] = v
-	}
-	for k, v := range e.Envs {
-		distinctEntries[k] = v
-	}
-	for k, v := range e.SecretEnvs {
-		distinctEntries[k] = v
-	}
-
-	// Add DAGU_PARAMS_JSON with JSON encoded params when available
-	if e.DAG.ParamsJSON != "" {
-		distinctEntries[EnvKeyDAGParamsJSON] = e.DAG.ParamsJSON
-	}
-
-	var envs []string
-	for k, v := range distinctEntries {
-		envs = append(envs, k+"="+v)
-	}
-
-	return envs
+	return e.EnvScope.ToSlice()
 }
 
 // Database is the interface for accessing the database to retrieve DAGs and dag-run statuses.
@@ -266,12 +225,21 @@ func NewContext(
 		envs[k] = v
 	}
 
+	secretEnvs := stringutil.KeyValuesToMap(options.secretEnvs)
+
+	// Build EnvScope with proper source tracking and layering
+	// Precedence (highest to lowest): Secrets > DAG Env > Params > OS
+	scope := cmdutil.NewEnvScope(nil, true) // OS layer
+	scope = scope.WithEntries(envs, cmdutil.EnvSourceDAGEnv)
+	if len(secretEnvs) > 0 {
+		scope = scope.WithEntries(secretEnvs, cmdutil.EnvSourceSecret)
+	}
+
 	return context.WithValue(ctx, dagCtxKey{}, Context{
 		RootDAGRun:         options.rootDAGRun,
 		DAG:                dag,
 		DB:                 options.db,
-		Envs:               envs,
-		SecretEnvs:         stringutil.KeyValuesToMap(options.secretEnvs),
+		EnvScope:           scope,
 		DAGRunID:           dagRunID,
 		BaseEnv:            config.GetBaseEnv(ctx),
 		CoordinatorCli:     options.coordinator,

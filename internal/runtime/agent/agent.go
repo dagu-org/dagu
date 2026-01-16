@@ -152,6 +152,15 @@ type Agent struct {
 	// attemptID is the attempt ID from the coordinator.
 	// When set, the agent creates an attempt with this ID instead of generating a new one.
 	attemptID string
+
+	// Evaluated configs - these are expanded at runtime and stored separately
+	// to avoid mutating the original DAG struct.
+	evaluatedSMTP          *core.SMTPConfig
+	evaluatedErrorMail     *core.MailConfig
+	evaluatedInfoMail      *core.MailConfig
+	evaluatedWaitMail      *core.MailConfig
+	evaluatedRegistryAuths map[string]*core.AuthConfig
+	evaluatedWorkingDir    string
 }
 
 // StatusPusher is an interface for pushing status updates remotely.
@@ -259,8 +268,10 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Initialize propagators for W3C trace context before anything else
 	telemetry.InitializePropagators()
 
-	// Resolve secrets early so they're available for OTel config evaluation
+	// Resolve secrets early so they're available for OTel config evaluation.
+	// LoadDotEnv is idempotent - safe to call even if already loaded by caller.
 	a.dag.LoadDotEnv(ctx)
+
 	secretEnvs, secretErr := a.resolveSecrets(ctx)
 
 	// Build variables map for config evaluation (DAG env + secrets)
@@ -419,6 +430,16 @@ func (a *Agent) Run(ctx context.Context) error {
 		return err
 	}
 
+	// Evaluate registry auth credentials with environment variables and secrets.
+	if err := a.evaluateRegistryAuths(ctx); err != nil {
+		return err
+	}
+
+	// Evaluate working directory with environment variables.
+	if err := a.evaluateWorkingDir(ctx); err != nil {
+		return err
+	}
+
 	// Setup the reporter to send notifications (must be after mail config evaluation)
 	a.setupReporter(ctx)
 
@@ -456,13 +477,13 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Ensure working directory exists
-	if err := os.MkdirAll(a.dag.WorkingDir, 0o755); err != nil {
+	if err := os.MkdirAll(a.evaluatedWorkingDir, 0o755); err != nil {
 		initErr = fmt.Errorf("failed to create working directory: %w", err)
 		return initErr
 	}
 
 	// Move to the working directory
-	if err := os.Chdir(a.dag.WorkingDir); err != nil {
+	if err := os.Chdir(a.evaluatedWorkingDir); err != nil {
 		initErr = fmt.Errorf("failed to change working directory: %w", err)
 		return initErr
 	}
@@ -475,7 +496,8 @@ func (a *Agent) Run(ctx context.Context) error {
 			initErr = fmt.Errorf("failed to evaluate container config: %w", err)
 			return initErr
 		}
-		ctCfg, err := docker.LoadConfig(a.dag.WorkingDir, expandedContainer, a.dag.RegistryAuths)
+		// Use pre-evaluated registry auth credentials
+		ctCfg, err := docker.LoadConfig(a.evaluatedWorkingDir, expandedContainer, a.evaluatedRegistryAuths)
 		if err != nil {
 			initErr = fmt.Errorf("failed to load container config: %w", err)
 			return initErr
@@ -616,8 +638,8 @@ func (a *Agent) Run(ctx context.Context) error {
 	})
 
 	// Add registry authentication to context for docker executors
-	if len(a.dag.RegistryAuths) > 0 {
-		ctx = docker.WithRegistryAuth(ctx, a.dag.RegistryAuths)
+	if len(a.evaluatedRegistryAuths) > 0 {
+		ctx = docker.WithRegistryAuth(ctx, a.evaluatedRegistryAuths)
 	}
 
 	lastErr := a.runner.Run(ctx, a.plan, progressCh)
@@ -789,11 +811,13 @@ func (a *Agent) buildOutputs(ctx context.Context, finalStatus core.Status) *exec
 	}
 
 	// Mask any secrets in output values to prevent exposing sensitive data
+	// Use EnvScope.AllSecrets() for unified source tracking
 	rCtx := runtime.GetDAGContext(ctx)
-	if len(rCtx.SecretEnvs) > 0 {
+	secrets := rCtx.EnvScope.AllSecrets()
+	if len(secrets) > 0 {
 		// Convert secret envs map to the format expected by masker
 		var secretEnvs []string
-		for k, v := range rCtx.SecretEnvs {
+		for k, v := range secrets {
 			secretEnvs = append(secretEnvs, k+"="+v)
 		}
 		masker := masking.NewMasker(masking.SourcedEnvVars{
@@ -1005,12 +1029,12 @@ func (a *Agent) setupReporter(ctx context.Context) {
 	defer a.lock.Unlock()
 
 	var senderFn SenderFn
-	if a.dag.SMTP != nil {
+	if a.evaluatedSMTP != nil {
 		senderFn = mailer.New(mailer.Config{
-			Host:     a.dag.SMTP.Host,
-			Port:     a.dag.SMTP.Port,
-			Username: a.dag.SMTP.Username,
-			Password: a.dag.SMTP.Password,
+			Host:     a.evaluatedSMTP.Host,
+			Port:     a.evaluatedSMTP.Port,
+			Username: a.evaluatedSMTP.Username,
+			Password: a.evaluatedSMTP.Password,
 		}).Send
 	} else {
 		senderFn = func(ctx context.Context, _ string, _ []string, subject, _ string, _ []string) error {
@@ -1021,7 +1045,11 @@ func (a *Agent) setupReporter(ctx context.Context) {
 		}
 	}
 
-	a.reporter = newReporter(senderFn)
+	a.reporter = newReporter(senderFn, reporterConfig{
+		ErrorMail: a.evaluatedErrorMail,
+		InfoMail:  a.evaluatedInfoMail,
+		WaitMail:  a.evaluatedWaitMail,
+	})
 }
 
 // newRunner creates a runner instance for the dag-run.
@@ -1083,11 +1111,29 @@ func (a *Agent) resolveSecrets(ctx context.Context) ([]string, error) {
 		tag.Count(len(a.dag.Secrets)),
 	)
 
+	// Create an EnvScope with DAG env vars for the env secret provider.
+	// Since we no longer use os.Setenv during DAG loading, env vars from
+	// the DAG's env: field and .env files are in a.dag.Env but NOT in the
+	// global OS environment. Pass them via context so the env provider
+	// can resolve secrets that reference DAG-defined env vars.
+	envScope := cmdutil.NewEnvScope(nil, true) // include OS env as base
+	dagEnvs := make(map[string]string)
+	for _, env := range a.dag.Env {
+		if key, value, found := strings.Cut(env, "="); found {
+			dagEnvs[key] = value
+		}
+	}
+	if len(dagEnvs) > 0 {
+		envScope = envScope.WithEntries(dagEnvs, cmdutil.EnvSourceDAGEnv)
+	}
+	secretCtx := cmdutil.WithEnvScope(ctx, envScope)
+
 	// Create secret registry - all providers auto-registered via init()
 	// File provider tries base directories in order:
-	// 1. DAG working directory (if set)
+	// 1. DAG working directory (if set) - expanded with env vars
 	// 2. Directory containing the DAG file (if Location is set)
-	baseDirs := []string{a.dag.WorkingDir}
+	expandedWorkingDir := envScope.Expand(a.dag.WorkingDir)
+	baseDirs := []string{expandedWorkingDir}
 	if a.dag.Location != "" {
 		dagDir := filepath.Dir(a.dag.Location)
 		baseDirs = append(baseDirs, dagDir)
@@ -1095,7 +1141,7 @@ func (a *Agent) resolveSecrets(ctx context.Context) ([]string, error) {
 	secretRegistry := secrets.NewRegistry(baseDirs...)
 
 	// Resolve all secrets - providers handle their own configuration
-	resolvedSecrets, err := secretRegistry.ResolveAll(ctx, a.dag.Secrets)
+	resolvedSecrets, err := secretRegistry.ResolveAll(secretCtx, a.dag.Secrets)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve secrets: %w", err)
 	}
@@ -1107,8 +1153,8 @@ func (a *Agent) resolveSecrets(ctx context.Context) ([]string, error) {
 }
 
 // evaluateMailConfigs evaluates SMTP and mail notification configs with
-// environment variables and secrets. This follows the same pattern used for
-// container and SSH configs.
+// environment variables and secrets. Results are stored in agent fields to
+// avoid mutating the original DAG struct.
 func (a *Agent) evaluateMailConfigs(ctx context.Context) error {
 	vars := runtime.AllEnvsMap(ctx)
 
@@ -1118,7 +1164,7 @@ func (a *Agent) evaluateMailConfigs(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to evaluate smtp config: %w", err)
 		}
-		a.dag.SMTP = &evaluated
+		a.evaluatedSMTP = &evaluated
 	}
 
 	// Evaluate error mail config if defined
@@ -1127,7 +1173,7 @@ func (a *Agent) evaluateMailConfigs(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to evaluate error mail config: %w", err)
 		}
-		a.dag.ErrorMail = &evaluated
+		a.evaluatedErrorMail = &evaluated
 	}
 
 	// Evaluate info mail config if defined
@@ -1136,7 +1182,7 @@ func (a *Agent) evaluateMailConfigs(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to evaluate info mail config: %w", err)
 		}
-		a.dag.InfoMail = &evaluated
+		a.evaluatedInfoMail = &evaluated
 	}
 
 	// Evaluate wait mail config if defined
@@ -1145,7 +1191,58 @@ func (a *Agent) evaluateMailConfigs(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to evaluate wait mail config: %w", err)
 		}
-		a.dag.WaitMail = &evaluated
+		a.evaluatedWaitMail = &evaluated
+	}
+
+	return nil
+}
+
+// evaluateRegistryAuths evaluates registry authentication credentials with
+// environment variables and secrets. Results are stored in agent fields to
+// avoid mutating the original DAG struct.
+func (a *Agent) evaluateRegistryAuths(ctx context.Context) error {
+	if len(a.dag.RegistryAuths) == 0 {
+		return nil
+	}
+
+	vars := runtime.AllEnvsMap(ctx)
+	a.evaluatedRegistryAuths = make(map[string]*core.AuthConfig)
+
+	for registry, auth := range a.dag.RegistryAuths {
+		evaluatedAuth, err := cmdutil.EvalObject(ctx, *auth, vars)
+		if err != nil {
+			return fmt.Errorf("failed to evaluate registry auth for %s: %w", registry, err)
+		}
+		a.evaluatedRegistryAuths[registry] = &evaluatedAuth
+	}
+
+	return nil
+}
+
+// evaluateWorkingDir evaluates the working directory with environment variables.
+// The result is stored in evaluatedWorkingDir to avoid mutating the original DAG.
+func (a *Agent) evaluateWorkingDir(ctx context.Context) error {
+	if a.dag.WorkingDir == "" {
+		a.evaluatedWorkingDir = ""
+		return nil
+	}
+
+	// Use runtime context's EnvScope for consistent variable expansion
+	rCtx := runtime.GetDAGContext(ctx)
+	if rCtx.EnvScope != nil {
+		a.evaluatedWorkingDir = rCtx.EnvScope.Expand(a.dag.WorkingDir)
+	} else {
+		// Fallback to OS expansion if no scope available
+		a.evaluatedWorkingDir = os.ExpandEnv(a.dag.WorkingDir)
+	}
+
+	// Resolve ~ prefix after variable expansion
+	if strings.HasPrefix(a.evaluatedWorkingDir, "~") {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("failed to resolve home directory: %w", err)
+		}
+		a.evaluatedWorkingDir = filepath.Join(homeDir, a.evaluatedWorkingDir[1:])
 	}
 
 	return nil

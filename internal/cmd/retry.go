@@ -70,6 +70,11 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read DAG from record: %w", err)
 	}
 
+	dag, err = restoreDAGFromStatus(ctx.Context, dag, status)
+	if err != nil {
+		return fmt.Errorf("failed to restore DAG from status: %w", err)
+	}
+
 	// Block retry via CLI for DAGs with workerSelector, UNLESS this is a distributed worker execution
 	// (indicated by --worker-id being set to something other than "local")
 	if len(dag.WorkerSelector) > 0 && workerID == "local" {
@@ -118,8 +123,6 @@ func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRu
 	}()
 
 	logger.Info(ctx, "Dag-run retry initiated", tag.File(logFile.Name()))
-
-	dag.LoadDotEnv(ctx)
 
 	dr, err := ctx.dagStore(dagStoreConfig{
 		SearchPaths:           []string{filepath.Dir(dag.Location)},

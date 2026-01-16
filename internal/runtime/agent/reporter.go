@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"html"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
@@ -33,10 +34,27 @@ type SenderFn func(ctx context.Context, from string, to []string, subject, body 
 
 // reporter is responsible for reporting the status of the runner
 // to the user.
-type reporter struct{ senderFn SenderFn }
+type reporter struct {
+	senderFn  SenderFn
+	errorMail *core.MailConfig
+	infoMail  *core.MailConfig
+	waitMail  *core.MailConfig
+}
 
-func newReporter(f SenderFn) *reporter {
-	return &reporter{senderFn: f}
+// reporterConfig holds the evaluated mail configurations for the reporter.
+type reporterConfig struct {
+	ErrorMail *core.MailConfig
+	InfoMail  *core.MailConfig
+	WaitMail  *core.MailConfig
+}
+
+func newReporter(f SenderFn, cfg reporterConfig) *reporter {
+	return &reporter{
+		senderFn:  f,
+		errorMail: cfg.ErrorMail,
+		infoMail:  cfg.InfoMail,
+		waitMail:  cfg.WaitMail,
+	}
 }
 
 // reportStep is a function that reports the status of a step.
@@ -44,12 +62,12 @@ func (r *reporter) reportStep(
 	ctx context.Context, dag *core.DAG, dagStatus exec.DAGRunStatus, node *runtime.Node,
 ) error {
 	nodeStatus := node.State().Status
-	if nodeStatus == core.NodeFailed && node.NodeData().Step.MailOnError && dag.ErrorMail != nil {
-		fromAddress := dag.ErrorMail.From
-		toAddresses := dag.ErrorMail.To
-		subject := fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, dagStatus.Status)
+	if nodeStatus == core.NodeFailed && node.NodeData().Step.MailOnError && r.errorMail != nil {
+		fromAddress := r.errorMail.From
+		toAddresses := r.errorMail.To
+		subject := fmt.Sprintf("%s %s (%s)", r.errorMail.Prefix, dag.Name, dagStatus.Status)
 		html := renderHTMLWithDAGInfo(dagStatus)
-		attachments := addAttachments(dag.ErrorMail.AttachLogs, dagStatus.Nodes)
+		attachments := addAttachments(r.errorMail.AttachLogs, dagStatus.Nodes)
 		return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
 	}
 	return nil
@@ -57,35 +75,52 @@ func (r *reporter) reportStep(
 
 // send is a function that sends a report mail.
 func (r *reporter) send(ctx context.Context, dag *core.DAG, dagStatus exec.DAGRunStatus, err error) error {
-	if err != nil || dagStatus.Status == core.Failed {
-		if dag.MailOn != nil && dag.MailOn.Failure && dag.ErrorMail != nil {
-			fromAddress := dag.ErrorMail.From
-			toAddresses := dag.ErrorMail.To
-			subject := fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, dagStatus.Status)
-			html := renderHTMLWithDAGInfo(dagStatus)
-			attachments := addAttachments(dag.ErrorMail.AttachLogs, dagStatus.Nodes)
-			return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
-		}
-	} else if dagStatus.Status == core.Succeeded || dagStatus.Status == core.PartiallySucceeded {
-		if dag.MailOn != nil && dag.MailOn.Success && dag.InfoMail != nil {
-			fromAddress := dag.InfoMail.From
-			toAddresses := dag.InfoMail.To
-			subject := fmt.Sprintf("%s %s (%s)", dag.InfoMail.Prefix, dag.Name, dagStatus.Status)
-			html := renderHTMLWithDAGInfo(dagStatus)
-			attachments := addAttachments(dag.InfoMail.AttachLogs, dagStatus.Nodes)
-			return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
-		}
-	} else if dagStatus.Status == core.Waiting {
-		if dag.MailOn != nil && dag.MailOn.Wait && dag.WaitMail != nil {
-			fromAddress := dag.WaitMail.From
-			toAddresses := dag.WaitMail.To
-			subject := fmt.Sprintf("%s %s (%s)", dag.WaitMail.Prefix, dag.Name, dagStatus.Status)
-			html := renderHTMLWithDAGInfo(dagStatus)
-			attachments := addAttachments(dag.WaitMail.AttachLogs, dagStatus.Nodes)
-			return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
-		}
+	mailConfig := r.selectMailConfig(dag, dagStatus, err)
+	if mailConfig == nil {
+		return nil
 	}
-	return nil
+	return r.sendMail(ctx, mailConfig, dag.Name, dagStatus)
+}
+
+// selectMailConfig returns the appropriate mail config based on status, or nil if no mail should be sent.
+func (r *reporter) selectMailConfig(dag *core.DAG, dagStatus exec.DAGRunStatus, err error) *core.MailConfig {
+	if dag.MailOn == nil {
+		return nil
+	}
+
+	switch {
+	case (err != nil || dagStatus.Status == core.Failed) && dag.MailOn.Failure:
+		return r.errorMail
+	case (dagStatus.Status == core.Succeeded || dagStatus.Status == core.PartiallySucceeded) && dag.MailOn.Success:
+		return r.infoMail
+	case dagStatus.Status == core.Waiting && dag.MailOn.Wait:
+		return r.waitMail
+	default:
+		return nil
+	}
+}
+
+// sendMail sends an email using the provided mail configuration.
+func (r *reporter) sendMail(ctx context.Context, mailConfig *core.MailConfig, dagName string, dagStatus exec.DAGRunStatus) error {
+	subject := fmt.Sprintf("%s %s (%s)", mailConfig.Prefix, dagName, dagStatus.Status)
+	html := renderHTMLWithDAGInfo(dagStatus)
+	attachments := addAttachments(mailConfig.AttachLogs, dagStatus.Nodes)
+	return r.senderFn(ctx, mailConfig.From, mailConfig.To, subject, html, attachments)
+}
+
+// statusToClass maps a status string to its CSS class.
+func statusToClass(status string) string {
+	statusClasses := map[string]string{
+		"finished":            "status-finished",
+		"succeeded":           "status-finished",
+		"failed":              "status-failed",
+		"running":             "status-running",
+		"skipped":             "status-skipped",
+		"partially_succeeded": "status-partial-success",
+		"aborted":             "status-aborted",
+		"waiting":             "status-waiting",
+	}
+	return statusClasses[status]
 }
 
 var dagHeader = table.Row{
@@ -224,67 +259,32 @@ func renderHTML(nodes []*exec.Node) string {
 
 	// Add table rows
 	for i, n := range nodes {
-		_, _ = buffer.WriteString("<tr>")
-
-		// Row number with special styling
-		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"row-number\">%d</td>", i+1))
-
-		// Step name (escape HTML)
-		stepName := strings.ReplaceAll(n.Step.Name, "&", "&amp;")
-		stepName = strings.ReplaceAll(stepName, "<", "&lt;")
-		stepName = strings.ReplaceAll(stepName, ">", "&gt;")
-		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"step-name\">%s</td>", stepName))
-
-		// Started At with timestamp styling
-		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"timestamp\">%s</td>", n.StartedAt))
-
-		// Finished At with timestamp styling
-		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"timestamp\">%s</td>", n.FinishedAt))
-
-		// Status with conditional styling
-		status := n.Status.String()
-		statusClass := ""
-		switch status {
-		case "finished":
-			statusClass = "status-finished"
-		case "failed":
-			statusClass = "status-failed"
-		case "running":
-			statusClass = "status-running"
-		case "skipped":
-			statusClass = "status-skipped"
-		case "partially_succeeded":
-			statusClass = "status-partial-success"
-		case "aborted":
-			statusClass = "status-aborted"
-		case "waiting":
-			statusClass = "status-waiting"
-		}
-		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"%s\">%s</td>", statusClass, status))
-
-		// Command (join args and escape HTML)
-		command := formatCommands(n.Step.Commands)
-		command = strings.ReplaceAll(command, "&", "&amp;")
-		command = strings.ReplaceAll(command, "<", "&lt;")
-		command = strings.ReplaceAll(command, ">", "&gt;")
-		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"command-cell\">%s</td>", command))
-
-		// Error (escape HTML)
-		errorMsg := strings.ReplaceAll(n.Error, "&", "&amp;")
-		errorMsg = strings.ReplaceAll(errorMsg, "<", "&lt;")
-		errorMsg = strings.ReplaceAll(errorMsg, ">", "&gt;")
-		if errorMsg != "" {
-			_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"error-cell\">%s</td>", errorMsg))
-		} else {
-			_, _ = buffer.WriteString("<td></td>")
-		}
-
-		_, _ = buffer.WriteString("</tr>")
+		writeNodeRow(&buffer, i, n)
 	}
 
 	_, _ = buffer.WriteString("</tbody></table></body></html>")
 
 	return buffer.String()
+}
+
+// writeNodeRow writes a single node row to the HTML buffer.
+func writeNodeRow(buffer *bytes.Buffer, index int, n *exec.Node) {
+	_, _ = buffer.WriteString("<tr>")
+	_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"row-number\">%d</td>", index+1))
+	_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"step-name\">%s</td>", html.EscapeString(n.Step.Name)))
+	_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"timestamp\">%s</td>", html.EscapeString(n.StartedAt)))
+	_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"timestamp\">%s</td>", html.EscapeString(n.FinishedAt)))
+
+	status := n.Status.String()
+	_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"%s\">%s</td>", statusToClass(status), status))
+	_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"command-cell\">%s</td>", html.EscapeString(formatCommands(n.Step.Commands))))
+
+	if n.Error != "" {
+		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"error-cell\">%s</td>", html.EscapeString(n.Error)))
+	} else {
+		_, _ = buffer.WriteString("<td></td>")
+	}
+	_, _ = buffer.WriteString("</tr>")
 }
 
 func renderHTMLWithDAGInfo(dagStatus exec.DAGRunStatus) string {
@@ -475,22 +475,16 @@ func renderHTMLWithDAGInfo(dagStatus exec.DAGRunStatus) string {
 
 	// Add status class
 	statusStr := dagStatus.Status.String()
-	statusClass := ""
-	switch statusStr {
-	case "finished":
-		statusClass = "success"
-	case "failed":
-		statusClass = "failed"
-	case "running":
-		statusClass = "running"
-	case "skipped":
-		statusClass = "skipped"
-	case "aborted":
-		statusClass = "aborted"
-	case "wait":
-		statusClass = "wait"
+	badgeClasses := map[string]string{
+		"finished":  "success",
+		"succeeded": "success",
+		"failed":    "failed",
+		"running":   "running",
+		"skipped":   "skipped",
+		"aborted":   "aborted",
+		"waiting":   "wait",
 	}
-	_, _ = buffer.WriteString(statusClass)
+	_, _ = buffer.WriteString(badgeClasses[statusStr])
 	_, _ = buffer.WriteString(`">`)
 	_, _ = buffer.WriteString(strings.ToUpper(statusStr))
 	_, _ = buffer.WriteString(`</div>
@@ -498,10 +492,7 @@ func renderHTMLWithDAGInfo(dagStatus exec.DAGRunStatus) string {
         <div class="dag-name">`)
 
 	// Add DAG name (escaped)
-	dagName := strings.ReplaceAll(dagStatus.Name, "&", "&amp;")
-	dagName = strings.ReplaceAll(dagName, "<", "&lt;")
-	dagName = strings.ReplaceAll(dagName, ">", "&gt;")
-	_, _ = buffer.WriteString(dagName)
+	_, _ = buffer.WriteString(html.EscapeString(dagStatus.Name))
 
 	_, _ = buffer.WriteString(`</div>
         <div class="dag-info-grid">
@@ -510,10 +501,7 @@ func renderHTMLWithDAGInfo(dagStatus exec.DAGRunStatus) string {
                 <div class="dag-info-value mono">`)
 
 	// Add DAG Run ID (escaped)
-	dagRunID := strings.ReplaceAll(dagStatus.DAGRunID, "&", "&amp;")
-	dagRunID = strings.ReplaceAll(dagRunID, "<", "&lt;")
-	dagRunID = strings.ReplaceAll(dagRunID, ">", "&gt;")
-	_, _ = buffer.WriteString(dagRunID)
+	_, _ = buffer.WriteString(html.EscapeString(dagStatus.DAGRunID))
 
 	_, _ = buffer.WriteString(`</div>
             </div>
@@ -526,9 +514,7 @@ func renderHTMLWithDAGInfo(dagStatus exec.DAGRunStatus) string {
 	if params == "" {
 		params = "(none)"
 	}
-	params = strings.ReplaceAll(params, "&", "&amp;")
-	params = strings.ReplaceAll(params, "<", "&lt;")
-	params = strings.ReplaceAll(params, ">", "&gt;")
+	params = html.EscapeString(params)
 	params = strings.ReplaceAll(params, "\"", "&quot;")
 	_, _ = buffer.WriteString(params)
 
@@ -562,64 +548,9 @@ func renderHTMLWithDAGInfo(dagStatus exec.DAGRunStatus) string {
 	}
 	_, _ = buffer.WriteString("</tr></thead><tbody>")
 
-	// Add table rows (reuse the logic from renderHTML)
+	// Add table rows
 	for i, n := range dagStatus.Nodes {
-		_, _ = buffer.WriteString("<tr>")
-
-		// Row number with special styling
-		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"row-number\">%d</td>", i+1))
-
-		// Step name (escape HTML)
-		stepName := strings.ReplaceAll(n.Step.Name, "&", "&amp;")
-		stepName = strings.ReplaceAll(stepName, "<", "&lt;")
-		stepName = strings.ReplaceAll(stepName, ">", "&gt;")
-		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"step-name\">%s</td>", stepName))
-
-		// Started At with timestamp styling
-		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"timestamp\">%s</td>", n.StartedAt))
-
-		// Finished At with timestamp styling
-		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"timestamp\">%s</td>", n.FinishedAt))
-
-		// Status with conditional styling
-		nodeStatus := n.Status.String()
-		nodeStatusClass := ""
-		switch nodeStatus {
-		case "finished":
-			nodeStatusClass = "status-finished"
-		case "failed":
-			nodeStatusClass = "status-failed"
-		case "running":
-			nodeStatusClass = "status-running"
-		case "skipped":
-			nodeStatusClass = "status-skipped"
-		case "partially_succeeded":
-			nodeStatusClass = "status-partial-success"
-		case "aborted":
-			nodeStatusClass = "status-aborted"
-		case "waiting":
-			nodeStatusClass = "status-waiting"
-		}
-		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"%s\">%s</td>", nodeStatusClass, nodeStatus))
-
-		// Command (join args and escape HTML)
-		command := formatCommands(n.Step.Commands)
-		command = strings.ReplaceAll(command, "&", "&amp;")
-		command = strings.ReplaceAll(command, "<", "&lt;")
-		command = strings.ReplaceAll(command, ">", "&gt;")
-		_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"command-cell\">%s</td>", command))
-
-		// Error (escape HTML)
-		errorMsg := strings.ReplaceAll(n.Error, "&", "&amp;")
-		errorMsg = strings.ReplaceAll(errorMsg, "<", "&lt;")
-		errorMsg = strings.ReplaceAll(errorMsg, ">", "&gt;")
-		if errorMsg != "" {
-			_, _ = buffer.WriteString(fmt.Sprintf("<td class=\"error-cell\">%s</td>", errorMsg))
-		} else {
-			_, _ = buffer.WriteString("<td></td>")
-		}
-
-		_, _ = buffer.WriteString("</tr>")
+		writeNodeRow(&buffer, i, n)
 	}
 
 	_, _ = buffer.WriteString("</tbody></table></div></body></html>")

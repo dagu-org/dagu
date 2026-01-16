@@ -4,6 +4,7 @@
 package cmdutil
 
 import (
+	"context"
 	"os/exec"
 	"testing"
 
@@ -79,9 +80,9 @@ func TestBuildShellCommand(t *testing.T) {
 	}
 }
 
-func TestRunCommand_WithBuildShellCommand(t *testing.T) {
-	// This test verifies that runCommand works correctly with the new buildShellCommand
-	output, err := runCommand("echo test123")
+func TestRunCommandWithContext_WithBuildShellCommand(t *testing.T) {
+	// This test verifies that runCommandWithContext works correctly with buildShellCommand
+	output, err := runCommandWithContext(context.Background(), "echo test123")
 	require.NoError(t, err)
 	assert.Equal(t, "test123", output)
 }

@@ -68,12 +68,15 @@ func (oc *OutputCoordinator) setupMasker(ctx context.Context, _ NodeData) error 
 	oc.mu.Lock()
 	defer oc.mu.Unlock()
 
-	// Get secrets from DAGContext
+	// Get secrets from DAGContext via EnvScope
 	rCtx := GetDAGContext(ctx)
+
+	// Use EnvScope.AllSecrets() for unified source tracking
+	secrets := rCtx.EnvScope.AllSecrets()
 
 	// Convert secret envs map to []string format for masker
 	var secretEnvs []string
-	for k, v := range rCtx.SecretEnvs {
+	for k, v := range secrets {
 		secretEnvs = append(secretEnvs, k+"="+v)
 	}
 

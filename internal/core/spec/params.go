@@ -135,11 +135,21 @@ func evalParamValue(ctx BuildContext, raw string, accumulatedVars map[string]str
 		evalOptions = append(evalOptions, cmdutil.WithVariables(accumulatedVars))
 	}
 
-	if ctx.buildEnv != nil {
+	// Use envScope.buildEnv if available (new thread-safe approach),
+	// fall back to ctx.buildEnv for backward compatibility
+	if ctx.envScope != nil && len(ctx.envScope.buildEnv) > 0 {
+		evalOptions = append(evalOptions, cmdutil.WithVariables(ctx.envScope.buildEnv))
+	} else if ctx.buildEnv != nil {
 		evalOptions = append(evalOptions, cmdutil.WithVariables(ctx.buildEnv))
 	}
 
-	return cmdutil.EvalString(ctx.ctx, raw, evalOptions...)
+	// Also set EnvScope on context for command substitution
+	evalCtx := ctx.ctx
+	if ctx.envScope != nil && ctx.envScope.scope != nil {
+		evalCtx = cmdutil.WithEnvScope(evalCtx, ctx.envScope.scope)
+	}
+
+	return cmdutil.EvalString(evalCtx, raw, evalOptions...)
 }
 
 // parseParamValue parses the parameters for the DAG.
@@ -244,6 +254,9 @@ var paramRegex = regexp.MustCompile(
 	`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|` + "`(" + `?:\\"|[^"]*)` + "`" + `|[^"\s]+)`,
 )
 
+// backtickRegex matches backtick-enclosed commands for substitution.
+var backtickRegex = regexp.MustCompile("`[^`]*`")
+
 // tryParseJSONParams attempts to parse the input as JSON and convert it to paramPairs.
 // Returns an error if the input is not valid JSON.
 func tryParseJSONParams(ctx BuildContext, input string) ([]paramPair, error) {
@@ -306,9 +319,7 @@ func parseStringParams(ctx BuildContext, input string) ([]paramPair, error) {
 			}
 
 			if !ctx.opts.Has(BuildFlagNoEval) {
-				// Perform backtick command substitution
-				backtickRegex := regexp.MustCompile("`[^`]*`")
-
+				// Perform backtick command substitution using package-level regex
 				var cmdErr error
 				value = backtickRegex.ReplaceAllStringFunc(
 					value,

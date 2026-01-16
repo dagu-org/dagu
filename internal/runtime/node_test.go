@@ -390,7 +390,7 @@ func TestNodeBuildSubDAGRuns(t *testing.T) {
 			},
 			setupEnv: func(ctx context.Context) context.Context {
 				env := runtime.GetEnv(ctx)
-				env.Variables.Store("LIST_VAR", `LIST_VAR=["item1", "item2", "item3"]`)
+				env.Scope = env.Scope.WithEntry("LIST_VAR", `["item1", "item2", "item3"]`, cmdutil.EnvSourceStepEnv)
 				return runtime.WithEnv(ctx, env)
 			},
 			expectCount: 3,
@@ -405,7 +405,7 @@ func TestNodeBuildSubDAGRuns(t *testing.T) {
 			},
 			setupEnv: func(ctx context.Context) context.Context {
 				env := runtime.GetEnv(ctx)
-				env.Variables.Store("SPACE_VAR", "SPACE_VAR=one two three")
+				env.Scope = env.Scope.WithEntry("SPACE_VAR", "one two three", cmdutil.EnvSourceStepEnv)
 				return runtime.WithEnv(ctx, env)
 			},
 			expectCount: 3,
@@ -475,7 +475,7 @@ func TestNodeBuildSubDAGRuns(t *testing.T) {
 			},
 			setupEnv: func(ctx context.Context) context.Context {
 				env := runtime.GetEnv(ctx)
-				env.Variables.Store("SPACE_VAR", "SPACE_VAR=one two three")
+				env.Scope = env.Scope.WithEntry("SPACE_VAR", "one two three", cmdutil.EnvSourceStepEnv)
 				return runtime.WithEnv(ctx, env)
 			},
 			expectCount: 3,
@@ -767,11 +767,11 @@ func TestNodeSetupContextBeforeExec(t *testing.T) {
 	// Verify environment variables were set
 	newEnv := runtime.GetEnv(newCtx)
 
-	stdoutVar, _ := newEnv.Variables.Load(exec.EnvKeyDAGRunStepStdoutFile)
-	stderrVar, _ := newEnv.Variables.Load(exec.EnvKeyDAGRunStepStderrFile)
+	stdoutVar, _ := newEnv.Scope.Get(exec.EnvKeyDAGRunStepStdoutFile)
+	stderrVar, _ := newEnv.Scope.Get(exec.EnvKeyDAGRunStepStderrFile)
 
-	assert.Equal(t, "DAG_RUN_STEP_STDOUT_FILE=/tmp/stdout.log", stdoutVar)
-	assert.Equal(t, "DAG_RUN_STEP_STDERR_FILE=/tmp/stderr.log", stderrVar)
+	assert.Equal(t, "/tmp/stdout.log", stdoutVar)
+	assert.Equal(t, "/tmp/stderr.log", stderrVar)
 }
 
 func TestNodeOutputCaptureWithLargeOutput(t *testing.T) {

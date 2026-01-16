@@ -76,49 +76,62 @@ func OnlyReplaceVars() EvalOption {
 
 var reEscapedKeyValue = regexp.MustCompile(`^[^\s=]+="[^"]+"$`)
 
+// reVarSubstitution matches $VAR, ${VAR}, '$VAR', '${VAR}' patterns for variable substitution.
+// Group 1: ${...} content, Group 2: $VAR content (without braces)
+var reVarSubstitution = regexp.MustCompile(`[']{0,1}\$\{([^}]+)\}[']{0,1}|[']{0,1}\$([a-zA-Z0-9_][a-zA-Z0-9_]*)[']{0,1}`)
+
+// reQuotedJSONRef matches quoted JSON references like "${FOO.bar}" and simple variables like "${VAR}"
+var reQuotedJSONRef = regexp.MustCompile(`"\$\{([A-Za-z0-9_]\w*(?:\.[^}]+)?)\}"`)
+
+// reJSONPathRef matches patterns like ${FOO.bar.baz} or $FOO.bar for JSON path expansion
+var reJSONPathRef = regexp.MustCompile(`\$\{([A-Za-z0-9_]\w*)(\.[^}]+)\}|\$([A-Za-z0-9_]\w*)(\.[^\s]+)`)
+
 // BuildCommandEscapedString constructs a single shell-ready string from a command and its arguments.
 // It assumes that the command and arguments are already escaped.
 func BuildCommandEscapedString(command string, args []string) string {
-	quotedArgs := make([]string, 0, len(args))
-	for _, arg := range args {
-		// If already quoted, skip
-		if strings.HasPrefix(arg, `"`) && strings.HasSuffix(arg, `"`) {
-			quotedArgs = append(quotedArgs, arg)
-			continue
-		}
-		if strings.HasPrefix(arg, `'`) && strings.HasSuffix(arg, `'`) {
-			quotedArgs = append(quotedArgs, arg)
-			continue
-		}
-		// If the argument contains spaces, quote it.
-		if strings.ContainsAny(arg, " ") {
-			// If it includes '=' and is already quoted, skip
-			if reEscapedKeyValue.MatchString(arg) {
-				quotedArgs = append(quotedArgs, arg)
-				continue
-			}
-			// if it contains double quotes, escape them
-			arg = strings.ReplaceAll(arg, `"`, `\"`)
-			quotedArgs = append(quotedArgs, fmt.Sprintf(`"%s"`, arg))
-		} else {
-			quotedArgs = append(quotedArgs, arg)
-		}
+	if len(args) == 0 {
+		return command
 	}
 
-	// If we have no arguments, just return the command without trailing space.
-	if len(quotedArgs) == 0 {
-		return command
+	quotedArgs := make([]string, 0, len(args))
+	for _, arg := range args {
+		quotedArgs = append(quotedArgs, quoteArgIfNeeded(arg))
 	}
 
 	return fmt.Sprintf("%s %s", command, strings.Join(quotedArgs, " "))
 }
 
-// expandVariables expands variable references in the input string using the provided options
-func expandVariables(ctx context.Context, value string, options *EvalOptions) string {
-	if len(options.Variables) == 0 && options.StepMap != nil {
-		return ExpandReferencesWithSteps(ctx, value, map[string]string{}, options.StepMap)
+// quoteArgIfNeeded returns the argument quoted if it contains spaces and is not already quoted.
+func quoteArgIfNeeded(arg string) string {
+	// Already quoted with double or single quotes
+	if (strings.HasPrefix(arg, `"`) && strings.HasSuffix(arg, `"`)) ||
+		(strings.HasPrefix(arg, `'`) && strings.HasSuffix(arg, `'`)) {
+		return arg
 	}
 
+	// No spaces means no quoting needed
+	if !strings.ContainsAny(arg, " ") {
+		return arg
+	}
+
+	// Already escaped key=value format
+	if reEscapedKeyValue.MatchString(arg) {
+		return arg
+	}
+
+	// Escape any existing double quotes and wrap in double quotes
+	return fmt.Sprintf(`"%s"`, strings.ReplaceAll(arg, `"`, `\"`))
+}
+
+// expandVariables expands variable references in the input string using the provided options.
+// It uses opts.Variables for explicit variable maps, and falls back to EnvScope from context.
+func expandVariables(ctx context.Context, value string, options *EvalOptions) string {
+	// Handle step references like ${step.stdout} first
+	if options.StepMap != nil {
+		value = ExpandReferencesWithSteps(ctx, value, map[string]string{}, options.StepMap)
+	}
+
+	// Expand from explicit Variables maps
 	for _, vars := range options.Variables {
 		if options.StepMap != nil {
 			value = ExpandReferencesWithSteps(ctx, value, vars, options.StepMap)
@@ -127,6 +140,13 @@ func expandVariables(ctx context.Context, value string, options *EvalOptions) st
 		}
 		value = replaceVars(value, vars)
 	}
+
+	// Also expand from EnvScope if available (for params like $1, $2)
+	// This ensures variables in EnvScope are expanded even when opts.Variables is empty
+	if scope := GetEnvScope(ctx); scope != nil {
+		value = replaceVarsWithScope(value, scope)
+	}
+
 	return value
 }
 
@@ -145,8 +165,7 @@ func EvalString(ctx context.Context, input string, opts ...EvalOption) (string, 
 	// Expand quoted values first (including JSON paths)
 	for _, vars := range options.Variables {
 		// Handle quoted JSON references like "${FOO.bar}" and simple variables like "${VAR}"
-		quotedRefPattern := regexp.MustCompile(`"\$\{([A-Za-z0-9_]\w*(?:\.[^}]+)?)\}"`)
-		value = quotedRefPattern.ReplaceAllStringFunc(value, func(match string) string {
+		value = reQuotedJSONRef.ReplaceAllStringFunc(value, func(match string) string {
 			// Extract the reference (VAR or VAR.path)
 			ref := match[3 : len(match)-2] // Remove "$ and }"
 
@@ -179,17 +198,17 @@ func EvalString(ctx context.Context, input string, opts ...EvalOption) (string, 
 
 	if options.Substitute {
 		var err error
-		value, err = substituteCommands(value)
+		value, err = substituteCommandsWithContext(ctx, value)
 		if err != nil {
 			return "", fmt.Errorf("failed to substitute string in %q: %w", input, err)
 		}
 	}
 	if options.ExpandEnv {
-		expanded, err := expandWithShell(value, options)
+		expanded, err := expandWithShellContext(ctx, value, options)
 		if err != nil {
-			logger.Debug(ctx, "Shell expansion failed, falling back to os.ExpandEnv",
+			logger.Debug(ctx, "Shell expansion failed, falling back to ExpandEnvContext",
 				tag.Error(err))
-			value = os.ExpandEnv(value)
+			value = ExpandEnvContext(ctx, value)
 		} else {
 			value = expanded
 		}
@@ -208,19 +227,22 @@ func EvalIntString(ctx context.Context, input string, opts ...EvalOption) (int, 
 	value = expandVariables(ctx, value, options)
 
 	if options.ExpandEnv {
-		expanded, err := expandWithShell(value, options)
+		expanded, err := expandWithShellContext(ctx, value, options)
 		if err != nil {
-			logger.Debug(ctx, "Shell expansion failed, falling back to os.ExpandEnv",
+			logger.Debug(ctx, "Shell expansion failed, falling back to ExpandEnvContext",
 				tag.Error(err))
-			value = os.ExpandEnv(value)
+			value = ExpandEnvContext(ctx, value)
 		} else {
 			value = expanded
 		}
 	}
 
-	value, err := substituteCommands(value)
-	if err != nil {
-		return 0, err
+	if options.Substitute {
+		var err error
+		value, err = substituteCommandsWithContext(ctx, value)
+		if err != nil {
+			return 0, err
+		}
 	}
 	v, err := strconv.Atoi(value)
 	if err != nil {
@@ -265,6 +287,22 @@ func EvalStringFields[T any](ctx context.Context, obj T, opts ...EvalOption) (T,
 	}
 }
 
+// evalStringValue applies variable expansion, substitution, and env expansion to a string.
+func evalStringValue(ctx context.Context, value string, opts *EvalOptions) (string, error) {
+	value = expandVariables(ctx, value, opts)
+	if opts.Substitute {
+		var err error
+		value, err = substituteCommandsWithContext(ctx, value)
+		if err != nil {
+			return "", err
+		}
+	}
+	if opts.ExpandEnv {
+		value = ExpandEnvContext(ctx, value)
+	}
+	return value, nil
+}
+
 func processStructFields(ctx context.Context, v reflect.Value, opts *EvalOptions) error {
 	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
@@ -284,22 +322,10 @@ func processStructFields(ctx context.Context, v reflect.Value, opts *EvalOptions
 			}
 
 		case reflect.String:
-			value := field.String()
-
-			value = expandVariables(ctx, value, opts)
-
-			if opts.Substitute {
-				var err error
-				value, err = substituteCommands(value)
-				if err != nil {
-					return fmt.Errorf("field %q: %w", t.Field(i).Name, err)
-				}
+			value, err := evalStringValue(ctx, field.String(), opts)
+			if err != nil {
+				return fmt.Errorf("field %q: %w", t.Field(i).Name, err)
 			}
-
-			if opts.ExpandEnv {
-				value = os.ExpandEnv(value)
-			}
-
 			field.SetString(value)
 
 		case reflect.Struct:
@@ -308,23 +334,19 @@ func processStructFields(ctx context.Context, v reflect.Value, opts *EvalOptions
 			}
 
 		case reflect.Map:
-			// Process map fields
 			if field.IsNil() {
 				continue
 			}
-
 			processed, err := processMapWithOpts(ctx, field, opts)
 			if err != nil {
 				return fmt.Errorf("field %q: %w", t.Field(i).Name, err)
 			}
-
 			field.Set(processed)
 
 		case reflect.Slice, reflect.Array:
 			if field.IsNil() {
 				continue
 			}
-			// Create a new slice with new backing array to avoid mutating original
 			newSlice := reflect.MakeSlice(field.Type(), field.Len(), field.Cap())
 			reflect.Copy(newSlice, field)
 			if err := processSliceWithOpts(ctx, newSlice, opts); err != nil {
@@ -345,26 +367,15 @@ func processPointerField(ctx context.Context, field reflect.Value, opts *EvalOpt
 	// nolint:exhaustive
 	switch elem.Kind() {
 	case reflect.String:
-		value := elem.String()
-		value = expandVariables(ctx, value, opts)
-		if opts.Substitute {
-			var err error
-			value, err = substituteCommands(value)
-			if err != nil {
-				return err
-			}
+		value, err := evalStringValue(ctx, elem.String(), opts)
+		if err != nil {
+			return err
 		}
-		if opts.ExpandEnv {
-			value = os.ExpandEnv(value)
-		}
-		// Create a new string and update the pointer to point to it
-		// This avoids mutating the original value
 		newStr := reflect.New(elem.Type())
 		newStr.Elem().SetString(value)
 		field.Set(newStr)
 
 	case reflect.Struct:
-		// Create a copy of the struct to avoid mutating the original
 		newStruct := reflect.New(elem.Type())
 		newStruct.Elem().Set(elem)
 		if err := processStructFields(ctx, newStruct.Elem(), opts); err != nil {
@@ -380,7 +391,6 @@ func processPointerField(ctx context.Context, field reflect.Value, opts *EvalOpt
 		if err != nil {
 			return err
 		}
-		// Create a new pointer to the processed map
 		newMap := reflect.New(elem.Type())
 		newMap.Elem().Set(processed)
 		field.Set(newMap)
@@ -389,13 +399,11 @@ func processPointerField(ctx context.Context, field reflect.Value, opts *EvalOpt
 		if elem.IsNil() {
 			return nil
 		}
-		// Create a new slice with new backing array to avoid mutating original
 		newSlice := reflect.MakeSlice(elem.Type(), elem.Len(), elem.Cap())
 		reflect.Copy(newSlice, elem)
 		if err := processSliceWithOpts(ctx, newSlice, opts); err != nil {
 			return err
 		}
-		// Create new pointer to the new slice
 		newPtr := reflect.New(elem.Type())
 		newPtr.Elem().Set(newSlice)
 		field.Set(newPtr)
@@ -414,17 +422,9 @@ func processSliceWithOpts(ctx context.Context, v reflect.Value, opts *EvalOption
 		// nolint:exhaustive
 		switch elem.Kind() {
 		case reflect.String:
-			value := elem.String()
-			value = expandVariables(ctx, value, opts)
-			if opts.Substitute {
-				var err error
-				value, err = substituteCommands(value)
-				if err != nil {
-					return err
-				}
-			}
-			if opts.ExpandEnv {
-				value = os.ExpandEnv(value)
+			value, err := evalStringValue(ctx, elem.String(), opts)
+			if err != nil {
+				return err
 			}
 			elem.SetString(value)
 
@@ -458,70 +458,48 @@ func processSliceWithOpts(ctx context.Context, v reflect.Value, opts *EvalOption
 // processMapWithOpts recursively processes a map, evaluating string values and recursively processing
 // nested maps and structs.
 func processMapWithOpts(ctx context.Context, v reflect.Value, opts *EvalOptions) (reflect.Value, error) {
-	// Create a new map of the same type
 	mapType := v.Type()
 	newMap := reflect.MakeMap(mapType)
 
-	// Iterate over the map entries
 	iter := v.MapRange()
 	for iter.Next() {
 		key := iter.Key()
 		val := iter.Value()
 
-		// Process the value based on its type
-		var newVal reflect.Value
-		var err error
-
 		for (val.Kind() == reflect.Interface || val.Kind() == reflect.Ptr) && !val.IsNil() {
 			val = val.Elem()
 		}
 
+		var newVal reflect.Value
+		var err error
+
 		// nolint:exhaustive
 		switch val.Kind() {
 		case reflect.String:
-			// Evaluate string values
-			strVal := val.String()
-
-			strVal = expandVariables(ctx, strVal, opts)
-
-			if opts.Substitute {
-				var err error
-				strVal, err = substituteCommands(strVal)
-				if err != nil {
-					return v, fmt.Errorf("map value: %w", err)
-				}
+			strVal, err := evalStringValue(ctx, val.String(), opts)
+			if err != nil {
+				return v, fmt.Errorf("map value: %w", err)
 			}
-
-			if opts.ExpandEnv {
-				strVal = os.ExpandEnv(strVal)
-			}
-
 			newVal = reflect.ValueOf(strVal)
 
 		case reflect.Map:
-			// Recursively process nested maps
 			newVal, err = processMapWithOpts(ctx, val, opts)
 			if err != nil {
 				return v, err
 			}
 
 		case reflect.Struct:
-			// Process structs
 			structCopy := reflect.New(val.Type()).Elem()
 			structCopy.Set(val)
-
 			if err := processStructFields(ctx, structCopy, opts); err != nil {
 				return v, err
 			}
-
 			newVal = structCopy
 
 		default:
-			// Keep other types as is
 			newVal = val
 		}
 
-		// Set the new value in the map
 		newMap.SetMapIndex(key, newVal)
 	}
 
@@ -631,11 +609,8 @@ func resolveJSONPath(ctx context.Context, varName, jsonStr, path string) (string
 // ExpandReferencesWithSteps is like ExpandReferences but also handles step ID property access
 // like ${step_id.stdout}, ${step_id.stderr}, ${step_id.exit_code}
 func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[string]string, stepMap map[string]StepInfo) string {
-	// Regex to match patterns like ${FOO.bar.baz} or $FOO.bar
-	re := regexp.MustCompile(`\$\{([A-Za-z0-9_]\w*)(\.[^}]+)\}|\$([A-Za-z0-9_]\w*)(\.[^\s]+)`)
-
-	return re.ReplaceAllStringFunc(input, func(match string) string {
-		subMatches := re.FindStringSubmatch(match)
+	return reJSONPathRef.ReplaceAllStringFunc(input, func(match string) string {
+		subMatches := reJSONPathRef.FindStringSubmatch(match)
 		if len(subMatches) < 3 {
 			return match
 		}
@@ -659,7 +634,14 @@ func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[st
 		// Try regular variable or environment lookup
 		jsonStr, ok := dataMap[varName]
 		if !ok {
-			if envVal, exists := os.LookupEnv(varName); exists {
+			// Try EnvScope from context first, then fall back to os.LookupEnv
+			if scope := GetEnvScope(ctx); scope != nil {
+				if envVal, exists := scope.Get(varName); exists {
+					jsonStr = envVal
+				} else {
+					return match
+				}
+			} else if envVal, exists := os.LookupEnv(varName); exists {
 				jsonStr = envVal
 			} else {
 				return match
@@ -675,34 +657,70 @@ func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[st
 	})
 }
 
-func replaceVars(template string, vars map[string]string) string {
-	re := regexp.MustCompile(`[']{0,1}\$\{([^}]+)\}[']{0,1}|[']{0,1}\$([a-zA-Z0-9_][a-zA-Z0-9_]*)[']{0,1}`)
+// extractVarKey extracts the variable key from a regex match.
+// Returns the key and false if the match should be skipped (single-quoted).
+func extractVarKey(match string) (string, bool) {
+	if match[0] == '\'' && match[len(match)-1] == '\'' {
+		return "", false // Single-quoted - skip
+	}
+	if strings.HasPrefix(match, "${") {
+		return match[2 : len(match)-1], true
+	}
+	return match[1:], true
+}
 
-	return re.ReplaceAllStringFunc(template, func(match string) string {
-		var key string
-		if match[0] == '\'' && match[len(match)-1] == '\'' {
-			// If the match is surrounded by single quotes, leave it as-is
+// replaceVars substitutes $VAR and ${VAR} patterns using the provided map.
+func replaceVars(template string, vars map[string]string) string {
+	return reVarSubstitution.ReplaceAllStringFunc(template, func(match string) string {
+		key, ok := extractVarKey(match)
+		if !ok {
 			return match
 		}
-		if strings.HasPrefix(match, "${") {
-			key = match[2 : len(match)-1]
-		} else {
-			key = match[1:]
-		}
-
-		if val, ok := vars[key]; ok {
+		if val, found := vars[key]; found {
 			return val
 		}
 		return match
 	})
 }
 
-func expandWithShell(input string, opts *EvalOptions) (string, error) {
+// replaceVarsWithScope substitutes $VAR and ${VAR} patterns using EnvScope.
+//
+// This function intentionally skips OS-sourced variables (EnvSourceOS) during
+// early expansion. The rationale is:
+//
+//  1. OS environment variables may change between DAG load time and step execution
+//     (e.g., PATH modifications, dynamic tokens).
+//  2. By deferring OS var expansion to shell execution time (via expandWithShellContext),
+//     we ensure the shell reads the current OS environment when the command runs.
+//  3. User-defined variables (DAG env, step env, secrets, outputs) are stable and
+//     can be safely expanded early.
+//
+// This design allows commands like "echo $PATH" to use the live OS PATH at execution
+// time, rather than a stale value captured when the DAG was loaded.
+func replaceVarsWithScope(template string, scope *EnvScope) string {
+	return reVarSubstitution.ReplaceAllStringFunc(template, func(match string) string {
+		key, ok := extractVarKey(match)
+		if !ok {
+			return match
+		}
+		// Skip JSON paths (handled elsewhere)
+		if strings.Contains(key, ".") {
+			return match
+		}
+		// Only expand user-defined vars, not OS-sourced (see function doc for rationale)
+		if entry, found := scope.GetEntry(key); found && entry.Source != EnvSourceOS {
+			return entry.Value
+		}
+		return match
+	})
+}
+
+func expandWithShellContext(ctx context.Context, input string, opts *EvalOptions) (string, error) {
 	if !opts.ExpandShell {
 		if !opts.ExpandEnv {
 			return input, nil
 		}
-		return os.ExpandEnv(input), nil
+		return ExpandEnvContext(ctx, input), nil
 	}
 
 	parser := syntax.NewParser()
@@ -719,6 +737,14 @@ func expandWithShell(input string, opts *EvalOptions) (string, error) {
 			if val, ok := lookupVariable(name, opts.Variables); ok {
 				return val
 			}
+			// Check EnvScope from context first, then fall back to os.Getenv
+			if scope := GetEnvScope(ctx); scope != nil {
+				// Only use USER-defined vars from scope, not OS-sourced vars
+				// This lets us read live OS env values instead of frozen ones
+				if entry, ok := scope.GetEntry(name); ok && entry.Source != EnvSourceOS {
+					return entry.Value
+				}
+			}
 			return os.Getenv(name)
 		}),
 	}
@@ -727,7 +753,7 @@ func expandWithShell(input string, opts *EvalOptions) (string, error) {
 	if err != nil {
 		var unexpected expand.UnexpectedCommandError
 		if errors.As(err, &unexpected) {
-			return os.ExpandEnv(input), nil
+			return ExpandEnvContext(ctx, input), nil
 		}
 		return "", err
 	}

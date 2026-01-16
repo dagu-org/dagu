@@ -237,7 +237,8 @@ func (e *githubAction) generateWorkflowYAML(ctx context.Context) (string, error)
 	// This includes DAG env, Variables from previous steps, step env
 	// Secrets are excluded (they're passed separately via act's Config.Secrets)
 	workflowEnv := env.UserEnvsMap()
-	for k := range env.SecretEnvs {
+	// Use EnvScope.AllSecrets() for unified source tracking
+	for k := range env.Scope.AllSecrets() {
 		delete(workflowEnv, k)
 	}
 
@@ -316,9 +317,9 @@ func (e *githubAction) executeAct(ctx context.Context, workDir, tmpDir, workflow
 
 	// Build secrets map for act and remove secrets from actEnv
 	// Secrets should only be passed via Config.Secrets, not Config.Env
-	actSecrets := make(map[string]string)
-	for k, v := range env.SecretEnvs {
-		actSecrets[k] = v
+	// Use EnvScope.AllSecrets() for unified source tracking
+	actSecrets := env.Scope.AllSecrets()
+	for k := range actSecrets {
 		delete(actEnv, k) // Remove from env to avoid duplication
 	}
 

@@ -169,6 +169,65 @@ steps:
 	})
 }
 
+func TestAgent_WorkingDirExpansion(t *testing.T) {
+	t.Run("WorkingDirWithEnvVar", func(t *testing.T) {
+		th := test.Setup(t)
+		// Set up a temp directory and env var
+		tempDir := t.TempDir()
+		t.Setenv("TEST_WORK_DIR", tempDir)
+
+		// Create DAG with WorkingDir using env var
+		dag := th.DAG(t, `workingDir: $TEST_WORK_DIR
+steps:
+  - name: check-pwd
+    command: pwd
+`)
+		dagAgent := dag.Agent()
+		dagAgent.RunSuccess(t)
+
+		// Verify the DAG ran successfully
+		dagRunStatus := dagAgent.Status(th.Context)
+		require.Equal(t, core.Succeeded.String(), dagRunStatus.Status.String())
+	})
+
+	t.Run("WorkingDirWithDAGEnvVar", func(t *testing.T) {
+		th := test.Setup(t)
+		tempDir := t.TempDir()
+
+		// Create DAG with WorkingDir using DAG-defined env var
+		dag := th.DAG(t, `env:
+  - CUSTOM_DIR=`+tempDir+`
+workingDir: $CUSTOM_DIR
+steps:
+  - name: check-pwd
+    command: pwd
+`)
+		dagAgent := dag.Agent()
+		dagAgent.RunSuccess(t)
+
+		// Verify the DAG ran successfully
+		dagRunStatus := dagAgent.Status(th.Context)
+		require.Equal(t, core.Succeeded.String(), dagRunStatus.Status.String())
+	})
+
+	t.Run("WorkingDirWithTildeExpansion", func(t *testing.T) {
+		th := test.Setup(t)
+
+		// Create DAG with WorkingDir using tilde
+		dag := th.DAG(t, `workingDir: ~
+steps:
+  - name: check-pwd
+    command: pwd
+`)
+		dagAgent := dag.Agent()
+		dagAgent.RunSuccess(t)
+
+		// Verify the DAG ran successfully
+		dagRunStatus := dagAgent.Status(th.Context)
+		require.Equal(t, core.Succeeded.String(), dagRunStatus.Status.String())
+	})
+}
+
 func TestAgent_DryRun(t *testing.T) {
 	t.Run("DryRun", func(t *testing.T) {
 		th := test.Setup(t)
