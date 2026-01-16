@@ -5,7 +5,10 @@ import (
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
 // ListQueues implements api.StrictServerInterface.
@@ -25,7 +28,7 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 				queueType:      "global",
 				maxConcurrency: queueCfg.MaxActiveRuns,
 				running:        []api.DAGRunSummary{},
-				queued:         []api.DAGRunSummary{},
+				queuedCount:    0,
 			}
 			queueMap[queueCfg.Name] = queue
 		}
@@ -76,57 +79,39 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 		}
 	}
 
-	// 3. Get all queued items from QueueStore
-	allQueued, err := a.queueStore.All(ctx)
+	// 3. Get queued COUNTS only (NOT full items) using QueueList + Len
+	queueNames, err := a.queueStore.QueueList(ctx)
 	if err != nil {
 		return nil, &Error{
 			Code:       api.ErrorCodeInternalError,
-			Message:    "Failed to list queued items",
+			Message:    "Failed to list queue names",
 			HTTPStatus: 500,
 		}
 	}
 
-	// Process queued DAG runs
-	for _, queuedItem := range allQueued {
-		dagRunRef, err := queuedItem.Data()
+	for _, queueName := range queueNames {
+		count, err := a.queueStore.Len(ctx, queueName)
 		if err != nil {
-			continue // Skip if we can't get data
+			logger.Warn(ctx, "Failed to get queue length",
+				tag.Queue(queueName),
+				tag.Error(err))
+			continue
 		}
 
-		// Get the DAG run status to convert to summary
-		attempt, err := a.dagRunStore.FindAttempt(ctx, *dagRunRef)
-		if err != nil {
-			continue // Skip if we can't find the attempt
-		}
-
-		dag, err := attempt.ReadDAG(ctx)
-		if err != nil {
-			continue // Skip if we can't read DAG
-		}
-
-		queue := getOrCreateQueue(queueMap, dag.ProcGroup(), a.config, dag)
-
-		runStatus, err := attempt.ReadStatus(ctx)
-		if err != nil {
-			continue // Skip if we can't read status
-		}
-
-		// Only include if status is actually queued
-		if runStatus.Status == core.Queued {
-			runSummary := toDAGRunSummary(*runStatus)
-			queue.queued = append(queue.queued, runSummary)
-			totalQueued++
-		}
+		queue := getOrCreateQueue(queueMap, queueName, a.config, nil)
+		queue.queuedCount = count
+		totalQueued += count
 	}
 
 	// Convert map to slice and calculate total capacity
 	queues := make([]api.Queue, 0, len(queueMap))
 	for _, q := range queueMap {
 		queue := api.Queue{
-			Name:    q.name,
-			Type:    api.QueueType(q.queueType),
-			Running: q.running,
-			Queued:  q.queued,
+			Name:         q.name,
+			Type:         api.QueueType(q.queueType),
+			Running:      q.running,
+			RunningCount: len(q.running),
+			QueuedCount:  q.queuedCount,
 		}
 
 		// Include maxConcurrency for both global and DAG-based queues
@@ -159,13 +144,103 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 	return api.ListQueues200JSONResponse(response), nil
 }
 
+// ListQueueItems implements api.StrictServerInterface.
+// Returns paginated items for a specific queue.
+func (a *API) ListQueueItems(ctx context.Context, req api.ListQueueItemsRequestObject) (api.ListQueueItemsResponseObject, error) {
+	queueName := req.Name
+	itemType := api.ListQueueItemsParamsTypeQueued
+	if req.Params.Type != nil {
+		itemType = *req.Params.Type
+	}
+
+	// Create Paginator from page/perPage params
+	pg := exec.NewPaginator(valueOf(req.Params.Page), valueOf(req.Params.PerPage))
+
+	var items []api.DAGRunSummary
+
+	if itemType == api.ListQueueItemsParamsTypeRunning {
+		// Get running items from proc store (bounded by maxConcurrency)
+		runningByGroup, err := a.procStore.ListAllAlive(ctx)
+		if err != nil {
+			return nil, &Error{
+				Code:       api.ErrorCodeInternalError,
+				Message:    "Failed to list running processes",
+				HTTPStatus: 500,
+			}
+		}
+
+		runningRefs := runningByGroup[queueName]
+		total := len(runningRefs)
+
+		// Apply pagination manually for running items
+		offset := pg.Offset()
+		limit := pg.Limit()
+		if offset < total {
+			endIndex := offset + limit
+			if endIndex > total {
+				endIndex = total
+			}
+			for _, dagRun := range runningRefs[offset:endIndex] {
+				attempt, err := a.dagRunStore.FindAttempt(ctx, dagRun)
+				if err != nil {
+					continue
+				}
+				runStatus, err := attempt.ReadStatus(ctx)
+				if err != nil {
+					continue
+				}
+				items = append(items, toDAGRunSummary(*runStatus))
+			}
+		}
+
+		// Create paginated result for response
+		paginatedResult := exec.NewPaginatedResult(items, total, pg)
+		return api.ListQueueItems200JSONResponse{
+			Items:      items,
+			Pagination: toPagination(paginatedResult),
+		}, nil
+	}
+
+	// Get queued items with pagination using ListPaginated
+	paginatedResult, err := a.queueStore.ListPaginated(ctx, queueName, pg)
+	if err != nil {
+		return nil, &Error{
+			Code:       api.ErrorCodeInternalError,
+			Message:    "Failed to list queued items",
+			HTTPStatus: 500,
+		}
+	}
+
+	// Convert QueuedItemData to DAGRunSummary
+	for _, queuedItem := range paginatedResult.Items {
+		dagRunRef, err := queuedItem.Data()
+		if err != nil {
+			continue
+		}
+		attempt, err := a.dagRunStore.FindAttempt(ctx, *dagRunRef)
+		if err != nil {
+			continue
+		}
+		runStatus, err := attempt.ReadStatus(ctx)
+		if err != nil {
+			continue
+		}
+		items = append(items, toDAGRunSummary(*runStatus))
+	}
+
+	return api.ListQueueItems200JSONResponse{
+		Items:      items,
+		Pagination: toPagination(paginatedResult),
+	}, nil
+}
+
 // Helper struct to build queue information
 type queueInfo struct {
 	name           string
 	queueType      string
 	maxConcurrency int
 	running        []api.DAGRunSummary
-	queued         []api.DAGRunSummary
+	queuedCount    int
 }
 
 // Helper function to get or create queue in the map
@@ -173,10 +248,10 @@ func getOrCreateQueue(queueMap map[string]*queueInfo, queueName string, config *
 	queue, exists := queueMap[queueName]
 	if !exists {
 		queue = &queueInfo{
-			name:      queueName,
-			queueType: "dag-based", // Default to dag-based
-			running:   []api.DAGRunSummary{},
-			queued:    []api.DAGRunSummary{},
+			name:        queueName,
+			queueType:   "dag-based", // Default to dag-based
+			running:     []api.DAGRunSummary{},
+			queuedCount: 0,
 		}
 
 		// Check if this is a global queue from config

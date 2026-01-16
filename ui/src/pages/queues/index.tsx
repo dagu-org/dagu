@@ -153,15 +153,15 @@ function Queues() {
 
     // Count active queues (those with running or queued items)
     const activeQueues = queues.filter(
-      (q) => (q.running?.length || 0) > 0 || (q.queued?.length || 0) > 0
+      (q) => (q.runningCount || 0) > 0 || (q.queuedCount || 0) > 0
     ).length;
 
     const totalRunning = queues.reduce(
-      (sum, q) => sum + (q.running?.length || 0),
+      (sum, q) => sum + (q.runningCount || 0),
       0
     );
     const totalQueued = queues.reduce(
-      (sum, q) => sum + (q.queued?.length || 0),
+      (sum, q) => sum + (q.queuedCount || 0),
       0
     );
     const totalActive = totalRunning + totalQueued;
@@ -169,7 +169,7 @@ function Queues() {
     // Calculate utilization for global queues only (DAG-based queues are isolated and don't compete for shared capacity)
     const globalQueuesList = queues.filter((q) => q.type === 'global');
     const globalRunning = globalQueuesList.reduce(
-      (sum, q) => sum + (q.running?.length || 0),
+      (sum, q) => sum + (q.runningCount || 0),
       0
     );
     const globalCapacity = globalQueuesList

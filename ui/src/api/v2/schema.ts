@@ -721,6 +721,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dag-runs/{name}/{dagRunId}/log/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download full execution log of a DAG-run
+         * @description Downloads the entire execution log file for a DAG-run
+         */
+        get: operations["downloadDAGRunLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dag-runs/{name}/{dagRunId}/outputs": {
         parameters: {
             query?: never;
@@ -793,6 +813,26 @@ export interface paths {
          * @description Fetches the log for an individual step in a DAG-run
          */
         get: operations["getDAGRunStepLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dag-runs/{name}/{dagRunId}/steps/{stepName}/log/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download log for a specific step in a DAG-run
+         * @description Downloads the entire log file for an individual step in a DAG-run
+         */
+        get: operations["downloadDAGRunStepLog"];
         put?: never;
         post?: never;
         delete?: never;
@@ -921,6 +961,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/log/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download log for a specific sub DAG-run
+         * @description Downloads the entire log file for an individual sub DAG-run
+         */
+        get: operations["downloadSubDAGRunLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log": {
         parameters: {
             query?: never;
@@ -933,6 +993,26 @@ export interface paths {
          * @description Fetches the log for an individual step in a sub DAG-run
          */
         get: operations["getSubDAGRunStepLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download log for a specific step in a sub DAG-run
+         * @description Downloads the entire log file for an individual step in a sub DAG-run
+         */
+        get: operations["downloadSubDAGRunStepLog"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1029,10 +1109,30 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List all execution queues with active DAG-runs
-         * @description Retrieves all queues showing both running and queued DAG-runs, organized by queue/process group
+         * List all execution queues with summary statistics
+         * @description Returns queue list with running/queued counts. Use /queues/{name}/items for paginated item details.
          */
         get: operations["listQueues"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/queues/{name}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get paginated items for a specific queue
+         * @description Returns paginated list of running or queued DAG-runs for the specified queue
+         */
+        get: operations["listQueueItems"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1967,7 +2067,7 @@ export interface components {
             queues: components["schemas"]["Queue"][];
             summary: components["schemas"]["QueuesSummary"];
         };
-        /** @description A queue/process group with its active DAG-runs */
+        /** @description A queue/process group with summary statistics */
         Queue: {
             /** @description Name of the queue (global queue name or DAG name if no queue specified) */
             name: string;
@@ -1978,10 +2078,18 @@ export interface components {
             type: QueueType;
             /** @description Maximum number of concurrent runs allowed. For 'global' queues, this is the configured maxConcurrency. For 'dag-based' queues, this is the DAG's maxActiveRuns (default 1) */
             maxConcurrency?: number;
-            /** @description List of currently running DAG-runs */
+            /** @description Number of currently running DAG-runs */
+            runningCount: number;
+            /** @description Number of queued DAG-runs waiting to execute */
+            queuedCount: number;
+            /** @description List of currently running DAG-runs (bounded by maxConcurrency) */
             running: components["schemas"]["DAGRunSummary"][];
-            /** @description List of DAG-runs waiting to execute */
-            queued: components["schemas"]["DAGRunSummary"][];
+        };
+        /** @description Paginated queue items response */
+        QueueItemsResponse: {
+            /** @description List of DAG-run summaries */
+            items: components["schemas"]["DAGRunSummary"][];
+            pagination: components["schemas"]["Pagination"];
         };
         /** @description Summary statistics across all queues */
         QueuesSummary: {
@@ -4480,6 +4588,54 @@ export interface operations {
             };
         };
     };
+    downloadDAGRunLog: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Log file content */
+            200: {
+                headers: {
+                    /** @description Attachment filename */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Log file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getDAGRunOutputs: {
         parameters: {
             query?: {
@@ -4640,6 +4796,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Log"];
+                };
+            };
+            /** @description Log file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    downloadDAGRunStepLog: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Whether to return stdout or stderr logs */
+                stream?: components["parameters"]["Stream"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+                /** @description name of the step */
+                stepName: components["parameters"]["StepName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Log file content */
+            200: {
+                headers: {
+                    /** @description Attachment filename */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
                 };
             };
             /** @description Log file not found */
@@ -4999,6 +5207,56 @@ export interface operations {
             };
         };
     };
+    downloadSubDAGRunLog: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+                /** @description ID of the sub DAG-run to download the log for */
+                subDAGRunId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Log file content */
+            200: {
+                headers: {
+                    /** @description Attachment filename */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Log file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getSubDAGRunStepLog: {
         parameters: {
             query?: {
@@ -5037,6 +5295,60 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Log"];
+                };
+            };
+            /** @description Log file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    downloadSubDAGRunStepLog: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Whether to return stdout or stderr logs */
+                stream?: components["parameters"]["Stream"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+                /** @description ID of the sub DAG-run to download the step log for */
+                subDAGRunId: string;
+                /** @description name of the step */
+                stepName: components["parameters"]["StepName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Log file content */
+            200: {
+                headers: {
+                    /** @description Attachment filename */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
                 };
             };
             /** @description Log file not found */
@@ -5317,6 +5629,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueuesResponse"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listQueueItems: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description page number of items to fetch (default is 1) */
+                page?: components["parameters"]["Page"];
+                /** @description number of items per page (default is 30, max is 100) */
+                perPage?: components["parameters"]["PerPage"];
+                /** @description Item type to fetch */
+                type?: PathsQueuesNameItemsGetParametersQueryType;
+            };
+            header?: never;
+            path: {
+                /** @description Queue name */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueItemsResponse"];
+                };
+            };
+            /** @description Queue not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Generic error response */
@@ -5868,6 +6230,10 @@ export enum PathsDagsGetParametersQuerySort {
 export enum PathsDagsGetParametersQueryOrder {
     asc = "asc",
     desc = "desc"
+}
+export enum PathsQueuesNameItemsGetParametersQueryType {
+    running = "running",
+    queued = "queued"
 }
 export enum ChatMessageRole {
     system = "system",

@@ -24,6 +24,8 @@ type QueueStore interface {
 	Len(ctx context.Context, name string) (int, error)
 	// List returns all items in the queue with the given name
 	List(ctx context.Context, name string) ([]QueuedItemData, error)
+	// ListPaginated returns paginated items for a specific queue
+	ListPaginated(ctx context.Context, name string, pg Paginator) (PaginatedResult[QueuedItemData], error)
 	// All returns all items in the queue
 	All(ctx context.Context) ([]QueuedItemData, error)
 	// ListByDAGName returns all items that has a specific DAG name

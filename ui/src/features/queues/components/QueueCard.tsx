@@ -1,10 +1,13 @@
 import {
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Trash2,
 } from 'lucide-react';
 import React from 'react';
+import useSWR from 'swr';
 import type { components } from '../../../api/v2/schema';
+import { PathsQueuesNameItemsGetParametersQueryType } from '../../../api/v2/schema';
 import { Button } from '../../../components/ui/button';
 import {
   Tooltip,
@@ -38,15 +41,50 @@ function QueueCard({
   const [isExpanded, setIsExpanded] = React.useState(true);
   const [isClearing, setIsClearing] = React.useState(false);
   const [showClearConfirm, setShowClearConfirm] = React.useState(false);
+  const [queuedPage, setQueuedPage] = React.useState(1);
+  const perPage = 50;
+
+  // Reset page when remote node changes
+  const remoteNode = appBarContext?.selectedRemoteNode || 'local';
+  React.useEffect(() => {
+    setQueuedPage(1);
+  }, [remoteNode, queue.name]);
 
   const toggleExpanded = () => setIsExpanded(!isExpanded);
+
+  // Fetch paginated queued items when expanded and there are queued items
+  const shouldFetchQueued = isExpanded && queue.queuedCount > 0;
+  const { data: queuedResponse, mutate: mutateQueuedData } = useSWR(
+    shouldFetchQueued
+      ? ['listQueueItems', queue.name, queuedPage, perPage, remoteNode]
+      : null,
+    async () => {
+      const response = await client.GET('/queues/{name}/items', {
+        params: {
+          path: { name: queue.name },
+          query: {
+            type: PathsQueuesNameItemsGetParametersQueryType.queued,
+            page: queuedPage,
+            perPage: perPage,
+            remoteNode: remoteNode,
+          },
+        },
+      });
+      return response.data;
+    },
+    { refreshInterval: 3000 }
+  );
+
+  const queuedItems = queuedResponse?.items ?? [];
+  const pagination = queuedResponse?.pagination;
 
   const handleClearQueue = async () => {
     setIsClearing(true);
     try {
-      const queuedRuns = queue.queued || [];
+      // Clear all queued items by dequeuing them one by one
+      // Note: This will only clear items on the current page, but triggers a refresh
       await Promise.all(
-        queuedRuns.map(async (dagRun) => {
+        queuedItems.map(async (dagRun) => {
           try {
             await client.GET('/dag-runs/{name}/{dagRunId}/dequeue', {
               params: {
@@ -55,7 +93,7 @@ function QueueCard({
                   dagRunId: dagRun.dagRunId,
                 },
                 query: {
-                  remoteNode: appBarContext?.selectedRemoteNode || 'local',
+                  remoteNode: remoteNode,
                 },
               },
             });
@@ -67,6 +105,8 @@ function QueueCard({
           }
         })
       );
+      // Refresh the queued items
+      mutateQueuedData();
       if (onQueueCleared) {
         onQueueCleared();
       }
@@ -80,7 +120,7 @@ function QueueCard({
 
   const utilization = React.useMemo(() => {
     if (queue.type !== 'global' || !queue.maxConcurrency) return null;
-    const running = queue.running?.length || 0;
+    const running = queue.runningCount || 0;
     return Math.round((running / queue.maxConcurrency) * 100);
   }, [queue]);
 
@@ -159,7 +199,7 @@ function QueueCard({
                   />
                 </div>
                 <span className="text-xs text-muted-foreground tabular-nums">
-                  {queue.running?.length || 0}/{queue.maxConcurrency}
+                  {queue.runningCount || 0}/{queue.maxConcurrency}
                 </span>
               </div>
             )}
@@ -169,13 +209,13 @@ function QueueCard({
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <div className="flex items-baseline gap-1">
               <span className="text-sm font-light tabular-nums text-foreground">
-                {queue.running?.length || 0}
+                {queue.runningCount || 0}
               </span>
               <span>running</span>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className={`text-sm font-light tabular-nums ${(queue.queued?.length || 0) > 0 ? 'text-foreground' : 'text-muted-foreground/50'}`}>
-                {queue.queued?.length || 0}
+              <span className={`text-sm font-light tabular-nums ${(queue.queuedCount || 0) > 0 ? 'text-foreground' : 'text-muted-foreground/50'}`}>
+                {queue.queuedCount || 0}
               </span>
               <span>queued</span>
             </div>
@@ -232,12 +272,12 @@ function QueueCard({
           )}
 
           {/* Queued DAGs */}
-          {queue.queued && queue.queued.length > 0 && (
+          {queue.queuedCount > 0 && (
             <div className={queue.running && queue.running.length > 0 ? 'border-t' : ''}>
               <div className="px-3 py-2 bg-muted/10">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Queued ({queue.queued.length})
+                    Queued ({queue.queuedCount})
                   </span>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -281,7 +321,7 @@ function QueueCard({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/50">
-                      {queue.queued.map((dagRun) => (
+                      {queuedItems.map((dagRun) => (
                         <DAGRunRow
                           key={dagRun.dagRunId}
                           dagRun={dagRun}
@@ -291,13 +331,47 @@ function QueueCard({
                     </tbody>
                   </table>
                 </div>
+                {/* Pagination controls */}
+                {pagination && pagination.totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-2 border-t mt-2">
+                    <span className="text-xs text-muted-foreground">
+                      Page {pagination.currentPage} of {pagination.totalPages}
+                    </span>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={pagination.currentPage <= 1}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setQueuedPage(pagination.prevPage);
+                        }}
+                        className="h-6 px-2"
+                      >
+                        <ChevronLeft className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={pagination.currentPage >= pagination.totalPages}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setQueuedPage(pagination.nextPage);
+                        }}
+                        className="h-6 px-2"
+                      >
+                        <ChevronRight className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           {/* Empty state */}
           {(!queue.running || queue.running.length === 0) &&
-            (!queue.queued || queue.queued.length === 0) && (
+            queue.queuedCount === 0 && (
               <div className="px-3 py-4 text-center text-muted-foreground text-xs">
                 No DAGs running or queued
               </div>
@@ -318,7 +392,7 @@ function QueueCard({
             Remove all queued DAG runs from "{queue.name}"?
           </p>
           <p className="text-xs text-muted-foreground">
-            {queue.queued?.length || 0} DAG runs will be removed. This cannot be undone.
+            {queue.queuedCount || 0} DAG runs will be removed. This cannot be undone.
           </p>
         </div>
       </ConfirmModal>

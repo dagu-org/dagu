@@ -175,6 +175,67 @@ func (s *Store) List(ctx context.Context, name string) ([]exec.QueuedItemData, e
 	return items, nil
 }
 
+// ListPaginated returns paginated items for a specific queue.
+// This implementation paginates at the file-path level BEFORE creating any
+// QueuedFile objects, ensuring O(1) memory for the paginated items regardless
+// of total queue size.
+func (s *Store) ListPaginated(ctx context.Context, name string, pg exec.Paginator) (exec.PaginatedResult[exec.QueuedItemData], error) {
+	ctx = logger.WithValues(ctx, tag.Queue(name))
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	limit := pg.Limit()
+	offset := pg.Offset()
+
+	// Build queue directory path
+	queueDir := filepath.Join(s.baseDir, name)
+	if _, err := os.Stat(queueDir); os.IsNotExist(err) {
+		return exec.NewPaginatedResult([]exec.QueuedItemData{}, 0, pg), nil
+	}
+
+	// Collect file paths ONLY (no parsing, no object creation)
+	// High priority first, then low - maintains proper queue ordering
+	patterns := []string{
+		filepath.Join(queueDir, "item_high_*.json"),
+		filepath.Join(queueDir, "item_low_*.json"),
+	}
+
+	var allFiles []string
+	for _, pattern := range patterns {
+		files, err := filepath.Glob(pattern)
+		if err != nil {
+			logger.Error(ctx, "Failed to glob queue files", tag.Error(err))
+			return exec.PaginatedResult[exec.QueuedItemData]{}, fmt.Errorf("failed to list queue files: %w", err)
+		}
+		// Lexicographic sort = chronological (timestamp encoded in filename)
+		sort.Strings(files)
+		allFiles = append(allFiles, files...)
+	}
+
+	total := len(allFiles)
+
+	// Handle offset beyond total
+	if offset >= total {
+		return exec.NewPaginatedResult([]exec.QueuedItemData{}, total, pg), nil
+	}
+
+	// Apply pagination TO FILE PATHS (efficient - just string slicing)
+	endIndex := offset + limit
+	if endIndex > total {
+		endIndex = total
+	}
+	paginatedFiles := allFiles[offset:endIndex]
+
+	// Create QueuedFile objects ONLY for paginated portion
+	// QueuedFile is lazy-loaded - JSON not read until Data() called
+	items := make([]exec.QueuedItemData, 0, len(paginatedFiles))
+	for _, file := range paginatedFiles {
+		items = append(items, NewQueuedFile(file))
+	}
+
+	return exec.NewPaginatedResult(items, total, pg), nil
+}
+
 func (s *Store) ListByDAGName(ctx context.Context, name, dagName string) ([]exec.QueuedItemData, error) {
 	items, err := s.List(ctx, name)
 	if err != nil {
