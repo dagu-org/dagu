@@ -669,6 +669,37 @@ func (l *ConfigLoader) loadWorkerConfig(cfg *Config, def Definition) {
 			cfg.Worker.Coordinators = addresses
 			l.warnings = append(l.warnings, addrWarnings...)
 		}
+
+		// Load PostgresPool config
+		if def.Worker.PostgresPool != nil {
+			pp := def.Worker.PostgresPool
+			if pp.MaxOpenConns > 0 {
+				cfg.Worker.PostgresPool.MaxOpenConns = pp.MaxOpenConns
+			}
+			if pp.MaxIdleConns > 0 {
+				cfg.Worker.PostgresPool.MaxIdleConns = pp.MaxIdleConns
+			}
+			if pp.ConnMaxLifetime > 0 {
+				cfg.Worker.PostgresPool.ConnMaxLifetime = pp.ConnMaxLifetime
+			}
+			if pp.ConnMaxIdleTime > 0 {
+				cfg.Worker.PostgresPool.ConnMaxIdleTime = pp.ConnMaxIdleTime
+			}
+		}
+	}
+
+	// Set PostgresPool defaults if not configured
+	if cfg.Worker.PostgresPool.MaxOpenConns == 0 {
+		cfg.Worker.PostgresPool.MaxOpenConns = 25
+	}
+	if cfg.Worker.PostgresPool.MaxIdleConns == 0 {
+		cfg.Worker.PostgresPool.MaxIdleConns = 5
+	}
+	if cfg.Worker.PostgresPool.ConnMaxLifetime == 0 {
+		cfg.Worker.PostgresPool.ConnMaxLifetime = 300
+	}
+	if cfg.Worker.PostgresPool.ConnMaxIdleTime == 0 {
+		cfg.Worker.PostgresPool.ConnMaxIdleTime = 60
 	}
 }
 
@@ -1075,6 +1106,12 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	// Monitoring settings
 	l.v.SetDefault("monitoring.retention", "24h")
 	l.v.SetDefault("monitoring.interval", "5s")
+
+	// Worker PostgreSQL pool settings (for shared-nothing mode)
+	l.v.SetDefault("worker.postgresPool.maxOpenConns", 25)
+	l.v.SetDefault("worker.postgresPool.maxIdleConns", 5)
+	l.v.SetDefault("worker.postgresPool.connMaxLifetime", 300)
+	l.v.SetDefault("worker.postgresPool.connMaxIdleTime", 60)
 }
 
 // envBinding defines a mapping between a config key and its environment variable.
@@ -1211,6 +1248,12 @@ var envBindings = []envBinding{
 	// Monitoring configuration
 	{key: "monitoring.retention", env: "MONITORING_RETENTION"},
 	{key: "monitoring.interval", env: "MONITORING_INTERVAL"},
+
+	// Worker PostgreSQL pool configuration (for shared-nothing mode)
+	{key: "worker.postgresPool.maxOpenConns", env: "WORKER_POSTGRES_POOL_MAX_OPEN_CONNS"},
+	{key: "worker.postgresPool.maxIdleConns", env: "WORKER_POSTGRES_POOL_MAX_IDLE_CONNS"},
+	{key: "worker.postgresPool.connMaxLifetime", env: "WORKER_POSTGRES_POOL_CONN_MAX_LIFETIME"},
+	{key: "worker.postgresPool.connMaxIdleTime", env: "WORKER_POSTGRES_POOL_CONN_MAX_IDLE_TIME"},
 }
 
 // bindEnvironmentVariables binds configuration keys to environment variables using the loader's viper instance.

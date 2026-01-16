@@ -338,6 +338,10 @@ type Worker struct {
 	MaxActiveRuns int               // Maximum number of active runs (default: 100)
 	Labels        map[string]string // Worker labels for capability matching
 	Coordinators  []string          // Coordinator addresses for static discovery (host:port)
+
+	// PostgresPool holds connection pool settings for shared-nothing mode.
+	// When multiple DAGs run concurrently in a worker, they share this pool.
+	PostgresPool PostgresPoolConfig
 }
 
 // Scheduler represents the scheduler configuration
@@ -357,6 +361,28 @@ type Scheduler struct {
 	// A zombie DAG run is one marked as running but whose process is no longer alive.
 	// Set to 0 to disable zombie detection. Default is 45 seconds.
 	ZombieDetectionInterval time.Duration
+}
+
+// PostgresPoolConfig holds PostgreSQL connection pool settings for workers.
+// Used in shared-nothing worker mode to prevent connection exhaustion
+// when multiple DAGs run concurrently in a single worker process.
+type PostgresPoolConfig struct {
+	// MaxOpenConns is the maximum total open connections across ALL PostgreSQL DSNs.
+	// This is the hard limit shared across all database connections.
+	// Default: 25
+	MaxOpenConns int
+
+	// MaxIdleConns is the maximum number of idle connections per DSN.
+	// Default: 5
+	MaxIdleConns int
+
+	// ConnMaxLifetime is the maximum lifetime of a connection in seconds.
+	// Default: 300 (5 minutes)
+	ConnMaxLifetime int
+
+	// ConnMaxIdleTime is the maximum idle time for a connection in seconds.
+	// Default: 60 (1 minute)
+	ConnMaxIdleTime int
 }
 
 // Peer holds the certificate and TLS configuration for peer connections over gRPC.

@@ -35,6 +35,7 @@ type sqlExecutor struct {
 	stderr          io.Writer
 	cancelFunc      context.CancelFunc
 	advisoryRelease func() error
+	useGlobalPool   bool // true if using global pool manager (shared-nothing mode)
 }
 
 // ExecutionMetrics holds metrics from SQL execution.
@@ -61,18 +62,41 @@ func newSQLExecutor(ctx context.Context, step core.Step, driverName string) (exe
 		return nil, fmt.Errorf("failed to parse sql config: %w", err)
 	}
 
-	connMgr, err := NewConnectionManager(ctx, driver, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create connection manager: %w", err)
+	// Check for global pool manager (shared-nothing mode)
+	var connMgr *ConnectionManager
+	var useGlobalPool bool
+
+	if pm := GetPoolManager(ctx); pm != nil && driverName == "postgres" {
+		// Use global pool for PostgreSQL in shared-nothing mode
+		db, err := pm.GetOrCreatePool(ctx, driver, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get pool from global manager: %w", err)
+		}
+		// Create a connection manager that wraps the global pool's db
+		// We don't set cleanup since the global pool manages the lifecycle
+		connMgr = &ConnectionManager{
+			db:       db,
+			driver:   driver,
+			cfg:      cfg,
+			refCount: 1,
+		}
+		useGlobalPool = true
+	} else {
+		// Use per-step connection manager (non-distributed mode or SQLite)
+		connMgr, err = NewConnectionManager(ctx, driver, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create connection manager: %w", err)
+		}
 	}
 
 	return &sqlExecutor{
-		step:    step,
-		cfg:     cfg,
-		driver:  driver,
-		connMgr: connMgr,
-		stdout:  os.Stdout,
-		stderr:  os.Stderr,
+		step:          step,
+		cfg:           cfg,
+		driver:        driver,
+		connMgr:       connMgr,
+		useGlobalPool: useGlobalPool,
+		stdout:        os.Stdout,
+		stderr:        os.Stderr,
 	}, nil
 }
 
