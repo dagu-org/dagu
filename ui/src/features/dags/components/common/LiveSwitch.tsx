@@ -5,11 +5,12 @@
  */
 import { useErrorModal } from '@/components/ui/error-modal';
 import { Switch } from '@/components/ui/switch';
+import { AppBarContext } from '@/contexts/AppBarContext';
+import ConfirmModal from '@/ui/ConfirmModal';
 import { useCallback, useContext, useState } from 'react';
 import { components } from '../../../../api/v2/schema';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient } from '../../../../hooks/api';
-import { AppBarContext } from '@/contexts/AppBarContext';
 
 /**
  * Props for the LiveSwitch component
@@ -33,6 +34,8 @@ function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
   const config = useConfig();
   const { showError } = useErrorModal();
   const [checked, setChecked] = useState(!dag.suspended);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [pendingState, setPendingState] = useState<boolean | null>(null);
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
@@ -65,23 +68,48 @@ function LiveSwitch({ dag, refresh, 'aria-label': ariaLabel }: Props) {
     [client, dag.fileName, refresh, remoteNode, showError]
   );
 
-  const handleCheckedChange = useCallback(
-    (newCheckedState: boolean) => {
-      setChecked(newCheckedState);
-      onSubmit(!newCheckedState);
-    },
-    [onSubmit]
-  );
+  const handleCheckedChange = useCallback((newCheckedState: boolean) => {
+    setPendingState(newCheckedState);
+    setShowConfirm(true);
+  }, []);
+
+  const handleConfirm = useCallback(() => {
+    if (pendingState !== null) {
+      setChecked(pendingState);
+      onSubmit(!pendingState);
+    }
+    setShowConfirm(false);
+    setPendingState(null);
+  }, [pendingState, onSubmit]);
+
+  const handleCancel = useCallback(() => {
+    setShowConfirm(false);
+    setPendingState(null);
+  }, []);
 
   return (
-    <Switch
-      checked={checked}
-      onCheckedChange={
-        config.permissions.runDags ? handleCheckedChange : undefined
-      }
-      disabled={!config.permissions.runDags}
-      aria-label={ariaLabel}
-    />
+    <>
+      <Switch
+        checked={checked}
+        onCheckedChange={
+          config.permissions.runDags ? handleCheckedChange : undefined
+        }
+        disabled={!config.permissions.runDags}
+        aria-label={ariaLabel}
+      />
+      <ConfirmModal
+        title={pendingState ? 'Enable Schedule' : 'Disable Schedule'}
+        buttonText={pendingState ? 'Enable' : 'Disable'}
+        visible={showConfirm}
+        dismissModal={handleCancel}
+        onSubmit={handleConfirm}
+      >
+        <p>
+          Are you sure you want to {pendingState ? 'enable' : 'disable'} the
+          schedule for &quot;{dag.fileName}&quot;?
+        </p>
+      </ConfirmModal>
+    </>
   );
 }
 

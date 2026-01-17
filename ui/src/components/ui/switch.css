@@ -1,0 +1,67 @@
+/* Switch Component Styles */
+
+.switch-root {
+  display: inline-flex;
+  height: 1.25rem;
+  width: 2.25rem;
+  flex-shrink: 0;
+  cursor: pointer;
+  align-items: center;
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+
+.switch-root:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.switch-root:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Light mode - unchecked */
+.switch-root {
+  background-color: #cbd5e1; /* slate-300 */
+}
+
+/* Light mode - checked */
+.switch-root[data-state='checked'] {
+  background-color: var(--primary);
+}
+
+/* Dark mode - unchecked */
+.dark .switch-root {
+  background-color: #334155; /* slate-700 */
+}
+
+/* Dark mode - checked */
+.dark .switch-root[data-state='checked'] {
+  background-color: var(--primary);
+}
+
+/* Thumb styles */
+.switch-thumb {
+  pointer-events: none;
+  display: block;
+  height: 1rem;
+  width: 1rem;
+  border-radius: 9999px;
+  background-color: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+}
+
+.switch-thumb[data-state='unchecked'] {
+  transform: translateX(2px);
+}
+
+.switch-thumb[data-state='checked'] {
+  transform: translateX(18px);
+}
+
+/* Dark mode thumb */
+.dark .switch-thumb {
+  background-color: #e2e8f0; /* slate-200 */
+}

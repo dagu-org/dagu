@@ -1,8 +1,8 @@
-import { FolderOpen, Copy, Check, X } from 'lucide-react';
+import { Check, Copy, FolderOpen, X } from 'lucide-react';
 import React from 'react';
-import { cn } from '../../../lib/utils';
-import { useConfig, type PathsConfig } from '../../../contexts/ConfigContext';
 import { Button } from '../../../components/ui/button';
+import { useConfig, type PathsConfig } from '../../../contexts/ConfigContext';
+import { cn } from '../../../lib/utils';
 
 interface PathItemProps {
   label: string;
@@ -50,7 +50,13 @@ function PathItem({ label, path }: PathItemProps) {
   );
 }
 
-function PathsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+function PathsDialog({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
   const config = useConfig();
   const paths: PathsConfig = config.paths;
 
@@ -75,8 +81,8 @@ function PathsDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-card border rounded-lg w-full max-w-lg mx-4">
-        <div className="flex items-center justify-between p-2 border-b">
+      <div className="relative bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-indigo-500/30 rounded-xl w-full max-w-lg mx-4 shadow-2xl">
+        <div className="flex items-center justify-between p-3 border-b border-indigo-500/20">
           <div className="flex items-center gap-1.5">
             <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-xs font-medium">System Paths</span>
@@ -88,11 +94,15 @@ function PathsDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="p-2">
+        <div className="p-4">
           {paths ? (
             <div className="space-y-0">
               {pathItems.map((item) => (
-                <PathItem key={item.label} label={item.label} path={item.path} />
+                <PathItem
+                  key={item.label}
+                  label={item.label}
+                  path={item.path}
+                />
               ))}
             </div>
           ) : (

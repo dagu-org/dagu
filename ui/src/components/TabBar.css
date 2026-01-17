@@ -21,20 +21,25 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
+  padding: 8px 12px;
   min-width: 80px;
   max-width: 200px;
   flex: 0 1 auto;
   cursor: pointer;
   user-select: none;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   border: 1px solid var(--btn-secondary-border);
-  border-bottom: none;
+  border-bottom: 2px solid transparent;
   border-radius: 8px 8px 0 0;
   background: var(--muted);
   color: var(--muted-foreground);
-  transition: all 0.2s ease;
+  margin-bottom: -2px;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
   outline: none;
 }
 
@@ -48,9 +53,7 @@
   color: var(--foreground);
   border-color: var(--border);
   border-bottom: 2px solid var(--background);
-  margin-bottom: -2px;
   z-index: 10;
-  font-weight: 600;
   box-shadow: 0 -4px 12px -4px rgba(0, 0, 0, 0.1);
 }
 

@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback, useContext } from 'react';
-import { useConfig } from '@/contexts/ConfigContext';
-import { useIsAdmin, TOKEN_KEY } from '@/contexts/AuthContext';
-import { AppBarContext } from '@/contexts/AppBarContext';
 import { components } from '@/api/v2/schema';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Table,
   TableBody,
@@ -12,16 +14,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { KeyRound, MoreHorizontal, Pencil, Trash2, Plus } from 'lucide-react';
-import { APIKeyFormModal } from './APIKeyFormModal';
-import ConfirmModal from '@/ui/ConfirmModal';
+import { AppBarContext } from '@/contexts/AppBarContext';
+import { TOKEN_KEY, useIsAdmin } from '@/contexts/AuthContext';
+import { useConfig } from '@/contexts/ConfigContext';
 import dayjs from '@/lib/dayjs';
+import ConfirmModal from '@/ui/ConfirmModal';
+import { KeyRound, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useCallback, useContext, useEffect, useState } from 'react';
+import { APIKeyFormModal } from './APIKeyFormModal';
 
 type APIKey = components['schemas']['APIKey'];
 
@@ -47,11 +47,14 @@ export default function APIKeysPage() {
     try {
       const token = localStorage.getItem(TOKEN_KEY);
       const remoteNode = appBarContext.selectedRemoteNode || 'local';
-      const response = await fetch(`${config.apiURL}/api-keys?remoteNode=${remoteNode}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        `${config.apiURL}/api-keys?remoteNode=${remoteNode}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error('Failed to fetch API keys');
@@ -76,12 +79,15 @@ export default function APIKeysPage() {
     try {
       const token = localStorage.getItem(TOKEN_KEY);
       const remoteNode = appBarContext.selectedRemoteNode || 'local';
-      const response = await fetch(`${config.apiURL}/api-keys/${deletingKey.id}?remoteNode=${remoteNode}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        `${config.apiURL}/api-keys/${deletingKey.id}?remoteNode=${remoteNode}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
@@ -99,7 +105,9 @@ export default function APIKeysPage() {
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">You do not have permission to access this page.</p>
+        <p className="text-muted-foreground">
+          You do not have permission to access this page.
+        </p>
       </div>
     );
   }
@@ -113,7 +121,11 @@ export default function APIKeysPage() {
             Manage API keys for programmatic access
           </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)} size="sm" className="h-8">
+        <Button
+          onClick={() => setShowCreateModal(true)}
+          size="sm"
+          className="h-8"
+        >
           <Plus className="h-4 w-4 mr-1.5" />
           Create API Key
         </Button>
@@ -125,7 +137,7 @@ export default function APIKeysPage() {
         </div>
       )}
 
-      <div className="border rounded-lg">
+      <div className="card-obsidian">
         <Table>
           <TableHeader>
             <TableRow>
@@ -140,13 +152,19 @@ export default function APIKeysPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell
+                  colSpan={6}
+                  className="text-center text-muted-foreground py-8"
+                >
                   Loading API keys...
                 </TableCell>
               </TableRow>
             ) : apiKeys.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell
+                  colSpan={6}
+                  className="text-center text-muted-foreground py-8"
+                >
                   No API keys found. Create one to get started.
                 </TableCell>
               </TableRow>
@@ -243,8 +261,8 @@ export default function APIKeysPage() {
         onSubmit={handleDeleteKey}
       >
         <p>
-          Are you sure you want to revoke the API key &quot;{deletingKey?.name}&quot;?
-          Any applications using this key will immediately lose access.
+          Are you sure you want to revoke the API key &quot;{deletingKey?.name}
+          &quot;? Any applications using this key will immediately lose access.
         </p>
       </ConfirmModal>
     </div>

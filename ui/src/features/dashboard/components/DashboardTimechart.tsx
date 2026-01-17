@@ -635,7 +635,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
           border-width: 0 !important;
           cursor: pointer !important;
           transition: transform 0.1s ease, filter 0.1s ease !important;
-          box-shadow: 0 0 10px rgba(0,0,0,0.1);
+          box-shadow: 0 0 10px rgba(0,0,0,0.3);
         }
         .vis-item:hover {
           filter: brightness(1.2);
@@ -645,12 +645,12 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
         .vis-item.vis-selected {
           border-width: 1px !important;
           border-color: var(--primary) !important;
-          box-shadow: 0 0 15px rgba(var(--primary), 0.3);
+          box-shadow: 0 0 15px rgba(var(--primary-rgb), 0.3);
         }
         .vis-current-time {
           background-color: var(--primary) !important;
           width: 2px !important;
-          box-shadow: 0 0 10px rgba(var(--primary), 0.4);
+          box-shadow: 0 0 10px rgba(var(--primary-rgb), 0.4);
         }
         /* Scrollbar styling for timeline */
         .vis-timeline::-webkit-scrollbar {

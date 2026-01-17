@@ -129,10 +129,10 @@ function Graph({
     height: isExpandedView ? '100%' : 'auto',
     borderRadius: '0.5em',
     background: isDarkMode
-      ? `linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px),
-         linear-gradient(180deg, rgba(255,255,255,0.08) 1px, transparent 1px)`
-      : `linear-gradient(90deg, rgba(0,0,0,0.15) 1px, transparent 1px),
-         linear-gradient(180deg, rgba(0,0,0,0.15) 1px, transparent 1px)`,
+      ? `linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px),
+         linear-gradient(180deg, rgba(255,255,255,0.05) 1px, transparent 1px)`
+      : `linear-gradient(90deg, rgba(0,0,0,0.08) 1px, transparent 1px),
+         linear-gradient(180deg, rgba(0,0,0,0.08) 1px, transparent 1px)`,
     backgroundSize: '20px 20px',
   };
 
@@ -248,15 +248,15 @@ function Graph({
 
     // Define node styles for different states
     // Use theme-appropriate colors for light/dark modes
-    const nodeFill = isDarkMode ? '#1e293b' : '#ffffff'; // slate-800 for dark, white for light
-    const nodeColor = isDarkMode ? '#f8fafc' : '#1e293b'; // slate-50 for dark, slate-800 for light
-    const strokeDefault = isDarkMode ? '#64748b' : '#94a3b8'; // slate-500/slate-400
+    const nodeFill = isDarkMode ? '#161a3d' : '#ffffff'; // --card for dark, white for light
+    const nodeColor = isDarkMode ? '#f1f5f9' : '#0f1129'; // --foreground for dark, --background for light
+    const strokeDefault = isDarkMode ? '#2d336d' : '#94a3b8';
 
     dat.push(
       `classDef none color:${nodeColor},fill:${nodeFill},stroke:${strokeDefault},stroke-width:2.5px`
     );
     dat.push(
-      `classDef running color:${nodeColor},fill:${nodeFill},stroke:#22c55e,stroke-width:2.5px`
+      `classDef running color:${nodeColor},fill:${nodeFill},stroke:#10b981,stroke-width:2.5px`
     );
     dat.push(
       `classDef error color:${nodeColor},fill:${nodeFill},stroke:#ef4444,stroke-width:2.5px`
@@ -265,10 +265,10 @@ function Graph({
       `classDef cancel color:${nodeColor},fill:${nodeFill},stroke:#ec4899,stroke-width:2.5px`
     );
     dat.push(
-      `classDef done color:${nodeColor},fill:${nodeFill},stroke:#22c55e,stroke-width:2.5px`
+      `classDef done color:${nodeColor},fill:${nodeFill},stroke:#10b981,stroke-width:2.5px`
     );
     dat.push(
-      `classDef skipped color:${nodeColor},fill:${nodeFill},stroke:#6b7280,stroke-width:2.5px`
+      `classDef skipped color:${nodeColor},fill:${nodeFill},stroke:#64748b,stroke-width:2.5px`
     );
     dat.push(
       `classDef partial color:${nodeColor},fill:${nodeFill},stroke:#f59e0b,stroke-width:2.5px`
@@ -277,7 +277,7 @@ function Graph({
       `classDef waiting color:${nodeColor},fill:${nodeFill},stroke:#f59e0b,stroke-width:2.5px`
     );
     dat.push(
-      `classDef rejected color:${nodeColor},fill:${nodeFill},stroke:#dc2626,stroke-width:2.5px`
+      `classDef rejected color:${nodeColor},fill:${nodeFill},stroke:#ef4444,stroke-width:2.5px`
     );
 
     // Add custom link styles

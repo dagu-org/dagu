@@ -30,6 +30,7 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-surface: var(--surface);
 
   /* Sidebar */
   --color-sidebar: var(--sidebar);
@@ -80,6 +81,7 @@
     --success: #10b981;
     --warning: #f59e0b;
     --info: #0ea5e9;
+    --surface: #ffffff;
 
     --sidebar: #f8fafc;
     --sidebar-foreground: #475569;
@@ -103,48 +105,50 @@
   }
 
   .dark {
-    --background: #020617;
-    --foreground: #f8fafc;
-    --card: #0b0f1a;
-    --card-foreground: #f8fafc;
-    --popover: #0f172a;
-    --popover-foreground: #f8fafc;
-    --primary: #818cf8;
+    --background: #0a0c1f; /* Base Obsidian */
+    --foreground: #f1f5f9;
+    --card: rgba(255, 255, 255, 0.03); /* Transparent Cards for depth */
+    --card-foreground: #f1f5f9;
+    --popover: #111432;
+    --popover-foreground: #f1f5f9;
+    --primary: #6366f1;
     --primary-foreground: #ffffff;
-    --secondary: #1e293b;
-    --secondary-foreground: #f8fafc;
-    --muted: #0f172a;
+    --secondary: rgba(255, 255, 255, 0.05);
+    --secondary-foreground: #f1f5f9;
+    --muted: rgba(255, 255, 255, 0.02);
     --muted-foreground: #94a3b8;
-    --accent: #1e293b;
-    --accent-foreground: #f8fafc;
+    --accent: rgba(255, 255, 255, 0.05);
+    --accent-foreground: #f1f5f9;
     --destructive: #ef4444;
     --destructive-foreground: #ffffff;
-    --border: rgba(255, 255, 255, 0.08);
-    --input: rgba(255, 255, 255, 0.08);
+    --border: rgba(255, 255, 255, 0.06);
+    --input: rgba(255, 255, 255, 0.06);
     --ring: #6366f1;
     --success: #10b981;
     --warning: #f59e0b;
     --info: #0ea5e9;
+    --surface: #111432;
 
-    --sidebar: #020617;
+    --sidebar: #0a0c1f; /* Unified with background */
     --sidebar-foreground: #94a3b8;
-    --sidebar-border: rgba(255, 255, 255, 0.08);
+    --sidebar-border: rgba(255, 255, 255, 0.04);
 
     /* Button Tokens mapping - Obsidian Dark */
-    --btn-primary-top: #818cf8;
-    --btn-primary-bottom: #6366f1;
-    --btn-primary-border: #4f46e5;
+    --btn-primary-top: #6366f1;
+    --btn-primary-bottom: #4f46e5;
+    --btn-primary-border: #4338ca;
 
-    --btn-secondary-top: #1e293b;
-    --btn-secondary-bottom: #0f172a;
+    --btn-secondary-top: #1c224d;
+    --btn-secondary-bottom: #161a3d;
     --btn-secondary-border: rgba(255, 255, 255, 0.1);
-    --btn-secondary-platform: #020617;
+    --btn-secondary-platform: #0a0c1f;
 
     /* RGB fallbacks */
-    --bg: 2 6 23;
-    --text: 248 250 252;
-    --sidebar-bg: 2 6 23;
+    --bg: 10 12 31;
+    --text: 241 245 249;
+    --sidebar-bg: 10 12 31;
     --sidebar-text: 148 163 184;
+    --primary-rgb: 99 102 241;
   }
 
   * {
@@ -152,10 +156,22 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    background-color: var(--background);
+    color: var(--foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     letter-spacing: -0.011em;
+  }
+
+  .dark body {
+    background: radial-gradient(
+      circle at 60% 0%,
+      rgba(99, 102, 241, 0.08) 0%,
+      #0a0c1f 50%,
+      #0a0c1f 100%
+    );
+    background-color: #0a0c1f;
+    background-attachment: fixed;
   }
 }
 
@@ -268,4 +284,52 @@
 }
 .status-running {
   @apply bg-primary/10 text-primary border border-primary/20 animate-pulse;
+}
+
+/* Obsidian Card Utility - Unified containers */
+.card-obsidian {
+  @apply bg-card border border-border rounded-xl overflow-hidden;
+  box-shadow: none;
+}
+/* Light mode hover */
+.card-obsidian:hover {
+  @apply bg-secondary/50;
+  border-color: var(--border);
+}
+/* Dark mode specific styling */
+.dark .card-obsidian {
+  @apply border-white/5;
+}
+.dark .card-obsidian:hover {
+  @apply bg-white/[0.04] border-white/10;
+}
+/* Remove Radix Table internal borders within card-obsidian */
+.card-obsidian .rt-TableCell,
+.card-obsidian .rt-TableColumnHeaderCell,
+.card-obsidian .rt-TableRowHeaderCell {
+  box-shadow: none !important;
+  border-bottom: none !important;
+}
+.card-obsidian .rt-TableRow {
+  box-shadow: none !important;
+}
+.card-obsidian .rt-TableHeader {
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+.card-obsidian tr:last-child td {
+  border-bottom: none;
+}
+
+/* Dropdown & Popover Backgrounds */
+[data-radix-popper-content-wrapper] [role='menu'],
+[data-radix-popper-content-wrapper] [role='listbox'],
+[data-radix-popper-content-wrapper] [data-slot='select-content'] {
+  background-color: var(--popover) !important;
+}
+
+.dark [data-radix-popper-content-wrapper] [role='menu'],
+.dark [data-radix-popper-content-wrapper] [role='listbox'],
+.dark [data-radix-popper-content-wrapper] [data-slot='select-content'] {
+  background: linear-gradient(to bottom, #161b3d, #111432) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
 }

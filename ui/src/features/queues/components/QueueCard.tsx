@@ -179,8 +179,9 @@ function QueueCard({
   return (
     <div
       className={cn(
-        'border rounded-lg bg-card transition-all duration-200',
-        isSelected && 'ring-1 ring-foreground/20'
+        'card-obsidian transition-all duration-300 hover:bg-white/[0.05] hover:border-white/10',
+        isSelected &&
+          'ring-1 ring-primary/40 shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)]'
       )}
     >
       {/* Queue Header */}
@@ -251,7 +252,7 @@ function QueueCard({
           {/* Running DAGs */}
           {queue.running && queue.running.length > 0 && (
             <div>
-              <div className="px-3 py-2 bg-muted/20">
+              <div className="px-3 py-2 bg-muted/10">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Running ({queue.running.length})
@@ -313,7 +314,7 @@ function QueueCard({
                         <Trash2
                           className={cn(
                             'h-3 w-3',
-                            isClearing && 'animate-pulse'
+                            isClearing && 'animate-spin'
                           )}
                         />
                         <span className="ml-1 text-xs">Clear</span>

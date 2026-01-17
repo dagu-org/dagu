@@ -1,12 +1,14 @@
-import { useState, useEffect, useCallback, useContext, useRef } from 'react';
-import { useConfig } from '@/contexts/ConfigContext';
-import { useIsAdmin, TOKEN_KEY } from '@/contexts/AuthContext';
-import { AppBarContext } from '@/contexts/AppBarContext';
 import { components } from '@/api/v2/schema';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
-import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -15,15 +17,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { ScrollText, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
+import { AppBarContext } from '@/contexts/AppBarContext';
+import { TOKEN_KEY, useIsAdmin } from '@/contexts/AuthContext';
+import { useConfig } from '@/contexts/ConfigContext';
 import dayjs from '@/lib/dayjs';
+import { ChevronLeft, ChevronRight, RefreshCw, ScrollText } from 'lucide-react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 type AuditEntry = components['schemas']['AuditEntry'];
 
@@ -52,10 +52,16 @@ export default function AuditLogsPage() {
   const [offset, setOffset] = useState(0);
 
   // Date filter states
-  const [dateRangeMode, setDateRangeMode] = useState<'preset' | 'specific' | 'custom'>('preset');
+  const [dateRangeMode, setDateRangeMode] = useState<
+    'preset' | 'specific' | 'custom'
+  >('preset');
   const [datePreset, setDatePreset] = useState('last7days');
-  const [specificPeriod, setSpecificPeriod] = useState<'date' | 'month' | 'year'>('date');
-  const [specificValue, setSpecificValue] = useState(dayjs().format('YYYY-MM-DD'));
+  const [specificPeriod, setSpecificPeriod] = useState<
+    'date' | 'month' | 'year'
+  >('date');
+  const [specificValue, setSpecificValue] = useState(
+    dayjs().format('YYYY-MM-DD')
+  );
   const [fromDate, setFromDate] = useState<string | undefined>();
   const [toDate, setToDate] = useState<string | undefined>();
 
@@ -73,76 +79,104 @@ export default function AuditLogsPage() {
   const prevApiEndTimeRef = useRef(apiEndTime);
 
   // Helper functions for date calculations
-  const getPresetDates = useCallback((preset: string): { from: string; to?: string } => {
-    const now = dayjs();
-    const startOfDay = config.tzOffsetInSec !== undefined
-      ? now.utcOffset(config.tzOffsetInSec / 60).startOf('day')
-      : now.startOf('day');
+  const getPresetDates = useCallback(
+    (preset: string): { from: string; to?: string } => {
+      const now = dayjs();
+      const startOfDay =
+        config.tzOffsetInSec !== undefined
+          ? now.utcOffset(config.tzOffsetInSec / 60).startOf('day')
+          : now.startOf('day');
 
-    switch (preset) {
-      case 'today':
-        return { from: startOfDay.format('YYYY-MM-DDTHH:mm:ss') };
-      case 'yesterday':
-        return {
-          from: startOfDay.subtract(1, 'day').format('YYYY-MM-DDTHH:mm:ss'),
-          to: startOfDay.format('YYYY-MM-DDTHH:mm:ss'),
-        };
-      case 'last7days':
-        return { from: startOfDay.subtract(7, 'day').format('YYYY-MM-DDTHH:mm:ss') };
-      case 'last30days':
-        return { from: startOfDay.subtract(30, 'day').format('YYYY-MM-DDTHH:mm:ss') };
-      case 'thisWeek':
-        return { from: startOfDay.startOf('week').format('YYYY-MM-DDTHH:mm:ss') };
-      case 'thisMonth':
-        return { from: startOfDay.startOf('month').format('YYYY-MM-DDTHH:mm:ss') };
-      default:
-        return { from: startOfDay.subtract(7, 'day').format('YYYY-MM-DDTHH:mm:ss') };
-    }
-  }, [config.tzOffsetInSec]);
+      switch (preset) {
+        case 'today':
+          return { from: startOfDay.format('YYYY-MM-DDTHH:mm:ss') };
+        case 'yesterday':
+          return {
+            from: startOfDay.subtract(1, 'day').format('YYYY-MM-DDTHH:mm:ss'),
+            to: startOfDay.format('YYYY-MM-DDTHH:mm:ss'),
+          };
+        case 'last7days':
+          return {
+            from: startOfDay.subtract(7, 'day').format('YYYY-MM-DDTHH:mm:ss'),
+          };
+        case 'last30days':
+          return {
+            from: startOfDay.subtract(30, 'day').format('YYYY-MM-DDTHH:mm:ss'),
+          };
+        case 'thisWeek':
+          return {
+            from: startOfDay.startOf('week').format('YYYY-MM-DDTHH:mm:ss'),
+          };
+        case 'thisMonth':
+          return {
+            from: startOfDay.startOf('month').format('YYYY-MM-DDTHH:mm:ss'),
+          };
+        default:
+          return {
+            from: startOfDay.subtract(7, 'day').format('YYYY-MM-DDTHH:mm:ss'),
+          };
+      }
+    },
+    [config.tzOffsetInSec]
+  );
 
-  const getSpecificPeriodDates = useCallback((
-    period: 'date' | 'month' | 'year',
-    value: string
-  ): { from: string; to?: string } => {
-    const parsedDate = dayjs(value);
-    if (!parsedDate.isValid()) {
-      const fallback = config.tzOffsetInSec !== undefined
-        ? dayjs().utcOffset(config.tzOffsetInSec / 60)
-        : dayjs();
-      return { from: fallback.startOf('day').format('YYYY-MM-DDTHH:mm:ss') };
-    }
+  const getSpecificPeriodDates = useCallback(
+    (
+      period: 'date' | 'month' | 'year',
+      value: string
+    ): { from: string; to?: string } => {
+      const parsedDate = dayjs(value);
+      if (!parsedDate.isValid()) {
+        const fallback =
+          config.tzOffsetInSec !== undefined
+            ? dayjs().utcOffset(config.tzOffsetInSec / 60)
+            : dayjs();
+        return { from: fallback.startOf('day').format('YYYY-MM-DDTHH:mm:ss') };
+      }
 
-    // Apply config timezone offset before calculating day/month/year boundaries.
-    // This follows the same pattern as Dashboard (ui/src/pages/index.tsx).
-    const date = config.tzOffsetInSec !== undefined
-      ? parsedDate.utcOffset(config.tzOffsetInSec / 60)
-      : parsedDate;
+      // Apply config timezone offset before calculating day/month/year boundaries.
+      // This follows the same pattern as Dashboard (ui/src/pages/index.tsx).
+      const date =
+        config.tzOffsetInSec !== undefined
+          ? parsedDate.utcOffset(config.tzOffsetInSec / 60)
+          : parsedDate;
 
-    // dayjs uses 'day' instead of 'date' for startOf/endOf
-    const unit = period === 'date' ? 'day' : period;
-    return {
-      from: date.startOf(unit).format('YYYY-MM-DDTHH:mm:ss'),
-      to: date.endOf(unit).format('YYYY-MM-DDTHH:mm:ss'),
-    };
-  }, [config.tzOffsetInSec]);
+      // dayjs uses 'day' instead of 'date' for startOf/endOf
+      const unit = period === 'date' ? 'day' : period;
+      return {
+        from: date.startOf(unit).format('YYYY-MM-DDTHH:mm:ss'),
+        to: date.endOf(unit).format('YYYY-MM-DDTHH:mm:ss'),
+      };
+    },
+    [config.tzOffsetInSec]
+  );
 
   // Convert datetime to ISO 8601 for API calls
-  const formatDateForApi = useCallback((dateString: string | undefined): string | undefined => {
-    if (!dateString) return undefined;
-    // Add seconds if missing
-    const dateWithSeconds = dateString.split(':').length < 3 ? `${dateString}:00` : dateString;
-    // Apply timezone offset and convert to ISO string
-    if (config.tzOffsetInSec !== undefined) {
-      return dayjs(dateWithSeconds).utcOffset(config.tzOffsetInSec / 60, true).toISOString();
-    }
-    return dayjs(dateWithSeconds).toISOString();
-  }, [config.tzOffsetInSec]);
+  const formatDateForApi = useCallback(
+    (dateString: string | undefined): string | undefined => {
+      if (!dateString) return undefined;
+      // Add seconds if missing
+      const dateWithSeconds =
+        dateString.split(':').length < 3 ? `${dateString}:00` : dateString;
+      // Apply timezone offset and convert to ISO string
+      if (config.tzOffsetInSec !== undefined) {
+        return dayjs(dateWithSeconds)
+          .utcOffset(config.tzOffsetInSec / 60, true)
+          .toISOString();
+      }
+      return dayjs(dateWithSeconds).toISOString();
+    },
+    [config.tzOffsetInSec]
+  );
 
   const getInputTypeForPeriod = (period: 'date' | 'month' | 'year'): string => {
     switch (period) {
-      case 'date': return 'date';
-      case 'month': return 'month';
-      case 'year': return 'number';
+      case 'date':
+        return 'date';
+      case 'month':
+        return 'month';
+      case 'year':
+        return 'number';
     }
   };
 
@@ -173,60 +207,69 @@ export default function AuditLogsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchAuditLogs = useCallback(async (resetOffset = false) => {
-    // Reset offset if filters changed
-    let effectiveOffset = offset;
-    const filtersChanged = prevCategoryRef.current !== category ||
-      prevRemoteNodeRef.current !== remoteNode ||
-      prevApiStartTimeRef.current !== apiStartTime ||
-      prevApiEndTimeRef.current !== apiEndTime;
+  const fetchAuditLogs = useCallback(
+    async (resetOffset = false) => {
+      // Reset offset if filters changed
+      let effectiveOffset = offset;
+      const filtersChanged =
+        prevCategoryRef.current !== category ||
+        prevRemoteNodeRef.current !== remoteNode ||
+        prevApiStartTimeRef.current !== apiStartTime ||
+        prevApiEndTimeRef.current !== apiEndTime;
 
-    if (resetOffset || filtersChanged) {
-      effectiveOffset = 0;
-      if (filtersChanged) {
-        setOffset(0);
-        prevCategoryRef.current = category;
-        prevRemoteNodeRef.current = remoteNode;
-        prevApiStartTimeRef.current = apiStartTime;
-        prevApiEndTimeRef.current = apiEndTime;
-      }
-    }
-
-    try {
-      setIsLoading(true);
-      const token = localStorage.getItem(TOKEN_KEY);
-
-      const params = new URLSearchParams();
-      params.set('remoteNode', remoteNode);
-      if (category && category !== 'all') params.set('category', category);
-      params.set('limit', String(PAGE_SIZE));
-      params.set('offset', String(effectiveOffset));
-      if (apiStartTime) params.set('startTime', apiStartTime);
-      if (apiEndTime) params.set('endTime', apiEndTime);
-
-      const response = await fetch(`${config.apiURL}/audit?${params.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 403) {
-          throw new Error('You do not have permission to view audit logs');
+      if (resetOffset || filtersChanged) {
+        effectiveOffset = 0;
+        if (filtersChanged) {
+          setOffset(0);
+          prevCategoryRef.current = category;
+          prevRemoteNodeRef.current = remoteNode;
+          prevApiStartTimeRef.current = apiStartTime;
+          prevApiEndTimeRef.current = apiEndTime;
         }
-        throw new Error('Failed to fetch audit logs');
       }
 
-      const data = await response.json();
-      setEntries(data.entries || []);
-      setTotal(data.total || 0);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load audit logs');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [config.apiURL, category, offset, remoteNode, apiStartTime, apiEndTime]);
+      try {
+        setIsLoading(true);
+        const token = localStorage.getItem(TOKEN_KEY);
+
+        const params = new URLSearchParams();
+        params.set('remoteNode', remoteNode);
+        if (category && category !== 'all') params.set('category', category);
+        params.set('limit', String(PAGE_SIZE));
+        params.set('offset', String(effectiveOffset));
+        if (apiStartTime) params.set('startTime', apiStartTime);
+        if (apiEndTime) params.set('endTime', apiEndTime);
+
+        const response = await fetch(
+          `${config.apiURL}/audit?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          if (response.status === 403) {
+            throw new Error('You do not have permission to view audit logs');
+          }
+          throw new Error('Failed to fetch audit logs');
+        }
+
+        const data = await response.json();
+        setEntries(data.entries || []);
+        setTotal(data.total || 0);
+        setError(null);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'Failed to load audit logs'
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [config.apiURL, category, offset, remoteNode, apiStartTime, apiEndTime]
+  );
 
   useEffect(() => {
     if (apiStartTime !== undefined) {
@@ -253,7 +296,10 @@ export default function AuditLogsPage() {
     setApiEndTime(formatDateForApi(dates.to));
   };
 
-  const handleSpecificPeriodChange = (value: string, period?: 'date' | 'month' | 'year') => {
+  const handleSpecificPeriodChange = (
+    value: string,
+    period?: 'date' | 'month' | 'year'
+  ) => {
     setSpecificValue(value);
     const periodToUse = period || specificPeriod;
     const dates = getSpecificPeriodDates(periodToUse, value);
@@ -263,7 +309,9 @@ export default function AuditLogsPage() {
     setApiEndTime(formatDateForApi(dates.to));
   };
 
-  const handleDateRangeModeChange = (newMode: 'preset' | 'specific' | 'custom') => {
+  const handleDateRangeModeChange = (
+    newMode: 'preset' | 'specific' | 'custom'
+  ) => {
     setDateRangeMode(newMode);
 
     if (newMode === 'preset') {
@@ -292,12 +340,16 @@ export default function AuditLogsPage() {
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">You do not have permission to access this page.</p>
+        <p className="text-muted-foreground">
+          You do not have permission to access this page.
+        </p>
       </div>
     );
   }
 
-  const parseDetails = (details: string | undefined): Record<string, unknown> => {
+  const parseDetails = (
+    details: string | undefined
+  ): Record<string, unknown> => {
     if (!details) return {};
     try {
       return JSON.parse(details);
@@ -341,7 +393,12 @@ export default function AuditLogsPage() {
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={() => fetchAuditLogs()} size="sm" variant="outline" className="h-8">
+          <Button
+            onClick={() => fetchAuditLogs()}
+            size="sm"
+            variant="outline"
+            className="h-8"
+          >
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
@@ -404,11 +461,17 @@ export default function AuditLogsPage() {
                 const parsedDate = dayjs(specificValue);
 
                 if (newPeriod === 'date') {
-                  newValue = parsedDate.isValid() ? parsedDate.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD');
+                  newValue = parsedDate.isValid()
+                    ? parsedDate.format('YYYY-MM-DD')
+                    : dayjs().format('YYYY-MM-DD');
                 } else if (newPeriod === 'month') {
-                  newValue = parsedDate.isValid() ? parsedDate.format('YYYY-MM') : dayjs().format('YYYY-MM');
+                  newValue = parsedDate.isValid()
+                    ? parsedDate.format('YYYY-MM')
+                    : dayjs().format('YYYY-MM');
                 } else {
-                  newValue = parsedDate.isValid() ? parsedDate.format('YYYY') : dayjs().format('YYYY');
+                  newValue = parsedDate.isValid()
+                    ? parsedDate.format('YYYY')
+                    : dayjs().format('YYYY');
                 }
 
                 setSpecificValue(newValue);
@@ -459,7 +522,7 @@ export default function AuditLogsPage() {
         </div>
       )}
 
-      <div className="border rounded-lg">
+      <div className="card-obsidian">
         <Table>
           <TableHeader>
             <TableRow>
@@ -474,13 +537,19 @@ export default function AuditLogsPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell
+                  colSpan={6}
+                  className="text-center text-muted-foreground py-8"
+                >
                   Loading audit logs...
                 </TableCell>
               </TableRow>
             ) : entries.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell
+                  colSpan={6}
+                  className="text-center text-muted-foreground py-8"
+                >
                   <ScrollText className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   No audit log entries found
                 </TableCell>
@@ -490,7 +559,9 @@ export default function AuditLogsPage() {
                 <TableRow key={entry.id}>
                   <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                     {config.tzOffsetInSec !== undefined
-                      ? dayjs(entry.timestamp).utcOffset(config.tzOffsetInSec / 60).format('MMM D, YYYY HH:mm:ss')
+                      ? dayjs(entry.timestamp)
+                          .utcOffset(config.tzOffsetInSec / 60)
+                          .format('MMM D, YYYY HH:mm:ss')
                       : dayjs(entry.timestamp).format('MMM D, YYYY HH:mm:ss')}
                   </TableCell>
                   <TableCell>
@@ -499,14 +570,13 @@ export default function AuditLogsPage() {
                     </span>
                   </TableCell>
                   <TableCell>
-                    <span className="text-xs font-mono">
-                      {entry.action}
-                    </span>
+                    <span className="text-xs font-mono">{entry.action}</span>
                   </TableCell>
-                  <TableCell className="text-sm">
-                    {entry.username}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground max-w-[300px] truncate" title={entry.details}>
+                  <TableCell className="text-sm">{entry.username}</TableCell>
+                  <TableCell
+                    className="text-sm text-muted-foreground max-w-[300px] truncate"
+                    title={entry.details}
+                  >
                     {formatDetails(entry)}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground font-mono">
@@ -523,7 +593,8 @@ export default function AuditLogsPage() {
       {total > PAGE_SIZE && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Showing {offset + 1} - {Math.min(offset + PAGE_SIZE, total)} of {total} entries
+            Showing {offset + 1} - {Math.min(offset + PAGE_SIZE, total)} of{' '}
+            {total} entries
           </p>
           <div className="flex items-center gap-2">
             <Button

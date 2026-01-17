@@ -62,14 +62,14 @@ function NavItem({ to, icon, text, isOpen, onClick }: NavItemProps) {
           'flex items-center rounded-lg transition-all duration-200 ease-in-out px-2 group relative',
           isOpen ? 'h-9 w-full gap-3' : 'h-10 w-10 justify-center',
           isActive
-            ? 'text-foreground bg-primary/10 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.2)]'
+            ? 'text-foreground bg-primary/10 shadow-[0_0_15px_rgba(var(--primary-rgb),0.15),inset_0_0_0_1px_rgba(var(--primary-rgb),0.3)]'
             : 'text-sidebar-foreground hover:text-foreground hover:bg-white/5'
         )}
         aria-current={isActive ? 'page' : undefined}
         title={isOpen ? '' : text}
       >
         {isActive && (
-          <div className="absolute left-0 w-1 h-4 bg-primary rounded-r-full shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
+          <div className="absolute left-0 w-1 h-4 bg-primary rounded-r-full shadow-[0_0_8px_var(--primary)]" />
         )}
         <div
           className={cn(
@@ -119,7 +119,7 @@ export const mainListItems = React.forwardRef<
         {isOpen ? (
           <>
             <div className="flex-1 flex items-center gap-2 truncate">
-              <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(var(--primary),0.4)]">
+              <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(var(--primary),0.2)]">
                 <span className="text-white font-bold text-sm">D</span>
               </div>
               <span className="font-bold tracking-tight text-lg text-foreground select-none truncate">
@@ -140,7 +140,7 @@ export const mainListItems = React.forwardRef<
             className="mx-auto w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 transition-all text-foreground glow-sm active:scale-95"
             aria-label="Expand sidebar"
           >
-            <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(var(--primary),0.4)]">
+            <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(var(--primary),0.2)]">
               <span className="text-white font-bold text-sm">D</span>
             </div>
           </button>

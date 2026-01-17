@@ -129,7 +129,7 @@ function Content({ navbarColor, children }: LayoutProps) {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex flex-col flex-1 h-full overflow-hidden relative bg-background/50">
+      <div className="flex flex-col flex-1 h-full overflow-hidden relative bg-background">
         {/* Mobile Header Bar */}
         <header
           className={cn(

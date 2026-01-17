@@ -11,13 +11,34 @@ type statusColorMapping = {
 };
 
 export const statusColorMapping: statusColorMapping = {
-  [Status.NotStarted]: { backgroundColor: '#6b7280', color: 'white' }, // gray-500
-  [Status.Running]: { backgroundColor: '#16a34a', color: 'white' }, // green-600
-  [Status.Failed]: { backgroundColor: '#dc2626', color: 'white' }, // red-600
-  [Status.Aborted]: { backgroundColor: '#d97706', color: 'white' }, // amber-600
-  [Status.Success]: { backgroundColor: '#16a34a', color: 'white' }, // green-600
-  [Status.PartialSuccess]: { backgroundColor: '#ca8a04', color: 'white' }, // yellow-600
-  [Status.Rejected]: { backgroundColor: '#b91c1c', color: 'white' }, // red-700
+  [Status.NotStarted]: {
+    backgroundColor: 'var(--muted)',
+    color: 'var(--muted-foreground)',
+  },
+  [Status.Running]: {
+    backgroundColor: 'var(--success)',
+    color: 'var(--primary-foreground)',
+  },
+  [Status.Failed]: {
+    backgroundColor: 'var(--destructive)',
+    color: 'var(--destructive-foreground)',
+  },
+  [Status.Aborted]: {
+    backgroundColor: 'var(--warning)',
+    color: 'var(--primary-foreground)',
+  },
+  [Status.Success]: {
+    backgroundColor: 'var(--success)',
+    color: 'var(--primary-foreground)',
+  },
+  [Status.PartialSuccess]: {
+    backgroundColor: 'var(--warning)',
+    color: 'var(--primary-foreground)',
+  },
+  [Status.Rejected]: {
+    backgroundColor: 'var(--destructive)',
+    color: 'var(--destructive-foreground)',
+  },
 };
 
 export const nodeStatusColorMapping = {
@@ -26,7 +47,10 @@ export const nodeStatusColorMapping = {
   [NodeStatus.Failed]: statusColorMapping[Status.Failed],
   [NodeStatus.Aborted]: statusColorMapping[Status.Aborted],
   [NodeStatus.Success]: statusColorMapping[Status.Success],
-  [NodeStatus.Skipped]: { backgroundColor: '#9ca3af', color: 'white' }, // gray-400
+  [NodeStatus.Skipped]: {
+    backgroundColor: 'var(--muted)',
+    color: 'var(--muted-foreground)',
+  },
   [NodeStatus.PartialSuccess]: statusColorMapping[Status.PartialSuccess],
   [NodeStatus.Rejected]: statusColorMapping[Status.Rejected],
 };

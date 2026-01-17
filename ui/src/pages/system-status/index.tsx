@@ -203,10 +203,7 @@ function SystemStatus() {
 
       {/* Workers Status */}
       <h2 className="text-xl font-semibold mt-8 mb-4">Workers</h2>
-      <div
-        className="rounded-xl border border-border bg-surface overflow-hidden"
-        style={{ minHeight: '200px' }}
-      >
+      <div className="card-obsidian" style={{ minHeight: '200px' }}>
         <WorkersSummary
           workers={workersData?.workers || []}
           isLoading={!workersData && !workersError}

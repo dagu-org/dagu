@@ -1,18 +1,18 @@
+import { Activity, Cpu, Search, Server } from 'lucide-react';
 import React from 'react';
-import { Server, Activity, Cpu, Search } from 'lucide-react';
+import type { components } from '../../api/v2/schema';
 import { Input } from '../../components/ui/input';
 import { RefreshButton } from '../../components/ui/refresh-button';
 import { AppBarContext } from '../../contexts/AppBarContext';
-import { useQuery } from '../../hooks/api';
-import type { components } from '../../api/v2/schema';
+import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-details';
 import WorkerList from '../../features/workers/components/WorkerList';
 import WorkerMetrics from '../../features/workers/components/WorkerMetrics';
-import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-details';
+import { useQuery } from '../../hooks/api';
 
 function Workers() {
   const appBarContext = React.useContext(AppBarContext);
   const [searchText, setSearchText] = React.useState('');
-  
+
   // State for DAG run modal
   const [modalDAGRun, setModalDAGRun] = React.useState<{
     name: string;
@@ -46,19 +46,19 @@ function Workers() {
   // Filter workers based on search text
   const filteredWorkers = React.useMemo(() => {
     if (!data?.workers || !searchText) return data?.workers || [];
-    
+
     const search = searchText.toLowerCase();
     return data.workers.filter((worker) => {
       // Search by ID
       if (worker.id.toLowerCase().includes(search)) return true;
-      
+
       // Search by labels
       if (worker.labels) {
         return Object.entries(worker.labels).some(([key, value]) =>
           `${key}=${value}`.toLowerCase().includes(search)
         );
       }
-      
+
       return false;
     });
   }, [data?.workers, searchText]);
@@ -67,11 +67,21 @@ function Workers() {
   const metrics = React.useMemo(() => {
     const workers = data?.workers || [];
     const totalWorkers = workers.length;
-    const totalPollers = workers.reduce((sum, w) => sum + (w.totalPollers || 0), 0);
-    const busyPollers = workers.reduce((sum, w) => sum + (w.busyPollers || 0), 0);
-    const totalTasks = workers.reduce((sum, w) => sum + (w.runningTasks?.length || 0), 0);
-    const utilization = totalPollers > 0 ? Math.round((busyPollers / totalPollers) * 100) : 0;
-    
+    const totalPollers = workers.reduce(
+      (sum, w) => sum + (w.totalPollers || 0),
+      0
+    );
+    const busyPollers = workers.reduce(
+      (sum, w) => sum + (w.busyPollers || 0),
+      0
+    );
+    const totalTasks = workers.reduce(
+      (sum, w) => sum + (w.runningTasks?.length || 0),
+      0
+    );
+    const utilization =
+      totalPollers > 0 ? Math.round((busyPollers / totalPollers) * 100) : 0;
+
     // Count healthy workers (heartbeat within last 10 seconds)
     const healthyWorkers = workers.filter((worker) => {
       if (!worker.lastHeartbeatAt) return false;
@@ -91,28 +101,35 @@ function Workers() {
   }, [data?.workers]);
 
   // Handle task click
-  const handleTaskClick = React.useCallback((task: components['schemas']['RunningTask']) => {
-    // For nested tasks, we need to set up the URL params for sub DAG view
-    if (task.parentDagRunName && task.parentDagRunId) {
-      const searchParams = new URLSearchParams();
-      searchParams.set('subDAGRunId', task.dagRunId);
-      searchParams.set('dagRunId', task.parentDagRunId);
-      searchParams.set('dagRunName', task.parentDagRunName);
-      window.history.pushState({}, '', `${window.location.pathname}?${searchParams.toString()}`);
-      
-      // Open modal with parent DAG info
-      setModalDAGRun({
-        name: task.parentDagRunName,
-        dagRunId: task.parentDagRunId,
-      });
-    } else {
-      // For root tasks, open directly
-      setModalDAGRun({
-        name: task.dagName,
-        dagRunId: task.dagRunId,
-      });
-    }
-  }, []);
+  const handleTaskClick = React.useCallback(
+    (task: components['schemas']['RunningTask']) => {
+      // For nested tasks, we need to set up the URL params for sub DAG view
+      if (task.parentDagRunName && task.parentDagRunId) {
+        const searchParams = new URLSearchParams();
+        searchParams.set('subDAGRunId', task.dagRunId);
+        searchParams.set('dagRunId', task.parentDagRunId);
+        searchParams.set('dagRunName', task.parentDagRunName);
+        window.history.pushState(
+          {},
+          '',
+          `${window.location.pathname}?${searchParams.toString()}`
+        );
+
+        // Open modal with parent DAG info
+        setModalDAGRun({
+          name: task.parentDagRunName,
+          dagRunId: task.parentDagRunId,
+        });
+      } else {
+        // For root tasks, open directly
+        setModalDAGRun({
+          name: task.dagName,
+          dagRunId: task.dagRunId,
+        });
+      }
+    },
+    []
+  );
 
   if (error) {
     const errorData = error as components['schemas']['Error'];
@@ -124,7 +141,9 @@ function Workers() {
             {errorData?.message || 'Failed to load workers'}
           </p>
           {data?.errors?.map((err, idx) => (
-            <p key={idx} className="text-xs text-error">{err}</p>
+            <p key={idx} className="text-xs text-error">
+              {err}
+            </p>
           ))}
         </div>
       </div>
@@ -134,7 +153,7 @@ function Workers() {
   return (
     <div className="flex flex-col gap-3 w-full h-full overflow-hidden">
       {/* Header with search and refresh */}
-      <div className="border rounded bg-card flex-shrink-0">
+      <div className="card-obsidian flex-shrink-0">
         <div className="flex items-center justify-between p-3">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
@@ -160,7 +179,7 @@ function Workers() {
       <WorkerMetrics metrics={metrics} isLoading={isLoading} />
 
       {/* Worker List */}
-      <div className="border rounded bg-card flex-1 flex flex-col min-h-0">
+      <div className="card-obsidian flex-1 flex flex-col min-h-0">
         <div className="p-3 border-b flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -189,15 +208,15 @@ function Workers() {
           </div>
         </div>
         <div className="flex-1 min-h-0 overflow-auto">
-          <WorkerList 
-            workers={filteredWorkers} 
+          <WorkerList
+            workers={filteredWorkers}
             isLoading={isLoading && !data}
             errors={data?.errors}
             onTaskClick={handleTaskClick}
           />
         </div>
       </div>
-      
+
       {/* DAG Run Details Modal */}
       {modalDAGRun && (
         <DAGRunDetailsModal

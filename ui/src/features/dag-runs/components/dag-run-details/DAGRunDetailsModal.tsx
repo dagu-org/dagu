@@ -83,7 +83,11 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
         },
       },
     },
-    { refreshInterval: 2000, keepPreviousData: true, isPaused: () => !canQuerySubDag }
+    {
+      refreshInterval: 2000,
+      keepPreviousData: true,
+      isPaused: () => !canQuerySubDag,
+    }
   );
 
   // Fetch regular DAG-run details (only when not querying sub-DAG)
@@ -100,11 +104,17 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
         },
       },
     },
-    { refreshInterval: 2000, keepPreviousData: true, isPaused: () => canQuerySubDag }
+    {
+      refreshInterval: 2000,
+      keepPreviousData: true,
+      isPaused: () => canQuerySubDag,
+    }
   );
 
   // Use the appropriate query based on whether this is a sub-DAG-run
-  const { data, isLoading, isValidating, mutate } = canQuerySubDag ? subDAGQuery : dagRunQuery;
+  const { data, isLoading, isValidating, mutate } = canQuerySubDag
+    ? subDAGQuery
+    : dagRunQuery;
 
   // Update previous data ref when we get new data
   React.useEffect(() => {
@@ -118,15 +128,23 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
   }, [data, name, dagRunId]);
 
   // Use current data or fall back to previous data to prevent flickering
-  const displayData = data?.dagRunDetails || previousDataRef.current?.dagRunDetails;
-  const displayName = data?.dagRunDetails ? name : (previousDataRef.current?.name || name);
-  const displayDagRunId = data?.dagRunDetails ? dagRunId : (previousDataRef.current?.dagRunId || dagRunId);
+  const displayData =
+    data?.dagRunDetails || previousDataRef.current?.dagRunDetails;
+  const displayName = data?.dagRunDetails
+    ? name
+    : previousDataRef.current?.name || name;
+  const displayDagRunId = data?.dagRunDetails
+    ? dagRunId
+    : previousDataRef.current?.dagRunId || dagRunId;
 
   // Show loading indicator only on very first load (no previous data at all)
   const isInitialLoading = isLoading && !displayData;
   // Show subtle loading indicator when switching between items
-  const isTransitioning = isValidating && previousDataRef.current &&
-    (previousDataRef.current.dagRunId !== dagRunId || previousDataRef.current.name !== name);
+  const isTransitioning =
+    isValidating &&
+    previousDataRef.current &&
+    (previousDataRef.current.dagRunId !== dagRunId ||
+      previousDataRef.current.name !== name);
 
   const refreshFn = React.useCallback(() => {
     setTimeout(() => mutate(), 500);
@@ -177,14 +195,11 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
   return (
     <>
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 h-screen w-screen z-40"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 h-screen w-screen z-40" onClick={onClose} />
 
       {/* Side Modal */}
       <div
-        className={`fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border z-50 overflow-y-auto transition-all duration-150 ease-out ${
+        className={`fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-indigo-500/30 z-50 overflow-y-auto transition-all duration-150 ease-out ${
           isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
         }`}
       >
