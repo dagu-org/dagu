@@ -565,6 +565,9 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
         .vis-timeline .vis-panel {
           border-color: var(--border) !important;
         }
+        .vis-timeline .vis-panel.vis-left {
+          display: none !important;
+        }
         .vis-item .vis-item-overflow {
           overflow: visible;
           color: var(--foreground);
