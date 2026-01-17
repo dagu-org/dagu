@@ -42,7 +42,7 @@ function QueueCard({
   const [isClearing, setIsClearing] = React.useState(false);
   const [showClearConfirm, setShowClearConfirm] = React.useState(false);
   const [queuedPage, setQueuedPage] = React.useState(1);
-  const perPage = 50;
+  const perPage = 10;
 
   // Reset page when remote node changes
   const remoteNode = appBarContext?.selectedRemoteNode || 'local';
