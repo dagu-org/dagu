@@ -217,28 +217,28 @@ function SystemStatus() {
         <ResourceChart
           title="CPU Usage"
           data={resourceData?.cpu}
-          color="var(--primary)"
+          color="#73BF69"
           isLoading={!resourceData && !resourceError}
           error={resourceError ? String(resourceError) : undefined}
         />
         <ResourceChart
           title="Memory Usage"
           data={resourceData?.memory}
-          color="var(--info)"
+          color="#73BF69"
           isLoading={!resourceData && !resourceError}
           error={resourceError ? String(resourceError) : undefined}
         />
         <ResourceChart
           title="Disk Usage"
           data={resourceData?.disk}
-          color="var(--success)"
+          color="#73BF69"
           isLoading={!resourceData && !resourceError}
           error={resourceError ? String(resourceError) : undefined}
         />
         <ResourceChart
           title="Load Average"
           data={resourceData?.load}
-          color="var(--warning)"
+          color="#73BF69"
           unit=""
           isLoading={!resourceData && !resourceError}
           error={resourceError ? String(resourceError) : undefined}
