@@ -98,7 +98,25 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 			continue
 		}
 
-		queue := getOrCreateQueue(queueMap, queueName, a.config, nil)
+		// Try to load DAG metadata for DAG-based queues that aren't in the map yet.
+		// This ensures their MaxActiveRuns is used for totalCapacity.
+		var dag *core.DAG
+		if _, exists := queueMap[queueName]; !exists && findGlobalQueueConfig(queueName, a.config) == nil {
+			// Not a global queue and not yet in map (no running items found).
+			// Peek at the first queued item to find out which DAG it belongs to.
+			res, err := a.queueStore.ListPaginated(ctx, queueName, exec.NewPaginator(1, 1))
+			if err == nil && len(res.Items) > 0 {
+				ref, err := res.Items[0].Data()
+				if err == nil {
+					attempt, err := a.dagRunStore.FindAttempt(ctx, *ref)
+					if err == nil {
+						dag, _ = attempt.ReadDAG(ctx)
+					}
+				}
+			}
+		}
+
+		queue := getOrCreateQueue(queueMap, queueName, a.config, dag)
 		queue.queuedCount = count
 		totalQueued += count
 	}

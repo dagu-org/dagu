@@ -241,9 +241,9 @@ function Queues() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {filteredQueues.length !== data?.queues?.length && (
+          {data?.queues && filteredQueues.length !== data.queues.length && (
             <span className="text-xs text-muted-foreground">
-              ({filteredQueues.length} of {data?.queues?.length})
+              ({filteredQueues.length} of {data.queues.length})
             </span>
           )}
           <RefreshButton onRefresh={handleRefresh} />

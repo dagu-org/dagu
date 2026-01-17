@@ -178,8 +178,6 @@ func (m *mockDAGRunStore) RenameDAGRuns(ctx context.Context, oldName, newName st
 	return args.Error(0)
 }
 
-var _ exec.QueueStore = (*mockQueueStore)(nil)
-
 type mockQueueStore struct {
 	mock.Mock
 }

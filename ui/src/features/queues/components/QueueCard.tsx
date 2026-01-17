@@ -150,7 +150,15 @@ function QueueCard({
     return (
       <tr
         onClick={() => onDAGRunClick(dagRun)}
-        className="cursor-pointer hover:bg-muted/30 transition-colors"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onDAGRunClick(dagRun);
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        className="cursor-pointer hover:bg-muted/30 transition-colors focus:bg-muted/50 focus:outline-none"
       >
         <td className="py-1.5 px-2 text-xs font-medium">{dagRun.name}</td>
         <td className="py-1.5 px-2">
