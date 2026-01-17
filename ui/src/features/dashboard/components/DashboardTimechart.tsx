@@ -417,12 +417,8 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
     if (timelineInstance.current) {
       try {
         timelineInstance.current.fit();
-      } catch {
-        try {
-          timelineInstance.current.fit();
-        } catch (fitError) {
-          console.warn('Timeline fit failed:', fitError);
-        }
+      } catch (error) {
+        console.warn('Timeline fit failed:', error);
       }
     }
   };

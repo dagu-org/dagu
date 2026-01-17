@@ -9,34 +9,34 @@ type Props = {
   size?: 'xs' | 'sm' | 'md' | 'lg'; // Size variants
 };
 
-function StatusChip({ status, children, size = 'md' }: Props) {
-  // Determine the colors and icon based on status
-  let statusClass = '';
-  const isRunning = status === Status.Running;
-
+function getStatusClass(status?: Status): string {
   switch (status) {
     case Status.Success:
-      statusClass = 'status-success';
-      break;
+      return 'status-success';
     case Status.Failed:
     case Status.Rejected:
-      statusClass = 'status-failed';
-      break;
+      return 'status-failed';
     case Status.Running:
-      statusClass = 'status-running';
-      break;
+      return 'status-running';
     case Status.Queued:
     case Status.NotStarted:
-      statusClass = 'status-info';
-      break;
+      return 'status-info';
     case Status.PartialSuccess:
     case Status.Waiting:
     case Status.Aborted:
-      statusClass = 'status-warning';
-      break;
+      return 'status-warning';
     default:
-      statusClass = 'status-muted';
+      return 'status-muted';
   }
+}
+
+function StatusChip({
+  status,
+  children,
+  size = 'md',
+}: Props): React.JSX.Element {
+  const statusClass = getStatusClass(status);
+  const isRunning = status === Status.Running;
 
   // Size classes
   const sizeClasses = {

@@ -49,28 +49,35 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
       statusIcon = '✓';
       break;
     case NodeStatus.Failed:
+      statusClass = 'status-failed';
+      statusIcon = '✕';
+      break;
     case NodeStatus.Rejected:
       statusClass = 'status-failed';
-      statusIcon = status === NodeStatus.Failed ? '✕' : '⊘';
+      statusIcon = '⊘';
       break;
     case NodeStatus.Running:
       statusClass = 'status-running';
       break;
     case NodeStatus.NotStarted:
+      statusClass = 'status-info';
+      statusIcon = '○';
+      break;
     case NodeStatus.Skipped:
       statusClass = 'status-info';
-      statusIcon = status === NodeStatus.Skipped ? '―' : '○';
+      statusIcon = '―';
       break;
     case NodeStatus.PartialSuccess:
+      statusClass = 'status-warning';
+      statusIcon = '◐';
+      break;
     case NodeStatus.Waiting:
+      statusClass = 'status-warning';
+      statusIcon = '□';
+      break;
     case NodeStatus.Aborted:
       statusClass = 'status-warning';
-      statusIcon =
-        status === NodeStatus.Aborted
-          ? '■'
-          : status === NodeStatus.PartialSuccess
-            ? '◐'
-            : '□';
+      statusIcon = '■';
       break;
     default:
       statusClass = 'status-muted';

@@ -1,40 +1,40 @@
 import { Status } from '@/api/v2/schema';
+import React from 'react';
 
 type Props = {
   status: Status;
   statusLabel?: string;
 };
 
-export function StatusDot({ status, statusLabel }: Props) {
-  // Match colors from StatusChip.tsx
-  let bgColor = '';
-  let animation = '';
+type StatusStyle = {
+  bgColor: string;
+  animation: string;
+};
 
+function getStatusStyle(status: Status): StatusStyle {
   switch (status) {
     case Status.Success:
-      bgColor = 'bg-success';
-      break;
+      return { bgColor: 'bg-success', animation: '' };
     case Status.Failed:
     case Status.Rejected:
-      bgColor = 'bg-destructive';
-      break;
+      return { bgColor: 'bg-destructive', animation: '' };
     case Status.Running:
-      bgColor = 'bg-primary';
-      animation = 'animate-pulse';
-      break;
+      return { bgColor: 'bg-primary', animation: 'animate-pulse' };
     case Status.Queued:
     case Status.NotStarted:
-      bgColor = 'bg-info';
-      break;
+      return { bgColor: 'bg-info', animation: '' };
     case Status.PartialSuccess:
-    case Status.Waiting:
     case Status.Aborted:
-      bgColor = 'bg-warning';
-      if (status === Status.Waiting) animation = 'animate-pulse';
-      break;
+      return { bgColor: 'bg-warning', animation: '' };
+    case Status.Waiting:
+      return { bgColor: 'bg-warning', animation: 'animate-pulse' };
     default:
-      bgColor = 'bg-muted';
+      return { bgColor: 'bg-muted', animation: '' };
   }
+}
+
+export function StatusDot({ status, statusLabel }: Props): React.JSX.Element {
+  const { bgColor, animation } = getStatusStyle(status);
 
   return (
     <span
