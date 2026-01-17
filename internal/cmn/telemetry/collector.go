@@ -25,6 +25,8 @@ var (
 )
 
 // Collector implements prometheus.Collector interface
+var _ prometheus.Collector = (*Collector)(nil)
+
 type Collector struct {
 	startTime       time.Time
 	version         string

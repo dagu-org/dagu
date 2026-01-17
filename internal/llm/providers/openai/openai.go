@@ -24,6 +24,8 @@ func init() {
 }
 
 // Provider implements the llm.Provider interface for OpenAI.
+var _ llm.Provider = (*Provider)(nil)
+
 type Provider struct {
 	config     llm.Config
 	httpClient *llm.HTTPClient
