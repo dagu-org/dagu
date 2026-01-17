@@ -2688,8 +2688,8 @@ paths:
 
   /queues:
     get:
-      summary: "List all execution queues with active DAG-runs"
-      description: "Retrieves all queues showing both running and queued DAG-runs, organized by queue/process group"
+      summary: "List all execution queues with summary statistics"
+      description: "Returns queue list with running/queued counts. Use /queues/{name}/items for paginated item details."
       operationId: "listQueues"
       tags:
         - "queues"
@@ -2702,6 +2702,51 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/QueuesResponse"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /queues/{name}/items:
+    get:
+      summary: "Get paginated items for a specific queue"
+      description: "Returns paginated list of running or queued DAG-runs for the specified queue"
+      operationId: "listQueueItems"
+      tags:
+        - "queues"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - name: name
+          in: path
+          description: "Queue name"
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: query
+          description: "Item type to fetch"
+          required: false
+          schema:
+            type: string
+            enum: ["running", "queued"]
+            default: "queued"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueItemsResponse"
+        "404":
+          description: "Queue not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         default:
           description: "Generic error response"
           content:
@@ -4691,7 +4736,7 @@ components:
 
     Queue:
       type: object
-      description: "A queue/process group with its active DAG-runs"
+      description: "A queue/process group with summary statistics"
       properties:
         name:
           type: string
@@ -4704,21 +4749,40 @@ components:
           type: integer
           description: "Maximum number of concurrent runs allowed. For 'global' queues, this is the configured maxConcurrency. For 'dag-based' queues, this is the DAG's maxActiveRuns (default 1)"
           minimum: 1
+        runningCount:
+          type: integer
+          description: "Number of currently running DAG-runs"
+          minimum: 0
+        queuedCount:
+          type: integer
+          description: "Number of queued DAG-runs waiting to execute"
+          minimum: 0
         running:
           type: array
-          description: "List of currently running DAG-runs"
-          items:
-            $ref: "#/components/schemas/DAGRunSummary"
-        queued:
-          type: array
-          description: "List of DAG-runs waiting to execute"
+          description: "List of currently running DAG-runs (bounded by maxConcurrency)"
           items:
             $ref: "#/components/schemas/DAGRunSummary"
       required:
         - name
         - type
+        - runningCount
+        - queuedCount
         - running
-        - queued
+
+    QueueItemsResponse:
+      type: object
+      description: "Paginated queue items response"
+      properties:
+        items:
+          type: array
+          description: "List of DAG-run summaries"
+          items:
+            $ref: "#/components/schemas/DAGRunSummary"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+      required:
+        - items
+        - pagination
 
     QueuesSummary:
       type: object

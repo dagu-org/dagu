@@ -1109,10 +1109,30 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List all execution queues with active DAG-runs
-         * @description Retrieves all queues showing both running and queued DAG-runs, organized by queue/process group
+         * List all execution queues with summary statistics
+         * @description Returns queue list with running/queued counts. Use /queues/{name}/items for paginated item details.
          */
         get: operations["listQueues"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/queues/{name}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get paginated items for a specific queue
+         * @description Returns paginated list of running or queued DAG-runs for the specified queue
+         */
+        get: operations["listQueueItems"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2049,7 +2069,7 @@ export interface components {
             queues: components["schemas"]["Queue"][];
             summary: components["schemas"]["QueuesSummary"];
         };
-        /** @description A queue/process group with its active DAG-runs */
+        /** @description A queue/process group with summary statistics */
         Queue: {
             /** @description Name of the queue (global queue name or DAG name if no queue specified) */
             name: string;
@@ -2060,10 +2080,18 @@ export interface components {
             type: QueueType;
             /** @description Maximum number of concurrent runs allowed. For 'global' queues, this is the configured maxConcurrency. For 'dag-based' queues, this is the DAG's maxActiveRuns (default 1) */
             maxConcurrency?: number;
-            /** @description List of currently running DAG-runs */
+            /** @description Number of currently running DAG-runs */
+            runningCount: number;
+            /** @description Number of queued DAG-runs waiting to execute */
+            queuedCount: number;
+            /** @description List of currently running DAG-runs (bounded by maxConcurrency) */
             running: components["schemas"]["DAGRunSummary"][];
-            /** @description List of DAG-runs waiting to execute */
-            queued: components["schemas"]["DAGRunSummary"][];
+        };
+        /** @description Paginated queue items response */
+        QueueItemsResponse: {
+            /** @description List of DAG-run summaries */
+            items: components["schemas"]["DAGRunSummary"][];
+            pagination: components["schemas"]["Pagination"];
         };
         /** @description Summary statistics across all queues */
         QueuesSummary: {
@@ -5616,6 +5644,56 @@ export interface operations {
             };
         };
     };
+    listQueueItems: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description page number of items to fetch (default is 1) */
+                page?: components["parameters"]["Page"];
+                /** @description number of items per page (default is 30, max is 100) */
+                perPage?: components["parameters"]["PerPage"];
+                /** @description Item type to fetch */
+                type?: PathsQueuesNameItemsGetParametersQueryType;
+            };
+            header?: never;
+            path: {
+                /** @description Queue name */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueItemsResponse"];
+                };
+            };
+            /** @description Queue not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getResourceHistory: {
         parameters: {
             query?: {
@@ -6154,6 +6232,10 @@ export enum PathsDagsGetParametersQuerySort {
 export enum PathsDagsGetParametersQueryOrder {
     asc = "asc",
     desc = "desc"
+}
+export enum PathsQueuesNameItemsGetParametersQueryType {
+    running = "running",
+    queued = "queued"
 }
 export enum ChatMessageRole {
     system = "system",

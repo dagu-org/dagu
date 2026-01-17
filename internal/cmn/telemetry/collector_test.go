@@ -23,6 +23,8 @@ type mockDAGStore struct {
 	mock.Mock
 }
 
+var _ exec.DAGStore = (*mockDAGStore)(nil)
+
 func (m *mockDAGStore) Create(ctx context.Context, fileName string, spec []byte) error {
 	args := m.Called(ctx, fileName, spec)
 	return args.Error(0)
@@ -103,6 +105,8 @@ type mockDAGRunStore struct {
 	mock.Mock
 }
 
+var _ exec.DAGRunStore = (*mockDAGRunStore)(nil)
+
 // RemoveDAGRun implements models.DAGRunStore.
 func (m *mockDAGRunStore) RemoveDAGRun(_ context.Context, _ exec.DAGRunRef) error {
 	panic("unimplemented")
@@ -174,11 +178,11 @@ func (m *mockDAGRunStore) RenameDAGRuns(ctx context.Context, oldName, newName st
 	return args.Error(0)
 }
 
-var _ exec.QueueStore = (*mockQueueStore)(nil)
-
 type mockQueueStore struct {
 	mock.Mock
 }
+
+var _ exec.QueueStore = (*mockQueueStore)(nil)
 
 // QueueWatcher implements execution.QueueStore.
 func (m *mockQueueStore) QueueWatcher(_ context.Context) exec.QueueWatcher {
@@ -223,6 +227,11 @@ func (m *mockQueueStore) List(ctx context.Context, name string) ([]exec.QueuedIt
 	return args.Get(0).([]exec.QueuedItemData), args.Error(1)
 }
 
+func (m *mockQueueStore) ListPaginated(ctx context.Context, name string, pg exec.Paginator) (exec.PaginatedResult[exec.QueuedItemData], error) {
+	args := m.Called(ctx, name, pg)
+	return args.Get(0).(exec.PaginatedResult[exec.QueuedItemData]), args.Error(1)
+}
+
 func (m *mockQueueStore) All(ctx context.Context) ([]exec.QueuedItemData, error) {
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
@@ -236,6 +245,8 @@ var _ exec.ServiceRegistry = (*mockServiceRegistry)(nil)
 type mockServiceRegistry struct {
 	mock.Mock
 }
+
+var _ exec.ServiceRegistry = (*mockServiceRegistry)(nil)
 
 func (m *mockServiceRegistry) Register(ctx context.Context, serviceName exec.ServiceName, hostInfo exec.HostInfo) error {
 	args := m.Called(ctx, serviceName, hostInfo)
