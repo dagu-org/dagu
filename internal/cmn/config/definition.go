@@ -386,6 +386,9 @@ type WorkerDef struct {
 	// When specified, the worker will connect directly to these coordinators
 	// instead of using the file-based service registry.
 	Coordinators interface{} `mapstructure:"coordinators"`
+
+	// PostgresPool holds connection pool settings for shared-nothing mode.
+	PostgresPool *PostgresPoolDef `mapstructure:"postgresPool"`
 }
 
 // SchedulerDef holds the configuration for the scheduler.
@@ -404,4 +407,24 @@ type SchedulerDef struct {
 	// ZombieDetectionInterval is the interval between checks for zombie DAG runs.
 	// Default is 45 seconds. Set to 0 to disable.
 	ZombieDetectionInterval string `mapstructure:"zombieDetectionInterval"`
+}
+
+// PostgresPoolDef holds the definition for PostgreSQL connection pool configuration.
+// Used in shared-nothing worker mode to prevent connection exhaustion.
+type PostgresPoolDef struct {
+	// MaxOpenConns is the maximum total open connections across ALL PostgreSQL DSNs.
+	// Default: 25
+	MaxOpenConns int `mapstructure:"maxOpenConns"`
+
+	// MaxIdleConns is the maximum number of idle connections per DSN.
+	// Default: 5
+	MaxIdleConns int `mapstructure:"maxIdleConns"`
+
+	// ConnMaxLifetime is the maximum lifetime of a connection in seconds.
+	// Default: 300 (5 minutes)
+	ConnMaxLifetime int `mapstructure:"connMaxLifetime"`
+
+	// ConnMaxIdleTime is the maximum idle time for a connection in seconds.
+	// Default: 60 (1 minute)
+	ConnMaxIdleTime int `mapstructure:"connMaxIdleTime"`
 }

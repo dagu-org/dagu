@@ -235,6 +235,12 @@ func TestLoad_Env(t *testing.T) {
 		Worker: Worker{
 			ID:            "test-worker-123",
 			MaxActiveRuns: 200,
+			PostgresPool: PostgresPoolConfig{
+				MaxOpenConns:    25,
+				MaxIdleConns:    5,
+				ConnMaxLifetime: 300,
+				ConnMaxIdleTime: 60,
+			},
 		},
 		Scheduler: Scheduler{
 			Port:                    9999,
@@ -483,6 +489,12 @@ scheduler:
 			Labels: map[string]string{
 				"env":    "production",
 				"region": "us-west-2",
+			},
+			PostgresPool: PostgresPoolConfig{
+				MaxOpenConns:    25,
+				MaxIdleConns:    5,
+				ConnMaxLifetime: 300,
+				ConnMaxIdleTime: 60,
 			},
 		},
 		Scheduler: Scheduler{
