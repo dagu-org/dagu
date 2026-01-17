@@ -124,9 +124,8 @@ function Graph({
     justifyContent: 'flex-start',
     width: width,
     minWidth: '100%',
-    minHeight: '200px',
-    maxHeight: isExpandedView ? 'none' : '300px',
-    height: isExpandedView ? '100%' : 'auto',
+    minHeight: isExpandedView ? '100%' : '380px',
+    height: isExpandedView ? '100%' : '380px',
     borderRadius: '0.5em',
     background: isDarkMode
       ? `linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px),
@@ -383,6 +382,7 @@ function Graph({
           style={mermaidStyle}
           def={graph}
           scale={scale}
+          onClick={onRightClickNode}
           onDoubleClick={onClickNode}
           onRightClick={onRightClickNode}
         />

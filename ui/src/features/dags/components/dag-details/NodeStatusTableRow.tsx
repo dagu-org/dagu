@@ -179,23 +179,21 @@ function InlineLogViewer({
   const lineCount = data?.lineCount || 0;
 
   return (
-    <div className="bg-muted rounded overflow-hidden border border-border">
+    <div className="bg-slate-800 rounded overflow-hidden border border-slate-700">
       {isLoading && !data ? (
-        <div className="text-muted-foreground text-xs py-4 px-3">
-          Loading logs...
-        </div>
+        <div className="text-slate-400 text-xs py-4 px-3">Loading logs...</div>
       ) : lines.length === 0 ? (
-        <div className="text-muted-foreground text-xs py-4 px-3">
+        <div className="text-slate-400 text-xs py-4 px-3">
           &lt;No log output&gt;
         </div>
       ) : (
         <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-          <pre className="font-mono text-[11px] text-foreground p-2">
+          <pre className="font-mono text-[11px] text-slate-100 p-2">
             {lines.map((line, index) => {
               const lineNumber = totalLines - lineCount + index + 1;
               return (
                 <div key={index} className="flex px-1 py-0.5">
-                  <span className="text-muted-foreground/50 mr-3 select-none w-12 text-right flex-shrink-0">
+                  <span className="text-slate-500 mr-3 select-none w-12 text-right flex-shrink-0">
                     {lineNumber}
                   </span>
                   <span className="whitespace-pre-wrap break-all flex-grow">
@@ -981,8 +979,8 @@ function NodeStatusTableRow({
                         className={cn(
                           'px-3 py-1 text-xs font-medium transition-colors rounded',
                           activeLogTab === 'stdout'
-                            ? 'bg-foreground/80 text-white'
-                            : 'bg-accent text-foreground/90 hover:bg-accent'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-foreground hover:bg-muted/80'
                         )}
                       >
                         out
@@ -995,8 +993,8 @@ function NodeStatusTableRow({
                         className={cn(
                           'px-3 py-1 text-xs font-medium transition-colors rounded',
                           activeLogTab === 'stderr'
-                            ? 'bg-foreground/80 text-white'
-                            : 'bg-accent text-foreground/90 hover:bg-accent'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-foreground hover:bg-muted/80'
                         )}
                       >
                         err

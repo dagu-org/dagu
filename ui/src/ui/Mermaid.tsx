@@ -5,6 +5,7 @@ type Props = {
   def: string;
   style?: CSSProperties;
   scale: number;
+  onClick?: (id: string) => void;
   onDoubleClick?: (id: string) => void;
   onRightClick?: (id: string) => void;
 };
@@ -54,6 +55,7 @@ function Mermaid({
   def,
   style = {},
   scale,
+  onClick,
   onDoubleClick,
   onRightClick,
 }: Props) {
@@ -136,9 +138,14 @@ function Mermaid({
         }
 
         // Attach custom event handlers if provided
-        if ((onDoubleClick || onRightClick) && mermaidRef.current) {
+        if ((onClick || onDoubleClick || onRightClick) && mermaidRef.current) {
           // Find all nodes in the SVG (typically these are <g> elements with class="node")
           const nodeElements = mermaidRef.current.querySelectorAll('.node');
+          // Store click timeouts per node for cancellation
+          const clickTimeouts = new Map<
+            string,
+            ReturnType<typeof setTimeout>
+          >();
 
           nodeElements.forEach((node) => {
             // Extract the node ID from the element
@@ -146,9 +153,33 @@ function Mermaid({
             const nodeId = node.id.split('-')[1];
 
             if (nodeId) {
+              // Attach single-click event listener if provided
+              if (onClick) {
+                node.addEventListener('click', () => {
+                  // Clear any existing timeout for this node
+                  const existingTimeout = clickTimeouts.get(nodeId);
+                  if (existingTimeout) {
+                    clearTimeout(existingTimeout);
+                  }
+                  // Set timeout to allow double-click to cancel
+                  const timeout = setTimeout(() => {
+                    clickTimeouts.delete(nodeId);
+                    onClick(nodeId);
+                  }, 250);
+                  clickTimeouts.set(nodeId, timeout);
+                });
+              }
+
               // Attach double-click event listener if provided
               if (onDoubleClick) {
-                node.addEventListener('dblclick', () => {
+                node.addEventListener('dblclick', (event) => {
+                  event.stopPropagation();
+                  // Cancel pending single-click action
+                  const existingTimeout = clickTimeouts.get(nodeId);
+                  if (existingTimeout) {
+                    clearTimeout(existingTimeout);
+                    clickTimeouts.delete(nodeId);
+                  }
                   onDoubleClick(nodeId);
                 });
               }
@@ -157,6 +188,12 @@ function Mermaid({
               if (onRightClick) {
                 node.addEventListener('contextmenu', (event) => {
                   event.preventDefault(); // Prevent default context menu
+                  // Also cancel pending single-click
+                  const existingTimeout = clickTimeouts.get(nodeId);
+                  if (existingTimeout) {
+                    clearTimeout(existingTimeout);
+                    clickTimeouts.delete(nodeId);
+                  }
                   onRightClick(nodeId);
                 });
               }
