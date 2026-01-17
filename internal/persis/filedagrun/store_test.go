@@ -522,6 +522,59 @@ func TestListStatuses(t *testing.T) {
 		assert.Equal(t, "dagrun-id-2", statuses[1].DAGRunID)
 		assert.Equal(t, "dagrun-id-1", statuses[2].DAGRunID)
 	})
+
+	t.Run("FilterByTags", func(t *testing.T) {
+		th := setupTestStore(t)
+
+		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+
+		// Create runs with different tags
+		run1 := th.DAG("dag1")
+		run1.Tags = []string{"prod", "batch"}
+		th.CreateAttemptWithDAG(t, ts, "run-1", core.Succeeded, run1.DAG)
+
+		run2 := th.DAG("dag2")
+		run2.Tags = []string{"prod", "api"}
+		th.CreateAttemptWithDAG(t, ts, "run-2", core.Succeeded, run2.DAG)
+
+		run3 := th.DAG("dag3")
+		run3.Tags = []string{"dev"}
+		th.CreateAttemptWithDAG(t, ts, "run-3", core.Succeeded, run3.DAG)
+
+		// Filter by tag "prod" (should match run-1 and run-2)
+		statuses, err := th.Store.ListStatuses(th.Context,
+			exec.WithTags([]string{"prod"}),
+			exec.WithFrom(exec.NewUTC(ts)),
+		)
+		require.NoError(t, err)
+		assert.Len(t, statuses, 2)
+
+		// Filter by tags "prod" AND "batch" (should match only run-1)
+		statuses, err = th.Store.ListStatuses(th.Context,
+			exec.WithTags([]string{"prod", "batch"}),
+			exec.WithFrom(exec.NewUTC(ts)),
+		)
+		require.NoError(t, err)
+		assert.Len(t, statuses, 1)
+		assert.Equal(t, "run-1", statuses[0].DAGRunID)
+
+		// Filter by tag "dev" (should match only run-3)
+		statuses, err = th.Store.ListStatuses(th.Context,
+			exec.WithTags([]string{"dev"}),
+			exec.WithFrom(exec.NewUTC(ts)),
+		)
+		require.NoError(t, err)
+		assert.Len(t, statuses, 1)
+		assert.Equal(t, "run-3", statuses[0].DAGRunID)
+
+		// Filter by tag "nonexistent" (should match nothing)
+		statuses, err = th.Store.ListStatuses(th.Context,
+			exec.WithTags([]string{"nonexistent"}),
+			exec.WithFrom(exec.NewUTC(ts)),
+		)
+		require.NoError(t, err)
+		assert.Empty(t, statuses)
+	})
 }
 
 func TestLatestStatusTimezone(t *testing.T) {

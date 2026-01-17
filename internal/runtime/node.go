@@ -179,6 +179,15 @@ func (n *Node) Execute(ctx context.Context) error {
 		return err
 	}
 
+	// Ensure executor cleanup happens (releases connections, etc.)
+	defer func() {
+		if closeErr := executor.CloseExecutor(cmd); closeErr != nil {
+			logger.Warn(ctx, "Failed to close executor",
+				tag.Step(n.Name()),
+				tag.Error(closeErr))
+		}
+	}()
+
 	// Check if executor supports chat message handling
 	chatHandler, _ := cmd.(executor.ChatMessageHandler)
 

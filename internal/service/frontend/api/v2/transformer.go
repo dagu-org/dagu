@@ -147,6 +147,7 @@ func toDAGRunSummary(s exec.DAGRunStatus) api.DAGRunSummary {
 		Status:           api.Status(s.Status),
 		StatusLabel:      api.StatusLabel(s.Status.String()),
 		WorkerId:         ptrOf(s.WorkerID),
+		Tags:             &s.Tags,
 	}
 }
 
@@ -179,6 +180,7 @@ func toDAGRunDetails(s exec.DAGRunStatus) api.DAGRunDetails {
 		OnFailure:        ptrOf(toNode(s.OnFailure)),
 		OnCancel:         ptrOf(toNode(s.OnCancel)),
 		OnExit:           ptrOf(toNode(s.OnExit)),
+		Tags:             &s.Tags,
 	}
 }
 

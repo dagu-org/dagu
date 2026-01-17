@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"math"
 	"os"
 	"sync"
@@ -13,6 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/runtime/builtin/sql"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
@@ -24,6 +26,7 @@ type Worker struct {
 	coordinatorCli coordinator.Client
 	handler        TaskHandler
 	labels         map[string]string
+	cfg            *config.Config
 
 	// For tracking poller states and heartbeats
 	pollersMu    sync.Mutex
@@ -36,6 +39,9 @@ type Worker struct {
 	stopOnce   sync.Once
 	stopCancel context.CancelFunc // Cancels the worker's internal context
 	stopDone   chan struct{}      // Signals when all goroutines have stopped
+
+	// For global PostgreSQL connection pool (shared-nothing mode)
+	poolManager *sql.GlobalPoolManager
 }
 
 // SetHandler sets a custom task executor for testing or custom execution logic
@@ -60,6 +66,7 @@ func NewWorker(workerID string, maxActiveRuns int, coordinatorClient coordinator
 		coordinatorCli: coordinatorClient,
 		handler:        &taskHandler{subCmdBuilder: runtime.NewSubCmdBuilder(cfg)},
 		labels:         labels,
+		cfg:            cfg,
 		runningTasks:   make(map[string]*coordinatorv1.RunningTask),
 		cancelFuncs:    make(map[string]context.CancelFunc),
 	}
@@ -76,6 +83,21 @@ func (w *Worker) Start(ctx context.Context) error {
 	internalCtx, cancel := context.WithCancel(ctx)
 	w.stopCancel = cancel
 	w.stopDone = make(chan struct{})
+
+	// Initialize global PostgreSQL pool manager if in shared-nothing mode
+	if w.isSharedNothingMode() {
+		w.poolManager = sql.NewGlobalPoolManager(sql.GlobalPoolConfig{
+			MaxOpenConns:    w.cfg.Worker.PostgresPool.MaxOpenConns,
+			MaxIdleConns:    w.cfg.Worker.PostgresPool.MaxIdleConns,
+			ConnMaxLifetime: time.Duration(w.cfg.Worker.PostgresPool.ConnMaxLifetime) * time.Second,
+			ConnMaxIdleTime: time.Duration(w.cfg.Worker.PostgresPool.ConnMaxIdleTime) * time.Second,
+		})
+		internalCtx = sql.WithPoolManager(internalCtx, w.poolManager)
+		logger.Info(ctx, "Global PostgreSQL pool manager initialized",
+			tag.WorkerID(w.id),
+			slog.Int("maxOpenConns", w.cfg.Worker.PostgresPool.MaxOpenConns),
+			slog.Int("maxIdleConns", w.cfg.Worker.PostgresPool.MaxIdleConns))
+	}
 
 	// Create a wait group to track all polling goroutines
 	var wg sync.WaitGroup
@@ -137,9 +159,25 @@ func (w *Worker) Stop(ctx context.Context) error {
 			}
 		}
 
+		// Close the global PostgreSQL pool manager if initialized
+		if w.poolManager != nil {
+			if poolErr := w.poolManager.Close(); poolErr != nil {
+				logger.Error(ctx, "Failed to close PostgreSQL pool manager",
+					tag.WorkerID(w.id),
+					tag.Error(poolErr))
+				if err == nil {
+					err = fmt.Errorf("failed to close PostgreSQL pool manager: %w", poolErr)
+				}
+			} else {
+				logger.Info(ctx, "PostgreSQL pool manager closed", tag.WorkerID(w.id))
+			}
+		}
+
 		// Cleanup coordinator client connections
 		if cleanupErr := w.coordinatorCli.Cleanup(ctx); cleanupErr != nil {
-			err = fmt.Errorf("failed to cleanup coordinator client: %w", cleanupErr)
+			if err == nil {
+				err = fmt.Errorf("failed to cleanup coordinator client: %w", cleanupErr)
+			}
 		}
 	})
 
@@ -297,4 +335,11 @@ func (w *Worker) processCancellations(ctx context.Context, cancelledRuns []*coor
 			cancelFunc()
 		}
 	}
+}
+
+// isSharedNothingMode returns true if the worker is running in shared-nothing mode.
+// Shared-nothing mode is detected when static coordinator addresses are configured.
+// In shared-nothing mode, global PostgreSQL pool management is automatically enabled.
+func (w *Worker) isSharedNothingMode() bool {
+	return w.cfg != nil && len(w.cfg.Worker.Coordinators) > 0
 }

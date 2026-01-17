@@ -185,6 +185,24 @@ steps:
 			"STEP2_OUT": "from step2\ndone",
 		})
 	})
+
+	t.Run("CommandWithColonInArray", func(t *testing.T) {
+		t.Parallel()
+
+		dag := th.DAG(t, `
+steps:
+  - name: colon-test
+    command:
+      - echo SATID: 123
+    output: OUT
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"OUT": "SATID: 123",
+		})
+	})
 }
 
 func TestMultipleCommands_Docker(t *testing.T) {

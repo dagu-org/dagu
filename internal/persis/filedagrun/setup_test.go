@@ -39,7 +39,13 @@ func (th StoreTest) CreateAttempt(t *testing.T, ts time.Time, dagRunID string, s
 	t.Helper()
 
 	dag := th.DAG("test_DAG")
-	attempt, err := th.Store.CreateAttempt(th.Context, dag.DAG, ts, dagRunID, exec.NewDAGRunAttemptOptions{})
+	return th.CreateAttemptWithDAG(t, ts, dagRunID, s, dag.DAG)
+}
+
+func (th StoreTest) CreateAttemptWithDAG(t *testing.T, ts time.Time, dagRunID string, s core.Status, dag *core.DAG) *Attempt {
+	t.Helper()
+
+	attempt, err := th.Store.CreateAttempt(th.Context, dag, ts, dagRunID, exec.NewDAGRunAttemptOptions{})
 	require.NoError(t, err)
 
 	err = attempt.Open(th.Context)
@@ -49,7 +55,7 @@ func (th StoreTest) CreateAttempt(t *testing.T, ts time.Time, dagRunID string, s
 		_ = attempt.Close(th.Context)
 	}()
 
-	dagRunStatus := exec.InitialStatus(dag.DAG)
+	dagRunStatus := exec.InitialStatus(dag)
 	dagRunStatus.DAGRunID = dagRunID
 	dagRunStatus.Status = s
 

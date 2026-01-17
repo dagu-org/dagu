@@ -1794,6 +1794,8 @@ export interface components {
             params?: string;
             /** @description ID of the worker that executed this DAG-run ('local' for local execution) */
             workerId?: string;
+            /** @description List of tags for categorizing and filtering DAG runs */
+            tags?: string[];
         };
         /** @description Detailed status of a DAG-run including sub DAG-run nodes */
         DAGRunDetails: components["schemas"]["DAGRunSummary"] & {

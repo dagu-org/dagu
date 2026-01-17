@@ -12,6 +12,19 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
+// CloseExecutor safely closes an executor if it implements io.Closer.
+// Returns nil if executor doesn't implement io.Closer or is nil.
+// This should be called after executor.Run() completes to release resources.
+func CloseExecutor(exec Executor) error {
+	if exec == nil {
+		return nil
+	}
+	if closer, ok := exec.(io.Closer); ok {
+		return closer.Close()
+	}
+	return nil
+}
+
 // Executor is an interface for executing steps in a DAG.
 type Executor interface {
 	SetStdout(out io.Writer)

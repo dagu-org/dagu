@@ -254,19 +254,29 @@ func (m *historyMigrator) convertStatus(legacy *legacymodel.Status, dag *core.DA
 		createdAt = startedAt.UnixMilli()
 	}
 
+	// Set metadata from DAG if available
+	var tags []string
+	var preconditions []*core.Condition
+	if dag != nil {
+		tags = dag.Tags
+		preconditions = dag.Preconditions
+	}
+
 	status := &exec.DAGRunStatus{
-		Name:       legacy.Name,
-		DAGRunID:   legacy.RequestID,
-		Status:     legacy.Status,
-		PID:        exec.PID(legacy.PID),
-		Log:        legacy.Log,
-		Nodes:      make([]*exec.Node, 0),
-		Params:     legacy.Params,
-		ParamsList: legacy.ParamsList,
-		CreatedAt:  createdAt,
-		StartedAt:  formatTime(startedAt),
-		FinishedAt: formatTime(finishedAt),
-		QueuedAt:   formatTime(startedAt), // Use StartedAt as QueuedAt for migration
+		Name:          legacy.Name,
+		DAGRunID:      legacy.RequestID,
+		Status:        legacy.Status,
+		PID:           exec.PID(legacy.PID),
+		Log:           legacy.Log,
+		Nodes:         make([]*exec.Node, 0),
+		Params:        legacy.Params,
+		ParamsList:    legacy.ParamsList,
+		CreatedAt:     createdAt,
+		StartedAt:     formatTime(startedAt),
+		FinishedAt:    formatTime(finishedAt),
+		QueuedAt:      formatTime(startedAt), // Use StartedAt as QueuedAt for migration
+		Tags:          tags,
+		Preconditions: preconditions,
 	}
 
 	// Convert nodes
@@ -286,11 +296,6 @@ func (m *historyMigrator) convertStatus(legacy *legacymodel.Status, dag *core.DA
 	}
 	if legacy.OnCancel != nil {
 		status.OnCancel = m.convertNode(legacy.OnCancel)
-	}
-
-	// Set preconditions from DAG if available
-	if dag != nil {
-		status.Preconditions = dag.Preconditions
 	}
 
 	return status
