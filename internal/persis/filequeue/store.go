@@ -214,20 +214,13 @@ func (s *Store) ListPaginated(ctx context.Context, name string, pg exec.Paginato
 
 	total := len(allFiles)
 
-	// Handle offset beyond total
-	if offset >= total {
-		return exec.NewPaginatedResult([]exec.QueuedItemData{}, total, pg), nil
-	}
+	// Apply pagination to file paths (efficient string slicing)
+	startIndex := min(offset, total)
+	endIndex := min(offset+limit, total)
+	paginatedFiles := allFiles[startIndex:endIndex]
 
-	// Apply pagination TO FILE PATHS (efficient - just string slicing)
-	endIndex := offset + limit
-	if endIndex > total {
-		endIndex = total
-	}
-	paginatedFiles := allFiles[offset:endIndex]
-
-	// Create QueuedFile objects ONLY for paginated portion
-	// QueuedFile is lazy-loaded - JSON not read until Data() called
+	// Create QueuedFile objects only for the paginated portion.
+	// QueuedFile is lazy-loaded - JSON is not read until Data() is called.
 	items := make([]exec.QueuedItemData, 0, len(paginatedFiles))
 	for _, file := range paginatedFiles {
 		items = append(items, NewQueuedFile(file))

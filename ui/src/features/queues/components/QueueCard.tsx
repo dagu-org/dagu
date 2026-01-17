@@ -124,14 +124,13 @@ function QueueCard({
     return Math.round((running / queue.maxConcurrency) * 100);
   }, [queue]);
 
-  const formatDateTime = (datetime: string) => {
+  const formatDateTime = (datetime: string | undefined): string => {
     if (!datetime) return 'N/A';
+    const date = dayjs(datetime);
     if (config.tzOffsetInSec !== undefined) {
-      return dayjs(datetime)
-        .utcOffset(config.tzOffsetInSec / 60)
-        .format('MMM D, HH:mm:ss');
+      return date.utcOffset(config.tzOffsetInSec / 60).format('MMM D, HH:mm:ss');
     }
-    return dayjs(datetime).format('MMM D, HH:mm:ss');
+    return date.format('MMM D, HH:mm:ss');
   };
 
   const DAGRunRow: React.FC<{
@@ -149,13 +148,7 @@ function QueueCard({
         </StatusChip>
       </td>
       <td className="py-1.5 px-2 text-xs text-muted-foreground tabular-nums">
-        {showQueuedAt
-          ? dagRun.queuedAt
-            ? formatDateTime(dagRun.queuedAt)
-            : 'N/A'
-          : dagRun.startedAt
-            ? formatDateTime(dagRun.startedAt)
-            : 'N/A'}
+        {formatDateTime(showQueuedAt ? dagRun.queuedAt : dagRun.startedAt)}
       </td>
       <td className="py-1.5 px-2 text-xs text-muted-foreground font-mono">
         {dagRun.dagRunId}

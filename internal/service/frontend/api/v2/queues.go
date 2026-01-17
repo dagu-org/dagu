@@ -172,28 +172,21 @@ func (a *API) ListQueueItems(ctx context.Context, req api.ListQueueItemsRequestO
 		runningRefs := runningByGroup[queueName]
 		total := len(runningRefs)
 
-		// Apply pagination manually for running items
-		offset := pg.Offset()
-		limit := pg.Limit()
-		if offset < total {
-			endIndex := offset + limit
-			if endIndex > total {
-				endIndex = total
+		// Apply pagination to running items
+		startIndex := min(pg.Offset(), total)
+		endIndex := min(pg.Offset()+pg.Limit(), total)
+		for _, dagRun := range runningRefs[startIndex:endIndex] {
+			attempt, err := a.dagRunStore.FindAttempt(ctx, dagRun)
+			if err != nil {
+				continue
 			}
-			for _, dagRun := range runningRefs[offset:endIndex] {
-				attempt, err := a.dagRunStore.FindAttempt(ctx, dagRun)
-				if err != nil {
-					continue
-				}
-				runStatus, err := attempt.ReadStatus(ctx)
-				if err != nil {
-					continue
-				}
-				items = append(items, toDAGRunSummary(*runStatus))
+			runStatus, err := attempt.ReadStatus(ctx)
+			if err != nil {
+				continue
 			}
+			items = append(items, toDAGRunSummary(*runStatus))
 		}
 
-		// Create paginated result for response
 		paginatedResult := exec.NewPaginatedResult(items, total, pg)
 		return api.ListQueueItems200JSONResponse{
 			Items:      items,
@@ -243,53 +236,42 @@ type queueInfo struct {
 	queuedCount    int
 }
 
-// Helper function to get or create queue in the map
-func getOrCreateQueue(queueMap map[string]*queueInfo, queueName string, config *config.Config, dag *core.DAG) *queueInfo {
-	queue, exists := queueMap[queueName]
-	if !exists {
-		queue = &queueInfo{
-			name:        queueName,
-			queueType:   "dag-based", // Default to dag-based
-			running:     []api.DAGRunSummary{},
-			queuedCount: 0,
-		}
-
-		// Check if this is a global queue from config
-		if isGlobalQueue(queueName, config) {
-			queue.queueType = "global"
-			queue.maxConcurrency = getQueueMaxConcurrency(queueName, config)
-		} else if dag != nil {
-			// For DAG-based queues, use the DAG's MaxActiveRuns
-			queue.maxConcurrency = dag.MaxActiveRuns
-		}
-
-		queueMap[queueName] = queue
+// getOrCreateQueue returns an existing queue from the map or creates a new one.
+func getOrCreateQueue(queueMap map[string]*queueInfo, queueName string, cfg *config.Config, dag *core.DAG) *queueInfo {
+	if queue, exists := queueMap[queueName]; exists {
+		return queue
 	}
+
+	queue := &queueInfo{
+		name:        queueName,
+		queueType:   "dag-based",
+		running:     []api.DAGRunSummary{},
+		queuedCount: 0,
+	}
+
+	// Check if this is a global queue from config
+	if globalCfg := findGlobalQueueConfig(queueName, cfg); globalCfg != nil {
+		queue.queueType = "global"
+		queue.maxConcurrency = globalCfg.MaxActiveRuns
+	} else if dag != nil {
+		// For DAG-based queues, use the DAG's MaxActiveRuns
+		queue.maxConcurrency = dag.MaxActiveRuns
+	}
+
+	queueMap[queueName] = queue
 	return queue
 }
 
-// Helper function to check if a queue is global (defined in config)
-func isGlobalQueue(queueName string, config *config.Config) bool {
-	if config.Queues.Enabled && config.Queues.Config != nil {
-		for _, queueCfg := range config.Queues.Config {
-			if queueCfg.Name == queueName {
-				return true
-			}
+// findGlobalQueueConfig returns the queue config if this is a global queue defined in config.
+// Returns nil if not found or queues are disabled.
+func findGlobalQueueConfig(queueName string, cfg *config.Config) *config.QueueConfig {
+	if !cfg.Queues.Enabled || cfg.Queues.Config == nil {
+		return nil
+	}
+	for i := range cfg.Queues.Config {
+		if cfg.Queues.Config[i].Name == queueName {
+			return &cfg.Queues.Config[i]
 		}
 	}
-	return false
-}
-
-// Helper function to get queue max concurrency from config
-func getQueueMaxConcurrency(queueName string, config *config.Config) int {
-	if config.Queues.Enabled && config.Queues.Config != nil {
-		for _, queueCfg := range config.Queues.Config {
-			if queueCfg.Name == queueName {
-				return queueCfg.MaxActiveRuns
-			}
-		}
-	}
-
-	// Default to 1 if not found
-	return 1
+	return nil
 }
