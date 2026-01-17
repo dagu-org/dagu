@@ -8,7 +8,7 @@ import (
 )
 
 var cronParser = cron.NewParser(
-	cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow,
+	cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow,
 )
 
 // buildScheduler parses the schedule values and returns a list of schedules.
