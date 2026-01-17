@@ -1,6 +1,5 @@
 import {
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   Trash2,
 } from 'lucide-react';
@@ -21,6 +20,7 @@ import dayjs from '../../../lib/dayjs';
 import { cn } from '../../../lib/utils';
 import ConfirmModal from '../../../ui/ConfirmModal';
 import StatusChip from '../../../ui/StatusChip';
+import DAGPagination from '../../dags/components/common/DAGPagination';
 
 interface QueueCardProps {
   queue: components['schemas']['Queue'];
@@ -42,19 +42,19 @@ function QueueCard({
   const [isClearing, setIsClearing] = React.useState(false);
   const [showClearConfirm, setShowClearConfirm] = React.useState(false);
   const [queuedPage, setQueuedPage] = React.useState(1);
-  const perPage = 10;
+  const [perPage, setPerPage] = React.useState(10);
 
-  // Reset page when remote node changes
+  // Reset page when remote node, queue name, or items per page changes
   const remoteNode = appBarContext?.selectedRemoteNode || 'local';
   React.useEffect(() => {
     setQueuedPage(1);
-  }, [remoteNode, queue.name]);
+  }, [remoteNode, queue.name, perPage]);
 
   const toggleExpanded = () => setIsExpanded(!isExpanded);
 
   // Fetch paginated queued items when expanded and there are queued items
   const shouldFetchQueued = isExpanded && queue.queuedCount > 0;
-  const { data: queuedResponse, mutate: mutateQueuedData } = useSWR(
+  const { data: queuedResponse, mutate: mutateQueuedData, isLoading } = useSWR(
     shouldFetchQueued
       ? ['listQueueItems', queue.name, queuedPage, perPage, remoteNode]
       : null,
@@ -72,7 +72,13 @@ function QueueCard({
       });
       return response.data;
     },
-    { refreshInterval: 3000 }
+    {
+      refreshInterval: 3000,
+      keepPreviousData: true,
+      revalidateIfStale: false,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
   );
 
   const queuedItems = queuedResponse?.items ?? [];
@@ -295,7 +301,7 @@ function QueueCard({
                     </TooltipContent>
                   </Tooltip>
                 </div>
-                <div className="overflow-x-auto">
+                <div className={`overflow-x-auto ${isLoading ? 'opacity-70' : ''}`}>
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-border">
@@ -325,37 +331,15 @@ function QueueCard({
                   </table>
                 </div>
                 {/* Pagination controls */}
-                {pagination && pagination.totalPages > 1 && (
+                {pagination && pagination.totalRecords > 0 && (
                   <div className="flex items-center justify-between pt-2 border-t mt-2">
-                    <span className="text-xs text-muted-foreground">
-                      Page {pagination.currentPage} of {pagination.totalPages}
-                    </span>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={pagination.currentPage <= 1}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setQueuedPage(pagination.prevPage);
-                        }}
-                        className="h-6 px-2"
-                      >
-                        <ChevronLeft className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={pagination.currentPage >= pagination.totalPages}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setQueuedPage(pagination.nextPage);
-                        }}
-                        className="h-6 px-2"
-                      >
-                        <ChevronRight className="h-3 w-3" />
-                      </Button>
-                    </div>
+                    <DAGPagination
+                      totalPages={pagination.totalPages}
+                      page={pagination.currentPage}
+                      pageChange={setQueuedPage}
+                      pageLimit={perPage}
+                      onPageLimitChange={setPerPage}
+                    />
                   </div>
                 )}
               </div>
