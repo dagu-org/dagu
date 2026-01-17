@@ -721,6 +721,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dag-runs/{name}/{dagRunId}/log/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download full execution log of a DAG-run
+         * @description Downloads the entire execution log file for a DAG-run
+         */
+        get: operations["downloadDAGRunLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dag-runs/{name}/{dagRunId}/outputs": {
         parameters: {
             query?: never;
@@ -793,6 +813,26 @@ export interface paths {
          * @description Fetches the log for an individual step in a DAG-run
          */
         get: operations["getDAGRunStepLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dag-runs/{name}/{dagRunId}/steps/{stepName}/log/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download log for a specific step in a DAG-run
+         * @description Downloads the entire log file for an individual step in a DAG-run
+         */
+        get: operations["downloadDAGRunStepLog"];
         put?: never;
         post?: never;
         delete?: never;
@@ -921,6 +961,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/log/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download log for a specific sub DAG-run
+         * @description Downloads the entire log file for an individual sub DAG-run
+         */
+        get: operations["downloadSubDAGRunLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log": {
         parameters: {
             query?: never;
@@ -933,6 +993,26 @@ export interface paths {
          * @description Fetches the log for an individual step in a sub DAG-run
          */
         get: operations["getSubDAGRunStepLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download log for a specific step in a sub DAG-run
+         * @description Downloads the entire log file for an individual step in a sub DAG-run
+         */
+        get: operations["downloadSubDAGRunStepLog"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1694,6 +1774,8 @@ export interface components {
             params?: string;
             /** @description ID of the worker that executed this DAG-run ('local' for local execution) */
             workerId?: string;
+            /** @description List of tags for categorizing and filtering DAG runs */
+            tags?: string[];
         };
         /** @description Detailed status of a DAG-run including sub DAG-run nodes */
         DAGRunDetails: components["schemas"]["DAGRunSummary"] & {
@@ -4480,6 +4562,54 @@ export interface operations {
             };
         };
     };
+    downloadDAGRunLog: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Log file content */
+            200: {
+                headers: {
+                    /** @description Attachment filename */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Log file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getDAGRunOutputs: {
         parameters: {
             query?: {
@@ -4640,6 +4770,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Log"];
+                };
+            };
+            /** @description Log file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    downloadDAGRunStepLog: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Whether to return stdout or stderr logs */
+                stream?: components["parameters"]["Stream"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+                /** @description name of the step */
+                stepName: components["parameters"]["StepName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Log file content */
+            200: {
+                headers: {
+                    /** @description Attachment filename */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
                 };
             };
             /** @description Log file not found */
@@ -4999,6 +5181,56 @@ export interface operations {
             };
         };
     };
+    downloadSubDAGRunLog: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+                /** @description ID of the sub DAG-run to download the log for */
+                subDAGRunId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Log file content */
+            200: {
+                headers: {
+                    /** @description Attachment filename */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Log file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getSubDAGRunStepLog: {
         parameters: {
             query?: {
@@ -5037,6 +5269,60 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Log"];
+                };
+            };
+            /** @description Log file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    downloadSubDAGRunStepLog: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Whether to return stdout or stderr logs */
+                stream?: components["parameters"]["Stream"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+                /** @description ID of the sub DAG-run to download the step log for */
+                subDAGRunId: string;
+                /** @description name of the step */
+                stepName: components["parameters"]["StepName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Log file content */
+            200: {
+                headers: {
+                    /** @description Attachment filename */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
                 };
             };
             /** @description Log file not found */

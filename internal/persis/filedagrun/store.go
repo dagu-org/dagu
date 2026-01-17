@@ -203,6 +203,28 @@ func (store *Store) collectStatusesFromRoots(
 						tag.Error(err))
 					continue
 				}
+
+				// Filter by tags (AND logic)
+				if len(opts.Tags) > 0 {
+					match := true
+					for _, t := range opts.Tags {
+						found := false
+						for _, st := range status.Tags {
+							if st == t {
+								found = true
+								break
+							}
+						}
+						if !found {
+							match = false
+							break
+						}
+					}
+					if !match {
+						continue
+					}
+				}
+
 				if !hasStatusFilter {
 					statuses = append(statuses, status)
 					continue
