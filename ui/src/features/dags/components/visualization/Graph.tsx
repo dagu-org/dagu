@@ -65,7 +65,7 @@ declare global {
  * Graph component for visualizing DAG dagRuns
  * Renders a Mermaid.js flowchart with nodes and connections
  */
-const Graph: React.FC<Props> = ({
+function Graph({
   steps,
   flowchart = 'TD',
   onChangeFlowchart,
@@ -74,7 +74,7 @@ const Graph: React.FC<Props> = ({
   onRightClickNode,
   showIcons = true,
   isExpandedView = false,
-}) => {
+}: Props): React.JSX.Element {
   const [scale, setScale] = useState(isExpandedView ? 0.8 : 1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -155,11 +155,11 @@ const Graph: React.FC<Props> = ({
     // Track node classes for separate application
     const nodeClasses = new Map<string, string>();
 
-    const addNodeFn = (
+    function addNodeFn(
       step: components['schemas']['Step'],
       status: NodeStatus,
       node?: components['schemas']['Node']
-    ) => {
+    ): void {
       const id = toMermaidNodeId(step.name);
       const c = graphStatusMap[status] || '';
 
@@ -229,7 +229,7 @@ const Graph: React.FC<Props> = ({
 
       // We no longer add the standard Mermaid click handler
       // Double-click will be handled by our custom implementation
-    };
+    }
 
     // Process nodes based on type
     if (type === 'status') {
@@ -247,31 +247,31 @@ const Graph: React.FC<Props> = ({
     const nodeColor = '#3d3833'; // foreground
 
     dat.push(
-      `classDef none color:${nodeColor},fill:${nodeFill},stroke:#c8bfb0,stroke-width:1.2px`
+      `classDef none color:${nodeColor},fill:${nodeFill},stroke:#c8bfb0,stroke-width:2.5px`
     );
     dat.push(
-      `classDef running color:${nodeColor},fill:${nodeFill},stroke:#7da87d,stroke-width:1.2px`
+      `classDef running color:${nodeColor},fill:${nodeFill},stroke:#c0ebab,stroke-width:2.5px`
     );
     dat.push(
-      `classDef error color:${nodeColor},fill:${nodeFill},stroke:#c4726a,stroke-width:1.2px`
+      `classDef error color:${nodeColor},fill:${nodeFill},stroke:#c4726a,stroke-width:2.5px`
     );
     dat.push(
-      `classDef cancel color:${nodeColor},fill:${nodeFill},stroke:#d4a574,stroke-width:1.2px`
+      `classDef cancel color:${nodeColor},fill:${nodeFill},stroke:#e396b3,stroke-width:2.5px`
     );
     dat.push(
-      `classDef done color:${nodeColor},fill:${nodeFill},stroke:#7da87d,stroke-width:1.2px`
+      `classDef done color:${nodeColor},fill:${nodeFill},stroke:#7da87d,stroke-width:2.5px`
     );
     dat.push(
-      `classDef skipped color:${nodeColor},fill:${nodeFill},stroke:#6b635a,stroke-width:1.2px`
+      `classDef skipped color:${nodeColor},fill:${nodeFill},stroke:#6b635a,stroke-width:2.5px`
     );
     dat.push(
-      `classDef partial color:${nodeColor},fill:${nodeFill},stroke:#c4956a,stroke-width:1.2px`
+      `classDef partial color:${nodeColor},fill:${nodeFill},stroke:#c4956a,stroke-width:2.5px`
     );
     dat.push(
-      `classDef waiting color:${nodeColor},fill:${nodeFill},stroke:#f59e0b,stroke-width:1.2px`
+      `classDef waiting color:${nodeColor},fill:${nodeFill},stroke:#f59e0b,stroke-width:2.5px`
     );
     dat.push(
-      `classDef rejected color:${nodeColor},fill:${nodeFill},stroke:#dc2626,stroke-width:1.2px`
+      `classDef rejected color:${nodeColor},fill:${nodeFill},stroke:#dc2626,stroke-width:2.5px`
     );
 
     // Add custom link styles
@@ -408,13 +408,13 @@ const Graph: React.FC<Props> = ({
       )}
     </div>
   );
-};
+}
 
 /**
  * Calculate the maximum breadth of the graph
  * This helps determine the appropriate width for the graph container
  */
-const calculateGraphBreadth = (steps: Steps) => {
+function calculateGraphBreadth(steps: Steps): number {
   // Create a map of nodes and their dependencies
   const nodeMap = new Map<string, string[]>();
   const parentMap = new Map<string, string[]>();
@@ -435,7 +435,7 @@ const calculateGraphBreadth = (steps: Steps) => {
   const nodeLevels = new Map<string, number>();
   const visited = new Set<string>();
 
-  const calculateLevel = (nodeName: string, level = 0) => {
+  function calculateLevel(nodeName: string, level = 0): void {
     if (visited.has(nodeName)) return;
     visited.add(nodeName);
 
@@ -444,7 +444,7 @@ const calculateGraphBreadth = (steps: Steps) => {
     // Process children
     const children = parentMap.get(nodeName) || [];
     children.forEach((child) => calculateLevel(child, level + 1));
-  };
+  }
 
   // Start from nodes with no dependencies
   steps.forEach((node) => {
@@ -467,7 +467,7 @@ const calculateGraphBreadth = (steps: Steps) => {
   });
 
   return maxBreadth;
-};
+}
 
 export default Graph;
 
