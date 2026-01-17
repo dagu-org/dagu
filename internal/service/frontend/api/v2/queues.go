@@ -239,6 +239,10 @@ func (a *API) ListQueueItems(ctx context.Context, req api.ListQueueItemsRequestO
 		if err != nil {
 			continue
 		}
+		// Filter out running items from the "queued" list to avoid duplication
+		if summary.Status == api.StatusRunning {
+			continue
+		}
 		items = append(items, summary)
 	}
 
