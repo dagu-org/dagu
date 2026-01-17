@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -334,88 +333,16 @@ func (a *API) ListDAGRunsByName(ctx context.Context, request api.ListDAGRunsByNa
 }
 
 func (a *API) listDAGRuns(ctx context.Context, opts []exec.ListDAGRunStatusesOption) ([]api.DAGRunSummary, error) {
-	// Extract tags filter and build store options (tags are filtered client-side)
-	tagsFilter, storeOpts := extractTagsFilter(opts)
-
-	// Build allowed DAG names set if tags filter is specified
-	allowedDAGNames, err := a.buildAllowedDAGNames(ctx, tagsFilter)
-	if err != nil {
-		return nil, err
-	}
-	if tagsFilter != nil && len(allowedDAGNames) == 0 {
-		return []api.DAGRunSummary{}, nil
-	}
-
-	statuses, err := a.dagRunStore.ListStatuses(ctx, storeOpts...)
+	statuses, err := a.dagRunStore.ListStatuses(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("error listing dag-runs: %w", err)
 	}
 
 	dagRuns := make([]api.DAGRunSummary, 0, len(statuses))
 	for _, status := range statuses {
-		if allowedDAGNames != nil {
-			if _, ok := allowedDAGNames[status.Name]; !ok {
-				continue
-			}
-		}
 		dagRuns = append(dagRuns, toDAGRunSummary(*status))
 	}
 	return dagRuns, nil
-}
-
-// extractTagsFilter separates tag filter options from other options.
-// Tags are filtered client-side since the store doesn't support tag filtering.
-func extractTagsFilter(opts []exec.ListDAGRunStatusesOption) ([]string, []exec.ListDAGRunStatusesOption) {
-	var tagsFilter []string
-	storeOpts := make([]exec.ListDAGRunStatusesOption, 0, len(opts))
-
-	for _, opt := range opts {
-		tempOpts := exec.ListDAGRunStatusesOptions{}
-		opt(&tempOpts)
-		if len(tempOpts.Tags) > 0 {
-			tagsFilter = tempOpts.Tags
-		} else {
-			storeOpts = append(storeOpts, opt)
-		}
-	}
-	return tagsFilter, storeOpts
-}
-
-// buildAllowedDAGNames returns a set of DAG names that match all specified tags.
-// Returns nil if no tags filter is specified (all DAGs allowed).
-func (a *API) buildAllowedDAGNames(ctx context.Context, tagsFilter []string) (map[string]struct{}, error) {
-	if len(tagsFilter) == 0 {
-		return nil, nil
-	}
-
-	// Use a large page size to get all DAGs in one request
-	paginator := exec.NewPaginator(1, math.MaxInt)
-	result, _, err := a.dagStore.List(ctx, exec.ListDAGsOptions{Paginator: &paginator})
-	if err != nil {
-		return nil, fmt.Errorf("error getting DAGs for tag filter: %w", err)
-	}
-
-	allowedNames := make(map[string]struct{})
-	for _, dag := range result.Items {
-		if hasAllTags(dag.Tags, tagsFilter) {
-			allowedNames[dag.Name] = struct{}{}
-		}
-	}
-	return allowedNames, nil
-}
-
-// hasAllTags checks if dagTags contains all requiredTags (case-insensitive)
-func hasAllTags(dagTags, requiredTags []string) bool {
-	tagSet := make(map[string]struct{}, len(dagTags))
-	for _, t := range dagTags {
-		tagSet[strings.ToLower(t)] = struct{}{}
-	}
-	for _, req := range requiredTags {
-		if _, ok := tagSet[strings.ToLower(req)]; !ok {
-			return false
-		}
-	}
-	return true
 }
 
 // parseCommaSeparatedTags parses a comma-separated string of tags into a slice.

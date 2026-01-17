@@ -4138,6 +4138,11 @@ components:
         workerId:
           type: string
           description: "ID of the worker that executed this DAG-run ('local' for local execution)"
+        tags:
+          type: array
+          items:
+            type: string
+          description: "List of tags for categorizing and filtering DAG runs"
       required:
         - rootDAGRunName
         - rootDAGRunId

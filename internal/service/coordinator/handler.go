@@ -315,7 +315,7 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 		return fmt.Errorf("failed to open attempt: %w", err)
 	}
 
-	h.writeInitialStatus(ctx, attempt, dag.Name, task.DagRunId, task.AttemptKey, exec.DAGRunRef{})
+	h.writeInitialStatus(ctx, attempt, dag.Name, task.DagRunId, task.AttemptKey, exec.DAGRunRef{}, dag.Tags)
 
 	h.attemptsMu.Lock()
 	h.openAttempts[task.DagRunId] = attempt
@@ -367,7 +367,7 @@ func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinator
 		return fmt.Errorf("failed to open sub-attempt: %w", err)
 	}
 
-	h.writeInitialStatus(ctx, attempt, task.Target, task.DagRunId, task.AttemptKey, rootRef)
+	h.writeInitialStatus(ctx, attempt, task.Target, task.DagRunId, task.AttemptKey, rootRef, dag.Tags)
 
 	h.attemptsMu.Lock()
 	h.openAttempts[task.DagRunId] = attempt
@@ -385,7 +385,7 @@ func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinator
 
 // writeInitialStatus writes an initial NotStarted status to the attempt.
 // This ensures the status file is not empty when read before the worker reports its first status.
-func (h *Handler) writeInitialStatus(ctx context.Context, attempt exec.DAGRunAttempt, dagName, dagRunID, attemptKey string, root exec.DAGRunRef) {
+func (h *Handler) writeInitialStatus(ctx context.Context, attempt exec.DAGRunAttempt, dagName, dagRunID, attemptKey string, root exec.DAGRunRef, tags []string) {
 	initialStatus := exec.DAGRunStatus{
 		Name:       dagName,
 		DAGRunID:   dagRunID,
@@ -394,6 +394,7 @@ func (h *Handler) writeInitialStatus(ctx context.Context, attempt exec.DAGRunAtt
 		Status:     core.NotStarted,
 		StartedAt:  time.Now().UTC().Format(time.RFC3339),
 		Root:       root,
+		Tags:       tags,
 	}
 	if err := attempt.Write(ctx, initialStatus); err != nil {
 		logger.Warn(ctx, "Failed to write initial status", tag.Error(err), tag.RunID(dagRunID))

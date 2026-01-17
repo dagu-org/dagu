@@ -29,6 +29,7 @@ func InitialStatus(dag *core.DAG) DAGRunStatus {
 		StartedAt:     stringutil.FormatTime(time.Time{}),
 		FinishedAt:    stringutil.FormatTime(time.Time{}),
 		Preconditions: dag.Preconditions,
+		Tags:          dag.Tags,
 	}
 }
 
@@ -59,6 +60,7 @@ type DAGRunStatus struct {
 	Params        string            `json:"params,omitempty"`
 	ParamsList    []string          `json:"paramsList,omitempty"`
 	Preconditions []*core.Condition `json:"preconditions,omitempty"`
+	Tags          []string          `json:"tags,omitempty"`
 }
 
 // DAGRun returns a reference to the dag-run associated with this status
