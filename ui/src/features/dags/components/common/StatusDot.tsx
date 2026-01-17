@@ -12,36 +12,28 @@ export function StatusDot({ status, statusLabel }: Props) {
 
   switch (status) {
     case Status.Success:
-      bgColor = 'bg-[green]';
+      bgColor = 'bg-success';
       break;
     case Status.Failed:
-      bgColor = 'bg-[red]';
+    case Status.Rejected:
+      bgColor = 'bg-destructive';
       break;
     case Status.Running:
-      bgColor = 'bg-success';
+      bgColor = 'bg-primary';
       animation = 'animate-pulse';
-      break;
-    case Status.Aborted:
-      bgColor = 'bg-[deeppink]';
-      break;
-    case Status.NotStarted:
-      bgColor = 'bg-[steelblue]';
       break;
     case Status.Queued:
-      bgColor = 'bg-[purple]';
+    case Status.NotStarted:
+      bgColor = 'bg-info';
       break;
     case Status.PartialSuccess:
-      bgColor = 'bg-[#ea580c]';
-      break;
     case Status.Waiting:
-      bgColor = 'bg-[#f59e0b]';
-      animation = 'animate-pulse';
-      break;
-    case Status.Rejected:
-      bgColor = 'bg-[#dc2626]';
+    case Status.Aborted:
+      bgColor = 'bg-warning';
+      if (status === Status.Waiting) animation = 'animate-pulse';
       break;
     default:
-      bgColor = 'bg-[gray]';
+      bgColor = 'bg-muted';
   }
 
   return (

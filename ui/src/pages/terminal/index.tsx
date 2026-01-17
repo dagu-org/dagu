@@ -1,11 +1,12 @@
-import { useEffect, useRef, useContext, useCallback, useState } from 'react';
-import { Terminal } from '@xterm/xterm';
+import { AppBarContext } from '@/contexts/AppBarContext';
+import { TOKEN_KEY, useAuth, useIsAdmin } from '@/contexts/AuthContext';
+import { useConfig } from '@/contexts/ConfigContext';
+import { useUserPreferences } from '@/contexts/UserPreference';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
-import { useConfig } from '@/contexts/ConfigContext';
-import { useAuth, useIsAdmin, TOKEN_KEY } from '@/contexts/AuthContext';
-import { AppBarContext } from '@/contexts/AppBarContext';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 type MessageType = 'input' | 'output' | 'resize' | 'close' | 'error';
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
@@ -24,7 +25,10 @@ function getStatusBadgeClass(status: ConnectionStatus): string {
   }
 }
 
-function getStatusText(status: ConnectionStatus, errorMessage: string | null): string {
+function getStatusText(
+  status: ConnectionStatus,
+  errorMessage: string | null
+): string {
   switch (status) {
     case 'connected':
       return 'Connected';
@@ -55,8 +59,12 @@ export default function TerminalPage() {
   const { user } = useAuth();
   const isAdmin = useIsAdmin();
   const appBarContext = useContext(AppBarContext);
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
+  const [connectionStatus, setConnectionStatus] =
+    useState<ConnectionStatus>('disconnected');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const { preferences } = useUserPreferences();
+  const theme = preferences.theme || 'dark';
 
   // Set page title on mount
   useEffect(() => {
@@ -84,21 +92,21 @@ export default function TerminalPage() {
   useEffect(() => {
     if (!termRef.current || !isAdmin || !config.terminalEnabled) return;
 
-    // Initialize terminal
+    // Initialize terminal with theme
     const term = new Terminal({
       cursorBlink: true,
       fontSize: 14,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       theme: {
-        background: '#1e1e1e',
-        foreground: '#d4d4d4',
-        cursor: '#d4d4d4',
-        cursorAccent: '#1e1e1e',
-        selectionBackground: '#264f78',
+        background: theme === 'dark' ? '#020617' : '#ffffff',
+        foreground: theme === 'dark' ? '#d4d4d4' : '#020617',
+        cursor: theme === 'dark' ? '#d4d4d4' : '#020617',
+        cursorAccent: theme === 'dark' ? '#020617' : '#ffffff',
+        selectionBackground: theme === 'dark' ? '#264f78' : '#add6ff',
       },
       allowProposedApi: true,
     });
-
+    /* ... existing initialization ... */
     const fitAddon = new FitAddon();
     const webLinksAddon = new WebLinksAddon();
 
@@ -108,7 +116,7 @@ export default function TerminalPage() {
 
     terminalRef.current = term;
     fitAddonRef.current = fitAddon;
-
+    /* ... rest of the effect ... */
     // Initial fit
     setTimeout(() => fitAddon.fit(), 0);
 
@@ -134,11 +142,13 @@ export default function TerminalPage() {
       // Send initial resize
       setTimeout(() => {
         fitAddon.fit();
-        ws.send(JSON.stringify({
-          type: 'resize',
-          cols: term.cols,
-          rows: term.rows,
-        }));
+        ws.send(
+          JSON.stringify({
+            type: 'resize',
+            cols: term.cols,
+            rows: term.rows,
+          })
+        );
       }, 100);
     };
 
@@ -171,10 +181,12 @@ export default function TerminalPage() {
     // Handle terminal input
     term.onData((data) => {
       if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          type: 'input',
-          data: btoa(data),
-        }));
+        ws.send(
+          JSON.stringify({
+            type: 'input',
+            data: btoa(data),
+          })
+        );
       }
     });
 
@@ -183,11 +195,13 @@ export default function TerminalPage() {
       if (fitAddon && term) {
         fitAddon.fit();
         if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({
-            type: 'resize',
-            cols: term.cols,
-            rows: term.rows,
-          }));
+          ws.send(
+            JSON.stringify({
+              type: 'resize',
+              cols: term.cols,
+              rows: term.rows,
+            })
+          );
         }
       }
     });
@@ -197,12 +211,15 @@ export default function TerminalPage() {
     // Cleanup
     return () => {
       resizeObserver.disconnect();
-      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+      if (
+        ws.readyState === WebSocket.OPEN ||
+        ws.readyState === WebSocket.CONNECTING
+      ) {
         ws.close(1000, 'Component unmounted');
       }
       term.dispose();
     };
-  }, [config.basePath, config.terminalEnabled, isAdmin]);
+  }, [config.basePath, config.terminalEnabled, isAdmin, theme]);
 
   // Handle window resize
   useEffect(() => {
@@ -214,7 +231,9 @@ export default function TerminalPage() {
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">You do not have permission to access this page.</p>
+        <p className="text-muted-foreground">
+          You do not have permission to access this page.
+        </p>
       </div>
     );
   }
@@ -222,7 +241,9 @@ export default function TerminalPage() {
   if (!config.terminalEnabled) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Terminal is not enabled. Set DAGU_TERMINAL_ENABLED=true to enable.</p>
+        <p className="text-muted-foreground">
+          Terminal is not enabled. Set DAGU_TERMINAL_ENABLED=true to enable.
+        </p>
       </div>
     );
   }
@@ -233,11 +254,14 @@ export default function TerminalPage() {
         <div>
           <h1 className="text-lg font-semibold">Terminal</h1>
           <p className="text-sm text-muted-foreground">
-            Interactive shell session on local server as {user?.username || 'admin'}
+            Interactive shell session on local server as{' '}
+            {user?.username || 'admin'}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded ${getStatusBadgeClass(connectionStatus)}`}>
+          <span
+            className={`inline-flex items-center px-2 py-0.5 text-xs rounded ${getStatusBadgeClass(connectionStatus)}`}
+          >
             {getStatusText(connectionStatus, errorMessage)}
           </span>
         </div>
@@ -249,7 +273,7 @@ export default function TerminalPage() {
       )}
       <div
         ref={termRef}
-        className="flex-1 rounded border bg-[#1e1e1e] min-h-0 overflow-hidden"
+        className="flex-1 rounded border bg-background min-h-0 overflow-hidden"
         style={{ minHeight: '400px' }}
       />
     </div>

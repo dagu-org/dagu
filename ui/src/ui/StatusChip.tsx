@@ -11,61 +11,31 @@ type Props = {
 
 function StatusChip({ status, children, size = 'md' }: Props) {
   // Determine the colors and icon based on status
-  let bgColorClass = '';
-  let textColorClass = '';
-  let borderColorClass = '';
+  let statusClass = '';
   const isRunning = status === Status.Running;
 
   switch (status) {
-    case Status.Success: // done -> muted green (sepia-compatible)
-      bgColorClass = 'bg-[rgba(107,168,107,0.12)]';
-      borderColorClass = 'border-[#6ba86b]';
-      textColorClass = 'text-[#5a8a5a]';
+    case Status.Success:
+      statusClass = 'status-success';
       break;
-    case Status.Failed: // error -> warm coral red (sepia-compatible)
-      bgColorClass = 'bg-[rgba(196,114,106,0.12)]';
-      borderColorClass = 'border-[#c4726a]';
-      textColorClass = 'text-[#b05a52]';
+    case Status.Failed:
+    case Status.Rejected:
+      statusClass = 'status-failed';
       break;
-    case Status.Running: // running -> accent green (sepia-compatible)
-      bgColorClass = 'bg-[rgba(125,168,125,0.15)]';
-      borderColorClass = 'border-[#7da87d]';
-      textColorClass = 'text-[#6b9a6b]';
+    case Status.Running:
+      statusClass = 'status-running';
       break;
-    case Status.Aborted: // aborted -> muted coral/pink (sepia-compatible)
-      bgColorClass = 'bg-[rgba(212,132,122,0.12)]';
-      borderColorClass = 'border-[#d4847a]';
-      textColorClass = 'text-[#c06a62]';
+    case Status.Queued:
+    case Status.NotStarted:
+      statusClass = 'status-info';
       break;
-    case Status.NotStarted: // none -> slate blue (sepia-compatible)
-      bgColorClass = 'bg-[rgba(138,159,196,0.12)]';
-      borderColorClass = 'border-[#8a9fc4]';
-      textColorClass = 'text-[#6a7fa4]';
+    case Status.PartialSuccess:
+    case Status.Waiting:
+    case Status.Aborted:
+      statusClass = 'status-warning';
       break;
-    case Status.Queued: // queued -> muted purple (sepia-compatible)
-      bgColorClass = 'bg-[rgba(154,122,196,0.12)]';
-      borderColorClass = 'border-[#9a7ac4]';
-      textColorClass = 'text-[#7a5aa4]';
-      break;
-    case Status.PartialSuccess: // partial success -> warm amber (sepia-compatible)
-      bgColorClass = 'bg-[rgba(212,148,106,0.12)]';
-      borderColorClass = 'border-[#d4946a]';
-      textColorClass = 'text-[#c47a4a]';
-      break;
-    case Status.Waiting: // waiting for approval -> amber/yellow (attention-grabbing)
-      bgColorClass = 'bg-[rgba(245,158,11,0.15)]';
-      borderColorClass = 'border-[#f59e0b]';
-      textColorClass = 'text-[#d97706]';
-      break;
-    case Status.Rejected: // rejected -> coral/red (sepia-compatible)
-      bgColorClass = 'bg-[rgba(220,38,38,0.12)]';
-      borderColorClass = 'border-[#dc2626]';
-      textColorClass = 'text-[#b91c1c]';
-      break;
-    default: // Fallback to warm gray (sepia-compatible)
-      bgColorClass = 'bg-[rgba(168,160,152,0.12)]';
-      borderColorClass = 'border-[#a8a098]';
-      textColorClass = 'text-[#6b635a]';
+    default:
+      statusClass = 'status-muted';
   }
 
   // Size classes
@@ -76,25 +46,18 @@ function StatusChip({ status, children, size = 'md' }: Props) {
     lg: 'text-base py-1.5 px-4',
   };
 
-  // Render a pill-shaped badge with icon and text
+  // Render a pill-shaped badge with text
   return (
     <div
       className={cn(
-        'inline-flex items-center rounded-full border',
-        bgColorClass,
-        borderColorClass,
-        textColorClass,
+        'inline-flex items-center rounded-full border font-bold uppercase tracking-wider',
+        statusClass,
         sizeClasses[size]
       )}
     >
-      <span
-        className={cn(
-          'font-normal break-keep text-nowrap whitespace-nowrap',
-          textColorClass
-        )}
-      >
+      <span className="font-bold break-keep text-nowrap whitespace-nowrap">
         {isRunning && typeof children === 'string' ? (
-          <MatrixText text={children} className={textColorClass} />
+          <MatrixText text={children} />
         ) : (
           children
         )}

@@ -1,4 +1,4 @@
-import { Calendar, Server, Terminal, Timer, RefreshCw } from 'lucide-react';
+import { Calendar, RefreshCw, Server, Terminal, Timer } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { components, Status } from '../../../../api/v2/schema';
@@ -94,10 +94,10 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
     const handleKeyPress = (e: KeyboardEvent) => {
       // Get current tab (default to 'status' if not set)
       const currentTab = params.tab || 'status';
-      
+
       // Only trigger on status tab and when not typing
       if (currentTab !== 'status') return;
-      
+
       // Check if user is typing in an input field
       const target = e.target as HTMLElement;
       if (
@@ -109,9 +109,15 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
       ) {
         return;
       }
-      
+
       // Check for 'r' key without modifiers
-      if (e.key === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+      if (
+        e.key === 'r' &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey &&
+        !e.shiftKey
+      ) {
         e.preventDefault();
         handleRefresh();
       }
@@ -122,7 +128,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
   }, [params.tab, handleRefresh]);
 
   return (
-    <div className="bg-gradient-to-br from-slate-50 via-white to-slate-50 rounded-2xl p-6 mb-6 border border-border">
+    <div className="bg-card rounded-2xl p-6 mb-6 border border-border shadow-sm">
       {/* Header with title and actions */}
       <div className="flex items-start justify-between gap-6 mb-4">
         <div className="flex-1 min-w-0">
@@ -137,9 +143,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
                 >
                   {dagRunToDisplay.rootDAGRunName}
                 </a>
-                <span className="text-muted-foreground mx-1">
-                  /
-                </span>
+                <span className="text-muted-foreground mx-1">/</span>
               </>
             )}
 
@@ -156,9 +160,7 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
                   >
                     {dagRunToDisplay.parentDAGRunName}
                   </a>
-                  <span className="text-muted-foreground mx-1">
-                    /
-                  </span>
+                  <span className="text-muted-foreground mx-1">/</span>
                 </>
               )}
           </nav>
@@ -197,7 +199,9 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
               className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               title="Refresh (R)"
             >
-              <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`}
+              />
               <span>Refresh</span>
             </button>
 
@@ -230,7 +234,9 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
             )}
 
             <div className="flex items-center gap-1.5 text-muted-foreground">
-              <span className="font-medium text-xs uppercase tracking-wide">Run ID</span>
+              <span className="font-medium text-xs uppercase tracking-wide">
+                Run ID
+              </span>
               <code className="bg-accent text-foreground px-2 py-1 rounded-md text-xs font-mono border">
                 {dagRunToDisplay.rootDAGRunId}
               </code>

@@ -56,7 +56,6 @@ function getContrastColor(input?: string): string {
 }
 
 // Constants
-const sidebarWidthCollapsed = 'w-12'; // 48px for icon-only sidebar
 
 type LayoutProps = {
   navbarColor?: string;
@@ -107,24 +106,19 @@ function Content({ navbarColor, children }: LayoutProps) {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background">
-      {/* Desktop Sidebar - Hidden on mobile, visible in collapsed state on desktop */}
-      <div
+    <div className="flex h-screen w-full overflow-hidden bg-background">
+      {/* Sidebar - Desktop */}
+      <aside
         className={cn(
-          // Modern base styles with sidebar background
-          'h-full overflow-hidden',
+          'hidden md:block h-full transition-all duration-300 ease-in-out border-r border-border/40 z-20',
+          isSidebarExpanded ? 'w-60' : 'w-[68px]',
           !hasCustomColor && 'bg-sidebar text-sidebar-foreground',
-          hasCustomColor && 'custom-sidebar-color',
-          // Hidden on mobile, visible on desktop
-          'hidden md:block',
-          'z-40 transition-all duration-200 ease-in-out',
-          isSidebarExpanded ? 'w-60' : sidebarWidthCollapsed
+          hasCustomColor && 'custom-sidebar-color'
         )}
         style={sidebarStyle}
       >
-        {/* Simplified flex column layout */}
         <div className="flex flex-col h-full">
-          <nav className="flex-1">
+          <nav className="flex-1 px-3 py-4">
             <MainListItems
               isOpen={isSidebarExpanded}
               onToggle={toggleSidebar}
@@ -132,33 +126,66 @@ function Content({ navbarColor, children }: LayoutProps) {
             />
           </nav>
         </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <div className="flex flex-col flex-1 h-full overflow-hidden relative bg-background/50">
+        {/* Mobile Header Bar */}
+        <header
+          className={cn(
+            'md:hidden flex items-center justify-between h-14 px-4 flex-shrink-0 border-b border-border/40',
+            !hasCustomColor && 'bg-sidebar text-sidebar-foreground',
+            hasCustomColor && 'custom-sidebar-color'
+          )}
+          style={sidebarStyle}
+        >
+          <button
+            className="p-2 rounded-md hover:bg-white/5 transition-colors"
+            onClick={() => setIsMobileSidebarOpen(true)}
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <span className="font-semibold text-sm tracking-tight uppercase opacity-80">
+            {config.title || 'Dagu'}
+          </span>
+          <div className="w-8" />
+        </header>
+
+        {/* Scrollable Content */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 lg:p-8">
+          <div className="w-full h-full">{children}</div>
+        </main>
       </div>
 
-      {/* Mobile Sidebar - Overlay that appears when hamburger menu is clicked */}
+      {/* Mobile Sidebar - Overlay */}
       {isMobileSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-50 md:hidden flex"
+          className="fixed inset-0 bg-background/80 z-50 md:hidden flex backdrop-blur-md"
           onClick={() => setIsMobileSidebarOpen(false)}
         >
           <div
             className={cn(
-              'h-full w-60 overflow-hidden',
+              'h-full w-64 overflow-hidden shadow-2xl border-r border-border/40',
               !hasCustomColor && 'bg-sidebar text-sidebar-foreground',
               hasCustomColor && 'custom-sidebar-color'
             )}
             style={sidebarStyle}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-end p-4">
+            <div className="flex justify-between items-center p-4 border-b border-border/10">
+              <span className="font-bold text-lg">
+                {config.title || 'Dagu'}
+              </span>
               <button
                 onClick={() => setIsMobileSidebarOpen(false)}
-                className="text-current hover:opacity-70 transition-colors"
+                className="p-1 hover:bg-white/5 rounded-md transition-colors"
               >
-                <X className="h-6 w-6" />
+                <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="flex flex-col h-full">
-              <nav className="flex-1">
+            <div className="flex flex-col h-full pt-2">
+              <nav className="flex-1 px-3">
                 <MainListItems
                   isOpen={true}
                   onNavItemClick={() => setIsMobileSidebarOpen(false)}
@@ -169,34 +196,6 @@ function Content({ navbarColor, children }: LayoutProps) {
           </div>
         </div>
       )}
-
-      {/* Main Content Area */}
-      <div className="flex flex-col flex-1 h-full overflow-hidden bg-muted/30">
-        {/* Mobile Header Bar */}
-        <div
-          className={cn(
-            'md:hidden flex items-center justify-between h-12 px-3 flex-shrink-0',
-            !hasCustomColor && 'bg-sidebar text-sidebar-foreground',
-            hasCustomColor && 'custom-sidebar-color'
-          )}
-          style={sidebarStyle}
-        >
-          <button
-            className="p-1.5 rounded-md hover:bg-white/10 transition-colors"
-            onClick={() => setIsMobileSidebarOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-          <span className="font-bold text-lg">{config.title || 'Dagu'}</span>
-          <div className="w-8" /> {/* Spacer for balance */}
-        </div>
-
-        {/* Scrollable Content */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden px-2 md:px-2 py-2 md:py-2">
-          {children}
-        </main>
-      </div>
     </div>
   );
 }

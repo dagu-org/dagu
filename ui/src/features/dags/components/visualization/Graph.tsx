@@ -5,6 +5,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
+import { useUserPreferences } from '@/contexts/UserPreference';
 import { cn, toMermaidNodeId } from '@/lib/utils';
 import {
   ArrowDownUp,
@@ -78,6 +79,8 @@ function Graph({
   const [scale, setScale] = useState(isExpandedView ? 0.8 : 1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const { preferences } = useUserPreferences();
+  const isDarkMode = preferences.theme !== 'light';
 
   /** Increase zoom level */
   const zoomIn = () => {
@@ -125,10 +128,11 @@ function Graph({
     maxHeight: isExpandedView ? 'none' : '300px',
     height: isExpandedView ? '100%' : 'auto',
     borderRadius: '0.5em',
-    background: `
-      linear-gradient(90deg, #f0ebe3 1px, transparent 1px),
-      linear-gradient(180deg, #f0ebe3 1px, transparent 1px)
-    `,
+    background: isDarkMode
+      ? `linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px),
+         linear-gradient(180deg, rgba(255,255,255,0.08) 1px, transparent 1px)`
+      : `linear-gradient(90deg, rgba(0,0,0,0.15) 1px, transparent 1px),
+         linear-gradient(180deg, rgba(0,0,0,0.15) 1px, transparent 1px)`,
     backgroundSize: '20px 20px',
   };
 
@@ -242,30 +246,32 @@ function Graph({
       );
     }
 
-    // Define node styles for different states with sepia theme colors
-    const nodeFill = '#faf8f5'; // card
-    const nodeColor = '#3d3833'; // foreground
+    // Define node styles for different states
+    // Use theme-appropriate colors for light/dark modes
+    const nodeFill = isDarkMode ? '#1e293b' : '#ffffff'; // slate-800 for dark, white for light
+    const nodeColor = isDarkMode ? '#f8fafc' : '#1e293b'; // slate-50 for dark, slate-800 for light
+    const strokeDefault = isDarkMode ? '#64748b' : '#94a3b8'; // slate-500/slate-400
 
     dat.push(
-      `classDef none color:${nodeColor},fill:${nodeFill},stroke:#c8bfb0,stroke-width:2.5px`
+      `classDef none color:${nodeColor},fill:${nodeFill},stroke:${strokeDefault},stroke-width:2.5px`
     );
     dat.push(
-      `classDef running color:${nodeColor},fill:${nodeFill},stroke:#c0ebab,stroke-width:2.5px`
+      `classDef running color:${nodeColor},fill:${nodeFill},stroke:#22c55e,stroke-width:2.5px`
     );
     dat.push(
-      `classDef error color:${nodeColor},fill:${nodeFill},stroke:#c4726a,stroke-width:2.5px`
+      `classDef error color:${nodeColor},fill:${nodeFill},stroke:#ef4444,stroke-width:2.5px`
     );
     dat.push(
-      `classDef cancel color:${nodeColor},fill:${nodeFill},stroke:#e396b3,stroke-width:2.5px`
+      `classDef cancel color:${nodeColor},fill:${nodeFill},stroke:#ec4899,stroke-width:2.5px`
     );
     dat.push(
-      `classDef done color:${nodeColor},fill:${nodeFill},stroke:#7da87d,stroke-width:2.5px`
+      `classDef done color:${nodeColor},fill:${nodeFill},stroke:#22c55e,stroke-width:2.5px`
     );
     dat.push(
-      `classDef skipped color:${nodeColor},fill:${nodeFill},stroke:#6b635a,stroke-width:2.5px`
+      `classDef skipped color:${nodeColor},fill:${nodeFill},stroke:#6b7280,stroke-width:2.5px`
     );
     dat.push(
-      `classDef partial color:${nodeColor},fill:${nodeFill},stroke:#c4956a,stroke-width:2.5px`
+      `classDef partial color:${nodeColor},fill:${nodeFill},stroke:#f59e0b,stroke-width:2.5px`
     );
     dat.push(
       `classDef waiting color:${nodeColor},fill:${nodeFill},stroke:#f59e0b,stroke-width:2.5px`
@@ -283,7 +289,7 @@ function Graph({
     });
 
     return dat.join('\n');
-  }, [steps, onClickNode, flowchart, showIcons]);
+  }, [steps, onClickNode, flowchart, showIcons, isDarkMode]);
 
   return (
     <div

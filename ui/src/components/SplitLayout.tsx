@@ -43,7 +43,9 @@ function SplitLayout({
     return defaultLeftWidth;
   });
   const [isDragging, setIsDragging] = useState(false);
-  const [leftPanelPixelWidth, setLeftPanelPixelWidth] = useState<number | null>(null);
+  const [leftPanelPixelWidth, setLeftPanelPixelWidth] = useState<number | null>(
+    null
+  );
 
   // Track actual pixel width of left panel
   useEffect(() => {
@@ -120,10 +122,7 @@ function SplitLayout({
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
   return (
-    <div
-      ref={containerRef}
-      className="flex h-full overflow-hidden"
-    >
+    <div ref={containerRef} className="flex h-full overflow-hidden">
       {/* Left Panel - Full width on mobile, percentage width on desktop */}
       <div
         ref={leftPanelRef}
@@ -137,12 +136,16 @@ function SplitLayout({
 
       {/* Draggable Divider - Hidden on mobile */}
       <div
-        className="hidden md:flex items-center justify-center w-1 h-full bg-border hover:bg-primary/50 cursor-col-resize flex-shrink-0 transition-colors group"
+        className={`hidden md:flex items-center justify-center w-[1px] h-full bg-border/20 hover:bg-primary/50 hover:shadow-[0_0_10px_var(--color-primary)] cursor-col-resize flex-shrink-0 transition-all duration-300 group z-30 ${
+          isDragging ? 'bg-primary shadow-[0_0_15px_var(--color-primary)]' : ''
+        }`}
         onMouseDown={handleMouseDown}
       >
         <div
-          className={`w-0.5 h-8 rounded-full transition-colors ${
-            isDragging ? 'bg-primary' : 'bg-muted-foreground/30 group-hover:bg-primary/70'
+          className={`w-1 h-8 rounded-full transition-all duration-300 ${
+            isDragging
+              ? 'bg-primary shadow-[0_0_10px_var(--color-primary)] scale-110'
+              : 'bg-muted-foreground/30 group-hover:bg-primary group-hover:shadow-[0_0_8px_var(--color-primary)]'
           }`}
         />
       </div>

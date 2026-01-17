@@ -179,21 +179,23 @@ function InlineLogViewer({
   const lineCount = data?.lineCount || 0;
 
   return (
-    <div className="bg-slate-800 rounded overflow-hidden">
+    <div className="bg-muted rounded overflow-hidden border border-border">
       {isLoading && !data ? (
-        <div className="text-slate-400 text-xs py-4 px-3">Loading logs...</div>
+        <div className="text-muted-foreground text-xs py-4 px-3">
+          Loading logs...
+        </div>
       ) : lines.length === 0 ? (
-        <div className="text-slate-400 text-xs py-4 px-3">
+        <div className="text-muted-foreground text-xs py-4 px-3">
           &lt;No log output&gt;
         </div>
       ) : (
         <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-          <pre className="font-mono text-[11px] text-slate-100 p-2">
+          <pre className="font-mono text-[11px] text-foreground p-2">
             {lines.map((line, index) => {
               const lineNumber = totalLines - lineCount + index + 1;
               return (
                 <div key={index} className="flex px-1 py-0.5">
-                  <span className="text-slate-500 mr-3 select-none w-12 text-right flex-shrink-0">
+                  <span className="text-muted-foreground/50 mr-3 select-none w-12 text-right flex-shrink-0">
                     {lineNumber}
                   </span>
                   <span className="whitespace-pre-wrap break-all flex-grow">
@@ -757,14 +759,15 @@ function NodeStatusTableRow({
                   )}
                 </div>
               )}
-              {node.approvalInputs && Object.keys(node.approvalInputs).length > 0 && (
-                <div className="text-xs text-muted-foreground leading-tight">
-                  <span className="font-medium">Inputs:</span>{' '}
-                  <span className="font-mono text-foreground/80">
-                    {JSON.stringify(node.approvalInputs)}
-                  </span>
-                </div>
-              )}
+              {node.approvalInputs &&
+                Object.keys(node.approvalInputs).length > 0 && (
+                  <div className="text-xs text-muted-foreground leading-tight">
+                    <span className="font-medium">Inputs:</span>{' '}
+                    <span className="font-mono text-foreground/80">
+                      {JSON.stringify(node.approvalInputs)}
+                    </span>
+                  </div>
+                )}
               {/* Rejection info for rejected HITL steps */}
               {node.rejectedBy && (
                 <div className="text-xs text-muted-foreground leading-tight">
@@ -780,7 +783,9 @@ function NodeStatusTableRow({
               {node.rejectionReason && (
                 <div className="text-xs text-muted-foreground leading-tight">
                   <span className="font-medium">Reason:</span>{' '}
-                  <span className="text-foreground/80">{node.rejectionReason}</span>
+                  <span className="text-foreground/80">
+                    {node.rejectionReason}
+                  </span>
                 </div>
               )}
             </div>
@@ -909,20 +914,21 @@ function NodeStatusTableRow({
                   </>
                 )}
                 {/* Retry button - hidden for Waiting and Rejected steps */}
-                {node.status !== NodeStatus.Waiting && node.status !== NodeStatus.Rejected && (
-                  <Button
-                    size="icon-sm"
-                    className="btn-3d-secondary"
-                    title="Retry from this step"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowDialog(true);
-                    }}
-                    disabled={loading || dagRun.status === Status.Running}
-                  >
-                    <Play className="h-4 w-4 text-success" />
-                  </Button>
-                )}
+                {node.status !== NodeStatus.Waiting &&
+                  node.status !== NodeStatus.Rejected && (
+                    <Button
+                      size="icon-sm"
+                      className="btn-3d-secondary"
+                      title="Retry from this step"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowDialog(true);
+                      }}
+                      disabled={loading || dagRun.status === Status.Running}
+                    >
+                      <Play className="h-4 w-4 text-success" />
+                    </Button>
+                  )}
               </div>
               <Dialog open={showDialog} onOpenChange={setShowDialog}>
                 <DialogContent>
@@ -946,11 +952,7 @@ function NodeStatusTableRow({
                       <X className="h-4 w-4" />
                       Cancel
                     </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleRetry}
-                      disabled={loading}
-                    >
+                    <Button size="sm" onClick={handleRetry} disabled={loading}>
                       <Play className="h-4 w-4" />
                       {loading ? 'Retrying...' : 'Retry'}
                     </Button>
@@ -1144,15 +1146,18 @@ function NodeStatusTableRow({
       {/* Command section */}
       <div className="mb-3">
         <div className="text-xs font-medium text-foreground/90 mb-1">
-          {node.step.commands && node.step.commands.length > 1 ? 'Commands:' : 'Command:'}
+          {node.step.commands && node.step.commands.length > 1
+            ? 'Commands:'
+            : 'Command:'}
         </div>
         <div className="space-y-1.5">
           {node.step.commands && node.step.commands.length > 0 && (
             <div className="space-y-1.5">
               {node.step.commands.map((entry, idx) => {
-                const fullCmd = entry.args && entry.args.length > 0
-                  ? `${entry.command} ${entry.args.join(' ')}`
-                  : entry.command;
+                const fullCmd =
+                  entry.args && entry.args.length > 0
+                    ? `${entry.command} ${entry.args.join(' ')}`
+                    : entry.command;
                 return (
                   <div key={idx} className="flex items-start gap-1.5 text-xs">
                     {node.step.commands && node.step.commands.length > 1 ? (
@@ -1209,14 +1214,15 @@ function NodeStatusTableRow({
               )}
             </div>
           )}
-          {node.approvalInputs && Object.keys(node.approvalInputs).length > 0 && (
-            <div className="text-xs text-muted-foreground">
-              <span className="font-medium">Inputs:</span>{' '}
-              <span className="font-mono text-foreground/80">
-                {JSON.stringify(node.approvalInputs)}
-              </span>
-            </div>
-          )}
+          {node.approvalInputs &&
+            Object.keys(node.approvalInputs).length > 0 && (
+              <div className="text-xs text-muted-foreground">
+                <span className="font-medium">Inputs:</span>{' '}
+                <span className="font-mono text-foreground/80">
+                  {JSON.stringify(node.approvalInputs)}
+                </span>
+              </div>
+            )}
           {/* Rejection info for rejected HITL steps */}
           {node.rejectedBy && (
             <div className="text-xs text-muted-foreground">
@@ -1338,16 +1344,17 @@ function NodeStatusTableRow({
             </>
           )}
           {/* Retry button - hidden for Waiting and Rejected steps */}
-          {node.status !== NodeStatus.Waiting && node.status !== NodeStatus.Rejected && (
-            <button
-              className="p-2 rounded-full hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Retry from this step"
-              onClick={() => setShowDialog(true)}
-              disabled={loading || dagRun.status === Status.Running}
-            >
-              <Play className="h-6 w-6 text-success" />
-            </button>
-          )}
+          {node.status !== NodeStatus.Waiting &&
+            node.status !== NodeStatus.Rejected && (
+              <button
+                className="p-2 rounded-full hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Retry from this step"
+                onClick={() => setShowDialog(true)}
+                disabled={loading || dagRun.status === Status.Running}
+              >
+                <Play className="h-6 w-6 text-success" />
+              </button>
+            )}
           <Dialog open={showDialog} onOpenChange={setShowDialog}>
             <DialogContent>
               <DialogHeader>
@@ -1370,11 +1377,7 @@ function NodeStatusTableRow({
                   <X className="h-4 w-4" />
                   Cancel
                 </Button>
-                <Button
-                  size="sm"
-                  onClick={handleRetry}
-                  disabled={loading}
-                >
+                <Button size="sm" onClick={handleRetry} disabled={loading}>
                   <Play className="h-4 w-4" />
                   {loading ? 'Retrying...' : 'Retry'}
                 </Button>

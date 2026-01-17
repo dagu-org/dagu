@@ -1,6 +1,6 @@
+import type { YamlPathSegment } from '@/hooks/useYamlCursorPath';
 import { cn } from '@/lib/utils';
 import { ChevronRight } from 'lucide-react';
-import type { YamlPathSegment } from '@/hooks/useYamlCursorPath';
 
 interface SchemaPathBreadcrumbProps {
   segments: YamlPathSegment[];
@@ -34,9 +34,7 @@ export function SchemaPathBreadcrumb({
           <span
             className={cn(
               'px-1 py-0.5 rounded text-foreground',
-              segment.isArrayIndex
-                ? 'font-mono bg-[rgba(196,158,106,0.15)] text-[#9a7a4a]'
-                : 'bg-muted'
+              segment.isArrayIndex ? 'font-mono status-warning' : 'bg-muted'
             )}
           >
             {segment.isArrayIndex ? `[${segment.key}]` : segment.key}

@@ -1,4 +1,4 @@
-import { Calendar, Server, Terminal, Timer, RefreshCw } from 'lucide-react';
+import { Calendar, RefreshCw, Server, Terminal, Timer } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { components, Status } from '../../../../api/v2/schema';
@@ -76,9 +76,15 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
       ) {
         return;
       }
-      
+
       // Check for 'r' key without modifiers
-      if (e.key === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+      if (
+        e.key === 'r' &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey &&
+        !e.shiftKey
+      ) {
         e.preventDefault();
         handleRefresh();
       }
@@ -89,7 +95,7 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
   }, [handleRefresh]);
 
   return (
-    <div className="bg-gradient-to-br from-slate-50 via-white to-slate-50 rounded-2xl p-6 mb-6 border border-border">
+    <div className="bg-card rounded-2xl p-6 mb-6 border border-border shadow-sm">
       {/* Header with title and actions */}
       <div className="flex items-start justify-between gap-6 mb-4">
         <div className="flex-1 min-w-0">
@@ -104,9 +110,7 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
                 >
                   {dagRun.rootDAGRunName}
                 </a>
-                <span className="text-muted-foreground mx-1">
-                  /
-                </span>
+                <span className="text-muted-foreground mx-1">/</span>
               </>
             )}
 
@@ -122,9 +126,7 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
                   >
                     {dagRun.parentDAGRunName}
                   </a>
-                  <span className="text-muted-foreground mx-1">
-                    /
-                  </span>
+                  <span className="text-muted-foreground mx-1">/</span>
                 </>
               )}
           </nav>
@@ -151,7 +153,9 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
               className="relative group inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               title="Refresh (R)"
             >
-              <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`}
+              />
               <span>Refresh</span>
               <span className="absolute -bottom-1 -right-1 bg-muted text-muted-foreground text-[10px] font-medium px-1 rounded-sm border opacity-0 group-hover:opacity-100 transition-opacity">
                 R
