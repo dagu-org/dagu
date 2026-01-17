@@ -1,19 +1,14 @@
-import React from 'react';
 import { Layers, Search } from 'lucide-react';
+import React from 'react';
+import type { components } from '../../api/v2/schema';
 import { Input } from '../../components/ui/input';
 import { RefreshButton } from '../../components/ui/refresh-button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '../../components/ui/tooltip';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
-import { useQuery } from '../../hooks/api';
-import type { components } from '../../api/v2/schema';
-import QueueMetrics from '../../features/queues/components/QueueMetrics';
-import QueueList from '../../features/queues/components/QueueList';
 import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-details';
+import QueueList from '../../features/queues/components/QueueList';
+import QueueMetrics from '../../features/queues/components/QueueMetrics';
+import { useQuery } from '../../hooks/api';
 import Title from '../../ui/Title';
 
 function Queues() {
@@ -26,8 +21,9 @@ function Queues() {
     queueType: string;
   };
 
-  const areQueueFiltersEqual = (a: QueueFilters, b: QueueFilters) =>
-    a.searchText === b.searchText && a.queueType === b.queueType;
+  function areQueueFiltersEqual(a: QueueFilters, b: QueueFilters): boolean {
+    return a.searchText === b.searchText && a.queueType === b.queueType;
+  }
 
   const defaultFilters = React.useMemo<QueueFilters>(
     () => ({
@@ -116,9 +112,9 @@ function Queues() {
     }
   );
 
-  const handleRefresh = async () => {
+  async function handleRefresh(): Promise<void> {
     await mutate();
-  };
+  }
 
   // Filter queues based on search text and type
   const filteredQueues = React.useMemo(() => {
@@ -221,37 +217,37 @@ function Queues() {
       <Title>Queues</Title>
       {/* Header with search and refresh */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 flex-shrink-0">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-2 top-1.5 h-3 w-3 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Search queues..."
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  className="h-7 w-[200px] pl-7 text-xs"
-                />
-              </div>
-              <select
-                value={selectedQueueType}
-                onChange={(e) => setSelectedQueueType(e.target.value)}
-                className="h-7 px-2 text-xs border border-border rounded bg-input"
-              >
-                <option value="all">All Types</option>
-                <option value="global">Global</option>
-                <option value="dag-based">DAG-based</option>
-              </select>
-            </div>
-          </div>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="flex items-center gap-2">
-            {filteredQueues.length !== data?.queues?.length && (
-              <span className="text-xs text-muted-foreground">
-                ({filteredQueues.length} of {data?.queues?.length})
-              </span>
-            )}
-            <RefreshButton onRefresh={handleRefresh} />
+            <div className="relative">
+              <Search className="absolute left-2 top-1.5 h-3 w-3 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search queues..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="h-7 w-[200px] pl-7 text-xs"
+              />
+            </div>
+            <select
+              value={selectedQueueType}
+              onChange={(e) => setSelectedQueueType(e.target.value)}
+              className="h-7 px-2 text-xs border border-border rounded bg-input"
+            >
+              <option value="all">All Types</option>
+              <option value="global">Global</option>
+              <option value="dag-based">DAG-based</option>
+            </select>
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {filteredQueues.length !== data?.queues?.length && (
+            <span className="text-xs text-muted-foreground">
+              ({filteredQueues.length} of {data?.queues?.length})
+            </span>
+          )}
+          <RefreshButton onRefresh={handleRefresh} />
+        </div>
       </div>
 
       {/* Metrics */}

@@ -144,6 +144,19 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 	return api.ListQueues200JSONResponse(response), nil
 }
 
+// fetchDAGRunSummary fetches the status and converts it to a summary for a given DAG-run reference.
+func (a *API) fetchDAGRunSummary(ctx context.Context, dagRun exec.DAGRunRef) (api.DAGRunSummary, error) {
+	attempt, err := a.dagRunStore.FindAttempt(ctx, dagRun)
+	if err != nil {
+		return api.DAGRunSummary{}, err
+	}
+	runStatus, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return api.DAGRunSummary{}, err
+	}
+	return toDAGRunSummary(*runStatus), nil
+}
+
 // ListQueueItems implements api.StrictServerInterface.
 // Returns paginated items for a specific queue.
 func (a *API) ListQueueItems(ctx context.Context, req api.ListQueueItemsRequestObject) (api.ListQueueItemsResponseObject, error) {
@@ -153,13 +166,12 @@ func (a *API) ListQueueItems(ctx context.Context, req api.ListQueueItemsRequestO
 		itemType = *req.Params.Type
 	}
 
-	// Create Paginator from page/perPage params
 	pg := exec.NewPaginator(valueOf(req.Params.Page), valueOf(req.Params.PerPage))
-
 	var items []api.DAGRunSummary
+	var total int
 
 	if itemType == api.ListQueueItemsParamsTypeRunning {
-		// Get running items from proc store (bounded by maxConcurrency)
+		// Get running items from proc store
 		runningByGroup, err := a.procStore.ListAllAlive(ctx)
 		if err != nil {
 			return nil, &Error{
@@ -170,21 +182,17 @@ func (a *API) ListQueueItems(ctx context.Context, req api.ListQueueItemsRequestO
 		}
 
 		runningRefs := runningByGroup[queueName]
-		total := len(runningRefs)
+		total = len(runningRefs)
 
-		// Apply pagination to running items
+		// Apply pagination
 		startIndex := min(pg.Offset(), total)
 		endIndex := min(pg.Offset()+pg.Limit(), total)
 		for _, dagRun := range runningRefs[startIndex:endIndex] {
-			attempt, err := a.dagRunStore.FindAttempt(ctx, dagRun)
+			summary, err := a.fetchDAGRunSummary(ctx, dagRun)
 			if err != nil {
 				continue
 			}
-			runStatus, err := attempt.ReadStatus(ctx)
-			if err != nil {
-				continue
-			}
-			items = append(items, toDAGRunSummary(*runStatus))
+			items = append(items, summary)
 		}
 
 		paginatedResult := exec.NewPaginatedResult(items, total, pg)
@@ -204,21 +212,16 @@ func (a *API) ListQueueItems(ctx context.Context, req api.ListQueueItemsRequestO
 		}
 	}
 
-	// Convert QueuedItemData to DAGRunSummary
 	for _, queuedItem := range paginatedResult.Items {
 		dagRunRef, err := queuedItem.Data()
 		if err != nil {
 			continue
 		}
-		attempt, err := a.dagRunStore.FindAttempt(ctx, *dagRunRef)
+		summary, err := a.fetchDAGRunSummary(ctx, *dagRunRef)
 		if err != nil {
 			continue
 		}
-		runStatus, err := attempt.ReadStatus(ctx)
-		if err != nil {
-			continue
-		}
-		items = append(items, toDAGRunSummary(*runStatus))
+		items = append(items, summary)
 	}
 
 	return api.ListQueueItems200JSONResponse{

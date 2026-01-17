@@ -1,8 +1,4 @@
-import {
-  ChevronDown,
-  ChevronRight,
-  Trash2,
-} from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import React from 'react';
 import useSWR from 'swr';
 import type { components } from '../../../api/v2/schema';
@@ -54,7 +50,11 @@ function QueueCard({
 
   // Fetch paginated queued items when expanded and there are queued items
   const shouldFetchQueued = isExpanded && queue.queuedCount > 0;
-  const { data: queuedResponse, mutate: mutateQueuedData, isLoading } = useSWR(
+  const {
+    data: queuedResponse,
+    mutate: mutateQueuedData,
+    isLoading,
+  } = useSWR(
     shouldFetchQueued
       ? ['listQueueItems', queue.name, queuedPage, perPage, remoteNode]
       : null,
@@ -130,37 +130,43 @@ function QueueCard({
     return Math.round((running / queue.maxConcurrency) * 100);
   }, [queue]);
 
-  const formatDateTime = (datetime: string | undefined): string => {
+  function formatDateTime(datetime: string | undefined): string {
     if (!datetime) return 'N/A';
     const date = dayjs(datetime);
-    if (config.tzOffsetInSec !== undefined) {
-      return date.utcOffset(config.tzOffsetInSec / 60).format('MMM D, HH:mm:ss');
-    }
-    return date.format('MMM D, HH:mm:ss');
-  };
+    const offset = config.tzOffsetInSec;
+    const format = 'MMM D, HH:mm:ss';
+    return offset !== undefined
+      ? date.utcOffset(offset / 60).format(format)
+      : date.format(format);
+  }
 
-  const DAGRunRow: React.FC<{
+  function DAGRunRow({
+    dagRun,
+    showQueuedAt = false,
+  }: {
     dagRun: components['schemas']['DAGRunSummary'];
     showQueuedAt?: boolean;
-  }> = ({ dagRun, showQueuedAt = false }) => (
-    <tr
-      onClick={() => onDAGRunClick(dagRun)}
-      className="cursor-pointer hover:bg-muted/30 transition-colors"
-    >
-      <td className="py-1.5 px-2 text-xs font-medium">{dagRun.name}</td>
-      <td className="py-1.5 px-2">
-        <StatusChip status={dagRun.status} size="xs">
-          {dagRun.statusLabel}
-        </StatusChip>
-      </td>
-      <td className="py-1.5 px-2 text-xs text-muted-foreground tabular-nums">
-        {formatDateTime(showQueuedAt ? dagRun.queuedAt : dagRun.startedAt)}
-      </td>
-      <td className="py-1.5 px-2 text-xs text-muted-foreground font-mono">
-        {dagRun.dagRunId}
-      </td>
-    </tr>
-  );
+  }): React.JSX.Element {
+    return (
+      <tr
+        onClick={() => onDAGRunClick(dagRun)}
+        className="cursor-pointer hover:bg-muted/30 transition-colors"
+      >
+        <td className="py-1.5 px-2 text-xs font-medium">{dagRun.name}</td>
+        <td className="py-1.5 px-2">
+          <StatusChip status={dagRun.status} size="xs">
+            {dagRun.statusLabel}
+          </StatusChip>
+        </td>
+        <td className="py-1.5 px-2 text-xs text-muted-foreground tabular-nums">
+          {formatDateTime(showQueuedAt ? dagRun.queuedAt : dagRun.startedAt)}
+        </td>
+        <td className="py-1.5 px-2 text-xs text-muted-foreground font-mono">
+          {dagRun.dagRunId}
+        </td>
+      </tr>
+    );
+  }
 
   return (
     <div
@@ -213,7 +219,9 @@ function QueueCard({
               <span>running</span>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className={`text-sm font-light tabular-nums ${(queue.queuedCount || 0) > 0 ? 'text-foreground' : 'text-muted-foreground/50'}`}>
+              <span
+                className={`text-sm font-light tabular-nums ${(queue.queuedCount || 0) > 0 ? 'text-foreground' : 'text-muted-foreground/50'}`}
+              >
                 {queue.queuedCount || 0}
               </span>
               <span>queued</span>
@@ -272,7 +280,11 @@ function QueueCard({
 
           {/* Queued DAGs */}
           {queue.queuedCount > 0 && (
-            <div className={queue.running && queue.running.length > 0 ? 'border-t' : ''}>
+            <div
+              className={
+                queue.running && queue.running.length > 0 ? 'border-t' : ''
+              }
+            >
               <div className="px-3 py-2 bg-muted/10">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -291,7 +303,10 @@ function QueueCard({
                         className="h-6 px-2 text-muted-foreground hover:text-foreground"
                       >
                         <Trash2
-                          className={cn('h-3 w-3', isClearing && 'animate-pulse')}
+                          className={cn(
+                            'h-3 w-3',
+                            isClearing && 'animate-pulse'
+                          )}
                         />
                         <span className="ml-1 text-xs">Clear</span>
                       </Button>
@@ -301,7 +316,9 @@ function QueueCard({
                     </TooltipContent>
                   </Tooltip>
                 </div>
-                <div className={`overflow-x-auto ${isLoading ? 'opacity-70' : ''}`}>
+                <div
+                  className={`overflow-x-auto ${isLoading ? 'opacity-70' : ''}`}
+                >
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-border">
@@ -369,7 +386,8 @@ function QueueCard({
             Remove all queued DAG runs from "{queue.name}"?
           </p>
           <p className="text-xs text-muted-foreground">
-            {queue.queuedCount || 0} DAG runs will be removed. This cannot be undone.
+            {queue.queuedCount || 0} DAG runs will be removed. This cannot be
+            undone.
           </p>
         </div>
       </ConfirmModal>
