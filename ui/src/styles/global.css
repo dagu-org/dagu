@@ -65,7 +65,7 @@
     --card-foreground: #020617;
     --popover: #ffffff;
     --popover-foreground: #020617;
-    --primary: #6366f1;
+    --primary: #ea580c;
     --primary-foreground: #ffffff;
     --secondary: #f1f5f9;
     --secondary-foreground: #020617;
@@ -77,7 +77,7 @@
     --destructive-foreground: #ffffff;
     --border: #e2e8f0;
     --input: #e2e8f0;
-    --ring: #6366f1;
+    --ring: #ea580c;
     --success: #10b981;
     --warning: #f59e0b;
     --info: #0ea5e9;
@@ -88,9 +88,9 @@
     --sidebar-border: #e2e8f0;
 
     /* Button Tokens mapping */
-    --btn-primary-top: #6366f1;
-    --btn-primary-bottom: #4f46e5;
-    --btn-primary-border: #4338ca;
+    --btn-primary-top: #f97316;
+    --btn-primary-bottom: #ea580c;
+    --btn-primary-border: #c2410c;
 
     --btn-secondary-top: #ffffff;
     --btn-secondary-bottom: #f8fafc;
