@@ -108,9 +108,9 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             navigateToStatusTab={navigateToStatusTab}
           />
         )}
-        <div className="flex flex-col lg:flex-row justify-between items-center gap-3 lg:gap-0 mb-4 min-h-[40px]">
+        <div className="flex flex-col lg:flex-row justify-between items-center gap-3 lg:gap-0 mb-4">
           {/* Desktop Tabs (lg and up) */}
-          <div className="hidden lg:block overflow-x-auto">
+          <div className="hidden lg:block flex-1 min-w-0">
             <Tabs className="whitespace-nowrap">
               {isModal ? (
                 <ModalLinkTab
@@ -311,7 +311,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             </div>
           </div>
 
-          <div className={activeTab === 'spec' ? 'visible' : 'invisible'}>
+          <div className={activeTab === 'spec' ? 'visible' : 'hidden'}>
             <DAGEditButtons fileName={fileName || ''} />
           </div>
         </div>
