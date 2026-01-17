@@ -1167,8 +1167,16 @@ func TestBuildMultipleCommands(t *testing.T) {
 			},
 		},
 		{
-			name:     "RejectsMapType",
+			name:     "AcceptsSingleKeyMap",
 			commands: []any{"echo hello", map[string]any{"key": "value"}},
+			expectedCommands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello"}, CmdWithArgs: "echo hello"},
+				{Command: "key:", Args: []string{"value"}, CmdWithArgs: "key: value"},
+			},
+		},
+		{
+			name:     "RejectsMultiKeyMap",
+			commands: []any{"echo hello", map[string]any{"key1": "val1", "key2": "val2"}},
 			wantErr:  true,
 		},
 		{

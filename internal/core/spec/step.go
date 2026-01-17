@@ -852,6 +852,28 @@ func buildMultipleCommands(val []any, result *core.Step) error {
 			strVal = tv
 		case int, int64, uint64, float64, bool:
 			strVal = fmt.Sprintf("%v", tv)
+		case map[string]any:
+			if len(tv) == 1 {
+				for k, val := range tv {
+					switch v2 := val.(type) {
+					case string, int, int64, uint64, float64, bool:
+						strVal = fmt.Sprintf("%s: %v", k, v2)
+					default:
+						// Nested maps or arrays are too complex, fall through to error
+						return core.NewValidationError(
+							fmt.Sprintf("command[%d]", i),
+							v,
+							fmt.Errorf("command array elements must be strings. If this contains a colon, wrap it in quotes. Got nested %T", v2),
+						)
+					}
+				}
+			} else {
+				return core.NewValidationError(
+					fmt.Sprintf("command[%d]", i),
+					v,
+					fmt.Errorf("command array elements must be strings. If this contains a colon, wrap it in quotes."),
+				)
+			}
 		default:
 			return core.NewValidationError(
 				fmt.Sprintf("command[%d]", i),
