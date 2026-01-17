@@ -871,7 +871,7 @@ func buildMultipleCommands(val []any, result *core.Step) error {
 				return core.NewValidationError(
 					fmt.Sprintf("command[%d]", i),
 					v,
-					fmt.Errorf("command array elements must be strings. If this contains a colon, wrap it in quotes."),
+					fmt.Errorf("command array elements must be strings. If this contains a colon, wrap it in quotes"),
 				)
 			}
 		default:
