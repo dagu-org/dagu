@@ -94,8 +94,8 @@
 
     --btn-secondary-top: #ffffff;
     --btn-secondary-bottom: #f8fafc;
-    --btn-secondary-border: #e2e8f0;
-    --btn-secondary-platform: #cbd5e1;
+    --btn-secondary-border: #ea580c;
+    --btn-secondary-platform: #ea580c;
 
     /* RGB fallbacks for legacy components */
     --bg: 255 255 255;
