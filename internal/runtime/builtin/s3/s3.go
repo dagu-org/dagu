@@ -64,6 +64,39 @@ type executorImpl struct {
 func newExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
 	cfg := DefaultConfig()
 
+	// Get DAG-level S3 config from context and apply as defaults
+	if dagS3 := getS3ConfigFromContext(ctx); dagS3 != nil {
+		// Apply DAG-level defaults (step-level config will override these)
+		if dagS3.Region != "" {
+			cfg.Region = dagS3.Region
+		}
+		if dagS3.Endpoint != "" {
+			cfg.Endpoint = dagS3.Endpoint
+		}
+		if dagS3.AccessKeyID != "" {
+			cfg.AccessKeyID = dagS3.AccessKeyID
+		}
+		if dagS3.SecretAccessKey != "" {
+			cfg.SecretAccessKey = dagS3.SecretAccessKey
+		}
+		if dagS3.SessionToken != "" {
+			cfg.SessionToken = dagS3.SessionToken
+		}
+		if dagS3.Profile != "" {
+			cfg.Profile = dagS3.Profile
+		}
+		if dagS3.ForcePathStyle {
+			cfg.ForcePathStyle = dagS3.ForcePathStyle
+		}
+		if dagS3.DisableSSL {
+			cfg.DisableSSL = dagS3.DisableSSL
+		}
+		if dagS3.Bucket != "" {
+			cfg.Bucket = dagS3.Bucket
+		}
+	}
+
+	// Step-level config overrides DAG-level defaults
 	if step.ExecutorConfig.Config != nil {
 		if err := decodeConfig(step.ExecutorConfig.Config, cfg); err != nil {
 			return nil, fmt.Errorf("invalid s3 configuration: %w", err)

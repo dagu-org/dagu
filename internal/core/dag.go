@@ -184,6 +184,9 @@ type DAG struct {
 	// SSH contains the default SSH configuration for the DAG.
 	// Excluded from JSON: may contain password.
 	SSH *SSHConfig `json:"-"`
+	// S3 contains the default S3 configuration for the DAG.
+	// Excluded from JSON: may contain credentials.
+	S3 *S3Config `json:"-"`
 	// LLM contains the default LLM configuration for the DAG.
 	// Steps with type: chat inherit this configuration if they don't specify their own llm field.
 	LLM *LLMConfig `json:"llm,omitempty"`
@@ -516,6 +519,31 @@ type SSHConfig struct {
 	Shell string `json:"shell,omitempty"`
 	// ShellArgs contains additional arguments that should be passed to the shell executable.
 	ShellArgs []string `json:"shellArgs,omitempty"`
+}
+
+// S3Config contains the default S3 configuration for the DAG.
+// This allows steps to inherit S3 settings without specifying them individually.
+type S3Config struct {
+	// Region is the AWS region (e.g., us-east-1).
+	Region string `json:"region,omitempty"`
+	// Endpoint is a custom S3-compatible endpoint URL.
+	// Use this for S3-compatible services like MinIO, LocalStack, etc.
+	Endpoint string `json:"endpoint,omitempty"`
+	// AccessKeyID is the AWS access key ID.
+	AccessKeyID string `json:"accessKeyId,omitempty"`
+	// SecretAccessKey is the AWS secret access key.
+	SecretAccessKey string `json:"secretAccessKey,omitempty"`
+	// SessionToken is the AWS session token (for temporary credentials).
+	SessionToken string `json:"sessionToken,omitempty"`
+	// Profile is the AWS credentials profile name.
+	Profile string `json:"profile,omitempty"`
+	// ForcePathStyle enables path-style addressing (required for S3-compatible services).
+	ForcePathStyle bool `json:"forcePathStyle,omitempty"`
+	// DisableSSL disables SSL for the connection (for local testing only).
+	DisableSSL bool `json:"disableSSL,omitempty"`
+	// Bucket is the default S3 bucket name.
+	// Can be overridden at the step level.
+	Bucket string `json:"bucket,omitempty"`
 }
 
 // Schedule contains the cron expression and the parsed cron schedule.

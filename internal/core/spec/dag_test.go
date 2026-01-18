@@ -717,6 +717,85 @@ func TestBuildSSH(t *testing.T) {
 	}
 }
 
+func TestBuildS3(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    *s3Config
+		expected *core.S3Config
+	}{
+		{
+			name:     "Nil",
+			input:    nil,
+			expected: nil,
+		},
+		{
+			name: "BasicConfig",
+			input: &s3Config{
+				Region: "us-east-1",
+				Bucket: "my-bucket",
+			},
+			expected: &core.S3Config{
+				Region: "us-east-1",
+				Bucket: "my-bucket",
+			},
+		},
+		{
+			name: "FullConfig",
+			input: &s3Config{
+				Region:          "us-west-2",
+				Endpoint:        "http://localhost:9000",
+				AccessKeyID:     "test-key",
+				SecretAccessKey: "test-secret",
+				SessionToken:    "test-token",
+				Profile:         "test-profile",
+				Bucket:          "test-bucket",
+				ForcePathStyle:  true,
+				DisableSSL:      true,
+			},
+			expected: &core.S3Config{
+				Region:          "us-west-2",
+				Endpoint:        "http://localhost:9000",
+				AccessKeyID:     "test-key",
+				SecretAccessKey: "test-secret",
+				SessionToken:    "test-token",
+				Profile:         "test-profile",
+				Bucket:          "test-bucket",
+				ForcePathStyle:  true,
+				DisableSSL:      true,
+			},
+		},
+		{
+			name: "MinIOConfig",
+			input: &s3Config{
+				Endpoint:        "http://minio:9000",
+				AccessKeyID:     "minioadmin",
+				SecretAccessKey: "minioadmin",
+				Bucket:          "data",
+				ForcePathStyle:  true,
+			},
+			expected: &core.S3Config{
+				Endpoint:        "http://minio:9000",
+				AccessKeyID:     "minioadmin",
+				SecretAccessKey: "minioadmin",
+				Bucket:          "data",
+				ForcePathStyle:  true,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			d := &dag{S3: tt.input}
+			result, err := buildS3(testBuildContext(), d)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func TestBuildDotenv(t *testing.T) {
 	t.Parallel()
 
