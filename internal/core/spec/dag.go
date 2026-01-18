@@ -111,6 +111,9 @@ type dag struct {
 	// LLM is the default LLM configuration for all chat steps in this DAG.
 	// Steps can override this configuration by specifying their own llm field.
 	LLM *llmConfig `yaml:"llm,omitempty"`
+	// Redis is the default Redis configuration for all redis steps in this DAG.
+	// Steps can override this configuration by specifying their own config fields.
+	Redis *redisConfig `yaml:"redis,omitempty"`
 	// Secrets contains references to external secrets.
 	Secrets []secretRef
 }
@@ -246,6 +249,37 @@ type ssh struct {
 	Shell types.ShellValue `yaml:"shell,omitempty"`
 }
 
+// redisConfig defines the default Redis configuration for all redis steps in the DAG.
+// Steps can override these settings by specifying their own config fields.
+type redisConfig struct {
+	// URL is the Redis connection URL (redis://user:pass@host:port/db).
+	URL string `yaml:"url,omitempty"`
+	// Host is the Redis host (alternative to URL).
+	Host string `yaml:"host,omitempty"`
+	// Port is the Redis port (default: 6379).
+	Port int `yaml:"port,omitempty"`
+	// Password is the authentication password.
+	Password string `yaml:"password,omitempty"`
+	// Username is the ACL username (Redis 6+).
+	Username string `yaml:"username,omitempty"`
+	// DB is the database number (0-15).
+	DB int `yaml:"db,omitempty"`
+	// TLS enables TLS connection.
+	TLS bool `yaml:"tls,omitempty"`
+	// TLSSkipVerify skips TLS certificate verification.
+	TLSSkipVerify bool `yaml:"tlsSkipVerify,omitempty"`
+	// Mode is the connection mode (standalone, sentinel, cluster).
+	Mode string `yaml:"mode,omitempty"`
+	// SentinelMaster is the sentinel master name.
+	SentinelMaster string `yaml:"sentinelMaster,omitempty"`
+	// SentinelAddrs is the list of sentinel addresses.
+	SentinelAddrs []string `yaml:"sentinelAddrs,omitempty"`
+	// ClusterAddrs is the list of cluster node addresses.
+	ClusterAddrs []string `yaml:"clusterAddrs,omitempty"`
+	// MaxRetries is the maximum number of retries.
+	MaxRetries int `yaml:"maxRetries,omitempty"`
+}
+
 // secretRef defines a reference to an external secret.
 type secretRef struct {
 	// Name is the environment variable name (required).
@@ -338,6 +372,7 @@ var fullTransformers = []transform{
 	{"registryAuths", newTransformer("RegistryAuths", buildRegistryAuths)},
 	{"ssh", newTransformer("SSH", buildSSH)},
 	{"llm", newTransformer("LLM", buildLLM)},
+	{"redis", newTransformer("Redis", buildRedis)},
 	{"secrets", newTransformer("Secrets", buildSecrets)},
 	{"dotenv", newTransformer("Dotenv", buildDotenv)},
 	{"smtpConfig", newTransformer("SMTP", buildSMTPConfig)},
@@ -1344,6 +1379,28 @@ func buildLLM(_ BuildContext, d *dag) (*core.LLMConfig, error) {
 		APIKeyName:  cfg.APIKeyName,
 		Stream:      cfg.Stream,
 		Thinking:    thinking,
+	}, nil
+}
+
+func buildRedis(_ BuildContext, d *dag) (*core.RedisConfig, error) {
+	if d.Redis == nil {
+		return nil, nil
+	}
+
+	return &core.RedisConfig{
+		URL:            d.Redis.URL,
+		Host:           d.Redis.Host,
+		Port:           d.Redis.Port,
+		Password:       d.Redis.Password,
+		Username:       d.Redis.Username,
+		DB:             d.Redis.DB,
+		TLS:            d.Redis.TLS,
+		TLSSkipVerify:  d.Redis.TLSSkipVerify,
+		Mode:           d.Redis.Mode,
+		SentinelMaster: d.Redis.SentinelMaster,
+		SentinelAddrs:  d.Redis.SentinelAddrs,
+		ClusterAddrs:   d.Redis.ClusterAddrs,
+		MaxRetries:     d.Redis.MaxRetries,
 	}, nil
 }
 
