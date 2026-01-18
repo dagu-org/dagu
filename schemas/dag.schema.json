@@ -411,6 +411,10 @@
       "$ref": "#/definitions/sshConfig",
       "description": "Default SSH configuration for all steps in the DAG. Steps can override this configuration with their own SSH settings. Note: SSH and container configurations are mutually exclusive at the DAG level."
     },
+    "s3": {
+      "$ref": "#/definitions/s3Config",
+      "description": "Default S3 configuration for all S3 steps in the DAG. Steps can override this configuration with their own S3 settings. Supports AWS S3 and S3-compatible services like MinIO."
+    },
     "llm": {
       "$ref": "#/definitions/llmConfig",
       "description": "Default LLM configuration for all chat steps in the DAG. Steps with type: chat inherit this configuration if they don't specify their own llm field. If a step specifies llm, it completely overrides the DAG-level configuration."
@@ -1131,6 +1135,14 @@
               "config": { "$ref": "#/definitions/hitlExecutorConfig" }
             }
           }
+        },
+        {
+          "if": { "properties": { "type": { "const": "s3" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/s3ExecutorConfig" }
+            }
+          }
         }
       ]
     },
@@ -1491,6 +1503,178 @@
       },
       "required": ["user", "host"],
       "description": "SSH configuration for remote command execution. Can be specified at DAG level for reuse across steps, or at step level for specific overrides. Password authentication is supported but key-based auth is recommended."
+    },
+    "s3Config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "region": {
+          "type": "string",
+          "description": "AWS region (e.g., 'us-east-1', 'eu-west-1'). If not specified, uses AWS SDK default resolution."
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "Custom S3-compatible endpoint URL. Use for MinIO, LocalStack, or other S3-compatible services (e.g., 'http://localhost:9000')."
+        },
+        "accessKeyId": {
+          "type": "string",
+          "description": "AWS access key ID. Supports environment variable expansion (e.g., '${AWS_ACCESS_KEY_ID}')."
+        },
+        "secretAccessKey": {
+          "type": "string",
+          "description": "AWS secret access key. Supports environment variable expansion (e.g., '${AWS_SECRET_ACCESS_KEY}')."
+        },
+        "sessionToken": {
+          "type": "string",
+          "description": "AWS session token for temporary credentials. Supports environment variable expansion."
+        },
+        "profile": {
+          "type": "string",
+          "description": "AWS credentials profile name from ~/.aws/credentials."
+        },
+        "bucket": {
+          "type": "string",
+          "description": "Default S3 bucket name. Can be overridden at step level."
+        },
+        "forcePathStyle": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use path-style addressing (bucket in path instead of subdomain). Required for most S3-compatible services like MinIO."
+        },
+        "disableSSL": {
+          "type": "boolean",
+          "default": false,
+          "description": "Disable SSL/TLS for connections. Only use for local development with non-TLS endpoints."
+        }
+      },
+      "description": "S3 configuration for AWS S3 or S3-compatible services. Can be specified at DAG level for shared settings across all S3 steps."
+    },
+    "s3ExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "region": {
+          "type": "string",
+          "description": "AWS region. Overrides DAG-level s3.region."
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "Custom S3-compatible endpoint URL. Overrides DAG-level s3.endpoint."
+        },
+        "accessKeyId": {
+          "type": "string",
+          "description": "AWS access key ID. Overrides DAG-level s3.accessKeyId."
+        },
+        "secretAccessKey": {
+          "type": "string",
+          "description": "AWS secret access key. Overrides DAG-level s3.secretAccessKey."
+        },
+        "sessionToken": {
+          "type": "string",
+          "description": "AWS session token. Overrides DAG-level s3.sessionToken."
+        },
+        "profile": {
+          "type": "string",
+          "description": "AWS credentials profile name. Overrides DAG-level s3.profile."
+        },
+        "bucket": {
+          "type": "string",
+          "description": "S3 bucket name. Required unless specified at DAG level."
+        },
+        "forcePathStyle": {
+          "type": "boolean",
+          "description": "Use path-style addressing. Overrides DAG-level s3.forcePathStyle."
+        },
+        "disableSSL": {
+          "type": "boolean",
+          "description": "Disable SSL/TLS. Overrides DAG-level s3.disableSSL."
+        },
+        "key": {
+          "type": "string",
+          "description": "S3 object key (path). Required for upload, download, and single-object delete operations."
+        },
+        "source": {
+          "type": "string",
+          "description": "Local file path for upload operations. Required for 'upload' command."
+        },
+        "destination": {
+          "type": "string",
+          "description": "Local file path for download operations. Required for 'download' command."
+        },
+        "prefix": {
+          "type": "string",
+          "description": "S3 key prefix for list and batch delete operations."
+        },
+        "contentType": {
+          "type": "string",
+          "description": "Content-Type header for uploaded objects. Auto-detected from file extension if not specified."
+        },
+        "storageClass": {
+          "type": "string",
+          "enum": ["STANDARD", "REDUCED_REDUNDANCY", "STANDARD_IA", "ONEZONE_IA", "INTELLIGENT_TIERING", "GLACIER", "DEEP_ARCHIVE", "GLACIER_IR"],
+          "description": "S3 storage class for uploaded objects."
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Custom metadata key-value pairs for uploaded objects."
+        },
+        "tags": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "S3 object tags as key-value pairs."
+        },
+        "sse": {
+          "type": "string",
+          "enum": ["AES256", "aws:kms"],
+          "description": "Server-side encryption algorithm."
+        },
+        "sseKmsKeyId": {
+          "type": "string",
+          "description": "KMS key ID for SSE-KMS encryption."
+        },
+        "acl": {
+          "type": "string",
+          "enum": ["private", "public-read", "public-read-write", "authenticated-read", "aws-exec-read", "bucket-owner-read", "bucket-owner-full-control"],
+          "description": "Canned ACL for uploaded objects."
+        },
+        "checksumAlgorithm": {
+          "type": "string",
+          "enum": ["CRC32", "CRC32C", "SHA1", "SHA256"],
+          "description": "Checksum algorithm for upload integrity verification."
+        },
+        "partSize": {
+          "type": "integer",
+          "minimum": 5,
+          "default": 10,
+          "description": "Part size in MB for multipart uploads. Minimum 5MB. Default: 10MB."
+        },
+        "concurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5,
+          "description": "Number of concurrent upload/download parts. Default: 5."
+        },
+        "maxKeys": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 1000,
+          "description": "Maximum keys to return per list request. Default: 1000."
+        },
+        "recursive": {
+          "type": "boolean",
+          "default": true,
+          "description": "Recursively list objects under prefix. Default: true."
+        },
+        "outputFormat": {
+          "type": "string",
+          "enum": ["json", "jsonl"],
+          "default": "json",
+          "description": "Output format for list results. Default: json."
+        }
+      },
+      "description": "S3 executor configuration. Command specifies the operation: upload, download, list, or delete."
     },
     "httpExecutorConfig": {
       "type": "object",
@@ -2253,6 +2437,7 @@
         "http",
         "mail",
         "ssh",
+        "s3",
         "jq",
         "gha",
         "github_action",
@@ -2368,6 +2553,14 @@
           "then": {
             "properties": {
               "config": { "$ref": "#/definitions/hitlExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "s3" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/s3ExecutorConfig" }
             }
           }
         },
