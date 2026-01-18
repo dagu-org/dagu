@@ -4,6 +4,7 @@
  * @module features/dags/components/common
  */
 import { cn } from '@/lib/utils';
+import { getStatusClass, getNodeStatusIcon } from '@/lib/status-utils';
 import MatrixText from '@/ui/MatrixText';
 import React, { useEffect, useState } from 'react';
 import { NodeStatus } from '../../../../api/v2/schema';
@@ -39,50 +40,8 @@ type Props = {
  * NodeStatusChip displays a styled badge based on the node status
  */
 function NodeStatusChip({ status, children, size = 'md' }: Props) {
-  // Determine the colors and icon based on status
-  let statusClass = '';
-  let statusIcon = '';
-
-  switch (status) {
-    case NodeStatus.Success:
-      statusClass = 'status-success';
-      statusIcon = '✓';
-      break;
-    case NodeStatus.Failed:
-      statusClass = 'status-failed';
-      statusIcon = '✕';
-      break;
-    case NodeStatus.Rejected:
-      statusClass = 'status-failed';
-      statusIcon = '⊘';
-      break;
-    case NodeStatus.Running:
-      statusClass = 'status-running';
-      break;
-    case NodeStatus.NotStarted:
-      statusClass = 'status-info';
-      statusIcon = '○';
-      break;
-    case NodeStatus.Skipped:
-      statusClass = 'status-info';
-      statusIcon = '―';
-      break;
-    case NodeStatus.PartialSuccess:
-      statusClass = 'status-warning';
-      statusIcon = '◐';
-      break;
-    case NodeStatus.Waiting:
-      statusClass = 'status-warning';
-      statusIcon = '□';
-      break;
-    case NodeStatus.Aborted:
-      statusClass = 'status-warning';
-      statusIcon = '■';
-      break;
-    default:
-      statusClass = 'status-muted';
-      statusIcon = '○';
-  }
+  const statusClass = getStatusClass(status);
+  const statusIcon = getNodeStatusIcon(status);
 
   // Size classes
   const sizeClasses = {

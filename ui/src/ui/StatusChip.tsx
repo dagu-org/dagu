@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { getStatusClass } from '@/lib/status-utils';
 import React from 'react';
 import { Status } from '../api/v2/schema';
 import MatrixText from './MatrixText';
@@ -8,27 +9,6 @@ type Props = {
   children: React.ReactNode; // Allow ReactNode for flexibility, though we expect string
   size?: 'xs' | 'sm' | 'md' | 'lg'; // Size variants
 };
-
-function getStatusClass(status?: Status): string {
-  switch (status) {
-    case Status.Success:
-      return 'status-success';
-    case Status.Failed:
-    case Status.Rejected:
-      return 'status-failed';
-    case Status.Running:
-      return 'status-running';
-    case Status.Queued:
-    case Status.NotStarted:
-      return 'status-info';
-    case Status.PartialSuccess:
-    case Status.Waiting:
-    case Status.Aborted:
-      return 'status-warning';
-    default:
-      return 'status-muted';
-  }
-}
 
 function StatusChip({
   status,

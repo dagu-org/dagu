@@ -296,6 +296,14 @@
   @apply bg-muted text-muted-foreground border border-muted-foreground/20;
 }
 
+/* Toast Shadow Utility */
+.shadow-toast {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+.dark .shadow-toast {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
 /* Obsidian Card Utility - Unified containers */
 .card-obsidian {
   @apply bg-card border border-border rounded-xl overflow-hidden;

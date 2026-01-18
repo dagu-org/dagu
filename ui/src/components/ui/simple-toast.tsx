@@ -79,12 +79,10 @@ export const SimpleToast: React.FC<SimpleToastProps> = ({
           backdrop-blur-xl
           rounded-[20px]
           border border-border/50
+          shadow-toast
           transition-all duration-300 ease-out
           ${getAnimationClasses()}
         `}
-        style={{
-          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-        }}
       >
         {/* Animated checkmark circle */}
         <div className="relative w-12 h-12">

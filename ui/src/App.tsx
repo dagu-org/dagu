@@ -98,11 +98,11 @@ function AppInner({ config }: Props) {
     const root = document.documentElement;
     if (theme === 'dark') {
       root.classList.add('dark');
-      root.style.backgroundColor = '#020617';
     } else {
       root.classList.remove('dark');
-      root.style.backgroundColor = '#ffffff';
     }
+    // CSS variable from global.css handles background color automatically
+    root.style.backgroundColor = 'var(--background)';
   }, [theme]);
 
   return (

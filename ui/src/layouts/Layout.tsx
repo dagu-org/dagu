@@ -1,5 +1,6 @@
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils';
+import { getResponsiveTitleClass } from '@/lib/text-utils';
 import { Menu, X } from 'lucide-react';
 import * as React from 'react';
 import { mainListItems as MainListItems } from '../menu';
@@ -149,11 +150,7 @@ function Content({ navbarColor, children }: LayoutProps) {
           <span
             className={cn(
               'font-semibold tracking-tight uppercase opacity-80 whitespace-normal leading-tight text-center px-2',
-              (config.title || 'Dagu').length > 20
-                ? 'text-[10px]'
-                : (config.title || 'Dagu').length > 15
-                  ? 'text-[11px]'
-                  : 'text-xs'
+              getResponsiveTitleClass(config.title || 'Dagu', 'header-mobile')
             )}
           >
             {config.title || 'Dagu'}
@@ -186,11 +183,7 @@ function Content({ navbarColor, children }: LayoutProps) {
               <span
                 className={cn(
                   'font-bold whitespace-normal leading-tight',
-                  (config.title || 'Dagu').length > 20
-                    ? 'text-sm'
-                    : (config.title || 'Dagu').length > 15
-                      ? 'text-base'
-                      : 'text-lg'
+                  getResponsiveTitleClass(config.title || 'Dagu', 'sidebar-mobile')
                 )}
               >
                 {config.title || 'Dagu'}

@@ -9,6 +9,7 @@ import { UserMenu } from '@/components/UserMenu';
 import { useIsAdmin } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils';
+import { getResponsiveTitleClass } from '@/lib/text-utils';
 import {
   Activity,
   BarChart2,
@@ -136,13 +137,7 @@ export const mainListItems = React.forwardRef<
               <span
                 className={cn(
                   'font-bold tracking-tight text-sidebar-foreground select-none whitespace-normal leading-tight',
-                  (config.title || 'Dagu').length > 20
-                    ? 'text-xs'
-                    : (config.title || 'Dagu').length > 15
-                      ? 'text-sm'
-                      : (config.title || 'Dagu').length > 10
-                        ? 'text-base'
-                        : 'text-lg'
+                  getResponsiveTitleClass(config.title || 'Dagu', 'sidebar-expanded')
                 )}
               >
                 {config.title || 'Dagu'}

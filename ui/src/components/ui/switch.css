@@ -23,7 +23,7 @@
 
 /* Light mode - unchecked */
 .switch-root {
-  background-color: #cbd5e1; /* slate-300 */
+  background-color: var(--muted);
 }
 
 /* Light mode - checked */
@@ -33,7 +33,7 @@
 
 /* Dark mode - unchecked */
 .dark .switch-root {
-  background-color: #334155; /* slate-700 */
+  background-color: var(--muted);
 }
 
 /* Dark mode - checked */
@@ -63,5 +63,5 @@
 
 /* Dark mode thumb */
 .dark .switch-thumb {
-  background-color: #e2e8f0; /* slate-200 */
+  background-color: var(--background);
 }

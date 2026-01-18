@@ -10,7 +10,15 @@ type Props = {
   onRightClick?: (id: string) => void;
 };
 
-// Initialize Mermaid with sepia theme
+// Helper function to get computed CSS variable value
+function getCSSVariable(name: string): string {
+  if (typeof window === 'undefined') return '#000000';
+  return getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim();
+}
+
+// Initialize Mermaid with theme-aware colors
 function initializeMermaid(): void {
   mermaid.initialize({
     securityLevel: 'loose',
@@ -19,15 +27,15 @@ function initializeMermaid(): void {
     theme: 'default',
     themeVariables: {
       background: 'transparent',
-      primaryColor: '#faf8f5', // card
-      primaryTextColor: '#3d3833', // foreground
-      primaryBorderColor: '#c8bfb0', // border
-      lineColor: '#6b635a', // muted-foreground
+      primaryColor: getCSSVariable('--card'),
+      primaryTextColor: getCSSVariable('--foreground'),
+      primaryBorderColor: getCSSVariable('--border'),
+      lineColor: getCSSVariable('--muted-foreground'),
       sectionBkgColor: 'transparent',
       altSectionBkgColor: 'transparent',
       gridColor: 'transparent',
-      secondaryColor: '#f0ebe3', // secondary
-      tertiaryColor: '#f5f0e8', // background
+      secondaryColor: getCSSVariable('--secondary'),
+      tertiaryColor: getCSSVariable('--background'),
     },
     flowchart: {
       curve: 'basis',
