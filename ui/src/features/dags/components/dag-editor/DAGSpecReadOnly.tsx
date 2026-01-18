@@ -18,6 +18,8 @@ type DAGSpecReadOnlyProps = {
   dagName: string;
   /** DAG run ID */
   dagRunId: string;
+  /** Optional sub-DAG run ID for viewing subdag specs */
+  subDAGRunId?: string;
   /** Additional class name for the container */
   className?: string;
 };
@@ -52,19 +54,26 @@ function EditorSkeleton({ className }: { className?: string }) {
  * DAGSpecReadOnly fetches and displays a DAG specification in readonly mode
  * with the Schema Documentation sidebar available for reference.
  */
-function DAGSpecReadOnly({ dagName, dagRunId, className }: DAGSpecReadOnlyProps) {
+function DAGSpecReadOnly({ dagName, dagRunId, subDAGRunId, className }: DAGSpecReadOnlyProps) {
   const appBarContext = React.useContext(AppBarContext);
 
-  // Fetch DAG specification data using the dag-runs spec endpoint
-  const { data, isLoading, error } = useQuery('/dag-runs/{name}/{dagRunId}/spec', {
+  // Select endpoint based on whether this is a subdag
+  const endpoint = subDAGRunId
+    ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/spec' as const
+    : '/dag-runs/{name}/{dagRunId}/spec' as const;
+
+  // Build path params conditionally
+  const pathParams = subDAGRunId
+    ? { name: dagName, dagRunId: dagRunId, subDAGRunId: subDAGRunId }
+    : { name: dagName, dagRunId: dagRunId };
+
+  // Fetch DAG specification data using the appropriate endpoint
+  const { data, isLoading, error } = useQuery(endpoint, {
     params: {
       query: {
         remoteNode: appBarContext.selectedRemoteNode || 'local',
       },
-      path: {
-        name: dagName,
-        dagRunId: dagRunId,
-      },
+      path: pathParams as any,
     },
   });
 

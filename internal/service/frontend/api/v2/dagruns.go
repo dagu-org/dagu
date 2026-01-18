@@ -1106,6 +1106,34 @@ func (a *API) GetSubDAGRunDetails(ctx context.Context, request api.GetSubDAGRunD
 	}, nil
 }
 
+// GetSubDAGRunSpec implements api.StrictServerInterface.
+// This endpoint returns the YAML spec that was used for a specific sub-DAG run.
+func (a *API) GetSubDAGRunSpec(ctx context.Context, request api.GetSubDAGRunSpecRequestObject) (api.GetSubDAGRunSpecResponseObject, error) {
+	root := exec.NewDAGRunRef(request.Name, request.DagRunId)
+
+	// Find the sub-DAG run attempt using the existing store method
+	attempt, err := a.dagRunStore.FindSubAttempt(ctx, root, request.SubDAGRunId)
+	if err != nil {
+		return &api.GetSubDAGRunSpec404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("sub dag-run ID %s not found for DAG %s", request.SubDAGRunId, request.Name),
+		}, nil
+	}
+
+	// Read the DAG to get the YamlData field
+	dag, err := attempt.ReadDAG(ctx)
+	if err != nil || dag == nil || len(dag.YamlData) == 0 {
+		return &api.GetSubDAGRunSpec404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("DAG spec not found for sub dag-run %s", request.SubDAGRunId),
+		}, nil
+	}
+
+	return &api.GetSubDAGRunSpec200JSONResponse{
+		Spec: string(dag.YamlData),
+	}, nil
+}
+
 // GetSubDAGRunLog implements api.StrictServerInterface.
 func (a *API) GetSubDAGRunLog(ctx context.Context, request api.GetSubDAGRunLogRequestObject) (api.GetSubDAGRunLogResponseObject, error) {
 	root := exec.NewDAGRunRef(request.Name, request.DagRunId)

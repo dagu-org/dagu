@@ -440,9 +440,21 @@ function DAGStatus({ dagRun, fileName }: Props) {
       {activeTab === 'chat' && <ChatHistoryTab dagRun={dagRun} />}
 
       {/* Spec Tab Content */}
-      {activeTab === 'spec' && (
-        <DAGSpecReadOnly dagName={dagRun.name} dagRunId={dagRun.dagRunId} />
-      )}
+      {activeTab === 'spec' && (() => {
+        // Check if this is a sub DAG-run
+        const isSubDAGRun =
+          dagRun.rootDAGRunId &&
+          dagRun.rootDAGRunName &&
+          dagRun.rootDAGRunId !== dagRun.dagRunId;
+
+        return (
+          <DAGSpecReadOnly
+            dagName={isSubDAGRun ? dagRun.rootDAGRunName : dagRun.name}
+            dagRunId={isSubDAGRun ? dagRun.rootDAGRunId : dagRun.dagRunId}
+            subDAGRunId={isSubDAGRun ? dagRun.dagRunId : undefined}
+          />
+        );
+      })()}
 
       <StatusUpdateModal
         visible={modal}
