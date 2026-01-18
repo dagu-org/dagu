@@ -125,15 +125,26 @@ export const mainListItems = React.forwardRef<
       >
         {isOpen ? (
           <>
-            <div className="flex-1 flex items-center gap-2 truncate">
+            <div className="flex-1 flex items-center gap-2">
               {!customColor && (
-                <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(var(--primary),0.2)]">
+                <div className="w-7 h-7 bg-primary rounded-lg flex-shrink-0 flex items-center justify-center shadow-[0_0_15px_rgba(var(--primary),0.2)]">
                   <span className="text-white font-bold text-sm">
                     {(config.title || 'Dagu').charAt(0).toUpperCase()}
                   </span>
                 </div>
               )}
-              <span className="font-bold tracking-tight text-lg text-sidebar-foreground select-none truncate">
+              <span
+                className={cn(
+                  'font-bold tracking-tight text-sidebar-foreground select-none whitespace-normal leading-tight',
+                  (config.title || 'Dagu').length > 20
+                    ? 'text-xs'
+                    : (config.title || 'Dagu').length > 15
+                      ? 'text-sm'
+                      : (config.title || 'Dagu').length > 10
+                        ? 'text-base'
+                        : 'text-lg'
+                )}
+              >
                 {config.title || 'Dagu'}
               </span>
             </div>

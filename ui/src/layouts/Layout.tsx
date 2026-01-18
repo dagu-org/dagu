@@ -146,7 +146,16 @@ function Content({ navbarColor, children }: LayoutProps) {
           >
             <Menu className="h-5 w-5" />
           </button>
-          <span className="font-semibold text-sm tracking-tight uppercase opacity-80">
+          <span
+            className={cn(
+              'font-semibold tracking-tight uppercase opacity-80 whitespace-normal leading-tight text-center px-2',
+              (config.title || 'Dagu').length > 20
+                ? 'text-[10px]'
+                : (config.title || 'Dagu').length > 15
+                  ? 'text-[11px]'
+                  : 'text-xs'
+            )}
+          >
             {config.title || 'Dagu'}
           </span>
           <div className="w-8" />
@@ -174,7 +183,16 @@ function Content({ navbarColor, children }: LayoutProps) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center p-4 border-b border-border/10">
-              <span className="font-bold text-lg">
+              <span
+                className={cn(
+                  'font-bold whitespace-normal leading-tight',
+                  (config.title || 'Dagu').length > 20
+                    ? 'text-sm'
+                    : (config.title || 'Dagu').length > 15
+                      ? 'text-base'
+                      : 'text-lg'
+                )}
+              >
                 {config.title || 'Dagu'}
               </span>
               <button
