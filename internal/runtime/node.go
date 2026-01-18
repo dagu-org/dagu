@@ -221,6 +221,10 @@ func (n *Node) Execute(ctx context.Context) error {
 			for i, sr := range subRuns {
 				runtimeSubRuns[i] = SubDAGRun(sr)
 			}
+			// For repeated executions, accumulate sub-runs like call/parallel steps do
+			if n.IsRepeated() && len(n.State().SubRuns) > 0 {
+				n.AddSubRunsRepeated(n.State().SubRuns...)
+			}
 			n.SetSubRuns(runtimeSubRuns)
 		}
 	}
