@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -462,4 +463,114 @@ func TestDefaultConfig(t *testing.T) {
 	assert.Equal(t, 5, cfg.Concurrency)
 	assert.Equal(t, 1000, cfg.MaxKeys)
 	assert.Equal(t, "json", cfg.OutputFormat)
+}
+
+func TestS3ConfigVariableEvaluation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("EvalObject_expands_variables_in_S3Config", func(t *testing.T) {
+		t.Parallel()
+
+		// Create S3Config with variable references
+		cfg := core.S3Config{
+			Region:          "${AWS_REGION}",
+			Bucket:          "${S3_BUCKET}",
+			Endpoint:        "${S3_ENDPOINT}",
+			AccessKeyID:     "${AWS_ACCESS_KEY_ID}",
+			SecretAccessKey: "${AWS_SECRET_ACCESS_KEY}",
+			SessionToken:    "${AWS_SESSION_TOKEN}",
+			Profile:         "${AWS_PROFILE}",
+		}
+
+		// Variables to expand
+		vars := map[string]string{
+			"AWS_REGION":            "us-west-2",
+			"S3_BUCKET":             "my-test-bucket",
+			"S3_ENDPOINT":           "http://localhost:9000",
+			"AWS_ACCESS_KEY_ID":     "test-access-key",
+			"AWS_SECRET_ACCESS_KEY": "test-secret-key",
+			"AWS_SESSION_TOKEN":     "test-session-token",
+			"AWS_PROFILE":           "test-profile",
+		}
+
+		// Use cmdutil.EvalObject to evaluate the config
+		ctx := context.Background()
+		evaluated, err := cmdutil.EvalObject(ctx, cfg, vars)
+		require.NoError(t, err)
+
+		// Verify all variables were expanded
+		assert.Equal(t, "us-west-2", evaluated.Region)
+		assert.Equal(t, "my-test-bucket", evaluated.Bucket)
+		assert.Equal(t, "http://localhost:9000", evaluated.Endpoint)
+		assert.Equal(t, "test-access-key", evaluated.AccessKeyID)
+		assert.Equal(t, "test-secret-key", evaluated.SecretAccessKey)
+		assert.Equal(t, "test-session-token", evaluated.SessionToken)
+		assert.Equal(t, "test-profile", evaluated.Profile)
+	})
+
+	t.Run("EvalObject_partial_variable_expansion", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := core.S3Config{
+			Region:   "${AWS_REGION}",
+			Bucket:   "prefix-${BUCKET_NAME}-suffix",
+			Endpoint: "http://${HOST}:${PORT}",
+		}
+
+		vars := map[string]string{
+			"AWS_REGION":  "eu-west-1",
+			"BUCKET_NAME": "data",
+			"HOST":        "minio.local",
+			"PORT":        "9000",
+		}
+
+		ctx := context.Background()
+		evaluated, err := cmdutil.EvalObject(ctx, cfg, vars)
+		require.NoError(t, err)
+
+		assert.Equal(t, "eu-west-1", evaluated.Region)
+		assert.Equal(t, "prefix-data-suffix", evaluated.Bucket)
+		assert.Equal(t, "http://minio.local:9000", evaluated.Endpoint)
+	})
+
+	t.Run("EvalObject_missing_variable_becomes_empty", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := core.S3Config{
+			Region: "${UNDEFINED_VAR}",
+			Bucket: "static-bucket",
+		}
+
+		vars := map[string]string{} // Empty vars
+
+		ctx := context.Background()
+		evaluated, err := cmdutil.EvalObject(ctx, cfg, vars)
+		require.NoError(t, err)
+
+		// Undefined variables are replaced with empty strings
+		assert.Equal(t, "", evaluated.Region)
+		assert.Equal(t, "static-bucket", evaluated.Bucket)
+	})
+
+	t.Run("EvalObject_preserves_boolean_fields", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := core.S3Config{
+			Region:         "${AWS_REGION}",
+			ForcePathStyle: true,
+			DisableSSL:     true,
+		}
+
+		vars := map[string]string{
+			"AWS_REGION": "us-east-1",
+		}
+
+		ctx := context.Background()
+		evaluated, err := cmdutil.EvalObject(ctx, cfg, vars)
+		require.NoError(t, err)
+
+		assert.Equal(t, "us-east-1", evaluated.Region)
+		assert.True(t, evaluated.ForcePathStyle)
+		assert.True(t, evaluated.DisableSSL)
+	})
 }
