@@ -104,7 +104,7 @@ function NavItem({ to, icon, text, isOpen, onClick }: NavItemProps) {
 export const mainListItems = React.forwardRef<
   HTMLDivElement,
   MainListItemsProps
->(({ isOpen = false, onNavItemClick, onToggle }, ref) => {
+>(({ isOpen = false, onNavItemClick, onToggle, customColor }, ref) => {
   const config = useConfig();
   const isAdmin = useIsAdmin();
   const { preferences, updatePreference } = useUserPreferences();
@@ -126,16 +126,20 @@ export const mainListItems = React.forwardRef<
         {isOpen ? (
           <>
             <div className="flex-1 flex items-center gap-2 truncate">
-              <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(var(--primary),0.2)]">
-                <span className="text-white font-bold text-sm">D</span>
-              </div>
-              <span className="font-bold tracking-tight text-lg text-foreground select-none truncate">
+              {!customColor && (
+                <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(var(--primary),0.2)]">
+                  <span className="text-white font-bold text-sm">
+                    {(config.title || 'Dagu').charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              )}
+              <span className="font-bold tracking-tight text-lg text-sidebar-foreground select-none truncate">
                 {config.title || 'Dagu'}
               </span>
             </div>
             <button
               onClick={onToggle}
-              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg transition-all"
+              className="p-1.5 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-white/5 rounded-lg transition-all"
               aria-label="Collapse sidebar"
             >
               <PanelLeft size={18} />
@@ -144,12 +148,24 @@ export const mainListItems = React.forwardRef<
         ) : (
           <button
             onClick={onToggle}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 transition-all text-foreground glow-sm active:scale-95"
+            className={cn(
+              'w-10 h-10 flex items-center justify-center rounded-xl transition-all active:scale-95',
+              !customColor &&
+                'bg-white/5 hover:bg-white/10 text-foreground glow-sm'
+            )}
             aria-label="Expand sidebar"
           >
-            <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(var(--primary),0.2)]">
-              <span className="text-white font-bold text-sm">D</span>
-            </div>
+            {customColor ? (
+              <span className="text-xl font-bold text-sidebar-foreground">
+                {(config.title || 'Dagu').charAt(0).toUpperCase()}
+              </span>
+            ) : (
+              <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(var(--primary),0.2)]">
+                <span className="text-white font-bold text-sm">
+                  {(config.title || 'Dagu').charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
           </button>
         )}
       </div>
@@ -187,7 +203,10 @@ export const mainListItems = React.forwardRef<
                     onValueChange={context.selectRemoteNode}
                   >
                     <SelectTrigger className="w-10 h-10 p-0 bg-white/5 border-white/5 hover:bg-white/10 [&>svg:last-child]:hidden flex items-center justify-center rounded-lg transition-all">
-                      <Globe size={18} className="text-primary" />
+                      <Globe
+                        size={18}
+                        className={customColor ? 'opacity-80' : 'text-primary'}
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       {context.remoteNodes.map((node) => (
@@ -331,7 +350,12 @@ export const mainListItems = React.forwardRef<
                 : `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`
             }
           >
-            <div className="flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+            <div
+              className={cn(
+                'flex items-center justify-center group-hover:scale-110 transition-transform',
+                customColor ? 'opacity-80' : 'text-primary'
+              )}
+            >
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </div>
             {isOpen && (

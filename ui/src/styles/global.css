@@ -343,3 +343,37 @@
   background: linear-gradient(to bottom, #161b3d, #111432) !important;
   border-color: rgba(255, 255, 255, 0.1) !important;
 }
+
+/* Custom sidebar color - inherit text color from parent */
+.custom-sidebar-color,
+.custom-sidebar-color * {
+  --sidebar-foreground: currentColor;
+}
+.custom-sidebar-color .text-sidebar-foreground,
+.custom-sidebar-color .text-muted-foreground,
+.custom-sidebar-color .text-foreground,
+.custom-sidebar-color .text-primary {
+  color: inherit !important;
+}
+.custom-sidebar-color .text-muted-foreground\/50,
+.custom-sidebar-color .text-muted-foreground\/70,
+.custom-sidebar-color .text-sidebar-foreground\/50 {
+  color: inherit !important;
+  opacity: 0.6;
+}
+.custom-sidebar-color .opacity-70 {
+  opacity: 0.7;
+}
+/* SVG icons should inherit color */
+.custom-sidebar-color svg,
+.custom-sidebar-color svg.lucide,
+.custom-sidebar-color .lucide {
+  color: inherit !important;
+  stroke: currentColor !important;
+}
+.custom-sidebar-color svg.text-primary,
+.custom-sidebar-color .text-primary.lucide,
+.custom-sidebar-color svg.text-sidebar-foreground,
+.custom-sidebar-color svg.text-muted-foreground {
+  color: inherit !important;
+}

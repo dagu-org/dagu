@@ -84,7 +84,7 @@ function Content({ navbarColor, children }: LayoutProps) {
     ? ({
         backgroundColor: navbarColor,
         color: contrastColor,
-        '--sidebar-text': contrastColor,
+        '--sidebar-foreground': contrastColor,
       } as React.CSSProperties)
     : undefined;
   // Sidebar state with localStorage persistence
