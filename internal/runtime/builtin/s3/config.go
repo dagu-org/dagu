@@ -235,8 +235,9 @@ func containsIgnoreCase(slice []string, item string) bool {
 func ptrFloat(f float64) *float64 { return &f }
 
 var configSchema = &jsonschema.Schema{
-	Type:     "object",
-	Required: []string{"bucket"},
+	Type: "object",
+	// Note: bucket is not required here because it can come from DAG-level s3 config.
+	// ValidateForOperation() checks for bucket at runtime after config merging.
 	Properties: map[string]*jsonschema.Schema{
 		// AWS Connection
 		"region":          {Type: "string", Description: "AWS region (e.g., us-east-1)"},
