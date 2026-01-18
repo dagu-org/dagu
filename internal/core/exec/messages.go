@@ -10,6 +10,25 @@ const (
 	RoleTool      = core.LLMRoleTool
 )
 
+// ToolCall represents an LLM's request to call a tool.
+// This mirrors llmpkg.ToolCall for use in exec layer.
+type ToolCall struct {
+	// ID is a unique identifier for this tool call.
+	ID string `json:"id"`
+	// Type is always "function" for function calls.
+	Type string `json:"type"`
+	// Function contains the function call details.
+	Function ToolCallFunction `json:"function"`
+}
+
+// ToolCallFunction contains the details of a function call.
+type ToolCallFunction struct {
+	// Name is the name of the function to call.
+	Name string `json:"name"`
+	// Arguments is a JSON string containing the function arguments.
+	Arguments string `json:"arguments"`
+}
+
 // LLMMessage represents a single message in the conversation.
 type LLMMessage struct {
 	// Role is the message role (system, user, assistant, tool).
@@ -19,6 +38,9 @@ type LLMMessage struct {
 	// ToolCallID is the ID of the tool call this message is responding to.
 	// Only set when Role is "tool".
 	ToolCallID string `json:"tool_call_id,omitempty"`
+	// ToolCalls contains tool calls made by the assistant.
+	// Only set when Role is "assistant" and the model requested tool calls.
+	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
 	// Metadata contains API call metadata (only set for assistant responses).
 	Metadata *LLMMessageMetadata `json:"metadata,omitempty"`
 }

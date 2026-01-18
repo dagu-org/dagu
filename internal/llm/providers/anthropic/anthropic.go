@@ -283,7 +283,7 @@ func (p *Provider) convertTools(tools []llm.Tool) []tool {
 	if len(tools) == 0 {
 		return nil
 	}
-	
+
 	result := make([]tool, len(tools))
 	for i, t := range tools {
 		// Extract properties and required from the Parameters schema
@@ -440,8 +440,8 @@ type message struct {
 
 // Tool calling types
 type tool struct {
-	Name        string     `json:"name"`
-	Description string     `json:"description,omitempty"`
+	Name        string      `json:"name"`
+	Description string      `json:"description,omitempty"`
 	InputSchema inputSchema `json:"input_schema"`
 }
 
@@ -449,19 +449,6 @@ type inputSchema struct {
 	Type       string         `json:"type"` // always "object"
 	Properties map[string]any `json:"properties,omitempty"`
 	Required   []string       `json:"required,omitempty"`
-}
-
-type toolUseBlock struct {
-	Type  string         `json:"type"` // "tool_use"
-	ID    string         `json:"id"`
-	Name  string         `json:"name"`
-	Input map[string]any `json:"input"`
-}
-
-type toolResultBlock struct {
-	Type      string `json:"type"` // "tool_result"
-	ToolUseID string `json:"tool_use_id"`
-	Content   string `json:"content"`
 }
 
 type messagesRequest struct {

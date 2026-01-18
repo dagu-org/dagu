@@ -439,9 +439,9 @@ func (p *Provider) streamResponse(ctx context.Context, body io.ReadCloser, event
 // API request/response types
 
 type part struct {
-	Text             string                  `json:"text,omitempty"`
-	FunctionCall     *functionCallPart       `json:"functionCall,omitempty"`
-	FunctionResponse *functionResponsePart   `json:"functionResponse,omitempty"`
+	Text             string                `json:"text,omitempty"`
+	FunctionCall     *functionCallPart     `json:"functionCall,omitempty"`
+	FunctionResponse *functionResponsePart `json:"functionResponse,omitempty"`
 }
 
 // Function calling types

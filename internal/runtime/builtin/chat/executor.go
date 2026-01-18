@@ -174,6 +174,20 @@ func toLLMMessages(msgs []exec.LLMMessage) []llmpkg.Message {
 			Content:    msg.Content,
 			ToolCallID: msg.ToolCallID,
 		}
+		// Convert tool calls if present
+		if len(msg.ToolCalls) > 0 {
+			result[i].ToolCalls = make([]llmpkg.ToolCall, len(msg.ToolCalls))
+			for j, tc := range msg.ToolCalls {
+				result[i].ToolCalls[j] = llmpkg.ToolCall{
+					ID:   tc.ID,
+					Type: tc.Type,
+					Function: llmpkg.ToolCallFunction{
+						Name:      tc.Function.Name,
+						Arguments: tc.Function.Arguments,
+					},
+				}
+			}
+		}
 	}
 	return result
 }
@@ -269,8 +283,11 @@ func evalMessages(ctx context.Context, msgs []exec.LLMMessage) ([]exec.LLMMessag
 			return nil, fmt.Errorf("failed to evaluate message content: %w", err)
 		}
 		result[i] = exec.LLMMessage{
-			Role:    msg.Role,
-			Content: content,
+			Role:       msg.Role,
+			Content:    content,
+			ToolCallID: msg.ToolCallID,
+			ToolCalls:  msg.ToolCalls,
+			Metadata:   msg.Metadata,
 		}
 	}
 	return result, nil
@@ -299,9 +316,11 @@ func maskSecretsForProvider(ctx context.Context, msgs []exec.LLMMessage) []exec.
 	result := make([]exec.LLMMessage, len(msgs))
 	for i, msg := range msgs {
 		result[i] = exec.LLMMessage{
-			Role:     msg.Role,
-			Content:  masker.MaskString(msg.Content),
-			Metadata: msg.Metadata,
+			Role:       msg.Role,
+			Content:    masker.MaskString(msg.Content),
+			ToolCallID: msg.ToolCallID,
+			ToolCalls:  msg.ToolCalls, // Preserve tool calls (no secrets in IDs/names)
+			Metadata:   msg.Metadata,
 		}
 	}
 	return result
@@ -503,10 +522,24 @@ func (e *Executor) runWithTools(ctx context.Context, provider llmpkg.Provider, a
 			slog.Int("tool_call_count", len(resp.ToolCalls)),
 		)
 
+		// Convert llmpkg.ToolCall to exec.ToolCall for storage
+		execToolCalls := make([]exec.ToolCall, len(resp.ToolCalls))
+		for i, tc := range resp.ToolCalls {
+			execToolCalls[i] = exec.ToolCall{
+				ID:   tc.ID,
+				Type: tc.Type,
+				Function: exec.ToolCallFunction{
+					Name:      tc.Function.Name,
+					Arguments: tc.Function.Arguments,
+				},
+			}
+		}
+
 		// Add assistant message with tool calls to conversation
 		assistantMsg := exec.LLMMessage{
-			Role:    exec.RoleAssistant,
-			Content: resp.Content,
+			Role:      exec.RoleAssistant,
+			Content:   resp.Content,
+			ToolCalls: execToolCalls,
 		}
 		conversationMessages = append(conversationMessages, assistantMsg)
 
@@ -571,7 +604,6 @@ func (e *Executor) runWithTools(ctx context.Context, provider llmpkg.Provider, a
 
 	return nil
 }
-
 
 func init() {
 	executor.RegisterExecutor(core.ExecutorTypeChat, newChatExecutor, nil, core.ExecutorCapabilities{
