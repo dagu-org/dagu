@@ -106,8 +106,8 @@ func TestRedisExecutor_ConfigValidation_Invalid(t *testing.T) {
 
 	// Test cases that should return errors during config parsing
 	tests := []struct {
-		name    string
-		config  map[string]any
+		name   string
+		config map[string]any
 	}{
 		{
 			name: "missing host and url",
@@ -893,7 +893,7 @@ func TestTruncateString(t *testing.T) {
 		{"hello", 10, "hello"},
 		{"hello world", 5, "he..."},
 		{"hi", 2, "hi"},
-		{"hello", 3, "hel"},  // When maxLen <= 3, no room for ellipsis
+		{"hello", 3, "hel"}, // When maxLen <= 3, no room for ellipsis
 		{"ab", 1, "a"},
 	}
 

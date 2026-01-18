@@ -189,9 +189,9 @@ end
 // GetBuiltinScript returns a built-in script by name.
 func GetBuiltinScript(name string) (string, bool) {
 	scripts := map[string]string{
-		"rate_limit":       RateLimitScript,
-		"atomic_incr_max":  AtomicIncrWithMaxScript,
-		"compare_and_swap": CompareAndSwapScript,
+		"rate_limit":        RateLimitScript,
+		"atomic_incr_max":   AtomicIncrWithMaxScript,
+		"compare_and_swap":  CompareAndSwapScript,
 		"lock_with_timeout": LockWithTimeoutScript,
 	}
 	script, ok := scripts[name]
