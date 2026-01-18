@@ -179,7 +179,7 @@ function QueueCard({
   return (
     <div
       className={cn(
-        'card-obsidian transition-all duration-300 hover:bg-white/[0.05] hover:border-white/10',
+        'card-obsidian transition-all duration-300 dark:hover:bg-white/[0.05] dark:hover:border-white/10',
         isSelected &&
           'ring-1 ring-primary/40 shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)]'
       )}

@@ -74,21 +74,24 @@ function AppInner({ config }: Props) {
   const [selectedRemoteNode, setSelectedRemoteNode] =
     React.useState<string>(getInitialNode);
 
-  const handleSelectRemoteNode = (node: string) => {
-    if (remoteNodes.includes(node)) {
-      setSelectedRemoteNode(node);
-      localStorage.setItem(localStorageKey, node);
-    } else {
-      setSelectedRemoteNode('local');
-      localStorage.setItem(localStorageKey, 'local');
-    }
-  };
+  const handleSelectRemoteNode = React.useCallback(
+    (node: string) => {
+      if (remoteNodes.includes(node)) {
+        setSelectedRemoteNode(node);
+        localStorage.setItem(localStorageKey, node);
+      } else {
+        setSelectedRemoteNode('local');
+        localStorage.setItem(localStorageKey, 'local');
+      }
+    },
+    [remoteNodes, localStorageKey]
+  );
 
   React.useEffect(() => {
     if (!remoteNodes.includes(selectedRemoteNode)) {
       handleSelectRemoteNode('local');
     }
-  }, [remoteNodes, selectedRemoteNode]);
+  }, [remoteNodes, selectedRemoteNode, handleSelectRemoteNode]);
 
   // Effect to apply theme class to html element
   React.useEffect(() => {

@@ -78,7 +78,7 @@
     --border: #e2e8f0;
     --input: #e2e8f0;
     --ring: #ea580c;
-    --success: #10b981;
+    --success: #059669;
     --warning: #f59e0b;
     --info: #0ea5e9;
     --surface: #ffffff;
@@ -102,6 +102,7 @@
     --text: 2 6 23;
     --sidebar-bg: 248 250 252;
     --sidebar-text: 71 85 105;
+    --primary-rgb: 234 88 12;
   }
 
   .dark {
@@ -284,6 +285,15 @@
 }
 .status-running {
   @apply bg-primary/10 text-primary border border-primary/20 animate-pulse;
+}
+.status-info {
+  @apply bg-info/10 text-info border border-info/20;
+}
+.status-warning {
+  @apply bg-warning/10 text-warning border border-warning/20;
+}
+.status-muted {
+  @apply bg-muted text-muted-foreground border border-muted-foreground/20;
 }
 
 /* Obsidian Card Utility - Unified containers */

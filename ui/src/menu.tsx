@@ -51,7 +51,9 @@ type MainListItemsProps = {
 // NavItem component with Obsidian Deep styling
 function NavItem({ to, icon, text, isOpen, onClick }: NavItemProps) {
   const location = useLocation();
-  const isActive = location.pathname.startsWith(to);
+  const isActive =
+    location.pathname === to ||
+    (to !== '/' && location.pathname.startsWith(to + '/'));
 
   return (
     <div className={cn('px-1', !isOpen && 'flex justify-center')}>

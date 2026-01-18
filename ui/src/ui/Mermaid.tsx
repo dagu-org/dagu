@@ -62,6 +62,9 @@ function Mermaid({
   const mermaidRef = React.useRef<HTMLDivElement>(null); // Ref for the inner div holding the SVG
   const scrollContainerRef = React.useRef<HTMLDivElement>(null); // Ref for the outer scrollable div
   const scrollPosRef = React.useRef({ top: 0, left: 0 }); // Ref to store scroll position
+  const clickTimeoutsRef = React.useRef<
+    Map<string, ReturnType<typeof setTimeout>>
+  >(new Map()); // Persistent timeout storage
   const [uniqueId] = React.useState(
     () => `mermaid-${Math.random().toString(36).substr(2, 9)}`
   );
@@ -139,13 +142,12 @@ function Mermaid({
 
         // Attach custom event handlers if provided
         if ((onClick || onDoubleClick || onRightClick) && mermaidRef.current) {
+          // Clear existing timeouts before setting up new handlers
+          clickTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
+          clickTimeoutsRef.current.clear();
+
           // Find all nodes in the SVG (typically these are <g> elements with class="node")
           const nodeElements = mermaidRef.current.querySelectorAll('.node');
-          // Store click timeouts per node for cancellation
-          const clickTimeouts = new Map<
-            string,
-            ReturnType<typeof setTimeout>
-          >();
 
           nodeElements.forEach((node) => {
             // Extract the node ID from the element
@@ -157,16 +159,16 @@ function Mermaid({
               if (onClick) {
                 node.addEventListener('click', () => {
                   // Clear any existing timeout for this node
-                  const existingTimeout = clickTimeouts.get(nodeId);
+                  const existingTimeout = clickTimeoutsRef.current.get(nodeId);
                   if (existingTimeout) {
                     clearTimeout(existingTimeout);
                   }
                   // Set timeout to allow double-click to cancel
                   const timeout = setTimeout(() => {
-                    clickTimeouts.delete(nodeId);
+                    clickTimeoutsRef.current.delete(nodeId);
                     onClick(nodeId);
                   }, 250);
-                  clickTimeouts.set(nodeId, timeout);
+                  clickTimeoutsRef.current.set(nodeId, timeout);
                 });
               }
 
@@ -175,10 +177,10 @@ function Mermaid({
                 node.addEventListener('dblclick', (event) => {
                   event.stopPropagation();
                   // Cancel pending single-click action
-                  const existingTimeout = clickTimeouts.get(nodeId);
+                  const existingTimeout = clickTimeoutsRef.current.get(nodeId);
                   if (existingTimeout) {
                     clearTimeout(existingTimeout);
-                    clickTimeouts.delete(nodeId);
+                    clickTimeoutsRef.current.delete(nodeId);
                   }
                   onDoubleClick(nodeId);
                 });
@@ -189,10 +191,10 @@ function Mermaid({
                 node.addEventListener('contextmenu', (event) => {
                   event.preventDefault(); // Prevent default context menu
                   // Also cancel pending single-click
-                  const existingTimeout = clickTimeouts.get(nodeId);
+                  const existingTimeout = clickTimeoutsRef.current.get(nodeId);
                   if (existingTimeout) {
                     clearTimeout(existingTimeout);
-                    clickTimeouts.delete(nodeId);
+                    clickTimeoutsRef.current.delete(nodeId);
                   }
                   onRightClick(nodeId);
                 });
@@ -262,6 +264,14 @@ function Mermaid({
       }
     }
   }, [scale]); // Apply scale separately
+
+  // Cleanup timeouts on unmount or when def changes
+  React.useEffect(() => {
+    return () => {
+      clickTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
+      clickTimeoutsRef.current.clear();
+    };
+  }, [def]);
 
   return (
     // Attach ref to the scrollable container

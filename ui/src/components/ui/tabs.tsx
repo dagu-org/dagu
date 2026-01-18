@@ -39,7 +39,7 @@ function Tab({
 
   if (asChild) {
     return (
-      <span className={classes} {...props}>
+      <span className={classes} role="button" tabIndex={0} {...props}>
         {children}
       </span>
     );

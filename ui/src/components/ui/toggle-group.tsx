@@ -102,7 +102,7 @@ export const ToggleButton = ({
         'inline-flex items-center justify-center h-8 px-4 text-xs font-bold transition-all rounded-md cursor-pointer',
         isSelected
           ? 'bg-primary text-primary-foreground shadow-sm scale-100'
-          : 'text-muted-foreground hover:bg-white/10 hover:text-foreground active:scale-95',
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground active:scale-95',
         className
       )}
       onClick={onClick}
