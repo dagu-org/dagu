@@ -23,6 +23,21 @@ export function getExecutorCommand(
       const cmd = config.command as string;
       return config.key ? `${cmd} ${config.key}` : cmd;
     }
+    case 's3': {
+      const parts: string[] = [];
+      if (config.command) {
+        parts.push(String(config.command));
+      }
+      if (config.bucket) {
+        parts.push(`s3://${config.bucket}`);
+      }
+      if (config.key) {
+        parts.push(String(config.key));
+      } else if (config.prefix) {
+        parts.push(`${config.prefix}*`);
+      }
+      return parts.length > 0 ? parts.join(' ') : null;
+    }
     case 'sql':
       return config.query ? String(config.query) : null;
     case 'http':

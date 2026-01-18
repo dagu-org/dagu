@@ -108,6 +108,9 @@ type dag struct {
 	RegistryAuths any
 	// SSH is the default SSH configuration for the DAG.
 	SSH *ssh
+	// S3 is the default S3 configuration for the DAG.
+	// Steps can inherit these settings without specifying them individually.
+	S3 *s3Config `yaml:"s3,omitempty"`
 	// LLM is the default LLM configuration for all chat steps in this DAG.
 	// Steps can override this configuration by specifying their own llm field.
 	LLM *llmConfig `yaml:"llm,omitempty"`
@@ -249,6 +252,31 @@ type ssh struct {
 	Shell types.ShellValue `yaml:"shell,omitempty"`
 }
 
+// s3Config defines the default S3 configuration for the DAG.
+// This allows steps to inherit S3 settings without specifying them individually.
+type s3Config struct {
+	// Region is the AWS region (e.g., us-east-1).
+	Region string `yaml:"region,omitempty"`
+	// Endpoint is a custom S3-compatible endpoint URL.
+	// Use this for S3-compatible services like MinIO, LocalStack, etc.
+	Endpoint string `yaml:"endpoint,omitempty"`
+	// AccessKeyID is the AWS access key ID.
+	AccessKeyID string `yaml:"accessKeyId,omitempty"`
+	// SecretAccessKey is the AWS secret access key.
+	SecretAccessKey string `yaml:"secretAccessKey,omitempty"`
+	// SessionToken is the AWS session token (for temporary credentials).
+	SessionToken string `yaml:"sessionToken,omitempty"`
+	// Profile is the AWS credentials profile name.
+	Profile string `yaml:"profile,omitempty"`
+	// ForcePathStyle enables path-style addressing (required for S3-compatible services).
+	ForcePathStyle bool `yaml:"forcePathStyle,omitempty"`
+	// DisableSSL disables SSL for the connection (for local testing only).
+	DisableSSL bool `yaml:"disableSSL,omitempty"`
+	// Bucket is the default S3 bucket name.
+	// Can be overridden at the step level.
+	Bucket string `yaml:"bucket,omitempty"`
+}
+
 // redisConfig defines the default Redis configuration for all redis steps in the DAG.
 // Steps can override these settings by specifying their own config fields.
 type redisConfig struct {
@@ -371,6 +399,7 @@ var fullTransformers = []transform{
 	{"container", newTransformer("Container", buildContainer)},
 	{"registryAuths", newTransformer("RegistryAuths", buildRegistryAuths)},
 	{"ssh", newTransformer("SSH", buildSSH)},
+	{"s3", newTransformer("S3", buildS3)},
 	{"llm", newTransformer("LLM", buildLLM)},
 	{"redis", newTransformer("Redis", buildRedis)},
 	{"secrets", newTransformer("Secrets", buildSecrets)},
@@ -1315,6 +1344,24 @@ func buildSSH(_ BuildContext, d *dag) (*core.SSHConfig, error) {
 		KnownHostFile: d.SSH.KnownHostFile,
 		Shell:         shell,
 		ShellArgs:     shellArgs,
+	}, nil
+}
+
+func buildS3(_ BuildContext, d *dag) (*core.S3Config, error) {
+	if d.S3 == nil {
+		return nil, nil
+	}
+
+	return &core.S3Config{
+		Region:          d.S3.Region,
+		Endpoint:        d.S3.Endpoint,
+		AccessKeyID:     d.S3.AccessKeyID,
+		SecretAccessKey: d.S3.SecretAccessKey,
+		SessionToken:    d.S3.SessionToken,
+		Profile:         d.S3.Profile,
+		ForcePathStyle:  d.S3.ForcePathStyle,
+		DisableSSL:      d.S3.DisableSSL,
+		Bucket:          d.S3.Bucket,
 	}, nil
 }
 

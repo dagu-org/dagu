@@ -37,6 +37,7 @@ import (
 	"github.com/dagu-org/dagu/internal/output"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/docker"
+	"github.com/dagu-org/dagu/internal/runtime/builtin/s3"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/ssh"
 	"github.com/dagu-org/dagu/internal/runtime/remote"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
@@ -161,6 +162,7 @@ type Agent struct {
 	evaluatedWaitMail      *core.MailConfig
 	evaluatedRegistryAuths map[string]*core.AuthConfig
 	evaluatedWorkingDir    string
+	evaluatedS3            *core.S3Config
 }
 
 // StatusPusher is an interface for pushing status updates remotely.
@@ -440,6 +442,11 @@ func (a *Agent) Run(ctx context.Context) error {
 		return err
 	}
 
+	// Evaluate S3 configuration with environment variables and secrets.
+	if err := a.evaluateS3Config(ctx); err != nil {
+		return err
+	}
+
 	// Setup the reporter to send notifications (must be after mail config evaluation)
 	a.setupReporter(ctx)
 
@@ -640,6 +647,11 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Add registry authentication to context for docker executors
 	if len(a.evaluatedRegistryAuths) > 0 {
 		ctx = docker.WithRegistryAuth(ctx, a.evaluatedRegistryAuths)
+	}
+
+	// Add S3 configuration to context for S3 executors
+	if a.evaluatedS3 != nil {
+		ctx = s3.WithS3Config(ctx, a.evaluatedS3)
 	}
 
 	lastErr := a.runner.Run(ctx, a.plan, progressCh)
@@ -1245,6 +1257,22 @@ func (a *Agent) evaluateWorkingDir(ctx context.Context) error {
 		a.evaluatedWorkingDir = filepath.Join(homeDir, a.evaluatedWorkingDir[1:])
 	}
 
+	return nil
+}
+
+// evaluateS3Config evaluates S3 configuration with environment variables and secrets.
+// Results are stored in agent fields to avoid mutating the original DAG struct.
+func (a *Agent) evaluateS3Config(ctx context.Context) error {
+	if a.dag.S3 == nil {
+		return nil
+	}
+
+	vars := runtime.AllEnvsMap(ctx)
+	evaluated, err := cmdutil.EvalObject(ctx, *a.dag.S3, vars)
+	if err != nil {
+		return fmt.Errorf("failed to evaluate s3 config: %w", err)
+	}
+	a.evaluatedS3 = &evaluated
 	return nil
 }
 
