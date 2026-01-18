@@ -117,7 +117,12 @@ export const mainListItems = React.forwardRef<
   return (
     <div ref={ref} className="flex flex-col h-full">
       {/* Sidebar Header */}
-      <div className="h-14 relative mb-6 flex items-center px-3 border-b border-white/[0.03]">
+      <div
+        className={cn(
+          'h-14 relative mb-6 flex items-center border-b border-white/[0.03]',
+          isOpen ? 'px-3' : 'justify-center'
+        )}
+      >
         {isOpen ? (
           <>
             <div className="flex-1 flex items-center gap-2 truncate">
@@ -139,7 +144,7 @@ export const mainListItems = React.forwardRef<
         ) : (
           <button
             onClick={onToggle}
-            className="mx-auto w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 transition-all text-foreground glow-sm active:scale-95"
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 transition-all text-foreground glow-sm active:scale-95"
             aria-label="Expand sidebar"
           >
             <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(var(--primary),0.2)]">
@@ -156,7 +161,7 @@ export const mainListItems = React.forwardRef<
             if (!context.remoteNodes || context.remoteNodes.length === 0)
               return null;
             return (
-              <div className="px-1">
+              <div className={cn('px-1', !isOpen && 'flex justify-center')}>
                 {isOpen ? (
                   <Select
                     value={context.selectedRemoteNode}
