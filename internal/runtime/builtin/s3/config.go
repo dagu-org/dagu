@@ -221,6 +221,7 @@ func containsIgnoreCase(slice []string, item string) bool {
 	return false
 }
 
+// ptrFloat returns a pointer to a float64 value for use in JSON schema definitions.
 func ptrFloat(f float64) *float64 { return &f }
 
 var configSchema = &jsonschema.Schema{
