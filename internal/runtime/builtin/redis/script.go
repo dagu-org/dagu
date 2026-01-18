@@ -24,21 +24,41 @@ func NewScriptExecutor(client goredis.UniversalClient, cfg *Config) *ScriptExecu
 
 // Execute executes the Lua script and returns the result.
 func (e *ScriptExecutor) Execute(ctx context.Context) (any, error) {
-	// Get the script content
+	// Prepare keys and args
+	keys := e.cfg.ScriptKeys
+	args := e.cfg.ScriptArgs
+
+	// If SHA is provided directly, try EVALSHA first
+	sha := e.cfg.ScriptSHA
+	if sha != "" {
+		result, err := e.client.EvalSha(ctx, sha, keys, args...).Result()
+		if err != nil {
+			// Check if it's a NOSCRIPT error
+			if isNoScriptError(err) {
+				// Try to get script content for fallback
+				script, scriptErr := e.getScript()
+				if scriptErr != nil {
+					return nil, fmt.Errorf("NOSCRIPT error and no script content available for fallback: %w", err)
+				}
+				// Fall back to EVAL
+				result, err = e.client.Eval(ctx, script, keys, args...).Result()
+				if err != nil {
+					return nil, fmt.Errorf("script execution failed: %w", err)
+				}
+				return result, nil
+			}
+			return nil, fmt.Errorf("evalsha failed: %w", err)
+		}
+		return result, nil
+	}
+
+	// No SHA provided, get script content and calculate SHA
 	script, err := e.getScript()
 	if err != nil {
 		return nil, err
 	}
 
-	// Prepare keys and args
-	keys := e.cfg.ScriptKeys
-	args := e.cfg.ScriptArgs
-
-	// Try EVALSHA first if SHA is provided or we can calculate it
-	sha := e.cfg.ScriptSHA
-	if sha == "" {
-		sha = calculateSHA1(script)
-	}
+	sha = calculateSHA1(script)
 
 	// Try EVALSHA first for better performance (script may be cached)
 	result, err := e.client.EvalSha(ctx, sha, keys, args...).Result()

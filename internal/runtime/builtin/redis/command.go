@@ -34,6 +34,10 @@ func (h *CommandHandler) Execute(ctx context.Context) (any, error) {
 
 	case "SET":
 		ttl := time.Duration(h.cfg.TTL) * time.Second
+		// Handle KeepTTL option
+		if h.cfg.KeepTTL {
+			ttl = redis.KeepTTL
+		}
 		if h.cfg.NX {
 			return h.client.SetNX(ctx, h.cfg.Key, h.cfg.Value, ttl).Result()
 		}
@@ -560,7 +564,10 @@ func (h *CommandHandler) Execute(ctx context.Context) (any, error) {
 	}
 }
 
-// executeScan performs a SCAN operation and collects all results.
+// maxScanResults is the maximum number of keys to return from SCAN to prevent memory issues.
+const maxScanResults = 100000
+
+// executeScan performs a SCAN operation and collects results with memory safeguards.
 func (h *CommandHandler) executeScan(ctx context.Context) ([]string, error) {
 	var allKeys []string
 	var cursor uint64
@@ -579,6 +586,12 @@ func (h *CommandHandler) executeScan(ctx context.Context) ([]string, error) {
 			return nil, err
 		}
 		allKeys = append(allKeys, keys...)
+
+		// Safeguard: limit total results to prevent memory exhaustion on large datasets
+		if len(allKeys) >= maxScanResults {
+			return allKeys[:maxScanResults], nil
+		}
+
 		cursor = nextCursor
 		if cursor == 0 {
 			break

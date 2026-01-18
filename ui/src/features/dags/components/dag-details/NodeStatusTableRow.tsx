@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/tooltip';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient, useQuery } from '@/hooks/api';
+import { getExecutorCommand } from '@/lib/executor-utils';
 import dayjs from '@/lib/dayjs';
 import { cn } from '@/lib/utils';
 import {
@@ -208,40 +209,6 @@ function InlineLogViewer({
     </div>
   );
 }
-
-/**
- * Get displayable command from executor config when step.commands is empty
- */
-const getExecutorCommand = (
-  step: components['schemas']['Step']
-): string | null => {
-  const type = step.executorConfig?.type;
-  const config = step.executorConfig?.config as Record<string, unknown>;
-
-  if (!type || !config) return null;
-
-  switch (type) {
-    case 'redis':
-      if (config.command) {
-        const parts = [config.command as string];
-        if (config.key) parts.push(config.key as string);
-        return parts.join(' ');
-      }
-      return null;
-    case 'sql':
-      return config.query ? String(config.query) : null;
-    case 'http':
-      return config.url ? `${config.method || 'GET'} ${config.url}` : null;
-    case 'mail':
-      return config.to ? `Mail to ${config.to}` : null;
-    case 'jq':
-      return config.expression ? `jq: ${config.expression}` : null;
-    case 'docker':
-      return config.image ? `docker: ${config.image}` : null;
-    default:
-      return null;
-  }
-};
 
 /**
  * Calculate duration between two timestamps

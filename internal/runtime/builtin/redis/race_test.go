@@ -26,6 +26,7 @@ func TestRace_ConcurrentExecutors(t *testing.T) {
 	numExecutors := 10
 
 	var wg sync.WaitGroup
+	errCh := make(chan error, numExecutors*2) // Buffer for potential errors
 
 	for i := 0; i < numExecutors; i++ {
 		wg.Add(1)
@@ -44,17 +45,27 @@ func TestRace_ConcurrentExecutors(t *testing.T) {
 			}
 
 			exec, err := executor.NewExecutor(ctx, step)
-			require.NoError(t, err)
+			if err != nil {
+				errCh <- err
+				return
+			}
 
 			var stdout bytes.Buffer
 			exec.SetStdout(&stdout)
 
-			err = exec.Run(ctx)
-			require.NoError(t, err)
+			if err := exec.Run(ctx); err != nil {
+				errCh <- err
+			}
 		}(i)
 	}
 
 	wg.Wait()
+	close(errCh)
+
+	// Collect and assert errors in main goroutine
+	for err := range errCh {
+		require.NoError(t, err)
+	}
 }
 
 // TestRace_GlobalPoolManagerConcurrent tests concurrent access to the global pool manager.
@@ -73,6 +84,7 @@ func TestRace_GlobalPoolManagerConcurrent(t *testing.T) {
 
 	numGoroutines := 20
 	var wg sync.WaitGroup
+	errCh := make(chan error, numGoroutines)
 
 	// Test concurrent GetOrCreateClient calls
 	for i := 0; i < numGoroutines; i++ {
@@ -84,17 +96,20 @@ func TestRace_GlobalPoolManagerConcurrent(t *testing.T) {
 				"host":    host,
 				"command": "PING",
 			})
-			require.NoError(t, err)
+			if err != nil {
+				errCh <- err
+				return
+			}
 
 			client, err := pm.GetOrCreateClient(ctx, cfg)
 			if err != nil {
-				return
+				return // Connection errors are acceptable in race conditions
 			}
 
 			// Execute a command
 			_, err = client.Ping(ctx).Result()
 			if err != nil {
-				return
+				return // Ping errors are acceptable in race conditions
 			}
 
 			// Release client
@@ -103,6 +118,12 @@ func TestRace_GlobalPoolManagerConcurrent(t *testing.T) {
 	}
 
 	wg.Wait()
+	close(errCh)
+
+	// Collect and assert config parsing errors in main goroutine
+	for err := range errCh {
+		require.NoError(t, err)
+	}
 
 	// Verify pool stats are consistent
 	stats := pm.Stats()

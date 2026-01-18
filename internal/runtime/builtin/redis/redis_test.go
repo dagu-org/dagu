@@ -1002,7 +1002,7 @@ func TestGlobalRedisPoolManager_Stats(t *testing.T) {
 	t.Parallel()
 
 	pm := redisexec.NewGlobalRedisPoolManager(redisexec.GlobalPoolConfig{})
-	defer pm.Close()
+	t.Cleanup(func() { _ = pm.Close() })
 
 	stats := pm.Stats()
 	require.NotNil(t, stats)
@@ -1014,7 +1014,7 @@ func TestGlobalRedisPoolManager_Context(t *testing.T) {
 	t.Parallel()
 
 	pm := redisexec.NewGlobalRedisPoolManager(redisexec.GlobalPoolConfig{})
-	defer pm.Close()
+	t.Cleanup(func() { _ = pm.Close() })
 
 	ctx := context.Background()
 
@@ -1032,7 +1032,7 @@ func TestGlobalRedisPoolManager_Integration(t *testing.T) {
 	pm := redisexec.NewGlobalRedisPoolManager(redisexec.GlobalPoolConfig{
 		MaxClients: 5,
 	})
-	defer pm.Close()
+	t.Cleanup(func() { _ = pm.Close() })
 
 	ctx := redisexec.WithRedisPoolManager(context.Background(), pm)
 

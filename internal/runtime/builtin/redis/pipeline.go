@@ -119,28 +119,28 @@ func (e *PipelineExecutor) executeWithWatch(ctx context.Context) ([]any, error) 
 }
 
 // queueCommand queues a single command to the pipeline.
-func (e *PipelineExecutor) queueCommand(_ context.Context, pipe goredis.Pipeliner, cmd *PipelineCommand) (goredis.Cmder, error) {
+func (e *PipelineExecutor) queueCommand(ctx context.Context, pipe goredis.Pipeliner, cmd *PipelineCommand) (goredis.Cmder, error) {
 	switch strings.ToUpper(cmd.Command) {
 	// String commands
 	case "GET":
-		return pipe.Get(context.Background(), cmd.Key), nil
+		return pipe.Get(ctx, cmd.Key), nil
 	case "SET":
 		ttl := time.Duration(cmd.TTL) * time.Second
 		if cmd.NX {
-			return pipe.SetNX(context.Background(), cmd.Key, cmd.Value, ttl), nil
+			return pipe.SetNX(ctx, cmd.Key, cmd.Value, ttl), nil
 		}
 		if cmd.XX {
-			return pipe.SetXX(context.Background(), cmd.Key, cmd.Value, ttl), nil
+			return pipe.SetXX(ctx, cmd.Key, cmd.Value, ttl), nil
 		}
-		return pipe.Set(context.Background(), cmd.Key, cmd.Value, ttl), nil
+		return pipe.Set(ctx, cmd.Key, cmd.Value, ttl), nil
 	case "MGET":
-		return pipe.MGet(context.Background(), cmd.Keys...), nil
+		return pipe.MGet(ctx, cmd.Keys...), nil
 	case "MSET":
-		return pipe.MSet(context.Background(), cmd.Values...), nil
+		return pipe.MSet(ctx, cmd.Values...), nil
 	case "INCR":
-		return pipe.Incr(context.Background(), cmd.Key), nil
+		return pipe.Incr(ctx, cmd.Key), nil
 	case "DECR":
-		return pipe.Decr(context.Background(), cmd.Key), nil
+		return pipe.Decr(ctx, cmd.Key), nil
 
 	// Key commands
 	case "DEL":
@@ -148,21 +148,21 @@ func (e *PipelineExecutor) queueCommand(_ context.Context, pipe goredis.Pipeline
 		if len(keys) == 0 && cmd.Key != "" {
 			keys = []string{cmd.Key}
 		}
-		return pipe.Del(context.Background(), keys...), nil
+		return pipe.Del(ctx, keys...), nil
 	case "EXISTS":
 		keys := cmd.Keys
 		if len(keys) == 0 && cmd.Key != "" {
 			keys = []string{cmd.Key}
 		}
-		return pipe.Exists(context.Background(), keys...), nil
+		return pipe.Exists(ctx, keys...), nil
 	case "EXPIRE":
-		return pipe.Expire(context.Background(), cmd.Key, time.Duration(cmd.TTL)*time.Second), nil
+		return pipe.Expire(ctx, cmd.Key, time.Duration(cmd.TTL)*time.Second), nil
 	case "TTL":
-		return pipe.TTL(context.Background(), cmd.Key), nil
+		return pipe.TTL(ctx, cmd.Key), nil
 
 	// Hash commands
 	case "HGET":
-		return pipe.HGet(context.Background(), cmd.Key, cmd.Field), nil
+		return pipe.HGet(ctx, cmd.Key, cmd.Field), nil
 	case "HSET":
 		args := make([]any, 0, len(cmd.Fields)*2)
 		for k, v := range cmd.Fields {
@@ -171,51 +171,51 @@ func (e *PipelineExecutor) queueCommand(_ context.Context, pipe goredis.Pipeline
 		if cmd.Field != "" && cmd.Value != nil {
 			args = append(args, cmd.Field, cmd.Value)
 		}
-		return pipe.HSet(context.Background(), cmd.Key, args...), nil
+		return pipe.HSet(ctx, cmd.Key, args...), nil
 	case "HGETALL":
-		return pipe.HGetAll(context.Background(), cmd.Key), nil
+		return pipe.HGetAll(ctx, cmd.Key), nil
 	case "HDEL":
-		return pipe.HDel(context.Background(), cmd.Key, cmd.Field), nil
+		return pipe.HDel(ctx, cmd.Key, cmd.Field), nil
 
 	// List commands
 	case "LPUSH":
-		return pipe.LPush(context.Background(), cmd.Key, cmd.Values...), nil
+		return pipe.LPush(ctx, cmd.Key, cmd.Values...), nil
 	case "RPUSH":
-		return pipe.RPush(context.Background(), cmd.Key, cmd.Values...), nil
+		return pipe.RPush(ctx, cmd.Key, cmd.Values...), nil
 	case "LPOP":
-		return pipe.LPop(context.Background(), cmd.Key), nil
+		return pipe.LPop(ctx, cmd.Key), nil
 	case "RPOP":
-		return pipe.RPop(context.Background(), cmd.Key), nil
+		return pipe.RPop(ctx, cmd.Key), nil
 	case "LRANGE":
 		// Use default range if not specified
-		return pipe.LRange(context.Background(), cmd.Key, 0, -1), nil
+		return pipe.LRange(ctx, cmd.Key, 0, -1), nil
 	case "LLEN":
-		return pipe.LLen(context.Background(), cmd.Key), nil
+		return pipe.LLen(ctx, cmd.Key), nil
 
 	// Set commands
 	case "SADD":
-		return pipe.SAdd(context.Background(), cmd.Key, cmd.Values...), nil
+		return pipe.SAdd(ctx, cmd.Key, cmd.Values...), nil
 	case "SREM":
-		return pipe.SRem(context.Background(), cmd.Key, cmd.Values...), nil
+		return pipe.SRem(ctx, cmd.Key, cmd.Values...), nil
 	case "SMEMBERS":
-		return pipe.SMembers(context.Background(), cmd.Key), nil
+		return pipe.SMembers(ctx, cmd.Key), nil
 	case "SCARD":
-		return pipe.SCard(context.Background(), cmd.Key), nil
+		return pipe.SCard(ctx, cmd.Key), nil
 
 	// Sorted set commands
 	case "ZADD":
-		return pipe.ZAdd(context.Background(), cmd.Key, goredis.Z{Score: cmd.Score, Member: cmd.Value}), nil
+		return pipe.ZAdd(ctx, cmd.Key, goredis.Z{Score: cmd.Score, Member: cmd.Value}), nil
 	case "ZREM":
-		return pipe.ZRem(context.Background(), cmd.Key, cmd.Values...), nil
+		return pipe.ZRem(ctx, cmd.Key, cmd.Values...), nil
 	case "ZRANGE":
-		return pipe.ZRange(context.Background(), cmd.Key, 0, -1), nil
+		return pipe.ZRange(ctx, cmd.Key, 0, -1), nil
 	case "ZCARD":
-		return pipe.ZCard(context.Background(), cmd.Key), nil
+		return pipe.ZCard(ctx, cmd.Key), nil
 
 	// Pub/Sub
 	case "PUBLISH":
 		channel := cmd.Key // Use key as channel for simplicity
-		return pipe.Publish(context.Background(), channel, cmd.Value), nil
+		return pipe.Publish(ctx, channel, cmd.Value), nil
 
 	default:
 		return nil, fmt.Errorf("unsupported pipeline command: %s", cmd.Command)

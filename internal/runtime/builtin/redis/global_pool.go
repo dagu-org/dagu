@@ -158,9 +158,10 @@ func (m *GlobalRedisPoolManager) Close() error {
 }
 
 // hashConfig creates a short hash of the config for use as a map key.
-// This avoids storing sensitive connection details as keys.
+// This avoids storing sensitive connection details as keys while ensuring
+// different configs (including credentials and TLS settings) don't collide.
 func hashConfig(cfg *Config) string {
-	// Build a unique identifier from connection parameters
+	// Build a unique identifier from all connection parameters
 	identifier := cfg.URL
 	if identifier == "" {
 		identifier = fmt.Sprintf("%s:%d:%d:%s:%s",
@@ -176,6 +177,16 @@ func hashConfig(cfg *Config) string {
 			}
 		}
 	}
+
+	// Include credentials in hash to differentiate connections with different auth
+	identifier += fmt.Sprintf(":%s:%s:%d", cfg.Username, cfg.Password, cfg.MaxRetries)
+
+	// Include TLS settings to differentiate secure vs insecure connections
+	if cfg.TLS {
+		identifier += fmt.Sprintf(":tls:%s:%s:%s:%v",
+			cfg.TLSCert, cfg.TLSKey, cfg.TLSCA, cfg.TLSSkipVerify)
+	}
+
 	h := sha256.Sum256([]byte(identifier))
 	return hex.EncodeToString(h[:8])
 }

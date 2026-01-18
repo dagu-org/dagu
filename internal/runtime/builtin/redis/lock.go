@@ -43,6 +43,11 @@ func NewLockManager(client goredis.UniversalClient, cfg *Config) *LockManager {
 // Acquire attempts to acquire the lock with retry.
 // Returns a release function that must be called to release the lock.
 func (m *LockManager) Acquire(ctx context.Context) (func() error, error) {
+	// Validate lock key to prevent cross-DAG collisions from empty lock names
+	if m.cfg.Lock == "" {
+		return nil, fmt.Errorf("lock name cannot be empty: would create shared global key")
+	}
+
 	timeout := time.Duration(m.cfg.LockTimeout) * time.Second
 	if timeout == 0 {
 		timeout = 30 * time.Second

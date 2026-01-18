@@ -145,6 +145,7 @@ func createClusterClient(cfg *Config) (redis.UniversalClient, error) {
 // buildTLSConfig creates a TLS configuration from the config.
 func buildTLSConfig(cfg *Config) (*tls.Config, error) {
 	tlsConfig := &tls.Config{
+		MinVersion:         tls.VersionTLS12,  // Enforce TLS 1.2 minimum
 		InsecureSkipVerify: cfg.TLSSkipVerify, //nolint:gosec // User-controlled option
 	}
 

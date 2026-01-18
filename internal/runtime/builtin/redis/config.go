@@ -218,9 +218,14 @@ func (c *Config) validate() error {
 		return fmt.Errorf("port must be between 1 and 65535")
 	}
 
-	// Must have a command, script, or pipeline
-	if c.Command == "" && c.Script == "" && c.ScriptFile == "" && len(c.Pipeline) == 0 {
-		return fmt.Errorf("command, script, scriptFile, or pipeline is required")
+	// Must have a command, script, scriptSHA, or pipeline
+	if c.Command == "" && c.Script == "" && c.ScriptFile == "" && c.ScriptSHA == "" && len(c.Pipeline) == 0 {
+		return fmt.Errorf("command, script, scriptFile, scriptSHA, or pipeline is required")
+	}
+
+	// Validate TLS certificate pair - both must be provided together
+	if (c.TLSCert != "" && c.TLSKey == "") || (c.TLSCert == "" && c.TLSKey != "") {
+		return fmt.Errorf("both tlsCert and tlsKey must be provided together")
 	}
 
 	return nil
