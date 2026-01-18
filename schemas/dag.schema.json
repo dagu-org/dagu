@@ -1657,16 +1657,25 @@
           "default": 1000,
           "description": "Maximum keys to return per list request. Default: 1000."
         },
+        "delimiter": {
+          "type": "string",
+          "description": "Delimiter for grouping keys in list operations (e.g., '/')."
+        },
         "recursive": {
           "type": "boolean",
-          "default": true,
-          "description": "Recursively list objects under prefix. Default: true."
+          "default": false,
+          "description": "Recursively list all objects under prefix. Default: false."
         },
         "outputFormat": {
           "type": "string",
           "enum": ["json", "jsonl"],
           "default": "json",
           "description": "Output format for list results. Default: json."
+        },
+        "quiet": {
+          "type": "boolean",
+          "default": false,
+          "description": "Suppress output for delete operations. Default: false."
         }
       },
       "description": "S3 executor configuration. Command specifies the operation: upload, download, list, or delete."
