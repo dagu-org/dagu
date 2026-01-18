@@ -190,9 +190,3 @@ func (e *executorImpl) Close() error {
 func (e *executorImpl) writeResult(v any) error {
 	return encodeJSON(e.stdout, v)
 }
-
-// logError writes an error message to stderr.
-func (e *executorImpl) logError(format string, args ...any) {
-	msg := fmt.Sprintf(format, args...)
-	_, _ = fmt.Fprintf(e.stderr, "s3: %s\n", msg)
-}

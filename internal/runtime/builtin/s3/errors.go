@@ -92,41 +92,6 @@ func classifyAWSError(err error) error {
 	return err
 }
 
-// isTransientError returns true if the error is transient and retry may succeed.
-func isTransientError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	// Context errors are not transient
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return false
-	}
-
-	// Network and timeout errors are transient
-	if errors.Is(err, ErrNetwork) || errors.Is(err, ErrTimeout) {
-		return true
-	}
-
-	// Check for Smithy API errors with transient codes
-	var apiErr smithy.APIError
-	if errors.As(err, &apiErr) {
-		code := apiErr.ErrorCode()
-		switch code {
-		case "RequestTimeout", "SlowDown", "ServiceUnavailable", "InternalError":
-			return true
-		}
-	}
-
-	// Check for net.Error
-	var netErr net.Error
-	if errors.As(err, &netErr) {
-		return netErr.Temporary() || netErr.Timeout()
-	}
-
-	return false
-}
-
 // exitCodeFor returns an appropriate exit code for the given error.
 func exitCodeFor(err error) int {
 	if err == nil {
@@ -174,10 +139,3 @@ func encodeJSON(w io.Writer, v any) error {
 	return enc.Encode(v)
 }
 
-// wrapError wraps err with kind if err is not nil.
-func wrapError(kind error, err error) error {
-	if err == nil {
-		return nil
-	}
-	return fmt.Errorf("%w: %w", kind, err)
-}
