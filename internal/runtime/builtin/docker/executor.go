@@ -231,9 +231,7 @@ func (e *docker) runInNewContainer(ctx context.Context, tw *executor.TailWriter)
 	// If no step-level commands, use container.command (StartCmd) if specified
 	if len(e.step.Commands) == 0 {
 		exitCode, err := e.container.Run(ctx, e.cfg.StartCmd, e.stdout, e.stderr)
-		e.mu.Lock()
-		e.exitCode = exitCode
-		e.mu.Unlock()
+		e.setExitCode(exitCode)
 		if err != nil {
 			logger.Error(ctx, "Docker executor: Run completed with error", slog.Any("error", err))
 			if tail := tw.Tail(); tail != "" {
@@ -245,20 +243,14 @@ func (e *docker) runInNewContainer(ctx context.Context, tw *executor.TailWriter)
 
 	// For single command, use the simple Run approach
 	if len(e.step.Commands) == 1 {
-		firstCmd := e.step.Commands[0]
-		var cmd []string
-		if firstCmd.Command != "" {
-			cmd = append([]string{firstCmd.Command}, firstCmd.Args...)
-		}
+		cmd := e.buildCommandRaw(e.step.Commands[0])
 
 		logger.Debug(ctx, "Docker executor: calling container.Run for single command",
 			slog.Any("cmd", cmd),
 		)
 
 		exitCode, err := e.container.Run(ctx, cmd, e.stdout, e.stderr)
-		e.mu.Lock()
-		e.exitCode = exitCode
-		e.mu.Unlock()
+		e.setExitCode(exitCode)
 
 		if err != nil {
 			logger.Error(ctx, "Docker executor: command failed", slog.Any("error", err))
@@ -293,10 +285,7 @@ func (e *docker) runInNewContainer(ctx context.Context, tw *executor.TailWriter)
 		default:
 		}
 
-		var cmd []string
-		if cmdEntry.Command != "" {
-			cmd = append([]string{cmdEntry.Command}, cmdEntry.Args...)
-		}
+		cmd := e.buildCommandRaw(cmdEntry)
 
 		logger.Debug(ctx, "Docker executor: executing command",
 			slog.Int("commandIndex", i+1),
@@ -305,9 +294,7 @@ func (e *docker) runInNewContainer(ctx context.Context, tw *executor.TailWriter)
 		)
 
 		exitCode, err := e.container.Exec(ctx, cmd, e.stdout, e.stderr, ExecOptions{})
-		e.mu.Lock()
-		e.exitCode = exitCode
-		e.mu.Unlock()
+		e.setExitCode(exitCode)
 
 		if err != nil {
 			logger.Error(ctx, "Docker executor: command failed",
@@ -330,6 +317,32 @@ func (e *docker) ExitCode() int {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.exitCode
+}
+
+// setExitCode safely sets the exit code.
+func (e *docker) setExitCode(code int) {
+	e.mu.Lock()
+	e.exitCode = code
+	e.mu.Unlock()
+}
+
+// buildCommand builds a command slice from a CommandEntry, applying shell wrapping if configured.
+// This method is used when executing in an existing container where shell wrapping is needed.
+func (e *docker) buildCommand(cmdEntry core.CommandEntry) []string {
+	// For shell wrapping, use CmdWithArgs (original string) instead of reconstructed array
+	// This preserves quoting and matches command executor behavior
+	if e.cfg != nil && len(e.cfg.Shell) > 0 && cmdEntry.CmdWithArgs != "" {
+		return []string{cmdEntry.CmdWithArgs}
+	}
+	return e.buildCommandRaw(cmdEntry)
+}
+
+// buildCommandRaw builds a command slice from a CommandEntry without shell consideration.
+func (e *docker) buildCommandRaw(cmdEntry core.CommandEntry) []string {
+	if cmdEntry.Command == "" {
+		return nil
+	}
+	return append([]string{cmdEntry.Command}, cmdEntry.Args...)
 }
 
 func newDocker(ctx context.Context, step core.Step) (executor.Executor, error) {

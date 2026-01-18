@@ -253,19 +253,21 @@ func getContainerStatus(info types.ContainerJSON, err error) string {
 		}
 		return fmt.Sprintf("error: %v", err)
 	}
-	if info.State == nil {
+
+	state := info.State
+	if state == nil {
 		return "unknown"
 	}
-	if info.State.Running {
+	if state.Running {
 		return "running"
 	}
-	if info.State.Status != "" {
-		if info.State.ExitCode != 0 {
-			return fmt.Sprintf("%s (exit code: %d)", info.State.Status, info.State.ExitCode)
-		}
-		return info.State.Status
+	if state.Status == "" {
+		return "not running"
 	}
-	return "not running"
+	if state.ExitCode != 0 {
+		return fmt.Sprintf("%s (exit code: %d)", state.Status, state.ExitCode)
+	}
+	return state.Status
 }
 
 // Close closes the container client and cleans up resources
