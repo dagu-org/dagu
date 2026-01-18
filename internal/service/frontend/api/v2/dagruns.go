@@ -833,11 +833,15 @@ func (a *API) GetDAGRunStepMessages(ctx context.Context, request api.GetDAGRunSt
 	// Convert to API types
 	apiMessages := toChatMessages(messages)
 
+	// Get tool definitions from node state
+	toolDefinitions := toToolDefinitions(node.ToolDefinitions)
+
 	// Determine if more messages might arrive
 	hasMore := node.Status == core.NodeRunning
 
 	return api.GetDAGRunStepMessages200JSONResponse{
 		Messages:        apiMessages,
+		ToolDefinitions: toolDefinitions,
 		StepStatus:      api.NodeStatus(node.Status),
 		StepStatusLabel: api.NodeStatusLabel(node.Status.String()),
 		HasMore:         hasMore,
@@ -881,11 +885,15 @@ func (a *API) GetSubDAGRunStepMessages(ctx context.Context, request api.GetSubDA
 	// Convert to API types
 	apiMessages := toChatMessages(messages)
 
+	// Get tool definitions from node state
+	toolDefinitions := toToolDefinitions(node.ToolDefinitions)
+
 	// Determine if more messages might arrive
 	hasMore := node.Status == core.NodeRunning
 
 	return api.GetSubDAGRunStepMessages200JSONResponse{
 		Messages:        apiMessages,
+		ToolDefinitions: toolDefinitions,
 		StepStatus:      api.NodeStatus(node.Status),
 		StepStatusLabel: api.NodeStatusLabel(node.Status.String()),
 		HasMore:         hasMore,
@@ -1768,7 +1776,7 @@ func (a *API) GetSubDAGRuns(ctx context.Context, request api.GetSubDAGRunsReques
 
 		// Collect regular sub runs
 		for _, subRun := range node.SubRuns {
-			detail, err := a.getSubDAGRunDetail(ctx, rootRef, subRun.DAGRunID, subRun.Params)
+			detail, err := a.getSubDAGRunDetail(ctx, rootRef, subRun.DAGRunID, subRun.Params, subRun.DAGName)
 			if err != nil {
 				// Skip if we can't fetch details
 				continue
@@ -1778,7 +1786,7 @@ func (a *API) GetSubDAGRuns(ctx context.Context, request api.GetSubDAGRunsReques
 
 		// Collect repeated sub runs
 		for _, subRun := range node.SubRunsRepeated {
-			detail, err := a.getSubDAGRunDetail(ctx, rootRef, subRun.DAGRunID, subRun.Params)
+			detail, err := a.getSubDAGRunDetail(ctx, rootRef, subRun.DAGRunID, subRun.Params, subRun.DAGName)
 			if err != nil {
 				// Skip if we can't fetch details
 				continue
@@ -1793,7 +1801,7 @@ func (a *API) GetSubDAGRuns(ctx context.Context, request api.GetSubDAGRunsReques
 }
 
 // getSubDAGRunDetail fetches timing and status info for a single sub DAG run
-func (a *API) getSubDAGRunDetail(ctx context.Context, parentRef exec.DAGRunRef, subRunID string, params string) (api.SubDAGRunDetail, error) {
+func (a *API) getSubDAGRunDetail(ctx context.Context, parentRef exec.DAGRunRef, subRunID string, params string, dagName string) (api.SubDAGRunDetail, error) {
 	// Use FindSubDAGRunStatus to properly fetch sub DAG run from parent's storage
 	status, err := a.dagRunMgr.FindSubDAGRunStatus(ctx, parentRef, subRunID)
 	if err != nil {
@@ -1810,6 +1818,10 @@ func (a *API) getSubDAGRunDetail(ctx context.Context, parentRef exec.DAGRunRef, 
 
 	if params != "" {
 		detail.Params = &params
+	}
+
+	if dagName != "" {
+		detail.DagName = &dagName
 	}
 
 	return detail, nil

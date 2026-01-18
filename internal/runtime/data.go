@@ -65,6 +65,9 @@ type NodeState struct {
 	OutputVariables *collections.SyncMap
 	// ChatMessages stores the chat conversation messages for message passing between steps.
 	ChatMessages []exec.LLMMessage
+	// ToolDefinitions stores the tool definitions that were available to the LLM during execution.
+	// This provides visibility into what tools/functions the LLM could call.
+	ToolDefinitions []exec.ToolDefinition
 	// ApprovalInputs stores key-value parameters provided during HITL approval.
 	// These are available as environment variables in subsequent steps.
 	ApprovalInputs map[string]string
@@ -119,6 +122,10 @@ type SubDAGRun struct {
 	// - Raw JSON: '{"region": "us-east-1", "config": {"timeout": 30}}'
 	// The exact format depends on how the DAG expects to receive parameters.
 	Params string
+	// DAGName is the name of the executed sub-DAG.
+	// For chat tool calls, this is the tool DAG name.
+	// This field enables UI drill-down when step.call is not set.
+	DAGName string
 }
 
 func newSafeData(data NodeData) Data {
@@ -503,6 +510,20 @@ func (d *Data) GetChatMessages() []exec.LLMMessage {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return d.inner.State.ChatMessages
+}
+
+// SetToolDefinitions sets the tool definitions that were available to the LLM.
+func (d *Data) SetToolDefinitions(tools []exec.ToolDefinition) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.inner.State.ToolDefinitions = tools
+}
+
+// GetToolDefinitions returns the tool definitions that were available to the LLM.
+func (d *Data) GetToolDefinitions() []exec.ToolDefinition {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.inner.State.ToolDefinitions
 }
 
 // GetApprovalInputs returns a copy of the approval inputs map.

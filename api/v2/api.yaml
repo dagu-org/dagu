@@ -3522,11 +3522,33 @@ components:
         content:
           type: string
           description: "Message content"
+        toolCalls:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatToolCall"
+          description: "Tool calls made by the assistant (only for assistant messages)"
         metadata:
           $ref: "#/components/schemas/ChatMessageMetadata"
       required:
         - role
         - content
+
+    ChatToolCall:
+      type: object
+      description: "A tool call requested by the LLM"
+      properties:
+        id:
+          type: string
+          description: "Unique identifier for this tool call"
+        name:
+          type: string
+          description: "Name of the tool being called"
+        arguments:
+          type: string
+          description: "JSON string of tool arguments"
+      required:
+        - id
+        - name
 
     ChatMessageMetadata:
       type: object
@@ -3560,6 +3582,11 @@ components:
           items:
             $ref: "#/components/schemas/ChatMessage"
           description: "List of chat messages"
+        toolDefinitions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolDefinition"
+          description: "Tool definitions that were available to the LLM"
         stepStatus:
           $ref: "#/components/schemas/NodeStatus"
         stepStatusLabel:
@@ -3572,6 +3599,23 @@ components:
         - stepStatus
         - stepStatusLabel
         - hasMore
+
+    ToolDefinition:
+      type: object
+      description: "A tool definition that was available to the LLM"
+      properties:
+        name:
+          type: string
+          description: "Name of the tool"
+        description:
+          type: string
+          description: "Description of what the tool does"
+        parameters:
+          type: object
+          additionalProperties: true
+          description: "JSON Schema describing the tool's parameters"
+      required:
+        - name
 
     RejectStepRequest:
       type: object
@@ -4398,6 +4442,9 @@ components:
         params:
           type: string
           description: "Parameters passed to the sub DAG-run in JSON format"
+        dagName:
+          type: string
+          description: "Name of the executed sub-DAG. For chat tool calls, this is the tool DAG name."
       required:
         - dagRunId
 
@@ -4410,6 +4457,9 @@ components:
         params:
           type: string
           description: "Parameters passed to the sub DAG-run in JSON format"
+        dagName:
+          type: string
+          description: "Name of the executed sub-DAG. For chat tool calls, this is the tool DAG name."
         status:
           $ref: "#/components/schemas/Status"
         statusLabel:

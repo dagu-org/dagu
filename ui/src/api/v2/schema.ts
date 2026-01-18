@@ -1438,7 +1438,18 @@ export interface components {
             role: ChatMessageRole;
             /** @description Message content */
             content: string;
+            /** @description Tool calls made by the assistant (only for assistant messages) */
+            toolCalls?: components["schemas"]["ChatToolCall"][];
             metadata?: components["schemas"]["ChatMessageMetadata"];
+        };
+        /** @description A tool call requested by the LLM */
+        ChatToolCall: {
+            /** @description Unique identifier for this tool call */
+            id: string;
+            /** @description Name of the tool being called */
+            name: string;
+            /** @description JSON string of tool arguments */
+            arguments?: string;
         };
         /** @description Metadata about an LLM API call */
         ChatMessageMetadata: {
@@ -1457,10 +1468,23 @@ export interface components {
         ChatMessagesResponse: {
             /** @description List of chat messages */
             messages: components["schemas"]["ChatMessage"][];
+            /** @description Tool definitions that were available to the LLM */
+            toolDefinitions?: components["schemas"]["ToolDefinition"][];
             stepStatus: components["schemas"]["NodeStatus"];
             stepStatusLabel: components["schemas"]["NodeStatusLabel"];
             /** @description True if step is still running and more messages may arrive */
             hasMore: boolean;
+        };
+        /** @description A tool definition that was available to the LLM */
+        ToolDefinition: {
+            /** @description Name of the tool */
+            name: string;
+            /** @description Description of what the tool does */
+            description?: string;
+            /** @description JSON Schema describing the tool's parameters */
+            parameters?: {
+                [key: string]: unknown;
+            };
         };
         /** @description Request body for rejecting a waiting step */
         RejectStepRequest: {
@@ -1901,12 +1925,16 @@ export interface components {
             dagRunId: components["schemas"]["DAGRunId"];
             /** @description Parameters passed to the sub DAG-run in JSON format */
             params?: string;
+            /** @description Name of the executed sub-DAG. For chat tool calls, this is the tool DAG name. */
+            dagName?: string;
         };
         /** @description Detailed information for a sub DAG-run including timing and status */
         SubDAGRunDetail: {
             dagRunId: components["schemas"]["DAGRunId"];
             /** @description Parameters passed to the sub DAG-run in JSON format */
             params?: string;
+            /** @description Name of the executed sub-DAG. For chat tool calls, this is the tool DAG name. */
+            dagName?: string;
             status: components["schemas"]["Status"];
             statusLabel: components["schemas"]["StatusLabel"];
             /** @description RFC 3339 timestamp when the sub DAG-run started */

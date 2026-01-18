@@ -70,15 +70,33 @@ func (p *Provider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.ChatRes
 		return nil, llm.WrapError(providerName, fmt.Errorf("no choices in response"))
 	}
 
-	return &llm.ChatResponse{
-		Content:      resp.Choices[0].Message.Content,
-		FinishReason: resp.Choices[0].FinishReason,
+	choice := resp.Choices[0]
+	result := &llm.ChatResponse{
+		Content:      choice.Message.Content,
+		FinishReason: choice.FinishReason,
 		Usage: llm.Usage{
 			PromptTokens:     resp.Usage.PromptTokens,
 			CompletionTokens: resp.Usage.CompletionTokens,
 			TotalTokens:      resp.Usage.TotalTokens,
 		},
-	}, nil
+	}
+
+	// Extract tool calls if present
+	if len(choice.Message.ToolCalls) > 0 {
+		result.ToolCalls = make([]llm.ToolCall, len(choice.Message.ToolCalls))
+		for i, tc := range choice.Message.ToolCalls {
+			result.ToolCalls[i] = llm.ToolCall{
+				ID:   tc.ID,
+				Type: tc.Type,
+				Function: llm.ToolCallFunction{
+					Name:      tc.Function.Name,
+					Arguments: tc.Function.Arguments,
+				},
+			}
+		}
+	}
+
+	return result, nil
 }
 
 // ChatStream sends messages and streams the response.
@@ -112,6 +130,20 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 		if m.ToolCallID != "" {
 			messages[i].ToolCallID = m.ToolCallID
 		}
+		// Convert tool calls if present (for assistant messages with tool calls)
+		if len(m.ToolCalls) > 0 {
+			messages[i].ToolCalls = make([]toolCall, len(m.ToolCalls))
+			for j, tc := range m.ToolCalls {
+				messages[i].ToolCalls[j] = toolCall{
+					ID:   tc.ID,
+					Type: tc.Type,
+					Function: toolCallFunction{
+						Name:      tc.Function.Name,
+						Arguments: tc.Function.Arguments,
+					},
+				}
+			}
+		}
 	}
 
 	chatReq := chatCompletionRequest{
@@ -131,6 +163,26 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 	}
 	if len(req.Stop) > 0 {
 		chatReq.Stop = req.Stop
+	}
+
+	// Add tools if provided
+	if len(req.Tools) > 0 {
+		chatReq.Tools = make([]tool, len(req.Tools))
+		for i, t := range req.Tools {
+			chatReq.Tools[i] = tool{
+				Type: t.Type,
+				Function: toolFunction{
+					Name:        t.Function.Name,
+					Description: t.Function.Description,
+					Parameters:  t.Function.Parameters,
+				},
+			}
+		}
+	}
+
+	// Add tool choice if specified
+	if req.ToolChoice != "" {
+		chatReq.ToolChoice = req.ToolChoice
 	}
 
 	// Add reasoning configuration if enabled
@@ -231,10 +283,34 @@ func (p *Provider) streamResponse(ctx context.Context, body io.ReadCloser, event
 // API request/response types
 
 type message struct {
-	Role       string `json:"role"`
-	Content    string `json:"content"`
-	Name       string `json:"name,omitempty"`
-	ToolCallID string `json:"tool_call_id,omitempty"`
+	Role       string     `json:"role"`
+	Content    string     `json:"content"`
+	Name       string     `json:"name,omitempty"`
+	ToolCallID string     `json:"tool_call_id,omitempty"`
+	ToolCalls  []toolCall `json:"tool_calls,omitempty"`
+}
+
+// Tool calling types
+type tool struct {
+	Type     string       `json:"type"`
+	Function toolFunction `json:"function"`
+}
+
+type toolFunction struct {
+	Name        string         `json:"name"`
+	Description string         `json:"description,omitempty"`
+	Parameters  map[string]any `json:"parameters,omitempty"`
+}
+
+type toolCall struct {
+	ID       string           `json:"id"`
+	Type     string           `json:"type"`
+	Function toolCallFunction `json:"function"`
+}
+
+type toolCallFunction struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
 }
 
 type streamOptions struct {
@@ -252,6 +328,8 @@ type chatCompletionRequest struct {
 	Stream              bool              `json:"stream,omitempty"`
 	StreamOptions       *streamOptions    `json:"stream_options,omitempty"`
 	Reasoning           *reasoningRequest `json:"reasoning,omitempty"`
+	Tools               []tool            `json:"tools,omitempty"`
+	ToolChoice          any               `json:"tool_choice,omitempty"` // "auto", "required", "none", or object
 }
 
 // reasoningRequest represents OpenAI's reasoning configuration for o1/o3/GPT-5 models.
@@ -265,15 +343,22 @@ type chatCompletionResponse struct {
 	Created int64  `json:"created"`
 	Model   string `json:"model"`
 	Choices []struct {
-		Index        int     `json:"index"`
-		Message      message `json:"message"`
-		FinishReason string  `json:"finish_reason"`
+		Index        int             `json:"index"`
+		Message      responseMessage `json:"message"`
+		FinishReason string          `json:"finish_reason"`
 	} `json:"choices"`
 	Usage struct {
 		PromptTokens     int `json:"prompt_tokens"`
 		CompletionTokens int `json:"completion_tokens"`
 		TotalTokens      int `json:"total_tokens"`
 	} `json:"usage"`
+}
+
+type responseMessage struct {
+	Role       string     `json:"role"`
+	Content    string     `json:"content"`
+	ToolCalls  []toolCall `json:"tool_calls,omitempty"`
+	ToolCallID string     `json:"tool_call_id,omitempty"`
 }
 
 type streamChunk struct {

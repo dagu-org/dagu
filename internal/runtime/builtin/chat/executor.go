@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -24,6 +25,8 @@ import (
 
 var _ executor.Executor = (*Executor)(nil)
 var _ executor.ChatMessageHandler = (*Executor)(nil)
+var _ executor.SubRunProvider = (*Executor)(nil)
+var _ executor.ToolDefinitionProvider = (*Executor)(nil)
 
 // Executor implements the executor.Executor interface for chat steps.
 type Executor struct {
@@ -35,10 +38,20 @@ type Executor struct {
 	messages        []exec.LLMMessage
 	contextMessages []exec.LLMMessage
 	savedMessages   []exec.LLMMessage
+
+	// Tool calling support
+	toolRegistry *ToolRegistry
+	toolExecutor *ToolExecutor
+
+	// Collected sub-runs from tool executions for UI drill-down
+	collectedSubRuns []exec.SubDAGRun
+
+	// Tool definitions that were available to the LLM (for UI visibility)
+	savedToolDefinitions []exec.ToolDefinition
 }
 
 // newChatExecutor creates a new chat executor from a step configuration.
-func newChatExecutor(_ context.Context, step core.Step) (executor.Executor, error) {
+func newChatExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
 	if step.LLM == nil {
 		return nil, fmt.Errorf("llm configuration is required for chat executor")
 	}
@@ -77,14 +90,25 @@ func newChatExecutor(_ context.Context, step core.Step) (executor.Executor, erro
 		})
 	}
 
-	return &Executor{
+	e := &Executor{
 		stdout:       os.Stdout,
 		stderr:       os.Stderr,
 		step:         step,
 		providerType: providerType,
 		apiKeyEnvVar: apiKeyEnvVar,
 		messages:     messages,
-	}, nil
+	}
+
+	// Initialize tool registry if tools are configured
+	if cfg.HasTools() {
+		registry, err := NewToolRegistry(ctx, cfg.Tools)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize tool registry: %w", err)
+		}
+		e.toolRegistry = registry
+	}
+
+	return e, nil
 }
 
 // SetStdout sets the stdout writer.
@@ -97,8 +121,11 @@ func (e *Executor) SetStderr(out io.Writer) {
 	e.stderr = out
 }
 
-// Kill is a no-op for chat executor (requests are context-cancelled).
-func (e *Executor) Kill(_ os.Signal) error {
+// Kill terminates any running tool DAG executions.
+func (e *Executor) Kill(sig os.Signal) error {
+	if e.toolExecutor != nil {
+		return e.toolExecutor.Kill(sig)
+	}
 	return nil
 }
 
@@ -111,6 +138,18 @@ func (e *Executor) SetContext(messages []exec.LLMMessage) {
 // This includes inherited messages, step messages, and the assistant response.
 func (e *Executor) GetMessages() []exec.LLMMessage {
 	return e.savedMessages
+}
+
+// GetSubRuns returns the collected sub-DAG runs from tool executions.
+// This implements the SubRunProvider interface for UI drill-down functionality.
+func (e *Executor) GetSubRuns() []exec.SubDAGRun {
+	return e.collectedSubRuns
+}
+
+// GetToolDefinitions returns the tool definitions that were available to the LLM.
+// This implements the ToolDefinitionProvider interface for UI visibility.
+func (e *Executor) GetToolDefinitions() []exec.ToolDefinition {
+	return e.savedToolDefinitions
 }
 
 // buildMessageList orders messages so step's system message takes precedence over context.
@@ -141,8 +180,23 @@ func toLLMMessages(msgs []exec.LLMMessage) []llmpkg.Message {
 	result := make([]llmpkg.Message, len(msgs))
 	for i, msg := range msgs {
 		result[i] = llmpkg.Message{
-			Role:    llmpkg.Role(msg.Role),
-			Content: msg.Content,
+			Role:       llmpkg.Role(msg.Role),
+			Content:    msg.Content,
+			ToolCallID: msg.ToolCallID,
+		}
+		// Convert tool calls if present
+		if len(msg.ToolCalls) > 0 {
+			result[i].ToolCalls = make([]llmpkg.ToolCall, len(msg.ToolCalls))
+			for j, tc := range msg.ToolCalls {
+				result[i].ToolCalls[j] = llmpkg.ToolCall{
+					ID:   tc.ID,
+					Type: tc.Type,
+					Function: llmpkg.ToolCallFunction{
+						Name:      tc.Function.Name,
+						Arguments: tc.Function.Arguments,
+					},
+				}
+			}
 		}
 	}
 	return result
@@ -239,8 +293,11 @@ func evalMessages(ctx context.Context, msgs []exec.LLMMessage) ([]exec.LLMMessag
 			return nil, fmt.Errorf("failed to evaluate message content: %w", err)
 		}
 		result[i] = exec.LLMMessage{
-			Role:    msg.Role,
-			Content: content,
+			Role:       msg.Role,
+			Content:    content,
+			ToolCallID: msg.ToolCallID,
+			ToolCalls:  msg.ToolCalls,
+			Metadata:   msg.Metadata,
 		}
 	}
 	return result, nil
@@ -269,9 +326,11 @@ func maskSecretsForProvider(ctx context.Context, msgs []exec.LLMMessage) []exec.
 	result := make([]exec.LLMMessage, len(msgs))
 	for i, msg := range msgs {
 		result[i] = exec.LLMMessage{
-			Role:     msg.Role,
-			Content:  masker.MaskString(msg.Content),
-			Metadata: msg.Metadata,
+			Role:       msg.Role,
+			Content:    masker.MaskString(msg.Content),
+			ToolCallID: msg.ToolCallID,
+			ToolCalls:  msg.ToolCalls, // Preserve tool calls (no secrets in IDs/names)
+			Metadata:   msg.Metadata,
 		}
 	}
 	return result
@@ -279,8 +338,6 @@ func maskSecretsForProvider(ctx context.Context, msgs []exec.LLMMessage) []exec.
 
 // Run executes the chat request.
 func (e *Executor) Run(ctx context.Context) error {
-	cfg := e.step.LLM
-
 	// Create provider with evaluated config (supports variable substitution)
 	provider, err := e.createProvider(ctx)
 	if err != nil {
@@ -293,6 +350,19 @@ func (e *Executor) Run(ctx context.Context) error {
 	}
 
 	allMessages := buildMessageList(evaluatedMessages, e.contextMessages)
+
+	// Dispatch to tool-enabled execution if tools are configured
+	if e.toolRegistry != nil && e.toolRegistry.HasTools() {
+		return e.runWithTools(ctx, provider, allMessages)
+	}
+
+	// Standard execution without tools
+	return e.runSimple(ctx, provider, allMessages)
+}
+
+// runSimple executes a chat request without tool calling.
+func (e *Executor) runSimple(ctx context.Context, provider llmpkg.Provider, allMessages []exec.LLMMessage) error {
+	cfg := e.step.LLM
 	maskedForProvider := maskSecretsForProvider(ctx, allMessages)
 
 	req := &llmpkg.ChatRequest{
@@ -363,6 +433,191 @@ func (e *Executor) Run(ctx context.Context) error {
 		Content:  responseContent,
 		Metadata: metadata,
 	})
+
+	return nil
+}
+
+// runWithTools executes a chat request with tool calling support.
+// It implements a multi-turn loop where:
+// 1. Send messages + tools to LLM
+// 2. If LLM requests tool calls, execute them
+// 3. Add tool results to conversation
+// 4. Repeat until LLM provides final response (no more tool calls) or max iterations
+func (e *Executor) runWithTools(ctx context.Context, provider llmpkg.Provider, allMessages []exec.LLMMessage) error {
+	cfg := e.step.LLM
+	maxIterations := cfg.GetMaxToolIterations()
+
+	// Initialize tool executor for running DAGs
+	// Use resolved working directory (same as call step type), not DAG file location
+	workDir := runtime.GetEnv(ctx).WorkingDir
+	e.toolExecutor = NewToolExecutor(e.toolRegistry, workDir)
+
+	// Get tools in LLM format
+	tools := e.toolRegistry.ToLLMTools()
+
+	// Store tool definitions for UI visibility
+	e.savedToolDefinitions = make([]exec.ToolDefinition, len(tools))
+	for i, t := range tools {
+		e.savedToolDefinitions[i] = exec.ToolDefinition{
+			Name:        t.Function.Name,
+			Description: t.Function.Description,
+			Parameters:  t.Function.Parameters,
+		}
+	}
+
+	logger.Info(ctx, "Starting tool-enabled chat execution",
+		slog.Int("tool_count", len(tools)),
+		slog.Int("max_iterations", maxIterations),
+	)
+
+	// Working copy of messages for the tool loop
+	conversationMessages := make([]exec.LLMMessage, len(allMessages))
+	copy(conversationMessages, allMessages)
+
+	for iteration := 0; iteration < maxIterations; iteration++ {
+		logger.Debug(ctx, "Tool loop iteration",
+			slog.Int("iteration", iteration+1),
+			slog.Int("message_count", len(conversationMessages)),
+		)
+
+		// Mask secrets before sending to provider
+		maskedForProvider := maskSecretsForProvider(ctx, conversationMessages)
+
+		// Build request with tools
+		req := &llmpkg.ChatRequest{
+			Model:       cfg.Model,
+			Messages:    toLLMMessages(maskedForProvider),
+			Temperature: cfg.Temperature,
+			MaxTokens:   cfg.MaxTokens,
+			TopP:        cfg.TopP,
+			Thinking:    toThinkingRequest(cfg.Thinking),
+			Tools:       tools,
+			ToolChoice:  "auto",
+		}
+
+		// Execute request (non-streaming for tool calling - streaming complicates tool call detection)
+		resp, err := provider.Chat(ctx, req)
+		if err != nil {
+			return fmt.Errorf("chat request failed: %w", err)
+		}
+
+		// Check if the response contains tool calls
+		if len(resp.ToolCalls) == 0 {
+			// No tool calls - this is the final response
+			logger.Info(ctx, "LLM provided final response (no tool calls)",
+				slog.Int("iterations_used", iteration+1),
+			)
+
+			// Write the final response to stdout
+			if resp.Content != "" {
+				if _, err := fmt.Fprintln(e.stdout, resp.Content); err != nil {
+					logger.Error(ctx, "failed to write response", tag.Error(err))
+				}
+			}
+
+			// Build metadata for the assistant response
+			metadata := &exec.LLMMessageMetadata{
+				Provider:         cfg.Provider,
+				Model:            cfg.Model,
+				PromptTokens:     resp.Usage.PromptTokens,
+				CompletionTokens: resp.Usage.CompletionTokens,
+				TotalTokens:      resp.Usage.TotalTokens,
+			}
+
+			// Save full conversation including tool interactions
+			e.savedMessages = append(conversationMessages, exec.LLMMessage{
+				Role:     exec.RoleAssistant,
+				Content:  resp.Content,
+				Metadata: metadata,
+			})
+
+			return nil
+		}
+
+		// LLM requested tool calls - execute them
+		logger.Info(ctx, "LLM requested tool calls",
+			slog.Int("tool_call_count", len(resp.ToolCalls)),
+		)
+
+		// Convert llmpkg.ToolCall to exec.ToolCall for storage
+		execToolCalls := make([]exec.ToolCall, len(resp.ToolCalls))
+		for i, tc := range resp.ToolCalls {
+			execToolCalls[i] = exec.ToolCall{
+				ID:   tc.ID,
+				Type: tc.Type,
+				Function: exec.ToolCallFunction{
+					Name:      tc.Function.Name,
+					Arguments: tc.Function.Arguments,
+				},
+			}
+		}
+
+		// Add assistant message with tool calls to conversation
+		assistantMsg := exec.LLMMessage{
+			Role:      exec.RoleAssistant,
+			Content:   resp.Content,
+			ToolCalls: execToolCalls,
+		}
+		conversationMessages = append(conversationMessages, assistantMsg)
+
+		// Execute each tool call and collect results
+		toolCallResults := e.toolExecutor.ExecuteToolCalls(ctx, resp.ToolCalls)
+
+		// Add tool results to conversation and collect sub-runs for UI
+		for _, tcr := range toolCallResults {
+			result := tcr.Result
+			toolMsg := exec.LLMMessage{
+				Role:       exec.RoleTool,
+				Content:    result.Content,
+				ToolCallID: result.ToolCallID,
+			}
+			if result.Error != "" {
+				toolMsg.Content = fmt.Sprintf("Error: %s", result.Error)
+			}
+			conversationMessages = append(conversationMessages, toolMsg)
+
+			// Collect sub-run info for UI drill-down (even for failed executions)
+			if tcr.SubRun.DAGRunID != "" {
+				e.collectedSubRuns = append(e.collectedSubRuns, tcr.SubRun)
+			}
+
+			// Log tool result (truncated for readability)
+			content := result.Content
+			if len(content) > 200 {
+				content = content[:200] + "..."
+			}
+			logger.Info(ctx, "Tool execution result",
+				tag.Tool(result.Name),
+				tag.ToolCallID(result.ToolCallID),
+				slog.String("content_preview", content),
+			)
+		}
+	}
+
+	// Max iterations reached - return with warning
+	logger.Warn(ctx, "Max tool iterations reached",
+		slog.Int("max_iterations", maxIterations),
+	)
+
+	// Get the last assistant response if any
+	var lastContent string
+	for i := len(conversationMessages) - 1; i >= 0; i-- {
+		if conversationMessages[i].Role == exec.RoleAssistant {
+			lastContent = conversationMessages[i].Content
+			break
+		}
+	}
+
+	if lastContent == "" {
+		lastContent = fmt.Sprintf("[Max tool iterations (%d) reached. The LLM may not have provided a complete response.]", maxIterations)
+	}
+
+	if _, err := fmt.Fprintln(e.stdout, lastContent); err != nil {
+		logger.Error(ctx, "failed to write response", tag.Error(err))
+	}
+
+	// Save conversation state
+	e.savedMessages = conversationMessages
 
 	return nil
 }

@@ -288,11 +288,15 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
       const n = dagRun.nodes?.find(
         (n) => toMermaidNodeId(n.step.name) == id
       );
-
-      if (!n || !n.step.call) return;
+      if (!n) return;
 
       // If it's a sub dagRun, navigate to its details
       const subRuns = [...(n.subRuns ?? []), ...(n.subRunsRepeated ?? [])];
+
+      // Check for sub-DAG: step.call (for call steps) OR subRun.dagName (for chat tools, etc.)
+      const subDAGName = n.step?.call || subRuns[0]?.dagName;
+      if (!subDAGName || subRuns.length === 0) return;
+
       const subDAGRun = subRuns[0];
       if (subDAGRun && subDAGRun.dagRunId) {
         // Navigate to the sub dagRun details using React Router with search params

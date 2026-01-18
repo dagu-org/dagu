@@ -189,7 +189,8 @@ export function SubDAGRunsList({
   }, [statusCounts]);
 
   if (allSubRuns.length === 1) {
-    // Single sub DAG run
+    // Single sub DAG run - use per-run dagName if available, else fall back to prop
+    const displayName = allSubRuns[0]?.dagName || subDagName;
     return (
       <>
         <div
@@ -200,7 +201,7 @@ export function SubDAGRunsList({
           }}
           title="Click to view sub DAG run (Cmd/Ctrl+Click to open in new tab)"
         >
-          View Sub DAG Run: {subDagName}
+          View Sub DAG Run: {displayName}
         </div>
         {allSubRuns[0]?.params && (
           <div className="text-xs text-muted-foreground mt-1">
@@ -280,6 +281,8 @@ export function SubDAGRunsList({
                 'statusLabel' in subRun ? subRun.statusLabel : undefined;
               // Use original index for display number
               const displayNumber = subRun.originalIndex + 1;
+              // Use per-run dagName if available, else fall back to prop
+              const displayName = subRun.dagName || subDagName;
               return (
                 <div key={subRun.dagRunId} className="py-1">
                   <div className="flex items-center gap-2">
@@ -291,7 +294,7 @@ export function SubDAGRunsList({
                       }}
                       title="Click to view sub DAG run (Cmd/Ctrl+Click to open in new tab)"
                     >
-                      #{String(displayNumber).padStart(2, '0')}: {subDagName}
+                      #{String(displayNumber).padStart(2, '0')}: {displayName}
                     </div>
                     {startedAt && (
                       <div className="text-xs text-muted-foreground">

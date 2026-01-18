@@ -168,6 +168,10 @@ type llmConfig struct {
 	Stream *bool `yaml:"stream,omitempty"`
 	// Thinking enables extended thinking/reasoning mode.
 	Thinking *thinkingConfig `yaml:"thinking,omitempty"`
+	// Tools is a list of DAG names to use as callable tools.
+	Tools []string `yaml:"tools,omitempty"`
+	// MaxToolIterations limits tool calling rounds (default: 10).
+	MaxToolIterations *int `yaml:"maxToolIterations,omitempty"`
 }
 
 // llmMessage defines a message in the LLM conversation.
@@ -1389,16 +1393,18 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 	}
 
 	result.LLM = &core.LLMConfig{
-		Provider:    cfg.Provider,
-		Model:       cfg.Model,
-		System:      cfg.System,
-		Temperature: cfg.Temperature,
-		MaxTokens:   cfg.MaxTokens,
-		TopP:        cfg.TopP,
-		BaseURL:     cfg.BaseURL,
-		APIKeyName:  cfg.APIKeyName,
-		Stream:      cfg.Stream,
-		Thinking:    thinking,
+		Provider:          cfg.Provider,
+		Model:             cfg.Model,
+		System:            cfg.System,
+		Temperature:       cfg.Temperature,
+		MaxTokens:         cfg.MaxTokens,
+		TopP:              cfg.TopP,
+		BaseURL:           cfg.BaseURL,
+		APIKeyName:        cfg.APIKeyName,
+		Stream:            cfg.Stream,
+		Thinking:          thinking,
+		Tools:             cfg.Tools,
+		MaxToolIterations: cfg.MaxToolIterations,
 	}
 
 	return nil

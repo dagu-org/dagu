@@ -10,12 +10,37 @@ const (
 	RoleTool      = core.LLMRoleTool
 )
 
+// ToolCall represents an LLM's request to call a tool.
+// This mirrors llmpkg.ToolCall for use in exec layer.
+type ToolCall struct {
+	// ID is a unique identifier for this tool call.
+	ID string `json:"id"`
+	// Type is always "function" for function calls.
+	Type string `json:"type"`
+	// Function contains the function call details.
+	Function ToolCallFunction `json:"function"`
+}
+
+// ToolCallFunction contains the details of a function call.
+type ToolCallFunction struct {
+	// Name is the name of the function to call.
+	Name string `json:"name"`
+	// Arguments is a JSON string containing the function arguments.
+	Arguments string `json:"arguments"`
+}
+
 // LLMMessage represents a single message in the conversation.
 type LLMMessage struct {
-	// Role is the message role (system, user, assistant).
+	// Role is the message role (system, user, assistant, tool).
 	Role core.LLMRole `json:"role"`
 	// Content is the message content.
 	Content string `json:"content"`
+	// ToolCallID is the ID of the tool call this message is responding to.
+	// Only set when Role is "tool".
+	ToolCallID string `json:"tool_call_id,omitempty"`
+	// ToolCalls contains tool calls made by the assistant.
+	// Only set when Role is "assistant" and the model requested tool calls.
+	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
 	// Metadata contains API call metadata (only set for assistant responses).
 	Metadata *LLMMessageMetadata `json:"metadata,omitempty"`
 }
@@ -32,6 +57,18 @@ type LLMMessageMetadata struct {
 	CompletionTokens int `json:"completionTokens,omitempty"`
 	// TotalTokens is the sum of prompt and completion tokens.
 	TotalTokens int `json:"totalTokens,omitempty"`
+}
+
+// ToolDefinition represents a tool that was available to the LLM.
+// This is stored alongside messages to provide visibility into what
+// tool definitions were sent to the LLM during execution.
+type ToolDefinition struct {
+	// Name is the tool/function name as presented to the LLM.
+	Name string `json:"name"`
+	// Description describes what the tool does.
+	Description string `json:"description,omitempty"`
+	// Parameters is the JSON Schema describing the tool's parameters.
+	Parameters map[string]any `json:"parameters,omitempty"`
 }
 
 // DeduplicateSystemMessages keeps only the first system message.

@@ -219,6 +219,9 @@ func toSubDAGRuns(subDAGRuns []exec.SubDAGRun) []api.SubDAGRun {
 		if w.Params != "" {
 			subDAGRun.Params = &w.Params
 		}
+		if w.DAGName != "" {
+			subDAGRun.DagName = &w.DAGName
+		}
 		result = append(result, subDAGRun)
 	}
 	return result
@@ -316,6 +319,19 @@ func toChatMessages(messages []exec.LLMMessage) []api.ChatMessage {
 			Content: msg.Content,
 		}
 
+		// Include tool calls for assistant messages
+		if len(msg.ToolCalls) > 0 {
+			toolCalls := make([]api.ChatToolCall, 0, len(msg.ToolCalls))
+			for _, tc := range msg.ToolCalls {
+				toolCalls = append(toolCalls, api.ChatToolCall{
+					Id:        tc.ID,
+					Name:      tc.Function.Name,
+					Arguments: ptrOf(tc.Function.Arguments),
+				})
+			}
+			apiMsg.ToolCalls = &toolCalls
+		}
+
 		if msg.Metadata != nil {
 			apiMsg.Metadata = &api.ChatMessageMetadata{
 				Provider:         ptrOf(msg.Metadata.Provider),
@@ -330,4 +346,23 @@ func toChatMessages(messages []exec.LLMMessage) []api.ChatMessage {
 	}
 
 	return result
+}
+
+// toToolDefinitions converts internal tool definitions to API format.
+func toToolDefinitions(defs []exec.ToolDefinition) *[]api.ToolDefinition {
+	if len(defs) == 0 {
+		return nil
+	}
+
+	result := make([]api.ToolDefinition, 0, len(defs))
+	for _, def := range defs {
+		apiDef := api.ToolDefinition{
+			Name:        def.Name,
+			Description: ptrOf(def.Description),
+			Parameters:  ptrOf(def.Parameters),
+		}
+		result = append(result, apiDef)
+	}
+
+	return &result
 }

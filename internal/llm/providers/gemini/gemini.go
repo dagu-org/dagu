@@ -68,15 +68,32 @@ func (p *Provider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.ChatRes
 		return nil, llm.WrapError(providerName, fmt.Errorf("failed to decode response: %w", err))
 	}
 
-	// Extract content from response
+	// Extract content and function calls from response
 	var content string
 	var finishReason string
+	var toolCalls []llm.ToolCall
+	toolCallIdx := 0
+
 	if len(resp.Candidates) > 0 {
 		candidate := resp.Candidates[0]
 		finishReason = candidate.FinishReason
-		for _, part := range candidate.Content.Parts {
-			if part.Text != "" {
-				content += part.Text
+		for _, p := range candidate.Content.Parts {
+			if p.Text != "" {
+				content += p.Text
+			}
+			if p.FunctionCall != nil {
+				// Convert args map to JSON string for Arguments
+				argsJSON, _ := json.Marshal(p.FunctionCall.Args)
+				// Gemini doesn't provide tool call IDs, so we generate one
+				toolCalls = append(toolCalls, llm.ToolCall{
+					ID:   fmt.Sprintf("call_%d", toolCallIdx),
+					Type: "function",
+					Function: llm.ToolCallFunction{
+						Name:      p.FunctionCall.Name,
+						Arguments: string(argsJSON),
+					},
+				})
+				toolCallIdx++
 			}
 		}
 	}
@@ -95,6 +112,7 @@ func (p *Provider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.ChatRes
 		Content:      content,
 		FinishReason: finishReason,
 		Usage:        usage,
+		ToolCalls:    toolCalls,
 	}, nil
 }
 
@@ -119,10 +137,52 @@ func (p *Provider) ChatStream(ctx context.Context, req *llm.ChatRequest) (<-chan
 
 func (p *Provider) buildRequestBody(req *llm.ChatRequest) ([]byte, error) {
 	// Separate system instruction from other messages
-	var sysInstr *systemInstruction
-	contents := make([]content, 0, len(req.Messages))
+	sysInstr, contents := p.processMessages(req.Messages)
 
-	for _, m := range req.Messages {
+	geminiReq := generateContentRequest{
+		Contents: contents,
+	}
+
+	if sysInstr != nil {
+		geminiReq.SystemInstruction = sysInstr
+	}
+
+	// Add tools if provided
+	if len(req.Tools) > 0 {
+		geminiReq.Tools = p.convertTools(req.Tools)
+	}
+
+	// Add tool choice config if specified
+	if req.ToolChoice != "" {
+		switch req.ToolChoice {
+		case "auto":
+			geminiReq.ToolConfig = &toolConfig{
+				FunctionCallingConfig: &functionCallingConfig{Mode: "AUTO"},
+			}
+		case "required":
+			geminiReq.ToolConfig = &toolConfig{
+				FunctionCallingConfig: &functionCallingConfig{Mode: "ANY"},
+			}
+		case "none":
+			geminiReq.ToolConfig = &toolConfig{
+				FunctionCallingConfig: &functionCallingConfig{Mode: "NONE"},
+			}
+		}
+	}
+
+	// Build generation config
+	if genConfig := p.buildGenerationConfig(req); genConfig != nil {
+		geminiReq.GenerationConfig = genConfig
+	}
+
+	return json.Marshal(geminiReq)
+}
+
+func (p *Provider) processMessages(reqMessages []llm.Message) (*systemInstruction, []content) {
+	var sysInstr *systemInstruction
+	contents := make([]content, 0, len(reqMessages))
+
+	for _, m := range reqMessages {
 		switch m.Role {
 		case llm.RoleSystem:
 			if sysInstr == nil {
@@ -137,30 +197,77 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest) ([]byte, error) {
 			})
 
 		case llm.RoleAssistant:
-			contents = append(contents, content{
-				Role:  "model", // Gemini uses "model" instead of "assistant"
-				Parts: []part{{Text: m.Content}},
-			})
+			// Check if this assistant message has tool calls
+			if len(m.ToolCalls) > 0 {
+				parts := make([]part, 0, len(m.ToolCalls)+1)
+				if m.Content != "" {
+					parts = append(parts, part{Text: m.Content})
+				}
+				for _, tc := range m.ToolCalls {
+					// Parse arguments from JSON string
+					var args map[string]any
+					if tc.Function.Arguments != "" {
+						if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
+							args = map[string]any{}
+						}
+					}
+					parts = append(parts, part{
+						FunctionCall: &functionCallPart{
+							Name: tc.Function.Name,
+							Args: args,
+						},
+					})
+				}
+				contents = append(contents, content{
+					Role:  "model",
+					Parts: parts,
+				})
+			} else {
+				contents = append(contents, content{
+					Role:  "model", // Gemini uses "model" instead of "assistant"
+					Parts: []part{{Text: m.Content}},
+				})
+			}
 
 		case llm.RoleTool:
-			// Gemini uses "function" role for function/tool results.
-			// For basic chat, we include tool results as user messages.
+			// Gemini uses functionResponse part for tool results
+			// The response should be a map or the raw content
+			var response any = map[string]string{"result": m.Content}
+			// Try to parse as JSON
+			var jsonResponse map[string]any
+			if err := json.Unmarshal([]byte(m.Content), &jsonResponse); err == nil {
+				response = jsonResponse
+			}
 			contents = append(contents, content{
-				Role:  "user",
-				Parts: []part{{Text: m.Content}},
+				Role: "user",
+				Parts: []part{{
+					FunctionResponse: &functionResponsePart{
+						Name:     m.Name,
+						Response: response,
+					},
+				}},
 			})
 		}
 	}
+	return sysInstr, contents
+}
 
-	geminiReq := generateContentRequest{
-		Contents: contents,
+func (p *Provider) convertTools(tools []llm.Tool) []geminiTool {
+	if len(tools) == 0 {
+		return nil
 	}
-
-	if sysInstr != nil {
-		geminiReq.SystemInstruction = sysInstr
+	funcDecls := make([]functionDeclaration, len(tools))
+	for i, t := range tools {
+		funcDecls[i] = functionDeclaration{
+			Name:        t.Function.Name,
+			Description: t.Function.Description,
+			Parameters:  t.Function.Parameters,
+		}
 	}
+	return []geminiTool{{FunctionDeclarations: funcDecls}}
+}
 
-	// Build generation config
+func (p *Provider) buildGenerationConfig(req *llm.ChatRequest) *generationConfig {
 	genConfig := &generationConfig{}
 	hasConfig := false
 
@@ -215,11 +322,10 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest) ([]byte, error) {
 		}
 	}
 
-	if hasConfig {
-		geminiReq.GenerationConfig = genConfig
+	if !hasConfig {
+		return nil
 	}
-
-	return json.Marshal(geminiReq)
+	return genConfig
 }
 
 // mapEffortToThinkingLevel maps unified effort levels to Gemini thinkingLevel.
@@ -333,7 +439,34 @@ func (p *Provider) streamResponse(ctx context.Context, body io.ReadCloser, event
 // API request/response types
 
 type part struct {
-	Text string `json:"text,omitempty"`
+	Text             string                `json:"text,omitempty"`
+	FunctionCall     *functionCallPart     `json:"functionCall,omitempty"`
+	FunctionResponse *functionResponsePart `json:"functionResponse,omitempty"`
+}
+
+// Function calling types
+type functionCallPart struct {
+	Name string         `json:"name"`
+	Args map[string]any `json:"args"`
+}
+
+type functionResponsePart struct {
+	Name     string `json:"name"`
+	Response any    `json:"response"`
+}
+
+type functionDeclaration struct {
+	Name        string         `json:"name"`
+	Description string         `json:"description,omitempty"`
+	Parameters  map[string]any `json:"parameters,omitempty"`
+}
+
+type toolConfig struct {
+	FunctionCallingConfig *functionCallingConfig `json:"functionCallingConfig,omitempty"`
+}
+
+type functionCallingConfig struct {
+	Mode string `json:"mode,omitempty"` // AUTO, ANY, NONE
 }
 
 type content struct {
@@ -361,13 +494,24 @@ type generateContentRequest struct {
 	Contents          []content          `json:"contents"`
 	SystemInstruction *systemInstruction `json:"systemInstruction,omitempty"`
 	GenerationConfig  *generationConfig  `json:"generationConfig,omitempty"`
+	Tools             []geminiTool       `json:"tools,omitempty"`
+	ToolConfig        *toolConfig        `json:"toolConfig,omitempty"`
+}
+
+type geminiTool struct {
+	FunctionDeclarations []functionDeclaration `json:"functionDeclarations,omitempty"`
+}
+
+type responsePart struct {
+	Text         string            `json:"text,omitempty"`
+	FunctionCall *functionCallPart `json:"functionCall,omitempty"`
 }
 
 type generateContentResponse struct {
 	Candidates []struct {
 		Content struct {
-			Parts []part `json:"parts"`
-			Role  string `json:"role"`
+			Parts []responsePart `json:"parts"`
+			Role  string         `json:"role"`
 		} `json:"content"`
 		FinishReason  string `json:"finishReason"`
 		Index         int    `json:"index"`

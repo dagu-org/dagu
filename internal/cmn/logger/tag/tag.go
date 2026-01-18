@@ -508,3 +508,15 @@ func AdvertiseAddress(addr string) slog.Attr {
 func InstanceID(id string) slog.Attr {
 	return slog.String("instance-id", id)
 }
+
+// LLM and tool calling tags
+
+// Tool creates a tag for LLM tool names.
+func Tool(name string) slog.Attr {
+	return slog.String("tool", name)
+}
+
+// ToolCallID creates a tag for LLM tool call IDs.
+func ToolCallID(id string) slog.Attr {
+	return slog.String("tool-call-id", id)
+}

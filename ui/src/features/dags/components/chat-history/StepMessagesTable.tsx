@@ -3,8 +3,9 @@ import { Markdown } from '@/components/ui/markdown';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';
 import { cn } from '@/lib/utils';
-import { Check, ChevronRight, Copy, Loader2 } from 'lucide-react';
+import { Check, ChevronRight, Copy, Loader2, Wrench } from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
+import { ToolDefinitionCard } from './ToolDefinitionCard';
 
 interface StepMessagesTableProps {
   dagName: string;
@@ -28,6 +29,22 @@ const roleConfig: Record<string, { label: string; borderColor: string }> = {
 };
 
 const defaultRoleConfig = { label: 'MSG', borderColor: 'border-l-gray-500' };
+
+function getMessagePreview(msg: { content: string; toolCalls?: { name: string }[] }) {
+  if (msg.content) {
+    const preview = msg.content.slice(0, 80);
+    const suffix = msg.content.length > 80 ? '...' : '';
+    return <>{preview}{suffix}</>;
+  }
+  if (msg.toolCalls && msg.toolCalls.length > 0) {
+    return (
+      <span className="text-purple-500">
+        Calling: {msg.toolCalls.map((tc) => tc.name).join(', ')}
+      </span>
+    );
+  }
+  return <span className="italic">(empty)</span>;
+}
 
 export function StepMessagesTable({
   dagName,
@@ -87,6 +104,10 @@ export function StepMessagesTable({
   const { data, isLoading } = isSubDAGRun ? subDagQuery : regularQuery;
 
   const messages = data?.messages || [];
+  const toolDefinitions = data?.toolDefinitions || [];
+
+  // State for showing/hiding the tool definitions section
+  const [showTools, setShowTools] = useState(false);
 
   // Start with empty set; useEffect will expand the last message when data arrives
   const [expandedIndexes, setExpandedIndexes] = useState<Set<number>>(
@@ -142,6 +163,36 @@ export function StepMessagesTable({
 
   return (
     <div className="border rounded bg-card">
+      {/* Tool definitions section */}
+      {toolDefinitions.length > 0 && (
+        <div className="border-b">
+          <button
+            onClick={() => setShowTools(!showTools)}
+            className="w-full flex items-center gap-2 px-2 py-1 hover:bg-accent/50 text-left"
+            type="button"
+          >
+            <ChevronRight
+              className={cn(
+                'h-3 w-3 shrink-0 transition-transform',
+                showTools && 'rotate-90'
+              )}
+            />
+            <Wrench className="h-3 w-3 text-purple-500" />
+            <span className="text-xs font-medium">
+              Available Tools ({toolDefinitions.length})
+            </span>
+          </button>
+          {showTools && (
+            <div className="px-4 pb-2 space-y-2">
+              {toolDefinitions.map((tool) => (
+                <ToolDefinitionCard key={tool.name} tool={tool} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Messages list */}
       {messages.map((msg, i) => {
         const isExpanded = expandedIndexes.has(i);
         const config = roleConfig[msg.role] || defaultRoleConfig;
@@ -172,8 +223,7 @@ export function StepMessagesTable({
               {!isExpanded && (
                 <>
                   <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">
-                    {msg.content.slice(0, 80)}
-                    {msg.content.length > 80 && '...'}
+                    {getMessagePreview(msg)}
                   </span>
                   {msg.metadata && (
                     <span className="text-xs text-muted-foreground font-mono shrink-0">
@@ -189,7 +239,23 @@ export function StepMessagesTable({
               <div className="px-2 pb-2 pl-7">
                 <div className="flex gap-4 items-start">
                   <div className="flex-1 min-w-0">
-                    <Markdown content={msg.content} />
+                    {msg.content ? (
+                      <Markdown content={msg.content} />
+                    ) : msg.toolCalls && msg.toolCalls.length > 0 ? (
+                      <div className="space-y-1">
+                        <span className="text-xs text-purple-500 font-medium">Tool Calls:</span>
+                        {msg.toolCalls.map((tc, idx) => (
+                          <div key={idx} className="text-xs font-mono bg-muted/50 p-2 rounded">
+                            <span className="text-purple-500">{tc.name}</span>
+                            {tc.arguments && (
+                              <span className="text-muted-foreground ml-1">({tc.arguments})</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic">(empty message)</span>
+                    )}
                   </div>
                   <div className="shrink-0 flex flex-col items-end gap-1">
                     {msg.metadata && (

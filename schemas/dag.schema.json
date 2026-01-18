@@ -1059,6 +1059,13 @@
             "$ref": "#/definitions/llmMessage"
           },
           "description": "Conversation messages for chat steps. Only valid when type is 'chat'. Supports variable substitution with ${VAR}."
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of tool DAG names available to the LLM for function calling. Only valid when type is 'chat'. Tools are other DAGs that can be called by the LLM to perform specific tasks."
         }
       },
       "allOf": [

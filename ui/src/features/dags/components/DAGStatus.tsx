@@ -143,12 +143,14 @@ function DAGStatus({ dagRun, fileName }: Props) {
     async (id: string) => {
       // find the clicked step
       const n = dagRun.nodes?.find((n) => toMermaidNodeId(n.step.name) == id);
+      if (!n) return;
 
-      const subDAGName = n?.step?.call;
-      if (n && subDAGName) {
-        // Combine both regular children and repeated children
-        const allSubRuns = [...(n.subRuns || []), ...(n.subRunsRepeated || [])];
+      // Combine both regular children and repeated children
+      const allSubRuns = [...(n.subRuns || []), ...(n.subRunsRepeated || [])];
 
+      // Check for sub-DAG: step.call (for call steps) OR subRun.dagName (for chat tools, etc.)
+      const subDAGName = n.step?.call || allSubRuns[0]?.dagName;
+      if (subDAGName && allSubRuns.length > 0) {
         // Check if there are multiple sub runs (parallel execution or repeated)
         if (allSubRuns.length > 1) {
           // Show modal to select which execution to view
@@ -156,7 +158,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
             isOpen: true,
             node: n,
           });
-        } else if (allSubRuns.length === 1) {
+        } else {
           // Single sub dagRun - navigate directly
           navigateToSubDagRun(n, 0);
         }
