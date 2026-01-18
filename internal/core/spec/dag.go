@@ -207,6 +207,8 @@ type container struct {
 	RestartPolicy string `yaml:"restartPolicy,omitempty"`
 	// Healthcheck defines a custom healthcheck for the container.
 	Healthcheck *healthcheck `yaml:"healthcheck,omitempty"`
+	// Shell specifies the shell wrapper for executing step commands.
+	Shell []string `yaml:"shell,omitempty"`
 }
 
 // healthcheck is the spec representation for custom health checks.
@@ -1104,6 +1106,7 @@ func buildContainerFromSpec(ctx BuildContext, c *container) (*core.Container, er
 			User:       c.User,
 			WorkingDir: workingDir,
 			Env:        envs,
+			Shell:      c.Shell,
 		}, nil
 	}
 
@@ -1150,6 +1153,7 @@ func buildContainerFromSpec(ctx BuildContext, c *container) (*core.Container, er
 		LogPattern:    c.LogPattern,
 		RestartPolicy: strings.TrimSpace(c.RestartPolicy),
 		Healthcheck:   hc,
+		Shell:         c.Shell,
 	}
 
 	// Backward compatibility

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/cmn/signal"
@@ -251,19 +253,21 @@ func getContainerStatus(info types.ContainerJSON, err error) string {
 		}
 		return fmt.Sprintf("error: %v", err)
 	}
-	if info.State == nil {
+
+	state := info.State
+	if state == nil {
 		return "unknown"
 	}
-	if info.State.Running {
+	if state.Running {
 		return "running"
 	}
-	if info.State.Status != "" {
-		if info.State.ExitCode != 0 {
-			return fmt.Sprintf("%s (exit code: %d)", info.State.Status, info.State.ExitCode)
-		}
-		return info.State.Status
+	if state.Status == "" {
+		return "not running"
 	}
-	return "not running"
+	if state.ExitCode != 0 {
+		return fmt.Sprintf("%s (exit code: %d)", state.Status, state.ExitCode)
+	}
+	return state.Status
 }
 
 // Close closes the container client and cleans up resources
@@ -443,9 +447,7 @@ func (c *Client) StopContainerKeepAlive(ctx context.Context) {
 		if err := c.cli.ContainerStop(ctx, c.containerID, container.StopOptions{}); err != nil {
 			logger.Error(ctx, "Docker executor: stop container", tag.Error(err))
 		}
-	}
 
-	if c.containerID != "" {
 		// Forcefully stop after timeout
 		defaultStopTimeout := 5 * time.Second
 		var containerStopped atomic.Bool
@@ -711,13 +713,14 @@ func (c *Client) startNewContainer(ctx context.Context, name string, cli *client
 	ctCfg.Image = c.cfg.Image
 
 	if len(cmd) > 0 {
+		// Use cmd as-is for container startup (not wrapped with shell)
 		ctCfg.Cmd = cmd
 		if clearEntrypoint {
 			// Entrypoint should be empty slice to override image ENTRYPOINT
 			ctCfg.Entrypoint = []string{}
 		}
 	} else if c.cfg.Startup == "command" && len(c.cfg.StartCmd) > 0 {
-		// Use StartCmd for startup: command mode when no cmd override provided
+		// Use StartCmd for startup: command mode
 		ctCfg.Cmd = c.cfg.StartCmd
 	}
 
@@ -757,6 +760,55 @@ func (c *Client) startNewContainer(ctx context.Context, name string, cli *client
 	return resp.ID, err
 }
 
+// ensureCommandFlag adds the appropriate command flag (-c, -Command, /c)
+// if not already present in the shell array.
+func ensureCommandFlag(shell []string) []string {
+	if len(shell) == 0 {
+		return shell
+	}
+
+	flag := cmdutil.ShellCommandFlag(shell[0])
+	if slices.Contains(shell, flag) {
+		return shell
+	}
+
+	return append(slices.Clone(shell), flag)
+}
+
+// wrapCommandWithShell wraps a command array with a shell if specified.
+// If shell is not specified, returns the command as-is.
+//
+// The command flag (-c, -Command, /c) is automatically added if not present.
+// The command array is treated as follows:
+//   - Single element: Used as-is (preserves original YAML quoting from CmdWithArgs)
+//   - Multiple elements: Joined with spaces to create shell command string
+//
+// Shell format: ["/bin/bash", "-o", "errexit"]
+// Command: ["echo \"hello world\""]  (from CmdWithArgs)
+// Result: ["/bin/bash", "-o", "errexit", "-c", "echo \"hello world\""]
+//
+// Command: ["echo", "line1", "&&", "echo", "line2"]  (reconstructed array)
+// Result: ["/bin/bash", "-o", "errexit", "-c", "echo line1 && echo line2"]
+func wrapCommandWithShell(shell, cmd []string) []string {
+	if len(shell) == 0 || len(cmd) == 0 {
+		return cmd
+	}
+
+	// Auto-add command flag if not already present
+	shellWithFlag := ensureCommandFlag(shell)
+
+	// If single element, use as-is (preserves original quoting from CmdWithArgs)
+	// If multiple elements, join with spaces (array was reconstructed)
+	var cmdString string
+	if len(cmd) == 1 {
+		cmdString = cmd[0]
+	} else {
+		cmdString = strings.Join(cmd, " ")
+	}
+
+	return append(shellWithFlag, cmdString)
+}
+
 func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []string, stdout, stderr io.Writer, opts ExecOptions) (int, error) {
 	// Get container ID from context
 	c.mu.Lock()
@@ -772,6 +824,9 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 	if !info.State.Running {
 		return 1, fmt.Errorf("container %s is not running", containerID)
 	}
+
+	// Wrap command with shell if specified
+	cmd = wrapCommandWithShell(c.cfg.Shell, cmd)
 
 	// Create exec configuration
 	execOpts := container.ExecOptions{
@@ -903,34 +958,18 @@ func (c *Client) attachAndWait(ctx context.Context, cli *client.Client, containe
 
 // isDockerInDocker detects if we're running inside a Docker container
 func (c *Client) isDockerInDocker() bool {
-	// Check multiple indicators of running in a container
-
-	// 1. Check for Docker environment file
-	if c.fileExists(dockerEnvFile) {
+	// Check for container runtime environment files
+	if c.fileExists(dockerEnvFile) || c.fileExists(podmanEnvFile) {
 		return true
 	}
 
-	// 2. Check for Podman environment file
-	if c.fileExists(podmanEnvFile) {
-		return true
-	}
-
-	// 3. Check if we're in a container by examining cgroup
+	// Check if we're in a container by examining cgroup
 	if c.isInContainerByCgroup() {
 		return true
 	}
 
-	// 4. Check for Kubernetes environment
-	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
-		return true
-	}
-
-	// 5. Check if Docker socket is mounted (docker-in-docker scenario)
-	if c.fileExists(dockerSocketFile) && c.isInContainerByCgroup() {
-		return true
-	}
-
-	return false
+	// Check for Kubernetes environment
+	return os.Getenv("KUBERNETES_SERVICE_HOST") != ""
 }
 
 // fileExists checks if a file exists
@@ -1032,6 +1071,10 @@ func parseRestartPolicy(s string) (container.RestartPolicy, error) {
 	}
 }
 
+// terminalContainerStatuses are container statuses that indicate the container has stopped
+// and will not become running.
+var terminalContainerStatuses = []string{"exited", "dead", "removing"}
+
 // waitRunning waits until the container is in running state or context times out.
 func (c *Client) waitRunning(ctx context.Context, cli *client.Client, id string) error {
 	ticker := time.NewTicker(defaultPollInterval)
@@ -1046,19 +1089,19 @@ func (c *Client) waitRunning(ctx context.Context, cli *client.Client, id string)
 			if err != nil {
 				return fmt.Errorf("failed to inspect container %s: %w", id, err)
 			}
-			if info.State != nil {
-				if info.State.Running {
-					logger.Info(ctx, "Container ready (running)",
-						slog.String("id", id),
-					)
-					return nil
-				}
-				// If the container has already exited or is dead, fail fast
-				if status := strings.ToLower(info.State.Status); status == "exited" || status == "dead" || status == "removing" { //nolint:gocritic
-					return fmt.Errorf("container %s not running; status=%s, exitCode=%d", id, status, info.State.ExitCode)
-				}
-				last = fmt.Sprintf("running=%v,status=%s", info.State.Running, info.State.Status)
+			if info.State == nil {
+				continue
 			}
+			if info.State.Running {
+				logger.Info(ctx, "Container ready (running)", slog.String("id", id))
+				return nil
+			}
+			// If the container has already exited or is dead, fail fast
+			status := strings.ToLower(info.State.Status)
+			if slices.Contains(terminalContainerStatuses, status) {
+				return fmt.Errorf("container %s not running; status=%s, exitCode=%d", id, status, info.State.ExitCode)
+			}
+			last = fmt.Sprintf("running=%v,status=%s", info.State.Running, info.State.Status)
 		}
 	}
 }

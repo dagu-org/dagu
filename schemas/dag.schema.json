@@ -1465,6 +1465,12 @@
           },
           "required": ["test"],
           "description": "Custom healthcheck configuration for the container. Allows 'waitFor: healthy' to work with images that don't have built-in healthchecks (e.g., postgres, mysql). Not applicable in exec mode."
+        },
+        "shell": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "Shell wrapper for executing step commands. Format: first element is the shell executable, remaining elements are flags, and the step command is appended as the final argument. Example: [\"/bin/bash\", \"-o\", \"errexit\", \"-c\"]. The '-c' flag (or equivalent) should be the last flag. Works in both exec and image modes."
         }
       },
       "description": "Container configuration object. Either 'exec' (to run in an existing container) or 'image' (to create a new container) must be specified, but not both."
