@@ -480,6 +480,14 @@
         }
       ],
       "description": "Default shell to use for all steps in this DAG. Can be specified as a string with arguments (e.g., '/bin/bash -e') which will be automatically tokenized, or as an array for explicit argument separation. If not specified, the system default shell ($SHELL or /bin/sh) is used. Can be overridden at the step level."
+    },
+    "redis": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/redisConnectionConfig"
+        }
+      ],
+      "description": "Default Redis configuration for all steps in the DAG. Steps with type: redis inherit this configuration if they don't specify their own connection settings."
     }
   },
   "definitions": {
@@ -1133,6 +1141,14 @@
           "then": {
             "properties": {
               "config": { "$ref": "#/definitions/hitlExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "redis" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/redisExecutorConfig" }
             }
           }
         },
@@ -2302,6 +2318,370 @@
       },
       "description": "SQLite executor configuration for database operations. Uses pure Go SQLite with automatic pragmas: foreign_keys=ON, busy_timeout=5000."
     },
+    "redisConnectionConfig": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Redis connection URL (redis://[user:pass@]host:port[/db]). Alternative to host/port."
+        },
+        "host": {
+          "type": "string",
+          "default": "localhost",
+          "description": "Redis server hostname. Required if URL not provided."
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 6379,
+          "description": "Redis server port. Default: 6379."
+        },
+        "password": {
+          "type": "string",
+          "description": "Authentication password."
+        },
+        "username": {
+          "type": "string",
+          "description": "ACL username (Redis 6+)."
+        },
+        "db": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15,
+          "default": 0,
+          "description": "Database number (0-15). Default: 0."
+        },
+        "tls": {
+          "type": "boolean",
+          "description": "Enable TLS connection."
+        },
+        "tlsCert": {
+          "type": "string",
+          "description": "Client certificate path for mTLS."
+        },
+        "tlsKey": {
+          "type": "string",
+          "description": "Client key path for mTLS. Must be provided with tlsCert."
+        },
+        "tlsCA": {
+          "type": "string",
+          "description": "CA certificate path for TLS verification."
+        },
+        "tlsSkipVerify": {
+          "type": "boolean",
+          "description": "Skip TLS certificate verification. WARNING: Only use for testing."
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["standalone", "sentinel", "cluster"],
+          "default": "standalone",
+          "description": "Connection mode. Default: standalone."
+        },
+        "sentinelMaster": {
+          "type": "string",
+          "description": "Sentinel master name. Required when mode is 'sentinel'."
+        },
+        "sentinelAddrs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Sentinel server addresses. Required when mode is 'sentinel'."
+        },
+        "clusterAddrs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Cluster node addresses. Required when mode is 'cluster'."
+        },
+        "maxRetries": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 3,
+          "description": "Maximum retry attempts. Default: 3."
+        }
+      },
+      "description": "Common Redis connection configuration shared between DAG-level and step-level Redis settings."
+    },
+    "redisExecutorConfig": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/redisConnectionConfig"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "command": {
+          "type": "string",
+          "description": "Redis command to execute (e.g., 'GET', 'SET', 'HSET'). Required unless using script/pipeline."
+        },
+        "key": {
+          "type": "string",
+          "description": "Primary key for the command."
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Multiple keys for commands like MGET, DEL."
+        },
+        "value": {
+          "description": "Value for SET, LPUSH, etc. Can be string, number, boolean, or object."
+        },
+        "values": {
+          "type": "array",
+          "description": "Multiple values for commands like MSET, LPUSH."
+        },
+        "field": {
+          "type": "string",
+          "description": "Hash field for HGET, HSET."
+        },
+        "fields": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Multiple hash fields for HMSET, HGETALL."
+        },
+        "ttl": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Expiration time in seconds for SET with EX option."
+        },
+        "nx": {
+          "type": "boolean",
+          "description": "SET only if key does not exist."
+        },
+        "xx": {
+          "type": "boolean",
+          "description": "SET only if key exists."
+        },
+        "keepTTL": {
+          "type": "boolean",
+          "description": "Preserve existing TTL when updating key (Redis 6+)."
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Count parameter for SCAN, LPOP, RPOP."
+        },
+        "match": {
+          "type": "string",
+          "description": "Pattern for SCAN command (e.g., 'user:*')."
+        },
+        "position": {
+          "type": "string",
+          "enum": ["BEFORE", "AFTER"],
+          "description": "Position for LINSERT command."
+        },
+        "pivot": {
+          "type": "string",
+          "description": "Pivot value for LINSERT command."
+        },
+        "start": {
+          "type": "integer",
+          "description": "Range start index for LRANGE, ZRANGE."
+        },
+        "stop": {
+          "type": "integer",
+          "description": "Range stop index for LRANGE, ZRANGE."
+        },
+        "score": {
+          "type": "number",
+          "description": "Member score for ZADD, ZINCRBY."
+        },
+        "min": {
+          "type": "string",
+          "description": "Minimum score/value for ZRANGEBYSCORE, ZCOUNT."
+        },
+        "max": {
+          "type": "string",
+          "description": "Maximum score/value for ZRANGEBYSCORE, ZCOUNT."
+        },
+        "withScores": {
+          "type": "boolean",
+          "description": "Include scores in ZRANGE output."
+        },
+        "channel": {
+          "type": "string",
+          "description": "Pub/Sub channel name."
+        },
+        "channels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Multiple Pub/Sub channels."
+        },
+        "message": {
+          "description": "Message to publish. Can be string, number, boolean, or object."
+        },
+        "stream": {
+          "type": "string",
+          "description": "Stream key for XADD, XREAD."
+        },
+        "streamID": {
+          "type": "string",
+          "description": "Stream message ID. Use '*' for auto-generation."
+        },
+        "group": {
+          "type": "string",
+          "description": "Consumer group name for XREADGROUP."
+        },
+        "consumer": {
+          "type": "string",
+          "description": "Consumer name for XREADGROUP."
+        },
+        "streamFields": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Stream entry fields for XADD."
+        },
+        "maxLen": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum stream length for XADD."
+        },
+        "block": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Block timeout in milliseconds for XREAD, XREADGROUP."
+        },
+        "noAck": {
+          "type": "boolean",
+          "description": "Skip acknowledging messages in XREADGROUP."
+        },
+        "script": {
+          "type": "string",
+          "description": "Inline Lua script to execute."
+        },
+        "scriptFile": {
+          "type": "string",
+          "description": "Path to Lua script file."
+        },
+        "scriptSHA": {
+          "type": "string",
+          "description": "SHA of pre-loaded script. Use EVALSHA instead of EVAL."
+        },
+        "scriptKeys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "KEYS array for Lua script."
+        },
+        "scriptArgs": {
+          "type": "array",
+          "description": "ARGV array for Lua script."
+        },
+        "pipeline": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["command"],
+            "properties": {
+              "command": {
+                "type": "string"
+              },
+              "key": {
+                "type": "string"
+              },
+              "keys": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "value": {},
+              "values": {
+                "type": "array"
+              },
+              "field": {
+                "type": "string"
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "ttl": {
+                "type": "integer"
+              },
+              "nx": {
+                "type": "boolean"
+              },
+              "xx": {
+                "type": "boolean"
+              },
+              "score": {
+                "type": "number"
+              }
+            }
+          },
+          "description": "Batch of commands to execute in a pipeline."
+        },
+        "watch": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Keys to WATCH for optimistic locking."
+        },
+        "multi": {
+          "type": "boolean",
+          "description": "Wrap pipeline in MULTI/EXEC transaction."
+        },
+        "lock": {
+          "type": "string",
+          "description": "Distributed lock name. Acquires lock before executing command."
+        },
+        "lockTimeout": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 30,
+          "description": "Lock expiry in seconds. Default: 30."
+        },
+        "lockRetry": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 10,
+          "description": "Lock acquisition retry attempts. Default: 10."
+        },
+        "lockWait": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 100,
+          "description": "Wait between lock retries in milliseconds. Default: 100."
+        },
+        "outputFormat": {
+          "type": "string",
+          "enum": ["json", "jsonl", "raw", "csv"],
+          "default": "json",
+          "description": "Output format. Default: json."
+        },
+        "nullValue": {
+          "type": "string",
+          "default": "null",
+          "description": "String representation for nil values. Default: 'null'."
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 30,
+          "description": "Command timeout in seconds. Default: 30."
+        },
+        "maxResultSize": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 10485760,
+          "description": "Maximum result size in bytes. Default: 10MB."
+        }
+      }
+    }
+  ],
+  "description": "Redis executor configuration for executing Redis commands, managing cache, pub/sub, streams, and distributed locks."
+},
     "hitlExecutorConfig": {
       "type": "object",
       "additionalProperties": false,
@@ -2453,7 +2833,8 @@
         "chat",
         "hitl",
         "postgres",
-        "sqlite"
+        "sqlite",
+        "redis"
       ],
       "description": "Type of executor to use for this step."
     },
@@ -2557,6 +2938,14 @@
           "then": {
             "properties": {
               "config": { "$ref": "#/definitions/hitlExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "redis" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/redisExecutorConfig" }
             }
           }
         },

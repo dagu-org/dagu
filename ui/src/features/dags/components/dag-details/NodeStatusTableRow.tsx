@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/tooltip';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient, useQuery } from '@/hooks/api';
+import { getExecutorCommand } from '@/lib/executor-utils';
 import dayjs from '@/lib/dayjs';
 import { cn } from '@/lib/utils';
 import {
@@ -712,12 +713,33 @@ function NodeStatusTableRow({
           {/* Combined Command & Args */}
           <TableCell>
             <div className="space-y-1.5">
-              {node.step.commands && node.step.commands.length > 0 && (
+              {node.step.commands && node.step.commands.length > 0 ? (
                 <CommandDisplay
                   commands={node.step.commands}
                   icon="code"
                   maxLength={50}
                 />
+              ) : (
+                // Executor-specific display
+                (() => {
+                  const execCmd = getExecutorCommand(node.step);
+                  if (execCmd) {
+                    return (
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <Code className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                        <span
+                          className="font-mono text-xs truncate max-w-[200px]"
+                          title={execCmd}
+                        >
+                          {execCmd.length > 50
+                            ? execCmd.slice(0, 47) + '...'
+                            : execCmd}
+                        </span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()
               )}
               {node.step.script && (
                 <ScriptBadge
@@ -1149,7 +1171,7 @@ function NodeStatusTableRow({
             : 'Command:'}
         </div>
         <div className="space-y-1.5">
-          {node.step.commands && node.step.commands.length > 0 && (
+          {node.step.commands && node.step.commands.length > 0 ? (
             <div className="space-y-1.5">
               {node.step.commands.map((entry, idx) => {
                 const fullCmd =
@@ -1172,6 +1194,22 @@ function NodeStatusTableRow({
                 );
               })}
             </div>
+          ) : (
+            // Executor-specific display for mobile
+            (() => {
+              const execCmd = getExecutorCommand(node.step);
+              if (execCmd) {
+                return (
+                  <div className="flex items-start gap-1.5 text-xs">
+                    <Code className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                    <code className="bg-muted rounded-md px-2 py-1 text-foreground/90 break-all whitespace-pre-wrap font-mono text-xs flex-1">
+                      {execCmd}
+                    </code>
+                  </div>
+                );
+              }
+              return null;
+            })()
           )}
 
           {node.step.script && (

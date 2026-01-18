@@ -190,6 +190,10 @@ type DAG struct {
 	// LLM contains the default LLM configuration for the DAG.
 	// Steps with type: chat inherit this configuration if they don't specify their own llm field.
 	LLM *LLMConfig `json:"llm,omitempty"`
+	// Redis contains the default Redis configuration for the DAG.
+	// Steps with type: redis inherit this configuration.
+	// Excluded from JSON: may contain password.
+	Redis *RedisConfig `json:"-"`
 	// Secrets contains references to external secrets to be resolved at runtime.
 	Secrets []SecretRef `json:"secrets,omitempty"`
 	// dotenvOnce ensures LoadDotEnv is called only once, even with concurrent calls.
@@ -544,6 +548,37 @@ type S3Config struct {
 	// Bucket is the default S3 bucket name.
 	// Can be overridden at the step level.
 	Bucket string `json:"bucket,omitempty"`
+}
+
+// RedisConfig contains the default Redis configuration for the DAG.
+// Steps with type: redis inherit this configuration.
+type RedisConfig struct {
+	// URL is the Redis connection URL (redis://user:pass@host:port/db).
+	URL string `json:"url,omitempty"`
+	// Host is the Redis host (alternative to URL).
+	Host string `json:"host,omitempty"`
+	// Port is the Redis port (default: 6379).
+	Port int `json:"port,omitempty"`
+	// Password is the authentication password.
+	Password string `json:"password,omitempty"`
+	// Username is the ACL username (Redis 6+).
+	Username string `json:"username,omitempty"`
+	// DB is the database number (0-15).
+	DB int `json:"db,omitempty"`
+	// TLS enables TLS connection.
+	TLS bool `json:"tls,omitempty"`
+	// TLSSkipVerify skips TLS certificate verification.
+	TLSSkipVerify bool `json:"tlsSkipVerify,omitempty"`
+	// Mode is the connection mode (standalone, sentinel, cluster).
+	Mode string `json:"mode,omitempty"`
+	// SentinelMaster is the sentinel master name.
+	SentinelMaster string `json:"sentinelMaster,omitempty"`
+	// SentinelAddrs is the list of sentinel addresses.
+	SentinelAddrs []string `json:"sentinelAddrs,omitempty"`
+	// ClusterAddrs is the list of cluster node addresses.
+	ClusterAddrs []string `json:"clusterAddrs,omitempty"`
+	// MaxRetries is the maximum number of retries.
+	MaxRetries int `json:"maxRetries,omitempty"`
 }
 
 // Schedule contains the cron expression and the parsed cron schedule.
