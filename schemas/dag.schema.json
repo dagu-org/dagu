@@ -2225,7 +2225,6 @@
         },
         {
           "type": "object",
-          "additionalProperties": false,
           "properties": {
             "command": {
           "type": "string",
