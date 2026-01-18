@@ -956,34 +956,18 @@ func (c *Client) attachAndWait(ctx context.Context, cli *client.Client, containe
 
 // isDockerInDocker detects if we're running inside a Docker container
 func (c *Client) isDockerInDocker() bool {
-	// Check multiple indicators of running in a container
-
-	// 1. Check for Docker environment file
-	if c.fileExists(dockerEnvFile) {
+	// Check for container runtime environment files
+	if c.fileExists(dockerEnvFile) || c.fileExists(podmanEnvFile) {
 		return true
 	}
 
-	// 2. Check for Podman environment file
-	if c.fileExists(podmanEnvFile) {
-		return true
-	}
-
-	// 3. Check if we're in a container by examining cgroup
+	// Check if we're in a container by examining cgroup
 	if c.isInContainerByCgroup() {
 		return true
 	}
 
-	// 4. Check for Kubernetes environment
-	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
-		return true
-	}
-
-	// 5. Check if Docker socket is mounted (docker-in-docker scenario)
-	if c.fileExists(dockerSocketFile) && c.isInContainerByCgroup() {
-		return true
-	}
-
-	return false
+	// Check for Kubernetes environment
+	return os.Getenv("KUBERNETES_SERVICE_HOST") != ""
 }
 
 // fileExists checks if a file exists
@@ -1085,6 +1069,10 @@ func parseRestartPolicy(s string) (container.RestartPolicy, error) {
 	}
 }
 
+// terminalContainerStatuses are container statuses that indicate the container has stopped
+// and will not become running.
+var terminalContainerStatuses = []string{"exited", "dead", "removing"}
+
 // waitRunning waits until the container is in running state or context times out.
 func (c *Client) waitRunning(ctx context.Context, cli *client.Client, id string) error {
 	ticker := time.NewTicker(defaultPollInterval)
@@ -1099,19 +1087,19 @@ func (c *Client) waitRunning(ctx context.Context, cli *client.Client, id string)
 			if err != nil {
 				return fmt.Errorf("failed to inspect container %s: %w", id, err)
 			}
-			if info.State != nil {
-				if info.State.Running {
-					logger.Info(ctx, "Container ready (running)",
-						slog.String("id", id),
-					)
-					return nil
-				}
-				// If the container has already exited or is dead, fail fast
-				if status := strings.ToLower(info.State.Status); status == "exited" || status == "dead" || status == "removing" { //nolint:gocritic
-					return fmt.Errorf("container %s not running; status=%s, exitCode=%d", id, status, info.State.ExitCode)
-				}
-				last = fmt.Sprintf("running=%v,status=%s", info.State.Running, info.State.Status)
+			if info.State == nil {
+				continue
 			}
+			if info.State.Running {
+				logger.Info(ctx, "Container ready (running)", slog.String("id", id))
+				return nil
+			}
+			// If the container has already exited or is dead, fail fast
+			status := strings.ToLower(info.State.Status)
+			if slices.Contains(terminalContainerStatuses, status) {
+				return fmt.Errorf("container %s not running; status=%s, exitCode=%d", id, status, info.State.ExitCode)
+			}
+			last = fmt.Sprintf("running=%v,status=%s", info.State.Running, info.State.Status)
 		}
 	}
 }

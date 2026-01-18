@@ -188,9 +188,7 @@ func (e *docker) runInExistingContainer(ctx context.Context, cli *Client, tw *ex
 	// If no commands, run with empty command (use image default)
 	if len(e.step.Commands) == 0 {
 		exitCode, err := cli.Exec(ctx, nil, e.stdout, e.stderr, execOpts)
-		e.mu.Lock()
-		e.exitCode = exitCode
-		e.mu.Unlock()
+		e.setExitCode(exitCode)
 		if err != nil && tw.Tail() != "" {
 			return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tw.Tail())
 		}
@@ -199,20 +197,7 @@ func (e *docker) runInExistingContainer(ctx context.Context, cli *Client, tw *ex
 
 	// Execute each command sequentially
 	for i, cmdEntry := range e.step.Commands {
-		var cmd []string
-		if cmdEntry.Command != "" {
-			cmd = append([]string{cmdEntry.Command}, cmdEntry.Args...)
-		}
-
-		// For shell wrapping, use CmdWithArgs (original string) instead of reconstructed array
-		// This preserves quoting and matches command executor behavior
-		var cmdForExec []string
-		if e.cfg != nil && len(e.cfg.Shell) > 0 && cmdEntry.CmdWithArgs != "" {
-			// Use the original command string for shell execution
-			cmdForExec = []string{cmdEntry.CmdWithArgs}
-		} else {
-			cmdForExec = cmd
-		}
+		cmd := e.buildCommand(cmdEntry)
 
 		logger.Debug(ctx, "Docker executor: executing command in existing container",
 			slog.Int("commandIndex", i+1),
@@ -220,10 +205,8 @@ func (e *docker) runInExistingContainer(ctx context.Context, cli *Client, tw *ex
 			slog.Any("cmd", cmd),
 		)
 
-		exitCode, err := cli.Exec(ctx, cmdForExec, e.stdout, e.stderr, execOpts)
-		e.mu.Lock()
-		e.exitCode = exitCode
-		e.mu.Unlock()
+		exitCode, err := cli.Exec(ctx, cmd, e.stdout, e.stderr, execOpts)
+		e.setExitCode(exitCode)
 
 		if err != nil {
 			if tail := tw.Tail(); tail != "" {
