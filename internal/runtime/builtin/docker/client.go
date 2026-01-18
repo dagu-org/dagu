@@ -765,23 +765,11 @@ func (c *Client) startNewContainer(ctx context.Context, name string, cli *client
 // Result: ["/bin/bash", "-o", "errexit", "-c", "echo hello"]
 //
 // The command array is joined with spaces to create a shell command string.
-func wrapCommandWithShell(shell []string, cmd []string) []string {
-	if len(shell) == 0 {
+func wrapCommandWithShell(shell, cmd []string) []string {
+	if len(shell) == 0 || len(cmd) == 0 {
 		return cmd
 	}
-	if len(cmd) == 0 {
-		return cmd
-	}
-
-	// Join command array into a single shell command string
-	cmdString := strings.Join(cmd, " ")
-
-	// Build wrapped command: [shell_parts..., command_string]
-	wrapped := make([]string, 0, len(shell)+1)
-	wrapped = append(wrapped, shell...)
-	wrapped = append(wrapped, cmdString)
-
-	return wrapped
+	return append(append([]string{}, shell...), strings.Join(cmd, " "))
 }
 
 func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []string, stdout, stderr io.Writer, opts ExecOptions) (int, error) {
