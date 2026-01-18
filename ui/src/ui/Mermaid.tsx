@@ -11,7 +11,7 @@ type Props = {
 };
 
 // Initialize Mermaid with sepia theme
-const initializeMermaid = () => {
+function initializeMermaid(): void {
   mermaid.initialize({
     securityLevel: 'loose',
     startOnLoad: false,
@@ -46,7 +46,7 @@ const initializeMermaid = () => {
     fontFamily: 'Arial',
     logLevel: 4, // ERROR
   });
-};
+}
 
 // Initialize on load
 initializeMermaid();

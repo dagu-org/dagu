@@ -9,11 +9,11 @@ type ToggleGroupProps = {
   'aria-label'?: string;
 };
 
-export const ToggleGroup = ({
+export function ToggleGroup({
   children,
   className,
   'aria-label': ariaLabel,
-}: Omit<ToggleGroupProps, 'value' | 'onChange'>) => {
+}: Omit<ToggleGroupProps, 'value' | 'onChange'>): React.ReactElement {
   const groupRef = useRef<HTMLDivElement>(null);
 
   const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
@@ -73,7 +73,7 @@ export const ToggleGroup = ({
       {children}
     </div>
   );
-};
+}
 
 type ToggleButtonProps = {
   value: string;
@@ -85,14 +85,14 @@ type ToggleButtonProps = {
   position?: 'first' | 'middle' | 'last' | 'single';
 };
 
-export const ToggleButton = ({
+export function ToggleButton({
   value,
   groupValue,
   onClick,
   children,
   className,
   'aria-label': ariaLabel,
-}: ToggleButtonProps) => {
+}: ToggleButtonProps): React.ReactElement {
   const isSelected = groupValue === value;
 
   return (
@@ -112,4 +112,4 @@ export const ToggleButton = ({
       {children}
     </button>
   );
-};
+}
