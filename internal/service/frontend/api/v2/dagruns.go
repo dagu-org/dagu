@@ -1048,38 +1048,29 @@ func (a *API) GetDAGRunSpec(ctx context.Context, request api.GetDAGRunSpecReques
 	dagName := request.Name
 	dagRunId := request.DagRunId
 
+	var attempt exec.DAGRunAttempt
+	var err error
+	var notFoundMsg string
+
 	// Handle "latest" by getting the most recent attempt
 	if dagRunId == "latest" {
-		attempt, err := a.dagRunStore.LatestAttempt(ctx, dagName)
-		if err != nil {
-			return &api.GetDAGRunSpec404JSONResponse{
-				Code:    api.ErrorCodeNotFound,
-				Message: fmt.Sprintf("no dag-runs found for DAG %s", dagName),
-			}, nil
-		}
-		dag, err := attempt.ReadDAG(ctx)
-		if err != nil || dag == nil || len(dag.YamlData) == 0 {
-			return &api.GetDAGRunSpec404JSONResponse{
-				Code:    api.ErrorCodeNotFound,
-				Message: fmt.Sprintf("DAG spec not found for %s", dagName),
-			}, nil
-		}
-		return &api.GetDAGRunSpec200JSONResponse{
-			Spec: string(dag.YamlData),
-		}, nil
+		attempt, err = a.dagRunStore.LatestAttempt(ctx, dagName)
+		notFoundMsg = fmt.Sprintf("no dag-runs found for DAG %s", dagName)
+	} else {
+		// Get spec from the specific DAG-run attempt
+		attempt, err = a.dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(dagName, dagRunId))
+		notFoundMsg = fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
 	}
 
-	// Get spec from the specific DAG-run attempt
-	attempt, err := a.dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(dagName, dagRunId))
 	if err != nil {
 		return &api.GetDAGRunSpec404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
+			Message: notFoundMsg,
 		}, nil
 	}
 
-	dag, err := attempt.ReadDAG(ctx)
-	if err != nil || dag == nil || len(dag.YamlData) == 0 {
+	spec, err := a.getSpecFromAttempt(ctx, attempt)
+	if err != nil {
 		return &api.GetDAGRunSpec404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
 			Message: fmt.Sprintf("DAG spec not found for dag-run %s", dagRunId),
@@ -1087,7 +1078,7 @@ func (a *API) GetDAGRunSpec(ctx context.Context, request api.GetDAGRunSpecReques
 	}
 
 	return &api.GetDAGRunSpec200JSONResponse{
-		Spec: string(dag.YamlData),
+		Spec: spec,
 	}, nil
 }
 
@@ -1104,6 +1095,43 @@ func (a *API) GetSubDAGRunDetails(ctx context.Context, request api.GetSubDAGRunD
 	return &api.GetSubDAGRunDetails200JSONResponse{
 		DagRunDetails: toDAGRunDetails(*dagStatus),
 	}, nil
+}
+
+// GetSubDAGRunSpec implements api.StrictServerInterface.
+// This endpoint returns the YAML spec that was used for a specific sub-DAG run.
+func (a *API) GetSubDAGRunSpec(ctx context.Context, request api.GetSubDAGRunSpecRequestObject) (api.GetSubDAGRunSpecResponseObject, error) {
+	root := exec.NewDAGRunRef(request.Name, request.DagRunId)
+
+	// Find the sub-DAG run attempt using the existing store method
+	attempt, err := a.dagRunStore.FindSubAttempt(ctx, root, request.SubDAGRunId)
+	if err != nil {
+		return &api.GetSubDAGRunSpec404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("sub dag-run ID %s not found for DAG %s", request.SubDAGRunId, request.Name),
+		}, nil
+	}
+
+	spec, err := a.getSpecFromAttempt(ctx, attempt)
+	if err != nil {
+		return &api.GetSubDAGRunSpec404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("DAG spec not found for sub dag-run %s", request.SubDAGRunId),
+		}, nil
+	}
+
+	return &api.GetSubDAGRunSpec200JSONResponse{
+		Spec: spec,
+	}, nil
+}
+
+// getSpecFromAttempt reads YAML spec from DAG run attempt.
+// Returns spec string and nil error on success, or empty string and error on failure.
+func (a *API) getSpecFromAttempt(ctx context.Context, attempt exec.DAGRunAttempt) (string, error) {
+	dag, err := attempt.ReadDAG(ctx)
+	if err != nil || dag == nil || len(dag.YamlData) == 0 {
+		return "", fmt.Errorf("DAG spec not found")
+	}
+	return string(dag.YamlData), nil
 }
 
 // GetSubDAGRunLog implements api.StrictServerInterface.

@@ -16,7 +16,7 @@ import {
   Webhook,
   WebhookOff,
 } from 'lucide-react';
-import React, { useCallback, useContext, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useState } from 'react';
 import { components } from '../../../../api/v2/schema';
 import { Button } from '../../../../components/ui/button';
 import {
@@ -27,11 +27,11 @@ import {
   CardTitle,
 } from '../../../../components/ui/card';
 import { Switch } from '../../../../components/ui/switch';
-import { useConfig } from '../../../../contexts/ConfigContext';
-import { TOKEN_KEY } from '../../../../contexts/AuthContext';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
-import ConfirmModal from '../../../../ui/ConfirmModal';
+import { TOKEN_KEY } from '../../../../contexts/AuthContext';
+import { useConfig } from '../../../../contexts/ConfigContext';
 import dayjs from '../../../../lib/dayjs';
+import ConfirmModal from '../../../../ui/ConfirmModal';
 
 type WebhookDetails = components['schemas']['WebhookDetails'];
 
@@ -70,6 +70,10 @@ function WebhookTab({ fileName }: WebhookTabProps) {
   const [isActioning, setIsActioning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showToggleConfirm, setShowToggleConfirm] = useState(false);
+  const [pendingToggleState, setPendingToggleState] = useState<boolean | null>(
+    null
+  );
 
   // Copy states
   const [copiedUrl, setCopiedUrl] = useState(false);
@@ -78,9 +82,10 @@ function WebhookTab({ fileName }: WebhookTabProps) {
 
   // Construct webhook URL (include remoteNode if not local)
   const remoteNode = appBarContext.selectedRemoteNode;
-  const webhookUrl = remoteNode && remoteNode !== 'local'
-    ? `${window.location.origin}/api/v2/webhooks/${encodeURIComponent(fileName)}?remoteNode=${encodeURIComponent(remoteNode)}`
-    : `${window.location.origin}/api/v2/webhooks/${encodeURIComponent(fileName)}`;
+  const webhookUrl =
+    remoteNode && remoteNode !== 'local'
+      ? `${window.location.origin}/api/v2/webhooks/${encodeURIComponent(fileName)}?remoteNode=${encodeURIComponent(remoteNode)}`
+      : `${window.location.origin}/api/v2/webhooks/${encodeURIComponent(fileName)}`;
 
   // API helpers
   const getAuthHeaders = useCallback(() => {
@@ -222,8 +227,14 @@ function WebhookTab({ fileName }: WebhookTabProps) {
     }
   };
 
-  // Toggle enabled
-  const handleToggle = async (enabled: boolean) => {
+  // Toggle enabled - show confirmation first
+  const handleToggleClick = (enabled: boolean) => {
+    setPendingToggleState(enabled);
+    setShowToggleConfirm(true);
+  };
+
+  const handleToggleConfirm = async () => {
+    if (pendingToggleState === null) return;
     try {
       setError(null);
       const remoteNode = getRemoteNodeParam();
@@ -232,7 +243,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
         {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ enabled }),
+          body: JSON.stringify({ enabled: pendingToggleState }),
         }
       );
 
@@ -245,7 +256,15 @@ function WebhookTab({ fileName }: WebhookTabProps) {
       setWebhook(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to toggle webhook');
+    } finally {
+      setShowToggleConfirm(false);
+      setPendingToggleState(null);
     }
+  };
+
+  const handleToggleCancel = () => {
+    setShowToggleConfirm(false);
+    setPendingToggleState(null);
   };
 
   // Copy handler
@@ -396,7 +415,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
               </span>
               <Switch
                 checked={webhook.enabled}
-                onCheckedChange={handleToggle}
+                onCheckedChange={handleToggleClick}
               />
             </div>
           </div>
@@ -431,8 +450,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
           {/* Metadata */}
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <div>
-              Created:{' '}
-              {dayjs(webhook.createdAt).format('MMM D, YYYY HH:mm')}
+              Created: {dayjs(webhook.createdAt).format('MMM D, YYYY HH:mm')}
             </div>
             {webhook.lastUsedAt && (
               <div>
@@ -519,6 +537,20 @@ function WebhookTab({ fileName }: WebhookTabProps) {
         <p>
           Are you sure you want to delete this webhook? Any applications using
           this webhook token will immediately lose access.
+        </p>
+      </ConfirmModal>
+
+      {/* Toggle Confirmation Modal */}
+      <ConfirmModal
+        title={pendingToggleState ? 'Enable Webhook' : 'Disable Webhook'}
+        buttonText={pendingToggleState ? 'Enable' : 'Disable'}
+        visible={showToggleConfirm}
+        dismissModal={handleToggleCancel}
+        onSubmit={handleToggleConfirm}
+      >
+        <p>
+          Are you sure you want to {pendingToggleState ? 'enable' : 'disable'}{' '}
+          this webhook?
         </p>
       </ConfirmModal>
     </div>

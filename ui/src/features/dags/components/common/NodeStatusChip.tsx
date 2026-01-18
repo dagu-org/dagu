@@ -4,6 +4,7 @@
  * @module features/dags/components/common
  */
 import { cn } from '@/lib/utils';
+import { getStatusClass, getNodeStatusIcon } from '@/lib/status-utils';
 import MatrixText from '@/ui/MatrixText';
 import React, { useEffect, useState } from 'react';
 import { NodeStatus } from '../../../../api/v2/schema';
@@ -39,79 +40,8 @@ type Props = {
  * NodeStatusChip displays a styled badge based on the node status
  */
 function NodeStatusChip({ status, children, size = 'md' }: Props) {
-  // Determine the colors and icon based on status
-  let bgColorClass = '';
-  let textColorClass = '';
-  let borderColorClass = '';
-  let pulseAnimation = '';
-  let statusIcon = '';
-
-  switch (status) {
-    case NodeStatus.Success: // done -> green
-      bgColorClass = 'bg-[rgba(0,128,0,0.1)],100,0,0.2)]';
-      borderColorClass = 'border-[green]';
-      textColorClass = 'text-[green]';
-      statusIcon = '✓'; // Checkmark
-      break;
-    case NodeStatus.Failed: // error -> red
-      bgColorClass = 'bg-[rgba(255,0,0,0.1)],0,0,0.2)]';
-      borderColorClass = 'border-[red]';
-      textColorClass = 'text-[red]';
-      statusIcon = '✕'; // X mark
-      break;
-    case NodeStatus.Running: // running -> lime
-      bgColorClass = 'bg-[rgba(0,255,0,0.1)],205,50,0.2)]';
-      borderColorClass = 'border-success';
-      textColorClass = 'text-success';
-      // No static icon - uses BrailleSpinner
-      break;
-    case NodeStatus.Aborted: // aborted -> pink
-      bgColorClass =
-        'bg-[rgba(255,192,203,0.1)],20,147,0.2)]';
-      borderColorClass = 'border-[pink]';
-      textColorClass = 'text-[deeppink]';
-      statusIcon = '■'; // Square
-      break;
-    case NodeStatus.Skipped: // skipped -> gray
-      bgColorClass =
-        'bg-[rgba(128,128,128,0.1)],169,169,0.2)]';
-      borderColorClass = 'border-[gray]';
-      textColorClass = 'text-[gray]';
-      statusIcon = '―'; // Horizontal bar
-      break;
-    case NodeStatus.NotStarted: // none -> lightblue
-      bgColorClass =
-        'bg-[rgba(173,216,230,0.1)],130,180,0.2)]';
-      borderColorClass = 'border-[lightblue]';
-      textColorClass = 'text-[steelblue]';
-      statusIcon = '○'; // Circle
-      break;
-    case NodeStatus.PartialSuccess: // partial success -> orange/amber
-      bgColorClass = 'bg-[rgba(245,158,11,0.1)],158,11,0.2)]';
-      borderColorClass = 'border-[#f59e0b]';
-      textColorClass = 'text-[#f59e0b]';
-      statusIcon = '◐'; // Half-filled circle
-      break;
-    case NodeStatus.Waiting: // waiting for approval -> amber/yellow
-      bgColorClass = 'bg-[rgba(245,158,11,0.15)]';
-      borderColorClass = 'border-[#f59e0b]';
-      textColorClass = 'text-[#d97706]';
-      pulseAnimation = 'animate-pulse';
-      statusIcon = '□'; // Empty square
-      break;
-    case NodeStatus.Rejected: // rejected -> red
-      bgColorClass = 'bg-[rgba(220,38,38,0.1)]';
-      borderColorClass = 'border-[#dc2626]';
-      textColorClass = 'text-[#dc2626]';
-      statusIcon = '⊘'; // Prohibited sign
-      break;
-    default: // Fallback to gray
-      bgColorClass =
-        'bg-[rgba(128,128,128,0.1)],169,169,0.2)]';
-      borderColorClass = 'border-[gray]';
-      textColorClass = 'text-[gray]';
-      statusIcon = '○'; // Circle
-  }
+  const statusClass = getStatusClass(status);
+  const statusIcon = getNodeStatusIcon(status);
 
   // Size classes
   const sizeClasses = {
@@ -126,27 +56,17 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
   return (
     <div
       className={cn(
-        'inline-flex items-center rounded-full border',
-        bgColorClass,
-        borderColorClass,
-        textColorClass,
+        'inline-flex items-center rounded-full border font-bold uppercase tracking-wider',
+        statusClass,
         sizeClasses[size]
       )}
     >
-      <span
-        className={cn('mr-1.5 inline-flex', textColorClass)}
-        aria-hidden="true"
-      >
+      <span className="mr-1.5 inline-flex" aria-hidden="true">
         {isRunning ? <BrailleSpinner /> : statusIcon}
       </span>
-      <span
-        className={cn(
-          'font-normal break-keep text-nowrap whitespace-nowrap',
-          textColorClass
-        )}
-      >
+      <span className="font-bold break-keep text-nowrap whitespace-nowrap">
         {isRunning && typeof children === 'string' ? (
-          <MatrixText text={children} className={textColorClass} />
+          <MatrixText text={children} />
         ) : (
           children
         )}

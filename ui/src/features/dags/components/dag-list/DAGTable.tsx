@@ -21,12 +21,17 @@ import {
   Filter,
   Search,
 } from 'lucide-react';
-import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Config } from '../../../../contexts/ConfigContext';
-
-declare const getConfig: () => Config;
 import { components, Status } from '../../../../api/v2/schema';
+import type { Config } from '../../../../contexts/ConfigContext';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
 import Ticker from '../../../../ui/Ticker';
@@ -34,6 +39,8 @@ import VisuallyHidden from '../../../../ui/VisuallyHidden';
 import { CreateDAGModal, DAGPagination } from '../common';
 import DAGActions from '../common/DAGActions';
 import LiveSwitch from '../common/LiveSwitch';
+
+declare const getConfig: () => Config;
 
 // Helper to format milliseconds into d/h/m/s
 function formatMs(ms: number): string {
@@ -52,6 +59,7 @@ function formatMs(ms: number): string {
 }
 
 // Import shadcn/ui components
+import { PanelWidthContext } from '../../../../components/SplitLayout';
 import { Badge } from '../../../../components/ui/badge';
 import { Button } from '../../../../components/ui/button';
 import { Input } from '../../../../components/ui/input';
@@ -75,7 +83,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '../../../../components/ui/tooltip';
-import { PanelWidthContext } from '../../../../components/SplitLayout';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 
@@ -93,7 +100,14 @@ interface DAGCardProps {
   className?: string;
 }
 
-function DAGCard({ dag, isSelected, onSelect, onTagClick, refreshFn, className = '' }: DAGCardProps) {
+function DAGCard({
+  dag,
+  isSelected,
+  onSelect,
+  onTagClick,
+  refreshFn,
+  className = '',
+}: DAGCardProps) {
   const fileName = dag.fileName;
   const title = dag.dag.name;
   const status = dag.latestDAGRun?.status;
@@ -113,7 +127,7 @@ function DAGCard({ dag, isSelected, onSelect, onTagClick, refreshFn, className =
 
   return (
     <div
-      className={`p-2.5 rounded-md border cursor-pointer overflow-hidden bg-card border-border hover:bg-muted/50 ${isSelected ? 'shadow-[inset_3px_0_0_0_rgba(0,0,0,0.2)]' : ''} ${status === Status.Running ? 'animate-running-row' : ''} ${className}`}
+      className={`card-obsidian p-2.5 cursor-pointer hover:bg-white/[0.05] transition-all duration-300 ${isSelected ? 'shadow-[inset_3px_0_0_0_var(--primary)] bg-white/[0.04]' : ''} ${status === Status.Running ? 'animate-running-row' : ''} ${className}`}
       onClick={handleCardClick}
     >
       {/* Header: Name + Status */}
@@ -397,7 +411,10 @@ const defaultColumns = [
       if (data.kind === ItemKind.Group) {
         // Group Row: Render group name directly with vertical centering
         return (
-          <div style={{ paddingLeft: `${row.depth * 1.5}rem` }} className="flex items-center min-h-[2.5rem]">
+          <div
+            style={{ paddingLeft: `${row.depth * 1.5}rem` }}
+            className="flex items-center min-h-[2.5rem]"
+          >
             <span className="font-normal text-muted-foreground">
               {getValue()}
             </span>
@@ -985,7 +1002,9 @@ function DAGTable({
     return hierarchicalData;
   }, [dags, clientSort, clientOrder]);
 
-  const tableInstanceRef = useRef<ReturnType<typeof useReactTable> | null>(null);
+  const tableInstanceRef = useRef<ReturnType<typeof useReactTable> | null>(
+    null
+  );
 
   useEffect(() => {
     if (!selectedDAG || !tableInstanceRef.current || !onSelectDAG) return;
@@ -1156,13 +1175,22 @@ function DAGTable({
       </div>
 
       {/* Desktop Table View - Hidden on mobile or when panel is narrow */}
-      <div className={`w-full overflow-hidden ${useCardView ? 'hidden' : 'hidden md:block'}`}>
+      <div
+        className={`w-full overflow-hidden ${useCardView ? 'hidden' : 'hidden md:block'}`}
+      >
         <Table
           className={`w-full text-xs ${isLoading ? 'opacity-70' : ''}`}
           style={{ tableLayout: 'fixed' }}
         >
-{/* Column widths: Expand 32px fixed, Name auto, Status 10%, LastRun 18%, Schedule 20%, Actions 10% */}
-          <colgroup><col style={{ width: '32px' }} /><col /><col style={{ width: '10%' }} /><col style={{ width: '18%' }} /><col style={{ width: '20%' }} /><col style={{ width: '10%' }} /></colgroup>
+          {/* Column widths: Expand 32px fixed, Name auto, Status 10%, LastRun 18%, Schedule 20%, Actions 10% */}
+          <colgroup>
+            <col style={{ width: '32px' }} />
+            <col />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '20%' }} />
+            <col style={{ width: '10%' }} />
+          </colgroup>
           <TableHeader>
             {instance.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -1218,8 +1246,11 @@ function DAGTable({
                     className={`text-[0.8125rem] ${
                       row.original?.kind === ItemKind.Group
                         ? 'bg-muted/50 font-semibold cursor-pointer hover:bg-muted/70'
-                        : isDAGRow && 'dag' in row.original && selectedDAG === (row.original as DAGRow).dag.fileName
-                          ? 'cursor-pointer hover:bg-muted/50 shadow-[inset_3px_0_0_0_rgba(0,0,0,0.2)]'
+                        : isDAGRow &&
+                            'dag' in row.original &&
+                            selectedDAG ===
+                              (row.original as DAGRow).dag.fileName
+                          ? 'cursor-pointer hover:bg-muted/50 shadow-[inset_3px_0_0_0_var(--primary)]'
                           : 'cursor-pointer hover:bg-muted/50'
                     } ${isDAGRow && 'dag' in row.original && (row.original as DAGRow).dag.latestDAGRun?.status === Status.Running ? 'animate-running-row' : ''}`}
                     onClick={(e) => {

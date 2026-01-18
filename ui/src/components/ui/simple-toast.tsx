@@ -17,7 +17,9 @@ export const SimpleToast: React.FC<SimpleToastProps> = ({
   onClose,
 }) => {
   const [isVisible, setIsVisible] = useState(true);
-  const [animationState, setAnimationState] = useState<'entering' | 'visible' | 'exiting'>('entering');
+  const [animationState, setAnimationState] = useState<
+    'entering' | 'visible' | 'exiting'
+  >('entering');
   const [checkAnimated, setCheckAnimated] = useState(false);
 
   // Ensure duration is at least MIN_DURATION
@@ -73,15 +75,14 @@ export const SimpleToast: React.FC<SimpleToastProps> = ({
           pointer-events-auto
           flex flex-col items-center justify-center gap-3
           w-32 h-32
-          bg-black/70 dark:bg-black/80
+          bg-popover/80
           backdrop-blur-xl
           rounded-[20px]
+          border border-border/50
+          shadow-toast
           transition-all duration-300 ease-out
           ${getAnimationClasses()}
         `}
-        style={{
-          boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 0 0 0.5px rgba(255,255,255,0.1)',
-        }}
       >
         {/* Animated checkmark circle */}
         <div className="relative w-12 h-12">
@@ -89,7 +90,7 @@ export const SimpleToast: React.FC<SimpleToastProps> = ({
           <div
             className={`
               absolute inset-0 rounded-full
-              border-[2.5px] border-green-400
+              border-[2.5px] border-success
               transition-all duration-300 ease-out
               ${checkAnimated ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}
             `}
@@ -102,14 +103,14 @@ export const SimpleToast: React.FC<SimpleToastProps> = ({
               ${checkAnimated ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}
             `}
           >
-            <Check className="h-7 w-7 text-green-400" strokeWidth={3} />
+            <Check className="h-7 w-7 text-success" strokeWidth={3} />
           </div>
         </div>
 
         {/* Message */}
         <span
           className={`
-            text-[13px] font-medium text-white/90 text-center px-2
+            text-[13px] font-medium text-foreground/90 text-center px-2
             transition-all duration-200 delay-150
             ${checkAnimated ? 'opacity-100' : 'opacity-0'}
           `}

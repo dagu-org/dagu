@@ -1,10 +1,10 @@
-import React, { useState, useContext, useEffect } from 'react';
-import { ChevronRight, Copy, Check, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Markdown } from '@/components/ui/markdown';
-import { useQuery } from '@/hooks/api';
-import { AppBarContext } from '@/contexts/AppBarContext';
 import { ChatMessageRole } from '@/api/v2/schema';
+import { Markdown } from '@/components/ui/markdown';
+import { AppBarContext } from '@/contexts/AppBarContext';
+import { useQuery } from '@/hooks/api';
+import { cn } from '@/lib/utils';
+import { Check, ChevronRight, Copy, Loader2 } from 'lucide-react';
+import { useContext, useEffect, useState } from 'react';
 
 interface StepMessagesTableProps {
   dagName: string;
@@ -17,13 +17,13 @@ interface StepMessagesTableProps {
   rootDagRunId?: string;
 }
 
-const roleConfig: Record<
-  string,
-  { label: string; borderColor: string }
-> = {
+const roleConfig: Record<string, { label: string; borderColor: string }> = {
   [ChatMessageRole.system]: { label: 'SYS', borderColor: 'border-l-amber-500' },
   [ChatMessageRole.user]: { label: 'USER', borderColor: 'border-l-blue-500' },
-  [ChatMessageRole.assistant]: { label: 'ASST', borderColor: 'border-l-green-500' },
+  [ChatMessageRole.assistant]: {
+    label: 'ASST',
+    borderColor: 'border-l-green-500',
+  },
   [ChatMessageRole.tool]: { label: 'TOOL', borderColor: 'border-l-purple-500' },
 };
 
@@ -43,8 +43,8 @@ export function StepMessagesTable({
 
   // Determine if this is a sub-DAG run
   const isSubDAGRun = !!subDAGRunId;
-  const effectiveName = isSubDAGRun ? (rootDagName || dagName) : dagName;
-  const effectiveRunId = isSubDAGRun ? (rootDagRunId || dagRunId) : dagRunId;
+  const effectiveName = isSubDAGRun ? rootDagName || dagName : dagName;
+  const effectiveRunId = isSubDAGRun ? rootDagRunId || dagRunId : dagRunId;
 
   // Query for regular DAG runs
   const regularQuery = useQuery(
@@ -67,7 +67,12 @@ export function StepMessagesTable({
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/messages',
     {
       params: {
-        path: { name: effectiveName, dagRunId: effectiveRunId, subDAGRunId: subDAGRunId || '', stepName },
+        path: {
+          name: effectiveName,
+          dagRunId: effectiveRunId,
+          subDAGRunId: subDAGRunId || '',
+          stepName,
+        },
         query: { remoteNode: appBarContext.selectedRemoteNode || 'local' },
       },
     },
@@ -136,7 +141,7 @@ export function StepMessagesTable({
   }
 
   return (
-    <div className="border rounded bg-white">
+    <div className="border rounded bg-card">
       {messages.map((msg, i) => {
         const isExpanded = expandedIndexes.has(i);
         const config = roleConfig[msg.role] || defaultRoleConfig;
@@ -145,7 +150,7 @@ export function StepMessagesTable({
           <div
             key={i}
             className={cn(
-              'border-l-2 border-b last:border-b-0 bg-white',
+              'border-l-2 border-b last:border-b-0 bg-card',
               config.borderColor
             )}
           >
@@ -193,7 +198,8 @@ export function StepMessagesTable({
                           {msg.metadata.provider}/{msg.metadata.model}
                         </div>
                         <div>
-                          in:{msg.metadata.promptTokens} out:{msg.metadata.completionTokens}
+                          in:{msg.metadata.promptTokens} out:
+                          {msg.metadata.completionTokens}
                         </div>
                       </div>
                     )}

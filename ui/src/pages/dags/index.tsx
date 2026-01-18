@@ -48,7 +48,8 @@ function DAGsContent() {
   const searchState = useSearchState();
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
   const { preferences, updatePreference } = useUserPreferences();
-  const { tabs, activeTabId, selectDAG, addTab, closeTab, getActiveFileName } = useTabContext();
+  const { tabs, activeTabId, selectDAG, addTab, closeTab, getActiveFileName } =
+    useTabContext();
 
   const defaultFilters = React.useMemo<DAGDefinitionsFilters>(
     () => ({
@@ -236,7 +237,6 @@ function DAGsContent() {
     };
   }, [data]);
 
-
   const pageChange = (page: number) => {
     addSearchParam('page', page.toString());
     setPage(page);
@@ -293,7 +293,7 @@ function DAGsContent() {
   const displayData = data || lastValidData;
 
   const leftPanel = (
-    <div className="pr-2">
+    <div className="pr-2 pt-4 md:pt-6 lg:pt-8">
       <DAGListHeader onRefresh={refreshFn} />
       {displayData ? (
         <>
@@ -336,8 +336,8 @@ function DAGsContent() {
   // Handle adding a new tab - creates an empty tab that will be filled on next DAG selection
   const handleAddTab = () => {
     // Find a DAG to open in the new tab (first one not already open)
-    const openFileNames = new Set(tabs.map(t => t.fileName));
-    const availableDAG = dagFiles.find(d => !openFileNames.has(d.fileName));
+    const openFileNames = new Set(tabs.map((t) => t.fileName));
+    const availableDAG = dagFiles.find((d) => !openFileNames.has(d.fileName));
     if (availableDAG) {
       addTab(availableDAG.fileName, availableDAG.dag.name);
     }
@@ -350,27 +350,30 @@ function DAGsContent() {
     }
   };
 
-  const rightPanel = tabs.length > 0 ? (
-    <div className="flex flex-col h-full">
-      <TabBar onAddTab={handleAddTab} />
-      <div className="flex-1 overflow-hidden">
-        {selectedDAG && (
-          <DAGDetailsPanel
-            fileName={selectedDAG}
-            onClose={handleCloseActiveTab}
-          />
-        )}
+  const rightPanel =
+    tabs.length > 0 ? (
+      <div className="flex flex-col h-full">
+        <TabBar onAddTab={handleAddTab} />
+        <div className="flex-1 overflow-hidden">
+          {selectedDAG && (
+            <DAGDetailsPanel
+              fileName={selectedDAG}
+              onClose={handleCloseActiveTab}
+            />
+          )}
+        </div>
       </div>
-    </div>
-  ) : null;
+    ) : null;
 
   return (
-    <SplitLayout
-      leftPanel={leftPanel}
-      rightPanel={rightPanel}
-      defaultLeftWidth={40}
-      emptyRightMessage="Select a DAG to view details"
-    />
+    <div className="-my-4 md:-my-6 lg:-my-8 h-[calc(100%+2rem)] md:h-[calc(100%+3rem)] lg:h-[calc(100%+4rem)]">
+      <SplitLayout
+        leftPanel={leftPanel}
+        rightPanel={rightPanel}
+        defaultLeftWidth={40}
+        emptyRightMessage="Select a DAG to view details"
+      />
+    </div>
   );
 }
 

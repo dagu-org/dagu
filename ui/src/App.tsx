@@ -3,31 +3,34 @@ import '@radix-ui/themes/styles.css';
 import React from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { SWRConfig } from 'swr';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorModalProvider } from './components/ui/error-modal';
 import { ToastProvider } from './components/ui/simple-toast';
 import { AppBarContext } from './contexts/AppBarContext';
-import { Config, ConfigContext } from './contexts/ConfigContext';
-import { SearchStateProvider } from './contexts/SearchStateContext';
-import { SchemaProvider } from './contexts/SchemaContext';
-import { UserPreferencesProvider } from './contexts/UserPreference';
 import { AuthProvider } from './contexts/AuthContext';
-import { ProtectedRoute } from './components/ProtectedRoute';
+import { Config, ConfigContext } from './contexts/ConfigContext';
+import { SchemaProvider } from './contexts/SchemaContext';
+import { SearchStateProvider } from './contexts/SearchStateContext';
+import {
+  UserPreferencesProvider,
+  useUserPreferences,
+} from './contexts/UserPreference';
 import Layout from './layouts/Layout';
 import fetchJson from './lib/fetchJson';
 import Dashboard from './pages';
-import DAGs from './pages/dags';
-import DAGDetails from './pages/dags/dag';
-import Search from './pages/search';
+import APIKeysPage from './pages/api-keys';
+import AuditLogsPage from './pages/audit-logs';
 import DAGRuns from './pages/dag-runs';
 import DAGRunDetails from './pages/dag-runs/dag-run';
-import Queues from './pages/queues';
+import DAGs from './pages/dags';
+import DAGDetails from './pages/dags/dag';
 import LoginPage from './pages/login';
-import UsersPage from './pages/users';
-import APIKeysPage from './pages/api-keys';
-import WebhooksPage from './pages/webhooks';
-import TerminalPage from './pages/terminal';
-import AuditLogsPage from './pages/audit-logs';
+import Queues from './pages/queues';
+import Search from './pages/search';
 import SystemStatus from './pages/system-status';
+import TerminalPage from './pages/terminal';
+import UsersPage from './pages/users';
+import WebhooksPage from './pages/webhooks';
 
 type Props = {
   config: Config;
@@ -42,8 +45,13 @@ type Props = {
  * @param config - Application configuration (e.g., `basePath`, `remoteNodes`) used to configure routing and available remote nodes.
  * @returns The top-level React element for the application.
  */
-function App({ config }: Props) {
+/**
+ * Inner App component that has access to providers
+ */
+function AppInner({ config }: Props) {
   const [title, setTitle] = React.useState<string>('');
+  const { preferences } = useUserPreferences();
+  const theme = preferences.theme || 'dark';
 
   const remoteNodes = config.remoteNodes
     .split(',')
@@ -57,41 +65,53 @@ function App({ config }: Props) {
   // Read initial value from localStorage or default to 'local'
   const getInitialNode = () => {
     const storedNode = localStorage.getItem(localStorageKey);
-    // Ensure the stored node is actually in the available nodes list
     if (storedNode && remoteNodes.includes(storedNode)) {
       return storedNode;
     }
-    return 'local'; // Default
+    return 'local';
   };
 
   const [selectedRemoteNode, setSelectedRemoteNode] =
     React.useState<string>(getInitialNode);
 
-  // Function to update state and localStorage
-  const handleSelectRemoteNode = (node: string) => {
-    if (remoteNodes.includes(node)) {
-      setSelectedRemoteNode(node);
-      localStorage.setItem(localStorageKey, node);
-    } else {
-      console.warn(`Attempted to select invalid remote node: ${node}`);
-      // Optionally reset to default or handle error
-      setSelectedRemoteNode('local');
-      localStorage.setItem(localStorageKey, 'local');
-    }
-  };
+  const handleSelectRemoteNode = React.useCallback(
+    (node: string) => {
+      if (remoteNodes.includes(node)) {
+        setSelectedRemoteNode(node);
+        localStorage.setItem(localStorageKey, node);
+      } else {
+        setSelectedRemoteNode('local');
+        localStorage.setItem(localStorageKey, 'local');
+      }
+    },
+    [remoteNodes, localStorageKey]
+  );
 
-  // Effect to update state if remoteNodes list changes and current selection is invalid
   React.useEffect(() => {
     if (!remoteNodes.includes(selectedRemoteNode)) {
-      handleSelectRemoteNode('local'); // Reset to default if current selection is no longer valid
+      handleSelectRemoteNode('local');
     }
-    // We only want this effect to run if remoteNodes changes,
-    // or selectedRemoteNode becomes invalid relative to remoteNodes.
-    // Adding handleSelectRemoteNode to deps would cause unnecessary runs.
-  }, [remoteNodes, selectedRemoteNode]);
+  }, [remoteNodes, selectedRemoteNode, handleSelectRemoteNode]);
+
+  // Effect to apply theme class to html element
+  React.useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    // CSS variable from global.css handles background color automatically
+    root.style.backgroundColor = 'var(--background)';
+  }, [theme]);
 
   return (
-    <Theme appearance="light" accentColor="gray" grayColor="slate" radius="medium">
+    <Theme
+      appearance={theme}
+      accentColor="indigo"
+      grayColor="slate"
+      radius="large"
+    >
       <SWRConfig
         value={{
           fetcher: fetchJson,
@@ -101,114 +121,135 @@ function App({ config }: Props) {
         }}
       >
         <AppBarContext.Provider
-        value={{
-          title,
-          setTitle,
-          remoteNodes,
-          selectedRemoteNode,
-          selectRemoteNode: handleSelectRemoteNode,
-        }}
-      >
-        <ConfigContext.Provider value={config}>
-          <UserPreferencesProvider>
+          value={{
+            title,
+            setTitle,
+            remoteNodes,
+            selectedRemoteNode,
+            selectRemoteNode: handleSelectRemoteNode,
+          }}
+        >
+          <ConfigContext.Provider value={config}>
             <AuthProvider>
               <SearchStateProvider>
                 <SchemaProvider>
-                <ErrorModalProvider>
-                <ToastProvider>
-                  <BrowserRouter basename={config.basePath}>
-                    <Routes>
-                      {/* Public route - Login page */}
-                      <Route path="/login" element={<LoginPage />} />
+                  <ErrorModalProvider>
+                    <ToastProvider>
+                      <BrowserRouter basename={config.basePath}>
+                        <Routes>
+                          {/* Public route - Login page */}
+                          <Route path="/login" element={<LoginPage />} />
 
-                      {/* Protected routes */}
-                      <Route
-                        path="/*"
-                        element={
-                          <ProtectedRoute>
-                            <Layout navbarColor={config.navbarColor}>
-                              <Routes>
-                                <Route path="/" element={<Dashboard />} />
-                                <Route path="/dashboard" element={<Dashboard />} />
-                                <Route
-                                  path="/system-status"
-                                  element={
-                                    <ProtectedRoute requiredRole="admin">
-                                      <SystemStatus />
-                                    </ProtectedRoute>
-                                  }
-                                />
-                                <Route path="/dags/" element={<DAGs />} />
-                                <Route
-                                  path="/dags/:fileName/:tab"
-                                  element={<DAGDetails />}
-                                />
-                                <Route path="/dags/:fileName/" element={<DAGDetails />} />
-                                <Route path="/search/" element={<Search />} />
-                                <Route path="/queues" element={<Queues />} />
-                                <Route path="/dag-runs" element={<DAGRuns />} />
-                                <Route
-                                  path="/dag-runs/:name/:dagRunId"
-                                  element={<DAGRunDetails />}
-                                />
-                                {/* Admin-only routes */}
-                                <Route
-                                  path="/users"
-                                  element={
-                                    <ProtectedRoute requiredRole="admin">
-                                      <UsersPage />
-                                    </ProtectedRoute>
-                                  }
-                                />
-                                <Route
-                                  path="/api-keys"
-                                  element={
-                                    <ProtectedRoute requiredRole="admin">
-                                      <APIKeysPage />
-                                    </ProtectedRoute>
-                                  }
-                                />
-                                <Route
-                                  path="/webhooks"
-                                  element={
-                                    <ProtectedRoute requiredRole="admin">
-                                      <WebhooksPage />
-                                    </ProtectedRoute>
-                                  }
-                                />
-                                <Route
-                                  path="/terminal"
-                                  element={
-                                    <ProtectedRoute requiredRole="admin">
-                                      <TerminalPage />
-                                    </ProtectedRoute>
-                                  }
-                                />
-                                <Route
-                                  path="/audit-logs"
-                                  element={
-                                    <ProtectedRoute requiredRole="admin">
-                                      <AuditLogsPage />
-                                    </ProtectedRoute>
-                                  }
-                                />
-                              </Routes>
-                            </Layout>
-                          </ProtectedRoute>
-                        }
-                      />
-                    </Routes>
-                  </BrowserRouter>
-                </ToastProvider>
-                </ErrorModalProvider>
+                          {/* Protected routes */}
+                          <Route
+                            path="/*"
+                            element={
+                              <ProtectedRoute>
+                                <Layout navbarColor={config.navbarColor}>
+                                  <Routes>
+                                    <Route path="/" element={<Dashboard />} />
+                                    <Route
+                                      path="/dashboard"
+                                      element={<Dashboard />}
+                                    />
+                                    <Route
+                                      path="/system-status"
+                                      element={
+                                        <ProtectedRoute requiredRole="admin">
+                                          <SystemStatus />
+                                        </ProtectedRoute>
+                                      }
+                                    />
+                                    <Route path="/dags/" element={<DAGs />} />
+                                    <Route
+                                      path="/dags/:fileName/:tab"
+                                      element={<DAGDetails />}
+                                    />
+                                    <Route
+                                      path="/dags/:fileName/"
+                                      element={<DAGDetails />}
+                                    />
+                                    <Route
+                                      path="/search/"
+                                      element={<Search />}
+                                    />
+                                    <Route
+                                      path="/queues"
+                                      element={<Queues />}
+                                    />
+                                    <Route
+                                      path="/dag-runs"
+                                      element={<DAGRuns />}
+                                    />
+                                    <Route
+                                      path="/dag-runs/:name/:dagRunId"
+                                      element={<DAGRunDetails />}
+                                    />
+                                    {/* Admin-only routes */}
+                                    <Route
+                                      path="/users"
+                                      element={
+                                        <ProtectedRoute requiredRole="admin">
+                                          <UsersPage />
+                                        </ProtectedRoute>
+                                      }
+                                    />
+                                    <Route
+                                      path="/api-keys"
+                                      element={
+                                        <ProtectedRoute requiredRole="admin">
+                                          <APIKeysPage />
+                                        </ProtectedRoute>
+                                      }
+                                    />
+                                    <Route
+                                      path="/webhooks"
+                                      element={
+                                        <ProtectedRoute requiredRole="admin">
+                                          <WebhooksPage />
+                                        </ProtectedRoute>
+                                      }
+                                    />
+                                    <Route
+                                      path="/terminal"
+                                      element={
+                                        <ProtectedRoute requiredRole="admin">
+                                          <TerminalPage />
+                                        </ProtectedRoute>
+                                      }
+                                    />
+                                    <Route
+                                      path="/audit-logs"
+                                      element={
+                                        <ProtectedRoute requiredRole="admin">
+                                          <AuditLogsPage />
+                                        </ProtectedRoute>
+                                      }
+                                    />
+                                  </Routes>
+                                </Layout>
+                              </ProtectedRoute>
+                            }
+                          />
+                        </Routes>
+                      </BrowserRouter>
+                    </ToastProvider>
+                  </ErrorModalProvider>
                 </SchemaProvider>
               </SearchStateProvider>
             </AuthProvider>
-          </UserPreferencesProvider>
-        </ConfigContext.Provider>
-      </AppBarContext.Provider>
+          </ConfigContext.Provider>
+        </AppBarContext.Provider>
       </SWRConfig>
     </Theme>
+  );
+}
+
+function App({ config }: Props) {
+  return (
+    <UserPreferencesProvider>
+      <AppInner config={config} />
+    </UserPreferencesProvider>
   );
 }
 

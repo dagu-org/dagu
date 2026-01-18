@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
 import { components, NodeStatus } from '@/api/v2/schema';
+import { Loader2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { StepMessagesTable } from './StepMessagesTable';
 
 type DAGRunDetails = components['schemas']['DAGRunDetails'];
@@ -72,12 +72,14 @@ export function ChatHistoryTab({ dagRun }: ChatHistoryTabProps) {
     <div className="space-y-2">
       {/* Step selector dropdown */}
       <div className="flex items-center gap-2 text-xs">
-        <label htmlFor="chat-step-select" className="text-muted-foreground">Step:</label>
+        <label htmlFor="chat-step-select" className="text-muted-foreground">
+          Step:
+        </label>
         <select
           id="chat-step-select"
           value={selectedStep || ''}
           onChange={(e) => setSelectedStep(e.target.value)}
-          className="h-6 px-2 text-xs border rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="h-6 px-2 text-xs border rounded bg-card focus:outline-none focus:ring-1 focus:ring-primary"
         >
           {chatSteps.map((node) => (
             <option key={node.step.name} value={node.step.name}>

@@ -5,6 +5,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
+import { useUserPreferences } from '@/contexts/UserPreference';
 import { cn, toMermaidNodeId } from '@/lib/utils';
 import {
   ArrowDownUp,
@@ -78,6 +79,8 @@ function Graph({
   const [scale, setScale] = useState(isExpandedView ? 0.8 : 1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const { preferences } = useUserPreferences();
+  const isDarkMode = preferences.theme !== 'light';
 
   /** Increase zoom level */
   const zoomIn = () => {
@@ -121,14 +124,14 @@ function Graph({
     justifyContent: 'flex-start',
     width: width,
     minWidth: '100%',
-    minHeight: '200px',
-    maxHeight: isExpandedView ? 'none' : '300px',
-    height: isExpandedView ? '100%' : 'auto',
+    minHeight: isExpandedView ? '100%' : '380px',
+    height: isExpandedView ? '100%' : '380px',
     borderRadius: '0.5em',
-    background: `
-      linear-gradient(90deg, #f0ebe3 1px, transparent 1px),
-      linear-gradient(180deg, #f0ebe3 1px, transparent 1px)
-    `,
+    background: isDarkMode
+      ? `linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px),
+         linear-gradient(180deg, rgba(255,255,255,0.05) 1px, transparent 1px)`
+      : `linear-gradient(90deg, rgba(0,0,0,0.08) 1px, transparent 1px),
+         linear-gradient(180deg, rgba(0,0,0,0.08) 1px, transparent 1px)`,
     backgroundSize: '20px 20px',
   };
 
@@ -242,36 +245,38 @@ function Graph({
       );
     }
 
-    // Define node styles for different states with sepia theme colors
-    const nodeFill = '#faf8f5'; // card
-    const nodeColor = '#3d3833'; // foreground
+    // Define node styles for different states
+    // Use theme-appropriate colors for light/dark modes
+    const nodeFill = isDarkMode ? '#161a3d' : '#ffffff'; // --card for dark, white for light
+    const nodeColor = isDarkMode ? '#f1f5f9' : '#0f1129'; // --foreground for dark, --background for light
+    const strokeDefault = isDarkMode ? '#2d336d' : '#94a3b8';
 
     dat.push(
-      `classDef none color:${nodeColor},fill:${nodeFill},stroke:#c8bfb0,stroke-width:2.5px`
+      `classDef none color:${nodeColor},fill:${nodeFill},stroke:${strokeDefault},stroke-width:2.5px`
     );
     dat.push(
-      `classDef running color:${nodeColor},fill:${nodeFill},stroke:#c0ebab,stroke-width:2.5px`
+      `classDef running color:${nodeColor},fill:${nodeFill},stroke:#10b981,stroke-width:2.5px`
     );
     dat.push(
-      `classDef error color:${nodeColor},fill:${nodeFill},stroke:#c4726a,stroke-width:2.5px`
+      `classDef error color:${nodeColor},fill:${nodeFill},stroke:#ef4444,stroke-width:2.5px`
     );
     dat.push(
-      `classDef cancel color:${nodeColor},fill:${nodeFill},stroke:#e396b3,stroke-width:2.5px`
+      `classDef cancel color:${nodeColor},fill:${nodeFill},stroke:#ec4899,stroke-width:2.5px`
     );
     dat.push(
-      `classDef done color:${nodeColor},fill:${nodeFill},stroke:#7da87d,stroke-width:2.5px`
+      `classDef done color:${nodeColor},fill:${nodeFill},stroke:#10b981,stroke-width:2.5px`
     );
     dat.push(
-      `classDef skipped color:${nodeColor},fill:${nodeFill},stroke:#6b635a,stroke-width:2.5px`
+      `classDef skipped color:${nodeColor},fill:${nodeFill},stroke:#64748b,stroke-width:2.5px`
     );
     dat.push(
-      `classDef partial color:${nodeColor},fill:${nodeFill},stroke:#c4956a,stroke-width:2.5px`
+      `classDef partial color:${nodeColor},fill:${nodeFill},stroke:#f59e0b,stroke-width:2.5px`
     );
     dat.push(
       `classDef waiting color:${nodeColor},fill:${nodeFill},stroke:#f59e0b,stroke-width:2.5px`
     );
     dat.push(
-      `classDef rejected color:${nodeColor},fill:${nodeFill},stroke:#dc2626,stroke-width:2.5px`
+      `classDef rejected color:${nodeColor},fill:${nodeFill},stroke:#ef4444,stroke-width:2.5px`
     );
 
     // Add custom link styles
@@ -283,7 +288,7 @@ function Graph({
     });
 
     return dat.join('\n');
-  }, [steps, onClickNode, flowchart, showIcons]);
+  }, [steps, onClickNode, flowchart, showIcons, isDarkMode]);
 
   return (
     <div
@@ -377,6 +382,7 @@ function Graph({
           style={mermaidStyle}
           def={graph}
           scale={scale}
+          onClick={onRightClickNode}
           onDoubleClick={onClickNode}
           onRightClick={onRightClickNode}
         />

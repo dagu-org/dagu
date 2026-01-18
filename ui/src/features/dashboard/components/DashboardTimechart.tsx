@@ -251,35 +251,39 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
       end: validViewEndDate,
     };
 
-    timelineInstance.current = new Timeline(timelineRef.current, new DataSet([]), {
-      start: validViewStartDate,
-      end: validViewEndDate,
-      orientation: 'top',
-      stack: true,
-      showMajorLabels: true,
-      showMinorLabels: true,
-      showTooltips: true,
-      zoomable: true,
-      verticalScroll: true,
-      zoomKey: 'ctrlKey',
-      timeAxis: { scale: 'hour', step: 1 },
-      format: {
-        minorLabels: {
-          minute: 'HH:mm',
-          hour: 'HH:mm',
+    timelineInstance.current = new Timeline(
+      timelineRef.current,
+      new DataSet([]),
+      {
+        start: validViewStartDate,
+        end: validViewEndDate,
+        orientation: 'top',
+        stack: true,
+        showMajorLabels: true,
+        showMinorLabels: true,
+        showTooltips: true,
+        zoomable: true,
+        verticalScroll: true,
+        zoomKey: 'ctrlKey',
+        timeAxis: { scale: 'hour', step: 1 },
+        format: {
+          minorLabels: {
+            minute: 'HH:mm',
+            hour: 'HH:mm',
+          },
+          majorLabels: {
+            hour: 'ddd D MMM',
+            day: 'ddd D MMM',
+          },
         },
-        majorLabels: {
-          hour: 'ddd D MMM',
-          day: 'ddd D MMM',
+        height: '100%',
+        maxHeight: '100%',
+        margin: {
+          item: { vertical: 4, horizontal: 2 },
+          axis: 2,
         },
-      },
-      height: '100%',
-      maxHeight: '100%',
-      margin: {
-        item: { vertical: 4, horizontal: 2 },
-        axis: 2,
-      },
-    });
+      }
+    );
 
     // Add range change listener for dynamic time axis
     timelineInstance.current.on('rangechanged', () => {
@@ -316,7 +320,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
         timelineInstance.current = null;
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
 
   // Update timeline data when input changes (without recreating timeline)
@@ -413,12 +417,8 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
     if (timelineInstance.current) {
       try {
         timelineInstance.current.fit();
-      } catch {
-        try {
-          timelineInstance.current.fit();
-        } catch (fitError) {
-          console.warn('Timeline fit failed:', fitError);
-        }
+      } catch (error) {
+        console.warn('Timeline fit failed:', error);
       }
     }
   };
@@ -551,14 +551,18 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
       <style>
         {`
         .vis-timeline {
-          font-family: inherit !important;
-          font-size: 12px !important;
-          background-color: var(--card) !important;
-          border: none !important;
-          border-radius: 0 !important;
+          font-family: var(--font-sans) !important;
+          font-size: 11px !important;
+          background-color: var(--background) !important;
+          border: 1px solid var(--border) !important;
+          border-radius: 12px !important;
+          overflow: hidden !important;
         }
         .vis-timeline .vis-panel {
-          border: none !important;
+          border-color: var(--border) !important;
+        }
+        .vis-timeline .vis-panel.vis-left {
+          display: none !important;
         }
         .vis-item .vis-item-overflow {
           overflow: visible;
@@ -568,113 +572,100 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
           position: sticky;
           top: 0;
           z-index: 1;
-          background-color: var(--muted) !important;
+          background-color: var(--card) !important;
+          border-bottom: 1px solid var(--border) !important;
         }
         .vis-labelset {
           position: sticky;
           left: 0;
           z-index: 2;
-          background-color: var(--card) !important;
+          background-color: var(--background) !important;
+          border-right: 1px solid var(--border) !important;
+        }
+        .vis-labelset .vis-label {
+          color: var(--muted-foreground) !important;
+          padding: 4px 8px !important;
+          border-bottom: 1px solid var(--border) !important;
         }
         .vis-foreground {
           background-color: transparent !important;
         }
         .vis-background {
-          background-color: var(--card) !important;
+          background-color: var(--background) !important;
         }
         .vis-center {
-          background-color: var(--card) !important;
-        }
-        .vis-left {
-          background-color: var(--card) !important;
-        }
-        .vis-right {
-          background-color: var(--card) !important;
-        }
-        .vis-top {
-          background-color: var(--muted) !important;
-        }
-        .vis-bottom {
-          background-color: var(--card) !important;
+          background-color: var(--background) !important;
         }
         .vis-time-axis {
-          background-color: var(--muted) !important;
+          background-color: var(--card) !important;
           color: var(--foreground) !important;
         }
         .vis-time-axis .vis-text {
-          font-size: 11px !important;
-          color: var(--muted-foreground) !important;
-          font-family: inherit !important;
-        }
-        .vis-time-axis .vis-text.vis-major {
-          font-size: 11px !important;
-          font-weight: 600;
-          color: var(--foreground) !important;
-        }
-        .vis-time-axis .vis-text.vis-minor {
           font-size: 10px !important;
           color: var(--muted-foreground) !important;
+          font-family: var(--font-sans) !important;
+        }
+        .vis-time-axis .vis-text.vis-major {
+          color: var(--foreground) !important;
+          font-weight: 600;
         }
         .vis-time-axis .vis-grid.vis-minor {
           border-color: var(--border) !important;
-          opacity: 0.3;
+          opacity: 0.5;
         }
         .vis-time-axis .vis-grid.vis-major {
           border-color: var(--border) !important;
-          opacity: 0.6;
         }
         .vis-item .vis-item-content {
           position: absolute;
           left: 100% !important;
-          padding-left: 6px;
+          padding-left: 8px;
           transform: translateY(-50%);
           top: 50%;
           white-space: nowrap;
-          font-size: 11px !important;
-          font-weight: 500;
+          font-size: 10px !important;
+          font-weight: 600;
           color: var(--foreground) !important;
-          text-shadow: 0 0 2px var(--card);
         }
         .vis-item {
           overflow: visible !important;
-          height: 20px !important;
-          border-radius: 3px !important;
-          border-width: 1px !important;
+          height: 14px !important;
+          border-radius: 4px !important;
+          border-width: 0 !important;
           cursor: pointer !important;
-          transition: opacity 0.15s ease !important;
+          transition: transform 0.1s ease, filter 0.1s ease !important;
+          box-shadow: 0 0 10px rgba(0,0,0,0.3);
         }
         .vis-item:hover {
-          opacity: 0.85 !important;
-        }
-        .vis-panel {
-          background-color: var(--card) !important;
+          filter: brightness(1.2);
+          transform: scaleY(1.2);
+          z-index: 100 !important;
         }
         .vis-item.vis-selected {
-          border-color: var(--ring) !important;
-          border-width: 2px !important;
+          border-width: 1px !important;
+          border-color: var(--primary) !important;
+          box-shadow: 0 0 15px rgba(var(--primary-rgb), 0.3);
         }
         .vis-current-time {
           background-color: var(--primary) !important;
           width: 2px !important;
+          box-shadow: 0 0 10px rgba(var(--primary-rgb), 0.4);
         }
-        .vis-custom-time {
-          background-color: var(--primary) !important;
-        }
-        /* Scrollbar styling */
+        /* Scrollbar styling for timeline */
         .vis-timeline::-webkit-scrollbar {
           width: 8px;
           height: 8px;
         }
         .vis-timeline::-webkit-scrollbar-track {
-          background: var(--muted);
-          border-radius: 4px;
+          background: var(--background);
         }
         .vis-timeline::-webkit-scrollbar-thumb {
-          background: var(--border);
-          border-radius: 4px;
+          background: var(--muted);
+          border-radius: 10px;
+          border: 2px solid var(--background);
         }
         .vis-timeline::-webkit-scrollbar-thumb:hover {
-          background: var(--muted-foreground);
+          background: var(--secondary);
         }
         `}
       </style>

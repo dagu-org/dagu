@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback, useContext } from 'react';
-import { useConfig } from '@/contexts/ConfigContext';
-import { useAuth, useIsAdmin, TOKEN_KEY } from '@/contexts/AuthContext';
-import { AppBarContext } from '@/contexts/AppBarContext';
 import { components } from '@/api/v2/schema';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Table,
   TableBody,
@@ -12,17 +14,23 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { UserPlus, MoreHorizontal, Pencil, Trash2, Key, Ban, UserCheck } from 'lucide-react';
-import { UserFormModal } from './UserFormModal';
-import { ResetPasswordModal } from './ResetPasswordModal';
-import ConfirmModal from '@/ui/ConfirmModal';
+import { AppBarContext } from '@/contexts/AppBarContext';
+import { TOKEN_KEY, useAuth, useIsAdmin } from '@/contexts/AuthContext';
+import { useConfig } from '@/contexts/ConfigContext';
 import dayjs from '@/lib/dayjs';
+import ConfirmModal from '@/ui/ConfirmModal';
+import {
+  Ban,
+  Key,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  UserCheck,
+  UserPlus,
+} from 'lucide-react';
+import { useCallback, useContext, useEffect, useState } from 'react';
+import { ResetPasswordModal } from './ResetPasswordModal';
+import { UserFormModal } from './UserFormModal';
 
 type User = components['schemas']['User'];
 
@@ -56,12 +64,17 @@ export default function UsersPage() {
   const fetchUsers = useCallback(async () => {
     try {
       const token = localStorage.getItem(TOKEN_KEY);
-      const remoteNode = encodeURIComponent(appBarContext.selectedRemoteNode || 'local');
-      const response = await fetch(`${config.apiURL}/users?remoteNode=${remoteNode}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const remoteNode = encodeURIComponent(
+        appBarContext.selectedRemoteNode || 'local'
+      );
+      const response = await fetch(
+        `${config.apiURL}/users?remoteNode=${remoteNode}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error('Failed to fetch users');
@@ -85,13 +98,18 @@ export default function UsersPage() {
 
     try {
       const token = localStorage.getItem(TOKEN_KEY);
-      const remoteNode = encodeURIComponent(appBarContext.selectedRemoteNode || 'local');
-      const response = await fetch(`${config.apiURL}/users/${deletingUser.id}?remoteNode=${remoteNode}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const remoteNode = encodeURIComponent(
+        appBarContext.selectedRemoteNode || 'local'
+      );
+      const response = await fetch(
+        `${config.apiURL}/users/${deletingUser.id}?remoteNode=${remoteNode}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
@@ -109,15 +127,20 @@ export default function UsersPage() {
   const handleToggleDisabled = async (user: User) => {
     try {
       const token = localStorage.getItem(TOKEN_KEY);
-      const remoteNode = encodeURIComponent(appBarContext.selectedRemoteNode || 'local');
-      const response = await fetch(`${config.apiURL}/users/${user.id}?remoteNode=${remoteNode}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ isDisabled: !user.isDisabled }),
-      });
+      const remoteNode = encodeURIComponent(
+        appBarContext.selectedRemoteNode || 'local'
+      );
+      const response = await fetch(
+        `${config.apiURL}/users/${user.id}?remoteNode=${remoteNode}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ isDisabled: !user.isDisabled }),
+        }
+      );
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
@@ -140,7 +163,11 @@ export default function UsersPage() {
             Manage user accounts and their roles
           </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)} size="sm" className="h-8">
+        <Button
+          onClick={() => setShowCreateModal(true)}
+          size="sm"
+          className="h-8"
+        >
           <UserPlus className="h-4 w-4 mr-1.5" />
           Add User
         </Button>
@@ -152,7 +179,7 @@ export default function UsersPage() {
         </div>
       )}
 
-      <div className="border rounded-lg">
+      <div className="card-obsidian">
         <Table>
           <TableHeader>
             <TableRow>
@@ -168,24 +195,35 @@ export default function UsersPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell
+                  colSpan={7}
+                  className="text-center text-muted-foreground py-8"
+                >
                   Loading users...
                 </TableCell>
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell
+                  colSpan={7}
+                  className="text-center text-muted-foreground py-8"
+                >
                   No users found
                 </TableCell>
               </TableRow>
             ) : (
               users.map((user) => (
-                <TableRow key={user.id} className={user.isDisabled ? 'opacity-60' : ''}>
+                <TableRow
+                  key={user.id}
+                  className={user.isDisabled ? 'opacity-60' : ''}
+                >
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
                       {user.username}
                       {user.id === currentUser?.id && (
-                        <span className="text-xs text-muted-foreground">(you)</span>
+                        <span className="text-xs text-muted-foreground">
+                          (you)
+                        </span>
                       )}
                     </div>
                   </TableCell>
@@ -199,7 +237,9 @@ export default function UsersPage() {
                   </TableCell>
                   <TableCell className="text-sm">
                     {user.isDisabled ? (
-                      <span className="text-red-600 dark:text-red-400">Disabled</span>
+                      <span className="text-red-600 dark:text-red-400">
+                        Disabled
+                      </span>
                     ) : (
                       <span className="text-muted-foreground">Active</span>
                     )}
@@ -223,13 +263,17 @@ export default function UsersPage() {
                           Edit
                         </DropdownMenuItem>
                         {isAdmin && (
-                          <DropdownMenuItem onClick={() => setResetPasswordUser(user)}>
+                          <DropdownMenuItem
+                            onClick={() => setResetPasswordUser(user)}
+                          >
                             <Key className="h-4 w-4 mr-2" />
                             Reset Password
                           </DropdownMenuItem>
                         )}
                         {isAdmin && user.id !== currentUser?.id && (
-                          <DropdownMenuItem onClick={() => handleToggleDisabled(user)}>
+                          <DropdownMenuItem
+                            onClick={() => handleToggleDisabled(user)}
+                          >
                             {user.isDisabled ? (
                               <>
                                 <UserCheck className="h-4 w-4 mr-2" />
@@ -297,7 +341,10 @@ export default function UsersPage() {
         dismissModal={() => setDeletingUser(null)}
         onSubmit={handleDeleteUser}
       >
-        <p>Are you sure you want to delete user &quot;{deletingUser?.username}&quot;? This action cannot be undone.</p>
+        <p>
+          Are you sure you want to delete user &quot;{deletingUser?.username}
+          &quot;? This action cannot be undone.
+        </p>
       </ConfirmModal>
     </div>
   );

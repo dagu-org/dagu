@@ -5,12 +5,22 @@ type Props = {
   def: string;
   style?: CSSProperties;
   scale: number;
+  onClick?: (id: string) => void;
   onDoubleClick?: (id: string) => void;
   onRightClick?: (id: string) => void;
 };
 
-// Initialize Mermaid with sepia theme
-const initializeMermaid = () => {
+// Helper function to get computed CSS variable value with fallback
+function getCSSVariable(name: string, fallback: string): string {
+  if (typeof window === 'undefined') return fallback;
+  const value = getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim();
+  return value || fallback;
+}
+
+// Initialize Mermaid with theme-aware colors
+function initializeMermaid(): void {
   mermaid.initialize({
     securityLevel: 'loose',
     startOnLoad: false,
@@ -18,15 +28,15 @@ const initializeMermaid = () => {
     theme: 'default',
     themeVariables: {
       background: 'transparent',
-      primaryColor: '#faf8f5', // card
-      primaryTextColor: '#3d3833', // foreground
-      primaryBorderColor: '#c8bfb0', // border
-      lineColor: '#6b635a', // muted-foreground
+      primaryColor: getCSSVariable('--card', '#faf8f5'),
+      primaryTextColor: getCSSVariable('--foreground', '#3d3833'),
+      primaryBorderColor: getCSSVariable('--border', '#c8bfb0'),
+      lineColor: getCSSVariable('--muted-foreground', '#6b635a'),
       sectionBkgColor: 'transparent',
       altSectionBkgColor: 'transparent',
       gridColor: 'transparent',
-      secondaryColor: '#f0ebe3', // secondary
-      tertiaryColor: '#f5f0e8', // background
+      secondaryColor: getCSSVariable('--secondary', '#f0ebe3'),
+      tertiaryColor: getCSSVariable('--background', '#f5f0e8'),
     },
     flowchart: {
       curve: 'basis',
@@ -45,7 +55,7 @@ const initializeMermaid = () => {
     fontFamily: 'Arial',
     logLevel: 4, // ERROR
   });
-};
+}
 
 // Initialize on load
 initializeMermaid();
@@ -54,12 +64,16 @@ function Mermaid({
   def,
   style = {},
   scale,
+  onClick,
   onDoubleClick,
   onRightClick,
 }: Props) {
   const mermaidRef = React.useRef<HTMLDivElement>(null); // Ref for the inner div holding the SVG
   const scrollContainerRef = React.useRef<HTMLDivElement>(null); // Ref for the outer scrollable div
   const scrollPosRef = React.useRef({ top: 0, left: 0 }); // Ref to store scroll position
+  const clickTimeoutsRef = React.useRef<
+    Map<string, ReturnType<typeof setTimeout>>
+  >(new Map()); // Persistent timeout storage
   const [uniqueId] = React.useState(
     () => `mermaid-${Math.random().toString(36).substr(2, 9)}`
   );
@@ -136,7 +150,11 @@ function Mermaid({
         }
 
         // Attach custom event handlers if provided
-        if ((onDoubleClick || onRightClick) && mermaidRef.current) {
+        if ((onClick || onDoubleClick || onRightClick) && mermaidRef.current) {
+          // Clear existing timeouts before setting up new handlers
+          clickTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
+          clickTimeoutsRef.current.clear();
+
           // Find all nodes in the SVG (typically these are <g> elements with class="node")
           const nodeElements = mermaidRef.current.querySelectorAll('.node');
 
@@ -146,9 +164,33 @@ function Mermaid({
             const nodeId = node.id.split('-')[1];
 
             if (nodeId) {
+              // Attach single-click event listener if provided
+              if (onClick) {
+                node.addEventListener('click', () => {
+                  // Clear any existing timeout for this node
+                  const existingTimeout = clickTimeoutsRef.current.get(nodeId);
+                  if (existingTimeout) {
+                    clearTimeout(existingTimeout);
+                  }
+                  // Set timeout to allow double-click to cancel
+                  const timeout = setTimeout(() => {
+                    clickTimeoutsRef.current.delete(nodeId);
+                    onClick(nodeId);
+                  }, 250);
+                  clickTimeoutsRef.current.set(nodeId, timeout);
+                });
+              }
+
               // Attach double-click event listener if provided
               if (onDoubleClick) {
-                node.addEventListener('dblclick', () => {
+                node.addEventListener('dblclick', (event) => {
+                  event.stopPropagation();
+                  // Cancel pending single-click action
+                  const existingTimeout = clickTimeoutsRef.current.get(nodeId);
+                  if (existingTimeout) {
+                    clearTimeout(existingTimeout);
+                    clickTimeoutsRef.current.delete(nodeId);
+                  }
                   onDoubleClick(nodeId);
                 });
               }
@@ -157,6 +199,12 @@ function Mermaid({
               if (onRightClick) {
                 node.addEventListener('contextmenu', (event) => {
                   event.preventDefault(); // Prevent default context menu
+                  // Also cancel pending single-click
+                  const existingTimeout = clickTimeoutsRef.current.get(nodeId);
+                  if (existingTimeout) {
+                    clearTimeout(existingTimeout);
+                    clickTimeoutsRef.current.delete(nodeId);
+                  }
                   onRightClick(nodeId);
                 });
               }
@@ -225,6 +273,14 @@ function Mermaid({
       }
     }
   }, [scale]); // Apply scale separately
+
+  // Cleanup timeouts on unmount or when def changes
+  React.useEffect(() => {
+    return () => {
+      clickTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
+      clickTimeoutsRef.current.clear();
+    };
+  }, [def]);
 
   return (
     // Attach ref to the scrollable container

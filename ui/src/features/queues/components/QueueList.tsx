@@ -45,9 +45,11 @@ function QueueList({
   // Initialize selection when queues change
   React.useEffect(() => {
     if (queues.length > 0 && selectedIndex === -1) {
-      setSelectedIndex(0);
+      // Don't auto-select the first item by default to avoid weird border artifacts
+      // only select if there's actual interaction or specific need
+      // setSelectedIndex(0);
     } else if (selectedIndex >= queues.length) {
-      setSelectedIndex(queues.length - 1);
+      setSelectedIndex(queues.length > 0 ? queues.length - 1 : -1);
     }
   }, [queues, selectedIndex]);
 

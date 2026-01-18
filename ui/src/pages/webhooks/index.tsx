@@ -1,10 +1,20 @@
-import { useState, useEffect, useCallback, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useConfig } from '@/contexts/ConfigContext';
-import { useIsAdmin, TOKEN_KEY } from '@/contexts/AuthContext';
-import { AppBarContext } from '@/contexts/AppBarContext';
 import { components } from '@/api/v2/schema';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -13,32 +23,22 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { AppBarContext } from '@/contexts/AppBarContext';
+import { TOKEN_KEY, useIsAdmin } from '@/contexts/AuthContext';
+import { useConfig } from '@/contexts/ConfigContext';
+import dayjs from '@/lib/dayjs';
+import ConfirmModal from '@/ui/ConfirmModal';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { Switch } from '@/components/ui/switch';
-import {
-  Webhook,
-  MoreHorizontal,
+  Check,
+  Copy,
   ExternalLink,
+  MoreHorizontal,
   RefreshCw,
   Trash2,
-  Copy,
-  Check,
+  Webhook,
 } from 'lucide-react';
-import ConfirmModal from '@/ui/ConfirmModal';
-import dayjs from '@/lib/dayjs';
+import { useCallback, useContext, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 type WebhookDetails = components['schemas']['WebhookDetails'];
 
@@ -52,8 +52,15 @@ export default function WebhooksPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Modal states
-  const [deletingWebhook, setDeletingWebhook] = useState<WebhookDetails | null>(null);
-  const [regeneratingWebhook, setRegeneratingWebhook] = useState<WebhookDetails | null>(null);
+  const [deletingWebhook, setDeletingWebhook] = useState<WebhookDetails | null>(
+    null
+  );
+  const [regeneratingWebhook, setRegeneratingWebhook] =
+    useState<WebhookDetails | null>(null);
+  const [togglingWebhook, setTogglingWebhook] = useState<{
+    webhook: WebhookDetails;
+    enabled: boolean;
+  } | null>(null);
   const [newToken, setNewToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -99,16 +106,21 @@ export default function WebhooksPage() {
     fetchWebhooks();
   }, [fetchWebhooks]);
 
-  const handleToggle = async (webhook: WebhookDetails, enabled: boolean) => {
+  const handleToggleClick = (webhook: WebhookDetails, enabled: boolean) => {
+    setTogglingWebhook({ webhook, enabled });
+  };
+
+  const handleToggleConfirm = async () => {
+    if (!togglingWebhook) return;
     try {
       setError(null);
       const remoteNode = getRemoteNodeParam();
       const response = await fetch(
-        `${config.apiURL}/dags/${encodeURIComponent(webhook.dagName)}/webhook/toggle?remoteNode=${remoteNode}`,
+        `${config.apiURL}/dags/${encodeURIComponent(togglingWebhook.webhook.dagName)}/webhook/toggle?remoteNode=${remoteNode}`,
         {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ enabled }),
+          body: JSON.stringify({ enabled: togglingWebhook.enabled }),
         }
       );
 
@@ -120,6 +132,8 @@ export default function WebhooksPage() {
       fetchWebhooks();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to toggle webhook');
+    } finally {
+      setTogglingWebhook(null);
     }
   };
 
@@ -146,7 +160,9 @@ export default function WebhooksPage() {
       setNewToken(data.token);
       fetchWebhooks();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to regenerate token');
+      setError(
+        err instanceof Error ? err.message : 'Failed to regenerate token'
+      );
       setRegeneratingWebhook(null);
     }
   };
@@ -225,7 +241,7 @@ export default function WebhooksPage() {
         </div>
       )}
 
-      <div className="border rounded-lg">
+      <div className="card-obsidian">
         <Table>
           <TableHeader>
             <TableRow>
@@ -278,7 +294,7 @@ export default function WebhooksPage() {
                       <Switch
                         checked={webhook.enabled}
                         onCheckedChange={(checked) =>
-                          handleToggle(webhook, checked)
+                          handleToggleClick(webhook, checked)
                         }
                       />
                       <span className="text-xs text-muted-foreground">
@@ -392,6 +408,21 @@ export default function WebhooksPage() {
           Are you sure you want to delete the webhook for &quot;
           {deletingWebhook?.dagName}&quot;? Any applications using this token
           will immediately lose access.
+        </p>
+      </ConfirmModal>
+
+      {/* Toggle Confirmation */}
+      <ConfirmModal
+        title={togglingWebhook?.enabled ? 'Enable Webhook' : 'Disable Webhook'}
+        buttonText={togglingWebhook?.enabled ? 'Enable' : 'Disable'}
+        visible={!!togglingWebhook}
+        dismissModal={() => setTogglingWebhook(null)}
+        onSubmit={handleToggleConfirm}
+      >
+        <p>
+          Are you sure you want to{' '}
+          {togglingWebhook?.enabled ? 'enable' : 'disable'} the webhook for
+          &quot;{togglingWebhook?.webhook.dagName}&quot;?
         </p>
       </ConfirmModal>
     </div>

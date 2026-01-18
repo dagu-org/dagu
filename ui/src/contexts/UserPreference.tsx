@@ -1,9 +1,4 @@
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useState,
-} from 'react';
+import React, { createContext, useCallback, useContext, useState } from 'react';
 
 export type DAGRunsViewMode = 'list' | 'grouped';
 
@@ -11,6 +6,7 @@ export type UserPreferences = {
   pageLimit: number;
   dagRunsViewMode: DAGRunsViewMode;
   logWrap: boolean;
+  theme: 'light' | 'dark';
 };
 
 const UserPreferencesContext = createContext<{
@@ -33,6 +29,7 @@ export function UserPreferencesProvider({
         pageLimit: 50,
         dagRunsViewMode: 'list', // Default to list view
         logWrap: true, // Default to wrapped text
+        theme: 'dark', // Default to dark theme
       };
       return saved ? { ...defaultPrefs, ...JSON.parse(saved) } : defaultPrefs;
     } catch {
@@ -41,6 +38,7 @@ export function UserPreferencesProvider({
         pageLimit: 50,
         dagRunsViewMode: 'list' as DAGRunsViewMode,
         logWrap: true,
+        theme: 'dark',
       };
     }
   });

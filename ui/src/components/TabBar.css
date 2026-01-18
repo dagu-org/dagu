@@ -1,168 +1,124 @@
-/* =============================================================================
-   90s MAC OS INSPIRED TAB SYSTEM
-   Classic Platinum-era folder tabs with 3D depth
-   ============================================================================= */
-
 .tab-bar-wrapper {
   position: relative;
   display: flex;
   align-items: flex-end;
-  padding: 4px 8px 1px; /* 1px bottom for border space */
-  background: rgb(var(--sidebar-bg));
-  border-bottom: 1px solid rgb(var(--border));
+  padding: 8px 8px 0px;
+  background: var(--sidebar);
+  border-bottom: 2px solid var(--border);
+  gap: 4px;
 }
 
 .tab-list {
   display: flex;
   align-items: flex-end;
-  gap: 2px;
+  gap: 4px;
   flex: 1;
-  min-width: 0; /* Allow shrinking */
-  overflow: visible; /* Allow active tab to extend */
+  min-width: 0;
 }
-
-/* =============================================================================
-   TAB TRIGGER - Folder tab with beveled 3D appearance
-   ============================================================================= */
 
 .tab-trigger {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 5px 8px;
-  min-width: 40px; /* Allow shrinking to very small */
-  max-width: 160px;
-  flex: 1 1 120px; /* Grow and shrink, basis 120px */
+  gap: 8px;
+  padding: 8px 12px;
+  min-width: 80px;
+  max-width: 200px;
+  flex: 0 1 auto;
   cursor: pointer;
   user-select: none;
-  font-size: 12px;
-  font-weight: 500;
-  border: 1px solid rgb(var(--btn-secondary-border));
-  border-bottom: none;
-  border-radius: 5px 5px 0 0;
-  background: linear-gradient(
-    180deg,
-    rgb(var(--btn-secondary-top)) 0%,
-    rgb(var(--btn-secondary-bottom)) 100%
-  );
-  color: rgb(var(--sidebar-text));
-  /* 3D bevel effect */
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  /* No transition - instant state changes to avoid flicker */
-  /* Remove focus outline */
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--btn-secondary-border);
+  border-bottom: 2px solid transparent;
+  border-radius: 8px 8px 0 0;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  margin-bottom: -2px;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
   outline: none;
 }
 
-.tab-trigger:focus,
-.tab-trigger:focus-visible {
-  outline: none;
-}
-
-/* Hover state for inactive tabs */
 .tab-trigger:hover {
-  background: linear-gradient(
-    180deg,
-    rgb(var(--btn-secondary-hover-top)) 0%,
-    rgb(var(--btn-secondary-hover-bottom)) 100%
-  );
+  background: var(--secondary);
+  color: var(--foreground);
 }
 
-/* =============================================================================
-   ACTIVE TAB - Raised, connected to content
-   ============================================================================= */
-
-.tab-trigger[data-state="active"] {
-  background: rgb(var(--bg));
-  color: rgb(var(--text));
-  z-index: 3;
-  margin-bottom: -2px; /* Extend below to cover border */
-  padding-bottom: 7px; /* Compensate for margin */
-  border-color: rgb(var(--border));
-  /* Stronger bevel for raised appearance */
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+.tab-trigger[data-state='active'] {
+  background: var(--background);
+  color: var(--foreground);
+  border-color: var(--border);
+  border-bottom: 2px solid var(--background);
+  z-index: 10;
+  box-shadow: 0 -4px 12px -4px rgba(0, 0, 0, 0.1);
 }
 
-/* =============================================================================
-   TAB CONTENT ELEMENTS
-   ============================================================================= */
+.tab-trigger[data-state='active']::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary);
+  border-radius: 8px 8px 0 0;
+}
 
 .tab-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
-  min-width: 0; /* Allow text to shrink */
-  text-align: left;
 }
 
 .tab-close {
-  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border-radius: 3px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s, background 0.15s;
-  color: inherit;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  opacity: 0.4;
+  transition: all 0.2s;
 }
 
 .tab-trigger:hover .tab-close,
-.tab-trigger[data-state="active"] .tab-close {
-  opacity: 0.5;
+.tab-trigger[data-state='active'] .tab-close {
+  opacity: 0.8;
 }
 
 .tab-close:hover {
+  background: var(--destructive);
+  color: white;
   opacity: 1 !important;
-  background: rgba(var(--text), 0.1);
 }
 
-/* =============================================================================
-   ADD TAB BUTTON - Matching 3D style
-   ============================================================================= */
-
 .tab-add {
-  flex-shrink: 0; /* Never shrink the add button */
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  margin-left: 4px;
-  margin-bottom: 2px;
-  color: rgb(var(--sidebar-text));
-  border: 1px solid rgb(var(--btn-secondary-border));
-  border-radius: 4px;
-  background: linear-gradient(
-    180deg,
-    rgb(var(--btn-secondary-top)) 0%,
-    rgb(var(--btn-secondary-bottom)) 100%
-  );
+  width: 32px;
+  height: 32px;
+  margin-bottom: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--muted);
+  color: var(--muted-foreground);
   cursor: pointer;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  transition: all 0.1s ease;
+  transition: all 0.2s;
 }
 
 .tab-add:hover {
-  background: linear-gradient(
-    180deg,
-    rgb(var(--btn-secondary-hover-top)) 0%,
-    rgb(var(--btn-secondary-hover-bottom)) 100%
-  );
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  transform: scale(1.05);
 }
 
-.tab-add:active {
-  transform: translateY(1px);
-}
-
-/* Hide the edge element - not needed with this simpler design */
 .tab-edge-right {
   display: none;
 }

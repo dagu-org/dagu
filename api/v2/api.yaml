@@ -2327,6 +2327,49 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/spec:
+    get:
+      summary: "Get Sub-DAG Run Specification"
+      description: "Returns the YAML specification used for a specific sub-DAG run"
+      operationId: "getSubDAGRunSpec"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run to retrieve the spec for"
+      responses:
+        "200":
+          description: "Sub-DAG specification retrieved successfully"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - spec
+                properties:
+                  spec:
+                    type: string
+                    description: "YAML specification of the sub-DAG"
+        "404":
+          description: "Sub-DAG run not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/log:
     get:
       summary: "Retrieve log for a specific sub DAG-run"

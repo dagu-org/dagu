@@ -1,8 +1,14 @@
-import { FolderOpen, Copy, Check, X } from 'lucide-react';
+import { Check, Copy, FolderOpen } from 'lucide-react';
 import React from 'react';
-import { cn } from '../../../lib/utils';
-import { useConfig, type PathsConfig } from '../../../contexts/ConfigContext';
 import { Button } from '../../../components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '../../../components/ui/dialog';
+import { useConfig, type PathsConfig } from '../../../contexts/ConfigContext';
+import { cn } from '../../../lib/utils';
 
 interface PathItemProps {
   label: string;
@@ -23,12 +29,12 @@ function PathItem({ label, path }: PathItemProps) {
   };
 
   return (
-    <div className="flex items-center gap-2 py-0.5 group text-[11px]">
-      <span className="text-muted-foreground shrink-0 w-20">{label}</span>
+    <div className="flex items-center gap-2 py-1 group text-sm">
+      <span className="text-muted-foreground shrink-0 w-24">{label}</span>
       <code
         className={cn(
-          'font-mono px-1 py-0.5 rounded truncate flex-1',
-          'bg-muted text-muted-foreground'
+          'font-mono px-2 py-1 rounded truncate flex-1 text-xs',
+          'bg-muted text-foreground'
         )}
         title={path}
       >
@@ -37,20 +43,21 @@ function PathItem({ label, path }: PathItemProps) {
       <button
         onClick={handleCopy}
         className={cn(
-          'p-0.5 rounded transition-all shrink-0',
+          'p-1 rounded transition-all shrink-0',
           'opacity-0 group-hover:opacity-100',
-          'hover:bg-accent',
+          'hover:bg-accent text-muted-foreground hover:text-foreground',
           copied && 'opacity-100 text-success'
         )}
         title="Copy path"
       >
-        {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
       </button>
     </div>
   );
 }
 
-function PathsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+function PathsCard() {
+  const [open, setOpen] = React.useState(false);
   const config = useConfig();
   const paths: PathsConfig = config.paths;
 
@@ -70,52 +77,37 @@ function PathsDialog({ open, onClose }: { open: boolean; onClose: () => void }) 
     ];
   }, [paths]);
 
-  if (!open) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-card border rounded-lg w-full max-w-lg mx-4">
-        <div className="flex items-center justify-between p-2 border-b">
-          <div className="flex items-center gap-1.5">
-            <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-xs font-medium">System Paths</span>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded hover:bg-muted transition-colors"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-        <div className="p-2">
-          {paths ? (
-            <div className="space-y-0">
-              {pathItems.map((item) => (
-                <PathItem key={item.label} label={item.label} path={item.path} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-xs text-muted-foreground py-2">
-              No path information available
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PathsCard() {
-  const [open, setOpen] = React.useState(false);
-
   return (
     <>
       <Button onClick={() => setOpen(true)}>
         <FolderOpen className="h-4 w-4" />
         Paths
       </Button>
-      <PathsDialog open={open} onClose={() => setOpen(false)} />
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FolderOpen className="h-4 w-4" />
+              System Paths
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1">
+            {paths ? (
+              pathItems.map((item) => (
+                <PathItem
+                  key={item.label}
+                  label={item.label}
+                  path={item.path}
+                />
+              ))
+            ) : (
+              <div className="text-sm text-muted-foreground py-2">
+                No path information available
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -203,7 +203,7 @@ function SystemStatus() {
 
       {/* Workers Status */}
       <h2 className="text-xl font-semibold mt-8 mb-4">Workers</h2>
-      <div className="rounded-xl border border-border bg-surface overflow-hidden" style={{ minHeight: '200px' }}>
+      <div className="card-obsidian" style={{ minHeight: '200px' }}>
         <WorkersSummary
           workers={workersData?.workers || []}
           isLoading={!workersData && !workersError}
@@ -217,28 +217,28 @@ function SystemStatus() {
         <ResourceChart
           title="CPU Usage"
           data={resourceData?.cpu}
-          color="#c4956a" // primary
+          color="#73BF69"
           isLoading={!resourceData && !resourceError}
           error={resourceError ? String(resourceError) : undefined}
         />
         <ResourceChart
           title="Memory Usage"
           data={resourceData?.memory}
-          color="#8a9fc4" // info
+          color="#73BF69"
           isLoading={!resourceData && !resourceError}
           error={resourceError ? String(resourceError) : undefined}
         />
         <ResourceChart
           title="Disk Usage"
           data={resourceData?.disk}
-          color="#7da87d" // success
+          color="#73BF69"
           isLoading={!resourceData && !resourceError}
           error={resourceError ? String(resourceError) : undefined}
         />
         <ResourceChart
           title="Load Average"
           data={resourceData?.load}
-          color="#d4a574" // chart-4
+          color="#73BF69"
           unit=""
           isLoading={!resourceData && !resourceError}
           error={resourceError ? String(resourceError) : undefined}

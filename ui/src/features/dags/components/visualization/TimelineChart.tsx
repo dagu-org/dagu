@@ -15,7 +15,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import dayjs from '@/lib/dayjs';
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { components, NodeStatus } from '../../../../api/v2/schema';
 
 /**
@@ -82,15 +82,30 @@ function calculateDuration(startMs: number, endMs: number): string {
  * Status colors matching the Graph component (sepia theme)
  */
 const statusColors: Record<NodeStatus, { bg: string; border: string }> = {
-  [NodeStatus.NotStarted]: { bg: '#c8bfb0', border: '#c8bfb0' },
-  [NodeStatus.Running]: { bg: '#7da87d', border: '#7da87d' },
-  [NodeStatus.Failed]: { bg: '#c4726a', border: '#c4726a' },
-  [NodeStatus.Aborted]: { bg: '#d4a574', border: '#d4a574' },
-  [NodeStatus.Success]: { bg: '#7da87d', border: '#7da87d' },
-  [NodeStatus.Skipped]: { bg: '#6b635a', border: '#6b635a' },
-  [NodeStatus.PartialSuccess]: { bg: '#c4956a', border: '#c4956a' },
-  [NodeStatus.Waiting]: { bg: '#f59e0b', border: '#f59e0b' },
-  [NodeStatus.Rejected]: { bg: '#dc2626', border: '#dc2626' },
+  [NodeStatus.NotStarted]: {
+    bg: 'var(--muted)',
+    border: 'var(--muted-foreground)',
+  },
+  [NodeStatus.Running]: { bg: 'var(--success)', border: 'var(--success)' },
+  [NodeStatus.Failed]: {
+    bg: 'var(--destructive)',
+    border: 'var(--destructive)',
+  },
+  [NodeStatus.Aborted]: { bg: 'var(--warning)', border: 'var(--warning)' },
+  [NodeStatus.Success]: { bg: 'var(--success)', border: 'var(--success)' },
+  [NodeStatus.Skipped]: {
+    bg: 'var(--muted)',
+    border: 'var(--muted-foreground)',
+  },
+  [NodeStatus.PartialSuccess]: {
+    bg: 'var(--warning)',
+    border: 'var(--warning)',
+  },
+  [NodeStatus.Waiting]: { bg: 'var(--warning)', border: 'var(--warning)' },
+  [NodeStatus.Rejected]: {
+    bg: 'var(--destructive)',
+    border: 'var(--destructive)',
+  },
 };
 
 /**
@@ -201,7 +216,10 @@ function TimelineChart({ status }: Props) {
           <div
             key={idx}
             className="absolute top-0 h-full flex items-center"
-            style={{ left: `${marker.position}%`, transform: 'translateX(-50%)' }}
+            style={{
+              left: `${marker.position}%`,
+              transform: 'translateX(-50%)',
+            }}
           >
             <span className="text-[10px] text-muted-foreground font-mono">
               {marker.label}
@@ -225,7 +243,8 @@ function TimelineChart({ status }: Props) {
 
         {/* Step rows */}
         {items.map((item, idx) => {
-          const leftPercent = ((item.startMs - timelineStart) / totalRange) * 100;
+          const leftPercent =
+            ((item.startMs - timelineStart) / totalRange) * 100;
           const widthPercent = ((item.endMs - item.startMs) / totalRange) * 100;
           const colors = getStatusColor(item.status);
           const isRunning = item.status === NodeStatus.Running;
@@ -267,13 +286,20 @@ function TimelineChart({ status }: Props) {
                       </div>
                     )}
                     <div className="text-xs">
-                      Status: <span className="font-medium">{getStatusLabel(item.status)}</span>
+                      Status:{' '}
+                      <span className="font-medium">
+                        {getStatusLabel(item.status)}
+                      </span>
                     </div>
                     <div className="text-xs">
-                      Duration: <span className="font-mono">{calculateDuration(item.startMs, item.endMs)}</span>
+                      Duration:{' '}
+                      <span className="font-mono">
+                        {calculateDuration(item.startMs, item.endMs)}
+                      </span>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {dayjs(item.startMs).format('HH:mm:ss')} → {dayjs(item.endMs).format('HH:mm:ss')}
+                      {dayjs(item.startMs).format('HH:mm:ss')} →{' '}
+                      {dayjs(item.endMs).format('HH:mm:ss')}
                     </div>
                     {item.node.error && (
                       <div className="text-xs text-destructive">
