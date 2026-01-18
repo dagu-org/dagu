@@ -470,6 +470,9 @@ func EvalContainerFields(ctx context.Context, ct core.Container) (core.Container
 	if ct.Command, err = evalStringSlice(ctx, ct.Command); err != nil {
 		return ct, fmt.Errorf("failed to evaluate command: %w", err)
 	}
+	if ct.Shell, err = evalStringSlice(ctx, ct.Shell); err != nil {
+		return ct, fmt.Errorf("failed to evaluate shell: %w", err)
+	}
 
 	return ct, nil
 }

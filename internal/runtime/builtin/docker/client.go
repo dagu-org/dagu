@@ -711,13 +711,15 @@ func (c *Client) startNewContainer(ctx context.Context, name string, cli *client
 	ctCfg.Image = c.cfg.Image
 
 	if len(cmd) > 0 {
-		ctCfg.Cmd = cmd
+		// Wrap step command with shell if configured
+		ctCfg.Cmd = wrapCommandWithShell(c.cfg.Shell, cmd)
 		if clearEntrypoint {
 			// Entrypoint should be empty slice to override image ENTRYPOINT
 			ctCfg.Entrypoint = []string{}
 		}
 	} else if c.cfg.Startup == "command" && len(c.cfg.StartCmd) > 0 {
 		// Use StartCmd for startup: command mode when no cmd override provided
+		// StartCmd is NOT wrapped - it's a startup command, not a step command
 		ctCfg.Cmd = c.cfg.StartCmd
 	}
 
@@ -757,6 +759,33 @@ func (c *Client) startNewContainer(ctx context.Context, name string, cli *client
 	return resp.ID, err
 }
 
+// wrapCommandWithShell wraps a command array with a shell if specified.
+// If shell is not specified, returns the command as-is.
+//
+// Shell format: ["/bin/bash", "-o", "errexit", "-c"]
+// Command: ["echo", "hello"]
+// Result: ["/bin/bash", "-o", "errexit", "-c", "echo hello"]
+//
+// The command array is joined with spaces to create a shell command string.
+func wrapCommandWithShell(shell []string, cmd []string) []string {
+	if len(shell) == 0 {
+		return cmd
+	}
+	if len(cmd) == 0 {
+		return cmd
+	}
+
+	// Join command array into a single shell command string
+	cmdString := strings.Join(cmd, " ")
+
+	// Build wrapped command: [shell_parts..., command_string]
+	wrapped := make([]string, 0, len(shell)+1)
+	wrapped = append(wrapped, shell...)
+	wrapped = append(wrapped, cmdString)
+
+	return wrapped
+}
+
 func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []string, stdout, stderr io.Writer, opts ExecOptions) (int, error) {
 	// Get container ID from context
 	c.mu.Lock()
@@ -772,6 +801,9 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 	if !info.State.Running {
 		return 1, fmt.Errorf("container %s is not running", containerID)
 	}
+
+	// Wrap command with shell if specified
+	cmd = wrapCommandWithShell(c.cfg.Shell, cmd)
 
 	// Create exec configuration
 	execOpts := container.ExecOptions{
