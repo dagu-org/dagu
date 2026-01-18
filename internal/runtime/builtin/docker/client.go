@@ -777,17 +777,16 @@ func ensureCommandFlag(shell []string) []string {
 // If shell is not specified, returns the command as-is.
 //
 // The command flag (-c, -Command, /c) is automatically added if not present.
-// The command array is joined with spaces WITHOUT quoting to preserve shell
-// operators like &&, ||, pipes, redirects, etc.
+// The command array is treated as follows:
+//   - Single element: Used as-is (preserves original YAML quoting from CmdWithArgs)
+//   - Multiple elements: Joined with spaces to create shell command string
 //
 // Shell format: ["/bin/bash", "-o", "errexit"]
-// Command: ["echo", "line1", "&&", "echo", "line2"]
+// Command: ["echo \"hello world\""]  (from CmdWithArgs)
+// Result: ["/bin/bash", "-o", "errexit", "-c", "echo \"hello world\""]
+//
+// Command: ["echo", "line1", "&&", "echo", "line2"]  (reconstructed array)
 // Result: ["/bin/bash", "-o", "errexit", "-c", "echo line1 && echo line2"]
-//
-// Users are responsible for proper quoting in their YAML:
-//
-//	command: echo "hello world"     # Quotes preserved
-//	command: echo hello && echo hi  # Operators work
 func wrapCommandWithShell(shell, cmd []string) []string {
 	if len(shell) == 0 || len(cmd) == 0 {
 		return cmd
@@ -796,8 +795,14 @@ func wrapCommandWithShell(shell, cmd []string) []string {
 	// Auto-add command flag if not already present
 	shellWithFlag := ensureCommandFlag(shell)
 
-	// Join command array with spaces (NO quoting to preserve operators)
-	cmdString := strings.Join(cmd, " ")
+	// If single element, use as-is (preserves original quoting from CmdWithArgs)
+	// If multiple elements, join with spaces (array was reconstructed)
+	var cmdString string
+	if len(cmd) == 1 {
+		cmdString = cmd[0]
+	} else {
+		cmdString = strings.Join(cmd, " ")
+	}
 
 	return append(shellWithFlag, cmdString)
 }
