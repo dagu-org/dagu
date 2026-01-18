@@ -717,6 +717,109 @@ func TestBuildSSH(t *testing.T) {
 	}
 }
 
+func TestBuildRedis(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		input     *redisConfig
+		expected  *core.RedisConfig
+		expectErr bool
+	}{
+		{
+			name:     "Nil",
+			input:    nil,
+			expected: nil,
+		},
+		{
+			name: "BasicConfigWithURL",
+			input: &redisConfig{
+				URL: "redis://localhost:6379/0",
+			},
+			expected: &core.RedisConfig{
+				URL: "redis://localhost:6379/0",
+			},
+		},
+		{
+			name: "BasicConfigWithHost",
+			input: &redisConfig{
+				Host:     "localhost",
+				Port:     6379,
+				Password: "secret",
+			},
+			expected: &core.RedisConfig{
+				Host:     "localhost",
+				Port:     6379,
+				Password: "secret",
+			},
+		},
+		{
+			name: "FullConfig",
+			input: &redisConfig{
+				URL:           "redis://user:pass@host:6380/1",
+				Host:          "redis.example.com",
+				Port:          6380,
+				Password:      "secret",
+				Username:      "admin",
+				DB:            1,
+				TLS:           true,
+				TLSSkipVerify: true,
+				Mode:          "standalone",
+				MaxRetries:    5,
+			},
+			expected: &core.RedisConfig{
+				URL:           "redis://user:pass@host:6380/1",
+				Host:          "redis.example.com",
+				Port:          6380,
+				Password:      "secret",
+				Username:      "admin",
+				DB:            1,
+				TLS:           true,
+				TLSSkipVerify: true,
+				Mode:          "standalone",
+				MaxRetries:    5,
+			},
+		},
+		{
+			name: "SentinelMode",
+			input: &redisConfig{
+				Mode:           "sentinel",
+				SentinelMaster: "mymaster",
+				SentinelAddrs:  []string{"sentinel1:26379", "sentinel2:26379"},
+			},
+			expected: &core.RedisConfig{
+				Mode:           "sentinel",
+				SentinelMaster: "mymaster",
+				SentinelAddrs:  []string{"sentinel1:26379", "sentinel2:26379"},
+			},
+		},
+		{
+			name: "ClusterMode",
+			input: &redisConfig{
+				Mode:         "cluster",
+				ClusterAddrs: []string{"node1:6379", "node2:6379", "node3:6379"},
+			},
+			expected: &core.RedisConfig{
+				Mode:         "cluster",
+				ClusterAddrs: []string{"node1:6379", "node2:6379", "node3:6379"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := &dag{Redis: tt.input}
+			result, err := buildRedis(testBuildContext(), d)
+			if tt.expectErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func TestBuildDotenv(t *testing.T) {
 	t.Parallel()
 
