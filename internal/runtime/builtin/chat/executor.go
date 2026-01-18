@@ -438,11 +438,8 @@ func (e *Executor) runWithTools(ctx context.Context, provider llmpkg.Provider, a
 	maxIterations := cfg.GetMaxToolIterations()
 
 	// Initialize tool executor for running DAGs
-	rCtx := runtime.GetDAGContext(ctx)
-	workDir := ""
-	if rCtx.DAG != nil {
-		workDir = rCtx.DAG.Location
-	}
+	// Use resolved working directory (same as call step type), not DAG file location
+	workDir := runtime.GetEnv(ctx).WorkingDir
 	e.toolExecutor = NewToolExecutor(e.toolRegistry, workDir)
 
 	// Get tools in LLM format
