@@ -64,6 +64,25 @@ type Config struct {
 	DisableSSL bool `mapstructure:"disableSSL"` // For local testing only
 }
 
+var (
+	// ValidStorageClasses is the list of valid S3 storage classes.
+	ValidStorageClasses = []string{
+		"STANDARD", "REDUCED_REDUNDANCY", "STANDARD_IA",
+		"ONEZONE_IA", "INTELLIGENT_TIERING", "GLACIER",
+		"DEEP_ARCHIVE", "GLACIER_IR",
+	}
+
+	// ValidACLs is the list of valid canned ACLs.
+	ValidACLs = []string{
+		"private", "public-read", "public-read-write",
+		"authenticated-read", "aws-exec-read", "bucket-owner-read",
+		"bucket-owner-full-control",
+	}
+
+	// ValidChecksums is the list of valid checksum algorithms.
+	ValidChecksums = []string{"CRC32", "CRC32C", "SHA1", "SHA256"}
+)
+
 // DefaultConfig returns a Config with sensible defaults.
 func DefaultConfig() *Config {
 	return &Config{
@@ -71,6 +90,41 @@ func DefaultConfig() *Config {
 		Concurrency:  5,
 		MaxKeys:      1000,
 		OutputFormat: "json",
+	}
+}
+
+// ApplyDefaults maps the core.S3Config values to the Config struct
+// if they are present and not already set in the Config.
+func (c *Config) ApplyDefaults(defaults *core.S3Config) {
+	if defaults == nil {
+		return
+	}
+	if defaults.Region != "" {
+		c.Region = defaults.Region
+	}
+	if defaults.Endpoint != "" {
+		c.Endpoint = defaults.Endpoint
+	}
+	if defaults.AccessKeyID != "" {
+		c.AccessKeyID = defaults.AccessKeyID
+	}
+	if defaults.SecretAccessKey != "" {
+		c.SecretAccessKey = defaults.SecretAccessKey
+	}
+	if defaults.SessionToken != "" {
+		c.SessionToken = defaults.SessionToken
+	}
+	if defaults.Profile != "" {
+		c.Profile = defaults.Profile
+	}
+	if defaults.ForcePathStyle {
+		c.ForcePathStyle = defaults.ForcePathStyle
+	}
+	if defaults.DisableSSL {
+		c.DisableSSL = defaults.DisableSSL
+	}
+	if defaults.Bucket != "" {
+		c.Bucket = defaults.Bucket
 	}
 }
 
@@ -126,22 +180,8 @@ func (c *Config) ValidateForOperation(operation string) error {
 	}
 
 	// Validate storage class if provided
-	if c.StorageClass != "" {
-		validStorageClasses := []string{
-			"STANDARD", "REDUCED_REDUNDANCY", "STANDARD_IA",
-			"ONEZONE_IA", "INTELLIGENT_TIERING", "GLACIER",
-			"DEEP_ARCHIVE", "GLACIER_IR",
-		}
-		found := false
-		for _, sc := range validStorageClasses {
-			if strings.EqualFold(c.StorageClass, sc) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return fmt.Errorf("%w: invalid storage class %q", ErrConfig, c.StorageClass)
-		}
+	if c.StorageClass != "" && !containsIgnoreCase(ValidStorageClasses, c.StorageClass) {
+		return fmt.Errorf("%w: invalid storage class %q", ErrConfig, c.StorageClass)
 	}
 
 	// Validate output format
@@ -151,15 +191,7 @@ func (c *Config) ValidateForOperation(operation string) error {
 
 	// Validate server-side encryption
 	if c.ServerSideEncryption != "" {
-		validSSE := []string{"AES256", "aws:kms"}
-		found := false
-		for _, sse := range validSSE {
-			if strings.EqualFold(c.ServerSideEncryption, sse) {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !containsIgnoreCase([]string{"AES256", "aws:kms"}, c.ServerSideEncryption) {
 			return fmt.Errorf("%w: sse must be 'AES256' or 'aws:kms'", ErrConfig)
 		}
 		// KMS key ID is required for aws:kms
@@ -169,37 +201,13 @@ func (c *Config) ValidateForOperation(operation string) error {
 	}
 
 	// Validate ACL
-	if c.ACL != "" {
-		validACLs := []string{
-			"private", "public-read", "public-read-write",
-			"authenticated-read", "aws-exec-read", "bucket-owner-read",
-			"bucket-owner-full-control",
-		}
-		found := false
-		for _, acl := range validACLs {
-			if strings.EqualFold(c.ACL, acl) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return fmt.Errorf("%w: invalid acl %q", ErrConfig, c.ACL)
-		}
+	if c.ACL != "" && !containsIgnoreCase(ValidACLs, c.ACL) {
+		return fmt.Errorf("%w: invalid acl %q", ErrConfig, c.ACL)
 	}
 
 	// Validate checksum algorithm
-	if c.ChecksumAlgorithm != "" {
-		validChecksums := []string{"CRC32", "CRC32C", "SHA1", "SHA256"}
-		found := false
-		for _, cs := range validChecksums {
-			if strings.EqualFold(c.ChecksumAlgorithm, cs) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return fmt.Errorf("%w: checksumAlgorithm must be one of: CRC32, CRC32C, SHA1, SHA256", ErrConfig)
-		}
+	if c.ChecksumAlgorithm != "" && !containsIgnoreCase(ValidChecksums, c.ChecksumAlgorithm) {
+		return fmt.Errorf("%w: checksumAlgorithm must be one of: CRC32, CRC32C, SHA1, SHA256", ErrConfig)
 	}
 
 	// Validate concurrency
@@ -213,6 +221,15 @@ func (c *Config) ValidateForOperation(operation string) error {
 	}
 
 	return nil
+}
+
+func containsIgnoreCase(slice []string, item string) bool {
+	for _, s := range slice {
+		if strings.EqualFold(s, item) {
+			return true
+		}
+	}
+	return false
 }
 
 func ptrFloat(f float64) *float64 { return &f }

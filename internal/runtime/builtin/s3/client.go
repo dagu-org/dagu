@@ -16,17 +16,14 @@ import (
 func createClient(ctx context.Context, cfg *Config) (*s3.Client, error) {
 	var opts []func(*config.LoadOptions) error
 
-	// Set region if provided
 	if cfg.Region != "" {
 		opts = append(opts, config.WithRegion(cfg.Region))
 	}
 
-	// Set profile if provided
 	if cfg.Profile != "" {
 		opts = append(opts, config.WithSharedConfigProfile(cfg.Profile))
 	}
 
-	// Set explicit credentials if provided
 	if cfg.AccessKeyID != "" && cfg.SecretAccessKey != "" {
 		creds := credentials.NewStaticCredentialsProvider(
 			cfg.AccessKeyID,
@@ -52,14 +49,12 @@ func createClient(ctx context.Context, cfg *Config) (*s3.Client, error) {
 		})
 	}
 
-	// Force path-style addressing for S3-compatible services
 	if cfg.ForcePathStyle {
 		s3Opts = append(s3Opts, func(o *s3.Options) {
 			o.UsePathStyle = true
 		})
 	}
 
-	// Disable SSL for local testing (e.g., local MinIO without TLS)
 	if cfg.DisableSSL {
 		s3Opts = append(s3Opts, func(o *s3.Options) {
 			o.HTTPClient = &http.Client{
