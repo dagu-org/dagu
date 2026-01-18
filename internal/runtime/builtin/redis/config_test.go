@@ -243,7 +243,7 @@ func TestParseConfig_Invalid(t *testing.T) {
 			input: map[string]any{
 				"host": "localhost",
 			},
-			errContains: "command, script, scriptFile, or pipeline is required",
+			errContains: "command, script, scriptFile, scriptSHA, or pipeline is required",
 		},
 	}
 

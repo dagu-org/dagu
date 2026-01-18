@@ -270,47 +270,6 @@ func (rw *ResultWriter) formatValue(v any) string {
 	}
 }
 
-// WriteZSet writes sorted set values for CSV output.
-func (rw *ResultWriter) WriteZSet(values []goredis.Z) error {
-	for _, z := range values {
-		if err := rw.csvWriter.Write([]string{
-			rw.formatValue(z.Member),
-			fmt.Sprintf("%g", z.Score),
-		}); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// WriteHash writes hash values for CSV output.
-func (rw *ResultWriter) WriteHash(values map[string]string) error {
-	for k, v := range values {
-		if err := rw.csvWriter.Write([]string{k, v}); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// WriteList writes list values for CSV output.
-func (rw *ResultWriter) WriteList(values []string) error {
-	for _, v := range values {
-		if err := rw.csvWriter.Write([]string{v}); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// ParseRedisNil checks if the error is redis.Nil and returns appropriate value.
-func ParseRedisNil(err error, nullValue string) (string, bool) {
-	if err == goredis.Nil {
-		return nullValue, true
-	}
-	return "", false
-}
-
 // FormatDuration formats a duration for display.
 func FormatDuration(d int64) string {
 	if d < 0 {

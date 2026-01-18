@@ -195,81 +195,33 @@ func (e *redisExecutor) Run(ctx context.Context) error {
 
 // executeCommand executes a single Redis command.
 func (e *redisExecutor) executeCommand(ctx context.Context) error {
-	metrics := &ExecutionMetrics{
-		Command:   e.cfg.Command,
-		Key:       e.cfg.Key,
-		StartedAt: time.Now(),
-	}
-
-	defer func() {
-		metrics.FinishedAt = time.Now()
-		metrics.DurationMs = metrics.FinishedAt.Sub(metrics.StartedAt).Milliseconds()
-		e.writeMetrics(metrics)
-	}()
-
 	handler := NewCommandHandler(e.client, e.cfg)
-	result, err := handler.Execute(ctx)
-	if err != nil {
-		metrics.Status = "error"
-		metrics.Error = err.Error()
-		return err
-	}
-
-	metrics.Status = "success"
-
-	// Write result to stdout
-	if result != nil {
-		writer := NewResultWriter(e.stdout, e.cfg.OutputFormat, e.cfg.NullValue)
-		if err := writer.Write(result); err != nil {
-			return fmt.Errorf("failed to write result: %w", err)
-		}
-		if err := writer.Flush(); err != nil {
-			return fmt.Errorf("failed to flush result: %w", err)
-		}
-	}
-
-	return nil
+	return e.executeWithMetrics(ctx, e.cfg.Command, e.cfg.Key, func(ctx context.Context) (any, error) {
+		return handler.Execute(ctx)
+	})
 }
 
 // executePipeline executes a pipeline of commands.
 func (e *redisExecutor) executePipeline(ctx context.Context) error {
-	metrics := &ExecutionMetrics{
-		Command:   "PIPELINE",
-		StartedAt: time.Now(),
-	}
-
-	defer func() {
-		metrics.FinishedAt = time.Now()
-		metrics.DurationMs = metrics.FinishedAt.Sub(metrics.StartedAt).Milliseconds()
-		e.writeMetrics(metrics)
-	}()
-
 	executor := NewPipelineExecutor(e.client, e.cfg)
-	results, err := executor.Execute(ctx)
-	if err != nil {
-		metrics.Status = "error"
-		metrics.Error = err.Error()
-		return err
-	}
-
-	metrics.Status = "success"
-
-	// Write results to stdout
-	writer := NewResultWriter(e.stdout, e.cfg.OutputFormat, e.cfg.NullValue)
-	if err := writer.Write(results); err != nil {
-		return fmt.Errorf("failed to write results: %w", err)
-	}
-	if err := writer.Flush(); err != nil {
-		return fmt.Errorf("failed to flush results: %w", err)
-	}
-
-	return nil
+	return e.executeWithMetrics(ctx, "PIPELINE", "", func(ctx context.Context) (any, error) {
+		return executor.Execute(ctx)
+	})
 }
 
 // executeScript executes a Lua script.
 func (e *redisExecutor) executeScript(ctx context.Context) error {
+	executor := NewScriptExecutor(e.client, e.cfg)
+	return e.executeWithMetrics(ctx, "EVAL", "", func(ctx context.Context) (any, error) {
+		return executor.Execute(ctx)
+	})
+}
+
+// executeWithMetrics wraps execution with metrics tracking and result writing.
+func (e *redisExecutor) executeWithMetrics(ctx context.Context, command, key string, fn func(context.Context) (any, error)) error {
 	metrics := &ExecutionMetrics{
-		Command:   "EVAL",
+		Command:   command,
+		Key:       key,
 		StartedAt: time.Now(),
 	}
 
@@ -279,8 +231,7 @@ func (e *redisExecutor) executeScript(ctx context.Context) error {
 		e.writeMetrics(metrics)
 	}()
 
-	executor := NewScriptExecutor(e.client, e.cfg)
-	result, err := executor.Execute(ctx)
+	result, err := fn(ctx)
 	if err != nil {
 		metrics.Status = "error"
 		metrics.Error = err.Error()
@@ -289,17 +240,22 @@ func (e *redisExecutor) executeScript(ctx context.Context) error {
 
 	metrics.Status = "success"
 
-	// Write result to stdout
-	if result != nil {
-		writer := NewResultWriter(e.stdout, e.cfg.OutputFormat, e.cfg.NullValue)
-		if err := writer.Write(result); err != nil {
-			return fmt.Errorf("failed to write result: %w", err)
-		}
-		if err := writer.Flush(); err != nil {
-			return fmt.Errorf("failed to flush result: %w", err)
-		}
+	if result == nil {
+		return nil
 	}
 
+	return e.writeResult(result)
+}
+
+// writeResult writes the result to stdout.
+func (e *redisExecutor) writeResult(result any) error {
+	writer := NewResultWriter(e.stdout, e.cfg.OutputFormat, e.cfg.NullValue)
+	if err := writer.Write(result); err != nil {
+		return fmt.Errorf("failed to write result: %w", err)
+	}
+	if err := writer.Flush(); err != nil {
+		return fmt.Errorf("failed to flush result: %w", err)
+	}
 	return nil
 }
 

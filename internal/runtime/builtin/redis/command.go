@@ -10,6 +10,18 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// nilToNull converts redis.Nil errors to nil results.
+// Returns (result, nil) for non-nil results, (nil, nil) for redis.Nil, or (nil, err) for other errors.
+func nilToNull[T any](result T, err error) (any, error) {
+	if err == redis.Nil {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 // CommandHandler executes Redis commands.
 type CommandHandler struct {
 	client redis.UniversalClient
@@ -26,11 +38,7 @@ func (h *CommandHandler) Execute(ctx context.Context) (any, error) {
 	switch strings.ToUpper(h.cfg.Command) {
 	// String commands
 	case "GET":
-		result, err := h.client.Get(ctx, h.cfg.Key).Result()
-		if err == redis.Nil {
-			return nil, nil // Key doesn't exist
-		}
-		return result, err
+		return nilToNull(h.client.Get(ctx, h.cfg.Key).Result())
 
 	case "SET":
 		ttl := time.Duration(h.cfg.TTL) * time.Second
@@ -157,11 +165,7 @@ func (h *CommandHandler) Execute(ctx context.Context) (any, error) {
 
 	// Hash commands
 	case "HGET":
-		result, err := h.client.HGet(ctx, h.cfg.Key, h.cfg.Field).Result()
-		if err == redis.Nil {
-			return nil, nil
-		}
-		return result, err
+		return nilToNull(h.client.HGet(ctx, h.cfg.Key, h.cfg.Field).Result())
 
 	case "HSET":
 		return h.client.HSet(ctx, h.cfg.Key, h.flattenFields()...).Result()
@@ -223,40 +227,24 @@ func (h *CommandHandler) Execute(ctx context.Context) (any, error) {
 		return h.client.RPush(ctx, h.cfg.Key, h.cfg.Values...).Result()
 
 	case "LPOP":
-		result, err := h.client.LPop(ctx, h.cfg.Key).Result()
-		if err == redis.Nil {
-			return nil, nil
-		}
-		return result, err
+		return nilToNull(h.client.LPop(ctx, h.cfg.Key).Result())
 
 	case "RPOP":
-		result, err := h.client.RPop(ctx, h.cfg.Key).Result()
-		if err == redis.Nil {
-			return nil, nil
-		}
-		return result, err
+		return nilToNull(h.client.RPop(ctx, h.cfg.Key).Result())
 
 	case "BLPOP":
 		timeout := time.Duration(h.cfg.Block) * time.Millisecond
 		if timeout == 0 {
 			timeout = time.Duration(h.cfg.Timeout) * time.Second
 		}
-		result, err := h.client.BLPop(ctx, timeout, h.cfg.Key).Result()
-		if err == redis.Nil {
-			return nil, nil // Timeout
-		}
-		return result, err
+		return nilToNull(h.client.BLPop(ctx, timeout, h.cfg.Key).Result())
 
 	case "BRPOP":
 		timeout := time.Duration(h.cfg.Block) * time.Millisecond
 		if timeout == 0 {
 			timeout = time.Duration(h.cfg.Timeout) * time.Second
 		}
-		result, err := h.client.BRPop(ctx, timeout, h.cfg.Key).Result()
-		if err == redis.Nil {
-			return nil, nil // Timeout
-		}
-		return result, err
+		return nilToNull(h.client.BRPop(ctx, timeout, h.cfg.Key).Result())
 
 	case "LRANGE":
 		return h.client.LRange(ctx, h.cfg.Key, h.cfg.Start, h.cfg.Stop).Result()
@@ -269,11 +257,7 @@ func (h *CommandHandler) Execute(ctx context.Context) (any, error) {
 		if err != nil {
 			return nil, fmt.Errorf("lindex requires integer index: %w", err)
 		}
-		result, err := h.client.LIndex(ctx, h.cfg.Key, index).Result()
-		if err == redis.Nil {
-			return nil, nil
-		}
-		return result, err
+		return nilToNull(h.client.LIndex(ctx, h.cfg.Key, index).Result())
 
 	case "LSET":
 		return h.client.LSet(ctx, h.cfg.Key, h.cfg.Start, h.cfg.Value).Result()
@@ -330,11 +314,7 @@ func (h *CommandHandler) Execute(ctx context.Context) (any, error) {
 		return h.client.SCard(ctx, h.cfg.Key).Result()
 
 	case "SPOP":
-		result, err := h.client.SPop(ctx, h.cfg.Key).Result()
-		if err == redis.Nil {
-			return nil, nil
-		}
-		return result, err
+		return nilToNull(h.client.SPop(ctx, h.cfg.Key).Result())
 
 	case "SRANDMEMBER":
 		count := int64(h.cfg.Count)
@@ -385,25 +365,13 @@ func (h *CommandHandler) Execute(ctx context.Context) (any, error) {
 		return h.client.ZRangeByScore(ctx, h.cfg.Key, opt).Result()
 
 	case "ZSCORE":
-		result, err := h.client.ZScore(ctx, h.cfg.Key, toString(h.cfg.Value)).Result()
-		if err == redis.Nil {
-			return nil, nil
-		}
-		return result, err
+		return nilToNull(h.client.ZScore(ctx, h.cfg.Key, toString(h.cfg.Value)).Result())
 
 	case "ZRANK":
-		result, err := h.client.ZRank(ctx, h.cfg.Key, toString(h.cfg.Value)).Result()
-		if err == redis.Nil {
-			return nil, nil
-		}
-		return result, err
+		return nilToNull(h.client.ZRank(ctx, h.cfg.Key, toString(h.cfg.Value)).Result())
 
 	case "ZREVRANK":
-		result, err := h.client.ZRevRank(ctx, h.cfg.Key, toString(h.cfg.Value)).Result()
-		if err == redis.Nil {
-			return nil, nil
-		}
-		return result, err
+		return nilToNull(h.client.ZRevRank(ctx, h.cfg.Key, toString(h.cfg.Value)).Result())
 
 	case "ZCARD":
 		return h.client.ZCard(ctx, h.cfg.Key).Result()
@@ -448,29 +416,21 @@ func (h *CommandHandler) Execute(ctx context.Context) (any, error) {
 		return h.client.XAdd(ctx, args).Result()
 
 	case "XREAD":
-		result, err := h.client.XRead(ctx, &redis.XReadArgs{
+		return nilToNull(h.client.XRead(ctx, &redis.XReadArgs{
 			Streams: []string{h.cfg.Stream, h.cfg.StreamID},
 			Count:   int64(h.cfg.Count),
 			Block:   time.Duration(h.cfg.Block) * time.Millisecond,
-		}).Result()
-		if err == redis.Nil {
-			return nil, nil // Timeout or no messages
-		}
-		return result, err
+		}).Result())
 
 	case "XREADGROUP":
-		result, err := h.client.XReadGroup(ctx, &redis.XReadGroupArgs{
+		return nilToNull(h.client.XReadGroup(ctx, &redis.XReadGroupArgs{
 			Group:    h.cfg.Group,
 			Consumer: h.cfg.Consumer,
 			Streams:  []string{h.cfg.Stream, h.cfg.StreamID},
 			Count:    int64(h.cfg.Count),
 			Block:    time.Duration(h.cfg.Block) * time.Millisecond,
 			NoAck:    h.cfg.NoAck,
-		}).Result()
-		if err == redis.Nil {
-			return nil, nil // Timeout or no messages
-		}
-		return result, err
+		}).Result())
 
 	case "XACK":
 		ids := h.cfg.Keys // Reuse keys for message IDs
@@ -525,11 +485,7 @@ func (h *CommandHandler) Execute(ctx context.Context) (any, error) {
 
 	// Server commands
 	case "PING":
-		result, err := h.client.Ping(ctx).Result()
-		if err != nil {
-			return nil, err
-		}
-		return result, nil
+		return h.client.Ping(ctx).Result()
 
 	case "ECHO":
 		return h.client.Echo(ctx, toString(h.cfg.Value)).Result()

@@ -18,13 +18,11 @@ export function getExecutorCommand(
   if (!type || !config) return null;
 
   switch (type) {
-    case 'redis':
-      if (config.command) {
-        const parts = [config.command as string];
-        if (config.key) parts.push(config.key as string);
-        return parts.join(' ');
-      }
-      return null;
+    case 'redis': {
+      if (!config.command) return null;
+      const cmd = config.command as string;
+      return config.key ? `${cmd} ${config.key}` : cmd;
+    }
     case 'sql':
       return config.query ? String(config.query) : null;
     case 'http':
