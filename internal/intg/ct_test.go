@@ -233,6 +233,83 @@ steps:
 				"WORK_DIR_VOL_OUT2": "New content",
 			},
 		},
+		{
+			// Test for: https://github.com/dagu-org/dagu/issues/1589
+			// Shell field allows DRY approach to wrapping commands with a shell
+			name: "ShellFieldBasic",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+container:
+  image: %s
+  shell: ["/bin/sh", "-c"]
+steps:
+  - command: echo hello shell
+    output: SHELL_BASIC_OUT1
+  - command: echo world
+    output: SHELL_BASIC_OUT2
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"SHELL_BASIC_OUT1": "hello shell",
+				"SHELL_BASIC_OUT2": "world",
+			},
+		},
+		{
+			// Test shell field with multiple commands (multi-step execution)
+			name: "ShellFieldMultipleCommands",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+container:
+  image: %s
+  shell: ["/bin/sh", "-c"]
+steps:
+  - command: echo step1
+    output: SHELL_MULTI_OUT1
+  - command: echo step2
+    output: SHELL_MULTI_OUT2
+  - command: echo step3
+    output: SHELL_MULTI_OUT3
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"SHELL_MULTI_OUT1": "step1",
+				"SHELL_MULTI_OUT2": "step2",
+				"SHELL_MULTI_OUT3": "step3",
+			},
+		},
+		{
+			// Test shell field with pipes and redirects (shell features)
+			name: "ShellFieldWithPipes",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+container:
+  image: %s
+  shell: ["/bin/sh", "-c"]
+steps:
+  - command: echo "line1" && echo "line2"
+    output: SHELL_PIPE_OUT1
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"SHELL_PIPE_OUT1": "line1\nline2",
+			},
+		},
+		{
+			// Test backward compatibility: no shell field specified
+			name: "NoShellFieldBackwardCompat",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+container:
+  image: %s
+steps:
+  - command: echo no shell wrapper
+    output: NO_SHELL_OUT1
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"NO_SHELL_OUT1": "no shell wrapper",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -898,6 +975,40 @@ steps:
 `, containerName),
 			expectedOutputs: map[string]any{
 				"ALL_OVERRIDES_OUT": "user=root dir=/tmp var=test123",
+			},
+		},
+		{
+			// Test for: https://github.com/dagu-org/dagu/issues/1589
+			// Shell field should work in exec mode
+			name: "ShellField_ExecMode",
+			dagConfig: fmt.Sprintf(`
+container:
+  exec: %s
+  shell: ["/bin/sh", "-c"]
+steps:
+  - command: echo "shell in exec mode"
+    output: EXEC_SHELL_OUT1
+  - command: echo "second command"
+    output: EXEC_SHELL_OUT2
+`, containerName),
+			expectedOutputs: map[string]any{
+				"EXEC_SHELL_OUT1": "shell in exec mode",
+				"EXEC_SHELL_OUT2": "second command",
+			},
+		},
+		{
+			// Test shell field with pipes in exec mode
+			name: "ShellField_ExecModeWithPipes",
+			dagConfig: fmt.Sprintf(`
+container:
+  exec: %s
+  shell: ["/bin/sh", "-c"]
+steps:
+  - command: echo "a" && echo "b"
+    output: EXEC_SHELL_PIPE_OUT
+`, containerName),
+			expectedOutputs: map[string]any{
+				"EXEC_SHELL_PIPE_OUT": "a\nb",
 			},
 		},
 	}

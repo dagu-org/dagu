@@ -443,9 +443,7 @@ func (c *Client) StopContainerKeepAlive(ctx context.Context) {
 		if err := c.cli.ContainerStop(ctx, c.containerID, container.StopOptions{}); err != nil {
 			logger.Error(ctx, "Docker executor: stop container", tag.Error(err))
 		}
-	}
 
-	if c.containerID != "" {
 		// Forcefully stop after timeout
 		defaultStopTimeout := 5 * time.Second
 		var containerStopped atomic.Bool
