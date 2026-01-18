@@ -5,9 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"net"
-
-	"github.com/minio/minio-go/v7"
 )
 
 // Sentinel errors for S3 operations.
@@ -21,56 +18,8 @@ var (
 	ErrDownloadFailed = errors.New("s3: download failed")
 	ErrListFailed     = errors.New("s3: list failed")
 	ErrDeleteFailed   = errors.New("s3: delete failed")
-	ErrNetwork        = errors.New("s3: network error")
-	ErrTimeout        = errors.New("s3: operation timeout")
 	ErrCredentials    = errors.New("s3: invalid credentials")
-	ErrInvalidBucket  = errors.New("s3: invalid bucket name")
-	ErrInvalidKey     = errors.New("s3: invalid object key")
 )
-
-// classifyMinioError converts MinIO client errors into sentinel errors.
-func classifyMinioError(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	// Check for context cancellation
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return err
-	}
-
-	// Check for MinIO error response
-	errResp := minio.ToErrorResponse(err)
-	if errResp.Code != "" {
-		switch errResp.Code {
-		case "NoSuchBucket", "BucketNotFound":
-			return ErrBucketNotFound
-		case "NoSuchKey", "NotFound":
-			return ErrObjectNotFound
-		case "AccessDenied", "Forbidden", "AllAccessDisabled":
-			return ErrPermission
-		case "InvalidAccessKeyId", "SignatureDoesNotMatch":
-			return ErrCredentials
-		case "InvalidBucketName":
-			return ErrInvalidBucket
-		case "KeyTooLongError":
-			return ErrInvalidKey
-		case "RequestTimeout", "SlowDown":
-			return ErrTimeout
-		}
-	}
-
-	// Check for network errors
-	var netErr net.Error
-	if errors.As(err, &netErr) {
-		if netErr.Timeout() {
-			return ErrTimeout
-		}
-		return ErrNetwork
-	}
-
-	return err
-}
 
 // exitCodeFor returns an appropriate exit code for the given error.
 func exitCodeFor(err error) int {
@@ -99,14 +48,8 @@ func exitCodeFor(err error) int {
 		return 10
 	case errors.Is(err, ErrDeleteFailed):
 		return 11
-	case errors.Is(err, ErrNetwork):
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		return 12
-	case errors.Is(err, ErrTimeout):
-		return 13
-	case errors.Is(err, context.Canceled):
-		return 14
-	case errors.Is(err, context.DeadlineExceeded):
-		return 15
 	default:
 		return 1
 	}

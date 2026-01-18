@@ -38,47 +38,18 @@ func (e *executorImpl) runList(ctx context.Context) error {
 
 	maxObjects := e.cfg.MaxKeys
 	if maxObjects <= 0 {
-		maxObjects = 1000 // Default limit
+		maxObjects = 1000
 	}
 
-	// JSONL mode: stream objects one by one
-	if e.cfg.OutputFormat == "jsonl" {
-		count := 0
-		for object := range e.client.ListObjects(ctx, e.cfg.Bucket, opts) {
-			if object.Err != nil {
-				return fmt.Errorf("%w: %v", ErrListFailed, object.Err)
-			}
-
-			if count >= maxObjects {
-				break
-			}
-
-			listObj := ListObject{
-				Key:          object.Key,
-				Size:         object.Size,
-				LastModified: object.LastModified.Format(time.RFC3339),
-				ETag:         object.ETag,
-				StorageClass: object.StorageClass,
-			}
-
-			if err := encodeJSON(e.stdout, listObj); err != nil {
-				return fmt.Errorf("%w: failed to write output: %v", ErrListFailed, err)
-			}
-			count++
-		}
-		return nil
-	}
-
-	// JSON mode: collect all objects first
 	var objects []ListObject
-	count := 0
+	streamMode := e.cfg.OutputFormat == "jsonl"
 
 	for object := range e.client.ListObjects(ctx, e.cfg.Bucket, opts) {
 		if object.Err != nil {
 			return fmt.Errorf("%w: %v", ErrListFailed, object.Err)
 		}
 
-		if count >= maxObjects {
+		if len(objects) >= maxObjects {
 			break
 		}
 
@@ -90,8 +61,16 @@ func (e *executorImpl) runList(ctx context.Context) error {
 			StorageClass: object.StorageClass,
 		}
 
+		if streamMode {
+			if err := encodeJSON(e.stdout, listObj); err != nil {
+				return fmt.Errorf("%w: failed to write output: %v", ErrListFailed, err)
+			}
+		}
 		objects = append(objects, listObj)
-		count++
+	}
+
+	if streamMode {
+		return nil
 	}
 
 	result := ListResult{
@@ -100,7 +79,7 @@ func (e *executorImpl) runList(ctx context.Context) error {
 		Bucket:     e.cfg.Bucket,
 		Prefix:     e.cfg.Prefix,
 		Objects:    objects,
-		TotalCount: count,
+		TotalCount: len(objects),
 		Duration:   time.Since(start).Round(time.Millisecond).String(),
 	}
 

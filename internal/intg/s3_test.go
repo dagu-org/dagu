@@ -12,9 +12,9 @@ import (
 
 const minioImage = "minio/minio:latest"
 
-// TestS3Executor_WithMinIOContainer tests S3-like operations using a MinIO container.
-// Uses the DAG-level container field with MinIO's built-in mc client.
-func TestS3Executor_WithMinIOContainer(t *testing.T) {
+// TestMinIOContainer_WithMCCommands tests S3-like operations using MinIO's mc client
+// inside a container. This validates the container-based workflow pattern for object storage.
+func TestMinIOContainer_WithMCCommands(t *testing.T) {
 	t.Parallel()
 
 	tempDir, err := os.MkdirTemp("", "dagu-s3-test-*")
