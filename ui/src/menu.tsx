@@ -39,6 +39,7 @@ type NavItemProps = {
   text: string;
   isOpen: boolean;
   onClick?: () => void;
+  customColor?: boolean;
 };
 
 // Main List Items Props
@@ -50,7 +51,7 @@ type MainListItemsProps = {
 };
 
 // NavItem component with Obsidian Deep styling
-function NavItem({ to, icon, text, isOpen, onClick }: NavItemProps) {
+function NavItem({ to, icon, text, isOpen, onClick, customColor }: NavItemProps) {
   const location = useLocation();
   const isActive =
     location.pathname === to ||
@@ -65,20 +66,29 @@ function NavItem({ to, icon, text, isOpen, onClick }: NavItemProps) {
           'flex items-center rounded-lg transition-all duration-200 ease-in-out px-2 group relative',
           isOpen ? 'h-9 w-full gap-3' : 'h-10 w-10 justify-center',
           isActive
-            ? 'text-foreground bg-primary/10 shadow-[0_0_15px_rgba(var(--primary-rgb),0.15),inset_0_0_0_1px_rgba(var(--primary-rgb),0.3)]'
+            ? customColor
+              ? 'text-foreground bg-white/10 shadow-[0_0_15px_rgba(255,255,255,0.1),inset_0_0_0_1px_rgba(255,255,255,0.2)]'
+              : 'text-foreground bg-primary/10 shadow-[0_0_15px_rgba(var(--primary-rgb),0.15),inset_0_0_0_1px_rgba(var(--primary-rgb),0.3)]'
             : 'text-sidebar-foreground hover:text-foreground hover:bg-white/5'
         )}
         aria-current={isActive ? 'page' : undefined}
         title={isOpen ? '' : text}
       >
         {isActive && (
-          <div className="absolute left-0 w-1 h-4 bg-primary rounded-r-full shadow-[0_0_8px_var(--primary)]" />
+          <div className={cn(
+            'absolute left-0 w-1 h-4 rounded-r-full',
+            customColor
+              ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.4)]'
+              : 'bg-primary shadow-[0_0_8px_var(--primary)]'
+          )} />
         )}
         <div
           className={cn(
             'transition-transform duration-200 flex items-center justify-center',
             isActive
-              ? 'text-primary scale-110'
+              ? customColor
+                ? 'text-white scale-110'
+                : 'text-primary scale-110'
               : 'opacity-70 group-hover:opacity-100 group-hover:scale-105'
           )}
         >
@@ -242,6 +252,7 @@ export const mainListItems = React.forwardRef<
               icon={<BarChart2 size={18} />}
               isOpen={isOpen}
               onClick={onNavItemClick}
+              customColor={customColor}
             />
             {isAdmin && (
               <NavItem
@@ -250,6 +261,7 @@ export const mainListItems = React.forwardRef<
                 icon={<Activity size={18} />}
                 isOpen={isOpen}
                 onClick={onNavItemClick}
+                customColor={customColor}
               />
             )}
           </div>
@@ -266,6 +278,7 @@ export const mainListItems = React.forwardRef<
               icon={<Inbox size={18} />}
               isOpen={isOpen}
               onClick={onNavItemClick}
+              customColor={customColor}
             />
             <NavItem
               to="/dag-runs"
@@ -273,6 +286,7 @@ export const mainListItems = React.forwardRef<
               icon={<History size={18} />}
               isOpen={isOpen}
               onClick={onNavItemClick}
+              customColor={customColor}
             />
             <NavItem
               to="/dags"
@@ -280,6 +294,7 @@ export const mainListItems = React.forwardRef<
               icon={<Network size={18} />}
               isOpen={isOpen}
               onClick={onNavItemClick}
+              customColor={customColor}
             />
             <NavItem
               to="/search"
@@ -287,6 +302,7 @@ export const mainListItems = React.forwardRef<
               icon={<Search size={18} />}
               isOpen={isOpen}
               onClick={onNavItemClick}
+              customColor={customColor}
             />
           </div>
 
@@ -303,6 +319,7 @@ export const mainListItems = React.forwardRef<
                 icon={<Users size={18} />}
                 isOpen={isOpen}
                 onClick={onNavItemClick}
+                customColor={customColor}
               />
               <NavItem
                 to="/api-keys"
@@ -310,6 +327,7 @@ export const mainListItems = React.forwardRef<
                 icon={<KeyRound size={18} />}
                 isOpen={isOpen}
                 onClick={onNavItemClick}
+                customColor={customColor}
               />
               <NavItem
                 to="/webhooks"
@@ -317,6 +335,7 @@ export const mainListItems = React.forwardRef<
                 icon={<Webhook size={18} />}
                 isOpen={isOpen}
                 onClick={onNavItemClick}
+                customColor={customColor}
               />
               {config.terminalEnabled && (
                 <NavItem
@@ -325,6 +344,7 @@ export const mainListItems = React.forwardRef<
                   icon={<Terminal size={18} />}
                   isOpen={isOpen}
                   onClick={onNavItemClick}
+                  customColor={customColor}
                 />
               )}
               <NavItem
@@ -333,6 +353,7 @@ export const mainListItems = React.forwardRef<
                 icon={<ScrollText size={18} />}
                 isOpen={isOpen}
                 onClick={onNavItemClick}
+                customColor={customColor}
               />
             </div>
           )}

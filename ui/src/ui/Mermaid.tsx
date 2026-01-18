@@ -10,12 +10,13 @@ type Props = {
   onRightClick?: (id: string) => void;
 };
 
-// Helper function to get computed CSS variable value
-function getCSSVariable(name: string): string {
-  if (typeof window === 'undefined') return '#000000';
-  return getComputedStyle(document.documentElement)
+// Helper function to get computed CSS variable value with fallback
+function getCSSVariable(name: string, fallback: string): string {
+  if (typeof window === 'undefined') return fallback;
+  const value = getComputedStyle(document.documentElement)
     .getPropertyValue(name)
     .trim();
+  return value || fallback;
 }
 
 // Initialize Mermaid with theme-aware colors
@@ -27,15 +28,15 @@ function initializeMermaid(): void {
     theme: 'default',
     themeVariables: {
       background: 'transparent',
-      primaryColor: getCSSVariable('--card'),
-      primaryTextColor: getCSSVariable('--foreground'),
-      primaryBorderColor: getCSSVariable('--border'),
-      lineColor: getCSSVariable('--muted-foreground'),
+      primaryColor: getCSSVariable('--card', '#faf8f5'),
+      primaryTextColor: getCSSVariable('--foreground', '#3d3833'),
+      primaryBorderColor: getCSSVariable('--border', '#c8bfb0'),
+      lineColor: getCSSVariable('--muted-foreground', '#6b635a'),
       sectionBkgColor: 'transparent',
       altSectionBkgColor: 'transparent',
       gridColor: 'transparent',
-      secondaryColor: getCSSVariable('--secondary'),
-      tertiaryColor: getCSSVariable('--background'),
+      secondaryColor: getCSSVariable('--secondary', '#f0ebe3'),
+      tertiaryColor: getCSSVariable('--background', '#f5f0e8'),
     },
     flowchart: {
       curve: 'basis',
