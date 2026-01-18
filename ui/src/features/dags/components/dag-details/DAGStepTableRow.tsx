@@ -10,7 +10,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { ArrowRight, Folder, GitBranch, Mail, RefreshCw } from 'lucide-react';
+import { ArrowRight, Code, Folder, GitBranch, Mail, RefreshCw } from 'lucide-react';
 import { components } from '../../../../api/v2/schema';
 import { Badge } from '../../../../components/ui/badge';
 import { TableCell, TableRow } from '../../../../components/ui/table';
@@ -23,6 +23,40 @@ type Props = {
   step: components['schemas']['Step'];
   /** Index of the step in the list */
   index: number;
+};
+
+/**
+ * Get displayable command from executor config when step.commands is empty
+ */
+const getExecutorCommand = (
+  step: components['schemas']['Step']
+): string | null => {
+  const type = step.executorConfig?.type;
+  const config = step.executorConfig?.config as Record<string, unknown>;
+
+  if (!type || !config) return null;
+
+  switch (type) {
+    case 'redis':
+      if (config.command) {
+        const parts = [config.command as string];
+        if (config.key) parts.push(config.key as string);
+        return parts.join(' ');
+      }
+      return null;
+    case 'sql':
+      return config.query ? String(config.query) : null;
+    case 'http':
+      return config.url ? `${config.method || 'GET'} ${config.url}` : null;
+    case 'mail':
+      return config.to ? `Mail to ${config.to}` : null;
+    case 'jq':
+      return config.expression ? `jq: ${config.expression}` : null;
+    case 'docker':
+      return config.image ? `docker: ${config.image}` : null;
+    default:
+      return null;
+  }
 };
 
 /**
@@ -82,12 +116,33 @@ function DAGStepTableRow({ step, index }: Props) {
       <TableCell>
         <div className="space-y-1.5">
           {/* Command & Args */}
-          {step.commands && step.commands.length > 0 && (
+          {step.commands && step.commands.length > 0 ? (
             <CommandDisplay
               commands={step.commands}
               icon="terminal"
               maxLength={50}
             />
+          ) : (
+            // Executor-specific display
+            (() => {
+              const execCmd = getExecutorCommand(step);
+              if (execCmd) {
+                return (
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Code className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                    <span
+                      className="font-mono text-xs truncate max-w-[200px]"
+                      title={execCmd}
+                    >
+                      {execCmd.length > 50
+                        ? execCmd.slice(0, 47) + '...'
+                        : execCmd}
+                    </span>
+                  </div>
+                );
+              }
+              return null;
+            })()
           )}
 
           {/* Script */}
