@@ -41,17 +41,19 @@ func (e *executorImpl) runList(ctx context.Context) error {
 		maxObjects = 1000
 	}
 
-	var objects []ListObject
 	streamMode := e.cfg.OutputFormat == "jsonl"
+	var objects []ListObject
+	count := 0
 
 	for object := range e.client.ListObjects(ctx, e.cfg.Bucket, opts) {
 		if object.Err != nil {
 			return fmt.Errorf("%w: %v", ErrListFailed, object.Err)
 		}
 
-		if len(objects) >= maxObjects {
+		if count >= maxObjects {
 			break
 		}
+		count++
 
 		listObj := ListObject{
 			Key:          object.Key,
@@ -65,8 +67,9 @@ func (e *executorImpl) runList(ctx context.Context) error {
 			if err := encodeJSON(e.stdout, listObj); err != nil {
 				return fmt.Errorf("%w: failed to write output: %v", ErrListFailed, err)
 			}
+		} else {
+			objects = append(objects, listObj)
 		}
-		objects = append(objects, listObj)
 	}
 
 	if streamMode {

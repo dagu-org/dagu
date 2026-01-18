@@ -13,20 +13,26 @@ import (
 func createClient(_ context.Context, cfg *Config) (*minio.Client, error) {
 	endpoint, secure := parseEndpoint(cfg)
 
-	// Build credentials provider
+	// Build credentials provider with proper chain
 	var creds *credentials.Credentials
 	switch {
 	case cfg.AccessKeyID != "" && cfg.SecretAccessKey != "":
+		// Explicit credentials provided
 		creds = credentials.NewStaticV4(
 			cfg.AccessKeyID,
 			cfg.SecretAccessKey,
 			cfg.SessionToken,
 		)
 	case cfg.Profile != "":
+		// Use specific AWS profile
 		creds = credentials.NewFileAWSCredentials("", cfg.Profile)
 	default:
-		// IAM credentials (EC2/ECS/Lambda/GKE)
-		creds = credentials.NewIAM("")
+		// Use credentials chain: env vars -> shared config -> IAM
+		creds = credentials.NewChainCredentials([]credentials.Provider{
+			&credentials.EnvAWS{},
+			&credentials.FileAWSCredentials{},
+			&credentials.IAM{},
+		})
 	}
 
 	opts := &minio.Options{
@@ -36,6 +42,11 @@ func createClient(_ context.Context, cfg *Config) (*minio.Client, error) {
 
 	if cfg.Region != "" {
 		opts.Region = cfg.Region
+	}
+
+	// Enable path-style addressing for S3-compatible services (MinIO, LocalStack, etc.)
+	if cfg.ForcePathStyle {
+		opts.BucketLookup = minio.BucketLookupPath
 	}
 
 	return minio.New(endpoint, opts)

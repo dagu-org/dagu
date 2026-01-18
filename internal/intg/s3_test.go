@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const minioImage = "minio/minio:latest"
+const minioImage = "minio/minio:RELEASE.2024-10-02T17-50-41Z"
 
 // TestMinIOContainer_WithMCCommands tests S3-like operations using MinIO's mc client
 // inside a container. This validates the container-based workflow pattern for object storage.
@@ -40,9 +40,9 @@ container:
     - MINIO_ROOT_PASSWORD=minioadmin
 
 steps:
-  # Wait for MinIO to be ready and create bucket
+  # Wait for MinIO to be ready with retry loop, then create bucket
   - name: create-bucket
-    command: sh -c "sleep 2 && mc alias set local http://127.0.0.1:9000 minioadmin minioadmin && mc mb local/test-bucket --ignore-existing"
+    command: sh -c "for i in 1 2 3 4 5; do mc alias set local http://127.0.0.1:9000 minioadmin minioadmin && break || sleep 1; done && mc mb local/test-bucket --ignore-existing"
 
   # Upload a file (use echo -n to avoid trailing newline)
   - name: upload-file

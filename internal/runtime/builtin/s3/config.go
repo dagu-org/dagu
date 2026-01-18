@@ -173,9 +173,12 @@ func (c *Config) ValidateForOperation(operation string) error {
 		return fmt.Errorf("%w: unknown operation %q", ErrConfig, operation)
 	}
 
-	// Validate storage class if provided
-	if c.StorageClass != "" && !containsIgnoreCase(ValidStorageClasses, c.StorageClass) {
-		return fmt.Errorf("%w: invalid storage class %q", ErrConfig, c.StorageClass)
+	// Validate and normalize storage class if provided
+	if c.StorageClass != "" {
+		if !containsIgnoreCase(ValidStorageClasses, c.StorageClass) {
+			return fmt.Errorf("%w: invalid storage class %q", ErrConfig, c.StorageClass)
+		}
+		c.StorageClass = strings.ToUpper(c.StorageClass)
 	}
 
 	// Validate output format
@@ -194,19 +197,27 @@ func (c *Config) ValidateForOperation(operation string) error {
 		}
 	}
 
-	// Validate ACL
-	if c.ACL != "" && !containsIgnoreCase(ValidACLs, c.ACL) {
-		return fmt.Errorf("%w: invalid acl %q", ErrConfig, c.ACL)
+	// Validate and normalize ACL
+	if c.ACL != "" {
+		if !containsIgnoreCase(ValidACLs, c.ACL) {
+			return fmt.Errorf("%w: invalid acl %q", ErrConfig, c.ACL)
+		}
+		c.ACL = strings.ToLower(c.ACL)
 	}
 
-	// Validate concurrency
+	// Validate concurrency (must be >= 1 if specified, 0 means use default)
 	if c.Concurrency < 0 {
 		return fmt.Errorf("%w: concurrency must be >= 0", ErrConfig)
 	}
 
-	// Validate part size
-	if c.PartSize < 0 {
-		return fmt.Errorf("%w: partSize must be >= 0", ErrConfig)
+	// Validate part size (must be >= 5 MB if specified, 0 means use default)
+	if c.PartSize != 0 && c.PartSize < 5 {
+		return fmt.Errorf("%w: partSize must be >= 5 MB", ErrConfig)
+	}
+
+	// Validate maxKeys (must be >= 1 if specified, 0 means use default)
+	if c.MaxKeys < 0 {
+		return fmt.Errorf("%w: maxKeys must be >= 0", ErrConfig)
 	}
 
 	return nil

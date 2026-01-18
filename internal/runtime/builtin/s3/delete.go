@@ -81,10 +81,6 @@ func (e *executorImpl) deleteByPrefix(ctx context.Context, start time.Time) erro
 		}
 	}
 
-	if e.cfg.Quiet {
-		return nil
-	}
-
 	result := DeleteResult{
 		Operation:    opDelete,
 		Success:      len(deleteErrors) == 0,
@@ -103,5 +99,18 @@ func (e *executorImpl) deleteByPrefix(ctx context.Context, start time.Time) erro
 		result.Errors = deleteErrors
 	}
 
-	return e.writeResult(result)
+	// Write result unless quiet mode and no errors
+	if !e.cfg.Quiet || len(deleteErrors) > 0 {
+		if err := e.writeResult(result); err != nil {
+			return err
+		}
+	}
+
+	// Return error if any deletions failed
+	if len(deleteErrors) > 0 {
+		return fmt.Errorf("%w: %d of %d objects failed to delete",
+			ErrDeleteFailed, len(deleteErrors), len(deletedKeys)+len(deleteErrors))
+	}
+
+	return nil
 }
