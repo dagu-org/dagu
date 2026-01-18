@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -612,9 +613,7 @@ func toInt64(v any) (int64, error) {
 	case float32:
 		return int64(val), nil
 	case string:
-		var i int64
-		_, err := fmt.Sscanf(val, "%d", &i)
-		return i, err
+		return strconv.ParseInt(val, 10, 64)
 	default:
 		return 0, fmt.Errorf("cannot convert %T to int64", v)
 	}
@@ -634,9 +633,7 @@ func toFloat64(v any) (float64, error) {
 	case float32:
 		return float64(val), nil
 	case string:
-		var f float64
-		_, err := fmt.Sscanf(val, "%f", &f)
-		return f, err
+		return strconv.ParseFloat(val, 64)
 	default:
 		return 0, fmt.Errorf("cannot convert %T to float64", v)
 	}
