@@ -65,6 +65,9 @@ type NodeState struct {
 	OutputVariables *collections.SyncMap
 	// ChatMessages stores the chat conversation messages for message passing between steps.
 	ChatMessages []exec.LLMMessage
+	// ToolDefinitions stores the tool definitions that were available to the LLM during execution.
+	// This provides visibility into what tools/functions the LLM could call.
+	ToolDefinitions []exec.ToolDefinition
 	// ApprovalInputs stores key-value parameters provided during HITL approval.
 	// These are available as environment variables in subsequent steps.
 	ApprovalInputs map[string]string
@@ -507,6 +510,20 @@ func (d *Data) GetChatMessages() []exec.LLMMessage {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return d.inner.State.ChatMessages
+}
+
+// SetToolDefinitions sets the tool definitions that were available to the LLM.
+func (d *Data) SetToolDefinitions(tools []exec.ToolDefinition) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.inner.State.ToolDefinitions = tools
+}
+
+// GetToolDefinitions returns the tool definitions that were available to the LLM.
+func (d *Data) GetToolDefinitions() []exec.ToolDefinition {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.inner.State.ToolDefinitions
 }
 
 // GetApprovalInputs returns a copy of the approval inputs map.

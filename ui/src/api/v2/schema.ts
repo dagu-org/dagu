@@ -1468,10 +1468,23 @@ export interface components {
         ChatMessagesResponse: {
             /** @description List of chat messages */
             messages: components["schemas"]["ChatMessage"][];
+            /** @description Tool definitions that were available to the LLM */
+            toolDefinitions?: components["schemas"]["ToolDefinition"][];
             stepStatus: components["schemas"]["NodeStatus"];
             stepStatusLabel: components["schemas"]["NodeStatusLabel"];
             /** @description True if step is still running and more messages may arrive */
             hasMore: boolean;
+        };
+        /** @description A tool definition that was available to the LLM */
+        ToolDefinition: {
+            /** @description Name of the tool */
+            name: string;
+            /** @description Description of what the tool does */
+            description?: string;
+            /** @description JSON Schema describing the tool's parameters */
+            parameters?: {
+                [key: string]: unknown;
+            };
         };
         /** @description Request body for rejecting a waiting step */
         RejectStepRequest: {

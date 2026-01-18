@@ -59,6 +59,18 @@ type LLMMessageMetadata struct {
 	TotalTokens int `json:"totalTokens,omitempty"`
 }
 
+// ToolDefinition represents a tool that was available to the LLM.
+// This is stored alongside messages to provide visibility into what
+// tool definitions were sent to the LLM during execution.
+type ToolDefinition struct {
+	// Name is the tool/function name as presented to the LLM.
+	Name string `json:"name"`
+	// Description describes what the tool does.
+	Description string `json:"description,omitempty"`
+	// Parameters is the JSON Schema describing the tool's parameters.
+	Parameters map[string]any `json:"parameters,omitempty"`
+}
+
 // DeduplicateSystemMessages keeps only the first system message.
 func DeduplicateSystemMessages(messages []LLMMessage) []LLMMessage {
 	if len(messages) == 0 {

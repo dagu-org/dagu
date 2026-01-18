@@ -37,6 +37,9 @@ type Node struct {
 	// This field is populated during execution and synced via status updates
 	// in shared-nothing mode where workers don't have filesystem access.
 	ChatMessages []LLMMessage `json:"chatMessages,omitempty"`
+	// ToolDefinitions stores the tool definitions that were available to the LLM.
+	// This enables debugging visibility into what tools and schemas were sent.
+	ToolDefinitions []ToolDefinition `json:"toolDefinitions,omitempty"`
 }
 
 // SubDAGRun represents a sub DAG run associated with a node

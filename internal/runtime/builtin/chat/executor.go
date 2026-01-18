@@ -26,6 +26,7 @@ import (
 var _ executor.Executor = (*Executor)(nil)
 var _ executor.ChatMessageHandler = (*Executor)(nil)
 var _ executor.SubRunProvider = (*Executor)(nil)
+var _ executor.ToolDefinitionProvider = (*Executor)(nil)
 
 // Executor implements the executor.Executor interface for chat steps.
 type Executor struct {
@@ -44,6 +45,9 @@ type Executor struct {
 
 	// Collected sub-runs from tool executions for UI drill-down
 	collectedSubRuns []exec.SubDAGRun
+
+	// Tool definitions that were available to the LLM (for UI visibility)
+	savedToolDefinitions []exec.ToolDefinition
 }
 
 // newChatExecutor creates a new chat executor from a step configuration.
@@ -140,6 +144,12 @@ func (e *Executor) GetMessages() []exec.LLMMessage {
 // This implements the SubRunProvider interface for UI drill-down functionality.
 func (e *Executor) GetSubRuns() []exec.SubDAGRun {
 	return e.collectedSubRuns
+}
+
+// GetToolDefinitions returns the tool definitions that were available to the LLM.
+// This implements the ToolDefinitionProvider interface for UI visibility.
+func (e *Executor) GetToolDefinitions() []exec.ToolDefinition {
+	return e.savedToolDefinitions
 }
 
 // buildMessageList orders messages so step's system message takes precedence over context.
@@ -444,6 +454,16 @@ func (e *Executor) runWithTools(ctx context.Context, provider llmpkg.Provider, a
 
 	// Get tools in LLM format
 	tools := e.toolRegistry.ToLLMTools()
+
+	// Store tool definitions for UI visibility
+	e.savedToolDefinitions = make([]exec.ToolDefinition, len(tools))
+	for i, t := range tools {
+		e.savedToolDefinitions[i] = exec.ToolDefinition{
+			Name:        t.Function.Name,
+			Description: t.Function.Description,
+			Parameters:  t.Function.Parameters,
+		}
+	}
 
 	logger.Info(ctx, "Starting tool-enabled chat execution",
 		slog.Int("tool_count", len(tools)),

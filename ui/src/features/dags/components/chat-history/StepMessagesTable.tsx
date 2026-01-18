@@ -3,8 +3,9 @@ import { Markdown } from '@/components/ui/markdown';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';
 import { cn } from '@/lib/utils';
-import { Check, ChevronRight, Copy, Loader2 } from 'lucide-react';
+import { Check, ChevronRight, Copy, Loader2, Wrench } from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
+import { ToolDefinitionCard } from './ToolDefinitionCard';
 
 interface StepMessagesTableProps {
   dagName: string;
@@ -87,6 +88,10 @@ export function StepMessagesTable({
   const { data, isLoading } = isSubDAGRun ? subDagQuery : regularQuery;
 
   const messages = data?.messages || [];
+  const toolDefinitions = data?.toolDefinitions || [];
+
+  // State for showing/hiding the tool definitions section
+  const [showTools, setShowTools] = useState(false);
 
   // Start with empty set; useEffect will expand the last message when data arrives
   const [expandedIndexes, setExpandedIndexes] = useState<Set<number>>(
@@ -142,6 +147,36 @@ export function StepMessagesTable({
 
   return (
     <div className="border rounded bg-card">
+      {/* Tool definitions section */}
+      {toolDefinitions.length > 0 && (
+        <div className="border-b">
+          <button
+            onClick={() => setShowTools(!showTools)}
+            className="w-full flex items-center gap-2 px-2 py-1 hover:bg-accent/50 text-left"
+            type="button"
+          >
+            <ChevronRight
+              className={cn(
+                'h-3 w-3 shrink-0 transition-transform',
+                showTools && 'rotate-90'
+              )}
+            />
+            <Wrench className="h-3 w-3 text-purple-500" />
+            <span className="text-xs font-medium">
+              Available Tools ({toolDefinitions.length})
+            </span>
+          </button>
+          {showTools && (
+            <div className="px-4 pb-2 space-y-2">
+              {toolDefinitions.map((tool) => (
+                <ToolDefinitionCard key={tool.name} tool={tool} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Messages list */}
       {messages.map((msg, i) => {
         const isExpanded = expandedIndexes.has(i);
         const config = roleConfig[msg.role] || defaultRoleConfig;

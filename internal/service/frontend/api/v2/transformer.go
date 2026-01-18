@@ -347,3 +347,30 @@ func toChatMessages(messages []exec.LLMMessage) []api.ChatMessage {
 
 	return result
 }
+
+// toToolDefinitions converts internal tool definitions to API format.
+func toToolDefinitions(defs []exec.ToolDefinition) *[]api.ToolDefinition {
+	if len(defs) == 0 {
+		return nil
+	}
+
+	result := make([]api.ToolDefinition, 0, len(defs))
+	for _, def := range defs {
+		apiDef := api.ToolDefinition{
+			Name: def.Name,
+		}
+		if def.Description != "" {
+			apiDef.Description = &def.Description
+		}
+		if len(def.Parameters) > 0 {
+			params := make(map[string]interface{}, len(def.Parameters))
+			for k, v := range def.Parameters {
+				params[k] = v
+			}
+			apiDef.Parameters = &params
+		}
+		result = append(result, apiDef)
+	}
+
+	return &result
+}

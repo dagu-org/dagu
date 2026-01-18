@@ -833,11 +833,15 @@ func (a *API) GetDAGRunStepMessages(ctx context.Context, request api.GetDAGRunSt
 	// Convert to API types
 	apiMessages := toChatMessages(messages)
 
+	// Get tool definitions from node state
+	toolDefinitions := toToolDefinitions(node.ToolDefinitions)
+
 	// Determine if more messages might arrive
 	hasMore := node.Status == core.NodeRunning
 
 	return api.GetDAGRunStepMessages200JSONResponse{
 		Messages:        apiMessages,
+		ToolDefinitions: toolDefinitions,
 		StepStatus:      api.NodeStatus(node.Status),
 		StepStatusLabel: api.NodeStatusLabel(node.Status.String()),
 		HasMore:         hasMore,
@@ -881,11 +885,15 @@ func (a *API) GetSubDAGRunStepMessages(ctx context.Context, request api.GetSubDA
 	// Convert to API types
 	apiMessages := toChatMessages(messages)
 
+	// Get tool definitions from node state
+	toolDefinitions := toToolDefinitions(node.ToolDefinitions)
+
 	// Determine if more messages might arrive
 	hasMore := node.Status == core.NodeRunning
 
 	return api.GetSubDAGRunStepMessages200JSONResponse{
 		Messages:        apiMessages,
+		ToolDefinitions: toolDefinitions,
 		StepStatus:      api.NodeStatus(node.Status),
 		StepStatusLabel: api.NodeStatusLabel(node.Status.String()),
 		HasMore:         hasMore,

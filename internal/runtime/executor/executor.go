@@ -105,3 +105,10 @@ type ChatMessageHandler interface {
 type SubRunProvider interface {
 	GetSubRuns() []exec.SubDAGRun
 }
+
+// ToolDefinitionProvider is an interface for executors that provide tool definitions.
+// This is used by chat executors to report what tools were available to the LLM
+// for debugging and visibility purposes.
+type ToolDefinitionProvider interface {
+	GetToolDefinitions() []exec.ToolDefinition
+}

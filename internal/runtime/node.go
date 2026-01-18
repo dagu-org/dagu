@@ -225,6 +225,14 @@ func (n *Node) Execute(ctx context.Context) error {
 		}
 	}
 
+	// Capture tool definitions from chat executors for UI visibility
+	if toolDefProvider, ok := cmd.(executor.ToolDefinitionProvider); ok {
+		toolDefs := toolDefProvider.GetToolDefinitions()
+		if len(toolDefs) > 0 {
+			n.SetToolDefinitions(toolDefs)
+		}
+	}
+
 	if err := n.captureOutput(ctx); err != nil {
 		return err
 	}
