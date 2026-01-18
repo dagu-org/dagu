@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -35,10 +36,14 @@ type Executor struct {
 	messages        []exec.LLMMessage
 	contextMessages []exec.LLMMessage
 	savedMessages   []exec.LLMMessage
+
+	// Tool calling support
+	toolRegistry *ToolRegistry
+	toolExecutor *ToolExecutor
 }
 
 // newChatExecutor creates a new chat executor from a step configuration.
-func newChatExecutor(_ context.Context, step core.Step) (executor.Executor, error) {
+func newChatExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
 	if step.LLM == nil {
 		return nil, fmt.Errorf("llm configuration is required for chat executor")
 	}
@@ -77,14 +82,25 @@ func newChatExecutor(_ context.Context, step core.Step) (executor.Executor, erro
 		})
 	}
 
-	return &Executor{
+	e := &Executor{
 		stdout:       os.Stdout,
 		stderr:       os.Stderr,
 		step:         step,
 		providerType: providerType,
 		apiKeyEnvVar: apiKeyEnvVar,
 		messages:     messages,
-	}, nil
+	}
+
+	// Initialize tool registry if tools are configured
+	if cfg.HasTools() {
+		registry, err := NewToolRegistry(ctx, cfg.Tools)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize tool registry: %w", err)
+		}
+		e.toolRegistry = registry
+	}
+
+	return e, nil
 }
 
 // SetStdout sets the stdout writer.
@@ -97,8 +113,11 @@ func (e *Executor) SetStderr(out io.Writer) {
 	e.stderr = out
 }
 
-// Kill is a no-op for chat executor (requests are context-cancelled).
-func (e *Executor) Kill(_ os.Signal) error {
+// Kill terminates any running tool DAG executions.
+func (e *Executor) Kill(sig os.Signal) error {
+	if e.toolExecutor != nil {
+		return e.toolExecutor.Kill(sig)
+	}
 	return nil
 }
 
@@ -141,8 +160,9 @@ func toLLMMessages(msgs []exec.LLMMessage) []llmpkg.Message {
 	result := make([]llmpkg.Message, len(msgs))
 	for i, msg := range msgs {
 		result[i] = llmpkg.Message{
-			Role:    llmpkg.Role(msg.Role),
-			Content: msg.Content,
+			Role:       llmpkg.Role(msg.Role),
+			Content:    msg.Content,
+			ToolCallID: msg.ToolCallID,
 		}
 	}
 	return result
@@ -279,8 +299,6 @@ func maskSecretsForProvider(ctx context.Context, msgs []exec.LLMMessage) []exec.
 
 // Run executes the chat request.
 func (e *Executor) Run(ctx context.Context) error {
-	cfg := e.step.LLM
-
 	// Create provider with evaluated config (supports variable substitution)
 	provider, err := e.createProvider(ctx)
 	if err != nil {
@@ -293,6 +311,19 @@ func (e *Executor) Run(ctx context.Context) error {
 	}
 
 	allMessages := buildMessageList(evaluatedMessages, e.contextMessages)
+
+	// Dispatch to tool-enabled execution if tools are configured
+	if e.toolRegistry != nil && e.toolRegistry.HasTools() {
+		return e.runWithTools(ctx, provider, allMessages)
+	}
+
+	// Standard execution without tools
+	return e.runSimple(ctx, provider, allMessages)
+}
+
+// runSimple executes a chat request without tool calling.
+func (e *Executor) runSimple(ctx context.Context, provider llmpkg.Provider, allMessages []exec.LLMMessage) error {
+	cfg := e.step.LLM
 	maskedForProvider := maskSecretsForProvider(ctx, allMessages)
 
 	req := &llmpkg.ChatRequest{
@@ -366,6 +397,165 @@ func (e *Executor) Run(ctx context.Context) error {
 
 	return nil
 }
+
+// runWithTools executes a chat request with tool calling support.
+// It implements a multi-turn loop where:
+// 1. Send messages + tools to LLM
+// 2. If LLM requests tool calls, execute them
+// 3. Add tool results to conversation
+// 4. Repeat until LLM provides final response (no more tool calls) or max iterations
+func (e *Executor) runWithTools(ctx context.Context, provider llmpkg.Provider, allMessages []exec.LLMMessage) error {
+	cfg := e.step.LLM
+	maxIterations := cfg.GetMaxToolIterations()
+
+	// Initialize tool executor for running DAGs
+	rCtx := runtime.GetDAGContext(ctx)
+	workDir := ""
+	if rCtx.DAG != nil {
+		workDir = rCtx.DAG.Location
+	}
+	e.toolExecutor = NewToolExecutor(e.toolRegistry, workDir)
+
+	// Get tools in LLM format
+	tools := e.toolRegistry.ToLLMTools()
+
+	logger.Info(ctx, "Starting tool-enabled chat execution",
+		slog.Int("tool_count", len(tools)),
+		slog.Int("max_iterations", maxIterations),
+	)
+
+	// Working copy of messages for the tool loop
+	conversationMessages := make([]exec.LLMMessage, len(allMessages))
+	copy(conversationMessages, allMessages)
+
+	for iteration := 0; iteration < maxIterations; iteration++ {
+		logger.Debug(ctx, "Tool loop iteration",
+			slog.Int("iteration", iteration+1),
+			slog.Int("message_count", len(conversationMessages)),
+		)
+
+		// Mask secrets before sending to provider
+		maskedForProvider := maskSecretsForProvider(ctx, conversationMessages)
+
+		// Build request with tools
+		req := &llmpkg.ChatRequest{
+			Model:       cfg.Model,
+			Messages:    toLLMMessages(maskedForProvider),
+			Temperature: cfg.Temperature,
+			MaxTokens:   cfg.MaxTokens,
+			TopP:        cfg.TopP,
+			Thinking:    toThinkingRequest(cfg.Thinking),
+			Tools:       tools,
+			ToolChoice:  "auto",
+		}
+
+		// Execute request (non-streaming for tool calling - streaming complicates tool call detection)
+		resp, err := provider.Chat(ctx, req)
+		if err != nil {
+			return fmt.Errorf("chat request failed: %w", err)
+		}
+
+		// Check if the response contains tool calls
+		if len(resp.ToolCalls) == 0 {
+			// No tool calls - this is the final response
+			logger.Info(ctx, "LLM provided final response (no tool calls)",
+				slog.Int("iterations_used", iteration+1),
+			)
+
+			// Write the final response to stdout
+			if resp.Content != "" {
+				if _, err := fmt.Fprintln(e.stdout, resp.Content); err != nil {
+					logger.Error(ctx, "failed to write response", tag.Error(err))
+				}
+			}
+
+			// Build metadata for the assistant response
+			metadata := &exec.LLMMessageMetadata{
+				Provider:         cfg.Provider,
+				Model:            cfg.Model,
+				PromptTokens:     resp.Usage.PromptTokens,
+				CompletionTokens: resp.Usage.CompletionTokens,
+				TotalTokens:      resp.Usage.TotalTokens,
+			}
+
+			// Save full conversation including tool interactions
+			e.savedMessages = append(conversationMessages, exec.LLMMessage{
+				Role:     exec.RoleAssistant,
+				Content:  resp.Content,
+				Metadata: metadata,
+			})
+
+			return nil
+		}
+
+		// LLM requested tool calls - execute them
+		logger.Info(ctx, "LLM requested tool calls",
+			slog.Int("tool_call_count", len(resp.ToolCalls)),
+		)
+
+		// Add assistant message with tool calls to conversation
+		assistantMsg := exec.LLMMessage{
+			Role:    exec.RoleAssistant,
+			Content: resp.Content,
+		}
+		conversationMessages = append(conversationMessages, assistantMsg)
+
+		// Execute each tool call and collect results
+		toolResults := e.toolExecutor.ExecuteToolCalls(ctx, resp.ToolCalls)
+
+		// Add tool results to conversation
+		for _, result := range toolResults {
+			toolMsg := exec.LLMMessage{
+				Role:       exec.RoleTool,
+				Content:    result.Content,
+				ToolCallID: result.ToolCallID,
+			}
+			if result.Error != "" {
+				toolMsg.Content = fmt.Sprintf("Error: %s", result.Error)
+			}
+			conversationMessages = append(conversationMessages, toolMsg)
+
+			// Log tool result (truncated for readability)
+			content := result.Content
+			if len(content) > 200 {
+				content = content[:200] + "..."
+			}
+			logger.Info(ctx, "Tool execution result",
+				tag.Tool(result.Name),
+				tag.ToolCallID(result.ToolCallID),
+				slog.String("content_preview", content),
+			)
+		}
+	}
+
+	// Max iterations reached - return with warning
+	logger.Warn(ctx, "Max tool iterations reached",
+		slog.Int("max_iterations", maxIterations),
+	)
+
+	// Get the last assistant response if any
+	var lastContent string
+	for i := len(conversationMessages) - 1; i >= 0; i-- {
+		if conversationMessages[i].Role == exec.RoleAssistant {
+			lastContent = conversationMessages[i].Content
+			break
+		}
+	}
+
+	if lastContent == "" {
+		lastContent = fmt.Sprintf("[Max tool iterations (%d) reached. The LLM may not have provided a complete response.]", maxIterations)
+	}
+
+	if _, err := fmt.Fprintln(e.stdout, lastContent); err != nil {
+		logger.Error(ctx, "failed to write response", tag.Error(err))
+	}
+
+	// Save conversation state
+	e.savedMessages = conversationMessages
+
+	return nil
+}
+
 
 func init() {
 	executor.RegisterExecutor(core.ExecutorTypeChat, newChatExecutor, nil, core.ExecutorCapabilities{

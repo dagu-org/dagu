@@ -1,0 +1,292 @@
+// Copyright (C) 2024 The Daguflow/Dagu Authors
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+package chat
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log/slog"
+	"os"
+	"sort"
+	"strings"
+	"sync"
+
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/core"
+	exec1 "github.com/dagu-org/dagu/internal/core/exec"
+	llmpkg "github.com/dagu-org/dagu/internal/llm"
+	"github.com/dagu-org/dagu/internal/runtime/executor"
+	"github.com/google/uuid"
+)
+
+// ToolExecutor handles the execution of tool calls by running DAGs.
+type ToolExecutor struct {
+	registry *ToolRegistry
+
+	// Track running executors for cleanup
+	mu            sync.Mutex
+	runningDAGs   map[string]*executor.SubDAGExecutor
+	parentWorkDir string
+}
+
+// NewToolExecutor creates a new ToolExecutor with the given registry.
+func NewToolExecutor(registry *ToolRegistry, workDir string) *ToolExecutor {
+	return &ToolExecutor{
+		registry:      registry,
+		runningDAGs:   make(map[string]*executor.SubDAGExecutor),
+		parentWorkDir: workDir,
+	}
+}
+
+// ExecuteToolCalls executes multiple tool calls and returns the results.
+// Tool calls are executed sequentially to maintain consistency.
+func (e *ToolExecutor) ExecuteToolCalls(ctx context.Context, toolCalls []llmpkg.ToolCall) []core.ToolResult {
+	results := make([]core.ToolResult, 0, len(toolCalls))
+
+	for _, tc := range toolCalls {
+		result := e.executeToolCall(ctx, tc)
+		results = append(results, result)
+	}
+
+	return results
+}
+
+// executeToolCall executes a single tool call and returns the result.
+func (e *ToolExecutor) executeToolCall(ctx context.Context, tc llmpkg.ToolCall) core.ToolResult {
+	toolName := tc.Function.Name
+
+	ctx = logger.WithValues(ctx,
+		tag.Tool(toolName),
+		tag.ToolCallID(tc.ID),
+	)
+	logger.Info(ctx, "Executing tool call")
+
+	// Get the DAG for this tool
+	dag, ok := e.registry.GetDAGByToolName(toolName)
+	if !ok {
+		logger.Error(ctx, "Tool not found in registry")
+		return core.ToolResult{
+			ToolCallID: tc.ID,
+			Name:       toolName,
+			Error:      fmt.Sprintf("tool %q not found", toolName),
+		}
+	}
+
+	// Parse the arguments from JSON string
+	var args map[string]any
+	if tc.Function.Arguments != "" {
+		if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
+			logger.Error(ctx, "Failed to parse tool arguments", tag.Error(err))
+			return core.ToolResult{
+				ToolCallID: tc.ID,
+				Name:       toolName,
+				Error:      fmt.Sprintf("failed to parse arguments: %v", err),
+			}
+		}
+	}
+
+	logger.Debug(ctx, "Parsed tool arguments", slog.Any("args", args))
+
+	// Build parameter string from arguments
+	params := buildParamString(args)
+
+	// Generate a unique run ID for this tool execution
+	runID, err := generateRunID()
+	if err != nil {
+		logger.Error(ctx, "Failed to generate run ID", tag.Error(err))
+		return core.ToolResult{
+			ToolCallID: tc.ID,
+			Name:       toolName,
+			Error:      fmt.Sprintf("failed to generate run ID: %v", err),
+		}
+	}
+
+	// Create SubDAGExecutor for this tool DAG
+	subDAGExec, err := executor.NewSubDAGExecutor(ctx, e.registry.dagNames[toolName])
+	if err != nil {
+		logger.Error(ctx, "Failed to create SubDAGExecutor", tag.Error(err))
+		return core.ToolResult{
+			ToolCallID: tc.ID,
+			Name:       toolName,
+			Error:      fmt.Sprintf("failed to create executor: %v", err),
+		}
+	}
+	defer func() {
+		if cleanErr := subDAGExec.Cleanup(ctx); cleanErr != nil {
+			logger.Warn(ctx, "Failed to cleanup SubDAGExecutor", tag.Error(cleanErr))
+		}
+	}()
+
+	// Track the running executor for potential cleanup
+	e.mu.Lock()
+	e.runningDAGs[runID] = subDAGExec
+	e.mu.Unlock()
+
+	defer func() {
+		e.mu.Lock()
+		delete(e.runningDAGs, runID)
+		e.mu.Unlock()
+	}()
+
+	// Execute the DAG
+	runParams := executor.RunParams{
+		RunID:  runID,
+		Params: params,
+	}
+
+	logger.Info(ctx, "Starting tool DAG execution",
+		tag.RunID(runID),
+		tag.DAG(dag.Name),
+		slog.String("params", params),
+	)
+
+	result, err := subDAGExec.Execute(ctx, runParams, e.parentWorkDir)
+	if err != nil {
+		logger.Error(ctx, "Tool DAG execution failed", tag.Error(err))
+		return core.ToolResult{
+			ToolCallID: tc.ID,
+			Name:       toolName,
+			Error:      fmt.Sprintf("execution failed: %v", err),
+		}
+	}
+
+	// Format the result content from DAG outputs
+	content := formatToolResult(result)
+
+	logger.Info(ctx, "Tool execution completed successfully",
+		tag.RunID(runID),
+		slog.Int("output_length", len(content)),
+	)
+
+	return core.ToolResult{
+		ToolCallID: tc.ID,
+		Name:       toolName,
+		Content:    content,
+	}
+}
+
+// Kill terminates all running tool DAG executions.
+func (e *ToolExecutor) Kill(sig os.Signal) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	var errs []error
+	for runID, subDAG := range e.runningDAGs {
+		if err := subDAG.Kill(sig); err != nil {
+			errs = append(errs, fmt.Errorf("failed to kill tool DAG %s: %w", runID, err))
+		}
+	}
+
+	if len(errs) > 0 {
+		return errs[0]
+	}
+	return nil
+}
+
+// buildParamString converts tool arguments to a DAG parameter string.
+// Format: "KEY1=value1 KEY2=value2"
+func buildParamString(args map[string]any) string {
+	if len(args) == 0 {
+		return ""
+	}
+
+	// Sort keys for deterministic output
+	keys := make([]string, 0, len(args))
+	for k := range args {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var parts []string
+	for _, key := range keys {
+		value := args[key]
+		valueStr := formatArgValue(value)
+
+		// Quote values with spaces
+		if strings.Contains(valueStr, " ") {
+			valueStr = fmt.Sprintf(`"%s"`, valueStr)
+		}
+
+		parts = append(parts, fmt.Sprintf("%s=%s", key, valueStr))
+	}
+
+	return strings.Join(parts, " ")
+}
+
+// formatArgValue converts an argument value to a string representation.
+func formatArgValue(value any) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case float64:
+		// JSON numbers are float64
+		if v == float64(int64(v)) {
+			return fmt.Sprintf("%d", int64(v))
+		}
+		return fmt.Sprintf("%g", v)
+	case bool:
+		return fmt.Sprintf("%t", v)
+	case nil:
+		return ""
+	default:
+		// For arrays and objects, marshal back to JSON
+		data, err := json.Marshal(v)
+		if err != nil {
+			return fmt.Sprintf("%v", v)
+		}
+		return string(data)
+	}
+}
+
+// formatToolResult converts a DAG execution result to a tool result content string.
+func formatToolResult(result *exec1.RunStatus) string {
+	if result == nil {
+		return "Tool execution completed but no result returned"
+	}
+
+	// Check if the DAG succeeded
+	if !result.Status.IsSuccess() {
+		return fmt.Sprintf("Tool execution failed with status: %s", result.Status.String())
+	}
+
+	// If there are outputs, return them as JSON
+	if len(result.Outputs) > 0 {
+		data, err := json.Marshal(result.Outputs)
+		if err != nil {
+			// Fallback to simple string format
+			var parts []string
+			for k, v := range result.Outputs {
+				parts = append(parts, fmt.Sprintf("%s: %s", k, v))
+			}
+			return strings.Join(parts, "\n")
+		}
+		return string(data)
+	}
+
+	// No outputs, return a simple success message
+	return "Tool execution completed successfully"
+}
+
+// generateRunID generates a unique run ID for tool execution.
+func generateRunID() (string, error) {
+	id, err := uuid.NewV7()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate UUID: %w", err)
+	}
+	return id.String(), nil
+}

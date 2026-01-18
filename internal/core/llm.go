@@ -92,6 +92,13 @@ type LLMConfig struct {
 	// Provider-specific: Anthropic uses budget_tokens, OpenAI uses reasoning.effort,
 	// Gemini uses thinkingLevel/thinkingBudget, OpenRouter normalizes across providers.
 	Thinking *ThinkingConfig `json:"thinking,omitempty"`
+	// Tools is a list of DAG names to use as callable tools.
+	// Tool names, descriptions, and parameters are auto-discovered from DAG definitions.
+	// Example: ["search-tool", "analyzer-tool"]
+	Tools []string `json:"tools,omitempty"`
+	// MaxToolIterations limits the number of tool calling rounds.
+	// Default is 10 if not specified.
+	MaxToolIterations *int `json:"maxToolIterations,omitempty"`
 }
 
 // LLMMessage represents a message in the LLM conversation.
@@ -102,6 +109,28 @@ type LLMMessage struct {
 	Content string `json:"content,omitempty"`
 }
 
+// ToolCall represents an LLM's request to invoke a tool.
+type ToolCall struct {
+	// ID is the unique identifier for this tool call.
+	ID string `json:"id"`
+	// Name is the name of the tool to invoke (matches DAG name field).
+	Name string `json:"name"`
+	// Arguments contains the tool arguments as key-value pairs.
+	Arguments map[string]any `json:"arguments"`
+}
+
+// ToolResult represents the result of a tool execution.
+type ToolResult struct {
+	// ToolCallID is the ID of the tool call this result corresponds to.
+	ToolCallID string `json:"tool_call_id"`
+	// Name is the name of the tool that was executed.
+	Name string `json:"name"`
+	// Content is the result content from the tool execution.
+	Content string `json:"content"`
+	// Error contains any error message if the tool execution failed.
+	Error string `json:"error,omitempty"`
+}
+
 // StreamEnabled returns true if streaming is enabled.
 // Default is true if Stream is nil.
 func (c *LLMConfig) StreamEnabled() bool {
@@ -109,6 +138,20 @@ func (c *LLMConfig) StreamEnabled() bool {
 		return true
 	}
 	return *c.Stream
+}
+
+// GetMaxToolIterations returns the maximum number of tool calling iterations.
+// Default is 10 if not specified.
+func (c *LLMConfig) GetMaxToolIterations() int {
+	if c.MaxToolIterations == nil {
+		return 10
+	}
+	return *c.MaxToolIterations
+}
+
+// HasTools returns true if tools are configured.
+func (c *LLMConfig) HasTools() bool {
+	return len(c.Tools) > 0
 }
 
 // ExecutorTypeChat is the executor type for chat steps.

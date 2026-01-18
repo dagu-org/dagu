@@ -74,15 +74,29 @@ func (p *Provider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.ChatRes
 		return nil, llm.WrapError(providerName, fmt.Errorf("failed to decode response: %w", err))
 	}
 
-	// Extract content from response
+	// Extract content and tool calls from response
 	var content string
+	var toolCalls []llm.ToolCall
+
 	for _, block := range resp.Content {
-		if block.Type == "text" {
+		switch block.Type {
+		case "text":
 			content += block.Text
+		case "tool_use":
+			// Convert input map to JSON string for Arguments
+			argsJSON, _ := json.Marshal(block.Input)
+			toolCalls = append(toolCalls, llm.ToolCall{
+				ID:   block.ID,
+				Type: "function",
+				Function: llm.ToolCallFunction{
+					Name:      block.Name,
+					Arguments: string(argsJSON),
+				},
+			})
 		}
 	}
 
-	return &llm.ChatResponse{
+	result := &llm.ChatResponse{
 		Content:      content,
 		FinishReason: resp.StopReason,
 		Usage: llm.Usage{
@@ -90,7 +104,10 @@ func (p *Provider) Chat(ctx context.Context, req *llm.ChatRequest) (*llm.ChatRes
 			CompletionTokens: resp.Usage.OutputTokens,
 			TotalTokens:      resp.Usage.InputTokens + resp.Usage.OutputTokens,
 		},
-	}, nil
+		ToolCalls: toolCalls,
+	}
+
+	return result, nil
 }
 
 // ChatStream sends messages and streams the response.
@@ -124,17 +141,59 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 				systemContent += "\n\n"
 			}
 			systemContent += m.Content
-		case llm.RoleUser, llm.RoleAssistant:
+		case llm.RoleUser:
 			messages = append(messages, message{
 				Role:    string(m.Role),
 				Content: m.Content,
 			})
+		case llm.RoleAssistant:
+			// Check if this assistant message has tool calls
+			if len(m.ToolCalls) > 0 {
+				// Convert to content blocks with tool_use
+				contentBlocks := make([]any, 0, len(m.ToolCalls)+1)
+				if m.Content != "" {
+					contentBlocks = append(contentBlocks, map[string]any{
+						"type": "text",
+						"text": m.Content,
+					})
+				}
+				for _, tc := range m.ToolCalls {
+					// Parse arguments from JSON string
+					var input map[string]any
+					if tc.Function.Arguments != "" {
+						if err := json.Unmarshal([]byte(tc.Function.Arguments), &input); err != nil {
+							input = map[string]any{}
+						}
+					}
+					contentBlocks = append(contentBlocks, map[string]any{
+						"type":  "tool_use",
+						"id":    tc.ID,
+						"name":  tc.Function.Name,
+						"input": input,
+					})
+				}
+				messages = append(messages, message{
+					Role:    "assistant",
+					Content: contentBlocks,
+				})
+			} else {
+				messages = append(messages, message{
+					Role:    string(m.Role),
+					Content: m.Content,
+				})
+			}
 		case llm.RoleTool:
-			// Tool results in Anthropic are sent as user messages with tool_result content blocks.
-			// For basic chat, we include tool results as user messages.
+			// Tool results in Anthropic are sent as user messages with tool_result content blocks
+			contentBlocks := []any{
+				map[string]any{
+					"type":        "tool_result",
+					"tool_use_id": m.ToolCallID,
+					"content":     m.Content,
+				},
+			}
 			messages = append(messages, message{
 				Role:    "user",
-				Content: m.Content,
+				Content: contentBlocks,
 			})
 		}
 	}
@@ -153,6 +212,54 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 	// Set system message if present
 	if systemContent != "" {
 		chatReq.System = systemContent
+	}
+
+	// Add tools if provided
+	if len(req.Tools) > 0 {
+		chatReq.Tools = make([]tool, len(req.Tools))
+		for i, t := range req.Tools {
+			// Extract properties and required from the Parameters schema
+			var props map[string]any
+			var required []string
+			if t.Function.Parameters != nil {
+				if p, ok := t.Function.Parameters["properties"].(map[string]any); ok {
+					props = p
+				}
+				if r, ok := t.Function.Parameters["required"].([]any); ok {
+					required = make([]string, len(r))
+					for j, v := range r {
+						if s, ok := v.(string); ok {
+							required[j] = s
+						}
+					}
+				}
+			}
+			chatReq.Tools[i] = tool{
+				Name:        t.Function.Name,
+				Description: t.Function.Description,
+				InputSchema: inputSchema{
+					Type:       "object",
+					Properties: props,
+					Required:   required,
+				},
+			}
+		}
+	}
+
+	// Add tool choice if specified
+	if req.ToolChoice != "" {
+		switch req.ToolChoice {
+		case "auto":
+			chatReq.ToolChoice = map[string]string{"type": "auto"}
+		case "required":
+			chatReq.ToolChoice = map[string]string{"type": "any"}
+		case "none":
+			// Don't include tools
+			chatReq.Tools = nil
+		default:
+			// Specific tool name
+			chatReq.ToolChoice = map[string]string{"type": "tool", "name": req.ToolChoice}
+		}
 	}
 
 	// Add thinking configuration if enabled
@@ -315,7 +422,33 @@ func (p *Provider) streamResponse(ctx context.Context, body io.ReadCloser, event
 
 type message struct {
 	Role    string `json:"role"`
-	Content string `json:"content"`
+	Content any    `json:"content"` // string or []contentBlock
+}
+
+// Tool calling types
+type tool struct {
+	Name        string     `json:"name"`
+	Description string     `json:"description,omitempty"`
+	InputSchema inputSchema `json:"input_schema"`
+}
+
+type inputSchema struct {
+	Type       string         `json:"type"` // always "object"
+	Properties map[string]any `json:"properties,omitempty"`
+	Required   []string       `json:"required,omitempty"`
+}
+
+type toolUseBlock struct {
+	Type  string         `json:"type"` // "tool_use"
+	ID    string         `json:"id"`
+	Name  string         `json:"name"`
+	Input map[string]any `json:"input"`
+}
+
+type toolResultBlock struct {
+	Type      string `json:"type"` // "tool_result"
+	ToolUseID string `json:"tool_use_id"`
+	Content   string `json:"content"`
 }
 
 type messagesRequest struct {
@@ -328,6 +461,8 @@ type messagesRequest struct {
 	StopSequences []string         `json:"stop_sequences,omitempty"`
 	Stream        bool             `json:"stream,omitempty"`
 	Thinking      *thinkingRequest `json:"thinking,omitempty"`
+	Tools         []tool           `json:"tools,omitempty"`
+	ToolChoice    any              `json:"tool_choice,omitempty"` // "auto", "any", or {"type": "tool", "name": "..."}
 }
 
 // thinkingRequest represents Anthropic's extended thinking configuration.
@@ -337,8 +472,11 @@ type thinkingRequest struct {
 }
 
 type contentBlock struct {
-	Type string `json:"type"`
-	Text string `json:"text,omitempty"`
+	Type  string         `json:"type"`
+	Text  string         `json:"text,omitempty"`
+	ID    string         `json:"id,omitempty"`    // For tool_use blocks
+	Name  string         `json:"name,omitempty"`  // For tool_use blocks
+	Input map[string]any `json:"input,omitempty"` // For tool_use blocks
 }
 
 type messagesResponse struct {

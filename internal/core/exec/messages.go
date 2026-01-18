@@ -12,10 +12,13 @@ const (
 
 // LLMMessage represents a single message in the conversation.
 type LLMMessage struct {
-	// Role is the message role (system, user, assistant).
+	// Role is the message role (system, user, assistant, tool).
 	Role core.LLMRole `json:"role"`
 	// Content is the message content.
 	Content string `json:"content"`
+	// ToolCallID is the ID of the tool call this message is responding to.
+	// Only set when Role is "tool".
+	ToolCallID string `json:"tool_call_id,omitempty"`
 	// Metadata contains API call metadata (only set for assistant responses).
 	Metadata *LLMMessageMetadata `json:"metadata,omitempty"`
 }

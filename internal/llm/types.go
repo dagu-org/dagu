@@ -61,6 +61,45 @@ type Message struct {
 	// ToolCallID is the ID of the tool call this message is responding to.
 	// Required when Role is "tool".
 	ToolCallID string `json:"tool_call_id,omitempty"`
+	// ToolCalls contains tool calls made by the assistant.
+	// Only set when Role is "assistant" and the model requests tool calls.
+	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
+}
+
+// Tool represents a function/tool available to the LLM.
+type Tool struct {
+	// Type is always "function" for function tools.
+	Type string `json:"type"`
+	// Function contains the function definition.
+	Function ToolFunction `json:"function"`
+}
+
+// ToolFunction describes a callable function.
+type ToolFunction struct {
+	// Name is the function name (must match [a-zA-Z0-9_-]+).
+	Name string `json:"name"`
+	// Description explains what the function does.
+	Description string `json:"description"`
+	// Parameters is a JSON Schema describing the function parameters.
+	Parameters map[string]any `json:"parameters"`
+}
+
+// ToolCall represents an LLM's request to call a tool.
+type ToolCall struct {
+	// ID is a unique identifier for this tool call.
+	ID string `json:"id"`
+	// Type is always "function" for function calls.
+	Type string `json:"type"`
+	// Function contains the function call details.
+	Function ToolCallFunction `json:"function"`
+}
+
+// ToolCallFunction contains the details of a function call.
+type ToolCallFunction struct {
+	// Name is the name of the function to call.
+	Name string `json:"name"`
+	// Arguments is a JSON string containing the function arguments.
+	Arguments string `json:"arguments"`
 }
 
 // Usage contains token usage information from an LLM API call.
@@ -140,6 +179,11 @@ type ChatRequest struct {
 	// Thinking enables extended thinking/reasoning mode.
 	// Provider-specific handling in each provider implementation.
 	Thinking *ThinkingRequest
+	// Tools is a list of tools available for the model to call.
+	Tools []Tool
+	// ToolChoice controls how the model uses tools.
+	// Values: "auto" (default), "required", "none", or a specific tool name.
+	ToolChoice string
 }
 
 // ChatResponse contains the output from a chat completion request.
@@ -147,10 +191,13 @@ type ChatResponse struct {
 	// Content is the generated text content.
 	Content string
 	// FinishReason indicates why the model stopped generating.
-	// Common values: "stop", "length", "content_filter".
+	// Common values: "stop", "length", "content_filter", "tool_calls".
 	FinishReason string
 	// Usage contains token usage statistics.
 	Usage Usage
+	// ToolCalls contains tool calls requested by the model.
+	// Only populated when FinishReason is "tool_calls".
+	ToolCalls []ToolCall
 }
 
 // StreamEvent represents a single event in a streaming response.
@@ -163,4 +210,9 @@ type StreamEvent struct {
 	Error error
 	// Usage contains token usage statistics (only set when Done is true).
 	Usage *Usage
+	// ToolCalls contains tool calls accumulated during streaming.
+	// Only populated when Done is true and the model requested tool calls.
+	ToolCalls []ToolCall
+	// FinishReason indicates why the model stopped (only set when Done is true).
+	FinishReason string
 }
