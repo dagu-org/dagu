@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/cmn/signal"
@@ -709,15 +711,14 @@ func (c *Client) startNewContainer(ctx context.Context, name string, cli *client
 	ctCfg.Image = c.cfg.Image
 
 	if len(cmd) > 0 {
-		// Wrap step command with shell if configured
-		ctCfg.Cmd = wrapCommandWithShell(c.cfg.Shell, cmd)
+		// Use cmd as-is for container startup (not wrapped with shell)
+		ctCfg.Cmd = cmd
 		if clearEntrypoint {
 			// Entrypoint should be empty slice to override image ENTRYPOINT
 			ctCfg.Entrypoint = []string{}
 		}
 	} else if c.cfg.Startup == "command" && len(c.cfg.StartCmd) > 0 {
-		// Use StartCmd for startup: command mode when no cmd override provided
-		// StartCmd is NOT wrapped - it's a startup command, not a step command
+		// Use StartCmd for startup: command mode
 		ctCfg.Cmd = c.cfg.StartCmd
 	}
 
@@ -757,19 +758,48 @@ func (c *Client) startNewContainer(ctx context.Context, name string, cli *client
 	return resp.ID, err
 }
 
+// ensureCommandFlag adds the appropriate command flag (-c, -Command, /c)
+// if not already present in the shell array.
+func ensureCommandFlag(shell []string) []string {
+	if len(shell) == 0 {
+		return shell
+	}
+
+	flag := cmdutil.ShellCommandFlag(shell[0])
+	if slices.Contains(shell, flag) {
+		return shell
+	}
+
+	return append(slices.Clone(shell), flag)
+}
+
 // wrapCommandWithShell wraps a command array with a shell if specified.
 // If shell is not specified, returns the command as-is.
 //
-// Shell format: ["/bin/bash", "-o", "errexit", "-c"]
-// Command: ["echo", "hello"]
-// Result: ["/bin/bash", "-o", "errexit", "-c", "echo hello"]
+// The command flag (-c, -Command, /c) is automatically added if not present.
+// The command array is joined with spaces WITHOUT quoting to preserve shell
+// operators like &&, ||, pipes, redirects, etc.
 //
-// The command array is joined with spaces to create a shell command string.
+// Shell format: ["/bin/bash", "-o", "errexit"]
+// Command: ["echo", "line1", "&&", "echo", "line2"]
+// Result: ["/bin/bash", "-o", "errexit", "-c", "echo line1 && echo line2"]
+//
+// Users are responsible for proper quoting in their YAML:
+//
+//	command: echo "hello world"     # Quotes preserved
+//	command: echo hello && echo hi  # Operators work
 func wrapCommandWithShell(shell, cmd []string) []string {
 	if len(shell) == 0 || len(cmd) == 0 {
 		return cmd
 	}
-	return append(append([]string{}, shell...), strings.Join(cmd, " "))
+
+	// Auto-add command flag if not already present
+	shellWithFlag := ensureCommandFlag(shell)
+
+	// Join command array with spaces (NO quoting to preserve operators)
+	cmdString := strings.Join(cmd, " ")
+
+	return append(shellWithFlag, cmdString)
 }
 
 func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []string, stdout, stderr io.Writer, opts ExecOptions) (int, error) {

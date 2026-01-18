@@ -318,6 +318,7 @@ var configSchema = &jsonschema.Schema{
 		"host":          {Type: "object", AdditionalProperties: &jsonschema.Schema{}},
 		"network":       {Type: "object", AdditionalProperties: &jsonschema.Schema{}},
 		"exec":          {Type: "object", AdditionalProperties: &jsonschema.Schema{}},
+		"shell":         {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Shell wrapper for step commands (e.g., [\"/bin/bash\", \"-c\"])"},
 	},
 	AllOf: []*jsonschema.Schema{
 		// Require at least one of image or containerName

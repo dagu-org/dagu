@@ -255,20 +255,72 @@ steps:
 			},
 		},
 		{
-			// Test shell field with pipes and redirects (shell features)
-			name: "ShellFieldWithPipes",
+			// Test shell field with command chaining operator
+			name: "ShellFieldWithOperators",
 			dagConfigFunc: func(_ string) string {
 				return fmt.Sprintf(`
 container:
   image: %s
   shell: ["/bin/sh", "-c"]
 steps:
-  - command: echo "line1" && echo "line2"
+  - command: echo line1 && echo line2
+    output: SHELL_OPERATOR_OUT1
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"SHELL_OPERATOR_OUT1": "line1\nline2",
+			},
+		},
+		{
+			// Test shell field without -c flag (auto-added)
+			name: "ShellFieldAutoAddsFlag",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+container:
+  image: %s
+  shell: ["/bin/sh"]
+steps:
+  - command: echo auto-flag-test
+    output: SHELL_AUTO_FLAG_OUT1
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"SHELL_AUTO_FLAG_OUT1": "auto-flag-test",
+			},
+		},
+		{
+			// Test shell field with pipe operator
+			name: "ShellFieldWithPipe",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+container:
+  image: %s
+  shell: ["/bin/sh", "-c"]
+steps:
+  - command: echo hello | tr a-z A-Z
     output: SHELL_PIPE_OUT1
 `, testImage)
 			},
 			expectedOutputs: map[string]any{
-				"SHELL_PIPE_OUT1": "line1\nline2",
+				"SHELL_PIPE_OUT1": "HELLO",
+			},
+		},
+		{
+			// Test shell strict mode flags from issue #1589
+			// Using /bin/sh with errexit flag (alpine doesn't have bash)
+			name: "ShellFieldWithStrictMode",
+			dagConfigFunc: func(_ string) string {
+				return fmt.Sprintf(`
+container:
+  image: %s
+  shell: ["/bin/sh", "-e", "-x", "-c"]
+steps:
+  - command: echo "strict mode enabled"
+    output: STRICT_MODE_OUT1
+`, testImage)
+			},
+			expectedOutputs: map[string]any{
+				"STRICT_MODE_OUT1": "strict mode enabled",
 			},
 		},
 		{

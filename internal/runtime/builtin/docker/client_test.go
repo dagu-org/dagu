@@ -1361,3 +1361,110 @@ func TestMergeEnvVars(t *testing.T) {
 		})
 	}
 }
+
+func TestWrapCommandWithShell(t *testing.T) {
+	tests := []struct {
+		name     string
+		shell    []string
+		cmd      []string
+		expected []string
+	}{
+		{
+			name:     "NoShell_ReturnsCommandAsIs",
+			shell:    nil,
+			cmd:      []string{"echo", "hello"},
+			expected: []string{"echo", "hello"},
+		},
+		{
+			name:     "EmptyShell_ReturnsCommandAsIs",
+			shell:    []string{},
+			cmd:      []string{"echo", "hello"},
+			expected: []string{"echo", "hello"},
+		},
+		{
+			name:     "EmptyCommand_ReturnsEmpty",
+			shell:    []string{"/bin/bash", "-c"},
+			cmd:      []string{},
+			expected: []string{},
+		},
+		{
+			name:     "SimpleCommand_WithFlagAlready",
+			shell:    []string{"/bin/bash", "-c"},
+			cmd:      []string{"echo", "hello"},
+			expected: []string{"/bin/bash", "-c", "echo hello"},
+		},
+		{
+			name:     "SimpleCommand_AutoAddsFlag",
+			shell:    []string{"/bin/sh"},
+			cmd:      []string{"echo", "hello"},
+			expected: []string{"/bin/sh", "-c", "echo hello"},
+		},
+		{
+			name:     "BashWithStrictFlags_AutoAddsFlag",
+			shell:    []string{"/bin/bash", "-o", "errexit", "-o", "pipefail"},
+			cmd:      []string{"echo", "test"},
+			expected: []string{"/bin/bash", "-o", "errexit", "-o", "pipefail", "-c", "echo test"},
+		},
+		{
+			name:     "BashWithStrictFlags_FlagAlreadyPresent",
+			shell:    []string{"/bin/bash", "-o", "errexit", "-o", "pipefail", "-c"},
+			cmd:      []string{"echo", "test"},
+			expected: []string{"/bin/bash", "-o", "errexit", "-o", "pipefail", "-c", "echo test"},
+		},
+		{
+			name:     "PowerShell_AutoAddsCommandFlag",
+			shell:    []string{"powershell"},
+			cmd:      []string{"Write-Host", "hello"},
+			expected: []string{"powershell", "-Command", "Write-Host hello"},
+		},
+		{
+			name:     "PowerShell_FlagAlreadyPresent",
+			shell:    []string{"pwsh", "-NoProfile", "-Command"},
+			cmd:      []string{"Write-Host", "hello"},
+			expected: []string{"pwsh", "-NoProfile", "-Command", "Write-Host hello"},
+		},
+		{
+			name:     "CmdExe_AutoAddsFlag",
+			shell:    []string{"cmd.exe"},
+			cmd:      []string{"echo", "hello"},
+			expected: []string{"cmd.exe", "/c", "echo hello"},
+		},
+		{
+			name:     "NixShell_AutoAddsFlag",
+			shell:    []string{"nix-shell"},
+			cmd:      []string{"echo", "hello"},
+			expected: []string{"nix-shell", "--run", "echo hello"},
+		},
+		{
+			name:     "CommandWithAndOperator",
+			shell:    []string{"/bin/sh", "-c"},
+			cmd:      []string{"echo", "line1", "&&", "echo", "line2"},
+			expected: []string{"/bin/sh", "-c", "echo line1 && echo line2"},
+		},
+		{
+			name:     "CommandWithOrOperator",
+			shell:    []string{"/bin/bash", "-c"},
+			cmd:      []string{"false", "||", "echo", "fallback"},
+			expected: []string{"/bin/bash", "-c", "false || echo fallback"},
+		},
+		{
+			name:     "CommandWithPipe",
+			shell:    []string{"/bin/sh", "-c"},
+			cmd:      []string{"echo", "hello", "|", "tr", "a-z", "A-Z"},
+			expected: []string{"/bin/sh", "-c", "echo hello | tr a-z A-Z"},
+		},
+		{
+			name:     "MultipleArguments",
+			shell:    []string{"/bin/bash", "-c"},
+			cmd:      []string{"cat", "/etc/hosts", "/etc/resolv.conf"},
+			expected: []string{"/bin/bash", "-c", "cat /etc/hosts /etc/resolv.conf"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := wrapCommandWithShell(tt.shell, tt.cmd)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
