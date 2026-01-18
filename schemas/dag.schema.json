@@ -412,7 +412,11 @@
       "description": "Default SSH configuration for all steps in the DAG. Steps can override this configuration with their own SSH settings. Note: SSH and container configurations are mutually exclusive at the DAG level."
     },
     "s3": {
-      "$ref": "#/definitions/s3Config",
+      "allOf": [
+        {
+          "$ref": "#/definitions/s3ConnectionConfig"
+        }
+      ],
       "description": "Default S3 configuration for all S3 steps in the DAG. Steps can override this configuration with their own S3 settings. Supports AWS S3 and S3-compatible services like MinIO."
     },
     "llm": {
@@ -1520,9 +1524,8 @@
       "required": ["user", "host"],
       "description": "SSH configuration for remote command execution. Can be specified at DAG level for reuse across steps, or at step level for specific overrides. Password authentication is supported but key-based auth is recommended."
     },
-    "s3Config": {
+    "s3ConnectionConfig": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "region": {
           "type": "string",
@@ -1563,49 +1566,17 @@
           "description": "Disable SSL/TLS for connections. Only use for local development with non-TLS endpoints."
         }
       },
-      "description": "S3 configuration for AWS S3 or S3-compatible services. Can be specified at DAG level for shared settings across all S3 steps."
+      "description": "Common S3 connection configuration shared between DAG-level and step-level S3 settings."
     },
     "s3ExecutorConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "region": {
-          "type": "string",
-          "description": "AWS region. Overrides DAG-level s3.region."
+      "allOf": [
+        {
+          "$ref": "#/definitions/s3ConnectionConfig"
         },
-        "endpoint": {
-          "type": "string",
-          "description": "Custom S3-compatible endpoint URL. Overrides DAG-level s3.endpoint."
-        },
-        "accessKeyId": {
-          "type": "string",
-          "description": "AWS access key ID. Overrides DAG-level s3.accessKeyId."
-        },
-        "secretAccessKey": {
-          "type": "string",
-          "description": "AWS secret access key. Overrides DAG-level s3.secretAccessKey."
-        },
-        "sessionToken": {
-          "type": "string",
-          "description": "AWS session token. Overrides DAG-level s3.sessionToken."
-        },
-        "profile": {
-          "type": "string",
-          "description": "AWS credentials profile name. Overrides DAG-level s3.profile."
-        },
-        "bucket": {
-          "type": "string",
-          "description": "S3 bucket name. Required unless specified at DAG level."
-        },
-        "forcePathStyle": {
-          "type": "boolean",
-          "description": "Use path-style addressing. Overrides DAG-level s3.forcePathStyle."
-        },
-        "disableSSL": {
-          "type": "boolean",
-          "description": "Disable SSL/TLS. Overrides DAG-level s3.disableSSL."
-        },
-        "key": {
+        {
+          "type": "object",
+          "properties": {
+            "key": {
           "type": "string",
           "description": "S3 object key (path). Required for upload, download, and single-object delete operations."
         },
@@ -1693,7 +1664,9 @@
           "default": false,
           "description": "Suppress output for delete operations. Default: false."
         }
-      },
+          }
+        }
+      ],
       "description": "S3 executor configuration. Command specifies the operation: upload, download, list, or delete."
     },
     "httpExecutorConfig": {

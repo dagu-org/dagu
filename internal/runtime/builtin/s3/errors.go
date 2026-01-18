@@ -61,4 +61,3 @@ func encodeJSON(w io.Writer, v any) error {
 	enc.SetIndent("", "  ")
 	return enc.Encode(v)
 }
-
