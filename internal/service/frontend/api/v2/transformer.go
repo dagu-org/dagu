@@ -319,6 +319,19 @@ func toChatMessages(messages []exec.LLMMessage) []api.ChatMessage {
 			Content: msg.Content,
 		}
 
+		// Include tool calls for assistant messages
+		if len(msg.ToolCalls) > 0 {
+			toolCalls := make([]api.ChatToolCall, 0, len(msg.ToolCalls))
+			for _, tc := range msg.ToolCalls {
+				toolCalls = append(toolCalls, api.ChatToolCall{
+					Id:        tc.ID,
+					Name:      tc.Function.Name,
+					Arguments: ptrOf(tc.Function.Arguments),
+				})
+			}
+			apiMsg.ToolCalls = &toolCalls
+		}
+
 		if msg.Metadata != nil {
 			apiMsg.Metadata = &api.ChatMessageMetadata{
 				Provider:         ptrOf(msg.Metadata.Provider),

@@ -172,8 +172,18 @@ export function StepMessagesTable({
               {!isExpanded && (
                 <>
                   <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">
-                    {msg.content.slice(0, 80)}
-                    {msg.content.length > 80 && '...'}
+                    {msg.content ? (
+                      <>
+                        {msg.content.slice(0, 80)}
+                        {msg.content.length > 80 && '...'}
+                      </>
+                    ) : msg.toolCalls && msg.toolCalls.length > 0 ? (
+                      <span className="text-purple-500">
+                        Calling: {msg.toolCalls.map(tc => tc.name).join(', ')}
+                      </span>
+                    ) : (
+                      <span className="italic">(empty)</span>
+                    )}
                   </span>
                   {msg.metadata && (
                     <span className="text-xs text-muted-foreground font-mono shrink-0">
@@ -189,7 +199,23 @@ export function StepMessagesTable({
               <div className="px-2 pb-2 pl-7">
                 <div className="flex gap-4 items-start">
                   <div className="flex-1 min-w-0">
-                    <Markdown content={msg.content} />
+                    {msg.content ? (
+                      <Markdown content={msg.content} />
+                    ) : msg.toolCalls && msg.toolCalls.length > 0 ? (
+                      <div className="space-y-1">
+                        <span className="text-xs text-purple-500 font-medium">Tool Calls:</span>
+                        {msg.toolCalls.map((tc, idx) => (
+                          <div key={idx} className="text-xs font-mono bg-muted/50 p-2 rounded">
+                            <span className="text-purple-500">{tc.name}</span>
+                            {tc.arguments && (
+                              <span className="text-muted-foreground ml-1">({tc.arguments})</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic">(empty message)</span>
+                    )}
                   </div>
                   <div className="shrink-0 flex flex-col items-end gap-1">
                     {msg.metadata && (

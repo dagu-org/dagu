@@ -1438,7 +1438,18 @@ export interface components {
             role: ChatMessageRole;
             /** @description Message content */
             content: string;
+            /** @description Tool calls made by the assistant (only for assistant messages) */
+            toolCalls?: components["schemas"]["ChatToolCall"][];
             metadata?: components["schemas"]["ChatMessageMetadata"];
+        };
+        /** @description A tool call requested by the LLM */
+        ChatToolCall: {
+            /** @description Unique identifier for this tool call */
+            id: string;
+            /** @description Name of the tool being called */
+            name: string;
+            /** @description JSON string of tool arguments */
+            arguments?: string;
         };
         /** @description Metadata about an LLM API call */
         ChatMessageMetadata: {

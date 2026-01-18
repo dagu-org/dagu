@@ -3522,11 +3522,33 @@ components:
         content:
           type: string
           description: "Message content"
+        toolCalls:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatToolCall"
+          description: "Tool calls made by the assistant (only for assistant messages)"
         metadata:
           $ref: "#/components/schemas/ChatMessageMetadata"
       required:
         - role
         - content
+
+    ChatToolCall:
+      type: object
+      description: "A tool call requested by the LLM"
+      properties:
+        id:
+          type: string
+          description: "Unique identifier for this tool call"
+        name:
+          type: string
+          description: "Name of the tool being called"
+        arguments:
+          type: string
+          description: "JSON string of tool arguments"
+      required:
+        - id
+        - name
 
     ChatMessageMetadata:
       type: object
