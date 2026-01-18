@@ -98,3 +98,10 @@ type ChatMessageHandler interface {
 	SetContext([]exec.LLMMessage)
 	GetMessages() []exec.LLMMessage
 }
+
+// SubRunProvider is an interface for executors that spawn sub-DAG runs.
+// This is used by executors like chat (with tools) to report sub-runs
+// for UI drill-down functionality.
+type SubRunProvider interface {
+	GetSubRuns() []exec.SubDAGRun
+}

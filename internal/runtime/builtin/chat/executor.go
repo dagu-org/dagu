@@ -25,6 +25,7 @@ import (
 
 var _ executor.Executor = (*Executor)(nil)
 var _ executor.ChatMessageHandler = (*Executor)(nil)
+var _ executor.SubRunProvider = (*Executor)(nil)
 
 // Executor implements the executor.Executor interface for chat steps.
 type Executor struct {
@@ -40,6 +41,9 @@ type Executor struct {
 	// Tool calling support
 	toolRegistry *ToolRegistry
 	toolExecutor *ToolExecutor
+
+	// Collected sub-runs from tool executions for UI drill-down
+	collectedSubRuns []exec.SubDAGRun
 }
 
 // newChatExecutor creates a new chat executor from a step configuration.
@@ -130,6 +134,12 @@ func (e *Executor) SetContext(messages []exec.LLMMessage) {
 // This includes inherited messages, step messages, and the assistant response.
 func (e *Executor) GetMessages() []exec.LLMMessage {
 	return e.savedMessages
+}
+
+// GetSubRuns returns the collected sub-DAG runs from tool executions.
+// This implements the SubRunProvider interface for UI drill-down functionality.
+func (e *Executor) GetSubRuns() []exec.SubDAGRun {
+	return e.collectedSubRuns
 }
 
 // buildMessageList orders messages so step's system message takes precedence over context.
@@ -501,10 +511,11 @@ func (e *Executor) runWithTools(ctx context.Context, provider llmpkg.Provider, a
 		conversationMessages = append(conversationMessages, assistantMsg)
 
 		// Execute each tool call and collect results
-		toolResults := e.toolExecutor.ExecuteToolCalls(ctx, resp.ToolCalls)
+		toolCallResults := e.toolExecutor.ExecuteToolCalls(ctx, resp.ToolCalls)
 
-		// Add tool results to conversation
-		for _, result := range toolResults {
+		// Add tool results to conversation and collect sub-runs for UI
+		for _, tcr := range toolCallResults {
+			result := tcr.Result
 			toolMsg := exec.LLMMessage{
 				Role:       exec.RoleTool,
 				Content:    result.Content,
@@ -514,6 +525,11 @@ func (e *Executor) runWithTools(ctx context.Context, provider llmpkg.Provider, a
 				toolMsg.Content = fmt.Sprintf("Error: %s", result.Error)
 			}
 			conversationMessages = append(conversationMessages, toolMsg)
+
+			// Collect sub-run info for UI drill-down (even for failed executions)
+			if tcr.SubRun.DAGRunID != "" {
+				e.collectedSubRuns = append(e.collectedSubRuns, tcr.SubRun)
+			}
 
 			// Log tool result (truncated for readability)
 			content := result.Content

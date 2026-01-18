@@ -119,6 +119,10 @@ type SubDAGRun struct {
 	// - Raw JSON: '{"region": "us-east-1", "config": {"timeout": 30}}'
 	// The exact format depends on how the DAG expects to receive parameters.
 	Params string
+	// DAGName is the name of the executed sub-DAG.
+	// For chat tool calls, this is the tool DAG name.
+	// This field enables UI drill-down when step.call is not set.
+	DAGName string
 }
 
 func newSafeData(data NodeData) Data {

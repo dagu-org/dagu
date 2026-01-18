@@ -219,6 +219,9 @@ func toSubDAGRuns(subDAGRuns []exec.SubDAGRun) []api.SubDAGRun {
 		if w.Params != "" {
 			subDAGRun.Params = &w.Params
 		}
+		if w.DAGName != "" {
+			subDAGRun.DagName = &w.DAGName
+		}
 		result = append(result, subDAGRun)
 	}
 	return result

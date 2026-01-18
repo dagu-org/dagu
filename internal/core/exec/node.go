@@ -43,6 +43,10 @@ type Node struct {
 type SubDAGRun struct {
 	DAGRunID string `json:"dagRunId,omitempty"`
 	Params   string `json:"params,omitempty"`
+	// DAGName is the name of the executed sub-DAG.
+	// For chat tool calls, this is the tool DAG name.
+	// This field enables UI drill-down when step.call is not set.
+	DAGName string `json:"dagName,omitempty"`
 }
 
 // NewNodesFromSteps converts a list of DAG steps to persistence Node objects.

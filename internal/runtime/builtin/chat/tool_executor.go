@@ -19,6 +19,13 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 )
 
+// ToolCallResult bundles a tool result with sub-DAG run info for tracking.
+// This enables UI drill-down into tool executions.
+type ToolCallResult struct {
+	Result core.ToolResult
+	SubRun exec1.SubDAGRun
+}
+
 // ToolExecutor handles the execution of tool calls by running DAGs.
 type ToolExecutor struct {
 	registry *ToolRegistry
@@ -40,19 +47,23 @@ func NewToolExecutor(registry *ToolRegistry, workDir string) *ToolExecutor {
 
 // ExecuteToolCalls executes multiple tool calls and returns the results.
 // Tool calls are executed sequentially to maintain consistency.
-func (e *ToolExecutor) ExecuteToolCalls(ctx context.Context, toolCalls []llmpkg.ToolCall) []core.ToolResult {
-	results := make([]core.ToolResult, 0, len(toolCalls))
+// Each result includes both the tool result and sub-DAG run info for UI tracking.
+func (e *ToolExecutor) ExecuteToolCalls(ctx context.Context, toolCalls []llmpkg.ToolCall) []ToolCallResult {
+	results := make([]ToolCallResult, 0, len(toolCalls))
 
 	for _, tc := range toolCalls {
-		result := e.executeToolCall(ctx, tc)
-		results = append(results, result)
+		result, subRun := e.executeToolCall(ctx, tc)
+		results = append(results, ToolCallResult{
+			Result: result,
+			SubRun: subRun,
+		})
 	}
 
 	return results
 }
 
-// executeToolCall executes a single tool call and returns the result.
-func (e *ToolExecutor) executeToolCall(ctx context.Context, tc llmpkg.ToolCall) core.ToolResult {
+// executeToolCall executes a single tool call and returns the result with sub-DAG run info.
+func (e *ToolExecutor) executeToolCall(ctx context.Context, tc llmpkg.ToolCall) (core.ToolResult, exec1.SubDAGRun) {
 	toolName := tc.Function.Name
 
 	ctx = logger.WithValues(ctx,
@@ -69,7 +80,7 @@ func (e *ToolExecutor) executeToolCall(ctx context.Context, tc llmpkg.ToolCall) 
 			ToolCallID: tc.ID,
 			Name:       toolName,
 			Error:      fmt.Sprintf("tool %q not found", toolName),
-		}
+		}, exec1.SubDAGRun{}
 	}
 
 	// Parse the arguments from JSON string
@@ -81,7 +92,7 @@ func (e *ToolExecutor) executeToolCall(ctx context.Context, tc llmpkg.ToolCall) 
 				ToolCallID: tc.ID,
 				Name:       toolName,
 				Error:      fmt.Sprintf("failed to parse arguments: %v", err),
-			}
+			}, exec1.SubDAGRun{}
 		}
 	}
 
@@ -104,7 +115,7 @@ func (e *ToolExecutor) executeToolCall(ctx context.Context, tc llmpkg.ToolCall) 
 			ToolCallID: tc.ID,
 			Name:       toolName,
 			Error:      fmt.Sprintf("failed to create executor: %v", err),
-		}
+		}, exec1.SubDAGRun{}
 	}
 	defer func() {
 		if cleanErr := subDAGExec.Cleanup(ctx); cleanErr != nil {
@@ -136,13 +147,21 @@ func (e *ToolExecutor) executeToolCall(ctx context.Context, tc llmpkg.ToolCall) 
 	)
 
 	result, err := subDAGExec.Execute(ctx, runParams, e.parentWorkDir)
+
+	// Build SubDAGRun info for UI drill-down tracking
+	subRun := exec1.SubDAGRun{
+		DAGRunID: runID,
+		Params:   params,
+		DAGName:  dag.Name, // Use DAG name for UI display
+	}
+
 	if err != nil {
 		logger.Error(ctx, "Tool DAG execution failed", tag.Error(err))
 		return core.ToolResult{
 			ToolCallID: tc.ID,
 			Name:       toolName,
 			Error:      fmt.Sprintf("execution failed: %v", err),
-		}
+		}, subRun
 	}
 
 	// Format the result content from DAG outputs
@@ -157,7 +176,7 @@ func (e *ToolExecutor) executeToolCall(ctx context.Context, tc llmpkg.ToolCall) 
 		ToolCallID: tc.ID,
 		Name:       toolName,
 		Content:    content,
-	}
+	}, subRun
 }
 
 // Kill terminates all running tool DAG executions.

@@ -4398,6 +4398,9 @@ components:
         params:
           type: string
           description: "Parameters passed to the sub DAG-run in JSON format"
+        dagName:
+          type: string
+          description: "Name of the executed sub-DAG. For chat tool calls, this is the tool DAG name."
       required:
         - dagRunId
 
@@ -4410,6 +4413,9 @@ components:
         params:
           type: string
           description: "Parameters passed to the sub DAG-run in JSON format"
+        dagName:
+          type: string
+          description: "Name of the executed sub-DAG. For chat tool calls, this is the tool DAG name."
         status:
           $ref: "#/components/schemas/Status"
         statusLabel:

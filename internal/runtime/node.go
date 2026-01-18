@@ -212,6 +212,19 @@ func (n *Node) Execute(ctx context.Context) error {
 		n.SetChatMessages(chatHandler.GetMessages())
 	}
 
+	// Capture sub-runs from executors that spawn sub-DAGs (like chat with tools)
+	if subRunProvider, ok := cmd.(executor.SubRunProvider); ok {
+		subRuns := subRunProvider.GetSubRuns()
+		if len(subRuns) > 0 {
+			// Convert exec.SubDAGRun to runtime.SubDAGRun
+			runtimeSubRuns := make([]SubDAGRun, len(subRuns))
+			for i, sr := range subRuns {
+				runtimeSubRuns[i] = SubDAGRun(sr)
+			}
+			n.SetSubRuns(runtimeSubRuns)
+		}
+	}
+
 	if err := n.captureOutput(ctx); err != nil {
 		return err
 	}

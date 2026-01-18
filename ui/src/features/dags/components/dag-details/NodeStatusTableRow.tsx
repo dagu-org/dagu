@@ -285,7 +285,8 @@ function NodeStatusTableRow({
   // Check if this is a sub dagRun node
   // Include both regular and repeated sub runs
   const allSubRuns = [...(node.subRuns || []), ...(node.subRunsRepeated || [])];
-  const subDagName = node.step.call;
+  // Use step.call OR fallback to first subRun's dagName (for chat tools, etc.)
+  const subDagName = node.step.call || allSubRuns[0]?.dagName;
   const hasSubDAGRun = !!subDagName && allSubRuns.length > 0;
 
   // Update duration every second for running tasks

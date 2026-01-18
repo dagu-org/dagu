@@ -1901,12 +1901,16 @@ export interface components {
             dagRunId: components["schemas"]["DAGRunId"];
             /** @description Parameters passed to the sub DAG-run in JSON format */
             params?: string;
+            /** @description Name of the executed sub-DAG. For chat tool calls, this is the tool DAG name. */
+            dagName?: string;
         };
         /** @description Detailed information for a sub DAG-run including timing and status */
         SubDAGRunDetail: {
             dagRunId: components["schemas"]["DAGRunId"];
             /** @description Parameters passed to the sub DAG-run in JSON format */
             params?: string;
+            /** @description Name of the executed sub-DAG. For chat tool calls, this is the tool DAG name. */
+            dagName?: string;
             status: components["schemas"]["Status"];
             statusLabel: components["schemas"]["StatusLabel"];
             /** @description RFC 3339 timestamp when the sub DAG-run started */
