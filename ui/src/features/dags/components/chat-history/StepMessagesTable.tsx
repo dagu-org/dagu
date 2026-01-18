@@ -30,6 +30,22 @@ const roleConfig: Record<string, { label: string; borderColor: string }> = {
 
 const defaultRoleConfig = { label: 'MSG', borderColor: 'border-l-gray-500' };
 
+function getMessagePreview(msg: { content: string; toolCalls?: { name: string }[] }) {
+  if (msg.content) {
+    const preview = msg.content.slice(0, 80);
+    const suffix = msg.content.length > 80 ? '...' : '';
+    return <>{preview}{suffix}</>;
+  }
+  if (msg.toolCalls && msg.toolCalls.length > 0) {
+    return (
+      <span className="text-purple-500">
+        Calling: {msg.toolCalls.map((tc) => tc.name).join(', ')}
+      </span>
+    );
+  }
+  return <span className="italic">(empty)</span>;
+}
+
 export function StepMessagesTable({
   dagName,
   dagRunId,
@@ -207,18 +223,7 @@ export function StepMessagesTable({
               {!isExpanded && (
                 <>
                   <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">
-                    {msg.content ? (
-                      <>
-                        {msg.content.slice(0, 80)}
-                        {msg.content.length > 80 && '...'}
-                      </>
-                    ) : msg.toolCalls && msg.toolCalls.length > 0 ? (
-                      <span className="text-purple-500">
-                        Calling: {msg.toolCalls.map(tc => tc.name).join(', ')}
-                      </span>
-                    ) : (
-                      <span className="italic">(empty)</span>
-                    )}
+                    {getMessagePreview(msg)}
                   </span>
                   {msg.metadata && (
                     <span className="text-xs text-muted-foreground font-mono shrink-0">
