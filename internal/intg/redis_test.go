@@ -19,9 +19,6 @@ type redisTest struct {
 func TestDAGLevelRedis(t *testing.T) {
 	t.Parallel()
 
-	// Base port - each test gets its own port to allow parallel execution
-	basePort := 16379
-
 	tests := []redisTest{
 		{
 			name: "BasicPing",
@@ -46,7 +43,7 @@ steps:
 `, redisTestImage, port, port)
 			},
 			expectedOutputs: map[string]any{
-				"REDIS_OUT": "\"PONG\"", // JSON-encoded string
+				"REDIS_OUT": "\"PONG\"",
 			},
 		},
 		{
@@ -81,7 +78,7 @@ steps:
 `, redisTestImage, port, port)
 			},
 			expectedOutputs: map[string]any{
-				"REDIS_GET_OUT": "\"hello\"", // JSON-encoded string
+				"REDIS_GET_OUT": "\"hello\"",
 			},
 		},
 		{
@@ -123,7 +120,6 @@ steps:
 			},
 		},
 		{
-			// Pipeline test - just verify it succeeds, output format is complex
 			name: "Pipeline",
 			dagConfigFunc: func(port int) string {
 				return fmt.Sprintf(`
@@ -154,10 +150,9 @@ steps:
           key: pipe-key2
 `, redisTestImage, port, port)
 			},
-			expectedOutputs: nil, // Just verify it succeeds
+			expectedOutputs: nil,
 		},
 		{
-			// List operations - just verify it succeeds
 			name: "ListOperations",
 			dagConfigFunc: func(port int) string {
 				return fmt.Sprintf(`
@@ -192,11 +187,10 @@ steps:
 `, redisTestImage, port, port)
 			},
 			expectedOutputs: map[string]any{
-				"LIST_LEN": "3", // Integer output
+				"LIST_LEN": "3",
 			},
 		},
 		{
-			// Hash operations - just verify it succeeds
 			name: "HashOperations",
 			dagConfigFunc: func(port int) string {
 				return fmt.Sprintf(`
@@ -267,20 +261,23 @@ steps:
 `, redisTestImage, port, port)
 			},
 			expectedOutputs: map[string]any{
-				"EXISTS_OUT": "1", // Key exists
+				"EXISTS_OUT": "1",
 			},
 		},
 	}
 
+	// Base port for parallel test execution - each test gets a unique port
+	basePort := 16379
+
 	for i, tt := range tests {
+		port := basePort + i
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			port := basePort + i
 			th := test.Setup(t)
 			dag := th.DAG(t, tt.dagConfigFunc(port))
 			dag.Agent().RunSuccess(t)
 			dag.AssertLatestStatus(t, core.Succeeded)
-			if len(tt.expectedOutputs) > 0 {
+			if tt.expectedOutputs != nil {
 				dag.AssertOutputs(t, tt.expectedOutputs)
 			}
 		})
