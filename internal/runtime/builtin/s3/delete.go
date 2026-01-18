@@ -61,7 +61,6 @@ func (e *executorImpl) deleteByPrefix(ctx context.Context, start time.Time) erro
 	var deletedKeys []string
 	var deleteErrors []string
 
-	// List objects with the prefix
 	opts := minio.ListObjectsOptions{
 		Prefix:    e.cfg.Prefix,
 		Recursive: true,
@@ -71,43 +70,39 @@ func (e *executorImpl) deleteByPrefix(ctx context.Context, start time.Time) erro
 		if object.Err != nil {
 			return fmt.Errorf("%w: failed to list objects: %v", ErrDeleteFailed, object.Err)
 		}
-
-		// Delete each object
-		err := e.client.RemoveObject(ctx, e.cfg.Bucket, object.Key, minio.RemoveObjectOptions{})
-		if err != nil {
+		if err := e.client.RemoveObject(ctx, e.cfg.Bucket, object.Key, minio.RemoveObjectOptions{}); err != nil {
 			deleteErrors = append(deleteErrors, fmt.Sprintf("%s: %v", object.Key, err))
 		} else {
 			deletedKeys = append(deletedKeys, object.Key)
 		}
 	}
 
-	result := DeleteResult{
-		Operation:    opDelete,
-		Success:      len(deleteErrors) == 0,
-		Bucket:       e.cfg.Bucket,
-		Prefix:       e.cfg.Prefix,
-		DeletedCount: len(deletedKeys),
-		ErrorCount:   len(deleteErrors),
-		Duration:     time.Since(start).Round(time.Millisecond).String(),
-	}
+	hasErrors := len(deleteErrors) > 0
 
-	// Only include deleted keys if not too many
-	if len(deletedKeys) <= 100 {
-		result.DeletedKeys = deletedKeys
-	}
-	if len(deleteErrors) > 0 {
-		result.Errors = deleteErrors
-	}
-
-	// Write result unless quiet mode and no errors
-	if !e.cfg.Quiet || len(deleteErrors) > 0 {
+	// Write result unless quiet mode with no errors
+	if !e.cfg.Quiet || hasErrors {
+		result := DeleteResult{
+			Operation:    opDelete,
+			Success:      !hasErrors,
+			Bucket:       e.cfg.Bucket,
+			Prefix:       e.cfg.Prefix,
+			DeletedCount: len(deletedKeys),
+			ErrorCount:   len(deleteErrors),
+			Duration:     time.Since(start).Round(time.Millisecond).String(),
+		}
+		// Only include deleted keys if not too many
+		if len(deletedKeys) <= 100 {
+			result.DeletedKeys = deletedKeys
+		}
+		if hasErrors {
+			result.Errors = deleteErrors
+		}
 		if err := e.writeResult(result); err != nil {
 			return err
 		}
 	}
 
-	// Return error if any deletions failed
-	if len(deleteErrors) > 0 {
+	if hasErrors {
 		return fmt.Errorf("%w: %d of %d objects failed to delete",
 			ErrDeleteFailed, len(deleteErrors), len(deletedKeys)+len(deleteErrors))
 	}

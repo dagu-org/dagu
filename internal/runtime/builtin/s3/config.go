@@ -89,6 +89,8 @@ func DefaultConfig() *Config {
 
 // ApplyDefaults maps the core.S3Config values to the Config struct
 // if they are present and not already set in the Config.
+// Note: This sets DAG-level defaults BEFORE step config is decoded,
+// so step config will override these values.
 func (c *Config) ApplyDefaults(defaults *core.S3Config) {
 	if defaults == nil {
 		return
@@ -111,12 +113,8 @@ func (c *Config) ApplyDefaults(defaults *core.S3Config) {
 	if defaults.Profile != "" {
 		c.Profile = defaults.Profile
 	}
-	if defaults.ForcePathStyle {
-		c.ForcePathStyle = defaults.ForcePathStyle
-	}
-	if defaults.DisableSSL {
-		c.DisableSSL = defaults.DisableSSL
-	}
+	c.ForcePathStyle = defaults.ForcePathStyle
+	c.DisableSSL = defaults.DisableSSL
 	if defaults.Bucket != "" {
 		c.Bucket = defaults.Bucket
 	}
@@ -163,7 +161,7 @@ func (c *Config) ValidateForOperation(operation string) error {
 			return fmt.Errorf("%w: destination is required for download", ErrConfig)
 		}
 	case opList:
-		// List only needs bucket (already validated)
+		// Bucket is already validated above
 	case opDelete:
 		// Delete needs either key or prefix
 		if c.Key == "" && c.Prefix == "" {

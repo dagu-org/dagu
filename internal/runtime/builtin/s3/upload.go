@@ -28,7 +28,6 @@ type UploadResult struct {
 func (e *executorImpl) runUpload(ctx context.Context) error {
 	start := time.Now()
 
-	// Validate source exists
 	sourceInfo, err := os.Stat(e.cfg.Source)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -36,46 +35,25 @@ func (e *executorImpl) runUpload(ctx context.Context) error {
 		}
 		return fmt.Errorf("%w: cannot access source file %q: %v", ErrSourceNotFound, e.cfg.Source, err)
 	}
-
 	if sourceInfo.IsDir() {
 		return fmt.Errorf("%w: source %q is a directory, not a file", ErrConfig, e.cfg.Source)
 	}
 
-	// Determine content type
-	contentType := e.cfg.ContentType
-	if contentType == "" {
-		ext := filepath.Ext(e.cfg.Source)
-		if ext != "" {
-			contentType = mime.TypeByExtension(ext)
-		}
-		if contentType == "" {
-			contentType = "application/octet-stream"
-		}
-	}
+	contentType := e.resolveContentType()
 
-	// Build upload options
 	opts := minio.PutObjectOptions{
 		ContentType:  contentType,
 		UserMetadata: e.cfg.Metadata,
+		StorageClass: e.cfg.StorageClass,
+		UserTags:     e.cfg.Tags,
 	}
 
-	if e.cfg.StorageClass != "" {
-		opts.StorageClass = e.cfg.StorageClass
-	}
-
-	// Set user tags if specified
-	if len(e.cfg.Tags) > 0 {
-		opts.UserTags = e.cfg.Tags
-	}
-
-	// Upload file using FPutObject (handles multipart automatically)
 	info, err := e.client.FPutObject(ctx, e.cfg.Bucket, e.cfg.Key, e.cfg.Source, opts)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrUploadFailed, err)
 	}
 
-	// Build result
-	result := UploadResult{
+	return e.writeResult(UploadResult{
 		Operation:    opUpload,
 		Success:      true,
 		Bucket:       e.cfg.Bucket,
@@ -86,7 +64,19 @@ func (e *executorImpl) runUpload(ctx context.Context) error {
 		ContentType:  contentType,
 		StorageClass: e.cfg.StorageClass,
 		Duration:     time.Since(start).Round(time.Millisecond).String(),
-	}
+	})
+}
 
-	return e.writeResult(result)
+// resolveContentType determines the content type for the upload.
+// Uses configured content type if set, otherwise detects from file extension.
+func (e *executorImpl) resolveContentType() string {
+	if e.cfg.ContentType != "" {
+		return e.cfg.ContentType
+	}
+	if ext := filepath.Ext(e.cfg.Source); ext != "" {
+		if ct := mime.TypeByExtension(ext); ct != "" {
+			return ct
+		}
+	}
+	return "application/octet-stream"
 }

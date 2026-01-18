@@ -41,42 +41,30 @@ func (e *executorImpl) runList(ctx context.Context) error {
 		maxObjects = 1000
 	}
 
-	streamMode := e.cfg.OutputFormat == "jsonl"
-	var objects []ListObject
-	count := 0
+	// Stream mode outputs each object as a separate JSON line
+	if e.cfg.OutputFormat == "jsonl" {
+		return e.runListStream(ctx, opts, maxObjects)
+	}
 
+	// Default mode collects all objects and returns a single JSON result
+	var objects []ListObject
 	for object := range e.client.ListObjects(ctx, e.cfg.Bucket, opts) {
 		if object.Err != nil {
 			return fmt.Errorf("%w: %v", ErrListFailed, object.Err)
 		}
-
-		if count >= maxObjects {
+		if len(objects) >= maxObjects {
 			break
 		}
-		count++
-
-		listObj := ListObject{
+		objects = append(objects, ListObject{
 			Key:          object.Key,
 			Size:         object.Size,
 			LastModified: object.LastModified.Format(time.RFC3339),
 			ETag:         object.ETag,
 			StorageClass: object.StorageClass,
-		}
-
-		if streamMode {
-			if err := encodeJSON(e.stdout, listObj); err != nil {
-				return fmt.Errorf("%w: failed to write output: %v", ErrListFailed, err)
-			}
-		} else {
-			objects = append(objects, listObj)
-		}
+		})
 	}
 
-	if streamMode {
-		return nil
-	}
-
-	result := ListResult{
+	return e.writeResult(ListResult{
 		Operation:  opList,
 		Success:    true,
 		Bucket:     e.cfg.Bucket,
@@ -84,7 +72,28 @@ func (e *executorImpl) runList(ctx context.Context) error {
 		Objects:    objects,
 		TotalCount: len(objects),
 		Duration:   time.Since(start).Round(time.Millisecond).String(),
-	}
+	})
+}
 
-	return e.writeResult(result)
+func (e *executorImpl) runListStream(ctx context.Context, opts minio.ListObjectsOptions, maxObjects int) error {
+	count := 0
+	for object := range e.client.ListObjects(ctx, e.cfg.Bucket, opts) {
+		if object.Err != nil {
+			return fmt.Errorf("%w: %v", ErrListFailed, object.Err)
+		}
+		if count >= maxObjects {
+			break
+		}
+		count++
+		if err := encodeJSON(e.stdout, ListObject{
+			Key:          object.Key,
+			Size:         object.Size,
+			LastModified: object.LastModified.Format(time.RFC3339),
+			ETag:         object.ETag,
+			StorageClass: object.StorageClass,
+		}); err != nil {
+			return fmt.Errorf("%w: failed to write output: %v", ErrListFailed, err)
+		}
+	}
+	return nil
 }

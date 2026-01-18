@@ -133,30 +133,28 @@ func (e *executorImpl) Run(_ context.Context) error {
 	ctx := e.ctx
 	e.mu.Unlock()
 
-	var err error
-
-	switch e.operation {
-	case opUpload:
-		err = e.runUpload(ctx)
-	case opDownload:
-		err = e.runDownload(ctx)
-	case opList:
-		err = e.runList(ctx)
-	case opDelete:
-		err = e.runDelete(ctx)
-	default:
-		err = fmt.Errorf("%w: unknown operation %q", ErrConfig, e.operation)
-	}
+	err := e.runOperation(ctx)
 
 	e.mu.Lock()
-	if err == nil {
-		e.exitCode = 0
-	} else {
-		e.exitCode = exitCodeFor(err)
-	}
+	e.exitCode = exitCodeFor(err)
 	e.mu.Unlock()
 
 	return err
+}
+
+func (e *executorImpl) runOperation(ctx context.Context) error {
+	switch e.operation {
+	case opUpload:
+		return e.runUpload(ctx)
+	case opDownload:
+		return e.runDownload(ctx)
+	case opList:
+		return e.runList(ctx)
+	case opDelete:
+		return e.runDelete(ctx)
+	default:
+		return fmt.Errorf("%w: unknown operation %q", ErrConfig, e.operation)
+	}
 }
 
 func (e *executorImpl) Kill(_ os.Signal) error {
