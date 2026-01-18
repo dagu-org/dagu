@@ -214,19 +214,18 @@ func (n *Node) Execute(ctx context.Context) error {
 
 	// Capture sub-runs from executors that spawn sub-DAGs (like chat with tools)
 	if subRunProvider, ok := cmd.(executor.SubRunProvider); ok {
-		subRuns := subRunProvider.GetSubRuns()
-		if len(subRuns) > 0 {
-			// Convert exec.SubDAGRun to runtime.SubDAGRun
-			runtimeSubRuns := make([]SubDAGRun, len(subRuns))
-			for i, sr := range subRuns {
-				runtimeSubRuns[i] = SubDAGRun(sr)
-			}
-			// For repeated executions, accumulate sub-runs like call/parallel steps do
-			if n.IsRepeated() && len(n.State().SubRuns) > 0 {
-				n.AddSubRunsRepeated(n.State().SubRuns...)
-			}
-			n.SetSubRuns(runtimeSubRuns)
+		// For repeated executions, accumulate previous sub-runs before setting new ones
+		if n.IsRepeated() && len(n.State().SubRuns) > 0 {
+			n.AddSubRunsRepeated(n.State().SubRuns...)
 		}
+
+		subRuns := subRunProvider.GetSubRuns()
+		// Convert exec.SubDAGRun to runtime.SubDAGRun
+		runtimeSubRuns := make([]SubDAGRun, len(subRuns))
+		for i, sr := range subRuns {
+			runtimeSubRuns[i] = SubDAGRun(sr)
+		}
+		n.SetSubRuns(runtimeSubRuns) // May be empty if no tool calls this iteration
 	}
 
 	// Capture tool definitions from chat executors for UI visibility
