@@ -4,13 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net"
-	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/aws/smithy-go"
+	"github.com/minio/minio-go/v7"
 )
 
 // Sentinel errors for S3 operations.
@@ -31,8 +28,8 @@ var (
 	ErrInvalidKey     = errors.New("s3: invalid object key")
 )
 
-// classifyAWSError converts AWS SDK errors into sentinel errors.
-func classifyAWSError(err error) error {
+// classifyMinioError converts MinIO client errors into sentinel errors.
+func classifyMinioError(err error) error {
 	if err == nil {
 		return nil
 	}
@@ -42,41 +39,24 @@ func classifyAWSError(err error) error {
 		return err
 	}
 
-	// Check for S3 specific errors
-	var noSuchBucket *types.NoSuchBucket
-	if errors.As(err, &noSuchBucket) {
-		return fmt.Errorf("%w: %v", ErrBucketNotFound, err)
-	}
-
-	var noSuchKey *types.NoSuchKey
-	if errors.As(err, &noSuchKey) {
-		return fmt.Errorf("%w: %v", ErrObjectNotFound, err)
-	}
-
-	var notFound *types.NotFound
-	if errors.As(err, &notFound) {
-		return fmt.Errorf("%w: %v", ErrObjectNotFound, err)
-	}
-
-	// Check for Smithy API errors
-	var apiErr smithy.APIError
-	if errors.As(err, &apiErr) {
-		code := apiErr.ErrorCode()
-		switch {
-		case code == "AccessDenied" || code == "Forbidden" || strings.Contains(code, "AccessDenied"):
-			return fmt.Errorf("%w: %v", ErrPermission, err)
-		case code == "InvalidAccessKeyId" || code == "SignatureDoesNotMatch":
-			return fmt.Errorf("%w: %v", ErrCredentials, err)
-		case code == "NoSuchBucket" || code == "BucketNotFound":
-			return fmt.Errorf("%w: %v", ErrBucketNotFound, err)
-		case code == "NoSuchKey" || code == "NotFound":
-			return fmt.Errorf("%w: %v", ErrObjectNotFound, err)
-		case code == "InvalidBucketName":
-			return fmt.Errorf("%w: %v", ErrInvalidBucket, err)
-		case code == "KeyTooLongError":
-			return fmt.Errorf("%w: %v", ErrInvalidKey, err)
-		case code == "RequestTimeout" || code == "SlowDown":
-			return fmt.Errorf("%w: %v", ErrTimeout, err)
+	// Check for MinIO error response
+	errResp := minio.ToErrorResponse(err)
+	if errResp.Code != "" {
+		switch errResp.Code {
+		case "NoSuchBucket", "BucketNotFound":
+			return ErrBucketNotFound
+		case "NoSuchKey", "NotFound":
+			return ErrObjectNotFound
+		case "AccessDenied", "Forbidden", "AllAccessDisabled":
+			return ErrPermission
+		case "InvalidAccessKeyId", "SignatureDoesNotMatch":
+			return ErrCredentials
+		case "InvalidBucketName":
+			return ErrInvalidBucket
+		case "KeyTooLongError":
+			return ErrInvalidKey
+		case "RequestTimeout", "SlowDown":
+			return ErrTimeout
 		}
 	}
 
@@ -84,9 +64,9 @@ func classifyAWSError(err error) error {
 	var netErr net.Error
 	if errors.As(err, &netErr) {
 		if netErr.Timeout() {
-			return fmt.Errorf("%w: %v", ErrTimeout, err)
+			return ErrTimeout
 		}
-		return fmt.Errorf("%w: %v", ErrNetwork, err)
+		return ErrNetwork
 	}
 
 	return err

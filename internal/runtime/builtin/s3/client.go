@@ -2,74 +2,66 @@ package s3
 
 import (
 	"context"
-	"fmt"
-	"net/http"
+	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
-// createClient creates an S3 client based on the configuration.
-// It supports the standard AWS credential chain plus explicit credentials.
-func createClient(ctx context.Context, cfg *Config) (*s3.Client, error) {
-	var opts []func(*config.LoadOptions) error
+// createClient creates a MinIO client based on the configuration.
+// MinIO client supports AWS S3 and all S3-compatible services (GCS, MinIO, etc.).
+func createClient(_ context.Context, cfg *Config) (*minio.Client, error) {
+	endpoint, secure := parseEndpoint(cfg)
 
-	if cfg.Region != "" {
-		opts = append(opts, config.WithRegion(cfg.Region))
-	}
-
-	if cfg.Profile != "" {
-		opts = append(opts, config.WithSharedConfigProfile(cfg.Profile))
-	}
-
-	if cfg.AccessKeyID != "" && cfg.SecretAccessKey != "" {
-		creds := credentials.NewStaticCredentialsProvider(
+	// Build credentials provider
+	var creds *credentials.Credentials
+	switch {
+	case cfg.AccessKeyID != "" && cfg.SecretAccessKey != "":
+		creds = credentials.NewStaticV4(
 			cfg.AccessKeyID,
 			cfg.SecretAccessKey,
 			cfg.SessionToken,
 		)
-		opts = append(opts, config.WithCredentialsProvider(creds))
+	case cfg.Profile != "":
+		creds = credentials.NewFileAWSCredentials("", cfg.Profile)
+	default:
+		// IAM credentials (EC2/ECS/Lambda/GKE)
+		creds = credentials.NewIAM("")
 	}
 
-	// Load AWS config
-	awsCfg, err := config.LoadDefaultConfig(ctx, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("%w: failed to load AWS config: %v", ErrConfig, err)
+	opts := &minio.Options{
+		Creds:  creds,
+		Secure: secure,
 	}
 
-	// Build S3 client options
-	var s3Opts []func(*s3.Options)
-
-	// Set custom endpoint for S3-compatible services (MinIO, DigitalOcean Spaces, etc.)
-	if cfg.Endpoint != "" {
-		s3Opts = append(s3Opts, func(o *s3.Options) {
-			o.BaseEndpoint = aws.String(cfg.Endpoint)
-		})
+	if cfg.Region != "" {
+		opts.Region = cfg.Region
 	}
 
-	if cfg.ForcePathStyle {
-		s3Opts = append(s3Opts, func(o *s3.Options) {
-			o.UsePathStyle = true
-		})
+	return minio.New(endpoint, opts)
+}
+
+// parseEndpoint parses the endpoint configuration and returns the host and secure flag.
+func parseEndpoint(cfg *Config) (endpoint string, secure bool) {
+	if cfg.Endpoint == "" {
+		// Default to AWS S3
+		if cfg.Region != "" {
+			return "s3." + cfg.Region + ".amazonaws.com", true
+		}
+		return "s3.amazonaws.com", true
 	}
 
-	if cfg.DisableSSL {
-		s3Opts = append(s3Opts, func(o *s3.Options) {
-			o.HTTPClient = &http.Client{
-				Transport: &http.Transport{
-					// Use default transport settings
-				},
-			}
-			// Override endpoint scheme to http if needed
-			if cfg.Endpoint != "" {
-				o.EndpointOptions.DisableHTTPS = true
-			}
-		})
+	endpoint = cfg.Endpoint
+	secure = !cfg.DisableSSL
+
+	// Strip scheme if present and determine secure from scheme
+	if strings.HasPrefix(endpoint, "https://") {
+		endpoint = strings.TrimPrefix(endpoint, "https://")
+		secure = true
+	} else if strings.HasPrefix(endpoint, "http://") {
+		endpoint = strings.TrimPrefix(endpoint, "http://")
+		secure = false
 	}
 
-	// Create and return the S3 client
-	client := s3.NewFromConfig(awsCfg, s3Opts...)
-	return client, nil
+	return endpoint, secure
 }

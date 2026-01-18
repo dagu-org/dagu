@@ -43,9 +43,6 @@ type Config struct {
 	// Object tagging
 	Tags map[string]string `mapstructure:"tags"`
 
-	// Checksum
-	ChecksumAlgorithm string `mapstructure:"checksumAlgorithm"` // CRC32, CRC32C, SHA1, SHA256
-
 	// Transfer options
 	PartSize    int64 `mapstructure:"partSize"`    // MB, default 10
 	Concurrency int   `mapstructure:"concurrency"` // default 5
@@ -78,9 +75,6 @@ var (
 		"authenticated-read", "aws-exec-read", "bucket-owner-read",
 		"bucket-owner-full-control",
 	}
-
-	// ValidChecksums is the list of valid checksum algorithms.
-	ValidChecksums = []string{"CRC32", "CRC32C", "SHA1", "SHA256"}
 )
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -205,11 +199,6 @@ func (c *Config) ValidateForOperation(operation string) error {
 		return fmt.Errorf("%w: invalid acl %q", ErrConfig, c.ACL)
 	}
 
-	// Validate checksum algorithm
-	if c.ChecksumAlgorithm != "" && !containsIgnoreCase(ValidChecksums, c.ChecksumAlgorithm) {
-		return fmt.Errorf("%w: checksumAlgorithm must be one of: CRC32, CRC32C, SHA1, SHA256", ErrConfig)
-	}
-
 	// Validate concurrency
 	if c.Concurrency < 0 {
 		return fmt.Errorf("%w: concurrency must be >= 0", ErrConfig)
@@ -268,9 +257,6 @@ var configSchema = &jsonschema.Schema{
 
 		// Object tagging
 		"tags": {Type: "object", Description: "Object tags as key-value pairs"},
-
-		// Checksum
-		"checksumAlgorithm": {Type: "string", Enum: []any{"CRC32", "CRC32C", "SHA1", "SHA256"}, Description: "Checksum algorithm for data integrity"},
 
 		// Transfer options
 		"partSize":    {Type: "integer", Minimum: ptrFloat(5), Description: "Multipart upload part size in MB (default: 10, min: 5)"},

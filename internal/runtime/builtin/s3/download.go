@@ -7,9 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/minio/minio-go/v7"
 )
 
 // DownloadResult contains the result of a download operation.
@@ -35,65 +33,36 @@ func (e *executorImpl) runDownload(ctx context.Context) error {
 		return fmt.Errorf("%w: failed to create destination directory: %v", ErrDownloadFailed, err)
 	}
 
-	// Get object metadata first to check existence and get size
-	headOutput, err := e.client.HeadObject(ctx, &s3.HeadObjectInput{
-		Bucket: aws.String(e.cfg.Bucket),
-		Key:    aws.String(e.cfg.Key),
-	})
+	// Get object metadata first to check existence and get info
+	objInfo, err := e.client.StatObject(ctx, e.cfg.Bucket, e.cfg.Key, minio.StatObjectOptions{})
 	if err != nil {
-		classifiedErr := classifyAWSError(err)
-		return fmt.Errorf("%w: %v", ErrDownloadFailed, classifiedErr)
+		return fmt.Errorf("%w: %v", ErrDownloadFailed, err)
 	}
 
-	// Create a temporary file for atomic download
-	tempFile, err := os.CreateTemp(destDir, ".s3download-*")
-	if err != nil {
-		return fmt.Errorf("%w: failed to create temp file: %v", ErrDownloadFailed, err)
-	}
-	tempPath := tempFile.Name()
+	// Download to temp file first (atomic)
+	tmpFile := e.cfg.Destination + ".tmp"
 
-	// Clean up on failure
-	success := false
+	// Clean up temp file on error
 	defer func() {
-		if !success {
-			_ = os.Remove(tempPath)
-		}
+		_ = os.Remove(tmpFile)
 	}()
 
-	// Configure downloader with part size and concurrency
-	partSizeBytes := e.cfg.PartSize * 1024 * 1024 // Convert MB to bytes
-	if partSizeBytes < manager.MinUploadPartSize {
-		partSizeBytes = manager.MinUploadPartSize
-	}
-
-	downloader := manager.NewDownloader(e.client, func(d *manager.Downloader) {
-		d.PartSize = partSizeBytes
-		if e.cfg.Concurrency > 0 {
-			d.Concurrency = e.cfg.Concurrency
-		}
-	})
-
-	// Download to temp file
-	numBytes, err := downloader.Download(ctx, tempFile, &s3.GetObjectInput{
-		Bucket: aws.String(e.cfg.Bucket),
-		Key:    aws.String(e.cfg.Key),
-	})
+	// Download file using FGetObject (handles large files automatically)
+	err = e.client.FGetObject(ctx, e.cfg.Bucket, e.cfg.Key, tmpFile, minio.GetObjectOptions{})
 	if err != nil {
-		_ = tempFile.Close()
-		classifiedErr := classifyAWSError(err)
-		return fmt.Errorf("%w: %v", ErrDownloadFailed, classifiedErr)
-	}
-
-	// Close temp file before rename
-	if err := tempFile.Close(); err != nil {
-		return fmt.Errorf("%w: failed to close temp file: %v", ErrDownloadFailed, err)
+		return fmt.Errorf("%w: %v", ErrDownloadFailed, err)
 	}
 
 	// Atomic rename to final destination
-	if err := os.Rename(tempPath, e.cfg.Destination); err != nil {
+	if err := os.Rename(tmpFile, e.cfg.Destination); err != nil {
 		return fmt.Errorf("%w: failed to move file to destination: %v", ErrDownloadFailed, err)
 	}
-	success = true
+
+	// Get final file info
+	fileInfo, err := os.Stat(e.cfg.Destination)
+	if err != nil {
+		return fmt.Errorf("%w: failed to stat destination file: %v", ErrDownloadFailed, err)
+	}
 
 	// Build result
 	result := DownloadResult{
@@ -103,15 +72,10 @@ func (e *executorImpl) runDownload(ctx context.Context) error {
 		Key:         e.cfg.Key,
 		URI:         fmt.Sprintf("s3://%s/%s", e.cfg.Bucket, e.cfg.Key),
 		Destination: e.cfg.Destination,
-		Size:        numBytes,
+		Size:        fileInfo.Size(),
+		ContentType: objInfo.ContentType,
+		ETag:        objInfo.ETag,
 		Duration:    time.Since(start).Round(time.Millisecond).String(),
-	}
-
-	if headOutput.ContentType != nil {
-		result.ContentType = *headOutput.ContentType
-	}
-	if headOutput.ETag != nil {
-		result.ETag = *headOutput.ETag
 	}
 
 	return e.writeResult(result)
