@@ -2626,6 +2626,120 @@ steps:
 	})
 }
 
+func TestRedisInheritance(t *testing.T) {
+	t.Run("StepInheritsRedisFromDAG", func(t *testing.T) {
+		yaml := `
+redis:
+  url: redis://localhost:6379
+  password: secret
+steps:
+  - name: step1
+    type: redis
+    config:
+      command: PING
+  - name: step2
+    type: redis
+    config:
+      command: GET
+      key: mykey
+`
+		ctx := context.Background()
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 2)
+
+		// Both steps should inherit Redis config
+		for _, step := range dag.Steps {
+			assert.Equal(t, "redis", step.ExecutorConfig.Type)
+			assert.Equal(t, "redis://localhost:6379", step.ExecutorConfig.Config["url"])
+			assert.Equal(t, "secret", step.ExecutorConfig.Config["password"])
+		}
+
+		// Step 1 should have PING command
+		assert.Equal(t, "PING", dag.Steps[0].ExecutorConfig.Config["command"])
+
+		// Step 2 should have GET command with key
+		assert.Equal(t, "GET", dag.Steps[1].ExecutorConfig.Config["command"])
+		assert.Equal(t, "mykey", dag.Steps[1].ExecutorConfig.Config["key"])
+	})
+
+	t.Run("StepOverridesRedisConfig", func(t *testing.T) {
+		yaml := `
+redis:
+  url: redis://default:6379
+  db: 0
+steps:
+  - name: step1
+    type: redis
+    config:
+      db: 1
+      command: PING
+  - name: step2
+    type: redis
+    config:
+      command: GET
+      key: mykey
+`
+		ctx := context.Background()
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 2)
+
+		// Step 1 should override db but inherit url
+		step1 := dag.Steps[0]
+		assert.Equal(t, "redis", step1.ExecutorConfig.Type)
+		assert.Equal(t, "redis://default:6379", step1.ExecutorConfig.Config["url"])
+		// YAML may parse the db as different int types, so compare using interface conversion
+		assert.EqualValues(t, 1, step1.ExecutorConfig.Config["db"]) // Overridden
+
+		// Step 2 should inherit all from DAG
+		step2 := dag.Steps[1]
+		assert.Equal(t, "redis", step2.ExecutorConfig.Type)
+		assert.Equal(t, "redis://default:6379", step2.ExecutorConfig.Config["url"])
+		// db should NOT be set because it's 0 (zero value) at DAG level
+	})
+
+	t.Run("RedisTypeInferenceFromDAG", func(t *testing.T) {
+		yaml := `
+redis:
+  host: localhost
+  port: 6379
+steps:
+  - name: step1
+    config:
+      command: PING
+`
+		ctx := context.Background()
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		// Type should be inferred as redis from DAG-level config
+		assert.Equal(t, "redis", dag.Steps[0].ExecutorConfig.Type)
+		assert.Equal(t, "localhost", dag.Steps[0].ExecutorConfig.Config["host"])
+		assert.Equal(t, 6379, dag.Steps[0].ExecutorConfig.Config["port"])
+	})
+
+	t.Run("ExplicitTypeOverridesDAGRedis", func(t *testing.T) {
+		yaml := `
+redis:
+  host: localhost
+  port: 6379
+steps:
+  - name: step1
+    type: command
+    command: echo hello
+`
+		ctx := context.Background()
+		dag, err := spec.LoadYAML(ctx, []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		// Explicit type should override DAG-level redis inference
+		assert.Equal(t, "command", dag.Steps[0].ExecutorConfig.Type)
+	})
+}
+
 func TestStepLevelEnv(t *testing.T) {
 	t.Run("BasicStepEnv", func(t *testing.T) {
 		yaml := `

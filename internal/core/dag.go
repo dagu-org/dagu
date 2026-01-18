@@ -184,9 +184,16 @@ type DAG struct {
 	// SSH contains the default SSH configuration for the DAG.
 	// Excluded from JSON: may contain password.
 	SSH *SSHConfig `json:"-"`
+	// S3 contains the default S3 configuration for the DAG.
+	// Excluded from JSON: may contain credentials.
+	S3 *S3Config `json:"-"`
 	// LLM contains the default LLM configuration for the DAG.
 	// Steps with type: chat inherit this configuration if they don't specify their own llm field.
 	LLM *LLMConfig `json:"llm,omitempty"`
+	// Redis contains the default Redis configuration for the DAG.
+	// Steps with type: redis inherit this configuration.
+	// Excluded from JSON: may contain password.
+	Redis *RedisConfig `json:"-"`
 	// Secrets contains references to external secrets to be resolved at runtime.
 	Secrets []SecretRef `json:"secrets,omitempty"`
 	// dotenvOnce ensures LoadDotEnv is called only once, even with concurrent calls.
@@ -516,6 +523,62 @@ type SSHConfig struct {
 	Shell string `json:"shell,omitempty"`
 	// ShellArgs contains additional arguments that should be passed to the shell executable.
 	ShellArgs []string `json:"shellArgs,omitempty"`
+}
+
+// S3Config contains the default S3 configuration for the DAG.
+// This allows steps to inherit S3 settings without specifying them individually.
+type S3Config struct {
+	// Region is the AWS region (e.g., us-east-1).
+	Region string `json:"region,omitempty"`
+	// Endpoint is a custom S3-compatible endpoint URL.
+	// Use this for S3-compatible services like MinIO, LocalStack, etc.
+	Endpoint string `json:"endpoint,omitempty"`
+	// AccessKeyID is the AWS access key ID.
+	AccessKeyID string `json:"accessKeyId,omitempty"`
+	// SecretAccessKey is the AWS secret access key.
+	SecretAccessKey string `json:"secretAccessKey,omitempty"`
+	// SessionToken is the AWS session token (for temporary credentials).
+	SessionToken string `json:"sessionToken,omitempty"`
+	// Profile is the AWS credentials profile name.
+	Profile string `json:"profile,omitempty"`
+	// ForcePathStyle enables path-style addressing (required for S3-compatible services).
+	ForcePathStyle bool `json:"forcePathStyle,omitempty"`
+	// DisableSSL disables SSL for the connection (for local testing only).
+	DisableSSL bool `json:"disableSSL,omitempty"`
+	// Bucket is the default S3 bucket name.
+	// Can be overridden at the step level.
+	Bucket string `json:"bucket,omitempty"`
+}
+
+// RedisConfig contains the default Redis configuration for the DAG.
+// Steps with type: redis inherit this configuration.
+type RedisConfig struct {
+	// URL is the Redis connection URL (redis://user:pass@host:port/db).
+	URL string `json:"url,omitempty"`
+	// Host is the Redis host (alternative to URL).
+	Host string `json:"host,omitempty"`
+	// Port is the Redis port (default: 6379).
+	Port int `json:"port,omitempty"`
+	// Password is the authentication password.
+	Password string `json:"password,omitempty"`
+	// Username is the ACL username (Redis 6+).
+	Username string `json:"username,omitempty"`
+	// DB is the database number (0-15).
+	DB int `json:"db,omitempty"`
+	// TLS enables TLS connection.
+	TLS bool `json:"tls,omitempty"`
+	// TLSSkipVerify skips TLS certificate verification.
+	TLSSkipVerify bool `json:"tlsSkipVerify,omitempty"`
+	// Mode is the connection mode (standalone, sentinel, cluster).
+	Mode string `json:"mode,omitempty"`
+	// SentinelMaster is the sentinel master name.
+	SentinelMaster string `json:"sentinelMaster,omitempty"`
+	// SentinelAddrs is the list of sentinel addresses.
+	SentinelAddrs []string `json:"sentinelAddrs,omitempty"`
+	// ClusterAddrs is the list of cluster node addresses.
+	ClusterAddrs []string `json:"clusterAddrs,omitempty"`
+	// MaxRetries is the maximum number of retries.
+	MaxRetries int `json:"maxRetries,omitempty"`
 }
 
 // Schedule contains the cron expression and the parsed cron schedule.

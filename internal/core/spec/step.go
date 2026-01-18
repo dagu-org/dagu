@@ -1147,10 +1147,60 @@ func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 			result.ExecutorConfig.Type = "container"
 		} else if ctx.dag.SSH != nil {
 			result.ExecutorConfig.Type = "ssh"
+		} else if ctx.dag.Redis != nil {
+			result.ExecutorConfig.Type = "redis"
 		}
 	}
 
+	// Merge DAG-level Redis config into step config (step takes precedence)
+	if result.ExecutorConfig.Type == "redis" && ctx.dag != nil && ctx.dag.Redis != nil {
+		mergeRedisConfig(ctx.dag.Redis, result.ExecutorConfig.Config)
+	}
+
 	return nil
+}
+
+// mergeRedisConfig merges DAG-level Redis defaults into step config.
+// Step-level values take precedence over DAG-level defaults.
+func mergeRedisConfig(dagRedis *core.RedisConfig, stepConfig map[string]any) {
+	setIfMissing := func(key string, value any) {
+		if _, exists := stepConfig[key]; !exists && !isRedisZeroValue(value) {
+			stepConfig[key] = value
+		}
+	}
+
+	setIfMissing("url", dagRedis.URL)
+	setIfMissing("host", dagRedis.Host)
+	setIfMissing("port", dagRedis.Port)
+	setIfMissing("password", dagRedis.Password)
+	setIfMissing("username", dagRedis.Username)
+	setIfMissing("db", dagRedis.DB)
+	setIfMissing("tls", dagRedis.TLS)
+	setIfMissing("tlsSkipVerify", dagRedis.TLSSkipVerify)
+	setIfMissing("mode", dagRedis.Mode)
+	setIfMissing("sentinelMaster", dagRedis.SentinelMaster)
+	setIfMissing("sentinelAddrs", dagRedis.SentinelAddrs)
+	setIfMissing("clusterAddrs", dagRedis.ClusterAddrs)
+	setIfMissing("maxRetries", dagRedis.MaxRetries)
+}
+
+// isRedisZeroValue checks if a value is a zero value for Redis config merging.
+func isRedisZeroValue(v any) bool {
+	if v == nil {
+		return true
+	}
+	switch val := v.(type) {
+	case string:
+		return val == ""
+	case int:
+		return val == 0
+	case bool:
+		return !val
+	case []string:
+		return len(val) == 0
+	default:
+		return false
+	}
 }
 
 // parseLegacyExecutor parses the legacy executor field format.

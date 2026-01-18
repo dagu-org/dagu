@@ -10,7 +10,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { ArrowRight, Folder, GitBranch, Mail, RefreshCw } from 'lucide-react';
+import { getExecutorCommand } from '@/lib/executor-utils';
+import { ArrowRight, Code, Folder, GitBranch, Mail, RefreshCw } from 'lucide-react';
 import { components } from '../../../../api/v2/schema';
 import { Badge } from '../../../../components/ui/badge';
 import { TableCell, TableRow } from '../../../../components/ui/table';
@@ -82,12 +83,33 @@ function DAGStepTableRow({ step, index }: Props) {
       <TableCell>
         <div className="space-y-1.5">
           {/* Command & Args */}
-          {step.commands && step.commands.length > 0 && (
+          {step.commands && step.commands.length > 0 ? (
             <CommandDisplay
               commands={step.commands}
               icon="terminal"
               maxLength={50}
             />
+          ) : (
+            // Executor-specific display
+            (() => {
+              const execCmd = getExecutorCommand(step);
+              if (execCmd) {
+                return (
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Code className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                    <span
+                      className="font-mono text-xs truncate max-w-[200px]"
+                      title={execCmd}
+                    >
+                      {execCmd.length > 50
+                        ? execCmd.slice(0, 47) + '...'
+                        : execCmd}
+                    </span>
+                  </div>
+                );
+              }
+              return null;
+            })()
           )}
 
           {/* Script */}
