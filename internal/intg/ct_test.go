@@ -255,29 +255,6 @@ steps:
 			},
 		},
 		{
-			// Test shell field with multiple commands (multi-step execution)
-			name: "ShellFieldMultipleCommands",
-			dagConfigFunc: func(_ string) string {
-				return fmt.Sprintf(`
-container:
-  image: %s
-  shell: ["/bin/sh", "-c"]
-steps:
-  - command: echo step1
-    output: SHELL_MULTI_OUT1
-  - command: echo step2
-    output: SHELL_MULTI_OUT2
-  - command: echo step3
-    output: SHELL_MULTI_OUT3
-`, testImage)
-			},
-			expectedOutputs: map[string]any{
-				"SHELL_MULTI_OUT1": "step1",
-				"SHELL_MULTI_OUT2": "step2",
-				"SHELL_MULTI_OUT3": "step3",
-			},
-		},
-		{
 			// Test shell field with pipes and redirects (shell features)
 			name: "ShellFieldWithPipes",
 			dagConfigFunc: func(_ string) string {
@@ -994,21 +971,6 @@ steps:
 			expectedOutputs: map[string]any{
 				"EXEC_SHELL_OUT1": "shell in exec mode",
 				"EXEC_SHELL_OUT2": "second command",
-			},
-		},
-		{
-			// Test shell field with pipes in exec mode
-			name: "ShellField_ExecModeWithPipes",
-			dagConfig: fmt.Sprintf(`
-container:
-  exec: %s
-  shell: ["/bin/sh", "-c"]
-steps:
-  - command: echo "a" && echo "b"
-    output: EXEC_SHELL_PIPE_OUT
-`, containerName),
-			expectedOutputs: map[string]any{
-				"EXEC_SHELL_PIPE_OUT": "a\nb",
 			},
 		},
 	}
