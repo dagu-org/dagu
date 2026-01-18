@@ -280,7 +280,7 @@ steps:
 			dag := th.DAG(t, tt.dagConfigFunc(port))
 			dag.Agent().RunSuccess(t)
 			dag.AssertLatestStatus(t, core.Succeeded)
-			if tt.expectedOutputs != nil && len(tt.expectedOutputs) > 0 {
+			if len(tt.expectedOutputs) > 0 {
 				dag.AssertOutputs(t, tt.expectedOutputs)
 			}
 		})
