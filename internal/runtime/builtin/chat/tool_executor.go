@@ -1,18 +1,3 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package chat
 
 import (
@@ -30,8 +15,8 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	exec1 "github.com/dagu-org/dagu/internal/core/exec"
 	llmpkg "github.com/dagu-org/dagu/internal/llm"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
-	"github.com/google/uuid"
 )
 
 // ToolExecutor handles the execution of tool calls by running DAGs.
@@ -105,16 +90,11 @@ func (e *ToolExecutor) executeToolCall(ctx context.Context, tc llmpkg.ToolCall) 
 	// Build parameter string from arguments
 	params := buildParamString(args)
 
-	// Generate a unique run ID for this tool execution
-	runID, err := generateRunID()
-	if err != nil {
-		logger.Error(ctx, "Failed to generate run ID", tag.Error(err))
-		return core.ToolResult{
-			ToolCallID: tc.ID,
-			Name:       toolName,
-			Error:      fmt.Sprintf("failed to generate run ID: %v", err),
-		}
-	}
+	// Generate a unique run ID for this tool execution using the standard sub-DAG ID generation.
+	// Using repeated=true ensures uniqueness even if the same tool is called multiple times
+	// in a single tool calling loop. This also ensures proper UI/API integration since the
+	// ID follows the deterministic pattern: Base58EncodeSHA256(parentRunID:stepName:params:random)
+	runID := runtime.GenerateSubDAGRunID(ctx, params, true)
 
 	// Create SubDAGExecutor for this tool DAG
 	subDAGExec, err := executor.NewSubDAGExecutor(ctx, e.registry.dagNames[toolName])
@@ -280,13 +260,4 @@ func formatToolResult(result *exec1.RunStatus) string {
 
 	// No outputs, return a simple success message
 	return "Tool execution completed successfully"
-}
-
-// generateRunID generates a unique run ID for tool execution.
-func generateRunID() (string, error) {
-	id, err := uuid.NewV7()
-	if err != nil {
-		return "", fmt.Errorf("failed to generate UUID: %w", err)
-	}
-	return id.String(), nil
 }

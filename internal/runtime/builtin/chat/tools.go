@@ -40,15 +40,13 @@ type toolParam struct {
 
 // NewToolRegistry creates a ToolRegistry by loading the specified DAGs.
 // dagNames is a list of DAG names to load as tools.
+// Tools are first searched in LocalDAGs (inline definitions with ---), then in the database.
 func NewToolRegistry(ctx context.Context, dagNames []string) (*ToolRegistry, error) {
 	if len(dagNames) == 0 {
 		return nil, nil
 	}
 
 	rCtx := exec1.GetContext(ctx)
-	if rCtx.DB == nil {
-		return nil, fmt.Errorf("database not available in context")
-	}
 
 	registry := &ToolRegistry{
 		tools:    make(map[string]*toolInfo),
@@ -56,9 +54,26 @@ func NewToolRegistry(ctx context.Context, dagNames []string) (*ToolRegistry, err
 	}
 
 	for _, dagName := range dagNames {
-		dag, err := rCtx.DB.GetDAG(ctx, dagName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load tool DAG %q: %w", dagName, err)
+		var dag *core.DAG
+
+		// First, check if it's a local DAG defined in the same file (using --- separator)
+		// This follows the same pattern as SubDAGExecutor.NewSubDAGExecutor()
+		if rCtx.DAG != nil && rCtx.DAG.LocalDAGs != nil {
+			if localDAG, ok := rCtx.DAG.LocalDAGs[dagName]; ok {
+				dag = localDAG
+			}
+		}
+
+		// If not found locally, fall back to database lookup
+		if dag == nil {
+			if rCtx.DB == nil {
+				return nil, fmt.Errorf("database not available in context and tool DAG %q not found in local DAGs", dagName)
+			}
+			var err error
+			dag, err = rCtx.DB.GetDAG(ctx, dagName)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load tool DAG %q: %w", dagName, err)
+			}
 		}
 
 		// Use DAG.Name as the tool name (this is what the LLM will use)
