@@ -130,10 +130,89 @@ func (p *Provider) ChatStream(ctx context.Context, req *llm.ChatRequest) (<-chan
 
 func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, error) {
 	// Anthropic separates system message from other messages
-	var systemContent string
-	messages := make([]message, 0, len(req.Messages))
+	systemContent, messages := p.processMessages(req.Messages)
+	// Anthropic requires at least one user message
+	if len(messages) == 0 {
+		return nil, llm.WrapError(providerName, fmt.Errorf("at least one user message is required"))
+	}
 
-	for _, m := range req.Messages {
+	chatReq := messagesRequest{
+		Model:    req.Model,
+		Messages: messages,
+		Stream:   stream,
+	}
+
+	// Set system message if present
+	if systemContent != "" {
+		chatReq.System = systemContent
+	}
+
+	// Add tools if provided
+	if len(req.Tools) > 0 {
+		chatReq.Tools = p.convertTools(req.Tools)
+	}
+
+	// Add tool choice if specified
+	if req.ToolChoice != "" {
+		switch req.ToolChoice {
+		case "auto":
+			chatReq.ToolChoice = map[string]string{"type": "auto"}
+		case "required":
+			chatReq.ToolChoice = map[string]string{"type": "any"}
+		case "none":
+			// Don't include tools
+			chatReq.Tools = nil
+		default:
+			// Specific tool name
+			chatReq.ToolChoice = map[string]string{"type": "tool", "name": req.ToolChoice}
+		}
+	}
+
+	// Add thinking configuration if enabled
+	// Must be done before setting max_tokens since max_tokens must be > budget_tokens
+	var thinkingBudget int
+	if req.Thinking != nil && req.Thinking.Enabled {
+		thinkingBudget = p.getThinkingBudget(req.Thinking)
+		chatReq.Thinking = &thinkingRequest{
+			Type:        "enabled",
+			BudgetToken: thinkingBudget,
+		}
+	}
+
+	// Set max_tokens (required by Anthropic)
+	// When thinking is enabled, max_tokens must be > budget_tokens
+	if req.MaxTokens != nil {
+		chatReq.MaxTokens = *req.MaxTokens
+	} else {
+		// Default to 4096 if not specified
+		chatReq.MaxTokens = 4096
+	}
+
+	// Ensure max_tokens > budget_tokens when thinking is enabled
+	if thinkingBudget > 0 && chatReq.MaxTokens <= thinkingBudget {
+		// Set max_tokens to budget + reasonable buffer for response
+		// Anthropic recommends having room for the actual response after thinking
+		chatReq.MaxTokens = thinkingBudget + 4096
+	}
+
+	if req.Temperature != nil {
+		chatReq.Temperature = req.Temperature
+	}
+	if req.TopP != nil {
+		chatReq.TopP = req.TopP
+	}
+	if len(req.Stop) > 0 {
+		chatReq.StopSequences = req.Stop
+	}
+
+	return json.Marshal(chatReq)
+}
+
+func (p *Provider) processMessages(reqMessages []llm.Message) (string, []message) {
+	var systemContent string
+	messages := make([]message, 0, len(reqMessages))
+
+	for _, m := range reqMessages {
 		switch m.Role {
 		case llm.RoleSystem:
 			// Concatenate system messages
@@ -197,109 +276,43 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest, stream bool) ([]byte, 
 			})
 		}
 	}
+	return systemContent, messages
+}
 
-	// Anthropic requires at least one user message
-	if len(messages) == 0 {
-		return nil, llm.WrapError(providerName, fmt.Errorf("at least one user message is required"))
+func (p *Provider) convertTools(tools []llm.Tool) []tool {
+	if len(tools) == 0 {
+		return nil
 	}
-
-	chatReq := messagesRequest{
-		Model:    req.Model,
-		Messages: messages,
-		Stream:   stream,
-	}
-
-	// Set system message if present
-	if systemContent != "" {
-		chatReq.System = systemContent
-	}
-
-	// Add tools if provided
-	if len(req.Tools) > 0 {
-		chatReq.Tools = make([]tool, len(req.Tools))
-		for i, t := range req.Tools {
-			// Extract properties and required from the Parameters schema
-			var props map[string]any
-			var required []string
-			if t.Function.Parameters != nil {
-				if p, ok := t.Function.Parameters["properties"].(map[string]any); ok {
-					props = p
-				}
-				if r, ok := t.Function.Parameters["required"].([]any); ok {
-					required = make([]string, len(r))
-					for j, v := range r {
-						if s, ok := v.(string); ok {
-							required[j] = s
-						}
+	
+	result := make([]tool, len(tools))
+	for i, t := range tools {
+		// Extract properties and required from the Parameters schema
+		var props map[string]any
+		var required []string
+		if t.Function.Parameters != nil {
+			if p, ok := t.Function.Parameters["properties"].(map[string]any); ok {
+				props = p
+			}
+			if r, ok := t.Function.Parameters["required"].([]any); ok {
+				required = make([]string, len(r))
+				for j, v := range r {
+					if s, ok := v.(string); ok {
+						required[j] = s
 					}
 				}
 			}
-			chatReq.Tools[i] = tool{
-				Name:        t.Function.Name,
-				Description: t.Function.Description,
-				InputSchema: inputSchema{
-					Type:       "object",
-					Properties: props,
-					Required:   required,
-				},
-			}
+		}
+		result[i] = tool{
+			Name:        t.Function.Name,
+			Description: t.Function.Description,
+			InputSchema: inputSchema{
+				Type:       "object",
+				Properties: props,
+				Required:   required,
+			},
 		}
 	}
-
-	// Add tool choice if specified
-	if req.ToolChoice != "" {
-		switch req.ToolChoice {
-		case "auto":
-			chatReq.ToolChoice = map[string]string{"type": "auto"}
-		case "required":
-			chatReq.ToolChoice = map[string]string{"type": "any"}
-		case "none":
-			// Don't include tools
-			chatReq.Tools = nil
-		default:
-			// Specific tool name
-			chatReq.ToolChoice = map[string]string{"type": "tool", "name": req.ToolChoice}
-		}
-	}
-
-	// Add thinking configuration if enabled
-	// Must be done before setting max_tokens since max_tokens must be > budget_tokens
-	var thinkingBudget int
-	if req.Thinking != nil && req.Thinking.Enabled {
-		thinkingBudget = p.getThinkingBudget(req.Thinking)
-		chatReq.Thinking = &thinkingRequest{
-			Type:        "enabled",
-			BudgetToken: thinkingBudget,
-		}
-	}
-
-	// Set max_tokens (required by Anthropic)
-	// When thinking is enabled, max_tokens must be > budget_tokens
-	if req.MaxTokens != nil {
-		chatReq.MaxTokens = *req.MaxTokens
-	} else {
-		// Default to 4096 if not specified
-		chatReq.MaxTokens = 4096
-	}
-
-	// Ensure max_tokens > budget_tokens when thinking is enabled
-	if thinkingBudget > 0 && chatReq.MaxTokens <= thinkingBudget {
-		// Set max_tokens to budget + reasonable buffer for response
-		// Anthropic recommends having room for the actual response after thinking
-		chatReq.MaxTokens = thinkingBudget + 4096
-	}
-
-	if req.Temperature != nil {
-		chatReq.Temperature = req.Temperature
-	}
-	if req.TopP != nil {
-		chatReq.TopP = req.TopP
-	}
-	if len(req.Stop) > 0 {
-		chatReq.StopSequences = req.Stop
-	}
-
-	return json.Marshal(chatReq)
+	return result
 }
 
 // getThinkingBudget determines the token budget for thinking mode.

@@ -137,10 +137,52 @@ func (p *Provider) ChatStream(ctx context.Context, req *llm.ChatRequest) (<-chan
 
 func (p *Provider) buildRequestBody(req *llm.ChatRequest) ([]byte, error) {
 	// Separate system instruction from other messages
-	var sysInstr *systemInstruction
-	contents := make([]content, 0, len(req.Messages))
+	sysInstr, contents := p.processMessages(req.Messages)
 
-	for _, m := range req.Messages {
+	geminiReq := generateContentRequest{
+		Contents: contents,
+	}
+
+	if sysInstr != nil {
+		geminiReq.SystemInstruction = sysInstr
+	}
+
+	// Add tools if provided
+	if len(req.Tools) > 0 {
+		geminiReq.Tools = p.convertTools(req.Tools)
+	}
+
+	// Add tool choice config if specified
+	if req.ToolChoice != "" {
+		switch req.ToolChoice {
+		case "auto":
+			geminiReq.ToolConfig = &toolConfig{
+				FunctionCallingConfig: &functionCallingConfig{Mode: "AUTO"},
+			}
+		case "required":
+			geminiReq.ToolConfig = &toolConfig{
+				FunctionCallingConfig: &functionCallingConfig{Mode: "ANY"},
+			}
+		case "none":
+			geminiReq.ToolConfig = &toolConfig{
+				FunctionCallingConfig: &functionCallingConfig{Mode: "NONE"},
+			}
+		}
+	}
+
+	// Build generation config
+	if genConfig := p.buildGenerationConfig(req); genConfig != nil {
+		geminiReq.GenerationConfig = genConfig
+	}
+
+	return json.Marshal(geminiReq)
+}
+
+func (p *Provider) processMessages(reqMessages []llm.Message) (*systemInstruction, []content) {
+	var sysInstr *systemInstruction
+	contents := make([]content, 0, len(reqMessages))
+
+	for _, m := range reqMessages {
 		switch m.Role {
 		case llm.RoleSystem:
 			if sysInstr == nil {
@@ -207,47 +249,25 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest) ([]byte, error) {
 			})
 		}
 	}
+	return sysInstr, contents
+}
 
-	geminiReq := generateContentRequest{
-		Contents: contents,
+func (p *Provider) convertTools(tools []llm.Tool) []geminiTool {
+	if len(tools) == 0 {
+		return nil
 	}
-
-	if sysInstr != nil {
-		geminiReq.SystemInstruction = sysInstr
-	}
-
-	// Add tools if provided
-	if len(req.Tools) > 0 {
-		funcDecls := make([]functionDeclaration, len(req.Tools))
-		for i, t := range req.Tools {
-			funcDecls[i] = functionDeclaration{
-				Name:        t.Function.Name,
-				Description: t.Function.Description,
-				Parameters:  t.Function.Parameters,
-			}
-		}
-		geminiReq.Tools = []geminiTool{{FunctionDeclarations: funcDecls}}
-	}
-
-	// Add tool choice config if specified
-	if req.ToolChoice != "" {
-		switch req.ToolChoice {
-		case "auto":
-			geminiReq.ToolConfig = &toolConfig{
-				FunctionCallingConfig: &functionCallingConfig{Mode: "AUTO"},
-			}
-		case "required":
-			geminiReq.ToolConfig = &toolConfig{
-				FunctionCallingConfig: &functionCallingConfig{Mode: "ANY"},
-			}
-		case "none":
-			geminiReq.ToolConfig = &toolConfig{
-				FunctionCallingConfig: &functionCallingConfig{Mode: "NONE"},
-			}
+	funcDecls := make([]functionDeclaration, len(tools))
+	for i, t := range tools {
+		funcDecls[i] = functionDeclaration{
+			Name:        t.Function.Name,
+			Description: t.Function.Description,
+			Parameters:  t.Function.Parameters,
 		}
 	}
+	return []geminiTool{{FunctionDeclarations: funcDecls}}
+}
 
-	// Build generation config
+func (p *Provider) buildGenerationConfig(req *llm.ChatRequest) *generationConfig {
 	genConfig := &generationConfig{}
 	hasConfig := false
 
@@ -302,11 +322,10 @@ func (p *Provider) buildRequestBody(req *llm.ChatRequest) ([]byte, error) {
 		}
 	}
 
-	if hasConfig {
-		geminiReq.GenerationConfig = genConfig
+	if !hasConfig {
+		return nil
 	}
-
-	return json.Marshal(geminiReq)
+	return genConfig
 }
 
 // mapEffortToThinkingLevel maps unified effort levels to Gemini thinkingLevel.
