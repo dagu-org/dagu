@@ -264,6 +264,9 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 		return
 	}
 	q := v.(*queue)
+	logger.Debug(ctx, "Processing queue",
+		tag.MaxConcurrency(q.maxConc()),
+	)
 
 	items, err := p.queueStore.List(ctx, queueName)
 	if err != nil {
@@ -301,6 +304,11 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 
 	maxConc := q.maxConc()
 	free := maxConc - alive
+	logger.Debug(ctx, "Queue capacity check",
+		tag.MaxConcurrency(maxConc),
+		tag.Alive(alive),
+		tag.Count(free),
+	)
 	if free <= 0 {
 		logger.Debug(ctx, "Max concurrency reached",
 			tag.MaxConcurrency(maxConc),
