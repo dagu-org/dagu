@@ -5,11 +5,14 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 
 	"github.com/dagu-org/dagu/api/v2"
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/gitsync"
+	"github.com/dagu-org/dagu/internal/service/audit"
 )
 
 // SyncService is the interface for Git sync operations.
@@ -102,6 +105,21 @@ func (a *API) SyncPull(ctx context.Context, _ api.SyncPullRequestObject) (api.Sy
 		return nil, internalError(err)
 	}
 
+	// Audit log
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		details, _ := json.Marshal(map[string]any{
+			"synced":    result.Synced,
+			"modified":  result.Modified,
+			"conflicts": result.Conflicts,
+		})
+		entry := audit.NewEntry(audit.CategoryGitSync, "sync_pull", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
+	}
+
 	return api.SyncPull200JSONResponse(toAPISyncResult(result)), nil
 }
 
@@ -125,6 +143,21 @@ func (a *API) SyncPublishAll(ctx context.Context, req api.SyncPublishAllRequestO
 			return nil, errSyncNotConfigured
 		}
 		return nil, internalError(err)
+	}
+
+	// Audit log
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		details, _ := json.Marshal(map[string]any{
+			"message":  message,
+			"synced":   result.Synced,
+			"modified": result.Modified,
+		})
+		entry := audit.NewEntry(audit.CategoryGitSync, "sync_publish_all", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
 	}
 
 	return api.SyncPublishAll200JSONResponse(toAPISyncResult(result)), nil
@@ -188,6 +221,22 @@ func (a *API) UpdateSyncConfig(ctx context.Context, req api.UpdateSyncConfigRequ
 		return nil, internalError(err)
 	}
 
+	// Audit log (exclude sensitive auth fields)
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		details, _ := json.Marshal(map[string]any{
+			"enabled":      cfg.Enabled,
+			"repository":   cfg.Repository,
+			"branch":       cfg.Branch,
+			"push_enabled": cfg.PushEnabled,
+		})
+		entry := audit.NewEntry(audit.CategoryGitSync, "sync_config_update", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
+	}
+
 	return api.UpdateSyncConfig200JSONResponse(toAPISyncConfig(cfg)), nil
 }
 
@@ -205,6 +254,21 @@ func (a *API) PublishDag(ctx context.Context, req api.PublishDagRequestObject) (
 	result, err := a.syncService.Publish(ctx, req.Name, message, force)
 	if err != nil {
 		return handlePublishError(err, req.Name)
+	}
+
+	// Audit log
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		details, _ := json.Marshal(map[string]any{
+			"dag_id":  req.Name,
+			"message": message,
+			"force":   force,
+		})
+		entry := audit.NewEntry(audit.CategoryGitSync, "sync_publish", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
 	}
 
 	return api.PublishDag200JSONResponse(toAPISyncResult(result)), nil
@@ -227,6 +291,19 @@ func (a *API) DiscardDagChanges(ctx context.Context, req api.DiscardDagChangesRe
 			}, nil
 		}
 		return nil, internalError(err)
+	}
+
+	// Audit log
+	if a.auditService != nil {
+		currentUser, _ := auth.UserFromContext(ctx)
+		clientIP, _ := auth.ClientIPFromContext(ctx)
+		details, _ := json.Marshal(map[string]string{
+			"dag_id": req.Name,
+		})
+		entry := audit.NewEntry(audit.CategoryGitSync, "sync_discard", currentUser.ID, currentUser.Username).
+			WithDetails(string(details)).
+			WithIPAddress(clientIP)
+		_ = a.auditService.Log(ctx, entry)
 	}
 
 	return api.DiscardDagChanges200JSONResponse{
