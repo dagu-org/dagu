@@ -49,6 +49,8 @@ type Config struct {
 	LogPattern string
 	// ShouldStart indicates whether the container should be started (for DAG-level containers)
 	ShouldStart bool
+	// Shell specifies the shell wrapper for executing step commands.
+	Shell []string
 }
 
 // LoadConfig parses executorConfig into Container struct with registry auth
@@ -66,6 +68,7 @@ func LoadConfigFromMap(data map[string]any, registryAuths map[string]*core.AuthC
 		// User-friendly shortcuts (mapped to nested fields)
 		WorkingDir string   `mapstructure:"workingDir"`
 		Volumes    []string `mapstructure:"volumes"`
+		Shell      []string `mapstructure:"shell"`
 	}{}
 
 	md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
@@ -161,6 +164,7 @@ func LoadConfigFromMap(data map[string]any, registryAuths map[string]*core.AuthC
 		ExecOptions:   &ret.Exec,
 		AutoRemove:    autoRemove,
 		AuthManager:   authManager,
+		Shell:         ret.Shell,
 	}), nil
 }
 
@@ -176,6 +180,7 @@ func LoadConfig(workDir string, ct core.Container, registryAuths map[string]*cor
 		return loadDefaults(&Config{
 			ContainerName: ct.Exec,
 			ExecOptions:   execOpts,
+			Shell:         append([]string{}, ct.Shell...),
 		}), nil
 	}
 
@@ -277,6 +282,7 @@ func LoadConfig(workDir string, ct core.Container, registryAuths map[string]*cor
 		LogPattern:    ct.LogPattern,
 		StartCmd:      append([]string{}, ct.Command...),
 		AuthManager:   authManager,
+		Shell:         append([]string{}, ct.Shell...),
 	}), nil
 }
 
@@ -312,6 +318,7 @@ var configSchema = &jsonschema.Schema{
 		"host":          {Type: "object", AdditionalProperties: &jsonschema.Schema{}},
 		"network":       {Type: "object", AdditionalProperties: &jsonschema.Schema{}},
 		"exec":          {Type: "object", AdditionalProperties: &jsonschema.Schema{}},
+		"shell":         {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Shell wrapper for step commands (e.g., [\"/bin/bash\", \"-c\"])"},
 	},
 	AllOf: []*jsonschema.Schema{
 		// Require at least one of image or containerName

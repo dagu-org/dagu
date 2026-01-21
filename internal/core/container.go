@@ -53,6 +53,12 @@ type Container struct {
 	// If specified with waitFor: healthy, this healthcheck is used instead of
 	// relying on the image's built-in healthcheck.
 	Healthcheck *Healthcheck `yaml:"healthcheck,omitempty"`
+	// Shell specifies the shell wrapper for executing step commands.
+	// When specified, all step commands are wrapped with this shell.
+	// Format: ["/bin/bash", "-o", "errexit", "-o", "xtrace", "-c"]
+	// The step command will be appended as the final argument.
+	// Works in both exec mode and image mode.
+	Shell []string `yaml:"shell,omitempty"`
 }
 
 // Healthcheck defines a custom health check for a container.
