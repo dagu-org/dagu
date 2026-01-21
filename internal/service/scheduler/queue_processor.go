@@ -264,6 +264,9 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 		return
 	}
 	q := v.(*queue)
+	logger.Debug(ctx, "Processing queue",
+		tag.MaxConcurrency(q.maxConc()),
+	)
 
 	items, err := p.queueStore.List(ctx, queueName)
 	if err != nil {
@@ -301,6 +304,11 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 
 	maxConc := q.maxConc()
 	free := maxConc - alive
+	logger.Debug(ctx, "Queue capacity check",
+		tag.MaxConcurrency(maxConc),
+		tag.Alive(alive),
+		tag.Count(free),
+	)
 	if free <= 0 {
 		logger.Debug(ctx, "Max concurrency reached",
 			tag.MaxConcurrency(maxConc),
@@ -500,6 +508,9 @@ func (p *QueueProcessor) monitorStartup(ctx context.Context, queueName string, r
 // the queue's maxConcurrency based on the DAG's MaxActiveRuns setting.
 // This is used to initialize non-global queues with the correct concurrency
 // before calculating how many items to process.
+//
+// This function includes retry logic to handle race conditions where the DAG
+// file may not be fully written to disk when the queue item is first processed.
 func (p *QueueProcessor) updateQueueMaxConcurrency(ctx context.Context, q *queue, item exec.QueuedItemData) error {
 	data, err := item.Data()
 	if err != nil {
@@ -507,16 +518,28 @@ func (p *QueueProcessor) updateQueueMaxConcurrency(ctx context.Context, q *queue
 	}
 
 	runRef := *data
+
+	policy := backoff.NewExponentialBackoffPolicy(p.backoffConfig.InitialInterval)
+	policy.MaxInterval = p.backoffConfig.MaxInterval
+	policy.MaxRetries = p.backoffConfig.MaxRetries
+
+	operation := func(ctx context.Context) error {
+		dag, err := p.readDAGFromAttempt(ctx, runRef)
+		if err != nil {
+			return err
+		}
+		q.setMaxConc(dag.MaxActiveRuns)
+		return nil
+	}
+
+	return backoff.Retry(ctx, operation, policy, nil)
+}
+
+// readDAGFromAttempt finds a DAG run attempt and reads its DAG definition.
+func (p *QueueProcessor) readDAGFromAttempt(ctx context.Context, runRef exec.DAGRunRef) (*core.DAG, error) {
 	attempt, err := p.dagRunStore.FindAttempt(ctx, runRef)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	dag, err := attempt.ReadDAG(ctx)
-	if err != nil {
-		return err
-	}
-
-	q.setMaxConc(dag.MaxActiveRuns)
-	return nil
+	return attempt.ReadDAG(ctx)
 }

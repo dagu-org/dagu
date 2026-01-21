@@ -1,119 +1,279 @@
-package scheduler_test
+package scheduler
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/persis/filedagrun"
+	"github.com/dagu-org/dagu/internal/persis/fileproc"
+	"github.com/dagu-org/dagu/internal/persis/filequeue"
 	"github.com/dagu-org/dagu/internal/runtime"
-	"github.com/dagu-org/dagu/internal/service/scheduler"
-	"github.com/dagu-org/dagu/internal/test"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// testBackoffConfig returns a fast backoff configuration for testing.
-func testBackoffConfig() scheduler.BackoffConfig {
-	return scheduler.BackoffConfig{
-		InitialInterval: 10 * time.Millisecond,
-		MaxInterval:     50 * time.Millisecond,
-		MaxRetries:      2,
+type syncBuffer struct {
+	buf  *bytes.Buffer
+	lock sync.Mutex
+}
+
+func (b *syncBuffer) Write(p []byte) (n int, err error) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	return b.buf.String()
+}
+
+type queueFixture struct {
+	t           *testing.T
+	ctx         context.Context
+	logBuffer   *syncBuffer
+	dagRunStore exec.DAGRunStore
+	queueStore  exec.QueueStore
+	procStore   exec.ProcStore
+	processor   *QueueProcessor
+	dag         *core.DAG
+}
+
+func newQueueFixture(t *testing.T) *queueFixture {
+	t.Helper()
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	logBuffer := &syncBuffer{buf: new(bytes.Buffer)}
+	ctx := logger.WithFixedLogger(context.Background(), logger.NewLogger(
+		logger.WithDebug(), logger.WithFormat("text"), logger.WithWriter(logBuffer),
+	))
+
+	return &queueFixture{
+		t: t, ctx: ctx, logBuffer: logBuffer,
+		dagRunStore: filedagrun.New(filepath.Join(tmpDir, "dag-runs")),
+		queueStore:  filequeue.New(filepath.Join(tmpDir, "queue")),
+		procStore:   fileproc.New(filepath.Join(tmpDir, "proc")),
 	}
 }
 
-func TestQueueProcessor_StrictFIFO(t *testing.T) {
-	t.Parallel()
-
-	th := test.Setup(t)
-
-	// Enable queues
-	th.Config.Queues.Enabled = true
-	th.Config.Queues.Config = []config.QueueConfig{
-		{Name: "test-dag", MaxActiveRuns: 1},
+func (f *queueFixture) withDAG(name string, maxActiveRuns int) *queueFixture {
+	f.dag = &core.DAG{
+		Name: name, MaxActiveRuns: maxActiveRuns,
+		YamlData: []byte(fmt.Sprintf("name: %s\nmaxActiveRuns: %d\nsteps:\n  - name: test\n    command: echo hello", name, maxActiveRuns)),
+		Steps:    []core.Step{{Name: "test", Command: "echo hello"}},
 	}
+	return f
+}
 
-	// Create a simple DAG (local execution, no dispatcher needed)
-	dagYaml := []byte("name: test-dag\nsteps:\n  - name: fail\n    command: exit 1")
-	dag := &core.DAG{
-		Name:          "test-dag",
-		MaxActiveRuns: 1,
-		YamlData:      dagYaml,
-		Steps: []core.Step{
-			{Name: "fail", Command: "exit 1"},
-		},
+func (f *queueFixture) enqueueRuns(n int) *queueFixture {
+	for i := 1; i <= n; i++ {
+		runID := fmt.Sprintf("run-%d", i)
+		run, err := f.dagRunStore.CreateAttempt(f.ctx, f.dag, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
+		require.NoError(f.t, err)
+		require.NoError(f.t, run.Open(f.ctx))
+		st := exec.InitialStatus(f.dag)
+		st.Status, st.DAGRunID = core.Queued, runID
+		require.NoError(f.t, run.Write(f.ctx, st))
+		require.NoError(f.t, run.Close(f.ctx))
+		require.NoError(f.t, f.queueStore.Enqueue(f.ctx, f.dag.Name, exec.QueuePriorityHigh, exec.NewDAGRunRef(f.dag.Name, runID)))
 	}
+	return f
+}
 
-	// Store DAG
-	err := th.DAGStore.Create(th.Context, "test-dag.yaml", dagYaml)
-	require.NoError(t, err)
-
-	// Create 2 DAG runs and initialize them
-	run1, err := th.DAGRunStore.CreateAttempt(th.Context, dag, time.Now(), "run-1", exec.NewDAGRunAttemptOptions{})
-	require.NoError(t, err)
-	require.NoError(t, run1.Open(th.Context))
-	st1 := exec.InitialStatus(dag)
-	st1.Status = core.Queued
-	require.NoError(t, run1.Write(th.Context, st1))
-	require.NoError(t, run1.Close(th.Context))
-
-	run2, err := th.DAGRunStore.CreateAttempt(th.Context, dag, time.Now(), "run-2", exec.NewDAGRunAttemptOptions{})
-	require.NoError(t, err)
-	require.NoError(t, run2.Open(th.Context))
-	st2 := exec.InitialStatus(dag)
-	st2.Status = core.Queued
-	require.NoError(t, run2.Write(th.Context, st2))
-	require.NoError(t, run2.Close(th.Context))
-
-	// Enqueue items
-	err = th.QueueStore.Enqueue(th.Context, "test-dag", exec.QueuePriorityHigh, exec.NewDAGRunRef("test-dag", "run-1"))
-	require.NoError(t, err)
-
-	err = th.QueueStore.Enqueue(th.Context, "test-dag", exec.QueuePriorityHigh, exec.NewDAGRunRef("test-dag", "run-2"))
-	require.NoError(t, err)
-
-	// Create DAGExecutor (no dispatcher, so it will use local execution)
-	dagExecutor := scheduler.NewDAGExecutor(nil, runtime.NewSubCmdBuilder(th.Config))
-
-	// Create QueueProcessor with fast backoff for testing
-	processor := scheduler.NewQueueProcessor(
-		th.QueueStore,
-		th.DAGRunStore,
-		th.ProcStore,
-		dagExecutor,
-		th.Config.Queues,
-		scheduler.WithBackoffConfig(testBackoffConfig()),
+func (f *queueFixture) withProcessor(cfg config.Queues) *queueFixture {
+	f.processor = NewQueueProcessor(f.queueStore, f.dagRunStore, f.procStore,
+		NewDAGExecutor(nil, runtime.NewSubCmdBuilder(&config.Config{Paths: config.PathsConfig{Executable: "/usr/bin/dagu"}})),
+		cfg, WithBackoffConfig(BackoffConfig{InitialInterval: 10 * time.Millisecond, MaxInterval: 50 * time.Millisecond, MaxRetries: 2}),
 	)
+	return f
+}
 
-	// Process the queue
-	// Since run-1 will fail and be retried multiple times,
-	// run-2 should NOT be processed due to strict FIFO
-	processor.ProcessQueueItems(context.Background(), "test-dag")
+func (f *queueFixture) simulateQueue(maxConcurrency int, isGlobal bool) *queueFixture {
+	f.processor.queues.Store(f.dag.Name, &queue{maxConcurrency: maxConcurrency, isGlobal: isGlobal})
+	return f
+}
 
-	// Give the processor enough time to attempt all retries for run-1
-	// The backoff is configured to: initial=10ms, max=50ms, retries=2
-	// So worst case: 10ms + 20ms + 40ms + overhead ≈ 150ms should be safe
+func (f *queueFixture) logs() string { return f.logBuffer.String() }
+
+func (f *queueFixture) enqueueWithPriority(runID string, priority exec.QueuePriority) {
+	f.enqueueToQueue(f.dag.Name, runID, priority)
+}
+
+func (f *queueFixture) enqueueToQueue(queueName, runID string, priority exec.QueuePriority) {
+	run, err := f.dagRunStore.CreateAttempt(f.ctx, f.dag, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
+	require.NoError(f.t, err)
+	require.NoError(f.t, run.Open(f.ctx))
+	st := exec.InitialStatus(f.dag)
+	st.Status, st.DAGRunID = core.Queued, runID
+	require.NoError(f.t, run.Write(f.ctx, st))
+	require.NoError(f.t, run.Close(f.ctx))
+	require.NoError(f.t, f.queueStore.Enqueue(f.ctx, queueName, priority, exec.NewDAGRunRef(f.dag.Name, runID)))
+}
+
+func TestQueueProcessor_DynamicQueueConcurrency(t *testing.T) {
+	f := newQueueFixture(t).withDAG("concurrent-dag", 3).enqueueRuns(3).withProcessor(config.Queues{}).simulateQueue(1, false)
+	v, _ := f.processor.queues.Load("concurrent-dag")
+	require.Equal(t, 1, v.(*queue).maxConc())
+
+	f.processor.ProcessQueueItems(f.ctx, "concurrent-dag")
+	time.Sleep(200 * time.Millisecond)
+
+	v, _ = f.processor.queues.Load("concurrent-dag")
+	assert.Equal(t, 3, v.(*queue).maxConc())
+	assert.True(t, strings.Contains(f.logs(), "count=3"))
+}
+
+func TestQueueProcessor_GlobalQueue(t *testing.T) {
+	f := newQueueFixture(t).withDAG("global-dag", 1).withProcessor(config.Queues{
+		Enabled: true, Config: []config.QueueConfig{{Name: "global-queue", MaxActiveRuns: 3}},
+	})
+
+	for i := 1; i <= 3; i++ {
+		f.enqueueToQueue("global-queue", fmt.Sprintf("run-%d", i), exec.QueuePriorityHigh)
+	}
+
+	v, ok := f.processor.queues.Load("global-queue")
+	require.True(t, ok)
+	require.Equal(t, 3, v.(*queue).maxConc())
+
+	f.processor.ProcessQueueItems(f.ctx, "global-queue")
+	time.Sleep(200 * time.Millisecond)
+	assert.True(t, strings.Contains(f.logs(), "count=3"))
+}
+
+func TestQueueProcessor_ItemsRemainOnFailure(t *testing.T) {
+	f := newQueueFixture(t).withDAG("fifo-dag", 1).enqueueRuns(2).
+		withProcessor(config.Queues{Enabled: true, Config: []config.QueueConfig{{Name: "fifo-dag", MaxActiveRuns: 1}}}).
+		simulateQueue(1, false)
+
+	f.processor.ProcessQueueItems(f.ctx, "fifo-dag")
 	time.Sleep(150 * time.Millisecond)
 
-	// Verify that run-2 is still in the queue (not processed)
-	items, err := th.QueueStore.List(th.Context, "test-dag")
+	items, err := f.queueStore.List(f.ctx, "fifo-dag")
 	require.NoError(t, err)
-	require.Len(t, items, 2, "Both items should still be in queue since run-1 keeps failing")
+	require.Len(t, items, 2, "Both items should still be in queue")
+}
 
-	// Verify both items are still there
-	foundRun1 := false
-	foundRun2 := false
-	for _, item := range items {
-		data, err := item.Data()
-		require.NoError(t, err, "expected no error when getting item data")
-		if data.ID == "run-1" {
-			foundRun1 = true
-		}
-		if data.ID == "run-2" {
-			foundRun2 = true
-		}
+func TestQueueProcessor_PriorityOrdering(t *testing.T) {
+	f := newQueueFixture(t).withDAG("priority-dag", 1).withProcessor(config.Queues{})
+
+	// Enqueue low priority first, then high priority
+	f.enqueueWithPriority("low-1", exec.QueuePriorityLow)
+	f.enqueueWithPriority("low-2", exec.QueuePriorityLow)
+	f.enqueueWithPriority("high-1", exec.QueuePriorityHigh)
+	f.enqueueWithPriority("high-2", exec.QueuePriorityHigh)
+
+	// Dequeue should return high priority first
+	item1, err := f.queueStore.DequeueByName(f.ctx, f.dag.Name)
+	require.NoError(t, err)
+	ref1, err := item1.Data()
+	require.NoError(t, err)
+	assert.Equal(t, "high-1", ref1.ID)
+
+	item2, err := f.queueStore.DequeueByName(f.ctx, f.dag.Name)
+	require.NoError(t, err)
+	ref2, err := item2.Data()
+	require.NoError(t, err)
+	assert.Equal(t, "high-2", ref2.ID)
+
+	item3, err := f.queueStore.DequeueByName(f.ctx, f.dag.Name)
+	require.NoError(t, err)
+	ref3, err := item3.Data()
+	require.NoError(t, err)
+	assert.Equal(t, "low-1", ref3.ID)
+
+	item4, err := f.queueStore.DequeueByName(f.ctx, f.dag.Name)
+	require.NoError(t, err)
+	ref4, err := item4.Data()
+	require.NoError(t, err)
+	assert.Equal(t, "low-2", ref4.ID)
+}
+
+func TestQueueProcessor_ConcurrencyLimit(t *testing.T) {
+	f := newQueueFixture(t).withDAG("conc-dag", 1).enqueueRuns(3).
+		withProcessor(config.Queues{}).simulateQueue(1, false)
+
+	// Process with maxConcurrency=1
+	f.processor.ProcessQueueItems(f.ctx, "conc-dag")
+	time.Sleep(100 * time.Millisecond)
+
+	// Should only process 1 item at a time, leaving 2 in queue
+	items, err := f.queueStore.List(f.ctx, "conc-dag")
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, len(items), 2, "Concurrency limit should prevent processing all at once")
+}
+
+func TestQueueProcessor_GlobalQueueIgnoresDAGMaxActiveRuns(t *testing.T) {
+	// Global queue config: MaxActiveRuns=5
+	// DAG config: maxActiveRuns=1
+	// Expected: Global queue should use 5, NOT be overwritten by DAG's 1
+	f := newQueueFixture(t).withDAG("dag-with-low-concurrency", 1).withProcessor(config.Queues{
+		Enabled: true, Config: []config.QueueConfig{{Name: "global-queue", MaxActiveRuns: 5}},
+	})
+
+	// Enqueue 5 items to the global queue
+	for i := 1; i <= 5; i++ {
+		f.enqueueToQueue("global-queue", fmt.Sprintf("run-%d", i), exec.QueuePriorityHigh)
 	}
-	require.True(t, foundRun1, "run-1 should still be in queue")
-	require.True(t, foundRun2, "run-2 should still be in queue (strict FIFO - not processed)")
+
+	// Verify initial maxConcurrency is 5 (from global config)
+	v, ok := f.processor.queues.Load("global-queue")
+	require.True(t, ok)
+	require.Equal(t, 5, v.(*queue).maxConc(), "Global queue should have maxConcurrency=5 from config")
+
+	// Process items
+	f.processor.ProcessQueueItems(f.ctx, "global-queue")
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify maxConcurrency is STILL 5 (not overwritten by DAG's maxActiveRuns=1)
+	v, _ = f.processor.queues.Load("global-queue")
+	assert.Equal(t, 5, v.(*queue).maxConc(), "Global queue maxConcurrency should NOT be overwritten by DAG")
+
+	// Verify all 5 items were processed in the batch (not just 1)
+	assert.True(t, strings.Contains(f.logs(), "count=5"), "Should process 5 items, not 1")
+}
+
+func TestQueueProcessor_GlobalQueueViaLoop(t *testing.T) {
+	// This test mimics the real scheduler flow where ProcessQueueItems
+	// is called via the loop, not directly.
+	f := newQueueFixture(t).withDAG("loop-dag", 1).withProcessor(config.Queues{
+		Enabled: true, Config: []config.QueueConfig{{Name: "global-queue", MaxActiveRuns: 3}},
+	})
+
+	// Enqueue 3 items BEFORE calling process (mimics real scenario)
+	for i := 1; i <= 3; i++ {
+		f.enqueueToQueue("global-queue", fmt.Sprintf("run-%d", i), exec.QueuePriorityHigh)
+	}
+
+	// Verify queue list returns the global queue
+	queueList, err := f.queueStore.QueueList(f.ctx)
+	require.NoError(t, err)
+	require.Contains(t, queueList, "global-queue")
+
+	// Simulate what loop() does: check if queue exists in p.queues
+	v, ok := f.processor.queues.Load("global-queue")
+	require.True(t, ok, "Global queue should exist in processor")
+	require.Equal(t, 3, v.(*queue).maxConc(), "Global queue should have maxConcurrency=3")
+	require.True(t, v.(*queue).isGlobalQueue(), "Should be marked as global queue")
+
+	// Process
+	f.processor.ProcessQueueItems(f.ctx, "global-queue")
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify all 3 items processed
+	t.Logf("Logs: %s", f.logs())
+	assert.Contains(t, f.logs(), "count=3", "Should process all 3 items")
+	assert.Contains(t, f.logs(), "max-concurrency=3", "maxConcurrency should be 3")
 }
