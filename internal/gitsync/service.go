@@ -276,8 +276,58 @@ func (s *serviceImpl) syncFilesToDAGsDir(ctx context.Context, pullResult *PullRe
 		}
 	}
 
+	// Scan for local DAGs not in the repo
+	_ = s.scanLocalDAGs(state)
+
 	s.stateManager.Save(state)
 	return synced, conflicts, nil
+}
+
+// scanLocalDAGs scans the local DAGs directory and marks any DAGs not in state as untracked.
+func (s *serviceImpl) scanLocalDAGs(state *State) error {
+	extensions := map[string]bool{".yaml": true, ".yml": true}
+
+	entries, err := os.ReadDir(s.dagsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil // DAGs directory doesn't exist yet
+		}
+		return err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		ext := filepath.Ext(entry.Name())
+		if !extensions[ext] {
+			continue
+		}
+
+		dagID := strings.TrimSuffix(entry.Name(), ext)
+
+		// Skip if already tracked
+		if _, exists := state.DAGs[dagID]; exists {
+			continue
+		}
+
+		// Read local file to compute hash
+		filePath := filepath.Join(s.dagsDir, entry.Name())
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			continue
+		}
+
+		now := time.Now()
+		state.DAGs[dagID] = &DAGState{
+			Status:     StatusUntracked,
+			LocalHash:  ComputeContentHash(content),
+			ModifiedAt: &now,
+		}
+	}
+
+	return nil
 }
 
 // Publish commits and pushes a single DAG to the remote.
