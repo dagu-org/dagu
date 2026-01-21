@@ -132,33 +132,22 @@ func NewService(cfg *Config, dagsDir, dataDir string) Service {
 
 // Pull fetches and merges changes from the remote repository.
 func (s *serviceImpl) Pull(ctx context.Context) (*SyncResult, error) {
-	if !s.cfg.Enabled {
-		return nil, ErrNotEnabled
-	}
-	if !s.cfg.IsValid() {
-		return nil, ErrNotConfigured
+	if err := s.validateEnabled(); err != nil {
+		return nil, err
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	result := &SyncResult{
-		Timestamp: time.Now(),
-	}
+	result := &SyncResult{Timestamp: time.Now()}
 
-	// Ensure repo is cloned
-	if !s.gitClient.IsCloned() {
-		if err := s.gitClient.Clone(ctx); err != nil {
-			result.Success = false
-			result.Message = "Failed to clone repository"
-			result.Errors = append(result.Errors, SyncError{Message: err.Error()})
-			s.updateLastSyncError(err)
-			return result, err
-		}
-	} else {
-		if err := s.gitClient.Open(); err != nil {
-			return nil, err
-		}
+	// Ensure repo is cloned and opened
+	if err := s.ensureRepoReady(ctx); err != nil {
+		result.Success = false
+		result.Message = "Failed to prepare repository"
+		result.Errors = append(result.Errors, SyncError{Message: err.Error()})
+		s.updateLastSyncError(err)
+		return result, err
 	}
 
 	// Fetch and pull
@@ -186,27 +175,11 @@ func (s *serviceImpl) Pull(ctx context.Context) (*SyncResult, error) {
 
 	result.Synced = syncedDAGs
 	result.Conflicts = conflicts
-
-	// Update state
-	state, _ := s.stateManager.GetState()
-	now := time.Now()
-	state.LastSyncAt = &now
-	state.LastSyncCommit = currentCommit
-	state.LastSyncStatus = "success"
-	state.LastError = nil
-	state.Repository = s.cfg.Repository
-	state.Branch = s.cfg.Branch
-	s.stateManager.Save(state)
-
 	result.Success = true
-	switch {
-	case len(conflicts) > 0:
-		result.Message = fmt.Sprintf("Pulled with %d conflict(s)", len(conflicts))
-	case pullResult.AlreadyUpToDate:
-		result.Message = "Already up to date"
-	default:
-		result.Message = fmt.Sprintf("Synced %d DAG(s)", len(syncedDAGs))
-	}
+	result.Message = s.buildPullMessage(pullResult.AlreadyUpToDate, syncedDAGs, conflicts)
+
+	// Update sync state
+	s.updateSuccessState(currentCommit)
 
 	return result, nil
 }
@@ -309,19 +282,14 @@ func (s *serviceImpl) syncFilesToDAGsDir(ctx context.Context, pullResult *PullRe
 
 // Publish commits and pushes a single DAG to the remote.
 func (s *serviceImpl) Publish(ctx context.Context, dagID, message string, force bool) (*SyncResult, error) {
-	if !s.cfg.Enabled {
-		return nil, ErrNotEnabled
-	}
-	if !s.cfg.PushEnabled {
-		return nil, ErrPushDisabled
+	if err := s.validatePushEnabled(); err != nil {
+		return nil, err
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	result := &SyncResult{
-		Timestamp: time.Now(),
-	}
+	result := &SyncResult{Timestamp: time.Now()}
 
 	state, err := s.stateManager.GetState()
 	if err != nil {
@@ -333,22 +301,10 @@ func (s *serviceImpl) Publish(ctx context.Context, dagID, message string, force 
 		return nil, &DAGNotFoundError{DAGID: dagID}
 	}
 
-	// Check for conflict
-	if dagState.Status == StatusConflict && !force {
-		return nil, &ConflictError{
-			DAGID:         dagID,
-			RemoteCommit:  dagState.RemoteCommit,
-			RemoteAuthor:  dagState.RemoteAuthor,
-			RemoteMessage: dagState.RemoteMessage,
-		}
+	if err := s.validatePublishable(dagState, dagID, force); err != nil {
+		return nil, err
 	}
 
-	// Check if there are changes to publish
-	if dagState.Status == StatusSynced {
-		return nil, ErrNoChanges
-	}
-
-	// Open repo
 	if err := s.gitClient.Open(); err != nil {
 		return nil, err
 	}
@@ -379,25 +335,14 @@ func (s *serviceImpl) Publish(ctx context.Context, dagID, message string, force 
 		return nil, err
 	}
 
-	// Push
 	if err := s.gitClient.Push(ctx); err != nil {
 		return nil, err
 	}
 
-	// Update state
-	now := time.Now()
+	// Update DAG state to synced
 	contentHash := ComputeContentHash(content)
-	state.DAGs[dagID] = &DAGState{
-		Status:         StatusSynced,
-		BaseCommit:     commitHash,
-		LastSyncedHash: contentHash,
-		LastSyncedAt:   &now,
-		LocalHash:      contentHash,
-	}
-	state.LastSyncAt = &now
-	state.LastSyncCommit = commitHash
-	state.LastSyncStatus = "success"
-	s.stateManager.Save(state)
+	state.DAGs[dagID] = s.newSyncedDAGState(commitHash, contentHash)
+	s.updateSuccessStateWithCommit(state, commitHash)
 
 	result.Success = true
 	result.Message = fmt.Sprintf("Published %s", dagID)
@@ -408,38 +353,25 @@ func (s *serviceImpl) Publish(ctx context.Context, dagID, message string, force 
 
 // PublishAll commits and pushes all modified DAGs.
 func (s *serviceImpl) PublishAll(ctx context.Context, message string) (*SyncResult, error) {
-	if !s.cfg.Enabled {
-		return nil, ErrNotEnabled
-	}
-	if !s.cfg.PushEnabled {
-		return nil, ErrPushDisabled
+	if err := s.validatePushEnabled(); err != nil {
+		return nil, err
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	result := &SyncResult{
-		Timestamp: time.Now(),
-	}
+	result := &SyncResult{Timestamp: time.Now()}
 
 	state, err := s.stateManager.GetState()
 	if err != nil {
 		return nil, err
 	}
 
-	// Find all modified DAGs (skip conflicts)
-	var modifiedDAGs []string
-	for dagID, dagState := range state.DAGs {
-		if dagState.Status == StatusModified || dagState.Status == StatusUntracked {
-			modifiedDAGs = append(modifiedDAGs, dagID)
-		}
-	}
-
+	modifiedDAGs := s.findModifiedDAGs(state)
 	if len(modifiedDAGs) == 0 {
 		return nil, ErrNoChanges
 	}
 
-	// Open repo
 	if err := s.gitClient.Open(); err != nil {
 		return nil, err
 	}
@@ -481,26 +413,15 @@ func (s *serviceImpl) PublishAll(ctx context.Context, message string) (*SyncResu
 	}
 
 	// Update state for all published DAGs
-	now := time.Now()
 	for _, dagID := range modifiedDAGs {
 		dagFilePath := s.dagIDToFilePath(dagID)
 		content, _ := os.ReadFile(dagFilePath)
 		contentHash := ComputeContentHash(content)
-
-		state.DAGs[dagID] = &DAGState{
-			Status:         StatusSynced,
-			BaseCommit:     commitHash,
-			LastSyncedHash: contentHash,
-			LastSyncedAt:   &now,
-			LocalHash:      contentHash,
-		}
+		state.DAGs[dagID] = s.newSyncedDAGState(commitHash, contentHash)
 		result.Synced = append(result.Synced, dagID)
 	}
 
-	state.LastSyncAt = &now
-	state.LastSyncCommit = commitHash
-	state.LastSyncStatus = "success"
-	s.stateManager.Save(state)
+	s.updateSuccessStateWithCommit(state, commitHash)
 
 	result.Success = true
 	result.Message = fmt.Sprintf("Published %d DAG(s)", len(result.Synced))
@@ -510,8 +431,8 @@ func (s *serviceImpl) PublishAll(ctx context.Context, message string) (*SyncResu
 
 // Discard discards local changes for a DAG.
 func (s *serviceImpl) Discard(ctx context.Context, dagID string) error {
-	if !s.cfg.Enabled {
-		return ErrNotEnabled
+	if err := s.validateEnabled(); err != nil {
+		return err
 	}
 
 	s.mu.Lock()
@@ -546,15 +467,8 @@ func (s *serviceImpl) Discard(ctx context.Context, dagID string) error {
 	}
 
 	// Update state
-	now := time.Now()
 	contentHash := ComputeContentHash(repoContent)
-	state.DAGs[dagID] = &DAGState{
-		Status:         StatusSynced,
-		BaseCommit:     dagState.BaseCommit,
-		LastSyncedHash: contentHash,
-		LastSyncedAt:   &now,
-		LocalHash:      contentHash,
-	}
+	state.DAGs[dagID] = s.newSyncedDAGState(dagState.BaseCommit, contentHash)
 	s.stateManager.Save(state)
 
 	return nil
@@ -619,8 +533,8 @@ func (s *serviceImpl) GetStatus(ctx context.Context) (*OverallStatus, error) {
 
 // GetDAGStatus returns the sync status for a specific DAG.
 func (s *serviceImpl) GetDAGStatus(ctx context.Context, dagID string) (*DAGState, error) {
-	if !s.cfg.Enabled {
-		return nil, ErrNotEnabled
+	if err := s.validateEnabled(); err != nil {
+		return nil, err
 	}
 
 	state, err := s.stateManager.GetState()
@@ -791,4 +705,103 @@ func (s *serviceImpl) dagIDToRepoPath(dagID string) string {
 
 func (s *serviceImpl) ensureDir(dir string) error {
 	return os.MkdirAll(dir, 0755)
+}
+
+// validateEnabled checks if git sync is enabled and configured.
+func (s *serviceImpl) validateEnabled() error {
+	if !s.cfg.Enabled {
+		return ErrNotEnabled
+	}
+	if !s.cfg.IsValid() {
+		return ErrNotConfigured
+	}
+	return nil
+}
+
+// validatePushEnabled checks if push operations are allowed.
+func (s *serviceImpl) validatePushEnabled() error {
+	if !s.cfg.Enabled {
+		return ErrNotEnabled
+	}
+	if !s.cfg.PushEnabled {
+		return ErrPushDisabled
+	}
+	return nil
+}
+
+// validatePublishable checks if a DAG can be published.
+func (s *serviceImpl) validatePublishable(dagState *DAGState, dagID string, force bool) error {
+	if dagState.Status == StatusConflict && !force {
+		return &ConflictError{
+			DAGID:         dagID,
+			RemoteCommit:  dagState.RemoteCommit,
+			RemoteAuthor:  dagState.RemoteAuthor,
+			RemoteMessage: dagState.RemoteMessage,
+		}
+	}
+	if dagState.Status == StatusSynced {
+		return ErrNoChanges
+	}
+	return nil
+}
+
+// ensureRepoReady ensures the repository is cloned and opened.
+func (s *serviceImpl) ensureRepoReady(ctx context.Context) error {
+	if !s.gitClient.IsCloned() {
+		return s.gitClient.Clone(ctx)
+	}
+	return s.gitClient.Open()
+}
+
+// findModifiedDAGs returns all DAGs that have been modified or are untracked.
+func (s *serviceImpl) findModifiedDAGs(state *State) []string {
+	var modified []string
+	for dagID, dagState := range state.DAGs {
+		if dagState.Status == StatusModified || dagState.Status == StatusUntracked {
+			modified = append(modified, dagID)
+		}
+	}
+	return modified
+}
+
+// newSyncedDAGState creates a new DAGState in synced status.
+func (s *serviceImpl) newSyncedDAGState(commitHash, contentHash string) *DAGState {
+	now := time.Now()
+	return &DAGState{
+		Status:         StatusSynced,
+		BaseCommit:     commitHash,
+		LastSyncedHash: contentHash,
+		LastSyncedAt:   &now,
+		LocalHash:      contentHash,
+	}
+}
+
+// updateSuccessState updates the global sync state after a successful pull.
+func (s *serviceImpl) updateSuccessState(commitHash string) {
+	state, _ := s.stateManager.GetState()
+	s.updateSuccessStateWithCommit(state, commitHash)
+}
+
+// updateSuccessStateWithCommit updates and saves the state after a successful sync.
+func (s *serviceImpl) updateSuccessStateWithCommit(state *State, commitHash string) {
+	now := time.Now()
+	state.LastSyncAt = &now
+	state.LastSyncCommit = commitHash
+	state.LastSyncStatus = "success"
+	state.LastError = nil
+	state.Repository = s.cfg.Repository
+	state.Branch = s.cfg.Branch
+	s.stateManager.Save(state)
+}
+
+// buildPullMessage constructs the result message for a pull operation.
+func (s *serviceImpl) buildPullMessage(alreadyUpToDate bool, synced, conflicts []string) string {
+	switch {
+	case len(conflicts) > 0:
+		return fmt.Sprintf("Pulled with %d conflict(s)", len(conflicts))
+	case alreadyUpToDate:
+		return "Already up to date"
+	default:
+		return fmt.Sprintf("Synced %d DAG(s)", len(synced))
+	}
 }

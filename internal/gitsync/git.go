@@ -69,11 +69,19 @@ func (c *GitClient) normalizeRepoURL() string {
 	if repo == "" {
 		return ""
 	}
-	if strings.HasPrefix(repo, "https://") || strings.HasPrefix(repo, "http://") || strings.HasPrefix(repo, "git@") || strings.HasPrefix(repo, "ssh://") {
+	if c.isFullURL(repo) {
 		return repo
 	}
 	// Assume github.com/org/repo format and use HTTPS
 	return "https://" + repo + ".git"
+}
+
+// isFullURL checks if the string is already a complete Git URL.
+func (c *GitClient) isFullURL(s string) bool {
+	return strings.HasPrefix(s, "https://") ||
+		strings.HasPrefix(s, "http://") ||
+		strings.HasPrefix(s, "git@") ||
+		strings.HasPrefix(s, "ssh://")
 }
 
 // Clone clones the repository.
@@ -126,8 +134,8 @@ func (c *GitClient) IsCloned() bool {
 
 // Fetch fetches updates from the remote.
 func (c *GitClient) Fetch(ctx context.Context) error {
-	if c.repo == nil {
-		return ErrRepoNotCloned
+	if err := c.requireRepo(); err != nil {
+		return err
 	}
 
 	auth, err := c.getAuth()
@@ -142,10 +150,7 @@ func (c *GitClient) Fetch(ctx context.Context) error {
 		Force:      true,
 	})
 	if err != nil && err != git.NoErrAlreadyUpToDate {
-		if err == transport.ErrAuthenticationRequired {
-			return ErrAuthFailed
-		}
-		return &NetworkError{Operation: "fetch", Cause: err}
+		return c.wrapAuthError(err, "fetch")
 	}
 
 	return nil
@@ -153,11 +158,10 @@ func (c *GitClient) Fetch(ctx context.Context) error {
 
 // Pull pulls updates and resets to the remote branch (hard reset for clean state).
 func (c *GitClient) Pull(ctx context.Context) (*PullResult, error) {
-	if c.repo == nil {
-		return nil, ErrRepoNotCloned
+	if err := c.requireRepo(); err != nil {
+		return nil, err
 	}
 
-	// Get worktree
 	wt, err := c.repo.Worktree()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get worktree: %w", err)
@@ -168,7 +172,6 @@ func (c *GitClient) Pull(ctx context.Context) (*PullResult, error) {
 		return nil, err
 	}
 
-	// First fetch
 	if err := c.Fetch(ctx); err != nil {
 		return nil, err
 	}
@@ -196,7 +199,6 @@ func (c *GitClient) Pull(ctx context.Context) (*PullResult, error) {
 		return result, nil
 	}
 
-	// Pull with rebase disabled (we handle conflicts manually)
 	err = wt.Pull(&git.PullOptions{
 		Auth:          auth,
 		RemoteName:    "origin",
@@ -205,8 +207,7 @@ func (c *GitClient) Pull(ctx context.Context) (*PullResult, error) {
 		Force:         true,
 	})
 	if err != nil && err != git.NoErrAlreadyUpToDate {
-		// For conflicts or diverged history, we'll handle this at the service level
-		return nil, &NetworkError{Operation: "pull", Cause: err}
+		return nil, c.wrapAuthError(err, "pull")
 	}
 
 	return result, nil
@@ -221,8 +222,8 @@ type PullResult struct {
 
 // GetHeadCommit returns the current HEAD commit hash.
 func (c *GitClient) GetHeadCommit() (string, error) {
-	if c.repo == nil {
-		return "", ErrRepoNotCloned
+	if err := c.requireRepo(); err != nil {
+		return "", err
 	}
 
 	ref, err := c.repo.Head()
@@ -235,8 +236,8 @@ func (c *GitClient) GetHeadCommit() (string, error) {
 
 // GetRemoteCommit returns the latest commit hash from the remote branch.
 func (c *GitClient) GetRemoteCommit() (string, error) {
-	if c.repo == nil {
-		return "", ErrRepoNotCloned
+	if err := c.requireRepo(); err != nil {
+		return "", err
 	}
 
 	ref, err := c.repo.Reference(plumbing.NewRemoteReferenceName("origin", c.cfg.Branch), true)
@@ -249,8 +250,8 @@ func (c *GitClient) GetRemoteCommit() (string, error) {
 
 // GetCommitInfo returns information about a commit.
 func (c *GitClient) GetCommitInfo(commitHash string) (*CommitInfo, error) {
-	if c.repo == nil {
-		return nil, ErrRepoNotCloned
+	if err := c.requireRepo(); err != nil {
+		return nil, err
 	}
 
 	commit, err := c.repo.CommitObject(plumbing.NewHash(commitHash))
@@ -278,8 +279,8 @@ type CommitInfo struct {
 
 // AddAndCommit stages a file and creates a commit.
 func (c *GitClient) AddAndCommit(filePath, message string) (string, error) {
-	if c.repo == nil {
-		return "", ErrRepoNotCloned
+	if err := c.requireRepo(); err != nil {
+		return "", err
 	}
 
 	wt, err := c.repo.Worktree()
@@ -287,13 +288,10 @@ func (c *GitClient) AddAndCommit(filePath, message string) (string, error) {
 		return "", fmt.Errorf("failed to get worktree: %w", err)
 	}
 
-	// Stage the file
-	_, err = wt.Add(filePath)
-	if err != nil {
+	if _, err = wt.Add(filePath); err != nil {
 		return "", fmt.Errorf("failed to stage file: %w", err)
 	}
 
-	// Create commit
 	commit, err := wt.Commit(message, &git.CommitOptions{
 		Author: &object.Signature{
 			Name:  c.cfg.GetAuthorName(),
@@ -310,10 +308,9 @@ func (c *GitClient) AddAndCommit(filePath, message string) (string, error) {
 
 // Push pushes commits to the remote.
 func (c *GitClient) Push(ctx context.Context) error {
-	if c.repo == nil {
-		return ErrRepoNotCloned
+	if err := c.requireRepo(); err != nil {
+		return err
 	}
-
 	if !c.cfg.PushEnabled {
 		return ErrPushDisabled
 	}
@@ -327,26 +324,18 @@ func (c *GitClient) Push(ctx context.Context) error {
 		Auth:       auth,
 		RemoteName: "origin",
 	})
-	if err != nil {
-		if err == git.NoErrAlreadyUpToDate {
-			return nil
-		}
-		if err == transport.ErrAuthenticationRequired {
-			return ErrAuthFailed
-		}
-		return &NetworkError{Operation: "push", Cause: err}
+	if err == nil || err == git.NoErrAlreadyUpToDate {
+		return nil
 	}
-
-	return nil
+	return c.wrapAuthError(err, "push")
 }
 
 // Reset resets a file to the version in HEAD.
 func (c *GitClient) Reset(filePath string) error {
-	if c.repo == nil {
-		return ErrRepoNotCloned
+	if err := c.requireRepo(); err != nil {
+		return err
 	}
 
-	// Get HEAD commit
 	ref, err := c.repo.Head()
 	if err != nil {
 		return fmt.Errorf("failed to get HEAD: %w", err)
@@ -372,7 +361,6 @@ func (c *GitClient) Reset(filePath string) error {
 		return fmt.Errorf("failed to read file content: %w", err)
 	}
 
-	// Write content back to working directory
 	fullPath := filepath.Join(c.repoPath, filePath)
 	if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
@@ -445,22 +433,13 @@ func (c *GitClient) TestConnection(ctx context.Context) error {
 		return err
 	}
 
-	url := c.normalizeRepoURL()
-
-	// Create a remote object to list references
 	remote := git.NewRemote(nil, &config.RemoteConfig{
 		Name: "origin",
-		URLs: []string{url},
+		URLs: []string{c.normalizeRepoURL()},
 	})
 
-	_, err = remote.List(&git.ListOptions{
-		Auth: auth,
-	})
-	if err != nil {
-		if err == transport.ErrAuthenticationRequired {
-			return ErrAuthFailed
-		}
-		return &NetworkError{Operation: "test connection", Cause: err}
+	if _, err = remote.List(&git.ListOptions{Auth: auth}); err != nil {
+		return c.wrapAuthError(err, "test connection")
 	}
 
 	return nil
@@ -468,8 +447,8 @@ func (c *GitClient) TestConnection(ctx context.Context) error {
 
 // GetFileContentAtCommit returns the content of a file at a specific commit.
 func (c *GitClient) GetFileContentAtCommit(filePath, commitHash string) ([]byte, error) {
-	if c.repo == nil {
-		return nil, ErrRepoNotCloned
+	if err := c.requireRepo(); err != nil {
+		return nil, err
 	}
 
 	commit, err := c.repo.CommitObject(plumbing.NewHash(commitHash))
@@ -497,16 +476,14 @@ func (c *GitClient) GetFileContentAtCommit(filePath, commitHash string) ([]byte,
 
 // SetupRemote ensures the remote is configured correctly.
 func (c *GitClient) SetupRemote() error {
-	if c.repo == nil {
-		return ErrRepoNotCloned
+	if err := c.requireRepo(); err != nil {
+		return err
 	}
 
 	url := c.normalizeRepoURL()
 
-	// Check if remote exists
 	remote, err := c.repo.Remote("origin")
 	if err == git.ErrRemoteNotFound {
-		// Create remote
 		_, err = c.repo.CreateRemote(&config.RemoteConfig{
 			Name: "origin",
 			URLs: []string{url},
@@ -538,4 +515,20 @@ func (c *GitClient) SetupRemote() error {
 	}
 
 	return nil
+}
+
+// requireRepo returns an error if the repository is not initialized.
+func (c *GitClient) requireRepo() error {
+	if c.repo == nil {
+		return ErrRepoNotCloned
+	}
+	return nil
+}
+
+// wrapAuthError converts authentication errors to the appropriate error type.
+func (c *GitClient) wrapAuthError(err error, operation string) error {
+	if err == transport.ErrAuthenticationRequired {
+		return ErrAuthFailed
+	}
+	return &NetworkError{Operation: operation, Cause: err}
 }

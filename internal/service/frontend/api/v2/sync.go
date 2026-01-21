@@ -24,30 +24,39 @@ type SyncService interface {
 	TestConnection(ctx context.Context) (*gitsync.ConnectionResult, error)
 }
 
+// errSyncNotConfigured returns an error for when sync service is not available.
+var errSyncNotConfigured = &Error{
+	Code:       api.ErrorCodeInternalError,
+	Message:    "Git sync is not configured",
+	HTTPStatus: http.StatusServiceUnavailable,
+}
+
+// requireSyncService checks if the sync service is available.
+func (a *API) requireSyncService() error {
+	if a.syncService == nil {
+		return errSyncNotConfigured
+	}
+	return nil
+}
+
+// internalError creates an internal server error from an error.
+func internalError(err error) *Error {
+	return &Error{
+		Code:       api.ErrorCodeInternalError,
+		Message:    err.Error(),
+		HTTPStatus: http.StatusInternalServerError,
+	}
+}
+
 // GetSyncStatus returns the overall Git sync status.
 func (a *API) GetSyncStatus(ctx context.Context, _ api.GetSyncStatusRequestObject) (api.GetSyncStatusResponseObject, error) {
-	// Check if sync service is available
 	if a.syncService == nil {
-		// Return disabled status when sync is not configured
-		return api.GetSyncStatus200JSONResponse{
-			Enabled: false,
-			Summary: api.SyncSummarySynced,
-			Counts: api.SyncStatusCounts{
-				Synced:    0,
-				Modified:  0,
-				Untracked: 0,
-				Conflict:  0,
-			},
-		}, nil
+		return disabledSyncStatusResponse(), nil
 	}
 
 	status, err := a.syncService.GetStatus(ctx)
 	if err != nil {
-		return nil, &Error{
-			Code:       api.ErrorCodeInternalError,
-			Message:    err.Error(),
-			HTTPStatus: http.StatusInternalServerError,
-		}
+		return nil, internalError(err)
 	}
 
 	return api.GetSyncStatus200JSONResponse{
@@ -64,23 +73,29 @@ func (a *API) GetSyncStatus(ctx context.Context, _ api.GetSyncStatusRequestObjec
 	}, nil
 }
 
+// disabledSyncStatusResponse returns a response for when sync is disabled.
+func disabledSyncStatusResponse() api.GetSyncStatus200JSONResponse {
+	return api.GetSyncStatus200JSONResponse{
+		Enabled: false,
+		Summary: api.SyncSummarySynced,
+		Counts: api.SyncStatusCounts{
+			Synced:    0,
+			Modified:  0,
+			Untracked: 0,
+			Conflict:  0,
+		},
+	}
+}
+
 // SyncPull pulls changes from the remote repository.
 func (a *API) SyncPull(ctx context.Context, _ api.SyncPullRequestObject) (api.SyncPullResponseObject, error) {
-	if a.syncService == nil {
-		return nil, &Error{
-			Code:       api.ErrorCodeInternalError,
-			Message:    "Git sync is not configured",
-			HTTPStatus: http.StatusServiceUnavailable,
-		}
+	if err := a.requireSyncService(); err != nil {
+		return nil, err
 	}
 
 	result, err := a.syncService.Pull(ctx)
 	if err != nil {
-		return nil, &Error{
-			Code:       api.ErrorCodeInternalError,
-			Message:    err.Error(),
-			HTTPStatus: http.StatusInternalServerError,
-		}
+		return nil, internalError(err)
 	}
 
 	return api.SyncPull200JSONResponse(toAPISyncResult(result)), nil
@@ -88,12 +103,8 @@ func (a *API) SyncPull(ctx context.Context, _ api.SyncPullRequestObject) (api.Sy
 
 // SyncPublishAll publishes all modified DAGs.
 func (a *API) SyncPublishAll(ctx context.Context, req api.SyncPublishAllRequestObject) (api.SyncPublishAllResponseObject, error) {
-	if a.syncService == nil {
-		return nil, &Error{
-			Code:       api.ErrorCodeInternalError,
-			Message:    "Git sync is not configured",
-			HTTPStatus: http.StatusServiceUnavailable,
-		}
+	if err := a.requireSyncService(); err != nil {
+		return nil, err
 	}
 
 	var message string
@@ -104,17 +115,9 @@ func (a *API) SyncPublishAll(ctx context.Context, req api.SyncPublishAllRequestO
 	result, err := a.syncService.PublishAll(ctx, message)
 	if err != nil {
 		if gitsync.IsNotEnabled(err) {
-			return nil, &Error{
-				Code:       api.ErrorCodeInternalError,
-				Message:    "Git sync is not enabled",
-				HTTPStatus: http.StatusServiceUnavailable,
-			}
+			return nil, errSyncNotConfigured
 		}
-		return nil, &Error{
-			Code:       api.ErrorCodeInternalError,
-			Message:    err.Error(),
-			HTTPStatus: http.StatusInternalServerError,
-		}
+		return nil, internalError(err)
 	}
 
 	return api.SyncPublishAll200JSONResponse(toAPISyncResult(result)), nil
@@ -147,183 +150,48 @@ func (a *API) SyncTestConnection(ctx context.Context, _ api.SyncTestConnectionRe
 // GetSyncConfig returns the Git sync configuration.
 func (a *API) GetSyncConfig(ctx context.Context, _ api.GetSyncConfigRequestObject) (api.GetSyncConfigResponseObject, error) {
 	if a.syncService == nil {
-		return api.GetSyncConfig200JSONResponse{
-			Enabled: false,
-		}, nil
+		return api.GetSyncConfig200JSONResponse{Enabled: false}, nil
 	}
 
 	cfg, err := a.syncService.GetConfig(ctx)
 	if err != nil {
-		return nil, &Error{
-			Code:       api.ErrorCodeInternalError,
-			Message:    err.Error(),
-			HTTPStatus: http.StatusInternalServerError,
-		}
+		return nil, internalError(err)
 	}
 
-	return api.GetSyncConfig200JSONResponse{
-		Enabled:     cfg.Enabled,
-		Repository:  ptrOf(cfg.Repository),
-		Branch:      ptrOf(cfg.Branch),
-		Path:        ptrOf(cfg.Path),
-		PushEnabled: ptrOf(cfg.PushEnabled),
-		Auth: &api.SyncAuthConfig{
-			Type:       api.SyncAuthConfigType(cfg.Auth.Type),
-			SshKeyPath: ptrOf(cfg.Auth.SSHKeyPath),
-			// Token is not returned for security
-		},
-		AutoSync: &api.SyncAutoSyncConfig{
-			Enabled:   cfg.AutoSync.Enabled,
-			OnStartup: cfg.AutoSync.OnStartup,
-			Interval:  cfg.AutoSync.Interval,
-		},
-		Commit: &api.SyncCommitConfig{
-			AuthorName:  ptrOf(cfg.Commit.AuthorName),
-			AuthorEmail: ptrOf(cfg.Commit.AuthorEmail),
-		},
-	}, nil
+	return api.GetSyncConfig200JSONResponse(toAPISyncConfig(cfg)), nil
 }
 
 // UpdateSyncConfig updates the Git sync configuration.
 func (a *API) UpdateSyncConfig(ctx context.Context, req api.UpdateSyncConfigRequestObject) (api.UpdateSyncConfigResponseObject, error) {
-	if a.syncService == nil {
-		return nil, &Error{
-			Code:       api.ErrorCodeInternalError,
-			Message:    "Git sync is not configured",
-			HTTPStatus: http.StatusServiceUnavailable,
-		}
+	if err := a.requireSyncService(); err != nil {
+		return nil, err
 	}
 
 	cfg, err := a.syncService.GetConfig(ctx)
 	if err != nil {
-		return nil, &Error{
-			Code:       api.ErrorCodeInternalError,
-			Message:    err.Error(),
-			HTTPStatus: http.StatusInternalServerError,
-		}
+		return nil, internalError(err)
 	}
 
-	// Update fields from request
-	if req.Body.Enabled != nil {
-		cfg.Enabled = *req.Body.Enabled
-	}
-	if req.Body.Repository != nil {
-		cfg.Repository = *req.Body.Repository
-	}
-	if req.Body.Branch != nil {
-		cfg.Branch = *req.Body.Branch
-	}
-	if req.Body.Path != nil {
-		cfg.Path = *req.Body.Path
-	}
-	if req.Body.PushEnabled != nil {
-		cfg.PushEnabled = *req.Body.PushEnabled
-	}
-	if req.Body.Auth != nil {
-		cfg.Auth.Type = string(req.Body.Auth.Type)
-		if req.Body.Auth.Token != nil {
-			cfg.Auth.Token = *req.Body.Auth.Token
-		}
-		if req.Body.Auth.SshKeyPath != nil {
-			cfg.Auth.SSHKeyPath = *req.Body.Auth.SshKeyPath
-		}
-	}
-	if req.Body.AutoSync != nil {
-		cfg.AutoSync.Enabled = req.Body.AutoSync.Enabled
-		cfg.AutoSync.OnStartup = req.Body.AutoSync.OnStartup
-		cfg.AutoSync.Interval = req.Body.AutoSync.Interval
-	}
-	if req.Body.Commit != nil {
-		if req.Body.Commit.AuthorName != nil {
-			cfg.Commit.AuthorName = *req.Body.Commit.AuthorName
-		}
-		if req.Body.Commit.AuthorEmail != nil {
-			cfg.Commit.AuthorEmail = *req.Body.Commit.AuthorEmail
-		}
-	}
+	applyConfigUpdates(cfg, req.Body)
 
 	if err := a.syncService.UpdateConfig(ctx, cfg); err != nil {
-		return nil, &Error{
-			Code:       api.ErrorCodeInternalError,
-			Message:    err.Error(),
-			HTTPStatus: http.StatusInternalServerError,
-		}
+		return nil, internalError(err)
 	}
 
-	// Return the updated config
-	return api.UpdateSyncConfig200JSONResponse{
-		Enabled:     cfg.Enabled,
-		Repository:  ptrOf(cfg.Repository),
-		Branch:      ptrOf(cfg.Branch),
-		Path:        ptrOf(cfg.Path),
-		PushEnabled: ptrOf(cfg.PushEnabled),
-		Auth: &api.SyncAuthConfig{
-			Type:       api.SyncAuthConfigType(cfg.Auth.Type),
-			SshKeyPath: ptrOf(cfg.Auth.SSHKeyPath),
-			// Token is not returned for security
-		},
-		AutoSync: &api.SyncAutoSyncConfig{
-			Enabled:   cfg.AutoSync.Enabled,
-			OnStartup: cfg.AutoSync.OnStartup,
-			Interval:  cfg.AutoSync.Interval,
-		},
-		Commit: &api.SyncCommitConfig{
-			AuthorName:  ptrOf(cfg.Commit.AuthorName),
-			AuthorEmail: ptrOf(cfg.Commit.AuthorEmail),
-		},
-	}, nil
+	return api.UpdateSyncConfig200JSONResponse(toAPISyncConfig(cfg)), nil
 }
 
 // PublishDag publishes a single DAG.
 func (a *API) PublishDag(ctx context.Context, req api.PublishDagRequestObject) (api.PublishDagResponseObject, error) {
-	if a.syncService == nil {
-		return nil, &Error{
-			Code:       api.ErrorCodeInternalError,
-			Message:    "Git sync is not configured",
-			HTTPStatus: http.StatusServiceUnavailable,
-		}
+	if err := a.requireSyncService(); err != nil {
+		return nil, err
 	}
 
-	var message string
-	var force bool
-	if req.Body != nil {
-		if req.Body.Message != nil {
-			message = *req.Body.Message
-		}
-		if req.Body.Force != nil {
-			force = *req.Body.Force
-		}
-	}
+	message, force := extractPublishOptions(req.Body)
 
 	result, err := a.syncService.Publish(ctx, req.Name, message, force)
 	if err != nil {
-		var conflictErr *gitsync.ConflictError
-		if gitsync.IsConflict(err) {
-			if conflictErr, _ = err.(*gitsync.ConflictError); conflictErr != nil {
-				return api.PublishDag409JSONResponse{
-					DagId:         conflictErr.DAGID,
-					RemoteCommit:  ptrOf(conflictErr.RemoteCommit),
-					RemoteAuthor:  ptrOf(conflictErr.RemoteAuthor),
-					RemoteMessage: ptrOf(conflictErr.RemoteMessage),
-					Message:       conflictErr.Error(),
-				}, nil
-			}
-			return api.PublishDag409JSONResponse{
-				DagId:   req.Name,
-				Message: err.Error(),
-			}, nil
-		}
-		if gitsync.IsDAGNotFound(err) {
-			return api.PublishDag404JSONResponse{
-				Code:    api.ErrorCodeNotFound,
-				Message: err.Error(),
-			}, nil
-		}
-		return nil, &Error{
-			Code:       api.ErrorCodeInternalError,
-			Message:    err.Error(),
-			HTTPStatus: http.StatusInternalServerError,
-		}
+		return handlePublishError(err, req.Name)
 	}
 
 	return api.PublishDag200JSONResponse(toAPISyncResult(result)), nil
@@ -331,12 +199,8 @@ func (a *API) PublishDag(ctx context.Context, req api.PublishDagRequestObject) (
 
 // DiscardDagChanges discards local changes for a DAG.
 func (a *API) DiscardDagChanges(ctx context.Context, req api.DiscardDagChangesRequestObject) (api.DiscardDagChangesResponseObject, error) {
-	if a.syncService == nil {
-		return nil, &Error{
-			Code:       api.ErrorCodeInternalError,
-			Message:    "Git sync is not configured",
-			HTTPStatus: http.StatusServiceUnavailable,
-		}
+	if err := a.requireSyncService(); err != nil {
+		return nil, err
 	}
 
 	if err := a.syncService.Discard(ctx, req.Name); err != nil {
@@ -346,11 +210,7 @@ func (a *API) DiscardDagChanges(ctx context.Context, req api.DiscardDagChangesRe
 				Message: err.Error(),
 			}, nil
 		}
-		return nil, &Error{
-			Code:       api.ErrorCodeInternalError,
-			Message:    err.Error(),
-			HTTPStatus: http.StatusInternalServerError,
-		}
+		return nil, internalError(err)
 	}
 
 	return api.DiscardDagChanges200JSONResponse{
@@ -443,5 +303,110 @@ func toAPISyncResult(result *gitsync.SyncResult) api.SyncResultResponse {
 		Errors:    errors,
 		Timestamp: result.Timestamp,
 	}
+}
+
+// toAPISyncConfig converts a gitsync.Config to the API response format.
+func toAPISyncConfig(cfg *gitsync.Config) api.SyncConfigResponse {
+	return api.SyncConfigResponse{
+		Enabled:     cfg.Enabled,
+		Repository:  ptrOf(cfg.Repository),
+		Branch:      ptrOf(cfg.Branch),
+		Path:        ptrOf(cfg.Path),
+		PushEnabled: ptrOf(cfg.PushEnabled),
+		Auth: &api.SyncAuthConfig{
+			Type:       api.SyncAuthConfigType(cfg.Auth.Type),
+			SshKeyPath: ptrOf(cfg.Auth.SSHKeyPath),
+		},
+		AutoSync: &api.SyncAutoSyncConfig{
+			Enabled:   cfg.AutoSync.Enabled,
+			OnStartup: cfg.AutoSync.OnStartup,
+			Interval:  cfg.AutoSync.Interval,
+		},
+		Commit: &api.SyncCommitConfig{
+			AuthorName:  ptrOf(cfg.Commit.AuthorName),
+			AuthorEmail: ptrOf(cfg.Commit.AuthorEmail),
+		},
+	}
+}
+
+// applyConfigUpdates applies request body updates to the config.
+func applyConfigUpdates(cfg *gitsync.Config, body *api.UpdateSyncConfigJSONRequestBody) {
+	if body.Enabled != nil {
+		cfg.Enabled = *body.Enabled
+	}
+	if body.Repository != nil {
+		cfg.Repository = *body.Repository
+	}
+	if body.Branch != nil {
+		cfg.Branch = *body.Branch
+	}
+	if body.Path != nil {
+		cfg.Path = *body.Path
+	}
+	if body.PushEnabled != nil {
+		cfg.PushEnabled = *body.PushEnabled
+	}
+	if body.Auth != nil {
+		cfg.Auth.Type = string(body.Auth.Type)
+		if body.Auth.Token != nil {
+			cfg.Auth.Token = *body.Auth.Token
+		}
+		if body.Auth.SshKeyPath != nil {
+			cfg.Auth.SSHKeyPath = *body.Auth.SshKeyPath
+		}
+	}
+	if body.AutoSync != nil {
+		cfg.AutoSync.Enabled = body.AutoSync.Enabled
+		cfg.AutoSync.OnStartup = body.AutoSync.OnStartup
+		cfg.AutoSync.Interval = body.AutoSync.Interval
+	}
+	if body.Commit != nil {
+		if body.Commit.AuthorName != nil {
+			cfg.Commit.AuthorName = *body.Commit.AuthorName
+		}
+		if body.Commit.AuthorEmail != nil {
+			cfg.Commit.AuthorEmail = *body.Commit.AuthorEmail
+		}
+	}
+}
+
+// extractPublishOptions extracts message and force options from the request body.
+func extractPublishOptions(body *api.PublishDagJSONRequestBody) (message string, force bool) {
+	if body == nil {
+		return "", false
+	}
+	if body.Message != nil {
+		message = *body.Message
+	}
+	if body.Force != nil {
+		force = *body.Force
+	}
+	return message, force
+}
+
+// handlePublishError handles errors from the publish operation.
+func handlePublishError(err error, dagName string) (api.PublishDagResponseObject, error) {
+	if gitsync.IsConflict(err) {
+		if conflictErr, ok := err.(*gitsync.ConflictError); ok {
+			return api.PublishDag409JSONResponse{
+				DagId:         conflictErr.DAGID,
+				RemoteCommit:  ptrOf(conflictErr.RemoteCommit),
+				RemoteAuthor:  ptrOf(conflictErr.RemoteAuthor),
+				RemoteMessage: ptrOf(conflictErr.RemoteMessage),
+				Message:       conflictErr.Error(),
+			}, nil
+		}
+		return api.PublishDag409JSONResponse{
+			DagId:   dagName,
+			Message: err.Error(),
+		}, nil
+	}
+	if gitsync.IsDAGNotFound(err) {
+		return api.PublishDag404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: err.Error(),
+		}, nil
+	}
+	return nil, internalError(err)
 }
 
