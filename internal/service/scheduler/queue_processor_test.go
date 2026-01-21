@@ -106,6 +106,16 @@ func (f *queueFixture) simulateQueue(maxConcurrency int, isGlobal bool) *queueFi
 
 func (f *queueFixture) logs() string { return f.logBuffer.String() }
 
+func (f *queueFixture) enqueueWithPriority(runID string, priority exec.QueuePriority) {
+	run, _ := f.dagRunStore.CreateAttempt(f.ctx, f.dag, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
+	_ = run.Open(f.ctx)
+	st := exec.InitialStatus(f.dag)
+	st.Status, st.DAGRunID = core.Queued, runID
+	_ = run.Write(f.ctx, st)
+	_ = run.Close(f.ctx)
+	_ = f.queueStore.Enqueue(f.ctx, f.dag.Name, priority, exec.NewDAGRunRef(f.dag.Name, runID))
+}
+
 func TestQueueProcessor_DynamicQueueConcurrency(t *testing.T) {
 	f := newQueueFixture(t).withDAG("concurrent-dag", 3).enqueueRuns(3).withProcessor(config.Queues{}).simulateQueue(1, false)
 	v, _ := f.processor.queues.Load("concurrent-dag")
@@ -115,17 +125,6 @@ func TestQueueProcessor_DynamicQueueConcurrency(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	v, _ = f.processor.queues.Load("concurrent-dag")
-	assert.Equal(t, 3, v.(*queue).maxConc())
-	assert.True(t, strings.Contains(f.logs(), "count=3"))
-}
-
-func TestQueueProcessor_RetryLogic(t *testing.T) {
-	f := newQueueFixture(t).withDAG("retry-dag", 3).enqueueRuns(3).withProcessor(config.Queues{}).simulateQueue(1, false)
-
-	f.processor.ProcessQueueItems(f.ctx, "retry-dag")
-	time.Sleep(200 * time.Millisecond)
-
-	v, _ := f.processor.queues.Load("retry-dag")
 	assert.Equal(t, 3, v.(*queue).maxConc())
 	assert.True(t, strings.Contains(f.logs(), "count=3"))
 }
@@ -155,7 +154,7 @@ func TestQueueProcessor_GlobalQueue(t *testing.T) {
 	assert.True(t, strings.Contains(f.logs(), "count=3"))
 }
 
-func TestQueueProcessor_StrictFIFO(t *testing.T) {
+func TestQueueProcessor_ItemsRemainOnFailure(t *testing.T) {
 	f := newQueueFixture(t).withDAG("fifo-dag", 1).enqueueRuns(2).
 		withProcessor(config.Queues{Enabled: true, Config: []config.QueueConfig{{Name: "fifo-dag", MaxActiveRuns: 1}}}).
 		simulateQueue(1, false)
@@ -165,4 +164,48 @@ func TestQueueProcessor_StrictFIFO(t *testing.T) {
 
 	items, _ := f.queueStore.List(f.ctx, "fifo-dag")
 	require.Len(t, items, 2, "Both items should still be in queue")
+}
+
+func TestQueueProcessor_PriorityOrdering(t *testing.T) {
+	f := newQueueFixture(t).withDAG("priority-dag", 1).withProcessor(config.Queues{})
+
+	// Enqueue low priority first, then high priority
+	f.enqueueWithPriority("low-1", exec.QueuePriorityLow)
+	f.enqueueWithPriority("low-2", exec.QueuePriorityLow)
+	f.enqueueWithPriority("high-1", exec.QueuePriorityHigh)
+	f.enqueueWithPriority("high-2", exec.QueuePriorityHigh)
+
+	// Dequeue should return high priority first
+	item1, err := f.queueStore.DequeueByName(f.ctx, f.dag.Name)
+	require.NoError(t, err)
+	ref1, _ := item1.Data()
+	assert.Equal(t, "high-1", ref1.ID)
+
+	item2, err := f.queueStore.DequeueByName(f.ctx, f.dag.Name)
+	require.NoError(t, err)
+	ref2, _ := item2.Data()
+	assert.Equal(t, "high-2", ref2.ID)
+
+	item3, err := f.queueStore.DequeueByName(f.ctx, f.dag.Name)
+	require.NoError(t, err)
+	ref3, _ := item3.Data()
+	assert.Equal(t, "low-1", ref3.ID)
+
+	item4, err := f.queueStore.DequeueByName(f.ctx, f.dag.Name)
+	require.NoError(t, err)
+	ref4, _ := item4.Data()
+	assert.Equal(t, "low-2", ref4.ID)
+}
+
+func TestQueueProcessor_ConcurrencyLimit(t *testing.T) {
+	f := newQueueFixture(t).withDAG("conc-dag", 1).enqueueRuns(3).
+		withProcessor(config.Queues{}).simulateQueue(1, false)
+
+	// Process with maxConcurrency=1
+	f.processor.ProcessQueueItems(f.ctx, "conc-dag")
+	time.Sleep(100 * time.Millisecond)
+
+	// Should only process 1 item at a time, leaving 2 in queue
+	items, _ := f.queueStore.List(f.ctx, "conc-dag")
+	assert.GreaterOrEqual(t, len(items), 2, "Concurrency limit should prevent processing all at once")
 }

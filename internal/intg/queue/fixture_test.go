@@ -95,6 +95,10 @@ func (f *fixture) Enqueue(n int) *fixture {
 }
 
 func (f *fixture) enqueueOne() string {
+	return f.enqueueWithPriority(exec.QueuePriorityLow)
+}
+
+func (f *fixture) enqueueWithPriority(priority exec.QueuePriority) string {
 	id := uuid.New().String()
 	att, _ := f.th.DAGRunStore.CreateAttempt(f.th.Context, f.dag, time.Now(), id, exec.NewDAGRunAttemptOptions{})
 	logFile := filepath.Join(f.th.Config.Paths.LogDir, f.dag.Name, id+".log")
@@ -107,8 +111,14 @@ func (f *fixture) enqueueOne() string {
 	_ = att.Open(f.th.Context)
 	_ = att.Write(f.th.Context, st)
 	_ = att.Close(f.th.Context)
-	_ = f.th.QueueStore.Enqueue(f.th.Context, f.queue, exec.QueuePriorityLow, exec.NewDAGRunRef(f.dag.Name, id))
+	_ = f.th.QueueStore.Enqueue(f.th.Context, f.queue, priority, exec.NewDAGRunRef(f.dag.Name, id))
 	return id
+}
+
+// EnqueueWithPriority adds a single DAG run with specified priority.
+func (f *fixture) EnqueueWithPriority(priority exec.QueuePriority) *fixture {
+	f.runIDs = append(f.runIDs, f.enqueueWithPriority(priority))
+	return f
 }
 
 // StartScheduler starts the scheduler in background.
