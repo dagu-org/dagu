@@ -145,17 +145,6 @@ type thinkingConfig struct {
 	IncludeInOutput bool `yaml:"includeInOutput,omitempty"`
 }
 
-// modelEntry represents a single model in the model array for fallback support.
-type modelEntry struct {
-	Provider    string   `yaml:"provider"`
-	Name        string   `yaml:"name"`
-	Temperature *float64 `yaml:"temperature,omitempty"`
-	MaxTokens   *int     `yaml:"maxTokens,omitempty"`
-	TopP        *float64 `yaml:"topP,omitempty"`
-	BaseURL     string   `yaml:"baseURL,omitempty"`
-	APIKeyName  string   `yaml:"apiKeyName,omitempty"`
-}
-
 type llmConfig struct {
 	// Provider is the LLM provider (openai, anthropic, gemini, openrouter, local).
 	// Used for single model config (backward compatible).
@@ -1049,22 +1038,28 @@ func validateLLM(result *core.Step) error {
 			fmt.Errorf("executor type %q does not support llm field; use type: chat with llm: config", result.ExecutorConfig.Type),
 		)
 	}
-	// Provider is required (can be set at DAG or step level)
-	if result.LLM.Provider == "" {
-		return core.NewValidationError(
-			"llm.provider",
-			result.LLM.Provider,
-			fmt.Errorf("provider is required (set at DAG or step level)"),
-		)
+
+	// When Models array is used, Provider/Model fields are derived from the first entry
+	hasModels := len(result.LLM.Models) > 0
+
+	if !hasModels {
+		// Single model config (legacy): require both provider and model
+		if result.LLM.Provider == "" {
+			return core.NewValidationError(
+				"llm.provider",
+				result.LLM.Provider,
+				fmt.Errorf("provider is required (set at DAG or step level)"),
+			)
+		}
+		if result.LLM.Model == "" {
+			return core.NewValidationError(
+				"llm.model",
+				result.LLM.Model,
+				fmt.Errorf("model is required (set at DAG or step level)"),
+			)
+		}
 	}
-	// Model is required (can be set at DAG or step level)
-	if result.LLM.Model == "" {
-		return core.NewValidationError(
-			"llm.model",
-			result.LLM.Model,
-			fmt.Errorf("model is required (set at DAG or step level)"),
-		)
-	}
+
 	// Messages are required (at step level)
 	if len(result.Messages) == 0 {
 		return core.NewValidationError(
