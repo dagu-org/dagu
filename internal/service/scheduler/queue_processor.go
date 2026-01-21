@@ -511,47 +511,41 @@ func (p *QueueProcessor) updateQueueMaxConcurrency(ctx context.Context, q *queue
 
 	runRef := *data
 
-	// Retry logic to handle race condition where DAG file may not be
-	// fully written yet when queue item is first processed.
 	const maxRetries = 3
 	retryDelay := 50 * time.Millisecond
 
 	var lastErr error
 	for i := 0; i < maxRetries; i++ {
-		attempt, err := p.dagRunStore.FindAttempt(ctx, runRef)
-		if err != nil {
-			lastErr = err
-			if i < maxRetries-1 {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case <-time.After(retryDelay):
-					retryDelay *= 2 // exponential backoff
-					continue
-				}
-			}
-			return lastErr
+		dag, err := p.readDAGFromAttempt(ctx, runRef)
+		if err == nil {
+			q.setMaxConc(dag.MaxActiveRuns)
+			return nil
 		}
 
-		dag, err := attempt.ReadDAG(ctx)
-		if err != nil {
-			lastErr = err
-			if i < maxRetries-1 {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case <-time.After(retryDelay):
-					retryDelay *= 2 // exponential backoff
-					continue
-				}
-			}
-			return lastErr
+		lastErr = err
+
+		// On last retry, return immediately without waiting
+		if i >= maxRetries-1 {
+			break
 		}
 
-		// Successfully read DAG, update maxConcurrency
-		q.setMaxConc(dag.MaxActiveRuns)
-		return nil
+		// Wait with exponential backoff, respecting context cancellation
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(retryDelay):
+			retryDelay *= 2
+		}
 	}
 
 	return lastErr
+}
+
+// readDAGFromAttempt finds a DAG run attempt and reads its DAG definition.
+func (p *QueueProcessor) readDAGFromAttempt(ctx context.Context, runRef exec.DAGRunRef) (*core.DAG, error) {
+	attempt, err := p.dagRunStore.FindAttempt(ctx, runRef)
+	if err != nil {
+		return nil, err
+	}
+	return attempt.ReadDAG(ctx)
 }

@@ -107,13 +107,17 @@ func (f *queueFixture) simulateQueue(maxConcurrency int, isGlobal bool) *queueFi
 func (f *queueFixture) logs() string { return f.logBuffer.String() }
 
 func (f *queueFixture) enqueueWithPriority(runID string, priority exec.QueuePriority) {
+	f.enqueueToQueue(f.dag.Name, runID, priority)
+}
+
+func (f *queueFixture) enqueueToQueue(queueName, runID string, priority exec.QueuePriority) {
 	run, _ := f.dagRunStore.CreateAttempt(f.ctx, f.dag, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
 	_ = run.Open(f.ctx)
 	st := exec.InitialStatus(f.dag)
 	st.Status, st.DAGRunID = core.Queued, runID
 	_ = run.Write(f.ctx, st)
 	_ = run.Close(f.ctx)
-	_ = f.queueStore.Enqueue(f.ctx, f.dag.Name, priority, exec.NewDAGRunRef(f.dag.Name, runID))
+	_ = f.queueStore.Enqueue(f.ctx, queueName, priority, exec.NewDAGRunRef(f.dag.Name, runID))
 }
 
 func TestQueueProcessor_DynamicQueueConcurrency(t *testing.T) {
@@ -135,14 +139,7 @@ func TestQueueProcessor_GlobalQueue(t *testing.T) {
 	})
 
 	for i := 1; i <= 3; i++ {
-		runID := fmt.Sprintf("run-%d", i)
-		run, _ := f.dagRunStore.CreateAttempt(f.ctx, f.dag, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
-		_ = run.Open(f.ctx)
-		st := exec.InitialStatus(f.dag)
-		st.Status, st.DAGRunID = core.Queued, runID
-		_ = run.Write(f.ctx, st)
-		_ = run.Close(f.ctx)
-		_ = f.queueStore.Enqueue(f.ctx, "global-queue", exec.QueuePriorityHigh, exec.NewDAGRunRef(f.dag.Name, runID))
+		f.enqueueToQueue("global-queue", fmt.Sprintf("run-%d", i), exec.QueuePriorityHigh)
 	}
 
 	v, ok := f.processor.queues.Load("global-queue")
