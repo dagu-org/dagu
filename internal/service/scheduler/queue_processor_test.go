@@ -277,4 +277,3 @@ func TestQueueProcessor_GlobalQueueViaLoop(t *testing.T) {
 	assert.Contains(t, f.logs(), "count=3", "Should process all 3 items")
 	assert.Contains(t, f.logs(), "max-concurrency=3", "maxConcurrency should be 3")
 }
-
