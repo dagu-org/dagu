@@ -43,6 +43,8 @@ tags:
     description: "Webhook endpoints for triggering DAG execution"
   - name: "audit"
     description: "Audit log operations (admin only)"
+  - name: "sync"
+    description: "Git synchronization operations for DAGs"
 
 paths:
   /health:
@@ -3253,6 +3255,225 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  # Git Sync endpoints
+  /sync/status:
+    get:
+      summary: "Get Git sync status"
+      description: "Returns the overall Git sync status including status of all DAGs"
+      operationId: "getSyncStatus"
+      tags:
+        - "sync"
+      responses:
+        "200":
+          description: "Sync status retrieved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncStatusResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /sync/pull:
+    post:
+      summary: "Pull changes from remote repository"
+      description: "Fetches and syncs changes from the remote Git repository"
+      operationId: "syncPull"
+      tags:
+        - "sync"
+      responses:
+        "200":
+          description: "Pull completed successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResultResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /sync/publish-all:
+    post:
+      summary: "Publish all modified DAGs"
+      description: "Commits and pushes all modified DAGs to the remote repository"
+      operationId: "syncPublishAll"
+      tags:
+        - "sync"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyncPublishAllRequest"
+      responses:
+        "200":
+          description: "Publish completed successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResultResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /sync/test-connection:
+    post:
+      summary: "Test connection to remote repository"
+      description: "Tests authentication and connectivity to the configured Git repository"
+      operationId: "syncTestConnection"
+      tags:
+        - "sync"
+      responses:
+        "200":
+          description: "Connection test result"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncConnectionTestResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /sync/config:
+    get:
+      summary: "Get Git sync configuration"
+      description: "Returns the current Git sync configuration"
+      operationId: "getSyncConfig"
+      tags:
+        - "sync"
+      responses:
+        "200":
+          description: "Configuration retrieved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncConfigResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      summary: "Update Git sync configuration"
+      description: "Updates the Git sync configuration"
+      operationId: "updateSyncConfig"
+      tags:
+        - "sync"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyncConfigUpdateRequest"
+      responses:
+        "200":
+          description: "Configuration updated successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncConfigResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{name}/publish:
+    post:
+      summary: "Publish a single DAG"
+      description: "Commits and pushes a single DAG to the remote repository"
+      operationId: "publishDag"
+      tags:
+        - "sync"
+        - "dags"
+      parameters:
+        - name: name
+          in: path
+          description: "The DAG name (file name without extension)"
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyncPublishRequest"
+      responses:
+        "200":
+          description: "DAG published successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResultResponse"
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Conflict detected"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncConflictResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{name}/discard:
+    post:
+      summary: "Discard local changes for a DAG"
+      description: "Discards local changes and reverts to the version in the remote repository"
+      operationId: "discardDagChanges"
+      tags:
+        - "sync"
+        - "dags"
+      parameters:
+        - name: name
+          in: path
+          description: "The DAG name (file name without extension)"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Changes discarded successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   securitySchemes:
     basicAuth:
@@ -5223,6 +5444,305 @@ components:
           description: "Success message"
       required:
         - message
+
+    # Git Sync schemas
+    SyncStatus:
+      type: string
+      description: "Sync status of a DAG"
+      enum:
+        - synced
+        - modified
+        - untracked
+        - conflict
+
+    SyncSummary:
+      type: string
+      description: "Summary status for the sync badge"
+      enum:
+        - synced
+        - pending
+        - conflict
+        - error
+
+    SyncDAGState:
+      type: object
+      description: "Sync state for a single DAG"
+      properties:
+        status:
+          $ref: "#/components/schemas/SyncStatus"
+        baseCommit:
+          type: string
+          description: "Commit hash when last synced"
+        lastSyncedHash:
+          type: string
+          description: "Content hash when last synced"
+        lastSyncedAt:
+          type: string
+          format: date-time
+          description: "When the DAG was last synced"
+        modifiedAt:
+          type: string
+          format: date-time
+          description: "When the DAG was last modified locally"
+        localHash:
+          type: string
+          description: "Current local content hash"
+        remoteCommit:
+          type: string
+          description: "Remote commit hash (for conflicts)"
+        remoteAuthor:
+          type: string
+          description: "Author of the remote commit (for conflicts)"
+        remoteMessage:
+          type: string
+          description: "Message of the remote commit (for conflicts)"
+        conflictDetectedAt:
+          type: string
+          format: date-time
+          description: "When the conflict was detected"
+      required:
+        - status
+
+    SyncStatusCounts:
+      type: object
+      description: "Counts of DAGs in each sync status"
+      properties:
+        synced:
+          type: integer
+        modified:
+          type: integer
+        untracked:
+          type: integer
+        conflict:
+          type: integer
+      required:
+        - synced
+        - modified
+        - untracked
+        - conflict
+
+    SyncStatusResponse:
+      type: object
+      description: "Overall Git sync status"
+      properties:
+        enabled:
+          type: boolean
+          description: "Whether Git sync is enabled"
+        repository:
+          type: string
+          description: "Repository URL"
+        branch:
+          type: string
+          description: "Branch being synced"
+        summary:
+          $ref: "#/components/schemas/SyncSummary"
+        lastSyncAt:
+          type: string
+          format: date-time
+          description: "When the last sync occurred"
+        lastSyncCommit:
+          type: string
+          description: "Commit hash of last sync"
+        lastSyncStatus:
+          type: string
+          description: "Status of last sync (success/error)"
+        lastError:
+          type: string
+          description: "Error message from last failed sync"
+        dags:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/SyncDAGState"
+          description: "Sync state for each DAG"
+        counts:
+          $ref: "#/components/schemas/SyncStatusCounts"
+      required:
+        - enabled
+        - summary
+        - counts
+
+    SyncError:
+      type: object
+      description: "Error during sync operation"
+      properties:
+        dagId:
+          type: string
+        message:
+          type: string
+      required:
+        - message
+
+    SyncResultResponse:
+      type: object
+      description: "Result of a sync operation"
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        synced:
+          type: array
+          items:
+            type: string
+          description: "DAG IDs that were synced"
+        modified:
+          type: array
+          items:
+            type: string
+          description: "DAG IDs that were modified"
+        conflicts:
+          type: array
+          items:
+            type: string
+          description: "DAG IDs with conflicts"
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncError"
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - success
+        - timestamp
+
+    SyncPublishRequest:
+      type: object
+      description: "Request to publish a DAG"
+      properties:
+        message:
+          type: string
+          description: "Commit message"
+        force:
+          type: boolean
+          default: false
+          description: "Force publish even with conflicts"
+
+    SyncPublishAllRequest:
+      type: object
+      description: "Request to publish all modified DAGs"
+      properties:
+        message:
+          type: string
+          description: "Commit message"
+
+    SyncConflictResponse:
+      type: object
+      description: "Response when a conflict is detected"
+      properties:
+        dagId:
+          type: string
+        remoteCommit:
+          type: string
+        remoteAuthor:
+          type: string
+        remoteMessage:
+          type: string
+        message:
+          type: string
+      required:
+        - dagId
+        - message
+
+    SyncConnectionTestResponse:
+      type: object
+      description: "Result of connection test"
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        error:
+          type: string
+      required:
+        - success
+
+    SyncAuthConfig:
+      type: object
+      description: "Git authentication configuration"
+      properties:
+        type:
+          type: string
+          enum:
+            - token
+            - ssh
+        token:
+          type: string
+          description: "Personal access token (write-only)"
+        sshKeyPath:
+          type: string
+          description: "Path to SSH private key"
+      required:
+        - type
+
+    SyncAutoSyncConfig:
+      type: object
+      description: "Auto-sync configuration"
+      properties:
+        enabled:
+          type: boolean
+        onStartup:
+          type: boolean
+        interval:
+          type: integer
+          description: "Sync interval in seconds"
+      required:
+        - enabled
+        - onStartup
+        - interval
+
+    SyncCommitConfig:
+      type: object
+      description: "Commit configuration"
+      properties:
+        authorName:
+          type: string
+        authorEmail:
+          type: string
+
+    SyncConfigResponse:
+      type: object
+      description: "Git sync configuration"
+      properties:
+        enabled:
+          type: boolean
+        repository:
+          type: string
+        branch:
+          type: string
+        path:
+          type: string
+        auth:
+          $ref: "#/components/schemas/SyncAuthConfig"
+        autoSync:
+          $ref: "#/components/schemas/SyncAutoSyncConfig"
+        pushEnabled:
+          type: boolean
+        commit:
+          $ref: "#/components/schemas/SyncCommitConfig"
+      required:
+        - enabled
+
+    SyncConfigUpdateRequest:
+      type: object
+      description: "Request to update Git sync configuration"
+      properties:
+        enabled:
+          type: boolean
+        repository:
+          type: string
+        branch:
+          type: string
+        path:
+          type: string
+        auth:
+          $ref: "#/components/schemas/SyncAuthConfig"
+        autoSync:
+          $ref: "#/components/schemas/SyncAutoSyncConfig"
+        pushEnabled:
+          type: boolean
+        commit:
+          $ref: "#/components/schemas/SyncCommitConfig"
 
 # Apply security requirements globally
 security:

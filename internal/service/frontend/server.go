@@ -24,6 +24,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/cmn/telemetry"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/gitsync"
 	"github.com/dagu-org/dagu/internal/persis/fileapikey"
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
 	"github.com/dagu-org/dagu/internal/persis/fileuser"
@@ -108,6 +109,12 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	}
 	if auditSvc != nil {
 		apiOpts = append(apiOpts, apiv2.WithAuditService(auditSvc))
+	}
+
+	// Initialize git sync service if enabled
+	syncSvc := initSyncService(ctx, cfg)
+	if syncSvc != nil {
+		apiOpts = append(apiOpts, apiv2.WithSyncService(syncSvc))
 	}
 
 	// Initialize auth service if builtin mode is enabled
@@ -309,6 +316,60 @@ func initAuditService(cfg *config.Config) (*audit.Service, error) {
 	}
 
 	return audit.New(store), nil
+}
+
+// initSyncService creates and returns a Git sync service if enabled.
+// Returns nil if Git sync is not enabled or not configured.
+func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
+	gitSyncCfg := cfg.GitSync
+	if !gitSyncCfg.Enabled {
+		return nil
+	}
+
+	// Convert config types
+	syncCfg := &gitsync.Config{
+		Enabled:     gitSyncCfg.Enabled,
+		Repository:  gitSyncCfg.Repository,
+		Branch:      gitSyncCfg.Branch,
+		Path:        gitSyncCfg.Path,
+		PushEnabled: gitSyncCfg.PushEnabled,
+		Auth: gitsync.AuthConfig{
+			Type:          gitSyncCfg.Auth.Type,
+			Token:         gitSyncCfg.Auth.Token,
+			SSHKeyPath:    gitSyncCfg.Auth.SSHKeyPath,
+			SSHPassphrase: gitSyncCfg.Auth.SSHPassphrase,
+		},
+		AutoSync: gitsync.AutoSyncConfig{
+			Enabled:   gitSyncCfg.AutoSync.Enabled,
+			OnStartup: gitSyncCfg.AutoSync.OnStartup,
+			Interval:  gitSyncCfg.AutoSync.Interval,
+		},
+		Commit: gitsync.CommitConfig{
+			AuthorName:  gitSyncCfg.Commit.AuthorName,
+			AuthorEmail: gitSyncCfg.Commit.AuthorEmail,
+		},
+	}
+
+	svc := gitsync.NewService(syncCfg, cfg.Paths.DAGsDir, cfg.Paths.DataDir)
+
+	// Start auto-sync if enabled
+	if syncCfg.AutoSync.Enabled {
+		go func() {
+			if err := svc.Start(ctx); err != nil {
+				logger.Error(ctx, "Failed to start git sync auto-sync", tag.Error(err))
+			}
+		}()
+		logger.Info(ctx, "Git sync auto-sync started",
+			slog.String("repository", syncCfg.Repository),
+			slog.String("branch", syncCfg.Branch),
+			slog.Int("interval", syncCfg.AutoSync.Interval))
+	}
+
+	logger.Info(ctx, "Git sync service initialized",
+		slog.String("repository", syncCfg.Repository),
+		slog.String("branch", syncCfg.Branch))
+
+	return svc
 }
 
 // Serve starts the HTTP server and configures routes

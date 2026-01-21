@@ -149,6 +149,9 @@ type Definition struct {
 
 	// Audit contains configuration for the audit logging feature.
 	Audit *AuditDef `mapstructure:"audit"`
+
+	// GitSync contains configuration for Git synchronization.
+	GitSync *GitSyncDef `mapstructure:"gitSync"`
 }
 
 // TerminalDef represents the terminal configuration.
@@ -427,4 +430,93 @@ type PostgresPoolDef struct {
 	// ConnMaxIdleTime is the maximum idle time for a connection in seconds.
 	// Default: 60 (1 minute)
 	ConnMaxIdleTime int `mapstructure:"connMaxIdleTime"`
+}
+
+// GitSyncDef holds the definition for Git synchronization configuration.
+type GitSyncDef struct {
+	// Enabled indicates whether Git sync is enabled.
+	// Default: false
+	// Env: DAGU_GITSYNC_ENABLED
+	Enabled *bool `mapstructure:"enabled"`
+
+	// Repository is the Git repository URL.
+	// Format: github.com/org/repo or https://github.com/org/repo.git
+	// Env: DAGU_GITSYNC_REPOSITORY
+	Repository string `mapstructure:"repository"`
+
+	// Branch is the branch to sync with.
+	// Default: main
+	// Env: DAGU_GITSYNC_BRANCH
+	Branch string `mapstructure:"branch"`
+
+	// Path is the subdirectory within the repository to sync.
+	// Empty string means root directory.
+	// Env: DAGU_GITSYNC_PATH
+	Path string `mapstructure:"path"`
+
+	// Auth contains authentication configuration.
+	Auth *GitSyncAuthDef `mapstructure:"auth"`
+
+	// AutoSync contains auto-sync configuration.
+	AutoSync *GitSyncAutoSyncDef `mapstructure:"autoSync"`
+
+	// PushEnabled indicates whether pushing changes is allowed.
+	// Default: true
+	// Env: DAGU_GITSYNC_PUSH_ENABLED
+	PushEnabled *bool `mapstructure:"pushEnabled"`
+
+	// Commit contains commit configuration.
+	Commit *GitSyncCommitDef `mapstructure:"commit"`
+}
+
+// GitSyncAuthDef holds authentication configuration for Git operations.
+type GitSyncAuthDef struct {
+	// Type is the authentication type: "token" or "ssh".
+	// Default: token
+	// Env: DAGU_GITSYNC_AUTH_TYPE
+	Type string `mapstructure:"type"`
+
+	// Token is the personal access token for HTTPS authentication.
+	// Env: DAGU_GITSYNC_AUTH_TOKEN
+	Token string `mapstructure:"token"`
+
+	// SSHKeyPath is the path to the SSH private key file.
+	// Env: DAGU_GITSYNC_AUTH_SSH_KEY_PATH
+	SSHKeyPath string `mapstructure:"sshKeyPath"`
+
+	// SSHPassphrase is the passphrase for the SSH key (optional).
+	// Env: DAGU_GITSYNC_AUTH_SSH_PASSPHRASE
+	SSHPassphrase string `mapstructure:"sshPassphrase"`
+}
+
+// GitSyncAutoSyncDef holds configuration for automatic synchronization.
+type GitSyncAutoSyncDef struct {
+	// Enabled indicates whether auto-sync is enabled.
+	// Default: false
+	// Env: DAGU_GITSYNC_AUTOSYNC_ENABLED
+	Enabled *bool `mapstructure:"enabled"`
+
+	// OnStartup indicates whether to sync on server startup.
+	// Default: true
+	// Env: DAGU_GITSYNC_AUTOSYNC_ON_STARTUP
+	OnStartup *bool `mapstructure:"onStartup"`
+
+	// Interval is the sync interval in seconds.
+	// 0 means auto-sync is disabled (pull on startup only).
+	// Default: 300 (5 minutes)
+	// Env: DAGU_GITSYNC_AUTOSYNC_INTERVAL
+	Interval int `mapstructure:"interval"`
+}
+
+// GitSyncCommitDef holds configuration for Git commits.
+type GitSyncCommitDef struct {
+	// AuthorName is the name to use for commits.
+	// Default: Dagu
+	// Env: DAGU_GITSYNC_COMMIT_AUTHOR_NAME
+	AuthorName string `mapstructure:"authorName"`
+
+	// AuthorEmail is the email to use for commits.
+	// Default: dagu@localhost
+	// Env: DAGU_GITSYNC_COMMIT_AUTHOR_EMAIL
+	AuthorEmail string `mapstructure:"authorEmail"`
 }

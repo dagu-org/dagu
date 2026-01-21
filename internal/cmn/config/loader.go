@@ -96,15 +96,16 @@ const (
 	SectionUI                                    // 32
 	SectionQueues                                // 64
 	SectionMonitoring                            // 128
+	SectionGitSync                               // 256
 
 	// SectionAll combines all sections (useful for ServiceNone/CLI)
-	SectionAll = SectionServer | SectionScheduler | SectionWorker | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring
+	SectionAll = SectionServer | SectionScheduler | SectionWorker | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync
 )
 
 // serviceRequirements maps services to their required config sections using bitwise OR.
 var serviceRequirements = map[Service]ConfigSection{
 	ServiceNone:        SectionAll,
-	ServiceServer:      SectionServer | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring,
+	ServiceServer:      SectionServer | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync,
 	ServiceScheduler:   SectionScheduler | SectionCoordinator | SectionQueues,
 	ServiceWorker:      SectionWorker | SectionCoordinator,
 	ServiceCoordinator: SectionCoordinator,
@@ -238,6 +239,9 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	}
 	if l.requires(SectionMonitoring) {
 		l.loadMonitoringConfig(&cfg, def)
+	}
+	if l.requires(SectionGitSync) {
+		l.loadGitSyncConfig(&cfg, def)
 	}
 
 	// Cache config is always loaded (used by all services)
@@ -839,6 +843,86 @@ func (l *ConfigLoader) loadMonitoringConfig(cfg *Config, def Definition) {
 	}
 }
 
+// loadGitSyncConfig loads the Git synchronization configuration.
+func (l *ConfigLoader) loadGitSyncConfig(cfg *Config, def Definition) {
+	// Set defaults
+	cfg.GitSync.Branch = "main"
+	cfg.GitSync.PushEnabled = true
+	cfg.GitSync.Auth.Type = "token"
+	cfg.GitSync.AutoSync.OnStartup = true
+	cfg.GitSync.AutoSync.Interval = 300
+	cfg.GitSync.Commit.AuthorName = "Dagu"
+	cfg.GitSync.Commit.AuthorEmail = "dagu@localhost"
+
+	if def.GitSync == nil {
+		return
+	}
+
+	// Enabled
+	if def.GitSync.Enabled != nil {
+		cfg.GitSync.Enabled = *def.GitSync.Enabled
+	}
+
+	// Repository
+	if def.GitSync.Repository != "" {
+		cfg.GitSync.Repository = def.GitSync.Repository
+	}
+
+	// Branch
+	if def.GitSync.Branch != "" {
+		cfg.GitSync.Branch = def.GitSync.Branch
+	}
+
+	// Path
+	if def.GitSync.Path != "" {
+		cfg.GitSync.Path = def.GitSync.Path
+	}
+
+	// PushEnabled
+	if def.GitSync.PushEnabled != nil {
+		cfg.GitSync.PushEnabled = *def.GitSync.PushEnabled
+	}
+
+	// Auth
+	if def.GitSync.Auth != nil {
+		if def.GitSync.Auth.Type != "" {
+			cfg.GitSync.Auth.Type = def.GitSync.Auth.Type
+		}
+		if def.GitSync.Auth.Token != "" {
+			cfg.GitSync.Auth.Token = def.GitSync.Auth.Token
+		}
+		if def.GitSync.Auth.SSHKeyPath != "" {
+			cfg.GitSync.Auth.SSHKeyPath = def.GitSync.Auth.SSHKeyPath
+		}
+		if def.GitSync.Auth.SSHPassphrase != "" {
+			cfg.GitSync.Auth.SSHPassphrase = def.GitSync.Auth.SSHPassphrase
+		}
+	}
+
+	// AutoSync
+	if def.GitSync.AutoSync != nil {
+		if def.GitSync.AutoSync.Enabled != nil {
+			cfg.GitSync.AutoSync.Enabled = *def.GitSync.AutoSync.Enabled
+		}
+		if def.GitSync.AutoSync.OnStartup != nil {
+			cfg.GitSync.AutoSync.OnStartup = *def.GitSync.AutoSync.OnStartup
+		}
+		if def.GitSync.AutoSync.Interval > 0 {
+			cfg.GitSync.AutoSync.Interval = def.GitSync.AutoSync.Interval
+		}
+	}
+
+	// Commit
+	if def.GitSync.Commit != nil {
+		if def.GitSync.Commit.AuthorName != "" {
+			cfg.GitSync.Commit.AuthorName = def.GitSync.Commit.AuthorName
+		}
+		if def.GitSync.Commit.AuthorEmail != "" {
+			cfg.GitSync.Commit.AuthorEmail = def.GitSync.Commit.AuthorEmail
+		}
+	}
+}
+
 // loadCacheConfig loads the cache configuration.
 func (l *ConfigLoader) loadCacheConfig(cfg *Config, def Definition) {
 	if def.Cache != nil {
@@ -1254,6 +1338,22 @@ var envBindings = []envBinding{
 	{key: "worker.postgresPool.maxIdleConns", env: "WORKER_POSTGRES_POOL_MAX_IDLE_CONNS"},
 	{key: "worker.postgresPool.connMaxLifetime", env: "WORKER_POSTGRES_POOL_CONN_MAX_LIFETIME"},
 	{key: "worker.postgresPool.connMaxIdleTime", env: "WORKER_POSTGRES_POOL_CONN_MAX_IDLE_TIME"},
+
+	// Git sync configuration
+	{key: "gitSync.enabled", env: "GITSYNC_ENABLED"},
+	{key: "gitSync.repository", env: "GITSYNC_REPOSITORY"},
+	{key: "gitSync.branch", env: "GITSYNC_BRANCH"},
+	{key: "gitSync.path", env: "GITSYNC_PATH"},
+	{key: "gitSync.pushEnabled", env: "GITSYNC_PUSH_ENABLED"},
+	{key: "gitSync.auth.type", env: "GITSYNC_AUTH_TYPE"},
+	{key: "gitSync.auth.token", env: "GITSYNC_AUTH_TOKEN"},
+	{key: "gitSync.auth.sshKeyPath", env: "GITSYNC_AUTH_SSH_KEY_PATH", isPath: true},
+	{key: "gitSync.auth.sshPassphrase", env: "GITSYNC_AUTH_SSH_PASSPHRASE"},
+	{key: "gitSync.autoSync.enabled", env: "GITSYNC_AUTOSYNC_ENABLED"},
+	{key: "gitSync.autoSync.onStartup", env: "GITSYNC_AUTOSYNC_ON_STARTUP"},
+	{key: "gitSync.autoSync.interval", env: "GITSYNC_AUTOSYNC_INTERVAL"},
+	{key: "gitSync.commit.authorName", env: "GITSYNC_COMMIT_AUTHOR_NAME"},
+	{key: "gitSync.commit.authorEmail", env: "GITSYNC_COMMIT_AUTHOR_EMAIL"},
 }
 
 // bindEnvironmentVariables binds configuration keys to environment variables using the loader's viper instance.

@@ -40,6 +40,77 @@ type Config struct {
 
 	// Cache defines the cache mode preset (low, normal, high).
 	Cache CacheMode
+
+	// GitSync contains configuration for Git synchronization.
+	GitSync GitSyncConfig
+}
+
+// GitSyncConfig holds the configuration for Git sync functionality.
+type GitSyncConfig struct {
+	// Enabled indicates whether Git sync is enabled.
+	Enabled bool
+
+	// Repository is the Git repository URL.
+	// Format: github.com/org/repo or https://github.com/org/repo.git
+	Repository string
+
+	// Branch is the branch to sync with.
+	Branch string
+
+	// Path is the subdirectory within the repository to sync.
+	// Empty string means root directory.
+	Path string
+
+	// Auth contains authentication configuration.
+	Auth GitSyncAuthConfig
+
+	// AutoSync contains auto-sync configuration.
+	AutoSync GitSyncAutoSyncConfig
+
+	// PushEnabled indicates whether pushing changes is allowed.
+	PushEnabled bool
+
+	// Commit contains commit configuration.
+	Commit GitSyncCommitConfig
+}
+
+// GitSyncAuthConfig holds authentication configuration for Git operations.
+type GitSyncAuthConfig struct {
+	// Type is the authentication type: "token" or "ssh".
+	Type string
+
+	// Token is the personal access token for HTTPS authentication.
+	Token string
+
+	// SSHKeyPath is the path to the SSH private key file.
+	SSHKeyPath string
+
+	// SSHPassphrase is the passphrase for the SSH key (optional).
+	SSHPassphrase string
+}
+
+// GitSyncAutoSyncConfig holds configuration for automatic synchronization.
+type GitSyncAutoSyncConfig struct {
+	// Enabled indicates whether auto-sync is enabled.
+	Enabled bool
+
+	// OnStartup indicates whether to sync on server startup.
+	OnStartup bool
+
+	// Interval is the sync interval in seconds.
+	// 0 means auto-sync is disabled (pull on startup only).
+	Interval int
+}
+
+// GitSyncCommitConfig holds configuration for Git commits.
+type GitSyncCommitConfig struct {
+	// AuthorName is the name to use for commits.
+	// Defaults to "Dagu" if not specified.
+	AuthorName string
+
+	// AuthorEmail is the email to use for commits.
+	// Defaults to "dagu@localhost" if not specified.
+	AuthorEmail string
 }
 
 // MonitoringConfig holds the configuration for system monitoring.

@@ -50,6 +50,7 @@ type API struct {
 	resourceService    *resource.Service
 	authService        AuthService
 	auditService       *audit.Service
+	syncService        SyncService
 }
 
 // AuthService defines the interface for authentication operations.
@@ -99,6 +100,13 @@ func WithAuthService(as AuthService) APIOption {
 func WithAuditService(as *audit.Service) APIOption {
 	return func(a *API) {
 		a.auditService = as
+	}
+}
+
+// WithSyncService returns an APIOption that sets the API's SyncService.
+func WithSyncService(ss SyncService) APIOption {
+	return func(a *API) {
+		a.syncService = ss
 	}
 }
 
