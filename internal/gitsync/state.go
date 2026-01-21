@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -178,44 +177,6 @@ func (m *StateManager) GetState() (*State, error) {
 	m.mu.RUnlock()
 
 	return m.Load()
-}
-
-// UpdateDAGState updates the state for a single DAG and saves.
-func (m *StateManager) UpdateDAGState(dagID string, dagState *DAGState) error {
-	state, err := m.GetState()
-	if err != nil {
-		return err
-	}
-
-	state.DAGs[dagID] = dagState
-	return m.Save(state)
-}
-
-// RemoveDAGState removes a DAG from the state.
-func (m *StateManager) RemoveDAGState(dagID string) error {
-	state, err := m.GetState()
-	if err != nil {
-		return err
-	}
-
-	delete(state.DAGs, dagID)
-	return m.Save(state)
-}
-
-// ComputeFileHash computes the SHA256 hash of a file.
-func ComputeFileHash(filePath string) (string, error) {
-	f, err := os.Open(filePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to open file: %w", err)
-	}
-	defer f.Close()
-
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", fmt.Errorf("failed to compute hash: %w", err)
-	}
-
-	return "sha256:" + hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // ComputeContentHash computes the SHA256 hash of content bytes.
