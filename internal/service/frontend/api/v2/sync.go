@@ -93,6 +93,9 @@ func (a *API) SyncPull(ctx context.Context, _ api.SyncPullRequestObject) (api.Sy
 	if err := a.requireSyncService(); err != nil {
 		return nil, err
 	}
+	if err := a.requireDAGWrite(ctx); err != nil {
+		return nil, err
+	}
 
 	result, err := a.syncService.Pull(ctx)
 	if err != nil {
@@ -105,6 +108,9 @@ func (a *API) SyncPull(ctx context.Context, _ api.SyncPullRequestObject) (api.Sy
 // SyncPublishAll publishes all modified DAGs.
 func (a *API) SyncPublishAll(ctx context.Context, req api.SyncPublishAllRequestObject) (api.SyncPublishAllResponseObject, error) {
 	if err := a.requireSyncService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireDAGWrite(ctx); err != nil {
 		return nil, err
 	}
 
@@ -167,6 +173,9 @@ func (a *API) UpdateSyncConfig(ctx context.Context, req api.UpdateSyncConfigRequ
 	if err := a.requireSyncService(); err != nil {
 		return nil, err
 	}
+	if err := a.requireAdmin(ctx); err != nil {
+		return nil, err
+	}
 
 	cfg, err := a.syncService.GetConfig(ctx)
 	if err != nil {
@@ -187,6 +196,9 @@ func (a *API) PublishDag(ctx context.Context, req api.PublishDagRequestObject) (
 	if err := a.requireSyncService(); err != nil {
 		return nil, err
 	}
+	if err := a.requireDAGWrite(ctx); err != nil {
+		return nil, err
+	}
 
 	message, force := extractPublishOptions(req.Body)
 
@@ -201,6 +213,9 @@ func (a *API) PublishDag(ctx context.Context, req api.PublishDagRequestObject) (
 // DiscardDagChanges discards local changes for a DAG.
 func (a *API) DiscardDagChanges(ctx context.Context, req api.DiscardDagChangesRequestObject) (api.DiscardDagChangesResponseObject, error) {
 	if err := a.requireSyncService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireDAGWrite(ctx); err != nil {
 		return nil, err
 	}
 
