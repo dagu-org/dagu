@@ -1512,8 +1512,14 @@ func anyToInt(v any) (int, bool) {
 	case int64:
 		return int(t), true
 	case uint:
+		if t > math.MaxInt {
+			return 0, false
+		}
 		return int(t), true
 	case uint32:
+		if t > math.MaxInt32 {
+			return 0, false
+		}
 		return int(t), true
 	case uint64:
 		if t > math.MaxInt {
