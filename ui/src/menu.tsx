@@ -13,6 +13,7 @@ import { getResponsiveTitleClass } from '@/lib/text-utils';
 import {
   Activity,
   BarChart2,
+  GitBranch,
   Globe,
   History,
   Inbox,
@@ -351,6 +352,14 @@ export const mainListItems = React.forwardRef<
                 to="/audit-logs"
                 text="Audit Logs"
                 icon={<ScrollText size={18} />}
+                isOpen={isOpen}
+                onClick={onNavItemClick}
+                customColor={customColor}
+              />
+              <NavItem
+                to="/git-sync"
+                text="Git Sync"
+                icon={<GitBranch size={18} />}
                 isOpen={isOpen}
                 onClick={onNavItemClick}
                 customColor={customColor}

@@ -5,6 +5,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/dagu-org/dagu/api/v2"
@@ -386,16 +387,17 @@ func extractPublishOptions(body *api.PublishDagJSONRequestBody) (message string,
 
 // handlePublishError handles errors from the publish operation.
 func handlePublishError(err error, dagName string) (api.PublishDagResponseObject, error) {
+	var conflictErr *gitsync.ConflictError
+	if errors.As(err, &conflictErr) {
+		return api.PublishDag409JSONResponse{
+			DagId:         conflictErr.DAGID,
+			RemoteCommit:  ptrOf(conflictErr.RemoteCommit),
+			RemoteAuthor:  ptrOf(conflictErr.RemoteAuthor),
+			RemoteMessage: ptrOf(conflictErr.RemoteMessage),
+			Message:       conflictErr.Error(),
+		}, nil
+	}
 	if gitsync.IsConflict(err) {
-		if conflictErr, ok := err.(*gitsync.ConflictError); ok {
-			return api.PublishDag409JSONResponse{
-				DagId:         conflictErr.DAGID,
-				RemoteCommit:  ptrOf(conflictErr.RemoteCommit),
-				RemoteAuthor:  ptrOf(conflictErr.RemoteAuthor),
-				RemoteMessage: ptrOf(conflictErr.RemoteMessage),
-				Message:       conflictErr.Error(),
-			}, nil
-		}
 		return api.PublishDag409JSONResponse{
 			DagId:   dagName,
 			Message: err.Error(),
