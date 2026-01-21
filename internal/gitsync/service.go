@@ -545,6 +545,13 @@ func (s *serviceImpl) GetStatus(ctx context.Context) (*OverallStatus, error) {
 		return status, nil
 	}
 
+	// Scan for new local DAGs not yet tracked
+	prevCount := len(state.DAGs)
+	_ = s.scanLocalDAGs(state)
+	if len(state.DAGs) > prevCount {
+		s.stateManager.Save(state)
+	}
+
 	status.LastSyncAt = state.LastSyncAt
 	status.LastSyncCommit = state.LastSyncCommit
 	status.LastSyncStatus = state.LastSyncStatus
