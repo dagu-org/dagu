@@ -79,16 +79,7 @@ const (
 
 // IsValid returns true if the configuration is valid for sync operations.
 func (c *Config) IsValid() bool {
-	if !c.Enabled {
-		return false
-	}
-	if c.Repository == "" {
-		return false
-	}
-	if c.Branch == "" {
-		return false
-	}
-	return true
+	return c.Enabled && c.Repository != "" && c.Branch != ""
 }
 
 // GetAuthorName returns the commit author name, using default if not set.

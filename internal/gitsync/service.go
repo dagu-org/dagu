@@ -198,14 +198,13 @@ func (s *serviceImpl) Pull(ctx context.Context) (*SyncResult, error) {
 	state.Branch = s.cfg.Branch
 	s.stateManager.Save(state)
 
-	if len(conflicts) > 0 {
-		result.Success = true
+	result.Success = true
+	switch {
+	case len(conflicts) > 0:
 		result.Message = fmt.Sprintf("Pulled with %d conflict(s)", len(conflicts))
-	} else if pullResult.AlreadyUpToDate {
-		result.Success = true
+	case pullResult.AlreadyUpToDate:
 		result.Message = "Already up to date"
-	} else {
-		result.Success = true
+	default:
 		result.Message = fmt.Sprintf("Synced %d DAG(s)", len(syncedDAGs))
 	}
 

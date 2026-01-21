@@ -6,7 +6,6 @@ package api
 import (
 	"context"
 	"net/http"
-	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/gitsync"
@@ -298,12 +297,9 @@ func (a *API) PublishDag(ctx context.Context, req api.PublishDagRequestObject) (
 
 	result, err := a.syncService.Publish(ctx, req.Name, message, force)
 	if err != nil {
+		var conflictErr *gitsync.ConflictError
 		if gitsync.IsConflict(err) {
-			var conflictErr *gitsync.ConflictError
-			if gitsync.IsConflict(err) {
-				conflictErr, _ = err.(*gitsync.ConflictError)
-			}
-			if conflictErr != nil {
+			if conflictErr, _ = err.(*gitsync.ConflictError); conflictErr != nil {
 				return api.PublishDag409JSONResponse{
 					DagId:         conflictErr.DAGID,
 					RemoteCommit:  ptrOf(conflictErr.RemoteCommit),
@@ -449,10 +445,3 @@ func toAPISyncResult(result *gitsync.SyncResult) api.SyncResultResponse {
 	}
 }
 
-// toTimePtr converts a time.Time to a *time.Time, returning nil for zero values.
-func toTimePtr(t time.Time) *time.Time {
-	if t.IsZero() {
-		return nil
-	}
-	return &t
-}
