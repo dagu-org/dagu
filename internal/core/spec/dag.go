@@ -1390,6 +1390,33 @@ func buildLLM(_ BuildContext, d *dag) (*core.LLMConfig, error) {
 		}
 	}
 
+	// Parse model field - can be string or array (optional at DAG level)
+	var modelString string
+	var models []core.ModelEntry
+
+	if cfg.Model != nil {
+		switch m := cfg.Model.(type) {
+		case string:
+			modelString = m
+		case []any:
+			if len(m) > 0 {
+				models = make([]core.ModelEntry, len(m))
+				for i, entry := range m {
+					entryMap, ok := entry.(map[string]any)
+					if !ok {
+						return nil, core.NewValidationError(fmt.Sprintf("llm.model[%d]", i), entry,
+							fmt.Errorf("model entry must be an object with provider and name"))
+					}
+					me, err := parseModelEntry(entryMap, i)
+					if err != nil {
+						return nil, err
+					}
+					models[i] = me
+				}
+			}
+		}
+	}
+
 	// Validate temperature range if specified
 	if cfg.Temperature != nil {
 		if *cfg.Temperature < 0.0 || *cfg.Temperature > 2.0 {
@@ -1421,7 +1448,8 @@ func buildLLM(_ BuildContext, d *dag) (*core.LLMConfig, error) {
 
 	return &core.LLMConfig{
 		Provider:    cfg.Provider,
-		Model:       cfg.Model,
+		Model:       modelString,
+		Models:      models,
 		System:      cfg.System,
 		Temperature: cfg.Temperature,
 		MaxTokens:   cfg.MaxTokens,

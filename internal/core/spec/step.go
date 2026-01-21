@@ -145,11 +145,25 @@ type thinkingConfig struct {
 	IncludeInOutput bool `yaml:"includeInOutput,omitempty"`
 }
 
+// modelEntry represents a single model in the model array for fallback support.
+type modelEntry struct {
+	Provider    string   `yaml:"provider"`
+	Name        string   `yaml:"name"`
+	Temperature *float64 `yaml:"temperature,omitempty"`
+	MaxTokens   *int     `yaml:"maxTokens,omitempty"`
+	TopP        *float64 `yaml:"topP,omitempty"`
+	BaseURL     string   `yaml:"baseURL,omitempty"`
+	APIKeyName  string   `yaml:"apiKeyName,omitempty"`
+}
+
 type llmConfig struct {
 	// Provider is the LLM provider (openai, anthropic, gemini, openrouter, local).
+	// Used for single model config (backward compatible).
 	Provider string `yaml:"provider,omitempty"`
-	// Model is the model to use (e.g., gpt-4o, claude-sonnet-4-20250514).
-	Model string `yaml:"model,omitempty"`
+	// Model can be a string (single model) or array of modelEntry (fallback support).
+	// String example: "gpt-4o"
+	// Array example: [{provider: openai, name: gpt-4o}, {provider: anthropic, name: claude-sonnet-4-20250514}]
+	Model any `yaml:"model,omitempty"`
 	// System is the default system prompt for conversations.
 	System string `yaml:"system,omitempty"`
 	// Temperature controls randomness (0.0-2.0).
@@ -1350,17 +1364,48 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 	// Step has explicit llm: config - use it (full override of DAG-level)
 	cfg := s.LLM
 
-	// Validate provider if specified
+	// Validate provider if specified (for single model config)
 	if cfg.Provider != "" {
 		if _, err := llm.ParseProviderType(cfg.Provider); err != nil {
 			return core.NewValidationError("llm.provider", cfg.Provider, err)
 		}
 	}
 
-	// Validate model is specified
-	if cfg.Model == "" {
-		return core.NewValidationError("llm.model", cfg.Model,
+	// Parse model field - can be string or array
+	var modelString string
+	var models []core.ModelEntry
+
+	switch m := cfg.Model.(type) {
+	case nil:
+		return core.NewValidationError("llm.model", nil,
 			fmt.Errorf("model must be specified when llm config is provided"))
+	case string:
+		if m == "" {
+			return core.NewValidationError("llm.model", m,
+				fmt.Errorf("model must be specified when llm config is provided"))
+		}
+		modelString = m
+	case []any:
+		if len(m) == 0 {
+			return core.NewValidationError("llm.model", m,
+				fmt.Errorf("model array must have at least one entry"))
+		}
+		models = make([]core.ModelEntry, len(m))
+		for i, entry := range m {
+			entryMap, ok := entry.(map[string]any)
+			if !ok {
+				return core.NewValidationError(fmt.Sprintf("llm.model[%d]", i), entry,
+					fmt.Errorf("model entry must be an object with provider and name"))
+			}
+			me, err := parseModelEntry(entryMap, i)
+			if err != nil {
+				return err
+			}
+			models[i] = me
+		}
+	default:
+		return core.NewValidationError("llm.model", cfg.Model,
+			fmt.Errorf("model must be a string or array of model entries"))
 	}
 
 	// Validate temperature range
@@ -1394,7 +1439,8 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 
 	result.LLM = &core.LLMConfig{
 		Provider:          cfg.Provider,
-		Model:             cfg.Model,
+		Model:             modelString,
+		Models:            models,
 		System:            cfg.System,
 		Temperature:       cfg.Temperature,
 		MaxTokens:         cfg.MaxTokens,
@@ -1408,6 +1454,75 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 	}
 
 	return nil
+}
+
+// parseModelEntry parses a model entry from a map.
+func parseModelEntry(m map[string]any, index int) (core.ModelEntry, error) {
+	entry := core.ModelEntry{}
+
+	// Required: provider
+	if provider, ok := m["provider"].(string); ok && provider != "" {
+		if _, err := llm.ParseProviderType(provider); err != nil {
+			return entry, core.NewValidationError(fmt.Sprintf("llm.model[%d].provider", index), provider, err)
+		}
+		entry.Provider = provider
+	} else {
+		return entry, core.NewValidationError(fmt.Sprintf("llm.model[%d].provider", index), m["provider"],
+			fmt.Errorf("provider is required for each model entry"))
+	}
+
+	// Required: name
+	if name, ok := m["name"].(string); ok && name != "" {
+		entry.Name = name
+	} else {
+		return entry, core.NewValidationError(fmt.Sprintf("llm.model[%d].name", index), m["name"],
+			fmt.Errorf("name is required for each model entry"))
+	}
+
+	// Optional: temperature
+	if temp, ok := m["temperature"]; ok {
+		switch v := temp.(type) {
+		case float64:
+			entry.Temperature = &v
+		case int:
+			f := float64(v)
+			entry.Temperature = &f
+		}
+	}
+
+	// Optional: maxTokens
+	if tokens, ok := m["maxTokens"]; ok {
+		switch v := tokens.(type) {
+		case int:
+			entry.MaxTokens = &v
+		case float64:
+			i := int(v)
+			entry.MaxTokens = &i
+		}
+	}
+
+	// Optional: topP
+	if topP, ok := m["topP"]; ok {
+		switch v := topP.(type) {
+		case float64:
+			entry.TopP = &v
+		case int:
+			f := float64(v)
+			entry.TopP = &f
+		}
+	}
+
+	// Optional: baseURL
+	if baseURL, ok := m["baseURL"].(string); ok {
+		entry.BaseURL = baseURL
+	}
+
+	// Optional: apiKeyName
+	if apiKeyName, ok := m["apiKeyName"].(string); ok {
+		entry.APIKeyName = apiKeyName
+	}
+
+	return entry, nil
 }
 
 // buildThinkingConfig converts thinkingConfig to core.ThinkingConfig.

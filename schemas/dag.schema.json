@@ -2689,28 +2689,39 @@
       },
       "description": "Human-in-the-loop executor configuration. Pauses workflow execution until human approval is received."
     },
+    "llmProvider": {
+      "type": "string",
+      "enum": ["openai", "anthropic", "gemini", "openrouter", "local", "ollama", "vllm", "llama"]
+    },
     "llmConfig": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["provider", "model"],
       "properties": {
         "provider": {
-          "type": "string",
-          "enum": [
-            "openai",
-            "anthropic",
-            "gemini",
-            "openrouter",
-            "local",
-            "ollama",
-            "vllm",
-            "llama"
-          ],
-          "description": "LLM provider to use. Aliases 'ollama', 'vllm', 'llama' map to 'local'."
+          "$ref": "#/definitions/llmProvider",
+          "description": "LLM provider to use (for single model config). Aliases 'ollama', 'vllm', 'llama' map to 'local'. Not required when using model array."
         },
         "model": {
-          "type": "string",
-          "description": "Model identifier (e.g., 'gpt-4o', 'claude-sonnet-4-20250514', 'gemini-pro')."
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["provider", "name"],
+                "properties": {
+                  "provider": { "$ref": "#/definitions/llmProvider" },
+                  "name": { "type": "string" },
+                  "temperature": { "type": "number" },
+                  "maxTokens": { "type": "integer" },
+                  "topP": { "type": "number" },
+                  "baseURL": { "type": "string" },
+                  "apiKeyName": { "type": "string" }
+                }
+              }
+            }
+          ],
+          "description": "Model name (string) or array of model objects for fallback."
         },
         "system": {
           "type": "string",

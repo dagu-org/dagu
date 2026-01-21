@@ -3,6 +3,9 @@ internal/service/frontend/assets/fonts/*
 internal/service/frontend/assets/*
 !internal/service/frontend/assets/.gitkeep
 
+# copied schema
+ui/src/assets/dag.schema.json
+
 # NVM
 .nvmrc
 
