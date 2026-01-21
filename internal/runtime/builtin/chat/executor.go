@@ -313,6 +313,10 @@ func (e *Executor) Run(ctx context.Context) error {
 	// Multiple models: implement fallback
 	var lastErr error
 	for i, model := range models {
+		// Reset per-attempt state before each attempt
+		e.collectedSubRuns = nil
+		e.savedMessages = nil
+
 		logger.Info(ctx, "Attempting LLM request",
 			slog.String("provider", model.Provider),
 			slog.String("model", model.Name),
@@ -344,6 +348,12 @@ func (e *Executor) runWithModel(ctx context.Context, model core.ModelEntry, allM
 	// Build effective config for this model
 	effectiveCfg := e.buildEffectiveConfig(model)
 
+	// Disable streaming if fallback is configured to avoid output corruption
+	if e.step.LLM.HasFallback() && effectiveCfg.StreamEnabled() {
+		stream := false
+		effectiveCfg.Stream = &stream
+	}
+
 	// Create provider for this model
 	provider, err := e.createProviderForModel(ctx, model, effectiveCfg)
 	if err != nil {
@@ -363,26 +373,6 @@ func (e *Executor) runWithModel(ctx context.Context, model core.ModelEntry, allM
 func (e *Executor) buildEffectiveConfig(model core.ModelEntry) *core.LLMConfig {
 	cfg := e.step.LLM
 
-	// Helper to select first non-nil pointer
-	selectFloat := func(override, fallback *float64) *float64 {
-		if override != nil {
-			return override
-		}
-		return fallback
-	}
-	selectInt := func(override, fallback *int) *int {
-		if override != nil {
-			return override
-		}
-		return fallback
-	}
-	selectString := func(override, fallback string) string {
-		if override != "" {
-			return override
-		}
-		return fallback
-	}
-
 	return &core.LLMConfig{
 		Provider:          model.Provider,
 		Model:             model.Name,
@@ -391,12 +381,28 @@ func (e *Executor) buildEffectiveConfig(model core.ModelEntry) *core.LLMConfig {
 		Thinking:          cfg.Thinking,
 		Tools:             cfg.Tools,
 		MaxToolIterations: cfg.MaxToolIterations,
-		Temperature:       selectFloat(model.Temperature, cfg.Temperature),
-		MaxTokens:         selectInt(model.MaxTokens, cfg.MaxTokens),
-		TopP:              selectFloat(model.TopP, cfg.TopP),
-		BaseURL:           selectString(model.BaseURL, cfg.BaseURL),
-		APIKeyName:        selectString(model.APIKeyName, cfg.APIKeyName),
+		Temperature:       coalescePtr(model.Temperature, cfg.Temperature),
+		MaxTokens:         coalescePtr(model.MaxTokens, cfg.MaxTokens),
+		TopP:              coalescePtr(model.TopP, cfg.TopP),
+		BaseURL:           coalesceStr(model.BaseURL, cfg.BaseURL),
+		APIKeyName:        coalesceStr(model.APIKeyName, cfg.APIKeyName),
 	}
+}
+
+// coalescePtr returns the first non-nil pointer.
+func coalescePtr[T any](override, fallback *T) *T {
+	if override != nil {
+		return override
+	}
+	return fallback
+}
+
+// coalesceStr returns the first non-empty string.
+func coalesceStr(override, fallback string) string {
+	if override != "" {
+		return override
+	}
+	return fallback
 }
 
 // createProviderForModel creates an LLM provider for a specific model.

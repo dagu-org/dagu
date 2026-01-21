@@ -1367,40 +1367,9 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 	}
 
 	// Parse model field - can be string or array
-	var modelString string
-	var models []core.ModelEntry
-
-	switch m := cfg.Model.(type) {
-	case nil:
-		return core.NewValidationError("llm.model", nil,
-			fmt.Errorf("model must be specified when llm config is provided"))
-	case string:
-		if m == "" {
-			return core.NewValidationError("llm.model", m,
-				fmt.Errorf("model must be specified when llm config is provided"))
-		}
-		modelString = m
-	case []any:
-		if len(m) == 0 {
-			return core.NewValidationError("llm.model", m,
-				fmt.Errorf("model array must have at least one entry"))
-		}
-		models = make([]core.ModelEntry, len(m))
-		for i, entry := range m {
-			entryMap, ok := entry.(map[string]any)
-			if !ok {
-				return core.NewValidationError(fmt.Sprintf("llm.model[%d]", i), entry,
-					fmt.Errorf("model entry must be an object with provider and name"))
-			}
-			me, err := parseModelEntry(entryMap, i)
-			if err != nil {
-				return err
-			}
-			models[i] = me
-		}
-	default:
-		return core.NewValidationError("llm.model", cfg.Model,
-			fmt.Errorf("model must be a string or array of model entries"))
+	modelString, models, err := parseModelFieldRequired(cfg.Model)
+	if err != nil {
+		return err
 	}
 
 	// Validate temperature range
@@ -1451,6 +1420,115 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 	return nil
 }
 
+// parseModelField parses a model field that can be nil, string, or array (optional).
+// Returns (modelString, models, error). At DAG level, model is optional.
+func parseModelField(model any) (string, []core.ModelEntry, error) {
+	if model == nil {
+		return "", nil, nil
+	}
+
+	switch m := model.(type) {
+	case string:
+		return m, nil, nil
+	case []any:
+		if len(m) == 0 {
+			return "", nil, core.NewValidationError("llm.model", m,
+				fmt.Errorf("model array must have at least one entry"))
+		}
+		models := make([]core.ModelEntry, len(m))
+		for i, entry := range m {
+			entryMap, ok := entry.(map[string]any)
+			if !ok {
+				return "", nil, core.NewValidationError(fmt.Sprintf("llm.model[%d]", i), entry,
+					fmt.Errorf("model entry must be an object with provider and name"))
+			}
+			me, err := parseModelEntry(entryMap, i)
+			if err != nil {
+				return "", nil, err
+			}
+			models[i] = me
+		}
+		return "", models, nil
+	default:
+		return "", nil, core.NewValidationError("llm.model", model,
+			fmt.Errorf("model must be a string or array of model entries"))
+	}
+}
+
+// parseModelFieldRequired parses a model field that must be specified.
+// At step level, model is required when llm config is provided.
+func parseModelFieldRequired(model any) (string, []core.ModelEntry, error) {
+	if model == nil {
+		return "", nil, core.NewValidationError("llm.model", nil,
+			fmt.Errorf("model must be specified when llm config is provided"))
+	}
+
+	modelString, models, err := parseModelField(model)
+	if err != nil {
+		return "", nil, err
+	}
+
+	// Check for empty string case
+	if modelString == "" && len(models) == 0 {
+		return "", nil, core.NewValidationError("llm.model", model,
+			fmt.Errorf("model must be specified when llm config is provided"))
+	}
+
+	return modelString, models, nil
+}
+
+// anyToFloat converts various numeric types to float64.
+func anyToFloat(v any) (float64, bool) {
+	switch t := v.(type) {
+	case float64:
+		return t, true
+	case float32:
+		return float64(t), true
+	case int:
+		return float64(t), true
+	case int32:
+		return float64(t), true
+	case int64:
+		return float64(t), true
+	case uint:
+		return float64(t), true
+	case uint32:
+		return float64(t), true
+	case uint64:
+		return float64(t), true
+	default:
+		return 0, false
+	}
+}
+
+// anyToInt converts various numeric types to int.
+// Returns false if the value overflows int range.
+func anyToInt(v any) (int, bool) {
+	switch t := v.(type) {
+	case int:
+		return t, true
+	case int32:
+		return int(t), true
+	case int64:
+		return int(t), true
+	case uint:
+		return int(t), true
+	case uint32:
+		return int(t), true
+	case uint64:
+		if t > math.MaxInt {
+			return 0, false
+		}
+		return int(t), true
+	case float64:
+		return int(t), true
+	case float32:
+		return int(t), true
+	default:
+		return 0, false
+	}
+}
+
 // parseModelEntry parses a model entry from a map.
 func parseModelEntry(m map[string]any, index int) (core.ModelEntry, error) {
 	entry := core.ModelEntry{}
@@ -1476,35 +1554,44 @@ func parseModelEntry(m map[string]any, index int) (core.ModelEntry, error) {
 
 	// Optional: temperature
 	if temp, ok := m["temperature"]; ok {
-		switch v := temp.(type) {
-		case float64:
-			entry.Temperature = &v
-		case int:
-			f := float64(v)
-			entry.Temperature = &f
+		v, ok := anyToFloat(temp)
+		if !ok {
+			return entry, core.NewValidationError(fmt.Sprintf("llm.model[%d].temperature", index), temp,
+				fmt.Errorf("temperature must be a number"))
 		}
+		if v < 0.0 || v > 2.0 {
+			return entry, core.NewValidationError(fmt.Sprintf("llm.model[%d].temperature", index), temp,
+				fmt.Errorf("temperature must be between 0.0 and 2.0"))
+		}
+		entry.Temperature = &v
 	}
 
 	// Optional: maxTokens
 	if tokens, ok := m["maxTokens"]; ok {
-		switch v := tokens.(type) {
-		case int:
-			entry.MaxTokens = &v
-		case float64:
-			i := int(v)
-			entry.MaxTokens = &i
+		v, ok := anyToInt(tokens)
+		if !ok {
+			return entry, core.NewValidationError(fmt.Sprintf("llm.model[%d].maxTokens", index), tokens,
+				fmt.Errorf("maxTokens must be an integer"))
 		}
+		if v < 1 {
+			return entry, core.NewValidationError(fmt.Sprintf("llm.model[%d].maxTokens", index), tokens,
+				fmt.Errorf("maxTokens must be at least 1"))
+		}
+		entry.MaxTokens = &v
 	}
 
 	// Optional: topP
 	if topP, ok := m["topP"]; ok {
-		switch v := topP.(type) {
-		case float64:
-			entry.TopP = &v
-		case int:
-			f := float64(v)
-			entry.TopP = &f
+		v, ok := anyToFloat(topP)
+		if !ok {
+			return entry, core.NewValidationError(fmt.Sprintf("llm.model[%d].topP", index), topP,
+				fmt.Errorf("topP must be a number"))
 		}
+		if v < 0.0 || v > 1.0 {
+			return entry, core.NewValidationError(fmt.Sprintf("llm.model[%d].topP", index), topP,
+				fmt.Errorf("topP must be between 0.0 and 1.0"))
+		}
+		entry.TopP = &v
 	}
 
 	// Optional: baseURL
