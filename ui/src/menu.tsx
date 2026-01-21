@@ -360,8 +360,8 @@ export const mainListItems = React.forwardRef<
             </div>
           )}
 
-          {/* Git Sync - visible to users with write permission */}
-          {canWrite && (
+          {/* Git Sync - visible to users with write permission when enabled */}
+          {canWrite && config.gitSyncEnabled && (
             <div className="space-y-1">
               {isOpen && (
                 <div className="px-3 mb-1 text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">

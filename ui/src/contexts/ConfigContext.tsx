@@ -29,6 +29,7 @@ export type Config = {
   oidcEnabled: boolean;
   oidcButtonLabel: string;
   terminalEnabled: boolean;
+  gitSyncEnabled: boolean;
   permissions: {
     writeDags: boolean;
     runDags: boolean;

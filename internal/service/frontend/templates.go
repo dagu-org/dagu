@@ -66,6 +66,8 @@ type funcsConfig struct {
 	OIDCButtonLabel string
 	// Terminal configuration
 	TerminalEnabled bool
+	// Git Sync configuration
+	GitSyncEnabled bool
 }
 
 // and simple utility helpers for use inside HTML templates.
@@ -155,6 +157,9 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 		},
 		"terminalEnabled": func() string {
 			return convertBooleanToString(cfg.TerminalEnabled)
+		},
+		"gitSyncEnabled": func() string {
+			return convertBooleanToString(cfg.GitSyncEnabled)
 		},
 	}
 }

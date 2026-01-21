@@ -197,6 +197,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 			OIDCEnabled:           oidcEnabled,
 			OIDCButtonLabel:       oidcButtonLabel,
 			TerminalEnabled:       cfg.Server.Terminal.Enabled && authSvc != nil,
+			GitSyncEnabled:        cfg.GitSync.Enabled,
 		},
 	}
 
