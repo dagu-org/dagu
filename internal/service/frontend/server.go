@@ -326,29 +326,7 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 		return nil
 	}
 
-	// Convert config types
-	syncCfg := &gitsync.Config{
-		Enabled:     gitSyncCfg.Enabled,
-		Repository:  gitSyncCfg.Repository,
-		Branch:      gitSyncCfg.Branch,
-		Path:        gitSyncCfg.Path,
-		PushEnabled: gitSyncCfg.PushEnabled,
-		Auth: gitsync.AuthConfig{
-			Type:          gitSyncCfg.Auth.Type,
-			Token:         gitSyncCfg.Auth.Token,
-			SSHKeyPath:    gitSyncCfg.Auth.SSHKeyPath,
-			SSHPassphrase: gitSyncCfg.Auth.SSHPassphrase,
-		},
-		AutoSync: gitsync.AutoSyncConfig{
-			Enabled:   gitSyncCfg.AutoSync.Enabled,
-			OnStartup: gitSyncCfg.AutoSync.OnStartup,
-			Interval:  gitSyncCfg.AutoSync.Interval,
-		},
-		Commit: gitsync.CommitConfig{
-			AuthorName:  gitSyncCfg.Commit.AuthorName,
-			AuthorEmail: gitSyncCfg.Commit.AuthorEmail,
-		},
-	}
+	syncCfg := gitsync.NewConfigFromGlobal(gitSyncCfg)
 
 	svc := gitsync.NewService(syncCfg, cfg.Paths.DAGsDir, cfg.Paths.DataDir)
 

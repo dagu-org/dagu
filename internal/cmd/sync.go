@@ -305,29 +305,7 @@ func runSyncDiscard(ctx *Context, args []string) error {
 func newSyncService(ctx *Context) (gitsync.Service, error) {
 	cfg := ctx.Config.GitSync
 
-	// Convert config types
-	syncCfg := &gitsync.Config{
-		Enabled:     cfg.Enabled,
-		Repository:  cfg.Repository,
-		Branch:      cfg.Branch,
-		Path:        cfg.Path,
-		PushEnabled: cfg.PushEnabled,
-		Auth: gitsync.AuthConfig{
-			Type:          cfg.Auth.Type,
-			Token:         cfg.Auth.Token,
-			SSHKeyPath:    cfg.Auth.SSHKeyPath,
-			SSHPassphrase: cfg.Auth.SSHPassphrase,
-		},
-		AutoSync: gitsync.AutoSyncConfig{
-			Enabled:   cfg.AutoSync.Enabled,
-			OnStartup: cfg.AutoSync.OnStartup,
-			Interval:  cfg.AutoSync.Interval,
-		},
-		Commit: gitsync.CommitConfig{
-			AuthorName:  cfg.Commit.AuthorName,
-			AuthorEmail: cfg.Commit.AuthorEmail,
-		},
-	}
+	syncCfg := gitsync.NewConfigFromGlobal(cfg)
 
 	if !syncCfg.Enabled {
 		return nil, fmt.Errorf("Git sync is not enabled. Set gitSync.enabled=true in your config")

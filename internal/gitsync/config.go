@@ -3,6 +3,8 @@
 
 package gitsync
 
+import "github.com/dagu-org/dagu/internal/cmn/config"
+
 // Config holds the configuration for Git sync functionality.
 type Config struct {
 	// Enabled indicates whether Git sync is enabled.
@@ -96,4 +98,30 @@ func (c *Config) GetAuthorEmail() string {
 		return c.Commit.AuthorEmail
 	}
 	return "dagu@localhost"
+}
+
+// NewConfigFromGlobal creates a gitsync.Config from the global configuration.
+func NewConfigFromGlobal(cfg config.GitSyncConfig) *Config {
+	return &Config{
+		Enabled:     cfg.Enabled,
+		Repository:  cfg.Repository,
+		Branch:      cfg.Branch,
+		Path:        cfg.Path,
+		PushEnabled: cfg.PushEnabled,
+		Auth: AuthConfig{
+			Type:          cfg.Auth.Type,
+			Token:         cfg.Auth.Token,
+			SSHKeyPath:    cfg.Auth.SSHKeyPath,
+			SSHPassphrase: cfg.Auth.SSHPassphrase,
+		},
+		AutoSync: AutoSyncConfig{
+			Enabled:   cfg.AutoSync.Enabled,
+			OnStartup: cfg.AutoSync.OnStartup,
+			Interval:  cfg.AutoSync.Interval,
+		},
+		Commit: CommitConfig{
+			AuthorName:  cfg.Commit.AuthorName,
+			AuthorEmail: cfg.Commit.AuthorEmail,
+		},
+	}
 }

@@ -255,6 +255,7 @@ func (s *serviceImpl) syncFilesToDAGsDir(ctx context.Context, pullResult *PullRe
 				LastSyncedHash: repoHash,
 				LastSyncedAt:   &now,
 				LocalHash:      repoHash,
+				ModifiedAt:     &now, // Added ModifiedAt for new files
 			}
 			synced = append(synced, dagID)
 			continue
@@ -736,7 +737,11 @@ func (s *serviceImpl) runAutoSync(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			_, _ = s.Pull(ctx)
+			if _, err := s.Pull(ctx); err != nil {
+				// We don't return error here to keep the loop running,
+				// but the error is already updated in s.updateLastSyncError via s.Pull
+				fmt.Fprintf(os.Stderr, "Auto-sync failed: %v\n", err)
+			}
 		}
 	}
 }

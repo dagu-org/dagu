@@ -66,10 +66,13 @@ func (c *GitClient) getAuth() (transport.AuthMethod, error) {
 // normalizeRepoURL normalizes the repository URL to a full clone URL.
 func (c *GitClient) normalizeRepoURL() string {
 	repo := c.cfg.Repository
-	if strings.HasPrefix(repo, "https://") || strings.HasPrefix(repo, "git@") {
+	if repo == "" {
+		return ""
+	}
+	if strings.HasPrefix(repo, "https://") || strings.HasPrefix(repo, "http://") || strings.HasPrefix(repo, "git@") || strings.HasPrefix(repo, "ssh://") {
 		return repo
 	}
-	// Assume github.com/org/repo format
+	// Assume github.com/org/repo format and use HTTPS
 	return "https://" + repo + ".git"
 }
 
