@@ -206,3 +206,67 @@ func TestQueueProcessor_ConcurrencyLimit(t *testing.T) {
 	items, _ := f.queueStore.List(f.ctx, "conc-dag")
 	assert.GreaterOrEqual(t, len(items), 2, "Concurrency limit should prevent processing all at once")
 }
+
+func TestQueueProcessor_GlobalQueueIgnoresDAGMaxActiveRuns(t *testing.T) {
+	// Global queue config: MaxActiveRuns=5
+	// DAG config: maxActiveRuns=1
+	// Expected: Global queue should use 5, NOT be overwritten by DAG's 1
+	f := newQueueFixture(t).withDAG("dag-with-low-concurrency", 1).withProcessor(config.Queues{
+		Enabled: true, Config: []config.QueueConfig{{Name: "global-queue", MaxActiveRuns: 5}},
+	})
+
+	// Enqueue 5 items to the global queue
+	for i := 1; i <= 5; i++ {
+		f.enqueueToQueue("global-queue", fmt.Sprintf("run-%d", i), exec.QueuePriorityHigh)
+	}
+
+	// Verify initial maxConcurrency is 5 (from global config)
+	v, ok := f.processor.queues.Load("global-queue")
+	require.True(t, ok)
+	require.Equal(t, 5, v.(*queue).maxConc(), "Global queue should have maxConcurrency=5 from config")
+
+	// Process items
+	f.processor.ProcessQueueItems(f.ctx, "global-queue")
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify maxConcurrency is STILL 5 (not overwritten by DAG's maxActiveRuns=1)
+	v, _ = f.processor.queues.Load("global-queue")
+	assert.Equal(t, 5, v.(*queue).maxConc(), "Global queue maxConcurrency should NOT be overwritten by DAG")
+
+	// Verify all 5 items were processed in the batch (not just 1)
+	assert.True(t, strings.Contains(f.logs(), "count=5"), "Should process 5 items, not 1")
+}
+
+func TestQueueProcessor_GlobalQueueViaLoop(t *testing.T) {
+	// This test mimics the real scheduler flow where ProcessQueueItems
+	// is called via the loop, not directly.
+	f := newQueueFixture(t).withDAG("loop-dag", 1).withProcessor(config.Queues{
+		Enabled: true, Config: []config.QueueConfig{{Name: "global-queue", MaxActiveRuns: 3}},
+	})
+
+	// Enqueue 3 items BEFORE calling process (mimics real scenario)
+	for i := 1; i <= 3; i++ {
+		f.enqueueToQueue("global-queue", fmt.Sprintf("run-%d", i), exec.QueuePriorityHigh)
+	}
+
+	// Verify queue list returns the global queue
+	queueList, err := f.queueStore.QueueList(f.ctx)
+	require.NoError(t, err)
+	require.Contains(t, queueList, "global-queue")
+
+	// Simulate what loop() does: check if queue exists in p.queues
+	v, ok := f.processor.queues.Load("global-queue")
+	require.True(t, ok, "Global queue should exist in processor")
+	require.Equal(t, 3, v.(*queue).maxConc(), "Global queue should have maxConcurrency=3")
+	require.True(t, v.(*queue).isGlobalQueue(), "Should be marked as global queue")
+
+	// Process
+	f.processor.ProcessQueueItems(f.ctx, "global-queue")
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify all 3 items processed
+	t.Logf("Logs: %s", f.logs())
+	assert.Contains(t, f.logs(), "count=3", "Should process all 3 items")
+	assert.Contains(t, f.logs(), "max-concurrency=3", "maxConcurrency should be 3")
+}
+

@@ -317,11 +317,10 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 		tag.Alive(alive),
 	)
 
-	var wg sync.WaitGroup
 	for _, item := range runnableItems {
-		wg.Add(1)
+		// Process each item synchronously but without blocking on startup monitoring.
+		// This allows the next loop iteration to pick up more items quickly.
 		go func(ctx context.Context, item exec.QueuedItemData) {
-			defer wg.Done()
 			if p.processDAG(ctx, item, queueName) {
 				// Remove the item from the queue
 				data, err := item.Data()
@@ -335,7 +334,6 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 			}
 		}(ctx, item)
 	}
-	wg.Wait()
 }
 
 func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemData, queueName string) bool {
