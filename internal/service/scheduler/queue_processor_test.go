@@ -80,13 +80,14 @@ func (f *queueFixture) withDAG(name string, maxActiveRuns int) *queueFixture {
 func (f *queueFixture) enqueueRuns(n int) *queueFixture {
 	for i := 1; i <= n; i++ {
 		runID := fmt.Sprintf("run-%d", i)
-		run, _ := f.dagRunStore.CreateAttempt(f.ctx, f.dag, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
-		_ = run.Open(f.ctx)
+		run, err := f.dagRunStore.CreateAttempt(f.ctx, f.dag, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
+		require.NoError(f.t, err)
+		require.NoError(f.t, run.Open(f.ctx))
 		st := exec.InitialStatus(f.dag)
 		st.Status, st.DAGRunID = core.Queued, runID
-		_ = run.Write(f.ctx, st)
-		_ = run.Close(f.ctx)
-		_ = f.queueStore.Enqueue(f.ctx, f.dag.Name, exec.QueuePriorityHigh, exec.NewDAGRunRef(f.dag.Name, runID))
+		require.NoError(f.t, run.Write(f.ctx, st))
+		require.NoError(f.t, run.Close(f.ctx))
+		require.NoError(f.t, f.queueStore.Enqueue(f.ctx, f.dag.Name, exec.QueuePriorityHigh, exec.NewDAGRunRef(f.dag.Name, runID)))
 	}
 	return f
 }
@@ -111,13 +112,14 @@ func (f *queueFixture) enqueueWithPriority(runID string, priority exec.QueuePrio
 }
 
 func (f *queueFixture) enqueueToQueue(queueName, runID string, priority exec.QueuePriority) {
-	run, _ := f.dagRunStore.CreateAttempt(f.ctx, f.dag, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
-	_ = run.Open(f.ctx)
+	run, err := f.dagRunStore.CreateAttempt(f.ctx, f.dag, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
+	require.NoError(f.t, err)
+	require.NoError(f.t, run.Open(f.ctx))
 	st := exec.InitialStatus(f.dag)
 	st.Status, st.DAGRunID = core.Queued, runID
-	_ = run.Write(f.ctx, st)
-	_ = run.Close(f.ctx)
-	_ = f.queueStore.Enqueue(f.ctx, queueName, priority, exec.NewDAGRunRef(f.dag.Name, runID))
+	require.NoError(f.t, run.Write(f.ctx, st))
+	require.NoError(f.t, run.Close(f.ctx))
+	require.NoError(f.t, f.queueStore.Enqueue(f.ctx, queueName, priority, exec.NewDAGRunRef(f.dag.Name, runID)))
 }
 
 func TestQueueProcessor_DynamicQueueConcurrency(t *testing.T) {
@@ -159,7 +161,8 @@ func TestQueueProcessor_ItemsRemainOnFailure(t *testing.T) {
 	f.processor.ProcessQueueItems(f.ctx, "fifo-dag")
 	time.Sleep(150 * time.Millisecond)
 
-	items, _ := f.queueStore.List(f.ctx, "fifo-dag")
+	items, err := f.queueStore.List(f.ctx, "fifo-dag")
+	require.NoError(t, err)
 	require.Len(t, items, 2, "Both items should still be in queue")
 }
 
@@ -175,22 +178,26 @@ func TestQueueProcessor_PriorityOrdering(t *testing.T) {
 	// Dequeue should return high priority first
 	item1, err := f.queueStore.DequeueByName(f.ctx, f.dag.Name)
 	require.NoError(t, err)
-	ref1, _ := item1.Data()
+	ref1, err := item1.Data()
+	require.NoError(t, err)
 	assert.Equal(t, "high-1", ref1.ID)
 
 	item2, err := f.queueStore.DequeueByName(f.ctx, f.dag.Name)
 	require.NoError(t, err)
-	ref2, _ := item2.Data()
+	ref2, err := item2.Data()
+	require.NoError(t, err)
 	assert.Equal(t, "high-2", ref2.ID)
 
 	item3, err := f.queueStore.DequeueByName(f.ctx, f.dag.Name)
 	require.NoError(t, err)
-	ref3, _ := item3.Data()
+	ref3, err := item3.Data()
+	require.NoError(t, err)
 	assert.Equal(t, "low-1", ref3.ID)
 
 	item4, err := f.queueStore.DequeueByName(f.ctx, f.dag.Name)
 	require.NoError(t, err)
-	ref4, _ := item4.Data()
+	ref4, err := item4.Data()
+	require.NoError(t, err)
 	assert.Equal(t, "low-2", ref4.ID)
 }
 
@@ -203,7 +210,8 @@ func TestQueueProcessor_ConcurrencyLimit(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Should only process 1 item at a time, leaving 2 in queue
-	items, _ := f.queueStore.List(f.ctx, "conc-dag")
+	items, err := f.queueStore.List(f.ctx, "conc-dag")
+	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(items), 2, "Concurrency limit should prevent processing all at once")
 }
 

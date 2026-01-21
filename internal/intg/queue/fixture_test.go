@@ -100,18 +100,19 @@ func (f *fixture) enqueueOne() string {
 
 func (f *fixture) enqueueWithPriority(priority exec.QueuePriority) string {
 	id := uuid.New().String()
-	att, _ := f.th.DAGRunStore.CreateAttempt(f.th.Context, f.dag, time.Now(), id, exec.NewDAGRunAttemptOptions{})
+	att, err := f.th.DAGRunStore.CreateAttempt(f.th.Context, f.dag, time.Now(), id, exec.NewDAGRunAttemptOptions{})
+	require.NoError(f.t, err)
 	logFile := filepath.Join(f.th.Config.Paths.LogDir, f.dag.Name, id+".log")
-	_ = os.MkdirAll(filepath.Dir(logFile), 0755)
+	require.NoError(f.t, os.MkdirAll(filepath.Dir(logFile), 0755))
 	st := transform.NewStatusBuilder(f.dag).Create(id, core.Queued, 0, time.Time{},
 		transform.WithLogFilePath(logFile),
 		transform.WithAttemptID(att.ID()),
 		transform.WithHierarchyRefs(exec.NewDAGRunRef(f.dag.Name, id), exec.DAGRunRef{}),
 	)
-	_ = att.Open(f.th.Context)
-	_ = att.Write(f.th.Context, st)
-	_ = att.Close(f.th.Context)
-	_ = f.th.QueueStore.Enqueue(f.th.Context, f.queue, priority, exec.NewDAGRunRef(f.dag.Name, id))
+	require.NoError(f.t, att.Open(f.th.Context))
+	require.NoError(f.t, att.Write(f.th.Context, st))
+	require.NoError(f.t, att.Close(f.th.Context))
+	require.NoError(f.t, f.th.QueueStore.Enqueue(f.th.Context, f.queue, priority, exec.NewDAGRunRef(f.dag.Name, id)))
 	return id
 }
 
@@ -140,7 +141,8 @@ func (f *fixture) StartScheduler(timeout time.Duration) *fixture {
 // WaitDrain waits for the queue to empty.
 func (f *fixture) WaitDrain(timeout time.Duration) *fixture {
 	require.Eventually(f.t, func() bool {
-		items, _ := f.th.QueueStore.List(f.th.Context, f.queue)
+		items, err := f.th.QueueStore.List(f.th.Context, f.queue)
+		require.NoError(f.t, err)
 		f.t.Logf("Queue %s: %d remaining", f.queue, len(items))
 		return len(items) == 0
 	}, timeout, 200*time.Millisecond)
@@ -154,7 +156,8 @@ func (f *fixture) Stop() {
 	}
 	f.th.Cancel()
 	select {
-	case <-f.schedDone:
+	case err := <-f.schedDone:
+		require.NoError(f.t, err)
 	case <-time.After(5 * time.Second):
 	}
 }
@@ -177,9 +180,12 @@ func (f *fixture) AssertConcurrent(maxDiff time.Duration) {
 func (f *fixture) collectStartTimes() []time.Time {
 	var times []time.Time
 	for _, id := range f.runIDs {
-		att, _ := f.th.DAGRunStore.FindAttempt(f.th.Context, exec.NewDAGRunRef(f.dag.Name, id))
-		st, _ := att.ReadStatus(f.th.Context)
-		t, _ := stringutil.ParseTime(st.StartedAt)
+		att, err := f.th.DAGRunStore.FindAttempt(f.th.Context, exec.NewDAGRunRef(f.dag.Name, id))
+		require.NoError(f.t, err)
+		st, err := att.ReadStatus(f.th.Context)
+		require.NoError(f.t, err)
+		t, err := stringutil.ParseTime(st.StartedAt)
+		require.NoError(f.t, err)
 		times = append(times, t)
 	}
 	return times

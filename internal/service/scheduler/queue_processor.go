@@ -519,34 +519,20 @@ func (p *QueueProcessor) updateQueueMaxConcurrency(ctx context.Context, q *queue
 
 	runRef := *data
 
-	const maxRetries = 3
-	retryDelay := 50 * time.Millisecond
+	policy := backoff.NewExponentialBackoffPolicy(p.backoffConfig.InitialInterval)
+	policy.MaxInterval = p.backoffConfig.MaxInterval
+	policy.MaxRetries = p.backoffConfig.MaxRetries
 
-	var lastErr error
-	for i := 0; i < maxRetries; i++ {
+	operation := func(ctx context.Context) error {
 		dag, err := p.readDAGFromAttempt(ctx, runRef)
-		if err == nil {
-			q.setMaxConc(dag.MaxActiveRuns)
-			return nil
+		if err != nil {
+			return err
 		}
-
-		lastErr = err
-
-		// On last retry, return immediately without waiting
-		if i >= maxRetries-1 {
-			break
-		}
-
-		// Wait with exponential backoff, respecting context cancellation
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(retryDelay):
-			retryDelay *= 2
-		}
+		q.setMaxConc(dag.MaxActiveRuns)
+		return nil
 	}
 
-	return lastErr
+	return backoff.Retry(ctx, operation, policy, nil)
 }
 
 // readDAGFromAttempt finds a DAG run attempt and reads its DAG definition.
