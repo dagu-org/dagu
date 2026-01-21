@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -330,7 +331,7 @@ func TestSanitizeIdentifier(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s_wantErr_%v", tt.input, tt.wantErr), func(t *testing.T) {
 			t.Parallel()
 
 			_, err := sqlexec.SanitizeIdentifier(tt.input)

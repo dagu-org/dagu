@@ -1590,93 +1590,110 @@
           "type": "object",
           "properties": {
             "key": {
-          "type": "string",
-          "description": "S3 object key (path). Required for upload, download, and single-object delete operations."
-        },
-        "source": {
-          "type": "string",
-          "description": "Local file path for upload operations. Required for 'upload' command."
-        },
-        "destination": {
-          "type": "string",
-          "description": "Local file path for download operations. Required for 'download' command."
-        },
-        "prefix": {
-          "type": "string",
-          "description": "S3 key prefix for list and batch delete operations."
-        },
-        "contentType": {
-          "type": "string",
-          "description": "Content-Type header for uploaded objects. Auto-detected from file extension if not specified."
-        },
-        "storageClass": {
-          "type": "string",
-          "enum": ["STANDARD", "REDUCED_REDUNDANCY", "STANDARD_IA", "ONEZONE_IA", "INTELLIGENT_TIERING", "GLACIER", "DEEP_ARCHIVE", "GLACIER_IR"],
-          "description": "S3 storage class for uploaded objects."
-        },
-        "metadata": {
-          "type": "object",
-          "additionalProperties": { "type": "string" },
-          "description": "Custom metadata key-value pairs for uploaded objects."
-        },
-        "tags": {
-          "type": "object",
-          "additionalProperties": { "type": "string" },
-          "description": "S3 object tags as key-value pairs."
-        },
-        "sse": {
-          "type": "string",
-          "enum": ["AES256", "aws:kms"],
-          "description": "Server-side encryption algorithm."
-        },
-        "sseKmsKeyId": {
-          "type": "string",
-          "description": "KMS key ID for SSE-KMS encryption."
-        },
-        "acl": {
-          "type": "string",
-          "enum": ["private", "public-read", "public-read-write", "authenticated-read", "aws-exec-read", "bucket-owner-read", "bucket-owner-full-control"],
-          "description": "Canned ACL for uploaded objects."
-        },
-        "partSize": {
-          "type": "integer",
-          "minimum": 5,
-          "default": 10,
-          "description": "Part size in MB for multipart uploads. Minimum 5MB. Default: 10MB."
-        },
-        "concurrency": {
-          "type": "integer",
-          "minimum": 1,
-          "default": 5,
-          "description": "Number of concurrent upload/download parts. Default: 5."
-        },
-        "maxKeys": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 1000,
-          "default": 1000,
-          "description": "Maximum keys to return per list request. Default: 1000."
-        },
-        "delimiter": {
-          "type": "string",
-          "description": "Delimiter for grouping keys in list operations (e.g., '/')."
-        },
-        "recursive": {
-          "type": "boolean",
-          "default": false,
-          "description": "Recursively list all objects under prefix. Default: false."
-        },
-        "outputFormat": {
-          "type": "string",
-          "enum": ["json", "jsonl"],
-          "default": "json",
-          "description": "Output format for list results. Default: json."
-        },
-        "quiet": {
-          "type": "boolean",
-          "default": false,
-          "description": "Suppress output for delete operations. Default: false."
-        }
+              "type": "string",
+              "description": "S3 object key (path). Required for upload, download, and single-object delete operations."
+            },
+            "source": {
+              "type": "string",
+              "description": "Local file path for upload operations. Required for 'upload' command."
+            },
+            "destination": {
+              "type": "string",
+              "description": "Local file path for download operations. Required for 'download' command."
+            },
+            "prefix": {
+              "type": "string",
+              "description": "S3 key prefix for list and batch delete operations."
+            },
+            "contentType": {
+              "type": "string",
+              "description": "Content-Type header for uploaded objects. Auto-detected from file extension if not specified."
+            },
+            "storageClass": {
+              "type": "string",
+              "enum": [
+                "STANDARD",
+                "REDUCED_REDUNDANCY",
+                "STANDARD_IA",
+                "ONEZONE_IA",
+                "INTELLIGENT_TIERING",
+                "GLACIER",
+                "DEEP_ARCHIVE",
+                "GLACIER_IR"
+              ],
+              "description": "S3 storage class for uploaded objects."
+            },
+            "metadata": {
+              "type": "object",
+              "additionalProperties": { "type": "string" },
+              "description": "Custom metadata key-value pairs for uploaded objects."
+            },
+            "tags": {
+              "type": "object",
+              "additionalProperties": { "type": "string" },
+              "description": "S3 object tags as key-value pairs."
+            },
+            "sse": {
+              "type": "string",
+              "enum": ["AES256", "aws:kms"],
+              "description": "Server-side encryption algorithm."
+            },
+            "sseKmsKeyId": {
+              "type": "string",
+              "description": "KMS key ID for SSE-KMS encryption."
+            },
+            "acl": {
+              "type": "string",
+              "enum": [
+                "private",
+                "public-read",
+                "public-read-write",
+                "authenticated-read",
+                "aws-exec-read",
+                "bucket-owner-read",
+                "bucket-owner-full-control"
+              ],
+              "description": "Canned ACL for uploaded objects."
+            },
+            "partSize": {
+              "type": "integer",
+              "minimum": 5,
+              "default": 10,
+              "description": "Part size in MB for multipart uploads. Minimum 5MB. Default: 10MB."
+            },
+            "concurrency": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 5,
+              "description": "Number of concurrent upload/download parts. Default: 5."
+            },
+            "maxKeys": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 1000,
+              "description": "Maximum keys to return per list request. Default: 1000."
+            },
+            "delimiter": {
+              "type": "string",
+              "description": "Delimiter for grouping keys in list operations (e.g., '/')."
+            },
+            "recursive": {
+              "type": "boolean",
+              "default": false,
+              "description": "Recursively list all objects under prefix. Default: false."
+            },
+            "outputFormat": {
+              "type": "string",
+              "enum": ["json", "jsonl"],
+              "default": "json",
+              "description": "Output format for list results. Default: json."
+            },
+            "quiet": {
+              "type": "boolean",
+              "default": false,
+              "description": "Suppress output for delete operations. Default: false."
+            }
           }
         }
       ],
@@ -2177,7 +2194,12 @@
         },
         "isolationLevel": {
           "type": "string",
-          "enum": ["default", "read_committed", "repeatable_read", "serializable"],
+          "enum": [
+            "default",
+            "read_committed",
+            "repeatable_read",
+            "serializable"
+          ],
           "description": "Transaction isolation level."
         },
         "advisoryLock": {
@@ -2400,274 +2422,274 @@
           "type": "object",
           "properties": {
             "command": {
-          "type": "string",
-          "description": "Redis command to execute (e.g., 'GET', 'SET', 'HSET'). Required unless using script/pipeline."
-        },
-        "key": {
-          "type": "string",
-          "description": "Primary key for the command."
-        },
-        "keys": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Multiple keys for commands like MGET, DEL."
-        },
-        "value": {
-          "description": "Value for SET, LPUSH, etc. Can be string, number, boolean, or object."
-        },
-        "values": {
-          "type": "array",
-          "description": "Multiple values for commands like MSET, LPUSH."
-        },
-        "field": {
-          "type": "string",
-          "description": "Hash field for HGET, HSET."
-        },
-        "fields": {
-          "type": "object",
-          "additionalProperties": true,
-          "description": "Multiple hash fields for HMSET, HGETALL."
-        },
-        "ttl": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Expiration time in seconds for SET with EX option."
-        },
-        "nx": {
-          "type": "boolean",
-          "description": "SET only if key does not exist."
-        },
-        "xx": {
-          "type": "boolean",
-          "description": "SET only if key exists."
-        },
-        "keepTTL": {
-          "type": "boolean",
-          "description": "Preserve existing TTL when updating key (Redis 6+)."
-        },
-        "count": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "Count parameter for SCAN, LPOP, RPOP."
-        },
-        "match": {
-          "type": "string",
-          "description": "Pattern for SCAN command (e.g., 'user:*')."
-        },
-        "position": {
-          "type": "string",
-          "enum": ["BEFORE", "AFTER"],
-          "description": "Position for LINSERT command."
-        },
-        "pivot": {
-          "type": "string",
-          "description": "Pivot value for LINSERT command."
-        },
-        "start": {
-          "type": "integer",
-          "description": "Range start index for LRANGE, ZRANGE."
-        },
-        "stop": {
-          "type": "integer",
-          "description": "Range stop index for LRANGE, ZRANGE."
-        },
-        "score": {
-          "type": "number",
-          "description": "Member score for ZADD, ZINCRBY."
-        },
-        "min": {
-          "type": "string",
-          "description": "Minimum score/value for ZRANGEBYSCORE, ZCOUNT."
-        },
-        "max": {
-          "type": "string",
-          "description": "Maximum score/value for ZRANGEBYSCORE, ZCOUNT."
-        },
-        "withScores": {
-          "type": "boolean",
-          "description": "Include scores in ZRANGE output."
-        },
-        "channel": {
-          "type": "string",
-          "description": "Pub/Sub channel name."
-        },
-        "channels": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Multiple Pub/Sub channels."
-        },
-        "message": {
-          "description": "Message to publish. Can be string, number, boolean, or object."
-        },
-        "stream": {
-          "type": "string",
-          "description": "Stream key for XADD, XREAD."
-        },
-        "streamID": {
-          "type": "string",
-          "description": "Stream message ID. Use '*' for auto-generation."
-        },
-        "group": {
-          "type": "string",
-          "description": "Consumer group name for XREADGROUP."
-        },
-        "consumer": {
-          "type": "string",
-          "description": "Consumer name for XREADGROUP."
-        },
-        "streamFields": {
-          "type": "object",
-          "additionalProperties": true,
-          "description": "Stream entry fields for XADD."
-        },
-        "maxLen": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Maximum stream length for XADD."
-        },
-        "block": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Block timeout in milliseconds for XREAD, XREADGROUP."
-        },
-        "noAck": {
-          "type": "boolean",
-          "description": "Skip acknowledging messages in XREADGROUP."
-        },
-        "script": {
-          "type": "string",
-          "description": "Inline Lua script to execute."
-        },
-        "scriptFile": {
-          "type": "string",
-          "description": "Path to Lua script file."
-        },
-        "scriptSHA": {
-          "type": "string",
-          "description": "SHA of pre-loaded script. Use EVALSHA instead of EVAL."
-        },
-        "scriptKeys": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "KEYS array for Lua script."
-        },
-        "scriptArgs": {
-          "type": "array",
-          "description": "ARGV array for Lua script."
-        },
-        "pipeline": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["command"],
-            "properties": {
-              "command": {
+              "type": "string",
+              "description": "Redis command to execute (e.g., 'GET', 'SET', 'HSET'). Required unless using script/pipeline."
+            },
+            "key": {
+              "type": "string",
+              "description": "Primary key for the command."
+            },
+            "keys": {
+              "type": "array",
+              "items": {
                 "type": "string"
               },
-              "key": {
+              "description": "Multiple keys for commands like MGET, DEL."
+            },
+            "value": {
+              "description": "Value for SET, LPUSH, etc. Can be string, number, boolean, or object."
+            },
+            "values": {
+              "type": "array",
+              "description": "Multiple values for commands like MSET, LPUSH."
+            },
+            "field": {
+              "type": "string",
+              "description": "Hash field for HGET, HSET."
+            },
+            "fields": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Multiple hash fields for HMSET, HGETALL."
+            },
+            "ttl": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Expiration time in seconds for SET with EX option."
+            },
+            "nx": {
+              "type": "boolean",
+              "description": "SET only if key does not exist."
+            },
+            "xx": {
+              "type": "boolean",
+              "description": "SET only if key exists."
+            },
+            "keepTTL": {
+              "type": "boolean",
+              "description": "Preserve existing TTL when updating key (Redis 6+)."
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Count parameter for SCAN, LPOP, RPOP."
+            },
+            "match": {
+              "type": "string",
+              "description": "Pattern for SCAN command (e.g., 'user:*')."
+            },
+            "position": {
+              "type": "string",
+              "enum": ["BEFORE", "AFTER"],
+              "description": "Position for LINSERT command."
+            },
+            "pivot": {
+              "type": "string",
+              "description": "Pivot value for LINSERT command."
+            },
+            "start": {
+              "type": "integer",
+              "description": "Range start index for LRANGE, ZRANGE."
+            },
+            "stop": {
+              "type": "integer",
+              "description": "Range stop index for LRANGE, ZRANGE."
+            },
+            "score": {
+              "type": "number",
+              "description": "Member score for ZADD, ZINCRBY."
+            },
+            "min": {
+              "type": "string",
+              "description": "Minimum score/value for ZRANGEBYSCORE, ZCOUNT."
+            },
+            "max": {
+              "type": "string",
+              "description": "Maximum score/value for ZRANGEBYSCORE, ZCOUNT."
+            },
+            "withScores": {
+              "type": "boolean",
+              "description": "Include scores in ZRANGE output."
+            },
+            "channel": {
+              "type": "string",
+              "description": "Pub/Sub channel name."
+            },
+            "channels": {
+              "type": "array",
+              "items": {
                 "type": "string"
               },
-              "keys": {
-                "type": "array",
-                "items": {
-                  "type": "string"
+              "description": "Multiple Pub/Sub channels."
+            },
+            "message": {
+              "description": "Message to publish. Can be string, number, boolean, or object."
+            },
+            "stream": {
+              "type": "string",
+              "description": "Stream key for XADD, XREAD."
+            },
+            "streamID": {
+              "type": "string",
+              "description": "Stream message ID. Use '*' for auto-generation."
+            },
+            "group": {
+              "type": "string",
+              "description": "Consumer group name for XREADGROUP."
+            },
+            "consumer": {
+              "type": "string",
+              "description": "Consumer name for XREADGROUP."
+            },
+            "streamFields": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Stream entry fields for XADD."
+            },
+            "maxLen": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Maximum stream length for XADD."
+            },
+            "block": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Block timeout in milliseconds for XREAD, XREADGROUP."
+            },
+            "noAck": {
+              "type": "boolean",
+              "description": "Skip acknowledging messages in XREADGROUP."
+            },
+            "script": {
+              "type": "string",
+              "description": "Inline Lua script to execute."
+            },
+            "scriptFile": {
+              "type": "string",
+              "description": "Path to Lua script file."
+            },
+            "scriptSHA": {
+              "type": "string",
+              "description": "SHA of pre-loaded script. Use EVALSHA instead of EVAL."
+            },
+            "scriptKeys": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "KEYS array for Lua script."
+            },
+            "scriptArgs": {
+              "type": "array",
+              "description": "ARGV array for Lua script."
+            },
+            "pipeline": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["command"],
+                "properties": {
+                  "command": {
+                    "type": "string"
+                  },
+                  "key": {
+                    "type": "string"
+                  },
+                  "keys": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "value": {},
+                  "values": {
+                    "type": "array"
+                  },
+                  "field": {
+                    "type": "string"
+                  },
+                  "fields": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "ttl": {
+                    "type": "integer"
+                  },
+                  "nx": {
+                    "type": "boolean"
+                  },
+                  "xx": {
+                    "type": "boolean"
+                  },
+                  "score": {
+                    "type": "number"
+                  }
                 }
               },
-              "value": {},
-              "values": {
-                "type": "array"
-              },
-              "field": {
+              "description": "Batch of commands to execute in a pipeline."
+            },
+            "watch": {
+              "type": "array",
+              "items": {
                 "type": "string"
               },
-              "fields": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "ttl": {
-                "type": "integer"
-              },
-              "nx": {
-                "type": "boolean"
-              },
-              "xx": {
-                "type": "boolean"
-              },
-              "score": {
-                "type": "number"
-              }
+              "description": "Keys to WATCH for optimistic locking."
+            },
+            "multi": {
+              "type": "boolean",
+              "description": "Wrap pipeline in MULTI/EXEC transaction."
+            },
+            "lock": {
+              "type": "string",
+              "description": "Distributed lock name. Acquires lock before executing command."
+            },
+            "lockTimeout": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 30,
+              "description": "Lock expiry in seconds. Default: 30."
+            },
+            "lockRetry": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 10,
+              "description": "Lock acquisition retry attempts. Default: 10."
+            },
+            "lockWait": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 100,
+              "description": "Wait between lock retries in milliseconds. Default: 100."
+            },
+            "outputFormat": {
+              "type": "string",
+              "enum": ["json", "jsonl", "raw", "csv"],
+              "default": "json",
+              "description": "Output format. Default: json."
+            },
+            "nullValue": {
+              "type": "string",
+              "default": "null",
+              "description": "String representation for nil values. Default: 'null'."
+            },
+            "timeout": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 30,
+              "description": "Command timeout in seconds. Default: 30."
+            },
+            "maxResultSize": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 10485760,
+              "description": "Maximum result size in bytes. Default: 10MB."
             }
-          },
-          "description": "Batch of commands to execute in a pipeline."
-        },
-        "watch": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Keys to WATCH for optimistic locking."
-        },
-        "multi": {
-          "type": "boolean",
-          "description": "Wrap pipeline in MULTI/EXEC transaction."
-        },
-        "lock": {
-          "type": "string",
-          "description": "Distributed lock name. Acquires lock before executing command."
-        },
-        "lockTimeout": {
-          "type": "integer",
-          "minimum": 1,
-          "default": 30,
-          "description": "Lock expiry in seconds. Default: 30."
-        },
-        "lockRetry": {
-          "type": "integer",
-          "minimum": 0,
-          "default": 10,
-          "description": "Lock acquisition retry attempts. Default: 10."
-        },
-        "lockWait": {
-          "type": "integer",
-          "minimum": 0,
-          "default": 100,
-          "description": "Wait between lock retries in milliseconds. Default: 100."
-        },
-        "outputFormat": {
-          "type": "string",
-          "enum": ["json", "jsonl", "raw", "csv"],
-          "default": "json",
-          "description": "Output format. Default: json."
-        },
-        "nullValue": {
-          "type": "string",
-          "default": "null",
-          "description": "String representation for nil values. Default: 'null'."
-        },
-        "timeout": {
-          "type": "integer",
-          "minimum": 0,
-          "default": 30,
-          "description": "Command timeout in seconds. Default: 30."
-        },
-        "maxResultSize": {
-          "type": "integer",
-          "minimum": 0,
-          "default": 10485760,
-          "description": "Maximum result size in bytes. Default: 10MB."
+          }
         }
-      }
-    }
-  ],
-  "description": "Redis executor configuration for executing Redis commands, managing cache, pub/sub, streams, and distributed locks."
-},
+      ],
+      "description": "Redis executor configuration for executing Redis commands, managing cache, pub/sub, streams, and distributed locks."
+    },
     "hitlExecutorConfig": {
       "type": "object",
       "additionalProperties": false,
@@ -2689,28 +2711,49 @@
       },
       "description": "Human-in-the-loop executor configuration. Pauses workflow execution until human approval is received."
     },
+    "llmProvider": {
+      "type": "string",
+      "enum": [
+        "openai",
+        "anthropic",
+        "gemini",
+        "google",
+        "openrouter",
+        "local",
+        "ollama",
+        "vllm",
+        "llama"
+      ]
+    },
     "llmConfig": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["provider", "model"],
       "properties": {
         "provider": {
-          "type": "string",
-          "enum": [
-            "openai",
-            "anthropic",
-            "gemini",
-            "openrouter",
-            "local",
-            "ollama",
-            "vllm",
-            "llama"
-          ],
-          "description": "LLM provider to use. Aliases 'ollama', 'vllm', 'llama' map to 'local'."
+          "$ref": "#/definitions/llmProvider",
+          "description": "LLM provider to use (for single model config). Aliases 'ollama', 'vllm', 'llama' map to 'local'. Not required when using model array."
         },
         "model": {
-          "type": "string",
-          "description": "Model identifier (e.g., 'gpt-4o', 'claude-sonnet-4-20250514', 'gemini-pro')."
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["provider", "name"],
+                "properties": {
+                  "provider": { "$ref": "#/definitions/llmProvider" },
+                  "name": { "type": "string" },
+                  "temperature": { "type": "number" },
+                  "maxTokens": { "type": "integer" },
+                  "topP": { "type": "number" },
+                  "baseURL": { "type": "string" },
+                  "apiKeyName": { "type": "string" }
+                }
+              }
+            }
+          ],
+          "description": "Model name (string) or array of model objects for fallback."
         },
         "system": {
           "type": "string",

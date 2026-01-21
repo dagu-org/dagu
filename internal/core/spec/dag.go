@@ -1390,6 +1390,22 @@ func buildLLM(_ BuildContext, d *dag) (*core.LLMConfig, error) {
 		}
 	}
 
+	// Get model string or entries (optional at DAG level)
+	var modelString string
+	var models []core.ModelEntry
+
+	if !cfg.Model.IsZero() {
+		if cfg.Model.IsArray() {
+			var err error
+			models, err = convertModelEntries(cfg.Model.Entries())
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			modelString = cfg.Model.String()
+		}
+	}
+
 	// Validate temperature range if specified
 	if cfg.Temperature != nil {
 		if *cfg.Temperature < 0.0 || *cfg.Temperature > 2.0 {
@@ -1421,7 +1437,8 @@ func buildLLM(_ BuildContext, d *dag) (*core.LLMConfig, error) {
 
 	return &core.LLMConfig{
 		Provider:    cfg.Provider,
-		Model:       cfg.Model,
+		Model:       modelString,
+		Models:      models,
 		System:      cfg.System,
 		Temperature: cfg.Temperature,
 		MaxTokens:   cfg.MaxTokens,

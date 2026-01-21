@@ -3456,6 +3456,11 @@ func TestBuildStepLLM(t *testing.T) {
 
 	temp := func(v float64) *float64 { return &v }
 	tokens := func(v int) *int { return &v }
+	model := func(s string) types.ModelValue {
+		var m types.ModelValue
+		_ = yaml.Unmarshal([]byte(s), &m)
+		return m
+	}
 
 	tests := []struct {
 		name    string
@@ -3481,7 +3486,7 @@ func TestBuildStepLLM(t *testing.T) {
 			name: "InvalidProvider",
 			step: &step{
 				Type: "chat",
-				LLM:  &llmConfig{Provider: "invalid", Model: "test"},
+				LLM:  &llmConfig{Provider: "invalid", Model: model("test")},
 			},
 			wantErr: true,
 			errMsg:  "llm.provider",
@@ -3499,7 +3504,7 @@ func TestBuildStepLLM(t *testing.T) {
 			name: "TemperatureTooLow",
 			step: &step{
 				Type: "chat",
-				LLM:  &llmConfig{Provider: "openai", Model: "gpt-4", Temperature: temp(-0.1)},
+				LLM:  &llmConfig{Provider: "openai", Model: model("gpt-4"), Temperature: temp(-0.1)},
 			},
 			wantErr: true,
 			errMsg:  "llm.temperature",
@@ -3508,7 +3513,7 @@ func TestBuildStepLLM(t *testing.T) {
 			name: "TemperatureTooHigh",
 			step: &step{
 				Type: "chat",
-				LLM:  &llmConfig{Provider: "openai", Model: "gpt-4", Temperature: temp(2.1)},
+				LLM:  &llmConfig{Provider: "openai", Model: model("gpt-4"), Temperature: temp(2.1)},
 			},
 			wantErr: true,
 			errMsg:  "llm.temperature",
@@ -3517,7 +3522,7 @@ func TestBuildStepLLM(t *testing.T) {
 			name: "MaxTokensInvalid",
 			step: &step{
 				Type: "chat",
-				LLM:  &llmConfig{Provider: "openai", Model: "gpt-4", MaxTokens: tokens(0)},
+				LLM:  &llmConfig{Provider: "openai", Model: model("gpt-4"), MaxTokens: tokens(0)},
 			},
 			wantErr: true,
 			errMsg:  "llm.maxTokens",
@@ -3526,7 +3531,7 @@ func TestBuildStepLLM(t *testing.T) {
 			name: "TopPTooLow",
 			step: &step{
 				Type: "chat",
-				LLM:  &llmConfig{Provider: "openai", Model: "gpt-4", TopP: temp(-0.1)},
+				LLM:  &llmConfig{Provider: "openai", Model: model("gpt-4"), TopP: temp(-0.1)},
 			},
 			wantErr: true,
 			errMsg:  "llm.topP",
@@ -3535,7 +3540,7 @@ func TestBuildStepLLM(t *testing.T) {
 			name: "TopPTooHigh",
 			step: &step{
 				Type: "chat",
-				LLM:  &llmConfig{Provider: "openai", Model: "gpt-4", TopP: temp(1.1)},
+				LLM:  &llmConfig{Provider: "openai", Model: model("gpt-4"), TopP: temp(1.1)},
 			},
 			wantErr: true,
 			errMsg:  "llm.topP",
@@ -3546,7 +3551,7 @@ func TestBuildStepLLM(t *testing.T) {
 				Type: "chat",
 				LLM: &llmConfig{
 					Provider:    "openai",
-					Model:       "gpt-4",
+					Model:       model("gpt-4"),
 					Temperature: temp(0.7),
 					MaxTokens:   tokens(100),
 					TopP:        temp(0.9),

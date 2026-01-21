@@ -58,14 +58,24 @@ func newChatExecutor(ctx context.Context, step core.Step) (executor.Executor, er
 
 	cfg := step.LLM
 
+	// Get primary model's provider (first model in array or legacy Provider field)
+	models := cfg.GetModels()
+	primaryProvider := models[0].Provider
+	if primaryProvider == "" {
+		primaryProvider = cfg.Provider
+	}
+
 	// Parse provider type (required field, validated in spec)
-	providerType, err := llmpkg.ParseProviderType(cfg.Provider)
+	providerType, err := llmpkg.ParseProviderType(primaryProvider)
 	if err != nil {
 		return nil, fmt.Errorf("invalid provider: %w", err)
 	}
 
 	// Determine which environment variable to use for API key
-	apiKeyEnvVar := cfg.APIKeyName
+	apiKeyEnvVar := models[0].APIKeyName
+	if apiKeyEnvVar == "" {
+		apiKeyEnvVar = cfg.APIKeyName
+	}
 	if apiKeyEnvVar == "" {
 		apiKeyEnvVar = llmpkg.DefaultAPIKeyEnvVar(providerType)
 	}
@@ -233,57 +243,6 @@ func normalizeEnvVarExpr(expr string) string {
 	return "${" + expr + "}"
 }
 
-// createProvider creates the LLM provider with evaluated config values.
-// This is called at runtime to support variable substitution in config fields.
-func (e *Executor) createProvider(ctx context.Context) (llmpkg.Provider, error) {
-	cfg := e.step.LLM
-
-	// Evaluate API key from environment variable (supports ${VAR} substitution)
-	var apiKey string
-	if e.apiKeyEnvVar != "" {
-		apiKeyExpr := normalizeEnvVarExpr(e.apiKeyEnvVar)
-		var err error
-		apiKey, err = runtime.EvalString(ctx, apiKeyExpr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate API key: %w", err)
-		}
-	}
-
-	// Evaluate base URL if specified
-	baseURL := cfg.BaseURL
-	if baseURL != "" {
-		var err error
-		baseURL, err = runtime.EvalString(ctx, baseURL)
-		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate baseURL: %w", err)
-		}
-	}
-
-	// Use default base URL if not specified
-	if baseURL == "" {
-		baseURL = llmpkg.DefaultBaseURL(e.providerType)
-	}
-
-	// Build provider config
-	providerCfg := llmpkg.Config{
-		APIKey:          apiKey,
-		BaseURL:         baseURL,
-		Timeout:         5 * time.Minute,
-		MaxRetries:      3,
-		InitialInterval: 1 * time.Second,
-		MaxInterval:     30 * time.Second,
-		Multiplier:      2.0,
-	}
-
-	// Create provider
-	provider, err := llmpkg.NewProvider(e.providerType, providerCfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create LLM provider: %w", err)
-	}
-
-	return provider, nil
-}
-
 // evalMessages evaluates variable substitution in message content.
 func evalMessages(ctx context.Context, msgs []exec.LLMMessage) ([]exec.LLMMessage, error) {
 	result := make([]exec.LLMMessage, len(msgs))
@@ -338,31 +297,174 @@ func maskSecretsForProvider(ctx context.Context, msgs []exec.LLMMessage) []exec.
 
 // Run executes the chat request.
 func (e *Executor) Run(ctx context.Context) error {
-	// Create provider with evaluated config (supports variable substitution)
-	provider, err := e.createProvider(ctx)
-	if err != nil {
-		return err
-	}
-
 	evaluatedMessages, err := evalMessages(ctx, e.messages)
 	if err != nil {
 		return err
 	}
 
 	allMessages := buildMessageList(evaluatedMessages, e.contextMessages)
+	models := e.step.LLM.GetModels()
+
+	// If only one model, use simple path (no fallback)
+	if len(models) == 1 {
+		return e.runWithModel(ctx, models[0], allMessages)
+	}
+
+	// Multiple models: implement fallback
+	var lastErr error
+	for i, model := range models {
+		// Reset per-attempt state before each attempt
+		e.collectedSubRuns = nil
+		e.savedMessages = nil
+
+		logger.Info(ctx, "Attempting LLM request",
+			slog.String("provider", model.Provider),
+			slog.String("model", model.Name),
+			slog.Int("attemptIndex", i))
+
+		err := e.runWithModel(ctx, model, allMessages)
+		if err == nil {
+			return nil // Success
+		}
+
+		lastErr = err
+		logger.Warn(ctx, "LLM request failed",
+			slog.String("provider", model.Provider),
+			slog.String("model", model.Name),
+			tag.Error(err))
+
+		// More models to try?
+		if i < len(models)-1 {
+			logger.Info(ctx, "Falling back to next model",
+				slog.String("next", models[i+1].Name))
+		}
+	}
+
+	return fmt.Errorf("all %d models exhausted: %w", len(models), lastErr)
+}
+
+// runWithModel executes a chat request with a specific model.
+func (e *Executor) runWithModel(ctx context.Context, model core.ModelEntry, allMessages []exec.LLMMessage) error {
+	// Build effective config for this model
+	effectiveCfg := e.buildEffectiveConfig(model)
+
+	// Disable streaming if fallback is configured to avoid output corruption
+	if e.step.LLM.HasFallback() && effectiveCfg.StreamEnabled() {
+		stream := false
+		effectiveCfg.Stream = &stream
+	}
+
+	// Create provider for this model
+	provider, err := e.createProviderForModel(ctx, model, effectiveCfg)
+	if err != nil {
+		return err
+	}
 
 	// Dispatch to tool-enabled execution if tools are configured
 	if e.toolRegistry != nil && e.toolRegistry.HasTools() {
-		return e.runWithTools(ctx, provider, allMessages)
+		return e.runWithToolsForModel(ctx, provider, allMessages, effectiveCfg)
 	}
 
 	// Standard execution without tools
-	return e.runSimple(ctx, provider, allMessages)
+	return e.runSimpleForModel(ctx, provider, allMessages, effectiveCfg)
 }
 
-// runSimple executes a chat request without tool calling.
-func (e *Executor) runSimple(ctx context.Context, provider llmpkg.Provider, allMessages []exec.LLMMessage) error {
+// buildEffectiveConfig merges model-specific overrides with shared config.
+func (e *Executor) buildEffectiveConfig(model core.ModelEntry) *core.LLMConfig {
 	cfg := e.step.LLM
+
+	return &core.LLMConfig{
+		Provider:          model.Provider,
+		Model:             model.Name,
+		System:            cfg.System,
+		Stream:            cfg.Stream,
+		Thinking:          cfg.Thinking,
+		Tools:             cfg.Tools,
+		MaxToolIterations: cfg.MaxToolIterations,
+		Temperature:       coalescePtr(model.Temperature, cfg.Temperature),
+		MaxTokens:         coalescePtr(model.MaxTokens, cfg.MaxTokens),
+		TopP:              coalescePtr(model.TopP, cfg.TopP),
+		BaseURL:           coalesceStr(model.BaseURL, cfg.BaseURL),
+		APIKeyName:        coalesceStr(model.APIKeyName, cfg.APIKeyName),
+	}
+}
+
+// coalescePtr returns the first non-nil pointer.
+func coalescePtr[T any](override, fallback *T) *T {
+	if override != nil {
+		return override
+	}
+	return fallback
+}
+
+// coalesceStr returns the first non-empty string.
+func coalesceStr(override, fallback string) string {
+	if override != "" {
+		return override
+	}
+	return fallback
+}
+
+// createProviderForModel creates an LLM provider for a specific model.
+func (e *Executor) createProviderForModel(ctx context.Context, model core.ModelEntry, cfg *core.LLMConfig) (llmpkg.Provider, error) {
+	// Parse provider type for this model
+	providerType, err := llmpkg.ParseProviderType(cfg.Provider)
+	if err != nil {
+		return nil, fmt.Errorf("invalid provider: %w", err)
+	}
+
+	// Determine API key env var
+	apiKeyEnvVar := cfg.APIKeyName
+	if apiKeyEnvVar == "" {
+		apiKeyEnvVar = llmpkg.DefaultAPIKeyEnvVar(providerType)
+	}
+
+	// Evaluate API key from environment variable
+	var apiKey string
+	if apiKeyEnvVar != "" {
+		apiKeyExpr := normalizeEnvVarExpr(apiKeyEnvVar)
+		apiKey, err = runtime.EvalString(ctx, apiKeyExpr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate API key: %w", err)
+		}
+	}
+
+	// Evaluate base URL if specified
+	baseURL := cfg.BaseURL
+	if baseURL != "" {
+		baseURL, err = runtime.EvalString(ctx, baseURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate baseURL: %w", err)
+		}
+	}
+
+	// Use default base URL if not specified
+	if baseURL == "" {
+		baseURL = llmpkg.DefaultBaseURL(providerType)
+	}
+
+	// Build provider config
+	providerCfg := llmpkg.Config{
+		APIKey:          apiKey,
+		BaseURL:         baseURL,
+		Timeout:         5 * time.Minute,
+		MaxRetries:      3,
+		InitialInterval: 1 * time.Second,
+		MaxInterval:     30 * time.Second,
+		Multiplier:      2.0,
+	}
+
+	// Create provider
+	provider, err := llmpkg.NewProvider(providerType, providerCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create LLM provider: %w", err)
+	}
+
+	return provider, nil
+}
+
+// runSimpleForModel executes a chat request without tool calling, using the given config.
+func (e *Executor) runSimpleForModel(ctx context.Context, provider llmpkg.Provider, allMessages []exec.LLMMessage, cfg *core.LLMConfig) error {
 	maskedForProvider := maskSecretsForProvider(ctx, allMessages)
 
 	req := &llmpkg.ChatRequest{
@@ -437,19 +539,17 @@ func (e *Executor) runSimple(ctx context.Context, provider llmpkg.Provider, allM
 	return nil
 }
 
-// runWithTools executes a chat request with tool calling support.
+// runWithToolsForModel executes a chat request with tool calling support, using the given config.
 // It implements a multi-turn loop where:
 // 1. Send messages + tools to LLM
 // 2. If LLM requests tool calls, execute them
 // 3. Add tool results to conversation
 // 4. Repeat until LLM provides final response (no more tool calls) or max iterations
-func (e *Executor) runWithTools(ctx context.Context, provider llmpkg.Provider, allMessages []exec.LLMMessage) error {
-	cfg := e.step.LLM
+func (e *Executor) runWithToolsForModel(ctx context.Context, provider llmpkg.Provider, allMessages []exec.LLMMessage, cfg *core.LLMConfig) error {
 	maxIterations := cfg.GetMaxToolIterations()
+	workDir := runtime.GetEnv(ctx).WorkingDir
 
 	// Initialize tool executor for running DAGs
-	// Use resolved working directory (same as call step type), not DAG file location
-	workDir := runtime.GetEnv(ctx).WorkingDir
 	e.toolExecutor = NewToolExecutor(e.toolRegistry, workDir)
 
 	// Get tools in LLM format
@@ -475,151 +575,197 @@ func (e *Executor) runWithTools(ctx context.Context, provider llmpkg.Provider, a
 	copy(conversationMessages, allMessages)
 
 	for iteration := 0; iteration < maxIterations; iteration++ {
-		logger.Debug(ctx, "Tool loop iteration",
-			slog.Int("iteration", iteration+1),
-			slog.Int("message_count", len(conversationMessages)),
-		)
-
-		// Mask secrets before sending to provider
-		maskedForProvider := maskSecretsForProvider(ctx, conversationMessages)
-
-		// Build request with tools
-		req := &llmpkg.ChatRequest{
-			Model:       cfg.Model,
-			Messages:    toLLMMessages(maskedForProvider),
-			Temperature: cfg.Temperature,
-			MaxTokens:   cfg.MaxTokens,
-			TopP:        cfg.TopP,
-			Thinking:    toThinkingRequest(cfg.Thinking),
-			Tools:       tools,
-			ToolChoice:  "auto",
-		}
-
-		// Execute request (non-streaming for tool calling - streaming complicates tool call detection)
-		resp, err := provider.Chat(ctx, req)
+		var done bool
+		var err error
+		conversationMessages, done, err = e.executeToolStep(ctx, provider, cfg, tools, conversationMessages, iteration)
 		if err != nil {
-			return fmt.Errorf("chat request failed: %w", err)
+			return err
 		}
-
-		// Check if the response contains tool calls
-		if len(resp.ToolCalls) == 0 {
-			// No tool calls - this is the final response
-			logger.Info(ctx, "LLM provided final response (no tool calls)",
-				slog.Int("iterations_used", iteration+1),
-			)
-
-			// Write the final response to stdout
-			if resp.Content != "" {
-				if _, err := fmt.Fprintln(e.stdout, resp.Content); err != nil {
-					logger.Error(ctx, "failed to write response", tag.Error(err))
-				}
-			}
-
-			// Build metadata for the assistant response
-			metadata := &exec.LLMMessageMetadata{
-				Provider:         cfg.Provider,
-				Model:            cfg.Model,
-				PromptTokens:     resp.Usage.PromptTokens,
-				CompletionTokens: resp.Usage.CompletionTokens,
-				TotalTokens:      resp.Usage.TotalTokens,
-			}
-
-			// Save full conversation including tool interactions
-			e.savedMessages = append(conversationMessages, exec.LLMMessage{
-				Role:     exec.RoleAssistant,
-				Content:  resp.Content,
-				Metadata: metadata,
-			})
-
+		if done {
+			e.savedMessages = conversationMessages
 			return nil
-		}
-
-		// LLM requested tool calls - execute them
-		logger.Info(ctx, "LLM requested tool calls",
-			slog.Int("tool_call_count", len(resp.ToolCalls)),
-		)
-
-		// Convert llmpkg.ToolCall to exec.ToolCall for storage
-		execToolCalls := make([]exec.ToolCall, len(resp.ToolCalls))
-		for i, tc := range resp.ToolCalls {
-			execToolCalls[i] = exec.ToolCall{
-				ID:   tc.ID,
-				Type: tc.Type,
-				Function: exec.ToolCallFunction{
-					Name:      tc.Function.Name,
-					Arguments: tc.Function.Arguments,
-				},
-			}
-		}
-
-		// Add assistant message with tool calls to conversation
-		assistantMsg := exec.LLMMessage{
-			Role:      exec.RoleAssistant,
-			Content:   resp.Content,
-			ToolCalls: execToolCalls,
-		}
-		conversationMessages = append(conversationMessages, assistantMsg)
-
-		// Execute each tool call and collect results
-		toolCallResults := e.toolExecutor.ExecuteToolCalls(ctx, resp.ToolCalls)
-
-		// Add tool results to conversation and collect sub-runs for UI
-		for _, tcr := range toolCallResults {
-			result := tcr.Result
-			toolMsg := exec.LLMMessage{
-				Role:       exec.RoleTool,
-				Content:    result.Content,
-				ToolCallID: result.ToolCallID,
-			}
-			if result.Error != "" {
-				toolMsg.Content = fmt.Sprintf("Error: %s", result.Error)
-			}
-			conversationMessages = append(conversationMessages, toolMsg)
-
-			// Collect sub-run info for UI drill-down (even for failed executions)
-			if tcr.SubRun.DAGRunID != "" {
-				e.collectedSubRuns = append(e.collectedSubRuns, tcr.SubRun)
-			}
-
-			// Log tool result (truncated for readability)
-			content := result.Content
-			if len(content) > 200 {
-				content = content[:200] + "..."
-			}
-			logger.Info(ctx, "Tool execution result",
-				tag.Tool(result.Name),
-				tag.ToolCallID(result.ToolCallID),
-				slog.String("content_preview", content),
-			)
 		}
 	}
 
-	// Max iterations reached - return with warning
+	// Max iterations reached
+	return e.handleMaxIterationsReached(ctx, maxIterations, conversationMessages)
+}
+
+// executeToolStep performs a single iteration of the tool execution loop.
+// Returns updated messages, whether the conversation is done, and any error.
+func (e *Executor) executeToolStep(
+	ctx context.Context,
+	provider llmpkg.Provider,
+	cfg *core.LLMConfig,
+	tools []llmpkg.Tool,
+	msgs []exec.LLMMessage,
+	iteration int,
+) ([]exec.LLMMessage, bool, error) {
+	logger.Debug(ctx, "Tool loop iteration",
+		slog.Int("iteration", iteration+1),
+		slog.Int("message_count", len(msgs)),
+	)
+
+	// Mask secrets before sending to provider
+	maskedForProvider := maskSecretsForProvider(ctx, msgs)
+
+	req := &llmpkg.ChatRequest{
+		Model:       cfg.Model,
+		Messages:    toLLMMessages(maskedForProvider),
+		Temperature: cfg.Temperature,
+		MaxTokens:   cfg.MaxTokens,
+		TopP:        cfg.TopP,
+		Thinking:    toThinkingRequest(cfg.Thinking),
+		Tools:       tools,
+		ToolChoice:  "auto",
+	}
+
+	// Execute request
+	resp, err := provider.Chat(ctx, req)
+	if err != nil {
+		return nil, false, fmt.Errorf("chat request failed: %w", err)
+	}
+
+	// Check for final response (no tool calls)
+	if len(resp.ToolCalls) == 0 {
+		e.handleFinalResponse(ctx, msgs, resp, cfg, iteration)
+		// Return updated messages including the final response
+		finalMsgs := append(msgs, exec.LLMMessage{
+			Role:     exec.RoleAssistant,
+			Content:  resp.Content,
+			Metadata: e.createResponseMetadata(cfg, &resp.Usage),
+		})
+		return finalMsgs, true, nil
+	}
+
+	// Process tool calls
+	return e.processToolCalls(ctx, msgs, resp, iteration)
+}
+
+// handleFinalResponse processes and logs the final response from the LLM.
+func (e *Executor) handleFinalResponse(
+	ctx context.Context,
+	msgs []exec.LLMMessage,
+	resp *llmpkg.ChatResponse,
+	cfg *core.LLMConfig,
+	iteration int,
+) {
+	logger.Info(ctx, "LLM provided final response (no tool calls)",
+		slog.Int("iterations_used", iteration+1),
+	)
+
+	if resp.Content != "" {
+		if _, err := fmt.Fprintln(e.stdout, resp.Content); err != nil {
+			logger.Error(ctx, "failed to write response", tag.Error(err))
+		}
+	}
+}
+
+// processToolCalls handles the execution of tool calls requested by the LLM.
+func (e *Executor) processToolCalls(
+	ctx context.Context,
+	msgs []exec.LLMMessage,
+	resp *llmpkg.ChatResponse,
+	iteration int,
+) ([]exec.LLMMessage, bool, error) {
+	logger.Info(ctx, "LLM requested tool calls",
+		slog.Int("tool_call_count", len(resp.ToolCalls)),
+	)
+
+	// Add assistant message with tool calls
+	execToolCalls := make([]exec.ToolCall, len(resp.ToolCalls))
+	for i, tc := range resp.ToolCalls {
+		execToolCalls[i] = exec.ToolCall{
+			ID:   tc.ID,
+			Type: tc.Type,
+			Function: exec.ToolCallFunction{
+				Name:      tc.Function.Name,
+				Arguments: tc.Function.Arguments,
+			},
+		}
+	}
+
+	assistantMsg := exec.LLMMessage{
+		Role:      exec.RoleAssistant,
+		Content:   resp.Content,
+		ToolCalls: execToolCalls,
+	}
+	newMsgs := append(msgs, assistantMsg)
+
+	// Execute tools
+	toolCallResults := e.toolExecutor.ExecuteToolCalls(ctx, resp.ToolCalls)
+
+	// Append results
+	for _, tcr := range toolCallResults {
+		result := tcr.Result
+		toolMsg := exec.LLMMessage{
+			Role:       exec.RoleTool,
+			Content:    result.Content,
+			ToolCallID: result.ToolCallID,
+		}
+		if result.Error != "" {
+			toolMsg.Content = fmt.Sprintf("Error: %s", result.Error)
+		}
+		newMsgs = append(newMsgs, toolMsg)
+
+		if tcr.SubRun.DAGRunID != "" {
+			e.collectedSubRuns = append(e.collectedSubRuns, tcr.SubRun)
+		}
+
+		contentPreview := result.Content
+		if len(contentPreview) > 200 {
+			contentPreview = contentPreview[:200] + "..."
+		}
+		logger.Info(ctx, "Tool execution result",
+			tag.Tool(result.Name),
+			tag.ToolCallID(result.ToolCallID),
+			slog.String("content_preview", contentPreview),
+		)
+	}
+
+	return newMsgs, false, nil
+}
+
+// handleMaxIterationsReached handles the case where the tool loop hits the limit.
+func (e *Executor) handleMaxIterationsReached(
+	ctx context.Context,
+	maxIterations int,
+	msgs []exec.LLMMessage,
+) error {
 	logger.Warn(ctx, "Max tool iterations reached",
 		slog.Int("max_iterations", maxIterations),
 	)
 
-	// Get the last assistant response if any
-	var lastContent string
-	for i := len(conversationMessages) - 1; i >= 0; i-- {
-		if conversationMessages[i].Role == exec.RoleAssistant {
-			lastContent = conversationMessages[i].Content
+	lastContent := fmt.Sprintf("[Max tool iterations (%d) reached. The LLM may not have provided a complete response.]", maxIterations)
+
+	// Try to find the last assistant message
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].Role == exec.RoleAssistant {
+			lastContent = msgs[i].Content
 			break
 		}
-	}
-
-	if lastContent == "" {
-		lastContent = fmt.Sprintf("[Max tool iterations (%d) reached. The LLM may not have provided a complete response.]", maxIterations)
 	}
 
 	if _, err := fmt.Fprintln(e.stdout, lastContent); err != nil {
 		logger.Error(ctx, "failed to write response", tag.Error(err))
 	}
 
-	// Save conversation state
-	e.savedMessages = conversationMessages
-
+	e.savedMessages = msgs
 	return nil
+}
+
+// createResponseMetadata builds metadata for the assistant response.
+func (e *Executor) createResponseMetadata(cfg *core.LLMConfig, usage *llmpkg.Usage) *exec.LLMMessageMetadata {
+	metadata := &exec.LLMMessageMetadata{
+		Provider: cfg.Provider,
+		Model:    cfg.Model,
+	}
+	if usage != nil {
+		metadata.PromptTokens = usage.PromptTokens
+		metadata.CompletionTokens = usage.CompletionTokens
+		metadata.TotalTokens = usage.TotalTokens
+	}
+	return metadata
 }
 
 func init() {

@@ -358,68 +358,103 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *dag) ([]*core.
 		// Update the context with the current document index
 		ctx.index = docIndex
 
-		// Decode the document into manifest
-		spec, err := decode(doc)
+		// Process the document
+		dag, err := processDAGDocument(ctx, doc, baseDef, filePath, dat, docIndex)
 		if err != nil {
-			return nil, fmt.Errorf("failed to decode document %d: %w", docIndex, err)
+			return nil, fmt.Errorf("failed to process document %d: %w", docIndex, err)
 		}
 
-		// Build a fresh base core.DAG from base manifest if provided
-		var dest *core.DAG
-		if baseDef != nil {
-			// Build a new base core.DAG for this document
-			buildCtx := ctx
-			// Don't parse parameters for the base core.DAG
-			buildCtx.opts.Parameters = ""
-			buildCtx.opts.ParametersList = nil
-			// Build the base core.DAG
-			baseDAG, err := baseDef.build(buildCtx)
-			if err != nil {
-				return nil, fmt.Errorf("failed to build base core.DAG for document %d: %w", docIndex, err)
-			}
-
-			// Skip handlers from base config for sub-DAG runs to prevent inheritance.
-			// Sub-DAGs should define their own handlers explicitly if needed.
-			if ctx.opts.Has(BuildFlagSkipBaseHandlers) {
-				baseDAG.HandlerOn = core.HandlerOn{}
-			}
-
-			dest = baseDAG
-		} else {
-			dest = new(core.DAG)
-		}
-
-		// Build the core.DAG from the current document
-		dag, err := spec.build(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build core.DAG in document %d: %w", docIndex, err)
-		}
-
-		// Merge the current core.DAG into the base core.DAG
-		if err := merge(dest, dag); err != nil {
-			return nil, fmt.Errorf("failed to merge core.DAG in document %d: %w", docIndex, err)
-		}
-
-		// Set the location for the core.DAG
-		dest.Location = filePath
-
-		if docIndex == 0 {
-			// If this is the first document, set the entire core.DAG
-			dest.YamlData = dat
-		} else {
-			// Marshal the document back to YAML to preserve original data
-			yamlData, err := yaml.Marshal(doc)
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal core.DAG in document %d: %w", docIndex, err)
-			}
-			dest.YamlData = yamlData
-		}
-
-		dags = append(dags, dest)
+		dags = append(dags, dag)
 		docIndex++
 	}
 
 	// Validate unique names in multi-DAG files
+	if err := validateUniqueNames(dags); err != nil {
+		return nil, err
+	}
+
+	return dags, nil
+}
+
+// processDAGDocument processes a single DAG document from the YAML file.
+func processDAGDocument(
+	ctx BuildContext,
+	doc map[string]any,
+	baseDef *dag,
+	filePath string,
+	fullData []byte,
+	docIndex int,
+) (*core.DAG, error) {
+	// Decode the document into manifest
+	spec, err := decode(doc)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build a fresh base core.DAG from base manifest if provided
+	var dest *core.DAG
+	if baseDef != nil {
+		dest, err = buildBaseDAG(ctx, baseDef)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		dest = new(core.DAG)
+	}
+
+	// Build the core.DAG from the current document
+	dag, err := spec.build(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Merge the current core.DAG into the base core.DAG
+	if err := merge(dest, dag); err != nil {
+		return nil, err
+	}
+
+	// Set the location for the core.DAG
+	dest.Location = filePath
+
+	if docIndex == 0 {
+		// If this is the first document, set the entire core.DAG
+		dest.YamlData = fullData
+	} else {
+		// Marshal the document back to YAML to preserve original data
+		yamlData, err := yaml.Marshal(doc)
+		if err != nil {
+			return nil, err
+		}
+		dest.YamlData = yamlData
+	}
+
+	return dest, nil
+}
+
+// buildBaseDAG builds a new base DAG from the base definition.
+func buildBaseDAG(ctx BuildContext, baseDef *dag) (*core.DAG, error) {
+	buildCtx := ctx
+	// Don't parse parameters for the base core.DAG
+	buildCtx.opts.Parameters = ""
+	buildCtx.opts.ParametersList = nil
+
+	// Build the base core.DAG
+	baseDAG, err := baseDef.build(buildCtx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build base core.DAG: %w", err)
+	}
+
+	// Skip handlers from base config for sub-DAG runs to prevent inheritance.
+	// Sub-DAGs should define their own handlers explicitly if needed.
+	if ctx.opts.Has(BuildFlagSkipBaseHandlers) {
+		baseDAG.HandlerOn = core.HandlerOn{}
+	}
+
+	return baseDAG, nil
+}
+
+// validateUniqueNames ensures all DAGs in a multi-DAG file have unique names.
+func validateUniqueNames(dags []*core.DAG) error {
 	if len(dags) > 1 {
 		names := make(map[string]bool)
 		for i, dag := range dags {
@@ -428,16 +463,15 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *dag) ([]*core.
 				continue
 			}
 			if dag.Name == "" {
-				return nil, fmt.Errorf("DAG at index %d must have a name in multi-DAG file", i)
+				return fmt.Errorf("DAG at index %d must have a name in multi-DAG file", i)
 			}
 			if names[dag.Name] {
-				return nil, fmt.Errorf("duplicate DAG name %q found", dag.Name)
+				return fmt.Errorf("duplicate DAG name %q found", dag.Name)
 			}
 			names[dag.Name] = true
 		}
 	}
-
-	return dags, nil
+	return nil
 }
 
 // defaultName returns the default name for the given file.
@@ -595,6 +629,10 @@ func TypedUnionDecodeHook() mapstructure.DecodeHookFunc {
 		// Handle types.LogOutputValue
 		if to == reflect.TypeOf(types.LogOutputValue{}) {
 			return decodeViaYAML[types.LogOutputValue](data)
+		}
+		// Handle types.ModelValue
+		if to == reflect.TypeOf(types.ModelValue{}) {
+			return decodeViaYAML[types.ModelValue](data)
 		}
 		return data, nil
 	}

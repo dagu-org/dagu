@@ -66,12 +66,37 @@ type ThinkingConfig struct {
 	IncludeInOutput bool `json:"includeInOutput,omitempty"`
 }
 
+// ModelEntry represents a single model in the model array for fallback support.
+// When multiple models are specified, they are tried in order until one succeeds.
+type ModelEntry struct {
+	// Provider is the LLM provider for this model.
+	Provider string `json:"provider"`
+	// Name is the model name (e.g., gpt-4o, claude-sonnet-4-20250514).
+	Name string `json:"name"`
+	// Temperature overrides the shared temperature for this model.
+	Temperature *float64 `json:"temperature,omitempty"`
+	// MaxTokens overrides the shared maxTokens for this model.
+	MaxTokens *int `json:"maxTokens,omitempty"`
+	// TopP overrides the shared topP for this model.
+	TopP *float64 `json:"topP,omitempty"`
+	// BaseURL is a custom API endpoint for this model.
+	BaseURL string `json:"baseURL,omitempty"`
+	// APIKeyName overrides the API key environment variable for this model.
+	APIKeyName string `json:"apiKeyName,omitempty"`
+}
+
 // LLMConfig contains the configuration for LLM-based executors (chat, agent, etc.).
 type LLMConfig struct {
 	// Provider is the LLM provider (openai, anthropic, gemini, openrouter, local).
+	// Used for single model config (backward compatible).
 	Provider string `json:"provider,omitempty"`
 	// Model is the model to use (e.g., gpt-4o, claude-sonnet-4-20250514).
+	// Used for single model config (backward compatible).
 	Model string `json:"model,omitempty"`
+	// Models is an array of models for fallback support.
+	// First model is primary, rest are tried in order if primary fails.
+	// When set, Provider/Model fields are ignored.
+	Models []ModelEntry `json:"models,omitempty"`
 	// System is the default system prompt for conversations.
 	System string `json:"system,omitempty"`
 	// Temperature controls randomness (0.0-2.0).
@@ -152,6 +177,24 @@ func (c *LLMConfig) GetMaxToolIterations() int {
 // HasTools returns true if tools are configured.
 func (c *LLMConfig) HasTools() bool {
 	return len(c.Tools) > 0
+}
+
+// GetModels returns the ordered list of models to try.
+// If Models array is set, returns it. Otherwise, creates single-entry list from Provider/Model.
+func (c *LLMConfig) GetModels() []ModelEntry {
+	if len(c.Models) > 0 {
+		return c.Models
+	}
+	// Backward compatibility: single model from Provider/Model fields
+	return []ModelEntry{{
+		Provider: c.Provider,
+		Name:     c.Model,
+	}}
+}
+
+// HasFallback returns true if there are multiple models configured.
+func (c *LLMConfig) HasFallback() bool {
+	return len(c.Models) > 1
 }
 
 // ExecutorTypeChat is the executor type for chat steps.

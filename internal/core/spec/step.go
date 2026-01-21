@@ -147,9 +147,12 @@ type thinkingConfig struct {
 
 type llmConfig struct {
 	// Provider is the LLM provider (openai, anthropic, gemini, openrouter, local).
+	// Used for single model config (backward compatible).
 	Provider string `yaml:"provider,omitempty"`
-	// Model is the model to use (e.g., gpt-4o, claude-sonnet-4-20250514).
-	Model string `yaml:"model,omitempty"`
+	// Model can be a string (single model) or array of model entries (fallback support).
+	// String example: "gpt-4o"
+	// Array example: [{provider: openai, name: gpt-4o}, {provider: anthropic, name: claude-sonnet-4-20250514}]
+	Model types.ModelValue `yaml:"model,omitempty"`
 	// System is the default system prompt for conversations.
 	System string `yaml:"system,omitempty"`
 	// Temperature controls randomness (0.0-2.0).
@@ -499,41 +502,18 @@ func buildStepRetryPolicy(_ StepBuildContext, s *step) (core.RetryPolicy, error)
 	}
 
 	var result core.RetryPolicy
+	var err error
 
-	switch v := s.RetryPolicy.Limit.(type) {
-	case int:
-		result.Limit = v
-	case int64:
-		result.Limit = int(v)
-	case uint64:
-		if v > math.MaxInt {
-			return core.RetryPolicy{}, core.NewValidationError("retryPolicy.limit", v, fmt.Errorf("value %d exceeds maximum int", v))
-		}
-		result.Limit = int(v)
-	case string:
-		result.LimitStr = v
-	case nil:
-		return core.RetryPolicy{}, core.NewValidationError("retryPolicy.limit", nil, fmt.Errorf("limit is required when retryPolicy is specified"))
-	default:
-		return core.RetryPolicy{}, core.NewValidationError("retryPolicy.limit", v, fmt.Errorf("invalid type: %T", v))
+	// Parse Limit
+	result.Limit, result.LimitStr, err = parseRetryLimit(s.RetryPolicy.Limit)
+	if err != nil {
+		return core.RetryPolicy{}, err
 	}
 
-	switch v := s.RetryPolicy.IntervalSec.(type) {
-	case int:
-		result.Interval = time.Second * time.Duration(v)
-	case int64:
-		result.Interval = time.Second * time.Duration(v)
-	case uint64:
-		if v > math.MaxInt64 {
-			return core.RetryPolicy{}, core.NewValidationError("retryPolicy.intervalSec", v, fmt.Errorf("value %d exceeds maximum int64", v))
-		}
-		result.Interval = time.Second * time.Duration(v)
-	case string:
-		result.IntervalSecStr = v
-	case nil:
-		return core.RetryPolicy{}, core.NewValidationError("retryPolicy.intervalSec", nil, fmt.Errorf("intervalSec is required when retryPolicy is specified"))
-	default:
-		return core.RetryPolicy{}, core.NewValidationError("retryPolicy.intervalSec", v, fmt.Errorf("invalid type: %T", v))
+	// Parse Interval
+	result.Interval, result.IntervalSecStr, err = parseRetryInterval(s.RetryPolicy.IntervalSec)
+	if err != nil {
+		return core.RetryPolicy{}, err
 	}
 
 	if s.RetryPolicy.ExitCode != nil {
@@ -541,28 +521,11 @@ func buildStepRetryPolicy(_ StepBuildContext, s *step) (core.RetryPolicy, error)
 	}
 
 	// Parse backoff field
-	if s.RetryPolicy.Backoff != nil {
-		switch v := s.RetryPolicy.Backoff.(type) {
-		case bool:
-			if v {
-				result.Backoff = 2.0 // Default multiplier when true
-			}
-		case int:
-			result.Backoff = float64(v)
-		case int64:
-			result.Backoff = float64(v)
-		case float64:
-			result.Backoff = v
-		default:
-			return core.RetryPolicy{}, core.NewValidationError("retryPolicy.Backoff", v, fmt.Errorf("invalid type: %T", v))
-		}
-
-		// Validate backoff value
-		if result.Backoff > 0 && result.Backoff <= 1.0 {
-			return core.RetryPolicy{}, core.NewValidationError("retryPolicy.Backoff", result.Backoff,
-				fmt.Errorf("backoff must be greater than 1.0 for exponential growth"))
-		}
+	backoff, err := parseBackoffValue(s.RetryPolicy.Backoff, "retryPolicy.backoff")
+	if err != nil {
+		return core.RetryPolicy{}, core.NewValidationError("retryPolicy.backoff", s.RetryPolicy.Backoff, err)
 	}
+	result.Backoff = backoff
 
 	// Parse maxIntervalSec
 	if s.RetryPolicy.MaxIntervalSec > 0 {
@@ -570,6 +533,77 @@ func buildStepRetryPolicy(_ StepBuildContext, s *step) (core.RetryPolicy, error)
 	}
 
 	return result, nil
+}
+
+func parseRetryLimit(val any) (int, string, error) {
+	switch v := val.(type) {
+	case int:
+		return v, "", nil
+	case int64:
+		return int(v), "", nil
+	case uint64:
+		if v > math.MaxInt {
+			return 0, "", core.NewValidationError("retryPolicy.limit", v, fmt.Errorf("value %d exceeds maximum int", v))
+		}
+		return int(v), "", nil
+	case string:
+		return 0, v, nil
+	case nil:
+		return 0, "", core.NewValidationError("retryPolicy.limit", nil, fmt.Errorf("limit is required when retryPolicy is specified"))
+	default:
+		return 0, "", core.NewValidationError("retryPolicy.limit", v, fmt.Errorf("invalid type: %T", v))
+	}
+}
+
+func parseRetryInterval(val any) (time.Duration, string, error) {
+	switch v := val.(type) {
+	case int:
+		return time.Second * time.Duration(v), "", nil
+	case int64:
+		return time.Second * time.Duration(v), "", nil
+	case uint64:
+		if v > math.MaxInt64 {
+			return 0, "", core.NewValidationError("retryPolicy.intervalSec", v, fmt.Errorf("value %d exceeds maximum int64", v))
+		}
+		return time.Second * time.Duration(v), "", nil
+	case string:
+		return 0, v, nil
+	case nil:
+		return 0, "", core.NewValidationError("retryPolicy.intervalSec", nil, fmt.Errorf("intervalSec is required when retryPolicy is specified"))
+	default:
+		return 0, "", core.NewValidationError("retryPolicy.intervalSec", v, fmt.Errorf("invalid type: %T", v))
+	}
+}
+
+// parseBackoffValue parses a backoff value from various types (bool, int, float64).
+// Returns the backoff multiplier and an error if validation fails.
+func parseBackoffValue(val any, fieldName string) (float64, error) {
+	if val == nil {
+		return 0, nil
+	}
+
+	var backoff float64
+	switch v := val.(type) {
+	case bool:
+		if v {
+			backoff = 2.0 // Default multiplier when true
+		}
+	case int:
+		backoff = float64(v)
+	case int64:
+		backoff = float64(v)
+	case float64:
+		backoff = v
+	default:
+		return 0, fmt.Errorf("invalid type for %s: %T (must be boolean or number)", fieldName, v)
+	}
+
+	// Validate backoff value
+	if backoff > 0 && backoff <= 1.0 {
+		return 0, fmt.Errorf("%s must be greater than 1.0 for exponential growth, got: %v", fieldName, backoff)
+	}
+
+	return backoff, nil
 }
 
 func buildStepRepeatPolicy(_ StepBuildContext, s *step) (core.RepeatPolicy, error) {
@@ -640,28 +674,11 @@ func buildStepRepeatPolicy(_ StepBuildContext, s *step) (core.RepeatPolicy, erro
 	result.ExitCode = rp.ExitCode
 
 	// Parse backoff field
-	if rp.Backoff != nil {
-		switch v := rp.Backoff.(type) {
-		case bool:
-			if v {
-				result.Backoff = 2.0 // Default multiplier when true
-			}
-		case int:
-			result.Backoff = float64(v)
-		case int64:
-			result.Backoff = float64(v)
-		case float64:
-			result.Backoff = v
-		default:
-			return core.RepeatPolicy{}, fmt.Errorf("invalid value for backoff: '%v'. It must be a boolean or number", v)
-		}
-
-		// Validate backoff value
-		if result.Backoff > 0 && result.Backoff <= 1.0 {
-			return core.RepeatPolicy{}, fmt.Errorf("backoff must be greater than 1.0 for exponential growth, got: %v",
-				result.Backoff)
-		}
+	backoff, err := parseBackoffValue(rp.Backoff, "repeatPolicy.backoff")
+	if err != nil {
+		return core.RepeatPolicy{}, err
 	}
+	result.Backoff = backoff
 
 	// Parse maxIntervalSec
 	if rp.MaxIntervalSec > 0 {
@@ -1035,22 +1052,28 @@ func validateLLM(result *core.Step) error {
 			fmt.Errorf("executor type %q does not support llm field; use type: chat with llm: config", result.ExecutorConfig.Type),
 		)
 	}
-	// Provider is required (can be set at DAG or step level)
-	if result.LLM.Provider == "" {
-		return core.NewValidationError(
-			"llm.provider",
-			result.LLM.Provider,
-			fmt.Errorf("provider is required (set at DAG or step level)"),
-		)
+
+	// When Models array is used, Provider/Model fields are derived from the first entry
+	hasModels := len(result.LLM.Models) > 0
+
+	if !hasModels {
+		// Single model config (legacy): require both provider and model
+		if result.LLM.Provider == "" {
+			return core.NewValidationError(
+				"llm.provider",
+				result.LLM.Provider,
+				fmt.Errorf("provider is required (set at DAG or step level)"),
+			)
+		}
+		if result.LLM.Model == "" {
+			return core.NewValidationError(
+				"llm.model",
+				result.LLM.Model,
+				fmt.Errorf("model is required (set at DAG or step level)"),
+			)
+		}
 	}
-	// Model is required (can be set at DAG or step level)
-	if result.LLM.Model == "" {
-		return core.NewValidationError(
-			"llm.model",
-			result.LLM.Model,
-			fmt.Errorf("model is required (set at DAG or step level)"),
-		)
-	}
+
 	// Messages are required (at step level)
 	if len(result.Messages) == 0 {
 		return core.NewValidationError(
@@ -1350,17 +1373,35 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 	// Step has explicit llm: config - use it (full override of DAG-level)
 	cfg := s.LLM
 
-	// Validate provider if specified
+	// Validate provider if specified (for single model config)
 	if cfg.Provider != "" {
 		if _, err := llm.ParseProviderType(cfg.Provider); err != nil {
 			return core.NewValidationError("llm.provider", cfg.Provider, err)
 		}
 	}
 
-	// Validate model is specified
-	if cfg.Model == "" {
-		return core.NewValidationError("llm.model", cfg.Model,
+	// Model is required when llm config is provided
+	if cfg.Model.IsZero() {
+		return core.NewValidationError("llm.model", nil,
 			fmt.Errorf("model must be specified when llm config is provided"))
+	}
+
+	// Get model string or entries from the parsed value
+	var modelString string
+	var models []core.ModelEntry
+
+	if cfg.Model.IsArray() {
+		var err error
+		models, err = convertModelEntries(cfg.Model.Entries())
+		if err != nil {
+			return err
+		}
+	} else {
+		modelString = cfg.Model.String()
+		if modelString == "" {
+			return core.NewValidationError("llm.model", cfg.Model.Value(),
+				fmt.Errorf("model must be specified when llm config is provided"))
+		}
 	}
 
 	// Validate temperature range
@@ -1394,7 +1435,8 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 
 	result.LLM = &core.LLMConfig{
 		Provider:          cfg.Provider,
-		Model:             cfg.Model,
+		Model:             modelString,
+		Models:            models,
 		System:            cfg.System,
 		Temperature:       cfg.Temperature,
 		MaxTokens:         cfg.MaxTokens,
@@ -1408,6 +1450,26 @@ func buildStepLLM(ctx StepBuildContext, s *step, result *core.Step) error {
 	}
 
 	return nil
+}
+
+// convertModelEntries converts types.ModelEntry slice to core.ModelEntry slice with validation.
+func convertModelEntries(entries []types.ModelEntry) ([]core.ModelEntry, error) {
+	models := make([]core.ModelEntry, len(entries))
+	for i, e := range entries {
+		if _, err := llm.ParseProviderType(e.Provider); err != nil {
+			return nil, core.NewValidationError(fmt.Sprintf("llm.model[%d].provider", i), e.Provider, err)
+		}
+		models[i] = core.ModelEntry{
+			Provider:    e.Provider,
+			Name:        e.Name,
+			Temperature: e.Temperature,
+			MaxTokens:   e.MaxTokens,
+			TopP:        e.TopP,
+			BaseURL:     e.BaseURL,
+			APIKeyName:  e.APIKeyName,
+		}
+	}
+	return models, nil
 }
 
 // buildThinkingConfig converts thinkingConfig to core.ThinkingConfig.

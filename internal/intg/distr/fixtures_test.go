@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -81,6 +82,9 @@ func newTestFixture(t *testing.T, yaml string, opts ...fixtureOption) *testFixtu
 
 	var coordOpts []test.HelperOption
 	coordOpts = append(coordOpts, test.WithStatusPersistence())
+	coordOpts = append(coordOpts, test.WithConfigMutator(func(c *config.Config) {
+		c.Queues.Enabled = true
+	}))
 	if cfg.logPersistence {
 		coordOpts = append(coordOpts, test.WithLogPersistence())
 	}
@@ -207,7 +211,7 @@ func (f *testFixture) enqueue() error {
 	f.t.Helper()
 	subCmdBuilder := runtime.NewSubCmdBuilder(f.coord.Config)
 	enqueueSpec := subCmdBuilder.Enqueue(f.dagWrapper.DAG, runtime.EnqueueOptions{Quiet: true})
-	return runtime.Start(f.coord.Context, enqueueSpec)
+	return runtime.Run(f.coord.Context, enqueueSpec)
 }
 
 func (f *testFixture) start() error {
@@ -227,9 +231,9 @@ func (f *testFixture) retry(dagRunID string) error {
 func (f *testFixture) waitForQueued() {
 	f.t.Helper()
 	require.Eventually(f.t, func() bool {
-		items, _ := f.coord.QueueStore.ListByDAGName(f.coord.Context, f.dagWrapper.ProcGroup(), f.dagWrapper.Name)
-		return len(items) == 1
-	}, 2*time.Second, 50*time.Millisecond, "DAG should be enqueued")
+		items, err := f.coord.QueueStore.ListByDAGName(f.coord.Context, f.dagWrapper.ProcGroup(), f.dagWrapper.Name)
+		return err == nil && len(items) == 1
+	}, 5*time.Second, 100*time.Millisecond, "DAG should be enqueued")
 }
 
 func (f *testFixture) waitForStatus(expected core.Status, timeout time.Duration) exec.DAGRunStatus {
