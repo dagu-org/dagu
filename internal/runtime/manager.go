@@ -319,7 +319,7 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *core.DAG) (exec.DAGR
 	// If the DAG is running, query the current status
 	if st.Status == core.Running {
 		dag, err = attempt.ReadDAG(ctx)
-		if err != nil {
+		if err == nil {
 			currentStatus, err := m.currentStatus(ctx, dag, st.DAGRunID)
 			if err == nil {
 				st = currentStatus
