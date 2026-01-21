@@ -500,6 +500,9 @@ func (p *QueueProcessor) monitorStartup(ctx context.Context, queueName string, r
 // the queue's maxConcurrency based on the DAG's MaxActiveRuns setting.
 // This is used to initialize non-global queues with the correct concurrency
 // before calculating how many items to process.
+//
+// This function includes retry logic to handle race conditions where the DAG
+// file may not be fully written to disk when the queue item is first processed.
 func (p *QueueProcessor) updateQueueMaxConcurrency(ctx context.Context, q *queue, item exec.QueuedItemData) error {
 	data, err := item.Data()
 	if err != nil {
@@ -507,16 +510,48 @@ func (p *QueueProcessor) updateQueueMaxConcurrency(ctx context.Context, q *queue
 	}
 
 	runRef := *data
-	attempt, err := p.dagRunStore.FindAttempt(ctx, runRef)
-	if err != nil {
-		return err
+
+	// Retry logic to handle race condition where DAG file may not be
+	// fully written yet when queue item is first processed.
+	const maxRetries = 3
+	retryDelay := 50 * time.Millisecond
+
+	var lastErr error
+	for i := 0; i < maxRetries; i++ {
+		attempt, err := p.dagRunStore.FindAttempt(ctx, runRef)
+		if err != nil {
+			lastErr = err
+			if i < maxRetries-1 {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(retryDelay):
+					retryDelay *= 2 // exponential backoff
+					continue
+				}
+			}
+			return lastErr
+		}
+
+		dag, err := attempt.ReadDAG(ctx)
+		if err != nil {
+			lastErr = err
+			if i < maxRetries-1 {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(retryDelay):
+					retryDelay *= 2 // exponential backoff
+					continue
+				}
+			}
+			return lastErr
+		}
+
+		// Successfully read DAG, update maxConcurrency
+		q.setMaxConc(dag.MaxActiveRuns)
+		return nil
 	}
 
-	dag, err := attempt.ReadDAG(ctx)
-	if err != nil {
-		return err
-	}
-
-	q.setMaxConc(dag.MaxActiveRuns)
-	return nil
+	return lastErr
 }
