@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { AppBarContext } from '@/contexts/AppBarContext';
+import { useCanWrite } from '@/contexts/AuthContext';
 import { useQuery, useClient } from '@/hooks/api';
 import { cn } from '@/lib/utils';
 import dayjs from '@/lib/dayjs';
@@ -68,6 +69,7 @@ const summaryConfig: Record<SyncSummary, { label: string; className: string; ico
 export default function GitSyncPage() {
   const appBarContext = useContext(AppBarContext);
   const client = useClient();
+  const canWrite = useCanWrite();
 
   // State
   const [isPulling, setIsPulling] = useState(false);
@@ -246,7 +248,8 @@ export default function GitSyncPage() {
             variant="outline"
             size="sm"
             onClick={handlePull}
-            disabled={isPulling}
+            disabled={isPulling || !canWrite}
+            title={!canWrite ? 'Write permission required' : undefined}
           >
             <Download className={cn('h-4 w-4 mr-1', isPulling && 'animate-spin')} />
             Pull
@@ -254,8 +257,8 @@ export default function GitSyncPage() {
           <Button
             size="sm"
             onClick={() => setPublishModal({ open: true })}
-            disabled={!hasModifiedDags || !config?.pushEnabled}
-            title={!config?.pushEnabled ? 'Push is disabled in read-only mode' : undefined}
+            disabled={!hasModifiedDags || !config?.pushEnabled || !canWrite}
+            title={!canWrite ? 'Write permission required' : !config?.pushEnabled ? 'Push is disabled in read-only mode' : undefined}
           >
             <Upload className="h-4 w-4 mr-1" />
             Publish All
@@ -385,7 +388,7 @@ export default function GitSyncPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      {(dag.status === SyncStatus.modified || dag.status === SyncStatus.untracked || dag.status === SyncStatus.conflict) && config?.pushEnabled && (
+                      {(dag.status === SyncStatus.modified || dag.status === SyncStatus.untracked || dag.status === SyncStatus.conflict) && config?.pushEnabled && canWrite && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -396,7 +399,7 @@ export default function GitSyncPage() {
                           <Upload className="h-3.5 w-3.5" />
                         </Button>
                       )}
-                      {(dag.status === SyncStatus.modified || dag.status === SyncStatus.conflict) && (
+                      {(dag.status === SyncStatus.modified || dag.status === SyncStatus.conflict) && canWrite && (
                         <Button
                           variant="ghost"
                           size="sm"

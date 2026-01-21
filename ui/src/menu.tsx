@@ -6,7 +6,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { UserMenu } from '@/components/UserMenu';
-import { useIsAdmin } from '@/contexts/AuthContext';
+import { useIsAdmin, useCanWrite } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils';
 import { getResponsiveTitleClass } from '@/lib/text-utils';
@@ -119,6 +119,7 @@ export const mainListItems = React.forwardRef<
 >(({ isOpen = false, onNavItemClick, onToggle, customColor }, ref) => {
   const config = useConfig();
   const isAdmin = useIsAdmin();
+  const canWrite = useCanWrite();
   const { preferences, updatePreference } = useUserPreferences();
 
   const theme = preferences.theme || 'dark';
@@ -356,6 +357,17 @@ export const mainListItems = React.forwardRef<
                 onClick={onNavItemClick}
                 customColor={customColor}
               />
+            </div>
+          )}
+
+          {/* Git Sync - visible to users with write permission */}
+          {canWrite && (
+            <div className="space-y-1">
+              {isOpen && (
+                <div className="px-3 mb-1 text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">
+                  Sync
+                </div>
+              )}
               <NavItem
                 to="/git-sync"
                 text="Git Sync"
