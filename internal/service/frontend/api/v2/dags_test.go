@@ -7,10 +7,79 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/api/v2"
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
+
+func TestDAGWritesDisabledInReadOnlyMode(t *testing.T) {
+	// Setup server with gitSync.enabled=true, pushEnabled=false (read-only mode)
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.GitSync.Enabled = true
+		cfg.GitSync.PushEnabled = false
+	}))
+
+	t.Run("CreateNewDAG", func(t *testing.T) {
+		spec := "steps:\n  - command: echo test"
+		server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+			Name: "test_dag",
+			Spec: &spec,
+		}).ExpectStatus(http.StatusForbidden).Send(t)
+	})
+
+	t.Run("DeleteDAG", func(t *testing.T) {
+		server.Client().Delete("/api/v2/dags/any_dag").
+			ExpectStatus(http.StatusForbidden).Send(t)
+	})
+
+	t.Run("UpdateDAGSpec", func(t *testing.T) {
+		server.Client().Put("/api/v2/dags/any_dag/spec", api.UpdateDAGSpecJSONRequestBody{
+			Spec: "steps:\n  - command: echo updated",
+		}).ExpectStatus(http.StatusForbidden).Send(t)
+	})
+
+	t.Run("RenameDAG", func(t *testing.T) {
+		server.Client().Post("/api/v2/dags/any_dag/rename", api.RenameDAGJSONRequestBody{
+			NewFileName: "new_name",
+		}).ExpectStatus(http.StatusForbidden).Send(t)
+	})
+}
+
+func TestDAGWritesAllowedWhenPushEnabled(t *testing.T) {
+	// Setup server with gitSync.enabled=true, pushEnabled=true
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.GitSync.Enabled = true
+		cfg.GitSync.PushEnabled = true
+	}))
+
+	// Test CreateNewDAG is allowed
+	spec := "steps:\n  - command: echo test"
+	server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+		Name: "test_dag_push_enabled",
+		Spec: &spec,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	// Cleanup
+	server.Client().Delete("/api/v2/dags/test_dag_push_enabled").ExpectStatus(http.StatusNoContent).Send(t)
+}
+
+func TestDAGWritesAllowedWhenGitSyncDisabled(t *testing.T) {
+	// Setup server with gitSync.enabled=false (default)
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.GitSync.Enabled = false
+	}))
+
+	// Test CreateNewDAG is allowed
+	spec := "steps:\n  - command: echo test"
+	server.Client().Post("/api/v2/dags", api.CreateNewDAGJSONRequestBody{
+		Name: "test_dag_gitsync_disabled",
+		Spec: &spec,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	// Cleanup
+	server.Client().Delete("/api/v2/dags/test_dag_gitsync_disabled").ExpectStatus(http.StatusNoContent).Send(t)
+}
 
 func TestDAG(t *testing.T) {
 	server := test.SetupServer(t)
