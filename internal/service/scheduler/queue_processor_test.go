@@ -122,17 +122,21 @@ func (f *queueFixture) enqueueToQueue(queueName, runID string, priority exec.Que
 	require.NoError(f.t, f.queueStore.Enqueue(f.ctx, queueName, priority, exec.NewDAGRunRef(f.dag.Name, runID)))
 }
 
-func TestQueueProcessor_DynamicQueueConcurrency(t *testing.T) {
-	f := newQueueFixture(t).withDAG("concurrent-dag", 3).enqueueRuns(3).withProcessor(config.Queues{}).simulateQueue(1, false)
-	v, _ := f.processor.queues.Load("concurrent-dag")
+func TestQueueProcessor_LocalQueueAlwaysFIFO(t *testing.T) {
+	// Local queue should always use maxConcurrency=1, ignoring DAG's maxActiveRuns=5
+	f := newQueueFixture(t).withDAG("local-dag", 5).enqueueRuns(3).
+		withProcessor(config.Queues{}).simulateQueue(1, false)
+
+	// Verify initial maxConcurrency is 1
+	v, _ := f.processor.queues.Load("local-dag")
 	require.Equal(t, 1, v.(*queue).maxConc())
 
-	f.processor.ProcessQueueItems(f.ctx, "concurrent-dag")
+	f.processor.ProcessQueueItems(f.ctx, "local-dag")
 	time.Sleep(200 * time.Millisecond)
 
-	v, _ = f.processor.queues.Load("concurrent-dag")
-	assert.Equal(t, 3, v.(*queue).maxConc())
-	assert.True(t, strings.Contains(f.logs(), "count=3"))
+	// Verify maxConcurrency is STILL 1 (not updated to DAG's 5)
+	v, _ = f.processor.queues.Load("local-dag")
+	assert.Equal(t, 1, v.(*queue).maxConc(), "Local queue should always have maxConcurrency=1")
 }
 
 func TestQueueProcessor_GlobalQueue(t *testing.T) {
