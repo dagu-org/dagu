@@ -255,7 +255,11 @@ func (s *serviceImpl) syncFilesToDAGsDir(ctx context.Context, pullResult *PullRe
 			// Local was modified, check if remote also changed
 			if dagState.LastSyncedHash != repoHash {
 				// Both local and remote changed - conflict
-				commitInfo, _ := s.gitClient.GetCommitInfo(pullResult.CurrentCommit)
+				var remoteAuthor, remoteMessage string
+				if commitInfo, err := s.gitClient.GetCommitInfo(pullResult.CurrentCommit); err == nil && commitInfo != nil {
+					remoteAuthor = commitInfo.Author
+					remoteMessage = commitInfo.Message
+				}
 				now := time.Now()
 				state.DAGs[dagID] = &DAGState{
 					Status:             StatusConflict,
@@ -264,8 +268,8 @@ func (s *serviceImpl) syncFilesToDAGsDir(ctx context.Context, pullResult *PullRe
 					LastSyncedAt:       dagState.LastSyncedAt,
 					LocalHash:          localHash,
 					RemoteCommit:       pullResult.CurrentCommit,
-					RemoteAuthor:       commitInfo.Author,
-					RemoteMessage:      commitInfo.Message,
+					RemoteAuthor:       remoteAuthor,
+					RemoteMessage:      remoteMessage,
 					ConflictDetectedAt: &now,
 				}
 				conflicts = append(conflicts, dagID)
@@ -294,7 +298,9 @@ func (s *serviceImpl) syncFilesToDAGsDir(ctx context.Context, pullResult *PullRe
 	// Scan for local DAGs not in the repo
 	_ = s.scanLocalDAGs(state)
 
-	s.stateManager.Save(state)
+	if err := s.stateManager.Save(state); err != nil {
+		return synced, conflicts, fmt.Errorf("failed to save state: %w", err)
+	}
 	return synced, conflicts, nil
 }
 
@@ -481,7 +487,10 @@ func (s *serviceImpl) PublishAll(ctx context.Context, message string) (*SyncResu
 		return nil, err
 	}
 
-	// Copy and stage all files
+	// Copy files and track which succeeded
+	successfulDAGs := make([]string, 0, len(modifiedDAGs))
+	stagedFiles := make([]string, 0, len(modifiedDAGs))
+
 	for _, dagID := range modifiedDAGs {
 		dagFilePath := s.dagIDToFilePath(dagID)
 		repoFilePath := s.dagIDToRepoPath(dagID)
@@ -501,11 +510,30 @@ func (s *serviceImpl) PublishAll(ctx context.Context, message string) (*SyncResu
 			result.Errors = append(result.Errors, SyncError{DAGID: dagID, Message: err.Error()})
 			continue
 		}
+
+		successfulDAGs = append(successfulDAGs, dagID)
+		stagedFiles = append(stagedFiles, repoFilePath)
 	}
 
-	// Commit all
+	// Check if any files were successfully staged
+	if len(successfulDAGs) == 0 {
+		return nil, fmt.Errorf("all files failed to copy: %d error(s)", len(result.Errors))
+	}
+
+	// Stage only the successful files
+	wt, err := s.gitClient.repo.Worktree()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get worktree: %w", err)
+	}
+	for _, file := range stagedFiles {
+		if _, err := wt.Add(file); err != nil {
+			return nil, fmt.Errorf("failed to stage file %s: %w", file, err)
+		}
+	}
+
+	// Commit
 	if message == "" {
-		message = fmt.Sprintf("Update %d DAG(s)", len(modifiedDAGs))
+		message = fmt.Sprintf("Update %d DAG(s)", len(successfulDAGs))
 	}
 	commitHash, err := s.gitClient.AddAndCommit(".", message)
 	if err != nil {
@@ -517,8 +545,8 @@ func (s *serviceImpl) PublishAll(ctx context.Context, message string) (*SyncResu
 		return nil, err
 	}
 
-	// Update state for all published DAGs
-	for _, dagID := range modifiedDAGs {
+	// Update state only for successfully published DAGs
+	for _, dagID := range successfulDAGs {
 		dagFilePath := s.dagIDToFilePath(dagID)
 		content, _ := os.ReadFile(dagFilePath)
 		contentHash := ComputeContentHash(content)
@@ -574,7 +602,7 @@ func (s *serviceImpl) Discard(ctx context.Context, dagID string) error {
 	// Update state
 	contentHash := ComputeContentHash(repoContent)
 	state.DAGs[dagID] = s.newSyncedDAGState(dagState.BaseCommit, contentHash)
-	s.stateManager.Save(state)
+	_ = s.stateManager.Save(state) // Best effort - discard was successful, state will sync on next operation
 
 	return nil
 }
@@ -608,9 +636,9 @@ func (s *serviceImpl) GetStatus(ctx context.Context) (*OverallStatus, error) {
 	// Refresh hashes for existing DAGs to detect local modifications
 	hashesChanged := s.refreshLocalHashes(state)
 
-	// Save state if anything changed
+	// Save state if anything changed (best effort - read-only operation)
 	if newDAGs || hashesChanged {
-		s.stateManager.Save(state)
+		_ = s.stateManager.Save(state)
 	}
 
 	status.LastSyncAt = state.LastSyncAt
@@ -967,7 +995,14 @@ func (s *serviceImpl) newSyncedDAGState(commitHash, contentHash string) *DAGStat
 
 // updateSuccessState updates the global sync state after a successful pull.
 func (s *serviceImpl) updateSuccessState(commitHash string) {
-	state, _ := s.stateManager.GetState()
+	state, err := s.stateManager.GetState()
+	if err != nil {
+		// Initialize new state if loading fails
+		state = &State{
+			Version: 1,
+			DAGs:    make(map[string]*DAGState),
+		}
+	}
 	s.updateSuccessStateWithCommit(state, commitHash)
 }
 
@@ -980,7 +1015,7 @@ func (s *serviceImpl) updateSuccessStateWithCommit(state *State, commitHash stri
 	state.LastError = nil
 	state.Repository = s.cfg.Repository
 	state.Branch = s.cfg.Branch
-	s.stateManager.Save(state)
+	_ = s.stateManager.Save(state) // Best effort - state will be recovered on next load
 }
 
 // buildPullMessage constructs the result message for a pull operation.

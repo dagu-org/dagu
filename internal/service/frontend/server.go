@@ -57,7 +57,8 @@ type Server struct {
 	builtinOIDCCfg *auth.BuiltinOIDCConfig // OIDC config for builtin auth mode
 	authService    *authservice.Service
 	auditService   *audit.Service
-	listener       net.Listener // Optional pre-bound listener (for tests)
+	syncService    gitsync.Service // Git sync service for graceful shutdown
+	listener       net.Listener    // Optional pre-bound listener (for tests)
 }
 
 // ServerOption is a functional option for configuring the Server
@@ -182,6 +183,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		builtinOIDCCfg: builtinOIDCCfg,
 		authService:    authSvc,
 		auditService:   auditSvc,
+		syncService:    syncSvc,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,
 			NavbarTitle:           cfg.UI.NavbarTitle,
@@ -598,6 +600,13 @@ func (srv *Server) startServer(ctx context.Context) {
 
 // Shutdown gracefully shuts down the server
 func (srv *Server) Shutdown(ctx context.Context) error {
+	// Stop Git sync service if running
+	if srv.syncService != nil {
+		if err := srv.syncService.Stop(); err != nil {
+			logger.Warn(ctx, "Failed to stop git sync service", tag.Error(err))
+		}
+	}
+
 	if srv.httpServer != nil {
 		logger.Info(ctx, "Server is shutting down", tag.Addr(srv.httpServer.Addr))
 

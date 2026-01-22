@@ -5,19 +5,19 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestService_GetStatus(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "gitsync-svc-test-*")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 
 	dagsDir := filepath.Join(tempDir, "dags")
 	dataDir := filepath.Join(tempDir, "data")
-	os.MkdirAll(dagsDir, 0755)
-	os.MkdirAll(dataDir, 0755)
+	require.NoError(t, os.MkdirAll(dagsDir, 0755))
+	require.NoError(t, os.MkdirAll(dataDir, 0755))
 
 	cfg := &Config{
 		Enabled:    true,
@@ -27,19 +27,11 @@ func TestService_GetStatus(t *testing.T) {
 
 	svc := NewService(cfg, dagsDir, dataDir)
 	status, err := svc.GetStatus(context.Background())
-	if err != nil {
-		t.Fatalf("GetStatus failed: %v", err)
-	}
+	require.NoError(t, err)
 
-	if !status.Enabled {
-		t.Error("status.Enabled = false, want true")
-	}
-	if status.Repository != cfg.Repository {
-		t.Errorf("status.Repository = %v, want %v", status.Repository, cfg.Repository)
-	}
-	if status.Branch != cfg.Branch {
-		t.Errorf("status.Branch = %v, want %v", status.Branch, cfg.Branch)
-	}
+	require.True(t, status.Enabled)
+	require.Equal(t, cfg.Repository, status.Repository)
+	require.Equal(t, cfg.Branch, status.Branch)
 }
 
 func TestService_PathHelpers(t *testing.T) {
@@ -52,19 +44,13 @@ func TestService_PathHelpers(t *testing.T) {
 
 	// Test filePathToDAGID
 	dagID := s.filePathToDAGID("subdir/my_dag.yaml")
-	if dagID != "my_dag" {
-		t.Errorf("filePathToDAGID = %v, want my_dag", dagID)
-	}
+	require.Equal(t, "my_dag", dagID)
 
 	// Test dagIDToFilePath
 	dagPath := s.dagIDToFilePath("my_dag")
-	if dagPath != "/dags/my_dag.yaml" {
-		t.Errorf("dagIDToFilePath = %v, want /dags/my_dag.yaml", dagPath)
-	}
+	require.Equal(t, "/dags/my_dag.yaml", dagPath)
 
 	// Test dagIDToRepoPath
 	repoPath := s.dagIDToRepoPath("my_dag")
-	if repoPath != "subdir/my_dag.yaml" {
-		t.Errorf("dagIDToRepoPath = %v, want subdir/my_dag.yaml", repoPath)
-	}
+	require.Equal(t, "subdir/my_dag.yaml", repoPath)
 }

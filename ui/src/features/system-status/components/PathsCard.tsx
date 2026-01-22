@@ -38,11 +38,13 @@ function PathRow({ label, path }: PathRowProps) {
   };
 
   return (
-    <div
+    <button
+      type="button"
       onClick={handleCopy}
+      aria-label={`Copy ${label} path`}
       className={cn(
-        'flex items-center justify-between gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all',
-        'hover:bg-accent/50 group'
+        'w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all text-left',
+        'hover:bg-accent/50 group focus:outline-none focus:ring-2 focus:ring-ring'
       )}
     >
       <span className="text-xs text-muted-foreground shrink-0 w-20">
@@ -56,12 +58,18 @@ function PathRow({ label, path }: PathRowProps) {
       <div
         className={cn(
           'shrink-0 transition-all',
-          copied ? 'text-success' : 'text-muted-foreground/50 group-hover:text-muted-foreground'
+          copied
+            ? 'text-success'
+            : 'text-muted-foreground/50 group-hover:text-muted-foreground'
         )}
       >
-        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+        {copied ? (
+          <Check className="h-3.5 w-3.5" />
+        ) : (
+          <Copy className="h-3.5 w-3.5" />
+        )}
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -98,7 +106,7 @@ function PathsCard() {
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-xl p-0 overflow-hidden">
-          <DialogHeader className="px-6 pt-6 pb-4 border-b border-border">
+          <DialogHeader className="px-4 pt-4 pb-3 border-b border-border">
             <DialogTitle className="flex items-center gap-2 text-base">
               <FolderOpen className="h-4 w-4 text-primary" />
               System Paths

@@ -1,15 +1,5 @@
 import { components, SyncStatus, SyncSummary } from '@/api/v2/schema';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -18,32 +8,45 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useErrorModal } from '@/components/ui/error-modal';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useSimpleToast } from '@/components/ui/simple-toast';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useCanWrite } from '@/contexts/AuthContext';
-import { useSimpleToast } from '@/components/ui/simple-toast';
-import { useErrorModal } from '@/components/ui/error-modal';
-import { useQuery, useClient } from '@/hooks/api';
-import { cn } from '@/lib/utils';
+import { useClient, useQuery } from '@/hooks/api';
 import dayjs from '@/lib/dayjs';
+import { cn } from '@/lib/utils';
+import ConfirmModal from '@/ui/ConfirmModal';
 import {
   Download,
   FileCode,
   GitBranch,
   RefreshCw,
   Settings,
-  Upload,
   Trash2,
+  Upload,
 } from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
 import { DiffModal } from './DiffModal';
-import ConfirmModal from '@/ui/ConfirmModal';
 
 type SyncStatusResponse = components['schemas']['SyncStatusResponse'];
 type SyncConfigResponse = components['schemas']['SyncConfigResponse'];
 type SyncDAGDiffResponse = components['schemas']['SyncDAGDiffResponse'];
 
 // Subtle, readable status colors
-const summaryConfig: Record<SyncSummary, { label: string; badgeClass: string }> = {
+const summaryConfig: Record<
+  SyncSummary,
+  { label: string; badgeClass: string }
+> = {
   [SyncSummary.synced]: {
     label: 'Synced',
     badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
@@ -91,12 +94,22 @@ export default function GitSyncPage() {
   const [isPulling, setIsPulling] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
-  const [publishModal, setPublishModal] = useState<{ open: boolean; dagId?: string }>({ open: false });
+  const [publishModal, setPublishModal] = useState<{
+    open: boolean;
+    dagId?: string;
+  }>({ open: false });
   const [commitMessage, setCommitMessage] = useState('');
-  const [filter, setFilter] = useState<'all' | 'modified' | 'untracked' | 'conflict'>('all');
-  const [diffModal, setDiffModal] = useState<{ open: boolean; dagId?: string }>({ open: false });
+  const [filter, setFilter] = useState<
+    'all' | 'modified' | 'untracked' | 'conflict'
+  >('all');
+  const [diffModal, setDiffModal] = useState<{ open: boolean; dagId?: string }>(
+    { open: false }
+  );
   const [diffData, setDiffData] = useState<SyncDAGDiffResponse | null>(null);
-  const [revertModal, setRevertModal] = useState<{ open: boolean; dagId?: string }>({ open: false });
+  const [revertModal, setRevertModal] = useState<{
+    open: boolean;
+    dagId?: string;
+  }>({ open: false });
 
   useEffect(() => {
     appBarContext.setTitle('Git Sync');
@@ -105,10 +118,7 @@ export default function GitSyncPage() {
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
   // Fetch sync status
-  const {
-    data: statusData,
-    mutate: mutateStatus,
-  } = useQuery(
+  const { data: statusData, mutate: mutateStatus } = useQuery(
     '/sync/status',
     {
       params: {
@@ -119,9 +129,7 @@ export default function GitSyncPage() {
   );
 
   // Fetch sync config
-  const {
-    data: configData,
-  } = useQuery('/sync/config', {
+  const { data: configData } = useQuery('/sync/config', {
     params: {
       query: { remoteNode },
     },
@@ -157,7 +165,10 @@ export default function GitSyncPage() {
         // Publish single DAG
         const response = await client.POST('/dags/{name}/publish', {
           params: { path: { name: dagId }, query: { remoteNode } },
-          body: { message: commitMessage || `Update ${dagId}`, force: force || false },
+          body: {
+            message: commitMessage || `Update ${dagId}`,
+            force: force || false,
+          },
         });
         if (response.error) {
           showError(response.error.message || 'Publish failed');
@@ -247,10 +258,9 @@ export default function GitSyncPage() {
       })
     : [];
 
-  const hasModifiedDags = status?.counts && (
-    (status.counts.modified || 0) > 0 ||
-    (status.counts.untracked || 0) > 0
-  );
+  const hasModifiedDags =
+    status?.counts &&
+    ((status.counts.modified || 0) > 0 || (status.counts.untracked || 0) > 0);
 
   const getFilterCount = (f: string): number => {
     if (!status?.counts) return 0;
@@ -265,8 +275,8 @@ export default function GitSyncPage() {
         <GitBranch className="h-16 w-16 text-muted-foreground/30 mb-4" />
         <h2 className="text-xl font-semibold mb-2">Git Sync Not Configured</h2>
         <p className="text-muted-foreground max-w-md">
-          Git sync allows you to synchronize DAG definitions with a remote Git repository.
-          Configure it in your server settings.
+          Git sync allows you to synchronize DAG definitions with a remote Git
+          repository. Configure it in your server settings.
         </p>
       </div>
     );
@@ -282,7 +292,12 @@ export default function GitSyncPage() {
             {status?.repository}:{status?.branch}
           </span>
           {status?.summary && (
-            <span className={cn('text-xs px-2 py-0.5 rounded', summaryConfig[status.summary]?.badgeClass)}>
+            <span
+              className={cn(
+                'text-xs px-2 py-0.5 rounded',
+                summaryConfig[status.summary]?.badgeClass
+              )}
+            >
               {summaryConfig[status.summary]?.label}
             </span>
           )}
@@ -304,7 +319,13 @@ export default function GitSyncPage() {
             className="h-8 w-8 p-0"
             onClick={() => setPublishModal({ open: true })}
             disabled={!hasModifiedDags || !config?.pushEnabled || !canWrite}
-            title={!canWrite ? 'Write permission required' : !config?.pushEnabled ? 'Push disabled in read-only mode' : 'Publish all changes'}
+            title={
+              !canWrite
+                ? 'Write permission required'
+                : !config?.pushEnabled
+                  ? 'Push disabled in read-only mode'
+                  : 'Publish all changes'
+            }
           >
             <Upload className="h-4 w-4" />
           </Button>
@@ -364,7 +385,10 @@ export default function GitSyncPage() {
           <TableBody>
             {filteredDags.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground py-8 text-xs">
+                <TableCell
+                  colSpan={4}
+                  className="text-center text-muted-foreground py-8 text-xs"
+                >
                   {filter === 'all' ? 'No DAGs found' : `No ${filter} DAGs`}
                 </TableCell>
               </TableRow>
@@ -375,7 +399,10 @@ export default function GitSyncPage() {
                   className="h-9 cursor-pointer hover:bg-muted/50"
                   onClick={() => handleViewDiff(dagId)}
                 >
-                  <TableCell className="py-1" onClick={(e) => e.stopPropagation()}>
+                  <TableCell
+                    className="py-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <a
                       href={`/dags/${encodeURIComponent(dagId)}`}
                       className="font-mono text-xs hover:underline"
@@ -389,7 +416,10 @@ export default function GitSyncPage() {
                   <TableCell className="py-1 text-xs text-muted-foreground">
                     {dag.lastSyncedAt ? dayjs(dag.lastSyncedAt).fromNow() : '-'}
                   </TableCell>
-                  <TableCell className="py-1" onClick={(e) => e.stopPropagation()}>
+                  <TableCell
+                    className="py-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <div className="flex items-center gap-0.5">
                       <Button
                         variant="ghost"
@@ -400,28 +430,38 @@ export default function GitSyncPage() {
                       >
                         <FileCode className="h-3 w-3" />
                       </Button>
-                      {(dag.status === SyncStatus.modified || dag.status === SyncStatus.untracked || dag.status === SyncStatus.conflict) && config?.pushEnabled && canWrite && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0"
-                          onClick={() => setPublishModal({ open: true, dagId })}
-                          title="Publish"
-                        >
-                          <Upload className="h-3 w-3" />
-                        </Button>
-                      )}
-                      {(dag.status === SyncStatus.modified || dag.status === SyncStatus.conflict) && canWrite && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 text-muted-foreground hover:text-rose-600"
-                          onClick={() => setRevertModal({ open: true, dagId })}
-                          title="Discard"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      )}
+                      {(dag.status === SyncStatus.modified ||
+                        dag.status === SyncStatus.untracked ||
+                        dag.status === SyncStatus.conflict) &&
+                        config?.pushEnabled &&
+                        canWrite && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={() =>
+                              setPublishModal({ open: true, dagId })
+                            }
+                            title="Publish"
+                          >
+                            <Upload className="h-3 w-3" />
+                          </Button>
+                        )}
+                      {(dag.status === SyncStatus.modified ||
+                        dag.status === SyncStatus.conflict) &&
+                        canWrite && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-rose-600"
+                            onClick={() =>
+                              setRevertModal({ open: true, dagId })
+                            }
+                            title="Discard"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -447,18 +487,24 @@ export default function GitSyncPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Push</span>
-              <span className="text-xs">{config?.pushEnabled ? 'Enabled' : 'Disabled'}</span>
+              <span className="text-xs">
+                {config?.pushEnabled ? 'Enabled' : 'Disabled'}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Auto-sync</span>
               <span className="text-xs">
-                {config?.autoSync?.enabled ? `Every ${config.autoSync.interval || 300}s` : 'Off'}
+                {config?.autoSync?.enabled
+                  ? `Every ${config.autoSync.interval || 300}s`
+                  : 'Off'}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Last Sync</span>
               <span className="text-xs">
-                {status?.lastSyncAt ? dayjs(status.lastSyncAt).format('MMM D, HH:mm') : 'Never'}
+                {status?.lastSyncAt
+                  ? dayjs(status.lastSyncAt).format('MMM D, HH:mm')
+                  : 'Never'}
               </span>
             </div>
             <Button
@@ -474,11 +520,16 @@ export default function GitSyncPage() {
       </Dialog>
 
       {/* Publish Modal */}
-      <Dialog open={publishModal.open} onOpenChange={(open) => setPublishModal({ open })}>
+      <Dialog
+        open={publishModal.open}
+        onOpenChange={(open) => setPublishModal({ open })}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-base">
-              {publishModal.dagId ? `Publish ${publishModal.dagId}` : 'Publish All'}
+              {publishModal.dagId
+                ? `Publish ${publishModal.dagId}`
+                : 'Publish All'}
             </DialogTitle>
             <DialogDescription className="text-xs">
               Enter a commit message for this change.
@@ -486,15 +537,21 @@ export default function GitSyncPage() {
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="commit-message" className="text-xs">Commit Message</Label>
+              <Label htmlFor="commit-message" className="text-xs">
+                Commit Message
+              </Label>
               <Input
                 id="commit-message"
                 className="h-8 text-sm"
-                placeholder={publishModal.dagId ? `Update ${publishModal.dagId}` : 'Batch update'}
+                placeholder={
+                  publishModal.dagId
+                    ? `Update ${publishModal.dagId}`
+                    : 'Batch update'
+                }
                 value={commitMessage}
                 onChange={(e) => setCommitMessage(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
+                  if (e.key === 'Enter' && !isPublishing) {
                     handlePublish(publishModal.dagId);
                   }
                 }}
@@ -502,10 +559,18 @@ export default function GitSyncPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setPublishModal({ open: false })}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPublishModal({ open: false })}
+            >
               Cancel
             </Button>
-            <Button size="sm" onClick={() => handlePublish(publishModal.dagId)} disabled={isPublishing}>
+            <Button
+              size="sm"
+              onClick={() => handlePublish(publishModal.dagId)}
+              disabled={isPublishing}
+            >
               {isPublishing ? (
                 <>
                   <RefreshCw className="h-3.5 w-3.5 mr-1 animate-spin" />
@@ -569,8 +634,11 @@ export default function GitSyncPage() {
         }}
       >
         <p className="text-sm text-muted-foreground">
-          Discard local changes to <span className="font-mono font-medium text-foreground">{revertModal.dagId}</span>?
-          This cannot be undone.
+          Discard local changes to{' '}
+          <span className="font-mono font-medium text-foreground">
+            {revertModal.dagId}
+          </span>
+          ? This cannot be undone.
         </p>
       </ConfirmModal>
     </div>

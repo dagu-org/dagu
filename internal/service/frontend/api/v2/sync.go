@@ -105,17 +105,19 @@ func (a *API) SyncPull(ctx context.Context, _ api.SyncPullRequestObject) (api.Sy
 
 	// Audit log
 	if a.auditService != nil {
-		currentUser, _ := auth.UserFromContext(ctx)
-		clientIP, _ := auth.ClientIPFromContext(ctx)
-		details, _ := json.Marshal(map[string]any{
-			"synced":    result.Synced,
-			"modified":  result.Modified,
-			"conflicts": result.Conflicts,
-		})
-		entry := audit.NewEntry(audit.CategoryGitSync, "sync_pull", currentUser.ID, currentUser.Username).
-			WithDetails(string(details)).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
+		currentUser, ok := auth.UserFromContext(ctx)
+		if ok && currentUser != nil {
+			clientIP, _ := auth.ClientIPFromContext(ctx)
+			details, _ := json.Marshal(map[string]any{
+				"synced":    result.Synced,
+				"modified":  result.Modified,
+				"conflicts": result.Conflicts,
+			})
+			entry := audit.NewEntry(audit.CategoryGitSync, "sync_pull", currentUser.ID, currentUser.Username).
+				WithDetails(string(details)).
+				WithIPAddress(clientIP)
+			_ = a.auditService.Log(ctx, entry)
+		}
 	}
 
 	return api.SyncPull200JSONResponse(toAPISyncResult(result)), nil
@@ -145,17 +147,19 @@ func (a *API) SyncPublishAll(ctx context.Context, req api.SyncPublishAllRequestO
 
 	// Audit log
 	if a.auditService != nil {
-		currentUser, _ := auth.UserFromContext(ctx)
-		clientIP, _ := auth.ClientIPFromContext(ctx)
-		details, _ := json.Marshal(map[string]any{
-			"message":  message,
-			"synced":   result.Synced,
-			"modified": result.Modified,
-		})
-		entry := audit.NewEntry(audit.CategoryGitSync, "sync_publish_all", currentUser.ID, currentUser.Username).
-			WithDetails(string(details)).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
+		currentUser, ok := auth.UserFromContext(ctx)
+		if ok && currentUser != nil {
+			clientIP, _ := auth.ClientIPFromContext(ctx)
+			details, _ := json.Marshal(map[string]any{
+				"message":  message,
+				"synced":   result.Synced,
+				"modified": result.Modified,
+			})
+			entry := audit.NewEntry(audit.CategoryGitSync, "sync_publish_all", currentUser.ID, currentUser.Username).
+				WithDetails(string(details)).
+				WithIPAddress(clientIP)
+			_ = a.auditService.Log(ctx, entry)
+		}
 	}
 
 	return api.SyncPublishAll200JSONResponse(toAPISyncResult(result)), nil
@@ -243,24 +247,35 @@ func (a *API) UpdateSyncConfig(ctx context.Context, req api.UpdateSyncConfigRequ
 
 	applyConfigUpdates(cfg, req.Body)
 
+	// Validate the resulting configuration
+	if cfg.Enabled && !cfg.IsValid() {
+		return nil, &Error{
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "Git sync configuration is incomplete - repository and branch are required",
+			HTTPStatus: http.StatusBadRequest,
+		}
+	}
+
 	if err := a.syncService.UpdateConfig(ctx, cfg); err != nil {
 		return nil, internalError(err)
 	}
 
 	// Audit log (exclude sensitive auth fields)
 	if a.auditService != nil {
-		currentUser, _ := auth.UserFromContext(ctx)
-		clientIP, _ := auth.ClientIPFromContext(ctx)
-		details, _ := json.Marshal(map[string]any{
-			"enabled":      cfg.Enabled,
-			"repository":   cfg.Repository,
-			"branch":       cfg.Branch,
-			"push_enabled": cfg.PushEnabled,
-		})
-		entry := audit.NewEntry(audit.CategoryGitSync, "sync_config_update", currentUser.ID, currentUser.Username).
-			WithDetails(string(details)).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
+		currentUser, ok := auth.UserFromContext(ctx)
+		if ok && currentUser != nil {
+			clientIP, _ := auth.ClientIPFromContext(ctx)
+			details, _ := json.Marshal(map[string]any{
+				"enabled":      cfg.Enabled,
+				"repository":   cfg.Repository,
+				"branch":       cfg.Branch,
+				"push_enabled": cfg.PushEnabled,
+			})
+			entry := audit.NewEntry(audit.CategoryGitSync, "sync_config_update", currentUser.ID, currentUser.Username).
+				WithDetails(string(details)).
+				WithIPAddress(clientIP)
+			_ = a.auditService.Log(ctx, entry)
+		}
 	}
 
 	return api.UpdateSyncConfig200JSONResponse(toAPISyncConfig(cfg)), nil
@@ -284,17 +299,19 @@ func (a *API) PublishDag(ctx context.Context, req api.PublishDagRequestObject) (
 
 	// Audit log
 	if a.auditService != nil {
-		currentUser, _ := auth.UserFromContext(ctx)
-		clientIP, _ := auth.ClientIPFromContext(ctx)
-		details, _ := json.Marshal(map[string]any{
-			"dag_id":  req.Name,
-			"message": message,
-			"force":   force,
-		})
-		entry := audit.NewEntry(audit.CategoryGitSync, "sync_publish", currentUser.ID, currentUser.Username).
-			WithDetails(string(details)).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
+		currentUser, ok := auth.UserFromContext(ctx)
+		if ok && currentUser != nil {
+			clientIP, _ := auth.ClientIPFromContext(ctx)
+			details, _ := json.Marshal(map[string]any{
+				"dag_id":  req.Name,
+				"message": message,
+				"force":   force,
+			})
+			entry := audit.NewEntry(audit.CategoryGitSync, "sync_publish", currentUser.ID, currentUser.Username).
+				WithDetails(string(details)).
+				WithIPAddress(clientIP)
+			_ = a.auditService.Log(ctx, entry)
+		}
 	}
 
 	return api.PublishDag200JSONResponse(toAPISyncResult(result)), nil
@@ -321,15 +338,17 @@ func (a *API) DiscardDagChanges(ctx context.Context, req api.DiscardDagChangesRe
 
 	// Audit log
 	if a.auditService != nil {
-		currentUser, _ := auth.UserFromContext(ctx)
-		clientIP, _ := auth.ClientIPFromContext(ctx)
-		details, _ := json.Marshal(map[string]string{
-			"dag_id": req.Name,
-		})
-		entry := audit.NewEntry(audit.CategoryGitSync, "sync_discard", currentUser.ID, currentUser.Username).
-			WithDetails(string(details)).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
+		currentUser, ok := auth.UserFromContext(ctx)
+		if ok && currentUser != nil {
+			clientIP, _ := auth.ClientIPFromContext(ctx)
+			details, _ := json.Marshal(map[string]string{
+				"dag_id": req.Name,
+			})
+			entry := audit.NewEntry(audit.CategoryGitSync, "sync_discard", currentUser.ID, currentUser.Username).
+				WithDetails(string(details)).
+				WithIPAddress(clientIP)
+			_ = a.auditService.Log(ctx, entry)
+		}
 	}
 
 	return api.DiscardDagChanges200JSONResponse{

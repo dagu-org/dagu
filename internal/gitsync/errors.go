@@ -50,8 +50,12 @@ type ConflictError struct {
 }
 
 func (e *ConflictError) Error() string {
+	commit := e.RemoteCommit
+	if len(commit) > 8 {
+		commit = commit[:8]
+	}
 	return fmt.Sprintf("conflict detected for DAG %q: remote commit %s by %s",
-		e.DAGID, e.RemoteCommit[:8], e.RemoteAuthor)
+		e.DAGID, commit, e.RemoteAuthor)
 }
 
 func (e *ConflictError) Unwrap() error {

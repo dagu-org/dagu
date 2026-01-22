@@ -5747,6 +5747,7 @@ components:
         token:
           type: string
           description: "Personal access token (write-only)"
+          writeOnly: true
         sshKeyPath:
           type: string
           description: "Path to SSH private key"
