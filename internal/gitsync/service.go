@@ -988,12 +988,11 @@ func (s *serviceImpl) updateSuccessStateWithCommit(state *State, commitHash stri
 
 // buildPullMessage constructs the result message for a pull operation.
 func (s *serviceImpl) buildPullMessage(alreadyUpToDate bool, synced, conflicts []string) string {
-	switch {
-	case len(conflicts) > 0:
+	if len(conflicts) > 0 {
 		return fmt.Sprintf("Pulled with %d conflict(s)", len(conflicts))
-	case alreadyUpToDate:
-		return "Already up to date"
-	default:
-		return fmt.Sprintf("Synced %d DAG(s)", len(synced))
 	}
+	if alreadyUpToDate {
+		return "Already up to date"
+	}
+	return fmt.Sprintf("Synced %d DAG(s)", len(synced))
 }

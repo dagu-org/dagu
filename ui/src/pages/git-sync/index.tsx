@@ -62,24 +62,20 @@ const summaryConfig: Record<SyncSummary, { label: string; badgeClass: string }> 
   },
 };
 
-// Status dot component - simple colored dots like GitHub
+// Status configuration for dots
+const statusConfig: Record<SyncStatus, { color: string; label: string }> = {
+  [SyncStatus.synced]: { color: 'bg-emerald-500', label: 'synced' },
+  [SyncStatus.modified]: { color: 'bg-amber-500', label: 'modified' },
+  [SyncStatus.untracked]: { color: 'bg-blue-500', label: 'untracked' },
+  [SyncStatus.conflict]: { color: 'bg-rose-500', label: 'conflict' },
+};
+
 function StatusDot({ status }: { status: SyncStatus }) {
-  const colors: Record<SyncStatus, string> = {
-    [SyncStatus.synced]: 'bg-emerald-500',
-    [SyncStatus.modified]: 'bg-amber-500',
-    [SyncStatus.untracked]: 'bg-blue-500',
-    [SyncStatus.conflict]: 'bg-rose-500',
-  };
-  const labels: Record<SyncStatus, string> = {
-    [SyncStatus.synced]: 'synced',
-    [SyncStatus.modified]: 'modified',
-    [SyncStatus.untracked]: 'untracked',
-    [SyncStatus.conflict]: 'conflict',
-  };
+  const config = statusConfig[status];
   return (
     <div className="flex items-center gap-1.5">
-      <span className={cn('h-2 w-2 rounded-full', colors[status])} />
-      <span className="text-xs text-muted-foreground">{labels[status]}</span>
+      <span className={cn('h-2 w-2 rounded-full', config.color)} />
+      <span className="text-xs text-muted-foreground">{config.label}</span>
     </div>
   );
 }
@@ -241,13 +237,10 @@ export default function GitSyncPage() {
     (status.counts.untracked || 0) > 0
   );
 
-  const getFilterCount = (f: string) => {
+  const getFilterCount = (f: string): number => {
     if (!status?.counts) return 0;
     if (f === 'all') return Object.keys(status.dags || {}).length;
-    if (f === 'modified') return status.counts.modified || 0;
-    if (f === 'untracked') return status.counts.untracked || 0;
-    if (f === 'conflict') return status.counts.conflict || 0;
-    return 0;
+    return status.counts[f as keyof typeof status.counts] || 0;
   };
 
   // Not configured state
