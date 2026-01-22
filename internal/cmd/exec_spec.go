@@ -97,9 +97,7 @@ func buildExecDAG(ctx *Context, opts ExecOptions) (*core.DAG, string, error) {
 		_ = os.Remove(tempPath)
 	}()
 
-	var loadOpts []spec.LoadOption
-	loadOpts = append(loadOpts, spec.WithName(name))
-
+	loadOpts := []spec.LoadOption{spec.WithName(name)}
 	if base := ctx.Config.Paths.BaseConfig; base != "" {
 		loadOpts = append(loadOpts, spec.WithBaseConfig(base))
 	}

@@ -62,9 +62,9 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 				dag, _ = attempt.ReadDAG(ctx)
 			}
 
-			// Get or create queue with the DAG info (only once for the group)
+			// Get or create queue (only once for the group)
 			if queue == nil {
-				queue = getOrCreateQueue(queueMap, groupName, a.config, dag)
+				queue = getOrCreateQueue(queueMap, groupName, a.config)
 			}
 
 			// Get the status and add to queue
@@ -98,25 +98,7 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 			continue
 		}
 
-		// Try to load DAG metadata for DAG-based queues that aren't in the map yet.
-		// Note: DAG's maxActiveRuns is deprecated for local queues (always use maxConcurrency=1).
-		var dag *core.DAG
-		if _, exists := queueMap[queueName]; !exists && findGlobalQueueConfig(queueName, a.config) == nil {
-			// Not a global queue and not yet in map (no running items found).
-			// Peek at the first queued item to find out which DAG it belongs to.
-			res, err := a.queueStore.ListPaginated(ctx, queueName, exec.NewPaginator(1, 1))
-			if err == nil && len(res.Items) > 0 {
-				ref, err := res.Items[0].Data()
-				if err == nil {
-					attempt, err := a.dagRunStore.FindAttempt(ctx, *ref)
-					if err == nil {
-						dag, _ = attempt.ReadDAG(ctx)
-					}
-				}
-			}
-		}
-
-		queue := getOrCreateQueue(queueMap, queueName, a.config, dag)
+		queue := getOrCreateQueue(queueMap, queueName, a.config)
 		queue.queuedCount = count
 		totalQueued += count
 	}
@@ -262,7 +244,7 @@ type queueInfo struct {
 }
 
 // getOrCreateQueue returns an existing queue from the map or creates a new one.
-func getOrCreateQueue(queueMap map[string]*queueInfo, queueName string, cfg *config.Config, dag *core.DAG) *queueInfo {
+func getOrCreateQueue(queueMap map[string]*queueInfo, queueName string, cfg *config.Config) *queueInfo {
 	if queue, exists := queueMap[queueName]; exists {
 		return queue
 	}
