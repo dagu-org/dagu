@@ -66,12 +66,6 @@ func (q *queue) maxConc() int {
 	return q.maxConcurrency
 }
 
-func (q *queue) setMaxConc(val int) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	q.maxConcurrency = max(val, 1)
-}
-
 func (q *queue) isGlobalQueue() bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
