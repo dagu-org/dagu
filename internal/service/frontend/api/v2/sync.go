@@ -23,6 +23,7 @@ type SyncService interface {
 	Discard(ctx context.Context, dagID string) error
 	GetStatus(ctx context.Context) (*gitsync.OverallStatus, error)
 	GetDAGStatus(ctx context.Context, dagID string) (*gitsync.DAGState, error)
+	GetDAGDiff(ctx context.Context, dagID string) (*gitsync.DAGDiff, error)
 	GetConfig(ctx context.Context) (*gitsync.Config, error)
 	UpdateConfig(ctx context.Context, cfg *gitsync.Config) error
 	TestConnection(ctx context.Context) (*gitsync.ConnectionResult, error)
@@ -199,6 +200,34 @@ func (a *API) GetSyncConfig(ctx context.Context, _ api.GetSyncConfigRequestObjec
 	}
 
 	return api.GetSyncConfig200JSONResponse(toAPISyncConfig(cfg)), nil
+}
+
+// GetSyncDAGDiff returns the diff between local and remote versions of a DAG.
+func (a *API) GetSyncDAGDiff(ctx context.Context, req api.GetSyncDAGDiffRequestObject) (api.GetSyncDAGDiffResponseObject, error) {
+	if err := a.requireSyncService(); err != nil {
+		return nil, err
+	}
+
+	diff, err := a.syncService.GetDAGDiff(ctx, req.Name)
+	if err != nil {
+		if gitsync.IsDAGNotFound(err) {
+			return api.GetSyncDAGDiff404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: err.Error(),
+			}, nil
+		}
+		return nil, internalError(err)
+	}
+
+	return api.GetSyncDAGDiff200JSONResponse{
+		DagId:         diff.DAGID,
+		Status:        toAPISyncStatus(diff.Status),
+		LocalContent:  diff.LocalContent,
+		RemoteContent: ptrOf(diff.RemoteContent),
+		RemoteCommit:  ptrOf(diff.RemoteCommit),
+		RemoteAuthor:  ptrOf(diff.RemoteAuthor),
+		RemoteMessage: ptrOf(diff.RemoteMessage),
+	}, nil
 }
 
 // UpdateSyncConfig updates the Git sync configuration.

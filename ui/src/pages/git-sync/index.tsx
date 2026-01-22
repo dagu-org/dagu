@@ -32,12 +32,14 @@ import {
   Settings,
   Upload,
   Trash2,
+  FileCode,
 } from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { DiffModal } from './DiffModal';
 
 type SyncStatusResponse = components['schemas']['SyncStatusResponse'];
 type SyncConfigResponse = components['schemas']['SyncConfigResponse'];
+type SyncDAGDiffResponse = components['schemas']['SyncDAGDiffResponse'];
 
 // Subtle, readable status colors
 const summaryConfig: Record<SyncSummary, { label: string; badgeClass: string }> = {
@@ -95,6 +97,9 @@ export default function GitSyncPage() {
   const [filter, setFilter] = useState<'all' | 'modified' | 'untracked' | 'conflict'>('all');
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [diffModal, setDiffModal] = useState<{ open: boolean; dagId?: string }>({ open: false });
+  const [diffData, setDiffData] = useState<SyncDAGDiffResponse | null>(null);
+  const [isLoadingDiff, setIsLoadingDiff] = useState(false);
 
   useEffect(() => {
     appBarContext.setTitle('Git Sync');
@@ -218,6 +223,25 @@ export default function GitSyncPage() {
       }
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Connection test failed');
+    }
+  };
+
+  const handleViewDiff = async (dagId: string) => {
+    setDiffModal({ open: true, dagId });
+    setDiffData(null);
+    setIsLoadingDiff(true);
+    try {
+      const response = await client.GET('/sync/dags/{name}/diff', {
+        params: { path: { name: dagId } },
+      });
+      if (response.data) {
+        setDiffData(response.data);
+      }
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to load diff');
+      setDiffModal({ open: false });
+    } finally {
+      setIsLoadingDiff(false);
     }
   };
 
@@ -368,12 +392,13 @@ export default function GitSyncPage() {
               filteredDags.map(([dagId, dag]) => (
                 <TableRow key={dagId} className="h-9">
                   <TableCell className="py-1">
-                    <Link
-                      to={`/dags/${encodeURIComponent(dagId)}`}
-                      className="font-mono text-xs hover:underline"
+                    <button
+                      onClick={() => handleViewDiff(dagId)}
+                      className="font-mono text-xs hover:underline text-left"
+                      title="View diff"
                     >
                       {dagId}
-                    </Link>
+                    </button>
                   </TableCell>
                   <TableCell className="py-1">
                     <StatusDot status={dag.status} />
@@ -383,6 +408,15 @@ export default function GitSyncPage() {
                   </TableCell>
                   <TableCell className="py-1">
                     <div className="flex items-center gap-0.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() => handleViewDiff(dagId)}
+                        title="View diff"
+                      >
+                        <FileCode className="h-3 w-3" />
+                      </Button>
                       {(dag.status === SyncStatus.modified || dag.status === SyncStatus.untracked || dag.status === SyncStatus.conflict) && config?.pushEnabled && canWrite && (
                         <Button
                           variant="ghost"
@@ -504,6 +538,19 @@ export default function GitSyncPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Diff Modal */}
+      <DiffModal
+        open={diffModal.open}
+        onOpenChange={(open) => setDiffModal({ open })}
+        dagId={diffModal.dagId || ''}
+        status={diffData?.status}
+        localContent={diffData?.localContent}
+        remoteContent={diffData?.remoteContent}
+        remoteCommit={diffData?.remoteCommit}
+        remoteAuthor={diffData?.remoteAuthor}
+        isLoading={isLoadingDiff}
+      />
     </div>
   );
 }

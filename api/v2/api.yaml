@@ -3392,6 +3392,40 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /sync/dags/{name}/diff:
+    get:
+      summary: "Get diff for a DAG"
+      description: "Returns the diff between local and remote versions of a DAG"
+      operationId: "getSyncDAGDiff"
+      tags:
+        - "sync"
+      parameters:
+        - name: name
+          in: path
+          description: "The DAG name (file name without extension)"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Diff retrieved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncDAGDiffResponse"
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dags/{name}/publish:
     post:
       summary: "Publish a single DAG"
@@ -5571,6 +5605,35 @@ components:
           type: string
       required:
         - message
+
+    SyncDAGDiffResponse:
+      type: object
+      description: "Diff between local and remote versions of a DAG"
+      properties:
+        dagId:
+          type: string
+          description: "The DAG identifier"
+        status:
+          $ref: "#/components/schemas/SyncStatus"
+        localContent:
+          type: string
+          description: "Current local file content"
+        remoteContent:
+          type: string
+          description: "Content from remote repository"
+        remoteCommit:
+          type: string
+          description: "Commit hash being compared against"
+        remoteAuthor:
+          type: string
+          description: "Author of the remote commit"
+        remoteMessage:
+          type: string
+          description: "Commit message of the remote version"
+      required:
+        - dagId
+        - status
+        - localContent
 
     SyncResultResponse:
       type: object

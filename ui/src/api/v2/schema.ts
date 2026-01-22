@@ -1484,6 +1484,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sync/dags/{name}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get diff for a DAG
+         * @description Returns the diff between local and remote versions of a DAG
+         */
+        get: operations["getSyncDAGDiff"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dags/{name}/publish": {
         parameters: {
             query?: never;
@@ -2542,6 +2562,22 @@ export interface components {
         SyncError: {
             dagId?: string;
             message: string;
+        };
+        /** @description Diff between local and remote versions of a DAG */
+        SyncDAGDiffResponse: {
+            /** @description The DAG identifier */
+            dagId: string;
+            status: components["schemas"]["SyncStatus"];
+            /** @description Current local file content */
+            localContent: string;
+            /** @description Content from remote repository */
+            remoteContent?: string;
+            /** @description Commit hash being compared against */
+            remoteCommit?: string;
+            /** @description Author of the remote commit */
+            remoteAuthor?: string;
+            /** @description Commit message of the remote version */
+            remoteMessage?: string;
         };
         /** @description Result of a sync operation */
         SyncResultResponse: {
@@ -6801,6 +6837,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SyncConfigResponse"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getSyncDAGDiff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The DAG name (file name without extension) */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Diff retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncDAGDiffResponse"];
+                };
+            };
+            /** @description DAG not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unexpected error */

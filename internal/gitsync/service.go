@@ -34,6 +34,9 @@ type Service interface {
 	// GetDAGStatus returns the sync status for a specific DAG.
 	GetDAGStatus(ctx context.Context, dagID string) (*DAGState, error)
 
+	// GetDAGDiff returns the diff between local and remote versions of a DAG.
+	GetDAGDiff(ctx context.Context, dagID string) (*DAGDiff, error)
+
 	// GetConfig returns the current configuration.
 	GetConfig(ctx context.Context) (*Config, error)
 
@@ -104,6 +107,17 @@ type ConnectionResult struct {
 	Success bool   `json:"success"`
 	Message string `json:"message,omitempty"`
 	Error   string `json:"error,omitempty"`
+}
+
+// DAGDiff represents the diff between local and remote versions of a DAG.
+type DAGDiff struct {
+	DAGID         string     `json:"dagId"`
+	Status        SyncStatus `json:"status"`
+	LocalContent  string     `json:"localContent"`
+	RemoteContent string     `json:"remoteContent,omitempty"`
+	RemoteCommit  string     `json:"remoteCommit,omitempty"`
+	RemoteAuthor  string     `json:"remoteAuthor,omitempty"`
+	RemoteMessage string     `json:"remoteMessage,omitempty"`
 }
 
 // serviceImpl implements the Service interface.
@@ -197,6 +211,9 @@ func (s *serviceImpl) syncFilesToDAGsDir(ctx context.Context, pullResult *PullRe
 
 	state, _ := s.stateManager.GetState()
 
+	// Refresh hashes to detect local modifications before checking for conflicts
+	s.refreshLocalHashes(state)
+
 	for _, file := range files {
 		dagID := s.filePathToDAGID(file)
 		repoFilePath := s.gitClient.GetFilePath(file)
@@ -236,7 +253,7 @@ func (s *serviceImpl) syncFilesToDAGsDir(ctx context.Context, pullResult *PullRe
 
 		localHash := ComputeContentHash(localContent)
 
-		// Check for conflict
+		// Check for locally modified files
 		if dagState != nil && dagState.Status == StatusModified {
 			// Local was modified, check if remote also changed
 			if dagState.LastSyncedHash != repoHash {
@@ -255,11 +272,12 @@ func (s *serviceImpl) syncFilesToDAGsDir(ctx context.Context, pullResult *PullRe
 					ConflictDetectedAt: &now,
 				}
 				conflicts = append(conflicts, dagID)
-				continue
 			}
+			// Local modified but remote unchanged - preserve local changes
+			continue
 		}
 
-		// No conflict, update local file if remote changed
+		// Only update local file if remote changed (and local wasn't modified)
 		if localHash != repoHash {
 			if err := os.WriteFile(dagFilePath, repoContent, 0644); err != nil {
 				continue
@@ -328,6 +346,46 @@ func (s *serviceImpl) scanLocalDAGs(state *State) error {
 	}
 
 	return nil
+}
+
+// refreshLocalHashes recalculates hashes for all tracked DAGs and updates status if modified.
+func (s *serviceImpl) refreshLocalHashes(state *State) bool {
+	changed := false
+	for dagID, dagState := range state.DAGs {
+		// Skip untracked (no remote to compare) and conflict (already detected)
+		if dagState.Status == StatusUntracked || dagState.Status == StatusConflict {
+			continue
+		}
+
+		// Read current local file
+		filePath := s.dagIDToFilePath(dagID)
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			// File might be deleted, skip for now
+			continue
+		}
+
+		currentHash := ComputeContentHash(content)
+
+		// Update LocalHash if changed
+		if dagState.LocalHash != currentHash {
+			dagState.LocalHash = currentHash
+			changed = true
+		}
+
+		// Check if status should change
+		if dagState.Status == StatusSynced && currentHash != dagState.LastSyncedHash {
+			dagState.Status = StatusModified
+			now := time.Now()
+			dagState.ModifiedAt = &now
+			changed = true
+		} else if dagState.Status == StatusModified && currentHash == dagState.LastSyncedHash {
+			// User reverted changes manually - back to synced
+			dagState.Status = StatusSynced
+			changed = true
+		}
+	}
+	return changed
 }
 
 // Publish commits and pushes a single DAG to the remote.
@@ -548,7 +606,13 @@ func (s *serviceImpl) GetStatus(ctx context.Context) (*OverallStatus, error) {
 	// Scan for new local DAGs not yet tracked
 	prevCount := len(state.DAGs)
 	_ = s.scanLocalDAGs(state)
-	if len(state.DAGs) > prevCount {
+	newDAGs := len(state.DAGs) > prevCount
+
+	// Refresh hashes for existing DAGs to detect local modifications
+	hashesChanged := s.refreshLocalHashes(state)
+
+	// Save state if anything changed
+	if newDAGs || hashesChanged {
 		s.stateManager.Save(state)
 	}
 
@@ -605,6 +669,77 @@ func (s *serviceImpl) GetDAGStatus(ctx context.Context, dagID string) (*DAGState
 	}
 
 	return dagState, nil
+}
+
+// GetDAGDiff returns the diff between local and remote versions of a DAG.
+func (s *serviceImpl) GetDAGDiff(ctx context.Context, dagID string) (*DAGDiff, error) {
+	if err := s.validateEnabled(); err != nil {
+		return nil, err
+	}
+
+	state, err := s.stateManager.GetState()
+	if err != nil {
+		return nil, err
+	}
+
+	dagState := state.DAGs[dagID]
+	if dagState == nil {
+		return nil, &DAGNotFoundError{DAGID: dagID}
+	}
+
+	// Read local content
+	localPath := s.dagIDToFilePath(dagID)
+	localContent, err := os.ReadFile(localPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read local file: %w", err)
+	}
+
+	diff := &DAGDiff{
+		DAGID:        dagID,
+		Status:       dagState.Status,
+		LocalContent: string(localContent),
+	}
+
+	// Get remote content based on status
+	switch dagState.Status {
+	case StatusSynced:
+		// For synced files, remote content is same as local
+		diff.RemoteContent = string(localContent)
+		diff.RemoteCommit = dagState.BaseCommit
+
+	case StatusModified:
+		// Compare against BaseCommit (last synced version)
+		if dagState.BaseCommit != "" {
+			if err := s.gitClient.Open(); err == nil {
+				repoPath := s.dagIDToRepoPath(dagID)
+				if remoteContent, err := s.gitClient.GetFileContentAtCommit(repoPath, dagState.BaseCommit); err == nil {
+					diff.RemoteContent = string(remoteContent)
+				}
+			}
+		}
+		diff.RemoteCommit = dagState.BaseCommit
+
+	case StatusConflict:
+		// Compare against remote HEAD (what we're conflicting with)
+		if dagState.RemoteCommit != "" {
+			if err := s.gitClient.Open(); err == nil {
+				repoPath := s.dagIDToRepoPath(dagID)
+				if remoteContent, err := s.gitClient.GetFileContentAtCommit(repoPath, dagState.RemoteCommit); err == nil {
+					diff.RemoteContent = string(remoteContent)
+				}
+			}
+		}
+		diff.RemoteCommit = dagState.RemoteCommit
+		diff.RemoteAuthor = dagState.RemoteAuthor
+		diff.RemoteMessage = dagState.RemoteMessage
+
+	case StatusUntracked:
+		// New file - no remote version
+		diff.RemoteContent = ""
+		diff.RemoteCommit = ""
+	}
+
+	return diff, nil
 }
 
 // GetConfig returns the current configuration.
