@@ -1,6 +1,3 @@
-// Copyright (C) 2025 The Dagu Authors
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package gitsync
 
 import (
@@ -78,7 +75,7 @@ func TestGitClient_LocalOps(t *testing.T) {
 	cfg := &Config{
 		Enabled:    true,
 		Repository: repoPath,
-		Branch:    "main",
+		Branch:     "main",
 		Commit: CommitConfig{
 			AuthorName:  "Test User",
 			AuthorEmail: "test@example.com",

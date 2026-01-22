@@ -1,6 +1,3 @@
-// Copyright (C) 2025 The Dagu Authors
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package gitsync
 
 import (
@@ -55,13 +52,13 @@ type Service interface {
 
 // SyncResult represents the result of a sync operation.
 type SyncResult struct {
-	Success   bool         `json:"success"`
-	Message   string       `json:"message,omitempty"`
-	Synced    []string     `json:"synced,omitempty"`
-	Modified  []string     `json:"modified,omitempty"`
-	Conflicts []string     `json:"conflicts,omitempty"`
-	Errors    []SyncError  `json:"errors,omitempty"`
-	Timestamp time.Time    `json:"timestamp"`
+	Success   bool        `json:"success"`
+	Message   string      `json:"message,omitempty"`
+	Synced    []string    `json:"synced,omitempty"`
+	Modified  []string    `json:"modified,omitempty"`
+	Conflicts []string    `json:"conflicts,omitempty"`
+	Errors    []SyncError `json:"errors,omitempty"`
+	Timestamp time.Time   `json:"timestamp"`
 }
 
 // SyncError represents an error during sync.
@@ -72,16 +69,16 @@ type SyncError struct {
 
 // OverallStatus represents the overall sync status.
 type OverallStatus struct {
-	Enabled        bool                  `json:"enabled"`
-	Repository     string                `json:"repository,omitempty"`
-	Branch         string                `json:"branch,omitempty"`
-	Summary        SummaryStatus         `json:"summary"`
-	LastSyncAt     *time.Time            `json:"lastSyncAt,omitempty"`
-	LastSyncCommit string                `json:"lastSyncCommit,omitempty"`
-	LastSyncStatus string                `json:"lastSyncStatus,omitempty"`
-	LastError      *string               `json:"lastError,omitempty"`
-	DAGs           map[string]*DAGState  `json:"dags,omitempty"`
-	Counts         StatusCounts          `json:"counts"`
+	Enabled        bool                 `json:"enabled"`
+	Repository     string               `json:"repository,omitempty"`
+	Branch         string               `json:"branch,omitempty"`
+	Summary        SummaryStatus        `json:"summary"`
+	LastSyncAt     *time.Time           `json:"lastSyncAt,omitempty"`
+	LastSyncCommit string               `json:"lastSyncCommit,omitempty"`
+	LastSyncStatus string               `json:"lastSyncStatus,omitempty"`
+	LastError      *string              `json:"lastError,omitempty"`
+	DAGs           map[string]*DAGState `json:"dags,omitempty"`
+	Counts         StatusCounts         `json:"counts"`
 }
 
 // SummaryStatus represents the summary status for the header badge.

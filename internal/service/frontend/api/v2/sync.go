@@ -1,6 +1,3 @@
-// Copyright (C) 2025 The Dagu Authors
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package api
 
 import (
@@ -532,4 +529,3 @@ func handlePublishError(err error, dagName string) (api.PublishDagResponseObject
 	}
 	return nil, internalError(err)
 }
-
