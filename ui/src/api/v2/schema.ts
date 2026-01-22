@@ -3621,8 +3621,8 @@ export interface operations {
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description Filter DAGs by name */
                 name?: string;
-                /** @description Filter DAGs by tag */
-                tag?: string;
+                /** @description Filter DAGs by tags (comma-separated). Returns DAGs that have ALL specified tags. */
+                tags?: string;
                 /** @description Field to sort by:
                  *     - `name`: Sort alphabetically by DAG name (case-insensitive)
                  *     - `nextRun`: Sort by next scheduled run time. DAGs with earlier next run times appear first in ascending order. DAGs without schedules appear last.

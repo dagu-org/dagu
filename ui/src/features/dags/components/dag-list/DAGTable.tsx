@@ -18,7 +18,6 @@ import {
   Calendar,
   ChevronDown,
   ChevronUp,
-  Filter,
   Search,
 } from 'lucide-react';
 import React, {
@@ -63,13 +62,7 @@ import { PanelWidthContext } from '../../../../components/SplitLayout';
 import { Badge } from '../../../../components/ui/badge';
 import { Button } from '../../../../components/ui/button';
 import { Input } from '../../../../components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../../../../components/ui/select'; // Use shadcn Select
+import { TagCombobox } from '../../../../components/ui/tag-combobox';
 import {
   Table,
   TableBody,
@@ -225,10 +218,10 @@ type Props = {
   searchText: string;
   /** Handler for search text changes */
   handleSearchTextChange: (searchText: string) => void;
-  /** Current tag filter */
-  searchTag: string;
+  /** Current tag filter (multi-select) */
+  searchTags: string[];
   /** Handler for tag filter changes */
-  handleSearchTagChange: (tag: string) => void;
+  handleSearchTagsChange: (tags: string[]) => void;
   /** Loading state */
   isLoading?: boolean;
   /** Pagination props */
@@ -280,8 +273,8 @@ declare module '@tanstack/react-table' {
   interface TableMeta<TData extends RowData> {
     group: string;
     refreshFn: () => void;
-    // Add tag change handler to meta for direct access in cell
-    handleSearchTagChange?: (tag: string) => void;
+    // Add tag click handler to meta for direct access in cell
+    onTagClick?: (tag: string) => void;
   }
 }
 
@@ -450,9 +443,8 @@ const defaultColumns = [
                     onClick={(e) => {
                       e.stopPropagation(); // Prevent row click
                       e.preventDefault();
-                      // Get the handleSearchTagChange from the component props
-                      const handleTagClick =
-                        table.options.meta?.handleSearchTagChange;
+                      // Get the onTagClick from the table meta
+                      const handleTagClick = table.options.meta?.onTagClick;
                       if (handleTagClick) handleTagClick(tag);
                     }}
                   >
@@ -828,8 +820,8 @@ function DAGTable({
   refreshFn,
   searchText,
   handleSearchTextChange,
-  searchTag,
-  handleSearchTagChange,
+  searchTags,
+  handleSearchTagsChange,
   isLoading = false,
   pagination,
   sortField = 'name',
@@ -887,8 +879,8 @@ function DAGTable({
   useEffect(() => {
     const nameFilter = columnFilters.find((f) => f.id === 'Name');
 
-    // Combine searchText and searchTag for the Name filter
-    const combinedFilter = searchTag || searchText || '';
+    // Combine searchText and searchTags for the Name filter
+    const combinedFilter = searchTags.length > 0 ? searchTags.join(',') : searchText || '';
     const currentValue = nameFilter?.value || '';
 
     let updated = false;
@@ -908,7 +900,18 @@ function DAGTable({
     if (updated) {
       setColumnFilters(newFilters);
     }
-  }, [searchText, searchTag, columnFilters]);
+  }, [searchText, searchTags, columnFilters]);
+
+  // Handler for clicking a tag to add it to the filter
+  const handleTagClick = useCallback(
+    (tag: string) => {
+      const normalizedTag = tag.toLowerCase();
+      if (!searchTags.includes(normalizedTag)) {
+        handleSearchTagsChange([...searchTags, normalizedTag]);
+      }
+    },
+    [searchTags, handleSearchTagsChange]
+  );
 
   // Transform the flat list of DAGs into a hierarchical structure with groups
   const data = useMemo(() => {
@@ -1070,7 +1073,13 @@ function DAGTable({
     meta: {
       group,
       refreshFn,
-      handleSearchTagChange,
+      onTagClick: (tag: string) => {
+        // Add tag to search tags if not already present
+        const normalizedTag = tag.toLowerCase();
+        if (!searchTags.includes(normalizedTag)) {
+          handleSearchTagsChange([...searchTags, normalizedTag]);
+        }
+      },
     },
   });
 
@@ -1135,29 +1144,13 @@ function DAGTable({
           </div>
 
           {/* Tag filter */}
-          <Select
-            value={searchTag}
-            onValueChange={(value) =>
-              handleSearchTagChange(value === 'all' ? '' : value)
-            }
-          >
-            <SelectTrigger className="w-auto min-w-[80px] h-9 border border-border rounded-md flex-shrink-0">
-              <div className="flex items-center gap-1">
-                <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                <SelectValue placeholder="Tag" />
-              </div>
-            </SelectTrigger>
-            <SelectContent className="max-h-[280px] overflow-y-auto">
-              <SelectItem value="all">
-                <span className="font-medium">All Tags</span>
-              </SelectItem>
-              {uniqueTags?.tags?.map((tag) => (
-                <SelectItem key={tag} value={tag}>
-                  {tag}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <TagCombobox
+            selectedTags={searchTags}
+            onTagsChange={handleSearchTagsChange}
+            availableTags={uniqueTags?.tags ?? []}
+            placeholder="Filter by tags..."
+            className="min-w-[180px] max-w-[300px] flex-shrink-0"
+          />
 
           {/* Pagination - pushed to right */}
           {pagination && (
@@ -1363,7 +1356,7 @@ function DAGTable({
                               dag={dagRow.dag}
                               isSelected={selectedDAG === dagRow.dag.fileName}
                               onSelect={handleSelectDAG}
-                              onTagClick={handleSearchTagChange}
+                              onTagClick={handleTagClick}
                               refreshFn={refreshFn}
                               className="ml-2"
                             />
@@ -1391,7 +1384,7 @@ function DAGTable({
                   dag={dagRow.dag}
                   isSelected={selectedDAG === dagRow.dag.fileName}
                   onSelect={handleSelectDAG}
-                  onTagClick={handleSearchTagChange}
+                  onTagClick={handleTagClick}
                   refreshFn={refreshFn}
                 />
               );

@@ -1,21 +1,12 @@
 import dayjs from 'dayjs';
-import { ChevronDown, Layers, List, Search, Tag, X } from 'lucide-react';
+import { Layers, List, Search } from 'lucide-react';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { Status } from '../../api/v2/schema';
-import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { DateRangePicker } from '../../components/ui/date-range-picker';
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '../../components/ui/dropdown-menu';
 import { Input } from '../../components/ui/input';
+import { TagCombobox } from '../../components/ui/tag-combobox';
 import {
   Select,
   SelectContent,
@@ -506,17 +497,6 @@ function DAGRuns() {
     mutate();
   };
 
-  const handleTagToggle = (tag: string) => {
-    const newTags = selectedTags.includes(tag)
-      ? selectedTags.filter((t) => t !== tag)
-      : [...selectedTags, tag];
-    updateTags(newTags);
-  };
-
-  const handleClearTags = () => {
-    updateTags([]);
-  };
-
   const handleViewModeChange = (value: string) => {
     const newViewMode = value as 'list' | 'grouped';
     updatePreference('dagRunsViewMode', newViewMode);
@@ -761,82 +741,13 @@ function DAGRuns() {
               </SelectContent>
             </Select>
             {/* Tags filter */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="default" className="px-3">
-                  <Tag size={14} className="mr-1.5" />
-                  Tags
-                  {selectedTags.length > 0 && (
-                    <Badge
-                      variant="secondary"
-                      className="ml-1.5 h-5 px-1.5 text-xs"
-                    >
-                      {selectedTags.length}
-                    </Badge>
-                  )}
-                  <ChevronDown size={14} className="ml-1.5 opacity-50" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-[200px]">
-                <DropdownMenuLabel className="text-xs text-muted-foreground">
-                  Filter by tags (AND)
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {availableTags.length === 0 ? (
-                  <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                    No tags available
-                  </div>
-                ) : (
-                  availableTags.map((tag) => (
-                    <DropdownMenuCheckboxItem
-                      key={tag}
-                      checked={selectedTags.includes(tag)}
-                      onCheckedChange={() => handleTagToggle(tag)}
-                      onSelect={(e) => e.preventDefault()}
-                    >
-                      {tag}
-                    </DropdownMenuCheckboxItem>
-                  ))
-                )}
-                {selectedTags.length > 0 && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onSelect={() => handleClearTags()}
-                    >
-                      <X size={14} className="mr-1.5" />
-                      Clear all
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {/* Selected tags display */}
-            {selectedTags.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {selectedTags.map((tag) => (
-                  <Badge
-                    key={tag}
-                    variant="secondary"
-                    className="text-xs cursor-pointer hover:bg-destructive/20"
-                    onClick={() => handleTagToggle(tag)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleTagToggle(tag);
-                      }
-                    }}
-                    tabIndex={0}
-                    role="button"
-                    aria-label={`Remove tag ${tag}`}
-                  >
-                    {tag}
-                    <X size={12} className="ml-1" />
-                  </Badge>
-                ))}
-              </div>
-            )}
+            <TagCombobox
+              selectedTags={selectedTags}
+              onTagsChange={updateTags}
+              availableTags={availableTags}
+              placeholder="Filter by tags..."
+              className="min-w-[180px] max-w-[300px]"
+            />
             <Button
               onClick={() => handleSearch()}
               size="default"

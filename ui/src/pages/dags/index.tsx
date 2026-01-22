@@ -21,10 +21,17 @@ import LoadingIndicator from '../../ui/LoadingIndicator';
 
 type DAGDefinitionsFilters = {
   searchText: string;
-  searchTag: string;
+  searchTags: string[];
   page: number;
   sortField: string;
   sortOrder: string;
+};
+
+const areTagsEqual = (a: string[], b: string[]): boolean => {
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].sort();
+  const sortedB = [...b].sort();
+  return sortedA.every((tag, i) => tag === sortedB[i]);
 };
 
 const areDAGDefinitionsFiltersEqual = (
@@ -32,7 +39,7 @@ const areDAGDefinitionsFiltersEqual = (
   b: DAGDefinitionsFilters
 ) =>
   a.searchText === b.searchText &&
-  a.searchTag === b.searchTag &&
+  areTagsEqual(a.searchTags, b.searchTags) &&
   a.page === b.page &&
   a.sortField === b.sortField &&
   a.sortOrder === b.sortOrder;
@@ -54,7 +61,7 @@ function DAGsContent() {
   const defaultFilters = React.useMemo<DAGDefinitionsFilters>(
     () => ({
       searchText: '',
-      searchTag: '',
+      searchTags: [],
       page: 1,
       sortField: 'name',
       sortOrder: 'asc',
@@ -63,13 +70,13 @@ function DAGsContent() {
   );
 
   const [searchText, setSearchText] = React.useState(defaultFilters.searchText);
-  const [searchTag, setSearchTag] = React.useState(defaultFilters.searchTag);
+  const [searchTags, setSearchTags] = React.useState<string[]>(defaultFilters.searchTags);
   const [page, setPage] = React.useState<number>(defaultFilters.page);
   const [apiSearchText, setAPISearchText] = React.useState(
     defaultFilters.searchText
   );
-  const [apiSearchTag, setAPISearchTag] = React.useState(
-    defaultFilters.searchTag
+  const [apiSearchTags, setAPISearchTags] = React.useState<string[]>(
+    defaultFilters.searchTags
   );
   const [sortField, setSortField] = React.useState(defaultFilters.sortField);
   const [sortOrder, setSortOrder] = React.useState(defaultFilters.sortOrder);
@@ -80,12 +87,12 @@ function DAGsContent() {
   const currentFilters = React.useMemo<DAGDefinitionsFilters>(
     () => ({
       searchText,
-      searchTag,
+      searchTags,
       page,
       sortField,
       sortOrder,
     }),
-    [searchText, searchTag, page, sortField, sortOrder]
+    [searchText, searchTags, page, sortField, sortOrder]
   );
 
   const currentFiltersRef = React.useRef(currentFilters);
@@ -116,8 +123,11 @@ function DAGsContent() {
       hasUrlFilters = true;
     }
 
-    if (params.has('tag')) {
-      urlFilters.searchTag = params.get('tag') ?? '';
+    if (params.has('tags')) {
+      const tagsParam = params.get('tags') ?? '';
+      urlFilters.searchTags = tagsParam
+        ? tagsParam.split(',').map((t) => t.trim().toLowerCase()).filter((t) => t !== '')
+        : [];
       hasUrlFilters = true;
     }
 
@@ -151,10 +161,10 @@ function DAGsContent() {
     }
 
     setSearchText(next.searchText);
-    setSearchTag(next.searchTag);
+    setSearchTags(next.searchTags);
     setPage(next.page);
     setAPISearchText(next.searchText);
-    setAPISearchTag(next.searchTag);
+    setAPISearchTags(next.searchTags);
     setSortField(next.sortField);
     setSortOrder(next.sortOrder);
 
@@ -185,7 +195,7 @@ function DAGsContent() {
           perPage: preferences.pageLimit || 200,
           remoteNode: appBarContext.selectedRemoteNode || 'local',
           name: apiSearchText ? apiSearchText : undefined,
-          tag: apiSearchTag ? apiSearchTag : undefined,
+          tags: apiSearchTags.length > 0 ? apiSearchTags.join(',') : undefined,
           sort: sortField as PathsDagsGetParametersQuerySort,
           order: sortOrder as PathsDagsGetParametersQueryOrder,
         },
@@ -198,9 +208,15 @@ function DAGsContent() {
     }
   );
 
-  const addSearchParam = (key: string, value: string) => {
+  const addSearchParam = (key: string, value: string | string[]) => {
     const locationQuery = new URLSearchParams(window.location.search);
-    if (value && value.length > 0) {
+    if (Array.isArray(value)) {
+      if (value.length > 0) {
+        locationQuery.set(key, value.join(','));
+      } else {
+        locationQuery.delete(key);
+      }
+    } else if (value && value.length > 0) {
       locationQuery.set(key, value);
     } else {
       locationQuery.delete(key);
@@ -250,10 +266,10 @@ function DAGsContent() {
     []
   );
 
-  const debouncedAPISearchTag = React.useMemo(
+  const debouncedAPISearchTags = React.useMemo(
     () =>
-      debounce((searchTag: string) => {
-        setAPISearchTag(searchTag);
+      debounce((tags: string[]) => {
+        setAPISearchTags(tags);
       }, 500),
     []
   );
@@ -265,11 +281,11 @@ function DAGsContent() {
     debouncedAPISearchText(searchText);
   };
 
-  const searchTagChange = (searchTag: string) => {
-    addSearchParam('tag', searchTag);
-    setSearchTag(searchTag);
+  const searchTagsChange = (tags: string[]) => {
+    addSearchParam('tags', tags);
+    setSearchTags(tags);
     setPage(1);
-    debouncedAPISearchTag(searchTag);
+    debouncedAPISearchTags(tags);
   };
 
   const handleSortChange = (field: string, order: string) => {
@@ -310,8 +326,8 @@ function DAGsContent() {
             refreshFn={refreshFn}
             searchText={searchText}
             handleSearchTextChange={searchTextChange}
-            searchTag={searchTag}
-            handleSearchTagChange={searchTagChange}
+            searchTags={searchTags}
+            handleSearchTagsChange={searchTagsChange}
             pagination={{
               totalPages: displayData.pagination.totalPages,
               page: page,
