@@ -286,7 +286,7 @@ permissions:
   runDAGs: false
 debug: true
 basePath: "/dagu"
-apiBasePath: "/api/v1"
+apiBasePath: "/api/v2"
 tz: "UTC"
 logFormat: "json"
 headless: true
@@ -394,7 +394,7 @@ scheduler:
 			Host:              "0.0.0.0",
 			Port:              9090,
 			BasePath:          "/dagu",
-			APIBasePath:       "/api/v1",
+			APIBasePath:       "/api/v2",
 			Headless:          true,
 			LatestStatusToday: true,
 			Auth: Auth{
@@ -700,7 +700,7 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 		def := Definition{
 			BasicAuthUsername:     "user",
 			BasicAuthPassword:     "pass",
-			APIBaseURL:            "/api/v1",
+			APIBaseURL:            "/api/v2",
 			IsAuthToken:           true,
 			AuthToken:             "token123",
 			DAGs:                  filepath.Join(testPaths, "legacy", "dags"),
@@ -725,7 +725,7 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 		assert.Equal(t, "user", cfg.Server.Auth.Basic.Username)
 		assert.Equal(t, "pass", cfg.Server.Auth.Basic.Password)
 		assert.Equal(t, "token123", cfg.Server.Auth.Token.Value)
-		assert.Equal(t, "/api/v1", cfg.Server.APIBasePath)
+		assert.Equal(t, "/api/v2", cfg.Server.APIBasePath)
 
 		// Paths - DAGsDir should take precedence over DAGs
 		assert.Equal(t, filepath.Join(testPaths, "new", "dags"), cfg.Paths.DAGsDir)
