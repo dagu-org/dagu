@@ -17,6 +17,7 @@ const (
 	CategoryDAG      Category = "dag"
 	CategoryAPIKey   Category = "api_key"
 	CategoryWebhook  Category = "webhook"
+	CategoryGitSync  Category = "git_sync"
 )
 
 // Entry represents a single audit log entry.

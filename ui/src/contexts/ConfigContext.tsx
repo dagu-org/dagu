@@ -11,6 +11,8 @@ export type PathsConfig = {
   procDir: string;
   serviceRegistryDir: string;
   configFileUsed: string;
+  gitSyncDir: string;
+  auditLogsDir: string;
 };
 
 export type AuthMode = 'none' | 'builtin' | 'oidc' | '';
@@ -29,6 +31,7 @@ export type Config = {
   oidcEnabled: boolean;
   oidcButtonLabel: string;
   terminalEnabled: boolean;
+  gitSyncEnabled: boolean;
   permissions: {
     writeDags: boolean;
     runDags: boolean;

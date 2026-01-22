@@ -350,6 +350,23 @@ When `DAGU_AUTH_MODE=builtin`, a file-based user management system with role-bas
 | `DAGU_TERMINAL_ENABLED` | `false` | Enable web-based terminal |
 | `DAGU_AUDIT_ENABLED` | `true` | Enable audit logging for security events |
 
+### Git Sync Configuration
+
+Synchronize DAG definitions with a Git repository. See [Git Sync](https://docs.dagu.cloud/features/git-sync) for details.
+
+| Environment Variable | Default | Description |
+|---------------------|---------|-------------|
+| `DAGU_GITSYNC_ENABLED` | `false` | Enable Git sync |
+| `DAGU_GITSYNC_REPOSITORY` | - | Repository URL (e.g., `github.com/org/repo`) |
+| `DAGU_GITSYNC_BRANCH` | `main` | Branch to sync |
+| `DAGU_GITSYNC_PATH` | `""` | Subdirectory in repo for DAGs |
+| `DAGU_GITSYNC_PUSH_ENABLED` | `true` | Enable push/publish operations |
+| `DAGU_GITSYNC_AUTH_TYPE` | `token` | Auth type: `token` or `ssh` |
+| `DAGU_GITSYNC_AUTH_TOKEN` | - | GitHub PAT for HTTPS auth |
+| `DAGU_GITSYNC_AUTH_SSH_KEY_PATH` | - | SSH private key path |
+| `DAGU_GITSYNC_AUTOSYNC_ENABLED` | `false` | Enable automatic periodic pull |
+| `DAGU_GITSYNC_AUTOSYNC_INTERVAL` | `300` | Auto-sync interval in seconds |
+
 ### Scheduler Configuration
 
 | Environment Variable | Default | Description |
@@ -486,6 +503,7 @@ This section outlines the current capabilities of Dagu.
 |                             | Role-based access control       | Builtin RBAC with admin, manager, operator, viewer roles                 | |
 |                             | User management                 | Create, update, delete users with role assignment                        | |
 |                             | Audit logging                   | Security event logging for authentication, user, and API key operations  | <a href="https://docs.dagu.cloud/configurations/server#audit-logging">Audit Logging</a> |
+|                             | Git Sync                        | Sync DAG definitions with Git repository (pull/publish/conflict detection) | <a href="https://docs.dagu.cloud/features/git-sync">Git Sync</a> |
 |                             | Web terminal                    | Web-based terminal for shell access (disabled by default)                | <a href="https://docs.dagu.cloud/configurations/server#terminal">Terminal</a> |
 |                             | HA (High availability) mode     | Control-plane with failover for scheduler / Web UI / Coordinator         | <a href="https://docs.dagu.cloud/features/scheduling#high-availability">High Availability</a> |
 | Executor types              | `jq`                            | JSON processing with jq queries                                          | <a href="https://docs.dagu.cloud/features/executors/jq">JQ Executor</a> |

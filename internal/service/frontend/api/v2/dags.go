@@ -74,10 +74,7 @@ func (a *API) ValidateDAGSpec(ctx context.Context, request api.ValidateDAGSpecRe
 }
 
 func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestObject) (api.CreateNewDAGResponseObject, error) {
-	if err := a.isAllowed(config.PermissionWriteDAGs); err != nil {
-		return nil, err
-	}
-	if err := a.requireWrite(ctx); err != nil {
+	if err := a.requireDAGWrite(ctx); err != nil {
 		return nil, err
 	}
 
@@ -142,10 +139,7 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 }
 
 func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject) (api.DeleteDAGResponseObject, error) {
-	if err := a.isAllowed(config.PermissionWriteDAGs); err != nil {
-		return nil, err
-	}
-	if err := a.requireWrite(ctx); err != nil {
+	if err := a.requireDAGWrite(ctx); err != nil {
 		return nil, err
 	}
 
@@ -234,10 +228,7 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 }
 
 func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecRequestObject) (api.UpdateDAGSpecResponseObject, error) {
-	if err := a.isAllowed(config.PermissionWriteDAGs); err != nil {
-		return nil, err
-	}
-	if err := a.requireWrite(ctx); err != nil {
+	if err := a.requireDAGWrite(ctx); err != nil {
 		return nil, err
 	}
 
@@ -269,10 +260,7 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 }
 
 func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject) (api.RenameDAGResponseObject, error) {
-	if err := a.isAllowed(config.PermissionWriteDAGs); err != nil {
-		return nil, err
-	}
-	if err := a.requireWrite(ctx); err != nil {
+	if err := a.requireDAGWrite(ctx); err != nil {
 		return nil, err
 	}
 

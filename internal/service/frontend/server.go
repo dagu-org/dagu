@@ -24,6 +24,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/cmn/telemetry"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/gitsync"
 	"github.com/dagu-org/dagu/internal/persis/fileapikey"
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
 	"github.com/dagu-org/dagu/internal/persis/fileuser"
@@ -56,7 +57,8 @@ type Server struct {
 	builtinOIDCCfg *auth.BuiltinOIDCConfig // OIDC config for builtin auth mode
 	authService    *authservice.Service
 	auditService   *audit.Service
-	listener       net.Listener // Optional pre-bound listener (for tests)
+	syncService    gitsync.Service // Git sync service for graceful shutdown
+	listener       net.Listener    // Optional pre-bound listener (for tests)
 }
 
 // ServerOption is a functional option for configuring the Server
@@ -108,6 +110,12 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	}
 	if auditSvc != nil {
 		apiOpts = append(apiOpts, apiv2.WithAuditService(auditSvc))
+	}
+
+	// Initialize git sync service if enabled
+	syncSvc := initSyncService(ctx, cfg)
+	if syncSvc != nil {
+		apiOpts = append(apiOpts, apiv2.WithSyncService(syncSvc))
 	}
 
 	// Initialize auth service if builtin mode is enabled
@@ -175,6 +183,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		builtinOIDCCfg: builtinOIDCCfg,
 		authService:    authSvc,
 		auditService:   auditSvc,
+		syncService:    syncSvc,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,
 			NavbarTitle:           cfg.UI.NavbarTitle,
@@ -190,6 +199,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 			OIDCEnabled:           oidcEnabled,
 			OIDCButtonLabel:       oidcButtonLabel,
 			TerminalEnabled:       cfg.Server.Terminal.Enabled && authSvc != nil,
+			GitSyncEnabled:        cfg.GitSync.Enabled,
 		},
 	}
 
@@ -309,6 +319,37 @@ func initAuditService(cfg *config.Config) (*audit.Service, error) {
 	}
 
 	return audit.New(store), nil
+}
+
+// initSyncService creates and returns a Git sync service if enabled.
+// Returns nil if Git sync is not enabled or not configured.
+func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
+	gitSyncCfg := cfg.GitSync
+	if !gitSyncCfg.Enabled {
+		return nil
+	}
+
+	syncCfg := gitsync.NewConfigFromGlobal(gitSyncCfg)
+
+	svc := gitsync.NewService(syncCfg, cfg.Paths.DAGsDir, cfg.Paths.DataDir)
+
+	// Start auto-sync if enabled
+	if syncCfg.AutoSync.Enabled {
+		if err := svc.Start(ctx); err != nil {
+			logger.Error(ctx, "Failed to start git sync auto-sync", tag.Error(err))
+		} else {
+			logger.Info(ctx, "Git sync auto-sync started",
+				slog.String("repository", syncCfg.Repository),
+				slog.String("branch", syncCfg.Branch),
+				slog.Int("interval", syncCfg.AutoSync.Interval))
+		}
+	}
+
+	logger.Info(ctx, "Git sync service initialized",
+		slog.String("repository", syncCfg.Repository),
+		slog.String("branch", syncCfg.Branch))
+
+	return svc
 }
 
 // Serve starts the HTTP server and configures routes
@@ -558,6 +599,13 @@ func (srv *Server) startServer(ctx context.Context) {
 
 // Shutdown gracefully shuts down the server
 func (srv *Server) Shutdown(ctx context.Context) error {
+	// Stop Git sync service if running
+	if srv.syncService != nil {
+		if err := srv.syncService.Stop(); err != nil {
+			logger.Warn(ctx, "Failed to stop git sync service", tag.Error(err))
+		}
+	}
+
 	if srv.httpServer != nil {
 		logger.Info(ctx, "Server is shutting down", tag.Addr(srv.httpServer.Addr))
 

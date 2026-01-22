@@ -1380,6 +1380,170 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sync/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Git sync status
+         * @description Returns the overall Git sync status including status of all DAGs
+         */
+        get: operations["getSyncStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sync/pull": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pull changes from remote repository
+         * @description Fetches and syncs changes from the remote Git repository
+         */
+        post: operations["syncPull"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sync/publish-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish all modified DAGs
+         * @description Commits and pushes all modified DAGs to the remote repository
+         */
+        post: operations["syncPublishAll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sync/test-connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test connection to remote repository
+         * @description Tests authentication and connectivity to the configured Git repository
+         */
+        post: operations["syncTestConnection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sync/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Git sync configuration
+         * @description Returns the current Git sync configuration
+         */
+        get: operations["getSyncConfig"];
+        /**
+         * Update Git sync configuration
+         * @description Updates the Git sync configuration
+         */
+        put: operations["updateSyncConfig"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sync/dags/{name}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get diff for a DAG
+         * @description Returns the diff between local and remote versions of a DAG
+         */
+        get: operations["getSyncDAGDiff"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dags/{name}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish a single DAG
+         * @description Commits and pushes a single DAG to the remote repository
+         */
+        post: operations["publishDag"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dags/{name}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Discard local changes for a DAG
+         * @description Discards local changes and reverts to the version in the remote repository
+         */
+        post: operations["discardDagChanges"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2319,6 +2483,187 @@ export interface components {
         SuccessResponse: {
             /** @description Success message */
             message: string;
+        };
+        /**
+         * @description Sync status of a DAG
+         * @enum {string}
+         */
+        SyncStatus: SyncStatus;
+        /**
+         * @description Summary status for the sync badge
+         * @enum {string}
+         */
+        SyncSummary: SyncSummary;
+        /** @description Sync state for a single DAG */
+        SyncDAGState: {
+            status: components["schemas"]["SyncStatus"];
+            /** @description Commit hash when last synced */
+            baseCommit?: string;
+            /** @description Content hash when last synced */
+            lastSyncedHash?: string;
+            /**
+             * Format: date-time
+             * @description When the DAG was last synced
+             */
+            lastSyncedAt?: string;
+            /**
+             * Format: date-time
+             * @description When the DAG was last modified locally
+             */
+            modifiedAt?: string;
+            /** @description Current local content hash */
+            localHash?: string;
+            /** @description Remote commit hash (for conflicts) */
+            remoteCommit?: string;
+            /** @description Author of the remote commit (for conflicts) */
+            remoteAuthor?: string;
+            /** @description Message of the remote commit (for conflicts) */
+            remoteMessage?: string;
+            /**
+             * Format: date-time
+             * @description When the conflict was detected
+             */
+            conflictDetectedAt?: string;
+        };
+        /** @description Counts of DAGs in each sync status */
+        SyncStatusCounts: {
+            synced: number;
+            modified: number;
+            untracked: number;
+            conflict: number;
+        };
+        /** @description Overall Git sync status */
+        SyncStatusResponse: {
+            /** @description Whether Git sync is enabled */
+            enabled: boolean;
+            /** @description Repository URL */
+            repository?: string;
+            /** @description Branch being synced */
+            branch?: string;
+            summary: components["schemas"]["SyncSummary"];
+            /**
+             * Format: date-time
+             * @description When the last sync occurred
+             */
+            lastSyncAt?: string;
+            /** @description Commit hash of last sync */
+            lastSyncCommit?: string;
+            /** @description Status of last sync (success/error) */
+            lastSyncStatus?: string;
+            /** @description Error message from last failed sync */
+            lastError?: string;
+            /** @description Sync state for each DAG */
+            dags?: {
+                [key: string]: components["schemas"]["SyncDAGState"];
+            };
+            counts: components["schemas"]["SyncStatusCounts"];
+        };
+        /** @description Error during sync operation */
+        SyncError: {
+            dagId?: string;
+            message: string;
+        };
+        /** @description Diff between local and remote versions of a DAG */
+        SyncDAGDiffResponse: {
+            /** @description The DAG identifier */
+            dagId: string;
+            status: components["schemas"]["SyncStatus"];
+            /** @description Current local file content */
+            localContent: string;
+            /** @description Content from remote repository */
+            remoteContent?: string;
+            /** @description Commit hash being compared against */
+            remoteCommit?: string;
+            /** @description Author of the remote commit */
+            remoteAuthor?: string;
+            /** @description Commit message of the remote version */
+            remoteMessage?: string;
+        };
+        /** @description Result of a sync operation */
+        SyncResultResponse: {
+            success: boolean;
+            message?: string;
+            /** @description DAG IDs that were synced */
+            synced?: string[];
+            /** @description DAG IDs that were modified */
+            modified?: string[];
+            /** @description DAG IDs with conflicts */
+            conflicts?: string[];
+            errors?: components["schemas"]["SyncError"][];
+            /** Format: date-time */
+            timestamp: string;
+        };
+        /** @description Request to publish a DAG */
+        SyncPublishRequest: {
+            /** @description Commit message */
+            message?: string;
+            /**
+             * @description Force publish even with conflicts
+             * @default false
+             */
+            force: boolean;
+        };
+        /** @description Request to publish all modified DAGs */
+        SyncPublishAllRequest: {
+            /** @description Commit message */
+            message?: string;
+        };
+        /** @description Response when a conflict is detected */
+        SyncConflictResponse: {
+            dagId: string;
+            remoteCommit?: string;
+            remoteAuthor?: string;
+            remoteMessage?: string;
+            message: string;
+        };
+        /** @description Result of connection test */
+        SyncConnectionTestResponse: {
+            success: boolean;
+            message?: string;
+            error?: string;
+        };
+        /** @description Git authentication configuration */
+        SyncAuthConfig: {
+            /** @enum {string} */
+            type: SyncAuthConfigType;
+            /** @description Personal access token (write-only) */
+            token?: string;
+            /** @description Path to SSH private key */
+            sshKeyPath?: string;
+        };
+        /** @description Auto-sync configuration */
+        SyncAutoSyncConfig: {
+            enabled: boolean;
+            onStartup: boolean;
+            /** @description Sync interval in seconds */
+            interval: number;
+        };
+        /** @description Commit configuration */
+        SyncCommitConfig: {
+            authorName?: string;
+            authorEmail?: string;
+        };
+        /** @description Git sync configuration */
+        SyncConfigResponse: {
+            enabled: boolean;
+            repository?: string;
+            branch?: string;
+            path?: string;
+            auth?: components["schemas"]["SyncAuthConfig"];
+            autoSync?: components["schemas"]["SyncAutoSyncConfig"];
+            pushEnabled?: boolean;
+            commit?: components["schemas"]["SyncCommitConfig"];
+        };
+        /** @description Request to update Git sync configuration */
+        SyncConfigUpdateRequest: {
+            enabled?: boolean;
+            repository?: string;
+            branch?: string;
+            path?: string;
+            auth?: components["schemas"]["SyncAuthConfig"];
+            autoSync?: components["schemas"]["SyncAutoSyncConfig"];
+            pushEnabled?: boolean;
+            commit?: components["schemas"]["SyncCommitConfig"];
         };
     };
     responses: never;
@@ -6323,6 +6668,351 @@ export interface operations {
             };
         };
     };
+    getSyncStatus: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sync status retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncStatusResponse"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    syncPull: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pull completed successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncResultResponse"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    syncPublishAll: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyncPublishAllRequest"];
+            };
+        };
+        responses: {
+            /** @description Publish completed successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncResultResponse"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    syncTestConnection: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Connection test result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncConnectionTestResponse"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getSyncConfig: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Configuration retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncConfigResponse"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateSyncConfig: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyncConfigUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Configuration updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncConfigResponse"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getSyncDAGDiff: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description The DAG name (file name without extension) */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Diff retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncDAGDiffResponse"];
+                };
+            };
+            /** @description DAG not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    publishDag: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description The DAG name (file name without extension) */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyncPublishRequest"];
+            };
+        };
+        responses: {
+            /** @description DAG published successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncResultResponse"];
+                };
+            };
+            /** @description DAG not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict detected */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncConflictResponse"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    discardDagChanges: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description The DAG name (file name without extension) */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Changes discarded successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"];
+                };
+            };
+            /** @description DAG not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
 }
 export enum PathsDagsGetParametersQuerySort {
     name = "name",
@@ -6442,4 +7132,20 @@ export enum UserRole {
 export enum UserAuthProvider {
     builtin = "builtin",
     oidc = "oidc"
+}
+export enum SyncStatus {
+    synced = "synced",
+    modified = "modified",
+    untracked = "untracked",
+    conflict = "conflict"
+}
+export enum SyncSummary {
+    synced = "synced",
+    pending = "pending",
+    conflict = "conflict",
+    error = "error"
+}
+export enum SyncAuthConfigType {
+    token = "token",
+    ssh = "ssh"
 }

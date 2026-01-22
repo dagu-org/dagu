@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"path"
+	"path/filepath"
 	"strings"
 	"text/template"
 
@@ -66,17 +67,18 @@ type funcsConfig struct {
 	OIDCButtonLabel string
 	// Terminal configuration
 	TerminalEnabled bool
+	// Git Sync configuration
+	GitSyncEnabled bool
 }
 
 // and simple utility helpers for use inside HTML templates.
 func defaultFunctions(cfg funcsConfig) template.FuncMap {
 	return template.FuncMap{
 		"defTitle": func(ip any) string {
-			v, ok := ip.(string)
-			if !ok || (ok && v == "") {
-				return ""
+			if v, ok := ip.(string); ok {
+				return v
 			}
-			return v
+			return ""
 		},
 		"version": func() string {
 			return config.Version
@@ -97,10 +99,10 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 			return cfg.TZ
 		},
 		"permissionsWriteDags": func() string {
-			return convertBooleanToString(cfg.Permissions[config.PermissionWriteDAGs])
+			return boolToString(cfg.Permissions[config.PermissionWriteDAGs])
 		},
 		"permissionsRunDags": func() string {
-			return convertBooleanToString(cfg.Permissions[config.PermissionRunDAGs])
+			return boolToString(cfg.Permissions[config.PermissionRunDAGs])
 		},
 		"tzOffsetInSec": func() int {
 			return cfg.TzOffsetInSec
@@ -144,22 +146,31 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 		"pathUsersDir": func() string {
 			return cfg.Paths.UsersDir
 		},
+		"pathGitSyncDir": func() string {
+			return filepath.Join(cfg.Paths.DataDir, "gitsync")
+		},
+		"pathAuditLogsDir": func() string {
+			return filepath.Join(cfg.Paths.AdminLogsDir, "audit")
+		},
 		"authMode": func() string {
 			return string(cfg.AuthMode)
 		},
 		"oidcEnabled": func() string {
-			return convertBooleanToString(cfg.OIDCEnabled)
+			return boolToString(cfg.OIDCEnabled)
 		},
 		"oidcButtonLabel": func() string {
 			return cfg.OIDCButtonLabel
 		},
 		"terminalEnabled": func() string {
-			return convertBooleanToString(cfg.TerminalEnabled)
+			return boolToString(cfg.TerminalEnabled)
+		},
+		"gitSyncEnabled": func() string {
+			return boolToString(cfg.GitSyncEnabled)
 		},
 	}
 }
 
-func convertBooleanToString(b bool) string {
+func boolToString(b bool) string {
 	if b {
 		return "true"
 	}
@@ -167,10 +178,5 @@ func convertBooleanToString(b bool) string {
 }
 
 func baseTemplates() []string {
-	var templateFiles = []string{"base.gohtml"}
-	ret := make([]string, 0, len(templateFiles))
-	for _, t := range templateFiles {
-		ret = append(ret, path.Join(templatePath, t))
-	}
-	return ret
+	return []string{path.Join(templatePath, "base.gohtml")}
 }

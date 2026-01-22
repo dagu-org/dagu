@@ -50,6 +50,8 @@ type API struct {
 	resourceService    *resource.Service
 	authService        AuthService
 	auditService       *audit.Service
+	syncService        SyncService
+	dagWritesDisabled  bool // True when git sync read-only mode is active
 }
 
 // AuthService defines the interface for authentication operations.
@@ -102,6 +104,13 @@ func WithAuditService(as *audit.Service) APIOption {
 	}
 }
 
+// WithSyncService returns an APIOption that sets the API's SyncService.
+func WithSyncService(ss SyncService) APIOption {
+	return func(a *API) {
+		a.syncService = ss
+	}
+}
+
 // New constructs an API instance wired with the provided DAG, DAG-run, queue and proc stores,
 // runtime manager, configuration, coordinator client, service registry, metrics registry, and resource service.
 // It also builds the internal remote node map from cfg.Server.RemoteNodes and initializes the sub-command
@@ -150,6 +159,10 @@ func New(
 	for _, opt := range opts {
 		opt(a)
 	}
+
+	// Set read-only mode flag based on git sync config
+	// When enabled with push disabled, DAG write operations are blocked
+	a.dagWritesDisabled = cfg.GitSync.Enabled && !cfg.GitSync.PushEnabled
 
 	return a
 }
@@ -359,27 +372,51 @@ func (a *API) requireAdmin(ctx context.Context) error {
 	return nil
 }
 
-// requireWrite checks if the current user can write (create/edit/delete) DAGs.
-// Returns nil if auth is not enabled (authService is nil).
-func (a *API) requireWrite(ctx context.Context) error {
-	if a.authService == nil {
-		return nil // Auth not enabled, allow access
-	}
-	user, ok := auth.UserFromContext(ctx)
-	if !ok {
-		return &Error{
-			Code:       api.ErrorCodeUnauthorized,
-			Message:    "Authentication required",
-			HTTPStatus: http.StatusUnauthorized,
-		}
-	}
-	if !user.Role.CanWrite() {
+// errDAGWritesDisabled is returned when DAG modifications are blocked in read-only mode.
+var errDAGWritesDisabled = &Error{
+	HTTPStatus: http.StatusForbidden,
+	Code:       api.ErrorCodeForbidden,
+	Message:    "DAG modifications disabled: Git sync is in read-only mode (pushEnabled: false)",
+}
+
+// requireDAGWrite checks all permissions for DAG write operations:
+// 1. Server-level permission (PermissionWriteDAGs)
+// 2. User role permission (CanWrite)
+// 3. Git sync read-only mode (dagWritesDisabled)
+func (a *API) requireDAGWrite(ctx context.Context) error {
+	// Check server-level permission
+	if !a.config.Server.Permissions[config.PermissionWriteDAGs] {
 		return &Error{
 			Code:       api.ErrorCodeForbidden,
-			Message:    "Insufficient permissions",
+			Message:    "Permission denied",
 			HTTPStatus: http.StatusForbidden,
 		}
 	}
+
+	// Check user role permission (if auth enabled)
+	if a.authService != nil {
+		user, ok := auth.UserFromContext(ctx)
+		if !ok {
+			return &Error{
+				Code:       api.ErrorCodeUnauthorized,
+				Message:    "Authentication required",
+				HTTPStatus: http.StatusUnauthorized,
+			}
+		}
+		if !user.Role.CanWrite() {
+			return &Error{
+				Code:       api.ErrorCodeForbidden,
+				Message:    "Insufficient permissions",
+				HTTPStatus: http.StatusForbidden,
+			}
+		}
+	}
+
+	// Check git sync read-only mode
+	if a.dagWritesDisabled {
+		return errDAGWritesDisabled
+	}
+
 	return nil
 }
 

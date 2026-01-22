@@ -31,6 +31,7 @@ import SystemStatus from './pages/system-status';
 import TerminalPage from './pages/terminal';
 import UsersPage from './pages/users';
 import WebhooksPage from './pages/webhooks';
+import GitSyncPage from './pages/git-sync';
 
 type Props = {
   config: Config;
@@ -223,6 +224,14 @@ function AppInner({ config }: Props) {
                                       element={
                                         <ProtectedRoute requiredRole="admin">
                                           <AuditLogsPage />
+                                        </ProtectedRoute>
+                                      }
+                                    />
+                                    <Route
+                                      path="/git-sync"
+                                      element={
+                                        <ProtectedRoute requiredRole="admin">
+                                          <GitSyncPage />
                                         </ProtectedRoute>
                                       }
                                     />

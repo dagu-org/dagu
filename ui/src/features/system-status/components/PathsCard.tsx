@@ -1,4 +1,13 @@
-import { Check, Copy, FolderOpen } from 'lucide-react';
+import {
+  Check,
+  Copy,
+  Database,
+  FileText,
+  FolderOpen,
+  GitBranch,
+  ScrollText,
+  Settings,
+} from 'lucide-react';
 import React from 'react';
 import { Button } from '../../../components/ui/button';
 import {
@@ -10,12 +19,12 @@ import {
 import { useConfig, type PathsConfig } from '../../../contexts/ConfigContext';
 import { cn } from '../../../lib/utils';
 
-interface PathItemProps {
+interface PathRowProps {
   label: string;
   path: string;
 }
 
-function PathItem({ label, path }: PathItemProps) {
+function PathRow({ label, path }: PathRowProps) {
   const [copied, setCopied] = React.useState(false);
 
   const handleCopy = async () => {
@@ -29,29 +38,57 @@ function PathItem({ label, path }: PathItemProps) {
   };
 
   return (
-    <div className="flex items-center gap-2 py-1 group text-sm">
-      <span className="text-muted-foreground shrink-0 w-24">{label}</span>
-      <code
+    <button
+      type="button"
+      onClick={handleCopy}
+      aria-label={`Copy ${label} path`}
+      className={cn(
+        'w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all text-left',
+        'hover:bg-accent/50 group focus:outline-none focus:ring-2 focus:ring-ring'
+      )}
+    >
+      <span className="text-xs text-muted-foreground shrink-0 w-20">
+        {label}
+      </span>
+      <div className="flex-1 min-w-0 overflow-hidden">
+        <code className="font-mono text-xs text-foreground block overflow-x-auto whitespace-nowrap no-scrollbar">
+          {path || '-'}
+        </code>
+      </div>
+      <div
         className={cn(
-          'font-mono px-2 py-1 rounded truncate flex-1 text-xs',
-          'bg-muted text-foreground'
+          'shrink-0 transition-all',
+          copied
+            ? 'text-success'
+            : 'text-muted-foreground/50 group-hover:text-muted-foreground'
         )}
-        title={path}
       >
-        {path || '-'}
-      </code>
-      <button
-        onClick={handleCopy}
-        className={cn(
-          'p-1 rounded transition-all shrink-0',
-          'opacity-0 group-hover:opacity-100',
-          'hover:bg-accent text-muted-foreground hover:text-foreground',
-          copied && 'opacity-100 text-success'
+        {copied ? (
+          <Check className="h-3.5 w-3.5" />
+        ) : (
+          <Copy className="h-3.5 w-3.5" />
         )}
-        title="Copy path"
-      >
-        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-      </button>
+      </div>
+    </button>
+  );
+}
+
+interface PathGroupProps {
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+}
+
+function PathGroup({ icon, title, children }: PathGroupProps) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2 px-3 py-1.5">
+        <span className="text-muted-foreground">{icon}</span>
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          {title}
+        </span>
+      </div>
+      <div className="space-y-0.5">{children}</div>
     </div>
   );
 }
@@ -61,22 +98,6 @@ function PathsCard() {
   const config = useConfig();
   const paths: PathsConfig = config.paths;
 
-  const pathItems = React.useMemo(() => {
-    if (!paths) return [];
-    return [
-      { label: 'Config File', path: paths.configFileUsed },
-      { label: 'Base Config', path: paths.baseConfig },
-      { label: 'DAGs', path: paths.dagsDir },
-      { label: 'DAG Runs', path: paths.dagRunsDir },
-      { label: 'Logs', path: paths.logDir },
-      { label: 'Admin Logs', path: paths.adminLogsDir },
-      { label: 'Queue', path: paths.queueDir },
-      { label: 'Process', path: paths.procDir },
-      { label: 'Services', path: paths.serviceRegistryDir },
-      { label: 'Suspend', path: paths.suspendFlagsDir },
-    ];
-  }, [paths]);
-
   return (
     <>
       <Button onClick={() => setOpen(true)}>
@@ -84,28 +105,64 @@ function PathsCard() {
         Paths
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FolderOpen className="h-4 w-4" />
+        <DialogContent className="sm:max-w-xl p-0 overflow-hidden">
+          <DialogHeader className="px-4 pt-4 pb-3 border-b border-border">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <FolderOpen className="h-4 w-4 text-primary" />
               System Paths
             </DialogTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Click any path to copy to clipboard
+            </p>
           </DialogHeader>
-          <div className="space-y-1">
-            {paths ? (
-              pathItems.map((item) => (
-                <PathItem
-                  key={item.label}
-                  label={item.label}
-                  path={item.path}
-                />
-              ))
-            ) : (
-              <div className="text-sm text-muted-foreground py-2">
+          {paths ? (
+            <div className="px-3 py-4 space-y-4 max-h-[60vh] overflow-y-auto no-scrollbar">
+              <PathGroup
+                icon={<Settings className="h-3.5 w-3.5" />}
+                title="Configuration"
+              >
+                <PathRow label="Config" path={paths.configFileUsed} />
+                <PathRow label="Base" path={paths.baseConfig} />
+              </PathGroup>
+
+              <PathGroup
+                icon={<Database className="h-3.5 w-3.5" />}
+                title="Data"
+              >
+                <PathRow label="DAGs" path={paths.dagsDir} />
+                <PathRow label="DAG Runs" path={paths.dagRunsDir} />
+                <PathRow label="Queue" path={paths.queueDir} />
+                <PathRow label="Process" path={paths.procDir} />
+                <PathRow label="Services" path={paths.serviceRegistryDir} />
+                <PathRow label="Suspend" path={paths.suspendFlagsDir} />
+              </PathGroup>
+
+              <PathGroup
+                icon={<ScrollText className="h-3.5 w-3.5" />}
+                title="Logs"
+              >
+                <PathRow label="Logs" path={paths.logDir} />
+                <PathRow label="Admin" path={paths.adminLogsDir} />
+                <PathRow label="Audit" path={paths.auditLogsDir} />
+              </PathGroup>
+
+              {config.gitSyncEnabled && (
+                <PathGroup
+                  icon={<GitBranch className="h-3.5 w-3.5" />}
+                  title="Git Sync"
+                >
+                  <PathRow label="Sync Dir" path={paths.gitSyncDir} />
+                </PathGroup>
+              )}
+            </div>
+          ) : (
+            <div className="px-6 py-8 text-center">
+              <FileText className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">
                 No path information available
-              </div>
-            )}
-          </div>
+              </p>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </>
