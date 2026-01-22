@@ -596,7 +596,7 @@ steps:
 	assert.Equal(t, "filter-web-dag", result.Items[0].Name)
 
 	// Test tag filtering
-	opts = exec.ListDAGsOptions{Tag: "frontend"}
+	opts = exec.ListDAGsOptions{Tags: []string{"frontend"}}
 	result, errList, err = store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)
@@ -604,7 +604,7 @@ steps:
 	assert.Equal(t, "filter-web-dag", result.Items[0].Name)
 
 	// Test case-insensitive tag filtering
-	opts = exec.ListDAGsOptions{Tag: "FRONTEND"}
+	opts = exec.ListDAGsOptions{Tags: []string{"FRONTEND"}}
 	result, errList, err = store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)
