@@ -4203,7 +4203,8 @@ components:
           description: "Name of the queue this DAG is assigned to. If not specified, the DAG name itself becomes the queue name"
         maxActiveRuns:
           type: integer
-          description: "Maximum number of concurrent DAG-runs allowed from this DAG"
+          description: "DEPRECATED: This field is ignored for local (DAG-based) queues. For concurrency control, use global queues"
+          deprecated: true
         runConfig:
           $ref: "#/components/schemas/RunConfig"
       required:
@@ -4425,7 +4426,8 @@ components:
             $ref: "#/components/schemas/Condition"
         maxActiveRuns:
           type: integer
-          description: "Maximum number of concurrent DAG-runs allowed from this DAG"
+          description: "DEPRECATED: This field is ignored for local (DAG-based) queues. For concurrency control, use global queues"
+          deprecated: true
         queue:
           type: string
           description: "Name of the queue this DAG is assigned to. If not specified, the DAG name itself becomes the queue name"
@@ -5110,7 +5112,7 @@ components:
           description: "Type of queue - 'global' if explicitly defined, 'dag-based' if using DAG name"
         maxConcurrency:
           type: integer
-          description: "Maximum number of concurrent runs allowed. For 'global' queues, this is the configured maxConcurrency. For 'dag-based' queues, this is the DAG's maxActiveRuns (default 1)"
+          description: "Maximum number of concurrent runs allowed. For 'global' queues, this is the configured maxConcurrency. For 'dag-based' queues, this is always 1 (FIFO execution)"
           minimum: 1
         runningCount:
           type: integer
