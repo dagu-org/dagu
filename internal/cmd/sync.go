@@ -57,7 +57,7 @@ Example:
 	)
 }
 
-func runSyncStatus(ctx *Context, args []string) error {
+func runSyncStatus(ctx *Context, _ []string) error {
 	syncSvc, err := newSyncService(ctx)
 	if err != nil {
 		return err
@@ -100,17 +100,17 @@ func runSyncStatus(ctx *Context, args []string) error {
 	if status.Counts.Modified > 0 || status.Counts.Untracked > 0 || status.Counts.Conflict > 0 {
 		fmt.Printf("\nDAGs with pending changes:\n")
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "  NAME\tSTATUS\tMODIFIED AT")
+		_, _ = fmt.Fprintln(w, "  NAME\tSTATUS\tMODIFIED AT")
 		for name, dagState := range status.DAGs {
 			if dagState.Status != gitsync.StatusSynced {
 				modifiedAt := "-"
 				if dagState.ModifiedAt != nil {
 					modifiedAt = dagState.ModifiedAt.Format("2006-01-02 15:04:05")
 				}
-				fmt.Fprintf(w, "  %s\t%s\t%s\n", name, dagState.Status, modifiedAt)
+				_, _ = fmt.Fprintf(w, "  %s\t%s\t%s\n", name, dagState.Status, modifiedAt)
 			}
 		}
-		w.Flush()
+		_ = w.Flush()
 	}
 
 	return nil
@@ -136,7 +136,7 @@ Example:
 	)
 }
 
-func runSyncPull(ctx *Context, args []string) error {
+func runSyncPull(ctx *Context, _ []string) error {
 	syncSvc, err := newSyncService(ctx)
 	if err != nil {
 		return err
@@ -305,7 +305,7 @@ func newSyncService(ctx *Context) (gitsync.Service, error) {
 	syncCfg := gitsync.NewConfigFromGlobal(cfg)
 
 	if !syncCfg.Enabled {
-		return nil, fmt.Errorf("Git sync is not enabled. Set gitSync.enabled=true in your config")
+		return nil, fmt.Errorf("git sync is not enabled, set gitSync.enabled=true in your config")
 	}
 
 	// Create the service

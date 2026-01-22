@@ -12,7 +12,7 @@ import (
 func TestService_GetStatus(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "gitsync-svc-test-*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	dagsDir := filepath.Join(tempDir, "dags")
 	dataDir := filepath.Join(tempDir, "data")

@@ -359,7 +359,7 @@ func (c *GitClient) Reset(filePath string) error {
 	}
 
 	fullPath := filepath.Join(c.repoPath, filePath)
-	if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(fullPath, []byte(content), 0600); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
@@ -424,7 +424,7 @@ func (c *GitClient) ListFiles(extensions []string) ([]string, error) {
 }
 
 // TestConnection tests the connection to the remote repository.
-func (c *GitClient) TestConnection(ctx context.Context) error {
+func (c *GitClient) TestConnection(_ context.Context) error {
 	auth, err := c.getAuth()
 	if err != nil {
 		return err

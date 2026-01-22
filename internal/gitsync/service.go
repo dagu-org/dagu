@@ -196,7 +196,7 @@ func (s *serviceImpl) Pull(ctx context.Context) (*SyncResult, error) {
 }
 
 // syncFilesToDAGsDir syncs files from the repo to the DAGs directory.
-func (s *serviceImpl) syncFilesToDAGsDir(ctx context.Context, pullResult *PullResult) ([]string, []string, error) {
+func (s *serviceImpl) syncFilesToDAGsDir(_ context.Context, pullResult *PullResult) ([]string, []string, error) {
 	var synced []string
 	var conflicts []string
 
@@ -217,14 +217,14 @@ func (s *serviceImpl) syncFilesToDAGsDir(ctx context.Context, pullResult *PullRe
 		dagFilePath := s.dagIDToFilePath(dagID)
 
 		// Read repo file content
-		repoContent, err := os.ReadFile(repoFilePath)
+		repoContent, err := os.ReadFile(repoFilePath) //nolint:gosec // path constructed from internal repo
 		if err != nil {
 			continue
 		}
 		repoHash := ComputeContentHash(repoContent)
 
 		// Check if local file exists
-		localContent, err := os.ReadFile(dagFilePath)
+		localContent, err := os.ReadFile(dagFilePath) //nolint:gosec // path constructed from internal dagsDir
 		dagState := state.DAGs[dagID]
 
 		if err != nil {
@@ -232,7 +232,7 @@ func (s *serviceImpl) syncFilesToDAGsDir(ctx context.Context, pullResult *PullRe
 			if err := s.ensureDir(filepath.Dir(dagFilePath)); err != nil {
 				continue
 			}
-			if err := os.WriteFile(dagFilePath, repoContent, 0644); err != nil {
+			if err := os.WriteFile(dagFilePath, repoContent, 0600); err != nil {
 				continue
 			}
 			now := time.Now()
@@ -280,7 +280,7 @@ func (s *serviceImpl) syncFilesToDAGsDir(ctx context.Context, pullResult *PullRe
 
 		// Only update local file if remote changed (and local wasn't modified)
 		if localHash != repoHash {
-			if err := os.WriteFile(dagFilePath, repoContent, 0644); err != nil {
+			if err := os.WriteFile(dagFilePath, repoContent, 0600); err != nil {
 				continue
 			}
 			now := time.Now()
@@ -335,7 +335,7 @@ func (s *serviceImpl) scanLocalDAGs(state *State) error {
 
 		// Read local file to compute hash
 		filePath := filepath.Join(s.dagsDir, entry.Name())
-		content, err := os.ReadFile(filePath)
+		content, err := os.ReadFile(filePath) //nolint:gosec // path constructed from internal dagsDir
 		if err != nil {
 			continue
 		}
@@ -362,7 +362,7 @@ func (s *serviceImpl) refreshLocalHashes(state *State) bool {
 
 		// Read current local file
 		filePath := s.dagIDToFilePath(dagID)
-		content, err := os.ReadFile(filePath)
+		content, err := os.ReadFile(filePath) //nolint:gosec // path constructed from internal dagsDir
 		if err != nil {
 			// File might be deleted, skip for now
 			continue
@@ -424,7 +424,7 @@ func (s *serviceImpl) Publish(ctx context.Context, dagID, message string, force 
 	dagFilePath := s.dagIDToFilePath(dagID)
 	repoFilePath := s.dagIDToRepoPath(dagID)
 
-	content, err := os.ReadFile(dagFilePath)
+	content, err := os.ReadFile(dagFilePath) //nolint:gosec // path constructed from internal dagsDir
 	if err != nil {
 		return nil, fmt.Errorf("failed to read DAG file: %w", err)
 	}
@@ -433,7 +433,7 @@ func (s *serviceImpl) Publish(ctx context.Context, dagID, message string, force 
 		return nil, err
 	}
 
-	if err := os.WriteFile(s.gitClient.GetFilePath(repoFilePath), content, 0644); err != nil {
+	if err := os.WriteFile(s.gitClient.GetFilePath(repoFilePath), content, 0600); err != nil {
 		return nil, fmt.Errorf("failed to write to repo: %w", err)
 	}
 
@@ -495,7 +495,7 @@ func (s *serviceImpl) PublishAll(ctx context.Context, message string) (*SyncResu
 		dagFilePath := s.dagIDToFilePath(dagID)
 		repoFilePath := s.dagIDToRepoPath(dagID)
 
-		content, err := os.ReadFile(dagFilePath)
+		content, err := os.ReadFile(dagFilePath) //nolint:gosec // path constructed from internal dagsDir
 		if err != nil {
 			result.Errors = append(result.Errors, SyncError{DAGID: dagID, Message: err.Error()})
 			continue
@@ -506,7 +506,7 @@ func (s *serviceImpl) PublishAll(ctx context.Context, message string) (*SyncResu
 			continue
 		}
 
-		if err := os.WriteFile(s.gitClient.GetFilePath(repoFilePath), content, 0644); err != nil {
+		if err := os.WriteFile(s.gitClient.GetFilePath(repoFilePath), content, 0600); err != nil {
 			result.Errors = append(result.Errors, SyncError{DAGID: dagID, Message: err.Error()})
 			continue
 		}
@@ -548,7 +548,7 @@ func (s *serviceImpl) PublishAll(ctx context.Context, message string) (*SyncResu
 	// Update state only for successfully published DAGs
 	for _, dagID := range successfulDAGs {
 		dagFilePath := s.dagIDToFilePath(dagID)
-		content, _ := os.ReadFile(dagFilePath)
+		content, _ := os.ReadFile(dagFilePath) //nolint:gosec // path constructed from internal dagsDir
 		contentHash := ComputeContentHash(content)
 		state.DAGs[dagID] = s.newSyncedDAGState(commitHash, contentHash)
 		result.Synced = append(result.Synced, dagID)
@@ -563,7 +563,7 @@ func (s *serviceImpl) PublishAll(ctx context.Context, message string) (*SyncResu
 }
 
 // Discard discards local changes for a DAG.
-func (s *serviceImpl) Discard(ctx context.Context, dagID string) error {
+func (s *serviceImpl) Discard(_ context.Context, dagID string) error {
 	if err := s.validateEnabled(); err != nil {
 		return err
 	}
@@ -595,7 +595,7 @@ func (s *serviceImpl) Discard(ctx context.Context, dagID string) error {
 
 	// Write to DAGs directory
 	dagFilePath := s.dagIDToFilePath(dagID)
-	if err := os.WriteFile(dagFilePath, repoContent, 0644); err != nil {
+	if err := os.WriteFile(dagFilePath, repoContent, 0600); err != nil {
 		return fmt.Errorf("failed to write DAG file: %w", err)
 	}
 
@@ -608,7 +608,7 @@ func (s *serviceImpl) Discard(ctx context.Context, dagID string) error {
 }
 
 // GetStatus returns the overall sync status.
-func (s *serviceImpl) GetStatus(ctx context.Context) (*OverallStatus, error) {
+func (s *serviceImpl) GetStatus(_ context.Context) (*OverallStatus, error) {
 	status := &OverallStatus{
 		Enabled: s.cfg.Enabled,
 	}
@@ -647,19 +647,7 @@ func (s *serviceImpl) GetStatus(ctx context.Context) (*OverallStatus, error) {
 	status.LastError = state.LastError
 	status.DAGs = state.DAGs
 
-	// Compute counts and summary
-	for _, dagState := range state.DAGs {
-		switch dagState.Status {
-		case StatusSynced:
-			status.Counts.Synced++
-		case StatusModified:
-			status.Counts.Modified++
-		case StatusUntracked:
-			status.Counts.Untracked++
-		case StatusConflict:
-			status.Counts.Conflict++
-		}
-	}
+	status.Counts = computeStatusCounts(state.DAGs)
 
 	// Determine summary status
 	if status.Counts.Conflict > 0 {
@@ -678,7 +666,7 @@ func (s *serviceImpl) GetStatus(ctx context.Context) (*OverallStatus, error) {
 }
 
 // GetDAGStatus returns the sync status for a specific DAG.
-func (s *serviceImpl) GetDAGStatus(ctx context.Context, dagID string) (*DAGState, error) {
+func (s *serviceImpl) GetDAGStatus(_ context.Context, dagID string) (*DAGState, error) {
 	if err := s.validateEnabled(); err != nil {
 		return nil, err
 	}
@@ -697,7 +685,7 @@ func (s *serviceImpl) GetDAGStatus(ctx context.Context, dagID string) (*DAGState
 }
 
 // GetDAGDiff returns the diff between local and remote versions of a DAG.
-func (s *serviceImpl) GetDAGDiff(ctx context.Context, dagID string) (*DAGDiff, error) {
+func (s *serviceImpl) GetDAGDiff(_ context.Context, dagID string) (*DAGDiff, error) {
 	if err := s.validateEnabled(); err != nil {
 		return nil, err
 	}
@@ -712,9 +700,8 @@ func (s *serviceImpl) GetDAGDiff(ctx context.Context, dagID string) (*DAGDiff, e
 		return nil, &DAGNotFoundError{DAGID: dagID}
 	}
 
-	// Read local content
 	localPath := s.dagIDToFilePath(dagID)
-	localContent, err := os.ReadFile(localPath)
+	localContent, err := os.ReadFile(localPath) //nolint:gosec // path constructed from internal dagsDir
 	if err != nil {
 		return nil, fmt.Errorf("failed to read local file: %w", err)
 	}
@@ -725,55 +712,51 @@ func (s *serviceImpl) GetDAGDiff(ctx context.Context, dagID string) (*DAGDiff, e
 		LocalContent: string(localContent),
 	}
 
-	// Get remote content based on status
 	switch dagState.Status {
 	case StatusSynced:
-		// For synced files, remote content is same as local
 		diff.RemoteContent = string(localContent)
 		diff.RemoteCommit = dagState.BaseCommit
 
 	case StatusModified:
-		// Compare against BaseCommit (last synced version)
-		if dagState.BaseCommit != "" {
-			if err := s.gitClient.Open(); err == nil {
-				repoPath := s.dagIDToRepoPath(dagID)
-				if remoteContent, err := s.gitClient.GetFileContentAtCommit(repoPath, dagState.BaseCommit); err == nil {
-					diff.RemoteContent = string(remoteContent)
-				}
-			}
-		}
+		diff.RemoteContent = s.fetchRemoteContent(dagID, dagState.BaseCommit)
 		diff.RemoteCommit = dagState.BaseCommit
 
 	case StatusConflict:
-		// Compare against remote HEAD (what we're conflicting with)
-		if dagState.RemoteCommit != "" {
-			if err := s.gitClient.Open(); err == nil {
-				repoPath := s.dagIDToRepoPath(dagID)
-				if remoteContent, err := s.gitClient.GetFileContentAtCommit(repoPath, dagState.RemoteCommit); err == nil {
-					diff.RemoteContent = string(remoteContent)
-				}
-			}
-		}
+		diff.RemoteContent = s.fetchRemoteContent(dagID, dagState.RemoteCommit)
 		diff.RemoteCommit = dagState.RemoteCommit
 		diff.RemoteAuthor = dagState.RemoteAuthor
 		diff.RemoteMessage = dagState.RemoteMessage
 
 	case StatusUntracked:
-		// New file - no remote version
-		diff.RemoteContent = ""
-		diff.RemoteCommit = ""
+		// No remote version for untracked files
 	}
 
 	return diff, nil
 }
 
+// fetchRemoteContent retrieves the content of a DAG file from a specific commit.
+func (s *serviceImpl) fetchRemoteContent(dagID, commitHash string) string {
+	if commitHash == "" {
+		return ""
+	}
+	if err := s.gitClient.Open(); err != nil {
+		return ""
+	}
+	repoPath := s.dagIDToRepoPath(dagID)
+	content, err := s.gitClient.GetFileContentAtCommit(repoPath, commitHash)
+	if err != nil {
+		return ""
+	}
+	return string(content)
+}
+
 // GetConfig returns the current configuration.
-func (s *serviceImpl) GetConfig(ctx context.Context) (*Config, error) {
+func (s *serviceImpl) GetConfig(_ context.Context) (*Config, error) {
 	return s.cfg, nil
 }
 
 // UpdateConfig updates the configuration.
-func (s *serviceImpl) UpdateConfig(ctx context.Context, cfg *Config) error {
+func (s *serviceImpl) UpdateConfig(_ context.Context, cfg *Config) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -884,7 +867,7 @@ func (s *serviceImpl) updateLastSyncError(err error) {
 	errMsg := err.Error()
 	state.LastError = &errMsg
 	state.LastSyncStatus = "error"
-	s.stateManager.Save(state)
+	_ = s.stateManager.Save(state)
 }
 
 func (s *serviceImpl) filePathToDAGID(filePath string) string {
@@ -921,7 +904,7 @@ func (s *serviceImpl) dagIDToRepoPath(dagID string) string {
 }
 
 func (s *serviceImpl) ensureDir(dir string) error {
-	return os.MkdirAll(dir, 0755)
+	return os.MkdirAll(dir, 0750)
 }
 
 // validateEnabled checks if git sync is enabled and configured.
@@ -1027,4 +1010,22 @@ func (s *serviceImpl) buildPullMessage(alreadyUpToDate bool, synced, conflicts [
 		return "Already up to date"
 	}
 	return fmt.Sprintf("Synced %d DAG(s)", len(synced))
+}
+
+// computeStatusCounts computes the counts for each DAG status.
+func computeStatusCounts(dags map[string]*DAGState) StatusCounts {
+	var counts StatusCounts
+	for _, dagState := range dags {
+		switch dagState.Status {
+		case StatusSynced:
+			counts.Synced++
+		case StatusModified:
+			counts.Modified++
+		case StatusUntracked:
+			counts.Untracked++
+		case StatusConflict:
+			counts.Conflict++
+		}
+	}
+	return counts
 }

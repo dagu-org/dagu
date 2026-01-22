@@ -58,7 +58,7 @@ func TestGitClient_LocalOps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	repoPath := filepath.Join(tempDir, "repo")
 	err = os.MkdirAll(repoPath, 0755)

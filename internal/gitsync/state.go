@@ -140,7 +140,7 @@ func (m *StateManager) Save(state *State) error {
 
 	// Ensure directory exists
 	dir := filepath.Dir(m.statePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("failed to create state directory: %w", err)
 	}
 
@@ -151,12 +151,12 @@ func (m *StateManager) Save(state *State) error {
 
 	// Write atomically using temp file
 	tmpPath := m.statePath + ".tmp"
-	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
+	if err := os.WriteFile(tmpPath, data, 0600); err != nil {
 		return fmt.Errorf("failed to write state file: %w", err)
 	}
 
 	if err := os.Rename(tmpPath, m.statePath); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("failed to rename state file: %w", err)
 	}
 
