@@ -593,17 +593,6 @@ func containsSearchText(text string, search string) bool {
 	return strings.Contains(strings.ToLower(text), strings.ToLower(search))
 }
 
-// containsTag checks if the tags contain the search tag (case-insensitive).
-func containsTag(tags []string, searchTag string) bool {
-	for _, tag := range tags {
-		if strings.EqualFold(tag, searchTag) {
-			return true
-		}
-	}
-
-	return false
-}
-
 // containsAllTags checks if the DAG tags contain all the filter tags (AND logic, case-insensitive).
 func containsAllTags(dagTags, filterTags []string) bool {
 	dagTagsLower := make(map[string]bool, len(dagTags))

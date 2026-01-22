@@ -211,41 +211,24 @@ function TagCombobox({
         </div>
       </div>
 
-      {isOpen && filteredSuggestions.length > 0 && (
+      {isOpen && (filteredSuggestions.length > 0 || inputValue.trim()) && (
         <div className="absolute z-50 mt-1 w-full max-h-[200px] overflow-y-auto rounded-md border border-border bg-popover shadow-md">
-          {filteredSuggestions.map((tag, index) => (
-            <div
-              key={tag}
-              className={cn(
-                'px-3 py-1.5 text-sm cursor-pointer',
-                index === highlightedIndex
-                  ? 'bg-accent text-accent-foreground'
-                  : 'hover:bg-muted'
-              )}
-              onClick={() => handleSuggestionClick(tag)}
-              onMouseEnter={() => setHighlightedIndex(index)}
-            >
-              {tag}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {isOpen && inputValue.trim() && !filteredSuggestions.some(
-        (t) => t.toLowerCase() === inputValue.toLowerCase().trim()
-      ) && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md">
-          <div
-            className={cn(
-              'px-3 py-1.5 text-sm cursor-pointer hover:bg-muted',
-              filteredSuggestions.length === 0 && highlightedIndex === -1
-                ? 'bg-accent text-accent-foreground'
-                : ''
+          {inputValue.trim() &&
+            !filteredSuggestions.some(
+              (t) => t.toLowerCase() === inputValue.toLowerCase().trim()
+            ) && (
+              <div
+                className={cn(
+                  'px-3 py-1.5 text-sm cursor-pointer hover:bg-muted',
+                  filteredSuggestions.length === 0 && highlightedIndex === -1
+                    ? 'bg-accent text-accent-foreground'
+                    : ''
+                )}
+                onClick={() => addTag(inputValue)}
+              >
+                Add "{inputValue.trim()}"
+              </div>
             )}
-            onClick={() => addTag(inputValue)}
-          >
-            Add "{inputValue.trim()}"
-          </div>
           {filteredSuggestions.map((tag, index) => (
             <div
               key={tag}

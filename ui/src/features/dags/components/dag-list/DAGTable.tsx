@@ -774,11 +774,12 @@ const SortableHeader = ({
   };
 
   // Determine which order to show
-  const displayOrder = isServerActive
-    ? currentOrder
-    : isClientActive
-      ? clientOrder
-      : '';
+  function getDisplayOrder(): string {
+    if (isServerActive) return currentOrder || '';
+    if (isClientActive) return clientOrder || '';
+    return '';
+  }
+  const displayOrder = getDisplayOrder();
 
   const button = (
     <Button
@@ -1073,13 +1074,7 @@ function DAGTable({
     meta: {
       group,
       refreshFn,
-      onTagClick: (tag: string) => {
-        // Add tag to search tags if not already present
-        const normalizedTag = tag.toLowerCase();
-        if (!searchTags.includes(normalizedTag)) {
-          handleSearchTagsChange([...searchTags, normalizedTag]);
-        }
-      },
+      onTagClick: handleTagClick,
     },
   });
 
