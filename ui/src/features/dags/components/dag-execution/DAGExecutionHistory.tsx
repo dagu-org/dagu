@@ -9,7 +9,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { components, NodeStatus, Status, Stream } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient, useQuery } from '../../../../hooks/api';
-import { toMermaidNodeId } from '../../../../lib/utils';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
 import { getEventHandlers } from '../../lib/getEventHandlers';
@@ -278,16 +277,14 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
    * Handle double-click on graph node (navigate to sub dagRun)
    */
   const onSelectStepOnGraph = React.useCallback(
-    async (id: string) => {
+    async (stepName: string) => {
       const dagRun = reversedDAGRuns[idx];
       if (!dagRun) {
         return;
       }
 
-      // Find the clicked step
-      const n = dagRun.nodes?.find(
-        (n) => toMermaidNodeId(n.step.name) == id
-      );
+      // Find the clicked step by name
+      const n = dagRun.nodes?.find((n) => n.step.name === stepName);
       if (!n) return;
 
       // If it's a sub dagRun, navigate to its details
@@ -314,7 +311,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
    * Handle right-click on graph node (show status update modal)
    */
   const onRightClickStepOnGraph = React.useCallback(
-    (id: string) => {
+    (stepName: string) => {
       const dagRun = reversedDAGRuns[idx];
       if (!dagRun) {
         return;
@@ -328,10 +325,8 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
         return;
       }
 
-      // Find the right-clicked step
-      const n = dagRun.nodes?.find(
-        (n) => toMermaidNodeId(n.step.name) == id
-      );
+      // Find the right-clicked step by name
+      const n = dagRun.nodes?.find((n) => n.step.name === stepName);
 
       if (n) {
         setSelectedStep(n.step);

@@ -20,7 +20,6 @@ import { components, NodeStatus, Status, Stream } from '../../../api/v2/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { useConfig } from '../../../contexts/ConfigContext';
 import { useClient } from '../../../hooks/api';
-import { toMermaidNodeId } from '../../../lib/utils';
 import BorderedBox from '../../../ui/BorderedBox';
 import { DAGRunOutputs } from '../../dag-runs/components/dag-run-details';
 import { DAGContext } from '../contexts/DAGContext';
@@ -140,9 +139,9 @@ function DAGStatus({ dagRun, fileName }: Props) {
   };
   // Handle double-click on graph node (navigate to sub dagRun)
   const onSelectStepOnGraph = React.useCallback(
-    async (id: string) => {
-      // find the clicked step
-      const n = dagRun.nodes?.find((n) => toMermaidNodeId(n.step.name) == id);
+    async (stepName: string) => {
+      // find the clicked step by name
+      const n = dagRun.nodes?.find((n) => n.step.name === stepName);
       if (!n) return;
 
       // Combine both regular children and repeated children
@@ -228,7 +227,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
 
   // Handle right-click on graph node (show status update modal)
   const onRightClickStepOnGraph = React.useCallback(
-    (id: string) => {
+    (stepName: string) => {
       // Check if user has permission to run DAGs
       if (!config.permissions.runDags) {
         return;
@@ -238,8 +237,8 @@ function DAGStatus({ dagRun, fileName }: Props) {
 
       // Only allow status updates for completed DAG runs
       if (status !== Status.Running && status !== Status.NotStarted) {
-        // find the right-clicked step
-        const n = dagRun.nodes?.find((n) => toMermaidNodeId(n.step.name) == id);
+        // find the right-clicked step by name
+        const n = dagRun.nodes?.find((n) => n.step.name === stepName);
 
         if (n) {
           // Show the modal (it will be centered by default)
