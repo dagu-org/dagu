@@ -25,10 +25,11 @@ steps:
 }
 
 func TestGlobalConcurrency(t *testing.T) {
+	// This test uses a global queue with maxConcurrency=3 to verify concurrent execution.
+	// Note: maxActiveRuns at DAG level is deprecated and intentionally omitted.
 	f := newFixture(t, `
 name: sleep-dag
 queue: global-queue
-maxActiveRuns: 1
 steps:
   - name: sleep
     command: sleep 1
@@ -40,20 +41,28 @@ steps:
 	f.AssertConcurrent(2 * time.Second)
 }
 
-func TestDAGMaxActiveRuns(t *testing.T) {
-	start := time.Now()
+func TestLocalQueueFIFOProcessing(t *testing.T) {
+	// Local queues always use maxConcurrency=1 (FIFO), ignoring DAG's maxActiveRuns.
+	// This verifies that even with maxActiveRuns: 3, local queues process sequentially.
 	f := newFixture(t, `
 name: batch-dag
 maxActiveRuns: 3
 steps:
   - name: sleep
-    command: sleep 2
+    command: sleep 1
 `).Enqueue(3).StartScheduler(30 * time.Second)
 
 	f.WaitDrain(20 * time.Second)
 	f.Stop()
-	f.AssertConcurrent(2 * time.Second)
-	require.Less(t, time.Since(start), 8*time.Second)
+
+	// Verify sequential processing: start times should be at least 1 second apart
+	times := f.collectStartTimes()
+	require.Len(t, times, 3)
+	for i := 1; i < len(times); i++ {
+		diff := times[i].Sub(times[i-1])
+		require.GreaterOrEqual(t, diff, 900*time.Millisecond,
+			"Local queue should process sequentially (FIFO), not concurrently")
+	}
 }
 
 func TestPriorityOrdering(t *testing.T) {

@@ -767,12 +767,13 @@ func TestDAG_InitializeDefaults(t *testing.T) {
 		assert.Equal(t, 5, dag.MaxActiveRuns)
 	})
 
-	t.Run("negative MaxActiveRuns preserved (queueing disabled)", func(t *testing.T) {
+	t.Run("negative MaxActiveRuns preserved (deprecated)", func(t *testing.T) {
 		t.Parallel()
 		dag := &core.DAG{MaxActiveRuns: -1}
 		core.InitializeDefaults(dag)
 
-		// Negative values mean queueing is disabled, should be preserved
+		// Negative values are deprecated but still preserved for backwards compatibility
+		// A build warning will be emitted when the DAG is loaded
 		assert.Equal(t, -1, dag.MaxActiveRuns)
 	})
 }

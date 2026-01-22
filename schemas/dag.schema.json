@@ -270,7 +270,8 @@
     "maxActiveRuns": {
       "type": "integer",
       "default": 1,
-      "description": "Maximum number of concurrent DAG runs allowed. Useful for limiting resource usage and preventing overload. If exceeded, new runs will be queued until existing ones complete. Defaults to 1. Set to -1 to disable queueing for this DAG."
+      "description": "DEPRECATED: This field is ignored for local (DAG-based) queues. For concurrency control, define a global queue in config and use the 'queue' field.",
+      "deprecated": true
     },
     "queue": {
       "type": "string",

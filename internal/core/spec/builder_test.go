@@ -3305,3 +3305,86 @@ steps:
 		assert.Contains(t, err.Error(), "invalid logOutput value")
 	})
 }
+
+func TestMaxActiveRunsDeprecationWarning(t *testing.T) {
+	t.Parallel()
+
+	t.Run("NoWarningForDefault", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+name: test-dag
+steps:
+  - name: step1
+    command: echo hello
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Empty(t, dag.BuildWarnings)
+	})
+
+	t.Run("NoWarningForMaxActiveRuns1", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+name: test-dag
+maxActiveRuns: 1
+steps:
+  - name: step1
+    command: echo hello
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		assert.Empty(t, dag.BuildWarnings)
+	})
+
+	t.Run("WarningForMaxActiveRunsGreaterThan1", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+name: test-dag
+maxActiveRuns: 3
+steps:
+  - name: step1
+    command: echo hello
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.BuildWarnings, 1)
+		assert.Contains(t, dag.BuildWarnings[0], "maxActiveRuns=3 is deprecated")
+		assert.Contains(t, dag.BuildWarnings[0], "global queue")
+	})
+
+	t.Run("WarningForNegativeMaxActiveRuns", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+name: test-dag
+maxActiveRuns: -1
+steps:
+  - name: step1
+    command: echo hello
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		require.Len(t, dag.BuildWarnings, 1)
+		assert.Contains(t, dag.BuildWarnings[0], "maxActiveRuns=-1 is deprecated")
+	})
+
+	t.Run("NoWarningWithGlobalQueue", func(t *testing.T) {
+		t.Parallel()
+
+		data := []byte(`
+name: test-dag
+queue: my-global-queue
+maxActiveRuns: 5
+steps:
+  - name: step1
+    command: echo hello
+`)
+		dag, err := spec.LoadYAML(context.Background(), data)
+		require.NoError(t, err)
+		// No warning when using a global queue (queue field is set)
+		assert.Empty(t, dag.BuildWarnings)
+	})
+}

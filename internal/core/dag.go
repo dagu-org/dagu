@@ -150,6 +150,8 @@ type DAG struct {
 	// MaxActiveSteps specifies the maximum concurrent steps to run in an execution.
 	MaxActiveSteps int `json:"maxActiveSteps,omitempty"`
 	// MaxActiveRuns specifies the maximum number of concurrent dag-runs.
+	// DEPRECATED: This field is ignored for local (DAG-based) queues.
+	// For concurrency control, define a global queue in config and use the 'queue' field.
 	MaxActiveRuns int `json:"maxActiveRuns,omitempty"`
 	// MaxCleanUpTime is the maximum time to wait for cleanup when the DAG is stopped.
 	MaxCleanUpTime time.Duration `json:"maxCleanUpTime,omitempty"`
@@ -425,7 +427,6 @@ func (d *DAG) initializeDefaults() {
 	}
 
 	// Set default max active runs to 1 only when not specified (0).
-	// MaxActiveRuns < 0 means queueing is disabled for this DAG.
 	if d.MaxActiveRuns == 0 {
 		d.MaxActiveRuns = 1
 	}

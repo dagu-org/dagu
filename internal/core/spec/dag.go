@@ -477,6 +477,16 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 	// Run the transformer pipeline
 	errs := runTransformers(ctx, d, result)
 
+	// Add deprecation warning for maxActiveRuns on local queues
+	// Both maxActiveRuns > 1 (concurrency) and maxActiveRuns < 0 (queue bypass) are deprecated
+	if result.Queue == "" && (result.MaxActiveRuns > 1 || result.MaxActiveRuns < 0) {
+		result.BuildWarnings = append(result.BuildWarnings, fmt.Sprintf(
+			"maxActiveRuns=%d is deprecated for local queues and will be ignored. "+
+				"Use a global queue with 'queue:' field for concurrency control.",
+			result.MaxActiveRuns,
+		))
+	}
+
 	// Build handlers and steps directly (they need access to partially built result)
 	if !ctx.opts.Has(BuildFlagOnlyMetadata) {
 		if handlerOn, err := buildHandlers(ctx, d, result); err != nil {
