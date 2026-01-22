@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/backoff"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
@@ -14,26 +15,41 @@ import (
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
-var errProcessorClosed = errors.New("processor closed")
+var (
+	errProcessorClosed = errors.New("processor closed")
+	errNotStarted      = errors.New("execution not started")
+)
 
-// inFlightTTL is the time after which an in-flight item can be re-dispatched.
-// This handles cases where a process crashes before establishing heartbeat.
-const inFlightTTL = 10 * time.Minute
+// BackoffConfig holds configuration for exponential backoff retry logic.
+type BackoffConfig struct {
+	InitialInterval time.Duration
+	MaxInterval     time.Duration
+	MaxRetries      int
+}
+
+// DefaultBackoffConfig returns the default backoff configuration.
+func DefaultBackoffConfig() BackoffConfig {
+	return BackoffConfig{
+		InitialInterval: 500 * time.Millisecond,
+		MaxInterval:     60 * time.Second,
+		MaxRetries:      10,
+	}
+}
 
 // QueueProcessor is responsible for processing queued DAG runs.
 type QueueProcessor struct {
-	queueStore  exec.QueueStore
-	dagRunStore exec.DAGRunStore
-	procStore   exec.ProcStore
-	dagExecutor *DAGExecutor
-	queues      sync.Map // map[string]*queue
-	inFlight    sync.Map // map[string]time.Time - tracks dispatched items to prevent duplicate dispatch
-	wakeUpCh    chan struct{}
-	quit        chan struct{}
-	wg          sync.WaitGroup
-	stopOnce    sync.Once
-	prevTime    time.Time
-	lock        sync.Mutex
+	queueStore    exec.QueueStore
+	dagRunStore   exec.DAGRunStore
+	procStore     exec.ProcStore
+	dagExecutor   *DAGExecutor
+	queues        sync.Map // map[string]*queue
+	wakeUpCh      chan struct{}
+	quit          chan struct{}
+	wg            sync.WaitGroup
+	stopOnce      sync.Once
+	prevTime      time.Time
+	lock          sync.Mutex
+	backoffConfig BackoffConfig
 }
 
 type queue struct {
@@ -48,10 +64,26 @@ func (q *queue) maxConc() int {
 	return q.maxConcurrency
 }
 
+func (q *queue) setMaxConc(val int) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.maxConcurrency = max(val, 1)
+}
+
 func (q *queue) isGlobalQueue() bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return q.isGlobal
+}
+
+// QueueProcessorOption is a functional option for configuring QueueProcessor.
+type QueueProcessorOption func(*QueueProcessor)
+
+// WithBackoffConfig sets a custom backoff configuration for the processor.
+func WithBackoffConfig(cfg BackoffConfig) QueueProcessorOption {
+	return func(p *QueueProcessor) {
+		p.backoffConfig = cfg
+	}
 }
 
 // NewQueueProcessor creates a new QueueProcessor.
@@ -61,15 +93,21 @@ func NewQueueProcessor(
 	procStore exec.ProcStore,
 	dagExecutor *DAGExecutor,
 	queuesConfig config.Queues,
+	opts ...QueueProcessorOption,
 ) *QueueProcessor {
 	p := &QueueProcessor{
-		queueStore:  queueStore,
-		dagRunStore: dagRunStore,
-		procStore:   procStore,
-		dagExecutor: dagExecutor,
-		wakeUpCh:    make(chan struct{}, 1),
-		quit:        make(chan struct{}),
-		prevTime:    time.Now(),
+		queueStore:    queueStore,
+		dagRunStore:   dagRunStore,
+		procStore:     procStore,
+		dagExecutor:   dagExecutor,
+		wakeUpCh:      make(chan struct{}, 1),
+		quit:          make(chan struct{}),
+		prevTime:      time.Now(),
+		backoffConfig: DefaultBackoffConfig(),
+	}
+
+	for _, opt := range opts {
+		opt(p)
 	}
 
 	for _, queueConfig := range queuesConfig.Config {
@@ -243,6 +281,18 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 
 	defer p.wakeUp()
 
+	// For non-global queues, update maxConcurrency from the first queued item's DAG
+	// before calculating available slots. This ensures we use the DAG's configured
+	// maxActiveRuns instead of the default value of 1.
+	if !q.isGlobalQueue() {
+		if err := p.updateQueueMaxConcurrency(ctx, q, items[0]); err != nil {
+			logger.Warn(ctx, "Failed to update queue max concurrency from DAG",
+				tag.Error(err),
+			)
+			// Continue with current maxConcurrency value
+		}
+	}
+
 	alive, err := p.procStore.CountAlive(ctx, queueName)
 	if err != nil {
 		logger.Error(ctx, "Failed to count alive processes",
@@ -311,29 +361,26 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemDat
 
 	runRef := *data
 	runID := runRef.ID
-	inFlightKey := queueName + "/" + runID
+	logger.Debug(ctx, "Processing queue item",
+		tag.Name(runRef.Name),
+	)
 
-	logger.Debug(ctx, "Processing queue item", tag.Name(runRef.Name))
-
-	// Check if the DAG run is already running (heartbeat detected)
-	running, err := p.procStore.IsRunAlive(ctx, queueName, runRef)
-	if err != nil {
+	// Check if the DAG run is already running
+	if running, err := p.procStore.IsRunAlive(ctx, queueName, runRef); err != nil {
 		logger.Error(ctx, "Failed to check if run is alive", tag.Error(err))
 		return false
-	}
-	if running {
+	} else if running {
 		logger.Warn(ctx, "DAG run is already running, discarding")
-		p.inFlight.Delete(inFlightKey) // Clean up if it was in-flight
-		return true
+		return true // Discarded, so it's "processed" from the queue's perspective
 	}
 
-	// Fetch the DAG run attempt
+	// Fetch the DAG of the dag-run attempt first to get queue configuration
 	attempt, err := p.dagRunStore.FindAttempt(ctx, runRef)
 	if err != nil {
 		logger.Error(ctx, "Failed to find run", tag.Error(err))
+		// If the attempt doesn't exist at all, mark as discard
 		if errors.Is(err, exec.ErrDAGRunIDNotFound) {
 			logger.Error(ctx, "DAG run not found, discarding")
-			p.inFlight.Delete(inFlightKey)
 			return true
 		}
 		return false
@@ -341,7 +388,6 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemDat
 
 	if attempt.Hidden() {
 		logger.Info(ctx, "DAG run is hidden, discarding")
-		p.inFlight.Delete(inFlightKey)
 		return true
 	}
 
@@ -349,69 +395,59 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemDat
 	if err != nil {
 		if errors.Is(err, exec.ErrCorruptedStatusFile) {
 			logger.Error(ctx, "Status file is corrupted, marking as invalid", tag.Error(err))
-			p.inFlight.Delete(inFlightKey)
 			return true
+		} else {
+			logger.Error(ctx, "Failed to read status", tag.Error(err))
 		}
-		logger.Error(ctx, "Failed to read status", tag.Error(err))
 		return false
 	}
 
 	if st.Status != core.Queued {
-		logger.Info(ctx, "Status is not queued, skipping", tag.Status(st.Status.String()))
-		p.inFlight.Delete(inFlightKey)
+		logger.Info(ctx, "Status is not queued, skipping",
+			tag.Status(st.Status.String()),
+		)
 		return true
 	}
 
-	// Check if already dispatched (in-flight) - prevents duplicate ExecuteDAG calls
-	if dispatchTime, alreadyDispatched := p.inFlight.Load(inFlightKey); alreadyDispatched {
-		elapsed := time.Since(dispatchTime.(time.Time))
-		if elapsed < inFlightTTL {
-			// Recently dispatched, just check if startup confirmed
-			logger.Debug(ctx, "Already in-flight, checking startup", tag.Duration(elapsed))
-			started, err := p.checkStartup(ctx, queueName, runRef)
-			if err != nil && !errors.Is(err, errProcessorClosed) {
-				logger.Warn(ctx, "Failed to check startup", tag.Error(err))
-			}
-			if started {
-				p.inFlight.Delete(inFlightKey)
-			}
-			return started
-		}
-		// TTL expired - process may have crashed, allow re-dispatch
-		logger.Warn(ctx, "In-flight TTL expired, allowing re-dispatch", tag.Duration(elapsed))
-		p.inFlight.Delete(inFlightKey)
-	}
-
-	// Read DAG for execution
 	dag, err := attempt.ReadDAG(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to read DAG", tag.Error(err), tag.DAG(runRef.Name))
+		logger.Error(ctx, "Failed to read DAG",
+			tag.Error(err),
+			tag.DAG(runRef.Name),
+		)
 		return false
 	}
 
-	// Mark as in-flight BEFORE dispatching
-	p.inFlight.Store(inFlightKey, time.Now())
+	// Update the queue configuration with the latest execution
+	// Only update maxConcurrency for DAG-based queues, not for global queues
+	// Global queues have their maxConcurrency set from config and should not be overridden
+	queueVal, _ := p.queues.Load(queueName)
+	queue := queueVal.(*queue)
+	if !queue.isGlobalQueue() {
+		queue.setMaxConc(dag.MaxActiveRuns)
+	}
 
-	// Dispatch the DAG
 	if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID, st); err != nil {
 		logger.Error(ctx, "Failed to execute DAG", tag.Error(err))
-		p.inFlight.Delete(inFlightKey) // Failed to dispatch, allow retry
 		return false
 	}
 
-	// Single immediate check for startup - no blocking retry
-	started, err := p.checkStartup(ctx, queueName, runRef)
-	if err != nil {
-		if errors.Is(err, errProcessorClosed) || errors.Is(err, context.Canceled) {
-			return false // Shutdown - keep in queue, keep in-flight
-		}
-		logger.Warn(ctx, "Failed to check startup", tag.Error(err))
-		return false // Error - keep in queue for next iteration
+	// Use exponential backoff for retries for monitoring the execution start
+	policy := backoff.NewExponentialBackoffPolicy(p.backoffConfig.InitialInterval)
+	policy.MaxInterval = p.backoffConfig.MaxInterval
+	policy.MaxRetries = p.backoffConfig.MaxRetries
+
+	var started bool
+	operation := func(ctx context.Context) error {
+		started, err = p.monitorStartup(ctx, queueName, runRef)
+		return err
 	}
 
-	if started {
-		p.inFlight.Delete(inFlightKey)
+	if err := backoff.Retry(ctx, operation, policy, nil); err != nil {
+		logger.Error(ctx, "Failed to execute DAG after retries", tag.Error(err))
 	}
+
+	// Successfully dispatched/started, remove from queue
 	return started
 }
 
@@ -422,31 +458,34 @@ func (p *QueueProcessor) wakeUp() {
 	}
 }
 
-// checkStartup checks if the DAG has started (heartbeat or status change).
-// Returns true if startup confirmed (should dequeue), false if not yet started.
-// This is a single immediate check - no retry loop.
-func (p *QueueProcessor) checkStartup(ctx context.Context, queueName string, runRef exec.DAGRunRef) (bool, error) {
+func (p *QueueProcessor) monitorStartup(ctx context.Context, queueName string, runRef exec.DAGRunRef) (bool, error) {
 	select {
 	case <-ctx.Done():
-		return false, ctx.Err()
+		logger.Debug(ctx, "Context canceled")
+		return false, backoff.PermanentError(ctx.Err())
 	case <-p.quit:
-		return false, errProcessorClosed
+		logger.Info(ctx, "Processor is closed")
+		return false, backoff.PermanentError(errProcessorClosed)
 	default:
 	}
 
 	// Check if the process is alive (has heartbeat)
 	isAlive, err := p.procStore.IsRunAlive(ctx, queueName, runRef)
 	if err != nil {
-		logger.Warn(ctx, "Failed to check run liveness", tag.Error(err))
-		// Continue to status check
+		logger.Warn(ctx, "Failed to check run liveness",
+			tag.Error(err),
+			tag.Queue(queueName),
+			tag.RunID(runRef.ID),
+		)
+		// Continue checking on error
 	} else if isAlive {
 		logger.Info(ctx, "DAG run has started (heartbeat detected)")
 		return true, nil
 	}
 
-	// Check status file
 	att, err := p.dagRunStore.FindAttempt(ctx, runRef)
 	if err != nil {
+		logger.Debug(ctx, "Failed to read attempt, keep checking")
 		return false, err
 	}
 
@@ -455,14 +494,52 @@ func (p *QueueProcessor) checkStartup(ctx context.Context, queueName string, run
 		return false, err
 	}
 
-	// If status changed from Queued, the DAG has been processed
-	if status.Status != core.Queued {
+	if status.Status != core.Queued && status.Status != core.Running {
 		logger.Info(ctx, "DAG execution started or finished",
 			tag.Status(status.Status.String()),
 		)
 		return true, nil
 	}
 
-	// Not started yet - keep in queue for next iteration
-	return false, nil
+	return false, errNotStarted
+}
+
+// updateQueueMaxConcurrency reads the DAG from a queued item and updates
+// the queue's maxConcurrency based on the DAG's MaxActiveRuns setting.
+// This is used to initialize non-global queues with the correct concurrency
+// before calculating how many items to process.
+//
+// This function includes retry logic to handle race conditions where the DAG
+// file may not be fully written to disk when the queue item is first processed.
+func (p *QueueProcessor) updateQueueMaxConcurrency(ctx context.Context, q *queue, item exec.QueuedItemData) error {
+	data, err := item.Data()
+	if err != nil {
+		return err
+	}
+
+	runRef := *data
+
+	policy := backoff.NewExponentialBackoffPolicy(p.backoffConfig.InitialInterval)
+	policy.MaxInterval = p.backoffConfig.MaxInterval
+	policy.MaxRetries = p.backoffConfig.MaxRetries
+
+	operation := func(ctx context.Context) error {
+		dag, err := p.readDAGFromAttempt(ctx, runRef)
+		if err != nil {
+			return err
+		}
+		q.setMaxConc(dag.MaxActiveRuns)
+		return nil
+	}
+
+	return backoff.Retry(ctx, operation, policy, nil)
+}
+
+// readDAGFromAttempt finds a DAG run attempt and reads its DAG definition.
+func (p *QueueProcessor) readDAGFromAttempt(ctx context.Context, runRef exec.DAGRunRef) (*core.DAG, error) {
+	attempt, err := p.dagRunStore.FindAttempt(ctx, runRef)
+	if err != nil {
+		return nil, err
+	}
+	return attempt.ReadDAG(ctx)
 }
