@@ -71,11 +71,9 @@ func WithListener(l net.Listener) ServerOption {
 	}
 }
 
-// NewServer constructs a Server configured from cfg and the provided stores, managers, and services.
-// It extracts remote node names from cfg.Server.RemoteNodes, initializes apiV1 and apiV2 with the given dependencies, and populates the Server's funcsConfig fields from cfg.
 // NewServer constructs and returns a Server configured from the provided configuration,
 // stores, managers, and services.
-// It initializes API v1 and v2, populates the server configuration (including UI function
+// It initializes API v2, populates the server configuration (including UI function
 // configuration), and wires an initialized builtin auth service into API v2 when
 // cfg.Server.Auth.Mode is set to builtin.
 // Returns the constructed *Server, or an error if initialization fails (for example,
@@ -517,15 +515,13 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 // setupAPIRoutes configures the API v2 routes
 func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV2BasePath, schema string) error {
 	var setupErr error
-
 	r.Route(apiV2BasePath, func(r chi.Router) {
 		url := fmt.Sprintf("%s://%s:%d%s", schema, srv.config.Server.Host, srv.config.Server.Port, apiV2BasePath)
 		if err := srv.apiV2.ConfigureRoutes(ctx, r, url); err != nil {
-			logger.Error(ctx, "Failed to configure v2 API routes", tag.Error(err))
+			logger.Error(ctx, "Failed to configure API routes", tag.Error(err))
 			setupErr = err
 		}
 	})
-
 	return setupErr
 }
 
