@@ -365,12 +365,12 @@ export default function GitSyncPage() {
               const filters = ['all', 'modified', 'untracked', 'conflict'] as const;
               if (e.key === 'ArrowRight') {
                 e.preventDefault();
-                const next = filters[(index + 1) % filters.length];
-                setFilter(next);
+                const nextFilter = filters[(index + 1) % filters.length];
+                if (nextFilter) setFilter(nextFilter);
               } else if (e.key === 'ArrowLeft') {
                 e.preventDefault();
-                const prev = filters[(index - 1 + filters.length) % filters.length];
-                setFilter(prev);
+                const prevFilter = filters[(index - 1 + filters.length) % filters.length];
+                if (prevFilter) setFilter(prevFilter);
               }
             }}
             className={cn(
