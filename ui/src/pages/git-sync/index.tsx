@@ -161,39 +161,30 @@ export default function GitSyncPage() {
   const handlePublish = async (dagId?: string, force?: boolean) => {
     setIsPublishing(true);
     try {
-      if (dagId) {
-        // Publish single DAG
-        const response = await client.POST('/dags/{name}/publish', {
-          params: { path: { name: dagId }, query: { remoteNode } },
-          body: {
-            message: commitMessage || `Update ${dagId}`,
-            force: force || false,
-          },
-        });
-        if (response.error) {
-          showError(response.error.message || 'Publish failed');
-        } else {
-          showToast(`Published ${dagId}`);
-          setPublishModal({ open: false });
-          setDiffModal({ open: false });
-          setCommitMessage('');
-          mutateStatus();
-        }
+      const response = dagId
+        ? await client.POST('/dags/{name}/publish', {
+            params: { path: { name: dagId }, query: { remoteNode } },
+            body: {
+              message: commitMessage || `Update ${dagId}`,
+              force: force || false,
+            },
+          })
+        : await client.POST('/sync/publish-all', {
+            params: { query: { remoteNode } },
+            body: { message: commitMessage || 'Batch update' },
+          });
+
+      if (response.error) {
+        showError(response.error.message || 'Publish failed');
       } else {
-        // Publish all modified DAGs
-        const response = await client.POST('/sync/publish-all', {
-          params: { query: { remoteNode } },
-          body: { message: commitMessage || 'Batch update' },
-        });
-        if (response.error) {
-          showError(response.error.message || 'Publish failed');
-        } else {
-          showToast(`Published ${response.data?.synced?.length || 0} DAGs`);
-          setPublishModal({ open: false });
-          setDiffModal({ open: false });
-          setCommitMessage('');
-          mutateStatus();
-        }
+        const count = dagId
+          ? dagId
+          : `${response.data?.synced?.length || 0} DAGs`;
+        showToast(`Published ${count}`);
+        setPublishModal({ open: false });
+        setDiffModal({ open: false });
+        setCommitMessage('');
+        mutateStatus();
       }
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Publish failed');
