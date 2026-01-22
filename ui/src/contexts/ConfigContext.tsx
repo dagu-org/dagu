@@ -11,6 +11,8 @@ export type PathsConfig = {
   procDir: string;
   serviceRegistryDir: string;
   configFileUsed: string;
+  gitSyncDir: string;
+  auditLogsDir: string;
 };
 
 export type AuthMode = 'none' | 'builtin' | 'oidc' | '';

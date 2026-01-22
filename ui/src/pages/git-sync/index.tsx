@@ -20,12 +20,12 @@ import {
 } from '@/components/ui/dialog';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useCanWrite } from '@/contexts/AuthContext';
+import { useSimpleToast } from '@/components/ui/simple-toast';
+import { useErrorModal } from '@/components/ui/error-modal';
 import { useQuery, useClient } from '@/hooks/api';
 import { cn } from '@/lib/utils';
 import dayjs from '@/lib/dayjs';
 import {
-  AlertTriangle,
-  Check,
   Download,
   GitBranch,
   RefreshCw,
@@ -87,6 +87,8 @@ export default function GitSyncPage() {
   const appBarContext = useContext(AppBarContext);
   const client = useClient();
   const canWrite = useCanWrite();
+  const { showToast } = useSimpleToast();
+  const { showError } = useErrorModal();
 
   // State
   const [isPulling, setIsPulling] = useState(false);
@@ -95,8 +97,6 @@ export default function GitSyncPage() {
   const [publishModal, setPublishModal] = useState<{ open: boolean; dagId?: string }>({ open: false });
   const [commitMessage, setCommitMessage] = useState('');
   const [filter, setFilter] = useState<'all' | 'modified' | 'untracked' | 'conflict'>('all');
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [diffModal, setDiffModal] = useState<{ open: boolean; dagId?: string }>({ open: false });
   const [diffData, setDiffData] = useState<SyncDAGDiffResponse | null>(null);
   const [isLoadingDiff, setIsLoadingDiff] = useState(false);
@@ -123,31 +123,19 @@ export default function GitSyncPage() {
   const status = statusData as SyncStatusResponse | undefined;
   const config = configData as SyncConfigResponse | undefined;
 
-  // Clear messages after 5 seconds
-  useEffect(() => {
-    if (actionError || actionSuccess) {
-      const timer = setTimeout(() => {
-        setActionError(null);
-        setActionSuccess(null);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [actionError, actionSuccess]);
-
   // Handlers
   const handlePull = async () => {
     setIsPulling(true);
-    setActionError(null);
     try {
       const response = await client.POST('/sync/pull', {});
       if (response.error) {
-        setActionError(response.error.message || 'Pull failed');
+        showError(response.error.message || 'Pull failed');
       } else {
-        setActionSuccess(`Pull completed. ${response.data?.synced?.length || 0} DAGs synced.`);
+        showToast(`Pulled ${response.data?.synced?.length || 0} DAGs`);
         mutateStatus();
       }
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Pull failed');
+      showError(err instanceof Error ? err.message : 'Pull failed');
     } finally {
       setIsPulling(false);
     }
@@ -155,7 +143,6 @@ export default function GitSyncPage() {
 
   const handlePublish = async (dagId?: string, force?: boolean) => {
     setIsPublishing(true);
-    setActionError(null);
     try {
       if (dagId) {
         // Publish single DAG
@@ -164,9 +151,9 @@ export default function GitSyncPage() {
           body: { message: commitMessage || `Update ${dagId}`, force: force || false },
         });
         if (response.error) {
-          setActionError(response.error.message || 'Publish failed');
+          showError(response.error.message || 'Publish failed');
         } else {
-          setActionSuccess(`Published ${dagId} successfully.`);
+          showToast(`Published ${dagId}`);
           setPublishModal({ open: false });
           setCommitMessage('');
           mutateStatus();
@@ -177,16 +164,16 @@ export default function GitSyncPage() {
           body: { message: commitMessage || 'Batch update' },
         });
         if (response.error) {
-          setActionError(response.error.message || 'Publish failed');
+          showError(response.error.message || 'Publish failed');
         } else {
-          setActionSuccess(`Published ${response.data?.synced?.length || 0} DAGs successfully.`);
+          showToast(`Published ${response.data?.synced?.length || 0} DAGs`);
           setPublishModal({ open: false });
           setCommitMessage('');
           mutateStatus();
         }
       }
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Publish failed');
+      showError(err instanceof Error ? err.message : 'Publish failed');
     } finally {
       setIsPublishing(false);
     }
@@ -194,35 +181,33 @@ export default function GitSyncPage() {
 
   const handleDiscard = async (dagId: string) => {
     if (!confirm(`Discard local changes to ${dagId}? This cannot be undone.`)) return;
-    setActionError(null);
     try {
       const response = await client.POST('/dags/{name}/discard', {
         params: { path: { name: dagId } },
       });
       if (response.error) {
-        setActionError(response.error.message || 'Discard failed');
+        showError(response.error.message || 'Discard failed');
       } else {
-        setActionSuccess(`Discarded changes to ${dagId}.`);
+        showToast(`Discarded changes to ${dagId}`);
         mutateStatus();
       }
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Discard failed');
+      showError(err instanceof Error ? err.message : 'Discard failed');
     }
   };
 
   const handleTestConnection = async () => {
-    setActionError(null);
     try {
       const response = await client.POST('/sync/test-connection', {});
       if (response.error) {
-        setActionError(response.error.message || 'Connection test failed');
+        showError(response.error.message || 'Connection test failed');
       } else if (response.data?.success) {
-        setActionSuccess('Connection successful!');
+        showToast('Connection successful');
       } else {
-        setActionError(response.data?.error || 'Connection test failed');
+        showError(response.data?.error || 'Connection test failed');
       }
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Connection test failed');
+      showError(err instanceof Error ? err.message : 'Connection test failed');
     }
   };
 
@@ -238,7 +223,7 @@ export default function GitSyncPage() {
         setDiffData(response.data);
       }
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to load diff');
+      showError(err instanceof Error ? err.message : 'Failed to load diff');
       setDiffModal({ open: false });
     } finally {
       setIsLoadingDiff(false);
@@ -321,7 +306,10 @@ export default function GitSyncPage() {
             variant="ghost"
             size="sm"
             className="h-8 w-8 p-0"
-            onClick={() => mutateStatus()}
+            onClick={async () => {
+              await mutateStatus();
+              showToast('Status refreshed');
+            }}
             title="Refresh status"
           >
             <RefreshCw className="h-4 w-4" />
@@ -337,20 +325,6 @@ export default function GitSyncPage() {
           </Button>
         </div>
       </div>
-
-      {/* Messages */}
-      {actionError && (
-        <div className="p-2 text-xs text-rose-700 dark:text-rose-400 bg-rose-500/10 rounded flex items-center gap-2">
-          <AlertTriangle className="h-3.5 w-3.5" />
-          {actionError}
-        </div>
-      )}
-      {actionSuccess && (
-        <div className="p-2 text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 rounded flex items-center gap-2">
-          <Check className="h-3.5 w-3.5" />
-          {actionSuccess}
-        </div>
-      )}
 
       {/* Filter Tabs */}
       <div className="flex items-center gap-1 text-xs border-b border-border/40">

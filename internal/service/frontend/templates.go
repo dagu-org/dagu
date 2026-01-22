@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"path"
+	"path/filepath"
 	"strings"
 	"text/template"
 
@@ -145,6 +146,12 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 		},
 		"pathUsersDir": func() string {
 			return cfg.Paths.UsersDir
+		},
+		"pathGitSyncDir": func() string {
+			return filepath.Join(cfg.Paths.DataDir, "gitsync")
+		},
+		"pathAuditLogsDir": func() string {
+			return filepath.Join(cfg.Paths.AdminLogsDir, "audit")
 		},
 		"authMode": func() string {
 			return string(cfg.AuthMode)

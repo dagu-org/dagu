@@ -29,17 +29,18 @@ function PathItem({ label, path }: PathItemProps) {
   };
 
   return (
-    <div className="flex items-center gap-2 py-1 group text-sm">
+    <div className="flex items-center gap-2 py-1 group text-sm min-w-0">
       <span className="text-muted-foreground shrink-0 w-24">{label}</span>
-      <code
-        className={cn(
-          'font-mono px-2 py-1 rounded truncate flex-1 text-xs',
-          'bg-muted text-foreground'
-        )}
-        title={path}
-      >
-        {path || '-'}
-      </code>
+      <div className="flex-1 min-w-0 overflow-hidden">
+        <code
+          className={cn(
+            'font-mono px-2 py-1 rounded text-xs block overflow-x-auto whitespace-nowrap no-scrollbar',
+            'bg-muted text-foreground'
+          )}
+        >
+          {path || '-'}
+        </code>
+      </div>
       <button
         onClick={handleCopy}
         className={cn(
@@ -70,10 +71,12 @@ function PathsCard() {
       { label: 'DAG Runs', path: paths.dagRunsDir },
       { label: 'Logs', path: paths.logDir },
       { label: 'Admin Logs', path: paths.adminLogsDir },
+      { label: 'Audit Logs', path: paths.auditLogsDir },
       { label: 'Queue', path: paths.queueDir },
       { label: 'Process', path: paths.procDir },
       { label: 'Services', path: paths.serviceRegistryDir },
       { label: 'Suspend', path: paths.suspendFlagsDir },
+      { label: 'Git Sync', path: paths.gitSyncDir },
     ];
   }, [paths]);
 
@@ -84,14 +87,14 @@ function PathsCard() {
         Paths
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FolderOpen className="h-4 w-4" />
               System Paths
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-1">
+          <div className="space-y-1 overflow-hidden">
             {paths ? (
               pathItems.map((item) => (
                 <PathItem
