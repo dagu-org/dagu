@@ -105,18 +105,18 @@ const ResourceChart: React.FC<ResourceChartProps> = ({
               <CartesianGrid
                 strokeDasharray="3 3"
                 vertical={false}
-                stroke="hsl(var(--border))"
+                stroke="var(--border)"
               />
               <XAxis dataKey="time" hide />
               <YAxis hide domain={[0, 'auto']} />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
+                  backgroundColor: 'var(--background)',
+                  border: '1px solid var(--border)',
                   borderRadius: 'var(--radius)',
                 }}
-                itemStyle={{ color: 'hsl(var(--foreground))' }}
-                labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
+                itemStyle={{ color: 'var(--foreground)' }}
+                labelStyle={{ color: 'var(--muted-foreground)' }}
               />
               <Area
                 type="monotone"

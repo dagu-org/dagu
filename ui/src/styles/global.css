@@ -257,7 +257,7 @@
 }
 
 .dark [data-slot='card'] {
-  background: linear-gradient(to bottom right, #252540, #1c1c2e) !important;
+  background: var(--card) !important;
 }
 
 /* Glass Panels */
@@ -318,10 +318,11 @@
 }
 /* Dark mode specific styling */
 .dark .card-obsidian {
-  @apply border-white/5;
+  border-color: var(--border);
 }
 .dark .card-obsidian:hover {
-  @apply bg-white/[0.04] border-white/10;
+  background: rgba(197, 107, 255, 0.08);
+  border-color: rgba(197, 107, 255, 0.2);
 }
 /* Remove Radix Table internal borders within card-obsidian */
 .card-obsidian .rt-TableCell,
