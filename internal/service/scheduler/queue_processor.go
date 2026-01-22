@@ -406,10 +406,15 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemDat
 		return false
 	}
 
-	if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID, st); err != nil {
-		logger.Error(ctx, "Failed to execute DAG", tag.Error(err))
-		return false
-	}
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID, st); err != nil {
+			logger.Error(ctx, "Failed to execute DAG", tag.Error(err))
+		}
+	}()
 
 	// Use exponential backoff for retries for monitoring the execution start
 	policy := backoff.NewExponentialBackoffPolicy(p.backoffConfig.InitialInterval)
@@ -425,6 +430,8 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemDat
 	if err := backoff.Retry(ctx, operation, policy, nil); err != nil {
 		logger.Error(ctx, "Failed to execute DAG after retries", tag.Error(err))
 	}
+
+	wg.Wait()
 
 	// Successfully dispatched/started, remove from queue
 	return started
