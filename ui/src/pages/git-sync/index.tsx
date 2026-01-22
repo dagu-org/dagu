@@ -27,15 +27,16 @@ import { cn } from '@/lib/utils';
 import dayjs from '@/lib/dayjs';
 import {
   Download,
+  FileCode,
   GitBranch,
   RefreshCw,
   Settings,
   Upload,
   Trash2,
-  FileCode,
 } from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
 import { DiffModal } from './DiffModal';
+import ConfirmModal from '@/ui/ConfirmModal';
 
 type SyncStatusResponse = components['schemas']['SyncStatusResponse'];
 type SyncConfigResponse = components['schemas']['SyncConfigResponse'];
@@ -99,7 +100,7 @@ export default function GitSyncPage() {
   const [filter, setFilter] = useState<'all' | 'modified' | 'untracked' | 'conflict'>('all');
   const [diffModal, setDiffModal] = useState<{ open: boolean; dagId?: string }>({ open: false });
   const [diffData, setDiffData] = useState<SyncDAGDiffResponse | null>(null);
-  const [isLoadingDiff, setIsLoadingDiff] = useState(false);
+  const [revertModal, setRevertModal] = useState<{ open: boolean; dagId?: string }>({ open: false });
 
   useEffect(() => {
     appBarContext.setTitle('Git Sync');
@@ -155,6 +156,7 @@ export default function GitSyncPage() {
         } else {
           showToast(`Published ${dagId}`);
           setPublishModal({ open: false });
+          setDiffModal({ open: false });
           setCommitMessage('');
           mutateStatus();
         }
@@ -168,6 +170,7 @@ export default function GitSyncPage() {
         } else {
           showToast(`Published ${response.data?.synced?.length || 0} DAGs`);
           setPublishModal({ open: false });
+          setDiffModal({ open: false });
           setCommitMessage('');
           mutateStatus();
         }
@@ -180,7 +183,6 @@ export default function GitSyncPage() {
   };
 
   const handleDiscard = async (dagId: string) => {
-    if (!confirm(`Discard local changes to ${dagId}? This cannot be undone.`)) return;
     try {
       const response = await client.POST('/dags/{name}/discard', {
         params: { path: { name: dagId } },
@@ -212,21 +214,17 @@ export default function GitSyncPage() {
   };
 
   const handleViewDiff = async (dagId: string) => {
-    setDiffModal({ open: true, dagId });
-    setDiffData(null);
-    setIsLoadingDiff(true);
+    // Fetch data first, then open modal
     try {
       const response = await client.GET('/sync/dags/{name}/diff', {
         params: { path: { name: dagId } },
       });
       if (response.data) {
         setDiffData(response.data);
+        setDiffModal({ open: true, dagId });
       }
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to load diff');
-      setDiffModal({ open: false });
-    } finally {
-      setIsLoadingDiff(false);
     }
   };
 
@@ -364,15 +362,18 @@ export default function GitSyncPage() {
               </TableRow>
             ) : (
               filteredDags.map(([dagId, dag]) => (
-                <TableRow key={dagId} className="h-9">
-                  <TableCell className="py-1">
-                    <button
-                      onClick={() => handleViewDiff(dagId)}
-                      className="font-mono text-xs hover:underline text-left"
-                      title="View diff"
+                <TableRow
+                  key={dagId}
+                  className="h-9 cursor-pointer hover:bg-muted/50"
+                  onClick={() => handleViewDiff(dagId)}
+                >
+                  <TableCell className="py-1" onClick={(e) => e.stopPropagation()}>
+                    <a
+                      href={`/dags/${encodeURIComponent(dagId)}`}
+                      className="font-mono text-xs hover:underline"
                     >
                       {dagId}
-                    </button>
+                    </a>
                   </TableCell>
                   <TableCell className="py-1">
                     <StatusDot status={dag.status} />
@@ -380,7 +381,7 @@ export default function GitSyncPage() {
                   <TableCell className="py-1 text-xs text-muted-foreground">
                     {dag.lastSyncedAt ? dayjs(dag.lastSyncedAt).fromNow() : '-'}
                   </TableCell>
-                  <TableCell className="py-1">
+                  <TableCell className="py-1" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-0.5">
                       <Button
                         variant="ghost"
@@ -407,7 +408,7 @@ export default function GitSyncPage() {
                           variant="ghost"
                           size="sm"
                           className="h-6 w-6 p-0 text-muted-foreground hover:text-rose-600"
-                          onClick={() => handleDiscard(dagId)}
+                          onClick={() => setRevertModal({ open: true, dagId })}
                           title="Discard"
                         >
                           <Trash2 className="h-3 w-3" />
@@ -523,8 +524,47 @@ export default function GitSyncPage() {
         remoteContent={diffData?.remoteContent}
         remoteCommit={diffData?.remoteCommit}
         remoteAuthor={diffData?.remoteAuthor}
-        isLoading={isLoadingDiff}
+        canPublish={
+          canWrite &&
+          config?.pushEnabled &&
+          (diffData?.status === SyncStatus.modified ||
+            diffData?.status === SyncStatus.untracked ||
+            diffData?.status === SyncStatus.conflict)
+        }
+        canRevert={
+          canWrite &&
+          (diffData?.status === SyncStatus.modified ||
+            diffData?.status === SyncStatus.conflict)
+        }
+        onPublish={() => {
+          setPublishModal({ open: true, dagId: diffModal.dagId });
+        }}
+        onRevert={() => {
+          if (diffModal.dagId) {
+            setRevertModal({ open: true, dagId: diffModal.dagId });
+          }
+        }}
       />
+
+      {/* Revert Confirmation Modal */}
+      <ConfirmModal
+        title="Discard Changes"
+        buttonText="Discard"
+        visible={revertModal.open}
+        dismissModal={() => setRevertModal({ open: false })}
+        onSubmit={() => {
+          if (revertModal.dagId) {
+            handleDiscard(revertModal.dagId);
+          }
+          setRevertModal({ open: false });
+          setDiffModal({ open: false });
+        }}
+      >
+        <p className="text-sm text-muted-foreground">
+          Discard local changes to <span className="font-mono font-medium text-foreground">{revertModal.dagId}</span>?
+          This cannot be undone.
+        </p>
+      </ConfirmModal>
     </div>
   );
 }
