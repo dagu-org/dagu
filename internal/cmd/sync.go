@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"slices"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/dagu-org/dagu/internal/gitsync"
@@ -101,14 +104,23 @@ func runSyncStatus(ctx *Context, _ []string) error {
 		fmt.Printf("\nDAGs with pending changes:\n")
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 		_, _ = fmt.Fprintln(w, "  NAME\tSTATUS\tMODIFIED AT")
+
+		// Collect and sort DAG names
+		var names []string
 		for name, dagState := range status.DAGs {
 			if dagState.Status != gitsync.StatusSynced {
-				modifiedAt := "-"
-				if dagState.ModifiedAt != nil {
-					modifiedAt = dagState.ModifiedAt.Format("2006-01-02 15:04:05")
-				}
-				_, _ = fmt.Fprintf(w, "  %s\t%s\t%s\n", name, dagState.Status, modifiedAt)
+				names = append(names, name)
 			}
+		}
+		slices.Sort(names)
+
+		for _, name := range names {
+			dagState := status.DAGs[name]
+			modifiedAt := "-"
+			if dagState.ModifiedAt != nil {
+				modifiedAt = dagState.ModifiedAt.Format("2006-01-02 15:04:05")
+			}
+			_, _ = fmt.Fprintf(w, "  %s\t%s\t%s\n", name, dagState.Status, modifiedAt)
 		}
 		_ = w.Flush()
 	}
@@ -256,11 +268,10 @@ func runSyncPublish(ctx *Context, args []string) error {
 
 // syncDiscard discards local changes for a DAG.
 func syncDiscard() *cobra.Command {
-	return NewCommand(
-		&cobra.Command{
-			Use:   "discard <dag-name>",
-			Short: "Discard local changes",
-			Long: `Discard local changes for a DAG and restore the remote version.
+	cmd := &cobra.Command{
+		Use:   "discard <dag-name>",
+		Short: "Discard local changes",
+		Long: `Discard local changes for a DAG and restore the remote version.
 
 This command reverts local modifications to a DAG, restoring it to
 the version from the remote repository.
@@ -268,12 +279,14 @@ the version from the remote repository.
 WARNING: This will permanently discard your local changes!
 
 Example:
-  dagu sync discard my_dag`,
-			Args: cobra.ExactArgs(1),
-		},
-		nil,
-		runSyncDiscard,
-	)
+  dagu sync discard my_dag
+  dagu sync discard my_dag --yes`,
+		Args: cobra.ExactArgs(1),
+	}
+
+	cmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
+
+	return NewCommand(cmd, nil, runSyncDiscard)
 }
 
 func runSyncDiscard(ctx *Context, args []string) error {
@@ -283,9 +296,24 @@ func runSyncDiscard(ctx *Context, args []string) error {
 	}
 
 	dagName := args[0]
+	skipConfirm, _ := ctx.Command.Flags().GetBool("yes")
 
 	fmt.Printf("Discarding local changes for DAG: %s\n", dagName)
 	fmt.Println("WARNING: This will permanently discard your local changes!")
+
+	if !skipConfirm {
+		fmt.Print("Are you sure? [y/N]: ")
+		reader := bufio.NewReader(os.Stdin)
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("failed to read input: %w", err)
+		}
+		input = strings.TrimSpace(strings.ToLower(input))
+		if input != "y" && input != "yes" {
+			fmt.Println("Aborted")
+			return nil
+		}
+	}
 
 	if err := syncSvc.Discard(ctx, dagName); err != nil {
 		if gitsync.IsDAGNotFound(err) {

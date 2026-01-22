@@ -113,7 +113,7 @@ export default function GitSyncPage() {
 
   useEffect(() => {
     appBarContext.setTitle('Git Sync');
-  }, [appBarContext]);
+  }, [appBarContext.setTitle]);
 
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
@@ -302,7 +302,11 @@ export default function GitSyncPage() {
             disabled={isPulling || !canWrite}
             title={!canWrite ? 'Write permission required' : 'Pull from remote'}
           >
-            <Download className={cn('h-4 w-4', isPulling && 'animate-spin')} />
+            {isPulling ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
           </Button>
           <Button
             variant="ghost"
@@ -345,13 +349,32 @@ export default function GitSyncPage() {
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-1 text-xs border-b border-border/40">
-        {(['all', 'modified', 'untracked', 'conflict'] as const).map((f) => (
+      <div
+        className="flex items-center gap-1 text-xs border-b border-border/40"
+        role="tablist"
+        aria-label="Filter DAGs by status"
+      >
+        {(['all', 'modified', 'untracked', 'conflict'] as const).map((f, index) => (
           <button
             key={f}
+            role="tab"
+            aria-selected={filter === f}
+            tabIndex={filter === f ? 0 : -1}
             onClick={() => setFilter(f)}
+            onKeyDown={(e) => {
+              const filters = ['all', 'modified', 'untracked', 'conflict'] as const;
+              if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                const next = filters[(index + 1) % filters.length];
+                setFilter(next);
+              } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                const prev = filters[(index - 1 + filters.length) % filters.length];
+                setFilter(prev);
+              }
+            }}
             className={cn(
-              'px-3 py-1.5 border-b-2 -mb-px transition-colors',
+              'px-3 py-1.5 border-b-2 -mb-px transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               filter === f
                 ? 'border-foreground text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -543,6 +566,7 @@ export default function GitSyncPage() {
                 onChange={(e) => setCommitMessage(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !isPublishing) {
+                    e.preventDefault();
                     handlePublish(publishModal.dagId);
                   }
                 }}

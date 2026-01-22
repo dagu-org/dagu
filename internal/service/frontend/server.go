@@ -335,15 +335,14 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 
 	// Start auto-sync if enabled
 	if syncCfg.AutoSync.Enabled {
-		go func() {
-			if err := svc.Start(ctx); err != nil {
-				logger.Error(ctx, "Failed to start git sync auto-sync", tag.Error(err))
-			}
-		}()
-		logger.Info(ctx, "Git sync auto-sync started",
-			slog.String("repository", syncCfg.Repository),
-			slog.String("branch", syncCfg.Branch),
-			slog.Int("interval", syncCfg.AutoSync.Interval))
+		if err := svc.Start(ctx); err != nil {
+			logger.Error(ctx, "Failed to start git sync auto-sync", tag.Error(err))
+		} else {
+			logger.Info(ctx, "Git sync auto-sync started",
+				slog.String("repository", syncCfg.Repository),
+				slog.String("branch", syncCfg.Branch),
+				slog.Int("interval", syncCfg.AutoSync.Interval))
+		}
 	}
 
 	logger.Info(ctx, "Git sync service initialized",

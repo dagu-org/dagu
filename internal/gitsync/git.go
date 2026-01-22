@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -22,6 +23,7 @@ type GitClient struct {
 	cfg      *Config
 	repoPath string
 	repo     *git.Repository
+	mu       sync.Mutex
 }
 
 // NewGitClient creates a new Git client.
@@ -83,6 +85,9 @@ func (c *GitClient) isFullURL(s string) bool {
 
 // Clone clones the repository.
 func (c *GitClient) Clone(ctx context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	auth, err := c.getAuth()
 	if err != nil {
 		return err
@@ -112,6 +117,9 @@ func (c *GitClient) Clone(ctx context.Context) error {
 
 // Open opens an existing repository.
 func (c *GitClient) Open() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	repo, err := git.PlainOpen(c.repoPath)
 	if err != nil {
 		if err == git.ErrRepositoryNotExists {

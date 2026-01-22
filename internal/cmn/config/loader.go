@@ -845,7 +845,20 @@ func (l *ConfigLoader) loadMonitoringConfig(cfg *Config, def Definition) {
 
 // loadGitSyncConfig loads the Git synchronization configuration.
 func (l *ConfigLoader) loadGitSyncConfig(cfg *Config, def Definition) {
-	// Set defaults
+	if def.GitSync == nil {
+		return
+	}
+
+	// Check if gitSync is enabled
+	enabled := def.GitSync.Enabled != nil && *def.GitSync.Enabled
+	cfg.GitSync.Enabled = enabled
+
+	// Only apply defaults when gitSync is enabled
+	if !enabled {
+		return
+	}
+
+	// Set defaults for enabled gitSync
 	cfg.GitSync.Branch = "main"
 	cfg.GitSync.PushEnabled = true
 	cfg.GitSync.Auth.Type = "token"
@@ -853,15 +866,6 @@ func (l *ConfigLoader) loadGitSyncConfig(cfg *Config, def Definition) {
 	cfg.GitSync.AutoSync.Interval = 300
 	cfg.GitSync.Commit.AuthorName = "Dagu"
 	cfg.GitSync.Commit.AuthorEmail = "dagu@localhost"
-
-	if def.GitSync == nil {
-		return
-	}
-
-	// Enabled
-	if def.GitSync.Enabled != nil {
-		cfg.GitSync.Enabled = *def.GitSync.Enabled
-	}
 
 	// Repository
 	if def.GitSync.Repository != "" {
@@ -907,7 +911,8 @@ func (l *ConfigLoader) loadGitSyncConfig(cfg *Config, def Definition) {
 		if def.GitSync.AutoSync.OnStartup != nil {
 			cfg.GitSync.AutoSync.OnStartup = *def.GitSync.AutoSync.OnStartup
 		}
-		if def.GitSync.AutoSync.Interval > 0 {
+		// Use IsSet to respect explicit zero value
+		if l.v.IsSet("gitSync.autoSync.interval") {
 			cfg.GitSync.AutoSync.Interval = def.GitSync.AutoSync.Interval
 		}
 	}

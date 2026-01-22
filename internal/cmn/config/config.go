@@ -513,6 +513,11 @@ func (c *Config) Validate() error {
 		return err
 	}
 
+	// Validate Git sync configuration
+	if err := c.validateGitSync(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -592,6 +597,45 @@ func (c *Config) validateOIDCForBuiltin() error {
 		// Just warn if no access control is configured
 		c.Warnings = append(c.Warnings,
 			"OIDC scopes do not include 'email'; access control features will not work if added later")
+	}
+
+	return nil
+}
+
+// validateGitSync validates the Git sync configuration.
+func (c *Config) validateGitSync() error {
+	if !c.GitSync.Enabled {
+		return nil
+	}
+
+	// Repository is required when enabled
+	if c.GitSync.Repository == "" {
+		return fmt.Errorf("git sync requires repository to be set (gitSync.repository)")
+	}
+
+	// Branch is required when enabled
+	if c.GitSync.Branch == "" {
+		return fmt.Errorf("git sync requires branch to be set (gitSync.branch)")
+	}
+
+	// Validate auth type
+	switch c.GitSync.Auth.Type {
+	case "token", "ssh":
+		// Valid auth types
+	case "":
+		// Empty is allowed (defaults to token)
+	default:
+		return fmt.Errorf("git sync auth type must be 'token' or 'ssh' (got: %q)", c.GitSync.Auth.Type)
+	}
+
+	// Validate SSH auth requires key path
+	if c.GitSync.Auth.Type == "ssh" && c.GitSync.Auth.SSHKeyPath == "" {
+		return fmt.Errorf("git sync SSH auth requires sshKeyPath to be set")
+	}
+
+	// Validate auto sync interval is non-negative
+	if c.GitSync.AutoSync.Interval < 0 {
+		return fmt.Errorf("git sync autoSync.interval must be non-negative (got: %d)", c.GitSync.AutoSync.Interval)
 	}
 
 	return nil

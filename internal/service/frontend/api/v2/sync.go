@@ -177,11 +177,16 @@ func (a *API) SyncTestConnection(ctx context.Context, _ api.SyncTestConnectionRe
 		}, nil
 	}
 
-	return api.SyncTestConnection200JSONResponse{
+	resp := api.SyncTestConnection200JSONResponse{
 		Success: result.Success,
-		Message: ptrOf(result.Message),
-		Error:   ptrOf(result.Error),
-	}, nil
+	}
+	if result.Message != "" {
+		resp.Message = ptrOf(result.Message)
+	}
+	if result.Error != "" {
+		resp.Error = ptrOf(result.Error)
+	}
+	return resp, nil
 }
 
 // GetSyncConfig returns the Git sync configuration.
@@ -277,7 +282,7 @@ func (a *API) PublishDag(ctx context.Context, req api.PublishDagRequestObject) (
 
 	result, err := a.syncService.Publish(ctx, req.Name, message, force)
 	if err != nil {
-		return handlePublishError(err, req.Name)
+		return handlePublishError(err)
 	}
 
 	a.logAudit(ctx, "sync_publish", map[string]any{
@@ -404,6 +409,12 @@ func toAPISyncResult(result *gitsync.SyncResult) api.SyncResultResponse {
 
 // toAPISyncConfig converts a gitsync.Config to the API response format.
 func toAPISyncConfig(cfg *gitsync.Config) api.SyncConfigResponse {
+	// Redact SSH key path - only indicate if it's configured
+	var sshKeyPath *string
+	if cfg.Auth.SSHKeyPath != "" {
+		sshKeyPath = ptrOf("[configured]")
+	}
+
 	return api.SyncConfigResponse{
 		Enabled:     cfg.Enabled,
 		Repository:  ptrOf(cfg.Repository),
@@ -412,7 +423,7 @@ func toAPISyncConfig(cfg *gitsync.Config) api.SyncConfigResponse {
 		PushEnabled: ptrOf(cfg.PushEnabled),
 		Auth: &api.SyncAuthConfig{
 			Type:       api.SyncAuthConfigType(cfg.Auth.Type),
-			SshKeyPath: ptrOf(cfg.Auth.SSHKeyPath),
+			SshKeyPath: sshKeyPath,
 		},
 		AutoSync: &api.SyncAutoSyncConfig{
 			Enabled:   cfg.AutoSync.Enabled,
@@ -482,7 +493,7 @@ func extractPublishOptions(body *api.PublishDagJSONRequestBody) (message string,
 }
 
 // handlePublishError handles errors from the publish operation.
-func handlePublishError(err error, dagName string) (api.PublishDagResponseObject, error) {
+func handlePublishError(err error) (api.PublishDagResponseObject, error) {
 	var conflictErr *gitsync.ConflictError
 	if errors.As(err, &conflictErr) {
 		return api.PublishDag409JSONResponse{
@@ -491,12 +502,6 @@ func handlePublishError(err error, dagName string) (api.PublishDagResponseObject
 			RemoteAuthor:  ptrOf(conflictErr.RemoteAuthor),
 			RemoteMessage: ptrOf(conflictErr.RemoteMessage),
 			Message:       conflictErr.Error(),
-		}, nil
-	}
-	if gitsync.IsConflict(err) {
-		return api.PublishDag409JSONResponse{
-			DagId:   dagName,
-			Message: err.Error(),
 		}, nil
 	}
 	if gitsync.IsDAGNotFound(err) {

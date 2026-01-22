@@ -96,7 +96,7 @@ func (e *NetworkError) Error() string {
 }
 
 func (e *NetworkError) Unwrap() error {
-	return e.Cause
+	return errors.Join(ErrNetworkError, e.Cause)
 }
 
 // IsConflict checks if the error is a conflict error.

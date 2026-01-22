@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGitClient_NormalizeRepoURL(t *testing.T) {
@@ -55,22 +56,15 @@ func TestGitClient_NormalizeRepoURL(t *testing.T) {
 func TestGitClient_LocalOps(t *testing.T) {
 	// Setup temporary repo
 	tempDir, err := os.MkdirTemp("", "gitsync-test-*")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	repoPath := filepath.Join(tempDir, "repo")
-	err = os.MkdirAll(repoPath, 0755)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.MkdirAll(repoPath, 0755))
 
 	// Initialize a real git repo for testing
 	repo, err := git.PlainInit(repoPath, false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	cfg := &Config{
 		Enabled:    true,
@@ -85,46 +79,27 @@ func TestGitClient_LocalOps(t *testing.T) {
 	c.repo = repo
 
 	// Test IsCloned
-	if !c.IsCloned() {
-		t.Error("IsCloned() = false, want true")
-	}
+	require.True(t, c.IsCloned())
 
 	// Test FileExists
 	testFile := "test.yaml"
 	fullPath := filepath.Join(repoPath, testFile)
-	err = os.WriteFile(fullPath, []byte("test content"), 0644)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !c.FileExists(testFile) {
-		t.Errorf("FileExists(%s) = false, want true", testFile)
-	}
+	require.NoError(t, os.WriteFile(fullPath, []byte("test content"), 0644))
+	require.True(t, c.FileExists(testFile), "FileExists(%s) should be true", testFile)
 
 	// Test AddAndCommit
 	hash, err := c.AddAndCommit(testFile, "initial commit")
-	if err != nil {
-		t.Fatalf("AddAndCommit failed: %v", err)
-	}
-	if hash == "" {
-		t.Error("AddAndCommit returned empty hash")
-	}
+	require.NoError(t, err)
+	require.NotEmpty(t, hash, "AddAndCommit should return non-empty hash")
 
 	// Test GetHeadCommit
 	head, err := c.GetHeadCommit()
-	if err != nil {
-		t.Fatalf("GetHeadCommit failed: %v", err)
-	}
-	if head != hash {
-		t.Errorf("GetHeadCommit() = %v, want %v", head, hash)
-	}
+	require.NoError(t, err)
+	require.Equal(t, hash, head)
 
 	// Test ListFiles
 	files, err := c.ListFiles([]string{".yaml"})
-	if err != nil {
-		t.Fatalf("ListFiles failed: %v", err)
-	}
-	if len(files) != 1 || files[0] != testFile {
-		t.Errorf("ListFiles() = %v, want [%s]", files, testFile)
-	}
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	require.Equal(t, testFile, files[0])
 }
