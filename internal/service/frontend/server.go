@@ -33,7 +33,6 @@ import (
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
-	apiv1 "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
 	apiv2 "github.com/dagu-org/dagu/internal/service/frontend/api/v2"
 	"github.com/dagu-org/dagu/internal/service/frontend/auth"
 	"github.com/dagu-org/dagu/internal/service/frontend/metrics"
@@ -49,7 +48,6 @@ import (
 
 // Server represents the HTTP server for the frontend application
 type Server struct {
-	apiV1          *apiv1.API
 	apiV2          *apiv2.API
 	config         *config.Config
 	httpServer     *http.Server
@@ -73,11 +71,9 @@ func WithListener(l net.Listener) ServerOption {
 	}
 }
 
-// NewServer constructs a Server configured from cfg and the provided stores, managers, and services.
-// It extracts remote node names from cfg.Server.RemoteNodes, initializes apiV1 and apiV2 with the given dependencies, and populates the Server's funcsConfig fields from cfg.
 // NewServer constructs and returns a Server configured from the provided configuration,
 // stores, managers, and services.
-// It initializes API v1 and v2, populates the server configuration (including UI function
+// It initializes API v2, populates the server configuration (including UI function
 // configuration), and wires an initialized builtin auth service into API v2 when
 // cfg.Server.Auth.Mode is set to builtin.
 // Returns the constructed *Server, or an error if initialization fails (for example,
@@ -177,7 +173,6 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	}
 
 	srv := &Server{
-		apiV1:          apiv1.New(dr, drs, drm, cfg),
 		apiV2:          apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, apiOpts...),
 		config:         cfg,
 		builtinOIDCCfg: builtinOIDCCfg,
@@ -380,7 +375,7 @@ func (srv *Server) Serve(ctx context.Context) error {
 	r.Use(middleware.RedirectSlashes)
 
 	// Configure API paths
-	apiV1BasePath, apiV2BasePath := srv.configureAPIPaths()
+	apiV2BasePath := srv.configureAPIPath()
 	schema := srv.getSchema()
 
 	// Set up routes
@@ -389,7 +384,7 @@ func (srv *Server) Serve(ctx context.Context) error {
 	}
 
 	// Configure API routes
-	if err := srv.setupAPIRoutes(ctx, r, apiV1BasePath, apiV2BasePath, schema); err != nil {
+	if err := srv.setupAPIRoutes(ctx, r, apiV2BasePath, schema); err != nil {
 		return err
 	}
 
@@ -422,19 +417,14 @@ func (srv *Server) Serve(ctx context.Context) error {
 	return nil
 }
 
-// configureAPIPaths returns the properly formatted API paths
-func (srv *Server) configureAPIPaths() (string, string) {
-	apiV1BasePath := path.Join(srv.config.Server.BasePath, "api/v1")
-	if !strings.HasPrefix(apiV1BasePath, "/") {
-		apiV1BasePath = "/" + apiV1BasePath
-	}
-
+// configureAPIPath returns the properly formatted API v2 path
+func (srv *Server) configureAPIPath() string {
 	apiV2BasePath := path.Join(srv.config.Server.BasePath, "api/v2")
 	if !strings.HasPrefix(apiV2BasePath, "/") {
 		apiV2BasePath = "/" + apiV2BasePath
 	}
 
-	return apiV1BasePath, apiV2BasePath
+	return apiV2BasePath
 }
 
 // getSchema returns the schema (http or https) based on TLS configuration
@@ -522,32 +512,16 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 	return nil
 }
 
-// setupAPIRoutes configures the API routes for both versions
-func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath, apiV2BasePath, schema string) error {
+// setupAPIRoutes configures the API v2 routes
+func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV2BasePath, schema string) error {
 	var setupErr error
-
-	r.Route(apiV1BasePath, func(r chi.Router) {
-		if srv.config.Server.Auth.Mode != config.AuthModeNone {
-			// v1 API is not available in auth mode - it doesn't support authentication
-			logger.Info(ctx, "Authentication enabled: V1 API is disabled, use V2 API instead",
-				slog.String("authMode", string(srv.config.Server.Auth.Mode)))
-			return
-		}
-		url := fmt.Sprintf("%s://%s:%d%s", schema, srv.config.Server.Host, srv.config.Server.Port, apiV1BasePath)
-		if err := srv.apiV1.ConfigureRoutes(r, url); err != nil {
-			logger.Error(ctx, "Failed to configure v1 API routes", tag.Error(err))
-			setupErr = err
-		}
-	})
-
 	r.Route(apiV2BasePath, func(r chi.Router) {
 		url := fmt.Sprintf("%s://%s:%d%s", schema, srv.config.Server.Host, srv.config.Server.Port, apiV2BasePath)
 		if err := srv.apiV2.ConfigureRoutes(ctx, r, url); err != nil {
-			logger.Error(ctx, "Failed to configure v2 API routes", tag.Error(err))
+			logger.Error(ctx, "Failed to configure API routes", tag.Error(err))
 			setupErr = err
 		}
 	})
-
 	return setupErr
 }
 

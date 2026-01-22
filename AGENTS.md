@@ -4,7 +4,7 @@ A file for [guiding coding agents](https://agents.md/).
 
 ## Project Structure & Module Organization
 - Backend entrypoint in `cmd/` orchestrates the scheduler and CLI; runtime, persistence, and service layers sit under `internal/*` (for example `internal/runtime`, `internal/persistence`).
-- API definitions live in `api/v1` and `api/v2`; generated server stubs land in `internal/service`, while matching TypeScript clients flow into `ui/src/api`.
+- API definitions live in `api/v2`; generated server stubs land in `internal/service`, while matching TypeScript clients flow into `ui/src/api`.
 - The React + TypeScript frontend resides in `ui/`, with production bundles copied to `internal/service/frontend/assets` by `make ui`.
 - Shared assets, docs, proto schemas, and scripts are grouped in `assets/`, `docs/`, `proto/`, and `scripts/`; integration fixtures live in `internal/test` and `internal/testdata`.
 
