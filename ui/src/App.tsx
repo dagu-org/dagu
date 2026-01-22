@@ -109,7 +109,7 @@ function AppInner({ config }: Props) {
   return (
     <Theme
       appearance={theme}
-      accentColor="indigo"
+      accentColor="pink"
       grayColor="slate"
       radius="large"
     >
