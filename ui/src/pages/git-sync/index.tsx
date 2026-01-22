@@ -102,20 +102,30 @@ export default function GitSyncPage() {
     appBarContext.setTitle('Git Sync');
   }, [appBarContext]);
 
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+
   // Fetch sync status
   const {
     data: statusData,
     mutate: mutateStatus,
   } = useQuery(
     '/sync/status',
-    {},
+    {
+      params: {
+        query: { remoteNode },
+      },
+    },
     { refreshInterval: 5000 }
   );
 
   // Fetch sync config
   const {
     data: configData,
-  } = useQuery('/sync/config', {});
+  } = useQuery('/sync/config', {
+    params: {
+      query: { remoteNode },
+    },
+  });
 
   const status = statusData as SyncStatusResponse | undefined;
   const config = configData as SyncConfigResponse | undefined;
@@ -124,7 +134,9 @@ export default function GitSyncPage() {
   const handlePull = async () => {
     setIsPulling(true);
     try {
-      const response = await client.POST('/sync/pull', {});
+      const response = await client.POST('/sync/pull', {
+        params: { query: { remoteNode } },
+      });
       if (response.error) {
         showError(response.error.message || 'Pull failed');
       } else {
@@ -144,7 +156,7 @@ export default function GitSyncPage() {
       if (dagId) {
         // Publish single DAG
         const response = await client.POST('/dags/{name}/publish', {
-          params: { path: { name: dagId } },
+          params: { path: { name: dagId }, query: { remoteNode } },
           body: { message: commitMessage || `Update ${dagId}`, force: force || false },
         });
         if (response.error) {
@@ -159,6 +171,7 @@ export default function GitSyncPage() {
       } else {
         // Publish all modified DAGs
         const response = await client.POST('/sync/publish-all', {
+          params: { query: { remoteNode } },
           body: { message: commitMessage || 'Batch update' },
         });
         if (response.error) {
@@ -181,7 +194,7 @@ export default function GitSyncPage() {
   const handleDiscard = async (dagId: string) => {
     try {
       const response = await client.POST('/dags/{name}/discard', {
-        params: { path: { name: dagId } },
+        params: { path: { name: dagId }, query: { remoteNode } },
       });
       if (response.error) {
         showError(response.error.message || 'Discard failed');
@@ -196,7 +209,9 @@ export default function GitSyncPage() {
 
   const handleTestConnection = async () => {
     try {
-      const response = await client.POST('/sync/test-connection', {});
+      const response = await client.POST('/sync/test-connection', {
+        params: { query: { remoteNode } },
+      });
       if (response.error) {
         showError(response.error.message || 'Connection test failed');
       } else if (response.data?.success) {
@@ -213,7 +228,7 @@ export default function GitSyncPage() {
     // Fetch data first, then open modal
     try {
       const response = await client.GET('/sync/dags/{name}/diff', {
-        params: { path: { name: dagId } },
+        params: { path: { name: dagId }, query: { remoteNode } },
       });
       if (response.data) {
         setDiffData(response.data);

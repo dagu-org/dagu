@@ -3263,6 +3263,8 @@ paths:
       operationId: "getSyncStatus"
       tags:
         - "sync"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
       responses:
         "200":
           description: "Sync status retrieved successfully"
@@ -3284,6 +3286,8 @@ paths:
       operationId: "syncPull"
       tags:
         - "sync"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
       responses:
         "200":
           description: "Pull completed successfully"
@@ -3305,6 +3309,8 @@ paths:
       operationId: "syncPublishAll"
       tags:
         - "sync"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
       requestBody:
         required: true
         content:
@@ -3332,6 +3338,8 @@ paths:
       operationId: "syncTestConnection"
       tags:
         - "sync"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
       responses:
         "200":
           description: "Connection test result"
@@ -3353,6 +3361,8 @@ paths:
       operationId: "getSyncConfig"
       tags:
         - "sync"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
       responses:
         "200":
           description: "Configuration retrieved successfully"
@@ -3372,6 +3382,8 @@ paths:
       operationId: "updateSyncConfig"
       tags:
         - "sync"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
       requestBody:
         required: true
         content:
@@ -3400,6 +3412,7 @@ paths:
       tags:
         - "sync"
       parameters:
+        - $ref: "#/components/parameters/RemoteNode"
         - name: name
           in: path
           description: "The DAG name (file name without extension)"
@@ -3435,6 +3448,7 @@ paths:
         - "sync"
         - "dags"
       parameters:
+        - $ref: "#/components/parameters/RemoteNode"
         - name: name
           in: path
           description: "The DAG name (file name without extension)"
@@ -3482,6 +3496,7 @@ paths:
         - "sync"
         - "dags"
       parameters:
+        - $ref: "#/components/parameters/RemoteNode"
         - name: name
           in: path
           description: "The DAG name (file name without extension)"

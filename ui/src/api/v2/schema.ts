@@ -6670,7 +6670,10 @@ export interface operations {
     };
     getSyncStatus: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6699,7 +6702,10 @@ export interface operations {
     };
     syncPull: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6728,7 +6734,10 @@ export interface operations {
     };
     syncPublishAll: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6761,7 +6770,10 @@ export interface operations {
     };
     syncTestConnection: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6790,7 +6802,10 @@ export interface operations {
     };
     getSyncConfig: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6819,7 +6834,10 @@ export interface operations {
     };
     updateSyncConfig: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6852,7 +6870,10 @@ export interface operations {
     };
     getSyncDAGDiff: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path: {
                 /** @description The DAG name (file name without extension) */
@@ -6893,7 +6914,10 @@ export interface operations {
     };
     publishDag: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path: {
                 /** @description The DAG name (file name without extension) */
@@ -6947,7 +6971,10 @@ export interface operations {
     };
     discardDagChanges: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path: {
                 /** @description The DAG name (file name without extension) */
