@@ -4205,6 +4205,7 @@ components:
           type: integer
           description: "DEPRECATED: This field is ignored for local (DAG-based) queues. For concurrency control, use global queues"
           deprecated: true
+          x-deprecated-reason: "For concurrency control, configure global queues in config.yaml instead"
         runConfig:
           $ref: "#/components/schemas/RunConfig"
       required:
@@ -4428,6 +4429,7 @@ components:
           type: integer
           description: "DEPRECATED: This field is ignored for local (DAG-based) queues. For concurrency control, use global queues"
           deprecated: true
+          x-deprecated-reason: "For concurrency control, configure global queues in config.yaml instead"
         queue:
           type: string
           description: "Name of the queue this DAG is assigned to. If not specified, the DAG name itself becomes the queue name"

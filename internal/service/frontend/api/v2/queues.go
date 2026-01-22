@@ -7,7 +7,6 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
-	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
@@ -46,7 +45,6 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 
 	// Process running DAG runs
 	for groupName, dagRuns := range runningByGroup {
-		var dag *core.DAG
 		var queue *queueInfo
 
 		// Convert each running DAG run to DAGRunSummary
@@ -55,11 +53,6 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 			attempt, err := a.dagRunStore.FindAttempt(ctx, dagRun)
 			if err != nil {
 				continue // Skip if we can't find the attempt
-			}
-
-			// Get the DAG from the attempt (only once for the group)
-			if dag == nil {
-				dag, _ = attempt.ReadDAG(ctx)
 			}
 
 			// Get or create queue (only once for the group)

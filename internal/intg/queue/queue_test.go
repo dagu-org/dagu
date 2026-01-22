@@ -25,10 +25,11 @@ steps:
 }
 
 func TestGlobalConcurrency(t *testing.T) {
+	// This test uses a global queue with maxConcurrency=3 to verify concurrent execution.
+	// Note: maxActiveRuns at DAG level is deprecated and intentionally omitted.
 	f := newFixture(t, `
 name: sleep-dag
 queue: global-queue
-maxActiveRuns: 1
 steps:
   - name: sleep
     command: sleep 1
