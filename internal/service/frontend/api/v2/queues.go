@@ -99,7 +99,7 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 		}
 
 		// Try to load DAG metadata for DAG-based queues that aren't in the map yet.
-		// This ensures their MaxActiveRuns is used for totalCapacity.
+		// Note: DAG's maxActiveRuns is deprecated for local queues (always use maxConcurrency=1).
 		var dag *core.DAG
 		if _, exists := queueMap[queueName]; !exists && findGlobalQueueConfig(queueName, a.config) == nil {
 			// Not a global queue and not yet in map (no running items found).
@@ -278,9 +278,10 @@ func getOrCreateQueue(queueMap map[string]*queueInfo, queueName string, cfg *con
 	if globalCfg := findGlobalQueueConfig(queueName, cfg); globalCfg != nil {
 		queue.queueType = "global"
 		queue.maxConcurrency = globalCfg.MaxActiveRuns
-	} else if dag != nil {
-		// For DAG-based queues, use the DAG's MaxActiveRuns
-		queue.maxConcurrency = dag.MaxActiveRuns
+	} else {
+		// For DAG-based (local) queues, maxConcurrency is always 1 (FIFO processing).
+		// DAG's maxActiveRuns is deprecated and ignored for local queues.
+		queue.maxConcurrency = 1
 	}
 
 	queueMap[queueName] = queue
