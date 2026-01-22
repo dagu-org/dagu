@@ -13,6 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"golang.org/x/crypto/ssh"
 )
@@ -96,27 +97,58 @@ func (e *sshExecutor) Kill(_ os.Signal) error {
 }
 
 func (e *sshExecutor) Run(ctx context.Context) error {
-	// If no commands, nothing to execute
-	if len(e.step.Commands) == 0 {
+	// Skip if nothing to execute
+	if len(e.step.Commands) == 0 && e.step.Script == "" {
 		return nil
 	}
 
-	// Execute each command sequentially
-	// Each command requires a new session since session.Run can only be called once
-	for i, cmdEntry := range e.step.Commands {
-		// Check context cancellation between commands
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		if err := e.runCommand(ctx, i, cmdEntry); err != nil {
-			return err
-		}
+	session, err := e.client.NewSession()
+	if err != nil {
+		return fmt.Errorf("failed to create SSH session: %w", err)
 	}
 
-	return nil
+	e.mu.Lock()
+	e.session = session
+	e.mu.Unlock()
+
+	defer func() {
+		if closeErr := session.Close(); closeErr != nil {
+			logger.Warn(ctx, "SSH session close error", tag.Error(closeErr))
+		}
+	}()
+
+	session.Stdout = e.stdout
+	session.Stderr = e.stderr
+
+	// Build the script wrapped in a function for robust execution
+	script := e.buildScript(ctx)
+
+	// Build shell command string
+	shellCmd := e.shell
+	if len(e.shellArgs) > 0 {
+		shellCmd += " " + strings.Join(e.shellArgs, " ")
+	}
+
+	// Pipe script to shell's stdin
+	session.Stdin = strings.NewReader(script)
+
+	// Run with context cancellation support
+	done := make(chan error, 1)
+	go func() {
+		done <- session.Run(shellCmd)
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			return fmt.Errorf("ssh execution failed: %w", err)
+		}
+		return nil
+	case <-ctx.Done():
+		// Context cancelled - close session to terminate
+		session.Close()
+		return ctx.Err()
+	}
 }
 
 // buildCommand constructs the command string for SSH execution.
@@ -136,10 +168,55 @@ func (e *sshExecutor) buildCommand(cmdEntry core.CommandEntry) string {
 	return cmdutil.BuildShellCommandString(e.shell, e.shellArgs, command)
 }
 
-// resolveShell determines the shell to use for a step based on priority:
-// 1. Shell specified in step-level SSH configuration.
-// 2. Shell specified in DAG-level SSH configuration.
-// 3. Shell specified in the step's Shell field (fallback).
+// buildScript constructs a complete script for SSH execution, wrapped in a function.
+// The function wrapper ensures the shell reads all input before execution,
+// making it robust against slow networks and buffering issues.
+func (e *sshExecutor) buildScript(ctx context.Context) string {
+	var body strings.Builder
+
+	// Get working directory from runtime environment
+	env := runtime.GetEnv(ctx)
+	workingDir := env.WorkingDir
+
+	// Change to working directory if specified
+	if workingDir != "" {
+		fmt.Fprintf(&body, "cd %s || return 1\n", cmdutil.ShellQuote(workingDir))
+	}
+
+	// Add error handling (exit on first error)
+	body.WriteString("set -e\n")
+
+	// Add script content or commands
+	if e.step.Script != "" {
+		body.WriteString(e.step.Script)
+		if !strings.HasSuffix(e.step.Script, "\n") {
+			body.WriteString("\n")
+		}
+	} else {
+		for _, cmd := range e.step.Commands {
+			body.WriteString(e.buildCommandString(cmd))
+			body.WriteString("\n")
+		}
+	}
+
+	// Wrap in function - shell MUST read entire body before executing
+	return fmt.Sprintf("__dagu_exec(){\n%s}\n__dagu_exec\n", body.String())
+}
+
+// buildCommandString constructs a simple command string from a CommandEntry.
+func (e *sshExecutor) buildCommandString(cmd core.CommandEntry) string {
+	if len(cmd.Args) == 0 {
+		return cmd.Command
+	}
+	return cmd.Command + " " + cmdutil.ShellQuoteArgs(cmd.Args)
+}
+
+// resolveShell determines the shell to use for remote execution.
+// Priority:
+// 1. Shell specified in SSH configuration (step-level or DAG-level).
+// 2. Shell specified in the step's Shell field.
+// 3. /bin/sh as POSIX-compliant fallback.
+// Note: DAG-level shell (dag.Shell) is NOT used as it's configured for local execution.
 func resolveShell(step core.Step, client *Client) (string, []string) {
 	if client != nil && client.Shell != "" {
 		return client.Shell, slices.Clone(client.ShellArgs)
@@ -147,61 +224,15 @@ func resolveShell(step core.Step, client *Client) (string, []string) {
 	if step.Shell != "" {
 		return step.Shell, slices.Clone(step.ShellArgs)
 	}
-	return "", nil
-}
-
-// runCommand executes a single command with context cancellation support.
-// Since session.Run() blocks without context awareness, we run it in a goroutine
-// and select on both completion and context cancellation for responsiveness.
-func (e *sshExecutor) runCommand(ctx context.Context, index int, cmdEntry core.CommandEntry) error {
-	session, err := e.client.NewSession()
-	if err != nil {
-		return fmt.Errorf("command %d: failed to create session: %w", index+1, err)
-	}
-
-	e.mu.Lock()
-	e.session = session
-	e.mu.Unlock()
-
-	session.Stdout = e.stdout
-	session.Stderr = e.stderr
-
-	// Build command with shell wrapping if configured
-	command := e.buildCommand(cmdEntry)
-
-	// Run command in goroutine to enable context cancellation
-	done := make(chan error, 1)
-	go func() {
-		done <- session.Run(command)
-	}()
-
-	// Wait for either command completion or context cancellation
-	select {
-	case err = <-done:
-		// Command completed (success or failure)
-	case <-ctx.Done():
-		// Context cancelled - close session to terminate the command
-		if closeErr := session.Close(); closeErr != nil {
-			logger.Warn(ctx, "SSH session close error during cancellation", tag.Error(closeErr))
-		}
-		return ctx.Err()
-	}
-
-	if closeErr := session.Close(); closeErr != nil {
-		logger.Warn(ctx, "SSH session close error", tag.Error(closeErr))
-	}
-
-	if err != nil {
-		return fmt.Errorf("command %d failed: %w", index+1, err)
-	}
-
-	return nil
+	// Fallback to /bin/sh - POSIX standard, available on all Unix systems
+	return "/bin/sh", nil
 }
 
 func init() {
 	caps := core.ExecutorCapabilities{
 		Command:          true,
 		MultipleCommands: true,
+		Script:           true,
 		Shell:            true,
 		GetEvalOptions: func(ctx context.Context, step core.Step) []cmdutil.EvalOption {
 			if hasShellConfigured(ctx, step) {

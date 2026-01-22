@@ -2,9 +2,11 @@ package ssh
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -140,7 +142,7 @@ func TestNewSSHExecutor_WithShellConfig(t *testing.T) {
 				"port":     22,
 				"password": "testpassword",
 			},
-			expectedShell: "",
+			expectedShell: "/bin/sh", // Fallback to POSIX shell when no shell configured
 		},
 	}
 
@@ -337,8 +339,8 @@ func TestSSHExecutor_StepSSHConfigWithoutShellIgnoresDAGShell(t *testing.T) {
 	sshExec, ok := exec.(*sshExecutor)
 	require.True(t, ok)
 	// Step-level SSH config takes priority, and it has no shell
-	// DAG-level shell should NOT be inherited
-	assert.Equal(t, "", sshExec.shell)
+	// DAG-level shell should NOT be inherited, falls back to /bin/sh
+	assert.Equal(t, "/bin/sh", sshExec.shell)
 }
 
 func TestSSHExecutor_GetEvalOptions(t *testing.T) {
@@ -409,6 +411,180 @@ func TestSSHExecutor_GetEvalOptions(t *testing.T) {
 			} else {
 				require.Empty(t, opts, "expected no eval options")
 			}
+		})
+	}
+}
+
+func TestSSHExecutor_BuildScript_WithWorkingDir(t *testing.T) {
+	t.Parallel()
+
+	exec := &sshExecutor{
+		step: core.Step{
+			Commands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello"}},
+			},
+		},
+		shell: "/bin/sh",
+	}
+
+	// Create context with working directory
+	ctx := context.Background()
+	env := runtime.Env{WorkingDir: "/app/src"}
+	ctx = runtime.WithEnv(ctx, env)
+
+	script := exec.buildScript(ctx)
+
+	// Verify the script contains cd command (path may or may not be quoted)
+	assert.Contains(t, script, "cd ")
+	assert.Contains(t, script, "/app/src")
+	assert.Contains(t, script, "|| return 1")
+	assert.Contains(t, script, "set -e")
+	assert.Contains(t, script, "echo hello")
+	assert.Contains(t, script, "__dagu_exec(){")
+	assert.Contains(t, script, "__dagu_exec")
+}
+
+func TestSSHExecutor_BuildScript_WithScript(t *testing.T) {
+	t.Parallel()
+
+	exec := &sshExecutor{
+		step: core.Step{
+			Script: "echo 'line1'\necho 'line2'",
+		},
+		shell: "/bin/bash",
+	}
+
+	ctx := context.Background()
+	script := exec.buildScript(ctx)
+
+	// Verify script content is included
+	assert.Contains(t, script, "echo 'line1'")
+	assert.Contains(t, script, "echo 'line2'")
+	assert.Contains(t, script, "set -e")
+	assert.Contains(t, script, "__dagu_exec(){")
+}
+
+func TestSSHExecutor_BuildScript_WithCommands(t *testing.T) {
+	t.Parallel()
+
+	exec := &sshExecutor{
+		step: core.Step{
+			Commands: []core.CommandEntry{
+				{Command: "git", Args: []string{"pull"}},
+				{Command: "make", Args: []string{"build"}},
+				{Command: "./deploy.sh"},
+			},
+		},
+		shell: "/bin/sh",
+	}
+
+	ctx := context.Background()
+	script := exec.buildScript(ctx)
+
+	// Verify all commands are included
+	assert.Contains(t, script, "git pull")
+	assert.Contains(t, script, "make build")
+	assert.Contains(t, script, "./deploy.sh")
+	assert.Contains(t, script, "set -e")
+}
+
+func TestSSHExecutor_BuildScript_FunctionWrapper(t *testing.T) {
+	t.Parallel()
+
+	exec := &sshExecutor{
+		step: core.Step{
+			Commands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"test"}},
+			},
+		},
+		shell: "/bin/sh",
+	}
+
+	ctx := context.Background()
+	script := exec.buildScript(ctx)
+
+	// Verify function wrapper format
+	assert.True(t, strings.HasPrefix(script, "__dagu_exec(){"))
+	assert.True(t, strings.HasSuffix(script, "__dagu_exec\n"))
+	assert.Contains(t, script, "}\n__dagu_exec")
+}
+
+func TestSSHExecutor_ResolveShell_Fallback(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		step          core.Step
+		client        *Client
+		expectedShell string
+		expectedArgs  []string
+	}{
+		{
+			name:          "FallbackToSh",
+			step:          core.Step{},
+			client:        &Client{},
+			expectedShell: "/bin/sh",
+			expectedArgs:  nil,
+		},
+		{
+			name: "ClientShellTakesPriority",
+			step: core.Step{Shell: "/bin/zsh"},
+			client: &Client{
+				Shell:     "/bin/bash",
+				ShellArgs: []string{"-e"},
+			},
+			expectedShell: "/bin/bash",
+			expectedArgs:  []string{"-e"},
+		},
+		{
+			name:          "StepShellWhenNoClient",
+			step:          core.Step{Shell: "/bin/zsh", ShellArgs: []string{"-x"}},
+			client:        &Client{},
+			expectedShell: "/bin/zsh",
+			expectedArgs:  []string{"-x"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			shell, args := resolveShell(tt.step, tt.client)
+			assert.Equal(t, tt.expectedShell, shell)
+			assert.Equal(t, tt.expectedArgs, args)
+		})
+	}
+}
+
+func TestSSHExecutor_BuildCommandString(t *testing.T) {
+	t.Parallel()
+
+	exec := &sshExecutor{}
+
+	tests := []struct {
+		name     string
+		cmd      core.CommandEntry
+		expected string
+	}{
+		{
+			name:     "CommandOnly",
+			cmd:      core.CommandEntry{Command: "ls"},
+			expected: "ls",
+		},
+		{
+			name:     "CommandWithArgs",
+			cmd:      core.CommandEntry{Command: "ls", Args: []string{"-la", "/tmp"}},
+			expected: "ls -la /tmp",
+		},
+		{
+			name:     "CommandWithSpacesInArgs",
+			cmd:      core.CommandEntry{Command: "echo", Args: []string{"hello world"}},
+			expected: "echo 'hello world'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := exec.buildCommandString(tt.cmd)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
