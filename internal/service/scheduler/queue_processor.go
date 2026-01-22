@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/backoff"
@@ -55,6 +56,7 @@ type QueueProcessor struct {
 type queue struct {
 	maxConcurrency int
 	isGlobal       bool // true if this queue is defined in config (global queue)
+	inflight       atomic.Int32
 	mu             sync.Mutex
 }
 
@@ -75,6 +77,9 @@ func (q *queue) isGlobalQueue() bool {
 	defer q.mu.Unlock()
 	return q.isGlobal
 }
+
+func (q *queue) incInflight() { q.inflight.Add(1) }
+func (q *queue) decInflight() { q.inflight.Add(-1) }
 
 // QueueProcessorOption is a functional option for configuring QueueProcessor.
 type QueueProcessorOption func(*QueueProcessor)
@@ -291,7 +296,8 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 	}
 
 	maxConc := q.maxConc()
-	free := maxConc - alive
+	inflight := int(q.inflight.Load())
+	free := maxConc - alive - inflight
 	logger.Debug(ctx, "Queue capacity check",
 		tag.MaxConcurrency(maxConc),
 		tag.Alive(alive),
@@ -318,7 +324,7 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 		wg.Add(1)
 		go func(ctx context.Context, item exec.QueuedItemData) {
 			defer wg.Done()
-			if p.processDAG(ctx, item, queueName) {
+			if p.processDAG(ctx, item, queueName, q.incInflight, q.decInflight) {
 				// Remove the item from the queue
 				data, err := item.Data()
 				if err != nil {
@@ -334,7 +340,7 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 	wg.Wait()
 }
 
-func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemData, queueName string) bool {
+func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemData, queueName string, incInflight, decInflight func()) bool {
 	if p.isClosed() {
 		return false
 	}
@@ -406,11 +412,9 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemDat
 		return false
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
+	incInflight()
 
 	go func() {
-		defer wg.Done()
 		if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID, st); err != nil {
 			logger.Error(ctx, "Failed to execute DAG", tag.Error(err))
 		}
@@ -431,7 +435,8 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemDat
 		logger.Error(ctx, "Failed to execute DAG after retries", tag.Error(err))
 	}
 
-	wg.Wait()
+	// Decrement inflight before returning (process is now tracked by CountAlive if started)
+	decInflight()
 
 	// Successfully dispatched/started, remove from queue
 	return started
