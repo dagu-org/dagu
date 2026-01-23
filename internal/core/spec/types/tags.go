@@ -19,6 +19,15 @@ func (e TagEntry) Key() string { return e.key }
 // Value returns the tag value.
 func (e TagEntry) Value() string { return e.value }
 
+// String returns the canonical string representation.
+// Format: "key=value" or "key" if value is empty.
+func (e TagEntry) String() string {
+	if e.value == "" {
+		return e.key
+	}
+	return e.key + "=" + e.value
+}
+
 // TagsValue represents tag configuration that can be specified as:
 //   - A space-separated string: "foo=bar zoo=baz"
 //   - A map of key-value pairs: { foo: bar, zoo: baz }
@@ -190,11 +199,7 @@ func (t TagsValue) Values() []string {
 	}
 	values := make([]string, len(t.entries))
 	for i, entry := range t.entries {
-		if entry.value == "" {
-			values[i] = entry.key
-		} else {
-			values[i] = entry.key + "=" + entry.value
-		}
+		values[i] = entry.String()
 	}
 	return values
 }

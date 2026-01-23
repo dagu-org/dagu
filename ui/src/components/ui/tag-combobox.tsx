@@ -1,5 +1,5 @@
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn, parseTagParts } from '@/lib/utils';
 import { ChevronDown, X } from 'lucide-react';
 import * as React from 'react';
 
@@ -155,20 +155,22 @@ function TagCombobox({
         )}
         onClick={() => inputRef.current?.focus()}
       >
-        {selectedTags.map((tag) => (
+        {selectedTags.map((tag) => {
+          const { key, value } = parseTagParts(tag);
+          return (
           <Badge
             key={tag}
             variant="secondary"
             className="text-xs h-6 px-2 gap-1"
           >
-            {tag.includes('=') ? (
+            {value !== null ? (
               <>
-                <span className="font-medium">{tag.split('=')[0]}</span>
+                <span className="font-medium">{key}</span>
                 <span className="opacity-60">=</span>
-                <span>{tag.split('=').slice(1).join('=')}</span>
+                <span>{value}</span>
               </>
             ) : (
-              tag
+              key
             )}
             <button
               type="button"
@@ -186,7 +188,8 @@ function TagCombobox({
               <X className="h-3 w-3" />
             </button>
           </Badge>
-        ))}
+        );
+        })}
         <input
           ref={inputRef}
           type="text"

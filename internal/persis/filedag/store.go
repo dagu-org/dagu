@@ -608,9 +608,8 @@ func containsAllTags(dagTags core.Tags, filterTags []string) bool {
 
 	filters := make([]core.TagFilter, 0, len(filterTags))
 	for _, f := range filterTags {
-		normalized := strings.TrimSpace(f)
-		if normalized != "" {
-			filters = append(filters, core.ParseTagFilter(normalized))
+		if trimmed := strings.TrimSpace(f); trimmed != "" {
+			filters = append(filters, core.ParseTagFilter(trimmed))
 		}
 	}
 

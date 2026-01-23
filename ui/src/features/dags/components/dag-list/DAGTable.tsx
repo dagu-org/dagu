@@ -78,6 +78,7 @@ import {
 } from '../../../../components/ui/tooltip';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
+import { parseTagParts } from '../../../../lib/utils';
 
 // Threshold in pixels below which we switch to card view
 // Set higher than table's comfortable minimum width (~700px for all columns)
@@ -435,7 +436,9 @@ const defaultColumns = [
 
             {tags.length > 0 && (
               <div className="flex flex-wrap gap-0.5">
-                {tags.map((tag) => (
+                {tags.map((tag) => {
+                  const { key, value } = parseTagParts(tag);
+                  return (
                   <Badge
                     key={tag}
                     variant="outline"
@@ -459,17 +462,18 @@ const defaultColumns = [
                     }}
                   >
                     <div className="h-1 w-1 rounded-full bg-primary/70 mr-0.5"></div>
-                    {tag.includes('=') ? (
+                    {value !== null ? (
                       <>
-                        <span className="font-medium">{tag.split('=')[0]}</span>
+                        <span className="font-medium">{key}</span>
                         <span className="opacity-60">=</span>
-                        <span>{tag.split('=').slice(1).join('=')}</span>
+                        <span>{value}</span>
                       </>
                     ) : (
-                      tag
+                      key
                     )}
                   </Badge>
-                ))}
+                );
+                })}
               </div>
             )}
           </div>

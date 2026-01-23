@@ -76,11 +76,11 @@ func (t Tags) Strings() []string {
 
 // Keys returns all unique keys in the collection.
 func (t Tags) Keys() []string {
-	seen := make(map[string]bool)
-	keys := make([]string, 0)
+	seen := make(map[string]struct{})
+	keys := make([]string, 0, len(t))
 	for _, tag := range t {
-		if !seen[tag.Key] {
-			seen[tag.Key] = true
+		if _, exists := seen[tag.Key]; !exists {
+			seen[tag.Key] = struct{}{}
 			keys = append(keys, tag.Key)
 		}
 	}
