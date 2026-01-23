@@ -248,9 +248,6 @@ type ssh struct {
 	Shell types.ShellValue `yaml:"shell,omitempty"`
 	// Timeout is the connection timeout duration (e.g., "30s", "1m"). Defaults to 30s.
 	Timeout string `yaml:"timeout,omitempty"`
-	// Env contains environment variables to set on the remote host before execution.
-	// These are exported at the beginning of the script.
-	Env map[string]string `yaml:"env,omitempty"`
 	// Bastion is the jump host / bastion server configuration.
 	Bastion *bastion `yaml:"bastion,omitempty"`
 }
@@ -1376,7 +1373,6 @@ func buildSSH(_ BuildContext, d *dag) (*core.SSHConfig, error) {
 		Shell:         shell,
 		ShellArgs:     shellArgs,
 		Timeout:       d.SSH.Timeout,
-		Env:           d.SSH.Env,
 		Bastion:       bastionCfg,
 	}, nil
 }

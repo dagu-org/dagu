@@ -438,6 +438,103 @@ steps:
 			"TIMEOUT_OUT": "timeout configured",
 		})
 	})
+
+	t.Run("SFTPUploadFile", func(t *testing.T) {
+		th := test.Setup(t)
+
+		// Create local file to upload
+		localDir := t.TempDir()
+		localFile := filepath.Join(localDir, "upload_test.txt")
+		err := os.WriteFile(localFile, []byte("sftp upload test content"), 0644)
+		require.NoError(t, err, "failed to create local test file")
+
+		// Upload file to remote
+		dagConfig := fmt.Sprintf(`
+steps:
+  - name: upload-file
+    executor:
+      type: sftp
+      config:
+        host: 127.0.0.1
+        port: "%s"
+        user: %s
+        key: "%s"
+        strictHostKey: false
+        direction: upload
+        source: "%s"
+        destination: /tmp/uploaded_file.txt
+  - name: verify-upload
+    executor:
+      type: ssh
+      config:
+        host: 127.0.0.1
+        port: "%s"
+        user: %s
+        key: "%s"
+        strictHostKey: false
+        shell: /bin/sh
+    command: cat /tmp/uploaded_file.txt
+    output: UPLOAD_VERIFY
+    depends:
+      - upload-file
+`, sshServer.hostPort, sshTestUser, sshServer.keyPath, localFile,
+			sshServer.hostPort, sshTestUser, sshServer.keyPath)
+
+		dag := th.DAG(t, dagConfig)
+		dag.Agent().RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"UPLOAD_VERIFY": "sftp upload test content",
+		})
+	})
+
+	t.Run("SFTPDownloadFile", func(t *testing.T) {
+		th := test.Setup(t)
+
+		// Create file on remote first, then download
+		downloadDir := t.TempDir()
+		downloadPath := filepath.Join(downloadDir, "downloaded.txt")
+
+		dagConfig := fmt.Sprintf(`
+steps:
+  - name: create-remote-file
+    executor:
+      type: ssh
+      config:
+        host: 127.0.0.1
+        port: "%s"
+        user: %s
+        key: "%s"
+        strictHostKey: false
+        shell: /bin/sh
+    script: |
+      echo "sftp download test content" > /tmp/download_test.txt
+  - name: download-file
+    executor:
+      type: sftp
+      config:
+        host: 127.0.0.1
+        port: "%s"
+        user: %s
+        key: "%s"
+        strictHostKey: false
+        direction: download
+        source: /tmp/download_test.txt
+        destination: "%s"
+    depends:
+      - create-remote-file
+`, sshServer.hostPort, sshTestUser, sshServer.keyPath,
+			sshServer.hostPort, sshTestUser, sshServer.keyPath, downloadPath)
+
+		dag := th.DAG(t, dagConfig)
+		dag.Agent().RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+
+		// Verify downloaded file contents
+		content, err := os.ReadFile(downloadPath)
+		require.NoError(t, err, "failed to read downloaded file")
+		require.Equal(t, "sftp download test content\n", string(content))
+	})
 }
 
 // startSSHServer creates and starts an SSH server container

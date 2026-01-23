@@ -16,9 +16,8 @@ import (
 type Client struct {
 	hostPort   string
 	cfg        *ssh.ClientConfig
-	Shell      string            // Shell for remote command execution
-	ShellArgs  []string          // Shell arguments for remote command execution
-	Env        map[string]string // Environment variables to set on remote before execution
+	Shell      string   // Shell for remote command execution
+	ShellArgs  []string // Shell arguments for remote command execution
 	bastionCfg *bastionClientConfig
 }
 
@@ -49,15 +48,6 @@ func NewClient(cfg *Config) (*Client, error) {
 		port = "22"
 	}
 
-	// Clone Env map to avoid sharing mutable state
-	var env map[string]string
-	if len(cfg.Env) > 0 {
-		env = make(map[string]string, len(cfg.Env))
-		for k, v := range cfg.Env {
-			env[k] = v
-		}
-	}
-
 	// Setup bastion configuration if provided
 	var bastionCfg *bastionClientConfig
 	if cfg.Bastion != nil {
@@ -77,7 +67,6 @@ func NewClient(cfg *Config) (*Client, error) {
 		},
 		Shell:      cfg.Shell,
 		ShellArgs:  slices.Clone(cfg.ShellArgs),
-		Env:        env,
 		bastionCfg: bastionCfg,
 	}, nil
 }

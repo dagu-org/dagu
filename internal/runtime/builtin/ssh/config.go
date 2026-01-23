@@ -22,13 +22,12 @@ type Config struct {
 	Port          string
 	Key           string
 	Password      string
-	StrictHostKey bool              // Enable strict host key checking (defaults to true)
-	KnownHostFile string            // Path to known_hosts file (defaults to ~/.ssh/known_hosts)
-	Shell         string            // Shell for remote command execution (e.g., "/bin/bash")
-	ShellArgs     []string          // Additional shell arguments (e.g., -e, -o pipefail)
-	Timeout       time.Duration     // Connection timeout (defaults to 30s)
-	Env           map[string]string // Environment variables to set on remote before execution
-	Bastion       *BastionConfig    // Optional bastion/jump host configuration
+	StrictHostKey bool           // Enable strict host key checking (defaults to true)
+	KnownHostFile string         // Path to known_hosts file (defaults to ~/.ssh/known_hosts)
+	Shell         string         // Shell for remote command execution (e.g., "/bin/bash")
+	ShellArgs     []string       // Additional shell arguments (e.g., -e, -o pipefail)
+	Timeout       time.Duration  // Connection timeout (defaults to 30s)
+	Bastion       *BastionConfig // Optional bastion/jump host configuration
 }
 
 // BastionConfig represents bastion/jump host connection info
@@ -52,8 +51,7 @@ func FromMapConfig(_ context.Context, mapCfg map[string]any) (*Client, error) {
 		KnownHostFile string
 		Shell         string
 		ShellArgs     []string
-		Timeout       string            // Duration string like "30s", "1m"
-		Env           map[string]string // Environment variables for remote execution
+		Timeout       string // Duration string like "30s", "1m"
 		Bastion       *struct {
 			Host     string
 			Port     string
@@ -118,7 +116,6 @@ func FromMapConfig(_ context.Context, mapCfg map[string]any) (*Client, error) {
 		Shell:         shell,
 		ShellArgs:     shellArgs,
 		Timeout:       timeout,
-		Env:           def.Env,
 		Bastion:       bastionCfg,
 	}
 
@@ -158,7 +155,6 @@ var configSchema = &jsonschema.Schema{
 		"shell":         {Type: "string", Description: "Shell for remote execution"},
 		"shellArgs":     {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Additional shell arguments"},
 		"timeout":       {Type: "string", Description: "Connection timeout (e.g., '30s', '1m')"},
-		"env":           {Type: "object", Description: "Environment variables to set on remote host"},
 		"bastion": {
 			Type:        "object",
 			Description: "Bastion/jump host configuration",

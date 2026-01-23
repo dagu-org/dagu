@@ -570,7 +570,6 @@ func (a *Agent) Run(ctx context.Context) error {
 			Shell:         a.dag.SSH.Shell,
 			ShellArgs:     a.dag.SSH.ShellArgs,
 			Timeout:       sshTimeout,
-			Env:           a.dag.SSH.Env,
 			Bastion:       bastionCfg,
 		}, runtime.AllEnvsMap(ctx))
 		if err != nil {

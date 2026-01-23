@@ -45,7 +45,6 @@ type sshExecutor struct {
 	closed    bool         // Whether session/conn have been closed
 	shell     string
 	shellArgs []string
-	envVars   map[string]string // Environment variables to export on remote
 }
 
 func NewSSHExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
@@ -69,10 +68,6 @@ func NewSSHExecutor(ctx context.Context, step core.Step) (executor.Executor, err
 
 	shell, shellArgs := resolveShell(step, client)
 
-	// Merge environment variables: DAG-level (from client) + step-level
-	// Step-level env vars override DAG-level for the same key
-	envVars := mergeEnvVars(client.Env, parseEnvSlice(step.Env))
-
 	return &sshExecutor{
 		step:      step,
 		client:    client,
@@ -80,7 +75,6 @@ func NewSSHExecutor(ctx context.Context, step core.Step) (executor.Executor, err
 		shellArgs: shellArgs,
 		stdout:    os.Stdout,
 		stderr:    os.Stderr,
-		envVars:   envVars,
 	}, nil
 }
 
@@ -188,12 +182,6 @@ func (e *sshExecutor) buildShellCommand() string {
 func (e *sshExecutor) buildScript() string {
 	var body strings.Builder
 
-	// Export environment variables first (before cd or any commands)
-	// This ensures env vars are available for all subsequent commands
-	for key, value := range e.envVars {
-		fmt.Fprintf(&body, "export %s=%s\n", key, cmdutil.ShellQuote(value))
-	}
-
 	// For SSH execution, only use working directory if explicitly set at step level.
 	// DAG-level workingDir is for LOCAL execution and may not exist on the remote host.
 	// If step.Dir is empty, run in SSH user's home directory.
@@ -222,45 +210,6 @@ func (e *sshExecutor) buildScript() string {
 
 	// Wrap in function - shell MUST read entire body before executing
 	return fmt.Sprintf("__dagu_exec(){\n%s}\n__dagu_exec\n", body.String())
-}
-
-// mergeEnvVars merges base and override environment variable maps.
-// Override values take precedence for keys that exist in both maps.
-func mergeEnvVars(base, override map[string]string) map[string]string {
-	if len(base) == 0 && len(override) == 0 {
-		return nil
-	}
-
-	result := make(map[string]string, len(base)+len(override))
-
-	// Copy base first
-	for k, v := range base {
-		result[k] = v
-	}
-
-	// Override with step-level values
-	for k, v := range override {
-		result[k] = v
-	}
-
-	return result
-}
-
-// parseEnvSlice converts a slice of "KEY=VALUE" strings to a map.
-func parseEnvSlice(envs []string) map[string]string {
-	if len(envs) == 0 {
-		return nil
-	}
-
-	result := make(map[string]string, len(envs))
-	for _, env := range envs {
-		key, value, found := strings.Cut(env, "=")
-		if found {
-			result[key] = value
-		}
-	}
-
-	return result
 }
 
 // buildCommandString constructs a simple command string from a CommandEntry.

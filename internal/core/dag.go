@@ -527,9 +527,6 @@ type SSHConfig struct {
 	ShellArgs []string `json:"shellArgs,omitempty"`
 	// Timeout is the connection timeout duration (e.g., "30s", "1m"). Defaults to 30s.
 	Timeout string `json:"timeout,omitempty"`
-	// Env contains environment variables to set on the remote host before execution.
-	// These are exported at the beginning of the script.
-	Env map[string]string `json:"env,omitempty"`
 	// Bastion is the jump host / bastion server configuration for connecting to the target host.
 	Bastion *BastionConfig `json:"bastion,omitempty"`
 }
