@@ -27,9 +27,6 @@ type Container struct {
 	User string `yaml:"user,omitempty"` // User to run the container as
 	// WorkingDir is the working directory inside the container.
 	WorkingDir string `yaml:"workingDir,omitempty"` // Working directory inside the container
-	// WorkDir is the working directory inside the container.
-	// Deprecated: use workingDir instead
-	WorkDir string `yaml:"workDir,omitempty"` // Working directory inside the container
 	// Platform specifies the platform for the container (e.g., "linux/amd64").
 	Platform string `yaml:"platform,omitempty"` // Platform for the container
 	// Ports specifies the ports to expose from the container.
@@ -96,11 +93,8 @@ const (
 	WaitForHealthy ContainerWaitFor = "healthy"
 )
 
-// GetWorkingDir returns workdir or working dir (backward compatibility)
+// GetWorkingDir returns the working directory inside the container
 func (ct Container) GetWorkingDir() string {
-	if ct.WorkDir != "" {
-		return ct.WorkDir
-	}
 	return ct.WorkingDir
 }
 

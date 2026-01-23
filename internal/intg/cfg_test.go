@@ -226,7 +226,7 @@ steps:
     output: OUT1
   - command: echo match
     output: OUT2
-    precondition:
+    preconditions:
       - condition: "$OUT1"
         expected: "re:^abc.*def$"
 `)
@@ -268,7 +268,7 @@ steps:
     stdout: "${DATA_DIR}_${PROCESS_DATE}"
   - command: cat ${DATA_DIR}_${PROCESS_DATE}
     output: OUT1
-    precondition:
+    preconditions:
       - condition: "${DATA_DIR}_${PROCESS_DATE}"
         expected: "re:[0-9]{8}_[0-9]{6}"
   - command: rm ${DATA_DIR}_${PROCESS_DATE}
@@ -430,11 +430,11 @@ steps:
   - WORKDIR: $HOME
   - TILDE: ~/
 steps:
-  - dir: $TILDE
+  - workingDir: $TILDE
     command: echo $PWD
     output: OUT1
 
-  - dir: $WORKDIR
+  - workingDir: $WORKDIR
     command: echo $PWD
     output: OUT2
 `)
@@ -556,26 +556,6 @@ steps:
 	agent.RunSuccess(t)
 	dag.AssertOutputs(t, map[string]any{
 		"OUT2": "foo",
-	})
-}
-
-func TestLegacyRunSubDAG(t *testing.T) {
-	th := test.Setup(t)
-
-	dagContent := `steps:
-  - run: legacy-sub
-    output: OUT
----
-name: legacy-sub
-steps:
-  - command: echo "legacy works"
-    output: LEGACY_OUT
-`
-	dag := th.DAG(t, dagContent)
-	agent := dag.Agent()
-	agent.RunSuccess(t)
-	dag.AssertOutputs(t, map[string]any{
-		"OUT": []test.Contains{"legacy works"},
 	})
 }
 

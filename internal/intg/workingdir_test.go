@@ -44,7 +44,7 @@ steps:
     output: PARENT_DIR
 
   - name: parent_relative_step
-    dir: ../child_scripts
+    workingDir: ../child_scripts
     command: `+pwdCmd+`
     output: PARENT_STEP_DIR
 

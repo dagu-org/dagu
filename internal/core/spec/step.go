@@ -9,7 +9,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/cmn/collections"
-	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/signal"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec/types"
@@ -26,11 +25,6 @@ type step struct {
 	Description string `yaml:"description,omitempty"`
 	// WorkingDir is the working directory of the step.
 	WorkingDir string `yaml:"workingDir,omitempty"`
-	// Dir is the working directory of the step.
-	// Deprecated: use WorkingDir instead
-	Dir string `yaml:"dir,omitempty"`
-	// Executor is the executor configuration.
-	Executor any `yaml:"executor,omitempty"`
 	// Command is the command to run (on shell).
 	Command any `yaml:"command,omitempty"`
 	// Shell is the shell to run the command. Default is `$SHELL` or `sh`.
@@ -64,8 +58,6 @@ type step struct {
 	RepeatPolicy *repeatPolicy `yaml:"repeatPolicy,omitempty"`
 	// MailOnError is the flag to send mail on error.
 	MailOnError bool `yaml:"mailOnError,omitempty"`
-	// Precondition is the condition to run the step.
-	Precondition any `yaml:"precondition,omitempty"`
 	// Preconditions is the condition to run the step.
 	Preconditions any `yaml:"preconditions,omitempty"`
 	// SignalOnStop is the signal when the step is requested to stop.
@@ -74,9 +66,6 @@ type step struct {
 	SignalOnStop *string `yaml:"signalOnStop,omitempty"`
 	// Call is the name of a DAG to run as a sub dag-run.
 	Call string `yaml:"call,omitempty"`
-	// Run is the name of a DAG to run as a sub dag-run.
-	// Deprecated: use Call instead.
-	Run string `yaml:"run,omitempty"`
 	// Params specifies the parameters for the sub dag-run.
 	Params any `yaml:"params,omitempty"`
 	// Parallel specifies parallel execution configuration.
@@ -407,14 +396,7 @@ func buildStepWorkerSelector(_ StepBuildContext, s *step) (map[string]string, er
 }
 
 func buildStepWorkingDir(_ StepBuildContext, s *step) (string, error) {
-	switch {
-	case s.WorkingDir != "":
-		return strings.TrimSpace(s.WorkingDir), nil
-	case s.Dir != "":
-		return strings.TrimSpace(s.Dir), nil
-	default:
-		return "", nil
-	}
+	return strings.TrimSpace(s.WorkingDir), nil
 }
 
 // stepShellResult holds both shell and args for step
@@ -791,15 +773,7 @@ func buildStepEnvs(_ StepBuildContext, s *step) ([]string, error) {
 }
 
 func buildStepPreconditions(ctx StepBuildContext, s *step) ([]*core.Condition, error) {
-	conditions, err := parsePrecondition(ctx.BuildContext, s.Preconditions)
-	if err != nil {
-		return nil, err
-	}
-	condition, err := parsePrecondition(ctx.BuildContext, s.Precondition)
-	if err != nil {
-		return nil, err
-	}
-	return append(conditions, condition...), nil
+	return parsePrecondition(ctx.BuildContext, s.Preconditions)
 }
 
 // buildStepCommand parses the command field in the step definition.
@@ -1102,21 +1076,9 @@ func validateMessages(result *core.Step) error {
 
 // validateConflicts checks for mutual exclusivity between step fields.
 // This only checks new-vs-legacy format conflicts (type/config vs executor).
+// validateConflicts validates step field conflicts.
 // Execution type conflicts are handled by capability-based validators.
-func validateConflicts(s *step) error {
-	// Check for new format vs legacy format conflict
-	hasNewFormat := s.Type != "" || len(s.Config) > 0
-	hasLegacyFormat := s.Executor != nil
-
-	if hasNewFormat && hasLegacyFormat {
-		if s.Type != "" {
-			return core.NewValidationError("type", s.Type,
-				fmt.Errorf("cannot use both 'type' and 'executor' fields; use 'type' + 'config' instead"))
-		}
-		return core.NewValidationError("config", s.Config,
-			fmt.Errorf("cannot use both 'config' and 'executor' fields; use 'type' + 'config' instead"))
-	}
-
+func validateConflicts(_ *step) error {
 	return nil
 }
 
@@ -1143,19 +1105,12 @@ func buildStepParamsField(ctx StepBuildContext, s *step, result *core.Step) erro
 
 // buildStepExecutor parses the executor configuration from step fields.
 func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
-	// Step-level type and config fields (highest priority)
+	// Step-level type and config fields
 	if s.Type != "" {
 		result.ExecutorConfig.Type = strings.TrimSpace(s.Type)
 	}
 	for k, v := range s.Config {
 		result.ExecutorConfig.Config[k] = v
-	}
-
-	// Legacy executor field (backward compatibility)
-	if s.Executor != nil {
-		if err := parseLegacyExecutor(s.Executor, result); err != nil {
-			return err
-		}
 	}
 
 	// Infer type from container field
@@ -1224,49 +1179,6 @@ func isRedisZeroValue(v any) bool {
 	default:
 		return false
 	}
-}
-
-// parseLegacyExecutor parses the legacy executor field format.
-func parseLegacyExecutor(executor any, result *core.Step) error {
-	switch val := executor.(type) {
-	case string:
-		if result.ExecutorConfig.Type == "" {
-			result.ExecutorConfig.Type = strings.TrimSpace(val)
-		}
-
-	case map[string]any:
-		for key, v := range val {
-			switch key {
-			case "type":
-				typ, ok := v.(string)
-				if !ok {
-					return core.NewValidationError("executor.type", v, ErrExecutorTypeMustBeString)
-				}
-				if result.ExecutorConfig.Type == "" {
-					result.ExecutorConfig.Type = strings.TrimSpace(typ)
-				}
-
-			case "config":
-				cfg, ok := v.(map[string]any)
-				if !ok {
-					return core.NewValidationError("executor.config", v, ErrExecutorConfigValueMustBeMap)
-				}
-				for k, cv := range cfg {
-					if result.ExecutorConfig.Config[k] == nil {
-						result.ExecutorConfig.Config[k] = cv
-					}
-				}
-
-			default:
-				return core.NewValidationError("executor.config", key, fmt.Errorf("%w: %s", ErrExecutorHasInvalidKey, key))
-			}
-		}
-
-	default:
-		return core.NewValidationError("executor", val, ErrExecutorConfigMustBeStringOrMap)
-	}
-
-	return nil
 }
 
 // buildStepParallel parses the parallel field in the step definition.
@@ -1524,19 +1436,8 @@ func buildStepMessages(s *step, result *core.Step) error {
 // buildStepSubDAG parses the child core.DAG definition and sets up the step to run a sub DAG.
 func buildStepSubDAG(ctx StepBuildContext, s *step, result *core.Step) error {
 	name := strings.TrimSpace(s.Call)
-	if name == "" {
-		// TODO: remove legacy support in future major version
-		if legacyName := strings.TrimSpace(s.Run); legacyName != "" {
-			name = legacyName
-			message := "Step field 'run' is deprecated, use 'call' instead"
-			logger.Warn(ctx.ctx, message)
-			if ctx.dag != nil {
-				ctx.dag.BuildWarnings = append(ctx.dag.BuildWarnings, message)
-			}
-		}
-	}
 
-	// if the run field is not set, return nil.
+	// if the call field is not set, return nil.
 	if name == "" {
 		return nil
 	}

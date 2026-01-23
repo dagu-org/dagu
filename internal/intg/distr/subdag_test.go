@@ -115,7 +115,7 @@ name: parent-remote
 workerSelector:
   type: parent
 steps:
-  - run: child-remote
+  - call: child-remote
 `, withLabels(map[string]string{"type": "parent"}))
 		defer f.cleanup()
 
@@ -138,7 +138,7 @@ func TestSubDAG_InSameFile(t *testing.T) {
 	t.Run("parentAndChildInSameYAMLFile", func(t *testing.T) {
 		f := newTestFixture(t, `
 steps:
-  - run: dotest
+  - call: dotest
 params:
   - URL: default_value
 ---

@@ -1035,18 +1035,6 @@ func TestBuildContainer(t *testing.T) {
 				RestartPolicy: "always",
 			},
 		},
-		{
-			name: "BackwardCompatWorkDir",
-			input: &container{
-				Image:   "alpine:latest",
-				WorkDir: "/legacy",
-			},
-			expected: &core.Container{
-				Image:      "alpine:latest",
-				PullPolicy: core.PullPolicyMissing,
-				WorkingDir: "/legacy",
-			},
-		},
 	}
 
 	for _, tt := range tests {
@@ -1532,50 +1520,11 @@ func TestBuildPreconditions(t *testing.T) {
 		assert.Len(t, result, 2)
 	})
 
-	t.Run("DeprecatedPrecondition", func(t *testing.T) {
-		t.Parallel()
-		d := &dag{
-			Precondition: []any{
-				map[string]any{"condition": "test -d /dir"},
-			},
-		}
-		result, err := buildPreconditions(testBuildContext(), d)
-		require.NoError(t, err)
-		assert.Len(t, result, 1)
-		assert.Equal(t, "test -d /dir", result[0].Condition)
-	})
-
-	t.Run("BothPreconditionFields", func(t *testing.T) {
-		t.Parallel()
-		d := &dag{
-			Preconditions: []any{
-				map[string]any{"condition": "cond1"},
-			},
-			Precondition: []any{
-				map[string]any{"condition": "cond2"},
-			},
-		}
-		result, err := buildPreconditions(testBuildContext(), d)
-		require.NoError(t, err)
-		assert.Len(t, result, 2)
-	})
-
 	t.Run("InvalidPreconditionsType", func(t *testing.T) {
 		t.Parallel()
 		d := &dag{
 			Preconditions: []any{
 				map[string]any{"condition": 123}, // Invalid type
-			},
-		}
-		_, err := buildPreconditions(testBuildContext(), d)
-		require.Error(t, err)
-	})
-
-	t.Run("InvalidPreconditionType", func(t *testing.T) {
-		t.Parallel()
-		d := &dag{
-			Precondition: []any{
-				map[string]any{"condition": 456}, // Invalid type
 			},
 		}
 		_, err := buildPreconditions(testBuildContext(), d)
@@ -1951,35 +1900,6 @@ func TestBuildHandlers(t *testing.T) {
 		require.NotNil(t, handlerOn.Wait)
 		require.Len(t, handlerOn.Wait.Commands, 1)
 		assert.Equal(t, "echo wait", handlerOn.Wait.Commands[0].CmdWithArgs)
-	})
-
-	t.Run("CancelDeprecated", func(t *testing.T) {
-		t.Parallel()
-		d := &dag{
-			HandlerOn: handlerOn{
-				Cancel: &step{Command: "echo cancel"},
-			},
-		}
-		result := &core.DAG{}
-		handlerOn, err := buildHandlers(testBuildContext(), d, result)
-		require.NoError(t, err)
-		require.NotNil(t, handlerOn.Cancel)
-		require.Len(t, handlerOn.Cancel.Commands, 1)
-		assert.Equal(t, "echo cancel", handlerOn.Cancel.Commands[0].CmdWithArgs)
-	})
-
-	t.Run("AbortAndCancelConflict", func(t *testing.T) {
-		t.Parallel()
-		d := &dag{
-			HandlerOn: handlerOn{
-				Abort:  &step{Command: "echo abort"},
-				Cancel: &step{Command: "echo cancel"},
-			},
-		}
-		result := &core.DAG{}
-		_, err := buildHandlers(testBuildContext(), d, result)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot specify both 'abort' and 'cancel'")
 	})
 
 	t.Run("NoHandlers", func(t *testing.T) {
