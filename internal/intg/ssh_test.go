@@ -495,10 +495,10 @@ steps:
 		subDir := filepath.Join(localDir, "subdir")
 		require.NoError(t, os.MkdirAll(subDir, 0755))
 
-		// Create files in directory
-		require.NoError(t, os.WriteFile(filepath.Join(localDir, "file1.txt"), []byte("content1"), 0644))
-		require.NoError(t, os.WriteFile(filepath.Join(localDir, "file2.txt"), []byte("content2"), 0644))
-		require.NoError(t, os.WriteFile(filepath.Join(subDir, "nested.txt"), []byte("nested content"), 0644))
+		// Create files in directory (with trailing newlines for realistic file content)
+		require.NoError(t, os.WriteFile(filepath.Join(localDir, "file1.txt"), []byte("content1\n"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(localDir, "file2.txt"), []byte("content2\n"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(subDir, "nested.txt"), []byte("nested content\n"), 0644))
 
 		// Upload directory to remote
 		dagConfig := fmt.Sprintf(`
