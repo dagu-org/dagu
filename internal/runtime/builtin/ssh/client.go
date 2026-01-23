@@ -38,17 +38,9 @@ func NewClient(cfg *Config) (*Client, error) {
 		return nil, fmt.Errorf("failed to setup host key verification: %w", err)
 	}
 
-	timeout := cfg.Timeout
-	if timeout == 0 {
-		timeout = defaultSSHTimeout
-	}
+	timeout := defaultIfZero(cfg.Timeout, defaultSSHTimeout)
+	port := defaultIfEmpty(cfg.Port, "22")
 
-	port := cfg.Port
-	if port == "" || port == "0" {
-		port = "22"
-	}
-
-	// Setup bastion configuration if provided
 	var bastionCfg *bastionClientConfig
 	if cfg.Bastion != nil {
 		bastionCfg, err = newBastionClientConfig(cfg.Bastion, timeout)
@@ -69,6 +61,22 @@ func NewClient(cfg *Config) (*Client, error) {
 		ShellArgs:  slices.Clone(cfg.ShellArgs),
 		bastionCfg: bastionCfg,
 	}, nil
+}
+
+// defaultIfZero returns val if non-zero, otherwise returns defaultVal.
+func defaultIfZero(val, defaultVal time.Duration) time.Duration {
+	if val == 0 {
+		return defaultVal
+	}
+	return val
+}
+
+// defaultIfEmpty returns val if non-empty and not "0", otherwise returns defaultVal.
+func defaultIfEmpty(val, defaultVal string) string {
+	if val == "" || val == "0" {
+		return defaultVal
+	}
+	return val
 }
 
 func (c *Client) NewSession() (*ssh.Client, *ssh.Session, error) {
@@ -123,25 +131,18 @@ func (c *Client) dialViaBastion() (*ssh.Client, error) {
 	return ssh.NewClient(ncc, chans, reqs), nil
 }
 
-// newBastionClientConfig creates the bastion client configuration
+// newBastionClientConfig creates the bastion client configuration.
 func newBastionClientConfig(bastion *BastionConfig, timeout time.Duration) (*bastionClientConfig, error) {
 	authMethod, err := selectBastionAuthMethod(bastion)
 	if err != nil {
 		return nil, err
 	}
 
-	port := bastion.Port
-	if port == "" || port == "0" {
-		port = "22"
-	}
-
 	return &bastionClientConfig{
-		hostPort: net.JoinHostPort(bastion.Host, port),
+		hostPort: net.JoinHostPort(bastion.Host, defaultIfEmpty(bastion.Port, "22")),
 		cfg: &ssh.ClientConfig{
-			User: bastion.User,
-			Auth: []ssh.AuthMethod{authMethod},
-			// Bastion host key checking is disabled by default for simplicity.
-			// In production, users should configure proper host key verification.
+			User:            bastion.User,
+			Auth:            []ssh.AuthMethod{authMethod},
 			HostKeyCallback: ssh.InsecureIgnoreHostKey(), // nolint: gosec
 			Timeout:         timeout,
 		},
@@ -223,45 +224,41 @@ func getDefaultSSHKeys() []string {
 // selectSSHAuthMethod selects the authentication method based on the configuration.
 // Priority: explicit key > default keys > password.
 func selectSSHAuthMethod(cfg *Config) (ssh.AuthMethod, error) {
-	keyPath, err := resolveKeyPath(cfg)
+	if cfg.Key != "" {
+		return loadKeyAuth(cfg.Key)
+	}
+
+	if cfg.Password == "" {
+		if keyPath := findDefaultSSHKey(); keyPath != "" {
+			return loadKeyAuth(keyPath)
+		}
+		return nil, fmt.Errorf("no SSH key specified and no default keys found (~/.ssh/id_rsa, id_ecdsa, id_ed25519, or id_dsa)")
+	}
+
+	return ssh.Password(cfg.Password), nil
+}
+
+// loadKeyAuth loads an SSH key and returns a PublicKeys auth method.
+func loadKeyAuth(keyPath string) (ssh.AuthMethod, error) {
+	resolvedPath, err := fileutil.ResolvePath(keyPath)
 	if err != nil {
 		return nil, err
 	}
-
-	if keyPath != "" {
-		signer, err := getPublicKeySigner(keyPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load SSH key from %s: %w", keyPath, err)
-		}
-		return ssh.PublicKeys(signer), nil
+	signer, err := getPublicKeySigner(resolvedPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load SSH key from %s: %w", resolvedPath, err)
 	}
-
-	if cfg.Password != "" {
-		return ssh.Password(cfg.Password), nil
-	}
-
-	return nil, fmt.Errorf("no authentication method available: provide either SSH key or password")
+	return ssh.PublicKeys(signer), nil
 }
 
-// resolveKeyPath determines the SSH key path to use.
-// Returns empty string if password authentication should be used instead.
-func resolveKeyPath(cfg *Config) (string, error) {
-	if cfg.Key != "" {
-		return fileutil.ResolvePath(cfg.Key)
-	}
-
-	if cfg.Password != "" {
-		return "", nil
-	}
-
-	// Try default SSH keys
-	for _, defaultKey := range getDefaultSSHKeys() {
-		if _, err := os.Stat(defaultKey); err == nil {
-			return defaultKey, nil
+// findDefaultSSHKey returns the first existing default SSH key path, or empty string.
+func findDefaultSSHKey() string {
+	for _, keyPath := range getDefaultSSHKeys() {
+		if _, err := os.Stat(keyPath); err == nil {
+			return keyPath
 		}
 	}
-
-	return "", fmt.Errorf("no SSH key specified and no default keys found (~/.ssh/id_rsa, id_ecdsa, id_ed25519, or id_dsa)")
+	return ""
 }
 
 func getPublicKeySigner(path string) (ssh.Signer, error) {

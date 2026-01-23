@@ -30,40 +30,26 @@ type sftpExecutor struct {
 
 // NewSFTPExecutor creates a new SFTP executor for file transfers.
 func NewSFTPExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
-	var client *Client
-
-	// Prefer step-level SSH configuration if present
-	if len(step.ExecutorConfig.Config) > 0 {
-		c, err := FromMapConfig(ctx, step.ExecutorConfig.Config)
-		if err != nil {
-			return nil, fmt.Errorf("failed to setup sftp executor: %w", err)
-		}
-		client = c
-	} else if c := getSSHClientFromContext(ctx); c != nil {
-		// Fall back to DAG-level SSH client from context
-		client = c
+	client, err := resolveSSHClient(ctx, step)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup sftp executor: %w", err)
 	}
-
 	if client == nil {
 		return nil, fmt.Errorf("ssh configuration is not found for sftp executor")
 	}
 
-	// Get transfer parameters from config
 	config := step.ExecutorConfig.Config
-	direction, _ := config["direction"].(string)
-	if direction == "" {
-		direction = "upload" // Default to upload
-	}
+	direction := getStringConfig(config, "direction", "upload")
 	if direction != "upload" && direction != "download" {
 		return nil, fmt.Errorf("invalid direction %q: must be 'upload' or 'download'", direction)
 	}
 
-	source, _ := config["source"].(string)
+	source := getStringConfig(config, "source", "")
 	if source == "" {
 		return nil, fmt.Errorf("source path is required for sftp executor")
 	}
 
-	destination, _ := config["destination"].(string)
+	destination := getStringConfig(config, "destination", "")
 	if destination == "" {
 		return nil, fmt.Errorf("destination path is required for sftp executor")
 	}
@@ -76,6 +62,22 @@ func NewSFTPExecutor(ctx context.Context, step core.Step) (executor.Executor, er
 		stdout:      os.Stdout,
 		stderr:      os.Stderr,
 	}, nil
+}
+
+// resolveSSHClient resolves the SSH client from step config or context.
+func resolveSSHClient(ctx context.Context, step core.Step) (*Client, error) {
+	if len(step.ExecutorConfig.Config) > 0 {
+		return FromMapConfig(ctx, step.ExecutorConfig.Config)
+	}
+	return getSSHClientFromContext(ctx), nil
+}
+
+// getStringConfig returns a string value from config map with a default.
+func getStringConfig(config map[string]any, key, defaultVal string) string {
+	if val, ok := config[key].(string); ok && val != "" {
+		return val
+	}
+	return defaultVal
 }
 
 func (e *sftpExecutor) SetStdout(out io.Writer) {
@@ -100,21 +102,16 @@ func (e *sftpExecutor) Run(ctx context.Context) error {
 	defer session.Close()
 	defer conn.Close()
 
-	// Create SFTP client
 	sftpClient, err := sftp.NewClient(conn)
 	if err != nil {
 		return fmt.Errorf("failed to create SFTP client: %w", err)
 	}
 	defer sftpClient.Close()
 
-	switch e.direction {
-	case "upload":
-		return e.upload(ctx, sftpClient)
-	case "download":
+	if e.direction == "download" {
 		return e.download(ctx, sftpClient)
-	default:
-		return fmt.Errorf("unknown direction: %s", e.direction)
 	}
+	return e.upload(ctx, sftpClient)
 }
 
 // upload transfers files from local to remote.

@@ -45,18 +45,14 @@ const (
 )
 
 // EffectiveLogOutput returns the effective log output mode for a step.
-// It resolves the inheritance chain: step-level overrides DAG-level,
-// and if neither is set, returns the default (LogOutputSeparate).
+// Priority: step-level > DAG-level > default (LogOutputSeparate).
 func EffectiveLogOutput(dag *DAG, step *Step) LogOutputMode {
-	// Step-level override takes precedence
 	if step != nil && step.LogOutput != "" {
 		return step.LogOutput
 	}
-	// Fall back to DAG-level setting
 	if dag != nil && dag.LogOutput != "" {
 		return dag.LogOutput
 	}
-	// Default to separate
 	return LogOutputSeparate
 }
 
@@ -290,27 +286,23 @@ func (d *DAG) String() string {
 	return sb.String()
 }
 
-// Validate performs basic validation of the DAG structure
+// Validate performs basic validation of the DAG structure.
 func (d *DAG) Validate() error {
-	// If Name is not set, return an error
 	if d.Name == "" {
 		return fmt.Errorf("DAG name is required")
 	}
 
-	// Ensure all referenced steps exist
-	stepMap := make(map[string]bool)
+	stepExists := make(map[string]bool)
 	for _, step := range d.Steps {
-		stepMap[step.Name] = true
+		stepExists[step.Name] = true
 	}
 
-	// Check dependencies
 	for _, step := range d.Steps {
 		for _, dep := range step.Depends {
-			if !stepMap[dep] {
-				var errList error = ErrorList{
+			if !stepExists[dep] {
+				return ErrorList{
 					NewValidationError("depends", dep, fmt.Errorf("step %s depends on non-existent step", step.Name)),
 				}
-				return errList
 			}
 		}
 	}
@@ -710,31 +702,24 @@ func (h HandlerType) String() string {
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
 func SockAddr(name, dagRunID string) string {
-	// Create MD5 hash of the combined name and dag-run ID and take first 6 chars
-	hashLength := 6
-	hash := fmt.Sprintf("%x", md5.Sum([]byte(name+dagRunID)))[:hashLength] // nolint:gosec
+	const (
+		hashLength          = 6
+		maxSocketNameLength = 50
+		prefix              = "@dagu_"
+		connector           = "_"
+		suffix              = ".sock"
+	)
 
-	maxSocketNameLength := 50 // Maximum length for socket name
+	hash := fmt.Sprintf("%x", md5.Sum([]byte(name+dagRunID)))[:hashLength] // nolint:gosec
 	name = fileutil.SafeName(name)
 
-	// Calculate the total length with the full name
-	prefix := "@dagu_"
-	connector := "_"
-	suffix := ".sock"
 	totalLen := len(prefix) + len(name) + len(connector) + len(hash) + len(suffix)
-
-	// Truncate name only if the total length exceeds maxSocketNameLength (50)
 	if totalLen > maxSocketNameLength {
-		// Calculate how much to truncate
 		excessLen := totalLen - maxSocketNameLength
-		nameLen := len(name) - excessLen
-		name = name[:nameLen]
+		name = name[:len(name)-excessLen]
 	}
 
-	// Build the socket name
-	socketName := prefix + name + connector + hash + suffix
-
-	return getSocketPath(socketName)
+	return getSocketPath(prefix + name + connector + hash + suffix)
 }
 
 // getSocketPath returns the appropriate socket path for the current platform.

@@ -39,41 +39,39 @@ type BastionConfig struct {
 	Password string
 }
 
+// sshMapConfig is the structure for decoding SSH config from a map.
+type sshMapConfig struct {
+	User          string
+	IP            string
+	Host          string
+	Port          string
+	Key           string
+	Password      string
+	StrictHostKey bool
+	KnownHostFile string
+	Shell         string
+	ShellArgs     []string
+	Timeout       string
+	Bastion       *struct {
+		Host     string
+		Port     string
+		User     string
+		Key      string
+		Password string
+	}
+}
+
 func FromMapConfig(_ context.Context, mapCfg map[string]any) (*Client, error) {
-	def := new(struct {
-		User          string
-		IP            string
-		Host          string
-		Port          string
-		Key           string
-		Password      string
-		StrictHostKey bool
-		KnownHostFile string
-		Shell         string
-		ShellArgs     []string
-		Timeout       string // Duration string like "30s", "1m"
-		Bastion       *struct {
-			Host     string
-			Port     string
-			User     string
-			Key      string
-			Password string
-		}
+	var def sshMapConfig
+	md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:           &def,
+		WeaklyTypedInput: true,
 	})
-	md, err := mapstructure.NewDecoder(
-		&mapstructure.DecoderConfig{Result: def, WeaklyTypedInput: true},
-	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create decoder: %w", err)
 	}
-
 	if err := md.Decode(mapCfg); err != nil {
 		return nil, fmt.Errorf("failed to decode ssh config: %w", err)
-	}
-
-	host := def.Host
-	if def.IP != "" {
-		host = def.IP
 	}
 
 	shell, shellArgs, err := parseShellConfig(def.Shell, def.ShellArgs)
@@ -81,33 +79,14 @@ func FromMapConfig(_ context.Context, mapCfg map[string]any) (*Client, error) {
 		return nil, fmt.Errorf("failed to parse shell config: %w", err)
 	}
 
-	timeout := defaultSSHTimeout
-	if def.Timeout != "" {
-		parsed, err := time.ParseDuration(def.Timeout)
-		if err != nil {
-			return nil, fmt.Errorf("invalid timeout duration %q: %w", def.Timeout, err)
-		}
-		timeout = parsed
-	}
-
-	var bastionCfg *BastionConfig
-	if def.Bastion != nil {
-		port := def.Bastion.Port
-		if port == "" {
-			port = "22"
-		}
-		bastionCfg = &BastionConfig{
-			Host:     def.Bastion.Host,
-			Port:     port,
-			User:     def.Bastion.User,
-			Key:      def.Bastion.Key,
-			Password: def.Bastion.Password,
-		}
+	timeout, err := parseTimeout(def.Timeout)
+	if err != nil {
+		return nil, err
 	}
 
 	cfg := &Config{
 		User:          def.User,
-		Host:          host,
+		Host:          coalesce(def.Host, def.IP),
 		Port:          def.Port,
 		Key:           def.Key,
 		Password:      def.Password,
@@ -116,10 +95,56 @@ func FromMapConfig(_ context.Context, mapCfg map[string]any) (*Client, error) {
 		Shell:         shell,
 		ShellArgs:     shellArgs,
 		Timeout:       timeout,
-		Bastion:       bastionCfg,
+		Bastion:       buildBastionFromMap(def.Bastion),
 	}
 
 	return NewClient(cfg)
+}
+
+// parseTimeout parses a timeout string or returns the default.
+func parseTimeout(s string) (time.Duration, error) {
+	if s == "" {
+		return defaultSSHTimeout, nil
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, fmt.Errorf("invalid timeout duration %q: %w", s, err)
+	}
+	return d, nil
+}
+
+// buildBastionFromMap converts a bastion map config to BastionConfig.
+func buildBastionFromMap(b *struct {
+	Host     string
+	Port     string
+	User     string
+	Key      string
+	Password string
+}) *BastionConfig {
+	if b == nil {
+		return nil
+	}
+	port := b.Port
+	if port == "" {
+		port = "22"
+	}
+	return &BastionConfig{
+		Host:     b.Host,
+		Port:     port,
+		User:     b.User,
+		Key:      b.Key,
+		Password: b.Password,
+	}
+}
+
+// coalesce returns the first non-empty string.
+func coalesce(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func parseShellConfig(shell string, args []string) (string, []string, error) {
@@ -133,12 +158,11 @@ func parseShellConfig(shell string, args []string) (string, []string, error) {
 		return "", nil, err
 	}
 
-	// Return nil if no args to maintain nil vs empty slice distinction
-	if len(parsedArgs) == 0 && len(args) == 0 {
+	allArgs := append(parsedArgs, args...)
+	if len(allArgs) == 0 {
 		return strings.TrimSpace(parsedShell), nil, nil
 	}
-
-	return strings.TrimSpace(parsedShell), append(parsedArgs, args...), nil
+	return strings.TrimSpace(parsedShell), allArgs, nil
 }
 
 var configSchema = &jsonschema.Schema{

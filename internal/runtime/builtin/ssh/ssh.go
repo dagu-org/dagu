@@ -48,20 +48,10 @@ type sshExecutor struct {
 }
 
 func NewSSHExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
-	var client *Client
-
-	// Prefer step-level SSH configuration if present
-	if len(step.ExecutorConfig.Config) > 0 {
-		c, err := FromMapConfig(ctx, step.ExecutorConfig.Config)
-		if err != nil {
-			return nil, fmt.Errorf("failed to setup ssh executor: %w", err)
-		}
-		client = c
-	} else if c := getSSHClientFromContext(ctx); c != nil {
-		// Fall back to DAG-level SSH client from context
-		client = c
+	client, err := resolveSSHClient(ctx, step)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup ssh executor: %w", err)
 	}
-
 	if client == nil {
 		return nil, fmt.Errorf("ssh configuration is not found")
 	}
@@ -257,23 +247,24 @@ func init() {
 
 func hasShellConfigured(ctx context.Context, step core.Step) bool {
 	if len(step.ExecutorConfig.Config) > 0 {
-		shellValue, ok := step.ExecutorConfig.Config["shell"]
-		if ok {
-			switch v := shellValue.(type) {
-			case string:
-				return strings.TrimSpace(v) != ""
-			case []any:
-				return len(v) > 0
-			case []string:
-				return len(v) > 0
-			}
-		}
-		return false
+		return isShellValueSet(step.ExecutorConfig.Config["shell"])
 	}
-
 	if cli := getSSHClientFromContext(ctx); cli != nil && cli.Shell != "" {
 		return true
 	}
-
 	return step.Shell != ""
+}
+
+// isShellValueSet checks if a shell value from config is non-empty.
+func isShellValueSet(shellValue any) bool {
+	switch v := shellValue.(type) {
+	case string:
+		return strings.TrimSpace(v) != ""
+	case []any:
+		return len(v) > 0
+	case []string:
+		return len(v) > 0
+	default:
+		return false
+	}
 }

@@ -738,16 +738,11 @@ func (a *Agent) Run(ctx context.Context) error {
 	return lastErr
 }
 
-// nodeToModelNode converts a runner NodeData to a models.Node
+// nodeToModelNode converts a runner NodeData to an exec.Node.
 func (a *Agent) nodeToModelNode(nodeData runtime.NodeData) *exec.Node {
 	subRuns := make([]exec.SubDAGRun, len(nodeData.State.SubRuns))
 	for i, child := range nodeData.State.SubRuns {
 		subRuns[i] = exec.SubDAGRun(child)
-	}
-
-	var errText string
-	if nodeData.State.Error != nil {
-		errText = nodeData.State.Error.Error()
 	}
 
 	return &exec.Node{
@@ -760,10 +755,18 @@ func (a *Agent) nodeToModelNode(nodeData runtime.NodeData) *exec.Node {
 		RetriedAt:       stringutil.FormatTime(nodeData.State.RetriedAt),
 		RetryCount:      nodeData.State.RetryCount,
 		DoneCount:       nodeData.State.DoneCount,
-		Error:           errText,
+		Error:           errorString(nodeData.State.Error),
 		SubRuns:         subRuns,
 		OutputVariables: nodeData.State.OutputVariables,
 	}
+}
+
+// errorString returns the error message or empty string if err is nil.
+func errorString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 // collectOutputs gathers all step outputs into a map for the outputs.json file.
@@ -1137,22 +1140,31 @@ func (a *Agent) createCoordinatorClient(ctx context.Context) runtime.Dispatcher 
 
 // resolveSecrets resolves all secrets defined in the DAG and returns them as
 // environment variable strings in "NAME=value" format.
-// Returns an empty slice if no secrets are defined.
 func (a *Agent) resolveSecrets(ctx context.Context) ([]string, error) {
 	if len(a.dag.Secrets) == 0 {
 		return nil, nil
 	}
 
-	logger.Info(ctx, "Resolving secrets",
-		tag.Count(len(a.dag.Secrets)),
-	)
+	logger.Info(ctx, "Resolving secrets", tag.Count(len(a.dag.Secrets)))
 
-	// Create an EnvScope with DAG env vars for the env secret provider.
-	// Since we no longer use os.Setenv during DAG loading, env vars from
-	// the DAG's env: field and .env files are in a.dag.Env but NOT in the
-	// global OS environment. Pass them via context so the env provider
-	// can resolve secrets that reference DAG-defined env vars.
-	envScope := cmdutil.NewEnvScope(nil, true) // include OS env as base
+	envScope := a.buildEnvScopeForSecrets()
+	secretCtx := cmdutil.WithEnvScope(ctx, envScope)
+
+	baseDirs := a.buildSecretBaseDirs(envScope)
+	secretRegistry := secrets.NewRegistry(baseDirs...)
+
+	resolvedSecrets, err := secretRegistry.ResolveAll(secretCtx, a.dag.Secrets)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve secrets: %w", err)
+	}
+
+	logger.Debug(ctx, "Secrets resolved successfully", tag.Count(len(resolvedSecrets)))
+	return resolvedSecrets, nil
+}
+
+// buildEnvScopeForSecrets creates an EnvScope with DAG env vars for secret resolution.
+func (a *Agent) buildEnvScopeForSecrets() *cmdutil.EnvScope {
+	envScope := cmdutil.NewEnvScope(nil, true)
 	dagEnvs := make(map[string]string)
 	for _, env := range a.dag.Env {
 		if key, value, found := strings.Cut(env, "="); found {
@@ -1162,30 +1174,16 @@ func (a *Agent) resolveSecrets(ctx context.Context) ([]string, error) {
 	if len(dagEnvs) > 0 {
 		envScope = envScope.WithEntries(dagEnvs, cmdutil.EnvSourceDAGEnv)
 	}
-	secretCtx := cmdutil.WithEnvScope(ctx, envScope)
+	return envScope
+}
 
-	// Create secret registry - all providers auto-registered via init()
-	// File provider tries base directories in order:
-	// 1. DAG working directory (if set) - expanded with env vars
-	// 2. Directory containing the DAG file (if Location is set)
-	expandedWorkingDir := envScope.Expand(a.dag.WorkingDir)
-	baseDirs := []string{expandedWorkingDir}
+// buildSecretBaseDirs returns base directories for file-based secret resolution.
+func (a *Agent) buildSecretBaseDirs(envScope *cmdutil.EnvScope) []string {
+	baseDirs := []string{envScope.Expand(a.dag.WorkingDir)}
 	if a.dag.Location != "" {
-		dagDir := filepath.Dir(a.dag.Location)
-		baseDirs = append(baseDirs, dagDir)
+		baseDirs = append(baseDirs, filepath.Dir(a.dag.Location))
 	}
-	secretRegistry := secrets.NewRegistry(baseDirs...)
-
-	// Resolve all secrets - providers handle their own configuration
-	resolvedSecrets, err := secretRegistry.ResolveAll(secretCtx, a.dag.Secrets)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve secrets: %w", err)
-	}
-
-	logger.Debug(ctx, "Secrets resolved successfully",
-		tag.Count(len(resolvedSecrets)),
-	)
-	return resolvedSecrets, nil
+	return baseDirs
 }
 
 // evaluateMailConfigs evaluates SMTP and mail notification configs with
@@ -1498,35 +1496,26 @@ func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
 	return nil
 }
 
-// execWithRecovery executes a function with panic recovery and detailed error reporting
-// It captures stack traces and provides structured error information for debugging
+// execWithRecovery executes a function with panic recovery and logs any panics.
 func execWithRecovery(ctx context.Context, fn func()) {
 	defer func() {
 		if panicObj := recover(); panicObj != nil {
-			stack := debug.Stack()
-
-			// Convert panic object to error
-			var err error
-			switch v := panicObj.(type) {
-			case error:
-				err = v
-			case string:
-				err = fmt.Errorf("panic: %s", v)
-			default:
-				err = fmt.Errorf("panic: %v", v)
-			}
-
-			// Log with structured information
 			logger.Error(ctx, "Recovered from panic",
-				slog.String("err", err.Error()),
+				slog.String("err", panicToError(panicObj).Error()),
 				slog.String("errType", fmt.Sprintf("%T", panicObj)),
-				slog.String("stackTrace", string(stack)),
+				slog.String("stackTrace", string(debug.Stack())),
 			)
 		}
 	}()
-
-	// Execute the function
 	fn()
+}
+
+// panicToError converts a panic value to an error.
+func panicToError(panicObj any) error {
+	if err, ok := panicObj.(error); ok {
+		return err
+	}
+	return fmt.Errorf("panic: %v", panicObj)
 }
 
 type httpError struct {

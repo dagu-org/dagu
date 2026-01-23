@@ -950,42 +950,41 @@ func buildShellArgs(ctx BuildContext, d *dag) ([]string, error) {
 }
 
 func buildWorkingDir(ctx BuildContext, d *dag) (string, error) {
-	switch {
-	case d.WorkingDir != "":
-		wd := d.WorkingDir
-		// Path resolution at build time (needs DAG file location for relative paths)
-		// Variable expansion is deferred to runtime - see runtime/env.go resolveWorkingDir()
-		switch {
-		case filepath.IsAbs(wd) || strings.HasPrefix(wd, "~") || strings.HasPrefix(wd, "$"):
-			// Absolute paths, home dir paths, and variable paths: store as-is
-			// Runtime will expand variables and resolve ~ prefix
-			return wd, nil
-		case ctx.file != "":
-			// Relative path: resolve to absolute using DAG file location
-			// This must happen at build time since we have ctx.file here
-			return filepath.Join(filepath.Dir(ctx.file), wd), nil
-		default:
-			// No DAG file context, store as-is
-			return wd, nil
-		}
-
-	case ctx.opts.DefaultWorkingDir != "":
+	if d.WorkingDir != "" {
+		return resolveWorkingDirPath(d.WorkingDir, ctx.file)
+	}
+	if ctx.opts.DefaultWorkingDir != "" {
 		return ctx.opts.DefaultWorkingDir, nil
-
-	case ctx.file != "":
+	}
+	if ctx.file != "" {
 		return filepath.Dir(ctx.file), nil
+	}
+	return getDefaultWorkingDir()
+}
 
-	default:
-		dir, _ := os.Getwd()
-		if dir == "" {
-			var err error
-			dir, err = os.UserHomeDir()
-			if err != nil {
-				return "", fmt.Errorf("failed to get working directory: %w", err)
-			}
-		}
+// resolveWorkingDirPath resolves the working directory path at build time.
+// Absolute paths, home dir (~), and variable ($) paths are stored as-is for runtime expansion.
+// Relative paths are resolved against the DAG file location.
+func resolveWorkingDirPath(wd, dagFile string) (string, error) {
+	if filepath.IsAbs(wd) || strings.HasPrefix(wd, "~") || strings.HasPrefix(wd, "$") {
+		return wd, nil
+	}
+	if dagFile != "" {
+		return filepath.Join(filepath.Dir(dagFile), wd), nil
+	}
+	return wd, nil
+}
+
+// getDefaultWorkingDir returns the current working directory or user home as fallback.
+func getDefaultWorkingDir() (string, error) {
+	if dir, _ := os.Getwd(); dir != "" {
 		return dir, nil
 	}
+	dir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get working directory: %w", err)
+	}
+	return dir, nil
 }
 
 func buildContainer(ctx BuildContext, d *dag) (*core.Container, error) {
@@ -1318,63 +1317,68 @@ func buildSSH(_ BuildContext, d *dag) (*core.SSHConfig, error) {
 		return nil, nil
 	}
 
-	port := d.SSH.Port.String()
-	if port == "" {
-		port = "22"
-	}
-
-	strictHostKey := true
-	if d.SSH.StrictHostKey != nil {
-		strictHostKey = *d.SSH.StrictHostKey
-	}
-
-	var shell string
-	var shellArgs []string
-	if !d.SSH.Shell.IsZero() {
-		command := strings.TrimSpace(d.SSH.Shell.Command())
-		if command != "" {
-			if d.SSH.Shell.IsArray() {
-				shell = command
-				shellArgs = append(shellArgs, d.SSH.Shell.Arguments()...)
-			} else {
-				parsed, args, err := cmdutil.SplitCommand(command)
-				if err != nil {
-					return nil, core.NewValidationError("ssh.shell", d.SSH.Shell.Value(), fmt.Errorf("failed to parse shell command: %w", err))
-				}
-				shell = strings.TrimSpace(parsed)
-				shellArgs = append(shellArgs, args...)
-			}
-		}
-	}
-
-	var bastionCfg *core.BastionConfig
-	if d.SSH.Bastion != nil {
-		bastionPort := d.SSH.Bastion.Port.String()
-		if bastionPort == "" {
-			bastionPort = "22"
-		}
-		bastionCfg = &core.BastionConfig{
-			Host:     d.SSH.Bastion.Host,
-			Port:     bastionPort,
-			User:     d.SSH.Bastion.User,
-			Key:      d.SSH.Bastion.Key,
-			Password: d.SSH.Bastion.Password,
-		}
+	shell, shellArgs, err := parseSSHShell(d.SSH.Shell)
+	if err != nil {
+		return nil, err
 	}
 
 	return &core.SSHConfig{
 		User:          d.SSH.User,
 		Host:          d.SSH.Host,
-		Port:          port,
+		Port:          defaultPort(d.SSH.Port.String(), "22"),
 		Key:           d.SSH.Key,
 		Password:      d.SSH.Password,
-		StrictHostKey: strictHostKey,
+		StrictHostKey: d.SSH.StrictHostKey == nil || *d.SSH.StrictHostKey,
 		KnownHostFile: d.SSH.KnownHostFile,
 		Shell:         shell,
 		ShellArgs:     shellArgs,
 		Timeout:       d.SSH.Timeout,
-		Bastion:       bastionCfg,
+		Bastion:       buildBastionConfig(d.SSH.Bastion),
 	}, nil
+}
+
+// parseSSHShell parses shell configuration from ShellValue.
+func parseSSHShell(shellVal types.ShellValue) (string, []string, error) {
+	if shellVal.IsZero() {
+		return "", nil, nil
+	}
+
+	command := strings.TrimSpace(shellVal.Command())
+	if command == "" {
+		return "", nil, nil
+	}
+
+	if shellVal.IsArray() {
+		return command, shellVal.Arguments(), nil
+	}
+
+	parsed, args, err := cmdutil.SplitCommand(command)
+	if err != nil {
+		return "", nil, core.NewValidationError("ssh.shell", shellVal.Value(), fmt.Errorf("failed to parse shell command: %w", err))
+	}
+	return strings.TrimSpace(parsed), args, nil
+}
+
+// buildBastionConfig builds bastion configuration from spec.
+func buildBastionConfig(bastion *bastion) *core.BastionConfig {
+	if bastion == nil {
+		return nil
+	}
+	return &core.BastionConfig{
+		Host:     bastion.Host,
+		Port:     defaultPort(bastion.Port.String(), "22"),
+		User:     bastion.User,
+		Key:      bastion.Key,
+		Password: bastion.Password,
+	}
+}
+
+// defaultPort returns the port if non-empty, otherwise returns the default value.
+func defaultPort(port, defaultVal string) string {
+	if port == "" {
+		return defaultVal
+	}
+	return port
 }
 
 func buildS3(_ BuildContext, d *dag) (*core.S3Config, error) {

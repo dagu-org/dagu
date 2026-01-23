@@ -633,62 +633,73 @@ func stopSSHServer(t *testing.T, th test.Helper, dockerClient *client.Client, se
 }
 
 // waitForSSHReady waits for the SSH server to be ready to accept connections
-// and verifies that commands can be executed via shell stdin
+// and verifies that commands can be executed via shell stdin.
 func waitForSSHReady(t *testing.T, server *sshServerContainer) {
 	t.Helper()
 
-	// Read private key for testing connection
+	config := buildSSHClientConfig(t, server)
+	addr := net.JoinHostPort("127.0.0.1", server.hostPort)
+
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		if trySSHConnection(t, addr, config, server.hostPort) {
+			return
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	t.Fatalf("SSH server failed to become ready on port %s", server.hostPort)
+}
+
+// buildSSHClientConfig creates an SSH client config for testing.
+func buildSSHClientConfig(t *testing.T, server *sshServerContainer) *ssh.ClientConfig {
+	t.Helper()
+
 	keyBytes, err := os.ReadFile(server.keyPath)
 	require.NoError(t, err, "failed to read private key for connection test")
 
 	signer, err := ssh.ParsePrivateKey(keyBytes)
 	require.NoError(t, err, "failed to parse private key for connection test")
 
-	config := &ssh.ClientConfig{
-		User: sshTestUser,
-		Auth: []ssh.AuthMethod{
-			ssh.PublicKeys(signer),
-		},
+	return &ssh.ClientConfig{
+		User:            sshTestUser,
+		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         5 * time.Second,
 	}
+}
 
-	addr := net.JoinHostPort("127.0.0.1", server.hostPort)
+// trySSHConnection attempts to connect and run a test command.
+func trySSHConnection(t *testing.T, addr string, config *ssh.ClientConfig, port string) bool {
+	t.Helper()
 
-	// Retry connection for up to 30 seconds
-	deadline := time.Now().Add(30 * time.Second)
-	for time.Now().Before(deadline) {
-		conn, err := ssh.Dial("tcp", addr, config)
-		if err == nil {
-			// Test that we can run a command via shell stdin (like the executor does)
-			session, err := conn.NewSession()
-			if err == nil {
-				// Test with the exact approach the SSH executor uses
-				script := "__dagu_exec(){\nset -e\necho test\n}\n__dagu_exec\n"
-				session.Stdin = strings.NewReader(script)
+	conn, err := ssh.Dial("tcp", addr, config)
+	if err != nil {
+		t.Logf("Waiting for SSH server: %v", err)
+		return false
+	}
+	defer conn.Close()
 
-				var stdout, stderr strings.Builder
-				session.Stdout = &stdout
-				session.Stderr = &stderr
+	session, err := conn.NewSession()
+	if err != nil {
+		t.Logf("SSH session creation failed: %v", err)
+		return false
+	}
+	defer session.Close()
 
-				err = session.Run("/bin/sh")
-				_ = session.Close()
-				_ = conn.Close()
+	script := "__dagu_exec(){\nset -e\necho test\n}\n__dagu_exec\n"
+	session.Stdin = strings.NewReader(script)
 
-				if err == nil && strings.TrimSpace(stdout.String()) == "test" {
-					t.Logf("SSH server ready on port %s (shell stdin works)", server.hostPort)
-					return
-				}
-				t.Logf("SSH shell stdin test failed: stdout=%q stderr=%q err=%v", stdout.String(), stderr.String(), err)
-			} else {
-				_ = conn.Close()
-				t.Logf("SSH session creation failed: %v", err)
-			}
-		} else {
-			t.Logf("Waiting for SSH server: %v", err)
-		}
-		time.Sleep(1 * time.Second)
+	var stdout, stderr strings.Builder
+	session.Stdout = &stdout
+	session.Stderr = &stderr
+
+	err = session.Run("/bin/sh")
+	if err == nil && strings.TrimSpace(stdout.String()) == "test" {
+		t.Logf("SSH server ready on port %s (shell stdin works)", port)
+		return true
 	}
 
-	t.Fatalf("SSH server failed to become ready on port %s", server.hostPort)
+	t.Logf("SSH shell stdin test failed: stdout=%q stderr=%q err=%v", stdout.String(), stderr.String(), err)
+	return false
 }
