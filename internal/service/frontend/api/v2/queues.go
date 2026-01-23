@@ -104,7 +104,7 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 			Type:         api.QueueType(q.queueType),
 			Running:      q.running,
 			RunningCount: len(q.running),
-			QueuedCount:  q.queuedCount,
+			QueuedCount:  q.queuedCount -len(q.running),
 		}
 
 		// Include maxConcurrency for both global and DAG-based queues
