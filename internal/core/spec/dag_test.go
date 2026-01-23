@@ -49,6 +49,13 @@ func stringOrArrayList(ss []string) types.StringOrArray {
 	return v
 }
 
+// Helper to create TagsValue from single string
+func tagsValue(s string) types.TagsValue {
+	var v types.TagsValue
+	_ = yaml.Unmarshal([]byte(`"`+s+`"`), &v)
+	return v
+}
+
 func TestBuildParamsJSON(t *testing.T) {
 	t.Parallel()
 
@@ -324,28 +331,38 @@ func TestBuildTags(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		tags     types.StringOrArray
-		expected []string
+		tags     types.TagsValue
+		expected core.Tags
 	}{
 		{
 			name:     "NilTags",
-			tags:     types.StringOrArray{},
+			tags:     types.TagsValue{},
 			expected: nil,
 		},
 		{
 			name:     "CommaSeparated",
-			tags:     stringOrArray("daily,weekly"),
-			expected: []string{"daily", "weekly"},
+			tags:     tagsValue("daily,weekly"),
+			expected: core.Tags{{Key: "daily"}, {Key: "weekly"}},
 		},
 		{
 			name:     "NormalizedToLowercase",
-			tags:     stringOrArray("Daily,WEEKLY"),
-			expected: []string{"daily", "weekly"},
+			tags:     tagsValue("Daily,WEEKLY"),
+			expected: core.Tags{{Key: "daily"}, {Key: "weekly"}},
 		},
 		{
 			name:     "TrimmedWhitespace",
-			tags:     stringOrArray(" tag1 , tag2 "),
-			expected: []string{"tag1", "tag2"},
+			tags:     tagsValue(" tag1 , tag2 "),
+			expected: core.Tags{{Key: "tag1"}, {Key: "tag2"}},
+		},
+		{
+			name:     "KeyValueTags",
+			tags:     tagsValue("env=prod team=platform"),
+			expected: core.Tags{{Key: "env", Value: "prod"}, {Key: "team", Value: "platform"}},
+		},
+		{
+			name:     "MixedTags",
+			tags:     tagsValue("env=prod,critical"),
+			expected: core.Tags{{Key: "env", Value: "prod"}, {Key: "critical"}},
 		},
 	}
 

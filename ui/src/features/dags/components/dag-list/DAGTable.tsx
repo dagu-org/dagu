@@ -459,7 +459,15 @@ const defaultColumns = [
                     }}
                   >
                     <div className="h-1 w-1 rounded-full bg-primary/70 mr-0.5"></div>
-                    {tag}
+                    {tag.includes('=') ? (
+                      <>
+                        <span className="font-medium">{tag.split('=')[0]}</span>
+                        <span className="opacity-60">=</span>
+                        <span>{tag.split('=').slice(1).join('=')}</span>
+                      </>
+                    ) : (
+                      tag
+                    )}
                   </Badge>
                 ))}
               </div>

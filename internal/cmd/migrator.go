@@ -258,7 +258,7 @@ func (m *historyMigrator) convertStatus(legacy *legacymodel.Status, dag *core.DA
 	var tags []string
 	var preconditions []*core.Condition
 	if dag != nil {
-		tags = dag.Tags
+		tags = dag.Tags.Strings()
 		preconditions = dag.Preconditions
 	}
 

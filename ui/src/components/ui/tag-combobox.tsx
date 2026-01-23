@@ -161,7 +161,15 @@ function TagCombobox({
             variant="secondary"
             className="text-xs h-6 px-2 gap-1"
           >
-            {tag}
+            {tag.includes('=') ? (
+              <>
+                <span className="font-medium">{tag.split('=')[0]}</span>
+                <span className="opacity-60">=</span>
+                <span>{tag.split('=').slice(1).join('=')}</span>
+              </>
+            ) : (
+              tag
+            )}
             <button
               type="button"
               onClick={(e) => {

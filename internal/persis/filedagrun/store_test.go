@@ -530,15 +530,15 @@ func TestListStatuses(t *testing.T) {
 
 		// Create runs with different tags
 		run1 := th.DAG("dag1")
-		run1.Tags = []string{"prod", "batch"}
+		run1.Tags = core.NewTags([]string{"prod", "batch"})
 		th.CreateAttemptWithDAG(t, ts, "run-1", core.Succeeded, run1.DAG)
 
 		run2 := th.DAG("dag2")
-		run2.Tags = []string{"prod", "api"}
+		run2.Tags = core.NewTags([]string{"prod", "api"})
 		th.CreateAttemptWithDAG(t, ts, "run-2", core.Succeeded, run2.DAG)
 
 		run3 := th.DAG("dag3")
-		run3.Tags = []string{"dev"}
+		run3.Tags = core.NewTags([]string{"dev"})
 		th.CreateAttemptWithDAG(t, ts, "run-3", core.Succeeded, run3.DAG)
 
 		// Filter by tag "prod" (should match run-1 and run-2)

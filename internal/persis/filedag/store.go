@@ -555,7 +555,13 @@ func (store *Storage) TagList(ctx context.Context) ([]string, []string, error) {
 		}
 
 		for _, tag := range parsedDAG.Tags {
-			tagSet[strings.ToLower(tag)] = struct{}{}
+			// Add the full tag string representation
+			tagStr := tag.String()
+			tagSet[strings.ToLower(tagStr)] = struct{}{}
+			// Also add just the key for key-based filtering
+			if tag.Value != "" {
+				tagSet[strings.ToLower(tag.Key)] = struct{}{}
+			}
 		}
 	}
 
@@ -593,22 +599,22 @@ func containsSearchText(text string, search string) bool {
 	return strings.Contains(strings.ToLower(text), strings.ToLower(search))
 }
 
-// containsAllTags checks if the DAG tags contain all the filter tags (AND logic, case-insensitive).
-func containsAllTags(dagTags, filterTags []string) bool {
-	dagTagsLower := make(map[string]bool, len(dagTags))
-	for _, t := range dagTags {
-		dagTagsLower[strings.ToLower(t)] = true
+// containsAllTags checks if the DAG tags match all filter tags (AND logic).
+// Supports key-only filters ("env"), exact filters ("env=prod"), and negation ("!deprecated").
+func containsAllTags(dagTags core.Tags, filterTags []string) bool {
+	if len(filterTags) == 0 {
+		return true
 	}
-	for _, filterTag := range filterTags {
-		normalized := strings.ToLower(strings.TrimSpace(filterTag))
-		if normalized == "" {
-			continue
-		}
-		if !dagTagsLower[normalized] {
-			return false
+
+	filters := make([]core.TagFilter, 0, len(filterTags))
+	for _, f := range filterTags {
+		normalized := strings.TrimSpace(f)
+		if normalized != "" {
+			filters = append(filters, core.ParseTagFilter(normalized))
 		}
 	}
-	return true
+
+	return dagTags.MatchesFilters(filters)
 }
 
 // fileExists checks if a file exists.

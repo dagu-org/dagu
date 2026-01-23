@@ -121,7 +121,7 @@ steps:
 	require.NoError(t, err)
 	require.NotNil(t, dag)
 	assert.Equal(t, "test-dag", dag.Name)
-	assert.Equal(t, []string{"tag1", "tag2"}, dag.Tags)
+	assert.Equal(t, []string{"tag1", "tag2"}, dag.Tags.Strings())
 
 	// Test DAG not found
 	_, err = store.GetMetadata(ctx, "non-existent")

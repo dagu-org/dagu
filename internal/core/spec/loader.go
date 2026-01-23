@@ -634,6 +634,10 @@ func TypedUnionDecodeHook() mapstructure.DecodeHookFunc {
 		if to == reflect.TypeOf(types.ModelValue{}) {
 			return decodeViaYAML[types.ModelValue](data)
 		}
+		// Handle types.TagsValue
+		if to == reflect.TypeOf(types.TagsValue{}) {
+			return decodeViaYAML[types.TagsValue](data)
+		}
 		return data, nil
 	}
 }

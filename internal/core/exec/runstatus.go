@@ -29,7 +29,7 @@ func InitialStatus(dag *core.DAG) DAGRunStatus {
 		StartedAt:     stringutil.FormatTime(time.Time{}),
 		FinishedAt:    stringutil.FormatTime(time.Time{}),
 		Preconditions: dag.Preconditions,
-		Tags:          dag.Tags,
+		Tags:          dag.Tags.Strings(),
 	}
 }
 

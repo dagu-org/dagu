@@ -18,7 +18,7 @@ func toDAG(dag *core.DAG) api.DAG {
 		Description:   ptrOf(dag.Description),
 		Params:        ptrOf(dag.Params),
 		DefaultParams: ptrOf(dag.DefaultParams),
-		Tags:          ptrOf(dag.Tags),
+		Tags:          ptrOf(dag.Tags.Strings()),
 		Schedule:      ptrOf(schedules),
 	}
 }
@@ -299,7 +299,7 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 		Preconditions:     ptrOf(preconditions),
 		Schedule:          ptrOf(schedules),
 		Steps:             ptrOf(steps),
-		Tags:              ptrOf(dag.Tags),
+		Tags:              ptrOf(dag.Tags.Strings()),
 		RunConfig:         runConfig,
 	}
 
