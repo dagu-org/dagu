@@ -230,7 +230,7 @@ func TestTagsValue_UnmarshalYAML_Invalid(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			var v TagsValue
 			err := yaml.Unmarshal([]byte(tt.yaml), &v)
 			// Note: numeric values get stringified, so this actually succeeds

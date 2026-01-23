@@ -12,11 +12,11 @@ func TestParseTag(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		input    string
-		wantKey  string
-		wantVal  string
-		wantStr  string
+		name    string
+		input   string
+		wantKey string
+		wantVal string
+		wantStr string
 	}{
 		{
 			name:    "simple tag",

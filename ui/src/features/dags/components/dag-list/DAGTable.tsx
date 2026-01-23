@@ -439,40 +439,39 @@ const defaultColumns = [
                 {tags.map((tag) => {
                   const { key, value } = parseTagParts(tag);
                   return (
-                  <Badge
-                    key={tag}
-                    variant="outline"
-                    className="text-[10px] px-1 py-0 h-3.5 rounded-sm border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary transition-colors duration-200 cursor-pointer font-normal whitespace-normal break-words focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
+                    <Badge
+                      key={tag}
+                      variant="outline"
+                      className="text-[10px] px-1 py-0 h-3.5 rounded-sm border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary transition-colors duration-200 cursor-pointer font-normal whitespace-normal break-words focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const handleTagClick = table.options.meta?.onTagClick;
+                          if (handleTagClick) handleTagClick(tag);
+                        }
+                      }}
+                      onClick={(e) => {
                         e.stopPropagation();
+                        e.preventDefault();
                         const handleTagClick = table.options.meta?.onTagClick;
                         if (handleTagClick) handleTagClick(tag);
-                      }
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation(); // Prevent row click
-                      e.preventDefault();
-                      // Get the onTagClick from the table meta
-                      const handleTagClick = table.options.meta?.onTagClick;
-                      if (handleTagClick) handleTagClick(tag);
-                    }}
-                  >
-                    <div className="h-1 w-1 rounded-full bg-primary/70 mr-0.5"></div>
-                    {value !== null ? (
-                      <>
-                        <span className="font-medium">{key}</span>
-                        <span className="opacity-60">=</span>
-                        <span>{value}</span>
-                      </>
-                    ) : (
-                      key
-                    )}
-                  </Badge>
-                );
+                      }}
+                    >
+                      <div className="h-1 w-1 rounded-full bg-primary/70 mr-0.5"></div>
+                      {value !== null ? (
+                        <>
+                          <span className="font-medium">{key}</span>
+                          <span className="opacity-60">=</span>
+                          <span>{value}</span>
+                        </>
+                      ) : (
+                        key
+                      )}
+                    </Badge>
+                  );
                 })}
               </div>
             )}

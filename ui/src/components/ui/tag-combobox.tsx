@@ -158,37 +158,37 @@ function TagCombobox({
         {selectedTags.map((tag) => {
           const { key, value } = parseTagParts(tag);
           return (
-          <Badge
-            key={tag}
-            variant="secondary"
-            className="text-xs h-6 px-2 gap-1"
-          >
-            {value !== null ? (
-              <>
-                <span className="font-medium">{key}</span>
-                <span className="opacity-60">=</span>
-                <span>{value}</span>
-              </>
-            ) : (
-              key
-            )}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                removeTag(tag);
-              }}
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-              }}
-              className="ml-0.5 rounded-sm hover:bg-muted-foreground/20 hover:text-destructive focus:outline-none"
+            <Badge
+              key={tag}
+              variant="secondary"
+              className="text-xs h-6 px-2 gap-1"
             >
-              <X className="h-3 w-3" />
-            </button>
-          </Badge>
-        );
+              {value !== null ? (
+                <>
+                  <span className="font-medium">{key}</span>
+                  <span className="opacity-60">=</span>
+                  <span>{value}</span>
+                </>
+              ) : (
+                key
+              )}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  removeTag(tag);
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+                className="ml-0.5 rounded-sm hover:bg-muted-foreground/20 hover:text-destructive focus:outline-none"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          );
         })}
         <input
           ref={inputRef}
