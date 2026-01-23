@@ -214,30 +214,25 @@ func TestTagsValue_UnmarshalYAML_Null(t *testing.T) {
 	assert.Nil(t, v.Entries())
 }
 
-func TestTagsValue_UnmarshalYAML_Invalid(t *testing.T) {
+func TestTagsValue_UnmarshalYAML_NumericValues(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name string
-		yaml string
-	}{
-		{
-			name: "array with invalid type",
-			yaml: `
-- env=prod
-- 123`,
-		},
-	}
+	t.Run("numeric key in map gets stringified", func(t *testing.T) {
+		var v TagsValue
+		err := yaml.Unmarshal([]byte(`
+456: value`), &v)
+		require.NoError(t, err)
+		assert.Equal(t, []TagEntry{{key: "456", value: "value"}}, v.Entries())
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(_ *testing.T) {
-			var v TagsValue
-			err := yaml.Unmarshal([]byte(tt.yaml), &v)
-			// Note: numeric values get stringified, so this actually succeeds
-			// We're testing that it doesn't panic
-			_ = err
-		})
-	}
+	t.Run("array with numeric value returns error", func(t *testing.T) {
+		var v TagsValue
+		err := yaml.Unmarshal([]byte(`
+- env=prod
+- 123`), &v)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected map or string")
+	})
 }
 
 func TestTagsValue_IsZero(t *testing.T) {

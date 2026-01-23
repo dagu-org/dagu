@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -116,8 +117,15 @@ func (t *TagsValue) parseString(s string) error {
 }
 
 func (t *TagsValue) parseMap(m map[string]any) error {
-	for key, v := range m {
-		value := stringifyValue(v)
+	// Sort keys for deterministic ordering
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		value := stringifyValue(m[key])
 		t.entries = append(t.entries, TagEntry{
 			key:   strings.TrimSpace(key),
 			value: strings.TrimSpace(value),
@@ -131,8 +139,15 @@ func (t *TagsValue) parseArray(arr []any) error {
 		switch v := item.(type) {
 		case map[string]any:
 			// Map entry: { key: value }
-			for key, val := range v {
-				value := stringifyValue(val)
+			// Sort keys for deterministic ordering
+			keys := make([]string, 0, len(v))
+			for key := range v {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+
+			for _, key := range keys {
+				value := stringifyValue(v[key])
 				t.entries = append(t.entries, TagEntry{
 					key:   strings.TrimSpace(key),
 					value: strings.TrimSpace(value),
