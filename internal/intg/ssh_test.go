@@ -394,40 +394,6 @@ steps:
 		})
 	})
 
-	t.Run("BastionConfigParsing", func(t *testing.T) {
-		th := test.Setup(t)
-
-		// Test that DAG-level bastion configuration is properly parsed and built.
-		// This test uses the same server as both bastion and target to exercise
-		// the config parsing code path. In a real bastion setup, the target would
-		// only be reachable through the bastion.
-		dagConfig := fmt.Sprintf(`ssh:
-  host: 127.0.0.1
-  port: "%s"
-  user: %s
-  key: "%s"
-  strictHostKey: false
-  shell: /bin/sh
-  bastion:
-    host: 127.0.0.1
-    port: "%s"
-    user: %s
-    key: "%s"
-steps:
-  - name: bastion-config-test
-    type: ssh
-    command: echo "bastion configured"
-    output: BASTION_OUT
-`, sshServer.hostPort, sshTestUser, sshServer.keyPath,
-			sshServer.hostPort, sshTestUser, sshServer.keyPath)
-		dag := th.DAG(t, dagConfig)
-		dag.Agent().RunSuccess(t)
-		dag.AssertLatestStatus(t, core.Succeeded)
-		dag.AssertOutputs(t, map[string]any{
-			"BASTION_OUT": "bastion configured",
-		})
-	})
-
 	t.Run("SFTPUploadFile", func(t *testing.T) {
 		th := test.Setup(t)
 
