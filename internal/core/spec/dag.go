@@ -246,6 +246,8 @@ type ssh struct {
 	// Supports string or array syntax (e.g., "bash -e" or ["bash", "-e"]).
 	// If not specified, commands are executed directly without shell wrapping.
 	Shell types.ShellValue `yaml:"shell,omitempty"`
+	// Timeout is the connection timeout duration (e.g., "30s", "1m"). Defaults to 30s.
+	Timeout string `yaml:"timeout,omitempty"`
 }
 
 // s3Config defines the default S3 configuration for the DAG.
@@ -1339,6 +1341,7 @@ func buildSSH(_ BuildContext, d *dag) (*core.SSHConfig, error) {
 		KnownHostFile: d.SSH.KnownHostFile,
 		Shell:         shell,
 		ShellArgs:     shellArgs,
+		Timeout:       d.SSH.Timeout,
 	}, nil
 }
 

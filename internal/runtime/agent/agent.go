@@ -537,6 +537,16 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create SSH Client if the DAG has SSH configuration.
 	if a.dag.SSH != nil {
+		var sshTimeout time.Duration
+		if a.dag.SSH.Timeout != "" {
+			parsed, err := time.ParseDuration(a.dag.SSH.Timeout)
+			if err != nil {
+				initErr = fmt.Errorf("invalid ssh timeout duration %q: %w", a.dag.SSH.Timeout, err)
+				return initErr
+			}
+			sshTimeout = parsed
+		}
+
 		sshConfig, err := cmdutil.EvalObject(ctx, ssh.Config{
 			User:          a.dag.SSH.User,
 			Host:          a.dag.SSH.Host,
@@ -547,6 +557,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			KnownHostFile: a.dag.SSH.KnownHostFile,
 			Shell:         a.dag.SSH.Shell,
 			ShellArgs:     a.dag.SSH.ShellArgs,
+			Timeout:       sshTimeout,
 		}, runtime.AllEnvsMap(ctx))
 		if err != nil {
 			initErr = fmt.Errorf("failed to evaluate ssh config: %w", err)

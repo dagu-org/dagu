@@ -1,9 +1,11 @@
 package ssh
 
 import (
+	"bytes"
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
@@ -548,4 +550,151 @@ func TestSSHExecutor_BuildShellCommand(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestSSHExecutor_TimeoutConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		config          map[string]any
+		expectedTimeout time.Duration
+		expectError     bool
+	}{
+		{
+			name: "DefaultTimeout",
+			config: map[string]any{
+				"user":     "testuser",
+				"ip":       "testip",
+				"password": "testpassword",
+			},
+			expectedTimeout: 30 * time.Second, // Default timeout
+		},
+		{
+			name: "CustomTimeout",
+			config: map[string]any{
+				"user":     "testuser",
+				"ip":       "testip",
+				"password": "testpassword",
+				"timeout":  "1m",
+			},
+			expectedTimeout: 1 * time.Minute,
+		},
+		{
+			name: "ShortTimeout",
+			config: map[string]any{
+				"user":     "testuser",
+				"ip":       "testip",
+				"password": "testpassword",
+				"timeout":  "5s",
+			},
+			expectedTimeout: 5 * time.Second,
+		},
+		{
+			name: "InvalidTimeout",
+			config: map[string]any{
+				"user":     "testuser",
+				"ip":       "testip",
+				"password": "testpassword",
+				"timeout":  "invalid",
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			client, err := FromMapConfig(ctx, tt.config)
+
+			if tt.expectError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "invalid timeout duration")
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, client)
+			assert.Equal(t, tt.expectedTimeout, client.cfg.Timeout)
+		})
+	}
+}
+
+func TestSSHExecutor_Run_NoCommands(t *testing.T) {
+	t.Parallel()
+
+	// Create executor with no commands or script
+	exec := &sshExecutor{
+		step: core.Step{
+			Commands: nil,
+			Script:   "",
+		},
+		shell: "/bin/sh",
+	}
+
+	// Run should return nil immediately when there are no commands
+	err := exec.Run(context.Background())
+	require.NoError(t, err)
+}
+
+func TestSSHExecutor_SetStdout_SetStderr(t *testing.T) {
+	t.Parallel()
+
+	exec := &sshExecutor{}
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+
+	exec.SetStdout(stdout)
+	exec.SetStderr(stderr)
+
+	assert.Equal(t, stdout, exec.stdout)
+	assert.Equal(t, stderr, exec.stderr)
+}
+
+func TestSSHExecutor_Kill_NoSession(t *testing.T) {
+	t.Parallel()
+
+	// Create executor without session
+	exec := &sshExecutor{}
+
+	// Kill should return nil when there's no session
+	err := exec.Kill(nil)
+	require.NoError(t, err)
+}
+
+func TestNewSSHExecutor_NoConfig(t *testing.T) {
+	t.Parallel()
+
+	// Create step without SSH config and without DAG-level SSH client
+	step := core.Step{
+		Name: "ssh-exec",
+		ExecutorConfig: core.ExecutorConfig{
+			Type:   "ssh",
+			Config: nil,
+		},
+	}
+
+	ctx := context.Background()
+	_, err := NewSSHExecutor(ctx, step)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ssh configuration is not found")
+}
+
+func TestSSHExecutor_ClosedFlag(t *testing.T) {
+	t.Parallel()
+
+	// Verify that closed flag prevents double close issues
+	exec := &sshExecutor{
+		closed: false,
+	}
+
+	// First Kill should work (no session, so just returns nil)
+	err := exec.Kill(nil)
+	require.NoError(t, err)
+	assert.True(t, exec.closed)
+
+	// Second Kill should be no-op due to closed flag
+	err = exec.Kill(nil)
+	require.NoError(t, err)
 }

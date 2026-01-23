@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/google/jsonschema-go/jsonschema"
 )
+
+const defaultSSHTimeout = 30 * time.Second
 
 // Config represents SSH connection info
 type Config struct {
@@ -19,10 +22,11 @@ type Config struct {
 	Port          string
 	Key           string
 	Password      string
-	StrictHostKey bool     // Enable strict host key checking (defaults to true)
-	KnownHostFile string   // Path to known_hosts file (defaults to ~/.ssh/known_hosts)
-	Shell         string   // Shell for remote command execution (e.g., "/bin/bash")
-	ShellArgs     []string // Additional shell arguments (e.g., -e, -o pipefail)
+	StrictHostKey bool          // Enable strict host key checking (defaults to true)
+	KnownHostFile string        // Path to known_hosts file (defaults to ~/.ssh/known_hosts)
+	Shell         string        // Shell for remote command execution (e.g., "/bin/bash")
+	ShellArgs     []string      // Additional shell arguments (e.g., -e, -o pipefail)
+	Timeout       time.Duration // Connection timeout (defaults to 30s)
 }
 
 func FromMapConfig(_ context.Context, mapCfg map[string]any) (*Client, error) {
@@ -37,6 +41,7 @@ func FromMapConfig(_ context.Context, mapCfg map[string]any) (*Client, error) {
 		KnownHostFile string
 		Shell         string
 		ShellArgs     []string
+		Timeout       string // Duration string like "30s", "1m"
 	})
 	md, err := mapstructure.NewDecoder(
 		&mapstructure.DecoderConfig{Result: def, WeaklyTypedInput: true},
@@ -62,6 +67,15 @@ func FromMapConfig(_ context.Context, mapCfg map[string]any) (*Client, error) {
 		return nil, fmt.Errorf("failed to parse shell config: %w", err)
 	}
 
+	timeout := defaultSSHTimeout
+	if def.Timeout != "" {
+		parsed, err := time.ParseDuration(def.Timeout)
+		if err != nil {
+			return nil, fmt.Errorf("invalid timeout duration %q: %w", def.Timeout, err)
+		}
+		timeout = parsed
+	}
+
 	cfg := &Config{
 		User:          def.User,
 		Host:          host,
@@ -72,6 +86,7 @@ func FromMapConfig(_ context.Context, mapCfg map[string]any) (*Client, error) {
 		KnownHostFile: def.KnownHostFile,
 		Shell:         shell,
 		ShellArgs:     shellArgs,
+		Timeout:       timeout,
 	}
 
 	return NewClient(cfg)
@@ -108,6 +123,7 @@ var configSchema = &jsonschema.Schema{
 		"knownHostFile": {Type: "string", Description: "Path to known_hosts file"},
 		"shell":         {Type: "string", Description: "Shell for remote execution"},
 		"shellArgs":     {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Additional shell arguments"},
+		"timeout":       {Type: "string", Description: "Connection timeout (e.g., '30s', '1m')"},
 	},
 }
 

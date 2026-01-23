@@ -40,7 +40,9 @@ type sshExecutor struct {
 	client    *Client
 	stdout    io.Writer
 	stderr    io.Writer
-	session   *ssh.Session
+	conn      *ssh.Client  // SSH connection (must be closed after session)
+	session   *ssh.Session // SSH session
+	closed    bool         // Whether session/conn have been closed
 	shell     string
 	shellArgs []string
 }
@@ -86,13 +88,25 @@ func (e *sshExecutor) SetStderr(out io.Writer) {
 
 func (e *sshExecutor) Kill(_ os.Signal) error {
 	e.mu.Lock()
-	session := e.session
-	e.mu.Unlock()
+	defer e.mu.Unlock()
 
-	if session != nil {
-		return session.Close()
+	if e.closed {
+		return nil
 	}
-	return nil
+
+	var lastErr error
+	if e.session != nil {
+		if err := e.session.Close(); err != nil {
+			lastErr = err
+		}
+	}
+	if e.conn != nil {
+		if err := e.conn.Close(); err != nil {
+			lastErr = err
+		}
+	}
+	e.closed = true
+	return lastErr
 }
 
 func (e *sshExecutor) Run(ctx context.Context) error {
@@ -100,19 +114,32 @@ func (e *sshExecutor) Run(ctx context.Context) error {
 		return nil
 	}
 
-	session, err := e.client.NewSession()
+	conn, session, err := e.client.NewSession()
 	if err != nil {
 		return fmt.Errorf("failed to create SSH session: %w", err)
 	}
 
 	e.mu.Lock()
+	e.conn = conn
 	e.session = session
 	e.mu.Unlock()
 
 	defer func() {
+		e.mu.Lock()
+		defer e.mu.Unlock()
+
+		if e.closed {
+			return
+		}
+
+		// Close session first, then the underlying connection
 		if closeErr := session.Close(); closeErr != nil {
 			logger.Warn(ctx, "SSH session close error", tag.Error(closeErr))
 		}
+		if closeErr := conn.Close(); closeErr != nil {
+			logger.Warn(ctx, "SSH connection close error", tag.Error(closeErr))
+		}
+		e.closed = true
 	}()
 
 	session.Stdout = e.stdout
@@ -136,7 +163,11 @@ func (e *sshExecutor) runWithCancellation(ctx context.Context, session *ssh.Sess
 		}
 		return nil
 	case <-ctx.Done():
+		// Close session to unblock the goroutine running session.Run()
+		// Note: The defer in Run() will also close, but Close() is idempotent
 		_ = session.Close()
+		// Wait for goroutine to finish to avoid goroutine leak
+		<-done
 		return ctx.Err()
 	}
 }

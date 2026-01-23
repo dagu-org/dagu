@@ -31,10 +31,16 @@ func NewClient(cfg *Config) (*Client, error) {
 		return nil, fmt.Errorf("failed to setup host key verification: %w", err)
 	}
 
+	timeout := cfg.Timeout
+	if timeout == 0 {
+		timeout = defaultSSHTimeout
+	}
+
 	clientConfig := &ssh.ClientConfig{
 		User:            cfg.User,
 		Auth:            []ssh.AuthMethod{authMethod},
 		HostKeyCallback: hostKeyCallback,
+		Timeout:         timeout,
 	}
 
 	port := cfg.Port
@@ -50,13 +56,19 @@ func NewClient(cfg *Config) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) NewSession() (*ssh.Session, error) {
+func (c *Client) NewSession() (*ssh.Client, *ssh.Session, error) {
 	conn, err := ssh.Dial("tcp", c.hostPort, c.cfg)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return conn.NewSession()
+	session, err := conn.NewSession()
+	if err != nil {
+		conn.Close() // Clean up connection on session creation failure
+		return nil, nil, err
+	}
+
+	return conn, session, nil
 }
 
 // getHostKeyCallback returns the appropriate host key callback based on configuration

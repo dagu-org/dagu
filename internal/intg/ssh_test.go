@@ -55,6 +55,18 @@ func (s *sshServerContainer) sshConfig(shell string) string {
 `, s.hostPort, sshTestUser, s.keyPath, shell)
 }
 
+// sshPasswordConfig returns SSH configuration using password authentication.
+func (s *sshServerContainer) sshPasswordConfig(shell string) string {
+	return fmt.Sprintf(`ssh:
+  host: 127.0.0.1
+  port: "%s"
+  user: %s
+  password: "%s"
+  strictHostKey: false
+  shell: %s
+`, s.hostPort, sshTestUser, sshTestPass, shell)
+}
+
 // TestSSHExecutorIntegration tests SSH executor with a real SSH server in Docker
 func TestSSHExecutorIntegration(t *testing.T) {
 	if testing.Short() {
@@ -380,6 +392,51 @@ steps:
 `
 		dag := th.DAG(t, dagConfig)
 		dag.Agent().RunError(t)
+	})
+
+	t.Run("PasswordAuthentication", func(t *testing.T) {
+		th := test.Setup(t)
+
+		// Use password authentication instead of key-based auth
+		dagConfig := sshServer.sshPasswordConfig("/bin/sh") + `
+steps:
+  - name: password-auth-test
+    executor: ssh
+    command: echo "authenticated with password"
+    output: PASSWORD_AUTH_OUT
+`
+		dag := th.DAG(t, dagConfig)
+		dag.Agent().RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"PASSWORD_AUTH_OUT": "authenticated with password",
+		})
+	})
+
+	t.Run("TimeoutConfiguration", func(t *testing.T) {
+		th := test.Setup(t)
+
+		// Test that custom timeout configuration works
+		dagConfig := fmt.Sprintf(`ssh:
+  host: 127.0.0.1
+  port: "%s"
+  user: %s
+  key: "%s"
+  strictHostKey: false
+  shell: /bin/sh
+  timeout: "10s"
+steps:
+  - name: timeout-config-test
+    executor: ssh
+    command: echo "timeout configured"
+    output: TIMEOUT_OUT
+`, sshServer.hostPort, sshTestUser, sshServer.keyPath)
+		dag := th.DAG(t, dagConfig)
+		dag.Agent().RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"TIMEOUT_OUT": "timeout configured",
+		})
 	})
 }
 

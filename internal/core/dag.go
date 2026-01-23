@@ -525,6 +525,8 @@ type SSHConfig struct {
 	Shell string `json:"shell,omitempty"`
 	// ShellArgs contains additional arguments that should be passed to the shell executable.
 	ShellArgs []string `json:"shellArgs,omitempty"`
+	// Timeout is the connection timeout duration (e.g., "30s", "1m"). Defaults to 30s.
+	Timeout string `json:"timeout,omitempty"`
 }
 
 // S3Config contains the default S3 configuration for the DAG.
