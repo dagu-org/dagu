@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -420,6 +419,7 @@ func TestSSHExecutor_BuildScript_WithWorkingDir(t *testing.T) {
 
 	exec := &sshExecutor{
 		step: core.Step{
+			Dir: "/app/src", // Working directory is taken from step.Dir
 			Commands: []core.CommandEntry{
 				{Command: "echo", Args: []string{"hello"}},
 			},
@@ -427,12 +427,7 @@ func TestSSHExecutor_BuildScript_WithWorkingDir(t *testing.T) {
 		shell: "/bin/sh",
 	}
 
-	// Create context with working directory
-	ctx := context.Background()
-	env := runtime.Env{WorkingDir: "/app/src"}
-	ctx = runtime.WithEnv(ctx, env)
-
-	script := exec.buildScript(ctx)
+	script := exec.buildScript()
 
 	// Verify the script contains cd command (path may or may not be quoted)
 	assert.Contains(t, script, "cd ")
@@ -454,8 +449,7 @@ func TestSSHExecutor_BuildScript_WithScript(t *testing.T) {
 		shell: "/bin/bash",
 	}
 
-	ctx := context.Background()
-	script := exec.buildScript(ctx)
+	script := exec.buildScript()
 
 	// Verify script content is included
 	assert.Contains(t, script, "echo 'line1'")
@@ -478,8 +472,7 @@ func TestSSHExecutor_BuildScript_WithCommands(t *testing.T) {
 		shell: "/bin/sh",
 	}
 
-	ctx := context.Background()
-	script := exec.buildScript(ctx)
+	script := exec.buildScript()
 
 	// Verify all commands are included
 	assert.Contains(t, script, "git pull")
@@ -500,8 +493,7 @@ func TestSSHExecutor_BuildScript_FunctionWrapper(t *testing.T) {
 		shell: "/bin/sh",
 	}
 
-	ctx := context.Background()
-	script := exec.buildScript(ctx)
+	script := exec.buildScript()
 
 	// Verify function wrapper format
 	assert.True(t, strings.HasPrefix(script, "__dagu_exec(){"))

@@ -13,7 +13,6 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"golang.org/x/crypto/ssh"
 )
@@ -121,7 +120,7 @@ func (e *sshExecutor) Run(ctx context.Context) error {
 	session.Stderr = e.stderr
 
 	// Build the script wrapped in a function for robust execution
-	script := e.buildScript(ctx)
+	script := e.buildScript()
 
 	// Build shell command string
 	shellCmd := e.shell
@@ -171,14 +170,15 @@ func (e *sshExecutor) buildCommand(cmdEntry core.CommandEntry) string {
 // buildScript constructs a complete script for SSH execution, wrapped in a function.
 // The function wrapper ensures the shell reads all input before execution,
 // making it robust against slow networks and buffering issues.
-func (e *sshExecutor) buildScript(ctx context.Context) string {
+func (e *sshExecutor) buildScript() string {
 	var body strings.Builder
 
-	// Get working directory from runtime environment
-	env := runtime.GetEnv(ctx)
-	workingDir := env.WorkingDir
+	// For SSH execution, only use working directory if explicitly set at step level.
+	// DAG-level workingDir is for LOCAL execution and may not exist on the remote host.
+	// If step.Dir is empty, run in SSH user's home directory.
+	workingDir := e.step.Dir
 
-	// Change to working directory if specified
+	// Change to working directory if explicitly specified
 	if workingDir != "" {
 		fmt.Fprintf(&body, "cd %s || return 1\n", cmdutil.ShellQuote(workingDir))
 	}
