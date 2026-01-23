@@ -2549,16 +2549,6 @@ func TestValidateWorkerSelector(t *testing.T) {
 	}
 }
 
-func TestValidateConflicts(t *testing.T) {
-	t.Parallel()
-
-	// validateConflicts always returns nil as all validation is done by capability-based validators
-	t.Run("AlwaysReturnsNil", func(t *testing.T) {
-		err := validateConflicts(&step{Type: "http"})
-		assert.NoError(t, err)
-	})
-}
-
 func TestUnregisteredExecutorValidation(t *testing.T) {
 	t.Parallel()
 

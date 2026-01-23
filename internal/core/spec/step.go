@@ -258,11 +258,6 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	// Run the transformer pipeline
 	errs := runStepTransformers(ctx, s, result)
 
-	// validateConflicts checks for mutual exclusivity between step fields.
-	if err := validateConflicts(s); err != nil {
-		errs = append(errs, err)
-	}
-
 	// Action-defining transformations
 	if err := buildStepContainer(ctx, s, result); err != nil {
 		errs = append(errs, wrapTransformError("container", err))
@@ -1071,14 +1066,6 @@ func validateMessages(result *core.Step) error {
 			fmt.Errorf("executor type %q does not support messages field; use type: chat", result.ExecutorConfig.Type),
 		)
 	}
-	return nil
-}
-
-// validateConflicts checks for mutual exclusivity between step fields.
-// This only checks new-vs-legacy format conflicts (type/config vs executor).
-// validateConflicts validates step field conflicts.
-// Execution type conflicts are handled by capability-based validators.
-func validateConflicts(_ *step) error {
 	return nil
 }
 
