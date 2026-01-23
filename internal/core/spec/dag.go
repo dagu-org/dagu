@@ -248,6 +248,25 @@ type ssh struct {
 	Shell types.ShellValue `yaml:"shell,omitempty"`
 	// Timeout is the connection timeout duration (e.g., "30s", "1m"). Defaults to 30s.
 	Timeout string `yaml:"timeout,omitempty"`
+	// Env contains environment variables to set on the remote host before execution.
+	// These are exported at the beginning of the script.
+	Env map[string]string `yaml:"env,omitempty"`
+	// Bastion is the jump host / bastion server configuration.
+	Bastion *bastion `yaml:"bastion,omitempty"`
+}
+
+// bastion defines the bastion/jump host configuration.
+type bastion struct {
+	// Host is the bastion host address.
+	Host string `yaml:"host,omitempty"`
+	// Port is the bastion SSH port (can be string or number).
+	Port types.PortValue `yaml:"port,omitempty"`
+	// User is the bastion SSH user.
+	User string `yaml:"user,omitempty"`
+	// Key is the path to the SSH private key for the bastion.
+	Key string `yaml:"key,omitempty"`
+	// Password is the SSH password for the bastion.
+	Password string `yaml:"password,omitempty"`
 }
 
 // s3Config defines the default S3 configuration for the DAG.
@@ -1331,6 +1350,21 @@ func buildSSH(_ BuildContext, d *dag) (*core.SSHConfig, error) {
 		}
 	}
 
+	var bastionCfg *core.BastionConfig
+	if d.SSH.Bastion != nil {
+		bastionPort := d.SSH.Bastion.Port.String()
+		if bastionPort == "" {
+			bastionPort = "22"
+		}
+		bastionCfg = &core.BastionConfig{
+			Host:     d.SSH.Bastion.Host,
+			Port:     bastionPort,
+			User:     d.SSH.Bastion.User,
+			Key:      d.SSH.Bastion.Key,
+			Password: d.SSH.Bastion.Password,
+		}
+	}
+
 	return &core.SSHConfig{
 		User:          d.SSH.User,
 		Host:          d.SSH.Host,
@@ -1342,6 +1376,8 @@ func buildSSH(_ BuildContext, d *dag) (*core.SSHConfig, error) {
 		Shell:         shell,
 		ShellArgs:     shellArgs,
 		Timeout:       d.SSH.Timeout,
+		Env:           d.SSH.Env,
+		Bastion:       bastionCfg,
 	}, nil
 }
 

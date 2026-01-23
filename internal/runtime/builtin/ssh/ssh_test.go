@@ -698,3 +698,371 @@ func TestSSHExecutor_ClosedFlag(t *testing.T) {
 	err = exec.Kill(nil)
 	require.NoError(t, err)
 }
+
+func TestSSHExecutor_BuildScript_WithEnvVars(t *testing.T) {
+	t.Parallel()
+
+	exec := &sshExecutor{
+		step: core.Step{
+			Commands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"$MY_VAR"}},
+			},
+		},
+		shell: "/bin/sh",
+		envVars: map[string]string{
+			"MY_VAR":    "hello world", // Value with space to test quoting
+			"OTHER_VAR": "simple",      // Simple value (no quoting needed)
+		},
+	}
+
+	script := exec.buildScript()
+
+	// Verify env exports are in the script
+	assert.Contains(t, script, "export MY_VAR='hello world'") // Quoted due to space
+	assert.Contains(t, script, "export OTHER_VAR=simple")     // No quoting needed
+	// Verify env exports come before set -e
+	envPos := strings.Index(script, "export MY_VAR")
+	setEPos := strings.Index(script, "set -e")
+	assert.True(t, envPos < setEPos, "env exports should come before set -e")
+}
+
+func TestMergeEnvVars(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		base     map[string]string
+		override map[string]string
+		expected map[string]string
+	}{
+		{
+			name:     "BothNil",
+			base:     nil,
+			override: nil,
+			expected: nil,
+		},
+		{
+			name: "BaseOnly",
+			base: map[string]string{"A": "1", "B": "2"},
+			expected: map[string]string{
+				"A": "1",
+				"B": "2",
+			},
+		},
+		{
+			name:     "OverrideOnly",
+			override: map[string]string{"X": "10"},
+			expected: map[string]string{
+				"X": "10",
+			},
+		},
+		{
+			name:     "OverrideWins",
+			base:     map[string]string{"A": "1", "B": "2"},
+			override: map[string]string{"A": "100", "C": "3"},
+			expected: map[string]string{
+				"A": "100", // Override wins
+				"B": "2",
+				"C": "3",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := mergeEnvVars(tt.base, tt.override)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestParseEnvSlice(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    []string
+		expected map[string]string
+	}{
+		{
+			name:     "Empty",
+			input:    nil,
+			expected: nil,
+		},
+		{
+			name:  "SingleVar",
+			input: []string{"FOO=bar"},
+			expected: map[string]string{
+				"FOO": "bar",
+			},
+		},
+		{
+			name:  "MultipleVars",
+			input: []string{"FOO=bar", "BAZ=qux"},
+			expected: map[string]string{
+				"FOO": "bar",
+				"BAZ": "qux",
+			},
+		},
+		{
+			name:  "ValueWithEquals",
+			input: []string{"URL=http://example.com?a=1&b=2"},
+			expected: map[string]string{
+				"URL": "http://example.com?a=1&b=2",
+			},
+		},
+		{
+			name:  "EmptyValue",
+			input: []string{"EMPTY="},
+			expected: map[string]string{
+				"EMPTY": "",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseEnvSlice(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestNewSSHExecutor_WithEnvVars(t *testing.T) {
+	t.Parallel()
+
+	step := core.Step{
+		Name: "ssh-exec",
+		Env:  []string{"STEP_VAR=step_value"},
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "ssh",
+			Config: map[string]any{
+				"user":     "testuser",
+				"ip":       "testip",
+				"port":     22,
+				"password": "testpassword",
+				"env": map[string]any{
+					"DAG_VAR":  "dag_value",
+					"STEP_VAR": "dag_value", // Will be overridden by step-level
+				},
+			},
+		},
+	}
+
+	ctx := context.Background()
+	exec, err := NewSSHExecutor(ctx, step)
+	require.NoError(t, err)
+
+	sshExec, ok := exec.(*sshExecutor)
+	require.True(t, ok)
+
+	// Verify env vars are merged correctly with step-level taking precedence
+	assert.Equal(t, "dag_value", sshExec.envVars["DAG_VAR"])
+	assert.Equal(t, "step_value", sshExec.envVars["STEP_VAR"])
+}
+
+func TestFromMapConfig_WithBastion(t *testing.T) {
+	t.Parallel()
+
+	config := map[string]any{
+		"user":     "testuser",
+		"host":     "target.example.com",
+		"port":     "22",
+		"password": "targetpass",
+		"bastion": map[string]any{
+			"host":     "bastion.example.com",
+			"port":     "2222",
+			"user":     "bastionuser",
+			"password": "bastionpass",
+		},
+	}
+
+	ctx := context.Background()
+	client, err := FromMapConfig(ctx, config)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+
+	// Verify bastion config is set
+	assert.NotNil(t, client.bastionCfg)
+	assert.Equal(t, "bastion.example.com:2222", client.bastionCfg.hostPort)
+	assert.Equal(t, "bastionuser", client.bastionCfg.cfg.User)
+}
+
+func TestFromMapConfig_WithBastionDefaultPort(t *testing.T) {
+	t.Parallel()
+
+	config := map[string]any{
+		"user":     "testuser",
+		"host":     "target.example.com",
+		"password": "targetpass",
+		"bastion": map[string]any{
+			"host":     "bastion.example.com",
+			"user":     "bastionuser",
+			"password": "bastionpass",
+			// No port specified - should default to 22
+		},
+	}
+
+	ctx := context.Background()
+	client, err := FromMapConfig(ctx, config)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+
+	// Verify bastion config uses default port
+	assert.NotNil(t, client.bastionCfg)
+	assert.Equal(t, "bastion.example.com:22", client.bastionCfg.hostPort)
+}
+
+func TestNewClient_WithBastionConfig(t *testing.T) {
+	t.Parallel()
+
+	cfg := &Config{
+		User:     "testuser",
+		Host:     "target.example.com",
+		Port:     "22",
+		Password: "targetpass",
+		Bastion: &BastionConfig{
+			Host:     "bastion.example.com",
+			Port:     "2222",
+			User:     "bastionuser",
+			Password: "bastionpass",
+		},
+	}
+
+	client, err := NewClient(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+
+	// Verify bastion config is properly set
+	assert.NotNil(t, client.bastionCfg)
+	assert.Equal(t, "bastion.example.com:2222", client.bastionCfg.hostPort)
+}
+
+func TestNewSFTPExecutor(t *testing.T) {
+	t.Parallel()
+
+	step := core.Step{
+		Name: "sftp-transfer",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sftp",
+			Config: map[string]any{
+				"user":        "testuser",
+				"host":        "testhost",
+				"password":    "testpass",
+				"direction":   "upload",
+				"source":      "/local/path",
+				"destination": "/remote/path",
+			},
+		},
+	}
+
+	ctx := context.Background()
+	exec, err := NewSFTPExecutor(ctx, step)
+	require.NoError(t, err)
+	require.NotNil(t, exec)
+
+	sftpExec, ok := exec.(*sftpExecutor)
+	require.True(t, ok)
+	assert.Equal(t, "upload", sftpExec.direction)
+	assert.Equal(t, "/local/path", sftpExec.source)
+	assert.Equal(t, "/remote/path", sftpExec.destination)
+}
+
+func TestNewSFTPExecutor_MissingSource(t *testing.T) {
+	t.Parallel()
+
+	step := core.Step{
+		Name: "sftp-transfer",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sftp",
+			Config: map[string]any{
+				"user":        "testuser",
+				"host":        "testhost",
+				"password":    "testpass",
+				"direction":   "upload",
+				"destination": "/remote/path",
+				// source is missing
+			},
+		},
+	}
+
+	ctx := context.Background()
+	_, err := NewSFTPExecutor(ctx, step)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "source path is required")
+}
+
+func TestNewSFTPExecutor_MissingDestination(t *testing.T) {
+	t.Parallel()
+
+	step := core.Step{
+		Name: "sftp-transfer",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sftp",
+			Config: map[string]any{
+				"user":      "testuser",
+				"host":      "testhost",
+				"password":  "testpass",
+				"direction": "download",
+				"source":    "/remote/path",
+				// destination is missing
+			},
+		},
+	}
+
+	ctx := context.Background()
+	_, err := NewSFTPExecutor(ctx, step)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "destination path is required")
+}
+
+func TestNewSFTPExecutor_InvalidDirection(t *testing.T) {
+	t.Parallel()
+
+	step := core.Step{
+		Name: "sftp-transfer",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sftp",
+			Config: map[string]any{
+				"user":        "testuser",
+				"host":        "testhost",
+				"password":    "testpass",
+				"direction":   "invalid",
+				"source":      "/local/path",
+				"destination": "/remote/path",
+			},
+		},
+	}
+
+	ctx := context.Background()
+	_, err := NewSFTPExecutor(ctx, step)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid direction")
+}
+
+func TestNewSFTPExecutor_DefaultDirection(t *testing.T) {
+	t.Parallel()
+
+	step := core.Step{
+		Name: "sftp-transfer",
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "sftp",
+			Config: map[string]any{
+				"user":        "testuser",
+				"host":        "testhost",
+				"password":    "testpass",
+				"source":      "/local/path",
+				"destination": "/remote/path",
+				// direction not specified - should default to upload
+			},
+		},
+	}
+
+	ctx := context.Background()
+	exec, err := NewSFTPExecutor(ctx, step)
+	require.NoError(t, err)
+
+	sftpExec, ok := exec.(*sftpExecutor)
+	require.True(t, ok)
+	assert.Equal(t, "upload", sftpExec.direction) // Default to upload
+}

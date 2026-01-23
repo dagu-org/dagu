@@ -547,6 +547,18 @@ func (a *Agent) Run(ctx context.Context) error {
 			sshTimeout = parsed
 		}
 
+		// Build bastion config if present
+		var bastionCfg *ssh.BastionConfig
+		if a.dag.SSH.Bastion != nil {
+			bastionCfg = &ssh.BastionConfig{
+				Host:     a.dag.SSH.Bastion.Host,
+				Port:     a.dag.SSH.Bastion.Port,
+				User:     a.dag.SSH.Bastion.User,
+				Key:      a.dag.SSH.Bastion.Key,
+				Password: a.dag.SSH.Bastion.Password,
+			}
+		}
+
 		sshConfig, err := cmdutil.EvalObject(ctx, ssh.Config{
 			User:          a.dag.SSH.User,
 			Host:          a.dag.SSH.Host,
@@ -558,6 +570,8 @@ func (a *Agent) Run(ctx context.Context) error {
 			Shell:         a.dag.SSH.Shell,
 			ShellArgs:     a.dag.SSH.ShellArgs,
 			Timeout:       sshTimeout,
+			Env:           a.dag.SSH.Env,
+			Bastion:       bastionCfg,
 		}, runtime.AllEnvsMap(ctx))
 		if err != nil {
 			initErr = fmt.Errorf("failed to evaluate ssh config: %w", err)

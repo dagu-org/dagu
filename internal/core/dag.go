@@ -527,6 +527,25 @@ type SSHConfig struct {
 	ShellArgs []string `json:"shellArgs,omitempty"`
 	// Timeout is the connection timeout duration (e.g., "30s", "1m"). Defaults to 30s.
 	Timeout string `json:"timeout,omitempty"`
+	// Env contains environment variables to set on the remote host before execution.
+	// These are exported at the beginning of the script.
+	Env map[string]string `json:"env,omitempty"`
+	// Bastion is the jump host / bastion server configuration for connecting to the target host.
+	Bastion *BastionConfig `json:"bastion,omitempty"`
+}
+
+// BastionConfig contains the configuration for a bastion/jump host.
+type BastionConfig struct {
+	// Host is the bastion host address.
+	Host string `json:"host,omitempty"`
+	// Port is the bastion SSH port. Default is "22".
+	Port string `json:"port,omitempty"`
+	// User is the bastion SSH user.
+	User string `json:"user,omitempty"`
+	// Key is the path to the SSH private key for the bastion.
+	Key string `json:"key,omitempty"`
+	// Password is the SSH password for the bastion.
+	Password string `json:"password,omitempty"`
 }
 
 // S3Config contains the default S3 configuration for the DAG.
