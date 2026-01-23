@@ -30,77 +30,6 @@ func TestNewSSHExecutor(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestSSHExecutor_BuildCommand(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name      string
-		shell     string
-		shellArgs []string
-		command   string
-		args      []string
-		expected  string
-	}{
-		{
-			name:     "NoShell_NoArgs",
-			shell:    "",
-			command:  "ls",
-			args:     nil,
-			expected: "ls",
-		},
-		{
-			name:     "NoShell_WithArgs",
-			shell:    "",
-			command:  "ls",
-			args:     []string{"-la"},
-			expected: "ls -la",
-		},
-		{
-			name:     "NoShell_ArgsWithSpaces",
-			shell:    "",
-			command:  "echo",
-			args:     []string{"hello world"},
-			expected: "echo 'hello world'",
-		},
-		{
-			name:     "WithShell",
-			shell:    "/bin/bash",
-			command:  "echo",
-			args:     []string{"hello"},
-			expected: "/bin/bash -c 'echo hello'",
-		},
-		{
-			name:      "WithShellAndArgs",
-			shell:     "/bin/bash",
-			shellArgs: []string{"-e"},
-			command:   "echo",
-			args:      []string{"hello"},
-			expected:  "/bin/bash -e -c 'echo hello'",
-		},
-		{
-			name:     "WithShell_PowerShell",
-			shell:    "powershell",
-			command:  "Write-Host",
-			args:     []string{"hello"},
-			expected: "powershell -Command 'Write-Host hello'",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			e := &sshExecutor{
-				shell:     tt.shell,
-				shellArgs: tt.shellArgs,
-			}
-			result := e.buildCommand(core.CommandEntry{
-				Command: tt.command,
-				Args:    tt.args,
-			})
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 func TestNewSSHExecutor_WithShellConfig(t *testing.T) {
 	t.Parallel()
 
@@ -576,6 +505,46 @@ func TestSSHExecutor_BuildCommandString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := exec.buildCommandString(tt.cmd)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestSSHExecutor_BuildShellCommand(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		shell     string
+		shellArgs []string
+		expected  string
+	}{
+		{
+			name:     "ShellOnly",
+			shell:    "/bin/sh",
+			expected: "/bin/sh",
+		},
+		{
+			name:      "ShellWithSingleArg",
+			shell:     "/bin/bash",
+			shellArgs: []string{"-e"},
+			expected:  "/bin/bash -e",
+		},
+		{
+			name:      "ShellWithMultipleArgs",
+			shell:     "/bin/bash",
+			shellArgs: []string{"-e", "-o", "pipefail"},
+			expected:  "/bin/bash -e -o pipefail",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exec := &sshExecutor{
+				shell:     tt.shell,
+				shellArgs: tt.shellArgs,
+			}
+			result := exec.buildShellCommand()
 			assert.Equal(t, tt.expected, result)
 		})
 	}

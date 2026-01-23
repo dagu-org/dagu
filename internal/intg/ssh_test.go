@@ -43,6 +43,18 @@ type sshServerContainer struct {
 	workDir     string // working directory for test files
 }
 
+// sshConfig returns the common SSH configuration block for DAG tests.
+func (s *sshServerContainer) sshConfig(shell string) string {
+	return fmt.Sprintf(`ssh:
+  host: 127.0.0.1
+  port: "%s"
+  user: %s
+  key: "%s"
+  strictHostKey: false
+  shell: %s
+`, s.hostPort, sshTestUser, s.keyPath, shell)
+}
+
 // TestSSHExecutorIntegration tests SSH executor with a real SSH server in Docker
 func TestSSHExecutorIntegration(t *testing.T) {
 	if testing.Short() {
@@ -65,22 +77,13 @@ func TestSSHExecutorIntegration(t *testing.T) {
 	t.Run("BasicCommandExecution", func(t *testing.T) {
 		th := test.Setup(t)
 
-		dagConfig := fmt.Sprintf(`
-ssh:
-  host: 127.0.0.1
-  port: "%s"
-  user: %s
-  key: "%s"
-  strictHostKey: false
-  shell: /bin/sh
-
+		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: basic-ssh
     executor: ssh
     command: echo "hello from ssh"
     output: SSH_OUT
-`, sshServer.hostPort, sshTestUser, sshServer.keyPath)
-
+`
 		dag := th.DAG(t, dagConfig)
 		dag.Agent().RunSuccess(t)
 		dag.AssertLatestStatus(t, core.Succeeded)
@@ -92,22 +95,13 @@ steps:
 	t.Run("CommandWithArguments", func(t *testing.T) {
 		th := test.Setup(t)
 
-		dagConfig := fmt.Sprintf(`
-ssh:
-  host: 127.0.0.1
-  port: "%s"
-  user: %s
-  key: "%s"
-  strictHostKey: false
-  shell: /bin/sh
-
+		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: args-test
     executor: ssh
     command: echo hello world
     output: SSH_ARGS_OUT
-`, sshServer.hostPort, sshTestUser, sshServer.keyPath)
-
+`
 		dag := th.DAG(t, dagConfig)
 		dag.Agent().RunSuccess(t)
 		dag.AssertLatestStatus(t, core.Succeeded)
@@ -119,23 +113,14 @@ steps:
 	t.Run("WorkingDirectory", func(t *testing.T) {
 		th := test.Setup(t)
 
-		dagConfig := fmt.Sprintf(`
-ssh:
-  host: 127.0.0.1
-  port: "%s"
-  user: %s
-  key: "%s"
-  strictHostKey: false
-  shell: /bin/sh
-
+		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: workdir-test
     executor: ssh
     dir: /tmp
     command: pwd
     output: SSH_PWD_OUT
-`, sshServer.hostPort, sshTestUser, sshServer.keyPath)
-
+`
 		dag := th.DAG(t, dagConfig)
 		dag.Agent().RunSuccess(t)
 		dag.AssertLatestStatus(t, core.Succeeded)
@@ -149,15 +134,7 @@ steps:
 
 		// Test multi-line script execution
 		// Note: Avoid shell variables with ${} as dagu expands them before sending to SSH
-		dagConfig := fmt.Sprintf(`
-ssh:
-  host: 127.0.0.1
-  port: "%s"
-  user: %s
-  key: "%s"
-  strictHostKey: false
-  shell: /bin/sh
-
+		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: script-test
     executor: ssh
@@ -165,8 +142,7 @@ steps:
       echo -n "hello "
       echo "world"
     output: SSH_SCRIPT_OUT
-`, sshServer.hostPort, sshTestUser, sshServer.keyPath)
-
+`
 		dag := th.DAG(t, dagConfig)
 		dag.Agent().RunSuccess(t)
 		dag.AssertLatestStatus(t, core.Succeeded)
@@ -178,15 +154,7 @@ steps:
 	t.Run("ScriptWithWorkingDirectory", func(t *testing.T) {
 		th := test.Setup(t)
 
-		dagConfig := fmt.Sprintf(`
-ssh:
-  host: 127.0.0.1
-  port: "%s"
-  user: %s
-  key: "%s"
-  strictHostKey: false
-  shell: /bin/sh
-
+		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: script-workdir-test
     executor: ssh
@@ -194,8 +162,7 @@ steps:
     script: |
       echo "working in $(pwd)"
     output: SSH_SCRIPT_WORKDIR_OUT
-`, sshServer.hostPort, sshTestUser, sshServer.keyPath)
-
+`
 		dag := th.DAG(t, dagConfig)
 		dag.Agent().RunSuccess(t)
 		dag.AssertLatestStatus(t, core.Succeeded)
@@ -208,15 +175,7 @@ steps:
 		th := test.Setup(t)
 
 		// Use script instead of commands for multiple commands
-		dagConfig := fmt.Sprintf(`
-ssh:
-  host: 127.0.0.1
-  port: "%s"
-  user: %s
-  key: "%s"
-  strictHostKey: false
-  shell: /bin/sh
-
+		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: multi-cmd-test
     executor: ssh
@@ -224,8 +183,7 @@ steps:
       echo first
       echo second
     output: SSH_MULTI_OUT
-`, sshServer.hostPort, sshTestUser, sshServer.keyPath)
-
+`
 		dag := th.DAG(t, dagConfig)
 		dag.Agent().RunSuccess(t)
 		dag.AssertLatestStatus(t, core.Succeeded)
@@ -238,15 +196,7 @@ steps:
 		th := test.Setup(t)
 
 		// Use script instead of commands for multiple commands
-		dagConfig := fmt.Sprintf(`
-ssh:
-  host: 127.0.0.1
-  port: "%s"
-  user: %s
-  key: "%s"
-  strictHostKey: false
-  shell: /bin/sh
-
+		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: multi-cmd-workdir-test
     executor: ssh
@@ -255,8 +205,7 @@ steps:
       pwd
       echo done
     output: SSH_MULTI_WORKDIR_OUT
-`, sshServer.hostPort, sshTestUser, sshServer.keyPath)
-
+`
 		dag := th.DAG(t, dagConfig)
 		dag.Agent().RunSuccess(t)
 		dag.AssertLatestStatus(t, core.Succeeded)
@@ -268,21 +217,12 @@ steps:
 	t.Run("ErrorHandling_CommandFailure", func(t *testing.T) {
 		th := test.Setup(t)
 
-		dagConfig := fmt.Sprintf(`
-ssh:
-  host: 127.0.0.1
-  port: "%s"
-  user: %s
-  key: "%s"
-  strictHostKey: false
-  shell: /bin/sh
-
+		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: error-test
     executor: ssh
     command: exit 1
-`, sshServer.hostPort, sshTestUser, sshServer.keyPath)
-
+`
 		dag := th.DAG(t, dagConfig)
 		dag.Agent().RunError(t)
 	})
@@ -290,22 +230,13 @@ steps:
 	t.Run("ErrorHandling_InvalidWorkingDirectory", func(t *testing.T) {
 		th := test.Setup(t)
 
-		dagConfig := fmt.Sprintf(`
-ssh:
-  host: 127.0.0.1
-  port: "%s"
-  user: %s
-  key: "%s"
-  strictHostKey: false
-  shell: /bin/sh
-
+		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: invalid-dir-test
     executor: ssh
     dir: /nonexistent/directory/path
     command: echo "should not reach"
-`, sshServer.hostPort, sshTestUser, sshServer.keyPath)
-
+`
 		dag := th.DAG(t, dagConfig)
 		dag.Agent().RunError(t)
 	})
@@ -342,15 +273,7 @@ steps:
 		th := test.Setup(t)
 
 		// Test bash-specific features (process substitution)
-		dagConfig := fmt.Sprintf(`
-ssh:
-  host: 127.0.0.1
-  port: "%s"
-  user: %s
-  key: "%s"
-  strictHostKey: false
-  shell: /bin/bash
-
+		dagConfig := sshServer.sshConfig("/bin/bash") + `
 steps:
   - name: bash-test
     executor: ssh
@@ -359,8 +282,7 @@ steps:
       str="hello-world"
       echo "prefix-removed"
     output: SSH_BASH_OUT
-`, sshServer.hostPort, sshTestUser, sshServer.keyPath)
-
+`
 		dag := th.DAG(t, dagConfig)
 		dag.Agent().RunSuccess(t)
 		dag.AssertLatestStatus(t, core.Succeeded)
@@ -374,22 +296,13 @@ steps:
 
 		// Test that when no step.Dir is set, SSH runs in user's home directory
 		// Note: DAG-level workingDir is NOT used for SSH (it's for local execution)
-		dagConfig := fmt.Sprintf(`
-ssh:
-  host: 127.0.0.1
-  port: "%s"
-  user: %s
-  key: "%s"
-  strictHostKey: false
-  shell: /bin/sh
-
+		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: home-dir-test
     executor: ssh
     command: pwd
     output: SSH_HOME_DIR_OUT
-`, sshServer.hostPort, sshTestUser, sshServer.keyPath)
-
+`
 		dag := th.DAG(t, dagConfig)
 		dag.Agent().RunSuccess(t)
 		dag.AssertLatestStatus(t, core.Succeeded)
@@ -402,25 +315,14 @@ steps:
 	t.Run("StepWorkingDirOverridesDAGWorkingDir", func(t *testing.T) {
 		th := test.Setup(t)
 
-		dagConfig := fmt.Sprintf(`
-workingDir: /var
-
-ssh:
-  host: 127.0.0.1
-  port: "%s"
-  user: %s
-  key: "%s"
-  strictHostKey: false
-  shell: /bin/sh
-
+		dagConfig := "workingDir: /var\n\n" + sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: step-override-test
     executor: ssh
     dir: /tmp
     command: pwd
     output: SSH_OVERRIDE_WORKDIR_OUT
-`, sshServer.hostPort, sshTestUser, sshServer.keyPath)
-
+`
 		dag := th.DAG(t, dagConfig)
 		dag.Agent().RunSuccess(t)
 		dag.AssertLatestStatus(t, core.Succeeded)
@@ -432,23 +334,14 @@ steps:
 	t.Run("PipeInScript", func(t *testing.T) {
 		th := test.Setup(t)
 
-		dagConfig := fmt.Sprintf(`
-ssh:
-  host: 127.0.0.1
-  port: "%s"
-  user: %s
-  key: "%s"
-  strictHostKey: false
-  shell: /bin/sh
-
+		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: pipe-test
     executor: ssh
     script: |
       echo "hello" | tr 'h' 'H'
     output: SSH_PIPE_OUT
-`, sshServer.hostPort, sshTestUser, sshServer.keyPath)
-
+`
 		dag := th.DAG(t, dagConfig)
 		dag.Agent().RunSuccess(t)
 		dag.AssertLatestStatus(t, core.Succeeded)
@@ -460,22 +353,13 @@ steps:
 	t.Run("CommandSubstitution", func(t *testing.T) {
 		th := test.Setup(t)
 
-		dagConfig := fmt.Sprintf(`
-ssh:
-  host: 127.0.0.1
-  port: "%s"
-  user: %s
-  key: "%s"
-  strictHostKey: false
-  shell: /bin/sh
-
+		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: subst-test
     executor: ssh
     command: echo "hostname is $(hostname)"
     output: SSH_SUBST_OUT
-`, sshServer.hostPort, sshTestUser, sshServer.keyPath)
-
+`
 		dag := th.DAG(t, dagConfig)
 		dag.Agent().RunSuccess(t)
 		dag.AssertLatestStatus(t, core.Succeeded)
@@ -485,15 +369,7 @@ steps:
 	t.Run("SetEStopsOnFirstError", func(t *testing.T) {
 		th := test.Setup(t)
 
-		dagConfig := fmt.Sprintf(`
-ssh:
-  host: 127.0.0.1
-  port: "%s"
-  user: %s
-  key: "%s"
-  strictHostKey: false
-  shell: /bin/sh
-
+		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: set-e-test
     executor: ssh
@@ -501,8 +377,7 @@ steps:
       false
       echo "should not reach"
     output: SSH_SETE_OUT
-`, sshServer.hostPort, sshTestUser, sshServer.keyPath)
-
+`
 		dag := th.DAG(t, dagConfig)
 		dag.Agent().RunError(t)
 	})

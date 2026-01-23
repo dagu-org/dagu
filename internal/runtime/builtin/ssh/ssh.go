@@ -96,7 +96,6 @@ func (e *sshExecutor) Kill(_ os.Signal) error {
 }
 
 func (e *sshExecutor) Run(ctx context.Context) error {
-	// Skip if nothing to execute
 	if len(e.step.Commands) == 0 && e.step.Script == "" {
 		return nil
 	}
@@ -118,53 +117,36 @@ func (e *sshExecutor) Run(ctx context.Context) error {
 
 	session.Stdout = e.stdout
 	session.Stderr = e.stderr
+	session.Stdin = strings.NewReader(e.buildScript())
 
-	// Build the script wrapped in a function for robust execution
-	script := e.buildScript()
+	return e.runWithCancellation(ctx, session, e.buildShellCommand())
+}
 
-	// Build shell command string
-	shellCmd := e.shell
-	if len(e.shellArgs) > 0 {
-		shellCmd += " " + strings.Join(e.shellArgs, " ")
-	}
-
-	// Pipe script to shell's stdin
-	session.Stdin = strings.NewReader(script)
-
-	// Run with context cancellation support
+// runWithCancellation executes the session command with context cancellation support.
+func (e *sshExecutor) runWithCancellation(ctx context.Context, session *ssh.Session, shellCmd string) error {
 	done := make(chan error, 1)
 	go func() {
 		done <- session.Run(shellCmd)
 	}()
 
 	select {
-	case err := <-done:
-		if err != nil {
-			return fmt.Errorf("ssh execution failed: %w", err)
+	case runErr := <-done:
+		if runErr != nil {
+			return fmt.Errorf("ssh execution failed: %w", runErr)
 		}
 		return nil
 	case <-ctx.Done():
-		// Context cancelled - close session to terminate
-		session.Close()
+		_ = session.Close()
 		return ctx.Err()
 	}
 }
 
-// buildCommand constructs the command string for SSH execution.
-// Uses shared cmdutil functions for shell command building.
-func (e *sshExecutor) buildCommand(cmdEntry core.CommandEntry) string {
-	if e.shell == "" {
-		// No shell - direct execution, quote command and args for SSH transport
-		baseCommand := cmdutil.ShellQuote(cmdEntry.Command)
-		if len(cmdEntry.Args) > 0 {
-			baseCommand += " " + cmdutil.ShellQuoteArgs(cmdEntry.Args)
-		}
-		return baseCommand
+// buildShellCommand constructs the shell command string with arguments.
+func (e *sshExecutor) buildShellCommand() string {
+	if len(e.shellArgs) == 0 {
+		return e.shell
 	}
-
-	// With shell - use BuildShellCommandString which handles proper quoting
-	command := cmdutil.BuildCommandEscapedString(cmdEntry.Command, cmdEntry.Args)
-	return cmdutil.BuildShellCommandString(e.shell, e.shellArgs, command)
+	return e.shell + " " + strings.Join(e.shellArgs, " ")
 }
 
 // buildScript constructs a complete script for SSH execution, wrapped in a function.
