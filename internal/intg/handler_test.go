@@ -83,7 +83,7 @@ steps:
 handlerOn:
   init:
     command: "echo init-should-not-run"
-    precondition: "false"
+    preconditions: "false"
 
 steps:
   - name: step1
@@ -104,7 +104,7 @@ steps:
 		{
 			name: "InitHandler_DAGPreconditionFails_InitNotRun",
 			dagYAML: `
-precondition: "false"
+preconditions: "false"
 
 handlerOn:
   init:

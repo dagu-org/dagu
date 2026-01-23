@@ -58,7 +58,7 @@ func TestCancellation_SubDAG(t *testing.T) {
 	t.Run("parentCancelPropagatesToChildOnWorker", func(t *testing.T) {
 		f := newTestFixture(t, `
 steps:
-  - run: dotest
+  - call: dotest
 params:
   - URL: default_value
 ---

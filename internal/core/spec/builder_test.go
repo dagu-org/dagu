@@ -610,22 +610,6 @@ steps:
 		assert.Equal(t, "sub_dag", th.Steps[0].SubDAG.Name)
 		assert.Equal(t, "param1=\"value1\" param2=\"value2\"", th.Steps[0].SubDAG.Params)
 		assert.Empty(t, dag.BuildWarnings)
-
-		// Legacy run field is still accepted
-		dataLegacy := []byte(`
-steps:
-  - name: legacy sub-dag
-    run: sub_dag_legacy
-`)
-		dagLegacy, err := spec.LoadYAML(context.Background(), dataLegacy)
-		require.NoError(t, err)
-		thLegacy := DAG{t: t, DAG: dagLegacy}
-		assert.Len(t, thLegacy.Steps, 1)
-		assert.Equal(t, "dag", thLegacy.Steps[0].ExecutorConfig.Type)
-		require.NotNil(t, thLegacy.Steps[0].SubDAG)
-		assert.Equal(t, "sub_dag_legacy", thLegacy.Steps[0].SubDAG.Name)
-		require.Len(t, dagLegacy.BuildWarnings, 1)
-		assert.Contains(t, dagLegacy.BuildWarnings[0], "Step field 'run' is deprecated")
 	})
 	// ContinueOn success cases
 	continueOnTests := []struct {

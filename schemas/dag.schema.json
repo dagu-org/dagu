@@ -290,20 +290,6 @@
       "default": 1048576,
       "description": "Maximum size in bytes for the output of each step. If a step's output exceeds this limit, it will fail with an error. Defaults to 1MB (1048576 bytes). This limit also applies to pattern matching in preconditions and continueOn conditions."
     },
-    "precondition": {
-      "oneOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/condition"
-          }
-        }
-      ],
-      "description": "Conditions that must be satisfied before the DAG can run. Can use shell expansions or command substitutions to validate external states."
-    },
     "preconditions": {
       "oneOf": [
         {
@@ -316,7 +302,7 @@
           }
         }
       ],
-      "description": "Alternative name for precondition. Works exactly the same way."
+      "description": "Conditions that must be satisfied before the DAG can run. Can use shell expansions or command substitutions to validate external states."
     },
     "params": {
       "oneOf": [
@@ -557,10 +543,6 @@
           "type": "string",
           "description": "Unique identifier for the step within this DAG. If omitted, Dagu will automatically generate a name."
         },
-        "dir": {
-          "type": "string",
-          "description": "Deprecated alias for workingDir. Still accepted for backward compatibility."
-        },
         "id": {
           "type": "string",
           "description": "Optional short identifier for the step. Can be used in variable references like ${id.stdout} to access step properties. Must be unique within the DAG if specified."
@@ -572,18 +554,6 @@
         "workingDir": {
           "type": "string",
           "description": "Working directory for the step. Inherits from DAG's workingDir if not specified. Overrides DAG-level workingDir for this step."
-        },
-        "executor": {
-          "oneOf": [
-            {
-              "$ref": "#/definitions/executorType",
-              "description": "Executor type as string. For simple cases where no config is needed."
-            },
-            {
-              "$ref": "#/definitions/executorObject"
-            }
-          ],
-          "description": "Specialized executor configuration for running the step (e.g., docker for containerized execution, http for API calls, mail for sending emails, gha for running GitHub Actions locally)."
         },
         "command": {
           "oneOf": [
@@ -901,10 +871,6 @@
         "call": {
           "type": "string",
           "description": "Name of a DAG to execute as a sub dag-run."
-        },
-        "run": {
-          "type": "string",
-          "description": "Legacy field for DAG execution. Deprecated: use call instead."
         },
         "params": {
           "oneOf": [
@@ -1383,10 +1349,6 @@
         "workingDir": {
           "type": "string",
           "description": "Working directory inside the container. Commands will be executed from this directory."
-        },
-        "workDir": {
-          "type": "string",
-          "description": "Deprecated alias for workingDir. Still accepted for backward compatibility."
         },
         "platform": {
           "type": "string",

@@ -74,8 +74,6 @@ type dag struct {
 	RestartWaitSec int
 	// HistRetentionDays is the retention days of the dag-runs history.
 	HistRetentionDays *int
-	// Precondition is the condition to run the DAG.
-	Precondition any
 	// Preconditions is the condition to run the DAG.
 	Preconditions any
 	// maxActiveRuns is the maximum number of concurrent dag-runs.
@@ -126,8 +124,7 @@ type handlerOn struct {
 	Init    *step // Step to execute before steps (after preconditions pass)
 	Failure *step // Step to execute on failure
 	Success *step // Step to execute on success
-	Abort   *step // Step to execute on abort (canonical field)
-	Cancel  *step // Step to execute on cancel (deprecated: use Abort instead)
+	Abort   *step // Step to execute on abort
 	Exit    *step // Step to execute on exit
 	Wait    *step // Step to execute when DAG enters wait status (HITL)
 }
@@ -184,9 +181,6 @@ type container struct {
 	User string `yaml:"user,omitempty"` // User to run the container as
 	// WorkingDir is the working directory inside the container.
 	WorkingDir string `yaml:"workingDir,omitempty"` // Working directory inside the container
-	// WorkDir is the working directory inside the container.
-	// Deprecated: use WorkingDir instead
-	WorkDir string `yaml:"workDir,omitempty"` // Working directory inside the container
 	// Platform specifies the platform for the container (e.g., "linux/amd64").
 	Platform string `yaml:"platform,omitempty"` // Platform for the container
 	// Ports specifies the ports to expose from the container.
@@ -1104,17 +1098,11 @@ func buildContainerFromSpec(ctx BuildContext, c *container) (*core.Container, er
 			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
 		}
 
-		// Determine working dir
-		workingDir := c.WorkingDir
-		if c.WorkDir != "" {
-			workingDir = c.WorkDir
-		}
-
 		// Build exec-mode container
 		return &core.Container{
 			Exec:       strings.TrimSpace(c.Exec),
 			User:       c.User,
-			WorkingDir: workingDir,
+			WorkingDir: c.WorkingDir,
 			Env:        envs,
 			Shell:      c.Shell,
 		}, nil
@@ -1146,13 +1134,14 @@ func buildContainerFromSpec(ctx BuildContext, c *container) (*core.Container, er
 		}
 	}
 
-	result := &core.Container{
+	return &core.Container{
 		Name:          strings.TrimSpace(c.Name),
 		Image:         c.Image,
 		PullPolicy:    pullPolicy,
 		Env:           envs,
 		Volumes:       c.Volumes,
 		User:          c.User,
+		WorkingDir:    c.WorkingDir,
 		Platform:      c.Platform,
 		Ports:         c.Ports,
 		Network:       c.Network,
@@ -1164,16 +1153,7 @@ func buildContainerFromSpec(ctx BuildContext, c *container) (*core.Container, er
 		RestartPolicy: strings.TrimSpace(c.RestartPolicy),
 		Healthcheck:   hc,
 		Shell:         c.Shell,
-	}
-
-	// Backward compatibility
-	if c.WorkDir != "" {
-		result.WorkingDir = c.WorkDir
-	} else {
-		result.WorkingDir = c.WorkingDir
-	}
-
-	return result, nil
+	}, nil
 }
 
 // parseHealthcheck converts a spec healthcheck to a core.Healthcheck with validation.
@@ -1523,15 +1503,7 @@ func buildHandlers(ctx BuildContext, d *dag, result *core.DAG) (core.HandlerOn, 
 		return handlerOn, err
 	}
 
-	// Handle Abort (canonical) and Cancel (deprecated, for backward compatibility)
-	if d.HandlerOn.Abort != nil && d.HandlerOn.Cancel != nil {
-		return handlerOn, fmt.Errorf("cannot specify both 'abort' and 'cancel' in handlerOn; use 'abort' (cancel is deprecated)")
-	}
-	abortStep := d.HandlerOn.Abort
-	if abortStep == nil {
-		abortStep = d.HandlerOn.Cancel
-	}
-	if handlerOn.Cancel, err = buildHandler(abortStep, core.HandlerOnCancel); err != nil {
+	if handlerOn.Cancel, err = buildHandler(d.HandlerOn.Abort, core.HandlerOnCancel); err != nil {
 		return handlerOn, err
 	}
 
@@ -1568,16 +1540,7 @@ func buildWaitMailConfig(_ BuildContext, d *dag) (*core.MailConfig, error) {
 }
 
 func buildPreconditions(ctx BuildContext, d *dag) ([]*core.Condition, error) {
-	conditions, err := parsePrecondition(ctx, d.Preconditions)
-	if err != nil {
-		return nil, err
-	}
-	condition, err := parsePrecondition(ctx, d.Precondition)
-	if err != nil {
-		return nil, err
-	}
-
-	return append(conditions, condition...), nil
+	return parsePrecondition(ctx, d.Preconditions)
 }
 
 func buildOTel(_ BuildContext, d *dag) (*core.OTelConfig, error) {

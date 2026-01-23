@@ -318,19 +318,16 @@ func TestBuildStepWorkingDir(t *testing.T) {
 	tests := []struct {
 		name       string
 		workingDir string
-		dir        string // deprecated field
 		expected   string
 	}{
-		{name: "FromWorkingDir", workingDir: "/path/to/dir", dir: "", expected: "/path/to/dir"},
-		{name: "FromDeprecatedDir", workingDir: "", dir: "/old/path", expected: "/old/path"},
-		{name: "WorkingDirTakesPrecedence", workingDir: "/new/path", dir: "/old/path", expected: "/new/path"},
-		{name: "Trimmed", workingDir: "  /path  ", dir: "", expected: "/path"},
-		{name: "Empty", workingDir: "", dir: "", expected: ""},
+		{name: "FromWorkingDir", workingDir: "/path/to/dir", expected: "/path/to/dir"},
+		{name: "Trimmed", workingDir: "  /path  ", expected: "/path"},
+		{name: "Empty", workingDir: "", expected: ""},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &step{WorkingDir: tt.workingDir, Dir: tt.dir}
+			s := &step{WorkingDir: tt.workingDir}
 			result, err := buildStepWorkingDir(testStepBuildContext(), s)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
@@ -1276,25 +1273,23 @@ func TestBuildStepExecutor(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name:     "NilExecutor",
+			name:     "NoType",
 			step:     &step{},
 			ctx:      testStepBuildContext(),
 			expected: core.ExecutorConfig{Config: make(map[string]any)},
 		},
 		{
-			name:     "StringExecutor",
-			step:     &step{Executor: "http"},
+			name:     "TypeField",
+			step:     &step{Type: "http"},
 			ctx:      testStepBuildContext(),
 			expected: core.ExecutorConfig{Type: "http", Config: make(map[string]any)},
 		},
 		{
-			name: "ObjectExecutor",
+			name: "TypeAndConfig",
 			step: &step{
-				Executor: map[string]any{
-					"type": "docker",
-					"config": map[string]any{
-						"image": "alpine:latest",
-					},
+				Type: "docker",
+				Config: map[string]any{
+					"image": "alpine:latest",
 				},
 			},
 			ctx: testStepBuildContext(),
@@ -1320,22 +1315,6 @@ func TestBuildStepExecutor(t *testing.T) {
 				dag:          &core.DAG{SSH: &core.SSHConfig{Host: "example.com"}},
 			},
 			expected: core.ExecutorConfig{Type: "ssh", Config: make(map[string]any)},
-		},
-		{
-			name: "InvalidExecutorType",
-			step: &step{
-				Executor: map[string]any{
-					"type": 123,
-				},
-			},
-			ctx:     testStepBuildContext(),
-			wantErr: true,
-		},
-		{
-			name:    "InvalidExecutorValue",
-			step:    &step{Executor: 123},
-			ctx:     testStepBuildContext(),
-			wantErr: true,
 		},
 	}
 
@@ -1650,11 +1629,6 @@ func TestBuildStepSubDAG(t *testing.T) {
 			},
 			expected: &core.SubDAG{Name: "other-dag", Params: `key="value"`},
 		},
-		{
-			name:     "LegacyRunField",
-			step:     &step{Run: "legacy-dag"},
-			expected: &core.SubDAG{Name: "legacy-dag", Params: ""},
-		},
 	}
 
 	for _, tt := range tests {
@@ -1844,18 +1818,6 @@ func TestBuildStepContainer(t *testing.T) {
 			expected: &core.Container{
 				Image:      "alpine:3.18",
 				PullPolicy: core.PullPolicyMissing,
-			},
-		},
-		{
-			name: "BackwardCompatWorkDir",
-			input: &container{
-				Image:   "alpine:latest",
-				WorkDir: "/legacy",
-			},
-			expected: &core.Container{
-				Image:      "alpine:latest",
-				PullPolicy: core.PullPolicyMissing,
-				WorkingDir: "/legacy",
 			},
 		},
 	}
@@ -2587,47 +2549,6 @@ func TestValidateWorkerSelector(t *testing.T) {
 	}
 }
 
-func TestValidateConflicts(t *testing.T) {
-	t.Parallel()
-
-	// Test new-vs-legacy format conflicts (validateConflicts)
-	t.Run("NewVsLegacyFormatConflicts", func(t *testing.T) {
-		tests := []struct {
-			name    string
-			step    step
-			wantErr bool
-		}{
-			{
-				name: "TypeAndExecutorConflict",
-				step: step{
-					Type:     "http",
-					Executor: "shell",
-				},
-				wantErr: true,
-			},
-			{
-				name: "NoConflict",
-				step: step{
-					Type: "http",
-				},
-				wantErr: false,
-			},
-		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				err := validateConflicts(&tt.step)
-				if tt.wantErr {
-					assert.Error(t, err)
-				} else {
-					assert.NoError(t, err)
-				}
-			})
-		}
-	})
-
-}
-
 func TestUnregisteredExecutorValidation(t *testing.T) {
 	t.Parallel()
 
@@ -3152,64 +3073,6 @@ func TestBuildStepExecutorNewFormat(t *testing.T) {
 	}
 }
 
-func TestValidateConflicts_NewVsLegacyFormat(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name        string
-		step        *step
-		wantErr     bool
-		errContains string
-	}{
-		{
-			name:    "NewFormatOnly_Valid",
-			step:    &step{Type: "ssh", Config: map[string]any{"host": "server.com"}},
-			wantErr: false,
-		},
-		{
-			name:    "LegacyFormatOnly_Valid",
-			step:    &step{Executor: map[string]any{"type": "ssh"}},
-			wantErr: false,
-		},
-		{
-			name:        "TypeAndExecutor_Conflict",
-			step:        &step{Type: "ssh", Executor: "http"},
-			wantErr:     true,
-			errContains: "cannot use both 'type' and 'executor' fields",
-		},
-		{
-			name:        "ConfigAndExecutor_Conflict",
-			step:        &step{Config: map[string]any{"host": "server.com"}, Executor: "ssh"},
-			wantErr:     true,
-			errContains: "cannot use both 'config' and 'executor' fields",
-		},
-		{
-			name: "TypeConfigAndExecutor_Conflict",
-			step: &step{
-				Type:     "http",
-				Config:   map[string]any{"timeout": 30},
-				Executor: "ssh",
-			},
-			wantErr:     true,
-			errContains: "cannot use both 'type' and 'executor' fields",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := validateConflicts(tt.step)
-
-			if tt.wantErr {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errContains)
-				return
-			}
-
-			require.NoError(t, err)
-		})
-	}
-}
-
 func TestStepExecutorNewFormat_Integration(t *testing.T) {
 	t.Parallel()
 
@@ -3285,18 +3148,6 @@ func TestStepExecutorNewFormat_Integration(t *testing.T) {
 			wantConfig: map[string]any{
 				"host": "example.com",
 			},
-		},
-		{
-			name: "Conflict_Error",
-			yaml: `steps:
-  - name: conflict
-    type: http
-    executor:
-      type: ssh
-    command: test
-`,
-			wantErr:     true,
-			errContains: "cannot use both 'type' and 'executor' fields",
 		},
 	}
 
