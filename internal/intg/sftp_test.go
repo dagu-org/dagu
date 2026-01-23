@@ -1,0 +1,232 @@
+package intg_test
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/docker/docker/client"
+	"github.com/stretchr/testify/require"
+
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/test"
+)
+
+// TestSFTPExecutorIntegration tests SFTP executor with a real SSH server in Docker
+func TestSFTPExecutorIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	th := test.Setup(t)
+
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	require.NoError(t, err, "failed to create docker client")
+	defer func() { _ = dockerClient.Close() }()
+
+	// Start SSH server container (reuses helpers from ssh_test.go)
+	sshServer := startSSHServer(t, th, dockerClient)
+	defer stopSSHServer(t, th, dockerClient, sshServer)
+
+	// Wait for SSH server to be ready
+	waitForSSHReady(t, sshServer)
+
+	t.Run("UploadFile", func(t *testing.T) {
+		th := test.Setup(t)
+
+		// Create local file to upload
+		localDir := t.TempDir()
+		localFile := filepath.Join(localDir, "upload_test.txt")
+		err := os.WriteFile(localFile, []byte("sftp upload test content"), 0644)
+		require.NoError(t, err, "failed to create local test file")
+
+		// Upload file to remote
+		dagConfig := fmt.Sprintf(`
+steps:
+  - name: upload-file
+    type: sftp
+    config:
+      host: 127.0.0.1
+      port: "%s"
+      user: %s
+      key: "%s"
+      strictHostKey: false
+      direction: upload
+      source: "%s"
+      destination: /tmp/uploaded_file.txt
+  - name: verify-upload
+    type: ssh
+    config:
+      host: 127.0.0.1
+      port: "%s"
+      user: %s
+      key: "%s"
+      strictHostKey: false
+      shell: /bin/sh
+    command: cat /tmp/uploaded_file.txt
+    output: UPLOAD_VERIFY
+    depends:
+      - upload-file
+`, sshServer.hostPort, sshTestUser, sshServer.keyPath, localFile,
+			sshServer.hostPort, sshTestUser, sshServer.keyPath)
+
+		dag := th.DAG(t, dagConfig)
+		dag.Agent().RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"UPLOAD_VERIFY": "sftp upload test content",
+		})
+	})
+
+	t.Run("DownloadFile", func(t *testing.T) {
+		th := test.Setup(t)
+
+		// Create file on remote first, then download
+		downloadDir := t.TempDir()
+		downloadPath := filepath.Join(downloadDir, "downloaded.txt")
+
+		dagConfig := fmt.Sprintf(`
+steps:
+  - name: create-remote-file
+    type: ssh
+    config:
+      host: 127.0.0.1
+      port: "%s"
+      user: %s
+      key: "%s"
+      strictHostKey: false
+      shell: /bin/sh
+    script: |
+      echo "sftp download test content" > /tmp/download_test.txt
+  - name: download-file
+    type: sftp
+    config:
+      host: 127.0.0.1
+      port: "%s"
+      user: %s
+      key: "%s"
+      strictHostKey: false
+      direction: download
+      source: /tmp/download_test.txt
+      destination: "%s"
+    depends:
+      - create-remote-file
+`, sshServer.hostPort, sshTestUser, sshServer.keyPath,
+			sshServer.hostPort, sshTestUser, sshServer.keyPath, downloadPath)
+
+		dag := th.DAG(t, dagConfig)
+		dag.Agent().RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+
+		// Verify downloaded file contents
+		content, err := os.ReadFile(downloadPath)
+		require.NoError(t, err, "failed to read downloaded file")
+		require.Equal(t, "sftp download test content\n", string(content))
+	})
+
+	t.Run("UploadDirectory", func(t *testing.T) {
+		th := test.Setup(t)
+
+		// Create local directory with files to upload
+		localDir := t.TempDir()
+		subDir := filepath.Join(localDir, "subdir")
+		require.NoError(t, os.MkdirAll(subDir, 0755))
+
+		// Create files in directory (with trailing newlines for realistic file content)
+		require.NoError(t, os.WriteFile(filepath.Join(localDir, "file1.txt"), []byte("content1\n"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(localDir, "file2.txt"), []byte("content2\n"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(subDir, "nested.txt"), []byte("nested content\n"), 0644))
+
+		// Upload directory to remote
+		dagConfig := fmt.Sprintf(`
+steps:
+  - name: upload-dir
+    type: sftp
+    config:
+      host: 127.0.0.1
+      port: "%s"
+      user: %s
+      key: "%s"
+      strictHostKey: false
+      direction: upload
+      source: "%s"
+      destination: /tmp/uploaded_dir
+  - name: verify-upload
+    type: ssh
+    config:
+      host: 127.0.0.1
+      port: "%s"
+      user: %s
+      key: "%s"
+      strictHostKey: false
+      shell: /bin/sh
+    script: |
+      cat /tmp/uploaded_dir/file1.txt
+      cat /tmp/uploaded_dir/subdir/nested.txt
+    output: DIR_UPLOAD_VERIFY
+    depends:
+      - upload-dir
+`, sshServer.hostPort, sshTestUser, sshServer.keyPath, localDir,
+			sshServer.hostPort, sshTestUser, sshServer.keyPath)
+
+		dag := th.DAG(t, dagConfig)
+		dag.Agent().RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"DIR_UPLOAD_VERIFY": "content1\nnested content",
+		})
+	})
+
+	t.Run("DownloadDirectory", func(t *testing.T) {
+		th := test.Setup(t)
+
+		// Download directory from remote
+		downloadDir := t.TempDir()
+		downloadPath := filepath.Join(downloadDir, "downloaded_dir")
+
+		dagConfig := fmt.Sprintf(`
+steps:
+  - name: create-remote-dir
+    type: ssh
+    config:
+      host: 127.0.0.1
+      port: "%s"
+      user: %s
+      key: "%s"
+      strictHostKey: false
+      shell: /bin/sh
+    script: |
+      mkdir -p /tmp/remote_dir/subdir
+      echo "remote file1" > /tmp/remote_dir/file1.txt
+      echo "remote nested" > /tmp/remote_dir/subdir/nested.txt
+  - name: download-dir
+    type: sftp
+    config:
+      host: 127.0.0.1
+      port: "%s"
+      user: %s
+      key: "%s"
+      strictHostKey: false
+      direction: download
+      source: /tmp/remote_dir
+      destination: "%s"
+    depends:
+      - create-remote-dir
+`, sshServer.hostPort, sshTestUser, sshServer.keyPath,
+			sshServer.hostPort, sshTestUser, sshServer.keyPath, downloadPath)
+
+		dag := th.DAG(t, dagConfig)
+		dag.Agent().RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+
+		// Verify downloaded directory contents
+		content1, err := os.ReadFile(filepath.Join(downloadPath, "file1.txt"))
+		require.NoError(t, err, "failed to read downloaded file1.txt")
+		require.Equal(t, "remote file1\n", string(content1))
+
+		nested, err := os.ReadFile(filepath.Join(downloadPath, "subdir", "nested.txt"))
+		require.NoError(t, err, "failed to read downloaded nested.txt")
+		require.Equal(t, "remote nested\n", string(nested))
+	})
+}

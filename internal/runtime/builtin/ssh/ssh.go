@@ -2,6 +2,7 @@ package ssh
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -40,26 +41,18 @@ type sshExecutor struct {
 	client    *Client
 	stdout    io.Writer
 	stderr    io.Writer
-	session   *ssh.Session
+	conn      *ssh.Client  // SSH connection (must be closed after session)
+	session   *ssh.Session // SSH session
+	closed    bool         // Whether session/conn have been closed
 	shell     string
 	shellArgs []string
 }
 
 func NewSSHExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
-	var client *Client
-
-	// Prefer step-level SSH configuration if present
-	if len(step.ExecutorConfig.Config) > 0 {
-		c, err := FromMapConfig(ctx, step.ExecutorConfig.Config)
-		if err != nil {
-			return nil, fmt.Errorf("failed to setup ssh executor: %w", err)
-		}
-		client = c
-	} else if c := getSSHClientFromContext(ctx); c != nil {
-		// Fall back to DAG-level SSH client from context
-		client = c
+	client, err := resolveSSHClient(ctx, step)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup ssh executor: %w", err)
 	}
-
 	if client == nil {
 		return nil, fmt.Errorf("ssh configuration is not found")
 	}
@@ -86,60 +79,142 @@ func (e *sshExecutor) SetStderr(out io.Writer) {
 
 func (e *sshExecutor) Kill(_ os.Signal) error {
 	e.mu.Lock()
-	session := e.session
-	e.mu.Unlock()
+	defer e.mu.Unlock()
 
-	if session != nil {
-		return session.Close()
+	if e.closed {
+		return nil
 	}
-	return nil
+	e.closed = true
+
+	var sessionErr, connErr error
+	if e.session != nil {
+		sessionErr = e.session.Close()
+	}
+	if e.conn != nil {
+		connErr = e.conn.Close()
+	}
+	return errors.Join(sessionErr, connErr)
 }
 
 func (e *sshExecutor) Run(ctx context.Context) error {
-	// If no commands, nothing to execute
-	if len(e.step.Commands) == 0 {
+	if len(e.step.Commands) == 0 && e.step.Script == "" {
 		return nil
 	}
 
-	// Execute each command sequentially
-	// Each command requires a new session since session.Run can only be called once
-	for i, cmdEntry := range e.step.Commands {
-		// Check context cancellation between commands
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
+	conn, session, err := e.client.NewSession()
+	if err != nil {
+		return fmt.Errorf("failed to create SSH session: %w", err)
+	}
+
+	e.mu.Lock()
+	e.conn = conn
+	e.session = session
+	e.mu.Unlock()
+
+	defer func() {
+		e.mu.Lock()
+		defer e.mu.Unlock()
+
+		if e.closed {
+			return
 		}
 
-		if err := e.runCommand(ctx, i, cmdEntry); err != nil {
-			return err
+		// Close session first, then the underlying connection
+		if closeErr := session.Close(); closeErr != nil {
+			logger.Warn(ctx, "SSH session close error", tag.Error(closeErr))
+		}
+		if closeErr := conn.Close(); closeErr != nil {
+			logger.Warn(ctx, "SSH connection close error", tag.Error(closeErr))
+		}
+		e.closed = true
+	}()
+
+	session.Stdout = e.stdout
+	session.Stderr = e.stderr
+	session.Stdin = strings.NewReader(e.buildScript())
+
+	return e.runWithCancellation(ctx, session, e.buildShellCommand())
+}
+
+// runWithCancellation executes the session command with context cancellation support.
+func (e *sshExecutor) runWithCancellation(ctx context.Context, session *ssh.Session, shellCmd string) error {
+	done := make(chan error, 1)
+	go func() {
+		done <- session.Run(shellCmd)
+	}()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			return nil
+		}
+		return fmt.Errorf("ssh execution failed: %w", err)
+	case <-ctx.Done():
+		// Close session to unblock the goroutine, then wait for it to finish
+		_ = session.Close()
+		<-done
+		return ctx.Err()
+	}
+}
+
+// buildShellCommand constructs the shell command string with arguments.
+func (e *sshExecutor) buildShellCommand() string {
+	if len(e.shellArgs) == 0 {
+		return e.shell
+	}
+	return e.shell + " " + strings.Join(e.shellArgs, " ")
+}
+
+// buildScript constructs a complete script for SSH execution, wrapped in a function.
+// The function wrapper ensures the shell reads all input before execution,
+// making it robust against slow networks and buffering issues.
+func (e *sshExecutor) buildScript() string {
+	var body strings.Builder
+
+	// For SSH execution, only use working directory if explicitly set at step level.
+	// DAG-level workingDir is for LOCAL execution and may not exist on the remote host.
+	// If step.Dir is empty, run in SSH user's home directory.
+	workingDir := e.step.Dir
+
+	// Change to working directory if explicitly specified
+	if workingDir != "" {
+		fmt.Fprintf(&body, "cd %s || return 1\n", cmdutil.ShellQuote(workingDir))
+	}
+
+	// Add error handling (exit on first error)
+	body.WriteString("set -e\n")
+
+	// Add script content or commands
+	if e.step.Script != "" {
+		body.WriteString(e.step.Script)
+		if !strings.HasSuffix(e.step.Script, "\n") {
+			body.WriteString("\n")
+		}
+	} else {
+		for _, cmd := range e.step.Commands {
+			body.WriteString(e.buildCommandString(cmd))
+			body.WriteString("\n")
 		}
 	}
 
-	return nil
+	// Wrap in function - shell MUST read entire body before executing
+	return fmt.Sprintf("__dagu_exec(){\n%s}\n__dagu_exec\n", body.String())
 }
 
-// buildCommand constructs the command string for SSH execution.
-// Uses shared cmdutil functions for shell command building.
-func (e *sshExecutor) buildCommand(cmdEntry core.CommandEntry) string {
-	if e.shell == "" {
-		// No shell - direct execution, quote command and args for SSH transport
-		baseCommand := cmdutil.ShellQuote(cmdEntry.Command)
-		if len(cmdEntry.Args) > 0 {
-			baseCommand += " " + cmdutil.ShellQuoteArgs(cmdEntry.Args)
-		}
-		return baseCommand
+// buildCommandString constructs a simple command string from a CommandEntry.
+func (e *sshExecutor) buildCommandString(cmd core.CommandEntry) string {
+	if len(cmd.Args) == 0 {
+		return cmd.Command
 	}
-
-	// With shell - use BuildShellCommandString which handles proper quoting
-	command := cmdutil.BuildCommandEscapedString(cmdEntry.Command, cmdEntry.Args)
-	return cmdutil.BuildShellCommandString(e.shell, e.shellArgs, command)
+	return cmd.Command + " " + cmdutil.ShellQuoteArgs(cmd.Args)
 }
 
-// resolveShell determines the shell to use for a step based on priority:
-// 1. Shell specified in step-level SSH configuration.
-// 2. Shell specified in DAG-level SSH configuration.
-// 3. Shell specified in the step's Shell field (fallback).
+// resolveShell determines the shell to use for remote execution.
+// Priority:
+// 1. Shell specified in SSH configuration (step-level or DAG-level).
+// 2. Shell specified in the step's Shell field.
+// 3. /bin/sh as POSIX-compliant fallback.
+// Note: DAG-level shell (dag.Shell) is NOT used as it's configured for local execution.
 func resolveShell(step core.Step, client *Client) (string, []string) {
 	if client != nil && client.Shell != "" {
 		return client.Shell, slices.Clone(client.ShellArgs)
@@ -147,61 +222,15 @@ func resolveShell(step core.Step, client *Client) (string, []string) {
 	if step.Shell != "" {
 		return step.Shell, slices.Clone(step.ShellArgs)
 	}
-	return "", nil
-}
-
-// runCommand executes a single command with context cancellation support.
-// Since session.Run() blocks without context awareness, we run it in a goroutine
-// and select on both completion and context cancellation for responsiveness.
-func (e *sshExecutor) runCommand(ctx context.Context, index int, cmdEntry core.CommandEntry) error {
-	session, err := e.client.NewSession()
-	if err != nil {
-		return fmt.Errorf("command %d: failed to create session: %w", index+1, err)
-	}
-
-	e.mu.Lock()
-	e.session = session
-	e.mu.Unlock()
-
-	session.Stdout = e.stdout
-	session.Stderr = e.stderr
-
-	// Build command with shell wrapping if configured
-	command := e.buildCommand(cmdEntry)
-
-	// Run command in goroutine to enable context cancellation
-	done := make(chan error, 1)
-	go func() {
-		done <- session.Run(command)
-	}()
-
-	// Wait for either command completion or context cancellation
-	select {
-	case err = <-done:
-		// Command completed (success or failure)
-	case <-ctx.Done():
-		// Context cancelled - close session to terminate the command
-		if closeErr := session.Close(); closeErr != nil {
-			logger.Warn(ctx, "SSH session close error during cancellation", tag.Error(closeErr))
-		}
-		return ctx.Err()
-	}
-
-	if closeErr := session.Close(); closeErr != nil {
-		logger.Warn(ctx, "SSH session close error", tag.Error(closeErr))
-	}
-
-	if err != nil {
-		return fmt.Errorf("command %d failed: %w", index+1, err)
-	}
-
-	return nil
+	// Fallback to /bin/sh - POSIX standard, available on all Unix systems
+	return "/bin/sh", nil
 }
 
 func init() {
 	caps := core.ExecutorCapabilities{
 		Command:          true,
 		MultipleCommands: true,
+		Script:           true,
 		Shell:            true,
 		GetEvalOptions: func(ctx context.Context, step core.Step) []cmdutil.EvalOption {
 			if hasShellConfigured(ctx, step) {
@@ -217,22 +246,24 @@ func init() {
 
 func hasShellConfigured(ctx context.Context, step core.Step) bool {
 	if len(step.ExecutorConfig.Config) > 0 {
-		if shellValue, ok := step.ExecutorConfig.Config["shell"]; ok {
-			switch v := shellValue.(type) {
-			case string:
-				return strings.TrimSpace(v) != ""
-			case []any:
-				return len(v) > 0
-			case []string:
-				return len(v) > 0
-			}
-		}
-		return false
+		return isShellValueSet(step.ExecutorConfig.Config["shell"])
 	}
-
 	if cli := getSSHClientFromContext(ctx); cli != nil && cli.Shell != "" {
 		return true
 	}
-
 	return step.Shell != ""
+}
+
+// isShellValueSet checks if a shell value from config is non-empty.
+func isShellValueSet(shellValue any) bool {
+	switch v := shellValue.(type) {
+	case string:
+		return strings.TrimSpace(v) != ""
+	case []any:
+		return len(v) > 0
+	case []string:
+		return len(v) > 0
+	default:
+		return false
+	}
 }
