@@ -97,180 +97,119 @@ func TestNewSSHExecutor_WithShellConfig(t *testing.T) {
 	}
 }
 
-func TestSSHExecutor_DAGLevelShell(t *testing.T) {
+func TestSSHExecutor_ShellPriority(t *testing.T) {
 	t.Parallel()
 
-	// This test verifies that DAG-level SSH shell is passed through the Client
-	// when using DAG-level SSH configuration
-
-	// Create a mock client with shell set
-	mockClient := &Client{
-		hostPort:  "localhost:22",
-		Shell:     "/bin/bash",
-		ShellArgs: []string{"-e"},
-	}
-
-	// Create context with the mock client
-	ctx := WithSSHClient(context.Background(), mockClient)
-
-	// Create executor without step-level config (should use DAG-level)
-	step := core.Step{
-		Name: "ssh-step",
-		ExecutorConfig: core.ExecutorConfig{
-			Type:   "ssh",
-			Config: nil, // No step-level config
-		},
-	}
-
-	exec, err := NewSSHExecutor(ctx, step)
-	require.NoError(t, err)
-
-	sshExec, ok := exec.(*sshExecutor)
-	require.True(t, ok)
-	assert.Equal(t, "/bin/bash", sshExec.shell)
-	assert.Equal(t, []string{"-e"}, sshExec.shellArgs)
-}
-
-func TestSSHExecutor_StepLevelShellOverridesDAGLevel(t *testing.T) {
-	t.Parallel()
-
-	// Create a mock client with DAG-level shell
-	mockClient := &Client{
-		hostPort:  "localhost:22",
-		Shell:     "/bin/sh", // DAG-level shell
-		ShellArgs: []string{"-e"},
-	}
-
-	// Create context with the mock client
-	ctx := WithSSHClient(context.Background(), mockClient)
-
-	// Create executor with step-level config that has different shell
-	step := core.Step{
-		Name: "ssh-step",
-		ExecutorConfig: core.ExecutorConfig{
-			Type: "ssh",
-			Config: map[string]any{
-				"user":     "testuser",
-				"ip":       "testip",
-				"port":     22,
-				"password": "testpassword",
-				"shell":    "/bin/zsh -o pipefail", // Step-level shell overrides DAG-level
+	tests := []struct {
+		name          string
+		client        *Client
+		step          core.Step
+		expectedShell string
+		expectedArgs  []string
+	}{
+		{
+			name: "DAGLevelShell",
+			client: &Client{
+				hostPort:  "localhost:22",
+				Shell:     "/bin/bash",
+				ShellArgs: []string{"-e"},
 			},
-		},
-	}
-
-	exec, err := NewSSHExecutor(ctx, step)
-	require.NoError(t, err)
-
-	sshExec, ok := exec.(*sshExecutor)
-	require.True(t, ok)
-	// Step-level SSH config should take priority
-	assert.Equal(t, "/bin/zsh", sshExec.shell)
-	assert.Equal(t, []string{"-o", "pipefail"}, sshExec.shellArgs)
-}
-
-func TestSSHExecutor_StepShellFallback(t *testing.T) {
-	t.Parallel()
-
-	// Create a mock client WITHOUT shell set
-	mockClient := &Client{
-		hostPort: "localhost:22",
-		Shell:    "", // No SSH config shell
-	}
-
-	// Create context with the mock client
-	ctx := WithSSHClient(context.Background(), mockClient)
-
-	// Create executor with step.Shell set (fallback for UX)
-	step := core.Step{
-		Name:      "ssh-step",
-		Shell:     "/bin/bash", // Step-level shell as fallback
-		ShellArgs: []string{"-e"},
-		ExecutorConfig: core.ExecutorConfig{
-			Type:   "ssh",
-			Config: nil, // No step-level SSH config
-		},
-	}
-
-	exec, err := NewSSHExecutor(ctx, step)
-	require.NoError(t, err)
-
-	sshExec, ok := exec.(*sshExecutor)
-	require.True(t, ok)
-	// step.Shell should be used as fallback
-	assert.Equal(t, "/bin/bash", sshExec.shell)
-	assert.Equal(t, []string{"-e"}, sshExec.shellArgs)
-}
-
-func TestSSHExecutor_SSHConfigShellTakesPriorityOverStepShell(t *testing.T) {
-	t.Parallel()
-
-	// Create a mock client with shell set
-	mockClient := &Client{
-		hostPort:  "localhost:22",
-		Shell:     "/bin/zsh", // SSH config shell
-		ShellArgs: []string{"-e"},
-	}
-
-	// Create context with the mock client
-	ctx := WithSSHClient(context.Background(), mockClient)
-
-	// Create executor with both step.Shell and SSH config shell
-	step := core.Step{
-		Name:      "ssh-step",
-		Shell:     "/bin/bash", // Step-level shell (should be ignored)
-		ShellArgs: []string{"-o", "pipefail"},
-		ExecutorConfig: core.ExecutorConfig{
-			Type:   "ssh",
-			Config: nil, // No step-level SSH config, uses DAG-level
-		},
-	}
-
-	exec, err := NewSSHExecutor(ctx, step)
-	require.NoError(t, err)
-
-	sshExec, ok := exec.(*sshExecutor)
-	require.True(t, ok)
-	// SSH config shell takes priority over step.Shell
-	assert.Equal(t, "/bin/zsh", sshExec.shell)
-	assert.Equal(t, []string{"-e"}, sshExec.shellArgs)
-}
-
-func TestSSHExecutor_StepSSHConfigWithoutShellIgnoresDAGShell(t *testing.T) {
-	t.Parallel()
-
-	// DAG-level SSH config has a shell
-	mockClient := &Client{
-		hostPort: "localhost:22",
-		Shell:    "/bin/zsh", // DAG-level shell
-	}
-
-	ctx := WithSSHClient(context.Background(), mockClient)
-
-	// Step has its own SSH config WITHOUT shell
-	// This should override DAG-level config entirely (including shell)
-	step := core.Step{
-		Name: "ssh-step",
-		ExecutorConfig: core.ExecutorConfig{
-			Type: "ssh",
-			Config: map[string]any{
-				"user":     "stepuser",
-				"ip":       "step-host",
-				"port":     22,
-				"password": "steppassword",
-				// No shell specified - should NOT inherit from DAG-level
+			step: core.Step{
+				Name:           "ssh-step",
+				ExecutorConfig: core.ExecutorConfig{Type: "ssh", Config: nil},
 			},
+			expectedShell: "/bin/bash",
+			expectedArgs:  []string{"-e"},
+		},
+		{
+			name: "StepLevelShellOverridesDAGLevel",
+			client: &Client{
+				hostPort:  "localhost:22",
+				Shell:     "/bin/sh",
+				ShellArgs: []string{"-e"},
+			},
+			step: core.Step{
+				Name: "ssh-step",
+				ExecutorConfig: core.ExecutorConfig{
+					Type: "ssh",
+					Config: map[string]any{
+						"user":     "testuser",
+						"ip":       "testip",
+						"port":     22,
+						"password": "testpassword",
+						"shell":    "/bin/zsh -o pipefail",
+					},
+				},
+			},
+			expectedShell: "/bin/zsh",
+			expectedArgs:  []string{"-o", "pipefail"},
+		},
+		{
+			name: "StepShellFallbackWhenNoSSHConfigShell",
+			client: &Client{
+				hostPort: "localhost:22",
+				Shell:    "",
+			},
+			step: core.Step{
+				Name:           "ssh-step",
+				Shell:          "/bin/bash",
+				ShellArgs:      []string{"-e"},
+				ExecutorConfig: core.ExecutorConfig{Type: "ssh", Config: nil},
+			},
+			expectedShell: "/bin/bash",
+			expectedArgs:  []string{"-e"},
+		},
+		{
+			name: "SSHConfigShellTakesPriorityOverStepShell",
+			client: &Client{
+				hostPort:  "localhost:22",
+				Shell:     "/bin/zsh",
+				ShellArgs: []string{"-e"},
+			},
+			step: core.Step{
+				Name:           "ssh-step",
+				Shell:          "/bin/bash",
+				ShellArgs:      []string{"-o", "pipefail"},
+				ExecutorConfig: core.ExecutorConfig{Type: "ssh", Config: nil},
+			},
+			expectedShell: "/bin/zsh",
+			expectedArgs:  []string{"-e"},
+		},
+		{
+			name: "StepSSHConfigWithoutShellIgnoresDAGShell",
+			client: &Client{
+				hostPort: "localhost:22",
+				Shell:    "/bin/zsh",
+			},
+			step: core.Step{
+				Name: "ssh-step",
+				ExecutorConfig: core.ExecutorConfig{
+					Type: "ssh",
+					Config: map[string]any{
+						"user":     "stepuser",
+						"ip":       "step-host",
+						"port":     22,
+						"password": "steppassword",
+					},
+				},
+			},
+			expectedShell: "/bin/sh",
+			expectedArgs:  nil,
 		},
 	}
 
-	exec, err := NewSSHExecutor(ctx, step)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := WithSSHClient(context.Background(), tt.client)
+			exec, err := NewSSHExecutor(ctx, tt.step)
+			require.NoError(t, err)
 
-	sshExec, ok := exec.(*sshExecutor)
-	require.True(t, ok)
-	// Step-level SSH config takes priority, and it has no shell
-	// DAG-level shell should NOT be inherited, falls back to /bin/sh
-	assert.Equal(t, "/bin/sh", sshExec.shell)
+			sshExec, ok := exec.(*sshExecutor)
+			require.True(t, ok)
+			assert.Equal(t, tt.expectedShell, sshExec.shell)
+			assert.Equal(t, tt.expectedArgs, sshExec.shellArgs)
+		})
+	}
 }
 
 func TestSSHExecutor_GetEvalOptions(t *testing.T) {
@@ -702,53 +641,52 @@ func TestSSHExecutor_ClosedFlag(t *testing.T) {
 func TestFromMapConfig_WithBastion(t *testing.T) {
 	t.Parallel()
 
-	config := map[string]any{
-		"user":     "testuser",
-		"host":     "target.example.com",
-		"port":     "22",
-		"password": "targetpass",
-		"bastion": map[string]any{
-			"host":     "bastion.example.com",
-			"port":     "2222",
-			"user":     "bastionuser",
-			"password": "bastionpass",
+	tests := []struct {
+		name             string
+		bastion          map[string]any
+		expectedHostPort string
+		expectedUser     string
+	}{
+		{
+			name: "ExplicitPort",
+			bastion: map[string]any{
+				"host":     "bastion.example.com",
+				"port":     "2222",
+				"user":     "bastionuser",
+				"password": "bastionpass",
+			},
+			expectedHostPort: "bastion.example.com:2222",
+			expectedUser:     "bastionuser",
+		},
+		{
+			name: "DefaultPort",
+			bastion: map[string]any{
+				"host":     "bastion.example.com",
+				"user":     "bastionuser",
+				"password": "bastionpass",
+			},
+			expectedHostPort: "bastion.example.com:22",
+			expectedUser:     "bastionuser",
 		},
 	}
 
-	ctx := context.Background()
-	client, err := FromMapConfig(ctx, config)
-	require.NoError(t, err)
-	require.NotNil(t, client)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := map[string]any{
+				"user":     "testuser",
+				"host":     "target.example.com",
+				"password": "targetpass",
+				"bastion":  tt.bastion,
+			}
 
-	// Verify bastion config is set
-	assert.NotNil(t, client.bastionCfg)
-	assert.Equal(t, "bastion.example.com:2222", client.bastionCfg.hostPort)
-	assert.Equal(t, "bastionuser", client.bastionCfg.cfg.User)
-}
-
-func TestFromMapConfig_WithBastionDefaultPort(t *testing.T) {
-	t.Parallel()
-
-	config := map[string]any{
-		"user":     "testuser",
-		"host":     "target.example.com",
-		"password": "targetpass",
-		"bastion": map[string]any{
-			"host":     "bastion.example.com",
-			"user":     "bastionuser",
-			"password": "bastionpass",
-			// No port specified - should default to 22
-		},
+			client, err := FromMapConfig(context.Background(), config)
+			require.NoError(t, err)
+			require.NotNil(t, client)
+			require.NotNil(t, client.bastionCfg)
+			assert.Equal(t, tt.expectedHostPort, client.bastionCfg.hostPort)
+			assert.Equal(t, tt.expectedUser, client.bastionCfg.cfg.User)
+		})
 	}
-
-	ctx := context.Background()
-	client, err := FromMapConfig(ctx, config)
-	require.NoError(t, err)
-	require.NotNil(t, client)
-
-	// Verify bastion config uses default port
-	assert.NotNil(t, client.bastionCfg)
-	assert.Equal(t, "bastion.example.com:22", client.bastionCfg.hostPort)
 }
 
 func TestNewClient_WithBastionConfig(t *testing.T) {
@@ -806,62 +744,39 @@ func TestNewSFTPExecutor(t *testing.T) {
 	assert.Equal(t, "/remote/path", sftpExec.destination)
 }
 
-func TestNewSFTPExecutor_MissingSource(t *testing.T) {
+func TestNewSFTPExecutor_ValidationErrors(t *testing.T) {
 	t.Parallel()
 
-	step := core.Step{
-		Name: "sftp-transfer",
-		ExecutorConfig: core.ExecutorConfig{
-			Type: "sftp",
-			Config: map[string]any{
+	tests := []struct {
+		name        string
+		config      map[string]any
+		expectedErr string
+	}{
+		{
+			name: "MissingSource",
+			config: map[string]any{
 				"user":        "testuser",
 				"host":        "testhost",
 				"password":    "testpass",
 				"direction":   "upload",
 				"destination": "/remote/path",
-				// source is missing
 			},
+			expectedErr: "source path is required",
 		},
-	}
-
-	ctx := context.Background()
-	_, err := NewSFTPExecutor(ctx, step)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "source path is required")
-}
-
-func TestNewSFTPExecutor_MissingDestination(t *testing.T) {
-	t.Parallel()
-
-	step := core.Step{
-		Name: "sftp-transfer",
-		ExecutorConfig: core.ExecutorConfig{
-			Type: "sftp",
-			Config: map[string]any{
+		{
+			name: "MissingDestination",
+			config: map[string]any{
 				"user":      "testuser",
 				"host":      "testhost",
 				"password":  "testpass",
 				"direction": "download",
 				"source":    "/remote/path",
-				// destination is missing
 			},
+			expectedErr: "destination path is required",
 		},
-	}
-
-	ctx := context.Background()
-	_, err := NewSFTPExecutor(ctx, step)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "destination path is required")
-}
-
-func TestNewSFTPExecutor_InvalidDirection(t *testing.T) {
-	t.Parallel()
-
-	step := core.Step{
-		Name: "sftp-transfer",
-		ExecutorConfig: core.ExecutorConfig{
-			Type: "sftp",
-			Config: map[string]any{
+		{
+			name: "InvalidDirection",
+			config: map[string]any{
 				"user":        "testuser",
 				"host":        "testhost",
 				"password":    "testpass",
@@ -869,13 +784,21 @@ func TestNewSFTPExecutor_InvalidDirection(t *testing.T) {
 				"source":      "/local/path",
 				"destination": "/remote/path",
 			},
+			expectedErr: "invalid direction",
 		},
 	}
 
-	ctx := context.Background()
-	_, err := NewSFTPExecutor(ctx, step)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid direction")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			step := core.Step{
+				Name:           "sftp-transfer",
+				ExecutorConfig: core.ExecutorConfig{Type: "sftp", Config: tt.config},
+			}
+			_, err := NewSFTPExecutor(context.Background(), step)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.expectedErr)
+		})
+	}
 }
 
 func TestNewSFTPExecutor_DefaultDirection(t *testing.T) {

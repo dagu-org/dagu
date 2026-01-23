@@ -664,33 +664,31 @@ func startSSHServer(t *testing.T, th test.Helper, dockerClient *client.Client) *
 	containerName := fmt.Sprintf("dagu-ssh-test-%d", time.Now().UnixNano())
 
 	// Setup script to configure SSH server
+	// Uses shell variables to reduce repetition
 	setupScript := fmt.Sprintf(`
 set -e
-# Install openssh and bash
-apk add --no-cache openssh bash
+USER="%s"
+PASS="%s"
+PUBKEY='%s'
 
-# Generate host keys
+apk add --no-cache openssh bash
 ssh-keygen -A
 
-# Create test user
-adduser -D -s /bin/bash %s
-echo "%s:%s" | chpasswd
+adduser -D -s /bin/bash "$USER"
+echo "$USER:$PASS" | chpasswd
 
-# Setup SSH authorized keys for the test user
-mkdir -p /home/%s/.ssh
-echo '%s' > /home/%s/.ssh/authorized_keys
-chmod 700 /home/%s/.ssh
-chmod 600 /home/%s/.ssh/authorized_keys
-chown -R %s:%s /home/%s/.ssh
+mkdir -p "/home/$USER/.ssh"
+echo "$PUBKEY" > "/home/$USER/.ssh/authorized_keys"
+chmod 700 "/home/$USER/.ssh"
+chmod 600 "/home/$USER/.ssh/authorized_keys"
+chown -R "$USER:$USER" "/home/$USER/.ssh"
 
-# Configure sshd - allow password and key auth
 sed -i 's/#PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
 sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
 sed -i 's/#PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
 
-# Start sshd in foreground
 exec /usr/sbin/sshd -D -e
-`, sshTestUser, sshTestUser, sshTestPass, sshTestUser, string(pubKey), sshTestUser, sshTestUser, sshTestUser, sshTestUser, sshTestUser, sshTestUser)
+`, sshTestUser, sshTestPass, string(pubKey))
 
 	// Create container
 	created, err := dockerClient.ContainerCreate(
@@ -780,7 +778,8 @@ func waitForSSHReady(t *testing.T, server *sshServerContainer) {
 
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
-		if trySSHConnection(t, addr, config, server.hostPort) {
+		if trySSHConnection(t, addr, config) {
+			t.Logf("SSH server ready on port %s", server.hostPort)
 			return
 		}
 		time.Sleep(1 * time.Second)
@@ -808,7 +807,7 @@ func buildSSHClientConfig(t *testing.T, server *sshServerContainer) *ssh.ClientC
 }
 
 // trySSHConnection attempts to connect and run a test command.
-func trySSHConnection(t *testing.T, addr string, config *ssh.ClientConfig, port string) bool {
+func trySSHConnection(t *testing.T, addr string, config *ssh.ClientConfig) bool {
 	t.Helper()
 
 	conn, err := ssh.Dial("tcp", addr, config)
@@ -825,19 +824,15 @@ func trySSHConnection(t *testing.T, addr string, config *ssh.ClientConfig, port 
 	}
 	defer func() { _ = session.Close() }()
 
-	script := "__dagu_exec(){\nset -e\necho test\n}\n__dagu_exec\n"
-	session.Stdin = strings.NewReader(script)
+	session.Stdin = strings.NewReader("__dagu_exec(){\nset -e\necho test\n}\n__dagu_exec\n")
 
 	var stdout, stderr strings.Builder
 	session.Stdout = &stdout
 	session.Stderr = &stderr
 
-	err = session.Run("/bin/sh")
-	if err == nil && strings.TrimSpace(stdout.String()) == "test" {
-		t.Logf("SSH server ready on port %s (shell stdin works)", port)
-		return true
+	if err = session.Run("/bin/sh"); err != nil || strings.TrimSpace(stdout.String()) != "test" {
+		t.Logf("SSH shell stdin test failed: stdout=%q stderr=%q err=%v", stdout.String(), stderr.String(), err)
+		return false
 	}
-
-	t.Logf("SSH shell stdin test failed: stdout=%q stderr=%q err=%v", stdout.String(), stderr.String(), err)
-	return false
+	return true
 }
