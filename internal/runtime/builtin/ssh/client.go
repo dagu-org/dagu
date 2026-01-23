@@ -34,7 +34,6 @@ func NewClient(cfg *Config) (*Client, error) {
 		return nil, err
 	}
 
-	// Get host key callback for SSH verification
 	hostKeyCallback, err := getHostKeyCallback(cfg.StrictHostKey, cfg.KnownHostFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup host key verification: %w", err)
@@ -43,13 +42,6 @@ func NewClient(cfg *Config) (*Client, error) {
 	timeout := cfg.Timeout
 	if timeout == 0 {
 		timeout = defaultSSHTimeout
-	}
-
-	clientConfig := &ssh.ClientConfig{
-		User:            cfg.User,
-		Auth:            []ssh.AuthMethod{authMethod},
-		HostKeyCallback: hostKeyCallback,
-		Timeout:         timeout,
 	}
 
 	port := cfg.Port
@@ -76,8 +68,13 @@ func NewClient(cfg *Config) (*Client, error) {
 	}
 
 	return &Client{
-		hostPort:   net.JoinHostPort(cfg.Host, port),
-		cfg:        clientConfig,
+		hostPort: net.JoinHostPort(cfg.Host, port),
+		cfg: &ssh.ClientConfig{
+			User:            cfg.User,
+			Auth:            []ssh.AuthMethod{authMethod},
+			HostKeyCallback: hostKeyCallback,
+			Timeout:         timeout,
+		},
 		Shell:      cfg.Shell,
 		ShellArgs:  slices.Clone(cfg.ShellArgs),
 		Env:        env,
@@ -86,27 +83,26 @@ func NewClient(cfg *Config) (*Client, error) {
 }
 
 func (c *Client) NewSession() (*ssh.Client, *ssh.Session, error) {
-	var conn *ssh.Client
-	var err error
-
-	if c.bastionCfg != nil {
-		// Connect via bastion/jump host
-		conn, err = c.dialViaBastion()
-	} else {
-		// Direct connection
-		conn, err = ssh.Dial("tcp", c.hostPort, c.cfg)
-	}
+	conn, err := c.dial()
 	if err != nil {
 		return nil, nil, err
 	}
 
 	session, err := conn.NewSession()
 	if err != nil {
-		conn.Close() // Clean up connection on session creation failure
+		conn.Close()
 		return nil, nil, err
 	}
 
 	return conn, session, nil
+}
+
+// dial establishes an SSH connection either directly or via bastion host.
+func (c *Client) dial() (*ssh.Client, error) {
+	if c.bastionCfg != nil {
+		return c.dialViaBastion()
+	}
+	return ssh.Dial("tcp", c.hostPort, c.cfg)
 }
 
 // dialViaBastion establishes an SSH connection through a bastion/jump host.
@@ -140,8 +136,31 @@ func (c *Client) dialViaBastion() (*ssh.Client, error) {
 
 // newBastionClientConfig creates the bastion client configuration
 func newBastionClientConfig(bastion *BastionConfig, timeout time.Duration) (*bastionClientConfig, error) {
-	// Determine auth method for bastion
-	var authMethod ssh.AuthMethod
+	authMethod, err := selectBastionAuthMethod(bastion)
+	if err != nil {
+		return nil, err
+	}
+
+	port := bastion.Port
+	if port == "" || port == "0" {
+		port = "22"
+	}
+
+	return &bastionClientConfig{
+		hostPort: net.JoinHostPort(bastion.Host, port),
+		cfg: &ssh.ClientConfig{
+			User: bastion.User,
+			Auth: []ssh.AuthMethod{authMethod},
+			// Bastion host key checking is disabled by default for simplicity.
+			// In production, users should configure proper host key verification.
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(), // nolint: gosec
+			Timeout:         timeout,
+		},
+	}, nil
+}
+
+// selectBastionAuthMethod determines the authentication method for bastion host.
+func selectBastionAuthMethod(bastion *BastionConfig) (ssh.AuthMethod, error) {
 	if bastion.Key != "" {
 		keyPath, err := fileutil.ResolvePath(bastion.Key)
 		if err != nil {
@@ -151,43 +170,24 @@ func newBastionClientConfig(bastion *BastionConfig, timeout time.Duration) (*bas
 		if err != nil {
 			return nil, fmt.Errorf("failed to load bastion SSH key: %w", err)
 		}
-		authMethod = ssh.PublicKeys(signer)
-	} else if bastion.Password != "" {
-		authMethod = ssh.Password(bastion.Password)
-	} else {
-		// Try default keys for bastion
-		for _, defaultKey := range getDefaultSSHKeys() {
-			if _, err := os.Stat(defaultKey); err == nil {
-				signer, err := getPublicKeySigner(defaultKey)
-				if err == nil {
-					authMethod = ssh.PublicKeys(signer)
-					break
-				}
+		return ssh.PublicKeys(signer), nil
+	}
+
+	if bastion.Password != "" {
+		return ssh.Password(bastion.Password), nil
+	}
+
+	// Try default keys for bastion
+	for _, defaultKey := range getDefaultSSHKeys() {
+		if _, err := os.Stat(defaultKey); err == nil {
+			signer, err := getPublicKeySigner(defaultKey)
+			if err == nil {
+				return ssh.PublicKeys(signer), nil
 			}
 		}
-		if authMethod == nil {
-			return nil, fmt.Errorf("no authentication method available for bastion: provide either SSH key or password")
-		}
 	}
 
-	port := bastion.Port
-	if port == "" || port == "0" {
-		port = "22"
-	}
-
-	bastionConfig := &ssh.ClientConfig{
-		User: bastion.User,
-		Auth: []ssh.AuthMethod{authMethod},
-		// Bastion host key checking is disabled by default for simplicity.
-		// In production, users should configure proper host key verification.
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // nolint: gosec
-		Timeout:         timeout,
-	}
-
-	return &bastionClientConfig{
-		hostPort: net.JoinHostPort(bastion.Host, port),
-		cfg:      bastionConfig,
-	}, nil
+	return nil, fmt.Errorf("no authentication method available for bastion: provide either SSH key or password")
 }
 
 // getHostKeyCallback returns the appropriate host key callback based on configuration

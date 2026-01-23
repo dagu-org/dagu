@@ -162,10 +162,10 @@ func (e *sshExecutor) runWithCancellation(ctx context.Context, session *ssh.Sess
 
 	select {
 	case err := <-done:
-		if err != nil {
-			return fmt.Errorf("ssh execution failed: %w", err)
+		if err == nil {
+			return nil
 		}
-		return nil
+		return fmt.Errorf("ssh execution failed: %w", err)
 	case <-ctx.Done():
 		// Close session to unblock the goroutine, then wait for it to finish
 		_ = session.Close()
@@ -309,19 +309,17 @@ func init() {
 func hasShellConfigured(ctx context.Context, step core.Step) bool {
 	if len(step.ExecutorConfig.Config) > 0 {
 		shellValue, ok := step.ExecutorConfig.Config["shell"]
-		if !ok {
-			return false
+		if ok {
+			switch v := shellValue.(type) {
+			case string:
+				return strings.TrimSpace(v) != ""
+			case []any:
+				return len(v) > 0
+			case []string:
+				return len(v) > 0
+			}
 		}
-		switch v := shellValue.(type) {
-		case string:
-			return strings.TrimSpace(v) != ""
-		case []any:
-			return len(v) > 0
-		case []string:
-			return len(v) > 0
-		default:
-			return false
-		}
+		return false
 	}
 
 	if cli := getSSHClientFromContext(ctx); cli != nil && cli.Shell != "" {

@@ -136,11 +136,12 @@ func parseShellConfig(shell string, args []string) (string, []string, error) {
 		return "", nil, err
 	}
 
-	var resultArgs []string
-	if len(parsedArgs) > 0 || len(args) > 0 {
-		resultArgs = append(parsedArgs, args...)
+	// Return nil if no args to maintain nil vs empty slice distinction
+	if len(parsedArgs) == 0 && len(args) == 0 {
+		return strings.TrimSpace(parsedShell), nil, nil
 	}
-	return strings.TrimSpace(parsedShell), resultArgs, nil
+
+	return strings.TrimSpace(parsedShell), append(parsedArgs, args...), nil
 }
 
 var configSchema = &jsonschema.Schema{
