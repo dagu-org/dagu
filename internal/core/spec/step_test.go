@@ -3073,7 +3073,6 @@ func TestBuildStepExecutorNewFormat(t *testing.T) {
 	}
 }
 
-
 func TestStepExecutorNewFormat_Integration(t *testing.T) {
 	t.Parallel()
 
