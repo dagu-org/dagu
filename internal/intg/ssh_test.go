@@ -92,7 +92,7 @@ func TestSSHExecutorIntegration(t *testing.T) {
 		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: basic-ssh
-    executor: ssh
+    type: ssh
     command: echo "hello from ssh"
     output: SSH_OUT
 `
@@ -110,7 +110,7 @@ steps:
 		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: args-test
-    executor: ssh
+    type: ssh
     command: echo hello world
     output: SSH_ARGS_OUT
 `
@@ -128,8 +128,8 @@ steps:
 		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: workdir-test
-    executor: ssh
-    dir: /tmp
+    type: ssh
+    workingDir: /tmp
     command: pwd
     output: SSH_PWD_OUT
 `
@@ -149,7 +149,7 @@ steps:
 		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: script-test
-    executor: ssh
+    type: ssh
     script: |
       echo -n "hello "
       echo "world"
@@ -169,8 +169,8 @@ steps:
 		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: script-workdir-test
-    executor: ssh
-    dir: /tmp
+    type: ssh
+    workingDir: /tmp
     script: |
       echo "working in $(pwd)"
     output: SSH_SCRIPT_WORKDIR_OUT
@@ -190,7 +190,7 @@ steps:
 		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: multi-cmd-test
-    executor: ssh
+    type: ssh
     script: |
       echo first
       echo second
@@ -211,8 +211,8 @@ steps:
 		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: multi-cmd-workdir-test
-    executor: ssh
-    dir: /tmp
+    type: ssh
+    workingDir: /tmp
     script: |
       pwd
       echo done
@@ -232,7 +232,7 @@ steps:
 		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: error-test
-    executor: ssh
+    type: ssh
     command: exit 1
 `
 		dag := th.DAG(t, dagConfig)
@@ -245,8 +245,8 @@ steps:
 		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: invalid-dir-test
-    executor: ssh
-    dir: /nonexistent/directory/path
+    type: ssh
+    workingDir: /nonexistent/directory/path
     command: echo "should not reach"
 `
 		dag := th.DAG(t, dagConfig)
@@ -260,15 +260,14 @@ steps:
 		dagConfig := fmt.Sprintf(`
 steps:
   - name: step-ssh-config
-    executor:
-      type: ssh
-      config:
-        host: 127.0.0.1
-        port: "%s"
-        user: %s
-        key: "%s"
-        strictHostKey: false
-        shell: /bin/sh
+    type: ssh
+    config:
+      host: 127.0.0.1
+      port: "%s"
+      user: %s
+      key: "%s"
+      strictHostKey: false
+      shell: /bin/sh
     command: echo "step config works"
     output: STEP_SSH_OUT
 `, sshServer.hostPort, sshTestUser, sshServer.keyPath)
@@ -288,7 +287,7 @@ steps:
 		dagConfig := sshServer.sshConfig("/bin/bash") + `
 steps:
   - name: bash-test
-    executor: ssh
+    type: ssh
     script: |
       # Bash-specific: string manipulation
       str="hello-world"
@@ -311,7 +310,7 @@ steps:
 		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: home-dir-test
-    executor: ssh
+    type: ssh
     command: pwd
     output: SSH_HOME_DIR_OUT
 `
@@ -330,8 +329,8 @@ steps:
 		dagConfig := "workingDir: /var\n\n" + sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: step-override-test
-    executor: ssh
-    dir: /tmp
+    type: ssh
+    workingDir: /tmp
     command: pwd
     output: SSH_OVERRIDE_WORKDIR_OUT
 `
@@ -349,7 +348,7 @@ steps:
 		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: pipe-test
-    executor: ssh
+    type: ssh
     script: |
       echo "hello" | tr 'h' 'H'
     output: SSH_PIPE_OUT
@@ -368,7 +367,7 @@ steps:
 		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: subst-test
-    executor: ssh
+    type: ssh
     command: echo "hostname is $(hostname)"
     output: SSH_SUBST_OUT
 `
@@ -384,7 +383,7 @@ steps:
 		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: set-e-test
-    executor: ssh
+    type: ssh
     script: |
       false
       echo "should not reach"
@@ -401,7 +400,7 @@ steps:
 		dagConfig := sshServer.sshPasswordConfig("/bin/sh") + `
 steps:
   - name: password-auth-test
-    executor: ssh
+    type: ssh
     command: echo "authenticated with password"
     output: PASSWORD_AUTH_OUT
 `
@@ -427,7 +426,7 @@ steps:
   timeout: "10s"
 steps:
   - name: timeout-config-test
-    executor: ssh
+    type: ssh
     command: echo "timeout configured"
     output: TIMEOUT_OUT
 `, sshServer.hostPort, sshTestUser, sshServer.keyPath)
@@ -452,27 +451,25 @@ steps:
 		dagConfig := fmt.Sprintf(`
 steps:
   - name: upload-file
-    executor:
-      type: sftp
-      config:
-        host: 127.0.0.1
-        port: "%s"
-        user: %s
-        key: "%s"
-        strictHostKey: false
-        direction: upload
-        source: "%s"
-        destination: /tmp/uploaded_file.txt
+    type: sftp
+    config:
+      host: 127.0.0.1
+      port: "%s"
+      user: %s
+      key: "%s"
+      strictHostKey: false
+      direction: upload
+      source: "%s"
+      destination: /tmp/uploaded_file.txt
   - name: verify-upload
-    executor:
-      type: ssh
-      config:
-        host: 127.0.0.1
-        port: "%s"
-        user: %s
-        key: "%s"
-        strictHostKey: false
-        shell: /bin/sh
+    type: ssh
+    config:
+      host: 127.0.0.1
+      port: "%s"
+      user: %s
+      key: "%s"
+      strictHostKey: false
+      shell: /bin/sh
     command: cat /tmp/uploaded_file.txt
     output: UPLOAD_VERIFY
     depends:
@@ -498,29 +495,27 @@ steps:
 		dagConfig := fmt.Sprintf(`
 steps:
   - name: create-remote-file
-    executor:
-      type: ssh
-      config:
-        host: 127.0.0.1
-        port: "%s"
-        user: %s
-        key: "%s"
-        strictHostKey: false
-        shell: /bin/sh
+    type: ssh
+    config:
+      host: 127.0.0.1
+      port: "%s"
+      user: %s
+      key: "%s"
+      strictHostKey: false
+      shell: /bin/sh
     script: |
       echo "sftp download test content" > /tmp/download_test.txt
   - name: download-file
-    executor:
-      type: sftp
-      config:
-        host: 127.0.0.1
-        port: "%s"
-        user: %s
-        key: "%s"
-        strictHostKey: false
-        direction: download
-        source: /tmp/download_test.txt
-        destination: "%s"
+    type: sftp
+    config:
+      host: 127.0.0.1
+      port: "%s"
+      user: %s
+      key: "%s"
+      strictHostKey: false
+      direction: download
+      source: /tmp/download_test.txt
+      destination: "%s"
     depends:
       - create-remote-file
 `, sshServer.hostPort, sshTestUser, sshServer.keyPath,

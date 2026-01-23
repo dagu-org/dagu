@@ -2,6 +2,8 @@ package ssh
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log/slog"
@@ -129,7 +131,9 @@ func (e *sftpExecutor) upload(ctx context.Context, sftpClient *sftp.Client) erro
 	return e.uploadFile(ctx, sftpClient, e.source, e.destination)
 }
 
-// uploadFile uploads a single file.
+// uploadFile uploads a single file atomically.
+// It writes to a temp file first, then renames to the final destination.
+// This prevents partial files from being left on the remote server if the upload fails.
 func (e *sftpExecutor) uploadFile(ctx context.Context, sftpClient *sftp.Client, localPath, remotePath string) error {
 	logger.Info(ctx, "Uploading file",
 		slog.String("source", localPath),
@@ -155,22 +159,45 @@ func (e *sftpExecutor) uploadFile(ctx context.Context, sftpClient *sftp.Client, 
 		return fmt.Errorf("failed to create remote directory %s: %w", remoteDir, err)
 	}
 
-	// Create remote file
-	remoteFile, err := sftpClient.Create(remotePath)
-	if err != nil {
-		return fmt.Errorf("failed to create remote file: %w", err)
-	}
-	defer remoteFile.Close()
+	// Use atomic upload: write to temp file, then rename
+	// Random suffix prevents collisions and makes orphaned files identifiable
+	var randBytes [8]byte
+	_, _ = rand.Read(randBytes[:])
+	tempPath := remotePath + ".dagu-tmp-" + hex.EncodeToString(randBytes[:])
 
-	// Copy contents
-	bytes, err := io.Copy(remoteFile, localFile)
+	// Create temp file on remote
+	remoteFile, err := sftpClient.Create(tempPath)
 	if err != nil {
-		return fmt.Errorf("failed to copy file: %w", err)
+		return fmt.Errorf("failed to create remote temp file: %w", err)
 	}
 
-	// Set permissions
-	if err := sftpClient.Chmod(remotePath, info.Mode()); err != nil {
+	// Copy contents to temp file
+	bytes, copyErr := io.Copy(remoteFile, localFile)
+
+	// Close the file before rename (required on some systems)
+	closeErr := remoteFile.Close()
+
+	// If copy or close failed, clean up temp file and return error
+	if copyErr != nil {
+		_ = sftpClient.Remove(tempPath) // Best effort cleanup
+		return fmt.Errorf("failed to copy file: %w", copyErr)
+	}
+	if closeErr != nil {
+		_ = sftpClient.Remove(tempPath) // Best effort cleanup
+		return fmt.Errorf("failed to close remote temp file: %w", closeErr)
+	}
+
+	// Set permissions on temp file before rename
+	if err := sftpClient.Chmod(tempPath, info.Mode()); err != nil {
 		logger.Warn(ctx, "Failed to set remote file permissions", tag.Error(err))
+	}
+
+	// Atomic rename: temp file -> final destination
+	// Remove existing file first (rename won't overwrite on all systems)
+	_ = sftpClient.Remove(remotePath)
+	if err := sftpClient.Rename(tempPath, remotePath); err != nil {
+		_ = sftpClient.Remove(tempPath) // Best effort cleanup
+		return fmt.Errorf("failed to rename temp file to final destination: %w", err)
 	}
 
 	fmt.Fprintf(e.stdout, "Uploaded %s (%d bytes) to %s\n", localPath, bytes, remotePath)
