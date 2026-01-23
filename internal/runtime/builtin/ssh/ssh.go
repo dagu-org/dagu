@@ -93,19 +93,17 @@ func (e *sshExecutor) Kill(_ os.Signal) error {
 	if e.closed {
 		return nil
 	}
+	e.closed = true
 
 	var lastErr error
 	if e.session != nil {
-		if err := e.session.Close(); err != nil {
-			lastErr = err
-		}
+		lastErr = e.session.Close()
 	}
 	if e.conn != nil {
 		if err := e.conn.Close(); err != nil {
 			lastErr = err
 		}
 	}
-	e.closed = true
 	return lastErr
 }
 
@@ -157,16 +155,14 @@ func (e *sshExecutor) runWithCancellation(ctx context.Context, session *ssh.Sess
 	}()
 
 	select {
-	case runErr := <-done:
-		if runErr != nil {
-			return fmt.Errorf("ssh execution failed: %w", runErr)
+	case err := <-done:
+		if err != nil {
+			return fmt.Errorf("ssh execution failed: %w", err)
 		}
 		return nil
 	case <-ctx.Done():
-		// Close session to unblock the goroutine running session.Run()
-		// Note: The defer in Run() will also close, but Close() is idempotent
+		// Close session to unblock the goroutine, then wait for it to finish
 		_ = session.Close()
-		// Wait for goroutine to finish to avoid goroutine leak
 		<-done
 		return ctx.Err()
 	}
@@ -261,17 +257,20 @@ func init() {
 
 func hasShellConfigured(ctx context.Context, step core.Step) bool {
 	if len(step.ExecutorConfig.Config) > 0 {
-		if shellValue, ok := step.ExecutorConfig.Config["shell"]; ok {
-			switch v := shellValue.(type) {
-			case string:
-				return strings.TrimSpace(v) != ""
-			case []any:
-				return len(v) > 0
-			case []string:
-				return len(v) > 0
-			}
+		shellValue, ok := step.ExecutorConfig.Config["shell"]
+		if !ok {
+			return false
 		}
-		return false
+		switch v := shellValue.(type) {
+		case string:
+			return strings.TrimSpace(v) != ""
+		case []any:
+			return len(v) > 0
+		case []string:
+			return len(v) > 0
+		default:
+			return false
+		}
 	}
 
 	if cli := getSSHClientFromContext(ctx); cli != nil && cli.Shell != "" {

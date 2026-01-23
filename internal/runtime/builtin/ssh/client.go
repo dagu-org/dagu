@@ -113,71 +113,53 @@ func getDefaultSSHKeys() []string {
 }
 
 // selectSSHAuthMethod selects the authentication method based on the configuration.
-// If the key is provided, it will use the public key authentication method.
-// If no key is provided, it will try default SSH keys.
-// Otherwise, it will use the password authentication method.
+// Priority: explicit key > default keys > password.
 func selectSSHAuthMethod(cfg *Config) (ssh.AuthMethod, error) {
-	var signer ssh.Signer
-	var keyPath string
-
-	// If key is specified, use it
-	if len(cfg.Key) != 0 {
-		resolvedPath, err := fileutil.ResolvePath(cfg.Key)
-		if err != nil {
-			return nil, fmt.Errorf("failed to resolve key path: %w", err)
-		}
-		keyPath = resolvedPath
-	} else if cfg.Password == "" {
-		// No key specified and no password, try default keys
-		for _, defaultKey := range getDefaultSSHKeys() {
-			if _, err := os.Stat(defaultKey); err == nil {
-				keyPath = defaultKey
-				break
-			}
-		}
-		if keyPath == "" {
-			return nil, fmt.Errorf("no SSH key specified and no default keys found (~/.ssh/id_rsa, id_ecdsa, id_ed25519, or id_dsa)")
-		}
+	keyPath, err := resolveKeyPath(cfg)
+	if err != nil {
+		return nil, err
 	}
 
-	// If we have a key path, use public key authentication
 	if keyPath != "" {
-		var err error
-		if signer, err = getPublicKeySigner(keyPath); err != nil {
+		signer, err := getPublicKeySigner(keyPath)
+		if err != nil {
 			return nil, fmt.Errorf("failed to load SSH key from %s: %w", keyPath, err)
 		}
 		return ssh.PublicKeys(signer), nil
 	}
 
-	// Fall back to password authentication if provided
 	if cfg.Password != "" {
 		return ssh.Password(cfg.Password), nil
 	}
 
-	// No authentication method available
 	return nil, fmt.Errorf("no authentication method available: provide either SSH key or password")
 }
 
-// ref:
-//
-//	https://go.googlesource.com/crypto/+/master/ssh/example_test.go
-//	https://gist.github.com/boyzhujian/73b5ecd37efd6f8dd38f56e7588f1b58
+// resolveKeyPath determines the SSH key path to use.
+// Returns empty string if password authentication should be used instead.
+func resolveKeyPath(cfg *Config) (string, error) {
+	if cfg.Key != "" {
+		return fileutil.ResolvePath(cfg.Key)
+	}
+
+	if cfg.Password != "" {
+		return "", nil
+	}
+
+	// Try default SSH keys
+	for _, defaultKey := range getDefaultSSHKeys() {
+		if _, err := os.Stat(defaultKey); err == nil {
+			return defaultKey, nil
+		}
+	}
+
+	return "", fmt.Errorf("no SSH key specified and no default keys found (~/.ssh/id_rsa, id_ecdsa, id_ed25519, or id_dsa)")
+}
+
 func getPublicKeySigner(path string) (ssh.Signer, error) {
-	// A public key may be used to authenticate against the remote
-	// frontend by using an unencrypted PEM-encoded private key file.
-	//
-	// If you have an encrypted private key, the crypto/x509 package
-	// can be used to decrypt it.
 	key, err := os.ReadFile(path) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}
-
-	// Create the Signer for this private key.
-	signer, err := ssh.ParsePrivateKey(key)
-	if err != nil {
-		return nil, err
-	}
-
-	return signer, nil
+	return ssh.ParsePrivateKey(key)
 }

@@ -54,10 +54,7 @@ func FromMapConfig(_ context.Context, mapCfg map[string]any) (*Client, error) {
 		return nil, fmt.Errorf("failed to decode ssh config: %w", err)
 	}
 
-	var host string
-	if def.Host != "" {
-		host = def.Host
-	}
+	host := def.Host
 	if def.IP != "" {
 		host = def.IP
 	}
@@ -94,20 +91,20 @@ func FromMapConfig(_ context.Context, mapCfg map[string]any) (*Client, error) {
 
 func parseShellConfig(shell string, args []string) (string, []string, error) {
 	shell = strings.TrimSpace(shell)
-	resultArgs := slices.Clone(args)
 	if shell == "" {
-		return "", resultArgs, nil
+		return "", slices.Clone(args), nil
 	}
 
 	parsedShell, parsedArgs, err := cmdutil.SplitCommand(shell)
 	if err != nil {
 		return "", nil, err
 	}
-	parsedShell = strings.TrimSpace(parsedShell)
-	if len(parsedArgs) > 0 {
-		resultArgs = append(parsedArgs, resultArgs...)
+
+	var resultArgs []string
+	if len(parsedArgs) > 0 || len(args) > 0 {
+		resultArgs = append(parsedArgs, args...)
 	}
-	return parsedShell, resultArgs, nil
+	return strings.TrimSpace(parsedShell), resultArgs, nil
 }
 
 var configSchema = &jsonschema.Schema{
