@@ -678,14 +678,14 @@ func trySSHConnection(t *testing.T, addr string, config *ssh.ClientConfig, port 
 		t.Logf("Waiting for SSH server: %v", err)
 		return false
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	session, err := conn.NewSession()
 	if err != nil {
 		t.Logf("SSH session creation failed: %v", err)
 		return false
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	script := "__dagu_exec(){\nset -e\necho test\n}\n__dagu_exec\n"
 	session.Stdin = strings.NewReader(script)
