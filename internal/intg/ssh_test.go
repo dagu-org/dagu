@@ -240,22 +240,24 @@ steps:
 	t.Run("BashShell", func(t *testing.T) {
 		th := test.Setup(t)
 
-		// Test bash-specific features: parameter expansion to remove prefix
+		// Test bash-specific features: arithmetic expansion with (( ))
+		// Note: Avoid ${} syntax as dagu expands it before sending to SSH
 		dagConfig := sshServer.sshConfig("/bin/bash") + `
 steps:
   - name: bash-test
     type: ssh
     script: |
-      # Bash-specific: parameter expansion to remove prefix
-      str="hello-world"
-      echo "${str#hello-}"
+      # Bash-specific: arithmetic with (( )) - not available in sh
+      x=5
+      (( x += 3 ))
+      printf '%d\n' "$x"
     output: SSH_BASH_OUT
 `
 		dag := th.DAG(t, dagConfig)
 		dag.Agent().RunSuccess(t)
 		dag.AssertLatestStatus(t, core.Succeeded)
 		dag.AssertOutputs(t, map[string]any{
-			"SSH_BASH_OUT": "world",
+			"SSH_BASH_OUT": "8",
 		})
 	})
 
