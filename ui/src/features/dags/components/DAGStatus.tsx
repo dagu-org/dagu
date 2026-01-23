@@ -43,6 +43,15 @@ type Props = {
 
 type StatusTab = 'status' | 'timeline' | 'outputs' | 'chat' | 'spec';
 
+/** Check if the current DAG run is a sub DAG-run (has a different root) */
+function isSubDAGRun(dagRun: components['schemas']['DAGRunDetails']): boolean {
+  return !!(
+    dagRun.rootDAGRunId &&
+    dagRun.rootDAGRunName &&
+    dagRun.rootDAGRunId !== dagRun.dagRunId
+  );
+}
+
 function DAGStatus({ dagRun, fileName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
@@ -121,23 +130,18 @@ function DAGStatus({ dagRun, fileName }: Props) {
     step: components['schemas']['Step'],
     status: NodeStatus
   ) => {
-    // Check if this is a sub DAG-run by checking if rootDAGRunId and rootDAGRunName exist
-    // and are different from the current DAG-run's ID and name
-    const isSubDAGRun =
-      dagRun.rootDAGRunId &&
-      dagRun.rootDAGRunName &&
-      dagRun.rootDAGRunId !== dagRun.dagRunId;
+    const isSubRun = isSubDAGRun(dagRun);
 
     // Define path parameters with proper typing
     const pathParams = {
-      name: isSubDAGRun ? dagRun.rootDAGRunName : dagRun.name,
-      dagRunId: isSubDAGRun ? dagRun.rootDAGRunId : dagRun.dagRunId,
+      name: isSubRun ? dagRun.rootDAGRunName : dagRun.name,
+      dagRunId: isSubRun ? dagRun.rootDAGRunId : dagRun.dagRunId,
       stepName: step.name,
-      ...(isSubDAGRun ? { subDAGRunId: dagRun.dagRunId } : {}),
+      ...(isSubRun ? { subDAGRunId: dagRun.dagRunId } : {}),
     };
 
     // Use the appropriate endpoint based on whether this is a sub DAG-run
-    const endpoint = isSubDAGRun
+    const endpoint = isSubRun
       ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/status'
       : '/dag-runs/{name}/{dagRunId}/steps/{stepName}/status';
 
@@ -476,22 +480,13 @@ function DAGStatus({ dagRun, fileName }: Props) {
       {activeTab === 'chat' && <ChatHistoryTab dagRun={dagRun} />}
 
       {/* Spec Tab Content */}
-      {activeTab === 'spec' &&
-        (() => {
-          // Check if this is a sub DAG-run
-          const isSubDAGRun =
-            dagRun.rootDAGRunId &&
-            dagRun.rootDAGRunName &&
-            dagRun.rootDAGRunId !== dagRun.dagRunId;
-
-          return (
-            <DAGSpecReadOnly
-              dagName={isSubDAGRun ? dagRun.rootDAGRunName : dagRun.name}
-              dagRunId={isSubDAGRun ? dagRun.rootDAGRunId : dagRun.dagRunId}
-              subDAGRunId={isSubDAGRun ? dagRun.dagRunId : undefined}
-            />
-          );
-        })()}
+      {activeTab === 'spec' && (
+        <DAGSpecReadOnly
+          dagName={isSubDAGRun(dagRun) ? dagRun.rootDAGRunName : dagRun.name}
+          dagRunId={isSubDAGRun(dagRun) ? dagRun.rootDAGRunId : dagRun.dagRunId}
+          subDAGRunId={isSubDAGRun(dagRun) ? dagRun.dagRunId : undefined}
+        />
+      )}
 
       <StatusUpdateModal
         visible={modal}

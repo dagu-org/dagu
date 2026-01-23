@@ -9,22 +9,22 @@ import { components } from '../../../api/v2/schema';
 
 type MetricPoint = components['schemas']['MetricPoint'];
 
-interface MiniResourceChartProps {
+type MiniResourceChartProps = {
   title: string;
   data: MetricPoint[] | undefined;
   color?: string;
   unit?: string;
   isLoading?: boolean;
   error?: string;
-}
+};
 
-const MiniResourceChart: React.FC<MiniResourceChartProps> = ({
+function MiniResourceChart({
   title,
   data,
   unit = '%',
   isLoading,
   error,
-}) => {
+}: MiniResourceChartProps): React.ReactElement {
   // Use primary color with opacity for theme-aware styling
   const strokeColor = 'color-mix(in srgb, var(--primary) 50%, transparent)';
   const fillColor = 'color-mix(in srgb, var(--primary) 15%, transparent)';
@@ -102,6 +102,6 @@ const MiniResourceChart: React.FC<MiniResourceChartProps> = ({
       </div>
     </div>
   );
-};
+}
 
 export default MiniResourceChart;

@@ -18,23 +18,23 @@ import {
 
 type MetricPoint = components['schemas']['MetricPoint'];
 
-interface ResourceChartProps {
+type ResourceChartProps = {
   title: string;
   data: MetricPoint[] | undefined;
   color: string;
   unit?: string;
   isLoading?: boolean;
   error?: string;
-}
+};
 
-const ResourceChart: React.FC<ResourceChartProps> = ({
+function ResourceChart({
   title,
   data,
   color,
   unit = '%',
   isLoading,
   error,
-}) => {
+}: ResourceChartProps): React.ReactElement {
   if (error) {
     return (
       <Card>
@@ -131,6 +131,6 @@ const ResourceChart: React.FC<ResourceChartProps> = ({
       </CardContent>
     </Card>
   );
-};
+}
 
 export default ResourceChart;

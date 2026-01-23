@@ -941,38 +941,47 @@ function DAGTable({
     [searchTags, handleSearchTagsChange]
   );
 
+  // Helper function for client-side sorting comparison
+  const getSortValue = useCallback(
+    (dag: components['schemas']['DAGFile']): string | components['schemas']['Status'] => {
+      if (clientSort === 'Status') {
+        return dag.latestDAGRun?.status || '';
+      }
+      if (clientSort === 'LastRun') {
+        return dag.latestDAGRun?.startedAt || '';
+      }
+      return '';
+    },
+    [clientSort]
+  );
+
+  const compareDags = useCallback(
+    (a: components['schemas']['DAGFile'], b: components['schemas']['DAGFile']): number => {
+      let aValue = getSortValue(a);
+      let bValue = getSortValue(b);
+
+      if (clientOrder === 'desc') {
+        [aValue, bValue] = [bValue, aValue];
+      }
+
+      if (aValue < bValue) return -1;
+      if (aValue > bValue) return 1;
+      return 0;
+    },
+    [getSortValue, clientOrder]
+  );
+
   // Transform the flat list of DAGs into a hierarchical structure with groups
   const data = useMemo(() => {
-    // Apply client-side sorting if needed
     const sortedDags = [...dags];
+
     if (clientSort) {
-      sortedDags.sort((a, b) => {
-        let aValue: string | components['schemas']['Status'] = '';
-        let bValue: string | components['schemas']['Status'] = '';
-
-        if (clientSort === 'Status') {
-          aValue = a.latestDAGRun?.status || '';
-          bValue = b.latestDAGRun?.status || '';
-        } else if (clientSort === 'LastRun') {
-          aValue = a.latestDAGRun?.startedAt || '';
-          bValue = b.latestDAGRun?.startedAt || '';
-        }
-
-        // Handle ascending/descending
-        if (clientOrder === 'desc') {
-          [aValue, bValue] = [bValue, aValue];
-        }
-
-        // Compare values
-        if (aValue < bValue) return -1;
-        if (aValue > bValue) return 1;
-        return 0;
-      });
+      sortedDags.sort(compareDags);
     }
 
     const groups: { [key: string]: Data } = {};
     sortedDags.forEach((dag) => {
-      const groupName = dag.dag.group; // Use groupName consistently
+      const groupName = dag.dag.group;
       if (groupName) {
         if (!groups[groupName]) {
           groups[groupName] = {
@@ -996,30 +1005,13 @@ function DAGTable({
           group.subRows.sort((a, b) => {
             const aDag = (a as DAGRow).dag;
             const bDag = (b as DAGRow).dag;
-            let aValue: string | components['schemas']['Status'] = '';
-            let bValue: string | components['schemas']['Status'] = '';
-
-            if (clientSort === 'Status') {
-              aValue = aDag.latestDAGRun?.status || '';
-              bValue = bDag.latestDAGRun?.status || '';
-            } else if (clientSort === 'LastRun') {
-              aValue = aDag.latestDAGRun?.startedAt || '';
-              bValue = bDag.latestDAGRun?.startedAt || '';
-            }
-
-            if (clientOrder === 'desc') {
-              [aValue, bValue] = [bValue, aValue];
-            }
-
-            if (aValue < bValue) return -1;
-            if (aValue > bValue) return 1;
-            return 0;
+            return compareDags(aDag, bDag);
           });
         }
       });
     }
 
-    const hierarchicalData: Data[] = Object.values(groups); // Get group objects
+    const hierarchicalData: Data[] = Object.values(groups);
     // Add DAGs without a group
     sortedDags
       .filter((dag) => !dag.dag.group)
@@ -1031,7 +1023,7 @@ function DAGTable({
         });
       });
     return hierarchicalData;
-  }, [dags, clientSort, clientOrder]);
+  }, [dags, clientSort, compareDags]);
 
   const tableInstanceRef = useRef<ReturnType<typeof useReactTable> | null>(
     null
