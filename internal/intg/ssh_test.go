@@ -394,6 +394,40 @@ steps:
 		})
 	})
 
+	t.Run("BastionConfigParsing", func(t *testing.T) {
+		th := test.Setup(t)
+
+		// Test that DAG-level bastion configuration is properly parsed and built.
+		// This test uses the same server as both bastion and target to exercise
+		// the config parsing code path. In a real bastion setup, the target would
+		// only be reachable through the bastion.
+		dagConfig := fmt.Sprintf(`ssh:
+  host: 127.0.0.1
+  port: "%s"
+  user: %s
+  key: "%s"
+  strictHostKey: false
+  shell: /bin/sh
+  bastion:
+    host: 127.0.0.1
+    port: "%s"
+    user: %s
+    key: "%s"
+steps:
+  - name: bastion-config-test
+    type: ssh
+    command: echo "bastion configured"
+    output: BASTION_OUT
+`, sshServer.hostPort, sshTestUser, sshServer.keyPath,
+			sshServer.hostPort, sshTestUser, sshServer.keyPath)
+		dag := th.DAG(t, dagConfig)
+		dag.Agent().RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"BASTION_OUT": "bastion configured",
+		})
+	})
+
 	t.Run("SFTPUploadFile", func(t *testing.T) {
 		th := test.Setup(t)
 
@@ -485,6 +519,111 @@ steps:
 		content, err := os.ReadFile(downloadPath)
 		require.NoError(t, err, "failed to read downloaded file")
 		require.Equal(t, "sftp download test content\n", string(content))
+	})
+
+	t.Run("SFTPUploadDirectory", func(t *testing.T) {
+		th := test.Setup(t)
+
+		// Create local directory with files to upload
+		localDir := t.TempDir()
+		subDir := filepath.Join(localDir, "subdir")
+		require.NoError(t, os.MkdirAll(subDir, 0755))
+
+		// Create files in directory
+		require.NoError(t, os.WriteFile(filepath.Join(localDir, "file1.txt"), []byte("content1"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(localDir, "file2.txt"), []byte("content2"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(subDir, "nested.txt"), []byte("nested content"), 0644))
+
+		// Upload directory to remote
+		dagConfig := fmt.Sprintf(`
+steps:
+  - name: upload-dir
+    type: sftp
+    config:
+      host: 127.0.0.1
+      port: "%s"
+      user: %s
+      key: "%s"
+      strictHostKey: false
+      direction: upload
+      source: "%s"
+      destination: /tmp/uploaded_dir
+  - name: verify-upload
+    type: ssh
+    config:
+      host: 127.0.0.1
+      port: "%s"
+      user: %s
+      key: "%s"
+      strictHostKey: false
+      shell: /bin/sh
+    script: |
+      cat /tmp/uploaded_dir/file1.txt
+      cat /tmp/uploaded_dir/subdir/nested.txt
+    output: DIR_UPLOAD_VERIFY
+    depends:
+      - upload-dir
+`, sshServer.hostPort, sshTestUser, sshServer.keyPath, localDir,
+			sshServer.hostPort, sshTestUser, sshServer.keyPath)
+
+		dag := th.DAG(t, dagConfig)
+		dag.Agent().RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"DIR_UPLOAD_VERIFY": "content1\nnested content",
+		})
+	})
+
+	t.Run("SFTPDownloadDirectory", func(t *testing.T) {
+		th := test.Setup(t)
+
+		// Download directory from remote
+		downloadDir := t.TempDir()
+		downloadPath := filepath.Join(downloadDir, "downloaded_dir")
+
+		dagConfig := fmt.Sprintf(`
+steps:
+  - name: create-remote-dir
+    type: ssh
+    config:
+      host: 127.0.0.1
+      port: "%s"
+      user: %s
+      key: "%s"
+      strictHostKey: false
+      shell: /bin/sh
+    script: |
+      mkdir -p /tmp/remote_dir/subdir
+      echo "remote file1" > /tmp/remote_dir/file1.txt
+      echo "remote nested" > /tmp/remote_dir/subdir/nested.txt
+  - name: download-dir
+    type: sftp
+    config:
+      host: 127.0.0.1
+      port: "%s"
+      user: %s
+      key: "%s"
+      strictHostKey: false
+      direction: download
+      source: /tmp/remote_dir
+      destination: "%s"
+    depends:
+      - create-remote-dir
+`, sshServer.hostPort, sshTestUser, sshServer.keyPath,
+			sshServer.hostPort, sshTestUser, sshServer.keyPath, downloadPath)
+
+		dag := th.DAG(t, dagConfig)
+		dag.Agent().RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+
+		// Verify downloaded directory contents
+		content1, err := os.ReadFile(filepath.Join(downloadPath, "file1.txt"))
+		require.NoError(t, err, "failed to read downloaded file1.txt")
+		require.Equal(t, "remote file1\n", string(content1))
+
+		nested, err := os.ReadFile(filepath.Join(downloadPath, "subdir", "nested.txt"))
+		require.NoError(t, err, "failed to read downloaded nested.txt")
+		require.Equal(t, "remote nested\n", string(nested))
 	})
 }
 
