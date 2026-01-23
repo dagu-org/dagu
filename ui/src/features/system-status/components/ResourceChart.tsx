@@ -18,23 +18,23 @@ import {
 
 type MetricPoint = components['schemas']['MetricPoint'];
 
-interface ResourceChartProps {
+type ResourceChartProps = {
   title: string;
   data: MetricPoint[] | undefined;
   color: string;
   unit?: string;
   isLoading?: boolean;
   error?: string;
-}
+};
 
-const ResourceChart: React.FC<ResourceChartProps> = ({
+function ResourceChart({
   title,
   data,
   color,
   unit = '%',
   isLoading,
   error,
-}) => {
+}: ResourceChartProps): React.ReactElement {
   if (error) {
     return (
       <Card>
@@ -105,18 +105,18 @@ const ResourceChart: React.FC<ResourceChartProps> = ({
               <CartesianGrid
                 strokeDasharray="3 3"
                 vertical={false}
-                stroke="hsl(var(--border))"
+                stroke="var(--border)"
               />
               <XAxis dataKey="time" hide />
               <YAxis hide domain={[0, 'auto']} />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
+                  backgroundColor: 'var(--background)',
+                  border: '1px solid var(--border)',
                   borderRadius: 'var(--radius)',
                 }}
-                itemStyle={{ color: 'hsl(var(--foreground))' }}
-                labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
+                itemStyle={{ color: 'var(--foreground)' }}
+                labelStyle={{ color: 'var(--muted-foreground)' }}
               />
               <Area
                 type="monotone"
@@ -131,6 +131,6 @@ const ResourceChart: React.FC<ResourceChartProps> = ({
       </CardContent>
     </Card>
   );
-};
+}
 
 export default ResourceChart;

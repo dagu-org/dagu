@@ -18,7 +18,6 @@ import {
   Calendar,
   ChevronDown,
   ChevronUp,
-  Filter,
   Search,
 } from 'lucide-react';
 import React, {
@@ -64,13 +63,6 @@ import { Badge } from '../../../../components/ui/badge';
 import { Button } from '../../../../components/ui/button';
 import { Input } from '../../../../components/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../../../../components/ui/select'; // Use shadcn Select
-import {
   Table,
   TableBody,
   TableCell,
@@ -78,6 +70,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../../../components/ui/table';
+import { TagCombobox } from '../../../../components/ui/tag-combobox';
 import {
   Tooltip,
   TooltipContent,
@@ -225,10 +218,10 @@ type Props = {
   searchText: string;
   /** Handler for search text changes */
   handleSearchTextChange: (searchText: string) => void;
-  /** Current tag filter */
-  searchTag: string;
+  /** Current tag filter (multi-select) */
+  searchTags: string[];
   /** Handler for tag filter changes */
-  handleSearchTagChange: (tag: string) => void;
+  handleSearchTagsChange: (tags: string[]) => void;
   /** Loading state */
   isLoading?: boolean;
   /** Pagination props */
@@ -280,8 +273,8 @@ declare module '@tanstack/react-table' {
   interface TableMeta<TData extends RowData> {
     group: string;
     refreshFn: () => void;
-    // Add tag change handler to meta for direct access in cell
-    handleSearchTagChange?: (tag: string) => void;
+    // Add tag click handler to meta for direct access in cell
+    onTagClick?: (tag: string) => void;
   }
 }
 
@@ -446,13 +439,22 @@ const defaultColumns = [
                   <Badge
                     key={tag}
                     variant="outline"
-                    className="text-[10px] px-1 py-0 h-3.5 rounded-sm border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary transition-colors duration-200 cursor-pointer font-normal"
+                    className="text-[10px] px-1 py-0 h-3.5 rounded-sm border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary transition-colors duration-200 cursor-pointer font-normal whitespace-normal break-words focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const handleTagClick = table.options.meta?.onTagClick;
+                        if (handleTagClick) handleTagClick(tag);
+                      }
+                    }}
                     onClick={(e) => {
                       e.stopPropagation(); // Prevent row click
                       e.preventDefault();
-                      // Get the handleSearchTagChange from the component props
-                      const handleTagClick =
-                        table.options.meta?.handleSearchTagChange;
+                      // Get the onTagClick from the table meta
+                      const handleTagClick = table.options.meta?.onTagClick;
                       if (handleTagClick) handleTagClick(tag);
                     }}
                   >
@@ -476,20 +478,36 @@ const defaultColumns = [
         const name = data.dag.dag.name.toLowerCase();
         const fileName = data.dag.fileName.toLowerCase();
         const description = (data.dag.dag.description || '').toLowerCase();
-        const searchValue = String(filterValue).toLowerCase();
+        const searchValue = Array.isArray(filterValue)
+          ? ''
+          : String(filterValue).toLowerCase();
+
+        const tagFilters = Array.isArray(filterValue)
+          ? filterValue.map((t) => t.toLowerCase())
+          : [];
 
         // Search in name and description
         if (
-          fileName.includes(searchValue) ||
-          name.includes(searchValue) ||
-          description.includes(searchValue)
+          !tagFilters.length && // Only search text if no tag filters
+          (fileName.includes(searchValue) ||
+            name.includes(searchValue) ||
+            description.includes(searchValue))
         ) {
           return true;
         }
 
         // Also search in tags if needed
         const tags = data.dag.dag.tags || [];
-        if (tags.some((tag) => tag.toLowerCase().includes(searchValue))) {
+
+        if (tagFilters.length > 0) {
+          const rowTags = tags.map((tag) => tag.toLowerCase());
+          // AND logic: all selected tags must be present
+          if (tagFilters.every((tag) => rowTags.includes(tag))) {
+            return true;
+          }
+        } else if (
+          tags.some((tag) => tag.toLowerCase().includes(searchValue))
+        ) {
           return true;
         }
       }
@@ -782,11 +800,12 @@ const SortableHeader = ({
   };
 
   // Determine which order to show
-  const displayOrder = isServerActive
-    ? currentOrder
-    : isClientActive
-      ? clientOrder
-      : '';
+  function getDisplayOrder(): string {
+    if (isServerActive) return currentOrder || '';
+    if (isClientActive) return clientOrder || '';
+    return '';
+  }
+  const displayOrder = getDisplayOrder();
 
   const button = (
     <Button
@@ -828,8 +847,8 @@ function DAGTable({
   refreshFn,
   searchText,
   handleSearchTextChange,
-  searchTag,
-  handleSearchTagChange,
+  searchTags,
+  handleSearchTagsChange,
   isLoading = false,
   pagination,
   sortField = 'name',
@@ -887,8 +906,9 @@ function DAGTable({
   useEffect(() => {
     const nameFilter = columnFilters.find((f) => f.id === 'Name');
 
-    // Combine searchText and searchTag for the Name filter
-    const combinedFilter = searchTag || searchText || '';
+    // Combine searchText and searchTags for the Name filter
+    const combinedFilter =
+      searchTags.length > 0 ? searchTags.join(',') : searchText || '';
     const currentValue = nameFilter?.value || '';
 
     let updated = false;
@@ -908,40 +928,60 @@ function DAGTable({
     if (updated) {
       setColumnFilters(newFilters);
     }
-  }, [searchText, searchTag, columnFilters]);
+  }, [searchText, searchTags, columnFilters]);
+
+  // Handler for clicking a tag to add it to the filter
+  const handleTagClick = useCallback(
+    (tag: string) => {
+      const normalizedTag = tag.toLowerCase();
+      if (!searchTags.includes(normalizedTag)) {
+        handleSearchTagsChange([...searchTags, normalizedTag]);
+      }
+    },
+    [searchTags, handleSearchTagsChange]
+  );
+
+  // Helper function for client-side sorting comparison
+  const getSortValue = useCallback(
+    (dag: components['schemas']['DAGFile']): string | components['schemas']['Status'] => {
+      if (clientSort === 'Status') {
+        return dag.latestDAGRun?.status || '';
+      }
+      if (clientSort === 'LastRun') {
+        return dag.latestDAGRun?.startedAt || '';
+      }
+      return '';
+    },
+    [clientSort]
+  );
+
+  const compareDags = useCallback(
+    (a: components['schemas']['DAGFile'], b: components['schemas']['DAGFile']): number => {
+      let aValue = getSortValue(a);
+      let bValue = getSortValue(b);
+
+      if (clientOrder === 'desc') {
+        [aValue, bValue] = [bValue, aValue];
+      }
+
+      if (aValue < bValue) return -1;
+      if (aValue > bValue) return 1;
+      return 0;
+    },
+    [getSortValue, clientOrder]
+  );
 
   // Transform the flat list of DAGs into a hierarchical structure with groups
   const data = useMemo(() => {
-    // Apply client-side sorting if needed
     const sortedDags = [...dags];
+
     if (clientSort) {
-      sortedDags.sort((a, b) => {
-        let aValue: string | components['schemas']['Status'] = '';
-        let bValue: string | components['schemas']['Status'] = '';
-
-        if (clientSort === 'Status') {
-          aValue = a.latestDAGRun?.status || '';
-          bValue = b.latestDAGRun?.status || '';
-        } else if (clientSort === 'LastRun') {
-          aValue = a.latestDAGRun?.startedAt || '';
-          bValue = b.latestDAGRun?.startedAt || '';
-        }
-
-        // Handle ascending/descending
-        if (clientOrder === 'desc') {
-          [aValue, bValue] = [bValue, aValue];
-        }
-
-        // Compare values
-        if (aValue < bValue) return -1;
-        if (aValue > bValue) return 1;
-        return 0;
-      });
+      sortedDags.sort(compareDags);
     }
 
     const groups: { [key: string]: Data } = {};
     sortedDags.forEach((dag) => {
-      const groupName = dag.dag.group; // Use groupName consistently
+      const groupName = dag.dag.group;
       if (groupName) {
         if (!groups[groupName]) {
           groups[groupName] = {
@@ -965,30 +1005,13 @@ function DAGTable({
           group.subRows.sort((a, b) => {
             const aDag = (a as DAGRow).dag;
             const bDag = (b as DAGRow).dag;
-            let aValue: string | components['schemas']['Status'] = '';
-            let bValue: string | components['schemas']['Status'] = '';
-
-            if (clientSort === 'Status') {
-              aValue = aDag.latestDAGRun?.status || '';
-              bValue = bDag.latestDAGRun?.status || '';
-            } else if (clientSort === 'LastRun') {
-              aValue = aDag.latestDAGRun?.startedAt || '';
-              bValue = bDag.latestDAGRun?.startedAt || '';
-            }
-
-            if (clientOrder === 'desc') {
-              [aValue, bValue] = [bValue, aValue];
-            }
-
-            if (aValue < bValue) return -1;
-            if (aValue > bValue) return 1;
-            return 0;
+            return compareDags(aDag, bDag);
           });
         }
       });
     }
 
-    const hierarchicalData: Data[] = Object.values(groups); // Get group objects
+    const hierarchicalData: Data[] = Object.values(groups);
     // Add DAGs without a group
     sortedDags
       .filter((dag) => !dag.dag.group)
@@ -1000,7 +1023,7 @@ function DAGTable({
         });
       });
     return hierarchicalData;
-  }, [dags, clientSort, clientOrder]);
+  }, [dags, clientSort, compareDags]);
 
   const tableInstanceRef = useRef<ReturnType<typeof useReactTable> | null>(
     null
@@ -1070,7 +1093,7 @@ function DAGTable({
     meta: {
       group,
       refreshFn,
-      handleSearchTagChange,
+      onTagClick: handleTagClick,
     },
   });
 
@@ -1135,29 +1158,13 @@ function DAGTable({
           </div>
 
           {/* Tag filter */}
-          <Select
-            value={searchTag}
-            onValueChange={(value) =>
-              handleSearchTagChange(value === 'all' ? '' : value)
-            }
-          >
-            <SelectTrigger className="w-auto min-w-[80px] h-9 border border-border rounded-md flex-shrink-0">
-              <div className="flex items-center gap-1">
-                <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                <SelectValue placeholder="Tag" />
-              </div>
-            </SelectTrigger>
-            <SelectContent className="max-h-[280px] overflow-y-auto">
-              <SelectItem value="all">
-                <span className="font-medium">All Tags</span>
-              </SelectItem>
-              {uniqueTags?.tags?.map((tag) => (
-                <SelectItem key={tag} value={tag}>
-                  {tag}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <TagCombobox
+            selectedTags={searchTags}
+            onTagsChange={handleSearchTagsChange}
+            availableTags={uniqueTags?.tags ?? []}
+            placeholder="Filter by tags..."
+            className="min-w-[180px] max-w-[300px] flex-shrink-0 h-8"
+          />
 
           {/* Pagination - pushed to right */}
           {pagination && (
@@ -1363,7 +1370,7 @@ function DAGTable({
                               dag={dagRow.dag}
                               isSelected={selectedDAG === dagRow.dag.fileName}
                               onSelect={handleSelectDAG}
-                              onTagClick={handleSearchTagChange}
+                              onTagClick={handleTagClick}
                               refreshFn={refreshFn}
                               className="ml-2"
                             />
@@ -1391,7 +1398,7 @@ function DAGTable({
                   dag={dagRow.dag}
                   isSelected={selectedDAG === dagRow.dag.fileName}
                   onSelect={handleSelectDAG}
-                  onTagClick={handleSearchTagChange}
+                  onTagClick={handleTagClick}
                   refreshFn={refreshFn}
                 />
               );

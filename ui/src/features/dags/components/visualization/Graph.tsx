@@ -53,6 +53,8 @@ type Props = {
   animate?: boolean;
   /** Whether the graph is currently displayed in an expanded modal view */
   isExpandedView?: boolean;
+  /** Custom height for the graph container */
+  height?: string | number;
 };
 
 /** Extend window interface to include the click handler (kept for backward compatibility) */
@@ -75,6 +77,7 @@ function Graph({
   onRightClickNode,
   showIcons = true,
   isExpandedView = false,
+  height,
 }: Props): React.JSX.Element {
   const [scale, setScale] = useState(isExpandedView ? 0.8 : 1);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -118,22 +121,39 @@ function Graph({
     }
   }, [steps, flowchart]);
 
-  const mermaidStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'flex-start',
-    justifyContent: 'flex-start',
-    width: width,
-    minWidth: '100%',
-    minHeight: isExpandedView ? '100%' : '380px',
-    height: isExpandedView ? '100%' : '380px',
-    borderRadius: '0.5em',
-    background: isDarkMode
+  const mermaidStyle: React.CSSProperties = React.useMemo(() => {
+    const defaultHeight = '380px';
+
+    function getHeightValue(): string {
+      if (isExpandedView) {
+        return '100%';
+      }
+      if (height === undefined) {
+        return defaultHeight;
+      }
+      return typeof height === 'number' ? `${height}px` : height;
+    }
+
+    const heightValue = getHeightValue();
+    const gridBackground = isDarkMode
       ? `linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px),
          linear-gradient(180deg, rgba(255,255,255,0.05) 1px, transparent 1px)`
       : `linear-gradient(90deg, rgba(0,0,0,0.08) 1px, transparent 1px),
-         linear-gradient(180deg, rgba(0,0,0,0.08) 1px, transparent 1px)`,
-    backgroundSize: '20px 20px',
-  };
+         linear-gradient(180deg, rgba(0,0,0,0.08) 1px, transparent 1px)`;
+
+    return {
+      display: 'flex',
+      alignItems: 'flex-start',
+      justifyContent: 'flex-start',
+      width: width,
+      minWidth: '100%',
+      minHeight: heightValue,
+      height: heightValue,
+      borderRadius: '0.5em',
+      background: gridBackground,
+      backgroundSize: '20px 20px',
+    };
+  }, [width, isExpandedView, height, isDarkMode]);
 
   const graph = React.useMemo(() => {
     if (!steps || steps.length === 0) return '';

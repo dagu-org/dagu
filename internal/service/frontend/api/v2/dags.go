@@ -493,11 +493,14 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	// Use paginator from request
 	pg := exec.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
 
+	// Parse comma-separated tags parameter
+	tags := parseCommaSeparatedTags(request.Params.Tags)
+
 	// Let persistence layer handle sorting and pagination
 	result, errList, err := a.dagStore.List(ctx, exec.ListDAGsOptions{
 		Paginator: &pg,
 		Name:      valueOf(request.Params.Name),
-		Tag:       valueOf(request.Params.Tag),
+		Tags:      tags,
 		Sort:      sortField,
 		Order:     sortOrder,
 	})

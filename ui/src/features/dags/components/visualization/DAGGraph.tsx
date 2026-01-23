@@ -9,7 +9,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { GanttChart, GitGraph, MousePointerClick } from 'lucide-react';
+import {
+  GanttChart,
+  GitGraph,
+  GripHorizontal,
+  MousePointerClick,
+} from 'lucide-react';
 import React from 'react';
 import { useCookies } from 'react-cookie';
 import { components, Status } from '../../../../api/v2/schema';
@@ -41,6 +46,26 @@ function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
   // Flowchart direction preference stored in cookies
   const [cookie, setCookie] = useCookies(['flowchart']);
   const [flowchart, setFlowchart] = React.useState(cookie['flowchart']);
+  const [graphHeight, setGraphHeight] = React.useState(380);
+
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = graphHeight;
+
+    const handleMouseMove = (mv: MouseEvent) => {
+      const newHeight = startHeight + (mv.clientY - startY);
+      setGraphHeight(Math.max(200, newHeight));
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
 
   /**
    * Handle flowchart direction change and save preference to cookie
@@ -78,7 +103,7 @@ function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
         <div className="self-center sm:self-auto"></div>
       </div>
 
-      <BorderedBox className="py-4 px-4 flex flex-col overflow-x-auto">
+      <BorderedBox className="pt-4 px-4 pb-0 flex flex-col items-stretch overflow-hidden">
         {sub === '0' && (
           <div className="flex justify-end mb-2">
             <Tooltip>
@@ -101,7 +126,7 @@ function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
             </Tooltip>
           </div>
         )}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto -mx-4 px-4">
           {sub === '0' ? (
             <Graph
               steps={dagRun.nodes}
@@ -114,11 +139,21 @@ function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
               }
               showIcons={dagRun.status > Status.NotStarted}
               animate={dagRun.status == Status.Running}
+              height={graphHeight}
             />
           ) : (
             <TimelineChart status={dagRun} />
           )}
         </div>
+        {sub === '0' && (
+          <div
+            className="flex justify-center items-center py-2 cursor-row-resize hover:bg-muted/50 transition-colors w-full select-none"
+            onMouseDown={handleResizeMouseDown}
+          >
+            <GripHorizontal className="h-4 w-4 text-muted-foreground/50" />
+          </div>
+        )}
+        {sub === '1' && <div className="pb-4" />}
       </BorderedBox>
     </div>
   );

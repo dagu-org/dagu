@@ -9,11 +9,12 @@ import {
   ActivitySquare,
   FileCode,
   GanttChart,
+  GripHorizontal,
   MessageSquare,
   MousePointerClick,
   Package,
 } from 'lucide-react';
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useCookies } from 'react-cookie';
 import { useNavigate } from 'react-router-dom';
 import { components, NodeStatus, Status, Stream } from '../../../api/v2/schema';
@@ -25,15 +26,15 @@ import BorderedBox from '../../../ui/BorderedBox';
 import { DAGRunOutputs } from '../../dag-runs/components/dag-run-details';
 import { DAGContext } from '../contexts/DAGContext';
 import { getEventHandlers } from '../lib/getEventHandlers';
+import { ChatHistoryTab } from './chat-history';
 import { DAGStatusOverview, NodeStatusTable } from './dag-details';
+import { DAGSpecReadOnly } from './dag-editor';
 import {
   LogViewer,
   ParallelExecutionModal,
   StatusUpdateModal,
 } from './dag-execution';
-import { DAGSpecReadOnly } from './dag-editor';
 import { FlowchartType, Graph, TimelineChart } from './visualization';
-import { ChatHistoryTab } from './chat-history';
 
 type Props = {
   dagRun: components['schemas']['DAGRunDetails'];
@@ -41,6 +42,15 @@ type Props = {
 };
 
 type StatusTab = 'status' | 'timeline' | 'outputs' | 'chat' | 'spec';
+
+/** Check if the current DAG run is a sub DAG-run (has a different root) */
+function isSubDAGRun(dagRun: components['schemas']['DAGRunDetails']): boolean {
+  return !!(
+    dagRun.rootDAGRunId &&
+    dagRun.rootDAGRunName &&
+    dagRun.rootDAGRunId !== dagRun.dagRunId
+  );
+}
 
 function DAGStatus({ dagRun, fileName }: Props) {
   const appBarContext = React.useContext(AppBarContext);
@@ -52,12 +62,34 @@ function DAGStatus({ dagRun, fileName }: Props) {
 
   // Flowchart direction preference stored in cookies
   const [cookie, setCookie] = useCookies(['flowchart']);
-  const [flowchart, setFlowchart] = useState<FlowchartType>(cookie['flowchart']);
+  const [flowchart, setFlowchart] = useState<FlowchartType>(
+    cookie['flowchart']
+  );
 
+  const [graphHeight, setGraphHeight] = useState(380);
 
   const [selectedStep, setSelectedStep] = useState<
     components['schemas']['Step'] | undefined
   >(undefined);
+
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = graphHeight;
+
+    const handleMouseMove = (mv: MouseEvent) => {
+      const newHeight = startHeight + (mv.clientY - startY);
+      setGraphHeight(Math.max(200, newHeight));
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
   // State for log viewer
   const [logViewer, setLogViewer] = useState<{
     isOpen: boolean;
@@ -98,23 +130,18 @@ function DAGStatus({ dagRun, fileName }: Props) {
     step: components['schemas']['Step'],
     status: NodeStatus
   ) => {
-    // Check if this is a sub DAG-run by checking if rootDAGRunId and rootDAGRunName exist
-    // and are different from the current DAG-run's ID and name
-    const isSubDAGRun =
-      dagRun.rootDAGRunId &&
-      dagRun.rootDAGRunName &&
-      dagRun.rootDAGRunId !== dagRun.dagRunId;
+    const isSubRun = isSubDAGRun(dagRun);
 
     // Define path parameters with proper typing
     const pathParams = {
-      name: isSubDAGRun ? dagRun.rootDAGRunName : dagRun.name,
-      dagRunId: isSubDAGRun ? dagRun.rootDAGRunId : dagRun.dagRunId,
+      name: isSubRun ? dagRun.rootDAGRunName : dagRun.name,
+      dagRunId: isSubRun ? dagRun.rootDAGRunId : dagRun.dagRunId,
       stepName: step.name,
-      ...(isSubDAGRun ? { subDAGRunId: dagRun.dagRunId } : {}),
+      ...(isSubRun ? { subDAGRunId: dagRun.dagRunId } : {}),
     };
 
     // Use the appropriate endpoint based on whether this is a sub DAG-run
-    const endpoint = isSubDAGRun
+    const endpoint = isSubRun
       ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/status'
       : '/dag-runs/{name}/{dagRunId}/steps/{stepName}/status';
 
@@ -346,42 +373,53 @@ function DAGStatus({ dagRun, fileName }: Props) {
         <div className="space-y-6">
           {/* DAG Graph Visualization */}
           {dagRun.nodes && dagRun.nodes.length > 0 && (
-            <BorderedBox className="py-4 px-4 flex flex-col overflow-x-auto">
-              <div className="flex justify-end mb-2">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center text-xs text-muted-foreground bg-muted px-2 py-1 rounded cursor-help">
-                      <MousePointerClick className="h-3 w-3 mr-1" />
-                      {config.permissions.runDags
-                        ? 'Double-click to navigate / Right-click to change status'
-                        : 'Double-click to navigate'}
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <div className="space-y-1">
-                      <p>Double-click: Navigate to sub dagRun</p>
-                      {config.permissions.runDags && (
-                        <p>Right-click: Update node status</p>
-                      )}
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <div className="overflow-x-auto">
-                <Graph
-                  steps={dagRun.nodes}
-                  type="status"
-                  flowchart={flowchart}
-                  onChangeFlowchart={onChangeFlowchart}
-                  onClickNode={onSelectStepOnGraph}
-                  onRightClickNode={
-                    config.permissions.runDags ? onRightClickStepOnGraph : undefined
-                  }
-                  showIcons={dagRun.status > Status.NotStarted}
-                  animate={dagRun.status == Status.Running}
-                />
-              </div>
-            </BorderedBox>
+            <div className="flex flex-col">
+              <BorderedBox className="pt-4 px-4 pb-0 flex flex-col items-stretch overflow-hidden">
+                <div className="flex justify-end mb-2">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center text-xs text-muted-foreground bg-muted px-2 py-1 rounded cursor-help">
+                        <MousePointerClick className="h-3 w-3 mr-1" />
+                        {config.permissions.runDags
+                          ? 'Double-click to navigate / Right-click to change status'
+                          : 'Double-click to navigate'}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="space-y-1">
+                        <p>Double-click: Navigate to sub dagRun</p>
+                        {config.permissions.runDags && (
+                          <p>Right-click: Update node status</p>
+                        )}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <div className="overflow-x-auto -mx-4 px-4">
+                  <Graph
+                    steps={dagRun.nodes}
+                    type="status"
+                    flowchart={flowchart}
+                    onChangeFlowchart={onChangeFlowchart}
+                    onClickNode={onSelectStepOnGraph}
+                    onRightClickNode={
+                      config.permissions.runDags
+                        ? onRightClickStepOnGraph
+                        : undefined
+                    }
+                    showIcons={dagRun.status > Status.NotStarted}
+                    animate={dagRun.status == Status.Running}
+                    height={graphHeight}
+                  />
+                </div>
+                <div
+                  className="flex justify-center items-center py-2 cursor-row-resize hover:bg-muted/50 transition-colors w-full select-none"
+                  onMouseDown={handleResizeMouseDown}
+                >
+                  <GripHorizontal className="h-4 w-4 text-muted-foreground/50" />
+                </div>
+              </BorderedBox>
+            </div>
           )}
 
           <DAGContext.Consumer>
@@ -442,21 +480,13 @@ function DAGStatus({ dagRun, fileName }: Props) {
       {activeTab === 'chat' && <ChatHistoryTab dagRun={dagRun} />}
 
       {/* Spec Tab Content */}
-      {activeTab === 'spec' && (() => {
-        // Check if this is a sub DAG-run
-        const isSubDAGRun =
-          dagRun.rootDAGRunId &&
-          dagRun.rootDAGRunName &&
-          dagRun.rootDAGRunId !== dagRun.dagRunId;
-
-        return (
-          <DAGSpecReadOnly
-            dagName={isSubDAGRun ? dagRun.rootDAGRunName : dagRun.name}
-            dagRunId={isSubDAGRun ? dagRun.rootDAGRunId : dagRun.dagRunId}
-            subDAGRunId={isSubDAGRun ? dagRun.dagRunId : undefined}
-          />
-        );
-      })()}
+      {activeTab === 'spec' && (
+        <DAGSpecReadOnly
+          dagName={isSubDAGRun(dagRun) ? dagRun.rootDAGRunName : dagRun.name}
+          dagRunId={isSubDAGRun(dagRun) ? dagRun.rootDAGRunId : dagRun.dagRunId}
+          subDAGRunId={isSubDAGRun(dagRun) ? dagRun.dagRunId : undefined}
+        />
+      )}
 
       <StatusUpdateModal
         visible={modal}

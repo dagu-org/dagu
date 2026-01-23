@@ -106,50 +106,51 @@
   }
 
   .dark {
-    --background: #0a0c1f; /* Base Obsidian */
-    --foreground: #f1f5f9;
-    --card: rgba(255, 255, 255, 0.03); /* Transparent Cards for depth */
-    --card-foreground: #f1f5f9;
-    --popover: #111432;
-    --popover-foreground: #f1f5f9;
-    --primary: #6366f1;
+    /* Candy Pop Theme - Bold & Fun */
+    --background: #1c1c2e; /* Dark purple */
+    --foreground: #ffffff;
+    --card: rgba(255, 107, 203, 0.05); /* Pink tint for depth */
+    --card-foreground: #ffffff;
+    --popover: #252540;
+    --popover-foreground: #ffffff;
+    --primary: #ff6bcb; /* Bubblegum pink */
     --primary-foreground: #ffffff;
-    --secondary: rgba(255, 255, 255, 0.05);
-    --secondary-foreground: #f1f5f9;
-    --muted: rgba(255, 255, 255, 0.02);
-    --muted-foreground: #94a3b8;
-    --accent: rgba(255, 255, 255, 0.05);
-    --accent-foreground: #f1f5f9;
+    --secondary: rgba(197, 107, 255, 0.08); /* Grape tint */
+    --secondary-foreground: #ffffff;
+    --muted: rgba(255, 107, 203, 0.03);
+    --muted-foreground: #b8a8c8; /* Soft lavender */
+    --accent: rgba(197, 107, 255, 0.1); /* Grape accent */
+    --accent-foreground: #ffffff;
     --destructive: #ef4444;
     --destructive-foreground: #ffffff;
-    --border: rgba(255, 255, 255, 0.06);
-    --input: rgba(255, 255, 255, 0.06);
-    --ring: #6366f1;
+    --border: rgba(197, 107, 255, 0.15); /* Grape border */
+    --input: rgba(197, 107, 255, 0.15);
+    --ring: #ff6bcb;
     --success: #10b981;
     --warning: #f59e0b;
     --info: #0ea5e9;
-    --surface: #111432;
+    --surface: #252540;
 
-    --sidebar: #0a0c1f; /* Unified with background */
-    --sidebar-foreground: #94a3b8;
-    --sidebar-border: rgba(255, 255, 255, 0.04);
+    --sidebar: #1c1c2e; /* Unified with background */
+    --sidebar-foreground: #d4c4e4; /* Light lavender */
+    --sidebar-border: rgba(197, 107, 255, 0.1);
 
-    /* Button Tokens mapping - Obsidian Dark */
-    --btn-primary-top: #6366f1;
-    --btn-primary-bottom: #4f46e5;
-    --btn-primary-border: #4338ca;
+    /* Button Tokens mapping - Candy Pop */
+    --btn-primary-top: #ff85d5; /* Lighter pink */
+    --btn-primary-bottom: #ff6bcb; /* Bubblegum */
+    --btn-primary-border: #e050a8; /* Darker pink */
 
-    --btn-secondary-top: #1c224d;
-    --btn-secondary-bottom: #161a3d;
-    --btn-secondary-border: rgba(255, 255, 255, 0.1);
-    --btn-secondary-platform: #0a0c1f;
+    --btn-secondary-top: #2a2a45;
+    --btn-secondary-bottom: #232338;
+    --btn-secondary-border: rgba(197, 107, 255, 0.2);
+    --btn-secondary-platform: #1c1c2e;
 
     /* RGB fallbacks */
-    --bg: 10 12 31;
-    --text: 241 245 249;
-    --sidebar-bg: 10 12 31;
-    --sidebar-text: 148 163 184;
-    --primary-rgb: 99 102 241;
+    --bg: 28 28 46;
+    --text: 255 255 255;
+    --sidebar-bg: 28 28 46;
+    --sidebar-text: 212 196 228;
+    --primary-rgb: 255 107 203;
   }
 
   * {
@@ -167,11 +168,12 @@
   .dark body {
     background: radial-gradient(
       circle at 60% 0%,
-      rgba(99, 102, 241, 0.08) 0%,
-      #0a0c1f 50%,
-      #0a0c1f 100%
+      rgba(197, 107, 255, 0.12) 0%,
+      rgba(255, 107, 203, 0.05) 30%,
+      #1c1c2e 60%,
+      #1c1c2e 100%
     );
-    background-color: #0a0c1f;
+    background-color: #1c1c2e;
     background-attachment: fixed;
   }
 }
@@ -205,13 +207,13 @@
   border-color: var(--btn-primary-border);
   box-shadow:
     0 4px 0 0 var(--btn-primary-border),
-    0 8px 15px -4px rgba(99, 102, 241, 0.4);
+    0 8px 15px -4px rgba(var(--primary-rgb), 0.4);
 }
 .btn-3d-primary:hover {
   transform: translateY(-1px);
   box-shadow:
     0 5px 0 0 var(--btn-primary-border),
-    0 10px 20px -5px rgba(99, 102, 241, 0.5);
+    0 10px 20px -5px rgba(var(--primary-rgb), 0.5);
   filter: brightness(1.05);
 }
 .btn-3d-primary:active {
@@ -255,7 +257,7 @@
 }
 
 .dark [data-slot='card'] {
-  background: linear-gradient(to bottom right, #0b0f1a, #020617) !important;
+  background: var(--card) !important;
 }
 
 /* Glass Panels */
@@ -316,10 +318,11 @@
 }
 /* Dark mode specific styling */
 .dark .card-obsidian {
-  @apply border-white/5;
+  border-color: var(--border);
 }
 .dark .card-obsidian:hover {
-  @apply bg-white/[0.04] border-white/10;
+  background: rgba(197, 107, 255, 0.08);
+  border-color: rgba(197, 107, 255, 0.2);
 }
 /* Remove Radix Table internal borders within card-obsidian */
 .card-obsidian .rt-TableCell,
@@ -348,8 +351,8 @@
 .dark [data-radix-popper-content-wrapper] [role='menu'],
 .dark [data-radix-popper-content-wrapper] [role='listbox'],
 .dark [data-radix-popper-content-wrapper] [data-slot='select-content'] {
-  background: linear-gradient(to bottom, #161b3d, #111432) !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
+  background: linear-gradient(to bottom, #2a2a48, #252540) !important;
+  border-color: rgba(197, 107, 255, 0.15) !important;
 }
 
 /* Custom sidebar color - inherit text color from parent */

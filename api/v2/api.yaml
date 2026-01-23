@@ -700,12 +700,12 @@ paths:
           schema:
             type: "string"
           description: "Filter DAGs by name"
-        - name: "tag"
+        - name: "tags"
           in: "query"
           required: false
           schema:
             type: "string"
-          description: "Filter DAGs by tag"
+          description: "Filter DAGs by tags (comma-separated). Returns DAGs that have ALL specified tags."
         - name: "sort"
           in: "query"
           required: false

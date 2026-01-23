@@ -9,25 +9,25 @@ import { components } from '../../../api/v2/schema';
 
 type MetricPoint = components['schemas']['MetricPoint'];
 
-interface MiniResourceChartProps {
+type MiniResourceChartProps = {
   title: string;
   data: MetricPoint[] | undefined;
   color?: string;
   unit?: string;
   isLoading?: boolean;
   error?: string;
-}
+};
 
-const MiniResourceChart: React.FC<MiniResourceChartProps> = ({
+function MiniResourceChart({
   title,
   data,
   unit = '%',
   isLoading,
   error,
-}) => {
-  // Monochrome color - uses CSS variable
-  const strokeColor = 'hsl(var(--foreground) / 0.5)';
-  const fillColor = 'hsl(var(--foreground) / 0.08)';
+}: MiniResourceChartProps): React.ReactElement {
+  // Use primary color with opacity for theme-aware styling
+  const strokeColor = 'color-mix(in srgb, var(--primary) 50%, transparent)';
+  const fillColor = 'color-mix(in srgb, var(--primary) 15%, transparent)';
   const formattedData =
     data?.map((point) => ({
       time: point.timestamp
@@ -81,14 +81,14 @@ const MiniResourceChart: React.FC<MiniResourceChartProps> = ({
           >
             <Tooltip
               contentStyle={{
-                backgroundColor: 'hsl(var(--background))',
-                border: '1px solid hsl(var(--border))',
+                backgroundColor: 'var(--background)',
+                border: '1px solid var(--border)',
                 borderRadius: 'var(--radius)',
                 fontSize: '10px',
                 padding: '4px 8px',
               }}
-              itemStyle={{ color: 'hsl(var(--foreground))' }}
-              labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
+              itemStyle={{ color: 'var(--foreground)' }}
+              labelStyle={{ color: 'var(--muted-foreground)' }}
             />
             <Area
               type="monotone"
@@ -102,6 +102,6 @@ const MiniResourceChart: React.FC<MiniResourceChartProps> = ({
       </div>
     </div>
   );
-};
+}
 
 export default MiniResourceChart;

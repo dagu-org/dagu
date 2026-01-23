@@ -596,7 +596,7 @@ steps:
 	assert.Equal(t, "filter-web-dag", result.Items[0].Name)
 
 	// Test tag filtering
-	opts = exec.ListDAGsOptions{Tag: "frontend"}
+	opts = exec.ListDAGsOptions{Tags: []string{"frontend"}}
 	result, errList, err = store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)
@@ -604,12 +604,27 @@ steps:
 	assert.Equal(t, "filter-web-dag", result.Items[0].Name)
 
 	// Test case-insensitive tag filtering
-	opts = exec.ListDAGsOptions{Tag: "FRONTEND"}
+	opts = exec.ListDAGsOptions{Tags: []string{"FRONTEND"}}
 	result, errList, err = store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)
 	require.Len(t, result.Items, 1)
 	assert.Equal(t, "filter-web-dag", result.Items[0].Name)
+
+	// Test multi-tag AND filtering (all tags must match)
+	opts = exec.ListDAGsOptions{Tags: []string{"web", "frontend"}}
+	result, errList, err = store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	require.Len(t, result.Items, 1)
+	assert.Equal(t, "filter-web-dag", result.Items[0].Name)
+
+	// Negative case: missing one tag should return nothing
+	opts = exec.ListDAGsOptions{Tags: []string{"web", "backend"}}
+	result, errList, err = store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	require.Len(t, result.Items, 0)
 }
 
 func TestListWithSortAndOrder(t *testing.T) {

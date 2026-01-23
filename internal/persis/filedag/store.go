@@ -288,8 +288,8 @@ func (store *Storage) List(ctx context.Context, opts exec.ListDAGsOptions) (exec
 
 		baseName := path.Base(entry.Name())
 		dagName := strings.TrimSuffix(baseName, path.Ext(baseName))
-		if opts.Name != "" && opts.Tag == "" {
-			// If tag is not provided, check before reading the file to avoid
+		if opts.Name != "" && len(opts.Tags) == 0 {
+			// If tags are not provided, check before reading the file to avoid
 			// unnecessary file read and parsing.
 			if !containsSearchText(dagName, opts.Name) {
 				// Return early if the name does not match the search text.
@@ -316,7 +316,7 @@ func (store *Storage) List(ctx context.Context, opts exec.ListDAGsOptions) (exec
 			continue
 		}
 
-		if opts.Tag != "" && !containsTag(dag.Tags, opts.Tag) {
+		if len(opts.Tags) > 0 && !containsAllTags(dag.Tags, opts.Tags) {
 			continue
 		}
 
@@ -593,15 +593,22 @@ func containsSearchText(text string, search string) bool {
 	return strings.Contains(strings.ToLower(text), strings.ToLower(search))
 }
 
-// containsTag checks if the tags contain the search tag (case-insensitive).
-func containsTag(tags []string, searchTag string) bool {
-	for _, tag := range tags {
-		if strings.EqualFold(tag, searchTag) {
-			return true
+// containsAllTags checks if the DAG tags contain all the filter tags (AND logic, case-insensitive).
+func containsAllTags(dagTags, filterTags []string) bool {
+	dagTagsLower := make(map[string]bool, len(dagTags))
+	for _, t := range dagTags {
+		dagTagsLower[strings.ToLower(t)] = true
+	}
+	for _, filterTag := range filterTags {
+		normalized := strings.ToLower(strings.TrimSpace(filterTag))
+		if normalized == "" {
+			continue
+		}
+		if !dagTagsLower[normalized] {
+			return false
 		}
 	}
-
-	return false
+	return true
 }
 
 // fileExists checks if a file exists.
