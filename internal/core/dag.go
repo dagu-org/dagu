@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -90,7 +89,7 @@ type DAG struct {
 	// Dotenv is the path to the dotenv file. This is optional.
 	Dotenv []string `json:"dotenv,omitempty"`
 	// Tags contains the list of tags for the DAG. This is optional.
-	Tags []string `json:"tags,omitempty"`
+	Tags Tags `json:"tags,omitempty"`
 	// Description is the description of the DAG. This is optional.
 	Description string `json:"description,omitempty"`
 	// Schedule configuration for starting, stopping, and restarting the DAG.
@@ -217,8 +216,10 @@ type SecretRef struct {
 }
 
 // HasTag checks if the DAG has the given tag.
+// Supports both simple tags ("production") and key-value filters ("env=prod").
 func (d *DAG) HasTag(tag string) bool {
-	return slices.Contains(d.Tags, tag)
+	filter := ParseTagFilter(tag)
+	return filter.MatchesTags(d.Tags)
 }
 
 // Clone creates a shallow copy of the DAG.

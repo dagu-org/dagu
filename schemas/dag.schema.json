@@ -112,17 +112,37 @@
       "oneOf": [
         {
           "type": "string",
-          "description": "Comma-separated list of tags for categorization"
+          "description": "Tags as a string. Can be comma-separated (\"tag1, tag2\") or space-separated key=value format (\"env=prod team=platform\")"
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Tags as key-value pairs in map notation"
         },
         {
           "type": "array",
           "items": {
-            "type": "string"
+            "oneOf": [
+              {
+                "type": "string",
+                "description": "Simple tag or key=value format"
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "maxProperties": 1,
+                "description": "Single key-value pair"
+              }
+            ]
           },
-          "description": "List of tags for categorization"
+          "description": "Array of tags (strings or key-value objects)"
         }
       ],
-      "description": "Tags for categorizing and searching DAGs. Useful for filtering and organizing DAGs."
+      "description": "Tags for categorizing and filtering DAGs. Supports multiple formats: string (\"tag1, tag2\" or \"env=prod team=platform\"), map ({ env: prod }), or array ([\"tag1\", { env: prod }])"
     },
     "type": {
       "type": "string",

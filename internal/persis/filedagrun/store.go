@@ -204,23 +204,14 @@ func (store *Store) collectStatusesFromRoots(
 					continue
 				}
 
-				// Filter by tags (AND logic)
+				// Filter by tags (AND logic) using TagFilter for key-only, exact, and negation matching
 				if len(opts.Tags) > 0 {
-					match := true
+					statusTags := core.NewTags(status.Tags)
+					filters := make([]core.TagFilter, 0, len(opts.Tags))
 					for _, t := range opts.Tags {
-						found := false
-						for _, st := range status.Tags {
-							if st == t {
-								found = true
-								break
-							}
-						}
-						if !found {
-							match = false
-							break
-						}
+						filters = append(filters, core.ParseTagFilter(t))
 					}
-					if !match {
+					if !statusTags.MatchesFilters(filters) {
 						continue
 					}
 				}

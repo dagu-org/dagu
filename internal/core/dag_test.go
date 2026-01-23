@@ -519,16 +519,16 @@ func TestDAG_HasTag(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "case sensitive check - exact match",
-			tags:     []string{"Production"},
-			search:   "Production",
+			name:     "case insensitive - uppercase search matches lowercase tag",
+			tags:     []string{"production"},
+			search:   "PRODUCTION",
 			expected: true,
 		},
 		{
-			name:     "case sensitive check - different case returns false",
+			name:     "case insensitive - lowercase search matches uppercase tag",
 			tags:     []string{"Production"},
 			search:   "production",
-			expected: false,
+			expected: true,
 		},
 		{
 			name:     "nil tags returns false",
@@ -536,12 +536,42 @@ func TestDAG_HasTag(t *testing.T) {
 			search:   "test",
 			expected: false,
 		},
+		{
+			name:     "key-value tag with exact match",
+			tags:     []string{"env=prod"},
+			search:   "env=prod",
+			expected: true,
+		},
+		{
+			name:     "key-value tag with key-only search",
+			tags:     []string{"env=prod"},
+			search:   "env",
+			expected: true,
+		},
+		{
+			name:     "key-value tag with wrong value",
+			tags:     []string{"env=prod"},
+			search:   "env=staging",
+			expected: false,
+		},
+		{
+			name:     "negation filter - key not present",
+			tags:     []string{"env=prod"},
+			search:   "!deprecated",
+			expected: true,
+		},
+		{
+			name:     "negation filter - key present",
+			tags:     []string{"env=prod", "deprecated"},
+			search:   "!deprecated",
+			expected: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			dag := &core.DAG{Tags: tt.tags}
+			dag := &core.DAG{Tags: core.NewTags(tt.tags)}
 			result := dag.HasTag(tt.search)
 			assert.Equal(t, tt.expected, result)
 		})

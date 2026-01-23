@@ -315,7 +315,7 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 		return fmt.Errorf("failed to open attempt: %w", err)
 	}
 
-	h.writeInitialStatus(ctx, attempt, dag.Name, task.DagRunId, task.AttemptKey, exec.DAGRunRef{}, dag.Tags)
+	h.writeInitialStatus(ctx, attempt, dag.Name, task.DagRunId, task.AttemptKey, exec.DAGRunRef{}, dag.Tags.Strings())
 
 	h.attemptsMu.Lock()
 	h.openAttempts[task.DagRunId] = attempt
@@ -367,7 +367,7 @@ func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinator
 		return fmt.Errorf("failed to open sub-attempt: %w", err)
 	}
 
-	h.writeInitialStatus(ctx, attempt, task.Target, task.DagRunId, task.AttemptKey, rootRef, dag.Tags)
+	h.writeInitialStatus(ctx, attempt, task.Target, task.DagRunId, task.AttemptKey, rootRef, dag.Tags.Strings())
 
 	h.attemptsMu.Lock()
 	h.openAttempts[task.DagRunId] = attempt

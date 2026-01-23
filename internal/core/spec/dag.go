@@ -87,7 +87,7 @@ type dag struct {
 	// If the time is exceeded, the process is killed.
 	MaxCleanUpTimeSec *int
 	// Tags is the tags for the DAG.
-	Tags types.StringOrArray
+	Tags types.TagsValue
 	// Queue is the name of the queue to assign this DAG to.
 	Queue string
 	// MaxOutputSize is the maximum size of the output for each step.
@@ -582,20 +582,21 @@ func buildRestartWait(_ BuildContext, d *dag) (time.Duration, error) {
 	return time.Second * time.Duration(d.RestartWaitSec), nil
 }
 
-func buildTags(_ BuildContext, d *dag) ([]string, error) {
+func buildTags(_ BuildContext, d *dag) (core.Tags, error) {
 	if d.Tags.IsZero() {
 		return nil, nil
 	}
-	var ret []string
-	for _, tag := range d.Tags.Values() {
-		for _, t := range strings.Split(tag, ",") {
-			normalized := strings.ToLower(strings.TrimSpace(t))
-			if normalized != "" {
-				ret = append(ret, normalized)
-			}
+	var tags core.Tags
+	for _, entry := range d.Tags.Entries() {
+		if entry.Key() == "" {
+			continue
 		}
+		tags = append(tags, core.Tag{
+			Key:   strings.ToLower(strings.TrimSpace(entry.Key())),
+			Value: strings.ToLower(strings.TrimSpace(entry.Value())),
+		})
 	}
-	return ret, nil
+	return tags, nil
 }
 
 func buildMaxActiveRuns(_ BuildContext, d *dag) (int, error) {

@@ -81,10 +81,3 @@ func (s StringOrArray) IsEmpty() bool { return s.isSet && len(s.values) == 0 }
 //	to: user@example.com
 //	to: ["user1@example.com", "user2@example.com"]
 type MailToValue = StringOrArray
-
-// TagsValue is an alias for StringOrArray used for tags.
-// YAML examples:
-//
-//	tags: production
-//	tags: ["production", "critical"]
-type TagsValue = StringOrArray
