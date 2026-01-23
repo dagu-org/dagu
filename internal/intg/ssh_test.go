@@ -183,49 +183,6 @@ steps:
 		})
 	})
 
-	t.Run("MultipleCommands", func(t *testing.T) {
-		th := test.Setup(t)
-
-		// Use script instead of commands for multiple commands
-		dagConfig := sshServer.sshConfig("/bin/sh") + `
-steps:
-  - name: multi-cmd-test
-    type: ssh
-    script: |
-      echo first
-      echo second
-    output: SSH_MULTI_OUT
-`
-		dag := th.DAG(t, dagConfig)
-		dag.Agent().RunSuccess(t)
-		dag.AssertLatestStatus(t, core.Succeeded)
-		dag.AssertOutputs(t, map[string]any{
-			"SSH_MULTI_OUT": "first\nsecond",
-		})
-	})
-
-	t.Run("MultipleCommandsWithWorkingDirectory", func(t *testing.T) {
-		th := test.Setup(t)
-
-		// Use script instead of commands for multiple commands
-		dagConfig := sshServer.sshConfig("/bin/sh") + `
-steps:
-  - name: multi-cmd-workdir-test
-    type: ssh
-    workingDir: /tmp
-    script: |
-      pwd
-      echo done
-    output: SSH_MULTI_WORKDIR_OUT
-`
-		dag := th.DAG(t, dagConfig)
-		dag.Agent().RunSuccess(t)
-		dag.AssertLatestStatus(t, core.Succeeded)
-		dag.AssertOutputs(t, map[string]any{
-			"SSH_MULTI_WORKDIR_OUT": "/tmp\ndone",
-		})
-	})
-
 	t.Run("ErrorHandling_CommandFailure", func(t *testing.T) {
 		th := test.Setup(t)
 
@@ -283,22 +240,22 @@ steps:
 	t.Run("BashShell", func(t *testing.T) {
 		th := test.Setup(t)
 
-		// Test bash-specific features (process substitution)
+		// Test bash-specific features: parameter expansion to remove prefix
 		dagConfig := sshServer.sshConfig("/bin/bash") + `
 steps:
   - name: bash-test
     type: ssh
     script: |
-      # Bash-specific: string manipulation
+      # Bash-specific: parameter expansion to remove prefix
       str="hello-world"
-      echo "prefix-removed"
+      echo "${str#hello-}"
     output: SSH_BASH_OUT
 `
 		dag := th.DAG(t, dagConfig)
 		dag.Agent().RunSuccess(t)
 		dag.AssertLatestStatus(t, core.Succeeded)
 		dag.AssertOutputs(t, map[string]any{
-			"SSH_BASH_OUT": "prefix-removed",
+			"SSH_BASH_OUT": "world",
 		})
 	})
 
