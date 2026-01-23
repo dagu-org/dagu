@@ -53,7 +53,7 @@ function DAGsContent() {
   const group = query.get('group') || '';
   const appBarContext = React.useContext(AppBarContext);
   const searchState = useSearchState();
-  const remoteKey = appBarContext.selectedRemoteNode || 'local';
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const { preferences, updatePreference } = useUserPreferences();
   const { tabs, activeTabId, selectDAG, addTab, closeTab, getActiveFileName } =
     useTabContext();
@@ -70,7 +70,9 @@ function DAGsContent() {
   );
 
   const [searchText, setSearchText] = React.useState(defaultFilters.searchText);
-  const [searchTags, setSearchTags] = React.useState<string[]>(defaultFilters.searchTags);
+  const [searchTags, setSearchTags] = React.useState<string[]>(
+    defaultFilters.searchTags
+  );
   const [page, setPage] = React.useState<number>(defaultFilters.page);
   const [apiSearchText, setAPISearchText] = React.useState(
     defaultFilters.searchText
@@ -108,7 +110,7 @@ function DAGsContent() {
     const params = new URLSearchParams(location.search);
     const stored = searchState.readState<DAGDefinitionsFilters>(
       'dagDefinitions',
-      remoteKey
+      remoteNode
     );
     const base: DAGDefinitionsFilters = {
       ...defaultFilters,
@@ -126,7 +128,10 @@ function DAGsContent() {
     if (params.has('tags')) {
       const tagsParam = params.get('tags') ?? '';
       urlFilters.searchTags = tagsParam
-        ? tagsParam.split(',').map((t) => t.trim().toLowerCase()).filter((t) => t !== '')
+        ? tagsParam
+            .split(',')
+            .map((t) => t.trim().toLowerCase())
+            .filter((t) => t !== '')
         : [];
       hasUrlFilters = true;
     }
@@ -155,7 +160,7 @@ function DAGsContent() {
     if (current && areDAGDefinitionsFiltersEqual(current, next)) {
       if (hasUrlFilters) {
         lastPersistedFiltersRef.current = next;
-        searchState.writeState('dagDefinitions', remoteKey, next);
+        searchState.writeState('dagDefinitions', remoteNode, next);
       }
       return;
     }
@@ -169,8 +174,8 @@ function DAGsContent() {
     setSortOrder(next.sortOrder);
 
     lastPersistedFiltersRef.current = next;
-    searchState.writeState('dagDefinitions', remoteKey, next);
-  }, [defaultFilters, location.search, remoteKey, searchState]);
+    searchState.writeState('dagDefinitions', remoteNode, next);
+  }, [defaultFilters, location.search, remoteNode, searchState]);
 
   React.useEffect(() => {
     const persisted = lastPersistedFiltersRef.current;
@@ -179,8 +184,8 @@ function DAGsContent() {
     }
 
     lastPersistedFiltersRef.current = currentFilters;
-    searchState.writeState('dagDefinitions', remoteKey, currentFilters);
-  }, [currentFilters, remoteKey, searchState]);
+    searchState.writeState('dagDefinitions', remoteNode, currentFilters);
+  }, [currentFilters, remoteNode, searchState]);
 
   const handlePageLimitChange = (newLimit: number) => {
     updatePreference('pageLimit', newLimit);
@@ -214,6 +219,8 @@ function DAGsContent() {
       if (value.length > 0) {
         locationQuery.set(key, value.join(','));
       } else {
+        // Explicitly set to empty string to indicate empty list was processed
+        // This is needed so that the URL sync logic knows to clear the state
         locationQuery.delete(key);
       }
     } else if (value && value.length > 0) {

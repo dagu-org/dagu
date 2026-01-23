@@ -1,7 +1,7 @@
-import * as React from 'react';
-import { X, ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { ChevronDown, X } from 'lucide-react';
+import * as React from 'react';
 
 interface TagComboboxProps {
   selectedTags: string[];
@@ -36,9 +36,7 @@ function TagCombobox({
     }
 
     const searchLower = inputValue.toLowerCase().trim();
-    return available.filter((tag) =>
-      tag.toLowerCase().includes(searchLower)
-    );
+    return available.filter((tag) => tag.toLowerCase().includes(searchLower));
   }, [inputValue, availableTags, selectedTags]);
 
   // Reset highlighted index when suggestions change
@@ -85,7 +83,10 @@ function TagCombobox({
     switch (e.key) {
       case 'Enter':
         e.preventDefault();
-        if (highlightedIndex >= 0 && highlightedIndex < filteredSuggestions.length) {
+        if (
+          highlightedIndex >= 0 &&
+          highlightedIndex < filteredSuggestions.length
+        ) {
           const tag = filteredSuggestions[highlightedIndex];
           if (tag) addTag(tag);
         } else if (inputValue.trim()) {
@@ -186,6 +187,11 @@ function TagCombobox({
           onKeyDown={handleKeyDown}
           onFocus={handleInputFocus}
           placeholder={selectedTags.length === 0 ? placeholder : ''}
+          role="combobox"
+          aria-expanded={isOpen}
+          aria-haspopup="listbox"
+          aria-autocomplete="list"
+          aria-controls="tag-suggestions"
           className="flex-1 min-w-[80px] h-6 bg-transparent border-none outline-none text-sm placeholder:text-muted-foreground"
         />
         <div className="flex items-center gap-1 ml-auto">
@@ -212,7 +218,11 @@ function TagCombobox({
       </div>
 
       {isOpen && (filteredSuggestions.length > 0 || inputValue.trim()) && (
-        <div className="absolute z-50 mt-1 w-full max-h-[200px] overflow-y-auto rounded-md border border-border bg-popover shadow-md">
+        <div
+          id="tag-suggestions"
+          role="listbox"
+          className="absolute z-50 mt-1 w-full max-h-[200px] overflow-y-auto rounded-md border border-border bg-popover shadow-md"
+        >
           {inputValue.trim() &&
             !filteredSuggestions.some(
               (t) => t.toLowerCase() === inputValue.toLowerCase().trim()

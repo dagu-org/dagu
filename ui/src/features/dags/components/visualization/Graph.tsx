@@ -53,6 +53,8 @@ type Props = {
   animate?: boolean;
   /** Whether the graph is currently displayed in an expanded modal view */
   isExpandedView?: boolean;
+  /** Custom height for the graph container */
+  height?: string | number;
 };
 
 /** Extend window interface to include the click handler (kept for backward compatibility) */
@@ -75,6 +77,7 @@ function Graph({
   onRightClickNode,
   showIcons = true,
   isExpandedView = false,
+  height,
 }: Props): React.JSX.Element {
   const [scale, setScale] = useState(isExpandedView ? 0.8 : 1);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -124,8 +127,20 @@ function Graph({
     justifyContent: 'flex-start',
     width: width,
     minWidth: '100%',
-    minHeight: isExpandedView ? '100%' : '380px',
-    height: isExpandedView ? '100%' : '380px',
+    minHeight: isExpandedView
+      ? '100%'
+      : height
+        ? typeof height === 'number'
+          ? `${height}px`
+          : height
+        : '380px',
+    height: isExpandedView
+      ? '100%'
+      : height
+        ? typeof height === 'number'
+          ? `${height}px`
+          : height
+        : '380px',
     borderRadius: '0.5em',
     background: isDarkMode
       ? `linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px),

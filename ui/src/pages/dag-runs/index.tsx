@@ -6,7 +6,6 @@ import { Status } from '../../api/v2/schema';
 import { Button } from '../../components/ui/button';
 import { DateRangePicker } from '../../components/ui/date-range-picker';
 import { Input } from '../../components/ui/input';
-import { TagCombobox } from '../../components/ui/tag-combobox';
 import {
   Select,
   SelectContent,
@@ -14,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../components/ui/select';
+import { TagCombobox } from '../../components/ui/tag-combobox';
 import { ToggleButton, ToggleGroup } from '../../components/ui/toggle-group';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useConfig } from '../../contexts/ConfigContext';
@@ -292,7 +292,10 @@ function DAGRuns() {
     if (params.has('tags')) {
       const tagsParam = params.get('tags') ?? '';
       urlFilters.tags = tagsParam
-        ? tagsParam.split(',').map((t) => t.trim().toLowerCase()).filter((t) => t !== '')
+        ? tagsParam
+            .split(',')
+            .map((t) => t.trim().toLowerCase())
+            .filter((t) => t !== '')
         : [];
       hasUrlFilters = true;
     }
@@ -462,7 +465,10 @@ function DAGRuns() {
     addSearchParam('name', searchText);
     addSearchParam('dagRunId', dagRunId);
     addSearchParam('status', statusToUse);
-    addSearchParam('tags', selectedTags.length > 0 ? selectedTags.join(',') : undefined);
+    addSearchParam(
+      'tags',
+      selectedTags.length > 0 ? selectedTags.join(',') : undefined
+    );
     addSearchParam('fromDate', fromDate);
     addSearchParam('toDate', toDate);
     addSearchParam('dateMode', dateRangeMode);
@@ -733,7 +739,10 @@ function DAGRuns() {
                 </SelectItem>
                 {Object.entries(STATUS_CONFIG).map(([statusValue, label]) => (
                   <SelectItem key={statusValue} value={statusValue}>
-                    <StatusChip status={Number(statusValue) as Status} size="sm">
+                    <StatusChip
+                      status={Number(statusValue) as Status}
+                      size="sm"
+                    >
                       {label}
                     </StatusChip>
                   </SelectItem>
@@ -746,7 +755,7 @@ function DAGRuns() {
               onTagsChange={updateTags}
               availableTags={availableTags}
               placeholder="Filter by tags..."
-              className="min-w-[180px] max-w-[300px]"
+              className="min-w-[180px] max-w-[300px] h-8"
             />
             <Button
               onClick={() => handleSearch()}

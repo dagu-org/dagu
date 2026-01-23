@@ -600,7 +600,11 @@ func containsAllTags(dagTags, filterTags []string) bool {
 		dagTagsLower[strings.ToLower(t)] = true
 	}
 	for _, filterTag := range filterTags {
-		if !dagTagsLower[strings.ToLower(filterTag)] {
+		normalized := strings.ToLower(strings.TrimSpace(filterTag))
+		if normalized == "" {
+			continue
+		}
+		if !dagTagsLower[normalized] {
 			return false
 		}
 	}

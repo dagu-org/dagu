@@ -62,7 +62,6 @@ import { PanelWidthContext } from '../../../../components/SplitLayout';
 import { Badge } from '../../../../components/ui/badge';
 import { Button } from '../../../../components/ui/button';
 import { Input } from '../../../../components/ui/input';
-import { TagCombobox } from '../../../../components/ui/tag-combobox';
 import {
   Table,
   TableBody,
@@ -71,6 +70,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../../../components/ui/table';
+import { TagCombobox } from '../../../../components/ui/tag-combobox';
 import {
   Tooltip,
   TooltipContent,
@@ -439,7 +439,17 @@ const defaultColumns = [
                   <Badge
                     key={tag}
                     variant="outline"
-                    className="text-[10px] px-1 py-0 h-3.5 rounded-sm border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary transition-colors duration-200 cursor-pointer font-normal"
+                    className="text-[10px] px-1 py-0 h-3.5 rounded-sm border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary transition-colors duration-200 cursor-pointer font-normal whitespace-normal break-words focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const handleTagClick = table.options.meta?.onTagClick;
+                        if (handleTagClick) handleTagClick(tag);
+                      }
+                    }}
                     onClick={(e) => {
                       e.stopPropagation(); // Prevent row click
                       e.preventDefault();
@@ -468,20 +478,36 @@ const defaultColumns = [
         const name = data.dag.dag.name.toLowerCase();
         const fileName = data.dag.fileName.toLowerCase();
         const description = (data.dag.dag.description || '').toLowerCase();
-        const searchValue = String(filterValue).toLowerCase();
+        const searchValue = Array.isArray(filterValue)
+          ? ''
+          : String(filterValue).toLowerCase();
+
+        const tagFilters = Array.isArray(filterValue)
+          ? filterValue.map((t) => t.toLowerCase())
+          : [];
 
         // Search in name and description
         if (
-          fileName.includes(searchValue) ||
-          name.includes(searchValue) ||
-          description.includes(searchValue)
+          !tagFilters.length && // Only search text if no tag filters
+          (fileName.includes(searchValue) ||
+            name.includes(searchValue) ||
+            description.includes(searchValue))
         ) {
           return true;
         }
 
         // Also search in tags if needed
         const tags = data.dag.dag.tags || [];
-        if (tags.some((tag) => tag.toLowerCase().includes(searchValue))) {
+
+        if (tagFilters.length > 0) {
+          const rowTags = tags.map((tag) => tag.toLowerCase());
+          // AND logic: all selected tags must be present
+          if (tagFilters.every((tag) => rowTags.includes(tag))) {
+            return true;
+          }
+        } else if (
+          tags.some((tag) => tag.toLowerCase().includes(searchValue))
+        ) {
           return true;
         }
       }
@@ -881,7 +907,8 @@ function DAGTable({
     const nameFilter = columnFilters.find((f) => f.id === 'Name');
 
     // Combine searchText and searchTags for the Name filter
-    const combinedFilter = searchTags.length > 0 ? searchTags.join(',') : searchText || '';
+    const combinedFilter =
+      searchTags.length > 0 ? searchTags.join(',') : searchText || '';
     const currentValue = nameFilter?.value || '';
 
     let updated = false;
@@ -1144,7 +1171,7 @@ function DAGTable({
             onTagsChange={handleSearchTagsChange}
             availableTags={uniqueTags?.tags ?? []}
             placeholder="Filter by tags..."
-            className="min-w-[180px] max-w-[300px] flex-shrink-0"
+            className="min-w-[180px] max-w-[300px] flex-shrink-0 h-8"
           />
 
           {/* Pagination - pushed to right */}
