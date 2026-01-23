@@ -352,11 +352,27 @@ func TestEnvScope_Expand(t *testing.T) {
 		assert.Equal(t, "Hello, World!", result)
 	})
 
-	t.Run("VariableNotFoundReturnsEmpty", func(t *testing.T) {
+	t.Run("VariableNotFoundPreserved", func(t *testing.T) {
 		scope := NewEnvScope(nil, false)
 
+		// $VAR syntax preserved
 		result := scope.Expand("Hello, $UNKNOWN!")
-		assert.Equal(t, "Hello, !", result)
+		assert.Equal(t, "Hello, $UNKNOWN!", result)
+
+		// ${VAR} syntax preserved
+		result = scope.Expand("Hello, ${UNKNOWN}!")
+		assert.Equal(t, "Hello, ${UNKNOWN}!", result)
+	})
+
+	t.Run("MixedKnownAndUnknown", func(t *testing.T) {
+		scope := NewEnvScope(nil, false).
+			WithEntry("KNOWN", "found", EnvSourceDAGEnv)
+
+		result := scope.Expand("$KNOWN and $UNKNOWN")
+		assert.Equal(t, "found and $UNKNOWN", result)
+
+		result = scope.Expand("${KNOWN} and ${UNKNOWN}")
+		assert.Equal(t, "found and ${UNKNOWN}", result)
 	})
 
 	t.Run("MultipleVariables", func(t *testing.T) {

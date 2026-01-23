@@ -6,11 +6,13 @@ import (
 )
 
 // ExpandEnvContext expands ${VAR} and $VAR in s using EnvScope from context,
-// falling back to os.ExpandEnv if no scope in context.
+// falling back to os.LookupEnv if no scope in context.
+// Variables not found are preserved in their original form.
 func ExpandEnvContext(ctx context.Context, s string) string {
 	scope := GetEnvScope(ctx)
 	if scope == nil {
-		return os.ExpandEnv(s)
+		// No scope - use OS lookup but preserve unknown vars
+		return expandWithLookup(s, os.LookupEnv)
 	}
 	return scope.Expand(s)
 }

@@ -2335,10 +2335,10 @@ func TestWithoutExpandShell(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "ShellExpansionDisabledSkipsSubstring",
+			name:    "ShellExpansionDisabledPreservesSubstring",
 			input:   "${VAR:0:3}",
 			opts:    []EvalOption{WithVariables(map[string]string{"VAR": "HelloWorld"}), WithoutExpandShell()},
-			want:    "", // When shell expansion is disabled, substring syntax is not processed
+			want:    "${VAR:0:3}", // When shell expansion is disabled, preserve substring syntax for remote shell
 			wantErr: false,
 		},
 		{
