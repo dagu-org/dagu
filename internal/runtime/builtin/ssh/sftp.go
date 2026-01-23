@@ -8,7 +8,9 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
@@ -95,11 +97,11 @@ func (e *sftpExecutor) Kill(_ os.Signal) error {
 }
 
 func (e *sftpExecutor) Run(ctx context.Context) error {
-	conn, session, err := e.client.NewSession()
+	// Dial SSH connection directly - SFTP doesn't need a session, just the connection
+	conn, err := e.client.dial()
 	if err != nil {
-		return fmt.Errorf("failed to create SSH session: %w", err)
+		return fmt.Errorf("failed to connect to SSH server: %w", err)
 	}
-	defer session.Close()
 	defer conn.Close()
 
 	sftpClient, err := sftp.NewClient(conn)
@@ -150,8 +152,8 @@ func (e *sftpExecutor) uploadFile(ctx context.Context, sftpClient *sftp.Client, 
 		return fmt.Errorf("failed to stat local file: %w", err)
 	}
 
-	// Ensure remote directory exists
-	remoteDir := filepath.Dir(remotePath)
+	// Ensure remote directory exists (use path.Dir for POSIX remote paths)
+	remoteDir := path.Dir(remotePath)
 	if err := sftpClient.MkdirAll(remoteDir); err != nil {
 		return fmt.Errorf("failed to create remote directory %s: %w", remoteDir, err)
 	}
@@ -159,7 +161,9 @@ func (e *sftpExecutor) uploadFile(ctx context.Context, sftpClient *sftp.Client, 
 	// Use atomic upload: write to temp file, then rename
 	// Random suffix prevents collisions and makes orphaned files identifiable
 	var randBytes [8]byte
-	_, _ = rand.Read(randBytes[:])
+	if _, err := rand.Read(randBytes[:]); err != nil {
+		return fmt.Errorf("failed to generate random suffix for temp file: %w", err)
+	}
 	tempPath := remotePath + ".dagu-tmp-" + hex.EncodeToString(randBytes[:])
 
 	// Create temp file on remote
@@ -213,12 +217,13 @@ func (e *sftpExecutor) uploadDir(ctx context.Context, sftpClient *sftp.Client, l
 			return err
 		}
 
-		// Calculate relative path
+		// Calculate relative path from local directory
 		relPath, err := filepath.Rel(localDir, localPath)
 		if err != nil {
 			return fmt.Errorf("failed to get relative path: %w", err)
 		}
-		remotePath := filepath.Join(remoteDir, relPath)
+		// Use path.Join for remote POSIX paths (converts OS-specific separators to forward slashes)
+		remotePath := path.Join(remoteDir, filepath.ToSlash(relPath))
 
 		if info.IsDir() {
 			// Create remote directory
@@ -311,12 +316,10 @@ func (e *sftpExecutor) downloadDir(ctx context.Context, sftpClient *sftp.Client,
 		remotePath := walker.Path()
 		info := walker.Stat()
 
-		// Calculate relative path
-		relPath, err := filepath.Rel(remoteDir, remotePath)
-		if err != nil {
-			return fmt.Errorf("failed to get relative path: %w", err)
-		}
-		localPath := filepath.Join(localDir, relPath)
+		// Calculate relative path using POSIX path logic for remote paths
+		// (path package doesn't have Rel, so use string manipulation)
+		relPath := strings.TrimPrefix(strings.TrimPrefix(remotePath, remoteDir), "/")
+		localPath := filepath.Join(localDir, filepath.FromSlash(relPath))
 
 		if info.IsDir() {
 			// Create local directory

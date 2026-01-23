@@ -1,6 +1,7 @@
 package ssh
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -43,7 +44,8 @@ func NewClient(cfg *Config) (*Client, error) {
 
 	var bastionCfg *bastionClientConfig
 	if cfg.Bastion != nil {
-		bastionCfg, err = newBastionClientConfig(cfg.Bastion, timeout)
+		// Bastion inherits host key verification settings from main config
+		bastionCfg, err = newBastionClientConfig(cfg.Bastion, timeout, hostKeyCallback)
 		if err != nil {
 			return nil, fmt.Errorf("failed to setup bastion client: %w", err)
 		}
@@ -125,14 +127,32 @@ func (c *Client) dialViaBastion() (*ssh.Client, error) {
 		return nil, fmt.Errorf("failed to establish SSH connection through bastion: %w", err)
 	}
 
-	// Return the target SSH client
-	// Note: The bastion connection is kept alive as long as the target connection is open.
-	// When the target connection is closed, the bastion connection will also be closed.
-	return ssh.NewClient(ncc, chans, reqs), nil
+	// Wrap the connection to ensure bastion is closed when target is closed
+	wrappedConn := &bastionWrappedConn{
+		Conn:    ncc,
+		bastion: bastionConn,
+	}
+
+	return ssh.NewClient(wrappedConn, chans, reqs), nil
+}
+
+// bastionWrappedConn wraps an SSH client connection and ensures the bastion
+// connection is closed when the target connection is closed.
+type bastionWrappedConn struct {
+	ssh.Conn
+	bastion *ssh.Client
+}
+
+// Close closes both the target connection and the bastion connection.
+func (c *bastionWrappedConn) Close() error {
+	targetErr := c.Conn.Close()
+	bastionErr := c.bastion.Close()
+	return errors.Join(targetErr, bastionErr)
 }
 
 // newBastionClientConfig creates the bastion client configuration.
-func newBastionClientConfig(bastion *BastionConfig, timeout time.Duration) (*bastionClientConfig, error) {
+// It inherits the host key callback from the main SSH config for security.
+func newBastionClientConfig(bastion *BastionConfig, timeout time.Duration, hostKeyCallback ssh.HostKeyCallback) (*bastionClientConfig, error) {
 	authMethod, err := selectBastionAuthMethod(bastion)
 	if err != nil {
 		return nil, err
@@ -143,7 +163,7 @@ func newBastionClientConfig(bastion *BastionConfig, timeout time.Duration) (*bas
 		cfg: &ssh.ClientConfig{
 			User:            bastion.User,
 			Auth:            []ssh.AuthMethod{authMethod},
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(), // nolint: gosec
+			HostKeyCallback: hostKeyCallback,
 			Timeout:         timeout,
 		},
 	}, nil

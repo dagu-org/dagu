@@ -2,6 +2,7 @@ package ssh
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -85,16 +86,14 @@ func (e *sshExecutor) Kill(_ os.Signal) error {
 	}
 	e.closed = true
 
-	var lastErr error
+	var sessionErr, connErr error
 	if e.session != nil {
-		lastErr = e.session.Close()
+		sessionErr = e.session.Close()
 	}
 	if e.conn != nil {
-		if err := e.conn.Close(); err != nil {
-			lastErr = err
-		}
+		connErr = e.conn.Close()
 	}
-	return lastErr
+	return errors.Join(sessionErr, connErr)
 }
 
 func (e *sshExecutor) Run(ctx context.Context) error {
