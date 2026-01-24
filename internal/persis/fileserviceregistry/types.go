@@ -19,6 +19,9 @@ type instanceInfo struct {
 	PID       int                `json:"pid"`
 	Status    exec.ServiceStatus `json:"status"`
 	StartedAt time.Time          `json:"startedAt"`
+	// Namespace is the namespace this instance is assigned to (for workers).
+	// Empty string indicates the instance serves all namespaces (scheduler, coordinator).
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // instanceFilePath returns the file path for an instance

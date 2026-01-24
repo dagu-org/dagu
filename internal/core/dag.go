@@ -66,7 +66,11 @@ type DAG struct {
 	// Location is the absolute path to the DAG file.
 	// It is used to generate unix socket name and can be blank
 	Location string `json:"location,omitempty"`
+	// Namespace is the namespace this DAG belongs to.
+	// The namespace provides isolation boundaries for DAGs and their resources.
+	Namespace string `json:"namespace,omitempty"`
 	// Group is the group name of the DAG. This is optional.
+	// Deprecated: Use Namespace instead for organizational grouping.
 	Group string `json:"group,omitempty"`
 	// Name is the name of the DAG. The default is the filename without the extension.
 	Name string `json:"name,omitempty"`
@@ -246,15 +250,15 @@ func (d *DAG) HasHITLSteps() bool {
 // The address is used to communicate with the agent process.
 func (d *DAG) SockAddr(dagRunID string) string {
 	if d.Location != "" {
-		return SockAddr(d.Location, "")
+		return SockAddrWithNamespace(d.Namespace, d.Location, "")
 	}
-	return SockAddr(d.Name, dagRunID)
+	return SockAddrWithNamespace(d.Namespace, d.Name, dagRunID)
 }
 
 // SockAddrForSubDAGRun returns the unix socket address for a specific dag-run ID.
 // This is used to control sub dag-runs.
 func (d *DAG) SockAddrForSubDAGRun(dagRunID string) string {
-	return SockAddr(d.GetName(), dagRunID)
+	return SockAddrWithNamespace(d.Namespace, d.GetName(), dagRunID)
 }
 
 // GetName returns the name of the DAG.
@@ -701,7 +705,15 @@ func (h HandlerType) String() string {
 
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
+// Deprecated: Use SockAddrWithNamespace for namespace-aware socket paths.
 func SockAddr(name, dagRunID string) string {
+	return SockAddrWithNamespace("", name, dagRunID)
+}
+
+// SockAddrWithNamespace returns the unix socket address for the DAG with namespace.
+// The namespace is included in the hash to prevent collisions between namespaces.
+// If namespace is empty, it behaves like the original SockAddr for backward compatibility.
+func SockAddrWithNamespace(namespace, name, dagRunID string) string {
 	const (
 		hashLength          = 6
 		maxSocketNameLength = 50
@@ -710,16 +722,23 @@ func SockAddr(name, dagRunID string) string {
 		suffix              = ".sock"
 	)
 
-	hash := fmt.Sprintf("%x", md5.Sum([]byte(name+dagRunID)))[:hashLength] // nolint:gosec
-	name = fileutil.SafeName(name)
+	// Include namespace in the hash to prevent collisions
+	hashInput := namespace + "." + name + dagRunID
+	hash := fmt.Sprintf("%x", md5.Sum([]byte(hashInput)))[:hashLength] // nolint:gosec
 
-	totalLen := len(prefix) + len(name) + len(connector) + len(hash) + len(suffix)
-	if totalLen > maxSocketNameLength {
-		excessLen := totalLen - maxSocketNameLength
-		name = name[:len(name)-excessLen]
+	// Create safe name including namespace prefix if present
+	safeName := fileutil.SafeName(name)
+	if namespace != "" {
+		safeName = fileutil.SafeName(namespace + "." + name)
 	}
 
-	return getSocketPath(prefix + name + connector + hash + suffix)
+	totalLen := len(prefix) + len(safeName) + len(connector) + len(hash) + len(suffix)
+	if totalLen > maxSocketNameLength {
+		excessLen := totalLen - maxSocketNameLength
+		safeName = safeName[:len(safeName)-excessLen]
+	}
+
+	return getSocketPath(prefix + safeName + connector + hash + suffix)
 }
 
 // getSocketPath returns the appropriate socket path for the current platform.

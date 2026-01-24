@@ -29,9 +29,10 @@ func TestSockAddr(t *testing.T) {
 		// 50 is an application-imposed limit to keep socket names short and portable
 		// (the system limit UNIX_PATH_MAX is typically 108 bytes on Linux)
 		require.LessOrEqual(t, 50, len(dag.SockAddr("")))
+		// Note: Hash includes namespace prefix (empty in this case)
 		require.Equal(
 			t,
-			"/tmp/@dagu_testdata_testDagVeryLongNameThat_b92b71.sock",
+			"/tmp/@dagu_testdata_testDagVeryLongNameThat_e182b1.sock",
 			dag.SockAddr(""),
 		)
 	})
@@ -159,7 +160,7 @@ func TestSockAddr(t *testing.T) {
 	t.Run("HashConsistency", func(t *testing.T) {
 		t.Parallel()
 
-		// Verify that the hash is based on the combined name+dagRunID
+		// Verify that the hash is based on the combined namespace+"."+name+dagRunID
 		name := "testdag"
 		runID := "testrun"
 
@@ -170,8 +171,9 @@ func TestSockAddr(t *testing.T) {
 		lastPart := parts[len(parts)-1]
 		hash := strings.TrimSuffix(lastPart, ".sock")
 
-		// The hash should be the first 6 characters of MD5(name+runID)
-		expectedHash := fmt.Sprintf("%x", md5.Sum([]byte(name+runID)))[:6]
+		// The hash should be the first 6 characters of MD5("." + name + runID)
+		// (empty namespace results in "." prefix)
+		expectedHash := fmt.Sprintf("%x", md5.Sum([]byte("."+name+runID)))[:6]
 		require.Equal(t, expectedHash, hash)
 	})
 
@@ -213,6 +215,52 @@ func TestSockAddr(t *testing.T) {
 		// Should use the DAG name (not location) with the sub run ID
 		expectedAddr := core.SockAddr("parentdag", subRunID)
 		require.Equal(t, expectedAddr, addr)
+	})
+
+	t.Run("NamespaceIsolation", func(t *testing.T) {
+		t.Parallel()
+
+		// DAGs with same name in different namespaces should have different socket addresses
+		dag1 := &core.DAG{
+			Name:      "mydag",
+			Namespace: "team-a",
+		}
+		dag2 := &core.DAG{
+			Name:      "mydag",
+			Namespace: "team-b",
+		}
+
+		addr1 := dag1.SockAddr("run123")
+		addr2 := dag2.SockAddr("run123")
+
+		// Different namespaces should produce different addresses
+		require.NotEqual(t, addr1, addr2)
+
+		// Same namespace and name should produce same address
+		dag3 := &core.DAG{
+			Name:      "mydag",
+			Namespace: "team-a",
+		}
+		addr3 := dag3.SockAddr("run123")
+		require.Equal(t, addr1, addr3)
+	})
+
+	t.Run("SockAddrWithNamespace", func(t *testing.T) {
+		t.Parallel()
+
+		// Test the SockAddrWithNamespace function directly
+		addr1 := core.SockAddrWithNamespace("ns1", "dag", "run")
+		addr2 := core.SockAddrWithNamespace("ns2", "dag", "run")
+		addr3 := core.SockAddrWithNamespace("", "dag", "run")
+
+		// Different namespaces should produce different addresses
+		require.NotEqual(t, addr1, addr2)
+		require.NotEqual(t, addr1, addr3)
+		require.NotEqual(t, addr2, addr3)
+
+		// Should include namespace in the socket name
+		require.Contains(t, addr1, "ns1")
+		require.Contains(t, addr2, "ns2")
 	})
 }
 

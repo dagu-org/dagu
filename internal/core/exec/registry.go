@@ -71,4 +71,7 @@ type HostInfo struct {
 	Status ServiceStatus
 	// StartedAt is when the service instance was started
 	StartedAt time.Time
+	// Namespace is the namespace this host is assigned to (for workers).
+	// Empty string indicates the host serves all namespaces (scheduler, coordinator).
+	Namespace string
 }

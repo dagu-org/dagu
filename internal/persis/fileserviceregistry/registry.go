@@ -80,6 +80,7 @@ func (r *registry) Register(ctx context.Context, serviceName exec.ServiceName, h
 			PID:       os.Getpid(),
 			Status:    hostInfo.Status,
 			StartedAt: time.Now(),
+			Namespace: hostInfo.Namespace,
 		},
 	}
 
