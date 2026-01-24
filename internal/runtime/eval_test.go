@@ -522,13 +522,13 @@ func TestEvalStringEdgeCases(t *testing.T) {
 		{
 			name:     "NestedVariableReferences",
 			input:    "${${EMPTY}}",
-			expected: "}",
+			expected: "${${EMPTY}}", // Complex nested syntax preserved (not evaluated)
 			wantErr:  false,
 		},
 		{
 			name:     "MalformedVariable",
 			input:    "${",
-			expected: "",
+			expected: "${", // Malformed syntax preserved as-is
 			wantErr:  false,
 		},
 		{

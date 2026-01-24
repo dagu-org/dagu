@@ -533,7 +533,7 @@ func TestS3ConfigVariableEvaluation(t *testing.T) {
 		assert.Equal(t, "http://minio.local:9000", evaluated.Endpoint)
 	})
 
-	t.Run("EvalObject_missing_variable_becomes_empty", func(t *testing.T) {
+	t.Run("EvalObject_missing_variable_preserved", func(t *testing.T) {
 		t.Parallel()
 
 		cfg := core.S3Config{
@@ -547,8 +547,8 @@ func TestS3ConfigVariableEvaluation(t *testing.T) {
 		evaluated, err := cmdutil.EvalObject(ctx, cfg, vars)
 		require.NoError(t, err)
 
-		// Undefined variables are replaced with empty strings
-		assert.Equal(t, "", evaluated.Region)
+		// Undefined variables are preserved as-is
+		assert.Equal(t, "${UNDEFINED_VAR}", evaluated.Region)
 		assert.Equal(t, "static-bucket", evaluated.Bucket)
 	})
 

@@ -51,12 +51,17 @@ func TestExpandEnvContext(t *testing.T) {
 		assert.Equal(t, "Value is nil_ctx_value", result)
 	})
 
-	t.Run("VariableNotFoundReturnsEmpty", func(t *testing.T) {
+	t.Run("VariableNotFoundPreserved", func(t *testing.T) {
 		scope := NewEnvScope(nil, false)
 		ctx := WithEnvScope(context.Background(), scope)
 
+		// $VAR syntax preserved
 		result := ExpandEnvContext(ctx, "Hello $NONEXISTENT!")
-		assert.Equal(t, "Hello !", result)
+		assert.Equal(t, "Hello $NONEXISTENT!", result)
+
+		// ${VAR} syntax preserved
+		result = ExpandEnvContext(ctx, "Hello ${NONEXISTENT}!")
+		assert.Equal(t, "Hello ${NONEXISTENT}!", result)
 	})
 
 	t.Run("BracedVariableSyntax", func(t *testing.T) {
