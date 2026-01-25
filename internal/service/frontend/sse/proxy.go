@@ -71,10 +71,7 @@ func (h *Handler) proxyToRemoteNode(w http.ResponseWriter, r *http.Request, node
 	}
 
 	// Set SSE headers for the client
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("X-Accel-Buffering", "no")
+	SetSSEHeaders(w)
 
 	// Get flusher for streaming
 	flusher, ok := w.(http.Flusher)

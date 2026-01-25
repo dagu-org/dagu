@@ -85,7 +85,7 @@ func (w *Watcher) Stop() {
 func (w *Watcher) poll(ctx context.Context) {
 	ref := exec.NewDAGRunRef(w.dagName, w.dagRunID)
 
-	// Direct call to runtime manager - NO HTTP LOGGING!
+	// Fetch status directly from runtime manager to avoid HTTP overhead
 	status, err := w.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
 		// DAG run not found or error - notify clients
@@ -94,8 +94,12 @@ func (w *Watcher) poll(ctx context.Context) {
 	}
 
 	// Convert to API response format using exported transformer
+	// Wrap in object with dagRunDetails key to match REST API response structure
 	details := apiv2.ToDAGRunDetails(*status)
-	data, err := json.Marshal(details)
+	response := map[string]interface{}{
+		"dagRunDetails": details,
+	}
+	data, err := json.Marshal(response)
 	if err != nil {
 		w.broadcast(&Event{Type: EventTypeError, Data: err.Error()})
 		return
