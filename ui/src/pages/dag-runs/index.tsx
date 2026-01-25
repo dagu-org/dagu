@@ -415,7 +415,7 @@ function DAGRuns() {
   const sseParams = {
     name: apiSearchText || undefined,
     dagRunId: apiDagRunId || undefined,
-    status: apiStatus !== 'all' ? apiStatus : undefined,
+    status: apiStatus !== 'all' ? parseInt(apiStatus) : undefined,
     tags: apiTags.length > 0 ? apiTags.join(',') : undefined,
     fromDate: formatDateForApi(apiFromDate),
     toDate: formatDateForApi(apiToDate),

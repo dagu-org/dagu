@@ -8,7 +8,7 @@ interface DAGRunsListSSEResponse {
 }
 
 interface DAGRunsListParams {
-  status?: string;
+  status?: number;
   fromDate?: number;
   toDate?: number;
   name?: string;

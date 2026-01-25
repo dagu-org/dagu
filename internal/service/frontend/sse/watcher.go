@@ -54,6 +54,9 @@ func NewWatcher(identifier string, fetcher FetchFunc, topicType TopicType, metri
 // Start begins polling for data changes and broadcasts updates to clients.
 func (w *Watcher) Start(ctx context.Context) {
 	w.wg.Add(1)
+	if w.metrics != nil {
+		w.metrics.WatcherStarted()
+	}
 	defer w.wg.Done()
 
 	ticker := time.NewTicker(time.Second)
@@ -82,6 +85,9 @@ func (w *Watcher) Stop() {
 	}
 	w.mu.Unlock()
 	w.wg.Wait()
+	if w.metrics != nil {
+		w.metrics.WatcherStopped()
+	}
 }
 
 // poll fetches the current data and broadcasts if changed.

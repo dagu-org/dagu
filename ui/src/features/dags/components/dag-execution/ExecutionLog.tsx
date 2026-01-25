@@ -68,6 +68,13 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
   const isRunning = dagRun?.status === Status.Running;
   const [isLiveMode, setIsLiveMode] = useState(isRunning);
 
+  // Sync isLiveMode when run finishes
+  useEffect(() => {
+    if (!isRunning) {
+      setIsLiveMode(false);
+    }
+  }, [isRunning]);
+
   // Keep track of previous data to prevent flashing
   const [cachedData, setCachedData] = useState<LogWithPagination | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
@@ -241,9 +248,9 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
         const lineNumber = parseInt(htmlElement.getAttribute('data-line-number') || '0', 10);
         if (lineNumber === lineNum) {
           htmlElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          htmlElement.classList.add('bg-primary/100', 'bg-opacity-20');
+          htmlElement.classList.add('bg-primary/20');
           setTimeout(() => {
-            htmlElement.classList.remove('bg-primary/100', 'bg-opacity-20');
+            htmlElement.classList.remove('bg-primary/20');
           }, 2000);
           break;
         }

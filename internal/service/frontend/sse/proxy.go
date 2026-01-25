@@ -35,6 +35,7 @@ func (h *Handler) proxyToRemoteNode(w http.ResponseWriter, r *http.Request, node
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: node.SkipTLSVerify, //nolint:gosec
+				MinVersion:         tls.VersionTLS12,
 			},
 			MaxIdleConns:       10,
 			IdleConnTimeout:    90 * time.Second,

@@ -69,8 +69,12 @@ export function useSSE<T>(endpoint: string, enabled: boolean = true): SSEState<T
 
     eventSource.addEventListener('data', (event) => {
       const messageEvent = event as MessageEvent;
-      const parsed = JSON.parse(messageEvent.data) as T;
-      setState((prev) => ({ ...prev, data: parsed }));
+      try {
+        const parsed = JSON.parse(messageEvent.data) as T;
+        setState((prev) => ({ ...prev, data: parsed }));
+      } catch (err) {
+        console.error('SSE JSON parse error:', err);
+      }
     });
 
     eventSource.addEventListener('heartbeat', () => {});
@@ -91,9 +95,9 @@ export function useSSE<T>(endpoint: string, enabled: boolean = true): SSEState<T
       }));
 
       if (retryCountRef.current < MAX_RETRIES) {
-        const delay = calculateRetryDelay(retryCountRef.current);
+        retryCountRef.current++;
+        const delay = calculateRetryDelay(retryCountRef.current - 1);
         retryTimeoutRef.current = setTimeout(() => {
-          retryCountRef.current++;
           connect();
         }, delay);
       } else {
