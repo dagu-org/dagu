@@ -609,6 +609,7 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV2BasePath 
 	// DAG and DAG run events
 	r.Get(path.Join(apiV2BasePath, "events/dags"), handler.HandleDAGsListEvents)
 	r.Get(path.Join(apiV2BasePath, "events/dags/{fileName}"), handler.HandleDAGEvents)
+	r.Get(path.Join(apiV2BasePath, "events/dags/{fileName}/dag-runs"), handler.HandleDAGHistoryEvents)
 	r.Get(path.Join(apiV2BasePath, "events/dag-runs"), handler.HandleDAGRunsListEvents)
 	r.Get(path.Join(apiV2BasePath, "events/dag-runs/{name}/{dagRunId}"), handler.HandleDAGRunEvents)
 	r.Get(path.Join(apiV2BasePath, "events/dag-runs/{name}/{dagRunId}/logs"), handler.HandleDAGRunLogsEvents)
@@ -625,6 +626,7 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV2BasePath 
 // See sse.TopicType constants for identifier format documentation.
 func (srv *Server) registerSSEFetchers() {
 	srv.sseHub.RegisterFetcher(sse.TopicTypeDAG, srv.apiV2.GetDAGDetailsData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGHistory, srv.apiV2.GetDAGHistoryData)
 	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGsList, srv.apiV2.GetDAGsListData)
 	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRun, srv.apiV2.GetDAGRunDetailsData)
 	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRuns, srv.apiV2.GetDAGRunsListData)

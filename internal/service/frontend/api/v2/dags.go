@@ -1275,6 +1275,32 @@ func (a *API) GetDAGDetailsData(ctx context.Context, fileName string) (any, erro
 	return a.getDAGDetailsData(ctx, fileName)
 }
 
+// GetDAGHistoryData returns DAG execution history for SSE.
+// Identifier format: "fileName"
+func (a *API) GetDAGHistoryData(ctx context.Context, fileName string) (any, error) {
+	dag, err := a.dagStore.GetMetadata(ctx, fileName)
+	var dagName string
+	if err != nil {
+		dagName = fileName
+	} else {
+		dagName = dag.Name
+	}
+
+	defaultHistoryLimit := 30
+	recentHistory := a.dagRunMgr.ListRecentStatus(ctx, dagName, defaultHistoryLimit)
+
+	var dagRuns []api.DAGRunDetails
+	for _, status := range recentHistory {
+		dagRuns = append(dagRuns, ToDAGRunDetails(status))
+	}
+
+	gridData := a.readHistoryData(ctx, recentHistory)
+	return api.GetDAGDAGRunHistory200JSONResponse{
+		DagRuns:  dagRuns,
+		GridData: gridData,
+	}, nil
+}
+
 // GetDAGsListData returns DAGs list for SSE.
 // Identifier format: URL query string (e.g., "page=1&perPage=100&name=mydag")
 func (a *API) GetDAGsListData(ctx context.Context, queryString string) (any, error) {

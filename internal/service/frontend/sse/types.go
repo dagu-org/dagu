@@ -20,6 +20,7 @@ type TopicType string
 // Identifier formats:
 //   - TopicTypeDAGRun: "dagName/dagRunId"
 //   - TopicTypeDAG: "fileName"
+//   - TopicTypeDAGHistory: "fileName"
 //   - TopicTypeDAGRunLogs: "dagName/dagRunId"
 //   - TopicTypeStepLog: "dagName/dagRunId/stepName"
 //   - TopicTypeDAGRuns: URL query string (e.g., "limit=50&offset=0")
@@ -29,6 +30,7 @@ type TopicType string
 const (
 	TopicTypeDAGRun     TopicType = "dagrun"
 	TopicTypeDAG        TopicType = "dag"
+	TopicTypeDAGHistory TopicType = "daghistory"
 	TopicTypeDAGRunLogs TopicType = "dagrunlogs"
 	TopicTypeStepLog    TopicType = "steplog"
 	TopicTypeDAGRuns    TopicType = "dagruns"

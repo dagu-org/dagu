@@ -46,6 +46,13 @@ func (h *Handler) HandleDAGEvents(w http.ResponseWriter, r *http.Request) {
 	h.handleSSE(w, r, buildTopic(TopicTypeDAG, fileName))
 }
 
+// HandleDAGHistoryEvents handles SSE connections for DAG execution history.
+// Endpoint: GET /events/dags/{fileName}/dag-runs
+func (h *Handler) HandleDAGHistoryEvents(w http.ResponseWriter, r *http.Request) {
+	fileName := chi.URLParam(r, "fileName")
+	h.handleSSE(w, r, buildTopic(TopicTypeDAGHistory, fileName))
+}
+
 // HandleDAGRunLogsEvents handles SSE connections for DAG run logs.
 // Endpoint: GET /events/dag-runs/{name}/{dagRunId}/logs
 func (h *Handler) HandleDAGRunLogsEvents(w http.ResponseWriter, r *http.Request) {
