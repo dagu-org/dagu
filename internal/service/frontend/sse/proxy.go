@@ -106,7 +106,7 @@ func buildPathForTopic(topicType TopicType, identifier string) string {
 	case TopicTypeDAG:
 		return "/events/dags/" + identifier
 	case TopicTypeDAGRunLogs:
-		return "/events/dag-runs/" + identifier + "/logs"
+		return buildDAGRunLogsPath(identifier)
 	case TopicTypeStepLog:
 		return buildStepLogPath(identifier)
 	case TopicTypeDAGRuns:
@@ -132,6 +132,17 @@ func buildStepLogPath(identifier string) string {
 		return fmt.Sprintf("/events/dag-runs/%s/%s/logs/steps/%s", parts[0], parts[1], parts[2])
 	}
 	return "/events/dag-runs/" + identifier + "/logs/steps"
+}
+
+// buildDAGRunLogsPath constructs the path for DAG run logs events.
+// Handles identifiers that may include query params (e.g., "name/dagRunId?tail=1000").
+func buildDAGRunLogsPath(identifier string) string {
+	pathPart, query, hasQuery := strings.Cut(identifier, "?")
+	basePath := "/events/dag-runs/" + pathPart + "/logs"
+	if hasQuery {
+		return basePath + "?" + query
+	}
+	return basePath
 }
 
 // pathWithOptionalQuery appends a query string to the path if provided.
