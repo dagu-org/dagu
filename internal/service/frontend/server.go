@@ -582,8 +582,11 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV2BasePath 
 	// 6. Queue items: /events/queues/{name}/items
 	r.Get(path.Join(apiV2BasePath, "events/queues/{name}/items"), handler.HandleQueueItemsEvents)
 
+	// 7. Queue list: /events/queues
+	r.Get(path.Join(apiV2BasePath, "events/queues"), handler.HandleQueuesListEvents)
+
 	logger.Info(ctx, "SSE routes configured",
-		slog.Int("routes", 6),
+		slog.Int("routes", 7),
 		slog.String("basePath", apiV2BasePath))
 }
 
@@ -606,6 +609,9 @@ func (srv *Server) registerSSEFetchers() {
 
 	// 6. Queue items - identifier: "queueName"
 	srv.sseHub.RegisterFetcher(sse.TopicTypeQueueItems, srv.apiV2.GetQueueItemsData)
+
+	// 7. Queue list - identifier: URL query string
+	srv.sseHub.RegisterFetcher(sse.TopicTypeQueues, srv.apiV2.GetQueuesListData)
 }
 
 // startServer starts the HTTP server with or without TLS

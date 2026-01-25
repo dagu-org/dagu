@@ -45,6 +45,10 @@ const (
 	// TopicTypeQueueItems watches queue items
 	// Identifier format: "queueName"
 	TopicTypeQueueItems TopicType = "queueitems"
+
+	// TopicTypeQueues watches the queue list
+	// Identifier format: URL query string
+	TopicTypeQueues TopicType = "queues"
 )
 
 // FetchFunc fetches data for a given identifier.

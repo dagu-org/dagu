@@ -78,6 +78,14 @@ func (h *Handler) HandleQueueItemsEvents(w http.ResponseWriter, r *http.Request)
 	h.handleSSE(w, r, topic)
 }
 
+// HandleQueuesListEvents handles SSE connections for the queue list.
+// Endpoint: GET /events/queues
+func (h *Handler) HandleQueuesListEvents(w http.ResponseWriter, r *http.Request) {
+	// Include query params in topic for unique identification
+	topic := string(TopicTypeQueues) + ":" + r.URL.RawQuery
+	h.handleSSE(w, r, topic)
+}
+
 // handleSSE is the common SSE handling logic shared by all handlers.
 // It handles auth, headers, client creation, subscription, and the write pump.
 func (h *Handler) handleSSE(w http.ResponseWriter, r *http.Request, topic string) {

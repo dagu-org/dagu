@@ -270,7 +270,7 @@ func (a *API) GetDAGRunsListData(ctx context.Context, queryString string) (any, 
 		opts = append(opts, exec.WithDAGRunID(dagRunId))
 	}
 	if tags := params.Get("tags"); tags != "" {
-		tagList := parseCommaSeparatedTagsString(tags)
+		tagList := parseCommaSeparatedTags(&tags)
 		if len(tagList) > 0 {
 			opts = append(opts, exec.WithTags(tagList))
 		}
@@ -354,6 +354,16 @@ func (a *API) GetQueueItemsData(ctx context.Context, queueName string) (any, err
 	}, nil
 }
 
+// GetQueuesListData returns queue list for SSE.
+// Identifier format: URL query string (ignored for now)
+func (a *API) GetQueuesListData(ctx context.Context, _ string) (any, error) {
+	response, err := a.ListQueues(ctx, api.ListQueuesRequestObject{})
+	if err != nil {
+		return nil, fmt.Errorf("error listing queues: %w", err)
+	}
+	return response, nil
+}
+
 // Helper functions
 
 func fileExists(path string) bool {
@@ -361,22 +371,3 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
-func parseCommaSeparatedTagsString(tagsParam string) []string {
-	if tagsParam == "" {
-		return nil
-	}
-
-	parts := strings.Split(tagsParam, ",")
-	seen := make(map[string]struct{}, len(parts))
-	tags := make([]string, 0, len(parts))
-	for _, tag := range parts {
-		normalized := strings.ToLower(strings.TrimSpace(tag))
-		if normalized != "" {
-			if _, exists := seen[normalized]; !exists {
-				seen[normalized] = struct{}{}
-				tags = append(tags, normalized)
-			}
-		}
-	}
-	return tags
-}

@@ -15,6 +15,7 @@ import { TOKEN_KEY } from '../../../../contexts/AuthContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useUserPreferences } from '../../../../contexts/UserPreference';
 import { useQuery } from '../../../../hooks/api';
+import { useStepLogSSE } from '../../../../hooks/useStepLogSSE';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 
 // Extended Log type with pagination fields
@@ -98,6 +99,13 @@ function StepLog({
     dagRun.rootDAGRunName &&
     dagRun.rootDAGRunId !== dagRun.dagRunId;
 
+  // SSE only for: tail mode + live mode + running + not sub-DAG run
+  const shouldUseSSE = viewMode === 'tail' && isLiveMode && isRunning && !isSubDAGRun;
+  const sseResult = useStepLogSSE(dagName, dagRunId, stepName, shouldUseSSE);
+
+  // Determine if we need REST polling
+  const usePolling = !shouldUseSSE || sseResult.shouldUseFallback || !sseResult.isConnected;
+
   // Build query params based on view mode
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const tail = viewMode === 'tail' ? pageSize : undefined;
@@ -106,14 +114,15 @@ function StepLog({
   const limit = viewMode === 'page' ? pageSize : undefined;
 
   // SWR options shared by both queries - memoized to prevent unnecessary re-renders
+  // Only poll when SSE is not available/connected
   const swrOptions = React.useMemo(
     () => ({
-      refreshInterval: isLiveMode && isRunning ? 2000 : 0,
+      refreshInterval: usePolling && isLiveMode && isRunning ? 2000 : 0,
       keepPreviousData: true,
       revalidateOnFocus: false,
       dedupingInterval: 1000,
     }),
-    [isLiveMode, isRunning]
+    [isLiveMode, isRunning, usePolling]
   );
 
   // Fetch sub-DAG-run step log (only when isSubDAGRun is true)
@@ -166,6 +175,18 @@ function StepLog({
   // Use the appropriate query based on whether this is a sub-DAG-run
   const { data, isLoading, error, mutate } = isSubDAGRun ? subDAGQuery : dagRunQuery;
 
+  // Use SSE data when available in tail mode, selecting the correct stream
+  const sseLogData: LogWithPagination | null = shouldUseSSE && sseResult.data
+    ? {
+        content: stream === Stream.stdout
+          ? sseResult.data.stdoutContent
+          : sseResult.data.stderrContent,
+        lineCount: sseResult.data.lineCount,
+        totalLines: sseResult.data.totalLines,
+        hasMore: sseResult.data.hasMore,
+      }
+    : null;
+
   // Function to scroll to the bottom of the log container
   const scrollToBottom = useCallback(() => {
     if (logContainerRef.current) {
@@ -175,9 +196,12 @@ function StepLog({
 
   // Combined effect to handle data loading and navigation state
   useEffect(() => {
+    // Determine current active data source
+    const activeData = sseLogData || data;
+
     // When data is received, update cached data and reset navigation state
-    if (data) {
-      setCachedData(data as LogWithPagination);
+    if (activeData) {
+      setCachedData(activeData as LogWithPagination);
       setIsNavigating(false);
       isInitialLoad.current = false;
 
@@ -195,10 +219,10 @@ function StepLog({
     }
 
     // When loading completes with no data but we have cached data
-    if (!isLoading && !data && cachedData && !isInitialLoad.current) {
+    if (!isLoading && !activeData && cachedData && !isInitialLoad.current) {
       setIsNavigating(false);
     }
-  }, [data, isLoading, cachedData, viewMode, scrollToBottom]);
+  }, [data, sseLogData, isLoading, cachedData, viewMode, scrollToBottom]);
 
   // Set navigating state when changing view parameters
   useEffect(() => {
@@ -324,8 +348,8 @@ function StepLog({
     return <LoadingIndicator />;
   }
 
-  // Use cached data if available, otherwise use current data
-  const logData = (data || cachedData) as LogWithPagination;
+  // Use cached data if available, otherwise use current data (sseLogData is already computed above)
+  const logData = (sseLogData || data || cachedData) as LogWithPagination;
 
   // Handle error state (but not 404 - that just means no log file exists yet)
   if (error && !logData) {

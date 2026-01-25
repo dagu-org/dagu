@@ -19,6 +19,7 @@ import { DAGRunDetailsModal } from '../features/dag-runs/components/dag-run-deta
 import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
 import PathsCard from '../features/system-status/components/PathsCard';
 import { useQuery } from '../hooks/api';
+import { useDAGRunsListSSE } from '../hooks/useDAGRunsListSSE';
 import dayjs from '../lib/dayjs';
 import Title from '../ui/Title';
 
@@ -163,8 +164,20 @@ function Dashboard(): React.ReactElement | null {
     });
   };
 
-  // DAG runs data
-  const { data, error, isLoading, mutate } = useQuery(
+  // SSE for real-time updates
+  const sseResult = useDAGRunsListSSE(
+    {
+      fromDate: dateRange.startDate,
+      toDate: dateRange.endDate,
+      name: selectedDAGRun !== 'all' ? selectedDAGRun : undefined,
+    },
+    true
+  );
+
+  // Polling fallback (only when SSE fails or not connected)
+  const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
+
+  const { data: pollingData, error, isLoading, mutate } = useQuery(
     '/dag-runs',
     {
       params: {
@@ -177,9 +190,13 @@ function Dashboard(): React.ReactElement | null {
       },
     },
     {
-      refreshInterval: 5000,
+      refreshInterval: usePolling ? 5000 : 0,
+      isPaused: () => !usePolling,
     }
   );
+
+  // Use SSE data when available, otherwise polling
+  const data = sseResult.data || pollingData;
 
   const handleRefreshAll = async () => {
     await mutate();

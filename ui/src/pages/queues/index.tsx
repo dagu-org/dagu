@@ -9,6 +9,7 @@ import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-d
 import QueueList from '../../features/queues/components/QueueList';
 import QueueMetrics from '../../features/queues/components/QueueMetrics';
 import { useQuery } from '../../hooks/api';
+import { useQueuesListSSE } from '../../hooks/useQueuesListSSE';
 import Title from '../../ui/Title';
 
 function Queues() {
@@ -96,7 +97,13 @@ function Queues() {
     appBarContext.setTitle('Queue Dashboard');
   }, [appBarContext]);
 
-  const { data, error, isLoading, mutate } = useQuery(
+  // SSE for real-time updates
+  const sseResult = useQueuesListSSE(true);
+
+  // Polling fallback (only when SSE fails or not connected)
+  const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
+
+  const { data: pollingData, error, isLoading, mutate } = useQuery(
     '/queues',
     {
       params: {
@@ -106,11 +113,15 @@ function Queues() {
       },
     },
     {
-      refreshInterval: 3000, // Refresh every 3 seconds for real-time updates
-      revalidateOnFocus: true,
-      revalidateOnReconnect: true,
+      refreshInterval: usePolling ? 3000 : 0,
+      revalidateOnFocus: usePolling,
+      revalidateOnReconnect: usePolling,
+      isPaused: () => !usePolling,
     }
   );
+
+  // Use SSE data when available, otherwise polling
+  const data = sseResult.data || pollingData;
 
   async function handleRefresh(): Promise<void> {
     await mutate();
