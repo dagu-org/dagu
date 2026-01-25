@@ -278,17 +278,12 @@ func (f TagFilter) MatchesTags(tags Tags) bool {
 
 	case TagFilterTypeWildcard:
 		for _, t := range tags {
-			keyMatch := matchGlob(f.Key, t.Key)
-			if f.Value == "" {
-				// Key-only wildcard: match if any key matches pattern
-				if keyMatch {
-					return true
-				}
-			} else {
-				// Key=value wildcard: both must match
-				if keyMatch && matchGlob(f.Value, t.Value) {
-					return true
-				}
+			if !matchGlob(f.Key, t.Key) {
+				continue
+			}
+			// Key matches; check value if specified
+			if f.Value == "" || matchGlob(f.Value, t.Value) {
+				return true
 			}
 		}
 		return false
