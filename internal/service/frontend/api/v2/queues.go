@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/cmn/config"
@@ -275,4 +276,79 @@ func findGlobalQueueConfig(queueName string, cfg *config.Config) *config.QueueCo
 		}
 	}
 	return nil
+}
+
+// SSE Data Methods for Queues
+
+// QueueItemsResponse represents the response for queue items SSE.
+type QueueItemsResponse struct {
+	Running []api.DAGRunSummary `json:"running"`
+	Queued  []api.DAGRunSummary `json:"queued"`
+}
+
+// GetQueuesListData returns queue list for SSE.
+// Identifier format: URL query string (ignored for now)
+func (a *API) GetQueuesListData(ctx context.Context, _ string) (any, error) {
+	response, err := a.ListQueues(ctx, api.ListQueuesRequestObject{})
+	if err != nil {
+		return nil, fmt.Errorf("error listing queues: %w", err)
+	}
+	return response, nil
+}
+
+// GetQueueItemsData returns queue items for SSE.
+// Identifier format: "queueName"
+func (a *API) GetQueueItemsData(ctx context.Context, queueName string) (any, error) {
+	var running, queued []api.DAGRunSummary
+
+	// Get running items from proc store
+	runningByGroup, err := a.procStore.ListAllAlive(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list running processes: %w", err)
+	}
+
+	runningRefs := runningByGroup[queueName]
+	for _, dagRun := range runningRefs {
+		attempt, err := a.dagRunStore.FindAttempt(ctx, dagRun)
+		if err != nil {
+			continue
+		}
+		runStatus, err := attempt.ReadStatus(ctx)
+		if err != nil {
+			continue
+		}
+		running = append(running, toDAGRunSummary(*runStatus))
+	}
+
+	// Get queued items
+	queuedItems, err := a.queueStore.List(ctx, queueName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list queued items: %w", err)
+	}
+
+	for _, queuedItem := range queuedItems {
+		dagRunRef, err := queuedItem.Data()
+		if err != nil {
+			continue
+		}
+		attempt, err := a.dagRunStore.FindAttempt(ctx, *dagRunRef)
+		if err != nil {
+			continue
+		}
+		runStatus, err := attempt.ReadStatus(ctx)
+		if err != nil {
+			continue
+		}
+		summary := toDAGRunSummary(*runStatus)
+		// Skip running items to avoid duplication
+		if summary.Status == api.StatusRunning {
+			continue
+		}
+		queued = append(queued, summary)
+	}
+
+	return QueueItemsResponse{
+		Running: running,
+		Queued:  queued,
+	}, nil
 }

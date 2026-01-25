@@ -405,7 +405,6 @@ func TestWatcherFetchErrorMetrics(t *testing.T) {
 	assert.GreaterOrEqual(t, errorCount, float64(1), "fetch error should be recorded in metrics")
 }
 
-
 func TestWatcherIsInBackoffPeriod(t *testing.T) {
 	t.Parallel()
 	fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)

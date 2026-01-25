@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1260,4 +1262,82 @@ func (a *API) StopAllDAGRuns(ctx context.Context, request api.StopAllDAGRunsRequ
 	return &api.StopAllDAGRuns200JSONResponse{
 		Errors: errors,
 	}, nil
+}
+
+// SSE Data Methods for DAGs
+
+// GetDAGDetailsData returns DAG details for SSE.
+// Identifier format: "fileName"
+func (a *API) GetDAGDetailsData(ctx context.Context, fileName string) (any, error) {
+	return a.getDAGDetailsData(ctx, fileName)
+}
+
+// GetDAGsListData returns DAGs list for SSE.
+// Identifier format: URL query string (e.g., "page=1&perPage=100&name=mydag")
+func (a *API) GetDAGsListData(ctx context.Context, queryString string) (any, error) {
+	params, _ := url.ParseQuery(queryString)
+
+	page := parseIntParam(params.Get("page"), 1)
+	perPage := parseIntParam(params.Get("perPage"), 100)
+
+	sortField := params.Get("sort")
+	if sortField == "" {
+		sortField = "name"
+	}
+	sortOrder := params.Get("order")
+	if sortOrder == "" {
+		sortOrder = "asc"
+	}
+
+	var tags []string
+	if tagsParam := params.Get("tags"); tagsParam != "" {
+		tags = parseCommaSeparatedTags(&tagsParam)
+	}
+
+	pg := exec.NewPaginator(page, perPage)
+	listOpts := exec.ListDAGsOptions{
+		Paginator: &pg,
+		Name:      params.Get("name"),
+		Tags:      tags,
+		Sort:      sortField,
+		Order:     sortOrder,
+	}
+
+	result, errList, err := a.dagStore.List(ctx, listOpts)
+	if err != nil {
+		return nil, fmt.Errorf("error listing DAGs: %w", err)
+	}
+
+	dagFiles := make([]api.DAGFile, 0, len(result.Items))
+	for _, item := range result.Items {
+		dagStatus, statusErr := a.dagRunMgr.GetLatestStatus(ctx, item)
+		dagFile := api.DAGFile{
+			FileName:     item.FileName(),
+			LatestDAGRun: toDAGRunSummary(dagStatus),
+			Suspended:    a.dagStore.IsSuspended(ctx, item.FileName()),
+			Dag:          toDAG(item),
+			Errors:       extractBuildErrors(item.BuildErrors),
+		}
+		if statusErr != nil {
+			errList = append(errList, statusErr.Error())
+		}
+		dagFiles = append(dagFiles, dagFile)
+	}
+
+	return api.ListDAGs200JSONResponse{
+		Dags:       dagFiles,
+		Errors:     errList,
+		Pagination: toPagination(result),
+	}, nil
+}
+
+// parseIntParam parses an integer string, returning defaultVal if parsing fails or value is <= 0.
+func parseIntParam(s string, defaultVal int) int {
+	if s == "" {
+		return defaultVal
+	}
+	if v, err := strconv.Atoi(s); err == nil && v > 0 {
+		return v
+	}
+	return defaultVal
 }

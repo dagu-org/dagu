@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -2025,4 +2027,243 @@ func validateRequiredInputs(step core.Step, body *api.ApproveStepRequest) error 
 	}
 
 	return nil
+}
+
+// SSE Data Methods for DAG Runs
+
+// DAGRunLogsResponse represents the response for DAG run logs SSE.
+type DAGRunLogsResponse struct {
+	SchedulerLog SchedulerLogInfo `json:"schedulerLog"`
+	StepLogs     []StepLogInfo    `json:"stepLogs"`
+}
+
+// SchedulerLogInfo contains scheduler log metadata.
+type SchedulerLogInfo struct {
+	Content    string `json:"content"`
+	LineCount  int    `json:"lineCount"`
+	TotalLines int    `json:"totalLines"`
+	HasMore    bool   `json:"hasMore"`
+}
+
+// StepLogInfo contains step log metadata.
+type StepLogInfo struct {
+	StepName    string         `json:"stepName"`
+	Status      api.NodeStatus `json:"status"`
+	StatusLabel string         `json:"statusLabel"`
+	StartedAt   string         `json:"startedAt"`
+	FinishedAt  string         `json:"finishedAt"`
+	HasStdout   bool           `json:"hasStdout"`
+	HasStderr   bool           `json:"hasStderr"`
+}
+
+// StepLogResponse represents the response for step log SSE.
+type StepLogResponse struct {
+	StdoutContent string `json:"stdoutContent"`
+	StderrContent string `json:"stderrContent"`
+	LineCount     int    `json:"lineCount"`
+	TotalLines    int    `json:"totalLines"`
+	HasMore       bool   `json:"hasMore"`
+}
+
+// GetDAGRunDetailsData returns DAG run details for SSE.
+// Identifier format: "dagName/dagRunId"
+func (a *API) GetDAGRunDetailsData(ctx context.Context, identifier string) (any, error) {
+	dagName, dagRunId, ok := strings.Cut(identifier, "/")
+	if !ok {
+		return nil, fmt.Errorf("invalid identifier format: %s (expected 'dagName/dagRunId')", identifier)
+	}
+	return a.getDAGRunDetailsData(ctx, dagName, dagRunId)
+}
+
+// GetDAGRunLogsData returns DAG run logs for SSE.
+// Identifier format: "dagName/dagRunId" or "dagName/dagRunId?tail=N"
+func (a *API) GetDAGRunLogsData(ctx context.Context, identifier string) (any, error) {
+	// Parse query params if present
+	pathPart := identifier
+	var queryParams url.Values
+	if idx := strings.Index(identifier, "?"); idx != -1 {
+		pathPart = identifier[:idx]
+		queryParams, _ = url.ParseQuery(identifier[idx+1:])
+	}
+
+	dagName, dagRunId, ok := strings.Cut(pathPart, "/")
+	if !ok {
+		return nil, fmt.Errorf("invalid identifier format: %s (expected 'dagName/dagRunId')", identifier)
+	}
+
+	ref := exec.NewDAGRunRef(dagName, dagRunId)
+	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
+	if err != nil {
+		return nil, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
+	}
+
+	// Parse tail parameter with bounds validation (100-10000, default 500)
+	tail := 500
+	if queryParams != nil {
+		tail = clampInt(parseIntDefault(queryParams.Get("tail"), 500), 100, 10000)
+	}
+
+	options := fileutil.LogReadOptions{
+		Tail:     tail,
+		Encoding: a.logEncodingCharset,
+	}
+
+	content, lineCount, totalLines, hasMore, _, err := fileutil.ReadLogContent(dagStatus.Log, options)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("error reading scheduler log: %w", err)
+	}
+
+	schedulerLog := SchedulerLogInfo{
+		Content:    content,
+		LineCount:  lineCount,
+		TotalLines: totalLines,
+		HasMore:    hasMore,
+	}
+
+	// Build step logs info
+	stepLogs := make([]StepLogInfo, 0, len(dagStatus.Nodes))
+	for _, node := range dagStatus.Nodes {
+		stepLog := StepLogInfo{
+			StepName:    node.Step.Name,
+			Status:      api.NodeStatus(node.Status),
+			StatusLabel: node.Status.String(),
+			StartedAt:   node.StartedAt,
+			FinishedAt:  node.FinishedAt,
+			HasStdout:   node.Stdout != "" && fileExists(node.Stdout),
+			HasStderr:   node.Stderr != "" && fileExists(node.Stderr),
+		}
+		stepLogs = append(stepLogs, stepLog)
+	}
+
+	return DAGRunLogsResponse{
+		SchedulerLog: schedulerLog,
+		StepLogs:     stepLogs,
+	}, nil
+}
+
+// GetStepLogData returns step log for SSE.
+// Identifier format: "dagName/dagRunId/stepName"
+func (a *API) GetStepLogData(ctx context.Context, identifier string) (any, error) {
+	parts := strings.SplitN(identifier, "/", 3)
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("invalid identifier format: %s (expected 'dagName/dagRunId/stepName')", identifier)
+	}
+	dagName, dagRunId, stepName := parts[0], parts[1], parts[2]
+
+	ref := exec.NewDAGRunRef(dagName, dagRunId)
+	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
+	if err != nil {
+		return nil, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
+	}
+
+	node, err := dagStatus.NodeByName(stepName)
+	if err != nil {
+		return nil, fmt.Errorf("step %s not found in DAG %s", stepName, dagName)
+	}
+
+	options := fileutil.LogReadOptions{
+		Tail:     1000, // Last 1000 lines by default
+		Encoding: a.logEncodingCharset,
+	}
+
+	// Read stdout
+	var stdoutContent string
+	var lineCount, totalLines int
+	var hasMore bool
+	if node.Stdout != "" {
+		stdoutContent, lineCount, totalLines, hasMore, _, err = fileutil.ReadLogContent(node.Stdout, options)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("error reading stdout: %w", err)
+		}
+	}
+
+	// Read stderr
+	var stderrContent string
+	if node.Stderr != "" {
+		stderrContent, _, _, _, _, err = fileutil.ReadLogContent(node.Stderr, options)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			// Ignore stderr read errors, just return empty
+			stderrContent = ""
+		}
+	}
+
+	return StepLogResponse{
+		StdoutContent: stdoutContent,
+		StderrContent: stderrContent,
+		LineCount:     lineCount,
+		TotalLines:    totalLines,
+		HasMore:       hasMore,
+	}, nil
+}
+
+// GetDAGRunsListData returns DAG runs list for SSE.
+// Identifier format: URL query string (e.g., "status=running&name=mydag")
+func (a *API) GetDAGRunsListData(ctx context.Context, queryString string) (any, error) {
+	params, _ := url.ParseQuery(queryString)
+	var opts []exec.ListDAGRunStatusesOption
+
+	if status := params.Get("status"); status != "" {
+		if statusInt, err := strconv.Atoi(status); err == nil {
+			opts = append(opts, exec.WithStatuses([]core.Status{core.Status(statusInt)}))
+		}
+	}
+	if fromDate := params.Get("fromDate"); fromDate != "" {
+		if ts, err := strconv.ParseInt(fromDate, 10, 64); err == nil {
+			opts = append(opts, exec.WithFrom(exec.NewUTC(time.Unix(ts, 0))))
+		}
+	}
+	if toDate := params.Get("toDate"); toDate != "" {
+		if ts, err := strconv.ParseInt(toDate, 10, 64); err == nil {
+			opts = append(opts, exec.WithTo(exec.NewUTC(time.Unix(ts, 0))))
+		}
+	}
+	if name := params.Get("name"); name != "" {
+		opts = append(opts, exec.WithName(name))
+	}
+	if dagRunId := params.Get("dagRunId"); dagRunId != "" {
+		opts = append(opts, exec.WithDAGRunID(dagRunId))
+	}
+	if tags := params.Get("tags"); tags != "" {
+		if tagList := parseCommaSeparatedTags(&tags); len(tagList) > 0 {
+			opts = append(opts, exec.WithTags(tagList))
+		}
+	}
+
+	statuses, err := a.dagRunStore.ListStatuses(ctx, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("error listing dag-runs: %w", err)
+	}
+
+	dagRuns := make([]api.DAGRunSummary, 0, len(statuses))
+	for _, status := range statuses {
+		dagRuns = append(dagRuns, toDAGRunSummary(*status))
+	}
+
+	return api.ListDAGRuns200JSONResponse{
+		DagRuns: dagRuns,
+	}, nil
+}
+
+// Helper functions for SSE data
+
+// parseIntDefault parses an integer string, returning defaultVal if parsing fails or value is <= 0.
+func parseIntDefault(s string, defaultVal int) int {
+	if s == "" {
+		return defaultVal
+	}
+	if v, err := strconv.Atoi(s); err == nil && v > 0 {
+		return v
+	}
+	return defaultVal
+}
+
+// clampInt restricts value to the range [minVal, maxVal].
+func clampInt(value, minVal, maxVal int) int {
+	return max(minVal, min(value, maxVal))
+}
+
+// fileExists returns true if the file at path exists.
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
