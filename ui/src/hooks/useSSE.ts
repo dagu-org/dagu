@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useContext } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
 
@@ -11,6 +11,11 @@ interface SSEState<T> {
 }
 
 const MAX_RETRIES = 5;
+const MAX_RETRY_DELAY_MS = 16000;
+
+function calculateRetryDelay(retryCount: number): number {
+  return Math.min(1000 * Math.pow(2, retryCount), MAX_RETRY_DELAY_MS);
+}
 
 export function useSSE<T>(
   endpoint: string,
@@ -35,22 +40,20 @@ export function useSSE<T>(
   const connect = useCallback(() => {
     if (!enabled) return;
 
-    // Get auth token
-    const token = localStorage.getItem('dagu_auth_token');
-
-    // Build SSE URL
     const url = new URL(`${config.apiURL}${endpoint}`, window.location.origin);
     url.searchParams.set('remoteNode', remoteNode);
+
+    const token = localStorage.getItem('dagu_auth_token');
     if (token) {
       url.searchParams.set('token', token);
     }
 
     setState((prev) => ({ ...prev, isConnecting: true }));
 
-    const es = new EventSource(url.toString());
-    eventSourceRef.current = es;
+    const eventSource = new EventSource(url.toString());
+    eventSourceRef.current = eventSource;
 
-    es.addEventListener('connected', () => {
+    eventSource.addEventListener('connected', () => {
       setState((prev) => ({
         ...prev,
         isConnected: true,
@@ -60,7 +63,7 @@ export function useSSE<T>(
       retryCountRef.current = 0;
     });
 
-    es.addEventListener('data', (event) => {
+    eventSource.addEventListener('data', (event) => {
       try {
         const parsed = JSON.parse((event as MessageEvent).data) as T;
         setState((prev) => ({ ...prev, data: parsed }));
@@ -69,20 +72,19 @@ export function useSSE<T>(
       }
     });
 
-    es.addEventListener('heartbeat', () => {
-      // Heartbeat received - connection is alive
+    eventSource.addEventListener('heartbeat', () => {
+      // Connection keepalive
     });
 
-    es.addEventListener('error', (event) => {
-      // Check for specific error event data
+    eventSource.addEventListener('error', (event) => {
       const messageEvent = event as MessageEvent;
       if (messageEvent.data) {
         console.error('SSE error event:', messageEvent.data);
       }
     });
 
-    es.onerror = () => {
-      es.close();
+    eventSource.onerror = () => {
+      eventSource.close();
       setState((prev) => ({
         ...prev,
         isConnected: false,
@@ -90,17 +92,12 @@ export function useSSE<T>(
       }));
 
       if (retryCountRef.current < MAX_RETRIES) {
-        // Exponential backoff: 1s, 2s, 4s, 8s, 16s
-        const delay = Math.min(
-          1000 * Math.pow(2, retryCountRef.current),
-          16000
-        );
+        const delay = calculateRetryDelay(retryCountRef.current);
         retryTimeoutRef.current = setTimeout(() => {
           retryCountRef.current++;
           connect();
         }, delay);
       } else {
-        // Max retries reached - fall back to polling
         setState((prev) => ({
           ...prev,
           shouldUseFallback: true,
@@ -116,9 +113,7 @@ export function useSSE<T>(
       if (retryTimeoutRef.current !== null) {
         clearTimeout(retryTimeoutRef.current);
       }
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
+      eventSourceRef.current?.close();
     };
   }, [connect]);
 

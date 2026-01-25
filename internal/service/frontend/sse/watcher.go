@@ -5,48 +5,35 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"strings"
 	"sync"
 	"time"
-
-	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/runtime"
-	apiv2 "github.com/dagu-org/dagu/internal/service/frontend/api/v2"
 )
 
-// Watcher polls for status changes on a specific DAG run topic
-// and broadcasts updates to all subscribed clients
+// Watcher polls for data changes on a specific topic
+// and broadcasts updates to all subscribed clients.
+// It uses a pluggable FetchFunc to retrieve data, making it
+// generic across different data sources.
 type Watcher struct {
-	topic     string // e.g., "mydag/run123"
-	dagName   string
-	dagRunID  string
-	dagRunMgr runtime.Manager
-	clients   map[*Client]struct{}
-	mu        sync.RWMutex
-	lastHash  string
-	stopCh    chan struct{}
-	stopped   bool
+	topic      string          // Full topic string (e.g., "dagrun:mydag/run123")
+	identifier string          // Identifier portion (e.g., "mydag/run123")
+	fetcher    FetchFunc       // Function to fetch data for this topic
+	clients    map[*Client]struct{}
+	mu         sync.RWMutex
+	lastHash   string
+	stopCh     chan struct{}
+	stopped    bool
 }
 
-// NewWatcher creates a new watcher for the given topic
-func NewWatcher(topic string, dagRunMgr runtime.Manager) *Watcher {
-	parts := strings.SplitN(topic, "/", 2)
-	dagName := ""
-	dagRunID := ""
-	if len(parts) >= 1 {
-		dagName = parts[0]
-	}
-	if len(parts) >= 2 {
-		dagRunID = parts[1]
-	}
-
+// NewWatcher creates a new watcher for the given topic.
+// The identifier is the portion after the topic type (e.g., "mydag/run123" for "dagrun:mydag/run123").
+// The fetcher is called to retrieve data and should return the same structure as the REST API.
+func NewWatcher(topic, identifier string, fetcher FetchFunc) *Watcher {
 	return &Watcher{
-		topic:     topic,
-		dagName:   dagName,
-		dagRunID:  dagRunID,
-		dagRunMgr: dagRunMgr,
-		clients:   make(map[*Client]struct{}),
-		stopCh:    make(chan struct{}),
+		topic:      topic,
+		identifier: identifier,
+		fetcher:    fetcher,
+		clients:    make(map[*Client]struct{}),
+		stopCh:     make(chan struct{}),
 	}
 }
 
@@ -81,39 +68,27 @@ func (w *Watcher) Stop() {
 	}
 }
 
-// poll fetches the current status and broadcasts if changed
+// poll fetches the current data and broadcasts if changed.
 func (w *Watcher) poll(ctx context.Context) {
-	ref := exec.NewDAGRunRef(w.dagName, w.dagRunID)
-
-	// Fetch status directly from runtime manager to avoid HTTP overhead
-	status, err := w.dagRunMgr.GetSavedStatus(ctx, ref)
+	// Call the registered fetcher to get current data
+	response, err := w.fetcher(ctx, w.identifier)
 	if err != nil {
-		// DAG run not found or error - notify clients
 		w.broadcast(&Event{Type: EventTypeError, Data: err.Error()})
 		return
 	}
 
-	// Convert to API response format using exported transformer
-	// Wrap in object with dagRunDetails key to match REST API response structure
-	details := apiv2.ToDAGRunDetails(*status)
-	response := map[string]interface{}{
-		"dagRunDetails": details,
-	}
+	// Marshal to JSON for comparison and transmission
 	data, err := json.Marshal(response)
 	if err != nil {
 		w.broadcast(&Event{Type: EventTypeError, Data: err.Error()})
 		return
 	}
 
-	// Hash comparison
-	currentHash := computeHash(data)
-	if currentHash == w.lastHash {
-		return // No change
+	// Only broadcast if data changed (hash-based comparison)
+	if hash := computeHash(data); hash != w.lastHash {
+		w.lastHash = hash
+		w.broadcast(&Event{Type: EventTypeData, Data: string(data)})
 	}
-	w.lastHash = currentHash
-
-	// Broadcast to all subscribers
-	w.broadcast(&Event{Type: EventTypeData, Data: string(data)})
 }
 
 // broadcast sends an event to all subscribed clients
@@ -136,17 +111,11 @@ func (w *Watcher) AddClient(client *Client) {
 	w.clients[client] = struct{}{}
 }
 
-// RemoveClient removes a client from this watcher's subscription list
-// Returns true if the client was found and removed
-func (w *Watcher) RemoveClient(client *Client) bool {
+// RemoveClient removes a client from this watcher's subscription list.
+func (w *Watcher) RemoveClient(client *Client) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-
-	if _, ok := w.clients[client]; ok {
-		delete(w.clients, client)
-		return true
-	}
-	return false
+	delete(w.clients, client)
 }
 
 // ClientCount returns the number of subscribed clients

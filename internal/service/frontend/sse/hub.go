@@ -3,10 +3,9 @@ package sse
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
-
-	"github.com/dagu-org/dagu/internal/runtime"
 )
 
 // HubOption is a functional option for configuring the Hub
@@ -19,25 +18,28 @@ func WithMaxClients(max int) HubOption {
 	}
 }
 
-// Hub manages all SSE client connections and their associated watchers
+// Hub manages all SSE client connections and their associated watchers.
+// It uses a pluggable fetcher pattern where each TopicType has a registered
+// FetchFunc that knows how to retrieve data for that topic type.
 type Hub struct {
 	mu              sync.RWMutex
-	clients         map[*Client]string            // client -> topic
-	watchers        map[string]*Watcher           // topic -> watcher
-	dagRunMgr       runtime.Manager
+	clients         map[*Client]string          // client -> topic
+	watchers        map[string]*Watcher         // topic -> watcher
+	fetchers        map[TopicType]FetchFunc     // topicType -> fetcher
 	maxClients      int
 	heartbeatTicker *time.Ticker
 	ctx             context.Context
 	cancel          context.CancelFunc
 }
 
-// NewHub creates a new SSE hub
-func NewHub(dagRunMgr runtime.Manager, opts ...HubOption) *Hub {
+// NewHub creates a new SSE hub.
+// Use RegisterFetcher to add data fetchers for each topic type before subscribing clients.
+func NewHub(opts ...HubOption) *Hub {
 	ctx, cancel := context.WithCancel(context.Background())
 	h := &Hub{
 		clients:    make(map[*Client]string),
 		watchers:   make(map[string]*Watcher),
-		dagRunMgr:  dagRunMgr,
+		fetchers:   make(map[TopicType]FetchFunc),
 		maxClients: 1000, // Default limit
 		ctx:        ctx,
 		cancel:     cancel,
@@ -46,6 +48,15 @@ func NewHub(dagRunMgr runtime.Manager, opts ...HubOption) *Hub {
 		opt(h)
 	}
 	return h
+}
+
+// RegisterFetcher registers a data fetcher for a specific topic type.
+// The fetcher will be called by watchers to retrieve data for topics of this type.
+// This must be called before any clients subscribe to topics of this type.
+func (h *Hub) RegisterFetcher(topicType TopicType, fetcher FetchFunc) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.fetchers[topicType] = fetcher
 }
 
 // Start begins the hub's background tasks (heartbeat, etc.)
@@ -79,7 +90,8 @@ func (h *Hub) Shutdown() {
 	h.watchers = make(map[string]*Watcher)
 }
 
-// Subscribe adds a client to watch a specific topic
+// Subscribe adds a client to watch a specific topic.
+// Topic format: "topicType:identifier" (e.g., "dagrun:mydag/run123")
 func (h *Hub) Subscribe(client *Client, topic string) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -88,12 +100,23 @@ func (h *Hub) Subscribe(client *Client, topic string) error {
 		return fmt.Errorf("max clients reached (%d)", h.maxClients)
 	}
 
+	// Parse topic format: "type:identifier"
+	topicType, identifier, ok := strings.Cut(topic, ":")
+	if !ok {
+		return fmt.Errorf("invalid topic format: %s (expected 'type:identifier')", topic)
+	}
+
+	// Look up the fetcher for this topic type
+	fetcher, exists := h.fetchers[TopicType(topicType)]
+	if !exists {
+		return fmt.Errorf("no fetcher registered for topic type: %s", topicType)
+	}
+
 	h.clients[client] = topic
 
-	// Get or create watcher for this topic
-	watcher, ok := h.watchers[topic]
-	if !ok {
-		watcher = NewWatcher(topic, h.dagRunMgr)
+	watcher, exists := h.watchers[topic]
+	if !exists {
+		watcher = NewWatcher(topic, identifier, fetcher)
 		h.watchers[topic] = watcher
 		go watcher.Start(h.ctx)
 	}
@@ -102,20 +125,19 @@ func (h *Hub) Subscribe(client *Client, topic string) error {
 	return nil
 }
 
-// Unsubscribe removes a client from its topic
+// Unsubscribe removes a client from its topic.
 func (h *Hub) Unsubscribe(client *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	topic, ok := h.clients[client]
-	if !ok {
+	topic, exists := h.clients[client]
+	if !exists {
 		return
 	}
 	delete(h.clients, client)
 
-	// Remove from watcher, stop if empty
-	watcher, ok := h.watchers[topic]
-	if !ok {
+	watcher, exists := h.watchers[topic]
+	if !exists {
 		return
 	}
 
@@ -138,19 +160,20 @@ func (h *Hub) heartbeatLoop() {
 	}
 }
 
-// sendHeartbeats sends a heartbeat event to all connected clients
+// sendHeartbeats sends a heartbeat event to all connected clients.
 func (h *Hub) sendHeartbeats() {
 	h.mu.RLock()
-	defer h.mu.RUnlock()
+	clients := make([]*Client, 0, len(h.clients))
+	for client := range h.clients {
+		clients = append(clients, client)
+	}
+	h.mu.RUnlock()
 
 	heartbeat := &Event{Type: EventTypeHeartbeat, Data: "{}"}
-	for client := range h.clients {
+	for _, client := range clients {
 		if !client.Send(heartbeat) {
-			// Client buffer full - close it asynchronously
-			go func(c *Client) {
-				c.Close()
-				h.Unsubscribe(c)
-			}(client)
+			client.Close()
+			h.Unsubscribe(client)
 		}
 	}
 }

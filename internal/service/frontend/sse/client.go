@@ -17,17 +17,16 @@ type Client struct {
 	mu      sync.Mutex
 }
 
-// NewClient creates a new SSE client from an HTTP response writer
+// NewClient creates a new SSE client from an HTTP response writer.
 func NewClient(w http.ResponseWriter) (*Client, error) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		return nil, fmt.Errorf("streaming not supported")
 	}
-
 	return &Client{
 		w:       w,
 		flusher: flusher,
-		send:    make(chan *Event, 64), // Buffered to handle bursts
+		send:    make(chan *Event, 64),
 		done:    make(chan struct{}),
 	}, nil
 }
@@ -41,18 +40,15 @@ func (c *Client) WritePump(ctx context.Context) {
 			return
 		case <-c.done:
 			return
-		case event, ok := <-c.send:
-			if !ok {
-				return
-			}
-			if err := c.writeEvent(event); err != nil {
+		case event := <-c.send:
+			if event == nil || c.writeEvent(event) != nil {
 				return
 			}
 		}
 	}
 }
 
-// writeEvent writes a single SSE event to the client
+// writeEvent writes a single SSE event to the client.
 func (c *Client) writeEvent(event *Event) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -61,9 +57,7 @@ func (c *Client) writeEvent(event *Event) error {
 		return fmt.Errorf("client closed")
 	}
 
-	// SSE format: "event: <type>\ndata: <json>\n\n"
-	_, err := fmt.Fprintf(c.w, "event: %s\ndata: %s\n\n", event.Type, event.Data)
-	if err != nil {
+	if _, err := fmt.Fprintf(c.w, "event: %s\ndata: %s\n\n", event.Type, event.Data); err != nil {
 		return err
 	}
 	c.flusher.Flush()
@@ -71,13 +65,12 @@ func (c *Client) writeEvent(event *Event) error {
 }
 
 // Send queues an event to be sent to the client.
-// Returns false if the client buffer is full (slow client).
+// Returns false if the client buffer is full.
 func (c *Client) Send(event *Event) bool {
 	select {
 	case c.send <- event:
 		return true
 	default:
-		// Buffer full - client is too slow
 		return false
 	}
 }

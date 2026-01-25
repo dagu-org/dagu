@@ -26,30 +26,28 @@ const DAGRunDetailsPanel: React.FC<DAGRunDetailsPanelProps> = ({
   const navigate = useNavigate();
   const appBarContext = React.useContext(AppBarContext);
 
-  // Check for sub DAG-run ID in URL search params
+  // Parse sub DAG-run params from URL
   const searchParams = new URLSearchParams(window.location.search);
   const subDAGRunId = searchParams.get('subDAGRunId');
   const parentDAGRunId = searchParams.get('dagRunId');
   const parentName = searchParams.get('dagRunName') || name;
+  const isSubDAGRun = Boolean(subDAGRunId && parentDAGRunId && parentName);
 
-  // Guard: only query sub-DAG endpoint when all required params are present
-  const canQuerySubDag = !!(subDAGRunId && parentDAGRunId && parentName);
-
-  // SSE for real-time DAG run updates (only for regular DAG runs, not sub-DAGs)
+  // SSE for real-time updates (disabled for sub-DAG runs)
   const sseResult = useDAGRunSSE(
     name || '',
     dagRunId || 'latest',
-    !canQuerySubDag // Only enable SSE for regular DAG runs
+    !isSubDAGRun
   );
 
-  // Fetch sub-DAG-run details (only when all sub-DAG params are valid)
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+
+  // Sub-DAG query (only enabled for sub-DAG runs)
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
     {
       params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-        },
+        query: { remoteNode },
         path: {
           name: parentName as string,
           dagRunId: parentDAGRunId as string,
@@ -57,17 +55,16 @@ const DAGRunDetailsPanel: React.FC<DAGRunDetailsPanelProps> = ({
         },
       },
     },
-    { refreshInterval: 2000, keepPreviousData: true, isPaused: () => !canQuerySubDag }
+    { refreshInterval: 2000, keepPreviousData: true, isPaused: () => !isSubDAGRun }
   );
 
-  // Fetch regular DAG-run details (only when SSE fails and not querying sub-DAG)
+  // Regular DAG query (fallback when SSE fails)
+  const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}',
     {
       params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-        },
+        query: { remoteNode },
         path: {
           name: name || '',
           dagRunId: dagRunId || 'latest',
@@ -75,19 +72,15 @@ const DAGRunDetailsPanel: React.FC<DAGRunDetailsPanelProps> = ({
       },
     },
     {
-      refreshInterval: sseResult.shouldUseFallback ? 2000 : 0,
+      refreshInterval: usePolling ? 2000 : 0,
       keepPreviousData: true,
-      // Only poll when SSE fails or for initial load before SSE connects
-      isPaused: () => canQuerySubDag || (sseResult.isConnected && !sseResult.shouldUseFallback),
+      isPaused: () => isSubDAGRun || (sseResult.isConnected && !sseResult.shouldUseFallback),
     }
   );
 
-  // Use the appropriate data source based on the scenario:
-  // 1. Sub-DAG: always use polling query
-  // 2. Regular DAG with SSE connected: use SSE data
-  // 3. Regular DAG with SSE fallback: use polling query
-  const { mutate } = canQuerySubDag ? subDAGQuery : dagRunQuery;
-  const data = canQuerySubDag
+  // Select data source: sub-DAG query, SSE data, or polling query
+  const { mutate } = isSubDAGRun ? subDAGQuery : dagRunQuery;
+  const data = isSubDAGRun
     ? subDAGQuery.data
     : sseResult.data || dagRunQuery.data;
 

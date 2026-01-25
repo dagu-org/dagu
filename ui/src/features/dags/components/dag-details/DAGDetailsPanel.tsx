@@ -6,6 +6,7 @@ import { components } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { UnsavedChangesProvider } from '../../../../contexts/UnsavedChangesContext';
 import { useQuery } from '../../../../hooks/api';
+import { useDAGSSE } from '../../../../hooks/useDAGSSE';
 import dayjs from '../../../../lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
@@ -39,23 +40,30 @@ const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
 
   const [notFound, setNotFound] = React.useState(false);
 
-  const { data, error, mutate } = useQuery(
+  // SSE for real-time updates
+  const sseResult = useDAGSSE(fileName || '', !!fileName);
+
+  // Polling fallback (only when SSE fails or not connected)
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
+
+  const { data: pollingData, error, mutate } = useQuery(
     '/dags/{fileName}',
     {
       params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-        },
-        path: {
-          fileName: fileName || '',
-        },
+        query: { remoteNode },
+        path: { fileName: fileName || '' },
       },
     },
     {
-      refreshInterval: notFound ? 0 : 2000, // Stop polling if DAG not found
+      refreshInterval: notFound ? 0 : usePolling ? 2000 : 0,
       keepPreviousData: true,
+      isPaused: () => !usePolling && !notFound,
     }
   );
+
+  // Use SSE data when available, otherwise polling
+  const data = sseResult.data || pollingData;
 
   // Detect if DAG was deleted (404 error)
   React.useEffect(() => {

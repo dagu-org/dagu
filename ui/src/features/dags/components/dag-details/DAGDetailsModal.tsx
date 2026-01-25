@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { components } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
+import { useDAGSSE } from '../../../../hooks/useDAGSSE';
 import dayjs from '../../../../lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
@@ -37,20 +38,30 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
     setActiveTab('status');
   }, []);
 
-  const { data, isLoading, mutate } = useQuery(
+  // SSE for real-time updates (only when modal is open)
+  const sseResult = useDAGSSE(fileName || '', isOpen && !!fileName);
+
+  // Polling fallback (only when SSE fails or not connected)
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
+
+  const { data: pollingData, isLoading, mutate } = useQuery(
     '/dags/{fileName}',
     {
       params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-        },
-        path: {
-          fileName: fileName || '',
-        },
+        query: { remoteNode },
+        path: { fileName: fileName || '' },
       },
     },
-    { refreshInterval: 2000 }
+    {
+      refreshInterval: usePolling ? 2000 : 0,
+      keepPreviousData: true,
+      isPaused: () => !isOpen || (!usePolling && sseResult.isConnected),
+    }
   );
+
+  // Use SSE data when available, otherwise polling
+  const data = sseResult.data || pollingData;
 
   const refreshFn = React.useCallback(() => {
     setTimeout(() => mutate(), 500);
@@ -124,7 +135,17 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
 
   if (!isOpen) return null;
 
-  if (isLoading || !data || !data.latestDAGRun) {
+  // Only show loading on initial load (when no data from either SSE or polling)
+  const hasData = data && data.latestDAGRun;
+  if (!hasData && (isLoading || sseResult.isConnecting)) {
+    return (
+      <div className="fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border z-50 flex items-center justify-center">
+        <LoadingIndicator />
+      </div>
+    );
+  }
+
+  if (!hasData) {
     return (
       <div className="fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border z-50 flex items-center justify-center">
         <LoadingIndicator />
