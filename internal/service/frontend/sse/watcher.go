@@ -149,16 +149,16 @@ func (w *Watcher) adaptInterval(fetchDuration time.Duration) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
+	// Clamp target to bounds
 	target := time.Duration(intervalMultiplier) * fetchDuration
 	target = max(w.baseInterval, min(target, w.maxInterval))
 
-	// EMA: new = α×target + (1-α)×current
-	smoothed := time.Duration(
+	// EMA: new = alpha*target + (1-alpha)*current
+	// Since both target and currentInterval are within bounds, the result is too
+	w.currentInterval = time.Duration(
 		float64(target)*smoothingFactor +
 			float64(w.currentInterval)*(1-smoothingFactor),
 	)
-
-	w.currentInterval = max(w.baseInterval, min(smoothed, w.maxInterval))
 }
 
 // isInBackoffPeriod returns true if we're still in an error backoff period.
@@ -231,19 +231,11 @@ func (w *Watcher) broadcast(event *Event) {
 	w.mu.RUnlock()
 
 	// Send outside lock to reduce contention
-	var sentCount int
 	for _, client := range clients {
-		if !client.Send(event) {
-			client.Close()
-		} else {
-			sentCount++
-		}
-	}
-
-	// Record metrics outside lock
-	if w.metrics != nil {
-		for i := 0; i < sentCount; i++ {
+		if client.Send(event) {
 			w.metrics.MessageSent(event.Type)
+		} else {
+			client.Close()
 		}
 	}
 }

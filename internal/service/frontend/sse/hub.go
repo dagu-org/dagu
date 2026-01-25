@@ -209,16 +209,9 @@ func (h *Hub) sendHeartbeats() {
 		if !client.Send(heartbeat) {
 			client.Close()
 			h.Unsubscribe(client)
-			continue
+		} else if h.metrics != nil {
+			h.metrics.MessageSent(EventTypeHeartbeat)
 		}
-		h.recordMessageSent(EventTypeHeartbeat)
-	}
-}
-
-// recordMessageSent records a sent message metric if metrics are enabled.
-func (h *Hub) recordMessageSent(eventType string) {
-	if h.metrics != nil {
-		h.metrics.MessageSent(eventType)
 	}
 }
 
