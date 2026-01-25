@@ -47,7 +47,11 @@ func (h *Handler) HandleDAGEvents(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleDAGRunLogsEvents(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	dagRunID := chi.URLParam(r, "dagRunId")
-	h.handleSSE(w, r, buildTopic(TopicTypeDAGRunLogs, name, dagRunID))
+	identifier := name + "/" + dagRunID
+	if q := r.URL.RawQuery; q != "" {
+		identifier += "?" + q
+	}
+	h.handleSSE(w, r, buildTopic(TopicTypeDAGRunLogs, identifier))
 }
 
 // HandleStepLogEvents handles SSE connections for individual step logs.

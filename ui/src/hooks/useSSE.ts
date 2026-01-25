@@ -111,6 +111,10 @@ export function useSSE<T>(endpoint: string, enabled: boolean = true): SSEState<T
   }, [endpoint, enabled, remoteNode, config.apiURL]);
 
   useEffect(() => {
+    // Reset state and retry counter when dependencies change
+    setState(INITIAL_STATE as SSEState<T>);
+    retryCountRef.current = 0;
+
     connect();
     return () => {
       if (retryTimeoutRef.current) {

@@ -119,9 +119,17 @@ type StepLogInfo struct {
 }
 
 // GetDAGRunLogsData returns DAG run logs for SSE.
-// Identifier format: "dagName/dagRunId"
+// Identifier format: "dagName/dagRunId" or "dagName/dagRunId?tail=N"
 func (a *API) GetDAGRunLogsData(ctx context.Context, identifier string) (any, error) {
-	dagName, dagRunId, ok := strings.Cut(identifier, "/")
+	// Parse query params if present
+	pathPart := identifier
+	var queryParams url.Values
+	if idx := strings.Index(identifier, "?"); idx != -1 {
+		pathPart = identifier[:idx]
+		queryParams, _ = url.ParseQuery(identifier[idx+1:])
+	}
+
+	dagName, dagRunId, ok := strings.Cut(pathPart, "/")
 	if !ok {
 		return nil, fmt.Errorf("invalid identifier format: %s (expected 'dagName/dagRunId')", identifier)
 	}
@@ -132,9 +140,24 @@ func (a *API) GetDAGRunLogsData(ctx context.Context, identifier string) (any, er
 		return nil, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
 	}
 
-	// Read scheduler log with default limits
+	// Parse tail parameter with bounds validation (100-10000, default 500)
+	tail := 500
+	if queryParams != nil {
+		if tailStr := queryParams.Get("tail"); tailStr != "" {
+			if parsed, err := strconv.Atoi(tailStr); err == nil {
+				if parsed < 100 {
+					tail = 100
+				} else if parsed > 10000 {
+					tail = 10000
+				} else {
+					tail = parsed
+				}
+			}
+		}
+	}
+
 	options := fileutil.LogReadOptions{
-		Tail:     500, // Last 500 lines by default
+		Tail:     tail,
 		Encoding: a.logEncodingCharset,
 	}
 

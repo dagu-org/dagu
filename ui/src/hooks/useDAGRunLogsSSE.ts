@@ -28,8 +28,12 @@ export interface DAGRunLogsSSEResponse {
 export function useDAGRunLogsSSE(
   name: string,
   dagRunId: string,
-  enabled: boolean = true
+  enabled: boolean = true,
+  tail?: number
 ): SSEState<DAGRunLogsSSEResponse> {
-  const endpoint = `/events/dag-runs/${encodeURIComponent(name)}/${encodeURIComponent(dagRunId)}/logs`;
+  let endpoint = `/events/dag-runs/${encodeURIComponent(name)}/${encodeURIComponent(dagRunId)}/logs`;
+  if (tail !== undefined) {
+    endpoint += `?tail=${tail}`;
+  }
   return useSSE<DAGRunLogsSSEResponse>(endpoint, enabled);
 }
