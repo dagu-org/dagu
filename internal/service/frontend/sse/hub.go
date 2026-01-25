@@ -8,10 +8,12 @@ import (
 	"time"
 )
 
-// HubOption is a functional option for configuring the Hub
+const defaultMaxClients = 1000
+
+// HubOption is a functional option for configuring the Hub.
 type HubOption func(*Hub)
 
-// WithMaxClients sets the maximum number of concurrent SSE clients
+// WithMaxClients sets the maximum number of concurrent SSE clients.
 func WithMaxClients(max int) HubOption {
 	return func(h *Hub) {
 		h.maxClients = max
@@ -40,7 +42,7 @@ func NewHub(opts ...HubOption) *Hub {
 		clients:    make(map[*Client]string),
 		watchers:   make(map[string]*Watcher),
 		fetchers:   make(map[TopicType]FetchFunc),
-		maxClients: 1000, // Default limit
+		maxClients: defaultMaxClients,
 		ctx:        ctx,
 		cancel:     cancel,
 	}
@@ -107,16 +109,16 @@ func (h *Hub) Subscribe(client *Client, topic string) error {
 	}
 
 	// Look up the fetcher for this topic type
-	fetcher, exists := h.fetchers[TopicType(topicType)]
-	if !exists {
+	fetcher, ok := h.fetchers[TopicType(topicType)]
+	if !ok {
 		return fmt.Errorf("no fetcher registered for topic type: %s", topicType)
 	}
 
 	h.clients[client] = topic
 
-	watcher, exists := h.watchers[topic]
-	if !exists {
-		watcher = NewWatcher(topic, identifier, fetcher)
+	watcher, ok := h.watchers[topic]
+	if !ok {
+		watcher = NewWatcher(identifier, fetcher)
 		h.watchers[topic] = watcher
 		go watcher.Start(h.ctx)
 	}
@@ -130,14 +132,14 @@ func (h *Hub) Unsubscribe(client *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	topic, exists := h.clients[client]
-	if !exists {
+	topic, ok := h.clients[client]
+	if !ok {
 		return
 	}
 	delete(h.clients, client)
 
-	watcher, exists := h.watchers[topic]
-	if !exists {
+	watcher, ok := h.watchers[topic]
+	if !ok {
 		return
 	}
 
@@ -162,13 +164,7 @@ func (h *Hub) heartbeatLoop() {
 
 // sendHeartbeats sends a heartbeat event to all connected clients.
 func (h *Hub) sendHeartbeats() {
-	h.mu.RLock()
-	clients := make([]*Client, 0, len(h.clients))
-	for client := range h.clients {
-		clients = append(clients, client)
-	}
-	h.mu.RUnlock()
-
+	clients := h.collectClients()
 	heartbeat := &Event{Type: EventTypeHeartbeat, Data: "{}"}
 	for _, client := range clients {
 		if !client.Send(heartbeat) {
@@ -176,6 +172,18 @@ func (h *Hub) sendHeartbeats() {
 			h.Unsubscribe(client)
 		}
 	}
+}
+
+// collectClients returns a snapshot of all connected clients.
+func (h *Hub) collectClients() []*Client {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	clients := make([]*Client, 0, len(h.clients))
+	for client := range h.clients {
+		clients = append(clients, client)
+	}
+	return clients
 }
 
 // ClientCount returns the current number of connected clients

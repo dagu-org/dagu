@@ -2,9 +2,16 @@ package sse
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
+)
+
+// Sentinel errors for Client operations
+var (
+	ErrStreamingNotSupported = errors.New("streaming not supported")
+	ErrClientClosed          = errors.New("client closed")
 )
 
 // Client represents a connected SSE client
@@ -21,7 +28,7 @@ type Client struct {
 func NewClient(w http.ResponseWriter) (*Client, error) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		return nil, fmt.Errorf("streaming not supported")
+		return nil, ErrStreamingNotSupported
 	}
 	return &Client{
 		w:       w,
@@ -41,7 +48,10 @@ func (c *Client) WritePump(ctx context.Context) {
 		case <-c.done:
 			return
 		case event := <-c.send:
-			if event == nil || c.writeEvent(event) != nil {
+			if event == nil {
+				return
+			}
+			if err := c.writeEvent(event); err != nil {
 				return
 			}
 		}
@@ -54,7 +64,7 @@ func (c *Client) writeEvent(event *Event) error {
 	defer c.mu.Unlock()
 
 	if c.closed {
-		return fmt.Errorf("client closed")
+		return ErrClientClosed
 	}
 
 	if _, err := fmt.Fprintf(c.w, "event: %s\ndata: %s\n\n", event.Type, event.Data); err != nil {

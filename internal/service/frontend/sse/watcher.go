@@ -14,9 +14,8 @@ import (
 // It uses a pluggable FetchFunc to retrieve data, making it
 // generic across different data sources.
 type Watcher struct {
-	topic      string    // Full topic string (e.g., "dagrun:mydag/run123")
-	identifier string    // Identifier portion (e.g., "mydag/run123")
-	fetcher    FetchFunc // Function to fetch data for this topic
+	identifier string
+	fetcher    FetchFunc
 	clients    map[*Client]struct{}
 	mu         sync.RWMutex
 	lastHash   string
@@ -27,9 +26,8 @@ type Watcher struct {
 // NewWatcher creates a new watcher for the given topic.
 // The identifier is the portion after the topic type (e.g., "mydag/run123" for "dagrun:mydag/run123").
 // The fetcher is called to retrieve data and should return the same structure as the REST API.
-func NewWatcher(topic, identifier string, fetcher FetchFunc) *Watcher {
+func NewWatcher(identifier string, fetcher FetchFunc) *Watcher {
 	return &Watcher{
-		topic:      topic,
 		identifier: identifier,
 		fetcher:    fetcher,
 		clients:    make(map[*Client]struct{}),
@@ -37,13 +35,12 @@ func NewWatcher(topic, identifier string, fetcher FetchFunc) *Watcher {
 	}
 }
 
-// Start begins polling for status changes
+// Start begins polling for data changes and broadcasts updates to clients.
 func (w *Watcher) Start(ctx context.Context) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
-	// Send initial state immediately
-	w.poll(ctx)
+	w.poll(ctx) // Initial state
 
 	for {
 		select {
@@ -57,7 +54,7 @@ func (w *Watcher) Start(ctx context.Context) {
 	}
 }
 
-// Stop signals the watcher to stop polling
+// Stop signals the watcher to stop polling.
 func (w *Watcher) Stop() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -70,41 +67,38 @@ func (w *Watcher) Stop() {
 
 // poll fetches the current data and broadcasts if changed.
 func (w *Watcher) poll(ctx context.Context) {
-	// Call the registered fetcher to get current data
 	response, err := w.fetcher(ctx, w.identifier)
 	if err != nil {
 		w.broadcast(&Event{Type: EventTypeError, Data: err.Error()})
 		return
 	}
 
-	// Marshal to JSON for comparison and transmission
 	data, err := json.Marshal(response)
 	if err != nil {
 		w.broadcast(&Event{Type: EventTypeError, Data: err.Error()})
 		return
 	}
 
-	// Only broadcast if data changed (hash-based comparison)
-	if hash := computeHash(data); hash != w.lastHash {
+	hash := computeHash(data)
+	if hash != w.lastHash {
 		w.lastHash = hash
 		w.broadcast(&Event{Type: EventTypeData, Data: string(data)})
 	}
 }
 
-// broadcast sends an event to all subscribed clients
+// broadcast sends an event to all subscribed clients.
 func (w *Watcher) broadcast(event *Event) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
 	for client := range w.clients {
 		if !client.Send(event) {
-			// Client buffer full - close it asynchronously
-			go client.Close()
+			go client.Close() // Buffer full
 		}
 	}
 }
 
-// AddClient adds a client to this watcher's subscription list
+// AddClient adds a client to this watcher's subscription list.
 func (w *Watcher) AddClient(client *Client) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -118,7 +112,7 @@ func (w *Watcher) RemoveClient(client *Client) {
 	delete(w.clients, client)
 }
 
-// ClientCount returns the number of subscribed clients
+// ClientCount returns the number of subscribed clients.
 func (w *Watcher) ClientCount() int {
 	w.mu.RLock()
 	defer w.mu.RUnlock()

@@ -37,20 +37,18 @@ func (a *API) GetDAGDetailsData(ctx context.Context, fileName string) (any, erro
 
 	details := toDAGDetails(dag)
 
-	var localDAGs []api.LocalDag
+	localDAGs := make([]api.LocalDag, 0, len(dag.LocalDAGs))
 	for _, localDAG := range dag.LocalDAGs {
 		localDAGs = append(localDAGs, toLocalDAG(localDAG))
 	}
 
 	sort.Slice(localDAGs, func(i, j int) bool {
-		return strings.Compare(localDAGs[i].Name, localDAGs[j].Name) <= 0
+		return localDAGs[i].Name < localDAGs[j].Name
 	})
 
-	var errs []string
-	if len(dag.BuildErrors) > 0 {
-		for _, buildErr := range dag.BuildErrors {
-			errs = append(errs, buildErr.Error())
-		}
+	errs := make([]string, 0, len(dag.BuildErrors))
+	for _, buildErr := range dag.BuildErrors {
+		errs = append(errs, buildErr.Error())
 	}
 
 	return api.GetDAGDetails200JSONResponse{
@@ -241,40 +239,7 @@ func (a *API) GetStepLogData(ctx context.Context, identifier string) (any, error
 // Identifier format: URL query string (e.g., "status=running&name=mydag")
 func (a *API) GetDAGRunsListData(ctx context.Context, queryString string) (any, error) {
 	params, _ := url.ParseQuery(queryString)
-
-	var opts []exec.ListDAGRunStatusesOption
-
-	if status := params.Get("status"); status != "" {
-		if statusInt, err := strconv.Atoi(status); err == nil {
-			opts = append(opts, exec.WithStatuses([]core.Status{
-				core.Status(statusInt),
-			}))
-		}
-	}
-	if fromDate := params.Get("fromDate"); fromDate != "" {
-		if ts, err := strconv.ParseInt(fromDate, 10, 64); err == nil {
-			dt := exec.NewUTC(time.Unix(ts, 0))
-			opts = append(opts, exec.WithFrom(dt))
-		}
-	}
-	if toDate := params.Get("toDate"); toDate != "" {
-		if ts, err := strconv.ParseInt(toDate, 10, 64); err == nil {
-			dt := exec.NewUTC(time.Unix(ts, 0))
-			opts = append(opts, exec.WithTo(dt))
-		}
-	}
-	if name := params.Get("name"); name != "" {
-		opts = append(opts, exec.WithName(name))
-	}
-	if dagRunId := params.Get("dagRunId"); dagRunId != "" {
-		opts = append(opts, exec.WithDAGRunID(dagRunId))
-	}
-	if tags := params.Get("tags"); tags != "" {
-		tagList := parseCommaSeparatedTags(&tags)
-		if len(tagList) > 0 {
-			opts = append(opts, exec.WithTags(tagList))
-		}
-	}
+	opts := a.buildDAGRunsListOptions(params)
 
 	statuses, err := a.dagRunStore.ListStatuses(ctx, opts...)
 	if err != nil {
@@ -289,6 +254,40 @@ func (a *API) GetDAGRunsListData(ctx context.Context, queryString string) (any, 
 	return api.ListDAGRuns200JSONResponse{
 		DagRuns: dagRuns,
 	}, nil
+}
+
+// buildDAGRunsListOptions constructs filter options from URL query parameters.
+func (a *API) buildDAGRunsListOptions(params url.Values) []exec.ListDAGRunStatusesOption {
+	var opts []exec.ListDAGRunStatusesOption
+
+	if status := params.Get("status"); status != "" {
+		if statusInt, err := strconv.Atoi(status); err == nil {
+			opts = append(opts, exec.WithStatuses([]core.Status{core.Status(statusInt)}))
+		}
+	}
+	if fromDate := params.Get("fromDate"); fromDate != "" {
+		if ts, err := strconv.ParseInt(fromDate, 10, 64); err == nil {
+			opts = append(opts, exec.WithFrom(exec.NewUTC(time.Unix(ts, 0))))
+		}
+	}
+	if toDate := params.Get("toDate"); toDate != "" {
+		if ts, err := strconv.ParseInt(toDate, 10, 64); err == nil {
+			opts = append(opts, exec.WithTo(exec.NewUTC(time.Unix(ts, 0))))
+		}
+	}
+	if name := params.Get("name"); name != "" {
+		opts = append(opts, exec.WithName(name))
+	}
+	if dagRunId := params.Get("dagRunId"); dagRunId != "" {
+		opts = append(opts, exec.WithDAGRunID(dagRunId))
+	}
+	if tags := params.Get("tags"); tags != "" {
+		if tagList := parseCommaSeparatedTags(&tags); len(tagList) > 0 {
+			opts = append(opts, exec.WithTags(tagList))
+		}
+	}
+
+	return opts
 }
 
 // QueueItemsResponse represents the response for queue items SSE.
@@ -368,77 +367,18 @@ func (a *API) GetQueuesListData(ctx context.Context, _ string) (any, error) {
 // Identifier format: URL query string (e.g., "page=1&perPage=100&name=mydag")
 func (a *API) GetDAGsListData(ctx context.Context, queryString string) (any, error) {
 	params, _ := url.ParseQuery(queryString)
+	listOpts := a.buildDAGsListOptions(params)
 
-	// Parse pagination
-	page := 1
-	perPage := 100
-	if p := params.Get("page"); p != "" {
-		if v, err := strconv.Atoi(p); err == nil && v > 0 {
-			page = v
-		}
-	}
-	if pp := params.Get("perPage"); pp != "" {
-		if v, err := strconv.Atoi(pp); err == nil && v > 0 {
-			perPage = v
-		}
-	}
-
-	// Parse sort/order
-	sortField := params.Get("sort")
-	if sortField == "" {
-		sortField = "name"
-	}
-	sortOrder := params.Get("order")
-	if sortOrder == "" {
-		sortOrder = "asc"
-	}
-
-	// Parse filters
-	var nameFilter string
-	if n := params.Get("name"); n != "" {
-		nameFilter = n
-	}
-	var tags []string
-	if tagsParam := params.Get("tags"); tagsParam != "" {
-		tags = parseCommaSeparatedTags(&tagsParam)
-	}
-
-	pg := exec.NewPaginator(page, perPage)
-	result, errList, err := a.dagStore.List(ctx, exec.ListDAGsOptions{
-		Paginator: &pg,
-		Name:      nameFilter,
-		Tags:      tags,
-		Sort:      sortField,
-		Order:     sortOrder,
-	})
+	result, errList, err := a.dagStore.List(ctx, listOpts)
 	if err != nil {
 		return nil, fmt.Errorf("error listing DAGs: %w", err)
 	}
 
-	// Build DAG files
 	dagFiles := make([]api.DAGFile, 0, len(result.Items))
 	for _, item := range result.Items {
-		dagStatus, err := a.dagRunMgr.GetLatestStatus(ctx, item)
-		if err != nil {
-			errList = append(errList, err.Error())
-		}
-
-		suspended := a.dagStore.IsSuspended(ctx, item.FileName())
-		dagRun := toDAGRunSummary(dagStatus)
-
-		var dagErrors []string
-		if item.BuildErrors != nil {
-			for _, err := range item.BuildErrors {
-				dagErrors = append(dagErrors, err.Error())
-			}
-		}
-
-		dagFile := api.DAGFile{
-			FileName:     item.FileName(),
-			LatestDAGRun: dagRun,
-			Suspended:    suspended,
-			Dag:          toDAG(item),
-			Errors:       dagErrors,
+		dagFile, itemErr := a.buildDAGFile(ctx, item)
+		if itemErr != nil {
+			errList = append(errList, itemErr.Error())
 		}
 		dagFiles = append(dagFiles, dagFile)
 	}
@@ -448,6 +388,64 @@ func (a *API) GetDAGsListData(ctx context.Context, queryString string) (any, err
 		Errors:     errList,
 		Pagination: toPagination(result),
 	}, nil
+}
+
+// buildDAGsListOptions constructs ListDAGsOptions from URL query parameters.
+func (a *API) buildDAGsListOptions(params url.Values) exec.ListDAGsOptions {
+	page := parseIntWithDefault(params.Get("page"), 1)
+	perPage := parseIntWithDefault(params.Get("perPage"), 100)
+
+	sortField := params.Get("sort")
+	if sortField == "" {
+		sortField = "name"
+	}
+	sortOrder := params.Get("order")
+	if sortOrder == "" {
+		sortOrder = "asc"
+	}
+
+	var tags []string
+	if tagsParam := params.Get("tags"); tagsParam != "" {
+		tags = parseCommaSeparatedTags(&tagsParam)
+	}
+
+	pg := exec.NewPaginator(page, perPage)
+	return exec.ListDAGsOptions{
+		Paginator: &pg,
+		Name:      params.Get("name"),
+		Tags:      tags,
+		Sort:      sortField,
+		Order:     sortOrder,
+	}
+}
+
+// buildDAGFile constructs a DAGFile from a DAG item.
+func (a *API) buildDAGFile(ctx context.Context, item *core.DAG) (api.DAGFile, error) {
+	dagStatus, err := a.dagRunMgr.GetLatestStatus(ctx, item)
+
+	dagErrors := make([]string, 0, len(item.BuildErrors))
+	for _, buildErr := range item.BuildErrors {
+		dagErrors = append(dagErrors, buildErr.Error())
+	}
+
+	return api.DAGFile{
+		FileName:     item.FileName(),
+		LatestDAGRun: toDAGRunSummary(dagStatus),
+		Suspended:    a.dagStore.IsSuspended(ctx, item.FileName()),
+		Dag:          toDAG(item),
+		Errors:       dagErrors,
+	}, err
+}
+
+// parseIntWithDefault parses an integer string, returning defaultVal if parsing fails or value is <= 0.
+func parseIntWithDefault(s string, defaultVal int) int {
+	if s == "" {
+		return defaultVal
+	}
+	if v, err := strconv.Atoi(s); err == nil && v > 0 {
+		return v
+	}
+	return defaultVal
 }
 
 // Helper functions

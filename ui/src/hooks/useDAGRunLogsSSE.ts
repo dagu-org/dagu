@@ -3,14 +3,14 @@ import { useSSE } from './useSSE';
 
 type NodeStatus = components['schemas']['NodeStatus'];
 
-interface SchedulerLogInfo {
+export interface SchedulerLogInfo {
   content: string;
   lineCount: number;
   totalLines: number;
   hasMore: boolean;
 }
 
-interface StepLogInfo {
+export interface StepLogInfo {
   stepName: string;
   status: NodeStatus;
   statusLabel: string;
@@ -20,7 +20,7 @@ interface StepLogInfo {
   hasStderr: boolean;
 }
 
-interface DAGRunLogsSSEResponse {
+export interface DAGRunLogsSSEResponse {
   schedulerLog: SchedulerLogInfo;
   stepLogs: StepLogInfo[];
 }
@@ -33,5 +33,3 @@ export function useDAGRunLogsSSE(
   const endpoint = `/events/dag-runs/${encodeURIComponent(name)}/${encodeURIComponent(dagRunId)}/logs`;
   return useSSE<DAGRunLogsSSEResponse>(endpoint, enabled);
 }
-
-export type { SchedulerLogInfo, StepLogInfo, DAGRunLogsSSEResponse };

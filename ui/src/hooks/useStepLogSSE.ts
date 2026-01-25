@@ -1,6 +1,6 @@
 import { useSSE } from './useSSE';
 
-interface StepLogSSEResponse {
+export interface StepLogSSEResponse {
   stdoutContent: string;
   stderrContent: string;
   lineCount: number;
@@ -17,5 +17,3 @@ export function useStepLogSSE(
   const endpoint = `/events/dag-runs/${encodeURIComponent(name)}/${encodeURIComponent(dagRunId)}/logs/steps/${encodeURIComponent(stepName)}`;
   return useSSE<StepLogSSEResponse>(endpoint, enabled);
 }
-
-export type { StepLogSSEResponse };

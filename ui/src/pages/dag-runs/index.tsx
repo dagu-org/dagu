@@ -411,21 +411,17 @@ function DAGRuns() {
   );
   const availableTags = tagsData?.tags ?? [];
 
-  // SSE for real-time updates
-  const sseResult = useDAGRunsListSSE(
-    {
-      name: apiSearchText || undefined,
-      dagRunId: apiDagRunId || undefined,
-      status: apiStatus && apiStatus !== 'all' ? apiStatus : undefined,
-      tags: apiTags.length > 0 ? apiTags.join(',') : undefined,
-      fromDate: formatDateForApi(apiFromDate),
-      toDate: formatDateForApi(apiToDate),
-    },
-    true
-  );
-
-  // Polling fallback (only when SSE fails or not connected)
-  const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
+  // SSE for real-time updates with polling fallback
+  const sseParams = {
+    name: apiSearchText || undefined,
+    dagRunId: apiDagRunId || undefined,
+    status: apiStatus !== 'all' ? apiStatus : undefined,
+    tags: apiTags.length > 0 ? apiTags.join(',') : undefined,
+    fromDate: formatDateForApi(apiFromDate),
+    toDate: formatDateForApi(apiToDate),
+  };
+  const sseResult = useDAGRunsListSSE(sseParams, true);
+  const shouldUsePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
 
   const { data: pollingData, mutate } = useQuery(
     '/dag-runs',
@@ -433,10 +429,9 @@ function DAGRuns() {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
-          name: apiSearchText ? apiSearchText : undefined,
-          dagRunId: apiDagRunId ? apiDagRunId : undefined,
-          status:
-            apiStatus && apiStatus !== 'all' ? parseInt(apiStatus) : undefined,
+          name: apiSearchText || undefined,
+          dagRunId: apiDagRunId || undefined,
+          status: apiStatus !== 'all' ? parseInt(apiStatus) : undefined,
           tags: apiTags.length > 0 ? apiTags.join(',') : undefined,
           fromDate: formatDateForApi(apiFromDate),
           toDate: formatDateForApi(apiToDate),
@@ -444,16 +439,16 @@ function DAGRuns() {
       },
     },
     {
-      revalidateIfStale: usePolling,
-      revalidateOnFocus: usePolling,
-      revalidateOnReconnect: usePolling,
-      refreshInterval: usePolling ? 2000 : 0,
-      isPaused: () => !usePolling,
+      revalidateIfStale: shouldUsePolling,
+      revalidateOnFocus: shouldUsePolling,
+      revalidateOnReconnect: shouldUsePolling,
+      refreshInterval: shouldUsePolling ? 2000 : 0,
+      isPaused: () => !shouldUsePolling,
     }
   );
 
-  // Use SSE data when available, otherwise polling
-  const data = sseResult.data || pollingData;
+  // Prefer SSE data when connected, fall back to polling data
+  const data = sseResult.data ?? pollingData;
 
   const addSearchParam = (key: string, value: string | undefined) => {
     const locationQuery = new URLSearchParams(window.location.search);

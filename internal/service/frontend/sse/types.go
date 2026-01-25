@@ -5,68 +5,49 @@ import (
 	"net/http"
 )
 
-// Event type constants for SSE messages
+// Event type constants for SSE messages.
 const (
-	// EventTypeData is sent when data changes
-	EventTypeData = "data"
-	// EventTypeHeartbeat is sent every 30 seconds to keep connection alive
+	EventTypeData      = "data"
 	EventTypeHeartbeat = "heartbeat"
-	// EventTypeConnected is sent when client successfully connects
 	EventTypeConnected = "connected"
-	// EventTypeError is sent when an error occurs
-	EventTypeError = "error"
+	EventTypeError     = "error"
 )
 
 // TopicType identifies the type of data being watched.
-// Each topic type has its own registered fetcher function.
 type TopicType string
 
+// Topic type constants. Each has a registered fetcher function.
+// Identifier formats:
+//   - TopicTypeDAGRun: "dagName/dagRunId"
+//   - TopicTypeDAG: "fileName"
+//   - TopicTypeDAGRunLogs: "dagName/dagRunId"
+//   - TopicTypeStepLog: "dagName/dagRunId/stepName"
+//   - TopicTypeDAGRuns: URL query string (e.g., "limit=50&offset=0")
+//   - TopicTypeQueueItems: "queueName"
+//   - TopicTypeQueues: URL query string
+//   - TopicTypeDAGsList: URL query string (e.g., "page=1&perPage=100&name=mydag")
 const (
-	// TopicTypeDAGRun watches a specific DAG run's status
-	// Identifier format: "dagName/dagRunId"
-	TopicTypeDAGRun TopicType = "dagrun"
-
-	// TopicTypeDAG watches a DAG's details including latest run
-	// Identifier format: "fileName"
-	TopicTypeDAG TopicType = "dag"
-
-	// TopicTypeDAGRunLogs watches a DAG run's execution logs
-	// Identifier format: "dagName/dagRunId"
+	TopicTypeDAGRun     TopicType = "dagrun"
+	TopicTypeDAG        TopicType = "dag"
 	TopicTypeDAGRunLogs TopicType = "dagrunlogs"
-
-	// TopicTypeStepLog watches an individual step's log output
-	// Identifier format: "dagName/dagRunId/stepName"
-	TopicTypeStepLog TopicType = "steplog"
-
-	// TopicTypeDAGRuns watches the dashboard DAG runs list
-	// Identifier format: URL query string (e.g., "limit=50&offset=0")
-	TopicTypeDAGRuns TopicType = "dagruns"
-
-	// TopicTypeQueueItems watches queue items
-	// Identifier format: "queueName"
+	TopicTypeStepLog    TopicType = "steplog"
+	TopicTypeDAGRuns    TopicType = "dagruns"
 	TopicTypeQueueItems TopicType = "queueitems"
-
-	// TopicTypeQueues watches the queue list
-	// Identifier format: URL query string
-	TopicTypeQueues TopicType = "queues"
-
-	// TopicTypeDAGsList watches the DAGs list
-	// Identifier format: URL query string (e.g., "page=1&perPage=100&name=mydag")
-	TopicTypeDAGsList TopicType = "dagslist"
+	TopicTypeQueues     TopicType = "queues"
+	TopicTypeDAGsList   TopicType = "dagslist"
 )
 
-// FetchFunc fetches data for a given identifier.
-// The returned data will be JSON marshaled and sent to clients.
-// It should return the same structure as the corresponding REST API endpoint.
+// FetchFunc fetches data for a given identifier. The returned data is JSON
+// marshaled and sent to clients with the same structure as the REST API.
 type FetchFunc func(ctx context.Context, identifier string) (any, error)
 
-// Event represents an SSE event to be sent to clients
+// Event represents an SSE event to be sent to clients.
 type Event struct {
 	Type string
 	Data string
 }
 
-// SetSSEHeaders sets the standard headers required for SSE responses
+// SetSSEHeaders sets the standard headers required for SSE responses.
 func SetSSEHeaders(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")

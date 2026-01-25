@@ -2,7 +2,7 @@ import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
 
-interface SSEState<T> {
+export interface SSEState<T> {
   data: T | null;
   error: Error | null;
   isConnected: boolean;
@@ -12,26 +12,36 @@ interface SSEState<T> {
 
 const MAX_RETRIES = 5;
 const MAX_RETRY_DELAY_MS = 16000;
+const INITIAL_STATE: SSEState<unknown> = {
+  data: null,
+  error: null,
+  isConnected: false,
+  isConnecting: false,
+  shouldUseFallback: false,
+};
 
 function calculateRetryDelay(retryCount: number): number {
-  return Math.min(1000 * Math.pow(2, retryCount), MAX_RETRY_DELAY_MS);
+  return Math.min(1000 * 2 ** retryCount, MAX_RETRY_DELAY_MS);
 }
 
-export function useSSE<T>(
-  endpoint: string,
-  enabled: boolean = true
-): SSEState<T> {
+function buildSSEUrl(apiURL: string, endpoint: string, remoteNode: string): URL {
+  const url = new URL(`${apiURL}${endpoint}`, window.location.origin);
+  url.searchParams.set('remoteNode', remoteNode);
+
+  const token = localStorage.getItem('dagu_auth_token');
+  if (token) {
+    url.searchParams.set('token', token);
+  }
+
+  return url;
+}
+
+export function useSSE<T>(endpoint: string, enabled: boolean = true): SSEState<T> {
   const appBarContext = useContext(AppBarContext);
   const config = useConfig();
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
-  const [state, setState] = useState<SSEState<T>>({
-    data: null,
-    error: null,
-    isConnected: false,
-    isConnecting: false,
-    shouldUseFallback: false,
-  });
+  const [state, setState] = useState<SSEState<T>>(INITIAL_STATE as SSEState<T>);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const retryCountRef = useRef(0);
@@ -40,13 +50,7 @@ export function useSSE<T>(
   const connect = useCallback(() => {
     if (!enabled) return;
 
-    const url = new URL(`${config.apiURL}${endpoint}`, window.location.origin);
-    url.searchParams.set('remoteNode', remoteNode);
-
-    const token = localStorage.getItem('dagu_auth_token');
-    if (token) {
-      url.searchParams.set('token', token);
-    }
+    const url = buildSSEUrl(config.apiURL, endpoint, remoteNode);
 
     setState((prev) => ({ ...prev, isConnecting: true }));
 
@@ -64,17 +68,12 @@ export function useSSE<T>(
     });
 
     eventSource.addEventListener('data', (event) => {
-      try {
-        const parsed = JSON.parse((event as MessageEvent).data) as T;
-        setState((prev) => ({ ...prev, data: parsed }));
-      } catch (e) {
-        console.error('Failed to parse SSE data:', e);
-      }
+      const messageEvent = event as MessageEvent;
+      const parsed = JSON.parse(messageEvent.data) as T;
+      setState((prev) => ({ ...prev, data: parsed }));
     });
 
-    eventSource.addEventListener('heartbeat', () => {
-      // Connection keepalive
-    });
+    eventSource.addEventListener('heartbeat', () => {});
 
     eventSource.addEventListener('error', (event) => {
       const messageEvent = event as MessageEvent;
@@ -110,7 +109,7 @@ export function useSSE<T>(
   useEffect(() => {
     connect();
     return () => {
-      if (retryTimeoutRef.current !== null) {
+      if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
       }
       eventSourceRef.current?.close();

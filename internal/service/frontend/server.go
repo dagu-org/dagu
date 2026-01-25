@@ -546,14 +546,10 @@ func (srv *Server) setupTerminalRoute(ctx context.Context, r *chi.Mux, apiV2Base
 
 // setupSSERoute configures SSE routes for real-time updates
 func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV2BasePath string) {
-	// Create and start hub
 	srv.sseHub = sse.NewHub()
 	srv.sseHub.Start()
-
-	// Register all fetchers
 	srv.registerSSEFetchers()
 
-	// Create remote nodes map
 	remoteNodes := make(map[string]config.RemoteNode)
 	for _, n := range srv.config.Server.RemoteNodes {
 		remoteNodes[n.Name] = n
@@ -561,61 +557,32 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV2BasePath 
 
 	handler := sse.NewHandler(srv.sseHub, remoteNodes, srv.authService)
 
-	// Register all SSE routes
-	// 1. DAG run details: /events/dag-runs/{name}/{dagRunId}
-	r.Get(path.Join(apiV2BasePath, "events/dag-runs/{name}/{dagRunId}"), handler.HandleDAGRunEvents)
-
-	// 2. DAG details: /events/dags/{fileName}
+	// DAG and DAG run events
+	r.Get(path.Join(apiV2BasePath, "events/dags"), handler.HandleDAGsListEvents)
 	r.Get(path.Join(apiV2BasePath, "events/dags/{fileName}"), handler.HandleDAGEvents)
-
-	// 3. DAG run logs: /events/dag-runs/{name}/{dagRunId}/logs
+	r.Get(path.Join(apiV2BasePath, "events/dag-runs"), handler.HandleDAGRunsListEvents)
+	r.Get(path.Join(apiV2BasePath, "events/dag-runs/{name}/{dagRunId}"), handler.HandleDAGRunEvents)
 	r.Get(path.Join(apiV2BasePath, "events/dag-runs/{name}/{dagRunId}/logs"), handler.HandleDAGRunLogsEvents)
-
-	// 4. Step log: /events/dag-runs/{name}/{dagRunId}/logs/steps/{stepName}
 	r.Get(path.Join(apiV2BasePath, "events/dag-runs/{name}/{dagRunId}/logs/steps/{stepName}"), handler.HandleStepLogEvents)
 
-	// 5. Dashboard DAG runs list: /events/dag-runs
-	r.Get(path.Join(apiV2BasePath, "events/dag-runs"), handler.HandleDAGRunsListEvents)
-
-	// 6. Queue items: /events/queues/{name}/items
+	// Queue events
+	r.Get(path.Join(apiV2BasePath, "events/queues"), handler.HandleQueuesListEvents)
 	r.Get(path.Join(apiV2BasePath, "events/queues/{name}/items"), handler.HandleQueueItemsEvents)
 
-	// 7. Queue list: /events/queues
-	r.Get(path.Join(apiV2BasePath, "events/queues"), handler.HandleQueuesListEvents)
-
-	// 8. DAGs list: /events/dags
-	r.Get(path.Join(apiV2BasePath, "events/dags"), handler.HandleDAGsListEvents)
-
-	logger.Info(ctx, "SSE routes configured",
-		slog.Int("routes", 8),
-		slog.String("basePath", apiV2BasePath))
+	logger.Info(ctx, "SSE routes configured", slog.String("basePath", apiV2BasePath))
 }
 
-// registerSSEFetchers registers data fetchers for all SSE topic types
+// registerSSEFetchers registers data fetchers for all SSE topic types.
+// See sse.TopicType constants for identifier format documentation.
 func (srv *Server) registerSSEFetchers() {
-	// 1. DAG run details - identifier: "dagName/dagRunId"
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRun, srv.apiV2.GetDAGRunDetailsData)
-
-	// 2. DAG details - identifier: "fileName"
 	srv.sseHub.RegisterFetcher(sse.TopicTypeDAG, srv.apiV2.GetDAGDetailsData)
-
-	// 3. DAG run logs - identifier: "dagName/dagRunId"
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRunLogs, srv.apiV2.GetDAGRunLogsData)
-
-	// 4. Step log - identifier: "dagName/dagRunId/stepName"
-	srv.sseHub.RegisterFetcher(sse.TopicTypeStepLog, srv.apiV2.GetStepLogData)
-
-	// 5. Dashboard DAG runs list - identifier: URL query string
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRuns, srv.apiV2.GetDAGRunsListData)
-
-	// 6. Queue items - identifier: "queueName"
-	srv.sseHub.RegisterFetcher(sse.TopicTypeQueueItems, srv.apiV2.GetQueueItemsData)
-
-	// 7. Queue list - identifier: URL query string
-	srv.sseHub.RegisterFetcher(sse.TopicTypeQueues, srv.apiV2.GetQueuesListData)
-
-	// 8. DAGs list - identifier: URL query string
 	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGsList, srv.apiV2.GetDAGsListData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRun, srv.apiV2.GetDAGRunDetailsData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRuns, srv.apiV2.GetDAGRunsListData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRunLogs, srv.apiV2.GetDAGRunLogsData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeStepLog, srv.apiV2.GetStepLogData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeQueues, srv.apiV2.GetQueuesListData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeQueueItems, srv.apiV2.GetQueueItemsData)
 }
 
 // startServer starts the HTTP server with or without TLS

@@ -1,7 +1,8 @@
-import { Button } from '@/components/ui/button';
-import { Maximize2, X } from 'lucide-react';
-import React from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Maximize2, X } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
 import { components } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { UnsavedChangesProvider } from '../../../../contexts/UnsavedChangesContext';
@@ -14,38 +15,44 @@ import { DAGContext } from '../../contexts/DAGContext';
 import { RootDAGRunContext } from '../../contexts/RootDAGRunContext';
 import DAGDetailsContent from './DAGDetailsContent';
 
-type DAGDetailsPanelProps = {
+const POLLING_INTERVAL_MS = 2000;
+
+function getPollingInterval(notFound: boolean, shouldPoll: boolean): number {
+  if (notFound) {
+    return 0;
+  }
+  return shouldPoll ? POLLING_INTERVAL_MS : 0;
+}
+
+type Props = {
   fileName: string;
   onClose: () => void;
   onNavigate?: (direction: 'up' | 'down') => void;
 };
 
-const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
-  fileName,
-  onClose,
-  onNavigate,
-}) => {
-  const navigate = useNavigate();
-  const appBarContext = React.useContext(AppBarContext);
-  const [currentDAGRun, setCurrentDAGRun] = React.useState<
-    components['schemas']['DAGRunDetails'] | undefined
-  >();
-  const [activeTab, setActiveTab] = React.useState('status');
-  const [dagRunId] = React.useState<string>('latest');
-  const [stepName] = React.useState<string | null>(null);
+type DAGRunDetails = components['schemas']['DAGRunDetails'];
+type DAGDetailsData = ReturnType<typeof useDAGSSE>['data'];
 
-  const navigateToStatusTab = React.useCallback(() => {
+function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactElement | null {
+  const navigate = useNavigate();
+  const appBarContext = useContext(AppBarContext);
+
+  const [currentDAGRun, setCurrentDAGRun] = useState<DAGRunDetails | undefined>();
+  const [activeTab, setActiveTab] = useState('status');
+  const [notFound, setNotFound] = useState(false);
+  const [lastValidData, setLastValidData] = useState<DAGDetailsData>(null);
+
+  const dagRunId = 'latest';
+  const stepName = null;
+
+  const navigateToStatusTab = useCallback(() => {
     setActiveTab('status');
   }, []);
 
-  const [notFound, setNotFound] = React.useState(false);
-
-  // SSE for real-time updates
+  // SSE for real-time updates with polling fallback
   const sseResult = useDAGSSE(fileName || '', !!fileName);
-
-  // Polling fallback (only when SSE fails or not connected)
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
+  const shouldPoll = sseResult.shouldUseFallback || !sseResult.isConnected;
 
   const { data: pollingData, error, mutate } = useQuery(
     '/dags/{fileName}',
@@ -56,100 +63,94 @@ const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
       },
     },
     {
-      refreshInterval: notFound ? 0 : usePolling ? 2000 : 0,
+      refreshInterval: getPollingInterval(notFound, shouldPoll),
       keepPreviousData: true,
-      isPaused: () => !usePolling && !notFound,
+      isPaused: () => !shouldPoll && !notFound,
     }
   );
 
-  // Use SSE data when available, otherwise polling
   const data = sseResult.data || pollingData;
 
-  // Detect if DAG was deleted (404 error)
-  React.useEffect(() => {
+  // Track data loading state and handle 404 errors
+  useEffect(() => {
     if (error) {
       setNotFound(true);
     } else if (data) {
       setNotFound(false);
+      setLastValidData(data as DAGDetailsData);
     }
   }, [error, data]);
 
-  // Reset notFound state when fileName changes
-  React.useEffect(() => {
+  // Reset state when fileName changes
+  useEffect(() => {
     setNotFound(false);
+    setActiveTab('status');
   }, [fileName]);
 
-  // Keep track of last valid data to prevent flickering
-  const [lastValidData, setLastValidData] = React.useState(data);
-  React.useEffect(() => {
-    if (data) {
-      setLastValidData(data);
-    }
-  }, [data]);
   const displayData = data || lastValidData;
 
-  const refreshFn = React.useCallback(() => {
+  const refreshFn = useCallback(() => {
     setTimeout(() => mutate(), 500);
   }, [mutate]);
 
-  const handleFullscreenClick = (e?: React.MouseEvent) => {
-    let url = `/dags/${fileName}`;
-    if (activeTab !== 'status') {
-      url = `${url}/${activeTab}`;
-    }
+  const handleFullscreenClick = useCallback(
+    (e?: React.MouseEvent) => {
+      const url = activeTab === 'status' ? `/dags/${fileName}` : `/dags/${fileName}/${activeTab}`;
 
-    if (e && (e.metaKey || e.ctrlKey)) {
-      window.open(url, '_blank');
-    } else {
-      navigate(url);
-    }
-  };
+      if (e?.metaKey || e?.ctrlKey) {
+        window.open(url, '_blank');
+      } else {
+        navigate(url);
+      }
+    },
+    [fileName, activeTab, navigate]
+  );
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (displayData) {
       setCurrentDAGRun(displayData.latestDAGRun);
     }
   }, [displayData]);
 
-  // Reset active tab when fileName changes
-  React.useEffect(() => {
-    setActiveTab('status');
-  }, [fileName]);
-
   // Keyboard shortcuts
-  React.useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent): void {
       if (shouldIgnoreKeyboardShortcuts()) {
         return;
       }
 
-      if (event.key === 'Escape') {
-        onClose();
+      switch (event.key) {
+        case 'Escape':
+          onClose();
+          break;
+        case 'f':
+        case 'F':
+          handleFullscreenClick();
+          break;
+        case 'ArrowDown':
+          if (onNavigate) {
+            event.preventDefault();
+            onNavigate('down');
+          }
+          break;
+        case 'ArrowUp':
+          if (onNavigate) {
+            event.preventDefault();
+            onNavigate('up');
+          }
+          break;
       }
-
-      if (event.key === 'f' || event.key === 'F') {
-        handleFullscreenClick();
-      }
-
-      if (event.key === 'ArrowDown' && onNavigate) {
-        event.preventDefault();
-        onNavigate('down');
-      }
-
-      if (event.key === 'ArrowUp' && onNavigate) {
-        event.preventDefault();
-        onNavigate('up');
-      }
-    };
+    }
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose, onNavigate, handleFullscreenClick]);
 
-  const formatDuration = (startDate: string, endDate: string) => {
-    if (!startDate || !endDate) return '--';
+  const formatDuration = useCallback((startDate: string, endDate: string): string => {
+    if (!startDate || !endDate) {
+      return '--';
+    }
+
     const duration = dayjs.duration(dayjs(endDate).diff(dayjs(startDate)));
     const hours = Math.floor(duration.asHours());
     const minutes = duration.minutes();
@@ -157,11 +158,12 @@ const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
 
     if (hours > 0) {
       return `${hours}h ${minutes}m ${seconds}s`;
-    } else if (minutes > 0) {
+    }
+    if (minutes > 0) {
       return `${minutes}m ${seconds}s`;
     }
     return `${seconds}s`;
-  };
+  }, []);
 
   // Show error state if DAG not found
   if (notFound) {
@@ -196,9 +198,7 @@ const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
         <RootDAGRunContext.Provider
           value={{
             data: currentDAGRun,
-            setData: (status: components['schemas']['DAGRunDetails']) => {
-              setCurrentDAGRun(status);
-            },
+            setData: setCurrentDAGRun,
           }}
         >
           <div className="pl-2 pt-2 w-full flex flex-col h-full overflow-hidden">
@@ -249,6 +249,6 @@ const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
       </DAGContext.Provider>
     </UnsavedChangesProvider>
   );
-};
+}
 
 export default DAGDetailsPanel;

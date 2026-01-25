@@ -19,14 +19,16 @@ interface DAGsListParams {
   order?: string;
 }
 
-export function useDAGsListSSE(params: DAGsListParams = {}, enabled: boolean = true) {
+export function useDAGsListSSE(
+  params: DAGsListParams = {},
+  enabled: boolean = true
+) {
   const searchParams = new URLSearchParams();
-  if (params.page) searchParams.set('page', String(params.page));
-  if (params.perPage) searchParams.set('perPage', String(params.perPage));
-  if (params.name) searchParams.set('name', params.name);
-  if (params.tags) searchParams.set('tags', params.tags);
-  if (params.sort) searchParams.set('sort', params.sort);
-  if (params.order) searchParams.set('order', params.order);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      searchParams.set(key, String(value));
+    }
+  });
 
   const queryString = searchParams.toString();
   const endpoint = queryString ? `/events/dags?${queryString}` : '/events/dags';

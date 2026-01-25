@@ -1,5 +1,5 @@
 import { components } from '../api/v2/schema';
-import { useSSE } from './useSSE';
+import { SSEState, useSSE } from './useSSE';
 
 type DAGDetails = components['schemas']['DAGDetails'];
 type DAGRunDetails = components['schemas']['DAGRunDetails'];
@@ -13,7 +13,10 @@ interface DAGSSEResponse {
   errors: string[];
 }
 
-export function useDAGSSE(fileName: string, enabled: boolean = true) {
+export function useDAGSSE(
+  fileName: string,
+  enabled: boolean = true
+): SSEState<DAGSSEResponse> {
   const endpoint = `/events/dags/${encodeURIComponent(fileName)}`;
   return useSSE<DAGSSEResponse>(endpoint, enabled);
 }

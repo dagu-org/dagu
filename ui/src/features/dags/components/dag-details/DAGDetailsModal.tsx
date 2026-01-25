@@ -45,7 +45,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
 
-  const { data: pollingData, isLoading, mutate } = useQuery(
+  const { data: pollingData, mutate } = useQuery(
     '/dags/{fileName}',
     {
       params: {
@@ -68,16 +68,12 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
   }, [mutate]);
 
   const handleFullscreenClick = (e?: React.MouseEvent) => {
-    // Determine the URL path based on the active tab
-    let url = `/dags/${fileName}`;
+    const url =
+      activeTab === 'status'
+        ? `/dags/${fileName}`
+        : `/dags/${fileName}/${activeTab}`;
 
-    // Add the tab to the URL if it's not the default 'status' tab
-    if (activeTab !== 'status') {
-      url = `${url}/${activeTab}`;
-    }
-
-    // If Cmd (Mac) or Ctrl (Windows/Linux) key is pressed, open in new tab
-    if (e && (e.metaKey || e.ctrlKey)) {
+    if (e?.metaKey || e?.ctrlKey) {
       window.open(url, '_blank');
     } else {
       navigate(url);
@@ -118,18 +114,16 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
     };
   }, [isOpen, onClose, handleFullscreenClick]);
 
-  const formatDuration = (startDate: string, endDate: string) => {
+  const formatDuration = (startDate: string, endDate: string): string => {
     if (!startDate || !endDate) return '--';
+
     const duration = dayjs.duration(dayjs(endDate).diff(dayjs(startDate)));
     const hours = Math.floor(duration.asHours());
     const minutes = duration.minutes();
     const seconds = duration.seconds();
 
-    if (hours > 0) {
-      return `${hours}h ${minutes}m ${seconds}s`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${seconds}s`;
-    }
+    if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+    if (minutes > 0) return `${minutes}m ${seconds}s`;
     return `${seconds}s`;
   };
 

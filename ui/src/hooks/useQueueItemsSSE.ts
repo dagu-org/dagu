@@ -8,7 +8,10 @@ interface QueueItemsSSEResponse {
   queued: DAGRunSummary[];
 }
 
-export function useQueueItemsSSE(queueName: string, enabled: boolean = true) {
+export function useQueueItemsSSE(
+  queueName: string,
+  enabled: boolean = true
+): ReturnType<typeof useSSE<QueueItemsSSEResponse>> {
   const endpoint = `/events/queues/${encodeURIComponent(queueName)}/items`;
   return useSSE<QueueItemsSSEResponse>(endpoint, enabled);
 }

@@ -66,78 +66,64 @@ func buildRemoteURL(baseURL, topic, token string) string {
 
 	topicType, identifier, ok := strings.Cut(topic, ":")
 	if !ok {
-		// Fallback: treat entire topic as identifier for dagrun type
 		return fmt.Sprintf("%s/events/dag-runs/%s", baseURL, topic)
 	}
 
-	var path string
-	switch TopicType(topicType) {
-	case TopicTypeDAGRun:
-		// identifier: "name/dagRunId"
-		path = fmt.Sprintf("/events/dag-runs/%s", identifier)
-
-	case TopicTypeDAG:
-		// identifier: "fileName"
-		path = fmt.Sprintf("/events/dags/%s", identifier)
-
-	case TopicTypeDAGRunLogs:
-		// identifier: "name/dagRunId"
-		path = fmt.Sprintf("/events/dag-runs/%s/logs", identifier)
-
-	case TopicTypeStepLog:
-		// identifier: "name/dagRunId/stepName"
-		parts := strings.SplitN(identifier, "/", 3)
-		if len(parts) == 3 {
-			path = fmt.Sprintf("/events/dag-runs/%s/%s/logs/steps/%s", parts[0], parts[1], parts[2])
-		} else {
-			path = fmt.Sprintf("/events/dag-runs/%s/logs/steps", identifier)
-		}
-
-	case TopicTypeDAGRuns:
-		// identifier: URL query string (e.g., "limit=50&offset=0")
-		if identifier != "" {
-			path = "/events/dag-runs?" + identifier
-		} else {
-			path = "/events/dag-runs"
-		}
-
-	case TopicTypeQueueItems:
-		// identifier: "queueName"
-		path = fmt.Sprintf("/events/queues/%s/items", identifier)
-
-	case TopicTypeQueues:
-		// identifier: URL query string
-		if identifier != "" {
-			path = "/events/queues?" + identifier
-		} else {
-			path = "/events/queues"
-		}
-
-	case TopicTypeDAGsList:
-		// identifier: URL query string (e.g., "page=1&perPage=100&name=mydag")
-		if identifier != "" {
-			path = "/events/dags?" + identifier
-		} else {
-			path = "/events/dags"
-		}
-
-	default:
-		// Unknown topic type - try to use as-is
-		path = fmt.Sprintf("/events/%s/%s", topicType, identifier)
-	}
-
+	path := buildPathForTopic(TopicType(topicType), identifier)
 	url := baseURL + path
 
-	// Add token if provided (and not already in query string for dagruns)
-	if token != "" {
-		if strings.Contains(url, "?") {
-			url += "&token=" + token
-		} else {
-			url += "?token=" + token
-		}
+	if token == "" {
+		return url
 	}
 
-	return url
+	if strings.Contains(url, "?") {
+		return url + "&token=" + token
+	}
+	return url + "?token=" + token
+}
+
+// buildPathForTopic returns the URL path for the given topic type and identifier.
+func buildPathForTopic(topicType TopicType, identifier string) string {
+	switch topicType {
+	case TopicTypeDAGRun:
+		return "/events/dag-runs/" + identifier
+
+	case TopicTypeDAG:
+		return "/events/dags/" + identifier
+
+	case TopicTypeDAGRunLogs:
+		return "/events/dag-runs/" + identifier + "/logs"
+
+	case TopicTypeStepLog:
+		parts := strings.SplitN(identifier, "/", 3)
+		if len(parts) == 3 {
+			return fmt.Sprintf("/events/dag-runs/%s/%s/logs/steps/%s", parts[0], parts[1], parts[2])
+		}
+		return "/events/dag-runs/" + identifier + "/logs/steps"
+
+	case TopicTypeDAGRuns:
+		return pathWithOptionalQuery("/events/dag-runs", identifier)
+
+	case TopicTypeQueueItems:
+		return "/events/queues/" + identifier + "/items"
+
+	case TopicTypeQueues:
+		return pathWithOptionalQuery("/events/queues", identifier)
+
+	case TopicTypeDAGsList:
+		return pathWithOptionalQuery("/events/dags", identifier)
+
+	default:
+		return fmt.Sprintf("/events/%s/%s", topicType, identifier)
+	}
+}
+
+// pathWithOptionalQuery appends a query string to the path if provided.
+func pathWithOptionalQuery(basePath, query string) string {
+	if query != "" {
+		return basePath + "?" + query
+	}
+	return basePath
 }
 
 // applyNodeAuth adds authentication headers based on node configuration.

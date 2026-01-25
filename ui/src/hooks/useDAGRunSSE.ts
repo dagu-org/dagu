@@ -11,7 +11,9 @@ export function useDAGRunSSE(
   name: string,
   dagRunId: string,
   enabled: boolean = true
-) {
+): ReturnType<typeof useSSE<DAGRunSSEResponse>> {
   const endpoint = `/events/dag-runs/${encodeURIComponent(name)}/${encodeURIComponent(dagRunId)}`;
   return useSSE<DAGRunSSEResponse>(endpoint, enabled);
 }
+
+export type { DAGRunSSEResponse };

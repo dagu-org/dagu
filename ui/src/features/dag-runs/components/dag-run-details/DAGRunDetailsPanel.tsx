@@ -58,8 +58,8 @@ const DAGRunDetailsPanel: React.FC<DAGRunDetailsPanelProps> = ({
     { refreshInterval: 2000, keepPreviousData: true, isPaused: () => !isSubDAGRun }
   );
 
-  // Regular DAG query (fallback when SSE fails)
-  const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
+  // Regular DAG query (fallback when SSE is unavailable)
+  const sseIsActive = sseResult.isConnected && !sseResult.shouldUseFallback;
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}',
     {
@@ -72,9 +72,9 @@ const DAGRunDetailsPanel: React.FC<DAGRunDetailsPanelProps> = ({
       },
     },
     {
-      refreshInterval: usePolling ? 2000 : 0,
+      refreshInterval: sseIsActive ? 0 : 2000,
       keepPreviousData: true,
-      isPaused: () => isSubDAGRun || (sseResult.isConnected && !sseResult.shouldUseFallback),
+      isPaused: () => isSubDAGRun || sseIsActive,
     }
   );
 
@@ -97,41 +97,48 @@ const DAGRunDetailsPanel: React.FC<DAGRunDetailsPanelProps> = ({
     setTimeout(() => mutate(), 500);
   }, [mutate]);
 
-  const handleFullscreenClick = (e?: React.MouseEvent) => {
-    const url = `/dag-runs/${name}/${dagRunId}`;
+  const handleFullscreenClick = React.useCallback(
+    (e?: React.MouseEvent) => {
+      const url = `/dag-runs/${name}/${dagRunId}`;
 
-    if (e && (e.metaKey || e.ctrlKey)) {
-      window.open(url, '_blank');
-    } else {
-      navigate(url);
-    }
-  };
+      if (e && (e.metaKey || e.ctrlKey)) {
+        window.open(url, '_blank');
+      } else {
+        navigate(url);
+      }
+    },
+    [name, dagRunId, navigate]
+  );
 
   // Keyboard shortcuts
   React.useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+    function handleKeyDown(event: KeyboardEvent): void {
       if (shouldIgnoreKeyboardShortcuts()) {
         return;
       }
 
-      if (event.key === 'Escape') {
-        onClose();
+      switch (event.key) {
+        case 'Escape':
+          onClose();
+          break;
+        case 'f':
+        case 'F':
+          handleFullscreenClick();
+          break;
+        case 'ArrowDown':
+          if (onNavigate) {
+            event.preventDefault();
+            onNavigate('down');
+          }
+          break;
+        case 'ArrowUp':
+          if (onNavigate) {
+            event.preventDefault();
+            onNavigate('up');
+          }
+          break;
       }
-
-      if (event.key === 'f' || event.key === 'F') {
-        handleFullscreenClick();
-      }
-
-      if (event.key === 'ArrowDown' && onNavigate) {
-        event.preventDefault();
-        onNavigate('down');
-      }
-
-      if (event.key === 'ArrowUp' && onNavigate) {
-        event.preventDefault();
-        onNavigate('up');
-      }
-    };
+    }
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {

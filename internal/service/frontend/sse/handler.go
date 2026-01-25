@@ -3,6 +3,7 @@ package sse
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
@@ -31,16 +32,14 @@ func NewHandler(hub *Hub, remoteNodes map[string]config.RemoteNode, authService 
 func (h *Handler) HandleDAGRunEvents(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	dagRunID := chi.URLParam(r, "dagRunId")
-	topic := string(TopicTypeDAGRun) + ":" + name + "/" + dagRunID
-	h.handleSSE(w, r, topic)
+	h.handleSSE(w, r, buildTopic(TopicTypeDAGRun, name, dagRunID))
 }
 
 // HandleDAGEvents handles SSE connections for DAG details.
 // Endpoint: GET /events/dags/{fileName}
 func (h *Handler) HandleDAGEvents(w http.ResponseWriter, r *http.Request) {
 	fileName := chi.URLParam(r, "fileName")
-	topic := string(TopicTypeDAG) + ":" + fileName
-	h.handleSSE(w, r, topic)
+	h.handleSSE(w, r, buildTopic(TopicTypeDAG, fileName))
 }
 
 // HandleDAGRunLogsEvents handles SSE connections for DAG run logs.
@@ -48,8 +47,7 @@ func (h *Handler) HandleDAGEvents(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleDAGRunLogsEvents(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	dagRunID := chi.URLParam(r, "dagRunId")
-	topic := string(TopicTypeDAGRunLogs) + ":" + name + "/" + dagRunID
-	h.handleSSE(w, r, topic)
+	h.handleSSE(w, r, buildTopic(TopicTypeDAGRunLogs, name, dagRunID))
 }
 
 // HandleStepLogEvents handles SSE connections for individual step logs.
@@ -58,89 +56,93 @@ func (h *Handler) HandleStepLogEvents(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	dagRunID := chi.URLParam(r, "dagRunId")
 	stepName := chi.URLParam(r, "stepName")
-	topic := string(TopicTypeStepLog) + ":" + name + "/" + dagRunID + "/" + stepName
-	h.handleSSE(w, r, topic)
+	h.handleSSE(w, r, buildTopic(TopicTypeStepLog, name, dagRunID, stepName))
 }
 
 // HandleDAGRunsListEvents handles SSE connections for the dashboard DAG runs list.
 // Endpoint: GET /events/dag-runs
 func (h *Handler) HandleDAGRunsListEvents(w http.ResponseWriter, r *http.Request) {
-	// Include query params in topic for unique identification of different filters
-	topic := string(TopicTypeDAGRuns) + ":" + r.URL.RawQuery
-	h.handleSSE(w, r, topic)
+	h.handleSSE(w, r, buildTopic(TopicTypeDAGRuns, r.URL.RawQuery))
 }
 
 // HandleQueueItemsEvents handles SSE connections for queue items.
 // Endpoint: GET /events/queues/{name}/items
 func (h *Handler) HandleQueueItemsEvents(w http.ResponseWriter, r *http.Request) {
 	queueName := chi.URLParam(r, "name")
-	topic := string(TopicTypeQueueItems) + ":" + queueName
-	h.handleSSE(w, r, topic)
+	h.handleSSE(w, r, buildTopic(TopicTypeQueueItems, queueName))
 }
 
 // HandleQueuesListEvents handles SSE connections for the queue list.
 // Endpoint: GET /events/queues
 func (h *Handler) HandleQueuesListEvents(w http.ResponseWriter, r *http.Request) {
-	// Include query params in topic for unique identification
-	topic := string(TopicTypeQueues) + ":" + r.URL.RawQuery
-	h.handleSSE(w, r, topic)
+	h.handleSSE(w, r, buildTopic(TopicTypeQueues, r.URL.RawQuery))
 }
 
 // HandleDAGsListEvents handles SSE connections for the DAGs list.
 // Endpoint: GET /events/dags
 func (h *Handler) HandleDAGsListEvents(w http.ResponseWriter, r *http.Request) {
-	// Include query params in topic for unique identification
-	topic := string(TopicTypeDAGsList) + ":" + r.URL.RawQuery
-	h.handleSSE(w, r, topic)
+	h.handleSSE(w, r, buildTopic(TopicTypeDAGsList, r.URL.RawQuery))
+}
+
+// buildTopic constructs a topic string from a topic type and identifier parts.
+func buildTopic(topicType TopicType, parts ...string) string {
+	return fmt.Sprintf("%s:%s", topicType, strings.Join(parts, "/"))
 }
 
 // handleSSE is the common SSE handling logic shared by all handlers.
 // It handles auth, headers, client creation, subscription, and the write pump.
 func (h *Handler) handleSSE(w http.ResponseWriter, r *http.Request, topic string) {
 	ctx := r.Context()
+	query := r.URL.Query()
 
-	// Proxy to remote node if specified
-	if remoteNode := r.URL.Query().Get("remoteNode"); remoteNode != "" && remoteNode != "local" {
+	if remoteNode := query.Get("remoteNode"); remoteNode != "" && remoteNode != "local" {
 		h.proxyToRemoteNode(w, r, remoteNode, topic)
 		return
 	}
 
-	// Validate auth token if auth service is configured
-	if h.authService != nil {
-		token := r.URL.Query().Get("token")
-		if token == "" {
-			http.Error(w, "missing token", http.StatusUnauthorized)
-			return
-		}
-		if _, err := h.authService.GetUserFromToken(ctx, token); err != nil {
-			http.Error(w, "invalid or expired token", http.StatusUnauthorized)
-			return
-		}
+	if !h.validateAuth(w, r) {
+		return
 	}
 
-	// Set SSE headers
 	SetSSEHeaders(w)
 
-	// Create client
 	client, err := NewClient(w)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Subscribe to hub
 	if err := h.hub.Subscribe(client, topic); err != nil {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
 	defer h.hub.Unsubscribe(client)
 
-	// Send connected event
 	client.Send(&Event{
 		Type: EventTypeConnected,
 		Data: fmt.Sprintf(`{"topic":"%s"}`, topic),
 	})
 
-	// Block on write pump until client disconnects
 	client.WritePump(ctx)
+}
+
+// validateAuth validates the auth token if auth service is configured.
+// Returns true if authentication passed (or not required), false otherwise.
+func (h *Handler) validateAuth(w http.ResponseWriter, r *http.Request) bool {
+	if h.authService == nil {
+		return true
+	}
+
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		http.Error(w, "missing token", http.StatusUnauthorized)
+		return false
+	}
+
+	if _, err := h.authService.GetUserFromToken(r.Context(), token); err != nil {
+		http.Error(w, "invalid or expired token", http.StatusUnauthorized)
+		return false
+	}
+
+	return true
 }
