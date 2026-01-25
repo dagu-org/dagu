@@ -225,7 +225,7 @@ func TestWatcherHashBasedChangeDetection(t *testing.T) {
 
 func TestWatcherBackoff(t *testing.T) {
 	var fetchCount int32
-	errFetcher := func(ctx context.Context, identifier string) (any, error) {
+	errFetcher := func(_ context.Context, _ string) (any, error) {
 		atomic.AddInt32(&fetchCount, 1)
 		return nil, errors.New("fetch error")
 	}
@@ -343,7 +343,7 @@ func TestWatcherMetricsIntegration(t *testing.T) {
 func TestWatcherFetchErrorMetrics(t *testing.T) {
 	registry := prometheus.NewRegistry()
 	metrics := NewMetrics(registry)
-	errFetcher := func(ctx context.Context, identifier string) (any, error) {
+	errFetcher := func(_ context.Context, _ string) (any, error) {
 		return nil, errors.New("test error")
 	}
 	watcher := NewWatcher("test-id", errFetcher, TopicTypeDAGRun, metrics)
@@ -470,10 +470,10 @@ func TestWatcherAdaptInterval(t *testing.T) {
 		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
-		// Simulate a slow fetch (500ms), target = 1.5s
+		// 500ms fetch -> target = 3 * 500ms = 1.5s
 		watcher.adaptInterval(500 * time.Millisecond)
 
-		// EMA: 0.3 * 1.5s + 0.7 * 1s = 0.45s + 0.7s = 1.15s
+		// EMA smoothing: 0.3 * target + 0.7 * current = 0.3 * 1.5s + 0.7 * 1s = 1.15s
 		expected := time.Duration(float64(1500*time.Millisecond)*0.3 + float64(1000*time.Millisecond)*0.7)
 		assert.Equal(t, expected, watcher.currentInterval)
 	})
@@ -482,28 +482,27 @@ func TestWatcherAdaptInterval(t *testing.T) {
 		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
-		// Simulate a very slow fetch (5s), target = 10s (capped)
+		// 5s fetch -> target = 3 * 5s = 15s, capped to 10s
 		watcher.adaptInterval(5 * time.Second)
 
-		// EMA: 0.3 * 10s + 0.7 * 1s = 3s + 0.7s = 3.7s
-		// Not instant jump to 10s
+		// EMA smoothing prevents instant jump: 0.3 * 10s + 0.7 * 1s = 3.7s
 		expected := time.Duration(float64(10*time.Second)*0.3 + float64(1*time.Second)*0.7)
 		assert.Equal(t, expected, watcher.currentInterval)
-		assert.Less(t, watcher.currentInterval, defaultMaxInterval, "should be smoothed, not instant max")
+		assert.Less(t, watcher.currentInterval, defaultMaxInterval)
 	})
 
 	t.Run("repeated slow fetches converge to target", func(t *testing.T) {
 		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
-		// Simulate multiple slow fetches (2s each), target = 6s
+		// 2s fetch -> target = 3 * 2s = 6s
+		// Repeated calls should converge toward 6s via EMA
 		for i := 0; i < 10; i++ {
 			watcher.adaptInterval(2 * time.Second)
 		}
 
-		// After many iterations, should converge close to target (6s)
-		assert.GreaterOrEqual(t, watcher.currentInterval, 5*time.Second, "should converge toward 6s")
-		assert.LessOrEqual(t, watcher.currentInterval, 6*time.Second, "should not exceed target")
+		assert.GreaterOrEqual(t, watcher.currentInterval, 5*time.Second)
+		assert.LessOrEqual(t, watcher.currentInterval, 6*time.Second)
 	})
 }
 
@@ -511,7 +510,7 @@ func TestWatcherAdaptivePolling(t *testing.T) {
 	t.Run("polling adapts to slow fetcher", func(t *testing.T) {
 		// Create a fetcher that takes 400ms to complete
 		var fetchCount int32
-		fetcher := func(ctx context.Context, identifier string) (any, error) {
+		fetcher := func(_ context.Context, _ string) (any, error) {
 			atomic.AddInt32(&fetchCount, 1)
 			time.Sleep(400 * time.Millisecond)
 			return map[string]string{"key": "value"}, nil

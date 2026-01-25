@@ -303,13 +303,13 @@ func TestHubConcurrentOperations(t *testing.T) {
 	// Concurrent subscribes
 	for i := 0; i < 20; i++ {
 		wg.Add(1)
-		go func(id int) {
+		go func() {
 			defer wg.Done()
 			client := newTestClient(t)
 			_ = hub.Subscribe(client, "dagrun:concurrent-id")
 			time.Sleep(10 * time.Millisecond)
 			hub.Unsubscribe(client)
-		}(i)
+		}()
 	}
 
 	// Concurrent reads

@@ -280,12 +280,12 @@ func TestClientConcurrentSend(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
-		go func(id int) {
+		go func() {
 			defer wg.Done()
 			for j := 0; j < 10; j++ {
 				client.Send(&Event{Type: EventTypeData, Data: "concurrent"})
 			}
-		}(i)
+		}()
 	}
 
 	wg.Wait()
@@ -310,14 +310,11 @@ func TestClientWriteEventWhenClosed(t *testing.T) {
 }
 
 // failingWriter is a mock writer that fails on Write
-type failingWriter struct {
-	buf    bytes.Buffer
-	closed bool
-}
+type failingWriter struct{}
 
-func (f *failingWriter) Header() http.Header        { return http.Header{} }
-func (f *failingWriter) WriteHeader(statusCode int) {}
-func (f *failingWriter) Write(b []byte) (int, error) {
+func (f *failingWriter) Header() http.Header { return http.Header{} }
+func (f *failingWriter) WriteHeader(_ int)   {}
+func (f *failingWriter) Write(_ []byte) (int, error) {
 	return 0, errors.New("write failed")
 }
 func (f *failingWriter) Flush() {}

@@ -23,7 +23,7 @@ func TestSSEFullFlow(t *testing.T) {
 
 	fetchData := map[string]string{"status": "running", "progress": "50%"}
 	var fetchCount int32
-	fetcher := func(ctx context.Context, identifier string) (any, error) {
+	fetcher := func(_ context.Context, _ string) (any, error) {
 		atomic.AddInt32(&fetchCount, 1)
 		return fetchData, nil
 	}
@@ -133,7 +133,7 @@ func TestSSEErrorRecovery(t *testing.T) {
 
 	// Fetcher that fails twice then succeeds
 	var callCount int32
-	fetcher := func(ctx context.Context, identifier string) (any, error) {
+	fetcher := func(_ context.Context, _ string) (any, error) {
 		count := atomic.AddInt32(&callCount, 1)
 		if count <= 2 {
 			return nil, errors.New("temporary error")
@@ -237,7 +237,7 @@ func TestSSEConcurrentSubscribeUnsubscribe(t *testing.T) {
 	// Concurrent subscribe/unsubscribe
 	for i := 0; i < numOperations; i++ {
 		wg.Add(1)
-		go func(id int) {
+		go func() {
 			defer wg.Done()
 
 			client := newTestClient(t)
@@ -251,7 +251,7 @@ func TestSSEConcurrentSubscribeUnsubscribe(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 
 			hub.Unsubscribe(client)
-		}(i)
+		}()
 	}
 
 	wg.Wait()
@@ -266,7 +266,7 @@ func TestSSEDataChangeDetection(t *testing.T) {
 
 	// Fetcher that returns same data for multiple calls
 	callCount := 0
-	fetcher := func(ctx context.Context, identifier string) (any, error) {
+	fetcher := func(_ context.Context, _ string) (any, error) {
 		callCount++
 		// Always return same data
 		return map[string]string{"stable": "data"}, nil

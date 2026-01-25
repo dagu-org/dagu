@@ -131,21 +131,18 @@ func (w *Watcher) poll(ctx context.Context) {
 	w.broadcastIfChanged(response)
 }
 
-// adaptInterval adjusts the polling interval based on fetch duration using EMA smoothing.
-// Rule: target = max(baseInterval, intervalMultiplier * fetchDuration), capped at maxInterval.
-// EMA smoothing prevents erratic interval swings: new = α×target + (1-α)×current
+// adaptInterval adjusts the polling interval based on fetch duration.
+// Uses EMA smoothing to prevent erratic interval changes.
 func (w *Watcher) adaptInterval(fetchDuration time.Duration) {
-	// Calculate target interval
 	target := time.Duration(intervalMultiplier) * fetchDuration
 	target = max(w.baseInterval, min(target, w.maxInterval))
 
-	// Apply EMA smoothing to prevent erratic swings
+	// EMA: new = α×target + (1-α)×current
 	smoothed := time.Duration(
 		float64(target)*smoothingFactor +
 			float64(w.currentInterval)*(1-smoothingFactor),
 	)
 
-	// Ensure smoothed value respects bounds
 	w.currentInterval = max(w.baseInterval, min(smoothed, w.maxInterval))
 }
 
@@ -166,16 +163,14 @@ func (w *Watcher) handleFetchError(err error) {
 }
 
 // resetBackoff clears the backoff state after a successful fetch.
-// Also resets the polling interval to base for responsive recovery after errors.
+// If recovering from an error, also resets polling interval to base for responsiveness.
 func (w *Watcher) resetBackoff() {
-	// Only reset interval if we were in error backoff state
-	wasInBackoff := !w.backoffUntil.IsZero()
+	recoveringFromError := !w.backoffUntil.IsZero()
 
 	w.errorBackoff.Reset()
 	w.backoffUntil = time.Time{}
 
-	// Reset interval to base for responsive recovery after errors
-	if wasInBackoff {
+	if recoveringFromError {
 		w.currentInterval = w.baseInterval
 	}
 }

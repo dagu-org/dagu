@@ -333,7 +333,7 @@ func TestProxyToRemoteNode(t *testing.T) {
 	})
 
 	t.Run("remote server error", func(t *testing.T) {
-		remoteServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		remoteServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 		}))
 		defer remoteServer.Close()
@@ -428,9 +428,9 @@ type failingResponseWriter struct {
 	buf       bytes.Buffer
 }
 
-func (f *failingResponseWriter) Header() http.Header        { return http.Header{} }
-func (f *failingResponseWriter) WriteHeader(statusCode int) {}
-func (f *failingResponseWriter) Flush()                     {}
+func (f *failingResponseWriter) Header() http.Header { return http.Header{} }
+func (f *failingResponseWriter) WriteHeader(_ int)   {}
+func (f *failingResponseWriter) Flush()              {}
 func (f *failingResponseWriter) Write(b []byte) (int, error) {
 	f.written += len(b)
 	if f.written > f.failAfter {
@@ -440,7 +440,7 @@ func (f *failingResponseWriter) Write(b []byte) (int, error) {
 }
 
 func TestProxyToRemoteNodeNonFlusher(t *testing.T) {
-	remoteServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	remoteServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("data: test\n\n"))
