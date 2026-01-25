@@ -230,10 +230,12 @@ func (w *Watcher) broadcast(event *Event) {
 
 	// Send outside lock to reduce contention
 	for _, client := range clients {
-		if client.Send(event) {
-			w.metrics.MessageSent(event.Type)
-		} else {
+		if !client.Send(event) {
 			client.Close()
+			continue
+		}
+		if w.metrics != nil {
+			w.metrics.MessageSent(event.Type)
 		}
 	}
 }

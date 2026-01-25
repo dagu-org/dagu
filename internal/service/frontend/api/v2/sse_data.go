@@ -86,17 +86,7 @@ func (a *API) GetDAGRunLogsData(ctx context.Context, identifier string) (any, er
 	// Parse tail parameter with bounds validation (100-10000, default 500)
 	tail := 500
 	if queryParams != nil {
-		if tailStr := queryParams.Get("tail"); tailStr != "" {
-			if parsed, err := strconv.Atoi(tailStr); err == nil {
-				if parsed < 100 {
-					tail = 100
-				} else if parsed > 10000 {
-					tail = 10000
-				} else {
-					tail = parsed
-				}
-			}
-		}
+		tail = clampInt(parseIntWithDefault(queryParams.Get("tail"), 500), 100, 10000)
 	}
 
 	options := fileutil.LogReadOptions{
@@ -407,6 +397,11 @@ func parseIntWithDefault(s string, defaultVal int) int {
 		return v
 	}
 	return defaultVal
+}
+
+// clampInt restricts value to the range [minVal, maxVal].
+func clampInt(value, minVal, maxVal int) int {
+	return max(minVal, min(value, maxVal))
 }
 
 // Helper functions
