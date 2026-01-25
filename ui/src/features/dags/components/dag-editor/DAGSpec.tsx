@@ -77,21 +77,18 @@ function DAGSpec({ fileName, localDags }: Props) {
     [setCookie, flowchart, setFlowchart]
   );
 
-  // Fetch DAG specification data (spec YAML content)
-  const { data, isLoading } = useQuery(
-    '/dags/{fileName}/spec',
-    {
-      params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-        },
-        path: {
-          fileName: fileName,
-        },
+  // Fetch DAG specification data (spec YAML content) - no polling needed
+  // The spec is static and only changes when the user saves
+  const { data, isLoading } = useQuery('/dags/{fileName}/spec', {
+    params: {
+      query: {
+        remoteNode: appBarContext.selectedRemoteNode || 'local',
+      },
+      path: {
+        fileName: fileName,
       },
     },
-    { refreshInterval: 2000 }
-  );
+  });
 
   // localDags is passed from parent via SSE/polling - no need for redundant fetch
 

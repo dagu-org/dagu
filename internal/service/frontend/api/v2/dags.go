@@ -239,10 +239,12 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 	var loadErrs core.ErrorList
 	var errs []string
 
-	if errors.As(err, &loadErrs) {
-		errs = loadErrs.ToStringList()
-	} else {
-		return nil, err
+	if err != nil {
+		if errors.As(err, &loadErrs) {
+			errs = loadErrs.ToStringList()
+		} else {
+			return nil, err
+		}
 	}
 
 	// Log DAG spec update
