@@ -7,6 +7,7 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path"
@@ -351,16 +352,42 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 	return svc
 }
 
+// sanitizeURL removes sensitive query parameters from URLs for logging.
+func sanitizeURL(u string) string {
+	parsed, err := url.Parse(u)
+	if err != nil {
+		return u
+	}
+	q := parsed.Query()
+	if q.Has("token") {
+		q.Set("token", "[REDACTED]")
+		parsed.RawQuery = q.Encode()
+	}
+	return parsed.String()
+}
+
 // Serve starts the HTTP server and configures routes
 func (srv *Server) Serve(ctx context.Context) error {
 	// Setup logger for HTTP requests
+	logLevel := slog.LevelInfo
+	if srv.config.Core.Debug {
+		logLevel = slog.LevelDebug
+	}
 	requestLogger := httplog.NewLogger("http", httplog.Options{
-		LogLevel:         slog.LevelDebug,
+		LogLevel:         logLevel,
 		JSON:             srv.config.Core.LogFormat == "json",
 		Concise:          true,
-		RequestHeaders:   true,
+		RequestHeaders:   srv.config.Core.Debug,
 		MessageFieldName: "msg",
-		ResponseHeaders:  true,
+		ResponseHeaders:  false,
+		QuietDownRoutes:  []string{"/api/v2/events"},
+		QuietDownPeriod:  10 * time.Second,
+		ReplaceAttrsOverride: func(_ []string, a slog.Attr) slog.Attr {
+			if a.Key == "url" {
+				return slog.String("url", sanitizeURL(a.Value.String()))
+			}
+			return a
+		},
 	})
 
 	// Create router with middleware
