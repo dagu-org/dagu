@@ -49,16 +49,17 @@ import (
 
 // Server represents the HTTP server for the frontend application
 type Server struct {
-	apiV2          *apiv2.API
-	config         *config.Config
-	httpServer     *http.Server
-	funcsConfig    funcsConfig
-	builtinOIDCCfg *auth.BuiltinOIDCConfig // OIDC config for builtin auth mode
-	authService    *authservice.Service
-	auditService   *audit.Service
-	syncService    gitsync.Service // Git sync service for graceful shutdown
-	listener       net.Listener    // Optional pre-bound listener (for tests)
-	sseHub         *sse.Hub        // SSE hub for real-time updates
+	apiV2           *apiv2.API
+	config          *config.Config
+	httpServer      *http.Server
+	funcsConfig     funcsConfig
+	builtinOIDCCfg  *auth.BuiltinOIDCConfig // OIDC config for builtin auth mode
+	authService     *authservice.Service
+	auditService    *audit.Service
+	syncService     gitsync.Service        // Git sync service for graceful shutdown
+	listener        net.Listener           // Optional pre-bound listener (for tests)
+	sseHub          *sse.Hub               // SSE hub for real-time updates
+	metricsRegistry *prometheus.Registry   // Prometheus registry for metrics
 }
 
 // ServerOption is a functional option for configuring the Server
@@ -175,12 +176,13 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	}
 
 	srv := &Server{
-		apiV2:          apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, apiOpts...),
-		config:         cfg,
-		builtinOIDCCfg: builtinOIDCCfg,
-		authService:    authSvc,
-		auditService:   auditSvc,
-		syncService:    syncSvc,
+		apiV2:           apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, apiOpts...),
+		config:          cfg,
+		builtinOIDCCfg:  builtinOIDCCfg,
+		authService:     authSvc,
+		auditService:    auditSvc,
+		syncService:     syncSvc,
+		metricsRegistry: mr,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,
 			NavbarTitle:           cfg.UI.NavbarTitle,
@@ -546,7 +548,13 @@ func (srv *Server) setupTerminalRoute(ctx context.Context, r *chi.Mux, apiV2Base
 
 // setupSSERoute configures SSE routes for real-time updates
 func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV2BasePath string) {
-	srv.sseHub = sse.NewHub()
+	// Create SSE metrics if metrics registry is available
+	var sseMetrics *sse.Metrics
+	if srv.metricsRegistry != nil {
+		sseMetrics = sse.NewMetrics(srv.metricsRegistry)
+	}
+
+	srv.sseHub = sse.NewHub(sse.WithMetrics(sseMetrics))
 	srv.sseHub.Start()
 	srv.registerSSEFetchers()
 

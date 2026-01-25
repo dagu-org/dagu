@@ -20,6 +20,13 @@ func WithMaxClients(max int) HubOption {
 	}
 }
 
+// WithMetrics sets the metrics instance for the hub.
+func WithMetrics(m *Metrics) HubOption {
+	return func(h *Hub) {
+		h.metrics = m
+	}
+}
+
 // Hub manages all SSE client connections and their associated watchers.
 // It uses a pluggable fetcher pattern where each TopicType has a registered
 // FetchFunc that knows how to retrieve data for that topic type.
@@ -32,6 +39,7 @@ type Hub struct {
 	heartbeatTicker *time.Ticker
 	ctx             context.Context
 	cancel          context.CancelFunc
+	metrics         *Metrics
 }
 
 // NewHub creates a new SSE hub.
@@ -63,7 +71,7 @@ func (h *Hub) RegisterFetcher(topicType TopicType, fetcher FetchFunc) {
 
 // Start begins the hub's background tasks (heartbeat, etc.)
 func (h *Hub) Start() {
-	h.heartbeatTicker = time.NewTicker(30 * time.Second)
+	h.heartbeatTicker = time.NewTicker(10 * time.Second)
 	go h.heartbeatLoop()
 }
 
@@ -115,11 +123,17 @@ func (h *Hub) Subscribe(client *Client, topic string) error {
 	}
 
 	h.clients[client] = topic
+	if h.metrics != nil {
+		h.metrics.ClientConnected()
+	}
 
 	watcher, ok := h.watchers[topic]
 	if !ok {
-		watcher = NewWatcher(identifier, fetcher)
+		watcher = NewWatcher(identifier, fetcher, TopicType(topicType), h.metrics)
 		h.watchers[topic] = watcher
+		if h.metrics != nil {
+			h.metrics.WatcherStarted()
+		}
 		go watcher.Start(h.ctx)
 	}
 	watcher.AddClient(client)
@@ -137,6 +151,9 @@ func (h *Hub) Unsubscribe(client *Client) {
 		return
 	}
 	delete(h.clients, client)
+	if h.metrics != nil {
+		h.metrics.ClientDisconnected()
+	}
 
 	watcher, ok := h.watchers[topic]
 	if !ok {
@@ -147,6 +164,9 @@ func (h *Hub) Unsubscribe(client *Client) {
 	if watcher.ClientCount() == 0 {
 		watcher.Stop()
 		delete(h.watchers, topic)
+		if h.metrics != nil {
+			h.metrics.WatcherStopped()
+		}
 	}
 }
 
@@ -170,6 +190,8 @@ func (h *Hub) sendHeartbeats() {
 		if !client.Send(heartbeat) {
 			client.Close()
 			h.Unsubscribe(client)
+		} else if h.metrics != nil {
+			h.metrics.MessageSent(EventTypeHeartbeat)
 		}
 	}
 }

@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"sync"
 	"time"
+
+	"github.com/dagu-org/dagu/internal/cmn/backoff"
 )
 
 // Watcher polls for data changes on a specific topic
@@ -14,24 +16,37 @@ import (
 // It uses a pluggable FetchFunc to retrieve data, making it
 // generic across different data sources.
 type Watcher struct {
-	identifier string
-	fetcher    FetchFunc
-	clients    map[*Client]struct{}
-	mu         sync.RWMutex
-	lastHash   string
-	stopCh     chan struct{}
-	stopped    bool
+	identifier   string
+	topicType    TopicType
+	fetcher      FetchFunc
+	clients      map[*Client]struct{}
+	mu           sync.RWMutex
+	lastHash     string
+	stopCh       chan struct{}
+	stopped      bool
+	errorBackoff backoff.Retrier
+	backoffUntil time.Time
+	metrics      *Metrics
 }
 
 // NewWatcher creates a new watcher for the given topic.
 // The identifier is the portion after the topic type (e.g., "mydag/run123" for "dagrun:mydag/run123").
 // The fetcher is called to retrieve data and should return the same structure as the REST API.
-func NewWatcher(identifier string, fetcher FetchFunc) *Watcher {
+// The topicType is used for metrics labeling. Pass an empty TopicType if metrics are not needed.
+// The metrics parameter can be nil if metrics collection is not required.
+func NewWatcher(identifier string, fetcher FetchFunc, topicType TopicType, metrics *Metrics) *Watcher {
+	// Create exponential backoff policy: 1s initial, 2x factor, 30s max
+	policy := backoff.NewExponentialBackoffPolicy(time.Second)
+	policy.MaxInterval = 30 * time.Second
+
 	return &Watcher{
-		identifier: identifier,
-		fetcher:    fetcher,
-		clients:    make(map[*Client]struct{}),
-		stopCh:     make(chan struct{}),
+		identifier:   identifier,
+		topicType:    topicType,
+		fetcher:      fetcher,
+		clients:      make(map[*Client]struct{}),
+		stopCh:       make(chan struct{}),
+		errorBackoff: backoff.NewRetrier(policy),
+		metrics:      metrics,
 	}
 }
 
@@ -67,11 +82,24 @@ func (w *Watcher) Stop() {
 
 // poll fetches the current data and broadcasts if changed.
 func (w *Watcher) poll(ctx context.Context) {
+	// Skip polling during backoff period
+	if time.Now().Before(w.backoffUntil) {
+		return
+	}
+
 	response, err := w.fetcher(ctx, w.identifier)
 	if err != nil {
+		// Calculate next backoff interval
+		interval, _ := w.errorBackoff.Next(err)
+		w.backoffUntil = time.Now().Add(interval)
+		w.metrics.FetchError(string(w.topicType))
 		w.broadcast(&Event{Type: EventTypeError, Data: err.Error()})
 		return
 	}
+
+	// Reset backoff on successful fetch
+	w.errorBackoff.Reset()
+	w.backoffUntil = time.Time{}
 
 	data, err := json.Marshal(response)
 	if err != nil {
@@ -94,6 +122,8 @@ func (w *Watcher) broadcast(event *Event) {
 	for client := range w.clients {
 		if !client.Send(event) {
 			go client.Close() // Buffer full
+		} else {
+			w.metrics.MessageSent(event.Type)
 		}
 	}
 }
