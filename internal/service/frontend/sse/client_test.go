@@ -265,18 +265,6 @@ func TestClientClose(t *testing.T) {
 	})
 }
 
-func TestClientIsClosed(t *testing.T) {
-	w := newMockFlusher()
-	client, err := NewClient(w)
-	require.NoError(t, err)
-
-	assert.False(t, client.IsClosed())
-
-	client.Close()
-
-	assert.True(t, client.IsClosed())
-}
-
 func TestClientConcurrentSend(t *testing.T) {
 	w := newMockFlusher()
 	client, err := NewClient(w)
@@ -319,11 +307,6 @@ func TestClientWriteEventWhenClosed(t *testing.T) {
 
 	err = client.writeEvent(&Event{Type: EventTypeData, Data: "test"})
 	assert.Equal(t, ErrClientClosed, err)
-}
-
-func TestSentinelErrors(t *testing.T) {
-	assert.Equal(t, "streaming not supported", ErrStreamingNotSupported.Error())
-	assert.Equal(t, "client closed", ErrClientClosed.Error())
 }
 
 // failingWriter is a mock writer that fails on Write

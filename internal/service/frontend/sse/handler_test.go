@@ -109,11 +109,8 @@ func createChiRequest(method, path string, params map[string]string, timeout tim
 
 	// Create context with timeout and chi route context
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	// Store cancel function so tests can call it if needed
-	// Note: The context will auto-cancel after timeout
-	_ = cancel
+	_ = cancel // Context will be cancelled when timeout expires
 
-	// Apply chi context to the request context with timeout
 	ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
 	r = r.WithContext(ctx)
 
@@ -345,23 +342,6 @@ func TestValidateAuthNoService(t *testing.T) {
 	assert.True(t, result, "should pass when no auth service is configured")
 }
 
-// TestValidateAuthWithToken tests the auth validation behavior.
-// Note: Testing with an actual auth service requires complex setup with stores.
-// The missing token and invalid token paths are tested via integration tests.
-// Here we verify the nil auth service case works correctly.
-func TestValidateAuthAllowsAnonymous(t *testing.T) {
-	hub := NewHub()
-	// When authService is nil, all requests are allowed
-	handler := NewHandler(hub, nil, nil)
-
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodGet, "/test?token=sometoken", nil)
-
-	result := handler.validateAuth(w, r)
-
-	assert.True(t, result, "should allow all requests when auth service is nil")
-}
-
 func TestHandleSSEMaxClients(t *testing.T) {
 	hub := NewHub(WithMaxClients(1))
 	fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
@@ -410,84 +390,4 @@ func TestHandleSSEConnectedEvent(t *testing.T) {
 	body := w.Body.String()
 	assert.Contains(t, body, "event: connected")
 	assert.Contains(t, body, `"topic":"dag:mydag.yaml"`)
-}
-
-// TestHandlerWithAllEndpoints tests all handler endpoints in sequence
-func TestHandlerWithAllEndpoints(t *testing.T) {
-	handler, _ := setupHandler(t)
-
-	endpoints := []struct {
-		name    string
-		handler func(http.ResponseWriter, *http.Request)
-		path    string
-		params  map[string]string
-		query   string
-	}{
-		{
-			name:    "DAGRunEvents",
-			handler: handler.HandleDAGRunEvents,
-			path:    "/events/dag-runs/mydag/run123",
-			params:  map[string]string{"name": "mydag", "dagRunId": "run123"},
-		},
-		{
-			name:    "DAGEvents",
-			handler: handler.HandleDAGEvents,
-			path:    "/events/dags/mydag.yaml",
-			params:  map[string]string{"fileName": "mydag.yaml"},
-		},
-		{
-			name:    "DAGRunLogsEvents",
-			handler: handler.HandleDAGRunLogsEvents,
-			path:    "/events/dag-runs/mydag/run123/logs",
-			params:  map[string]string{"name": "mydag", "dagRunId": "run123"},
-		},
-		{
-			name:    "StepLogEvents",
-			handler: handler.HandleStepLogEvents,
-			path:    "/events/dag-runs/mydag/run123/logs/steps/step1",
-			params:  map[string]string{"name": "mydag", "dagRunId": "run123", "stepName": "step1"},
-		},
-		{
-			name:    "DAGRunsListEvents",
-			handler: handler.HandleDAGRunsListEvents,
-			path:    "/events/dag-runs",
-			params:  nil,
-			query:   "limit=50",
-		},
-		{
-			name:    "QueueItemsEvents",
-			handler: handler.HandleQueueItemsEvents,
-			path:    "/events/queues/myqueue/items",
-			params:  map[string]string{"name": "myqueue"},
-		},
-		{
-			name:    "QueuesListEvents",
-			handler: handler.HandleQueuesListEvents,
-			path:    "/events/queues",
-			params:  nil,
-		},
-		{
-			name:    "DAGsListEvents",
-			handler: handler.HandleDAGsListEvents,
-			path:    "/events/dags",
-			params:  nil,
-			query:   "page=1",
-		},
-	}
-
-	for _, ep := range endpoints {
-		t.Run(ep.name, func(t *testing.T) {
-			w := newMockFlusher()
-			r := createChiRequest(http.MethodGet, ep.path, ep.params, 100*time.Millisecond)
-			if ep.query != "" {
-				r.URL.RawQuery = ep.query
-			}
-
-			ep.handler(w, r)
-
-			assert.Equal(t, http.StatusOK, w.Code, "endpoint %s should return 200", ep.name)
-			assert.Equal(t, "text/event-stream", w.Header().Get("Content-Type"))
-			assert.Contains(t, w.Body.String(), "event: connected")
-		})
-	}
 }

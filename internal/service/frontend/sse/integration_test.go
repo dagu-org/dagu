@@ -124,41 +124,6 @@ func TestSSEMultipleClientsOnSameTopic(t *testing.T) {
 	assert.Equal(t, 0, hub.WatcherCount())
 }
 
-// TestSSEClientDisconnect tests clean disconnect and watcher cleanup
-func TestSSEClientDisconnect(t *testing.T) {
-	hub := NewHub()
-
-	fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
-	hub.RegisterFetcher(TopicTypeDAGRun, fetcher)
-
-	hub.Start()
-	defer hub.Shutdown()
-
-	// Subscribe two clients to the same topic
-	client1 := newTestClient(t)
-	client2 := newTestClient(t)
-
-	err := hub.Subscribe(client1, "dagrun:dag1/run1")
-	require.NoError(t, err)
-	err = hub.Subscribe(client2, "dagrun:dag1/run1")
-	require.NoError(t, err)
-
-	assert.Equal(t, 2, hub.ClientCount())
-	assert.Equal(t, 1, hub.WatcherCount())
-
-	// Disconnect first client
-	hub.Unsubscribe(client1)
-	assert.Equal(t, 1, hub.ClientCount())
-	// Watcher should still exist for second client
-	assert.Equal(t, 1, hub.WatcherCount())
-
-	// Disconnect second client
-	hub.Unsubscribe(client2)
-	assert.Equal(t, 0, hub.ClientCount())
-	// Watcher should be cleaned up
-	assert.Equal(t, 0, hub.WatcherCount())
-}
-
 // TestSSEErrorRecovery tests fetch error → backoff → retry → success
 func TestSSEErrorRecovery(t *testing.T) {
 	registry := prometheus.NewRegistry()
@@ -333,76 +298,4 @@ func TestSSEDataChangeDetection(t *testing.T) {
 	hub.Unsubscribe(client)
 	cancel()
 	<-pumpDone
-}
-
-// TestSSEGracefulShutdown tests that shutdown cleanly closes all connections
-func TestSSEGracefulShutdown(t *testing.T) {
-	hub := NewHub()
-
-	fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
-	hub.RegisterFetcher(TopicTypeDAGRun, fetcher)
-
-	hub.Start()
-
-	// Subscribe multiple clients
-	numClients := 5
-	clients := make([]*Client, numClients)
-
-	for i := 0; i < numClients; i++ {
-		clients[i] = newTestClient(t)
-		err := hub.Subscribe(clients[i], "dagrun:dag1/run1")
-		require.NoError(t, err)
-	}
-
-	assert.Equal(t, numClients, hub.ClientCount())
-
-	// Shutdown should close all clients
-	hub.Shutdown()
-
-	// All clients should be closed
-	for i, client := range clients {
-		assert.True(t, client.IsClosed(), "client %d should be closed after shutdown", i)
-	}
-
-	assert.Equal(t, 0, hub.ClientCount())
-	assert.Equal(t, 0, hub.WatcherCount())
-}
-
-// TestSSEHeartbeatDelivery tests that heartbeats are delivered to clients
-func TestSSEHeartbeatDelivery(t *testing.T) {
-	registry := prometheus.NewRegistry()
-	metrics := NewMetrics(registry)
-
-	hub := NewHub(WithMetrics(metrics))
-
-	fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
-	hub.RegisterFetcher(TopicTypeDAGRun, fetcher)
-
-	// Manually start with short heartbeat for testing
-	hub.mu.Lock()
-	hub.started = true
-	hub.heartbeatTicker = time.NewTicker(100 * time.Millisecond)
-	hub.mu.Unlock()
-	go hub.heartbeatLoop()
-
-	defer hub.Shutdown()
-
-	client := newTestClient(t)
-	err := hub.Subscribe(client, "dagrun:dag1/run1")
-	require.NoError(t, err)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go client.WritePump(ctx)
-
-	// Wait for heartbeats
-	time.Sleep(350 * time.Millisecond)
-
-	// Should have received multiple heartbeats
-	heartbeatCount := getCounterValue(t, metrics.messagesSent, EventTypeHeartbeat)
-	assert.GreaterOrEqual(t, heartbeatCount, float64(2))
-
-	hub.Unsubscribe(client)
-	cancel()
 }

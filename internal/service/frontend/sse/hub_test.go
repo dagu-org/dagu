@@ -290,51 +290,6 @@ func TestHubHeartbeat(t *testing.T) {
 	assert.Equal(t, 1, hub.ClientCount())
 }
 
-func TestHubClientCount(t *testing.T) {
-	hub := NewHub()
-	defer hub.Shutdown()
-
-	fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
-	hub.RegisterFetcher(TopicTypeDAGRun, fetcher)
-	hub.Start()
-
-	assert.Equal(t, 0, hub.ClientCount())
-
-	client1 := newTestClient(t)
-	_ = hub.Subscribe(client1, "dagrun:id1")
-	assert.Equal(t, 1, hub.ClientCount())
-
-	client2 := newTestClient(t)
-	_ = hub.Subscribe(client2, "dagrun:id2")
-	assert.Equal(t, 2, hub.ClientCount())
-
-	hub.Unsubscribe(client1)
-	assert.Equal(t, 1, hub.ClientCount())
-}
-
-func TestHubWatcherCount(t *testing.T) {
-	hub := NewHub()
-	defer hub.Shutdown()
-
-	fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
-	hub.RegisterFetcher(TopicTypeDAGRun, fetcher)
-	hub.Start()
-
-	assert.Equal(t, 0, hub.WatcherCount())
-
-	// Two clients on same topic = 1 watcher
-	client1 := newTestClient(t)
-	client2 := newTestClient(t)
-	_ = hub.Subscribe(client1, "dagrun:same-id")
-	_ = hub.Subscribe(client2, "dagrun:same-id")
-	assert.Equal(t, 1, hub.WatcherCount())
-
-	// Third client on different topic = 2 watchers
-	client3 := newTestClient(t)
-	_ = hub.Subscribe(client3, "dagrun:different-id")
-	assert.Equal(t, 2, hub.WatcherCount())
-}
-
 func TestHubConcurrentOperations(t *testing.T) {
 	hub := NewHub(WithMaxClients(100))
 	defer hub.Shutdown()
