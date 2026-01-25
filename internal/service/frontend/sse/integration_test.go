@@ -14,11 +14,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// speedUpHubWatchers configures all watchers in the hub to use fast intervals for testing
+// speedUpHubWatchers configures all watchers in the hub to use fast intervals for testing.
+// Note: This must be called BEFORE watchers start polling to avoid races.
+// In tests, call this after Subscribe but use proper synchronization.
 func speedUpHubWatchers(h *Hub) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	for _, w := range h.watchers {
+		// Use watcher's mutex to protect interval fields
+		w.mu.Lock()
 		w.baseInterval = 50 * time.Millisecond
 		w.maxInterval = 100 * time.Millisecond
 		w.currentInterval = 50 * time.Millisecond
@@ -26,6 +30,7 @@ func speedUpHubWatchers(h *Hub) {
 		policy := backoff.NewExponentialBackoffPolicy(50 * time.Millisecond)
 		policy.MaxInterval = 100 * time.Millisecond
 		w.errorBackoff = backoff.NewRetrier(policy)
+		w.mu.Unlock()
 	}
 }
 
@@ -289,9 +294,9 @@ func TestSSEDataChangeDetection(t *testing.T) {
 	hub := NewHub()
 
 	// Fetcher that returns same data for multiple calls
-	callCount := 0
+	var callCount int32
 	fetcher := func(_ context.Context, _ string) (any, error) {
-		callCount++
+		atomic.AddInt32(&callCount, 1)
 		// Always return same data
 		return map[string]string{"stable": "data"}, nil
 	}
@@ -320,7 +325,7 @@ func TestSSEDataChangeDetection(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Fetch should have been called multiple times
-	assert.GreaterOrEqual(t, callCount, 2)
+	assert.GreaterOrEqual(t, atomic.LoadInt32(&callCount), int32(2))
 
 	hub.Unsubscribe(client)
 	cancel()

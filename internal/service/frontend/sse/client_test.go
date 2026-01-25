@@ -118,7 +118,6 @@ func TestClientWritePump(t *testing.T) {
 		require.NoError(t, err)
 
 		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 
 		// Start write pump in background
 		done := make(chan struct{})
@@ -135,24 +134,17 @@ func TestClientWritePump(t *testing.T) {
 		// Give time for the event to be processed
 		time.Sleep(50 * time.Millisecond)
 
-		// Verify the output
+		// Cancel context and wait for pump to stop BEFORE reading from w
+		cancel()
+		<-done
+
+		// Now safe to verify the output (pump is stopped)
 		output := w.Body.String()
 		assert.Contains(t, output, "event: data")
 		assert.Contains(t, output, `data: {"key":"value"}`)
 
 		// Verify flush was called
 		assert.GreaterOrEqual(t, w.flushCount, 1)
-
-		// Cancel context to stop pump
-		cancel()
-
-		// Wait for pump to stop
-		select {
-		case <-done:
-			// Success
-		case <-time.After(time.Second):
-			t.Fatal("WritePump did not stop on context cancel")
-		}
 	})
 
 	t.Run("stops on context cancel", func(t *testing.T) {
@@ -287,10 +279,13 @@ func TestClientConcurrentSend(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
-	// Start write pump
-	go client.WritePump(ctx)
+	// Start write pump with done channel to know when it exits
+	pumpDone := make(chan struct{})
+	go func() {
+		client.WritePump(ctx)
+		close(pumpDone)
+	}()
 
 	// Concurrent sends
 	var wg sync.WaitGroup
@@ -309,7 +304,11 @@ func TestClientConcurrentSend(t *testing.T) {
 	// Give time for events to be processed
 	time.Sleep(100 * time.Millisecond)
 
-	// Verify some events were written (some may have been dropped due to buffer)
+	// Stop the WritePump and wait for it to exit before reading
+	cancel()
+	<-pumpDone
+
+	// Now safe to read from the buffer
 	output := w.Body.String()
 	assert.Contains(t, output, "event: data")
 }

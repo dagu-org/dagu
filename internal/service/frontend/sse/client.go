@@ -75,8 +75,16 @@ func (c *Client) writeEvent(event *Event) error {
 }
 
 // Send queues an event to be sent to the client.
-// Returns false if the client buffer is full.
+// Returns false if the client is closed or buffer is full.
+// Thread-safe: holds lock during entire operation to prevent race with Close().
 func (c *Client) Send(event *Event) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.closed {
+		return false
+	}
+
 	select {
 	case c.send <- event:
 		return true

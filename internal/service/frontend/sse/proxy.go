@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -31,7 +32,10 @@ func (h *Handler) proxyToRemoteNode(w http.ResponseWriter, r *http.Request, node
 	applyNodeAuth(req, node)
 
 	client := &http.Client{
-		Timeout: 30 * time.Second,
+		// Timeout: 0 is safe for SSE because:
+		// 1. Request is created with r.Context() which is cancelled when client disconnects
+		// 2. client.Do() will return with context.Canceled error when that happens
+		Timeout: 0,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: node.SkipTLSVerify, //nolint:gosec
@@ -45,7 +49,11 @@ func (h *Handler) proxyToRemoteNode(w http.ResponseWriter, r *http.Request, node
 
 	resp, err := client.Do(req)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to connect to remote node: %v", err), http.StatusBadGateway)
+		if r.Context().Err() != nil {
+			// Client cancelled or connection closed - don't write error
+			return
+		}
+		http.Error(w, "failed to connect to remote node", http.StatusBadGateway)
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()
@@ -76,16 +84,18 @@ func buildRemoteURL(baseURL, topic, token string) string {
 	}
 
 	path := buildPathForTopic(TopicType(topicType), identifier)
-	url := baseURL + path
+	result := baseURL + path
 
 	if token == "" {
-		return url
+		return result
 	}
 
-	if strings.Contains(url, "?") {
-		return url + "&token=" + token
+	// URL-encode the token to handle special characters
+	encodedToken := url.QueryEscape(token)
+	if strings.Contains(result, "?") {
+		return result + "&token=" + encodedToken
 	}
-	return url + "?token=" + token
+	return result + "?token=" + encodedToken
 }
 
 // buildPathForTopic returns the URL path for the given topic type and identifier.

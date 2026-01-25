@@ -112,7 +112,7 @@ func TestWatcherStartStop(t *testing.T) {
 		ctx := context.Background()
 
 		// Start watcher in background
-		go watcher.Start(ctx)
+		watcher.StartAsync(ctx)
 
 		// Wait for initial poll and at least one more (50ms interval)
 		time.Sleep(150 * time.Millisecond)
@@ -131,7 +131,7 @@ func TestWatcherStartStop(t *testing.T) {
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
 		ctx := context.Background()
-		go watcher.Start(ctx)
+		watcher.StartAsync(ctx)
 		time.Sleep(100 * time.Millisecond)
 
 		// Multiple stops should not panic
@@ -149,18 +149,21 @@ func TestWatcherStartStop(t *testing.T) {
 
 		ctx, cancel := context.WithCancel(context.Background())
 
-		done := make(chan struct{})
-		go func() {
-			watcher.Start(ctx)
-			close(done)
-		}()
+		watcher.StartAsync(ctx)
 
 		time.Sleep(100 * time.Millisecond)
 		cancel()
 
+		// Stop should return quickly since context was cancelled
+		done := make(chan struct{})
+		go func() {
+			watcher.Stop()
+			close(done)
+		}()
+
 		select {
 		case <-done:
-			// Success
+			// Success - Stop returned quickly
 		case <-time.After(2 * time.Second):
 			t.Fatal("watcher did not stop on context cancel")
 		}
@@ -184,7 +187,7 @@ func TestWatcherBroadcast(t *testing.T) {
 		assert.Equal(t, 2, watcher.ClientCount())
 
 		ctx := context.Background()
-		go watcher.Start(ctx)
+		watcher.StartAsync(ctx)
 
 		// Wait for broadcast
 		time.Sleep(100 * time.Millisecond)
@@ -207,7 +210,7 @@ func TestWatcherBroadcast(t *testing.T) {
 		assert.Equal(t, 1, watcher.ClientCount())
 
 		ctx := context.Background()
-		go watcher.Start(ctx)
+		watcher.StartAsync(ctx)
 
 		// Wait for broadcast attempt and client removal
 		time.Sleep(200 * time.Millisecond)
@@ -243,7 +246,7 @@ func TestWatcherHashBasedChangeDetection(t *testing.T) {
 		close(pumpDone)
 	}()
 
-	go watcher.Start(ctx)
+	watcher.StartAsync(ctx)
 
 	// Wait for multiple polls (50ms interval)
 	time.Sleep(250 * time.Millisecond)
@@ -270,7 +273,7 @@ func TestWatcherBackoff(t *testing.T) {
 	// Start write pump
 	go client.WritePump(ctx)
 
-	go watcher.Start(ctx)
+	watcher.StartAsync(ctx)
 
 	// Wait for multiple poll attempts with backoff (50ms initial, 100ms max)
 	// In 250ms we should see ~3 attempts
@@ -313,7 +316,7 @@ func TestWatcherConcurrentOperations(t *testing.T) {
 	watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
 	ctx := context.Background()
-	go watcher.Start(ctx)
+	watcher.StartAsync(ctx)
 
 	var wg sync.WaitGroup
 
@@ -357,7 +360,7 @@ func TestWatcherMetricsIntegration(t *testing.T) {
 	// Start write pump
 	go client.WritePump(ctx)
 
-	go watcher.Start(ctx)
+	watcher.StartAsync(ctx)
 
 	// Wait for some activity
 	time.Sleep(100 * time.Millisecond)
@@ -389,7 +392,7 @@ func TestWatcherFetchErrorMetrics(t *testing.T) {
 	// Start write pump
 	go client.WritePump(ctx)
 
-	go watcher.Start(ctx)
+	watcher.StartAsync(ctx)
 
 	// Wait for error to be recorded
 	time.Sleep(100 * time.Millisecond)
@@ -566,7 +569,7 @@ func TestWatcherAdaptivePolling(t *testing.T) {
 		watcher.maxInterval = 500 * time.Millisecond
 		ctx := context.Background()
 
-		go watcher.Start(ctx)
+		watcher.StartAsync(ctx)
 
 		// Wait for a few polls
 		// First poll: immediate + 50ms fetch, then interval adapts to ~150ms (3 * 50ms)
@@ -644,7 +647,7 @@ func TestWatcherFetchDurationMetrics(t *testing.T) {
 
 	ctx := context.Background()
 	go client.WritePump(ctx)
-	go watcher.Start(ctx)
+	watcher.StartAsync(ctx)
 
 	// Wait for a poll to complete
 	time.Sleep(200 * time.Millisecond)

@@ -69,11 +69,10 @@ func NewWatcher(identifier string, fetcher FetchFunc, topicType TopicType, metri
 
 // Start begins polling for data changes and broadcasts updates to clients.
 // Uses adaptive polling intervals based on fetch duration.
+// IMPORTANT: Call wg.Add(1) before spawning the goroutine that calls this method.
+// This method should be called via StartAsync for proper WaitGroup handling.
 // Note: The Hub is responsible for tracking watcher metrics (WatcherStarted/WatcherStopped).
 func (w *Watcher) Start(ctx context.Context) {
-	w.wg.Add(1)
-	defer w.wg.Done()
-
 	// Use Timer instead of Ticker for variable intervals
 	timer := time.NewTimer(0) // Immediate first poll
 	defer timer.Stop()
@@ -86,9 +85,22 @@ func (w *Watcher) Start(ctx context.Context) {
 			return
 		case <-timer.C:
 			w.poll(ctx)
-			timer.Reset(w.currentInterval) // Adaptive interval
+			w.mu.RLock()
+			interval := w.currentInterval
+			w.mu.RUnlock()
+			timer.Reset(interval) // Adaptive interval
 		}
 	}
+}
+
+// StartAsync starts the watcher in a background goroutine with proper WaitGroup handling.
+// This ensures wg.Add(1) is called BEFORE the goroutine starts, preventing races with Stop().
+func (w *Watcher) StartAsync(ctx context.Context) {
+	w.wg.Add(1)
+	go func() {
+		defer w.wg.Done()
+		w.Start(ctx)
+	}()
 }
 
 // Stop signals the watcher to stop polling and waits for it to finish.
@@ -134,6 +146,9 @@ func (w *Watcher) poll(ctx context.Context) {
 // adaptInterval adjusts the polling interval based on fetch duration.
 // Uses EMA smoothing to prevent erratic interval changes.
 func (w *Watcher) adaptInterval(fetchDuration time.Duration) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
 	target := time.Duration(intervalMultiplier) * fetchDuration
 	target = max(w.baseInterval, min(target, w.maxInterval))
 
@@ -148,13 +163,18 @@ func (w *Watcher) adaptInterval(fetchDuration time.Duration) {
 
 // isInBackoffPeriod returns true if we're still in an error backoff period.
 func (w *Watcher) isInBackoffPeriod() bool {
-	return time.Now().Before(w.backoffUntil)
+	w.mu.RLock()
+	until := w.backoffUntil
+	w.mu.RUnlock()
+	return time.Now().Before(until)
 }
 
 // handleFetchError applies exponential backoff and broadcasts the error.
 func (w *Watcher) handleFetchError(err error) {
+	w.mu.Lock()
 	interval, _ := w.errorBackoff.Next(err)
 	w.backoffUntil = time.Now().Add(interval)
+	w.mu.Unlock()
 
 	if w.metrics != nil {
 		w.metrics.FetchError(string(w.topicType))
@@ -165,6 +185,9 @@ func (w *Watcher) handleFetchError(err error) {
 // resetBackoff clears the backoff state after a successful fetch.
 // If recovering from an error, also resets polling interval to base for responsiveness.
 func (w *Watcher) resetBackoff() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
 	recoveringFromError := !w.backoffUntil.IsZero()
 
 	w.errorBackoff.Reset()
@@ -184,21 +207,42 @@ func (w *Watcher) broadcastIfChanged(response any) {
 	}
 
 	hash := computeHash(data)
-	if hash != w.lastHash {
+
+	w.mu.Lock()
+	changed := hash != w.lastHash
+	if changed {
 		w.lastHash = hash
+	}
+	w.mu.Unlock()
+
+	if changed {
 		w.broadcast(&Event{Type: EventTypeData, Data: string(data)})
 	}
 }
 
 // broadcast sends an event to all subscribed clients.
 func (w *Watcher) broadcast(event *Event) {
+	// Collect clients under lock
 	w.mu.RLock()
-	defer w.mu.RUnlock()
-
+	clients := make([]*Client, 0, len(w.clients))
 	for client := range w.clients {
+		clients = append(clients, client)
+	}
+	w.mu.RUnlock()
+
+	// Send outside lock to reduce contention
+	var sentCount int
+	for _, client := range clients {
 		if !client.Send(event) {
 			client.Close()
-		} else if w.metrics != nil {
+		} else {
+			sentCount++
+		}
+	}
+
+	// Record metrics outside lock
+	if w.metrics != nil {
+		for i := 0; i < sentCount; i++ {
 			w.metrics.MessageSent(event.Type)
 		}
 	}

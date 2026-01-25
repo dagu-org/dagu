@@ -293,6 +293,7 @@ func TestHubHeartbeat(t *testing.T) {
 	hub.started = true
 	hub.heartbeatTicker = time.NewTicker(100 * time.Millisecond)
 	hub.mu.Unlock()
+	hub.heartbeatWg.Add(1) // Must add before starting goroutine
 	go hub.heartbeatLoop()
 
 	client := newTestClient(t)

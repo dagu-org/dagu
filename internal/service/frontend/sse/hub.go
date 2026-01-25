@@ -40,6 +40,7 @@ type Hub struct {
 	fetchers        map[TopicType]FetchFunc // topicType -> fetcher
 	maxClients      int
 	heartbeatTicker *time.Ticker
+	heartbeatWg     sync.WaitGroup // Tracks heartbeat goroutine for clean shutdown
 	ctx             context.Context
 	cancel          context.CancelFunc
 	metrics         *Metrics
@@ -83,6 +84,7 @@ func (h *Hub) Start() {
 	}
 	h.started = true
 	h.heartbeatTicker = time.NewTicker(heartbeatInterval)
+	h.heartbeatWg.Add(1)
 	go h.heartbeatLoop()
 }
 
@@ -92,6 +94,10 @@ func (h *Hub) Shutdown() {
 	if h.heartbeatTicker != nil {
 		h.heartbeatTicker.Stop()
 	}
+
+	// Wait for heartbeat goroutine to exit BEFORE acquiring lock
+	// This prevents deadlock: heartbeat may be blocked in Unsubscribe() waiting for lock
+	h.heartbeatWg.Wait()
 
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -145,7 +151,7 @@ func (h *Hub) Subscribe(client *Client, topic string) error {
 		if h.metrics != nil {
 			h.metrics.WatcherStarted()
 		}
-		go watcher.Start(h.ctx)
+		watcher.StartAsync(h.ctx)
 	}
 	watcher.AddClient(client)
 
@@ -183,6 +189,7 @@ func (h *Hub) Unsubscribe(client *Client) {
 
 // heartbeatLoop sends heartbeat events to all clients periodically
 func (h *Hub) heartbeatLoop() {
+	defer h.heartbeatWg.Done()
 	for {
 		select {
 		case <-h.ctx.Done():

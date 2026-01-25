@@ -3,12 +3,15 @@ package sse
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/go-chi/chi/v5"
 )
+
+const maxQueryLength = 4096
 
 // Handler handles SSE connections for various data types.
 // Each handler method builds a topic string and delegates to handleSSE.
@@ -48,7 +51,7 @@ func (h *Handler) HandleDAGRunLogsEvents(w http.ResponseWriter, r *http.Request)
 	name := chi.URLParam(r, "name")
 	dagRunID := chi.URLParam(r, "dagRunId")
 	identifier := name + "/" + dagRunID
-	if q := r.URL.RawQuery; q != "" {
+	if q := sanitizeQueryForTopic(r.URL.RawQuery); q != "" {
 		identifier += "?" + q
 	}
 	h.handleSSE(w, r, buildTopic(TopicTypeDAGRunLogs, identifier))
@@ -66,7 +69,7 @@ func (h *Handler) HandleStepLogEvents(w http.ResponseWriter, r *http.Request) {
 // HandleDAGRunsListEvents handles SSE connections for the dashboard DAG runs list.
 // Endpoint: GET /events/dag-runs
 func (h *Handler) HandleDAGRunsListEvents(w http.ResponseWriter, r *http.Request) {
-	h.handleSSE(w, r, buildTopic(TopicTypeDAGRuns, r.URL.RawQuery))
+	h.handleSSE(w, r, buildTopic(TopicTypeDAGRuns, sanitizeQueryForTopic(r.URL.RawQuery)))
 }
 
 // HandleQueueItemsEvents handles SSE connections for queue items.
@@ -79,18 +82,41 @@ func (h *Handler) HandleQueueItemsEvents(w http.ResponseWriter, r *http.Request)
 // HandleQueuesListEvents handles SSE connections for the queue list.
 // Endpoint: GET /events/queues
 func (h *Handler) HandleQueuesListEvents(w http.ResponseWriter, r *http.Request) {
-	h.handleSSE(w, r, buildTopic(TopicTypeQueues, r.URL.RawQuery))
+	h.handleSSE(w, r, buildTopic(TopicTypeQueues, sanitizeQueryForTopic(r.URL.RawQuery)))
 }
 
 // HandleDAGsListEvents handles SSE connections for the DAGs list.
 // Endpoint: GET /events/dags
 func (h *Handler) HandleDAGsListEvents(w http.ResponseWriter, r *http.Request) {
-	h.handleSSE(w, r, buildTopic(TopicTypeDAGsList, r.URL.RawQuery))
+	h.handleSSE(w, r, buildTopic(TopicTypeDAGsList, sanitizeQueryForTopic(r.URL.RawQuery)))
 }
 
 // buildTopic constructs a topic string from a topic type and identifier parts.
 func buildTopic(topicType TopicType, parts ...string) string {
 	return fmt.Sprintf("%s:%s", topicType, strings.Join(parts, "/"))
+}
+
+// sanitizeQueryForTopic removes sensitive params (token, remoteNode) from query string
+// and limits length to prevent unbounded topic keys.
+func sanitizeQueryForTopic(rawQuery string) string {
+	if rawQuery == "" {
+		return ""
+	}
+
+	values, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		return ""
+	}
+
+	// Remove sensitive parameters that should not be part of topic identity
+	values.Del("token")
+	values.Del("remoteNode")
+
+	result := values.Encode()
+	if len(result) > maxQueryLength {
+		return result[:maxQueryLength]
+	}
+	return result
 }
 
 // handleSSE is the common SSE handling logic shared by all handlers.
