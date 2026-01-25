@@ -462,32 +462,48 @@ func TestWatcherAdaptInterval(t *testing.T) {
 		watcher.adaptInterval(10 * time.Millisecond)
 
 		// 3 * 10ms = 30ms, which is less than base interval (1s)
-		// So it should stay at base interval
+		// EMA: 0.3 * 1s + 0.7 * 1s = 1s (both target and current are at base)
 		assert.Equal(t, defaultBaseInterval, watcher.currentInterval)
 	})
 
-	t.Run("slow fetch increases interval proportionally", func(t *testing.T) {
+	t.Run("slow fetch increases interval gradually with EMA", func(t *testing.T) {
 		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
-		// Simulate a slow fetch (500ms)
+		// Simulate a slow fetch (500ms), target = 1.5s
 		watcher.adaptInterval(500 * time.Millisecond)
 
-		// 3 * 500ms = 1.5s, which is greater than base interval
-		expected := 1500 * time.Millisecond
+		// EMA: 0.3 * 1.5s + 0.7 * 1s = 0.45s + 0.7s = 1.15s
+		expected := time.Duration(float64(1500*time.Millisecond)*0.3 + float64(1000*time.Millisecond)*0.7)
 		assert.Equal(t, expected, watcher.currentInterval)
 	})
 
-	t.Run("very slow fetch is capped at max interval", func(t *testing.T) {
+	t.Run("very slow fetch is smoothed not instant capped", func(t *testing.T) {
 		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
-		// Simulate a very slow fetch (5s)
+		// Simulate a very slow fetch (5s), target = 10s (capped)
 		watcher.adaptInterval(5 * time.Second)
 
-		// 3 * 5s = 15s, which exceeds max interval (10s)
-		// So it should be capped at max interval
-		assert.Equal(t, defaultMaxInterval, watcher.currentInterval)
+		// EMA: 0.3 * 10s + 0.7 * 1s = 3s + 0.7s = 3.7s
+		// Not instant jump to 10s
+		expected := time.Duration(float64(10*time.Second)*0.3 + float64(1*time.Second)*0.7)
+		assert.Equal(t, expected, watcher.currentInterval)
+		assert.Less(t, watcher.currentInterval, defaultMaxInterval, "should be smoothed, not instant max")
+	})
+
+	t.Run("repeated slow fetches converge to target", func(t *testing.T) {
+		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
+		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
+
+		// Simulate multiple slow fetches (2s each), target = 6s
+		for i := 0; i < 10; i++ {
+			watcher.adaptInterval(2 * time.Second)
+		}
+
+		// After many iterations, should converge close to target (6s)
+		assert.GreaterOrEqual(t, watcher.currentInterval, 5*time.Second, "should converge toward 6s")
+		assert.LessOrEqual(t, watcher.currentInterval, 6*time.Second, "should not exceed target")
 	})
 }
 
@@ -524,6 +540,50 @@ func TestWatcherAdaptivePolling(t *testing.T) {
 		// 3 * 400ms = 1.2s, but actual timing may vary slightly
 		assert.GreaterOrEqual(t, watcher.currentInterval, 1100*time.Millisecond, "interval should be at least 1.1s")
 		assert.LessOrEqual(t, watcher.currentInterval, 1500*time.Millisecond, "interval should be at most 1.5s")
+	})
+}
+
+func TestWatcherErrorRecoveryResetsInterval(t *testing.T) {
+	t.Run("interval resets after error recovery", func(t *testing.T) {
+		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
+		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
+
+		// First, adapt to a slow fetch to increase interval
+		for i := 0; i < 5; i++ {
+			watcher.adaptInterval(2 * time.Second)
+		}
+
+		// Interval should now be significantly above base
+		assert.Greater(t, watcher.currentInterval, 3*time.Second, "interval should be elevated after slow fetches")
+
+		// Simulate an error which sets backoff
+		watcher.handleFetchError(errors.New("test error"))
+		assert.True(t, watcher.isInBackoffPeriod())
+
+		// Now reset backoff (simulating successful fetch after recovery)
+		watcher.resetBackoff()
+
+		// Interval should reset to base for responsive recovery
+		assert.Equal(t, defaultBaseInterval, watcher.currentInterval, "interval should reset to base after error recovery")
+	})
+
+	t.Run("interval remains elevated on normal reset", func(t *testing.T) {
+		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
+		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
+
+		// Adapt to slow fetches
+		for i := 0; i < 5; i++ {
+			watcher.adaptInterval(2 * time.Second)
+		}
+
+		elevated := watcher.currentInterval
+		assert.Greater(t, elevated, 3*time.Second, "interval should be elevated")
+
+		// Call resetBackoff without being in error state
+		watcher.resetBackoff()
+
+		// Interval should stay elevated (no reset since we weren't in backoff)
+		assert.Equal(t, elevated, watcher.currentInterval, "interval should stay elevated without error recovery")
 	})
 }
 

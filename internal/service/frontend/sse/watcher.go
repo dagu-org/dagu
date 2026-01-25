@@ -16,6 +16,7 @@ const (
 	defaultBaseInterval = time.Second      // Minimum polling interval
 	defaultMaxInterval  = 10 * time.Second // Maximum polling interval cap
 	intervalMultiplier  = 3                // interval = multiplier * fetchDuration
+	smoothingFactor     = 0.3              // EMA alpha: weight for new value (0.3 = 30% new, 70% old)
 )
 
 // Watcher polls for data changes on a specific topic
@@ -130,12 +131,22 @@ func (w *Watcher) poll(ctx context.Context) {
 	w.broadcastIfChanged(response)
 }
 
-// adaptInterval adjusts the polling interval based on fetch duration.
-// Rule: interval = max(baseInterval, intervalMultiplier * fetchDuration), capped at maxInterval.
-// This ensures slow queries get longer intervals to reduce server load.
+// adaptInterval adjusts the polling interval based on fetch duration using EMA smoothing.
+// Rule: target = max(baseInterval, intervalMultiplier * fetchDuration), capped at maxInterval.
+// EMA smoothing prevents erratic interval swings: new = α×target + (1-α)×current
 func (w *Watcher) adaptInterval(fetchDuration time.Duration) {
-	adapted := time.Duration(intervalMultiplier) * fetchDuration
-	w.currentInterval = max(w.baseInterval, min(adapted, w.maxInterval))
+	// Calculate target interval
+	target := time.Duration(intervalMultiplier) * fetchDuration
+	target = max(w.baseInterval, min(target, w.maxInterval))
+
+	// Apply EMA smoothing to prevent erratic swings
+	smoothed := time.Duration(
+		float64(target)*smoothingFactor +
+			float64(w.currentInterval)*(1-smoothingFactor),
+	)
+
+	// Ensure smoothed value respects bounds
+	w.currentInterval = max(w.baseInterval, min(smoothed, w.maxInterval))
 }
 
 // isInBackoffPeriod returns true if we're still in an error backoff period.
@@ -155,9 +166,18 @@ func (w *Watcher) handleFetchError(err error) {
 }
 
 // resetBackoff clears the backoff state after a successful fetch.
+// Also resets the polling interval to base for responsive recovery after errors.
 func (w *Watcher) resetBackoff() {
+	// Only reset interval if we were in error backoff state
+	wasInBackoff := !w.backoffUntil.IsZero()
+
 	w.errorBackoff.Reset()
 	w.backoffUntil = time.Time{}
+
+	// Reset interval to base for responsive recovery after errors
+	if wasInBackoff {
+		w.currentInterval = w.baseInterval
+	}
 }
 
 // broadcastIfChanged marshals and broadcasts data only if it differs from last broadcast.
