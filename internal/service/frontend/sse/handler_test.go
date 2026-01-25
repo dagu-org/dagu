@@ -189,7 +189,7 @@ func TestHandleEvents(t *testing.T) {
 			path:          "/events/dags?page=1&perPage=100",
 			query:         "page=1&perPage=100",
 			handler:       func(h *Handler) http.HandlerFunc { return h.HandleDAGsListEvents },
-			expectedTopic: "dagslist:page=1&perPage=100",
+			expectedTopic: `dagslist:page=1\u0026perPage=100`, // & is escaped as \u0026 in JSON
 		},
 	}
 
@@ -349,8 +349,10 @@ func TestHandleSSEMaxClients(t *testing.T) {
 		close(done1)
 	}()
 
-	// Wait for first client to connect
-	time.Sleep(50 * time.Millisecond)
+	// Wait for first client to connect using require.Eventually for deterministic synchronization
+	require.Eventually(t, func() bool {
+		return hub.ClientCount() == 1
+	}, 500*time.Millisecond, 10*time.Millisecond, "first client should connect")
 
 	// Second client should fail (max clients = 1)
 	w2 := newMockFlusher()

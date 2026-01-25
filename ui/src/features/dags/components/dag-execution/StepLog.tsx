@@ -263,9 +263,9 @@ function StepLog({
         const lineNumber = parseInt(htmlElement.getAttribute('data-line-number') || '0', 10);
         if (lineNumber === lineNum) {
           htmlElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          htmlElement.classList.add('bg-primary/100', 'bg-opacity-20');
+          htmlElement.classList.add('bg-primary/20');
           setTimeout(() => {
-            htmlElement.classList.remove('bg-primary/100', 'bg-opacity-20');
+            htmlElement.classList.remove('bg-primary/20');
           }, 2000);
           break;
         }

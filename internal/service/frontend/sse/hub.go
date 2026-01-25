@@ -201,17 +201,24 @@ func (h *Hub) heartbeatLoop() {
 }
 
 // sendHeartbeats sends a heartbeat event to all connected clients.
+// Failed clients are batched and unsubscribed after iteration to reduce lock contention.
 func (h *Hub) sendHeartbeats() {
 	clients := h.collectClients()
 	heartbeat := &Event{Type: EventTypeHeartbeat, Data: "{}"}
 
+	var failedClients []*Client
 	for _, client := range clients {
 		if !client.Send(heartbeat) {
 			client.Close()
-			h.Unsubscribe(client)
+			failedClients = append(failedClients, client)
 		} else if h.metrics != nil {
 			h.metrics.MessageSent(EventTypeHeartbeat)
 		}
+	}
+
+	// Batch unsubscribe outside the send loop to reduce lock contention
+	for _, client := range failedClients {
+		h.Unsubscribe(client)
 	}
 }
 

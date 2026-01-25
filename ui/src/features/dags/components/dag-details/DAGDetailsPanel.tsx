@@ -74,16 +74,21 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
   // Track data loading state and handle 404 errors
   useEffect(() => {
     if (error) {
-      setNotFound(true);
+      // Only set notFound for 404 errors when no cached data exists
+      const is404 = (error as { status?: number })?.status === 404;
+      if (is404 && !lastValidData) {
+        setNotFound(true);
+      }
     } else if (data) {
       setNotFound(false);
       setLastValidData(data as DAGDetailsData);
     }
-  }, [error, data]);
+  }, [error, data, lastValidData]);
 
   // Reset state when fileName changes
   useEffect(() => {
     setNotFound(false);
+    setLastValidData(null); // Clear cached data when switching DAGs
     setActiveTab('status');
   }, [fileName]);
 
@@ -173,7 +178,8 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
   }
 
   // Only show loading on initial load, not when switching DAGs
-  if (!displayData || !displayData.latestDAGRun) {
+  // Gate on dag existence, not latestDAGRun, so DAGs with no runs can still be displayed
+  if (!displayData?.dag) {
     return (
       <div className="flex items-center justify-center h-full">
         <LoadingIndicator />

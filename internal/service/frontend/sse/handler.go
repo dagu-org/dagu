@@ -1,6 +1,7 @@
 package sse
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -148,9 +149,11 @@ func (h *Handler) handleSSE(w http.ResponseWriter, r *http.Request, topic string
 	}
 	defer h.hub.Unsubscribe(client)
 
+	// Use json.Marshal for safe JSON encoding to prevent injection from special characters
+	topicData, _ := json.Marshal(map[string]string{"topic": topic})
 	client.Send(&Event{
 		Type: EventTypeConnected,
-		Data: fmt.Sprintf(`{"topic":"%s"}`, topic),
+		Data: string(topicData),
 	})
 
 	client.WritePump(ctx)

@@ -63,18 +63,21 @@ function DAGDetailsModal({ fileName, isOpen, onClose }: Props): React.ReactEleme
     setTimeout(() => mutate(), 500);
   }, [mutate]);
 
-  const handleFullscreenClick = (e?: React.MouseEvent) => {
-    const url =
-      activeTab === 'status'
-        ? `/dags/${fileName}`
-        : `/dags/${fileName}/${activeTab}`;
+  const handleFullscreenClick = React.useCallback(
+    (e?: React.MouseEvent) => {
+      const url =
+        activeTab === 'status'
+          ? `/dags/${fileName}`
+          : `/dags/${fileName}/${activeTab}`;
 
-    if (e?.metaKey || e?.ctrlKey) {
-      window.open(url, '_blank');
-    } else {
-      navigate(url);
-    }
-  };
+      if (e?.metaKey || e?.ctrlKey) {
+        window.open(url, '_blank');
+      } else {
+        navigate(url);
+      }
+    },
+    [activeTab, fileName, navigate]
+  );
 
   React.useEffect(() => {
     if (data) {
@@ -86,6 +89,11 @@ function DAGDetailsModal({ fileName, isOpen, onClose }: Props): React.ReactEleme
   React.useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
       if (shouldIgnoreKeyboardShortcuts()) {
+        return;
+      }
+
+      // Don't capture browser shortcuts like Ctrl/Cmd+F
+      if (event.metaKey || event.ctrlKey) {
         return;
       }
 
@@ -125,8 +133,8 @@ function DAGDetailsModal({ fileName, isOpen, onClose }: Props): React.ReactEleme
   if (!isOpen) return null;
 
   // Show loading when no data is available
-  const hasData = data && data.latestDAGRun;
-  if (!hasData) {
+  // Gate on dag existence, not latestDAGRun, so DAGs with no runs can still be displayed
+  if (!data?.dag) {
     return (
       <div className="fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border z-50 flex items-center justify-center">
         <LoadingIndicator />

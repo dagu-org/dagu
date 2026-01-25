@@ -299,7 +299,9 @@ func (a *API) GetQueuesListData(ctx context.Context, _ string) (any, error) {
 // GetQueueItemsData returns queue items for SSE.
 // Identifier format: "queueName"
 func (a *API) GetQueueItemsData(ctx context.Context, queueName string) (any, error) {
-	var running, queued []api.DAGRunSummary
+	// Initialize slices with make() to avoid null JSON payloads
+	running := make([]api.DAGRunSummary, 0)
+	queued := make([]api.DAGRunSummary, 0)
 
 	// Get running items from proc store
 	runningByGroup, err := a.procStore.ListAllAlive(ctx)
@@ -307,17 +309,13 @@ func (a *API) GetQueueItemsData(ctx context.Context, queueName string) (any, err
 		return nil, fmt.Errorf("failed to list running processes: %w", err)
 	}
 
-	runningRefs := runningByGroup[queueName]
-	for _, dagRun := range runningRefs {
-		attempt, err := a.dagRunStore.FindAttempt(ctx, dagRun)
+	// Use fetchDAGRunSummary helper to avoid code duplication
+	for _, dagRun := range runningByGroup[queueName] {
+		summary, err := a.fetchDAGRunSummary(ctx, dagRun)
 		if err != nil {
 			continue
 		}
-		runStatus, err := attempt.ReadStatus(ctx)
-		if err != nil {
-			continue
-		}
-		running = append(running, toDAGRunSummary(*runStatus))
+		running = append(running, summary)
 	}
 
 	// Get queued items
@@ -331,15 +329,10 @@ func (a *API) GetQueueItemsData(ctx context.Context, queueName string) (any, err
 		if err != nil {
 			continue
 		}
-		attempt, err := a.dagRunStore.FindAttempt(ctx, *dagRunRef)
+		summary, err := a.fetchDAGRunSummary(ctx, *dagRunRef)
 		if err != nil {
 			continue
 		}
-		runStatus, err := attempt.ReadStatus(ctx)
-		if err != nil {
-			continue
-		}
-		summary := toDAGRunSummary(*runStatus)
 		// Skip running items to avoid duplication
 		if summary.Status == api.StatusRunning {
 			continue

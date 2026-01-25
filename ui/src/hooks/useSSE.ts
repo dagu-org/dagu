@@ -74,6 +74,7 @@ export function useSSE<T>(endpoint: string, enabled: boolean = true): SSEState<T
         setState((prev) => ({ ...prev, data: parsed }));
       } catch (err) {
         console.error('SSE JSON parse error:', err);
+        setState((prev) => ({ ...prev, error: new Error('Invalid JSON response from SSE') }));
       }
     });
 
@@ -95,8 +96,9 @@ export function useSSE<T>(endpoint: string, enabled: boolean = true): SSEState<T
       }));
 
       if (retryCountRef.current < MAX_RETRIES) {
+        // Calculate delay before incrementing for correct exponential backoff
+        const delay = calculateRetryDelay(retryCountRef.current);
         retryCountRef.current++;
-        const delay = calculateRetryDelay(retryCountRef.current - 1);
         retryTimeoutRef.current = setTimeout(() => {
           connect();
         }, delay);

@@ -367,9 +367,10 @@ func (a *API) getDAGDetailsData(ctx context.Context, fileName string) (api.GetDA
 	}
 
 	dagStatus, err := a.dagRunMgr.GetLatestStatus(ctx, dag)
-	if err != nil {
+	if err != nil && !errors.Is(err, exec.ErrNoStatusData) {
 		return api.GetDAGDetails200JSONResponse{}, fmt.Errorf("failed to get latest status for DAG %s", fileName)
 	}
+	// If ErrNoStatusData, dagStatus will be zero-value (empty), which is fine for DAGs with no runs
 
 	details := toDAGDetails(dag)
 

@@ -41,6 +41,7 @@ func NewClient(w http.ResponseWriter) (*Client, error) {
 // WritePump reads events from the send channel and writes them to the client.
 // It blocks until the context is cancelled or the client is closed.
 func (c *Client) WritePump(ctx context.Context) {
+	defer c.Close() // Ensure cleanup on any exit path
 	for {
 		select {
 		case <-ctx.Done():
