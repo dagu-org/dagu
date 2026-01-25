@@ -128,15 +128,10 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
           handleFullscreenClick();
           break;
         case 'ArrowDown':
-          if (onNavigate) {
-            event.preventDefault();
-            onNavigate('down');
-          }
-          break;
         case 'ArrowUp':
           if (onNavigate) {
             event.preventDefault();
-            onNavigate('up');
+            onNavigate(event.key === 'ArrowDown' ? 'down' : 'up');
           }
           break;
       }

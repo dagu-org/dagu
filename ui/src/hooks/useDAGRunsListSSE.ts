@@ -16,16 +16,19 @@ interface DAGRunsListParams {
   tags?: string;
 }
 
+const BASE_ENDPOINT = '/events/dag-runs';
+
 function buildEndpoint(params: DAGRunsListParams): string {
   const searchParams = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null) {
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value != null) {
       searchParams.set(key, String(value));
     }
-  });
+  }
 
   const queryString = searchParams.toString();
-  return queryString ? `/events/dag-runs?${queryString}` : '/events/dag-runs';
+  return queryString ? `${BASE_ENDPOINT}?${queryString}` : BASE_ENDPOINT;
 }
 
 export function useDAGRunsListSSE(

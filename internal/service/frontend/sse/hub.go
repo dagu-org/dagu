@@ -8,7 +8,10 @@ import (
 	"time"
 )
 
-const defaultMaxClients = 1000
+const (
+	defaultMaxClients = 1000
+	heartbeatInterval = 10 * time.Second
+)
 
 // HubOption is a functional option for configuring the Hub.
 type HubOption func(*Hub)
@@ -79,7 +82,7 @@ func (h *Hub) Start() {
 		return
 	}
 	h.started = true
-	h.heartbeatTicker = time.NewTicker(10 * time.Second)
+	h.heartbeatTicker = time.NewTicker(heartbeatInterval)
 	go h.heartbeatLoop()
 }
 
@@ -194,13 +197,21 @@ func (h *Hub) heartbeatLoop() {
 func (h *Hub) sendHeartbeats() {
 	clients := h.collectClients()
 	heartbeat := &Event{Type: EventTypeHeartbeat, Data: "{}"}
+
 	for _, client := range clients {
 		if !client.Send(heartbeat) {
 			client.Close()
 			h.Unsubscribe(client)
-		} else if h.metrics != nil {
-			h.metrics.MessageSent(EventTypeHeartbeat)
+			continue
 		}
+		h.recordMessageSent(EventTypeHeartbeat)
+	}
+}
+
+// recordMessageSent records a sent message metric if metrics are enabled.
+func (h *Hub) recordMessageSent(eventType string) {
+	if h.metrics != nil {
+		h.metrics.MessageSent(eventType)
 	}
 }
 

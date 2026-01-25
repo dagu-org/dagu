@@ -7,7 +7,6 @@ import (
 	"mime"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"path"
@@ -352,34 +351,39 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 	return svc
 }
 
-// sanitizeURL removes sensitive query parameters from URLs for logging.
-func sanitizeURL(u string) string {
-	parsed, err := url.Parse(u)
-	if err != nil {
-		return u
-	}
-	q := parsed.Query()
-	if q.Has("token") {
-		q.Set("token", "[REDACTED]")
-		parsed.RawQuery = q.Encode()
-	}
-	return parsed.String()
-}
+// sanitizedRequestLogger returns a middleware that wraps httplog's RequestLogger
+// with URL sanitization. This ensures tokens in query strings are redacted in logs
+// regardless of httplog's internal attribute handling.
+func sanitizedRequestLogger(logger *httplog.Logger) func(next http.Handler) http.Handler {
+	httplogMw := httplog.RequestLogger(logger)
 
-// sanitizeLogAttr recursively sanitizes attributes, redacting sensitive data.
-func sanitizeLogAttr(a slog.Attr) slog.Attr {
-	if a.Value.Kind() == slog.KindGroup {
-		attrs := a.Value.Group()
-		newAttrs := make([]slog.Attr, len(attrs))
-		for i, attr := range attrs {
-			newAttrs[i] = sanitizeLogAttr(attr)
-		}
-		return slog.Attr{Key: a.Key, Value: slog.GroupValue(newAttrs...)}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Check if URL has token parameter that needs sanitization
+			logReq := r
+			if r.URL.RawQuery != "" && strings.Contains(r.URL.RawQuery, "token=") {
+				// Clone request with sanitized URL for logging
+				logReq = r.Clone(r.Context())
+				q := logReq.URL.Query()
+				if q.Has("token") {
+					q.Set("token", "[REDACTED]")
+					logReq.URL.RawQuery = q.Encode()
+					// CRITICAL: httplog uses r.RequestURI (not r.URL) to construct logged URL
+					// We must update RequestURI to match the sanitized URL
+					logReq.RequestURI = logReq.URL.RequestURI()
+				}
+			}
+
+			// Create inner handler that receives sanitized request from httplog
+			// but passes the original request to actual handlers
+			innerHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				next.ServeHTTP(w, r) // Use original request with real token
+			})
+
+			// httplog sees sanitized URL, actual handlers get original
+			httplogMw(innerHandler).ServeHTTP(w, logReq)
+		})
 	}
-	if a.Key == "url" {
-		return slog.String("url", sanitizeURL(a.Value.String()))
-	}
-	return a
 }
 
 // Serve starts the HTTP server and configures routes
@@ -398,16 +402,13 @@ func (srv *Server) Serve(ctx context.Context) error {
 		ResponseHeaders:  false,
 		QuietDownRoutes:  []string{"/api/v2/events"},
 		QuietDownPeriod:  10 * time.Second,
-		ReplaceAttrsOverride: func(_ []string, a slog.Attr) slog.Attr {
-			return sanitizeLogAttr(a)
-		},
 	})
 
 	// Create router with middleware
 	r := chi.NewMux()
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Compress(5))
-	r.Use(httplog.RequestLogger(requestLogger))
+	r.Use(sanitizedRequestLogger(requestLogger))
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"}, // TODO: Update to specific origins for better security

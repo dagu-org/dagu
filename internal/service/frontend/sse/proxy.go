@@ -92,35 +92,33 @@ func buildPathForTopic(topicType TopicType, identifier string) string {
 	switch topicType {
 	case TopicTypeDAGRun:
 		return "/events/dag-runs/" + identifier
-
 	case TopicTypeDAG:
 		return "/events/dags/" + identifier
-
 	case TopicTypeDAGRunLogs:
 		return "/events/dag-runs/" + identifier + "/logs"
-
 	case TopicTypeStepLog:
-		parts := strings.SplitN(identifier, "/", 3)
-		if len(parts) == 3 {
-			return fmt.Sprintf("/events/dag-runs/%s/%s/logs/steps/%s", parts[0], parts[1], parts[2])
-		}
-		return "/events/dag-runs/" + identifier + "/logs/steps"
-
+		return buildStepLogPath(identifier)
 	case TopicTypeDAGRuns:
 		return pathWithOptionalQuery("/events/dag-runs", identifier)
-
 	case TopicTypeQueueItems:
 		return "/events/queues/" + identifier + "/items"
-
 	case TopicTypeQueues:
 		return pathWithOptionalQuery("/events/queues", identifier)
-
 	case TopicTypeDAGsList:
 		return pathWithOptionalQuery("/events/dags", identifier)
-
 	default:
 		return fmt.Sprintf("/events/%s/%s", topicType, identifier)
 	}
+}
+
+// buildStepLogPath constructs the path for step log events.
+// Expected identifier format: "dagName/dagRunId/stepName"
+func buildStepLogPath(identifier string) string {
+	parts := strings.SplitN(identifier, "/", 3)
+	if len(parts) == 3 {
+		return fmt.Sprintf("/events/dag-runs/%s/%s/logs/steps/%s", parts[0], parts[1], parts[2])
+	}
+	return "/events/dag-runs/" + identifier + "/logs/steps"
 }
 
 // pathWithOptionalQuery appends a query string to the path if provided.

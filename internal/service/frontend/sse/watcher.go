@@ -86,27 +86,44 @@ func (w *Watcher) Stop() {
 
 // poll fetches the current data and broadcasts if changed.
 func (w *Watcher) poll(ctx context.Context) {
-	// Skip polling during backoff period
-	if time.Now().Before(w.backoffUntil) {
+	if w.isInBackoffPeriod() {
 		return
 	}
 
 	response, err := w.fetcher(ctx, w.identifier)
 	if err != nil {
-		// Calculate next backoff interval
-		interval, _ := w.errorBackoff.Next(err)
-		w.backoffUntil = time.Now().Add(interval)
-		if w.metrics != nil {
-			w.metrics.FetchError(string(w.topicType))
-		}
-		w.broadcast(&Event{Type: EventTypeError, Data: err.Error()})
+		w.handleFetchError(err)
 		return
 	}
 
-	// Reset backoff on successful fetch
+	w.resetBackoff()
+	w.broadcastIfChanged(response)
+}
+
+// isInBackoffPeriod returns true if we're still in an error backoff period.
+func (w *Watcher) isInBackoffPeriod() bool {
+	return time.Now().Before(w.backoffUntil)
+}
+
+// handleFetchError applies exponential backoff and broadcasts the error.
+func (w *Watcher) handleFetchError(err error) {
+	interval, _ := w.errorBackoff.Next(err)
+	w.backoffUntil = time.Now().Add(interval)
+
+	if w.metrics != nil {
+		w.metrics.FetchError(string(w.topicType))
+	}
+	w.broadcast(&Event{Type: EventTypeError, Data: err.Error()})
+}
+
+// resetBackoff clears the backoff state after a successful fetch.
+func (w *Watcher) resetBackoff() {
 	w.errorBackoff.Reset()
 	w.backoffUntil = time.Time{}
+}
 
+// broadcastIfChanged marshals and broadcasts data only if it differs from last broadcast.
+func (w *Watcher) broadcastIfChanged(response any) {
 	data, err := json.Marshal(response)
 	if err != nil {
 		w.broadcast(&Event{Type: EventTypeError, Data: err.Error()})
