@@ -283,7 +283,7 @@ func TestHandleSSENonFlusher(t *testing.T) {
 	handler.HandleDAGEvents(w, r)
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
-	assert.Contains(t, w.Buffer.String(), "streaming not supported")
+	assert.Contains(t, w.String(), "streaming not supported")
 }
 
 func TestHandleSSERemoteProxy(t *testing.T) {

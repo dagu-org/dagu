@@ -15,14 +15,14 @@ import (
 
 // mockFetchFunc creates a FetchFunc that returns the given data/error
 func mockFetchFunc(data any, err error) FetchFunc {
-	return func(ctx context.Context, identifier string) (any, error) {
+	return func(_ context.Context, _ string) (any, error) {
 		return data, err
 	}
 }
 
 // countingFetchFunc creates a FetchFunc that counts calls
 func countingFetchFunc(data any, counter *int32) FetchFunc {
-	return func(ctx context.Context, identifier string) (any, error) {
+	return func(_ context.Context, _ string) (any, error) {
 		atomic.AddInt32(counter, 1)
 		return data, nil
 	}
@@ -31,24 +31,12 @@ func countingFetchFunc(data any, counter *int32) FetchFunc {
 // changingFetchFunc creates a FetchFunc that returns different data on each call
 func changingFetchFunc(dataSeq []any) FetchFunc {
 	var idx int32
-	return func(ctx context.Context, identifier string) (any, error) {
+	return func(_ context.Context, _ string) (any, error) {
 		i := atomic.AddInt32(&idx, 1) - 1
 		if int(i) < len(dataSeq) {
 			return dataSeq[i], nil
 		}
 		return dataSeq[len(dataSeq)-1], nil
-	}
-}
-
-// errorThenSuccessFetchFunc returns errors for the first n calls, then succeeds
-func errorThenSuccessFetchFunc(errorCount int, data any) FetchFunc {
-	var count int32
-	return func(ctx context.Context, identifier string) (any, error) {
-		c := atomic.AddInt32(&count, 1)
-		if int(c) <= errorCount {
-			return nil, errors.New("fetch error")
-		}
-		return data, nil
 	}
 }
 
@@ -73,6 +61,11 @@ func TestNewWatcher(t *testing.T) {
 	assert.NotNil(t, watcher.stopCh)
 	assert.NotNil(t, watcher.errorBackoff)
 	assert.False(t, watcher.stopped)
+
+	// Verify adaptive interval fields are initialized
+	assert.Equal(t, defaultBaseInterval, watcher.baseInterval)
+	assert.Equal(t, defaultMaxInterval, watcher.maxInterval)
+	assert.Equal(t, defaultBaseInterval, watcher.currentInterval)
 }
 
 func TestNewWatcherWithMetrics(t *testing.T) {
@@ -340,8 +333,10 @@ func TestWatcherMetricsIntegration(t *testing.T) {
 	watcher.Stop()
 	client.Close()
 
-	// WatcherStarted and WatcherStopped should have been called
-	// Metrics gauge should be back to 0
+	// Note: WatcherStarted/WatcherStopped metrics are managed by the Hub, not the Watcher.
+	// This test verifies that the watcher correctly uses metrics for other operations
+	// (like RecordFetchDuration and MessageSent) without calling watcher lifecycle metrics.
+	// The watchersActive gauge should remain at 0 since the Hub didn't call WatcherStarted.
 	assert.Equal(t, float64(0), getGaugeValue(t, metrics.watchersActive))
 }
 
@@ -448,4 +443,124 @@ func TestWatcherBroadcastIfChanged(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("expected broadcast for changed data")
 	}
+}
+
+// slowFetchFunc creates a FetchFunc that takes a specified duration to complete
+func slowFetchFunc(delay time.Duration, data any) FetchFunc {
+	return func(_ context.Context, _ string) (any, error) {
+		time.Sleep(delay)
+		return data, nil
+	}
+}
+
+func TestWatcherAdaptInterval(t *testing.T) {
+	t.Run("fast fetch maintains base interval", func(t *testing.T) {
+		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
+		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
+
+		// Simulate a fast fetch (10ms)
+		watcher.adaptInterval(10 * time.Millisecond)
+
+		// 3 * 10ms = 30ms, which is less than base interval (1s)
+		// So it should stay at base interval
+		assert.Equal(t, defaultBaseInterval, watcher.currentInterval)
+	})
+
+	t.Run("slow fetch increases interval proportionally", func(t *testing.T) {
+		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
+		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
+
+		// Simulate a slow fetch (500ms)
+		watcher.adaptInterval(500 * time.Millisecond)
+
+		// 3 * 500ms = 1.5s, which is greater than base interval
+		expected := 1500 * time.Millisecond
+		assert.Equal(t, expected, watcher.currentInterval)
+	})
+
+	t.Run("very slow fetch is capped at max interval", func(t *testing.T) {
+		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
+		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
+
+		// Simulate a very slow fetch (5s)
+		watcher.adaptInterval(5 * time.Second)
+
+		// 3 * 5s = 15s, which exceeds max interval (10s)
+		// So it should be capped at max interval
+		assert.Equal(t, defaultMaxInterval, watcher.currentInterval)
+	})
+}
+
+func TestWatcherAdaptivePolling(t *testing.T) {
+	t.Run("polling adapts to slow fetcher", func(t *testing.T) {
+		// Create a fetcher that takes 400ms to complete
+		var fetchCount int32
+		fetcher := func(ctx context.Context, identifier string) (any, error) {
+			atomic.AddInt32(&fetchCount, 1)
+			time.Sleep(400 * time.Millisecond)
+			return map[string]string{"key": "value"}, nil
+		}
+
+		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
+		ctx := context.Background()
+
+		go watcher.Start(ctx)
+
+		// Wait long enough for a few polls
+		// First poll: immediate (0ms) + 400ms fetch = 400ms, then interval = 1.2s
+		// Second poll: at 1.6s + 400ms fetch = 2s
+		// Third poll: at 3.2s + 400ms = 3.6s
+		time.Sleep(3 * time.Second)
+
+		watcher.Stop()
+
+		// With adaptive polling (interval = 3 * ~400ms ≈ 1.2s),
+		// in 3 seconds we should have ~3 fetches
+		count := atomic.LoadInt32(&fetchCount)
+		assert.GreaterOrEqual(t, count, int32(2), "should have at least 2 fetches")
+		assert.LessOrEqual(t, count, int32(4), "adaptive polling should limit fetch frequency")
+
+		// Verify interval was adapted (allow for timing variance)
+		// 3 * 400ms = 1.2s, but actual timing may vary slightly
+		assert.GreaterOrEqual(t, watcher.currentInterval, 1100*time.Millisecond, "interval should be at least 1.1s")
+		assert.LessOrEqual(t, watcher.currentInterval, 1500*time.Millisecond, "interval should be at most 1.5s")
+	})
+}
+
+func TestWatcherFetchDurationMetrics(t *testing.T) {
+	registry := prometheus.NewRegistry()
+	metrics := NewMetrics(registry)
+
+	// Create a fetcher that takes a bit of time
+	fetcher := slowFetchFunc(50*time.Millisecond, map[string]string{"key": "value"})
+	watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, metrics)
+
+	client := newTestClient(t)
+	watcher.AddClient(client)
+
+	ctx := context.Background()
+	go client.WritePump(ctx)
+	go watcher.Start(ctx)
+
+	// Wait for a poll to complete
+	time.Sleep(200 * time.Millisecond)
+
+	watcher.Stop()
+	client.Close()
+
+	// Verify fetch duration was recorded
+	// The histogram should have at least one observation
+	mfs, err := registry.Gather()
+	require.NoError(t, err)
+
+	found := false
+	for _, mf := range mfs {
+		if mf.GetName() == "dagu_sse_fetch_duration_seconds" {
+			found = true
+			// Should have at least one metric
+			assert.NotEmpty(t, mf.GetMetric())
+			break
+		}
+	}
+	assert.True(t, found, "fetch duration metric should be recorded")
 }

@@ -11,6 +11,13 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/backoff"
 )
 
+// Adaptive polling interval constants
+const (
+	defaultBaseInterval = time.Second      // Minimum polling interval
+	defaultMaxInterval  = 10 * time.Second // Maximum polling interval cap
+	intervalMultiplier  = 3                // interval = multiplier * fetchDuration
+)
+
 // Watcher polls for data changes on a specific topic
 // and broadcasts updates to all subscribed clients.
 // It uses a pluggable FetchFunc to retrieve data, making it
@@ -28,6 +35,11 @@ type Watcher struct {
 	backoffUntil time.Time
 	metrics      *Metrics
 	wg           sync.WaitGroup
+
+	// Adaptive polling interval fields
+	baseInterval    time.Duration
+	maxInterval     time.Duration
+	currentInterval time.Duration
 }
 
 // NewWatcher creates a new watcher for the given topic.
@@ -41,28 +53,29 @@ func NewWatcher(identifier string, fetcher FetchFunc, topicType TopicType, metri
 	policy.MaxInterval = 30 * time.Second
 
 	return &Watcher{
-		identifier:   identifier,
-		topicType:    topicType,
-		fetcher:      fetcher,
-		clients:      make(map[*Client]struct{}),
-		stopCh:       make(chan struct{}),
-		errorBackoff: backoff.NewRetrier(policy),
-		metrics:      metrics,
+		identifier:      identifier,
+		topicType:       topicType,
+		fetcher:         fetcher,
+		clients:         make(map[*Client]struct{}),
+		stopCh:          make(chan struct{}),
+		errorBackoff:    backoff.NewRetrier(policy),
+		metrics:         metrics,
+		baseInterval:    defaultBaseInterval,
+		maxInterval:     defaultMaxInterval,
+		currentInterval: defaultBaseInterval,
 	}
 }
 
 // Start begins polling for data changes and broadcasts updates to clients.
+// Uses adaptive polling intervals based on fetch duration.
+// Note: The Hub is responsible for tracking watcher metrics (WatcherStarted/WatcherStopped).
 func (w *Watcher) Start(ctx context.Context) {
 	w.wg.Add(1)
-	if w.metrics != nil {
-		w.metrics.WatcherStarted()
-	}
 	defer w.wg.Done()
 
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-
-	w.poll(ctx) // Initial state
+	// Use Timer instead of Ticker for variable intervals
+	timer := time.NewTimer(0) // Immediate first poll
+	defer timer.Stop()
 
 	for {
 		select {
@@ -70,13 +83,15 @@ func (w *Watcher) Start(ctx context.Context) {
 			return
 		case <-w.stopCh:
 			return
-		case <-ticker.C:
+		case <-timer.C:
 			w.poll(ctx)
+			timer.Reset(w.currentInterval) // Adaptive interval
 		}
 	}
 }
 
 // Stop signals the watcher to stop polling and waits for it to finish.
+// Note: The Hub is responsible for tracking watcher metrics (WatcherStarted/WatcherStopped).
 func (w *Watcher) Stop() {
 	w.mu.Lock()
 	if !w.stopped {
@@ -85,25 +100,42 @@ func (w *Watcher) Stop() {
 	}
 	w.mu.Unlock()
 	w.wg.Wait()
-	if w.metrics != nil {
-		w.metrics.WatcherStopped()
-	}
 }
 
 // poll fetches the current data and broadcasts if changed.
+// It measures fetch duration and adapts the polling interval accordingly.
 func (w *Watcher) poll(ctx context.Context) {
 	if w.isInBackoffPeriod() {
 		return
 	}
 
+	start := time.Now()
 	response, err := w.fetcher(ctx, w.identifier)
+	fetchDuration := time.Since(start)
+
 	if err != nil {
 		w.handleFetchError(err)
 		return
 	}
 
+	// Record fetch duration metric if available
+	if w.metrics != nil {
+		w.metrics.RecordFetchDuration(string(w.topicType), fetchDuration)
+	}
+
+	// Adapt polling interval based on fetch duration
+	w.adaptInterval(fetchDuration)
+
 	w.resetBackoff()
 	w.broadcastIfChanged(response)
+}
+
+// adaptInterval adjusts the polling interval based on fetch duration.
+// Rule: interval = max(baseInterval, intervalMultiplier * fetchDuration), capped at maxInterval.
+// This ensures slow queries get longer intervals to reduce server load.
+func (w *Watcher) adaptInterval(fetchDuration time.Duration) {
+	adapted := time.Duration(intervalMultiplier) * fetchDuration
+	w.currentInterval = max(w.baseInterval, min(adapted, w.maxInterval))
 }
 
 // isInBackoffPeriod returns true if we're still in an error backoff period.

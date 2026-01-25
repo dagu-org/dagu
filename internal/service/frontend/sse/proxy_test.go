@@ -428,9 +428,9 @@ type failingResponseWriter struct {
 	buf       bytes.Buffer
 }
 
-func (f *failingResponseWriter) Header() http.Header         { return http.Header{} }
-func (f *failingResponseWriter) WriteHeader(statusCode int)  {}
-func (f *failingResponseWriter) Flush()                      {}
+func (f *failingResponseWriter) Header() http.Header        { return http.Header{} }
+func (f *failingResponseWriter) WriteHeader(statusCode int) {}
+func (f *failingResponseWriter) Flush()                     {}
 func (f *failingResponseWriter) Write(b []byte) (int, error) {
 	f.written += len(b)
 	if f.written > f.failAfter {
@@ -464,5 +464,5 @@ func TestProxyToRemoteNodeNonFlusher(t *testing.T) {
 
 	// Should return error since writer doesn't support flushing
 	// The error message should indicate streaming not supported
-	require.Contains(t, w.Buffer.String(), "streaming not supported")
+	require.Contains(t, w.String(), "streaming not supported")
 }
