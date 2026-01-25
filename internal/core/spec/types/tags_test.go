@@ -316,3 +316,108 @@ func TestTagsValue_BackwardCompatibility(t *testing.T) {
 		})
 	}
 }
+
+func TestTagsValue_Validation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		yaml    string
+		wantErr bool
+		errMsg  string
+	}{
+		// Invalid key formats
+		{
+			name:    "key starts with dash",
+			yaml:    `"-invalid"`,
+			wantErr: true,
+			errMsg:  "invalid characters",
+		},
+		{
+			name:    "key with space",
+			yaml:    `"my tag"`,
+			wantErr: true,
+			errMsg:  "invalid characters",
+		},
+		{
+			name:    "key with special char",
+			yaml:    `"my@tag"`,
+			wantErr: true,
+			errMsg:  "invalid characters",
+		},
+		{
+			name: "map key starts with dash",
+			yaml: `
+-invalid: value`,
+			wantErr: true,
+			errMsg:  "invalid characters",
+		},
+		{
+			name: "array key starts with dash",
+			yaml: `
+- -invalid`,
+			wantErr: true,
+			errMsg:  "invalid characters",
+		},
+
+		// Invalid value formats (use array/map to avoid space-separation parsing)
+		{
+			name: "value with space in array",
+			yaml: `
+- "env=my value"`,
+			wantErr: true,
+			errMsg:  "invalid characters",
+		},
+		{
+			name:    "value with special char",
+			yaml:    `"env=prod@test"`,
+			wantErr: true,
+			errMsg:  "invalid characters",
+		},
+		{
+			name: "map value with space",
+			yaml: `
+env: my value`,
+			wantErr: true,
+			errMsg:  "invalid characters",
+		},
+
+		// Valid cases should still work
+		{
+			name:    "valid key with dash",
+			yaml:    `"my-tag"`,
+			wantErr: false,
+		},
+		{
+			name:    "valid key with underscore",
+			yaml:    `"my_tag"`,
+			wantErr: false,
+		},
+		{
+			name:    "valid key with dot",
+			yaml:    `"my.tag"`,
+			wantErr: false,
+		},
+		{
+			name:    "valid value with slash",
+			yaml:    `"path=foo/bar"`,
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var v TagsValue
+			err := yaml.Unmarshal([]byte(tt.yaml), &v)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errMsg != "" {
+					assert.Contains(t, err.Error(), tt.errMsg)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}

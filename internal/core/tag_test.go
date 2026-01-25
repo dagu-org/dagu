@@ -407,3 +407,240 @@ func TestTags_MatchesFilters(t *testing.T) {
 		})
 	}
 }
+
+func TestParseTagFilter_Wildcard(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		input     string
+		wantType  TagFilterType
+		wantKey   string
+		wantValue string
+	}{
+		{
+			name:      "key wildcard star",
+			input:     "env*",
+			wantType:  TagFilterTypeWildcard,
+			wantKey:   "env*",
+			wantValue: "",
+		},
+		{
+			name:      "key wildcard question",
+			input:     "te?m",
+			wantType:  TagFilterTypeWildcard,
+			wantKey:   "te?m",
+			wantValue: "",
+		},
+		{
+			name:      "value wildcard",
+			input:     "env=prod*",
+			wantType:  TagFilterTypeWildcard,
+			wantKey:   "env",
+			wantValue: "prod*",
+		},
+		{
+			name:      "both wildcard",
+			input:     "env*=prod*",
+			wantType:  TagFilterTypeWildcard,
+			wantKey:   "env*",
+			wantValue: "prod*",
+		},
+		{
+			name:      "match any value",
+			input:     "team=*",
+			wantType:  TagFilterTypeWildcard,
+			wantKey:   "team",
+			wantValue: "*",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filter := ParseTagFilter(tt.input)
+			assert.Equal(t, tt.wantType, filter.Type)
+			assert.Equal(t, tt.wantKey, filter.Key)
+			assert.Equal(t, tt.wantValue, filter.Value)
+		})
+	}
+}
+
+func TestTagFilter_MatchesTags_Wildcard(t *testing.T) {
+	t.Parallel()
+
+	tags := Tags{
+		{Key: "env", Value: "prod"},
+		{Key: "env", Value: "production"},
+		{Key: "env", Value: "prod-us"},
+		{Key: "team", Value: "platform"},
+		{Key: "critical", Value: ""},
+	}
+
+	tests := []struct {
+		name   string
+		filter string
+		want   bool
+	}{
+		// Value wildcard patterns
+		{"value prefix match", "env=prod*", true},
+		{"value prefix no match", "env=staging*", false},
+		{"value question mark", "env=pro?", true},
+		{"value question mark no match", "env=pr?", false},
+		{"value any", "team=*", true},
+		{"value any empty tag", "critical=*", true}, // * matches empty string in Go's path.Match
+
+		// Key wildcard patterns
+		{"key prefix match", "env*", true},
+		{"key prefix no match", "missing*", false},
+		{"key question mark", "te?m", true},
+		{"key question mark no match", "te??m", false},
+
+		// Combined wildcards
+		{"key and value wildcard", "env*=prod*", true},
+		{"key and value wildcard no match", "missing*=*", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filter := ParseTagFilter(tt.filter)
+			assert.Equal(t, tt.want, filter.MatchesTags(tags), "filter: %s", tt.filter)
+		})
+	}
+}
+
+func TestValidateTag(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		tag     Tag
+		wantErr bool
+		errMsg  string
+	}{
+		// Valid tags
+		{"simple key", Tag{Key: "env"}, false, ""},
+		{"key with value", Tag{Key: "env", Value: "prod"}, false, ""},
+		{"key with dash", Tag{Key: "my-tag"}, false, ""},
+		{"key with underscore", Tag{Key: "my_tag"}, false, ""},
+		{"key with dot", Tag{Key: "my.tag"}, false, ""},
+		{"key starts with number", Tag{Key: "1env"}, false, ""},
+		{"value with slash", Tag{Key: "path", Value: "foo/bar"}, false, ""},
+
+		// Invalid keys
+		{"empty key", Tag{Key: ""}, true, "tag key cannot be empty"},
+		{"key starts with dash", Tag{Key: "-env"}, true, "invalid characters"},
+		{"key starts with underscore", Tag{Key: "_env"}, true, "invalid characters"},
+		{"key starts with dot", Tag{Key: ".env"}, true, "invalid characters"},
+		{"key with space", Tag{Key: "my env"}, true, "invalid characters"},
+		{"key with equals", Tag{Key: "my=env"}, true, "invalid characters"},
+		{"key with exclamation", Tag{Key: "my!env"}, true, "invalid characters"},
+		{"key with special char", Tag{Key: "my@env"}, true, "invalid characters"},
+
+		// Invalid values
+		{"value starts with dash", Tag{Key: "env", Value: "-prod"}, true, "invalid characters"},
+		{"value with space", Tag{Key: "env", Value: "my prod"}, true, "invalid characters"},
+		{"value with special char", Tag{Key: "env", Value: "prod@test"}, true, "invalid characters"},
+
+		// Length limits
+		{"key too long", Tag{Key: string(make([]byte, 64))}, true, "exceeds max length"},
+		{"value too long", Tag{Key: "env", Value: string(make([]byte, 256))}, true, "exceeds max length"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateTag(tt.tag)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errMsg != "" {
+					assert.Contains(t, err.Error(), tt.errMsg)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateTags(t *testing.T) {
+	t.Parallel()
+
+	t.Run("all valid", func(t *testing.T) {
+		tags := Tags{
+			{Key: "env", Value: "prod"},
+			{Key: "team", Value: "platform"},
+		}
+		err := ValidateTags(tags)
+		require.NoError(t, err)
+	})
+
+	t.Run("one invalid", func(t *testing.T) {
+		tags := Tags{
+			{Key: "env", Value: "prod"},
+			{Key: "invalid key", Value: "value"},
+		}
+		err := ValidateTags(tags)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid key")
+	})
+
+	t.Run("multiple invalid", func(t *testing.T) {
+		tags := Tags{
+			{Key: "", Value: "empty"},
+			{Key: "invalid key", Value: "value"},
+		}
+		err := ValidateTags(tags)
+		require.Error(t, err)
+		// Both errors should be present
+		assert.Contains(t, err.Error(), "cannot be empty")
+		assert.Contains(t, err.Error(), "invalid characters")
+	})
+
+	t.Run("empty tags", func(t *testing.T) {
+		err := ValidateTags(Tags{})
+		require.NoError(t, err)
+	})
+}
+
+func TestMatchGlob(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		pattern string
+		input   string
+		want    bool
+	}{
+		// Star wildcard
+		{"prod*", "prod", true},
+		{"prod*", "production", true},
+		{"prod*", "prod-us", true},
+		{"prod*", "dev", false},
+		{"*prod", "preprod", true},
+		{"*prod", "prod", true},
+		{"*", "anything", true},
+		{"*", "", true},
+
+		// Question mark wildcard
+		{"te?m", "team", true},
+		{"te?m", "teem", true},
+		{"te?m", "teaam", false},
+		{"te?m", "tem", false},
+		{"???", "abc", true},
+		{"???", "ab", false},
+
+		// Combined
+		{"prod-*", "prod-us", true},
+		{"prod-*", "prod-", true},
+		{"prod-*", "prod", false},
+		{"te?m-*", "team-platform", true},
+
+		// Exact match (no wildcards)
+		{"exact", "exact", true},
+		{"exact", "other", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.pattern+"_"+tt.input, func(t *testing.T) {
+			assert.Equal(t, tt.want, matchGlob(tt.pattern, tt.input))
+		})
+	}
+}
