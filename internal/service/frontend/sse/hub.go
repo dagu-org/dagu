@@ -23,9 +23,9 @@ func WithMaxClients(max int) HubOption {
 // FetchFunc that knows how to retrieve data for that topic type.
 type Hub struct {
 	mu              sync.RWMutex
-	clients         map[*Client]string          // client -> topic
-	watchers        map[string]*Watcher         // topic -> watcher
-	fetchers        map[TopicType]FetchFunc     // topicType -> fetcher
+	clients         map[*Client]string      // client -> topic
+	watchers        map[string]*Watcher     // topic -> watcher
+	fetchers        map[TopicType]FetchFunc // topicType -> fetcher
 	maxClients      int
 	heartbeatTicker *time.Ticker
 	ctx             context.Context

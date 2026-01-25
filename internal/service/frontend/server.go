@@ -58,7 +58,6 @@ type Server struct {
 	auditService   *audit.Service
 	syncService    gitsync.Service // Git sync service for graceful shutdown
 	listener       net.Listener    // Optional pre-bound listener (for tests)
-	dagRunMgr      runtime.Manager // Runtime manager for DAG run operations
 	sseHub         *sse.Hub        // SSE hub for real-time updates
 }
 
@@ -182,7 +181,6 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		authService:    authSvc,
 		auditService:   auditSvc,
 		syncService:    syncSvc,
-		dagRunMgr:      drm,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,
 			NavbarTitle:           cfg.UI.NavbarTitle,
@@ -585,8 +583,11 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV2BasePath 
 	// 7. Queue list: /events/queues
 	r.Get(path.Join(apiV2BasePath, "events/queues"), handler.HandleQueuesListEvents)
 
+	// 8. DAGs list: /events/dags
+	r.Get(path.Join(apiV2BasePath, "events/dags"), handler.HandleDAGsListEvents)
+
 	logger.Info(ctx, "SSE routes configured",
-		slog.Int("routes", 7),
+		slog.Int("routes", 8),
 		slog.String("basePath", apiV2BasePath))
 }
 
@@ -612,6 +613,9 @@ func (srv *Server) registerSSEFetchers() {
 
 	// 7. Queue list - identifier: URL query string
 	srv.sseHub.RegisterFetcher(sse.TopicTypeQueues, srv.apiV2.GetQueuesListData)
+
+	// 8. DAGs list - identifier: URL query string
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGsList, srv.apiV2.GetDAGsListData)
 }
 
 // startServer starts the HTTP server with or without TLS

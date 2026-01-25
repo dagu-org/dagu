@@ -49,6 +49,10 @@ const (
 	// TopicTypeQueues watches the queue list
 	// Identifier format: URL query string
 	TopicTypeQueues TopicType = "queues"
+
+	// TopicTypeDAGsList watches the DAGs list
+	// Identifier format: URL query string (e.g., "page=1&perPage=100&name=mydag")
+	TopicTypeDAGsList TopicType = "dagslist"
 )
 
 // FetchFunc fetches data for a given identifier.

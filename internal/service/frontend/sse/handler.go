@@ -86,6 +86,14 @@ func (h *Handler) HandleQueuesListEvents(w http.ResponseWriter, r *http.Request)
 	h.handleSSE(w, r, topic)
 }
 
+// HandleDAGsListEvents handles SSE connections for the DAGs list.
+// Endpoint: GET /events/dags
+func (h *Handler) HandleDAGsListEvents(w http.ResponseWriter, r *http.Request) {
+	// Include query params in topic for unique identification
+	topic := string(TopicTypeDAGsList) + ":" + r.URL.RawQuery
+	h.handleSSE(w, r, topic)
+}
+
 // handleSSE is the common SSE handling logic shared by all handlers.
 // It handles auth, headers, client creation, subscription, and the write pump.
 func (h *Handler) handleSSE(w http.ResponseWriter, r *http.Request, topic string) {

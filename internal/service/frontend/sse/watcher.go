@@ -14,9 +14,9 @@ import (
 // It uses a pluggable FetchFunc to retrieve data, making it
 // generic across different data sources.
 type Watcher struct {
-	topic      string          // Full topic string (e.g., "dagrun:mydag/run123")
-	identifier string          // Identifier portion (e.g., "mydag/run123")
-	fetcher    FetchFunc       // Function to fetch data for this topic
+	topic      string    // Full topic string (e.g., "dagrun:mydag/run123")
+	identifier string    // Identifier portion (e.g., "mydag/run123")
+	fetcher    FetchFunc // Function to fetch data for this topic
 	clients    map[*Client]struct{}
 	mu         sync.RWMutex
 	lastHash   string

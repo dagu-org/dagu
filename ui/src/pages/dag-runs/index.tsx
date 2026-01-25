@@ -23,6 +23,7 @@ import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-d
 import DAGRunGroupedView from '../../features/dag-runs/components/dag-run-list/DAGRunGroupedView';
 import DAGRunTable from '../../features/dag-runs/components/dag-run-list/DAGRunTable';
 import { useQuery } from '../../hooks/api';
+import { useDAGRunsListSSE } from '../../hooks/useDAGRunsListSSE';
 import StatusChip from '../../ui/StatusChip';
 import Title from '../../ui/Title';
 
@@ -410,7 +411,23 @@ function DAGRuns() {
   );
   const availableTags = tagsData?.tags ?? [];
 
-  const { data, mutate } = useQuery(
+  // SSE for real-time updates
+  const sseResult = useDAGRunsListSSE(
+    {
+      name: apiSearchText || undefined,
+      dagRunId: apiDagRunId || undefined,
+      status: apiStatus && apiStatus !== 'all' ? apiStatus : undefined,
+      tags: apiTags.length > 0 ? apiTags.join(',') : undefined,
+      fromDate: formatDateForApi(apiFromDate),
+      toDate: formatDateForApi(apiToDate),
+    },
+    true
+  );
+
+  // Polling fallback (only when SSE fails or not connected)
+  const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
+
+  const { data: pollingData, mutate } = useQuery(
     '/dag-runs',
     {
       params: {
@@ -427,13 +444,16 @@ function DAGRuns() {
       },
     },
     {
-      // This ensures the query only runs when apiSearchText or date range changes
-      revalidateIfStale: true,
-      revalidateOnFocus: true,
-      revalidateOnReconnect: true,
-      refreshInterval: 1000,
+      revalidateIfStale: usePolling,
+      revalidateOnFocus: usePolling,
+      revalidateOnReconnect: usePolling,
+      refreshInterval: usePolling ? 2000 : 0,
+      isPaused: () => !usePolling,
     }
   );
+
+  // Use SSE data when available, otherwise polling
+  const data = sseResult.data || pollingData;
 
   const addSearchParam = (key: string, value: string | undefined) => {
     const locationQuery = new URLSearchParams(window.location.search);

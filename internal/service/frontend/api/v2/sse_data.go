@@ -364,10 +364,95 @@ func (a *API) GetQueuesListData(ctx context.Context, _ string) (any, error) {
 	return response, nil
 }
 
+// GetDAGsListData returns DAGs list for SSE.
+// Identifier format: URL query string (e.g., "page=1&perPage=100&name=mydag")
+func (a *API) GetDAGsListData(ctx context.Context, queryString string) (any, error) {
+	params, _ := url.ParseQuery(queryString)
+
+	// Parse pagination
+	page := 1
+	perPage := 100
+	if p := params.Get("page"); p != "" {
+		if v, err := strconv.Atoi(p); err == nil && v > 0 {
+			page = v
+		}
+	}
+	if pp := params.Get("perPage"); pp != "" {
+		if v, err := strconv.Atoi(pp); err == nil && v > 0 {
+			perPage = v
+		}
+	}
+
+	// Parse sort/order
+	sortField := params.Get("sort")
+	if sortField == "" {
+		sortField = "name"
+	}
+	sortOrder := params.Get("order")
+	if sortOrder == "" {
+		sortOrder = "asc"
+	}
+
+	// Parse filters
+	var nameFilter string
+	if n := params.Get("name"); n != "" {
+		nameFilter = n
+	}
+	var tags []string
+	if tagsParam := params.Get("tags"); tagsParam != "" {
+		tags = parseCommaSeparatedTags(&tagsParam)
+	}
+
+	pg := exec.NewPaginator(page, perPage)
+	result, errList, err := a.dagStore.List(ctx, exec.ListDAGsOptions{
+		Paginator: &pg,
+		Name:      nameFilter,
+		Tags:      tags,
+		Sort:      sortField,
+		Order:     sortOrder,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error listing DAGs: %w", err)
+	}
+
+	// Build DAG files
+	dagFiles := make([]api.DAGFile, 0, len(result.Items))
+	for _, item := range result.Items {
+		dagStatus, err := a.dagRunMgr.GetLatestStatus(ctx, item)
+		if err != nil {
+			errList = append(errList, err.Error())
+		}
+
+		suspended := a.dagStore.IsSuspended(ctx, item.FileName())
+		dagRun := toDAGRunSummary(dagStatus)
+
+		var dagErrors []string
+		if item.BuildErrors != nil {
+			for _, err := range item.BuildErrors {
+				dagErrors = append(dagErrors, err.Error())
+			}
+		}
+
+		dagFile := api.DAGFile{
+			FileName:     item.FileName(),
+			LatestDAGRun: dagRun,
+			Suspended:    suspended,
+			Dag:          toDAG(item),
+			Errors:       dagErrors,
+		}
+		dagFiles = append(dagFiles, dagFile)
+	}
+
+	return api.ListDAGs200JSONResponse{
+		Dags:       dagFiles,
+		Errors:     errList,
+		Pagination: toPagination(result),
+	}, nil
+}
+
 // Helper functions
 
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
-

@@ -17,6 +17,7 @@ import { DAGErrors } from '../../features/dags/components/dag-editor';
 import { DAGTable } from '../../features/dags/components/dag-list';
 import DAGListHeader from '../../features/dags/components/dag-list/DAGListHeader';
 import { useQuery } from '../../hooks/api';
+import { useDAGsListSSE } from '../../hooks/useDAGsListSSE';
 import LoadingIndicator from '../../ui/LoadingIndicator';
 
 type DAGDefinitionsFilters = {
@@ -191,7 +192,23 @@ function DAGsContent() {
     updatePreference('pageLimit', newLimit);
   };
 
-  const { data, mutate, isLoading } = useQuery(
+  // SSE for real-time updates
+  const sseResult = useDAGsListSSE(
+    {
+      page,
+      perPage: preferences.pageLimit || 200,
+      name: apiSearchText || undefined,
+      tags: apiSearchTags.length > 0 ? apiSearchTags.join(',') : undefined,
+      sort: sortField,
+      order: sortOrder,
+    },
+    true
+  );
+
+  // Polling fallback (only when SSE fails or not connected)
+  const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
+
+  const { data: pollingData, mutate, isLoading } = useQuery(
     '/dags',
     {
       params: {
@@ -207,11 +224,15 @@ function DAGsContent() {
       },
     },
     {
-      refreshInterval: 1000,
+      refreshInterval: usePolling ? 2000 : 0,
       revalidateIfStale: false,
       keepPreviousData: true,
+      isPaused: () => !usePolling,
     }
   );
+
+  // Use SSE data when available, otherwise polling
+  const data = sseResult.data || pollingData;
 
   const addSearchParam = (key: string, value: string | string[]) => {
     const locationQuery = new URLSearchParams(window.location.search);

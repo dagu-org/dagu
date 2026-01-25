@@ -42,7 +42,7 @@ func (h *Handler) proxyToRemoteNode(w http.ResponseWriter, r *http.Request, node
 		http.Error(w, fmt.Sprintf("failed to connect to remote node: %v", err), http.StatusBadGateway)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		http.Error(w, fmt.Sprintf("remote node returned status: %d", resp.StatusCode), resp.StatusCode)
@@ -104,6 +104,22 @@ func buildRemoteURL(baseURL, topic, token string) string {
 	case TopicTypeQueueItems:
 		// identifier: "queueName"
 		path = fmt.Sprintf("/events/queues/%s/items", identifier)
+
+	case TopicTypeQueues:
+		// identifier: URL query string
+		if identifier != "" {
+			path = "/events/queues?" + identifier
+		} else {
+			path = "/events/queues"
+		}
+
+	case TopicTypeDAGsList:
+		// identifier: URL query string (e.g., "page=1&perPage=100&name=mydag")
+		if identifier != "" {
+			path = "/events/dags?" + identifier
+		} else {
+			path = "/events/dags"
+		}
 
 	default:
 		// Unknown topic type - try to use as-is
