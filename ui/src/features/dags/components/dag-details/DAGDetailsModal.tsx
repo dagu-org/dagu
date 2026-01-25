@@ -221,6 +221,7 @@ function DAGDetailsModal({ fileName, isOpen, onClose }: Props): React.ReactEleme
                     stepName={stepName}
                     isModal={true}
                     navigateToStatusTab={navigateToStatusTab}
+                    localDags={data?.localDags}
                   />
                 )}
               </div>

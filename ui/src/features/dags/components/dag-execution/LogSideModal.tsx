@@ -39,6 +39,10 @@ const LogSideModal: React.FC<LogSideModalProps> = ({
   // State to track if we're on mobile
   const [isMobile, setIsMobile] = useState(false);
 
+  // Track if modal should be rendered and if it's visible (for animation)
+  const [shouldRender, setShouldRender] = useState(isOpen);
+  const [isVisible, setIsVisible] = useState(false);
+
   // Check if screen is mobile size
   useEffect(() => {
     const checkIsMobile = () => {
@@ -52,6 +56,27 @@ const LogSideModal: React.FC<LogSideModalProps> = ({
       window.removeEventListener('resize', checkIsMobile);
     };
   }, []);
+
+  // Handle open/close with animation
+  useEffect(() => {
+    if (isOpen) {
+      // Start rendering, then trigger animation on next frame
+      setShouldRender(true);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setIsVisible(true);
+        });
+      });
+    } else {
+      // Start closing animation
+      setIsVisible(false);
+      // Remove from DOM after animation completes
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
 
   // Add keyboard shortcuts
   useEffect(() => {
@@ -71,7 +96,7 @@ const LogSideModal: React.FC<LogSideModalProps> = ({
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!shouldRender) return null;
 
   // Calculate z-index and positioning based on whether it's in a modal or not
   const zIndex = isInModal ? 60 : 50; // Higher z-index when in modal
@@ -126,11 +151,13 @@ const LogSideModal: React.FC<LogSideModalProps> = ({
       {/* Modal - full screen on mobile, side panel on desktop */}
       <div
         className={`fixed ${positioning} ${width} h-screen bg-background ${
-          isMobile 
-            ? 'border border-border rounded-none' 
+          isMobile
+            ? 'border border-border rounded-none'
             : 'border-l border-border'
-        } overflow-hidden flex flex-col ${
-          isMobile ? 'animate-in fade-in-0 slide-in-from-bottom-10' : 'slide-in-from-right'
+        } overflow-hidden flex flex-col transition-all duration-150 ease-out ${
+          isMobile
+            ? (isVisible ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0')
+            : (isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0')
         }`}
         style={{ zIndex: zIndex + 1 }} // Make sure modal is above backdrop
         onClick={(e) => e.stopPropagation()} // Prevent clicks inside the modal from closing it
@@ -180,8 +207,6 @@ const LogSideModal: React.FC<LogSideModalProps> = ({
         </div>
         <div className={`flex-1 overflow-auto ${isMobile ? 'p-2' : 'p-4'}`}>{children}</div>
       </div>
-
-      {/* Animation is handled via CSS classes in global.css */}
     </>
   );
 };

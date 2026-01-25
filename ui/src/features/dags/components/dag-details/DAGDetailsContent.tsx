@@ -35,6 +35,7 @@ type DAGDetailsContentProps = {
   isModal?: boolean;
   navigateToStatusTab?: () => void;
   skipHeader?: boolean;
+  localDags?: components['schemas']['LocalDag'][];
 };
 
 type LogViewerState = {
@@ -56,6 +57,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   isModal = false,
   navigateToStatusTab,
   skipHeader = false,
+  localDags,
 }) => {
   const baseUrl = isModal ? '#' : `/dags/${fileName}`;
   const [logViewer, setLogViewer] = useState<LogViewerState>({
@@ -322,7 +324,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
               <div className="h-6 flex-shrink-0" />
             </>
           ) : null}
-          {activeTab === 'spec' ? <DAGSpec fileName={fileName} /> : null}
+          {activeTab === 'spec' ? <DAGSpec fileName={fileName} localDags={localDags} /> : null}
           {activeTab === 'history' ? (
             <>
               <DAGExecutionHistory fileName={fileName || ''} />
