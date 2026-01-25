@@ -1,5 +1,5 @@
 import { components } from '../api/v2/schema';
-import { useSSE } from './useSSE';
+import { SSEState, useSSE } from './useSSE';
 
 type Queue = components['schemas']['Queue'];
 type QueuesSummary = components['schemas']['QueuesSummary'];
@@ -9,7 +9,7 @@ interface QueuesListSSEResponse {
   summary: QueuesSummary;
 }
 
-export function useQueuesListSSE(enabled: boolean = true) {
+export function useQueuesListSSE(enabled: boolean = true): SSEState<QueuesListSSEResponse> {
   return useSSE<QueuesListSSEResponse>('/events/queues', enabled);
 }
 

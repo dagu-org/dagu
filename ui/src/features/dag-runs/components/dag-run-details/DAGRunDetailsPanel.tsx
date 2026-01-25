@@ -10,19 +10,19 @@ import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGRunContext } from '../../contexts/DAGRunContext';
 import DAGRunDetailsContent from './DAGRunDetailsContent';
 
-type DAGRunDetailsPanelProps = {
+type Props = {
   name: string;
   dagRunId: string;
   onClose: () => void;
   onNavigate?: (direction: 'up' | 'down') => void;
 };
 
-const DAGRunDetailsPanel: React.FC<DAGRunDetailsPanelProps> = ({
+function DAGRunDetailsPanel({
   name,
   dagRunId,
   onClose,
   onNavigate,
-}) => {
+}: Props): React.ReactElement {
   const navigate = useNavigate();
   const appBarContext = React.useContext(AppBarContext);
 

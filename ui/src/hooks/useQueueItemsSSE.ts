@@ -1,5 +1,5 @@
 import { components } from '../api/v2/schema';
-import { useSSE } from './useSSE';
+import { SSEState, useSSE } from './useSSE';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
 
@@ -11,7 +11,7 @@ interface QueueItemsSSEResponse {
 export function useQueueItemsSSE(
   queueName: string,
   enabled: boolean = true
-): ReturnType<typeof useSSE<QueueItemsSSEResponse>> {
+): SSEState<QueueItemsSSEResponse> {
   const endpoint = `/events/queues/${encodeURIComponent(queueName)}/items`;
   return useSSE<QueueItemsSSEResponse>(endpoint, enabled);
 }

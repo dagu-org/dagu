@@ -13,17 +13,13 @@ import { DAGContext } from '../../contexts/DAGContext';
 import { RootDAGRunContext } from '../../contexts/RootDAGRunContext';
 import DAGDetailsContent from './DAGDetailsContent';
 
-type DAGDetailsModalProps = {
+type Props = {
   fileName: string;
   isOpen: boolean;
   onClose: () => void;
 };
 
-const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
-  fileName,
-  isOpen,
-  onClose,
-}) => {
+function DAGDetailsModal({ fileName, isOpen, onClose }: Props): React.ReactElement | null {
   const navigate = useNavigate();
   const appBarContext = React.useContext(AppBarContext);
   const [currentDAGRun, setCurrentDAGRun] = React.useState<
@@ -86,24 +82,23 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
     }
   }, [data]);
 
-  // Add keyboard shortcuts
+  // Keyboard shortcuts
   React.useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Ignore shortcuts when user is editing text (typing in inputs, textareas, editors, etc.)
+    function handleKeyDown(event: KeyboardEvent): void {
       if (shouldIgnoreKeyboardShortcuts()) {
         return;
       }
 
-      // Close modal with Escape key
-      if (event.key === 'Escape') {
-        onClose();
+      switch (event.key) {
+        case 'Escape':
+          onClose();
+          break;
+        case 'f':
+        case 'F':
+          handleFullscreenClick();
+          break;
       }
-
-      // Open in fullscreen with 'f' key
-      if (event.key === 'f' || event.key === 'F') {
-        handleFullscreenClick();
-      }
-    };
+    }
 
     if (isOpen) {
       window.addEventListener('keydown', handleKeyDown);

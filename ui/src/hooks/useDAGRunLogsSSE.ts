@@ -1,5 +1,5 @@
 import { components } from '../api/v2/schema';
-import { useSSE } from './useSSE';
+import { SSEState, useSSE } from './useSSE';
 
 type NodeStatus = components['schemas']['NodeStatus'];
 
@@ -29,7 +29,7 @@ export function useDAGRunLogsSSE(
   name: string,
   dagRunId: string,
   enabled: boolean = true
-) {
+): SSEState<DAGRunLogsSSEResponse> {
   const endpoint = `/events/dag-runs/${encodeURIComponent(name)}/${encodeURIComponent(dagRunId)}/logs`;
   return useSSE<DAGRunLogsSSEResponse>(endpoint, enabled);
 }
