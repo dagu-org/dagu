@@ -346,52 +346,56 @@ func (a *API) GetDAGDAGRunHistory(ctx context.Context, request api.GetDAGDAGRunH
 }
 
 func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsRequestObject) (api.GetDAGDetailsResponseObject, error) {
-	fileName := request.FileName
-	dag, err := a.dagStore.GetDetails(ctx, fileName, spec.WithAllowBuildErrors())
+	resp, err := a.getDAGDetailsData(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
 			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG %s not found", fileName),
+			Message:    err.Error(),
 		}
+	}
+	return resp, nil
+}
+
+// getDAGDetailsData returns DAG details data. Used by both HTTP handler and SSE fetcher.
+func (a *API) getDAGDetailsData(ctx context.Context, fileName string) (api.GetDAGDetails200JSONResponse, error) {
+	dag, err := a.dagStore.GetDetails(ctx, fileName, spec.WithAllowBuildErrors())
+	if err != nil {
+		return api.GetDAGDetails200JSONResponse{}, fmt.Errorf("DAG %s not found", fileName)
 	}
 
 	dagStatus, err := a.dagRunMgr.GetLatestStatus(ctx, dag)
 	if err != nil {
-		return nil, &Error{
-			HTTPStatus: http.StatusNotFound,
-			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG %s not found", fileName),
-		}
+		return api.GetDAGDetails200JSONResponse{}, fmt.Errorf("failed to get latest status for DAG %s", fileName)
 	}
 
 	details := toDAGDetails(dag)
 
-	var localDAGs []api.LocalDag
+	localDAGs := make([]api.LocalDag, 0, len(dag.LocalDAGs))
 	for _, localDAG := range dag.LocalDAGs {
 		localDAGs = append(localDAGs, toLocalDAG(localDAG))
 	}
 
-	// sort localDAGs by name
 	sort.Slice(localDAGs, func(i, j int) bool {
-		return strings.Compare(localDAGs[i].Name, localDAGs[j].Name) <= 0
+		return localDAGs[i].Name < localDAGs[j].Name
 	})
-
-	// Extract build errors if any
-	var errs []string
-	if len(dag.BuildErrors) > 0 {
-		for _, buildErr := range dag.BuildErrors {
-			errs = append(errs, buildErr.Error())
-		}
-	}
 
 	return api.GetDAGDetails200JSONResponse{
 		Dag:          details,
 		LatestDAGRun: ToDAGRunDetails(dagStatus),
 		Suspended:    a.dagStore.IsSuspended(ctx, fileName),
 		LocalDags:    localDAGs,
-		Errors:       errs,
+		Errors:       extractBuildErrors(dag.BuildErrors),
 	}, nil
+}
+
+// extractBuildErrors converts a slice of errors to a slice of strings.
+func extractBuildErrors(errs []error) []string {
+	result := make([]string, 0, len(errs))
+	for _, e := range errs {
+		result = append(result, e.Error())
+	}
+	return result
 }
 
 func (a *API) readHistoryData(

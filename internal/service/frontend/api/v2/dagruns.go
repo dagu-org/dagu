@@ -1014,23 +1014,28 @@ func (a *API) RejectSubDAGRunStep(ctx context.Context, request api.RejectSubDAGR
 
 // GetDAGRunDetails implements api.StrictServerInterface.
 func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetailsRequestObject) (api.GetDAGRunDetailsResponseObject, error) {
-	dagName := request.Name
-	dagRunId := request.DagRunId
+	resp, err := a.getDAGRunDetailsData(ctx, request.Name, request.DagRunId)
+	if err != nil {
+		return &api.GetDAGRunDetails404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: err.Error(),
+		}, nil
+	}
+	return &resp, nil
+}
 
+// getDAGRunDetailsData returns DAG run details data. Used by both HTTP handler and SSE fetcher.
+func (a *API) getDAGRunDetailsData(ctx context.Context, dagName, dagRunId string) (api.GetDAGRunDetails200JSONResponse, error) {
 	if dagRunId == "latest" {
-		// Get the DAG to retrieve the latest status
 		attempt, err := a.dagRunStore.LatestAttempt(ctx, dagName)
 		if err != nil {
-			return &api.GetDAGRunDetails404JSONResponse{
-				Code:    api.ErrorCodeNotFound,
-				Message: fmt.Sprintf("no dag-runs found for DAG %s", dagName),
-			}, nil
+			return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("no dag-runs found for DAG %s", dagName)
 		}
 		status, err := attempt.ReadStatus(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("error getting latest status: %w", err)
+			return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("error getting latest status: %w", err)
 		}
-		return &api.GetDAGRunDetails200JSONResponse{
+		return api.GetDAGRunDetails200JSONResponse{
 			DagRunDetails: ToDAGRunDetails(*status),
 		}, nil
 	}
@@ -1038,12 +1043,9 @@ func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetails
 	ref := exec.NewDAGRunRef(dagName, dagRunId)
 	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
-		return &api.GetDAGRunDetails404JSONResponse{
-			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
-		}, nil
+		return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
 	}
-	return &api.GetDAGRunDetails200JSONResponse{
+	return api.GetDAGRunDetails200JSONResponse{
 		DagRunDetails: ToDAGRunDetails(*dagStatus),
 	}, nil
 }

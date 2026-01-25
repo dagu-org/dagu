@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -15,7 +14,6 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/core/spec"
 )
 
 // SSE Data Methods
@@ -25,39 +23,7 @@ import (
 // GetDAGDetailsData returns DAG details for SSE.
 // Identifier format: "fileName"
 func (a *API) GetDAGDetailsData(ctx context.Context, fileName string) (any, error) {
-	dag, err := a.dagStore.GetDetails(ctx, fileName, spec.WithAllowBuildErrors())
-	if err != nil {
-		return nil, fmt.Errorf("DAG %s not found", fileName)
-	}
-
-	dagStatus, err := a.dagRunMgr.GetLatestStatus(ctx, dag)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get latest status for DAG %s", fileName)
-	}
-
-	details := toDAGDetails(dag)
-
-	localDAGs := make([]api.LocalDag, 0, len(dag.LocalDAGs))
-	for _, localDAG := range dag.LocalDAGs {
-		localDAGs = append(localDAGs, toLocalDAG(localDAG))
-	}
-
-	sort.Slice(localDAGs, func(i, j int) bool {
-		return localDAGs[i].Name < localDAGs[j].Name
-	})
-
-	errs := make([]string, 0, len(dag.BuildErrors))
-	for _, buildErr := range dag.BuildErrors {
-		errs = append(errs, buildErr.Error())
-	}
-
-	return api.GetDAGDetails200JSONResponse{
-		Dag:          details,
-		LatestDAGRun: ToDAGRunDetails(dagStatus),
-		Suspended:    a.dagStore.IsSuspended(ctx, fileName),
-		LocalDags:    localDAGs,
-		Errors:       errs,
-	}, nil
+	return a.getDAGDetailsData(ctx, fileName)
 }
 
 // GetDAGRunDetailsData returns DAG run details for SSE.
@@ -67,30 +33,7 @@ func (a *API) GetDAGRunDetailsData(ctx context.Context, identifier string) (any,
 	if !ok {
 		return nil, fmt.Errorf("invalid identifier format: %s (expected 'dagName/dagRunId')", identifier)
 	}
-
-	if dagRunId == "latest" {
-		attempt, err := a.dagRunStore.LatestAttempt(ctx, dagName)
-		if err != nil {
-			return nil, fmt.Errorf("no dag-runs found for DAG %s", dagName)
-		}
-		status, err := attempt.ReadStatus(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("error getting latest status: %w", err)
-		}
-		return api.GetDAGRunDetails200JSONResponse{
-			DagRunDetails: ToDAGRunDetails(*status),
-		}, nil
-	}
-
-	ref := exec.NewDAGRunRef(dagName, dagRunId)
-	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
-	if err != nil {
-		return nil, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
-	}
-
-	return api.GetDAGRunDetails200JSONResponse{
-		DagRunDetails: ToDAGRunDetails(*dagStatus),
-	}, nil
+	return a.getDAGRunDetailsData(ctx, dagName, dagRunId)
 }
 
 // DAGRunLogsResponse represents the response for DAG run logs SSE.
@@ -446,17 +389,12 @@ func (a *API) buildDAGsListOptions(params url.Values) exec.ListDAGsOptions {
 func (a *API) buildDAGFile(ctx context.Context, item *core.DAG) (api.DAGFile, error) {
 	dagStatus, err := a.dagRunMgr.GetLatestStatus(ctx, item)
 
-	dagErrors := make([]string, 0, len(item.BuildErrors))
-	for _, buildErr := range item.BuildErrors {
-		dagErrors = append(dagErrors, buildErr.Error())
-	}
-
 	return api.DAGFile{
 		FileName:     item.FileName(),
 		LatestDAGRun: toDAGRunSummary(dagStatus),
 		Suspended:    a.dagStore.IsSuspended(ctx, item.FileName()),
 		Dag:          toDAG(item),
-		Errors:       dagErrors,
+		Errors:       extractBuildErrors(item.BuildErrors),
 	}, err
 }
 

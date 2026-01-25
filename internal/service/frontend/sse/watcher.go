@@ -69,9 +69,7 @@ func NewWatcher(identifier string, fetcher FetchFunc, topicType TopicType, metri
 
 // Start begins polling for data changes and broadcasts updates to clients.
 // Uses adaptive polling intervals based on fetch duration.
-// IMPORTANT: Call wg.Add(1) before spawning the goroutine that calls this method.
-// This method should be called via StartAsync for proper WaitGroup handling.
-// Note: The Hub is responsible for tracking watcher metrics (WatcherStarted/WatcherStopped).
+// Callers must use StartAsync for proper WaitGroup handling.
 func (w *Watcher) Start(ctx context.Context) {
 	// Use Timer instead of Ticker for variable intervals
 	timer := time.NewTimer(0) // Immediate first poll

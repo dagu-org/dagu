@@ -100,170 +100,133 @@ func setupHandler(t *testing.T) (*Handler, *Hub) {
 	return handler, hub
 }
 
-// createChiRequest creates a request with chi URL params and timeout
-func createChiRequest(method, path string, params map[string]string, timeout time.Duration) *http.Request {
+// createChiRequest creates a request with chi URL params and timeout.
+// Returns the request and a cancel function that should be called when the test is done.
+func createChiRequest(method, path string, params map[string]string, timeout time.Duration) (*http.Request, context.CancelFunc) {
 	r := httptest.NewRequest(method, path, nil)
 
-	// Create chi route context with URL params
 	rctx := chi.NewRouteContext()
 	for k, v := range params {
 		rctx.URLParams.Add(k, v)
 	}
 
-	// Create context with timeout and chi route context
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	_ = cancel // Context will be cancelled when timeout expires
-
 	ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
 	r = r.WithContext(ctx)
 
-	return r
+	return r, cancel
 }
 
-func TestHandleDAGRunEvents(t *testing.T) {
+func TestHandleEvents(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		path          string
+		params        map[string]string
+		query         string
+		handler       func(*Handler) http.HandlerFunc
+		expectedTopic string
+	}{
+		{
+			name:          "DAGRunEvents",
+			path:          "/events/dag-runs/mydag/run123",
+			params:        map[string]string{"name": "mydag", "dagRunId": "run123"},
+			handler:       func(h *Handler) http.HandlerFunc { return h.HandleDAGRunEvents },
+			expectedTopic: "dagrun:mydag/run123",
+		},
+		{
+			name:          "DAGEvents",
+			path:          "/events/dags/mydag.yaml",
+			params:        map[string]string{"fileName": "mydag.yaml"},
+			handler:       func(h *Handler) http.HandlerFunc { return h.HandleDAGEvents },
+			expectedTopic: "dag:mydag.yaml",
+		},
+		{
+			name:          "DAGRunLogsEvents",
+			path:          "/events/dag-runs/mydag/run123/logs",
+			params:        map[string]string{"name": "mydag", "dagRunId": "run123"},
+			handler:       func(h *Handler) http.HandlerFunc { return h.HandleDAGRunLogsEvents },
+			expectedTopic: "dagrunlogs:mydag/run123",
+		},
+		{
+			name:          "DAGRunLogsEventsWithQuery",
+			path:          "/events/dag-runs/mydag/run123/logs?tail=100",
+			params:        map[string]string{"name": "mydag", "dagRunId": "run123"},
+			query:         "tail=100",
+			handler:       func(h *Handler) http.HandlerFunc { return h.HandleDAGRunLogsEvents },
+			expectedTopic: "dagrunlogs:mydag/run123?tail=100",
+		},
+		{
+			name:          "StepLogEvents",
+			path:          "/events/dag-runs/mydag/run123/logs/steps/step1",
+			params:        map[string]string{"name": "mydag", "dagRunId": "run123", "stepName": "step1"},
+			handler:       func(h *Handler) http.HandlerFunc { return h.HandleStepLogEvents },
+			expectedTopic: "steplog:mydag/run123/step1",
+		},
+		{
+			name:          "DAGRunsListEvents",
+			path:          "/events/dag-runs?limit=50",
+			query:         "limit=50",
+			handler:       func(h *Handler) http.HandlerFunc { return h.HandleDAGRunsListEvents },
+			expectedTopic: "dagruns:limit=50",
+		},
+		{
+			name:          "QueueItemsEvents",
+			path:          "/events/queues/myqueue/items",
+			params:        map[string]string{"name": "myqueue"},
+			handler:       func(h *Handler) http.HandlerFunc { return h.HandleQueueItemsEvents },
+			expectedTopic: "queueitems:myqueue",
+		},
+		{
+			name:          "QueuesListEvents",
+			path:          "/events/queues",
+			handler:       func(h *Handler) http.HandlerFunc { return h.HandleQueuesListEvents },
+			expectedTopic: "queues:",
+		},
+		{
+			name:          "DAGsListEvents",
+			path:          "/events/dags?page=1&perPage=100",
+			query:         "page=1&perPage=100",
+			handler:       func(h *Handler) http.HandlerFunc { return h.HandleDAGsListEvents },
+			expectedTopic: "dagslist:page=1&perPage=100",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			handler, _ := setupHandler(t)
+			w := newMockFlusher()
+			r, cancel := createChiRequest(http.MethodGet, tt.path, tt.params, 100*time.Millisecond)
+			defer cancel()
+			if tt.query != "" {
+				r.URL.RawQuery = tt.query
+			}
+
+			tt.handler(handler)(w, r)
+
+			assert.Equal(t, http.StatusOK, w.Code)
+			assert.Contains(t, w.Body.String(), tt.expectedTopic)
+		})
+	}
+}
+
+func TestHandleDAGRunEventsClientCleanup(t *testing.T) {
 	t.Parallel()
 	handler, hub := setupHandler(t)
 
-	// Create mock response writer with flusher
 	w := newMockFlusher()
-
-	params := map[string]string{
-		"name":     "mydag",
-		"dagRunId": "run123",
-	}
-	r := createChiRequest(http.MethodGet, "/events/dag-runs/mydag/run123", params, 100*time.Millisecond)
+	params := map[string]string{"name": "mydag", "dagRunId": "run123"}
+	r, cancel := createChiRequest(http.MethodGet, "/events/dag-runs/mydag/run123", params, 100*time.Millisecond)
+	defer cancel()
 
 	handler.HandleDAGRunEvents(w, r)
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "text/event-stream", w.Header().Get("Content-Type"))
 	assert.Contains(t, w.Body.String(), "event: connected")
-	assert.Contains(t, w.Body.String(), "dagrun:mydag/run123")
-
-	// Verify client was subscribed then unsubscribed
 	assert.Equal(t, 0, hub.ClientCount())
-}
-
-func TestHandleDAGEvents(t *testing.T) {
-	t.Parallel()
-	handler, _ := setupHandler(t)
-
-	w := newMockFlusher()
-	params := map[string]string{"fileName": "mydag.yaml"}
-	r := createChiRequest(http.MethodGet, "/events/dags/mydag.yaml", params, 100*time.Millisecond)
-
-	handler.HandleDAGEvents(w, r)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), "dag:mydag.yaml")
-}
-
-func TestHandleDAGRunLogsEvents(t *testing.T) {
-	t.Parallel()
-	handler, _ := setupHandler(t)
-
-	w := newMockFlusher()
-	params := map[string]string{
-		"name":     "mydag",
-		"dagRunId": "run123",
-	}
-	r := createChiRequest(http.MethodGet, "/events/dag-runs/mydag/run123/logs", params, 100*time.Millisecond)
-
-	handler.HandleDAGRunLogsEvents(w, r)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), "dagrunlogs:mydag/run123")
-}
-
-func TestHandleDAGRunLogsEventsWithQuery(t *testing.T) {
-	t.Parallel()
-	handler, _ := setupHandler(t)
-
-	w := newMockFlusher()
-	params := map[string]string{
-		"name":     "mydag",
-		"dagRunId": "run123",
-	}
-	r := createChiRequest(http.MethodGet, "/events/dag-runs/mydag/run123/logs?tail=100", params, 100*time.Millisecond)
-	r.URL.RawQuery = "tail=100"
-
-	handler.HandleDAGRunLogsEvents(w, r)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), "dagrunlogs:mydag/run123?tail=100")
-}
-
-func TestHandleStepLogEvents(t *testing.T) {
-	t.Parallel()
-	handler, _ := setupHandler(t)
-
-	w := newMockFlusher()
-	params := map[string]string{
-		"name":     "mydag",
-		"dagRunId": "run123",
-		"stepName": "step1",
-	}
-	r := createChiRequest(http.MethodGet, "/events/dag-runs/mydag/run123/logs/steps/step1", params, 100*time.Millisecond)
-
-	handler.HandleStepLogEvents(w, r)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), "steplog:mydag/run123/step1")
-}
-
-func TestHandleDAGRunsListEvents(t *testing.T) {
-	t.Parallel()
-	handler, _ := setupHandler(t)
-
-	w := newMockFlusher()
-	r := createChiRequest(http.MethodGet, "/events/dag-runs?limit=50", nil, 100*time.Millisecond)
-	r.URL.RawQuery = "limit=50"
-
-	handler.HandleDAGRunsListEvents(w, r)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), "dagruns:limit=50")
-}
-
-func TestHandleQueueItemsEvents(t *testing.T) {
-	t.Parallel()
-	handler, _ := setupHandler(t)
-
-	w := newMockFlusher()
-	params := map[string]string{"name": "myqueue"}
-	r := createChiRequest(http.MethodGet, "/events/queues/myqueue/items", params, 100*time.Millisecond)
-
-	handler.HandleQueueItemsEvents(w, r)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), "queueitems:myqueue")
-}
-
-func TestHandleQueuesListEvents(t *testing.T) {
-	t.Parallel()
-	handler, _ := setupHandler(t)
-
-	w := newMockFlusher()
-	r := createChiRequest(http.MethodGet, "/events/queues", nil, 100*time.Millisecond)
-
-	handler.HandleQueuesListEvents(w, r)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), "queues:")
-}
-
-func TestHandleDAGsListEvents(t *testing.T) {
-	t.Parallel()
-	handler, _ := setupHandler(t)
-
-	w := newMockFlusher()
-	r := createChiRequest(http.MethodGet, "/events/dags?page=1&perPage=100", nil, 100*time.Millisecond)
-	r.URL.RawQuery = "page=1&perPage=100"
-
-	handler.HandleDAGsListEvents(w, r)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), "dagslist:page=1&perPage=100")
 }
 
 func TestHandleSSEHeaders(t *testing.T) {
@@ -272,7 +235,8 @@ func TestHandleSSEHeaders(t *testing.T) {
 
 	w := newMockFlusher()
 	params := map[string]string{"fileName": "mydag.yaml"}
-	r := createChiRequest(http.MethodGet, "/events/dags/mydag.yaml", params, 100*time.Millisecond)
+	r, cancel := createChiRequest(http.MethodGet, "/events/dags/mydag.yaml", params, 100*time.Millisecond)
+	defer cancel()
 
 	handler.HandleDAGEvents(w, r)
 
@@ -289,7 +253,8 @@ func TestHandleSSENonFlusher(t *testing.T) {
 	// Use nonFlusher which doesn't implement http.Flusher (defined in helper_test.go)
 	w := &nonFlusher{}
 	params := map[string]string{"fileName": "mydag.yaml"}
-	r := createChiRequest(http.MethodGet, "/events/dags/mydag.yaml", params, 100*time.Millisecond)
+	r, cancel := createChiRequest(http.MethodGet, "/events/dags/mydag.yaml", params, 100*time.Millisecond)
+	defer cancel()
 
 	handler.HandleDAGEvents(w, r)
 
@@ -321,7 +286,8 @@ func TestHandleSSERemoteProxy(t *testing.T) {
 
 	w := newMockFlusher()
 	params := map[string]string{"fileName": "mydag.yaml"}
-	r := createChiRequest(http.MethodGet, "/events/dags/mydag.yaml?remoteNode=remote1", params, 5*time.Second)
+	r, cancel := createChiRequest(http.MethodGet, "/events/dags/mydag.yaml?remoteNode=remote1", params, 5*time.Second)
+	defer cancel()
 	r.URL.RawQuery = "remoteNode=remote1"
 
 	handler.HandleDAGEvents(w, r)
@@ -336,7 +302,8 @@ func TestHandleSSELocalNode(t *testing.T) {
 
 	w := newMockFlusher()
 	params := map[string]string{"fileName": "mydag.yaml"}
-	r := createChiRequest(http.MethodGet, "/events/dags/mydag.yaml?remoteNode=local", params, 100*time.Millisecond)
+	r, cancel := createChiRequest(http.MethodGet, "/events/dags/mydag.yaml?remoteNode=local", params, 100*time.Millisecond)
+	defer cancel()
 	r.URL.RawQuery = "remoteNode=local"
 
 	handler.HandleDAGEvents(w, r)
@@ -372,7 +339,8 @@ func TestHandleSSEMaxClients(t *testing.T) {
 	// First client - use longer timeout
 	w1 := newMockFlusher()
 	params := map[string]string{"fileName": "dag1.yaml"}
-	r1 := createChiRequest(http.MethodGet, "/events/dags/dag1.yaml", params, 200*time.Millisecond)
+	r1, cancel1 := createChiRequest(http.MethodGet, "/events/dags/dag1.yaml", params, 200*time.Millisecond)
+	defer cancel1()
 
 	// Start first client in goroutine
 	done1 := make(chan struct{})
@@ -386,7 +354,8 @@ func TestHandleSSEMaxClients(t *testing.T) {
 
 	// Second client should fail (max clients = 1)
 	w2 := newMockFlusher()
-	r2 := createChiRequest(http.MethodGet, "/events/dags/dag2.yaml", map[string]string{"fileName": "dag2.yaml"}, 50*time.Millisecond)
+	r2, cancel2 := createChiRequest(http.MethodGet, "/events/dags/dag2.yaml", map[string]string{"fileName": "dag2.yaml"}, 50*time.Millisecond)
+	defer cancel2()
 
 	handler.HandleDAGEvents(w2, r2)
 
@@ -402,7 +371,8 @@ func TestHandleSSEConnectedEvent(t *testing.T) {
 
 	w := newMockFlusher()
 	params := map[string]string{"fileName": "mydag.yaml"}
-	r := createChiRequest(http.MethodGet, "/events/dags/mydag.yaml", params, 100*time.Millisecond)
+	r, cancel := createChiRequest(http.MethodGet, "/events/dags/mydag.yaml", params, 100*time.Millisecond)
+	defer cancel()
 
 	handler.HandleDAGEvents(w, r)
 

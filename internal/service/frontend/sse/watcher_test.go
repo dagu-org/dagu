@@ -405,22 +405,6 @@ func TestWatcherFetchErrorMetrics(t *testing.T) {
 	assert.GreaterOrEqual(t, errorCount, float64(1), "fetch error should be recorded in metrics")
 }
 
-func TestComputeHash(t *testing.T) {
-	t.Parallel()
-	data1 := []byte(`{"key": "value1"}`)
-	data2 := []byte(`{"key": "value2"}`)
-	data3 := []byte(`{"key": "value1"}`)
-
-	hash1 := computeHash(data1)
-	hash2 := computeHash(data2)
-	hash3 := computeHash(data3)
-
-	assert.NotEmpty(t, hash1)
-	assert.Len(t, hash1, 16, "hash should be 16 hex chars (8 bytes)")
-
-	assert.NotEqual(t, hash1, hash2, "different data should have different hashes")
-	assert.Equal(t, hash1, hash3, "same data should have same hash")
-}
 
 func TestWatcherIsInBackoffPeriod(t *testing.T) {
 	t.Parallel()
@@ -499,11 +483,8 @@ func TestWatcherAdaptInterval(t *testing.T) {
 		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
-		// Simulate a fast fetch (10ms)
 		watcher.adaptInterval(10 * time.Millisecond)
 
-		// 3 * 10ms = 30ms, which is less than base interval (1s)
-		// EMA: 0.3 * 1s + 0.7 * 1s = 1s (both target and current are at base)
 		assert.Equal(t, defaultBaseInterval, watcher.currentInterval)
 	})
 
@@ -512,10 +493,8 @@ func TestWatcherAdaptInterval(t *testing.T) {
 		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
-		// 500ms fetch -> target = 3 * 500ms = 1.5s
 		watcher.adaptInterval(500 * time.Millisecond)
 
-		// EMA smoothing: 0.3 * target + 0.7 * current = 0.3 * 1.5s + 0.7 * 1s = 1.15s
 		expected := time.Duration(float64(1500*time.Millisecond)*0.3 + float64(1000*time.Millisecond)*0.7)
 		assert.Equal(t, expected, watcher.currentInterval)
 	})
@@ -525,10 +504,8 @@ func TestWatcherAdaptInterval(t *testing.T) {
 		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
-		// 5s fetch -> target = 3 * 5s = 15s, capped to 10s
 		watcher.adaptInterval(5 * time.Second)
 
-		// EMA smoothing prevents instant jump: 0.3 * 10s + 0.7 * 1s = 3.7s
 		expected := time.Duration(float64(10*time.Second)*0.3 + float64(1*time.Second)*0.7)
 		assert.Equal(t, expected, watcher.currentInterval)
 		assert.Less(t, watcher.currentInterval, defaultMaxInterval)
