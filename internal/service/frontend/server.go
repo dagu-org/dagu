@@ -57,10 +57,10 @@ type Server struct {
 	builtinOIDCCfg  *auth.BuiltinOIDCConfig // OIDC config for builtin auth mode
 	authService     *authservice.Service
 	auditService    *audit.Service
-	syncService     gitsync.Service        // Git sync service for graceful shutdown
-	listener        net.Listener           // Optional pre-bound listener (for tests)
-	sseHub          *sse.Hub               // SSE hub for real-time updates
-	metricsRegistry *prometheus.Registry   // Prometheus registry for metrics
+	syncService     gitsync.Service      // Git sync service for graceful shutdown
+	listener        net.Listener         // Optional pre-bound listener (for tests)
+	sseHub          *sse.Hub             // SSE hub for real-time updates
+	metricsRegistry *prometheus.Registry // Prometheus registry for metrics
 }
 
 // ServerOption is a functional option for configuring the Server
@@ -366,6 +366,22 @@ func sanitizeURL(u string) string {
 	return parsed.String()
 }
 
+// sanitizeLogAttr recursively sanitizes attributes, redacting sensitive data.
+func sanitizeLogAttr(a slog.Attr) slog.Attr {
+	if a.Value.Kind() == slog.KindGroup {
+		attrs := a.Value.Group()
+		newAttrs := make([]slog.Attr, len(attrs))
+		for i, attr := range attrs {
+			newAttrs[i] = sanitizeLogAttr(attr)
+		}
+		return slog.Attr{Key: a.Key, Value: slog.GroupValue(newAttrs...)}
+	}
+	if a.Key == "url" {
+		return slog.String("url", sanitizeURL(a.Value.String()))
+	}
+	return a
+}
+
 // Serve starts the HTTP server and configures routes
 func (srv *Server) Serve(ctx context.Context) error {
 	// Setup logger for HTTP requests
@@ -383,10 +399,7 @@ func (srv *Server) Serve(ctx context.Context) error {
 		QuietDownRoutes:  []string{"/api/v2/events"},
 		QuietDownPeriod:  10 * time.Second,
 		ReplaceAttrsOverride: func(_ []string, a slog.Attr) slog.Attr {
-			if a.Key == "url" {
-				return slog.String("url", sanitizeURL(a.Value.String()))
-			}
-			return a
+			return sanitizeLogAttr(a)
 		},
 	})
 
