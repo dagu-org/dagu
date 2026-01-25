@@ -21,12 +21,11 @@ export function useDAGRunsListSSE(
   enabled: boolean = true
 ) {
   const searchParams = new URLSearchParams();
-  if (params.status) searchParams.set('status', params.status);
-  if (params.fromDate) searchParams.set('fromDate', String(params.fromDate));
-  if (params.toDate) searchParams.set('toDate', String(params.toDate));
-  if (params.name) searchParams.set('name', params.name);
-  if (params.dagRunId) searchParams.set('dagRunId', params.dagRunId);
-  if (params.tags) searchParams.set('tags', params.tags);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      searchParams.set(key, String(value));
+    }
+  });
 
   const queryString = searchParams.toString();
   const endpoint = queryString ? `/events/dag-runs?${queryString}` : '/events/dag-runs';

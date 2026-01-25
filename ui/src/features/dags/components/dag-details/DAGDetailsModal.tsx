@@ -135,16 +135,8 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Only show loading on initial load (when no data from either SSE or polling)
+  // Show loading when no data is available
   const hasData = data && data.latestDAGRun;
-  if (!hasData && (isLoading || sseResult.isConnecting)) {
-    return (
-      <div className="fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border z-50 flex items-center justify-center">
-        <LoadingIndicator />
-      </div>
-    );
-  }
-
   if (!hasData) {
     return (
       <div className="fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border z-50 flex items-center justify-center">
