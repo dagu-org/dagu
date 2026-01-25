@@ -10,6 +10,26 @@ export interface SSEState<T> {
   shouldUseFallback: boolean;
 }
 
+/**
+ * Builds an SSE endpoint URL with query parameters from an object.
+ * Filters out null/undefined values and converts values to strings.
+ */
+export function buildSSEEndpoint(
+  basePath: string,
+  params: object
+): string {
+  const searchParams = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value != null) {
+      searchParams.set(key, String(value));
+    }
+  }
+
+  const queryString = searchParams.toString();
+  return queryString ? `${basePath}?${queryString}` : basePath;
+}
+
 const MAX_RETRIES = 5;
 const MAX_RETRY_DELAY_MS = 16000;
 const INITIAL_STATE: SSEState<unknown> = {

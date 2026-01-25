@@ -1,5 +1,5 @@
 import { components } from '../api/v2/schema';
-import { SSEState, useSSE } from './useSSE';
+import { buildSSEEndpoint, SSEState, useSSE } from './useSSE';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
 
@@ -16,26 +16,11 @@ interface DAGRunsListParams {
   tags?: string;
 }
 
-const BASE_ENDPOINT = '/events/dag-runs';
-
-function buildEndpoint(params: DAGRunsListParams): string {
-  const searchParams = new URLSearchParams();
-
-  for (const [key, value] of Object.entries(params)) {
-    if (value != null) {
-      searchParams.set(key, String(value));
-    }
-  }
-
-  const queryString = searchParams.toString();
-  return queryString ? `${BASE_ENDPOINT}?${queryString}` : BASE_ENDPOINT;
-}
-
 export function useDAGRunsListSSE(
   params: DAGRunsListParams = {},
   enabled: boolean = true
 ): SSEState<DAGRunsListSSEResponse> {
-  const endpoint = buildEndpoint(params);
+  const endpoint = buildSSEEndpoint('/events/dag-runs', params);
   return useSSE<DAGRunsListSSEResponse>(endpoint, enabled);
 }
 

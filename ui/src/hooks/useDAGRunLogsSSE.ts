@@ -31,9 +31,7 @@ export function useDAGRunLogsSSE(
   enabled: boolean = true,
   tail?: number
 ): SSEState<DAGRunLogsSSEResponse> {
-  let endpoint = `/events/dag-runs/${encodeURIComponent(name)}/${encodeURIComponent(dagRunId)}/logs`;
-  if (tail !== undefined) {
-    endpoint += `?tail=${tail}`;
-  }
+  const basePath = `/events/dag-runs/${encodeURIComponent(name)}/${encodeURIComponent(dagRunId)}/logs`;
+  const endpoint = tail !== undefined ? `${basePath}?tail=${tail}` : basePath;
   return useSSE<DAGRunLogsSSEResponse>(endpoint, enabled);
 }
