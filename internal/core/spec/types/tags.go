@@ -121,34 +121,14 @@ func (t *TagsValue) parseString(s string) error {
 }
 
 func (t *TagsValue) parseMap(m map[string]any) error {
-	// Sort keys for deterministic ordering
-	keys := make([]string, 0, len(m))
-	for key := range m {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	for _, key := range keys {
-		k := strings.TrimSpace(key)
-		v := strings.TrimSpace(stringifyValue(m[key]))
-
-		if err := validateKey(k); err != nil {
-			return err
-		}
-		if err := validateValue(v); err != nil {
-			return err
-		}
-
-		t.entries = append(t.entries, TagEntry{key: k, value: v})
-	}
-	return nil
+	return t.parseMapEntries(-1, m)
 }
 
 func (t *TagsValue) parseArray(arr []any) error {
 	for i, item := range arr {
 		switch v := item.(type) {
 		case map[string]any:
-			if err := t.parseArrayMapEntry(i, v); err != nil {
+			if err := t.parseMapEntries(i, v); err != nil {
 				return err
 			}
 		case string:
@@ -166,8 +146,9 @@ func (t *TagsValue) parseArray(arr []any) error {
 	return nil
 }
 
-// parseArrayMapEntry parses a map entry within an array (e.g., "- key: value").
-func (t *TagsValue) parseArrayMapEntry(index int, m map[string]any) error {
+// parseMapEntries parses key-value pairs from a map.
+// If index >= 0, errors are prefixed with "tags[index]: ".
+func (t *TagsValue) parseMapEntries(index int, m map[string]any) error {
 	// Sort keys for deterministic ordering
 	keys := make([]string, 0, len(m))
 	for key := range m {
@@ -179,11 +160,11 @@ func (t *TagsValue) parseArrayMapEntry(index int, m map[string]any) error {
 		k := strings.TrimSpace(key)
 		v := strings.TrimSpace(stringifyValue(m[key]))
 
-		if err := validateKey(k); err != nil {
-			return fmt.Errorf("tags[%d]: %w", index, err)
-		}
-		if err := validateValue(v); err != nil {
-			return fmt.Errorf("tags[%d]: %w", index, err)
+		if err := validateTagEntry(k, v); err != nil {
+			if index >= 0 {
+				return fmt.Errorf("tags[%d]: %w", index, err)
+			}
+			return err
 		}
 
 		t.entries = append(t.entries, TagEntry{key: k, value: v})
@@ -191,29 +172,9 @@ func (t *TagsValue) parseArrayMapEntry(index int, m map[string]any) error {
 	return nil
 }
 
-// validateKey validates a tag key and returns an error if invalid.
-func validateKey(key string) error {
-	if key == "" {
-		return fmt.Errorf("tag key cannot be empty")
-	}
-	if len(key) > core.MaxTagKeyLength {
-		return fmt.Errorf("tag key %q exceeds max length %d", key, core.MaxTagKeyLength)
-	}
-	if !core.ValidTagKeyPattern.MatchString(key) {
-		return fmt.Errorf("tag key %q contains invalid characters (allowed: a-z, A-Z, 0-9, -, _, .)", key)
-	}
-	return nil
-}
-
-// validateValue validates a tag value and returns an error if invalid.
-func validateValue(value string) error {
-	if len(value) > core.MaxTagValueLength {
-		return fmt.Errorf("tag value %q exceeds max length %d", value, core.MaxTagValueLength)
-	}
-	if value != "" && !core.ValidTagValuePattern.MatchString(value) {
-		return fmt.Errorf("tag value %q contains invalid characters (allowed: a-z, A-Z, 0-9, -, _, ., /)", value)
-	}
-	return nil
+// validateTagEntry validates a tag key-value pair using core.ValidateTag.
+func validateTagEntry(key, value string) error {
+	return core.ValidateTag(core.Tag{Key: key, Value: value})
 }
 
 // parseTagEntry parses a single tag string into TagEntry with validation.
@@ -226,19 +187,15 @@ func parseTagEntry(s string) (TagEntry, error) {
 	key, value, hasValue := strings.Cut(s, "=")
 	key = strings.TrimSpace(key)
 
-	if err := validateKey(key); err != nil {
+	if hasValue {
+		value = strings.TrimSpace(value)
+	}
+
+	if err := validateTagEntry(key, value); err != nil {
 		return TagEntry{}, err
 	}
 
-	if hasValue {
-		value = strings.TrimSpace(value)
-		if err := validateValue(value); err != nil {
-			return TagEntry{}, err
-		}
-		return TagEntry{key: key, value: value}, nil
-	}
-
-	return TagEntry{key: key}, nil
+	return TagEntry{key: key, value: value}, nil
 }
 
 // IsZero returns true if tags were not set in YAML.

@@ -246,6 +246,14 @@ func TestTags_JSON(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "null", string(data))
 	})
+
+	t.Run("unmarshal invalid JSON", func(t *testing.T) {
+		// Use valid JSON but wrong type - this triggers the error path inside UnmarshalJSON
+		data := []byte(`{"key": "value"}`)
+		var tags Tags
+		err := json.Unmarshal(data, &tags)
+		require.Error(t, err)
+	})
 }
 
 func TestParseTagFilter(t *testing.T) {
@@ -300,6 +308,13 @@ func TestParseTagFilter(t *testing.T) {
 			wantKey:   "deprecated",
 			wantValue: "",
 		},
+		{
+			name:      "empty string",
+			input:     "",
+			wantType:  TagFilterTypeKeyOnly,
+			wantKey:   "",
+			wantValue: "",
+		},
 	}
 
 	for _, tt := range tests {
@@ -349,6 +364,14 @@ func TestTagFilter_MatchesTags(t *testing.T) {
 			assert.Equal(t, tt.want, filter.MatchesTags(tags))
 		})
 	}
+}
+
+func TestTagFilter_MatchesTags_InvalidType(t *testing.T) {
+	t.Parallel()
+
+	tags := Tags{{Key: "env", Value: "prod"}}
+	filter := TagFilter{Type: TagFilterType(999), Key: "env"}
+	assert.False(t, filter.MatchesTags(tags))
 }
 
 func TestTags_MatchesFilters(t *testing.T) {
@@ -643,6 +666,21 @@ func TestMatchGlob(t *testing.T) {
 		// Exact match (no wildcards)
 		{"exact", "exact", true},
 		{"exact", "other", false},
+
+		// Invalid pattern (causes regex compile error)
+		{"[invalid", "test", false},
+
+		// Escaped regex metacharacters
+		{"test.name", "test.name", true},
+		{"test.name", "testXname", false},
+		{"test+name", "test+name", true},
+		{"test^name", "test^name", true},
+		{"test$name", "test$name", true},
+		{"test(name)", "test(name)", true},
+		{"test[x]", "test[x]", true},
+		{"test{name}", "test{name}", true},
+		{"test|name", "test|name", true},
+		{"test\\name", "test\\name", true},
 	}
 
 	for _, tt := range tests {
