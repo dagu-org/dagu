@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/goccy/go-yaml"
 )
 
@@ -108,7 +109,10 @@ func (t *TagsValue) parseString(s string) error {
 	}
 
 	for _, part := range parts {
-		entry := parseTagEntry(part)
+		entry, err := parseTagEntry(part)
+		if err != nil {
+			return err
+		}
 		if entry.key != "" {
 			t.entries = append(t.entries, entry)
 		}
@@ -117,45 +121,21 @@ func (t *TagsValue) parseString(s string) error {
 }
 
 func (t *TagsValue) parseMap(m map[string]any) error {
-	// Sort keys for deterministic ordering
-	keys := make([]string, 0, len(m))
-	for key := range m {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	for _, key := range keys {
-		value := stringifyValue(m[key])
-		t.entries = append(t.entries, TagEntry{
-			key:   strings.TrimSpace(key),
-			value: strings.TrimSpace(value),
-		})
-	}
-	return nil
+	return t.parseMapEntries(-1, m)
 }
 
 func (t *TagsValue) parseArray(arr []any) error {
 	for i, item := range arr {
 		switch v := item.(type) {
 		case map[string]any:
-			// Map entry: { key: value }
-			// Sort keys for deterministic ordering
-			keys := make([]string, 0, len(v))
-			for key := range v {
-				keys = append(keys, key)
-			}
-			sort.Strings(keys)
-
-			for _, key := range keys {
-				value := stringifyValue(v[key])
-				t.entries = append(t.entries, TagEntry{
-					key:   strings.TrimSpace(key),
-					value: strings.TrimSpace(value),
-				})
+			if err := t.parseMapEntries(i, v); err != nil {
+				return err
 			}
 		case string:
-			// String entry: "key=value" or "key"
-			entry := parseTagEntry(v)
+			entry, err := parseTagEntry(v)
+			if err != nil {
+				return fmt.Errorf("tags[%d]: %w", i, err)
+			}
 			if entry.key != "" {
 				t.entries = append(t.entries, entry)
 			}
@@ -166,24 +146,56 @@ func (t *TagsValue) parseArray(arr []any) error {
 	return nil
 }
 
-// parseTagEntry parses a single tag string into TagEntry.
-func parseTagEntry(s string) TagEntry {
+// parseMapEntries parses key-value pairs from a map.
+// If index >= 0, errors are prefixed with "tags[index]: ".
+func (t *TagsValue) parseMapEntries(index int, m map[string]any) error {
+	// Sort keys for deterministic ordering
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		k := strings.TrimSpace(key)
+		v := strings.TrimSpace(stringifyValue(m[key]))
+
+		if err := validateTagEntry(k, v); err != nil {
+			if index >= 0 {
+				return fmt.Errorf("tags[%d]: %w", index, err)
+			}
+			return err
+		}
+
+		t.entries = append(t.entries, TagEntry{key: k, value: v})
+	}
+	return nil
+}
+
+// validateTagEntry validates a tag key-value pair using core.ValidateTag.
+func validateTagEntry(key, value string) error {
+	return core.ValidateTag(core.Tag{Key: key, Value: value})
+}
+
+// parseTagEntry parses a single tag string into TagEntry with validation.
+func parseTagEntry(s string) (TagEntry, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return TagEntry{}
+		return TagEntry{}, nil
 	}
 
-	k, v, found := strings.Cut(s, "=")
-	k = strings.TrimSpace(k)
+	key, value, hasValue := strings.Cut(s, "=")
+	key = strings.TrimSpace(key)
 
-	if !found {
-		return TagEntry{key: k}
+	if hasValue {
+		value = strings.TrimSpace(value)
 	}
 
-	return TagEntry{
-		key:   k,
-		value: strings.TrimSpace(v),
+	if err := validateTagEntry(key, value); err != nil {
+		return TagEntry{}, err
 	}
+
+	return TagEntry{key: key, value: value}, nil
 }
 
 // IsZero returns true if tags were not set in YAML.
