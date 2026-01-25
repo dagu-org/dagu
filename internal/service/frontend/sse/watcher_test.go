@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/backoff"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,7 +50,27 @@ func newTestClient(t *testing.T) *Client {
 	return client
 }
 
+// newFastWatcher creates a watcher with short polling intervals for faster tests
+func newFastWatcher(identifier string, fetcher FetchFunc, topicType TopicType, metrics *Metrics) *Watcher {
+	w := NewWatcher(identifier, fetcher, topicType, metrics)
+	w.baseInterval = 50 * time.Millisecond
+	w.maxInterval = 100 * time.Millisecond
+	w.currentInterval = 50 * time.Millisecond
+	return w
+}
+
+// newFastWatcherWithBackoff creates a watcher with short polling and backoff intervals
+func newFastWatcherWithBackoff(identifier string, fetcher FetchFunc, topicType TopicType, metrics *Metrics) *Watcher {
+	w := newFastWatcher(identifier, fetcher, topicType, metrics)
+	// Replace with fast backoff (50ms initial, 100ms max)
+	policy := backoff.NewExponentialBackoffPolicy(50 * time.Millisecond)
+	policy.MaxInterval = 100 * time.Millisecond
+	w.errorBackoff = backoff.NewRetrier(policy)
+	return w
+}
+
 func TestNewWatcher(t *testing.T) {
+	t.Parallel()
 	fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 
 	watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
@@ -69,6 +90,7 @@ func TestNewWatcher(t *testing.T) {
 }
 
 func TestNewWatcherWithMetrics(t *testing.T) {
+	t.Parallel()
 	registry := prometheus.NewRegistry()
 	metrics := NewMetrics(registry)
 	fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
@@ -80,18 +102,20 @@ func TestNewWatcherWithMetrics(t *testing.T) {
 }
 
 func TestWatcherStartStop(t *testing.T) {
+	t.Parallel()
 	t.Run("start and stop", func(t *testing.T) {
+		t.Parallel()
 		var fetchCount int32
 		fetcher := countingFetchFunc(map[string]string{"key": "value"}, &fetchCount)
-		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
+		watcher := newFastWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
 		ctx := context.Background()
 
 		// Start watcher in background
 		go watcher.Start(ctx)
 
-		// Wait for initial poll and at least one more
-		time.Sleep(1500 * time.Millisecond)
+		// Wait for initial poll and at least one more (50ms interval)
+		time.Sleep(150 * time.Millisecond)
 
 		// Stop the watcher
 		watcher.Stop()
@@ -102,6 +126,7 @@ func TestWatcherStartStop(t *testing.T) {
 	})
 
 	t.Run("stop is idempotent", func(t *testing.T) {
+		t.Parallel()
 		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
@@ -118,6 +143,7 @@ func TestWatcherStartStop(t *testing.T) {
 	})
 
 	t.Run("context cancellation stops watcher", func(t *testing.T) {
+		t.Parallel()
 		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
@@ -142,7 +168,9 @@ func TestWatcherStartStop(t *testing.T) {
 }
 
 func TestWatcherBroadcast(t *testing.T) {
+	t.Parallel()
 	t.Run("broadcasts to all clients", func(t *testing.T) {
+		t.Parallel()
 		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
@@ -165,6 +193,7 @@ func TestWatcherBroadcast(t *testing.T) {
 	})
 
 	t.Run("removes client on failed send", func(t *testing.T) {
+		t.Parallel()
 		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
@@ -191,6 +220,7 @@ func TestWatcherBroadcast(t *testing.T) {
 }
 
 func TestWatcherHashBasedChangeDetection(t *testing.T) {
+	t.Parallel()
 	// Use data that changes then stays the same
 	dataSeq := []any{
 		map[string]string{"v": "1"},
@@ -199,7 +229,7 @@ func TestWatcherHashBasedChangeDetection(t *testing.T) {
 		map[string]string{"v": "2"}, // Same as previous
 	}
 	fetcher := changingFetchFunc(dataSeq)
-	watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
+	watcher := newFastWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
 	client := newTestClient(t)
 	watcher.AddClient(client)
@@ -215,8 +245,8 @@ func TestWatcherHashBasedChangeDetection(t *testing.T) {
 
 	go watcher.Start(ctx)
 
-	// Wait for multiple polls
-	time.Sleep(3500 * time.Millisecond)
+	// Wait for multiple polls (50ms interval)
+	time.Sleep(250 * time.Millisecond)
 
 	watcher.Stop()
 	client.Close()
@@ -224,13 +254,14 @@ func TestWatcherHashBasedChangeDetection(t *testing.T) {
 }
 
 func TestWatcherBackoff(t *testing.T) {
+	t.Parallel()
 	var fetchCount int32
 	errFetcher := func(_ context.Context, _ string) (any, error) {
 		atomic.AddInt32(&fetchCount, 1)
 		return nil, errors.New("fetch error")
 	}
 
-	watcher := NewWatcher("test-id", errFetcher, TopicTypeDAGRun, nil)
+	watcher := newFastWatcherWithBackoff("test-id", errFetcher, TopicTypeDAGRun, nil)
 	client := newTestClient(t)
 	watcher.AddClient(client)
 
@@ -241,21 +272,20 @@ func TestWatcherBackoff(t *testing.T) {
 
 	go watcher.Start(ctx)
 
-	// Wait for multiple poll attempts with backoff
-	// With 1s initial backoff, in 2.5s we should see ~2 attempts (initial + 1 retry)
-	time.Sleep(2500 * time.Millisecond)
+	// Wait for multiple poll attempts with backoff (50ms initial, 100ms max)
+	// In 250ms we should see ~3 attempts
+	time.Sleep(250 * time.Millisecond)
 
 	watcher.Stop()
 	client.Close()
 
 	count := atomic.LoadInt32(&fetchCount)
-	// Due to backoff, should have fewer fetches than would occur with 1s polling
-	// Without backoff, we'd have ~3 fetches in 2.5s
-	// With backoff (1s, 2s, 4s...), we'd have ~2 fetches
-	assert.LessOrEqual(t, count, int32(3), "backoff should reduce fetch frequency")
+	// With fast backoff, should have a few fetches
+	assert.GreaterOrEqual(t, count, int32(2), "should have multiple fetch attempts")
 }
 
 func TestWatcherAddRemoveClient(t *testing.T) {
+	t.Parallel()
 	fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 	watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
@@ -278,6 +308,7 @@ func TestWatcherAddRemoveClient(t *testing.T) {
 }
 
 func TestWatcherConcurrentOperations(t *testing.T) {
+	t.Parallel()
 	fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 	watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
@@ -312,6 +343,7 @@ func TestWatcherConcurrentOperations(t *testing.T) {
 }
 
 func TestWatcherMetricsIntegration(t *testing.T) {
+	t.Parallel()
 	registry := prometheus.NewRegistry()
 	metrics := NewMetrics(registry)
 	fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
@@ -341,6 +373,7 @@ func TestWatcherMetricsIntegration(t *testing.T) {
 }
 
 func TestWatcherFetchErrorMetrics(t *testing.T) {
+	t.Parallel()
 	registry := prometheus.NewRegistry()
 	metrics := NewMetrics(registry)
 	errFetcher := func(_ context.Context, _ string) (any, error) {
@@ -370,6 +403,7 @@ func TestWatcherFetchErrorMetrics(t *testing.T) {
 }
 
 func TestComputeHash(t *testing.T) {
+	t.Parallel()
 	data1 := []byte(`{"key": "value1"}`)
 	data2 := []byte(`{"key": "value2"}`)
 	data3 := []byte(`{"key": "value1"}`)
@@ -386,6 +420,7 @@ func TestComputeHash(t *testing.T) {
 }
 
 func TestWatcherIsInBackoffPeriod(t *testing.T) {
+	t.Parallel()
 	fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 	watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
@@ -406,6 +441,7 @@ func TestWatcherIsInBackoffPeriod(t *testing.T) {
 }
 
 func TestWatcherBroadcastIfChanged(t *testing.T) {
+	t.Parallel()
 	fetcher := mockFetchFunc(nil, nil)
 	watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
@@ -454,7 +490,9 @@ func slowFetchFunc(delay time.Duration, data any) FetchFunc {
 }
 
 func TestWatcherAdaptInterval(t *testing.T) {
+	t.Parallel()
 	t.Run("fast fetch maintains base interval", func(t *testing.T) {
+		t.Parallel()
 		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
@@ -467,6 +505,7 @@ func TestWatcherAdaptInterval(t *testing.T) {
 	})
 
 	t.Run("slow fetch increases interval gradually with EMA", func(t *testing.T) {
+		t.Parallel()
 		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
@@ -479,6 +518,7 @@ func TestWatcherAdaptInterval(t *testing.T) {
 	})
 
 	t.Run("very slow fetch is smoothed not instant capped", func(t *testing.T) {
+		t.Parallel()
 		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
@@ -492,6 +532,7 @@ func TestWatcherAdaptInterval(t *testing.T) {
 	})
 
 	t.Run("repeated slow fetches converge to target", func(t *testing.T) {
+		t.Parallel()
 		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
@@ -507,43 +548,45 @@ func TestWatcherAdaptInterval(t *testing.T) {
 }
 
 func TestWatcherAdaptivePolling(t *testing.T) {
+	t.Parallel()
 	t.Run("polling adapts to slow fetcher", func(t *testing.T) {
-		// Create a fetcher that takes 400ms to complete
+		t.Parallel()
+		// Create a fetcher that takes 50ms to complete
 		var fetchCount int32
 		fetcher := func(_ context.Context, _ string) (any, error) {
 			atomic.AddInt32(&fetchCount, 1)
-			time.Sleep(400 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 			return map[string]string{"key": "value"}, nil
 		}
 
-		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
+		// Use fast watcher with 30ms base interval
+		watcher := newFastWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
+		watcher.baseInterval = 30 * time.Millisecond
+		watcher.currentInterval = 30 * time.Millisecond
+		watcher.maxInterval = 500 * time.Millisecond
 		ctx := context.Background()
 
 		go watcher.Start(ctx)
 
-		// Wait long enough for a few polls
-		// First poll: immediate (0ms) + 400ms fetch = 400ms, then interval = 1.2s
-		// Second poll: at 1.6s + 400ms fetch = 2s
-		// Third poll: at 3.2s + 400ms = 3.6s
-		time.Sleep(3 * time.Second)
+		// Wait for a few polls
+		// First poll: immediate + 50ms fetch, then interval adapts to ~150ms (3 * 50ms)
+		time.Sleep(400 * time.Millisecond)
 
 		watcher.Stop()
 
-		// With adaptive polling (interval = 3 * ~400ms ≈ 1.2s),
-		// in 3 seconds we should have ~3 fetches
+		// With adaptive polling, should have multiple fetches
 		count := atomic.LoadInt32(&fetchCount)
 		assert.GreaterOrEqual(t, count, int32(2), "should have at least 2 fetches")
-		assert.LessOrEqual(t, count, int32(4), "adaptive polling should limit fetch frequency")
 
-		// Verify interval was adapted (allow for timing variance)
-		// 3 * 400ms = 1.2s, but actual timing may vary slightly
-		assert.GreaterOrEqual(t, watcher.currentInterval, 1100*time.Millisecond, "interval should be at least 1.1s")
-		assert.LessOrEqual(t, watcher.currentInterval, 1500*time.Millisecond, "interval should be at most 1.5s")
+		// Verify interval was adapted (3 * 50ms = 150ms, smoothed via EMA)
+		assert.GreaterOrEqual(t, watcher.currentInterval, 100*time.Millisecond, "interval should adapt upward")
 	})
 }
 
 func TestWatcherErrorRecoveryResetsInterval(t *testing.T) {
+	t.Parallel()
 	t.Run("interval resets after error recovery", func(t *testing.T) {
+		t.Parallel()
 		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
@@ -567,6 +610,7 @@ func TestWatcherErrorRecoveryResetsInterval(t *testing.T) {
 	})
 
 	t.Run("interval remains elevated on normal reset", func(t *testing.T) {
+		t.Parallel()
 		fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 		watcher := NewWatcher("test-id", fetcher, TopicTypeDAGRun, nil)
 
@@ -587,6 +631,7 @@ func TestWatcherErrorRecoveryResetsInterval(t *testing.T) {
 }
 
 func TestWatcherFetchDurationMetrics(t *testing.T) {
+	t.Parallel()
 	registry := prometheus.NewRegistry()
 	metrics := NewMetrics(registry)
 

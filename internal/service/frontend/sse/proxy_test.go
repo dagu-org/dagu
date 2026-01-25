@@ -13,6 +13,7 @@ import (
 )
 
 func TestBuildRemoteURL(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		baseURL  string
@@ -115,6 +116,7 @@ func TestBuildRemoteURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := buildRemoteURL(tt.baseURL, tt.topic, tt.token)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -122,6 +124,7 @@ func TestBuildRemoteURL(t *testing.T) {
 }
 
 func TestBuildPathForTopic(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		topicType  TopicType
 		identifier string
@@ -143,6 +146,7 @@ func TestBuildPathForTopic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(string(tt.topicType)+"_"+tt.identifier, func(t *testing.T) {
+			t.Parallel()
 			result := buildPathForTopic(tt.topicType, tt.identifier)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -150,6 +154,7 @@ func TestBuildPathForTopic(t *testing.T) {
 }
 
 func TestBuildStepLogPath(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		identifier string
@@ -179,6 +184,7 @@ func TestBuildStepLogPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := buildStepLogPath(tt.identifier)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -186,6 +192,7 @@ func TestBuildStepLogPath(t *testing.T) {
 }
 
 func TestPathWithOptionalQuery(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		basePath string
@@ -208,6 +215,7 @@ func TestPathWithOptionalQuery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := pathWithOptionalQuery(tt.basePath, tt.query)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -215,7 +223,9 @@ func TestPathWithOptionalQuery(t *testing.T) {
 }
 
 func TestApplyNodeAuth(t *testing.T) {
+	t.Parallel()
 	t.Run("basic auth", func(t *testing.T) {
+		t.Parallel()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		node := config.RemoteNode{
 			IsBasicAuth:       true,
@@ -232,6 +242,7 @@ func TestApplyNodeAuth(t *testing.T) {
 	})
 
 	t.Run("bearer token", func(t *testing.T) {
+		t.Parallel()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		node := config.RemoteNode{
 			IsAuthToken: true,
@@ -244,6 +255,7 @@ func TestApplyNodeAuth(t *testing.T) {
 	})
 
 	t.Run("no auth", func(t *testing.T) {
+		t.Parallel()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		node := config.RemoteNode{}
 
@@ -254,7 +266,9 @@ func TestApplyNodeAuth(t *testing.T) {
 }
 
 func TestStreamResponse(t *testing.T) {
+	t.Parallel()
 	t.Run("streams data correctly", func(t *testing.T) {
+		t.Parallel()
 		w := newMockFlusher()
 		body := io.NopCloser(bytes.NewReader([]byte("event: data\ndata: test\n\n")))
 
@@ -265,6 +279,7 @@ func TestStreamResponse(t *testing.T) {
 	})
 
 	t.Run("handles large data in chunks", func(t *testing.T) {
+		t.Parallel()
 		w := newMockFlusher()
 		// Create data larger than buffer (4096 bytes)
 		largeData := make([]byte, 10000)
@@ -279,6 +294,7 @@ func TestStreamResponse(t *testing.T) {
 	})
 
 	t.Run("handles empty body", func(t *testing.T) {
+		t.Parallel()
 		w := newMockFlusher()
 		body := io.NopCloser(bytes.NewReader([]byte{}))
 
@@ -289,7 +305,9 @@ func TestStreamResponse(t *testing.T) {
 }
 
 func TestProxyToRemoteNode(t *testing.T) {
+	t.Parallel()
 	t.Run("unknown remote node", func(t *testing.T) {
+		t.Parallel()
 		hub := NewHub()
 		handler := NewHandler(hub, map[string]config.RemoteNode{}, nil)
 
@@ -303,6 +321,7 @@ func TestProxyToRemoteNode(t *testing.T) {
 	})
 
 	t.Run("successful proxy", func(t *testing.T) {
+		t.Parallel()
 		// Create a mock remote server
 		remoteServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Verify the request path
@@ -333,6 +352,7 @@ func TestProxyToRemoteNode(t *testing.T) {
 	})
 
 	t.Run("remote server error", func(t *testing.T) {
+		t.Parallel()
 		remoteServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 		}))
@@ -356,6 +376,7 @@ func TestProxyToRemoteNode(t *testing.T) {
 	})
 
 	t.Run("connection failure", func(t *testing.T) {
+		t.Parallel()
 		hub := NewHub()
 		remoteNodes := map[string]config.RemoteNode{
 			"remote1": {
@@ -374,6 +395,7 @@ func TestProxyToRemoteNode(t *testing.T) {
 	})
 
 	t.Run("with basic auth", func(t *testing.T) {
+		t.Parallel()
 		var receivedAuth string
 		remoteServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			receivedAuth = r.Header.Get("Authorization")
@@ -406,6 +428,7 @@ func TestProxyToRemoteNode(t *testing.T) {
 }
 
 func TestStreamResponseWriteError(t *testing.T) {
+	t.Parallel()
 	// Create a writer that fails after writing some data
 	failingWriter := &failingResponseWriter{
 		failAfter: 100,
@@ -440,6 +463,7 @@ func (f *failingResponseWriter) Write(b []byte) (int, error) {
 }
 
 func TestProxyToRemoteNodeNonFlusher(t *testing.T) {
+	t.Parallel()
 	remoteServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)

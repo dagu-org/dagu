@@ -14,6 +14,7 @@ import (
 )
 
 func TestNewHandler(t *testing.T) {
+	t.Parallel()
 	hub := NewHub()
 	remoteNodes := map[string]config.RemoteNode{
 		"node1": {Name: "node1"},
@@ -28,6 +29,7 @@ func TestNewHandler(t *testing.T) {
 }
 
 func TestBuildTopic(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		topicType TopicType
@@ -68,6 +70,7 @@ func TestBuildTopic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := buildTopic(tt.topicType, tt.parts...)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -118,6 +121,7 @@ func createChiRequest(method, path string, params map[string]string, timeout tim
 }
 
 func TestHandleDAGRunEvents(t *testing.T) {
+	t.Parallel()
 	handler, hub := setupHandler(t)
 
 	// Create mock response writer with flusher
@@ -141,6 +145,7 @@ func TestHandleDAGRunEvents(t *testing.T) {
 }
 
 func TestHandleDAGEvents(t *testing.T) {
+	t.Parallel()
 	handler, _ := setupHandler(t)
 
 	w := newMockFlusher()
@@ -154,6 +159,7 @@ func TestHandleDAGEvents(t *testing.T) {
 }
 
 func TestHandleDAGRunLogsEvents(t *testing.T) {
+	t.Parallel()
 	handler, _ := setupHandler(t)
 
 	w := newMockFlusher()
@@ -170,6 +176,7 @@ func TestHandleDAGRunLogsEvents(t *testing.T) {
 }
 
 func TestHandleDAGRunLogsEventsWithQuery(t *testing.T) {
+	t.Parallel()
 	handler, _ := setupHandler(t)
 
 	w := newMockFlusher()
@@ -187,6 +194,7 @@ func TestHandleDAGRunLogsEventsWithQuery(t *testing.T) {
 }
 
 func TestHandleStepLogEvents(t *testing.T) {
+	t.Parallel()
 	handler, _ := setupHandler(t)
 
 	w := newMockFlusher()
@@ -204,6 +212,7 @@ func TestHandleStepLogEvents(t *testing.T) {
 }
 
 func TestHandleDAGRunsListEvents(t *testing.T) {
+	t.Parallel()
 	handler, _ := setupHandler(t)
 
 	w := newMockFlusher()
@@ -217,6 +226,7 @@ func TestHandleDAGRunsListEvents(t *testing.T) {
 }
 
 func TestHandleQueueItemsEvents(t *testing.T) {
+	t.Parallel()
 	handler, _ := setupHandler(t)
 
 	w := newMockFlusher()
@@ -230,6 +240,7 @@ func TestHandleQueueItemsEvents(t *testing.T) {
 }
 
 func TestHandleQueuesListEvents(t *testing.T) {
+	t.Parallel()
 	handler, _ := setupHandler(t)
 
 	w := newMockFlusher()
@@ -242,6 +253,7 @@ func TestHandleQueuesListEvents(t *testing.T) {
 }
 
 func TestHandleDAGsListEvents(t *testing.T) {
+	t.Parallel()
 	handler, _ := setupHandler(t)
 
 	w := newMockFlusher()
@@ -255,6 +267,7 @@ func TestHandleDAGsListEvents(t *testing.T) {
 }
 
 func TestHandleSSEHeaders(t *testing.T) {
+	t.Parallel()
 	handler, _ := setupHandler(t)
 
 	w := newMockFlusher()
@@ -270,6 +283,7 @@ func TestHandleSSEHeaders(t *testing.T) {
 }
 
 func TestHandleSSENonFlusher(t *testing.T) {
+	t.Parallel()
 	handler, _ := setupHandler(t)
 
 	// Use nonFlusher which doesn't implement http.Flusher (defined in helper_test.go)
@@ -284,6 +298,7 @@ func TestHandleSSENonFlusher(t *testing.T) {
 }
 
 func TestHandleSSERemoteProxy(t *testing.T) {
+	t.Parallel()
 	// Create a mock remote server
 	remoteServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -316,6 +331,7 @@ func TestHandleSSERemoteProxy(t *testing.T) {
 }
 
 func TestHandleSSELocalNode(t *testing.T) {
+	t.Parallel()
 	handler, _ := setupHandler(t)
 
 	w := newMockFlusher()
@@ -331,6 +347,7 @@ func TestHandleSSELocalNode(t *testing.T) {
 }
 
 func TestValidateAuthNoService(t *testing.T) {
+	t.Parallel()
 	hub := NewHub()
 	handler := NewHandler(hub, nil, nil)
 
@@ -343,6 +360,7 @@ func TestValidateAuthNoService(t *testing.T) {
 }
 
 func TestHandleSSEMaxClients(t *testing.T) {
+	t.Parallel()
 	hub := NewHub(WithMaxClients(1))
 	fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 	hub.RegisterFetcher(TopicTypeDAG, fetcher)
@@ -379,6 +397,7 @@ func TestHandleSSEMaxClients(t *testing.T) {
 }
 
 func TestHandleSSEConnectedEvent(t *testing.T) {
+	t.Parallel()
 	handler, _ := setupHandler(t)
 
 	w := newMockFlusher()

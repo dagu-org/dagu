@@ -8,14 +8,31 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/backoff"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+// speedUpHubWatchers configures all watchers in the hub to use fast intervals for testing
+func speedUpHubWatchers(h *Hub) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for _, w := range h.watchers {
+		w.baseInterval = 50 * time.Millisecond
+		w.maxInterval = 100 * time.Millisecond
+		w.currentInterval = 50 * time.Millisecond
+		// Also speed up backoff
+		policy := backoff.NewExponentialBackoffPolicy(50 * time.Millisecond)
+		policy.MaxInterval = 100 * time.Millisecond
+		w.errorBackoff = backoff.NewRetrier(policy)
+	}
+}
+
 // TestSSEFullFlow tests the complete SSE flow:
 // Hub → Subscribe → Watcher → Fetch → Broadcast → Client
 func TestSSEFullFlow(t *testing.T) {
+	t.Parallel()
 	registry := prometheus.NewRegistry()
 	metrics := NewMetrics(registry)
 
@@ -74,6 +91,7 @@ func TestSSEFullFlow(t *testing.T) {
 
 // TestSSEMultipleClientsOnSameTopic tests multiple clients subscribing to the same topic
 func TestSSEMultipleClientsOnSameTopic(t *testing.T) {
+	t.Parallel()
 	hub := NewHub()
 
 	fetcher := mockFetchFunc(map[string]string{"shared": "data"}, nil)
@@ -126,6 +144,7 @@ func TestSSEMultipleClientsOnSameTopic(t *testing.T) {
 
 // TestSSEErrorRecovery tests fetch error → backoff → retry → success
 func TestSSEErrorRecovery(t *testing.T) {
+	t.Parallel()
 	registry := prometheus.NewRegistry()
 	metrics := NewMetrics(registry)
 
@@ -149,6 +168,9 @@ func TestSSEErrorRecovery(t *testing.T) {
 	err := hub.Subscribe(client, "dagrun:dag1/run1")
 	require.NoError(t, err)
 
+	// Speed up watcher intervals for faster test
+	speedUpHubWatchers(hub)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -158,9 +180,8 @@ func TestSSEErrorRecovery(t *testing.T) {
 		close(pumpDone)
 	}()
 
-	// Wait for backoff and recovery
-	// Initial call fails, backoff 1s, retry fails, backoff 2s, retry succeeds
-	time.Sleep(4 * time.Second)
+	// Wait for backoff and recovery (with fast 50ms backoff)
+	time.Sleep(300 * time.Millisecond)
 
 	// Should have been called at least 3 times
 	assert.GreaterOrEqual(t, atomic.LoadInt32(&callCount), int32(3))
@@ -176,6 +197,7 @@ func TestSSEErrorRecovery(t *testing.T) {
 
 // TestSSEMultipleTopicTypes tests different topic types
 func TestSSEMultipleTopicTypes(t *testing.T) {
+	t.Parallel()
 	hub := NewHub()
 
 	// Register different fetchers for different topic types
@@ -223,6 +245,7 @@ func TestSSEMultipleTopicTypes(t *testing.T) {
 
 // TestSSEConcurrentSubscribeUnsubscribe tests concurrent operations
 func TestSSEConcurrentSubscribeUnsubscribe(t *testing.T) {
+	t.Parallel()
 	hub := NewHub(WithMaxClients(100))
 
 	fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
@@ -262,6 +285,7 @@ func TestSSEConcurrentSubscribeUnsubscribe(t *testing.T) {
 
 // TestSSEDataChangeDetection tests that data is only broadcast when it changes
 func TestSSEDataChangeDetection(t *testing.T) {
+	t.Parallel()
 	hub := NewHub()
 
 	// Fetcher that returns same data for multiple calls
@@ -280,6 +304,9 @@ func TestSSEDataChangeDetection(t *testing.T) {
 	err := hub.Subscribe(client, "dagrun:dag1/run1")
 	require.NoError(t, err)
 
+	// Speed up watcher intervals for faster test
+	speedUpHubWatchers(hub)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -289,8 +316,8 @@ func TestSSEDataChangeDetection(t *testing.T) {
 		close(pumpDone)
 	}()
 
-	// Wait for multiple polling cycles
-	time.Sleep(2500 * time.Millisecond)
+	// Wait for multiple polling cycles (50ms interval)
+	time.Sleep(200 * time.Millisecond)
 
 	// Fetch should have been called multiple times
 	assert.GreaterOrEqual(t, callCount, 2)

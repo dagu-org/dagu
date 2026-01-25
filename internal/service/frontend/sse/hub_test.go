@@ -12,6 +12,7 @@ import (
 )
 
 func TestNewHub(t *testing.T) {
+	t.Parallel()
 	hub := NewHub()
 
 	require.NotNil(t, hub)
@@ -23,12 +24,15 @@ func TestNewHub(t *testing.T) {
 }
 
 func TestNewHubWithOptions(t *testing.T) {
+	t.Parallel()
 	t.Run("with max clients", func(t *testing.T) {
+		t.Parallel()
 		hub := NewHub(WithMaxClients(50))
 		assert.Equal(t, 50, hub.maxClients)
 	})
 
 	t.Run("with metrics", func(t *testing.T) {
+		t.Parallel()
 		registry := prometheus.NewRegistry()
 		metrics := NewMetrics(registry)
 
@@ -37,6 +41,7 @@ func TestNewHubWithOptions(t *testing.T) {
 	})
 
 	t.Run("with multiple options", func(t *testing.T) {
+		t.Parallel()
 		registry := prometheus.NewRegistry()
 		metrics := NewMetrics(registry)
 
@@ -51,6 +56,7 @@ func TestNewHubWithOptions(t *testing.T) {
 }
 
 func TestHubRegisterFetcher(t *testing.T) {
+	t.Parallel()
 	hub := NewHub()
 	fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 
@@ -62,7 +68,9 @@ func TestHubRegisterFetcher(t *testing.T) {
 }
 
 func TestHubStart(t *testing.T) {
+	t.Parallel()
 	t.Run("starts heartbeat", func(t *testing.T) {
+		t.Parallel()
 		hub := NewHub()
 		defer hub.Shutdown()
 
@@ -73,6 +81,7 @@ func TestHubStart(t *testing.T) {
 	})
 
 	t.Run("idempotent start", func(t *testing.T) {
+		t.Parallel()
 		hub := NewHub()
 		defer hub.Shutdown()
 
@@ -87,6 +96,7 @@ func TestHubStart(t *testing.T) {
 }
 
 func TestHubShutdown(t *testing.T) {
+	t.Parallel()
 	hub := NewHub()
 	fetcher := mockFetchFunc(map[string]string{"key": "value"}, nil)
 	hub.RegisterFetcher(TopicTypeDAGRun, fetcher)
@@ -108,7 +118,9 @@ func TestHubShutdown(t *testing.T) {
 }
 
 func TestHubSubscribe(t *testing.T) {
+	t.Parallel()
 	t.Run("successful subscribe", func(t *testing.T) {
+		t.Parallel()
 		hub := NewHub()
 		defer hub.Shutdown()
 
@@ -125,6 +137,7 @@ func TestHubSubscribe(t *testing.T) {
 	})
 
 	t.Run("creates watcher for new topic", func(t *testing.T) {
+		t.Parallel()
 		hub := NewHub()
 		defer hub.Shutdown()
 
@@ -153,6 +166,7 @@ func TestHubSubscribe(t *testing.T) {
 	})
 
 	t.Run("error on max clients", func(t *testing.T) {
+		t.Parallel()
 		hub := NewHub(WithMaxClients(2))
 		defer hub.Shutdown()
 
@@ -176,6 +190,7 @@ func TestHubSubscribe(t *testing.T) {
 	})
 
 	t.Run("error on invalid topic format", func(t *testing.T) {
+		t.Parallel()
 		hub := NewHub()
 		defer hub.Shutdown()
 		hub.Start()
@@ -188,6 +203,7 @@ func TestHubSubscribe(t *testing.T) {
 	})
 
 	t.Run("error on unregistered topic type", func(t *testing.T) {
+		t.Parallel()
 		hub := NewHub()
 		defer hub.Shutdown()
 		hub.Start()
@@ -201,7 +217,9 @@ func TestHubSubscribe(t *testing.T) {
 }
 
 func TestHubUnsubscribe(t *testing.T) {
+	t.Parallel()
 	t.Run("removes client", func(t *testing.T) {
+		t.Parallel()
 		hub := NewHub()
 		defer hub.Shutdown()
 
@@ -219,6 +237,7 @@ func TestHubUnsubscribe(t *testing.T) {
 	})
 
 	t.Run("stops watcher when last client unsubscribes", func(t *testing.T) {
+		t.Parallel()
 		hub := NewHub()
 		defer hub.Shutdown()
 
@@ -246,6 +265,7 @@ func TestHubUnsubscribe(t *testing.T) {
 	})
 
 	t.Run("no-op for unknown client", func(t *testing.T) {
+		t.Parallel()
 		hub := NewHub()
 		defer hub.Shutdown()
 		hub.Start()
@@ -260,6 +280,7 @@ func TestHubUnsubscribe(t *testing.T) {
 }
 
 func TestHubHeartbeat(t *testing.T) {
+	t.Parallel()
 	// Create hub with short heartbeat for testing
 	hub := NewHub()
 	defer hub.Shutdown()
@@ -291,6 +312,7 @@ func TestHubHeartbeat(t *testing.T) {
 }
 
 func TestHubConcurrentOperations(t *testing.T) {
+	t.Parallel()
 	hub := NewHub(WithMaxClients(100))
 	defer hub.Shutdown()
 
@@ -326,6 +348,7 @@ func TestHubConcurrentOperations(t *testing.T) {
 }
 
 func TestHubMetricsIntegration(t *testing.T) {
+	t.Parallel()
 	registry := prometheus.NewRegistry()
 	metrics := NewMetrics(registry)
 
@@ -352,6 +375,7 @@ func TestHubMetricsIntegration(t *testing.T) {
 }
 
 func TestHubSendHeartbeats(t *testing.T) {
+	t.Parallel()
 	registry := prometheus.NewRegistry()
 	metrics := NewMetrics(registry)
 
@@ -375,6 +399,7 @@ func TestHubSendHeartbeats(t *testing.T) {
 }
 
 func TestHubCollectClients(t *testing.T) {
+	t.Parallel()
 	hub := NewHub()
 	defer hub.Shutdown()
 
@@ -393,6 +418,7 @@ func TestHubCollectClients(t *testing.T) {
 }
 
 func TestHubSendHeartbeatsClientBufferFull(t *testing.T) {
+	t.Parallel()
 	hub := NewHub()
 	defer hub.Shutdown()
 
@@ -420,6 +446,7 @@ func TestHubSendHeartbeatsClientBufferFull(t *testing.T) {
 }
 
 func TestHubAllTopicTypes(t *testing.T) {
+	t.Parallel()
 	hub := NewHub()
 	defer hub.Shutdown()
 	hub.Start()

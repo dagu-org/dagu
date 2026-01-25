@@ -10,6 +10,7 @@ import (
 )
 
 func TestNewMetrics(t *testing.T) {
+	t.Parallel()
 	registry := prometheus.NewRegistry()
 
 	m := NewMetrics(registry)
@@ -46,6 +47,7 @@ func TestNewMetrics(t *testing.T) {
 }
 
 func TestMetricsClientConnectedDisconnected(t *testing.T) {
+	t.Parallel()
 	registry := prometheus.NewRegistry()
 	m := NewMetrics(registry)
 
@@ -70,6 +72,7 @@ func TestMetricsClientConnectedDisconnected(t *testing.T) {
 }
 
 func TestMetricsWatcherStartedStopped(t *testing.T) {
+	t.Parallel()
 	registry := prometheus.NewRegistry()
 	m := NewMetrics(registry)
 
@@ -94,6 +97,7 @@ func TestMetricsWatcherStartedStopped(t *testing.T) {
 }
 
 func TestMetricsMessageSent(t *testing.T) {
+	t.Parallel()
 	registry := prometheus.NewRegistry()
 	m := NewMetrics(registry)
 
@@ -108,6 +112,7 @@ func TestMetricsMessageSent(t *testing.T) {
 }
 
 func TestMetricsFetchError(t *testing.T) {
+	t.Parallel()
 	registry := prometheus.NewRegistry()
 	m := NewMetrics(registry)
 
@@ -122,6 +127,7 @@ func TestMetricsFetchError(t *testing.T) {
 }
 
 func TestMetricsNilSafety(t *testing.T) {
+	t.Parallel()
 	var m *Metrics
 
 	// None of these should panic

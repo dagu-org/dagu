@@ -8,6 +8,7 @@ import (
 )
 
 func TestSetSSEHeaders(t *testing.T) {
+	t.Parallel()
 	w := httptest.NewRecorder()
 
 	SetSSEHeaders(w)

@@ -47,7 +47,9 @@ func newMockFlusher() *mockFlusher {
 }
 
 func TestNewClient(t *testing.T) {
+	t.Parallel()
 	t.Run("success with flusher", func(t *testing.T) {
+		t.Parallel()
 		w := newMockFlusher()
 
 		client, err := NewClient(w)
@@ -60,6 +62,7 @@ func TestNewClient(t *testing.T) {
 	})
 
 	t.Run("error without flusher", func(t *testing.T) {
+		t.Parallel()
 		w := &nonFlusher{}
 
 		client, err := NewClient(w)
@@ -71,7 +74,9 @@ func TestNewClient(t *testing.T) {
 }
 
 func TestClientSend(t *testing.T) {
+	t.Parallel()
 	t.Run("normal send", func(t *testing.T) {
+		t.Parallel()
 		w := newMockFlusher()
 		client, err := NewClient(w)
 		require.NoError(t, err)
@@ -87,6 +92,7 @@ func TestClientSend(t *testing.T) {
 	})
 
 	t.Run("buffer overflow", func(t *testing.T) {
+		t.Parallel()
 		w := newMockFlusher()
 		client, err := NewClient(w)
 		require.NoError(t, err)
@@ -104,7 +110,9 @@ func TestClientSend(t *testing.T) {
 }
 
 func TestClientWritePump(t *testing.T) {
+	t.Parallel()
 	t.Run("writes events", func(t *testing.T) {
+		t.Parallel()
 		w := newMockFlusher()
 		client, err := NewClient(w)
 		require.NoError(t, err)
@@ -148,6 +156,7 @@ func TestClientWritePump(t *testing.T) {
 	})
 
 	t.Run("stops on context cancel", func(t *testing.T) {
+		t.Parallel()
 		w := newMockFlusher()
 		client, err := NewClient(w)
 		require.NoError(t, err)
@@ -172,6 +181,7 @@ func TestClientWritePump(t *testing.T) {
 	})
 
 	t.Run("stops on client close", func(t *testing.T) {
+		t.Parallel()
 		w := newMockFlusher()
 		client, err := NewClient(w)
 		require.NoError(t, err)
@@ -196,6 +206,7 @@ func TestClientWritePump(t *testing.T) {
 	})
 
 	t.Run("stops on nil event", func(t *testing.T) {
+		t.Parallel()
 		w := newMockFlusher()
 		client, err := NewClient(w)
 		require.NoError(t, err)
@@ -221,7 +232,9 @@ func TestClientWritePump(t *testing.T) {
 }
 
 func TestClientClose(t *testing.T) {
+	t.Parallel()
 	t.Run("closes client", func(t *testing.T) {
+		t.Parallel()
 		w := newMockFlusher()
 		client, err := NewClient(w)
 		require.NoError(t, err)
@@ -234,6 +247,7 @@ func TestClientClose(t *testing.T) {
 	})
 
 	t.Run("idempotent close", func(t *testing.T) {
+		t.Parallel()
 		w := newMockFlusher()
 		client, err := NewClient(w)
 		require.NoError(t, err)
@@ -249,6 +263,7 @@ func TestClientClose(t *testing.T) {
 	})
 
 	t.Run("done channel is closed", func(t *testing.T) {
+		t.Parallel()
 		w := newMockFlusher()
 		client, err := NewClient(w)
 		require.NoError(t, err)
@@ -266,6 +281,7 @@ func TestClientClose(t *testing.T) {
 }
 
 func TestClientConcurrentSend(t *testing.T) {
+	t.Parallel()
 	w := newMockFlusher()
 	client, err := NewClient(w)
 	require.NoError(t, err)
@@ -299,6 +315,7 @@ func TestClientConcurrentSend(t *testing.T) {
 }
 
 func TestClientWriteEventWhenClosed(t *testing.T) {
+	t.Parallel()
 	w := newMockFlusher()
 	client, err := NewClient(w)
 	require.NoError(t, err)
@@ -320,6 +337,7 @@ func (f *failingWriter) Write(_ []byte) (int, error) {
 func (f *failingWriter) Flush() {}
 
 func TestClientWriteEventError(t *testing.T) {
+	t.Parallel()
 	w := &failingWriter{}
 	client, err := NewClient(w)
 	require.NoError(t, err)
@@ -331,6 +349,7 @@ func TestClientWriteEventError(t *testing.T) {
 }
 
 func TestClientWritePumpWriteError(t *testing.T) {
+	t.Parallel()
 	w := &failingWriter{}
 	client, err := NewClient(w)
 	require.NoError(t, err)
