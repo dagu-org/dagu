@@ -1031,7 +1031,7 @@ func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetails
 			return nil, fmt.Errorf("error getting latest status: %w", err)
 		}
 		return &api.GetDAGRunDetails200JSONResponse{
-			DagRunDetails: toDAGRunDetails(*status),
+			DagRunDetails: ToDAGRunDetails(*status),
 		}, nil
 	}
 
@@ -1044,7 +1044,7 @@ func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetails
 		}, nil
 	}
 	return &api.GetDAGRunDetails200JSONResponse{
-		DagRunDetails: toDAGRunDetails(*dagStatus),
+		DagRunDetails: ToDAGRunDetails(*dagStatus),
 	}, nil
 }
 
@@ -1101,7 +1101,7 @@ func (a *API) GetSubDAGRunDetails(ctx context.Context, request api.GetSubDAGRunD
 		}, nil
 	}
 	return &api.GetSubDAGRunDetails200JSONResponse{
-		DagRunDetails: toDAGRunDetails(*dagStatus),
+		DagRunDetails: ToDAGRunDetails(*dagStatus),
 	}, nil
 }
 

@@ -4,6 +4,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
+import { useDAGRunSSE } from '../../../../hooks/useDAGRunSSE';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGRunContext } from '../../contexts/DAGRunContext';
@@ -34,6 +35,13 @@ const DAGRunDetailsPanel: React.FC<DAGRunDetailsPanelProps> = ({
   // Guard: only query sub-DAG endpoint when all required params are present
   const canQuerySubDag = !!(subDAGRunId && parentDAGRunId && parentName);
 
+  // SSE for real-time DAG run updates (only for regular DAG runs, not sub-DAGs)
+  const sseResult = useDAGRunSSE(
+    name || '',
+    dagRunId || 'latest',
+    !canQuerySubDag // Only enable SSE for regular DAG runs
+  );
+
   // Fetch sub-DAG-run details (only when all sub-DAG params are valid)
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
@@ -52,7 +60,7 @@ const DAGRunDetailsPanel: React.FC<DAGRunDetailsPanelProps> = ({
     { refreshInterval: 2000, keepPreviousData: true, isPaused: () => !canQuerySubDag }
   );
 
-  // Fetch regular DAG-run details (only when not querying sub-DAG)
+  // Fetch regular DAG-run details (only when SSE fails and not querying sub-DAG)
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}',
     {
@@ -66,11 +74,22 @@ const DAGRunDetailsPanel: React.FC<DAGRunDetailsPanelProps> = ({
         },
       },
     },
-    { refreshInterval: 2000, keepPreviousData: true, isPaused: () => canQuerySubDag }
+    {
+      refreshInterval: sseResult.shouldUseFallback ? 2000 : 0,
+      keepPreviousData: true,
+      // Only poll when SSE fails or for initial load before SSE connects
+      isPaused: () => canQuerySubDag || (sseResult.isConnected && !sseResult.shouldUseFallback),
+    }
   );
 
-  // Use the appropriate query based on whether this is a sub-DAG-run
-  const { data, mutate } = canQuerySubDag ? subDAGQuery : dagRunQuery;
+  // Use the appropriate data source based on the scenario:
+  // 1. Sub-DAG: always use polling query
+  // 2. Regular DAG with SSE connected: use SSE data
+  // 3. Regular DAG with SSE fallback: use polling query
+  const { mutate } = canQuerySubDag ? subDAGQuery : dagRunQuery;
+  const data = canQuerySubDag
+    ? subDAGQuery.data
+    : sseResult.data || dagRunQuery.data;
 
   // Keep track of last valid data to prevent flickering
   const [lastValidData, setLastValidData] = React.useState(data);

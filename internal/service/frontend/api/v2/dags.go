@@ -335,7 +335,7 @@ func (a *API) GetDAGDAGRunHistory(ctx context.Context, request api.GetDAGDAGRunH
 
 	var dagRuns []api.DAGRunDetails
 	for _, status := range recentHistory {
-		dagRuns = append(dagRuns, toDAGRunDetails(status))
+		dagRuns = append(dagRuns, ToDAGRunDetails(status))
 	}
 
 	gridData := a.readHistoryData(ctx, recentHistory)
@@ -387,7 +387,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 
 	return api.GetDAGDetails200JSONResponse{
 		Dag:          details,
-		LatestDAGRun: toDAGRunDetails(dagStatus),
+		LatestDAGRun: ToDAGRunDetails(dagStatus),
 		Suspended:    a.dagStore.IsSuspended(ctx, fileName),
 		LocalDags:    localDAGs,
 		Errors:       errs,
@@ -582,7 +582,7 @@ func (a *API) GetDAGDAGRunDetails(ctx context.Context, request api.GetDAGDAGRunD
 			return nil, fmt.Errorf("error getting latest status: %w", err)
 		}
 		return &api.GetDAGDAGRunDetails200JSONResponse{
-			DagRun: toDAGRunDetails(latestStatus),
+			DagRun: ToDAGRunDetails(latestStatus),
 		}, nil
 	}
 
@@ -599,7 +599,7 @@ func (a *API) GetDAGDAGRunDetails(ctx context.Context, request api.GetDAGDAGRunD
 	}
 
 	return &api.GetDAGDAGRunDetails200JSONResponse{
-		DagRun: toDAGRunDetails(*dagStatus),
+		DagRun: ToDAGRunDetails(*dagStatus),
 	}, nil
 }
 
@@ -793,7 +793,7 @@ func (a *API) ExecuteDAGSync(ctx context.Context, request api.ExecuteDAGSyncRequ
 	}
 
 	return api.ExecuteDAGSync200JSONResponse{
-		DagRun: toDAGRunDetails(*dagStatus),
+		DagRun: ToDAGRunDetails(*dagStatus),
 	}, nil
 }
 

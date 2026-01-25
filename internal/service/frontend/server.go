@@ -36,6 +36,7 @@ import (
 	apiv2 "github.com/dagu-org/dagu/internal/service/frontend/api/v2"
 	"github.com/dagu-org/dagu/internal/service/frontend/auth"
 	"github.com/dagu-org/dagu/internal/service/frontend/metrics"
+	"github.com/dagu-org/dagu/internal/service/frontend/sse"
 	"github.com/dagu-org/dagu/internal/service/frontend/terminal"
 	"github.com/dagu-org/dagu/internal/service/oidcprovision"
 	"github.com/dagu-org/dagu/internal/service/resource"
@@ -57,6 +58,8 @@ type Server struct {
 	auditService   *audit.Service
 	syncService    gitsync.Service // Git sync service for graceful shutdown
 	listener       net.Listener    // Optional pre-bound listener (for tests)
+	dagRunMgr      runtime.Manager // Runtime manager for DAG run operations
+	sseHub         *sse.Hub        // SSE hub for real-time updates
 }
 
 // ServerOption is a functional option for configuring the Server
@@ -179,6 +182,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		authService:    authSvc,
 		auditService:   auditSvc,
 		syncService:    syncSvc,
+		dagRunMgr:      drm,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,
 			NavbarTitle:           cfg.UI.NavbarTitle,
@@ -393,6 +397,9 @@ func (srv *Server) Serve(ctx context.Context) error {
 		srv.setupTerminalRoute(ctx, r, apiV2BasePath)
 	}
 
+	// Configure SSE route for real-time DAG run status updates
+	srv.setupSSERoute(ctx, r, apiV2BasePath)
+
 	// Configure and start the server
 	addr := net.JoinHostPort(srv.config.Server.Host, strconv.Itoa(srv.config.Server.Port))
 	srv.httpServer = &http.Server{
@@ -539,6 +546,25 @@ func (srv *Server) setupTerminalRoute(ctx context.Context, r *chi.Mux, apiV2Base
 	logger.Info(ctx, "Terminal WebSocket route configured", slog.String("path", wsPath))
 }
 
+// setupSSERoute configures the SSE route for real-time DAG run status updates
+func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV2BasePath string) {
+	// Create and start hub
+	srv.sseHub = sse.NewHub(srv.dagRunMgr)
+	srv.sseHub.Start()
+
+	// Create remote nodes map
+	remoteNodes := make(map[string]config.RemoteNode)
+	for _, n := range srv.config.Server.RemoteNodes {
+		remoteNodes[n.Name] = n
+	}
+
+	handler := sse.NewHandler(srv.sseHub, remoteNodes, srv.authService)
+	ssePath := path.Join(apiV2BasePath, "events/dag-runs/{name}/{dagRunId}")
+	r.Get(ssePath, handler.HandleDAGRunEvents)
+
+	logger.Info(ctx, "SSE route configured", slog.String("path", ssePath))
+}
+
 // startServer starts the HTTP server with or without TLS
 func (srv *Server) startServer(ctx context.Context) {
 	var err error
@@ -578,6 +604,12 @@ func (srv *Server) Shutdown(ctx context.Context) error {
 		if err := srv.syncService.Stop(); err != nil {
 			logger.Warn(ctx, "Failed to stop git sync service", tag.Error(err))
 		}
+	}
+
+	// Stop SSE hub if running
+	if srv.sseHub != nil {
+		srv.sseHub.Shutdown()
+		logger.Info(ctx, "SSE hub shut down")
 	}
 
 	if srv.httpServer != nil {
