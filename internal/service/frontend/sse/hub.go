@@ -129,7 +129,7 @@ func (h *Hub) Subscribe(client *Client, topic string) error {
 
 	// Parse topic format: "type:identifier"
 	topicType, identifier, ok := strings.Cut(topic, ":")
-	if !ok {
+	if !ok || topicType == "" {
 		return fmt.Errorf("invalid topic format: %s (expected 'type:identifier')", topic)
 	}
 

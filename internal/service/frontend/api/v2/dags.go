@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"runtime"
@@ -1304,7 +1305,13 @@ func (a *API) GetDAGHistoryData(ctx context.Context, fileName string) (any, erro
 // GetDAGsListData returns DAGs list for SSE.
 // Identifier format: URL query string (e.g., "page=1&perPage=100&name=mydag")
 func (a *API) GetDAGsListData(ctx context.Context, queryString string) (any, error) {
-	params, _ := url.ParseQuery(queryString)
+	params, err := url.ParseQuery(queryString)
+	if err != nil {
+		logger.Warn(ctx, "Failed to parse query string for DAGs list",
+			tag.Error(err),
+			slog.String("queryString", queryString),
+		)
+	}
 
 	page := parseIntParam(params.Get("page"), 1)
 	perPage := parseIntParam(params.Get("perPage"), 100)

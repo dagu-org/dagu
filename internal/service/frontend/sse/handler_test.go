@@ -362,7 +362,7 @@ func TestHandleSSEMaxClients(t *testing.T) {
 	handler.HandleDAGEvents(w2, r2)
 
 	assert.Equal(t, http.StatusServiceUnavailable, w2.Code)
-	assert.Contains(t, w2.Body.String(), "max clients reached")
+	assert.Contains(t, w2.Body.String(), "unable to subscribe to events")
 
 	<-done1
 }

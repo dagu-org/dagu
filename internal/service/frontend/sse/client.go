@@ -14,6 +14,10 @@ var (
 	ErrClientClosed          = errors.New("client closed")
 )
 
+// defaultClientBufferSize is the buffer size for the client's send channel.
+// A larger buffer helps prevent message loss during bursts of events.
+const defaultClientBufferSize = 64
+
 // Client represents a connected SSE client
 type Client struct {
 	w       http.ResponseWriter
@@ -33,7 +37,7 @@ func NewClient(w http.ResponseWriter) (*Client, error) {
 	return &Client{
 		w:       w,
 		flusher: flusher,
-		send:    make(chan *Event, 64),
+		send:    make(chan *Event, defaultClientBufferSize),
 		done:    make(chan struct{}),
 	}, nil
 }

@@ -29,7 +29,7 @@ type Watcher struct {
 	fetcher      FetchFunc
 	clients      map[*Client]struct{}
 	mu           sync.RWMutex
-	lastHash     string
+	lastBroadcastHash string
 	stopCh       chan struct{}
 	stopped      bool
 	errorBackoff backoff.Retrier
@@ -152,7 +152,7 @@ func (w *Watcher) adaptInterval(fetchDuration time.Duration) {
 	target = max(w.baseInterval, min(target, w.maxInterval))
 
 	// EMA: new = alpha*target + (1-alpha)*current
-	// Since both target and currentInterval are within bounds, the result is too
+	// Since both target and currentInterval are within bounds, the result stays within bounds.
 	w.currentInterval = time.Duration(
 		float64(target)*smoothingFactor +
 			float64(w.currentInterval)*(1-smoothingFactor),
@@ -207,9 +207,9 @@ func (w *Watcher) broadcastIfChanged(response any) {
 	hash := computeHash(data)
 
 	w.mu.Lock()
-	changed := hash != w.lastHash
+	changed := hash != w.lastBroadcastHash
 	if changed {
-		w.lastHash = hash
+		w.lastBroadcastHash = hash
 	}
 	w.mu.Unlock()
 

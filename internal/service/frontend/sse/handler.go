@@ -146,12 +146,12 @@ func (h *Handler) handleSSE(w http.ResponseWriter, r *http.Request, topic string
 
 	client, err := NewClient(w)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "streaming not supported", http.StatusInternalServerError)
 		return
 	}
 
 	if err := h.hub.Subscribe(client, topic); err != nil {
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		http.Error(w, "unable to subscribe to events", http.StatusServiceUnavailable)
 		return
 	}
 	defer h.hub.Unsubscribe(client)

@@ -2083,7 +2083,14 @@ func (a *API) GetDAGRunLogsData(ctx context.Context, identifier string) (any, er
 	var queryParams url.Values
 	if idx := strings.Index(identifier, "?"); idx != -1 {
 		pathPart = identifier[:idx]
-		queryParams, _ = url.ParseQuery(identifier[idx+1:])
+		var err error
+		queryParams, err = url.ParseQuery(identifier[idx+1:])
+		if err != nil {
+			logger.Warn(ctx, "Failed to parse query string in identifier",
+				tag.Error(err),
+				slog.String("identifier", identifier),
+			)
+		}
 	}
 
 	dagName, dagRunId, ok := strings.Cut(pathPart, "/")
@@ -2100,7 +2107,7 @@ func (a *API) GetDAGRunLogsData(ctx context.Context, identifier string) (any, er
 	// Parse tail parameter with bounds validation (100-10000, default 500)
 	tail := 500
 	if queryParams != nil {
-		tail = clampInt(parseIntDefault(queryParams.Get("tail"), 500), 100, 10000)
+		tail = clampInt(parseIntParam(queryParams.Get("tail"), 500), 100, 10000)
 	}
 
 	options := fileutil.LogReadOptions{
@@ -2182,7 +2189,12 @@ func (a *API) GetStepLogData(ctx context.Context, identifier string) (any, error
 	if node.Stderr != "" {
 		stderrContent, _, _, _, _, err = fileutil.ReadLogContent(node.Stderr, options)
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			// Ignore stderr read errors, just return empty
+			// Log warning for real errors, return empty stderr
+			logger.Warn(ctx, "Failed to read stderr log",
+				tag.Error(err),
+				slog.String("stepName", stepName),
+				slog.String("stderrPath", node.Stderr),
+			)
 			stderrContent = ""
 		}
 	}
@@ -2199,22 +2211,43 @@ func (a *API) GetStepLogData(ctx context.Context, identifier string) (any, error
 // GetDAGRunsListData returns DAG runs list for SSE.
 // Identifier format: URL query string (e.g., "status=running&name=mydag")
 func (a *API) GetDAGRunsListData(ctx context.Context, queryString string) (any, error) {
-	params, _ := url.ParseQuery(queryString)
+	params, err := url.ParseQuery(queryString)
+	if err != nil {
+		logger.Warn(ctx, "Failed to parse query string for DAG runs list",
+			tag.Error(err),
+			slog.String("queryString", queryString),
+		)
+	}
 	var opts []exec.ListDAGRunStatusesOption
 
 	if status := params.Get("status"); status != "" {
 		if statusInt, err := strconv.Atoi(status); err == nil {
 			opts = append(opts, exec.WithStatuses([]core.Status{core.Status(statusInt)}))
+		} else {
+			logger.Warn(ctx, "Invalid status parameter",
+				slog.String("status", status),
+				tag.Error(err),
+			)
 		}
 	}
 	if fromDate := params.Get("fromDate"); fromDate != "" {
 		if ts, err := strconv.ParseInt(fromDate, 10, 64); err == nil {
 			opts = append(opts, exec.WithFrom(exec.NewUTC(time.Unix(ts, 0))))
+		} else {
+			logger.Warn(ctx, "Invalid fromDate parameter",
+				slog.String("fromDate", fromDate),
+				tag.Error(err),
+			)
 		}
 	}
 	if toDate := params.Get("toDate"); toDate != "" {
 		if ts, err := strconv.ParseInt(toDate, 10, 64); err == nil {
 			opts = append(opts, exec.WithTo(exec.NewUTC(time.Unix(ts, 0))))
+		} else {
+			logger.Warn(ctx, "Invalid toDate parameter",
+				slog.String("toDate", toDate),
+				tag.Error(err),
+			)
 		}
 	}
 	if name := params.Get("name"); name != "" {
@@ -2242,19 +2275,6 @@ func (a *API) GetDAGRunsListData(ctx context.Context, queryString string) (any, 
 	return api.ListDAGRuns200JSONResponse{
 		DagRuns: dagRuns,
 	}, nil
-}
-
-// Helper functions for SSE data
-
-// parseIntDefault parses an integer string, returning defaultVal if parsing fails or value is <= 0.
-func parseIntDefault(s string, defaultVal int) int {
-	if s == "" {
-		return defaultVal
-	}
-	if v, err := strconv.Atoi(s); err == nil && v > 0 {
-		return v
-	}
-	return defaultVal
 }
 
 // clampInt restricts value to the range [minVal, maxVal].

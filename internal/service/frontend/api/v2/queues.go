@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/cmn/config"
@@ -313,6 +314,11 @@ func (a *API) GetQueueItemsData(ctx context.Context, queueName string) (any, err
 	for _, dagRun := range runningByGroup[queueName] {
 		summary, err := a.fetchDAGRunSummary(ctx, dagRun)
 		if err != nil {
+			logger.Warn(ctx, "Failed to fetch running DAG run summary",
+				tag.Error(err),
+				slog.String("queue", queueName),
+				slog.String("dagRunId", dagRun.ID),
+			)
 			continue
 		}
 		running = append(running, summary)
@@ -327,10 +333,19 @@ func (a *API) GetQueueItemsData(ctx context.Context, queueName string) (any, err
 	for _, queuedItem := range queuedItems {
 		dagRunRef, err := queuedItem.Data()
 		if err != nil {
+			logger.Warn(ctx, "Failed to parse queued item data",
+				tag.Error(err),
+				slog.String("queue", queueName),
+			)
 			continue
 		}
 		summary, err := a.fetchDAGRunSummary(ctx, *dagRunRef)
 		if err != nil {
+			logger.Warn(ctx, "Failed to fetch queued DAG run summary",
+				tag.Error(err),
+				slog.String("queue", queueName),
+				slog.String("dagRunId", dagRunRef.ID),
+			)
 			continue
 		}
 		// Skip running items to avoid duplication
