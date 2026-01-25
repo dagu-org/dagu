@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path"
 	"regexp"
 	"strings"
 )
@@ -32,16 +31,28 @@ func (t Tag) IsZero() bool {
 
 // Tag validation constants.
 const (
-	MaxTagKeyLength   = 63
+	// MaxTagKeyLength is the maximum allowed length for tag keys (63 chars).
+	MaxTagKeyLength = 63
+	// MaxTagValueLength is the maximum allowed length for tag values (255 chars).
 	MaxTagValueLength = 255
 )
 
-// Tag validation patterns.
-// Keys: alphanumeric, dash, underscore, dot. Must start with letter/number.
-// Values: alphanumeric, dash, underscore, dot, slash. Can be empty.
+// Tag validation pattern strings (exported for use by other packages).
+const (
+	// TagKeyPatternStr is the regex pattern for valid tag keys.
+	// Allows alphanumeric, dash, underscore, dot. Must start with letter/number.
+	TagKeyPatternStr = `^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`
+	// TagValuePatternStr is the regex pattern for valid tag values.
+	// Allows alphanumeric, dash, underscore, dot, slash. Must start with letter/number.
+	TagValuePatternStr = `^[a-zA-Z0-9][a-zA-Z0-9_./-]*$`
+)
+
+// Tag validation patterns (compiled regex).
 var (
-	validTagKeyPattern   = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
-	validTagValuePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_./-]*$`)
+	// ValidTagKeyPattern validates tag keys.
+	ValidTagKeyPattern = regexp.MustCompile(TagKeyPatternStr)
+	// ValidTagValuePattern validates tag values.
+	ValidTagValuePattern = regexp.MustCompile(TagValuePatternStr)
 )
 
 // ValidateTag validates a tag's key and value format.
@@ -52,13 +63,13 @@ func ValidateTag(t Tag) error {
 	if len(t.Key) > MaxTagKeyLength {
 		return fmt.Errorf("tag key exceeds max length %d", MaxTagKeyLength)
 	}
-	if !validTagKeyPattern.MatchString(t.Key) {
+	if !ValidTagKeyPattern.MatchString(t.Key) {
 		return fmt.Errorf("tag key %q contains invalid characters (allowed: a-z, A-Z, 0-9, -, _, .)", t.Key)
 	}
 	if len(t.Value) > MaxTagValueLength {
 		return fmt.Errorf("tag value exceeds max length %d", MaxTagValueLength)
 	}
-	if t.Value != "" && !validTagValuePattern.MatchString(t.Value) {
+	if t.Value != "" && !ValidTagValuePattern.MatchString(t.Value) {
 		return fmt.Errorf("tag value %q contains invalid characters (allowed: a-z, A-Z, 0-9, -, _, ., /)", t.Value)
 	}
 	return nil
@@ -294,14 +305,38 @@ func (f TagFilter) MatchesTags(tags Tags) bool {
 }
 
 // matchGlob performs simple glob matching with * and ? wildcards.
-// * matches zero or more characters, ? matches exactly one character.
+// * matches zero or more characters (including slashes), ? matches exactly one character.
+// Uses regex internally to properly handle slashes in tag values.
 // Returns false if the pattern is invalid.
 func matchGlob(pattern, s string) bool {
-	matched, err := path.Match(pattern, s)
+	regexPattern := globToRegex(pattern)
+	re, err := regexp.Compile(regexPattern)
 	if err != nil {
 		return false
 	}
-	return matched
+	return re.MatchString(s)
+}
+
+// globToRegex converts a glob pattern to a regex pattern.
+// Escapes regex metacharacters and translates * to .* and ? to .
+func globToRegex(glob string) string {
+	var result strings.Builder
+	result.WriteString("^")
+	for _, ch := range glob {
+		switch ch {
+		case '*':
+			result.WriteString(".*")
+		case '?':
+			result.WriteString(".")
+		case '.', '+', '^', '$', '(', ')', '[', ']', '{', '}', '|', '\\':
+			result.WriteRune('\\')
+			result.WriteRune(ch)
+		default:
+			result.WriteRune(ch)
+		}
+	}
+	result.WriteString("$")
+	return result.String()
 }
 
 // MatchesFilters checks if tags match all filters (AND logic).

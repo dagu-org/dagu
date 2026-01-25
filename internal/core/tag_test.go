@@ -474,6 +474,7 @@ func TestTagFilter_MatchesTags_Wildcard(t *testing.T) {
 		{Key: "env", Value: "prod-us"},
 		{Key: "team", Value: "platform"},
 		{Key: "critical", Value: ""},
+		{Key: "path", Value: "foo/bar/baz"},
 	}
 
 	tests := []struct {
@@ -487,7 +488,7 @@ func TestTagFilter_MatchesTags_Wildcard(t *testing.T) {
 		{"value question mark", "env=pro?", true},
 		{"value question mark no match", "env=pr?", false},
 		{"value any", "team=*", true},
-		{"value any empty tag", "critical=*", true}, // * matches empty string in Go's path.Match
+		{"value any empty tag", "critical=*", true}, // * matches empty string
 
 		// Key wildcard patterns
 		{"key prefix match", "env*", true},
@@ -498,6 +499,12 @@ func TestTagFilter_MatchesTags_Wildcard(t *testing.T) {
 		// Combined wildcards
 		{"key and value wildcard", "env*=prod*", true},
 		{"key and value wildcard no match", "missing*=*", false},
+
+		// Wildcard with slashes (path.Match would fail these, regex works)
+		{"value with slash prefix", "path=foo/*", true},
+		{"value with slash any", "path=*", true},
+		{"value with slash pattern", "path=*/bar/*", true},
+		{"value with slash no match", "path=baz/*", false},
 	}
 
 	for _, tt := range tests {

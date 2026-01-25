@@ -2,23 +2,11 @@ package types
 
 import (
 	"fmt"
-	"regexp"
 	"sort"
 	"strings"
 
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/goccy/go-yaml"
-)
-
-// Tag validation constants (duplicated from core to avoid import issues).
-const (
-	maxTagKeyLength   = 63
-	maxTagValueLength = 255
-)
-
-// Tag validation patterns.
-var (
-	validTagKeyPattern   = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
-	validTagValuePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_./-]*$`)
 )
 
 // TagEntry represents a single tag entry with key and optional value.
@@ -208,10 +196,10 @@ func validateKey(key string) error {
 	if key == "" {
 		return fmt.Errorf("tag key cannot be empty")
 	}
-	if len(key) > maxTagKeyLength {
-		return fmt.Errorf("tag key %q exceeds max length %d", key, maxTagKeyLength)
+	if len(key) > core.MaxTagKeyLength {
+		return fmt.Errorf("tag key %q exceeds max length %d", key, core.MaxTagKeyLength)
 	}
-	if !validTagKeyPattern.MatchString(key) {
+	if !core.ValidTagKeyPattern.MatchString(key) {
 		return fmt.Errorf("tag key %q contains invalid characters (allowed: a-z, A-Z, 0-9, -, _, .)", key)
 	}
 	return nil
@@ -219,10 +207,10 @@ func validateKey(key string) error {
 
 // validateValue validates a tag value and returns an error if invalid.
 func validateValue(value string) error {
-	if len(value) > maxTagValueLength {
-		return fmt.Errorf("tag value %q exceeds max length %d", value, maxTagValueLength)
+	if len(value) > core.MaxTagValueLength {
+		return fmt.Errorf("tag value %q exceeds max length %d", value, core.MaxTagValueLength)
 	}
-	if value != "" && !validTagValuePattern.MatchString(value) {
+	if value != "" && !core.ValidTagValuePattern.MatchString(value) {
 		return fmt.Errorf("tag value %q contains invalid characters (allowed: a-z, A-Z, 0-9, -, _, ., /)", value)
 	}
 	return nil
