@@ -30,8 +30,8 @@ function getStatusStyling(status: number) {
       borderColorClass = 'border-success';
       break;
     case Status.Failed: // 2 - failed -> red
-      bgColorClass = 'bg-danger';
-      borderColorClass = 'border-danger';
+      bgColorClass = 'bg-destructive';
+      borderColorClass = 'border-destructive';
       break;
     case Status.Running: // 1 - running -> green with pulse
       bgColorClass = 'bg-success';
