@@ -368,8 +368,8 @@ func sanitizedRequestLogger(logger *httplog.Logger) func(next http.Handler) http
 				if q.Has("token") {
 					q.Set("token", "[REDACTED]")
 					logReq.URL.RawQuery = q.Encode()
-					// CRITICAL: httplog uses r.RequestURI (not r.URL) to construct logged URL
-					// We must update RequestURI to match the sanitized URL
+					// httplog uses r.RequestURI (not r.URL) to construct the logged URL,
+					// so we must update RequestURI to match the sanitized URL.
 					logReq.RequestURI = logReq.URL.RequestURI()
 				}
 			}

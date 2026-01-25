@@ -174,16 +174,16 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task) CmdSpec {
 
 	args = append(args, fmt.Sprintf("--run-id=%s", task.DagRunId))
 
-	// CRITICAL: Use original DAG name, not temp filename
-	// The temp file doesn't have a 'name:' field, so without this flag the subprocess
-	// would derive the name from the temp filename (e.g., "distributed_exec-12345")
-	// instead of using the original name ("distributed_exec"), causing dag-run lookup to fail.
+	// Use original DAG name, not temp filename. The temp file doesn't have a 'name:'
+	// field, so without this flag the subprocess would derive the name from the temp
+	// filename (e.g., "distributed_exec-12345") instead of using the original name
+	// ("distributed_exec"), causing dag-run lookup to fail.
 	if task.RootDagRunName != "" {
 		args = append(args, fmt.Sprintf("--name=%s", task.RootDagRunName))
 	}
 
-	// Pass worker ID for tracking which worker executes this DAG run
-	// CRITICAL: This prevents subprocess from re-dispatching to coordinator
+	// Pass worker ID for tracking which worker executes this DAG run.
+	// This prevents subprocess from re-dispatching to coordinator.
 	if task.WorkerId != "" {
 		args = append(args, fmt.Sprintf("--worker-id=%s", task.WorkerId))
 	}
