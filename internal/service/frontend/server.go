@@ -36,6 +36,7 @@ import (
 	apiv2 "github.com/dagu-org/dagu/internal/service/frontend/api/v2"
 	"github.com/dagu-org/dagu/internal/service/frontend/auth"
 	"github.com/dagu-org/dagu/internal/service/frontend/metrics"
+	"github.com/dagu-org/dagu/internal/service/frontend/sse"
 	"github.com/dagu-org/dagu/internal/service/frontend/terminal"
 	"github.com/dagu-org/dagu/internal/service/oidcprovision"
 	"github.com/dagu-org/dagu/internal/service/resource"
@@ -48,15 +49,17 @@ import (
 
 // Server represents the HTTP server for the frontend application
 type Server struct {
-	apiV2          *apiv2.API
-	config         *config.Config
-	httpServer     *http.Server
-	funcsConfig    funcsConfig
-	builtinOIDCCfg *auth.BuiltinOIDCConfig // OIDC config for builtin auth mode
-	authService    *authservice.Service
-	auditService   *audit.Service
-	syncService    gitsync.Service // Git sync service for graceful shutdown
-	listener       net.Listener    // Optional pre-bound listener (for tests)
+	apiV2           *apiv2.API
+	config          *config.Config
+	httpServer      *http.Server
+	funcsConfig     funcsConfig
+	builtinOIDCCfg  *auth.BuiltinOIDCConfig // OIDC config for builtin auth mode
+	authService     *authservice.Service
+	auditService    *audit.Service
+	syncService     gitsync.Service      // Git sync service for graceful shutdown
+	listener        net.Listener         // Optional pre-bound listener (for tests)
+	sseHub          *sse.Hub             // SSE hub for real-time updates
+	metricsRegistry *prometheus.Registry // Prometheus registry for metrics
 }
 
 // ServerOption is a functional option for configuring the Server
@@ -173,12 +176,13 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	}
 
 	srv := &Server{
-		apiV2:          apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, apiOpts...),
-		config:         cfg,
-		builtinOIDCCfg: builtinOIDCCfg,
-		authService:    authSvc,
-		auditService:   auditSvc,
-		syncService:    syncSvc,
+		apiV2:           apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, apiOpts...),
+		config:          cfg,
+		builtinOIDCCfg:  builtinOIDCCfg,
+		authService:     authSvc,
+		auditService:    auditSvc,
+		syncService:     syncSvc,
+		metricsRegistry: mr,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,
 			NavbarTitle:           cfg.UI.NavbarTitle,
@@ -347,23 +351,64 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 	return svc
 }
 
+// sanitizedRequestLogger returns a middleware that wraps httplog's RequestLogger
+// with URL sanitization. This ensures tokens in query strings are redacted in logs
+// regardless of httplog's internal attribute handling.
+func sanitizedRequestLogger(logger *httplog.Logger) func(next http.Handler) http.Handler {
+	httplogMw := httplog.RequestLogger(logger)
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Check if URL has token parameter that needs sanitization
+			logReq := r
+			if r.URL.RawQuery != "" && strings.Contains(r.URL.RawQuery, "token=") {
+				// Clone request with sanitized URL for logging
+				logReq = r.Clone(r.Context())
+				q := logReq.URL.Query()
+				if q.Has("token") {
+					q.Set("token", "[REDACTED]")
+					logReq.URL.RawQuery = q.Encode()
+					// httplog uses r.RequestURI (not r.URL) to construct the logged URL,
+					// so we must update RequestURI to match the sanitized URL.
+					logReq.RequestURI = logReq.URL.RequestURI()
+				}
+			}
+
+			// Create inner handler that receives sanitized request from httplog
+			// but passes the original request to actual handlers
+			innerHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				next.ServeHTTP(w, r) // Use original request with real token
+			})
+
+			// httplog sees sanitized URL, actual handlers get original
+			httplogMw(innerHandler).ServeHTTP(w, logReq)
+		})
+	}
+}
+
 // Serve starts the HTTP server and configures routes
 func (srv *Server) Serve(ctx context.Context) error {
 	// Setup logger for HTTP requests
+	logLevel := slog.LevelInfo
+	if srv.config.Core.Debug {
+		logLevel = slog.LevelDebug
+	}
 	requestLogger := httplog.NewLogger("http", httplog.Options{
-		LogLevel:         slog.LevelDebug,
+		LogLevel:         logLevel,
 		JSON:             srv.config.Core.LogFormat == "json",
 		Concise:          true,
-		RequestHeaders:   true,
+		RequestHeaders:   srv.config.Core.Debug,
 		MessageFieldName: "msg",
-		ResponseHeaders:  true,
+		ResponseHeaders:  false,
+		QuietDownRoutes:  []string{"/api/v2/events"},
+		QuietDownPeriod:  10 * time.Second,
 	})
 
 	// Create router with middleware
 	r := chi.NewMux()
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Compress(5))
-	r.Use(httplog.RequestLogger(requestLogger))
+	r.Use(sanitizedRequestLogger(requestLogger))
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"}, // TODO: Update to specific origins for better security
@@ -392,6 +437,9 @@ func (srv *Server) Serve(ctx context.Context) error {
 	if srv.config.Server.Terminal.Enabled && srv.authService != nil {
 		srv.setupTerminalRoute(ctx, r, apiV2BasePath)
 	}
+
+	// Configure SSE route for real-time DAG run status updates
+	srv.setupSSERoute(ctx, r, apiV2BasePath)
 
 	// Configure and start the server
 	addr := net.JoinHostPort(srv.config.Server.Host, strconv.Itoa(srv.config.Server.Port))
@@ -539,6 +587,55 @@ func (srv *Server) setupTerminalRoute(ctx context.Context, r *chi.Mux, apiV2Base
 	logger.Info(ctx, "Terminal WebSocket route configured", slog.String("path", wsPath))
 }
 
+// setupSSERoute configures SSE routes for real-time updates
+func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV2BasePath string) {
+	// Create SSE metrics if metrics registry is available
+	var sseMetrics *sse.Metrics
+	if srv.metricsRegistry != nil {
+		sseMetrics = sse.NewMetrics(srv.metricsRegistry)
+	}
+
+	srv.sseHub = sse.NewHub(sse.WithMetrics(sseMetrics))
+	srv.sseHub.Start()
+	srv.registerSSEFetchers()
+
+	remoteNodes := make(map[string]config.RemoteNode)
+	for _, n := range srv.config.Server.RemoteNodes {
+		remoteNodes[n.Name] = n
+	}
+
+	handler := sse.NewHandler(srv.sseHub, remoteNodes, srv.authService)
+
+	// DAG and DAG run events
+	r.Get(path.Join(apiV2BasePath, "events/dags"), handler.HandleDAGsListEvents)
+	r.Get(path.Join(apiV2BasePath, "events/dags/{fileName}"), handler.HandleDAGEvents)
+	r.Get(path.Join(apiV2BasePath, "events/dags/{fileName}/dag-runs"), handler.HandleDAGHistoryEvents)
+	r.Get(path.Join(apiV2BasePath, "events/dag-runs"), handler.HandleDAGRunsListEvents)
+	r.Get(path.Join(apiV2BasePath, "events/dag-runs/{name}/{dagRunId}"), handler.HandleDAGRunEvents)
+	r.Get(path.Join(apiV2BasePath, "events/dag-runs/{name}/{dagRunId}/logs"), handler.HandleDAGRunLogsEvents)
+	r.Get(path.Join(apiV2BasePath, "events/dag-runs/{name}/{dagRunId}/logs/steps/{stepName}"), handler.HandleStepLogEvents)
+
+	// Queue events
+	r.Get(path.Join(apiV2BasePath, "events/queues"), handler.HandleQueuesListEvents)
+	r.Get(path.Join(apiV2BasePath, "events/queues/{name}/items"), handler.HandleQueueItemsEvents)
+
+	logger.Info(ctx, "SSE routes configured", slog.String("basePath", apiV2BasePath))
+}
+
+// registerSSEFetchers registers data fetchers for all SSE topic types.
+// See sse.TopicType constants for identifier format documentation.
+func (srv *Server) registerSSEFetchers() {
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAG, srv.apiV2.GetDAGDetailsData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGHistory, srv.apiV2.GetDAGHistoryData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGsList, srv.apiV2.GetDAGsListData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRun, srv.apiV2.GetDAGRunDetailsData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRuns, srv.apiV2.GetDAGRunsListData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRunLogs, srv.apiV2.GetDAGRunLogsData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeStepLog, srv.apiV2.GetStepLogData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeQueues, srv.apiV2.GetQueuesListData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeQueueItems, srv.apiV2.GetQueueItemsData)
+}
+
 // startServer starts the HTTP server with or without TLS
 func (srv *Server) startServer(ctx context.Context) {
 	var err error
@@ -578,6 +675,12 @@ func (srv *Server) Shutdown(ctx context.Context) error {
 		if err := srv.syncService.Stop(); err != nil {
 			logger.Warn(ctx, "Failed to stop git sync service", tag.Error(err))
 		}
+	}
+
+	// Stop SSE hub if running
+	if srv.sseHub != nil {
+		srv.sseHub.Shutdown()
+		logger.Info(ctx, "SSE hub shut down")
 	}
 
 	if srv.httpServer != nil {

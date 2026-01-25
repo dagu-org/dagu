@@ -1,11 +1,13 @@
-import { Button } from '@/components/ui/button';
-import { Maximize2, X } from 'lucide-react';
-import React from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Maximize2, X } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
 import { components } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { UnsavedChangesProvider } from '../../../../contexts/UnsavedChangesContext';
 import { useQuery } from '../../../../hooks/api';
+import { useDAGSSE } from '../../../../hooks/useDAGSSE';
 import dayjs from '../../../../lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
@@ -13,135 +15,142 @@ import { DAGContext } from '../../contexts/DAGContext';
 import { RootDAGRunContext } from '../../contexts/RootDAGRunContext';
 import DAGDetailsContent from './DAGDetailsContent';
 
-type DAGDetailsPanelProps = {
+const POLLING_INTERVAL_MS = 2000;
+
+function getPollingInterval(notFound: boolean, shouldPoll: boolean): number {
+  if (notFound || !shouldPoll) {
+    return 0;
+  }
+  return POLLING_INTERVAL_MS;
+}
+
+type Props = {
   fileName: string;
   onClose: () => void;
   onNavigate?: (direction: 'up' | 'down') => void;
 };
 
-const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
-  fileName,
-  onClose,
-  onNavigate,
-}) => {
-  const navigate = useNavigate();
-  const appBarContext = React.useContext(AppBarContext);
-  const [currentDAGRun, setCurrentDAGRun] = React.useState<
-    components['schemas']['DAGRunDetails'] | undefined
-  >();
-  const [activeTab, setActiveTab] = React.useState('status');
-  const [dagRunId] = React.useState<string>('latest');
-  const [stepName] = React.useState<string | null>(null);
+type DAGRunDetails = components['schemas']['DAGRunDetails'];
+type DAGDetailsData = ReturnType<typeof useDAGSSE>['data'];
 
-  const navigateToStatusTab = React.useCallback(() => {
+function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactElement | null {
+  const navigate = useNavigate();
+  const appBarContext = useContext(AppBarContext);
+
+  const [currentDAGRun, setCurrentDAGRun] = useState<DAGRunDetails | undefined>();
+  const [activeTab, setActiveTab] = useState('status');
+  const [notFound, setNotFound] = useState(false);
+  const [lastValidData, setLastValidData] = useState<DAGDetailsData>(null);
+
+  const dagRunId = 'latest';
+  const stepName = null;
+
+  const navigateToStatusTab = useCallback(() => {
     setActiveTab('status');
   }, []);
 
-  const [notFound, setNotFound] = React.useState(false);
+  // SSE for real-time updates with polling fallback
+  const sseResult = useDAGSSE(fileName || '', !!fileName);
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const shouldPoll = sseResult.shouldUseFallback || !sseResult.isConnected;
 
-  const { data, error, mutate } = useQuery(
+  const { data: pollingData, error, mutate } = useQuery(
     '/dags/{fileName}',
     {
       params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-        },
-        path: {
-          fileName: fileName || '',
-        },
+        query: { remoteNode },
+        path: { fileName: fileName || '' },
       },
     },
     {
-      refreshInterval: notFound ? 0 : 2000, // Stop polling if DAG not found
+      refreshInterval: getPollingInterval(notFound, shouldPoll),
       keepPreviousData: true,
+      isPaused: () => !shouldPoll && !notFound,
     }
   );
 
-  // Detect if DAG was deleted (404 error)
-  React.useEffect(() => {
+  const data = sseResult.data || pollingData;
+
+  // Track data loading state and handle 404 errors
+  useEffect(() => {
     if (error) {
-      setNotFound(true);
+      // Only set notFound for 404 errors when no cached data exists
+      const is404 = (error as { status?: number })?.status === 404;
+      if (is404 && !lastValidData) {
+        setNotFound(true);
+      }
     } else if (data) {
       setNotFound(false);
+      setLastValidData(data as DAGDetailsData);
     }
-  }, [error, data]);
+  }, [error, data, lastValidData]);
 
-  // Reset notFound state when fileName changes
-  React.useEffect(() => {
+  // Reset state when fileName changes
+  useEffect(() => {
     setNotFound(false);
+    setLastValidData(null); // Clear cached data when switching DAGs
+    setActiveTab('status');
   }, [fileName]);
 
-  // Keep track of last valid data to prevent flickering
-  const [lastValidData, setLastValidData] = React.useState(data);
-  React.useEffect(() => {
-    if (data) {
-      setLastValidData(data);
-    }
-  }, [data]);
   const displayData = data || lastValidData;
 
-  const refreshFn = React.useCallback(() => {
+  const refreshFn = useCallback(() => {
     setTimeout(() => mutate(), 500);
   }, [mutate]);
 
-  const handleFullscreenClick = (e?: React.MouseEvent) => {
-    let url = `/dags/${fileName}`;
-    if (activeTab !== 'status') {
-      url = `${url}/${activeTab}`;
-    }
+  const handleFullscreenClick = useCallback(
+    (e?: React.MouseEvent) => {
+      const url = activeTab === 'status' ? `/dags/${fileName}` : `/dags/${fileName}/${activeTab}`;
 
-    if (e && (e.metaKey || e.ctrlKey)) {
-      window.open(url, '_blank');
-    } else {
-      navigate(url);
-    }
-  };
+      if (e?.metaKey || e?.ctrlKey) {
+        window.open(url, '_blank');
+      } else {
+        navigate(url);
+      }
+    },
+    [fileName, activeTab, navigate]
+  );
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (displayData) {
       setCurrentDAGRun(displayData.latestDAGRun);
     }
   }, [displayData]);
 
-  // Reset active tab when fileName changes
-  React.useEffect(() => {
-    setActiveTab('status');
-  }, [fileName]);
-
   // Keyboard shortcuts
-  React.useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent): void {
       if (shouldIgnoreKeyboardShortcuts()) {
         return;
       }
 
-      if (event.key === 'Escape') {
-        onClose();
+      switch (event.key) {
+        case 'Escape':
+          onClose();
+          break;
+        case 'f':
+        case 'F':
+          handleFullscreenClick();
+          break;
+        case 'ArrowDown':
+        case 'ArrowUp':
+          if (onNavigate) {
+            event.preventDefault();
+            onNavigate(event.key === 'ArrowDown' ? 'down' : 'up');
+          }
+          break;
       }
-
-      if (event.key === 'f' || event.key === 'F') {
-        handleFullscreenClick();
-      }
-
-      if (event.key === 'ArrowDown' && onNavigate) {
-        event.preventDefault();
-        onNavigate('down');
-      }
-
-      if (event.key === 'ArrowUp' && onNavigate) {
-        event.preventDefault();
-        onNavigate('up');
-      }
-    };
+    }
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose, onNavigate, handleFullscreenClick]);
 
-  const formatDuration = (startDate: string, endDate: string) => {
-    if (!startDate || !endDate) return '--';
+  const formatDuration = useCallback((startDate: string, endDate: string): string => {
+    if (!startDate || !endDate) {
+      return '--';
+    }
+
     const duration = dayjs.duration(dayjs(endDate).diff(dayjs(startDate)));
     const hours = Math.floor(duration.asHours());
     const minutes = duration.minutes();
@@ -149,11 +158,12 @@ const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
 
     if (hours > 0) {
       return `${hours}h ${minutes}m ${seconds}s`;
-    } else if (minutes > 0) {
+    }
+    if (minutes > 0) {
       return `${minutes}m ${seconds}s`;
     }
     return `${seconds}s`;
-  };
+  }, []);
 
   // Show error state if DAG not found
   if (notFound) {
@@ -168,7 +178,8 @@ const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
   }
 
   // Only show loading on initial load, not when switching DAGs
-  if (!displayData || !displayData.latestDAGRun) {
+  // Gate on dag existence, not latestDAGRun, so DAGs with no runs can still be displayed
+  if (!displayData?.dag) {
     return (
       <div className="flex items-center justify-center h-full">
         <LoadingIndicator />
@@ -188,9 +199,7 @@ const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
         <RootDAGRunContext.Provider
           value={{
             data: currentDAGRun,
-            setData: (status: components['schemas']['DAGRunDetails']) => {
-              setCurrentDAGRun(status);
-            },
+            setData: setCurrentDAGRun,
           }}
         >
           <div className="pl-2 pt-2 w-full flex flex-col h-full overflow-hidden">
@@ -233,6 +242,7 @@ const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
                   stepName={stepName}
                   isModal={true}
                   navigateToStatusTab={navigateToStatusTab}
+                  localDags={displayData?.localDags}
                 />
               )}
             </div>
@@ -241,6 +251,6 @@ const DAGDetailsPanel: React.FC<DAGDetailsPanelProps> = ({
       </DAGContext.Provider>
     </UnsavedChangesProvider>
   );
-};
+}
 
 export default DAGDetailsPanel;

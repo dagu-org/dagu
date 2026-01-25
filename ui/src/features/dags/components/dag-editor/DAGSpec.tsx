@@ -29,13 +29,15 @@ import DAGEditorWithDocs from './DAGEditorWithDocs';
 type Props = {
   /** DAG file name */
   fileName: string;
+  /** Local DAGs from parent (optional, avoids redundant fetch) */
+  localDags?: components['schemas']['LocalDag'][];
 };
 
 /**
  * DAGSpec displays and allows editing of a DAG specification
  * including visualization, attributes, steps, and YAML definition
  */
-function DAGSpec({ fileName }: Props) {
+function DAGSpec({ fileName, localDags }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
   const config = useConfig();
@@ -75,37 +77,20 @@ function DAGSpec({ fileName }: Props) {
     [setCookie, flowchart, setFlowchart]
   );
 
-  // Fetch DAG specification data
-  const { data, isLoading } = useQuery(
-    '/dags/{fileName}/spec',
-    {
-      params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-        },
-        path: {
-          fileName: fileName,
-        },
+  // Fetch DAG specification data (spec YAML content) - no polling needed
+  // The spec is static and only changes when the user saves
+  const { data, isLoading } = useQuery('/dags/{fileName}/spec', {
+    params: {
+      query: {
+        remoteNode: appBarContext.selectedRemoteNode || 'local',
+      },
+      path: {
+        fileName: fileName,
       },
     },
-    { refreshInterval: 2000 } // Refresh every 2 seconds
-  );
+  });
 
-  // Fetch DAG details to get localDags
-  const { data: dagDetails } = useQuery(
-    '/dags/{fileName}',
-    {
-      params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-        },
-        path: {
-          fileName: fileName,
-        },
-      },
-    },
-    { refreshInterval: 2000 } // Refresh every 2 seconds
-  );
+  // localDags is passed from parent via SSE/polling - no need for redundant fetch
 
   // Update current value when data changes
   useEffect(() => {
@@ -273,7 +258,7 @@ function DAGSpec({ fileName }: Props) {
   }
 
   // Check if we have local DAGs
-  const hasLocalDags = dagDetails?.localDags && dagDetails.localDags.length > 0;
+  const hasLocalDags = localDags && localDags.length > 0;
 
   // Helper function to render DAG content (Graph, Attributes, Steps, Errors)
   const renderDAGContent = (
@@ -360,7 +345,7 @@ function DAGSpec({ fileName }: Props) {
                         >
                           {data?.dag?.name} (Parent)
                         </Tab>
-                        {dagDetails?.localDags?.map(
+                        {localDags?.map(
                           (localDag: components['schemas']['LocalDag']) => (
                             <Tab
                               key={localDag.name}
@@ -387,7 +372,7 @@ function DAGSpec({ fileName }: Props) {
                       )
                     );
                   }
-                  const selectedLocalDag = dagDetails?.localDags?.find(
+                  const selectedLocalDag = localDags?.find(
                     (ld: components['schemas']['LocalDag']) =>
                       ld.name === activeTab
                   );

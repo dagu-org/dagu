@@ -9,6 +9,7 @@ import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-d
 import QueueList from '../../features/queues/components/QueueList';
 import QueueMetrics from '../../features/queues/components/QueueMetrics';
 import { useQuery } from '../../hooks/api';
+import { useQueuesListSSE } from '../../hooks/useQueuesListSSE';
 import Title from '../../ui/Title';
 
 function Queues() {
@@ -86,7 +87,6 @@ function Queues() {
     searchState.writeState('queues', remoteKey, currentFilters);
   }, [currentFilters, remoteKey, searchState]);
 
-  // State for DAG run modal
   const [modalDAGRun, setModalDAGRun] = React.useState<{
     name: string;
     dagRunId: string;
@@ -96,7 +96,10 @@ function Queues() {
     appBarContext.setTitle('Queue Dashboard');
   }, [appBarContext]);
 
-  const { data, error, isLoading, mutate } = useQuery(
+  const sseResult = useQueuesListSSE(true);
+  const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
+
+  const { data: pollingData, error, isLoading, mutate } = useQuery(
     '/queues',
     {
       params: {
@@ -106,94 +109,63 @@ function Queues() {
       },
     },
     {
-      refreshInterval: 3000, // Refresh every 3 seconds for real-time updates
-      revalidateOnFocus: true,
-      revalidateOnReconnect: true,
+      refreshInterval: usePolling ? 3000 : 0,
+      revalidateOnFocus: usePolling,
+      revalidateOnReconnect: usePolling,
+      isPaused: () => !usePolling,
     }
   );
+
+  const data = sseResult.data || pollingData;
 
   async function handleRefresh(): Promise<void> {
     await mutate();
   }
 
-  // Filter queues based on search text and type
   const filteredQueues = React.useMemo(() => {
     if (!data?.queues) return [];
 
-    let filtered = data.queues;
+    const search = searchText.toLowerCase();
 
-    // Filter by search text
-    if (searchText) {
-      const search = searchText.toLowerCase();
-      filtered = filtered.filter((queue) =>
-        queue.name.toLowerCase().includes(search)
-      );
-    }
-
-    // Filter by queue type
-    if (selectedQueueType !== 'all') {
-      filtered = filtered.filter((queue) => queue.type === selectedQueueType);
-    }
-
-    // Sort alphabetically by queue name for stable display
-    return filtered.sort((a, b) => a.name.localeCompare(b.name));
+    return data.queues
+      .filter((queue) => {
+        if (searchText && !queue.name.toLowerCase().includes(search)) {
+          return false;
+        }
+        if (selectedQueueType !== 'all' && queue.type !== selectedQueueType) {
+          return false;
+        }
+        return true;
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [data?.queues, searchText, selectedQueueType]);
 
-  // Calculate metrics
   const metrics = React.useMemo(() => {
     const queues = data?.queues || [];
-
-    // Count queues by type
-    const globalQueues = queues.filter((q) => q.type === 'global').length;
-    const dagBasedQueues = queues.filter((q) => q.type === 'dag-based').length;
-
-    // Count active queues (those with running or queued items)
-    const activeQueues = queues.filter(
-      (q) => (q.runningCount || 0) > 0 || (q.queuedCount || 0) > 0
-    ).length;
-
-    const totalRunning = queues.reduce(
-      (sum, q) => sum + (q.runningCount || 0),
-      0
-    );
-    const totalQueued = queues.reduce(
-      (sum, q) => sum + (q.queuedCount || 0),
-      0
-    );
-    const totalActive = totalRunning + totalQueued;
-
-    // Calculate utilization for global queues only (DAG-based queues are isolated and don't compete for shared capacity)
     const globalQueuesList = queues.filter((q) => q.type === 'global');
-    const globalRunning = globalQueuesList.reduce(
-      (sum, q) => sum + (q.runningCount || 0),
-      0
-    );
+
+    const totalRunning = queues.reduce((sum, q) => sum + (q.runningCount || 0), 0);
+    const totalQueued = queues.reduce((sum, q) => sum + (q.queuedCount || 0), 0);
+
+    const globalRunning = globalQueuesList.reduce((sum, q) => sum + (q.runningCount || 0), 0);
     const globalCapacity = globalQueuesList
       .filter((q) => q.maxConcurrency)
       .reduce((sum, q) => sum + (q.maxConcurrency || 0), 0);
-    const utilization =
-      globalCapacity > 0
-        ? Math.round((globalRunning / globalCapacity) * 100)
-        : 0;
 
     return {
-      globalQueues,
-      dagBasedQueues,
-      activeQueues,
+      globalQueues: globalQueuesList.length,
+      dagBasedQueues: queues.filter((q) => q.type === 'dag-based').length,
+      activeQueues: queues.filter((q) => (q.runningCount || 0) > 0 || (q.queuedCount || 0) > 0).length,
       totalRunning,
       totalQueued,
-      totalActive,
-      utilization,
+      totalActive: totalRunning + totalQueued,
+      utilization: globalCapacity > 0 ? Math.round((globalRunning / globalCapacity) * 100) : 0,
     };
   }, [data?.queues]);
 
-  // Handle DAG run click
   const handleDAGRunClick = React.useCallback(
     (dagRun: components['schemas']['DAGRunSummary']) => {
-      setModalDAGRun({
-        name: dagRun.name,
-        dagRunId: dagRun.dagRunId,
-      });
+      setModalDAGRun({ name: dagRun.name, dagRunId: dagRun.dagRunId });
     },
     []
   );
@@ -215,7 +187,6 @@ function Queues() {
   return (
     <div className="flex flex-col gap-2 w-full h-full overflow-hidden">
       <Title>Queues</Title>
-      {/* Header with search and refresh */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 flex-shrink-0">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="flex items-center gap-2">
@@ -250,10 +221,8 @@ function Queues() {
         </div>
       </div>
 
-      {/* Metrics */}
       <QueueMetrics metrics={metrics} isLoading={isLoading} />
 
-      {/* Queue List */}
       <div className="flex-1 min-h-0 overflow-auto">
         <QueueList
           queues={filteredQueues}
@@ -263,7 +232,6 @@ function Queues() {
         />
       </div>
 
-      {/* DAG Run Details Modal */}
       {modalDAGRun && (
         <DAGRunDetailsModal
           name={modalDAGRun.name}

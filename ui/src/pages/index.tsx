@@ -19,6 +19,7 @@ import { DAGRunDetailsModal } from '../features/dag-runs/components/dag-run-deta
 import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
 import PathsCard from '../features/system-status/components/PathsCard';
 import { useQuery } from '../hooks/api';
+import { useDAGRunsListSSE } from '../hooks/useDAGRunsListSSE';
 import dayjs from '../lib/dayjs';
 import Title from '../ui/Title';
 
@@ -26,24 +27,37 @@ type DAGRunSummary = components['schemas']['DAGRunSummary'];
 
 type Metrics = Record<Status, number>;
 
-const initializeMetrics = (): Metrics => {
-  const initialMetrics: Partial<Metrics> = {};
-  const relevantStatuses = [
-    Status.Success,
-    Status.Failed,
-    Status.Running,
-    Status.Aborted,
-    Status.Queued,
-    Status.NotStarted,
-    Status.PartialSuccess,
-    Status.Waiting,
-    Status.Rejected,
-  ];
-  relevantStatuses.forEach((status: Status) => {
-    initialMetrics[status] = 0;
-  });
-  return initialMetrics as Metrics;
-};
+const TRACKED_STATUSES = [
+  Status.Success,
+  Status.Failed,
+  Status.Running,
+  Status.Aborted,
+  Status.Queued,
+  Status.NotStarted,
+  Status.PartialSuccess,
+  Status.Waiting,
+  Status.Rejected,
+] as const;
+
+function createEmptyMetrics(): Metrics {
+  const metrics: Partial<Metrics> = {};
+  for (const status of TRACKED_STATUSES) {
+    metrics[status] = 0;
+  }
+  return metrics as Metrics;
+}
+
+function getDayBounds(
+  date: dayjs.Dayjs,
+  tzOffsetInSec: number | undefined
+): { startOfDay: dayjs.Dayjs; endOfDay: dayjs.Dayjs } {
+  const adjusted =
+    tzOffsetInSec !== undefined ? date.utcOffset(tzOffsetInSec / 60) : date;
+  return {
+    startOfDay: adjusted.startOf('day'),
+    endOfDay: adjusted.endOf('day'),
+  };
+}
 
 function Dashboard(): React.ReactElement | null {
   const appBarContext = React.useContext(AppBarContext);
@@ -51,7 +65,6 @@ function Dashboard(): React.ReactElement | null {
   const searchState = useSearchState();
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
 
-  // State for DAG run modal
   const [modalDAGRun, setModalDAGRun] = React.useState<{
     name: string;
     dagRunId: string;
@@ -71,11 +84,7 @@ function Dashboard(): React.ReactElement | null {
     (a.dateRange.endDate ?? null) === (b.dateRange.endDate ?? null);
 
   const getDefaultDateRange = React.useCallback(() => {
-    const now = dayjs();
-    const startOfDay =
-      config.tzOffsetInSec !== undefined
-        ? now.utcOffset(config.tzOffsetInSec / 60).startOf('day')
-        : now.startOf('day');
+    const { startOfDay } = getDayBounds(dayjs(), config.tzOffsetInSec);
     return {
       startDate: startOfDay.unix(),
       endDate: undefined,
@@ -163,8 +172,20 @@ function Dashboard(): React.ReactElement | null {
     });
   };
 
-  // DAG runs data
-  const { data, error, isLoading, mutate } = useQuery(
+  const selectedDAGName = selectedDAGRun !== 'all' ? selectedDAGRun : undefined;
+
+  const sseResult = useDAGRunsListSSE(
+    {
+      fromDate: dateRange.startDate,
+      toDate: dateRange.endDate,
+      name: selectedDAGName,
+    },
+    true
+  );
+
+  const shouldPoll = sseResult.shouldUseFallback || !sseResult.isConnected;
+
+  const { data: pollingData, error, isLoading, mutate } = useQuery(
     '/dag-runs',
     {
       params: {
@@ -172,14 +193,17 @@ function Dashboard(): React.ReactElement | null {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
           fromDate: dateRange.startDate,
           toDate: dateRange.endDate,
-          name: selectedDAGRun !== 'all' ? selectedDAGRun : undefined,
+          name: selectedDAGName,
         },
       },
     },
     {
-      refreshInterval: 5000,
+      refreshInterval: shouldPoll ? 5000 : 0,
+      isPaused: () => !shouldPoll,
     }
   );
+
+  const data = sseResult.data ?? pollingData;
 
   const handleRefreshAll = async () => {
     await mutate();
@@ -188,14 +212,10 @@ function Dashboard(): React.ReactElement | null {
   const dagRunsList: DAGRunSummary[] = data?.dagRuns || [];
 
   const uniqueDAGRunNames = React.useMemo(() => {
-    const names = new Set<string>();
-    if (data && data.dagRuns) {
-      data.dagRuns.forEach((dagRun) => {
-        if (dagRun.name) {
-          names.add(dagRun.name);
-        }
-      });
-    }
+    if (!data?.dagRuns) return [];
+    const names = new Set(
+      data.dagRuns.map((dagRun) => dagRun.name).filter(Boolean)
+    );
     return Array.from(names).sort();
   }, [data]);
 
@@ -216,20 +236,15 @@ function Dashboard(): React.ReactElement | null {
     return <div className="p-4 text-error">Error: {errorMessage}</div>;
   }
 
-  const metrics = initializeMetrics();
+  const metrics = createEmptyMetrics();
   const totalDAGRuns = dagRunsList.length;
 
-  dagRunsList.forEach((dagRun) => {
-    if (
-      dagRun &&
-      Object.prototype.hasOwnProperty.call(metrics, dagRun.status)
-    ) {
-      const statusKey = dagRun.status as Status;
-      metrics[statusKey]! += 1;
+  for (const dagRun of dagRunsList) {
+    if (dagRun && dagRun.status in metrics) {
+      metrics[dagRun.status as Status] += 1;
     }
-  });
+  }
 
-  // Compute health indicators
   const hasFailures = metrics[Status.Failed] > 0;
   const hasRunning = metrics[Status.Running] > 0;
 
@@ -267,12 +282,7 @@ function Dashboard(): React.ReactElement | null {
               if (!newDate) return;
               const date = dayjs(newDate);
               if (!date.isValid()) return;
-              const startOfDay = config.tzOffsetInSec !== undefined
-                ? date.utcOffset(config.tzOffsetInSec / 60).startOf('day')
-                : date.startOf('day');
-              const endOfDay = config.tzOffsetInSec !== undefined
-                ? date.utcOffset(config.tzOffsetInSec / 60).endOf('day')
-                : date.endOf('day');
+              const { startOfDay, endOfDay } = getDayBounds(date, config.tzOffsetInSec);
               handleDateChange(startOfDay.unix(), endOfDay.unix());
             }}
             className="h-9 w-[150px]"
@@ -280,13 +290,7 @@ function Dashboard(): React.ReactElement | null {
           <Button
             variant="outline"
             onClick={() => {
-              const now = dayjs();
-              const startOfDay = config.tzOffsetInSec !== undefined
-                ? now.utcOffset(config.tzOffsetInSec / 60).startOf('day')
-                : now.startOf('day');
-              const endOfDay = config.tzOffsetInSec !== undefined
-                ? now.utcOffset(config.tzOffsetInSec / 60).endOf('day')
-                : now.endOf('day');
+              const { startOfDay, endOfDay } = getDayBounds(dayjs(), config.tzOffsetInSec);
               handleDateChange(startOfDay.unix(), endOfDay.unix());
             }}
           >

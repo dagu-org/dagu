@@ -151,7 +151,9 @@ func toDAGRunSummary(s exec.DAGRunStatus) api.DAGRunSummary {
 	}
 }
 
-func toDAGRunDetails(s exec.DAGRunStatus) api.DAGRunDetails {
+// ToDAGRunDetails converts a DAGRunStatus to its API representation.
+// This function is exported for use by the SSE package.
+func ToDAGRunDetails(s exec.DAGRunStatus) api.DAGRunDetails {
 	preconditions := make([]api.Condition, len(s.Preconditions))
 	for i, p := range s.Preconditions {
 		preconditions[i] = toPrecondition(p)

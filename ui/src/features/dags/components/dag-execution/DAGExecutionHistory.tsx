@@ -9,6 +9,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { components, NodeStatus, Status, Stream } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient, useQuery } from '../../../../hooks/api';
+import { useDAGHistorySSE } from '../../../../hooks/useDAGHistorySSE';
 import { toMermaidNodeId } from '../../../../lib/utils';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
@@ -38,8 +39,12 @@ function DAGExecutionHistory({
 }: Omit<Props, 'isInModal' | 'activeTab'>) {
   const appBarContext = React.useContext(AppBarContext);
 
-  // Fetch execution history data
-  const { data } = useQuery(
+  // SSE for real-time updates with polling fallback
+  const sseResult = useDAGHistorySSE(fileName, !!fileName);
+  const shouldPoll = sseResult.shouldUseFallback || !sseResult.isConnected;
+
+  // Fetch execution history data - use polling only as fallback
+  const { data: pollingData } = useQuery(
     '/dags/{fileName}/dag-runs',
     {
       params: {
@@ -51,8 +56,15 @@ function DAGExecutionHistory({
         },
       },
     },
-    { refreshInterval: 2000 } // Refresh every 2 seconds
+    {
+      refreshInterval: shouldPoll ? 2000 : 0,
+      keepPreviousData: true,
+      isPaused: () => !shouldPoll && sseResult.isConnected,
+    }
   );
+
+  // Use SSE data when available, otherwise fall back to polling
+  const data = sseResult.data || pollingData;
 
   // Show loading indicator while fetching data
   if (!data) {

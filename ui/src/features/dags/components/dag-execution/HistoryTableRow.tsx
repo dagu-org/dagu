@@ -30,8 +30,8 @@ function getStatusStyling(status: number) {
       borderColorClass = 'border-success';
       break;
     case Status.Failed: // 2 - failed -> red
-      bgColorClass = 'bg-danger';
-      borderColorClass = 'border-danger';
+      bgColorClass = 'bg-destructive';
+      borderColorClass = 'border-destructive';
       break;
     case Status.Running: // 1 - running -> green with pulse
       bgColorClass = 'bg-success';
@@ -79,9 +79,7 @@ function HistoryTableRow({ data, onSelect, idx }: Props) {
         return (
           <TableCell
             key={i}
-            onClick={() => {
-              onSelect(i);
-            }}
+            onClick={() => onSelect(i)}
             className={cn(
               'max-w-[22px] min-w-[22px] p-2 text-center cursor-pointer',
               'hover:bg-accent transition-all duration-200',
@@ -91,8 +89,7 @@ function HistoryTableRow({ data, onSelect, idx }: Props) {
             {status !== 0 && (
               <div
                 className={cn(
-                  'w-[12px] h-[12px] rounded-full border-[1.5px] transition-all duration-300 mx-auto',
-                  ' hover:scale-110',
+                  'w-[12px] h-[12px] rounded-full border-[1.5px] transition-all duration-300 mx-auto hover:scale-110',
                   bgColorClass,
                   borderColorClass,
                   pulseAnimation

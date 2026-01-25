@@ -239,6 +239,6 @@ func (er *entryReaderImpl) initialize(ctx context.Context) error {
 		}
 	}
 
-	logger.Info(ctx, "DAGs loaded", slog.String("dags", strings.Join(dags, ",")))
+	logger.Debug(ctx, "DAGs loaded", slog.String("dags", strings.Join(dags, ",")))
 	return nil
 }

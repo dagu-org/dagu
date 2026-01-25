@@ -15,6 +15,7 @@ import { TOKEN_KEY } from '../../../../contexts/AuthContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useUserPreferences } from '../../../../contexts/UserPreference';
 import { useQuery } from '../../../../hooks/api';
+import { useDAGRunLogsSSE } from '../../../../hooks/useDAGRunLogsSSE';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 
 // Extended Log type with pagination fields
@@ -26,10 +27,9 @@ interface LogWithPagination {
   isEstimate?: boolean;
 }
 
-// Calculate total pages based on total lines and page size
-const calculateTotalPages = (totalLines: number, pageSize: number): number => {
+function calculateTotalPages(totalLines: number, pageSize: number): number {
   return Math.ceil(totalLines / pageSize);
-};
+}
 
 /**
  * Props for the ExecutionLog component
@@ -65,13 +65,15 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
   const [currentPage, setCurrentPage] = useState(1);
   const [jumpToLine, setJumpToLine] = useState<number | ''>('');
 
-  // Check if the DAG is running
-  const statusValue = dagRun?.status;
-  const isRunningStatus = statusValue === Status.Running;
+  const isRunning = dagRun?.status === Status.Running;
+  const [isLiveMode, setIsLiveMode] = useState(isRunning);
 
-  // Default to live mode if explicitly running
-  const defaultLiveMode = isRunningStatus;
-  const [isLiveMode, setIsLiveMode] = useState(defaultLiveMode);
+  // Sync isLiveMode when run finishes
+  useEffect(() => {
+    if (!isRunning) {
+      setIsLiveMode(false);
+    }
+  }, [isRunning]);
 
   // Keep track of previous data to prevent flashing
   const [cachedData, setCachedData] = useState<LogWithPagination | null>(null);
@@ -89,6 +91,13 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
     dagRun.rootDAGRunName &&
     dagRun.rootDAGRunId !== dagRun.dagRunId;
 
+  // SSE is used for tail mode with live updates (not supported for sub-DAG runs)
+  const useSSE = viewMode === 'tail' && isLiveMode && !isSubDAGRun;
+  const sseResult = useDAGRunLogsSSE(name, dagRunId, useSSE, pageSize);
+
+  // Fall back to REST polling when SSE is unavailable or disconnected
+  const usePolling = !useSSE || sseResult.shouldUseFallback || !sseResult.isConnected;
+
   // Build query params based on view mode
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const tail = viewMode === 'tail' ? pageSize : undefined;
@@ -96,15 +105,15 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
   const offset = viewMode === 'page' ? (currentPage - 1) * pageSize + 1 : undefined;
   const limit = viewMode === 'page' ? pageSize : undefined;
 
-  // SWR options shared by both queries
+  // SWR options: only poll when SSE is unavailable
   const swrOptions = React.useMemo(
     () => ({
-      refreshInterval: isLiveMode ? 2000 : 0,
+      refreshInterval: usePolling && isLiveMode ? 2000 : 0,
       keepPreviousData: true,
       revalidateOnFocus: false,
       dedupingInterval: 1000,
     }),
-    [isLiveMode]
+    [isLiveMode, usePolling]
   );
 
   // Fetch sub-DAG-run log (only when isSubDAGRun is true)
@@ -153,59 +162,55 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
   // Use the appropriate query based on whether this is a sub-DAG-run
   const { data, isLoading, error, mutate } = isSubDAGRun ? subDAGQuery : dagRunQuery;
 
-  // Function to scroll to the bottom of the log container
+  // Transform SSE data to match LogWithPagination interface
+  const sseLogData: LogWithPagination | null =
+    useSSE && sseResult.data ? { ...sseResult.data.schedulerLog } : null;
+
   const scrollToBottom = useCallback(() => {
     if (logContainerRef.current) {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
   }, []);
 
-  // Combined effect to handle data loading and navigation state
+  // Handle data loading and navigation state
   useEffect(() => {
-    // When data is received, update cached data and reset navigation state
-    if (data) {
-      setCachedData(data as LogWithPagination);
+    const activeData = sseLogData || data;
+
+    if (activeData) {
+      setCachedData(activeData as LogWithPagination);
       setIsNavigating(false);
       isInitialLoad.current = false;
 
-      // Clear any pending navigation timeout
       if (navigationTimeoutRef.current) {
         clearTimeout(navigationTimeoutRef.current);
         navigationTimeoutRef.current = null;
       }
 
-      // Auto-scroll to bottom when in tail view mode
       if (viewMode === 'tail') {
-        // Use setTimeout to ensure the DOM has updated
         setTimeout(scrollToBottom, 100);
       }
     }
 
-    // When loading completes with no data but we have cached data
-    if (!isLoading && !data && cachedData && !isInitialLoad.current) {
+    if (!isLoading && !activeData && cachedData && !isInitialLoad.current) {
       setIsNavigating(false);
     }
-  }, [data, isLoading, cachedData, viewMode, scrollToBottom]);
+  }, [data, sseLogData, isLoading, cachedData, viewMode, scrollToBottom]);
 
-  // Set navigating state when changing view parameters
+  // Track navigation state when view parameters change
   useEffect(() => {
-    // Only set navigating state after initial load
     if (!isInitialLoad.current) {
       setIsNavigating(true);
 
-      // Clear any existing timeout
       if (navigationTimeoutRef.current) {
         clearTimeout(navigationTimeoutRef.current);
       }
 
-      // Set a new safety timeout
       navigationTimeoutRef.current = setTimeout(() => {
         setIsNavigating(false);
         navigationTimeoutRef.current = null;
-      }, 3000); // Shorter timeout for better UX
+      }, 3000);
     }
 
-    // Cleanup on unmount
     return () => {
       if (navigationTimeoutRef.current) {
         clearTimeout(navigationTimeoutRef.current);
@@ -214,61 +219,44 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
     };
   }, [viewMode, currentPage, pageSize]);
 
-  // Handle navigation actions
-  const handleViewModeChange = (mode: 'tail' | 'head' | 'page') => {
-    // If already in this mode, don't trigger a reload
+  function handleViewModeChange(mode: 'tail' | 'head' | 'page'): void {
     if (mode === viewMode) return;
-
     setViewMode(mode);
     setCurrentPage(1);
+  }
 
-    // If switching to tail view, scroll to bottom after data loads
-    // The scrolling will happen in the data effect
-  };
-
-  const handlePageChange = (newPage: number) => {
+  function handlePageChange(newPage: number): void {
     setCurrentPage(newPage);
-  };
+  }
 
-  const handleJumpToLine = () => {
-    if (
-      jumpToLine !== '' &&
-      jumpToLine > 0 &&
-      jumpToLine <= (cachedData?.totalLines || 0)
-    ) {
-      // Calculate the target page
-      const lineNum = jumpToLine as number;
-      const targetPage = Math.ceil(lineNum / pageSize);
-
-      // Set the page and view mode
-      setCurrentPage(targetPage);
-      setViewMode('page');
-
-      // After the data loads and the component re-renders, scroll to the specific line
-      // We need to use setTimeout to ensure the DOM has updated
-      setTimeout(() => {
-        // Find the line element by its line number
-        const lineElements = document.querySelectorAll('[data-line-number]');
-        for (let i = 0; i < lineElements.length; i++) {
-          const element = lineElements[i] as HTMLElement;
-          const lineNumber = parseInt(
-            element.getAttribute('data-line-number') || '0',
-            10
-          );
-          if (lineNumber === lineNum) {
-            // Scroll the element into view
-            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            // Highlight the line temporarily
-            element.classList.add('bg-primary/100', 'bg-opacity-20');
-            setTimeout(() => {
-              element.classList.remove('bg-primary/100', 'bg-opacity-20');
-            }, 2000);
-            break;
-          }
-        }
-      }, 500);
+  function handleJumpToLine(): void {
+    if (jumpToLine === '' || jumpToLine <= 0 || jumpToLine > (cachedData?.totalLines || 0)) {
+      return;
     }
-  };
+
+    const lineNum = jumpToLine;
+    const targetPage = Math.ceil(lineNum / pageSize);
+
+    setCurrentPage(targetPage);
+    setViewMode('page');
+
+    // Scroll to the line after DOM updates
+    setTimeout(() => {
+      const lineElements = document.querySelectorAll('[data-line-number]');
+      for (const element of lineElements) {
+        const htmlElement = element as HTMLElement;
+        const lineNumber = parseInt(htmlElement.getAttribute('data-line-number') || '0', 10);
+        if (lineNumber === lineNum) {
+          htmlElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          htmlElement.classList.add('bg-primary/20');
+          setTimeout(() => {
+            htmlElement.classList.remove('bg-primary/20');
+          }, 2000);
+          break;
+        }
+      }
+    }, 500);
+  }
 
   const handleDownload = useCallback(async () => {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -310,8 +298,8 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
     return <LoadingIndicator />;
   }
 
-  // Use cached data if available, otherwise use current data
-  const logData = (data || cachedData) as LogWithPagination;
+  // Prioritize SSE data, then REST data, then cached data
+  const logData = (sseLogData || data || cachedData) as LogWithPagination;
 
   // Handle error state (but not 404 - that just means no log file exists yet)
   if (error && !logData) {
@@ -343,15 +331,16 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
 
   const totalPages = calculateTotalPages(effectiveTotalLines, pageSize);
 
-  const getLineNumber = (index: number): number => {
-    if (viewMode === 'tail') {
-      return Math.max(1, effectiveTotalLines - lines.length + 1) + index;
-    } else if (viewMode === 'head') {
-      return index + 1;
-    } else {
-      return (currentPage - 1) * pageSize + index + 1;
+  function getLineNumber(index: number): number {
+    switch (viewMode) {
+      case 'tail':
+        return Math.max(1, effectiveTotalLines - lines.length + 1) + index;
+      case 'head':
+        return index + 1;
+      case 'page':
+        return (currentPage - 1) * pageSize + index + 1;
     }
-  };
+  }
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -432,8 +421,8 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
               <Download className="h-4 w-4" />
             </Button>
 
-            {/* Live mode toggle - only show when DAG is running */}
-            {isRunningStatus && (
+            {/* Live mode toggle - only visible when DAG is running */}
+            {isRunning && (
               <Button
                 size="sm"
                 variant={isLiveMode ? 'primary' : 'default'}
@@ -526,7 +515,7 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
         className={`flex-1 rounded-lg bg-slate-800 pt-4 pr-4 pb-4 relative ${preferences.logWrap ? 'overflow-auto' : 'overflow-x-auto overflow-y-auto'}`}
       >
         {isNavigating && (
-          <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-10 pointer-events-none">
+          <div className="absolute inset-0 bg-black/20 flex items-center justify-center z-10 pointer-events-none">
             <div className="bg-card rounded-lg p-2">
               <div className="h-5 w-5 animate-spin rounded-full border-3 border-primary border-t-transparent"></div>
             </div>

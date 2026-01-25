@@ -4,44 +4,50 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
+import { useDAGRunSSE } from '../../../../hooks/useDAGRunSSE';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGRunContext } from '../../contexts/DAGRunContext';
 import DAGRunDetailsContent from './DAGRunDetailsContent';
 
-type DAGRunDetailsPanelProps = {
+type Props = {
   name: string;
   dagRunId: string;
   onClose: () => void;
   onNavigate?: (direction: 'up' | 'down') => void;
 };
 
-const DAGRunDetailsPanel: React.FC<DAGRunDetailsPanelProps> = ({
+function DAGRunDetailsPanel({
   name,
   dagRunId,
   onClose,
   onNavigate,
-}) => {
+}: Props): React.ReactElement {
   const navigate = useNavigate();
   const appBarContext = React.useContext(AppBarContext);
 
-  // Check for sub DAG-run ID in URL search params
+  // Parse sub DAG-run params from URL
   const searchParams = new URLSearchParams(window.location.search);
   const subDAGRunId = searchParams.get('subDAGRunId');
   const parentDAGRunId = searchParams.get('dagRunId');
   const parentName = searchParams.get('dagRunName') || name;
+  const isSubDAGRun = Boolean(subDAGRunId && parentDAGRunId && parentName);
 
-  // Guard: only query sub-DAG endpoint when all required params are present
-  const canQuerySubDag = !!(subDAGRunId && parentDAGRunId && parentName);
+  // SSE for real-time updates (disabled for sub-DAG runs)
+  const sseResult = useDAGRunSSE(
+    name || '',
+    dagRunId || 'latest',
+    !isSubDAGRun
+  );
 
-  // Fetch sub-DAG-run details (only when all sub-DAG params are valid)
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+
+  // Sub-DAG query (only enabled for sub-DAG runs)
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
     {
       params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-        },
+        query: { remoteNode },
         path: {
           name: parentName as string,
           dagRunId: parentDAGRunId as string,
@@ -49,28 +55,34 @@ const DAGRunDetailsPanel: React.FC<DAGRunDetailsPanelProps> = ({
         },
       },
     },
-    { refreshInterval: 2000, keepPreviousData: true, isPaused: () => !canQuerySubDag }
+    { refreshInterval: 2000, keepPreviousData: true, isPaused: () => !isSubDAGRun }
   );
 
-  // Fetch regular DAG-run details (only when not querying sub-DAG)
+  // Regular DAG query (fallback when SSE is unavailable)
+  const sseIsActive = sseResult.isConnected && !sseResult.shouldUseFallback;
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}',
     {
       params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-        },
+        query: { remoteNode },
         path: {
           name: name || '',
           dagRunId: dagRunId || 'latest',
         },
       },
     },
-    { refreshInterval: 2000, keepPreviousData: true, isPaused: () => canQuerySubDag }
+    {
+      refreshInterval: sseIsActive ? 0 : 2000,
+      keepPreviousData: true,
+      isPaused: () => isSubDAGRun || sseIsActive,
+    }
   );
 
-  // Use the appropriate query based on whether this is a sub-DAG-run
-  const { data, mutate } = canQuerySubDag ? subDAGQuery : dagRunQuery;
+  // Select data source: sub-DAG query, SSE data, or polling query
+  const { mutate } = isSubDAGRun ? subDAGQuery : dagRunQuery;
+  const data = isSubDAGRun
+    ? subDAGQuery.data
+    : sseResult.data || dagRunQuery.data;
 
   // Keep track of last valid data to prevent flickering
   const [lastValidData, setLastValidData] = React.useState(data);
@@ -85,41 +97,48 @@ const DAGRunDetailsPanel: React.FC<DAGRunDetailsPanelProps> = ({
     setTimeout(() => mutate(), 500);
   }, [mutate]);
 
-  const handleFullscreenClick = (e?: React.MouseEvent) => {
-    const url = `/dag-runs/${name}/${dagRunId}`;
+  const handleFullscreenClick = React.useCallback(
+    (e?: React.MouseEvent) => {
+      const url = `/dag-runs/${name}/${dagRunId}`;
 
-    if (e && (e.metaKey || e.ctrlKey)) {
-      window.open(url, '_blank');
-    } else {
-      navigate(url);
-    }
-  };
+      if (e && (e.metaKey || e.ctrlKey)) {
+        window.open(url, '_blank');
+      } else {
+        navigate(url);
+      }
+    },
+    [name, dagRunId, navigate]
+  );
 
   // Keyboard shortcuts
   React.useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+    function handleKeyDown(event: KeyboardEvent): void {
       if (shouldIgnoreKeyboardShortcuts()) {
         return;
       }
 
-      if (event.key === 'Escape') {
-        onClose();
+      switch (event.key) {
+        case 'Escape':
+          onClose();
+          break;
+        case 'f':
+        case 'F':
+          handleFullscreenClick();
+          break;
+        case 'ArrowDown':
+          if (onNavigate) {
+            event.preventDefault();
+            onNavigate('down');
+          }
+          break;
+        case 'ArrowUp':
+          if (onNavigate) {
+            event.preventDefault();
+            onNavigate('up');
+          }
+          break;
       }
-
-      if (event.key === 'f' || event.key === 'F') {
-        handleFullscreenClick();
-      }
-
-      if (event.key === 'ArrowDown' && onNavigate) {
-        event.preventDefault();
-        onNavigate('down');
-      }
-
-      if (event.key === 'ArrowUp' && onNavigate) {
-        event.preventDefault();
-        onNavigate('up');
-      }
-    };
+    }
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {

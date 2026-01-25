@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { components } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
+import { useDAGSSE } from '../../../../hooks/useDAGSSE';
 import dayjs from '../../../../lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
@@ -12,17 +13,13 @@ import { DAGContext } from '../../contexts/DAGContext';
 import { RootDAGRunContext } from '../../contexts/RootDAGRunContext';
 import DAGDetailsContent from './DAGDetailsContent';
 
-type DAGDetailsModalProps = {
+type Props = {
   fileName: string;
   isOpen: boolean;
   onClose: () => void;
 };
 
-const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
-  fileName,
-  isOpen,
-  onClose,
-}) => {
+function DAGDetailsModal({ fileName, isOpen, onClose }: Props): React.ReactElement | null {
   const navigate = useNavigate();
   const appBarContext = React.useContext(AppBarContext);
   const [currentDAGRun, setCurrentDAGRun] = React.useState<
@@ -37,41 +34,50 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
     setActiveTab('status');
   }, []);
 
-  const { data, isLoading, mutate } = useQuery(
+  // SSE for real-time updates (only when modal is open)
+  const sseResult = useDAGSSE(fileName || '', isOpen && !!fileName);
+
+  // Polling fallback (only when SSE fails or not connected)
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
+
+  const { data: pollingData, mutate } = useQuery(
     '/dags/{fileName}',
     {
       params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-        },
-        path: {
-          fileName: fileName || '',
-        },
+        query: { remoteNode },
+        path: { fileName: fileName || '' },
       },
     },
-    { refreshInterval: 2000 }
+    {
+      refreshInterval: usePolling ? 2000 : 0,
+      keepPreviousData: true,
+      isPaused: () => !isOpen || (!usePolling && sseResult.isConnected),
+    }
   );
+
+  // Use SSE data when available, otherwise polling
+  const data = sseResult.data || pollingData;
 
   const refreshFn = React.useCallback(() => {
     setTimeout(() => mutate(), 500);
   }, [mutate]);
 
-  const handleFullscreenClick = (e?: React.MouseEvent) => {
-    // Determine the URL path based on the active tab
-    let url = `/dags/${fileName}`;
+  const handleFullscreenClick = React.useCallback(
+    (e?: React.MouseEvent) => {
+      const url =
+        activeTab === 'status'
+          ? `/dags/${fileName}`
+          : `/dags/${fileName}/${activeTab}`;
 
-    // Add the tab to the URL if it's not the default 'status' tab
-    if (activeTab !== 'status') {
-      url = `${url}/${activeTab}`;
-    }
-
-    // If Cmd (Mac) or Ctrl (Windows/Linux) key is pressed, open in new tab
-    if (e && (e.metaKey || e.ctrlKey)) {
-      window.open(url, '_blank');
-    } else {
-      navigate(url);
-    }
-  };
+      if (e?.metaKey || e?.ctrlKey) {
+        window.open(url, '_blank');
+      } else {
+        navigate(url);
+      }
+    },
+    [activeTab, fileName, navigate]
+  );
 
   React.useEffect(() => {
     if (data) {
@@ -79,24 +85,28 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
     }
   }, [data]);
 
-  // Add keyboard shortcuts
+  // Keyboard shortcuts
   React.useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Ignore shortcuts when user is editing text (typing in inputs, textareas, editors, etc.)
+    function handleKeyDown(event: KeyboardEvent): void {
       if (shouldIgnoreKeyboardShortcuts()) {
         return;
       }
 
-      // Close modal with Escape key
-      if (event.key === 'Escape') {
-        onClose();
+      // Don't capture browser shortcuts like Ctrl/Cmd+F
+      if (event.metaKey || event.ctrlKey) {
+        return;
       }
 
-      // Open in fullscreen with 'f' key
-      if (event.key === 'f' || event.key === 'F') {
-        handleFullscreenClick();
+      switch (event.key) {
+        case 'Escape':
+          onClose();
+          break;
+        case 'f':
+        case 'F':
+          handleFullscreenClick();
+          break;
       }
-    };
+    }
 
     if (isOpen) {
       window.addEventListener('keydown', handleKeyDown);
@@ -107,24 +117,24 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
     };
   }, [isOpen, onClose, handleFullscreenClick]);
 
-  const formatDuration = (startDate: string, endDate: string) => {
+  const formatDuration = (startDate: string, endDate: string): string => {
     if (!startDate || !endDate) return '--';
+
     const duration = dayjs.duration(dayjs(endDate).diff(dayjs(startDate)));
     const hours = Math.floor(duration.asHours());
     const minutes = duration.minutes();
     const seconds = duration.seconds();
 
-    if (hours > 0) {
-      return `${hours}h ${minutes}m ${seconds}s`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${seconds}s`;
-    }
+    if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+    if (minutes > 0) return `${minutes}m ${seconds}s`;
     return `${seconds}s`;
   };
 
   if (!isOpen) return null;
 
-  if (isLoading || !data || !data.latestDAGRun) {
+  // Show loading when no data is available
+  // Gate on dag existence, not latestDAGRun, so DAGs with no runs can still be displayed
+  if (!data?.dag) {
     return (
       <div className="fixed top-0 bottom-0 right-0 md:w-3/4 w-full h-screen bg-background border-l border-border z-50 flex items-center justify-center">
         <LoadingIndicator />
@@ -211,6 +221,7 @@ const DAGDetailsModal: React.FC<DAGDetailsModalProps> = ({
                     stepName={stepName}
                     isModal={true}
                     navigateToStatusTab={navigateToStatusTab}
+                    localDags={data?.localDags}
                   />
                 )}
               </div>

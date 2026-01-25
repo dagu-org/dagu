@@ -10,6 +10,7 @@ import {
 import { DAGContext } from '../../../features/dags/contexts/DAGContext';
 import { RootDAGRunContext } from '../../../features/dags/contexts/RootDAGRunContext';
 import { useQuery } from '../../../hooks/api';
+import { useDAGSSE } from '../../../hooks/useDAGSSE';
 import dayjs from '../../../lib/dayjs';
 
 type Params = {
@@ -34,6 +35,10 @@ function DAGDetails() {
   // Use remoteNode from URL if present, otherwise from app bar context
   const remoteNode = searchParams.get('remoteNode') || appBarContext.selectedRemoteNode || 'local';
   const fileName = params.fileName || '';
+
+  // SSE for real-time updates with polling fallback
+  const sseResult = useDAGSSE(fileName || '', !!fileName);
+  const shouldPoll = sseResult.shouldUseFallback || !sseResult.isConnected;
 
   // Determine active tab
   const tab = params.tab || 'status';
@@ -85,8 +90,8 @@ function DAGDetails() {
     [fileName, navigate, buildUrl]
   );
 
-  // Fetch DAG details
-  const { data: dagData, mutate: mutateDag } = useQuery(
+  // Fetch DAG details - use polling only as fallback when SSE is not connected
+  const { data: pollingDagData, mutate: mutateDag } = useQuery(
     '/dags/{fileName}',
     {
       params: {
@@ -95,9 +100,14 @@ function DAGDetails() {
       },
     },
     {
-      refreshInterval: 1000,
+      refreshInterval: shouldPoll ? 2000 : 0,
+      keepPreviousData: true,
+      isPaused: () => !shouldPoll && sseResult.isConnected,
     }
   );
+
+  // Use SSE data when available, otherwise fall back to polling
+  const dagData = sseResult.data || pollingDagData;
 
   // Use dagRunName from URL if available, otherwise use the name from dagData
   const dagRunName = queriedDAGRunName || dagData?.dag?.name || '';
@@ -117,7 +127,7 @@ function DAGDetails() {
     {
       isPaused: () =>
         (!dagRunName && !queriedDAGRunName) || !dagRunId || !!subDAGRunId,
-      refreshInterval: 1000,
+      refreshInterval: 2000,
     }
   );
 
@@ -135,7 +145,7 @@ function DAGDetails() {
       },
     },
     {
-      refreshInterval: 1000,
+      refreshInterval: 2000,
       isPaused: () => !subDAGRunId || !dagRunId || !dagRunName,
     }
   );
@@ -233,7 +243,8 @@ function DAGDetails() {
                 stepName={stepName}
                 isModal={false}
                 navigateToStatusTab={navigateToStatusTab}
-                skipHeader={true} // Skip header since we're rendering it separately
+                skipHeader={true}
+                localDags={dagData?.localDags}
               />
             )}
           </div>

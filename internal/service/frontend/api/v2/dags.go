@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"net/url"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -237,10 +240,12 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 	var loadErrs core.ErrorList
 	var errs []string
 
-	if errors.As(err, &loadErrs) {
-		errs = loadErrs.ToStringList()
-	} else {
-		return nil, err
+	if err != nil {
+		if errors.As(err, &loadErrs) {
+			errs = loadErrs.ToStringList()
+		} else {
+			return nil, err
+		}
 	}
 
 	// Log DAG spec update
@@ -335,7 +340,7 @@ func (a *API) GetDAGDAGRunHistory(ctx context.Context, request api.GetDAGDAGRunH
 
 	var dagRuns []api.DAGRunDetails
 	for _, status := range recentHistory {
-		dagRuns = append(dagRuns, toDAGRunDetails(status))
+		dagRuns = append(dagRuns, ToDAGRunDetails(status))
 	}
 
 	gridData := a.readHistoryData(ctx, recentHistory)
@@ -346,52 +351,57 @@ func (a *API) GetDAGDAGRunHistory(ctx context.Context, request api.GetDAGDAGRunH
 }
 
 func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsRequestObject) (api.GetDAGDetailsResponseObject, error) {
-	fileName := request.FileName
-	dag, err := a.dagStore.GetDetails(ctx, fileName, spec.WithAllowBuildErrors())
+	resp, err := a.getDAGDetailsData(ctx, request.FileName)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusNotFound,
 			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG %s not found", fileName),
+			Message:    err.Error(),
 		}
+	}
+	return resp, nil
+}
+
+// getDAGDetailsData returns DAG details data. Used by both HTTP handler and SSE fetcher.
+func (a *API) getDAGDetailsData(ctx context.Context, fileName string) (api.GetDAGDetails200JSONResponse, error) {
+	dag, err := a.dagStore.GetDetails(ctx, fileName, spec.WithAllowBuildErrors())
+	if err != nil {
+		return api.GetDAGDetails200JSONResponse{}, fmt.Errorf("DAG %s not found", fileName)
 	}
 
 	dagStatus, err := a.dagRunMgr.GetLatestStatus(ctx, dag)
-	if err != nil {
-		return nil, &Error{
-			HTTPStatus: http.StatusNotFound,
-			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG %s not found", fileName),
-		}
+	if err != nil && !errors.Is(err, exec.ErrNoStatusData) {
+		return api.GetDAGDetails200JSONResponse{}, fmt.Errorf("failed to get latest status for DAG %s", fileName)
 	}
+	// If ErrNoStatusData, dagStatus will be zero-value (empty), which is fine for DAGs with no runs
 
 	details := toDAGDetails(dag)
 
-	var localDAGs []api.LocalDag
+	localDAGs := make([]api.LocalDag, 0, len(dag.LocalDAGs))
 	for _, localDAG := range dag.LocalDAGs {
 		localDAGs = append(localDAGs, toLocalDAG(localDAG))
 	}
 
-	// sort localDAGs by name
 	sort.Slice(localDAGs, func(i, j int) bool {
-		return strings.Compare(localDAGs[i].Name, localDAGs[j].Name) <= 0
+		return localDAGs[i].Name < localDAGs[j].Name
 	})
-
-	// Extract build errors if any
-	var errs []string
-	if len(dag.BuildErrors) > 0 {
-		for _, buildErr := range dag.BuildErrors {
-			errs = append(errs, buildErr.Error())
-		}
-	}
 
 	return api.GetDAGDetails200JSONResponse{
 		Dag:          details,
-		LatestDAGRun: toDAGRunDetails(dagStatus),
+		LatestDAGRun: ToDAGRunDetails(dagStatus),
 		Suspended:    a.dagStore.IsSuspended(ctx, fileName),
 		LocalDags:    localDAGs,
-		Errors:       errs,
+		Errors:       extractBuildErrors(dag.BuildErrors),
 	}, nil
+}
+
+// extractBuildErrors converts a slice of errors to a slice of strings.
+func extractBuildErrors(errs []error) []string {
+	result := make([]string, 0, len(errs))
+	for _, e := range errs {
+		result = append(result, e.Error())
+	}
+	return result
 }
 
 func (a *API) readHistoryData(
@@ -582,7 +592,7 @@ func (a *API) GetDAGDAGRunDetails(ctx context.Context, request api.GetDAGDAGRunD
 			return nil, fmt.Errorf("error getting latest status: %w", err)
 		}
 		return &api.GetDAGDAGRunDetails200JSONResponse{
-			DagRun: toDAGRunDetails(latestStatus),
+			DagRun: ToDAGRunDetails(latestStatus),
 		}, nil
 	}
 
@@ -599,7 +609,7 @@ func (a *API) GetDAGDAGRunDetails(ctx context.Context, request api.GetDAGDAGRunD
 	}
 
 	return &api.GetDAGDAGRunDetails200JSONResponse{
-		DagRun: toDAGRunDetails(*dagStatus),
+		DagRun: ToDAGRunDetails(*dagStatus),
 	}, nil
 }
 
@@ -793,7 +803,7 @@ func (a *API) ExecuteDAGSync(ctx context.Context, request api.ExecuteDAGSyncRequ
 	}
 
 	return api.ExecuteDAGSync200JSONResponse{
-		DagRun: toDAGRunDetails(*dagStatus),
+		DagRun: ToDAGRunDetails(*dagStatus),
 	}, nil
 }
 
@@ -1256,4 +1266,114 @@ func (a *API) StopAllDAGRuns(ctx context.Context, request api.StopAllDAGRunsRequ
 	return &api.StopAllDAGRuns200JSONResponse{
 		Errors: errors,
 	}, nil
+}
+
+// SSE Data Methods for DAGs
+
+// GetDAGDetailsData returns DAG details for SSE.
+// Identifier format: "fileName"
+func (a *API) GetDAGDetailsData(ctx context.Context, fileName string) (any, error) {
+	return a.getDAGDetailsData(ctx, fileName)
+}
+
+// GetDAGHistoryData returns DAG execution history for SSE.
+// Identifier format: "fileName"
+func (a *API) GetDAGHistoryData(ctx context.Context, fileName string) (any, error) {
+	dag, err := a.dagStore.GetMetadata(ctx, fileName)
+	var dagName string
+	if err != nil {
+		dagName = fileName
+	} else {
+		dagName = dag.Name
+	}
+
+	defaultHistoryLimit := 30
+	recentHistory := a.dagRunMgr.ListRecentStatus(ctx, dagName, defaultHistoryLimit)
+
+	var dagRuns []api.DAGRunDetails
+	for _, status := range recentHistory {
+		dagRuns = append(dagRuns, ToDAGRunDetails(status))
+	}
+
+	gridData := a.readHistoryData(ctx, recentHistory)
+	return api.GetDAGDAGRunHistory200JSONResponse{
+		DagRuns:  dagRuns,
+		GridData: gridData,
+	}, nil
+}
+
+// GetDAGsListData returns DAGs list for SSE.
+// Identifier format: URL query string (e.g., "page=1&perPage=100&name=mydag")
+func (a *API) GetDAGsListData(ctx context.Context, queryString string) (any, error) {
+	params, err := url.ParseQuery(queryString)
+	if err != nil {
+		logger.Warn(ctx, "Failed to parse query string for DAGs list",
+			tag.Error(err),
+			slog.String("queryString", queryString),
+		)
+	}
+
+	page := parseIntParam(params.Get("page"), 1)
+	perPage := parseIntParam(params.Get("perPage"), 100)
+
+	sortField := params.Get("sort")
+	if sortField == "" {
+		sortField = "name"
+	}
+	sortOrder := params.Get("order")
+	if sortOrder == "" {
+		sortOrder = "asc"
+	}
+
+	var tags []string
+	if tagsParam := params.Get("tags"); tagsParam != "" {
+		tags = parseCommaSeparatedTags(&tagsParam)
+	}
+
+	pg := exec.NewPaginator(page, perPage)
+	listOpts := exec.ListDAGsOptions{
+		Paginator: &pg,
+		Name:      params.Get("name"),
+		Tags:      tags,
+		Sort:      sortField,
+		Order:     sortOrder,
+	}
+
+	result, errList, err := a.dagStore.List(ctx, listOpts)
+	if err != nil {
+		return nil, fmt.Errorf("error listing DAGs: %w", err)
+	}
+
+	dagFiles := make([]api.DAGFile, 0, len(result.Items))
+	for _, item := range result.Items {
+		dagStatus, statusErr := a.dagRunMgr.GetLatestStatus(ctx, item)
+		dagFile := api.DAGFile{
+			FileName:     item.FileName(),
+			LatestDAGRun: toDAGRunSummary(dagStatus),
+			Suspended:    a.dagStore.IsSuspended(ctx, item.FileName()),
+			Dag:          toDAG(item),
+			Errors:       extractBuildErrors(item.BuildErrors),
+		}
+		if statusErr != nil {
+			errList = append(errList, statusErr.Error())
+		}
+		dagFiles = append(dagFiles, dagFile)
+	}
+
+	return api.ListDAGs200JSONResponse{
+		Dags:       dagFiles,
+		Errors:     errList,
+		Pagination: toPagination(result),
+	}, nil
+}
+
+// parseIntParam parses an integer string, returning defaultVal if parsing fails or value is <= 0.
+func parseIntParam(s string, defaultVal int) int {
+	if s == "" {
+		return defaultVal
+	}
+	if v, err := strconv.Atoi(s); err == nil && v > 0 {
+		return v
+	}
+	return defaultVal
 }

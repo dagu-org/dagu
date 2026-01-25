@@ -15,6 +15,7 @@ import { TOKEN_KEY } from '../../../../contexts/AuthContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useUserPreferences } from '../../../../contexts/UserPreference';
 import { useQuery } from '../../../../hooks/api';
+import { useStepLogSSE } from '../../../../hooks/useStepLogSSE';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 
 // Extended Log type with pagination fields
@@ -26,10 +27,9 @@ interface LogWithPagination {
   isEstimate?: boolean;
 }
 
-// Calculate total pages based on total lines and page size
-const calculateTotalPages = (totalLines: number, pageSize: number): number => {
+function calculateTotalPages(totalLines: number, pageSize: number): number {
   return Math.ceil(totalLines / pageSize);
-};
+}
 
 /**
  * Props for the StepLog component
@@ -77,46 +77,48 @@ function StepLog({
   const [pageSize, setPageSize] = useState(1000);
   const [currentPage, setCurrentPage] = useState(1);
   const [jumpToLine, setJumpToLine] = useState<number | ''>('');
-  // Check if the node is running
   const isRunning = node?.status === NodeStatus.Running;
 
   const [isLiveMode, setIsLiveMode] = useState(isRunning);
 
-  // Keep track of previous data to prevent flashing
   const [cachedData, setCachedData] = useState<LogWithPagination | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
 
-  // Refs to track component state
   const isInitialLoad = useRef(true);
   const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
-  // Determine if this is a sub DAG-run - check both rootDAGRunId AND rootDAGRunName
   const isSubDAGRun =
     dagRun &&
     dagRun.rootDAGRunId &&
     dagRun.rootDAGRunName &&
     dagRun.rootDAGRunId !== dagRun.dagRunId;
 
-  // Build query params based on view mode
+  // SSE is used for real-time updates when viewing tail of a running step (not sub-DAG runs)
+  const shouldUseSSE = viewMode === 'tail' && isLiveMode && isRunning && !isSubDAGRun;
+  const sseResult = useStepLogSSE(dagName, dagRunId, stepName, shouldUseSSE);
+  const sseIsActive = shouldUseSSE && sseResult.isConnected && !sseResult.shouldUseFallback;
+
+  // Fall back to REST polling when SSE is not available or not connected
+  const usePolling = !sseIsActive;
+
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const tail = viewMode === 'tail' ? pageSize : undefined;
   const head = viewMode === 'head' ? pageSize : undefined;
   const offset = viewMode === 'page' ? (currentPage - 1) * pageSize + 1 : undefined;
   const limit = viewMode === 'page' ? pageSize : undefined;
 
-  // SWR options shared by both queries - memoized to prevent unnecessary re-renders
+  // SWR options - poll only when SSE is not available
   const swrOptions = React.useMemo(
     () => ({
-      refreshInterval: isLiveMode && isRunning ? 2000 : 0,
+      refreshInterval: usePolling && isLiveMode && isRunning ? 2000 : 0,
       keepPreviousData: true,
       revalidateOnFocus: false,
       dedupingInterval: 1000,
     }),
-    [isLiveMode, isRunning]
+    [isLiveMode, isRunning, usePolling]
   );
 
-  // Fetch sub-DAG-run step log (only when isSubDAGRun is true)
   const subDAGQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log',
     {
@@ -140,7 +142,6 @@ function StepLog({
     { ...swrOptions, isPaused: () => !isSubDAGRun }
   );
 
-  // Fetch regular DAG-run step log (only when isSubDAGRun is false)
   const dagRunQuery = useQuery(
     '/dag-runs/{name}/{dagRunId}/steps/{stepName}/log',
     {
@@ -163,62 +164,68 @@ function StepLog({
     { ...swrOptions, isPaused: () => !!isSubDAGRun }
   );
 
-  // Use the appropriate query based on whether this is a sub-DAG-run
   const { data, isLoading, error, mutate } = isSubDAGRun ? subDAGQuery : dagRunQuery;
 
-  // Function to scroll to the bottom of the log container
+  // Transform SSE data to LogWithPagination format when available
+  const sseLogData: LogWithPagination | null = sseIsActive && sseResult.data
+    ? {
+        content: stream === Stream.stdout
+          ? sseResult.data.stdoutContent
+          : sseResult.data.stderrContent,
+        lineCount: sseResult.data.lineCount,
+        totalLines: sseResult.data.totalLines,
+        hasMore: sseResult.data.hasMore,
+      }
+    : null;
+
   const scrollToBottom = useCallback(() => {
     if (logContainerRef.current) {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
   }, []);
 
-  // Combined effect to handle data loading and navigation state
+  // Handle data updates from either SSE or REST API
   useEffect(() => {
-    // When data is received, update cached data and reset navigation state
-    if (data) {
-      setCachedData(data as LogWithPagination);
+    const activeData = sseLogData || data;
+
+    if (activeData) {
+      setCachedData(activeData as LogWithPagination);
       setIsNavigating(false);
       isInitialLoad.current = false;
 
-      // Clear any pending navigation timeout
       if (navigationTimeoutRef.current) {
         clearTimeout(navigationTimeoutRef.current);
         navigationTimeoutRef.current = null;
       }
 
-      // Auto-scroll to bottom when in tail view mode
       if (viewMode === 'tail') {
-        // Use setTimeout to ensure the DOM has updated
         setTimeout(scrollToBottom, 100);
       }
+      return;
     }
 
-    // When loading completes with no data but we have cached data
-    if (!isLoading && !data && cachedData && !isInitialLoad.current) {
+    // Reset navigation state when loading completes without data
+    if (!isLoading && cachedData && !isInitialLoad.current) {
       setIsNavigating(false);
     }
-  }, [data, isLoading, cachedData, viewMode, scrollToBottom]);
+  }, [data, sseLogData, isLoading, cachedData, viewMode, scrollToBottom]);
 
-  // Set navigating state when changing view parameters
+  // Set navigating state when view parameters change (after initial load)
   useEffect(() => {
-    // Only set navigating state after initial load
-    if (!isInitialLoad.current) {
-      setIsNavigating(true);
+    if (isInitialLoad.current) return;
 
-      // Clear any existing timeout
-      if (navigationTimeoutRef.current) {
-        clearTimeout(navigationTimeoutRef.current);
-      }
+    setIsNavigating(true);
 
-      // Set a new safety timeout
-      navigationTimeoutRef.current = setTimeout(() => {
-        setIsNavigating(false);
-        navigationTimeoutRef.current = null;
-      }, 3000); // Shorter timeout for better UX
+    if (navigationTimeoutRef.current) {
+      clearTimeout(navigationTimeoutRef.current);
     }
 
-    // Cleanup on unmount
+    // Safety timeout to prevent stuck navigation state
+    navigationTimeoutRef.current = setTimeout(() => {
+      setIsNavigating(false);
+      navigationTimeoutRef.current = null;
+    }, 3000);
+
     return () => {
       if (navigationTimeoutRef.current) {
         clearTimeout(navigationTimeoutRef.current);
@@ -227,61 +234,44 @@ function StepLog({
     };
   }, [viewMode, currentPage, pageSize]);
 
-  // Handle navigation actions
-  const handleViewModeChange = (mode: 'tail' | 'head' | 'page') => {
-    // If already in this mode, don't trigger a reload
+  function handleViewModeChange(mode: 'tail' | 'head' | 'page'): void {
     if (mode === viewMode) return;
-
     setViewMode(mode);
     setCurrentPage(1);
+  }
 
-    // If switching to tail view, scroll to bottom after data loads
-    // The scrolling will happen in the data effect
-  };
-
-  const handlePageChange = (newPage: number) => {
+  function handlePageChange(newPage: number): void {
     setCurrentPage(newPage);
-  };
+  }
 
-  const handleJumpToLine = () => {
-    if (
-      jumpToLine !== '' &&
-      jumpToLine > 0 &&
-      jumpToLine <= (cachedData?.totalLines || 0)
-    ) {
-      // Calculate the target page
-      const lineNum = jumpToLine as number;
-      const targetPage = Math.ceil(lineNum / pageSize);
-
-      // Set the page and view mode
-      setCurrentPage(targetPage);
-      setViewMode('page');
-
-      // After the data loads and the component re-renders, scroll to the specific line
-      // We need to use setTimeout to ensure the DOM has updated
-      setTimeout(() => {
-        // Find the line element by its line number
-        const lineElements = document.querySelectorAll('[data-line-number]');
-        for (let i = 0; i < lineElements.length; i++) {
-          const element = lineElements[i] as HTMLElement;
-          const lineNumber = parseInt(
-            element.getAttribute('data-line-number') || '0',
-            10
-          );
-          if (lineNumber === lineNum) {
-            // Scroll the element into view
-            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            // Highlight the line temporarily
-            element.classList.add('bg-primary/100', 'bg-opacity-20');
-            setTimeout(() => {
-              element.classList.remove('bg-primary/100', 'bg-opacity-20');
-            }, 2000);
-            break;
-          }
-        }
-      }, 500);
+  function handleJumpToLine(): void {
+    if (jumpToLine === '' || jumpToLine < 1 || jumpToLine > (cachedData?.totalLines || 0)) {
+      return;
     }
-  };
+
+    const lineNum = jumpToLine as number;
+    const targetPage = Math.ceil(lineNum / pageSize);
+
+    setCurrentPage(targetPage);
+    setViewMode('page');
+
+    // Scroll to the specific line after DOM update
+    setTimeout(() => {
+      const lineElements = document.querySelectorAll('[data-line-number]');
+      for (const element of lineElements) {
+        const htmlElement = element as HTMLElement;
+        const lineNumber = parseInt(htmlElement.getAttribute('data-line-number') || '0', 10);
+        if (lineNumber === lineNum) {
+          htmlElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          htmlElement.classList.add('bg-primary/20');
+          setTimeout(() => {
+            htmlElement.classList.remove('bg-primary/20');
+          }, 2000);
+          break;
+        }
+      }
+    }, 500);
+  }
 
   const handleDownload = useCallback(async () => {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -319,53 +309,47 @@ function StepLog({
     }
   }, [config.apiURL, dagName, dagRunId, stepName, stream, dagRun, isSubDAGRun, remoteNode]);
 
-  // Show loading indicator only on initial load
   if (isLoading && !cachedData && isInitialLoad.current) {
     return <LoadingIndicator />;
   }
 
-  // Use cached data if available, otherwise use current data
-  const logData = (data || cachedData) as LogWithPagination;
+  // Prioritize SSE data, then REST data, then cached data
+  const logData = (sseLogData || data || cachedData) as LogWithPagination;
 
-  // Handle error state (but not 404 - that just means no log file exists yet)
-  if (error && !logData) {
-    const isNotFound = error.message?.includes('not found');
-    if (!isNotFound) {
-      return (
-        <div className="w-full h-full flex items-center justify-center">
-          <div className="text-error">
-            Error loading log data: {error.message || 'Unknown error'}
-          </div>
+  // Show error state (but not 404 since that means no log file exists yet)
+  const isNotFoundError = error?.message?.includes('not found');
+  if (error && !logData && !isNotFoundError) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="text-error">
+          Error loading log data: {error.message || 'Unknown error'}
         </div>
-      );
-    }
+      </div>
+    );
   }
 
-  // Process log data
   const content =
     logData?.content.replace(new RegExp(ANSI_CODES_REGEX, 'g'), '') || '';
   const totalLines = logData?.totalLines || 0;
   const hasMore = logData?.hasMore || false;
   const isEstimate = logData?.isEstimate || false;
 
-  // Split content into lines, removing trailing empty line from trailing newline
   const rawLines = content ? content.split('\n') : ['<No log output>'];
   const lines = rawLines[rawLines.length - 1] === '' ? rawLines.slice(0, -1) : rawLines;
-
-  // API may count trailing newline as extra line; use lines.length if within 1
   const effectiveTotalLines = (totalLines - lines.length <= 1) ? lines.length : totalLines;
 
   const totalPages = calculateTotalPages(effectiveTotalLines, pageSize);
 
-  const getLineNumber = (index: number): number => {
-    if (viewMode === 'tail') {
-      return Math.max(1, effectiveTotalLines - lines.length + 1) + index;
-    } else if (viewMode === 'head') {
-      return index + 1;
-    } else {
-      return (currentPage - 1) * pageSize + index + 1;
+  function getLineNumber(index: number): number {
+    switch (viewMode) {
+      case 'tail':
+        return Math.max(1, effectiveTotalLines - lines.length + 1) + index;
+      case 'head':
+        return index + 1;
+      case 'page':
+        return (currentPage - 1) * pageSize + index + 1;
     }
-  };
+  }
 
   return (
     <div className="w-full h-full flex flex-col">

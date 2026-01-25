@@ -17,6 +17,7 @@ import { DAGErrors } from '../../features/dags/components/dag-editor';
 import { DAGTable } from '../../features/dags/components/dag-list';
 import DAGListHeader from '../../features/dags/components/dag-list/DAGListHeader';
 import { useQuery } from '../../hooks/api';
+import { useDAGsListSSE } from '../../hooks/useDAGsListSSE';
 import LoadingIndicator from '../../ui/LoadingIndicator';
 
 type DAGDefinitionsFilters = {
@@ -191,27 +192,42 @@ function DAGsContent() {
     updatePreference('pageLimit', newLimit);
   };
 
-  const { data, mutate, isLoading } = useQuery(
+  const queryParams = React.useMemo(
+    () => ({
+      page,
+      perPage: preferences.pageLimit || 200,
+      name: apiSearchText || undefined,
+      tags: apiSearchTags.length > 0 ? apiSearchTags.join(',') : undefined,
+      sort: sortField,
+      order: sortOrder,
+    }),
+    [page, preferences.pageLimit, apiSearchText, apiSearchTags, sortField, sortOrder]
+  );
+
+  const sseResult = useDAGsListSSE(queryParams, true);
+  const usePolling = sseResult.shouldUseFallback || !sseResult.isConnected;
+
+  const { data: pollingData, mutate, isLoading } = useQuery(
     '/dags',
     {
       params: {
         query: {
-          page,
-          perPage: preferences.pageLimit || 200,
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-          name: apiSearchText ? apiSearchText : undefined,
-          tags: apiSearchTags.length > 0 ? apiSearchTags.join(',') : undefined,
+          ...queryParams,
+          remoteNode,
           sort: sortField as PathsDagsGetParametersQuerySort,
           order: sortOrder as PathsDagsGetParametersQueryOrder,
         },
       },
     },
     {
-      refreshInterval: 1000,
+      refreshInterval: usePolling ? 2000 : 0,
       revalidateIfStale: false,
       keepPreviousData: true,
+      isPaused: () => !usePolling,
     }
   );
+
+  const data = sseResult.data ?? pollingData;
 
   const addSearchParam = (key: string, value: string | string[]) => {
     const locationQuery = new URLSearchParams(window.location.search);
@@ -244,19 +260,10 @@ function DAGsContent() {
   }, [appBarContext]);
 
   const { dagFiles, errorCount } = React.useMemo(() => {
-    const dagFiles: components['schemas']['DAGFile'][] = [];
-    let errorCount = 0;
-    if (data && data.dags) {
-      for (const val of data.dags) {
-        dagFiles.push(val);
-        if (val.errors?.length) {
-          errorCount += 1;
-        }
-      }
-    }
+    const dags = data?.dags ?? [];
     return {
-      dagFiles,
-      errorCount,
+      dagFiles: dags,
+      errorCount: dags.filter((dag) => dag.errors?.length).length,
     };
   }, [data]);
 
@@ -313,7 +320,7 @@ function DAGsContent() {
     }
   }, [data]);
 
-  const displayData = data || lastValidData;
+  const displayData = data ?? lastValidData;
 
   const leftPanel = (
     <div className="pr-2 pt-4 md:pt-6 lg:pt-8">
@@ -328,7 +335,7 @@ function DAGsContent() {
             }
           />
           <DAGTable
-            dags={isLoading ? (lastValidData ? dagFiles : []) : dagFiles}
+            dags={isLoading && !lastValidData ? [] : dagFiles}
             group={group}
             refreshFn={refreshFn}
             searchText={searchText}

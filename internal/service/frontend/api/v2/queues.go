@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/cmn/config"
@@ -275,4 +277,86 @@ func findGlobalQueueConfig(queueName string, cfg *config.Config) *config.QueueCo
 		}
 	}
 	return nil
+}
+
+// SSE Data Methods for Queues
+
+// QueueItemsResponse represents the response for queue items SSE.
+type QueueItemsResponse struct {
+	Running []api.DAGRunSummary `json:"running"`
+	Queued  []api.DAGRunSummary `json:"queued"`
+}
+
+// GetQueuesListData returns queue list for SSE.
+// Identifier format: URL query string (ignored for now)
+func (a *API) GetQueuesListData(ctx context.Context, _ string) (any, error) {
+	response, err := a.ListQueues(ctx, api.ListQueuesRequestObject{})
+	if err != nil {
+		return nil, fmt.Errorf("error listing queues: %w", err)
+	}
+	return response, nil
+}
+
+// GetQueueItemsData returns queue items for SSE.
+// Identifier format: "queueName"
+func (a *API) GetQueueItemsData(ctx context.Context, queueName string) (any, error) {
+	// Initialize slices with make() to avoid null JSON payloads
+	running := make([]api.DAGRunSummary, 0)
+	queued := make([]api.DAGRunSummary, 0)
+
+	// Get running items from proc store
+	runningByGroup, err := a.procStore.ListAllAlive(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list running processes: %w", err)
+	}
+
+	// Use fetchDAGRunSummary helper to avoid code duplication
+	for _, dagRun := range runningByGroup[queueName] {
+		summary, err := a.fetchDAGRunSummary(ctx, dagRun)
+		if err != nil {
+			logger.Warn(ctx, "Failed to fetch running DAG run summary",
+				tag.Error(err),
+				slog.String("queue", queueName),
+				slog.String("dagRunId", dagRun.ID),
+			)
+			continue
+		}
+		running = append(running, summary)
+	}
+
+	// Get queued items
+	queuedItems, err := a.queueStore.List(ctx, queueName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list queued items: %w", err)
+	}
+
+	for _, queuedItem := range queuedItems {
+		dagRunRef, err := queuedItem.Data()
+		if err != nil {
+			logger.Warn(ctx, "Failed to parse queued item data",
+				tag.Error(err),
+				slog.String("queue", queueName),
+			)
+			continue
+		}
+		summary, err := a.fetchDAGRunSummary(ctx, *dagRunRef)
+		if err != nil {
+			logger.Warn(ctx, "Failed to fetch queued DAG run summary",
+				tag.Error(err),
+				slog.String("queue", queueName),
+				slog.String("dagRunId", dagRunRef.ID),
+			)
+			continue
+		}
+		// Skip running items to avoid duplication
+		if summary.Status == api.StatusRunning {
+			continue
+		}
+		queued = append(queued, summary)
+	}
+
+	return QueueItemsResponse{
+		Running: running,
+		Queued:  queued,
+	}, nil
 }
