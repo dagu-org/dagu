@@ -24,18 +24,18 @@ const (
 // It uses a pluggable FetchFunc to retrieve data, making it
 // generic across different data sources.
 type Watcher struct {
-	identifier   string
-	topicType    TopicType
-	fetcher      FetchFunc
-	clients      map[*Client]struct{}
-	mu           sync.RWMutex
+	identifier        string
+	topicType         TopicType
+	fetcher           FetchFunc
+	clients           map[*Client]struct{}
+	mu                sync.RWMutex
 	lastBroadcastHash string
-	stopCh       chan struct{}
-	stopped      bool
-	errorBackoff backoff.Retrier
-	backoffUntil time.Time
-	metrics      *Metrics
-	wg           sync.WaitGroup
+	stopCh            chan struct{}
+	stopped           bool
+	errorBackoff      backoff.Retrier
+	backoffUntil      time.Time
+	metrics           *Metrics
+	wg                sync.WaitGroup
 
 	// Adaptive polling interval fields
 	baseInterval    time.Duration
