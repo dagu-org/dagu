@@ -92,7 +92,9 @@ func (w *Watcher) poll(ctx context.Context) {
 		// Calculate next backoff interval
 		interval, _ := w.errorBackoff.Next(err)
 		w.backoffUntil = time.Now().Add(interval)
-		w.metrics.FetchError(string(w.topicType))
+		if w.metrics != nil {
+			w.metrics.FetchError(string(w.topicType))
+		}
 		w.broadcast(&Event{Type: EventTypeError, Data: err.Error()})
 		return
 	}
@@ -122,7 +124,7 @@ func (w *Watcher) broadcast(event *Event) {
 	for client := range w.clients {
 		if !client.Send(event) {
 			go client.Close() // Buffer full
-		} else {
+		} else if w.metrics != nil {
 			w.metrics.MessageSent(event.Type)
 		}
 	}

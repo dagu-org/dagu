@@ -18,10 +18,10 @@ import DAGDetailsContent from './DAGDetailsContent';
 const POLLING_INTERVAL_MS = 2000;
 
 function getPollingInterval(notFound: boolean, shouldPoll: boolean): number {
-  if (notFound) {
+  if (notFound || !shouldPoll) {
     return 0;
   }
-  return shouldPoll ? POLLING_INTERVAL_MS : 0;
+  return POLLING_INTERVAL_MS;
 }
 
 type Props = {
