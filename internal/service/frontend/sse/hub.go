@@ -40,6 +40,7 @@ type Hub struct {
 	ctx             context.Context
 	cancel          context.CancelFunc
 	metrics         *Metrics
+	started         bool
 }
 
 // NewHub creates a new SSE hub.
@@ -70,7 +71,14 @@ func (h *Hub) RegisterFetcher(topicType TopicType, fetcher FetchFunc) {
 }
 
 // Start begins the hub's background tasks (heartbeat, etc.)
+// Safe to call multiple times; only the first call has effect.
 func (h *Hub) Start() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.started {
+		return
+	}
+	h.started = true
 	h.heartbeatTicker = time.NewTicker(10 * time.Second)
 	go h.heartbeatLoop()
 }

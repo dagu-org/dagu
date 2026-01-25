@@ -27,6 +27,7 @@ type Watcher struct {
 	errorBackoff backoff.Retrier
 	backoffUntil time.Time
 	metrics      *Metrics
+	wg           sync.WaitGroup
 }
 
 // NewWatcher creates a new watcher for the given topic.
@@ -52,6 +53,9 @@ func NewWatcher(identifier string, fetcher FetchFunc, topicType TopicType, metri
 
 // Start begins polling for data changes and broadcasts updates to clients.
 func (w *Watcher) Start(ctx context.Context) {
+	w.wg.Add(1)
+	defer w.wg.Done()
+
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
@@ -69,15 +73,15 @@ func (w *Watcher) Start(ctx context.Context) {
 	}
 }
 
-// Stop signals the watcher to stop polling.
+// Stop signals the watcher to stop polling and waits for it to finish.
 func (w *Watcher) Stop() {
 	w.mu.Lock()
-	defer w.mu.Unlock()
-
 	if !w.stopped {
 		w.stopped = true
 		close(w.stopCh)
 	}
+	w.mu.Unlock()
+	w.wg.Wait()
 }
 
 // poll fetches the current data and broadcasts if changed.
@@ -123,7 +127,7 @@ func (w *Watcher) broadcast(event *Event) {
 
 	for client := range w.clients {
 		if !client.Send(event) {
-			go client.Close() // Buffer full
+			client.Close()
 		} else if w.metrics != nil {
 			w.metrics.MessageSent(event.Type)
 		}

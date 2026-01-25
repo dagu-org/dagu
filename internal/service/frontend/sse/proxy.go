@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 )
@@ -30,10 +31,14 @@ func (h *Handler) proxyToRemoteNode(w http.ResponseWriter, r *http.Request, node
 	applyNodeAuth(req, node)
 
 	client := &http.Client{
+		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: node.SkipTLSVerify, //nolint:gosec
 			},
+			MaxIdleConns:       10,
+			IdleConnTimeout:    90 * time.Second,
+			DisableCompression: true,
 		},
 	}
 
@@ -143,6 +148,7 @@ func streamResponse(w http.ResponseWriter, flusher http.Flusher, body io.Reader)
 		n, readErr := body.Read(buf)
 		if n > 0 {
 			if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+				_, _ = io.Copy(io.Discard, body) // Drain remaining to allow connection reuse
 				return
 			}
 			flusher.Flush()
