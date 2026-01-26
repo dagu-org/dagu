@@ -152,6 +152,9 @@ type Definition struct {
 
 	// GitSync contains configuration for Git synchronization.
 	GitSync *GitSyncDef `mapstructure:"gitSync"`
+
+	// Tunnel contains configuration for tunnel services (Cloudflare/Tailscale).
+	Tunnel *TunnelDef `mapstructure:"tunnel"`
 }
 
 // TerminalDef represents the terminal configuration.
@@ -519,4 +522,90 @@ type GitSyncCommitDef struct {
 	// Default: dagu@localhost
 	// Env: DAGU_GITSYNC_COMMIT_AUTHOR_EMAIL
 	AuthorEmail string `mapstructure:"authorEmail"`
+}
+
+// TunnelDef holds the definition for tunnel configuration.
+type TunnelDef struct {
+	// Enabled indicates whether tunneling is enabled.
+	// Default: false
+	// Env: DAGU_TUNNEL_ENABLED
+	Enabled *bool `mapstructure:"enabled"`
+
+	// Provider specifies which tunnel provider to use: "cloudflare" or "tailscale".
+	// Env: DAGU_TUNNEL_PROVIDER
+	Provider string `mapstructure:"provider"`
+
+	// Cloudflare contains Cloudflare Tunnel configuration.
+	Cloudflare *CloudflareTunnelDef `mapstructure:"cloudflare"`
+
+	// Tailscale contains Tailscale configuration.
+	Tailscale *TailscaleTunnelDef `mapstructure:"tailscale"`
+
+	// AllowTerminal allows terminal access via tunnel (default: false for security).
+	// Env: DAGU_TUNNEL_ALLOW_TERMINAL
+	AllowTerminal *bool `mapstructure:"allowTerminal"`
+
+	// AllowedIPs is an IP allowlist (empty = allow all).
+	// Env: DAGU_TUNNEL_ALLOWED_IPS
+	AllowedIPs []string `mapstructure:"allowedIPs"`
+
+	// RateLimiting contains rate limiting configuration for auth endpoints.
+	RateLimiting *TunnelRateLimitDef `mapstructure:"rateLimiting"`
+}
+
+// CloudflareTunnelDef holds Cloudflare Tunnel settings.
+type CloudflareTunnelDef struct {
+	// Token is the Cloudflare Tunnel token (required for named tunnels).
+	// Get this from Cloudflare Dashboard → Zero Trust → Tunnels.
+	// Env: DAGU_TUNNEL_CLOUDFLARE_TOKEN
+	Token string `mapstructure:"token"`
+
+	// Hostname is the custom hostname for the tunnel.
+	// If empty, uses the default cfargotunnel.com subdomain.
+	// Env: DAGU_TUNNEL_CLOUDFLARE_HOSTNAME
+	Hostname string `mapstructure:"hostname"`
+}
+
+// TailscaleTunnelDef holds Tailscale settings.
+type TailscaleTunnelDef struct {
+	// AuthKey is the Tailscale auth key for headless authentication.
+	// If empty, interactive login via URL will be required.
+	// Env: DAGU_TUNNEL_TAILSCALE_AUTH_KEY
+	AuthKey string `mapstructure:"authKey"`
+
+	// Hostname is the machine name in the tailnet (default: "dagu").
+	// Env: DAGU_TUNNEL_TAILSCALE_HOSTNAME
+	Hostname string `mapstructure:"hostname"`
+
+	// Funnel enables Tailscale Funnel for public internet access.
+	// When false, the server is only accessible within the tailnet.
+	// Env: DAGU_TUNNEL_TAILSCALE_FUNNEL
+	Funnel *bool `mapstructure:"funnel"`
+
+	// StateDir is the directory for Tailscale state storage.
+	// Default: $DAGU_HOME/tailscale
+	// Env: DAGU_TUNNEL_TAILSCALE_STATE_DIR
+	StateDir string `mapstructure:"stateDir"`
+}
+
+// TunnelRateLimitDef holds rate limiting configuration.
+type TunnelRateLimitDef struct {
+	// Enabled indicates whether rate limiting is enabled.
+	// Env: DAGU_TUNNEL_RATE_LIMITING_ENABLED
+	Enabled *bool `mapstructure:"enabled"`
+
+	// LoginAttempts is the maximum login attempts per window.
+	// Default: 5
+	// Env: DAGU_TUNNEL_RATE_LIMITING_LOGIN_ATTEMPTS
+	LoginAttempts int `mapstructure:"loginAttempts"`
+
+	// WindowSeconds is the time window in seconds.
+	// Default: 300 (5 minutes)
+	// Env: DAGU_TUNNEL_RATE_LIMITING_WINDOW_SECONDS
+	WindowSeconds int `mapstructure:"windowSeconds"`
+
+	// BlockDurationSeconds is the block duration after exceeding limit.
+	// Default: 900 (15 minutes)
+	// Env: DAGU_TUNNEL_RATE_LIMITING_BLOCK_DURATION_SECONDS
+	BlockDurationSeconds int `mapstructure:"blockDurationSeconds"`
 }

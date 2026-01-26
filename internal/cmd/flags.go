@@ -281,6 +281,29 @@ var (
 		usage:     "Skip confirmation prompt",
 		isBool:    true,
 	}
+
+	// tunnelFlag enables tunnel mode.
+	tunnelFlag = commandLineFlag{
+		name:      "tunnel",
+		shorthand: "t",
+		usage:     "Enable tunnel mode for remote access",
+		isBool:    true,
+		bindViper: true,
+	}
+
+	// tunnelProviderFlag specifies the tunnel provider.
+	tunnelProviderFlag = commandLineFlag{
+		name:      "tunnel-provider",
+		usage:     "Tunnel provider: 'cloudflare' or 'tailscale' (default: tailscale)",
+		bindViper: true,
+	}
+
+	// tunnelTokenFlag provides authentication token for the tunnel.
+	tunnelTokenFlag = commandLineFlag{
+		name:      "tunnel-token",
+		usage:     "Tunnel auth token (Cloudflare tunnel token or Tailscale auth key)",
+		bindViper: true,
+	}
 )
 
 type commandLineFlag struct {

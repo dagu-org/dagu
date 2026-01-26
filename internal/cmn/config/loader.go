@@ -97,15 +97,16 @@ const (
 	SectionQueues                                // 64
 	SectionMonitoring                            // 128
 	SectionGitSync                               // 256
+	SectionTunnel                                // 512
 
 	// SectionAll combines all sections (useful for ServiceNone/CLI)
-	SectionAll = SectionServer | SectionScheduler | SectionWorker | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync
+	SectionAll = SectionServer | SectionScheduler | SectionWorker | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel
 )
 
 // serviceRequirements maps services to their required config sections using bitwise OR.
 var serviceRequirements = map[Service]ConfigSection{
 	ServiceNone:        SectionAll,
-	ServiceServer:      SectionServer | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync,
+	ServiceServer:      SectionServer | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel,
 	ServiceScheduler:   SectionScheduler | SectionCoordinator | SectionQueues,
 	ServiceWorker:      SectionWorker | SectionCoordinator,
 	ServiceCoordinator: SectionCoordinator,
@@ -242,6 +243,9 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	}
 	if l.requires(SectionGitSync) {
 		l.loadGitSyncConfig(&cfg, def)
+	}
+	if l.requires(SectionTunnel) {
+		l.loadTunnelConfig(&cfg, def)
 	}
 
 	// Cache config is always loaded (used by all services)
@@ -928,6 +932,97 @@ func (l *ConfigLoader) loadGitSyncConfig(cfg *Config, def Definition) {
 	}
 }
 
+// loadTunnelConfig loads the tunnel configuration.
+func (l *ConfigLoader) loadTunnelConfig(cfg *Config, def Definition) {
+	// Check if tunnel is enabled via CLI flag or config
+	enabled := l.v.GetBool("tunnel.enabled") || l.v.GetBool("tunnel")
+	if def.Tunnel != nil && def.Tunnel.Enabled != nil {
+		enabled = *def.Tunnel.Enabled
+	}
+	cfg.Tunnel.Enabled = enabled
+
+	if !enabled {
+		return
+	}
+
+	// Provider - CLI flag takes precedence
+	provider := l.v.GetString("tunnel.provider")
+	if provider == "" {
+		provider = l.v.GetString("tunnelProvider")
+	}
+	if def.Tunnel != nil && def.Tunnel.Provider != "" {
+		provider = def.Tunnel.Provider
+	}
+	// Default to tailscale if not specified
+	if provider == "" {
+		provider = TunnelProviderTailscale
+	}
+	cfg.Tunnel.Provider = provider
+
+	// Cloudflare config
+	if def.Tunnel != nil && def.Tunnel.Cloudflare != nil {
+		cfg.Tunnel.Cloudflare.Token = def.Tunnel.Cloudflare.Token
+		cfg.Tunnel.Cloudflare.Hostname = def.Tunnel.Cloudflare.Hostname
+	}
+
+	// Tailscale config
+	if def.Tunnel != nil && def.Tunnel.Tailscale != nil {
+		cfg.Tunnel.Tailscale.AuthKey = def.Tunnel.Tailscale.AuthKey
+		cfg.Tunnel.Tailscale.Hostname = def.Tunnel.Tailscale.Hostname
+		if def.Tunnel.Tailscale.Funnel != nil {
+			cfg.Tunnel.Tailscale.Funnel = *def.Tunnel.Tailscale.Funnel
+		}
+		cfg.Tunnel.Tailscale.StateDir = def.Tunnel.Tailscale.StateDir
+	}
+
+	// Handle --tunnel-token CLI flag
+	tunnelToken := l.v.GetString("tunnel.token")
+	if tunnelToken == "" {
+		tunnelToken = l.v.GetString("tunnelToken")
+	}
+	if tunnelToken != "" {
+		// Apply token to the appropriate provider
+		switch cfg.Tunnel.Provider {
+		case TunnelProviderCloudflare:
+			cfg.Tunnel.Cloudflare.Token = tunnelToken
+		case TunnelProviderTailscale:
+			cfg.Tunnel.Tailscale.AuthKey = tunnelToken
+		}
+	}
+
+	// Security options
+	if def.Tunnel != nil && def.Tunnel.AllowTerminal != nil {
+		cfg.Tunnel.AllowTerminal = *def.Tunnel.AllowTerminal
+	}
+	cfg.Tunnel.AllowedIPs = parseStringList(l.v.Get("tunnel.allowedIPs"))
+
+	// Rate limiting
+	if def.Tunnel != nil && def.Tunnel.RateLimiting != nil {
+		if def.Tunnel.RateLimiting.Enabled != nil {
+			cfg.Tunnel.RateLimiting.Enabled = *def.Tunnel.RateLimiting.Enabled
+		}
+		cfg.Tunnel.RateLimiting.LoginAttempts = def.Tunnel.RateLimiting.LoginAttempts
+		cfg.Tunnel.RateLimiting.WindowSeconds = def.Tunnel.RateLimiting.WindowSeconds
+		cfg.Tunnel.RateLimiting.BlockDurationSeconds = def.Tunnel.RateLimiting.BlockDurationSeconds
+	}
+
+	// Set defaults for rate limiting
+	if cfg.Tunnel.RateLimiting.LoginAttempts <= 0 {
+		cfg.Tunnel.RateLimiting.LoginAttempts = 5
+	}
+	if cfg.Tunnel.RateLimiting.WindowSeconds <= 0 {
+		cfg.Tunnel.RateLimiting.WindowSeconds = 300
+	}
+	if cfg.Tunnel.RateLimiting.BlockDurationSeconds <= 0 {
+		cfg.Tunnel.RateLimiting.BlockDurationSeconds = 900
+	}
+
+	// Set default Tailscale hostname
+	if cfg.Tunnel.Provider == TunnelProviderTailscale && cfg.Tunnel.Tailscale.Hostname == "" {
+		cfg.Tunnel.Tailscale.Hostname = "dagu"
+	}
+}
+
 // loadCacheConfig loads the cache configuration.
 func (l *ConfigLoader) loadCacheConfig(cfg *Config, def Definition) {
 	if def.Cache != nil {
@@ -1343,6 +1438,23 @@ var envBindings = []envBinding{
 	{key: "worker.postgresPool.maxIdleConns", env: "WORKER_POSTGRES_POOL_MAX_IDLE_CONNS"},
 	{key: "worker.postgresPool.connMaxLifetime", env: "WORKER_POSTGRES_POOL_CONN_MAX_LIFETIME"},
 	{key: "worker.postgresPool.connMaxIdleTime", env: "WORKER_POSTGRES_POOL_CONN_MAX_IDLE_TIME"},
+
+	// Tunnel configuration
+	{key: "tunnel.enabled", env: "TUNNEL"},           // Maps to --tunnel flag
+	{key: "tunnel.enabled", env: "TUNNEL_ENABLED"},   // Also support TUNNEL_ENABLED
+	{key: "tunnel.provider", env: "TUNNEL_PROVIDER"}, // Maps to --tunnel-provider flag
+	{key: "tunnel.cloudflare.token", env: "TUNNEL_CLOUDFLARE_TOKEN"},
+	{key: "tunnel.cloudflare.hostname", env: "TUNNEL_CLOUDFLARE_HOSTNAME"},
+	{key: "tunnel.tailscale.authKey", env: "TUNNEL_TAILSCALE_AUTH_KEY"},
+	{key: "tunnel.tailscale.hostname", env: "TUNNEL_TAILSCALE_HOSTNAME"},
+	{key: "tunnel.tailscale.funnel", env: "TUNNEL_TAILSCALE_FUNNEL"},
+	{key: "tunnel.tailscale.stateDir", env: "TUNNEL_TAILSCALE_STATE_DIR", isPath: true},
+	{key: "tunnel.allowTerminal", env: "TUNNEL_ALLOW_TERMINAL"},
+	{key: "tunnel.allowedIPs", env: "TUNNEL_ALLOWED_IPS"},
+	{key: "tunnel.rateLimiting.enabled", env: "TUNNEL_RATE_LIMITING_ENABLED"},
+	{key: "tunnel.rateLimiting.loginAttempts", env: "TUNNEL_RATE_LIMITING_LOGIN_ATTEMPTS"},
+	{key: "tunnel.rateLimiting.windowSeconds", env: "TUNNEL_RATE_LIMITING_WINDOW_SECONDS"},
+	{key: "tunnel.rateLimiting.blockDurationSeconds", env: "TUNNEL_RATE_LIMITING_BLOCK_DURATION_SECONDS"},
 
 	// Git sync configuration
 	{key: "gitSync.enabled", env: "GITSYNC_ENABLED"},

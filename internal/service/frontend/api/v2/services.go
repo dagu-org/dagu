@@ -8,6 +8,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/tunnel"
 )
 
 // GetSchedulerStatus returns the status of all registered scheduler instances
@@ -119,4 +120,69 @@ func (a *API) GetCoordinatorStatus(ctx context.Context, _ api.GetCoordinatorStat
 	return api.GetCoordinatorStatus200JSONResponse{
 		Coordinators: coordinators,
 	}, nil
+}
+
+// GetTunnelStatus returns the status of the tunnel service
+func (a *API) GetTunnelStatus(ctx context.Context, _ api.GetTunnelStatusRequestObject) (api.GetTunnelStatusResponseObject, error) {
+	logger.Info(ctx, "GetTunnelStatus called")
+
+	// Check if tunnel is enabled in config
+	if !a.config.Tunnel.Enabled {
+		return api.GetTunnelStatus200JSONResponse{
+			Enabled: false,
+			Status:  api.TunnelStatusResponseStatusDisabled,
+		}, nil
+	}
+
+	// If no tunnel service is available, return disabled status
+	if a.tunnelService == nil {
+		return api.GetTunnelStatus200JSONResponse{
+			Enabled: true,
+			Status:  api.TunnelStatusResponseStatusDisabled,
+		}, nil
+	}
+
+	// Get tunnel info from service
+	info := a.tunnelService.Info()
+
+	// Convert tunnel.Status to API status
+	var status api.TunnelStatusResponseStatus
+	switch info.Status {
+	case tunnel.StatusConnected:
+		status = api.TunnelStatusResponseStatusConnected
+	case tunnel.StatusConnecting:
+		status = api.TunnelStatusResponseStatusConnecting
+	case tunnel.StatusReconnecting:
+		status = api.TunnelStatusResponseStatusReconnecting
+	case tunnel.StatusError:
+		status = api.TunnelStatusResponseStatusError
+	default:
+		status = api.TunnelStatusResponseStatusDisabled
+	}
+
+	// Convert provider type
+	var provider *api.TunnelStatusResponseProvider
+	if info.Provider != "" {
+		p := api.TunnelStatusResponseProvider(info.Provider)
+		provider = &p
+	}
+
+	// Build response
+	response := api.GetTunnelStatus200JSONResponse{
+		Enabled:   true,
+		Status:    status,
+		Provider:  provider,
+		PublicUrl: ptrOf(info.PublicURL),
+		Error:     ptrOf(info.Error),
+		Mode:      ptrOf(info.Mode),
+		IsPublic:  ptrOf(info.IsPublic),
+	}
+
+	// Add startedAt if connected
+	if !info.StartedAt.IsZero() {
+		startedAt := info.StartedAt.Format(time.RFC3339)
+		response.StartedAt = &startedAt
+	}
+
+	return response, nil
 }

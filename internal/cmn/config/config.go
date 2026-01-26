@@ -43,6 +43,9 @@ type Config struct {
 
 	// GitSync contains configuration for Git synchronization.
 	GitSync GitSyncConfig
+
+	// Tunnel contains configuration for tunnel services (Cloudflare/Tailscale).
+	Tunnel TunnelConfig
 }
 
 // GitSyncConfig holds the configuration for Git sync functionality.
@@ -112,6 +115,80 @@ type GitSyncCommitConfig struct {
 	// Defaults to "dagu@localhost" if not specified.
 	AuthorEmail string
 }
+
+// TunnelConfig holds the configuration for tunnel services.
+type TunnelConfig struct {
+	// Enabled indicates whether tunneling is enabled.
+	Enabled bool
+
+	// Provider specifies which tunnel provider to use: "cloudflare" or "tailscale".
+	Provider string
+
+	// Cloudflare contains Cloudflare Tunnel configuration.
+	Cloudflare CloudflareTunnelConfig
+
+	// Tailscale contains Tailscale configuration.
+	Tailscale TailscaleTunnelConfig
+
+	// AllowTerminal allows terminal access via tunnel (default: false for security).
+	AllowTerminal bool
+
+	// AllowedIPs is an IP allowlist (empty = allow all).
+	AllowedIPs []string
+
+	// RateLimiting contains rate limiting configuration for auth endpoints.
+	RateLimiting TunnelRateLimitConfig
+}
+
+// CloudflareTunnelConfig holds Cloudflare Tunnel settings.
+type CloudflareTunnelConfig struct {
+	// Token is the Cloudflare Tunnel token (required for named tunnels).
+	// Get this from Cloudflare Dashboard → Zero Trust → Tunnels.
+	Token string
+
+	// Hostname is the custom hostname for the tunnel.
+	// If empty, uses the default cfargotunnel.com subdomain.
+	Hostname string
+}
+
+// TailscaleTunnelConfig holds Tailscale settings.
+type TailscaleTunnelConfig struct {
+	// AuthKey is the Tailscale auth key for headless authentication.
+	// If empty, interactive login via URL will be required.
+	AuthKey string
+
+	// Hostname is the machine name in the tailnet (default: "dagu").
+	Hostname string
+
+	// Funnel enables Tailscale Funnel for public internet access.
+	// When false, the server is only accessible within the tailnet.
+	Funnel bool
+
+	// StateDir is the directory for Tailscale state storage.
+	// Default: $DAGU_HOME/tailscale
+	StateDir string
+}
+
+// TunnelRateLimitConfig holds rate limiting configuration.
+type TunnelRateLimitConfig struct {
+	// Enabled indicates whether rate limiting is enabled.
+	Enabled bool
+
+	// LoginAttempts is the maximum login attempts per window.
+	LoginAttempts int
+
+	// WindowSeconds is the time window in seconds.
+	WindowSeconds int
+
+	// BlockDurationSeconds is the block duration after exceeding limit.
+	BlockDurationSeconds int
+}
+
+// TunnelProvider constants
+const (
+	TunnelProviderCloudflare = "cloudflare"
+	TunnelProviderTailscale  = "tailscale"
+)
 
 // MonitoringConfig holds the configuration for system monitoring.
 // Memory estimation: Each metric point is ~16 bytes. With 4 metrics collected
@@ -518,6 +595,11 @@ func (c *Config) Validate() error {
 		return err
 	}
 
+	// Validate tunnel configuration
+	if err := c.validateTunnel(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -639,4 +721,62 @@ func (c *Config) validateGitSync() error {
 	}
 
 	return nil
+}
+
+// validateTunnel validates the tunnel configuration.
+func (c *Config) validateTunnel() error {
+	if !c.Tunnel.Enabled {
+		return nil
+	}
+
+	// Validate provider
+	switch c.Tunnel.Provider {
+	case TunnelProviderCloudflare:
+		// Cloudflare requires a token for named tunnels
+		if c.Tunnel.Cloudflare.Token == "" {
+			return fmt.Errorf("cloudflare tunnel requires token to be set (tunnel.cloudflare.token)")
+		}
+	case TunnelProviderTailscale:
+		// Tailscale doesn't strictly require config, but hostname is recommended
+	case "":
+		return fmt.Errorf("tunnel provider must be set (tunnel.provider: cloudflare or tailscale)")
+	default:
+		return fmt.Errorf("invalid tunnel provider: %q (must be 'cloudflare' or 'tailscale')", c.Tunnel.Provider)
+	}
+
+	// Check if tunnel is public (Cloudflare or Tailscale with Funnel)
+	isPublic := c.Tunnel.Provider == TunnelProviderCloudflare ||
+		(c.Tunnel.Provider == TunnelProviderTailscale && c.Tunnel.Tailscale.Funnel)
+
+	// SECURITY: Public tunnels REQUIRE authentication
+	if isPublic && c.Server.Auth.Mode == AuthModeNone {
+		return fmt.Errorf(
+			"tunnel with public access requires authentication; "+
+				"set server.auth.mode=builtin or disable tailscale funnel for private access",
+		)
+	}
+
+	// Validate rate limiting config
+	if c.Tunnel.RateLimiting.Enabled {
+		if c.Tunnel.RateLimiting.LoginAttempts <= 0 {
+			return fmt.Errorf("tunnel rate limiting loginAttempts must be positive")
+		}
+		if c.Tunnel.RateLimiting.WindowSeconds <= 0 {
+			return fmt.Errorf("tunnel rate limiting windowSeconds must be positive")
+		}
+		if c.Tunnel.RateLimiting.BlockDurationSeconds <= 0 {
+			return fmt.Errorf("tunnel rate limiting blockDurationSeconds must be positive")
+		}
+	}
+
+	return nil
+}
+
+// IsTunnelPublic returns true if the tunnel exposes the service to the public internet.
+func (c *Config) IsTunnelPublic() bool {
+	if !c.Tunnel.Enabled {
+		return false
+	}
+	return c.Tunnel.Provider == TunnelProviderCloudflare ||
+		(c.Tunnel.Provider == TunnelProviderTailscale && c.Tunnel.Tailscale.Funnel)
 }

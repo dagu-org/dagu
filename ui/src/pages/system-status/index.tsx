@@ -8,11 +8,13 @@ import WorkersSummary from '../../features/dashboard/components/WorkersSummary';
 import PathsCard from '../../features/system-status/components/PathsCard';
 import ResourceChart from '../../features/system-status/components/ResourceChart';
 import ServiceCard from '../../features/system-status/components/ServiceCard';
+import TunnelStatusCard from '../../features/system-status/components/TunnelStatusCard';
 import { useQuery } from '../../hooks/api';
 import { cn } from '../../lib/utils';
 
 type SchedulerInstance = components['schemas']['SchedulerInstance'];
 type CoordinatorInstance = components['schemas']['CoordinatorInstance'];
+type TunnelStatusResponse = components['schemas']['TunnelStatusResponse'];
 
 /**
  * Render the System Status view showing service health, resource usage charts, and refresh controls.
@@ -107,6 +109,18 @@ function SystemStatus() {
     }
   );
 
+  const {
+    data: tunnelData,
+    error: tunnelError,
+    mutate: mutateTunnel,
+  } = useQuery(
+    '/services/tunnel',
+    {},
+    {
+      refreshInterval: autoRefresh ? 5000 : 0,
+    }
+  );
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
@@ -115,6 +129,7 @@ function SystemStatus() {
         mutateScheduler(),
         mutateCoordinator(),
         mutateWorkers(),
+        mutateTunnel(),
       ]);
       setLastUpdateTime(new Date());
     } finally {
@@ -198,6 +213,13 @@ function SystemStatus() {
           icon={<Server className="h-4 w-4" />}
           isLoading={!coordinatorData && !coordinatorError}
           error={coordinatorError ? String(coordinatorError) : undefined}
+        />
+
+        {/* Tunnel Service */}
+        <TunnelStatusCard
+          data={tunnelData as TunnelStatusResponse}
+          isLoading={!tunnelData && !tunnelError}
+          error={tunnelError ? String(tunnelError) : undefined}
         />
       </div>
 

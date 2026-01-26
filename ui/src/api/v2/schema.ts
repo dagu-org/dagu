@@ -1221,6 +1221,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/services/tunnel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get tunnel service status
+         * @description Returns status information about the tunnel service (Cloudflare or Tailscale)
+         */
+        get: operations["getTunnelStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/metrics": {
         parameters: {
             query?: never;
@@ -1820,7 +1840,10 @@ export interface components {
             tags?: string[];
             /** @description Name of the queue this DAG is assigned to. If not specified, the DAG name itself becomes the queue name */
             queue?: string;
-            /** @description Maximum number of concurrent DAG-runs allowed from this DAG */
+            /**
+             * @deprecated
+             * @description DEPRECATED: This field is ignored for local (DAG-based) queues. For concurrency control, use global queues
+             */
             maxActiveRuns?: number;
             runConfig?: components["schemas"]["RunConfig"];
         };
@@ -1909,6 +1932,31 @@ export interface components {
             /** @description Port number the coordinator is listening on */
             port: number;
         };
+        /** @description Response containing tunnel service status */
+        TunnelStatusResponse: {
+            /** @description Whether tunneling is enabled in configuration */
+            enabled: boolean;
+            /**
+             * @description The tunnel provider in use
+             * @enum {string}
+             */
+            provider?: TunnelStatusResponseProvider;
+            /**
+             * @description Current status of the tunnel
+             * @enum {string}
+             */
+            status: TunnelStatusResponseStatus;
+            /** @description The public URL provided by the tunnel */
+            publicUrl?: string;
+            /** @description Error message if tunnel failed */
+            error?: string;
+            /** @description RFC3339 timestamp when tunnel connected */
+            startedAt?: string;
+            /** @description Tunnel mode (e.g., 'named' for Cloudflare, 'direct' or 'funnel' for Tailscale) */
+            mode?: string;
+            /** @description Whether the tunnel provides public internet access */
+            isPublic?: boolean;
+        };
         /**
          * @description Health status of the worker based on heartbeat recency
          * @enum {string}
@@ -1937,7 +1985,10 @@ export interface components {
             histRetentionDays?: number;
             /** @description Conditions that must be met before a DAG-run can start */
             preconditions?: components["schemas"]["Condition"][];
-            /** @description Maximum number of concurrent DAG-runs allowed from this DAG */
+            /**
+             * @deprecated
+             * @description DEPRECATED: This field is ignored for local (DAG-based) queues. For concurrency control, use global queues
+             */
             maxActiveRuns?: number;
             /** @description Name of the queue this DAG is assigned to. If not specified, the DAG name itself becomes the queue name */
             queue?: string;
@@ -2290,7 +2341,7 @@ export interface components {
              * @enum {string}
              */
             type: QueueType;
-            /** @description Maximum number of concurrent runs allowed. For 'global' queues, this is the configured maxConcurrency. For 'dag-based' queues, this is the DAG's maxActiveRuns (default 1) */
+            /** @description Maximum number of concurrent runs allowed. For 'global' queues, this is the configured maxConcurrency. For 'dag-based' queues, this is always 1 (FIFO execution) */
             maxConcurrency?: number;
             /** @description Number of currently running DAG-runs */
             runningCount: number;
@@ -6236,6 +6287,35 @@ export interface operations {
             };
         };
     };
+    getTunnelStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TunnelStatusResponse"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getMetrics: {
         parameters: {
             query?: never;
@@ -7109,6 +7189,17 @@ export enum CoordinatorInstanceStatus {
     active = "active",
     inactive = "inactive",
     unknown = "unknown"
+}
+export enum TunnelStatusResponseProvider {
+    cloudflare = "cloudflare",
+    tailscale = "tailscale"
+}
+export enum TunnelStatusResponseStatus {
+    disabled = "disabled",
+    connecting = "connecting",
+    connected = "connected",
+    reconnecting = "reconnecting",
+    error = "error"
 }
 export enum WorkerHealthStatus {
     healthy = "healthy",
