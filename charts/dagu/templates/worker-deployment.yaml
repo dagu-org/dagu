@@ -22,13 +22,10 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["dagu", "worker"]
+          envFrom:
+            - configMapRef:
+                name: {{ include "dagu.fullname" . }}-config
           env:
-            - name: DAGU_DATA_DIR
-              value: "/data"
-            - name: DAGU_DAGS_DIR
-              value: "/data/dags"
-            - name: DAGU_LOG_DIR
-              value: "/data/logs"
             - name: DAGU_COORDINATOR_HOST
               value: "{{ include "dagu.fullname" . }}-scheduler.{{ .Release.Namespace }}.svc.cluster.local"
             - name: WORKER_ID
@@ -38,14 +35,9 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
-            - name: config
-              mountPath: /etc/dagu
           resources:
             {{- toYaml .Values.worker.resources | nindent 12 }}
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: {{ include "dagu.fullname" . }}-data
-        - name: config
-          configMap:
-            name: {{ include "dagu.fullname" . }}-config

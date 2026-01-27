@@ -21,14 +21,11 @@ spec:
         - name: ui
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["dagu", "ui"]
+          command: ["dagu", "server"]
+          envFrom:
+            - configMapRef:
+                name: {{ include "dagu.fullname" . }}-config
           env:
-            - name: DAGU_DATA_DIR
-              value: "/data"
-            - name: DAGU_DAGS_DIR
-              value: "/data/dags"
-            - name: DAGU_LOG_DIR
-              value: "/data/logs"
             - name: DAGU_HOST
               value: "0.0.0.0"
             - name: DAGU_PORT
@@ -40,8 +37,6 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
-            - name: config
-              mountPath: /etc/dagu
           livenessProbe:
             httpGet:
               path: /health
@@ -60,6 +55,3 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: {{ include "dagu.fullname" . }}-data
-        - name: config
-          configMap:
-            name: {{ include "dagu.fullname" . }}-config

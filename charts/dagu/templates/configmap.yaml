@@ -5,21 +5,21 @@ metadata:
   labels:
     {{- include "dagu.labels" . | nindent 4 }}
 data:
-  dagu.yaml: |
-    # This config defines dagu's filesystem-based state layout.
-    # All components mount the same shared volume at /data.
-    # This layout is required by dagu's current architecture.
-    
-    dataDir: /data
-    dagsDir: /data/dags
-    logDir: /data/logs
-    suspendFlagsDir: /data/suspend
-    adminLogsDir: /data/admin/logs
-    baseConfig: /data/base.yaml
-    executable: /usr/local/bin/dagu
-    dagRunsDir: /data/dag-runs
-    queueDir: /data/queue
-    procDir: /data/proc
-    serviceRegistryDir: /data/services
-    apiKeysDir: /data/api-keys
-    webhooksDir: /data/webhooks   
+  # Data directories
+  DAGU_DATA_DIR: "/data"
+  DAGU_DAGS_DIR: "/data/dags"
+  DAGU_LOG_DIR: "/data/logs"
+  DAGU_SUSPEND_FLAGS_DIR: "/data/suspend"
+  DAGU_ADMIN_LOG_DIR: "/data/admin/logs"
+  DAGU_DAG_RUNS_DIR: "/data/dag-runs"
+  DAGU_QUEUE_DIR: "/data/queue"
+  DAGU_PROC_DIR: "/data/proc"
+  DAGU_SERVICE_REGISTRY_DIR: "/data/services"
+  DAGU_API_KEYS_DIR: "/data/api-keys"
+  DAGU_WEBHOOKS_DIR: "/data/webhooks"
+  
+  # Scheduler configuration
+  DAGU_SCHEDULER_PORT: "8090"
+  
+  # Coordinator configuration
+  DAGU_COORDINATOR_PORT: "50055"
