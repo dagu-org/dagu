@@ -207,17 +207,15 @@ function DAGStatusOverview({ status, onViewLog }: Props): React.JSX.Element | nu
 
   return (
     <div className="space-y-2">
-      {/* Parameters - Compact single line */}
-      <div className="flex items-center gap-1.5 text-xs font-mono">
-        <Terminal className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-        {status.params ? (
+      {/* Parameters - Only show when present */}
+      {status.params && (
+        <div className="flex items-center gap-1.5 text-xs font-mono">
+          <Terminal className="h-3 w-3 text-muted-foreground flex-shrink-0" />
           <span className="text-foreground truncate" title={status.params}>
             {status.params}
           </span>
-        ) : (
-          <span className="text-muted-foreground italic">(no params)</span>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Timing & Metadata - Compact grid */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">

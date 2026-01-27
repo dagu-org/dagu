@@ -1,4 +1,4 @@
-import { Calendar, RefreshCw, Server, Terminal, Timer } from 'lucide-react';
+import { Calendar, RefreshCw, Server, Timer } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { components, Status } from '../../../../api/v2/schema';
@@ -205,61 +205,34 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
               <span>Refresh</span>
             </button>
 
-            <div className="flex items-center gap-1.5 text-foreground bg-accent rounded-md px-2 py-1 border">
-              <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="font-medium text-xs">
-                {dagRunToDisplay?.startedAt
-                  ? `${dayjs(dagRunToDisplay.startedAt).format('MMM D, HH:mm:ss')} ${dayjs(dagRunToDisplay.startedAt).format('z')}`
-                  : '--'}
-              </span>
-            </div>
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Calendar className="h-3 w-3" />
+              {dagRunToDisplay?.startedAt
+                ? dayjs(dagRunToDisplay.startedAt).format('MMM D, HH:mm:ss')
+                : '--'}
+            </span>
 
-            <div className="flex items-center gap-1.5 text-foreground bg-accent rounded-md px-2 py-1 border">
-              <Timer className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="font-medium text-xs flex items-center gap-1">
-                {currentDuration}
-                {isRunning && (
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                )}
-              </span>
-            </div>
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Timer className="h-3 w-3" />
+              {currentDuration}
+              {isRunning && (
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#66ff66]" />
+              )}
+            </span>
 
             {dagRunToDisplay.workerId && (
-              <div className="flex items-center gap-1.5 text-foreground bg-accent rounded-md px-2 py-1 border">
-                <Server className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="font-medium text-xs font-mono">
-                  {dagRunToDisplay.workerId}
-                </span>
-              </div>
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Server className="h-3 w-3" />
+                <span className="font-mono">{dagRunToDisplay.workerId}</span>
+              </span>
             )}
 
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <span className="font-medium text-xs uppercase tracking-wide">
-                Run ID
-              </span>
-              <code className="bg-accent text-foreground px-2 py-1 rounded-md text-xs font-mono border">
-                {dagRunToDisplay.rootDAGRunId}
-              </code>
-            </div>
+            <code className="text-xs font-mono text-muted-foreground">
+              {dagRunToDisplay.rootDAGRunId}
+            </code>
           </div>
         )}
 
-      {/* Parameters - Always show to prevent layout jumping */}
-      <div className="mt-4 border-t border-border pt-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Terminal className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xs font-semibold text-foreground/90">
-            Parameters
-          </span>
-        </div>
-        <div className="flex items-center bg-accent rounded-md px-3 py-1.5 font-mono text-xs min-h-[36px] max-h-[100px] overflow-y-auto border">
-          {dagRunToDisplay.params ? (
-            <span className="text-foreground">{dagRunToDisplay.params}</span>
-          ) : (
-            <span className="text-muted-foreground italic">No parameters</span>
-          )}
-        </div>
-      </div>
     </div>
   );
 };
