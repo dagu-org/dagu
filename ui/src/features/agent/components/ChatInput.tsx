@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { useState, useCallback, KeyboardEvent } from 'react';
+import { useState, useCallback, useEffect, KeyboardEvent } from 'react';
+import { flushSync } from 'react-dom';
 import { Send, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -20,14 +21,36 @@ export function ChatInput({
   placeholder = 'Type a message...',
 }: ChatInputProps) {
   const [message, setMessage] = useState('');
+  const [isPending, setIsPending] = useState(false);
+
+  // Combine local pending state with parent isWorking for immediate response
+  const showPauseButton = isPending || isWorking;
+
+  // Reset pending when isWorking becomes true (server confirmed processing)
+  useEffect(() => {
+    if (isWorking) {
+      setIsPending(false);
+    }
+  }, [isWorking]);
+
+  // Reset pending if isWorking stays false (in case of errors)
+  useEffect(() => {
+    if (!isWorking && isPending) {
+      const timer = setTimeout(() => setIsPending(false), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isWorking, isPending]);
 
   const handleSend = useCallback(() => {
     const trimmed = message.trim();
-    if (trimmed && !isWorking && !disabled) {
+    if (trimmed && !showPauseButton && !disabled) {
+      flushSync(() => {
+        setIsPending(true);
+      });
       onSend(trimmed);
       setMessage('');
     }
-  }, [message, isWorking, disabled, onSend]);
+  }, [message, showPauseButton, disabled, onSend]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -70,7 +93,7 @@ export function ChatInput({
           target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
         }}
       />
-      {isWorking ? (
+      {showPauseButton ? (
         <Button
           size="sm"
           variant="destructive"
