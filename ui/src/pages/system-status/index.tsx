@@ -115,7 +115,13 @@ function SystemStatus() {
     mutate: mutateTunnel,
   } = useQuery(
     '/services/tunnel',
-    {},
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
+      },
+    },
     {
       refreshInterval: autoRefresh ? 5000 : 0,
     }

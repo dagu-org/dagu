@@ -166,7 +166,7 @@ func (a *API) GetTunnelStatus(ctx context.Context, _ api.GetTunnelStatusRequestO
 
 	// Set startedAt if tunnel has been started
 	if !info.StartedAt.IsZero() {
-		startedAt := info.StartedAt.Format(time.RFC3339)
+		startedAt := info.StartedAt
 		response.StartedAt = &startedAt
 	}
 

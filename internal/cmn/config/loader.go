@@ -912,18 +912,18 @@ func (l *ConfigLoader) loadGitSyncConfig(cfg *Config, def Definition) {
 
 // loadTunnelConfig loads the tunnel configuration.
 func (l *ConfigLoader) loadTunnelConfig(cfg *Config, def Definition) {
-	// Check if tunnel is enabled via CLI flag (--tunnel.enabled or -t) or config
-	enabled := l.v.GetBool("tunnel.enabled")
-	if def.Tunnel != nil && def.Tunnel.Enabled != nil {
-		enabled = *def.Tunnel.Enabled
+	// Check if tunnel is enabled - CLI flag takes precedence over config file
+	if l.v.IsSet("tunnel.enabled") {
+		cfg.Tunnel.Enabled = l.v.GetBool("tunnel.enabled")
+	} else if def.Tunnel != nil && def.Tunnel.Enabled != nil {
+		cfg.Tunnel.Enabled = *def.Tunnel.Enabled
 	}
-	cfg.Tunnel.Enabled = enabled
 
-	if !enabled {
+	if !cfg.Tunnel.Enabled {
 		return
 	}
 
-	// Tailscale config from definition
+	// Tailscale config from definition (loaded first as base)
 	if def.Tunnel != nil && def.Tunnel.Tailscale != nil {
 		cfg.Tunnel.Tailscale.AuthKey = def.Tunnel.Tailscale.AuthKey
 		cfg.Tunnel.Tailscale.Hostname = def.Tunnel.Tailscale.Hostname
@@ -936,20 +936,18 @@ func (l *ConfigLoader) loadTunnelConfig(cfg *Config, def Definition) {
 		cfg.Tunnel.Tailscale.StateDir = def.Tunnel.Tailscale.StateDir
 	}
 
-	// Handle --tunnel-funnel CLI flag
-	if l.v.GetBool("tunnel.tailscale.funnel") {
-		cfg.Tunnel.Tailscale.Funnel = true
+	// CLI flags take precedence over config file
+	if l.v.IsSet("tunnel.tailscale.funnel") {
+		cfg.Tunnel.Tailscale.Funnel = l.v.GetBool("tunnel.tailscale.funnel")
 	}
 
-	// Handle --tunnel-https CLI flag
-	if l.v.GetBool("tunnel.tailscale.https") {
-		cfg.Tunnel.Tailscale.HTTPS = true
+	if l.v.IsSet("tunnel.tailscale.https") {
+		cfg.Tunnel.Tailscale.HTTPS = l.v.GetBool("tunnel.tailscale.https")
 	}
 
-	// Handle --tunnel-token CLI flag
-	tunnelToken := l.v.GetString("tunnel.token")
-	if tunnelToken != "" {
-		cfg.Tunnel.Tailscale.AuthKey = tunnelToken
+	// Handle --tunnel-token CLI flag (takes precedence over config)
+	if l.v.IsSet("tunnel.token") {
+		cfg.Tunnel.Tailscale.AuthKey = l.v.GetString("tunnel.token")
 	}
 
 	// Security options

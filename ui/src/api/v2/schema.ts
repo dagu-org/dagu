@@ -1230,7 +1230,7 @@ export interface paths {
         };
         /**
          * Get tunnel service status
-         * @description Returns status information about the tunnel service (Cloudflare or Tailscale)
+         * @description Returns status information about the tunnel service (Tailscale)
          */
         get: operations["getTunnelStatus"];
         put?: never;
@@ -1946,11 +1946,17 @@ export interface components {
              * @enum {string}
              */
             status: TunnelStatusResponseStatus;
-            /** @description The public URL provided by the tunnel */
+            /**
+             * Format: uri
+             * @description The public URL provided by the tunnel
+             */
             publicUrl?: string;
             /** @description Error message if tunnel failed */
             error?: string;
-            /** @description RFC3339 timestamp when tunnel connected */
+            /**
+             * Format: date-time
+             * @description RFC3339 timestamp when tunnel connected
+             */
             startedAt?: string;
             /** @description Tunnel mode (e.g., 'direct' or 'funnel' for Tailscale) */
             mode?: string;
@@ -6289,7 +6295,10 @@ export interface operations {
     };
     getTunnelStatus: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
             header?: never;
             path?: never;
             cookie?: never;

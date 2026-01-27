@@ -57,7 +57,7 @@ require (
 	gotest.tools/gotestsum v1.13.0
 	modernc.org/sqlite v1.43.0
 	mvdan.cc/sh/v3 v3.12.0
-	tailscale.com v1.94.1
+	tailscale.com v1.94.0
 )
 
 require (

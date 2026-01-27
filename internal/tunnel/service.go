@@ -98,9 +98,12 @@ func (s *Service) Stop(ctx context.Context) error {
 		return nil
 	}
 
-	err := s.provider.Stop(ctx)
+	if err := s.provider.Stop(ctx); err != nil {
+		return err
+	}
+
 	s.running = false
-	return err
+	return nil
 }
 
 // Info returns the current tunnel information.

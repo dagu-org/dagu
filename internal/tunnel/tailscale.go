@@ -130,10 +130,14 @@ func (p *TailscaleProvider) runTunnel(ctx context.Context, localAddr string) {
 		return
 	}
 
-	// Wait for the connection to be ready
+	// Wait for the connection to be ready (with timeout)
+	connectionTimeout := time.After(60 * time.Second)
 	for {
 		select {
 		case <-ctx.Done():
+			return
+		case <-connectionTimeout:
+			p.setError("timeout waiting for tailscale connection (60s)")
 			return
 		default:
 		}
@@ -225,8 +229,10 @@ func (p *TailscaleProvider) runTunnel(ctx context.Context, localAddr string) {
 
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
 	proxy.ErrorHandler = func(w http.ResponseWriter, _ *http.Request, err error) {
+		// Log detailed error server-side for debugging, but don't expose to clients
+		p.setError(fmt.Sprintf("proxy error: %v", err))
 		w.WriteHeader(http.StatusBadGateway)
-		_, _ = io.WriteString(w, "Tunnel proxy error: "+err.Error())
+		_, _ = io.WriteString(w, "Tunnel proxy error")
 	}
 
 	// Start HTTP server on the Tailscale listener

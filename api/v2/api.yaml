@@ -2878,10 +2878,12 @@ paths:
   /services/tunnel:
     get:
       summary: "Get tunnel service status"
-      description: "Returns status information about the tunnel service (Cloudflare or Tailscale)"
+      description: "Returns status information about the tunnel service (Tailscale)"
       operationId: "getTunnelStatus"
       tags:
         - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
       responses:
         "200":
           description: "A successful response"
@@ -4411,12 +4413,14 @@ components:
           description: "Current status of the tunnel"
         publicUrl:
           type: string
+          format: uri
           description: "The public URL provided by the tunnel"
         error:
           type: string
           description: "Error message if tunnel failed"
         startedAt:
           type: string
+          format: date-time
           description: "RFC3339 timestamp when tunnel connected"
         mode:
           type: string
