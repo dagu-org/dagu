@@ -44,7 +44,7 @@ type Config struct {
 	// GitSync contains configuration for Git synchronization.
 	GitSync GitSyncConfig
 
-	// Tunnel contains configuration for tunnel services (Cloudflare/Tailscale).
+	// Tunnel contains configuration for tunnel services (Tailscale).
 	Tunnel TunnelConfig
 }
 
@@ -121,12 +121,6 @@ type TunnelConfig struct {
 	// Enabled indicates whether tunneling is enabled.
 	Enabled bool
 
-	// Provider specifies which tunnel provider to use: "cloudflare" or "tailscale".
-	Provider string
-
-	// Cloudflare contains Cloudflare Tunnel configuration.
-	Cloudflare CloudflareTunnelConfig
-
 	// Tailscale contains Tailscale configuration.
 	Tailscale TailscaleTunnelConfig
 
@@ -138,17 +132,6 @@ type TunnelConfig struct {
 
 	// RateLimiting contains rate limiting configuration for auth endpoints.
 	RateLimiting TunnelRateLimitConfig
-}
-
-// CloudflareTunnelConfig holds Cloudflare Tunnel settings.
-type CloudflareTunnelConfig struct {
-	// Token is the Cloudflare Tunnel token (required for named tunnels).
-	// Get this from Cloudflare Dashboard → Zero Trust → Tunnels.
-	Token string
-
-	// Hostname is the custom hostname for the tunnel.
-	// If empty, uses the default cfargotunnel.com subdomain.
-	Hostname string
 }
 
 // TailscaleTunnelConfig holds Tailscale settings.
@@ -191,8 +174,7 @@ type TunnelRateLimitConfig struct {
 
 // TunnelProvider constants
 const (
-	TunnelProviderCloudflare = "cloudflare"
-	TunnelProviderTailscale  = "tailscale"
+	TunnelProviderTailscale = "tailscale"
 )
 
 // MonitoringConfig holds the configuration for system monitoring.
@@ -734,24 +716,8 @@ func (c *Config) validateTunnel() error {
 		return nil
 	}
 
-	// Validate provider
-	switch c.Tunnel.Provider {
-	case TunnelProviderCloudflare:
-		// Cloudflare requires a token for named tunnels
-		if c.Tunnel.Cloudflare.Token == "" {
-			return fmt.Errorf("cloudflare tunnel requires token to be set (tunnel.cloudflare.token)")
-		}
-	case TunnelProviderTailscale:
-		// Tailscale doesn't strictly require config, but hostname is recommended
-	case "":
-		return fmt.Errorf("tunnel provider must be set (tunnel.provider: cloudflare or tailscale)")
-	default:
-		return fmt.Errorf("invalid tunnel provider: %q (must be 'cloudflare' or 'tailscale')", c.Tunnel.Provider)
-	}
-
-	// Check if tunnel is public (Cloudflare or Tailscale with Funnel)
-	isPublic := c.Tunnel.Provider == TunnelProviderCloudflare ||
-		(c.Tunnel.Provider == TunnelProviderTailscale && c.Tunnel.Tailscale.Funnel)
+	// Check if tunnel is public (Tailscale with Funnel)
+	isPublic := c.Tunnel.Tailscale.Funnel
 
 	// SECURITY: Public tunnels REQUIRE authentication
 	if isPublic && c.Server.Auth.Mode == AuthModeNone {
@@ -782,6 +748,5 @@ func (c *Config) IsTunnelPublic() bool {
 	if !c.Tunnel.Enabled {
 		return false
 	}
-	return c.Tunnel.Provider == TunnelProviderCloudflare ||
-		(c.Tunnel.Provider == TunnelProviderTailscale && c.Tunnel.Tailscale.Funnel)
+	return c.Tunnel.Tailscale.Funnel
 }

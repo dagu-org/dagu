@@ -4403,7 +4403,7 @@ components:
           description: "Whether tunneling is enabled in configuration"
         provider:
           type: string
-          enum: ["cloudflare", "tailscale"]
+          enum: ["tailscale"]
           description: "The tunnel provider in use"
         status:
           type: string
@@ -4420,7 +4420,7 @@ components:
           description: "RFC3339 timestamp when tunnel connected"
         mode:
           type: string
-          description: "Tunnel mode (e.g., 'named' for Cloudflare, 'direct' or 'funnel' for Tailscale)"
+          description: "Tunnel mode (e.g., 'direct' or 'funnel' for Tailscale)"
         isPublic:
           type: boolean
           description: "Whether the tunnel provides public internet access"

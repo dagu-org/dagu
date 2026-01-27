@@ -10,21 +10,13 @@ import (
 
 // Config holds the configuration for tunnel services.
 type Config struct {
-	Enabled    bool
-	Provider   ProviderType
-	Cloudflare CloudflareConfig
-	Tailscale  TailscaleConfig
+	Enabled   bool
+	Tailscale TailscaleConfig
 
 	// Security options
 	AllowTerminal bool
 	AllowedIPs    []string
 	RateLimiting  RateLimitConfig
-}
-
-// CloudflareConfig holds Cloudflare Tunnel settings.
-type CloudflareConfig struct {
-	Token    string // Required - tunnel token from Cloudflare dashboard
-	Hostname string // Optional - custom hostname
 }
 
 // TailscaleConfig holds Tailscale settings.
@@ -64,19 +56,11 @@ func NewService(cfg *Config, dataDir string) (*Service, error) {
 		urlFile: filepath.Join(dataDir, "tunnel_url"),
 	}
 
-	// Create the appropriate provider based on configuration
+	// Create Tailscale provider (only supported provider)
 	var err error
-	switch cfg.Provider {
-	case ProviderCloudflare:
-		s.provider, err = NewCloudflareProvider(&cfg.Cloudflare)
-	case ProviderTailscale:
-		s.provider, err = NewTailscaleProvider(&cfg.Tailscale, dataDir)
-	default:
-		return nil, fmt.Errorf("unknown tunnel provider: %s", cfg.Provider)
-	}
-
+	s.provider, err = NewTailscaleProvider(&cfg.Tailscale, dataDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create %s provider: %w", cfg.Provider, err)
+		return nil, fmt.Errorf("failed to create tailscale provider: %w", err)
 	}
 
 	return s, nil

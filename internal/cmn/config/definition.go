@@ -153,7 +153,7 @@ type Definition struct {
 	// GitSync contains configuration for Git synchronization.
 	GitSync *GitSyncDef `mapstructure:"gitSync"`
 
-	// Tunnel contains configuration for tunnel services (Cloudflare/Tailscale).
+	// Tunnel contains configuration for tunnel services (Tailscale).
 	Tunnel *TunnelDef `mapstructure:"tunnel"`
 }
 
@@ -531,13 +531,6 @@ type TunnelDef struct {
 	// Env: DAGU_TUNNEL_ENABLED
 	Enabled *bool `mapstructure:"enabled"`
 
-	// Provider specifies which tunnel provider to use: "cloudflare" or "tailscale".
-	// Env: DAGU_TUNNEL_PROVIDER
-	Provider string `mapstructure:"provider"`
-
-	// Cloudflare contains Cloudflare Tunnel configuration.
-	Cloudflare *CloudflareTunnelDef `mapstructure:"cloudflare"`
-
 	// Tailscale contains Tailscale configuration.
 	Tailscale *TailscaleTunnelDef `mapstructure:"tailscale"`
 
@@ -551,19 +544,6 @@ type TunnelDef struct {
 
 	// RateLimiting contains rate limiting configuration for auth endpoints.
 	RateLimiting *TunnelRateLimitDef `mapstructure:"rateLimiting"`
-}
-
-// CloudflareTunnelDef holds Cloudflare Tunnel settings.
-type CloudflareTunnelDef struct {
-	// Token is the Cloudflare Tunnel token (required for named tunnels).
-	// Get this from Cloudflare Dashboard → Zero Trust → Tunnels.
-	// Env: DAGU_TUNNEL_CLOUDFLARE_TOKEN
-	Token string `mapstructure:"token"`
-
-	// Hostname is the custom hostname for the tunnel.
-	// If empty, uses the default cfargotunnel.com subdomain.
-	// Env: DAGU_TUNNEL_CLOUDFLARE_HOSTNAME
-	Hostname string `mapstructure:"hostname"`
 }
 
 // TailscaleTunnelDef holds Tailscale settings.

@@ -20,8 +20,7 @@ const (
 type ProviderType string
 
 const (
-	ProviderCloudflare ProviderType = "cloudflare"
-	ProviderTailscale  ProviderType = "tailscale"
+	ProviderTailscale ProviderType = "tailscale"
 )
 
 // Info contains information about an active tunnel.
@@ -31,13 +30,13 @@ type Info struct {
 	PublicURL string       `json:"publicUrl,omitempty"`
 	Error     string       `json:"error,omitempty"`
 	StartedAt time.Time    `json:"startedAt,omitempty"`
-	Mode      string       `json:"mode"` // "named" for CF, "direct"/"funnel" for TS
+	Mode      string       `json:"mode"` // "direct" or "funnel"
 	IsPublic  bool         `json:"isPublic"`
 }
 
 // Provider defines the interface that all tunnel providers must implement.
 type Provider interface {
-	// Name returns the provider name (e.g., "cloudflare", "tailscale").
+	// Name returns the provider name (e.g., "tailscale").
 	Name() ProviderType
 
 	// Start initiates the tunnel connection.

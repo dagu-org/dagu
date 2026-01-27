@@ -292,18 +292,10 @@ var (
 		viperKey:  "tunnel.enabled",
 	}
 
-	// tunnelProviderFlag specifies the tunnel provider.
-	tunnelProviderFlag = commandLineFlag{
-		name:      "tunnel-provider",
-		usage:     "Tunnel provider: 'cloudflare' or 'tailscale' (default: tailscale)",
-		bindViper: true,
-		viperKey:  "tunnel.provider",
-	}
-
 	// tunnelTokenFlag provides authentication token for the tunnel.
 	tunnelTokenFlag = commandLineFlag{
 		name:      "tunnel-token",
-		usage:     "Tunnel auth token (Cloudflare tunnel token or Tailscale auth key)",
+		usage:     "Tailscale auth key for headless authentication",
 		bindViper: true,
 		viperKey:  "tunnel.token",
 	}

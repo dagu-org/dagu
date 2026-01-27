@@ -76,7 +76,6 @@ function TunnelStatusCard({ data, isLoading, error }: TunnelStatusCardProps) {
   };
 
   const providerLabels: Record<string, string> = {
-    cloudflare: 'Cloudflare',
     tailscale: 'Tailscale',
   };
   const providerLabel = data?.provider

@@ -1952,7 +1952,7 @@ export interface components {
             error?: string;
             /** @description RFC3339 timestamp when tunnel connected */
             startedAt?: string;
-            /** @description Tunnel mode (e.g., 'named' for Cloudflare, 'direct' or 'funnel' for Tailscale) */
+            /** @description Tunnel mode (e.g., 'direct' or 'funnel' for Tailscale) */
             mode?: string;
             /** @description Whether the tunnel provides public internet access */
             isPublic?: boolean;
@@ -7191,7 +7191,6 @@ export enum CoordinatorInstanceStatus {
     unknown = "unknown"
 }
 export enum TunnelStatusResponseProvider {
-    cloudflare = "cloudflare",
     tailscale = "tailscale"
 }
 export enum TunnelStatusResponseStatus {

@@ -922,23 +922,6 @@ func (l *ConfigLoader) loadTunnelConfig(cfg *Config, def Definition) {
 		return
 	}
 
-	// Provider - CLI flag takes precedence over config file
-	provider := l.v.GetString("tunnel.provider")
-	if def.Tunnel != nil && def.Tunnel.Provider != "" && provider == "" {
-		provider = def.Tunnel.Provider
-	}
-	// Default to tailscale if not specified
-	if provider == "" {
-		provider = TunnelProviderTailscale
-	}
-	cfg.Tunnel.Provider = provider
-
-	// Cloudflare config from definition
-	if def.Tunnel != nil && def.Tunnel.Cloudflare != nil {
-		cfg.Tunnel.Cloudflare.Token = def.Tunnel.Cloudflare.Token
-		cfg.Tunnel.Cloudflare.Hostname = def.Tunnel.Cloudflare.Hostname
-	}
-
 	// Tailscale config from definition
 	if def.Tunnel != nil && def.Tunnel.Tailscale != nil {
 		cfg.Tunnel.Tailscale.AuthKey = def.Tunnel.Tailscale.AuthKey
@@ -962,16 +945,10 @@ func (l *ConfigLoader) loadTunnelConfig(cfg *Config, def Definition) {
 		cfg.Tunnel.Tailscale.HTTPS = true
 	}
 
-	// Handle --tunnel.token CLI flag - applies to the selected provider
+	// Handle --tunnel-token CLI flag
 	tunnelToken := l.v.GetString("tunnel.token")
 	if tunnelToken != "" {
-		// Apply token to the appropriate provider
-		switch cfg.Tunnel.Provider {
-		case TunnelProviderCloudflare:
-			cfg.Tunnel.Cloudflare.Token = tunnelToken
-		case TunnelProviderTailscale:
-			cfg.Tunnel.Tailscale.AuthKey = tunnelToken
-		}
+		cfg.Tunnel.Tailscale.AuthKey = tunnelToken
 	}
 
 	// Security options
@@ -1002,7 +979,7 @@ func (l *ConfigLoader) loadTunnelConfig(cfg *Config, def Definition) {
 	}
 
 	// Set default Tailscale hostname
-	if cfg.Tunnel.Provider == TunnelProviderTailscale && cfg.Tunnel.Tailscale.Hostname == "" {
+	if cfg.Tunnel.Tailscale.Hostname == "" {
 		cfg.Tunnel.Tailscale.Hostname = AppSlug
 	}
 }
@@ -1423,15 +1400,13 @@ var envBindings = []envBinding{
 	{key: "worker.postgresPool.connMaxLifetime", env: "WORKER_POSTGRES_POOL_CONN_MAX_LIFETIME"},
 	{key: "worker.postgresPool.connMaxIdleTime", env: "WORKER_POSTGRES_POOL_CONN_MAX_IDLE_TIME"},
 
-	// Tunnel configuration
-	{key: "tunnel.enabled", env: "TUNNEL"},           // Maps to --tunnel flag
-	{key: "tunnel.enabled", env: "TUNNEL_ENABLED"},   // Also support TUNNEL_ENABLED
-	{key: "tunnel.provider", env: "TUNNEL_PROVIDER"}, // Maps to --tunnel-provider flag
-	{key: "tunnel.cloudflare.token", env: "TUNNEL_CLOUDFLARE_TOKEN"},
-	{key: "tunnel.cloudflare.hostname", env: "TUNNEL_CLOUDFLARE_HOSTNAME"},
+	// Tunnel configuration (Tailscale only)
+	{key: "tunnel.enabled", env: "TUNNEL"},         // Maps to --tunnel flag
+	{key: "tunnel.enabled", env: "TUNNEL_ENABLED"}, // Also support TUNNEL_ENABLED
 	{key: "tunnel.tailscale.authKey", env: "TUNNEL_TAILSCALE_AUTH_KEY"},
 	{key: "tunnel.tailscale.hostname", env: "TUNNEL_TAILSCALE_HOSTNAME"},
 	{key: "tunnel.tailscale.funnel", env: "TUNNEL_TAILSCALE_FUNNEL"},
+	{key: "tunnel.tailscale.https", env: "TUNNEL_TAILSCALE_HTTPS"},
 	{key: "tunnel.tailscale.stateDir", env: "TUNNEL_TAILSCALE_STATE_DIR", isPath: true},
 	{key: "tunnel.allowTerminal", env: "TUNNEL_ALLOW_TERMINAL"},
 	{key: "tunnel.allowedIPs", env: "TUNNEL_ALLOWED_IPS"},
