@@ -20,7 +20,17 @@ const (
 	MessageTypeSystem MessageType = "system"
 	// MessageTypeError is an error message.
 	MessageTypeError MessageType = "error"
+	// MessageTypeUIAction is a UI action message (e.g., navigate to page).
+	MessageTypeUIAction MessageType = "ui_action"
 )
+
+// UIAction represents an action to be performed by the UI.
+type UIAction struct {
+	// Type is the action type (e.g., "navigate", "refresh").
+	Type string `json:"type"`
+	// Path is the navigation path (for "navigate" action).
+	Path string `json:"path,omitempty"`
+}
 
 // Message represents a message in a conversation.
 // This is the format stored and sent to the UI.
@@ -35,6 +45,7 @@ type Message struct {
 	Usage          *llm.Usage       `json:"usage,omitempty"`
 	CreatedAt      time.Time        `json:"created_at"`
 	LLMData        *llm.Message     `json:"llm_data,omitempty"`
+	UIAction       *UIAction        `json:"ui_action,omitempty"`
 }
 
 // ToolResult represents the result of a tool call.
@@ -92,9 +103,13 @@ type ToolOut struct {
 // ToolFunc is the function signature for tool execution.
 type ToolFunc func(ctx ToolContext, input json.RawMessage) ToolOut
 
+// UIActionFunc is the function signature for emitting UI actions.
+type UIActionFunc func(action UIAction)
+
 // ToolContext provides context to tool execution.
 type ToolContext struct {
-	WorkingDir string
+	WorkingDir     string
+	EmitUIAction   UIActionFunc
 }
 
 // AgentTool extends llm.Tool with an execution function.

@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useEffect, useRef } from 'react';
-import { ChevronRight, Terminal, CheckCircle, XCircle, Loader2 } from 'lucide-react';
-import { Message, ToolCall, ToolResult } from '../types';
+import { ChevronRight, Terminal, CheckCircle, XCircle, Loader2, ExternalLink } from 'lucide-react';
+import { Message, ToolCall, ToolResult, UIAction } from '../types';
 import { cn } from '@/lib/utils';
 
 interface ChatMessagesProps {
@@ -63,6 +63,8 @@ function MessageItem({ message }: { message: Message }) {
       return <ToolResultMessage toolResults={message.tool_results || []} />;
     case 'error':
       return <ErrorMessage content={message.content || ''} />;
+    case 'ui_action':
+      return <UIActionMessage action={message.ui_action} />;
     default:
       return null;
   }
@@ -77,6 +79,23 @@ function ErrorMessage({ content }: { content: string }) {
       </div>
     </div>
   );
+}
+
+function UIActionMessage({ action }: { action?: UIAction }) {
+  if (!action) return null;
+
+  if (action.type === 'navigate') {
+    return (
+      <div className="pl-1">
+        <div className="flex items-center gap-1.5 text-muted-foreground">
+          <ExternalLink className="h-3 w-3 flex-shrink-0" />
+          <span>Navigating to {action.path}</span>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 function UserMessage({ content }: { content: string }) {

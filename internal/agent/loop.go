@@ -36,6 +36,8 @@ type LoopConfig struct {
 	ConversationID string
 	// OnWorking is called when the working state changes.
 	OnWorking func(working bool)
+	// EmitUIAction is called when a tool wants to emit a UI action.
+	EmitUIAction UIActionFunc
 }
 
 // Loop manages a conversation turn with an LLM including tool execution.
@@ -55,6 +57,7 @@ type Loop struct {
 	conversationID string
 	onWorking      func(working bool)
 	sequenceID     int64
+	emitUIAction   UIActionFunc
 }
 
 // NewLoop creates a new Loop instance.
@@ -76,6 +79,7 @@ func NewLoop(config LoopConfig) *Loop {
 		workingDir:     config.WorkingDir,
 		conversationID: config.ConversationID,
 		onWorking:      config.OnWorking,
+		emitUIAction:   config.EmitUIAction,
 	}
 }
 
@@ -294,7 +298,10 @@ func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) er
 			}
 
 			// Execute the tool
-			toolCtx := ToolContext{WorkingDir: l.workingDir}
+			toolCtx := ToolContext{
+				WorkingDir:   l.workingDir,
+				EmitUIAction: l.emitUIAction,
+			}
 			result = tool.Run(toolCtx, input)
 		}
 

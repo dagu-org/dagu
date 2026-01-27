@@ -1,6 +1,11 @@
 // Agent chat types
 
-export type MessageType = 'user' | 'assistant' | 'tool_use' | 'tool_result' | 'error';
+export type MessageType = 'user' | 'assistant' | 'tool_use' | 'tool_result' | 'error' | 'ui_action';
+
+export interface UIAction {
+  type: 'navigate' | 'refresh';
+  path?: string;
+}
 
 export interface ToolCall {
   id: string;
@@ -25,6 +30,7 @@ export interface Message {
   content?: string;
   tool_calls?: ToolCall[];
   tool_results?: ToolResult[];
+  ui_action?: UIAction;
   created_at: string;
 }
 

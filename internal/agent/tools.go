@@ -8,6 +8,7 @@ func CreateTools() []*AgentTool {
 		NewReadTool(),
 		NewPatchTool(),
 		NewThinkTool(),
+		NewNavigateTool(),
 	}
 }
 

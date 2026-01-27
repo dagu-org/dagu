@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useAgentChatContext } from '../context/AgentChatContext';
 import {
@@ -25,6 +26,7 @@ function getAuthHeaders(): HeadersInit {
 
 export function useAgentChat() {
   const config = useConfig();
+  const navigate = useNavigate();
   const {
     conversationId,
     messages,
@@ -85,6 +87,13 @@ export function useAgentChat() {
         if (data.messages) {
           data.messages.forEach((msg: Message) => {
             addMessage(msg);
+
+            // Handle UI actions
+            if (msg.type === 'ui_action' && msg.ui_action) {
+              if (msg.ui_action.type === 'navigate' && msg.ui_action.path) {
+                navigate(msg.ui_action.path);
+              }
+            }
           });
         }
 
@@ -113,7 +122,7 @@ export function useAgentChat() {
     return () => {
       eventSource.close();
     };
-  }, [conversationId, baseUrl, addMessage, setConversationState, setConversationId]);
+  }, [conversationId, baseUrl, addMessage, setConversationState, setConversationId, navigate]);
 
   // Start a new conversation
   const startConversation = useCallback(
