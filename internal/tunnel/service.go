@@ -32,6 +32,7 @@ type TailscaleConfig struct {
 	AuthKey  string // Optional - auth key for headless login
 	Hostname string // Machine name in tailnet
 	Funnel   bool   // Enable Tailscale Funnel for public access
+	HTTPS    bool   // Use HTTPS for tailnet-only access (requires enabling HTTPS in Tailscale admin)
 	StateDir string // State directory
 }
 

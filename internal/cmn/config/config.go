@@ -164,6 +164,11 @@ type TailscaleTunnelConfig struct {
 	// When false, the server is only accessible within the tailnet.
 	Funnel bool
 
+	// HTTPS enables HTTPS for tailnet-only access.
+	// Requires enabling HTTPS certificates in the Tailscale admin panel.
+	// When false, uses plain HTTP (still secure via WireGuard encryption).
+	HTTPS bool
+
 	// StateDir is the directory for Tailscale state storage.
 	// Default: $DAGU_HOME/tailscale
 	StateDir string

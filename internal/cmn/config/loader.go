@@ -934,8 +934,8 @@ func (l *ConfigLoader) loadGitSyncConfig(cfg *Config, def Definition) {
 
 // loadTunnelConfig loads the tunnel configuration.
 func (l *ConfigLoader) loadTunnelConfig(cfg *Config, def Definition) {
-	// Check if tunnel is enabled via CLI flag or config
-	enabled := l.v.GetBool("tunnel.enabled") || l.v.GetBool("tunnel")
+	// Check if tunnel is enabled via CLI flag (--tunnel.enabled or -t) or config
+	enabled := l.v.GetBool("tunnel.enabled")
 	if def.Tunnel != nil && def.Tunnel.Enabled != nil {
 		enabled = *def.Tunnel.Enabled
 	}
@@ -945,12 +945,9 @@ func (l *ConfigLoader) loadTunnelConfig(cfg *Config, def Definition) {
 		return
 	}
 
-	// Provider - CLI flag takes precedence
+	// Provider - CLI flag takes precedence over config file
 	provider := l.v.GetString("tunnel.provider")
-	if provider == "" {
-		provider = l.v.GetString("tunnelProvider")
-	}
-	if def.Tunnel != nil && def.Tunnel.Provider != "" {
+	if def.Tunnel != nil && def.Tunnel.Provider != "" && provider == "" {
 		provider = def.Tunnel.Provider
 	}
 	// Default to tailscale if not specified
@@ -959,27 +956,37 @@ func (l *ConfigLoader) loadTunnelConfig(cfg *Config, def Definition) {
 	}
 	cfg.Tunnel.Provider = provider
 
-	// Cloudflare config
+	// Cloudflare config from definition
 	if def.Tunnel != nil && def.Tunnel.Cloudflare != nil {
 		cfg.Tunnel.Cloudflare.Token = def.Tunnel.Cloudflare.Token
 		cfg.Tunnel.Cloudflare.Hostname = def.Tunnel.Cloudflare.Hostname
 	}
 
-	// Tailscale config
+	// Tailscale config from definition
 	if def.Tunnel != nil && def.Tunnel.Tailscale != nil {
 		cfg.Tunnel.Tailscale.AuthKey = def.Tunnel.Tailscale.AuthKey
 		cfg.Tunnel.Tailscale.Hostname = def.Tunnel.Tailscale.Hostname
 		if def.Tunnel.Tailscale.Funnel != nil {
 			cfg.Tunnel.Tailscale.Funnel = *def.Tunnel.Tailscale.Funnel
 		}
+		if def.Tunnel.Tailscale.HTTPS != nil {
+			cfg.Tunnel.Tailscale.HTTPS = *def.Tunnel.Tailscale.HTTPS
+		}
 		cfg.Tunnel.Tailscale.StateDir = def.Tunnel.Tailscale.StateDir
 	}
 
-	// Handle --tunnel-token CLI flag
-	tunnelToken := l.v.GetString("tunnel.token")
-	if tunnelToken == "" {
-		tunnelToken = l.v.GetString("tunnelToken")
+	// Handle --tunnel-funnel CLI flag
+	if l.v.GetBool("tunnel.tailscale.funnel") {
+		cfg.Tunnel.Tailscale.Funnel = true
 	}
+
+	// Handle --tunnel-https CLI flag
+	if l.v.GetBool("tunnel.tailscale.https") {
+		cfg.Tunnel.Tailscale.HTTPS = true
+	}
+
+	// Handle --tunnel.token CLI flag - applies to the selected provider
+	tunnelToken := l.v.GetString("tunnel.token")
 	if tunnelToken != "" {
 		// Apply token to the appropriate provider
 		switch cfg.Tunnel.Provider {

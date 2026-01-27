@@ -582,6 +582,12 @@ type TailscaleTunnelDef struct {
 	// Env: DAGU_TUNNEL_TAILSCALE_FUNNEL
 	Funnel *bool `mapstructure:"funnel"`
 
+	// HTTPS enables HTTPS for tailnet-only access.
+	// Requires enabling HTTPS certificates in the Tailscale admin panel.
+	// When false, uses plain HTTP (still secure via WireGuard encryption).
+	// Env: DAGU_TUNNEL_TAILSCALE_HTTPS
+	HTTPS *bool `mapstructure:"https"`
+
 	// StateDir is the directory for Tailscale state storage.
 	// Default: $DAGU_HOME/tailscale
 	// Env: DAGU_TUNNEL_TAILSCALE_STATE_DIR

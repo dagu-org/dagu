@@ -29,6 +29,7 @@ type TailscaleProvider struct {
 	listener  net.Listener
 	cancel    context.CancelFunc
 	done      chan struct{}
+	ready     chan struct{} // Closed when tunnel is connected and URL is available
 }
 
 // NewTailscaleProvider creates a new Tailscale tunnel provider.
@@ -63,17 +64,18 @@ func (p *TailscaleProvider) Name() ProviderType {
 }
 
 // Start initiates the Tailscale connection.
+// It blocks until the tunnel is connected and the URL is available, or until timeout/error.
 func (p *TailscaleProvider) Start(ctx context.Context, localAddr string) error {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	if p.status == StatusConnected || p.status == StatusConnecting {
+		p.mu.Unlock()
 		return nil
 	}
 
 	p.status = StatusConnecting
 	p.startedAt = time.Now()
 	p.errMsg = ""
+	p.ready = make(chan struct{})
 
 	// Create a cancellable context for the tunnel
 	tunnelCtx, cancel := context.WithCancel(ctx)
@@ -89,7 +91,6 @@ func (p *TailscaleProvider) Start(ctx context.Context, localAddr string) error {
 	srv := &tsnet.Server{
 		Hostname: hostname,
 		Dir:      p.stateDir,
-		Logf:     func(format string, args ...any) {}, // Silent logging
 	}
 
 	// Set auth key if provided
@@ -98,11 +99,28 @@ func (p *TailscaleProvider) Start(ctx context.Context, localAddr string) error {
 	}
 
 	p.server = srv
+	p.mu.Unlock()
 
 	// Start the tunnel in a goroutine
 	go p.runTunnel(tunnelCtx, localAddr)
 
-	return nil
+	// Wait for tunnel to be ready (with timeout)
+	select {
+	case <-p.ready:
+		// Tunnel is connected and URL is available
+		return nil
+	case <-p.done:
+		// Tunnel goroutine exited (likely error)
+		p.mu.RLock()
+		errMsg := p.errMsg
+		p.mu.RUnlock()
+		if errMsg != "" {
+			return fmt.Errorf("tunnel failed: %s", errMsg)
+		}
+		return fmt.Errorf("tunnel exited unexpectedly")
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // runTunnel runs the Tailscale tunnel.
@@ -155,35 +173,60 @@ func (p *TailscaleProvider) runTunnel(ctx context.Context, localAddr string) {
 		dnsName = dnsName[:len(dnsName)-1]
 	}
 
+	// Set URL scheme based on mode
+	scheme := "http"
+	if p.config.Funnel || p.config.HTTPS {
+		scheme = "https"
+	}
+
 	p.mu.Lock()
-	p.publicURL = fmt.Sprintf("https://%s", dnsName)
+	p.publicURL = fmt.Sprintf("%s://%s", scheme, dnsName)
 	p.status = StatusConnected
 	p.mu.Unlock()
 
-	// Create listener based on funnel mode
+	// Create listener based on mode
 	var ln net.Listener
 	if p.config.Funnel {
-		// Use Funnel for public access
+		// Use Funnel for public access (requires TLS)
 		ln, err = p.server.ListenFunnel("tcp", ":443")
 		if err != nil {
 			p.setError(fmt.Sprintf("failed to start funnel listener: %v", err))
 			return
 		}
-	} else {
-		// Use regular TLS listener for tailnet-only access
+	} else if p.config.HTTPS {
+		// Use TLS for tailnet-only access (requires enabling HTTPS in Tailscale admin)
 		ln, err = p.server.ListenTLS("tcp", ":443")
 		if err != nil {
 			p.setError(fmt.Sprintf("failed to start TLS listener: %v", err))
+			return
+		}
+	} else {
+		// For tailnet-only access, use plain HTTP (WireGuard already encrypts)
+		// This avoids requiring HTTPS certificates to be enabled in Tailscale admin
+		ln, err = p.server.Listen("tcp", ":80")
+		if err != nil {
+			p.setError(fmt.Sprintf("failed to start listener: %v", err))
 			return
 		}
 	}
 
 	p.mu.Lock()
 	p.listener = ln
+	ready := p.ready
 	p.mu.Unlock()
 
+	// Signal that we're ready AFTER listener is created
+	if ready != nil {
+		close(ready)
+	}
+
 	// Create reverse proxy to local server
-	targetURL, err := url.Parse(fmt.Sprintf("http://%s", localAddr))
+	// Use 127.0.0.1 if the host is 0.0.0.0 (can't connect to 0.0.0.0)
+	proxyAddr := localAddr
+	if host, port, err := net.SplitHostPort(localAddr); err == nil && host == "0.0.0.0" {
+		proxyAddr = net.JoinHostPort("127.0.0.1", port)
+	}
+	targetURL, err := url.Parse(fmt.Sprintf("http://%s", proxyAddr))
 	if err != nil {
 		p.setError(fmt.Sprintf("invalid local address: %v", err))
 		ln.Close()
@@ -253,6 +296,7 @@ func (p *TailscaleProvider) Stop(ctx context.Context) error {
 	p.server = nil
 	p.listener = nil
 	p.done = nil
+	p.ready = nil
 	p.mu.Unlock()
 
 	return nil

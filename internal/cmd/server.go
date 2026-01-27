@@ -42,7 +42,7 @@ Example:
 	)
 }
 
-var serverFlags = []commandLineFlag{dagsFlag, hostFlag, portFlag, tunnelFlag, tunnelProviderFlag, tunnelTokenFlag}
+var serverFlags = []commandLineFlag{dagsFlag, hostFlag, portFlag, tunnelFlag, tunnelProviderFlag, tunnelTokenFlag, tunnelFunnelFlag, tunnelHTTPSFlag}
 
 // runServer initializes and runs the web UI server and its resource monitoring service.
 // It logs startup info, starts the resource service (deferring its shutdown and logging any stop errors),
@@ -143,6 +143,7 @@ func initTunnelService(cfg *config.Config) (*tunnel.Service, error) {
 			AuthKey:  cfg.Tunnel.Tailscale.AuthKey,
 			Hostname: cfg.Tunnel.Tailscale.Hostname,
 			Funnel:   cfg.Tunnel.Tailscale.Funnel,
+			HTTPS:    cfg.Tunnel.Tailscale.HTTPS,
 			StateDir: cfg.Tunnel.Tailscale.StateDir,
 		},
 		AllowTerminal: cfg.Tunnel.AllowTerminal,
