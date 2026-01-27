@@ -80,6 +80,7 @@ func (e *DAGExecutor) HandleJob(
 	dag *core.DAG,
 	operation coordinatorv1.Operation,
 	runID string,
+	triggerType core.TriggerType,
 ) error {
 	// For distributed execution with START operation, enqueue for persistence
 	if e.shouldUseDistributedExecution(dag) && operation == coordinatorv1.Operation_OPERATION_START {
@@ -94,7 +95,8 @@ func (e *DAGExecutor) HandleJob(
 		)
 
 		spec := e.subCmdBuilder.Enqueue(dag, runtime.EnqueueOptions{
-			DAGRunID: runID,
+			DAGRunID:    runID,
+			TriggerType: triggerType.String(),
 		})
 		if err := runtime.Run(ctx, spec); err != nil {
 			return fmt.Errorf("failed to enqueue DAG run: %w", err)
@@ -103,7 +105,7 @@ func (e *DAGExecutor) HandleJob(
 	}
 
 	// For all other cases (local execution or non-START operations), use ExecuteDAG
-	return e.ExecuteDAG(ctx, dag, operation, runID, nil)
+	return e.ExecuteDAG(ctx, dag, operation, runID, nil, triggerType)
 }
 
 // ExecuteDAG executes or dispatches an already-persisted DAG.
@@ -121,6 +123,7 @@ func (e *DAGExecutor) ExecuteDAG(
 	operation coordinatorv1.Operation,
 	runID string,
 	previousStatus *exec.DAGRunStatus,
+	triggerType core.TriggerType,
 ) error {
 	if e.shouldUseDistributedExecution(dag) {
 		// Distributed execution: dispatch to coordinator
@@ -139,8 +142,9 @@ func (e *DAGExecutor) ExecuteDAG(
 	switch operation {
 	case coordinatorv1.Operation_OPERATION_START:
 		spec := e.subCmdBuilder.Start(dag, runtime.StartOptions{
-			DAGRunID: runID,
-			Quiet:    true,
+			DAGRunID:    runID,
+			Quiet:       true,
+			TriggerType: triggerType.String(),
 		})
 		return runtime.Start(ctx, spec)
 

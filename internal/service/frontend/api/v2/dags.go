@@ -871,6 +871,7 @@ func (a *API) startDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, 
 		dagRunID:     dagRunID,
 		nameOverride: nameOverride,
 		singleton:    singleton,
+		triggerType:  core.TriggerTypeManual,
 	})
 }
 
@@ -914,6 +915,7 @@ type startDAGRunOptions struct {
 	singleton    bool
 	fromRunID    string
 	target       string
+	triggerType  core.TriggerType
 }
 
 func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts startDAGRunOptions) error {
@@ -924,6 +926,7 @@ func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts st
 		NameOverride: opts.nameOverride,
 		FromRunID:    opts.fromRunID,
 		Target:       opts.target,
+		TriggerType:  opts.triggerType.String(),
 	})
 
 	if err := runtime1.Start(ctx, spec); err != nil {
@@ -1052,7 +1055,7 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		}
 	}
 
-	if err := a.enqueueDAGRun(ctx, dag, valueOf(request.Body.Params), dagRunId, nameOverride); err != nil {
+	if err := a.enqueueDAGRun(ctx, dag, valueOf(request.Body.Params), dagRunId, nameOverride, core.TriggerTypeManual); err != nil {
 		return nil, fmt.Errorf("error enqueuing dag-run: %w", err)
 	}
 
@@ -1079,11 +1082,12 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 	}, nil
 }
 
-func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride string) error {
+func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride string, triggerType core.TriggerType) error {
 	opts := runtime1.EnqueueOptions{
 		Params:       params,
 		DAGRunID:     dagRunID,
 		NameOverride: nameOverride,
+		TriggerType:  triggerType.String(),
 	}
 	if dag.Queue != "" {
 		opts.Queue = dag.Queue

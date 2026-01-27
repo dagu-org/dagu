@@ -42,6 +42,7 @@ type DAGRunStatus struct {
 	AttemptID     string            `json:"attemptId"`
 	AttemptKey    string            `json:"attemptKey,omitempty"` // Globally unique attempt identifier
 	Status        core.Status       `json:"status"`
+	TriggerType   core.TriggerType  `json:"triggerType,omitempty"`
 	WorkerID      string            `json:"workerId,omitempty"`
 	PID           PID               `json:"pid,omitempty"`
 	Nodes         []*Node           `json:"nodes,omitempty"`

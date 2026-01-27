@@ -1873,6 +1873,11 @@ export interface components {
          */
         StatusLabel: StatusLabel;
         /**
+         * @description How the DAG-run was initiated
+         * @enum {string}
+         */
+        TriggerType: TriggerType;
+        /**
          * @description Numeric status code indicating current node state:
          *     0: "Not started"
          *     1: "Running"
@@ -2059,6 +2064,7 @@ export interface components {
             params?: string;
             /** @description ID of the worker that executed this DAG-run ('local' for local execution) */
             workerId?: string;
+            triggerType?: components["schemas"]["TriggerType"];
             /** @description List of tags for categorizing and filtering DAG runs */
             tags?: string[];
         };
@@ -7166,6 +7172,13 @@ export enum StatusLabel {
     partially_succeeded = "partially_succeeded",
     waiting = "waiting",
     rejected = "rejected"
+}
+export enum TriggerType {
+    unknown = "unknown",
+    scheduler = "scheduler",
+    manual = "manual",
+    webhook = "webhook",
+    subdag = "subdag"
 }
 export enum NodeStatus {
     NotStarted = 0,

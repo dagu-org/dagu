@@ -8,6 +8,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/spf13/cobra"
 )
@@ -204,8 +205,8 @@ func runExec(ctx *Context, args []string) error {
 		tag.RunID(runID),
 	)
 
-	// exec command is always local execution
-	return tryExecuteDAG(ctx, dag, runID, dagRunRef, "local")
+	// exec command is always local execution with manual trigger type
+	return tryExecuteDAG(ctx, dag, runID, dagRunRef, "local", core.TriggerTypeManual)
 }
 
 var (

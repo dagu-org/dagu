@@ -118,3 +118,46 @@ func (s NodeStatus) String() string {
 		return "unknown"
 	}
 }
+
+// TriggerType represents how a DAG run was initiated.
+type TriggerType int
+
+const (
+	TriggerTypeUnknown TriggerType = iota
+	TriggerTypeScheduler
+	TriggerTypeManual
+	TriggerTypeWebhook
+	TriggerTypeSubDAG
+)
+
+// String returns the canonical lowercase token for the trigger type.
+func (t TriggerType) String() string {
+	switch t {
+	case TriggerTypeScheduler:
+		return "scheduler"
+	case TriggerTypeManual:
+		return "manual"
+	case TriggerTypeWebhook:
+		return "webhook"
+	case TriggerTypeSubDAG:
+		return "subdag"
+	default:
+		return "unknown"
+	}
+}
+
+// ParseTriggerType parses a string into a TriggerType.
+func ParseTriggerType(s string) TriggerType {
+	switch s {
+	case "scheduler":
+		return TriggerTypeScheduler
+	case "manual":
+		return TriggerTypeManual
+	case "webhook":
+		return TriggerTypeWebhook
+	case "subdag":
+		return TriggerTypeSubDAG
+	default:
+		return TriggerTypeUnknown
+	}
+}

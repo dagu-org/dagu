@@ -15,10 +15,12 @@ import {
   StopCircle,
   Terminal,
   Timer,
+  Zap,
 } from 'lucide-react';
 import React from 'react';
 import { components, Status } from '../../../../api/v2/schema';
 import LabeledItem from '../../../../ui/LabeledItem';
+import { TriggerTypeIndicator } from '../common/TriggerTypeIndicator';
 
 /**
  * Props for the DAGStatusOverview component
@@ -173,8 +175,17 @@ function DAGStatusOverview({ status, onViewLog }: Props) {
           </div>
         </div>
 
-        {/* Row 2: Worker and Run ID */}
+        {/* Row 2: Trigger, Worker, and Run ID */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          {status.triggerType && (
+            <div className="flex items-center">
+              <Zap className="w-3.5 mr-1 text-muted-foreground" />
+              <LabeledItem label="Trigger">
+                <TriggerTypeIndicator type={status.triggerType} size={12} />
+              </LabeledItem>
+            </div>
+          )}
+
           {status.workerId && (
             <div className="flex items-center">
               <Server className="w-3.5 mr-1 text-muted-foreground" />

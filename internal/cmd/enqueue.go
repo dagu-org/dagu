@@ -29,7 +29,7 @@ Examples:
 	)
 }
 
-var enqueueFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, queueFlag, defaultWorkingDirFlag}
+var enqueueFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, queueFlag, defaultWorkingDirFlag, triggerTypeFlag}
 
 func runEnqueue(ctx *Context, args []string) error {
 	// Get Run ID from the context or generate a new one
@@ -65,11 +65,14 @@ func runEnqueue(ctx *Context, args []string) error {
 		dag.Queue = queueOverride
 	}
 
-	return enqueueDAGRun(ctx, dag, runID)
+	triggerTypeStr, _ := ctx.StringParam("trigger-type")
+	triggerType := core.ParseTriggerType(triggerTypeStr)
+
+	return enqueueDAGRun(ctx, dag, runID, triggerType)
 }
 
 // enqueueDAGRun enqueues a dag-run to the queue.
-func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string) error {
+func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string, triggerType core.TriggerType) error {
 	// Queued dag-runs must not have a location because it is used to generate
 	// unix pipe. If two DAGs has same location, they can not run at the same time.
 	// Queued DAGs can be run at the same time depending on the `maxActiveRuns` setting.
@@ -105,6 +108,7 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string) error {
 			exec.NewDAGRunRef(dag.Name, dagRunID),
 			exec.DAGRunRef{},
 		),
+		transform.WithTriggerType(triggerType),
 	}
 
 	// As a prototype, we save the status to the database to enqueue the dag-run.

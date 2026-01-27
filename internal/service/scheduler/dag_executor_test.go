@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/scheduler"
@@ -58,6 +59,7 @@ steps:
 				dag,
 				coordinatorv1.Operation_OPERATION_START,
 				runID,
+				core.TriggerTypeScheduler,
 			)
 
 			// This succeeds because it enqueues the DAG
@@ -85,6 +87,7 @@ steps:
 				coordinatorv1.Operation_OPERATION_START,
 				runID,
 				nil,
+				core.TriggerTypeScheduler,
 			)
 
 			// This fails because no worker is connected, but the important
@@ -112,6 +115,7 @@ steps:
 				dag,
 				coordinatorv1.Operation_OPERATION_START,
 				runID,
+				core.TriggerTypeScheduler,
 			)
 
 			// With the test executable, this actually succeeds because
@@ -142,6 +146,7 @@ steps:
 				dag,
 				coordinatorv1.Operation_OPERATION_RETRY,
 				runID,
+				core.TriggerTypeScheduler,
 			)
 
 			// This fails because no worker is connected, but it shows

@@ -13,6 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
@@ -433,8 +434,8 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 		dagRunID = uuid.Must(uuid.NewV7()).String()
 	}
 
-	// Enqueue the DAG run
-	if err := a.enqueueDAGRun(ctx, dag, params, dagRunID, ""); err != nil {
+	// Enqueue the DAG run with webhook trigger type
+	if err := a.enqueueDAGRun(ctx, dag, params, dagRunID, "", core.TriggerTypeWebhook); err != nil {
 		logger.Error(ctx, "Webhook: failed to enqueue DAG run",
 			tag.Name(dag.Name),
 			tag.Error(err),

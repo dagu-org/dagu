@@ -131,6 +131,7 @@ func (e *SubDAGExecutor) buildCommand(ctx context.Context, runParams RunParams, 
 		fmt.Sprintf("--root=%s", rCtx.RootDAGRun.String()),
 		fmt.Sprintf("--parent=%s", rCtx.DAGRunRef().String()),
 		fmt.Sprintf("--run-id=%s", runParams.RunID),
+		"--trigger-type=subdag",
 	}
 	if workDir != "" {
 		args = append(args, fmt.Sprintf("--default-working-dir=%s", workDir))

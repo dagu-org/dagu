@@ -54,6 +54,9 @@ func (b *SubCmdBuilder) Start(dag *core.DAG, opts StartOptions) CmdSpec {
 	if opts.FromRunID != "" {
 		args = append(args, fmt.Sprintf("--from-run-id=%s", opts.FromRunID))
 	}
+	if opts.TriggerType != "" {
+		args = append(args, fmt.Sprintf("--trigger-type=%s", opts.TriggerType))
+	}
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
 	}
@@ -91,6 +94,9 @@ func (b *SubCmdBuilder) Enqueue(dag *core.DAG, opts EnqueueOptions) CmdSpec {
 	}
 	if opts.Queue != "" {
 		args = append(args, "--queue", opts.Queue)
+	}
+	if opts.TriggerType != "" {
+		args = append(args, fmt.Sprintf("--trigger-type=%s", opts.TriggerType))
 	}
 	args = append(args, dag.Location)
 
@@ -245,6 +251,7 @@ type StartOptions struct {
 	NameOverride string // Optional DAG name override
 	FromRunID    string // Historic dag-run ID to use as a template
 	Target       string // Optional CLI argument override (DAG name or file path)
+	TriggerType  string // How this DAG run was initiated (scheduler, manual, webhook, subdag)
 }
 
 // EnqueueOptions contains options for enqueuing a dag-run.
@@ -254,6 +261,7 @@ type EnqueueOptions struct {
 	DAGRunID     string // ID for the dag-run
 	Queue        string // Queue name to enqueue to
 	NameOverride string // Optional DAG name override
+	TriggerType  string // How this DAG run was initiated (scheduler, manual, webhook, subdag)
 }
 
 // RestartOptions contains options for restarting a dag-run.

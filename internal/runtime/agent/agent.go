@@ -135,6 +135,9 @@ type Agent struct {
 	// workerID is the identifier of the worker executing this DAG run.
 	workerID string
 
+	// triggerType indicates how this DAG run was initiated.
+	triggerType core.TriggerType
+
 	// tracer is the OpenTelemetry tracer for the agent.
 	tracer *telemetry.Tracer
 
@@ -213,6 +216,8 @@ type Options struct {
 	RootDAGRun exec.DAGRunRef
 	// PeerConfig is the configuration for peer communication.
 	PeerConfig config.Peer
+	// TriggerType indicates how this DAG run was initiated.
+	TriggerType core.TriggerType
 }
 
 // New creates a new Agent.
@@ -245,6 +250,7 @@ func New(
 		logWriterFactory: opts.LogWriterFactory,
 		queuedRun:        opts.QueuedRun,
 		attemptID:        opts.AttemptID,
+		triggerType:      opts.TriggerType,
 	}
 
 	// Initialize progress display if enabled
@@ -922,6 +928,7 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 			Create(a.dagRunID, core.Failed, os.Getpid(), time.Time{},
 				transform.WithAttemptID(a.dagRunAttemptID),
 				transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
+				transform.WithTriggerType(a.triggerType),
 			)
 	}
 
@@ -947,6 +954,7 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 		transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
 		transform.WithPreconditions(a.dag.Preconditions),
 		transform.WithWorkerID(a.workerID),
+		transform.WithTriggerType(a.triggerType),
 	}
 
 	// If the current execution is a retry, we need to copy some data

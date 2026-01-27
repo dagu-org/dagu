@@ -409,7 +409,8 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemDat
 	incInflight()
 
 	go func() {
-		if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID, st); err != nil {
+		// Preserve TriggerType from the queued status (set when the run was enqueued)
+		if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID, st, st.TriggerType); err != nil {
 			logger.Error(ctx, "Failed to execute DAG", tag.Error(err))
 		}
 	}()
