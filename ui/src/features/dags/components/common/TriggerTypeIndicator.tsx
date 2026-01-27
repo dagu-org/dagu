@@ -1,5 +1,6 @@
 import { TriggerType } from '@/api/v2/schema';
 import { Clock, GitBranch, HelpCircle, RotateCw, User, Webhook } from 'lucide-react';
+import React from 'react';
 
 const triggerTypeConfig: Record<
   TriggerType,
@@ -47,7 +48,7 @@ export function TriggerTypeIndicator({
   type,
   showLabel = true,
   size = 14,
-}: Props): JSX.Element | null {
+}: Props): React.JSX.Element | null {
   if (!type) {
     return null;
   }
