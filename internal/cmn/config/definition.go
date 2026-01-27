@@ -295,6 +295,7 @@ type PathsDef struct {
 	UsersDir           string `mapstructure:"usersDir"`
 	APIKeysDir         string `mapstructure:"apiKeysDir"`
 	WebhooksDir        string `mapstructure:"webhooksDir"`
+	ConversationsDir   string `mapstructure:"conversationsDir"`
 }
 
 // UIDef holds the user interface configuration settings.

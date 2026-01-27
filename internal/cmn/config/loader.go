@@ -367,6 +367,9 @@ func (l *ConfigLoader) loadPathsConfig(cfg *Config, def Definition) error {
 	if cfg.Paths.WebhooksDir, err = l.resolvePath("WebhooksDir", def.Paths.WebhooksDir); err != nil {
 		return err
 	}
+	if cfg.Paths.ConversationsDir, err = l.resolvePath("ConversationsDir", def.Paths.ConversationsDir); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -1020,6 +1023,9 @@ func (l *ConfigLoader) finalizePaths(cfg *Config) {
 	}
 	if cfg.Paths.WebhooksDir == "" {
 		cfg.Paths.WebhooksDir = filepath.Join(cfg.Paths.DataDir, "webhooks")
+	}
+	if cfg.Paths.ConversationsDir == "" {
+		cfg.Paths.ConversationsDir = filepath.Join(cfg.Paths.DataDir, "agent", "conversations")
 	}
 
 	if cfg.Paths.Executable == "" {

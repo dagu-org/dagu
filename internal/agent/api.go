@@ -29,7 +29,8 @@ func getUserIDFromContext(ctx context.Context) string {
 
 // API handles HTTP requests for the agent.
 type API struct {
-	conversations sync.Map // id -> *ConversationManager
+	conversations sync.Map // id -> *ConversationManager (active conversations)
+	store         ConversationStore
 	provider      llm.Provider
 	model         string
 	workingDir    string
@@ -39,10 +40,11 @@ type API struct {
 
 // APIConfig contains configuration for the API.
 type APIConfig struct {
-	Provider   llm.Provider
-	Model      string
-	WorkingDir string
-	Logger     *slog.Logger
+	Provider          llm.Provider
+	Model             string
+	WorkingDir        string
+	Logger            *slog.Logger
+	ConversationStore ConversationStore
 }
 
 // NewAPI creates a new API instance.
@@ -57,6 +59,7 @@ func NewAPI(cfg APIConfig) *API {
 		model:      cfg.Model,
 		workingDir: cfg.WorkingDir,
 		logger:     logger,
+		store:      cfg.ConversationStore,
 	}
 }
 
@@ -108,12 +111,37 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 
 	// Create new conversation manager
 	id := uuid.New().String()
+	now := time.Now()
+
+	// Create OnMessage callback for persistence
+	var onMessage func(ctx context.Context, msg Message) error
+	if a.store != nil {
+		onMessage = func(ctx context.Context, msg Message) error {
+			return a.store.AddMessage(ctx, id, &msg)
+		}
+	}
+
 	mgr := NewConversationManager(ConversationManagerConfig{
 		ID:         id,
 		UserID:     userID,
 		Logger:     a.logger,
 		WorkingDir: a.workingDir,
+		OnMessage:  onMessage,
 	})
+
+	// Persist conversation to store
+	if a.store != nil {
+		conv := &Conversation{
+			ID:        id,
+			UserID:    userID,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		if err := a.store.CreateConversation(r.Context(), conv); err != nil {
+			a.logger.Error("Failed to persist conversation", "error", err)
+			// Continue anyway - in-memory operation should still work
+		}
+	}
 
 	a.conversations.Store(id, mgr)
 
@@ -132,18 +160,24 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleListConversations lists all active conversations for the current user.
+// handleListConversations lists all conversations for the current user.
 // GET /api/v2/agent/conversations
 func (a *API) handleListConversations(w http.ResponseWriter, r *http.Request) {
 	userID := getUserIDFromContext(r.Context())
+
+	// Track active conversation IDs
+	activeIDs := make(map[string]bool)
 	var conversations []ConversationWithState
 
+	// First, get active conversations from sync.Map
 	a.conversations.Range(func(key, value any) bool {
 		mgr := value.(*ConversationManager)
 		// Only include conversations belonging to the current user
 		if mgr.UserID() != userID {
 			return true
 		}
+		id := key.(string)
+		activeIDs[id] = true
 		conversations = append(conversations, ConversationWithState{
 			Conversation: mgr.GetConversation(),
 			Working:      mgr.IsWorking(),
@@ -151,6 +185,25 @@ func (a *API) handleListConversations(w http.ResponseWriter, r *http.Request) {
 		})
 		return true
 	})
+
+	// Then, get persisted conversations from store (if available)
+	if a.store != nil {
+		persisted, err := a.store.ListConversations(r.Context(), userID)
+		if err != nil {
+			a.logger.Warn("Failed to list persisted conversations", "error", err)
+		} else {
+			// Add persisted conversations that aren't active
+			for _, conv := range persisted {
+				if !activeIDs[conv.ID] {
+					conversations = append(conversations, ConversationWithState{
+						Conversation: *conv,
+						Working:      false,
+						Model:        "",
+					})
+				}
+			}
+		}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(conversations)
@@ -169,28 +222,62 @@ func (a *API) handleGetConversation(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	userID := getUserIDFromContext(r.Context())
 
-	mgrValue, ok := a.conversations.Load(id)
-	if !ok {
+	// First check active conversations
+	if mgrValue, ok := a.conversations.Load(id); ok {
+		mgr := mgrValue.(*ConversationManager)
+
+		// Check user ownership
+		if mgr.UserID() != userID {
+			http.Error(w, "Conversation not found", http.StatusNotFound)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(StreamResponse{
+			Messages:     mgr.GetMessages(),
+			Conversation: ptrTo(mgr.GetConversation()),
+			ConversationState: &ConversationState{
+				ConversationID: id,
+				Working:        mgr.IsWorking(),
+				Model:          mgr.GetModel(),
+			},
+		})
+		return
+	}
+
+	// Fall back to store for inactive conversations
+	if a.store == nil {
 		http.Error(w, "Conversation not found", http.StatusNotFound)
 		return
 	}
 
-	mgr := mgrValue.(*ConversationManager)
-
-	// Check user ownership
-	if mgr.UserID() != userID {
+	conv, err := a.store.GetConversation(r.Context(), id)
+	if err != nil {
 		http.Error(w, "Conversation not found", http.StatusNotFound)
 		return
+	}
+
+	// Verify ownership
+	if conv.UserID != userID {
+		http.Error(w, "Conversation not found", http.StatusNotFound)
+		return
+	}
+
+	// Get messages from store
+	messages, err := a.store.GetMessages(r.Context(), id)
+	if err != nil {
+		a.logger.Error("Failed to get messages from store", "error", err)
+		messages = []Message{}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(StreamResponse{
-		Messages:     mgr.GetMessages(),
-		Conversation: ptrTo(mgr.GetConversation()),
+		Messages:     messages,
+		Conversation: conv,
 		ConversationState: &ConversationState{
 			ConversationID: id,
-			Working:        mgr.IsWorking(),
-			Model:          mgr.GetModel(),
+			Working:        false,
+			Model:          "",
 		},
 	})
 }
@@ -201,16 +288,45 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	userID := getUserIDFromContext(r.Context())
 
-	mgrValue, ok := a.conversations.Load(id)
-	if !ok {
-		http.Error(w, "Conversation not found", http.StatusNotFound)
-		return
-	}
+	var mgr *ConversationManager
 
-	mgr := mgrValue.(*ConversationManager)
+	// First check if conversation is active
+	if mgrValue, ok := a.conversations.Load(id); ok {
+		mgr = mgrValue.(*ConversationManager)
+		// Check user ownership
+		if mgr.UserID() != userID {
+			http.Error(w, "Conversation not found", http.StatusNotFound)
+			return
+		}
+	} else if a.store != nil {
+		// Try to reactivate from store
+		conv, err := a.store.GetConversation(r.Context(), id)
+		if err != nil {
+			http.Error(w, "Conversation not found", http.StatusNotFound)
+			return
+		}
 
-	// Check user ownership
-	if mgr.UserID() != userID {
+		// Verify ownership
+		if conv.UserID != userID {
+			http.Error(w, "Conversation not found", http.StatusNotFound)
+			return
+		}
+
+		// Create OnMessage callback for persistence
+		onMessage := func(ctx context.Context, msg Message) error {
+			return a.store.AddMessage(ctx, id, &msg)
+		}
+
+		// Reactivate the conversation
+		mgr = NewConversationManager(ConversationManagerConfig{
+			ID:         id,
+			UserID:     userID,
+			Logger:     a.logger,
+			WorkingDir: a.workingDir,
+			OnMessage:  onMessage,
+		})
+		a.conversations.Store(id, mgr)
+	} else {
 		http.Error(w, "Conversation not found", http.StatusNotFound)
 		return
 	}

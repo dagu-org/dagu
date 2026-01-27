@@ -32,6 +32,8 @@ type ConversationManager struct {
 
 	// onWorkingChange is called when the working state changes.
 	onWorkingChange func(id string, working bool)
+	// onMessage is called when a message is recorded, for persistence.
+	onMessage func(ctx context.Context, msg Message) error
 }
 
 // ConversationManagerConfig contains configuration for creating a ConversationManager.
@@ -41,6 +43,8 @@ type ConversationManagerConfig struct {
 	Logger          *slog.Logger
 	WorkingDir      string
 	OnWorkingChange func(id string, working bool)
+	// OnMessage is called when a message is recorded, for persistence.
+	OnMessage func(ctx context.Context, msg Message) error
 }
 
 // NewConversationManager creates a new ConversationManager.
@@ -65,6 +69,7 @@ func NewConversationManager(cfg ConversationManagerConfig) *ConversationManager 
 		messages:        make([]Message, 0),
 		workingDir:      cfg.WorkingDir,
 		onWorkingChange: cfg.OnWorkingChange,
+		onMessage:       cfg.OnMessage,
 	}
 }
 
@@ -245,6 +250,7 @@ func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) e
 	logger := cm.logger
 	workingDir := cm.workingDir
 	conversationID := cm.id
+	onMessage := cm.onMessage
 	cm.mu.Unlock()
 
 	// Create tools
@@ -272,6 +278,14 @@ func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) e
 		cm.subpub.Publish(seqID, StreamResponse{
 			Messages: []Message{msg},
 		})
+
+		// Persist message if callback is set
+		if onMessage != nil {
+			if err := onMessage(ctx, msg); err != nil {
+				logger.Warn("Failed to persist message", "error", err)
+				// Don't fail the operation - persistence is best-effort
+			}
+		}
 
 		return nil
 	}
