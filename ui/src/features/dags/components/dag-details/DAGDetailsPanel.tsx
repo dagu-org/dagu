@@ -202,7 +202,7 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
             setData: setCurrentDAGRun,
           }}
         >
-          <div className="pl-2 pt-2 w-full flex flex-col h-full overflow-hidden">
+          <div className="px-2 pt-2 w-full flex flex-col h-full overflow-hidden">
             <div className="flex justify-between items-center mb-2 flex-shrink-0">
               <p className="text-xs text-muted-foreground">
                 Use{' '}
