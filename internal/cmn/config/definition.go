@@ -155,39 +155,6 @@ type Definition struct {
 
 	// Tunnel contains configuration for tunnel services (Tailscale).
 	Tunnel *TunnelDef `mapstructure:"tunnel"`
-
-	// Agent contains configuration for the AI agent feature.
-	Agent *AgentDef `mapstructure:"agent"`
-}
-
-// AgentDef holds the definition for agent configuration.
-type AgentDef struct {
-	// Enabled indicates whether the agent feature is enabled.
-	// Default: false
-	// Env: DAGU_AGENT_ENABLED
-	Enabled *bool `mapstructure:"enabled"`
-
-	// LLM contains the LLM provider configuration.
-	LLM *AgentLLMDef `mapstructure:"llm"`
-}
-
-// AgentLLMDef holds LLM provider configuration for the agent.
-type AgentLLMDef struct {
-	// Provider is the LLM provider type (anthropic, openai, gemini, openrouter, local).
-	// Env: DAGU_AGENT_LLM_PROVIDER
-	Provider string `mapstructure:"provider"`
-
-	// Model is the model ID to use.
-	// Env: DAGU_AGENT_LLM_MODEL
-	Model string `mapstructure:"model"`
-
-	// APIKey is the API key for the LLM provider.
-	// Env: DAGU_AGENT_LLM_API_KEY
-	APIKey string `mapstructure:"apiKey"`
-
-	// BaseURL is the optional custom API endpoint URL.
-	// Env: DAGU_AGENT_LLM_BASE_URL
-	BaseURL string `mapstructure:"baseUrl"`
 }
 
 // TerminalDef represents the terminal configuration.

@@ -30,6 +30,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/gitsync"
 	"github.com/dagu-org/dagu/internal/llm"
+	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
 	"github.com/dagu-org/dagu/internal/persis/fileapikey"
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
 	"github.com/dagu-org/dagu/internal/persis/fileuser"
@@ -136,7 +137,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	}
 
 	// Initialize agent API if enabled
-	agentAPI, err := initAgentAPI(ctx, cfg)
+	agentAPI, err := initAgentAPI(ctx, cfg.Paths.DataDir, cfg.Paths.DAGsDir)
 	if err != nil {
 		logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
 	}
@@ -384,8 +385,20 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 
 // initAgentAPI creates and returns an agent API if enabled.
 // Returns nil if agent is not enabled or LLM provider cannot be initialized.
-func initAgentAPI(ctx context.Context, cfg *config.Config) (*agent.API, error) {
-	agentCfg := cfg.Agent
+// Loads configuration from the file-based agent config store with environment variable overrides.
+func initAgentAPI(ctx context.Context, dataDir, dagsDir string) (*agent.API, error) {
+	// Create agent config store
+	store, err := fileagentconfig.New(dataDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create agent config store: %w", err)
+	}
+
+	// Load agent configuration
+	agentCfg, err := store.Load(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load agent config: %w", err)
+	}
+
 	if !agentCfg.Enabled {
 		return nil, nil
 	}
@@ -415,7 +428,7 @@ func initAgentAPI(ctx context.Context, cfg *config.Config) (*agent.API, error) {
 	api := agent.NewAPI(agent.APIConfig{
 		Provider:   provider,
 		Model:      agentCfg.LLM.Model,
-		WorkingDir: cfg.Paths.DAGsDir,
+		WorkingDir: dagsDir,
 		Logger:     slog.Default(),
 	})
 
