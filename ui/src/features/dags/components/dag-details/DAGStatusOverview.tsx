@@ -132,16 +132,13 @@ function formatDuration(startedAt: string | undefined, finishedAt: string | unde
   const minutes = Math.floor((diff % 3600) / 60);
   const seconds = diff % 60;
 
-  const parts: string[] = [];
   if (hours > 0) {
-    parts.push(`${hours}h`);
+    return `${hours}h ${minutes}m ${seconds}s`;
   }
   if (minutes > 0) {
-    parts.push(`${minutes}m`);
+    return `${minutes}m ${seconds}s`;
   }
-  parts.push(`${seconds}s`);
-
-  return parts.join(' ');
+  return `${seconds}s`;
 }
 
 function DAGStatusOverview({ status, onViewLog }: Props): React.JSX.Element | null {
@@ -164,16 +161,15 @@ function DAGStatusOverview({ status, onViewLog }: Props): React.JSX.Element | nu
     }
   }, [isRunning, status?.startedAt, calculateDuration]);
 
-  const nodeStatus = useMemo(() => {
-    return status?.nodes?.reduce(
-      (acc, node) => {
+  const nodeStatus = useMemo(
+    () =>
+      status?.nodes?.reduce<Record<string, number>>((acc, node) => {
         const statusKey = node.statusLabel.toLowerCase().replace(' ', '_');
         acc[statusKey] = (acc[statusKey] || 0) + 1;
         return acc;
-      },
-      {} as Record<string, number>
-    );
-  }, [status?.nodes]);
+      }, {}),
+    [status?.nodes]
+  );
 
   const totalNodes = status?.nodes?.length;
 
@@ -348,17 +344,19 @@ function DAGStatusOverview({ status, onViewLog }: Props): React.JSX.Element | nu
           </div>
         )}
 
-        {EXECUTION_STATUS_CONFIG.map(({ status: execStatus, icon: Icon, iconClass, message }) => {
-          if (status.status !== execStatus) {
+        {(() => {
+          const config = EXECUTION_STATUS_CONFIG.find(c => c.status === status.status);
+          if (!config) {
             return null;
           }
+          const Icon = config.icon;
           return (
-            <div key={execStatus} className="mt-1.5 flex items-center text-xs text-muted-foreground">
-              <Icon className={`h-3 w-3 mr-1 ${iconClass}`} />
-              <span>{message}</span>
+            <div className="mt-1.5 flex items-center text-xs text-muted-foreground">
+              <Icon className={`h-3 w-3 mr-1 ${config.iconClass}`} />
+              <span>{config.message}</span>
             </div>
           );
-        })}
+        })()}
       </div>
 
       <PreconditionErrors preconditions={status.preconditions} />

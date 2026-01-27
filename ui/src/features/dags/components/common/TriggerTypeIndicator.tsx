@@ -1,11 +1,23 @@
 import { TriggerType } from '@/api/v2/schema';
-import { Clock, GitBranch, HelpCircle, RotateCw, User, Webhook } from 'lucide-react';
-import React from 'react';
+import { cn } from '@/lib/utils';
+import {
+  Clock,
+  GitBranch,
+  HelpCircle,
+  type LucideIcon,
+  RotateCw,
+  User,
+  Webhook,
+} from 'lucide-react';
+import type { ReactElement } from 'react';
 
-const triggerTypeConfig: Record<
-  TriggerType,
-  { icon: typeof Clock; label: string; colorClass: string }
-> = {
+type TriggerConfig = {
+  icon: LucideIcon;
+  label: string;
+  colorClass: string;
+};
+
+const triggerTypeConfig: Record<TriggerType, TriggerConfig> = {
   scheduler: {
     icon: Clock,
     label: 'Scheduled',
@@ -48,17 +60,17 @@ export function TriggerTypeIndicator({
   type,
   showLabel = true,
   size = 14,
-}: Props): React.JSX.Element | null {
+}: Props): ReactElement | null {
   if (!type) {
     return null;
   }
 
-  const config = triggerTypeConfig[type] || triggerTypeConfig.unknown;
+  const config = triggerTypeConfig[type] ?? triggerTypeConfig.unknown;
   const Icon = config.icon;
 
   return (
     <div
-      className={`flex items-center gap-1 ${config.colorClass}`}
+      className={cn('flex items-center gap-1', config.colorClass)}
       aria-label={config.label}
       title={config.label}
     >
