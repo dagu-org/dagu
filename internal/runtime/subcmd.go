@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -274,14 +275,20 @@ type RestartOptions struct {
 func Run(ctx context.Context, spec CmdSpec) error {
 	var stdout, stderr bytes.Buffer
 
-	// Override spec's stdout/stderr to capture output for error reporting
-	captureSpec := spec
-	captureSpec.Stdout = nil
-	captureSpec.Stderr = nil
+	cmd := newCommand(ctx, spec, true)
 
-	cmd := newCommand(ctx, captureSpec, true)
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	// Tee output to both capture buffer and original destination
+	stdoutDest := spec.Stdout
+	if stdoutDest == nil {
+		stdoutDest = os.Stdout
+	}
+	stderrDest := spec.Stderr
+	if stderrDest == nil {
+		stderrDest = os.Stderr
+	}
+
+	cmd.Stdout = io.MultiWriter(&stdout, stdoutDest)
+	cmd.Stderr = io.MultiWriter(&stderr, stderrDest)
 
 	if err := cmd.Run(); err != nil {
 		parts := []string{fmt.Sprintf("command failed: %v", err)}
@@ -313,9 +320,11 @@ func Start(ctx context.Context, spec CmdSpec) error {
 // newCommand creates an exec.Cmd from the spec with proper configuration.
 // nolint:gosec
 func newCommand(ctx context.Context, spec CmdSpec, withContext bool) *exec.Cmd {
-	cmd := exec.Command(spec.Executable, spec.Args...)
+	var cmd *exec.Cmd
 	if withContext {
 		cmd = exec.CommandContext(ctx, spec.Executable, spec.Args...)
+	} else {
+		cmd = exec.Command(spec.Executable, spec.Args...)
 	}
 
 	cmdutil.SetupCommand(cmd)
