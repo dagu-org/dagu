@@ -89,7 +89,9 @@ func (st *DAGRunStatus) Errors() []error {
 	return errs
 }
 
-// NodeByName returns the node with the specified name
+// NodeByName returns the node with the specified name.
+// For handlers, it matches on both the handler label (e.g., "onSuccess")
+// and the step name within the handler.
 func (st *DAGRunStatus) NodeByName(name string) (*Node, error) {
 	for _, node := range st.Nodes {
 		if node.Step.Name == name {
@@ -97,8 +99,11 @@ func (st *DAGRunStatus) NodeByName(name string) (*Node, error) {
 		}
 	}
 	for _, handler := range st.handlerNodes() {
-		if handler.node != nil && handler.node.Step.Name == name {
-			return handler.node, nil
+		if handler.node != nil {
+			// Match on handler label (e.g., "onSuccess") or step name
+			if handler.name == name || handler.node.Step.Name == name {
+				return handler.node, nil
+			}
 		}
 	}
 	return nil, fmt.Errorf("node %s not found", name)

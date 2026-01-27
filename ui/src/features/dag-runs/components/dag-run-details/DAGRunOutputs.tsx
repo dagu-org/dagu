@@ -40,9 +40,6 @@ function statusLabelToStatus(label: StatusLabel): Status {
 type Props = {
   dagName: string;
   dagRunId: string;
-  isSubDAGRun?: boolean;
-  parentName?: string;
-  parentDagRunId?: string;
 };
 
 type SortConfig = {
@@ -50,13 +47,7 @@ type SortConfig = {
   direction: 'asc' | 'desc';
 };
 
-function DAGRunOutputs({
-  dagName,
-  dagRunId,
-  isSubDAGRun: _isSubDAGRun,
-  parentName: _parentName,
-  parentDagRunId: _parentDagRunId,
-}: Props) {
+function DAGRunOutputs({ dagName, dagRunId }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const [filter, setFilter] = useState('');
   const [sortConfig, setSortConfig] = useState<SortConfig>({

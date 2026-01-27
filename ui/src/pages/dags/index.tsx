@@ -2,7 +2,6 @@ import { debounce } from 'lodash';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import {
-  components,
   PathsDagsGetParametersQueryOrder,
   PathsDagsGetParametersQuerySort,
 } from '../../api/v2/schema';

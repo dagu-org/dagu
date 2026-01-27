@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { X, BookOpen, RefreshCw, AlertCircle } from 'lucide-react';
+import { X, BookOpen, RefreshCw } from 'lucide-react';
 import { useSchema } from '@/contexts/SchemaContext';
 import { useSchemaLookup } from '@/hooks/useSchemaLookup';
 import type { YamlPathSegment } from '@/hooks/useYamlCursorPath';

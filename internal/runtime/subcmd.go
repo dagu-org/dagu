@@ -1,7 +1,6 @@
 package runtime
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -16,6 +15,64 @@ import (
 	exec1 "github.com/dagu-org/dagu/internal/core/exec"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
+
+// CommandError wraps a command execution error with captured output.
+// It preserves the original error for unwrapping (e.g., for exit code extraction).
+type CommandError struct {
+	Err    error
+	Stdout string
+	Stderr string
+}
+
+func (e *CommandError) Error() string {
+	parts := []string{fmt.Sprintf("command failed: %v", e.Err)}
+	if e.Stdout != "" {
+		parts = append(parts, fmt.Sprintf("stdout: %s", e.Stdout))
+	}
+	if e.Stderr != "" {
+		parts = append(parts, fmt.Sprintf("stderr: %s", e.Stderr))
+	}
+	return strings.Join(parts, "\n")
+}
+
+func (e *CommandError) Unwrap() error {
+	return e.Err
+}
+
+// cappedBuffer is a buffer that keeps only the last maxSize bytes.
+// This prevents memory exhaustion from verbose command output.
+type cappedBuffer struct {
+	data    []byte
+	maxSize int
+}
+
+const defaultMaxBufferSize = 64 * 1024 // 64KB
+
+func newCappedBuffer(maxSize int) *cappedBuffer {
+	return &cappedBuffer{
+		data:    make([]byte, 0, maxSize),
+		maxSize: maxSize,
+	}
+}
+
+func (b *cappedBuffer) Write(p []byte) (n int, err error) {
+	n = len(p)
+	if len(p) >= b.maxSize {
+		// If input is larger than max, keep only the last maxSize bytes
+		b.data = append(b.data[:0], p[len(p)-b.maxSize:]...)
+		return n, nil
+	}
+	// Append and trim to maxSize
+	b.data = append(b.data, p...)
+	if len(b.data) > b.maxSize {
+		b.data = b.data[len(b.data)-b.maxSize:]
+	}
+	return n, nil
+}
+
+func (b *cappedBuffer) String() string {
+	return string(b.data)
+}
 
 // SubCmdBuilder centralizes CLI command argument construction.
 type SubCmdBuilder struct {
@@ -272,29 +329,29 @@ type RestartOptions struct {
 
 // Run executes the command and waits for it to complete.
 // If the command fails and output was captured, it is included in the error for debugging.
+// Uses capped buffers to prevent memory exhaustion from verbose command output.
 func Run(ctx context.Context, spec CmdSpec) error {
-	var stdout, stderr bytes.Buffer
+	stdout := newCappedBuffer(defaultMaxBufferSize)
+	stderr := newCappedBuffer(defaultMaxBufferSize)
 
 	cmd := newCommand(ctx, spec, true)
-	cmd.Stdout = io.MultiWriter(&stdout, fileOrDefault(spec.Stdout, os.Stdout))
-	cmd.Stderr = io.MultiWriter(&stderr, fileOrDefault(spec.Stderr, os.Stderr))
+	cmd.Stdout = io.MultiWriter(stdout, fileOrDefault(spec.Stdout, os.Stdout))
+	cmd.Stderr = io.MultiWriter(stderr, fileOrDefault(spec.Stderr, os.Stderr))
 
 	if err := cmd.Run(); err != nil {
-		return buildCommandError(err, &stdout, &stderr)
+		return buildCommandError(err, stdout, stderr)
 	}
 	return nil
 }
 
-// buildCommandError constructs an error message that includes captured output for debugging.
-func buildCommandError(err error, stdout, stderr *bytes.Buffer) error {
-	parts := []string{fmt.Sprintf("command failed: %v", err)}
-	if stdout.Len() > 0 {
-		parts = append(parts, fmt.Sprintf("stdout: %s", strings.TrimSpace(stdout.String())))
+// buildCommandError constructs an error that includes captured output for debugging.
+// It preserves the original error for unwrapping (e.g., for exit code extraction via errors.As).
+func buildCommandError(err error, stdout, stderr *cappedBuffer) error {
+	return &CommandError{
+		Err:    err,
+		Stdout: strings.TrimSpace(stdout.String()),
+		Stderr: strings.TrimSpace(stderr.String()),
 	}
-	if stderr.Len() > 0 {
-		parts = append(parts, fmt.Sprintf("stderr: %s", strings.TrimSpace(stderr.String())))
-	}
-	return fmt.Errorf("%s", strings.Join(parts, "\n"))
 }
 
 // fileOrDefault returns the file if non-nil, otherwise returns the default.

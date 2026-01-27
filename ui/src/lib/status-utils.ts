@@ -60,7 +60,6 @@ export function getStatusColors(
   animation: string;
 } {
   const baseClass = getStatusClass(status);
-  const isRunning = status === Status.Running || status === NodeStatus.Running;
   const isWaiting = status === Status.Waiting || status === NodeStatus.Waiting;
 
   switch (baseClass) {

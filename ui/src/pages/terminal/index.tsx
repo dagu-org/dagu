@@ -69,7 +69,6 @@ export default function TerminalPage() {
   // Set page title on mount
   useEffect(() => {
     appBarContext.setTitle('Terminal');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const sendMessage = useCallback((msg: TerminalMessage) => {

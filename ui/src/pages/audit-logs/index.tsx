@@ -205,7 +205,6 @@ export default function AuditLogsPage() {
   // Set page title on mount
   useEffect(() => {
     appBarContext.setTitle('Audit Logs');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchAuditLogs = useCallback(

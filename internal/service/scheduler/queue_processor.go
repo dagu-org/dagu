@@ -213,11 +213,11 @@ func (p *QueueProcessor) loop(ctx context.Context) {
 		var wg sync.WaitGroup
 		for name := range activeQueues {
 			wg.Add(1)
-			go func() {
+			go func(queueName string) {
 				defer wg.Done()
-				queueCtx := logger.WithValues(ctx, tag.Queue(name))
-				p.ProcessQueueItems(queueCtx, name)
-			}()
+				queueCtx := logger.WithValues(ctx, tag.Queue(queueName))
+				p.ProcessQueueItems(queueCtx, queueName)
+			}(name)
 		}
 		wg.Wait()
 	}
@@ -295,12 +295,12 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 	var wg sync.WaitGroup
 	for _, item := range runnableItems {
 		wg.Add(1)
-		go func() {
+		go func(queuedItem exec.QueuedItemData) {
 			defer wg.Done()
-			if !p.processDAG(ctx, item, queueName, q.incInflight, q.decInflight) {
+			if !p.processDAG(ctx, queuedItem, queueName, q.incInflight, q.decInflight) {
 				return
 			}
-			data, err := item.Data()
+			data, err := queuedItem.Data()
 			if err != nil {
 				logger.Error(ctx, "Failed to get item data", tag.Error(err))
 				return
@@ -308,7 +308,7 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 			if _, err := p.queueStore.DequeueByDAGRunID(ctx, queueName, *data); err != nil {
 				logger.Error(ctx, "Failed to dequeue item", tag.Error(err))
 			}
-		}()
+		}(item)
 	}
 	wg.Wait()
 }

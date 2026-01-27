@@ -422,9 +422,20 @@ func (a *API) readHistoryData(_ context.Context, statusList []exec.DAGRunStatus)
 		for _, node := range st.Nodes {
 			addStatus(nodeData, idx, node.Step.Name, node.Status)
 		}
-		for _, handler := range []*exec.Node{st.OnSuccess, st.OnFailure, st.OnCancel, st.OnExit} {
-			if handler != nil {
-				addStatus(handlerData, idx, handler.Step.Name, handler.Status)
+		// Key handlers by their type (onSuccess, onFailure, etc.) not step name
+		// to ensure consistent lookup later
+		handlerPairs := []struct {
+			handlerType core.HandlerType
+			node        *exec.Node
+		}{
+			{core.HandlerOnSuccess, st.OnSuccess},
+			{core.HandlerOnFailure, st.OnFailure},
+			{core.HandlerOnCancel, st.OnCancel},
+			{core.HandlerOnExit, st.OnExit},
+		}
+		for _, h := range handlerPairs {
+			if h.node != nil {
+				addStatus(handlerData, idx, h.handlerType.String(), h.node.Status)
 			}
 		}
 	}
@@ -865,6 +876,11 @@ func (a *API) waitForDAGStatusChange(ctx context.Context, dag *core.DAG, dagRunI
 }
 
 func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts startDAGRunOptions) error {
+	// Only pass trigger type if it's a known value (not TriggerTypeUnknown)
+	triggerTypeStr := ""
+	if opts.triggerType != core.TriggerTypeUnknown {
+		triggerTypeStr = opts.triggerType.String()
+	}
 	spec := a.subCmdBuilder.Start(dag, runtime1.StartOptions{
 		Params:       opts.params,
 		DAGRunID:     opts.dagRunID,
@@ -872,7 +888,7 @@ func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts st
 		NameOverride: opts.nameOverride,
 		FromRunID:    opts.fromRunID,
 		Target:       opts.target,
-		TriggerType:  opts.triggerType.String(),
+		TriggerType:  triggerTypeStr,
 	})
 
 	if err := runtime1.Start(ctx, spec); err != nil {
@@ -973,11 +989,16 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 }
 
 func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride string, triggerType core.TriggerType) error {
+	// Only pass trigger type if it's a known value (not TriggerTypeUnknown)
+	triggerTypeStr := ""
+	if triggerType != core.TriggerTypeUnknown {
+		triggerTypeStr = triggerType.String()
+	}
 	opts := runtime1.EnqueueOptions{
 		Params:       params,
 		DAGRunID:     dagRunID,
 		NameOverride: nameOverride,
-		TriggerType:  triggerType.String(),
+		TriggerType:  triggerTypeStr,
 	}
 	if dag.Queue != "" {
 		opts.Queue = dag.Queue

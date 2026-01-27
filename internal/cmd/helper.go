@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
@@ -14,7 +16,10 @@ import (
 // Returns TriggerTypeUnknown (zero value) if the flag is empty, otherwise validates
 // that the provided value is a known trigger type.
 func parseTriggerTypeParam(ctx *Context) (core.TriggerType, error) {
-	triggerTypeStr, _ := ctx.StringParam("trigger-type")
+	triggerTypeStr, err := ctx.StringParam("trigger-type")
+	if err != nil {
+		logger.Debug(ctx, "Failed to read trigger-type flag", tag.Error(err))
+	}
 	if triggerTypeStr == "" {
 		return core.TriggerTypeUnknown, nil
 	}

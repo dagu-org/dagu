@@ -26,7 +26,6 @@ function ServiceCard({
   error,
 }: ServiceCardProps) {
   const activeCount = instances.filter((i) => i.status === 'active').length;
-  const hasActive = activeCount > 0;
 
   const getUptime = (startedAt: string): string => {
     const start = new Date(startedAt);
