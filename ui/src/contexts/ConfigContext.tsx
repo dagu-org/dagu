@@ -32,6 +32,7 @@ export type Config = {
   oidcButtonLabel: string;
   terminalEnabled: boolean;
   gitSyncEnabled: boolean;
+  agentEnabled: boolean;
   permissions: {
     writeDags: boolean;
     runDags: boolean;

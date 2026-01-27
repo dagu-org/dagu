@@ -69,6 +69,8 @@ type funcsConfig struct {
 	TerminalEnabled bool
 	// Git Sync configuration
 	GitSyncEnabled bool
+	// Agent configuration
+	AgentEnabled bool
 }
 
 // and simple utility helpers for use inside HTML templates.
@@ -166,6 +168,9 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 		},
 		"gitSyncEnabled": func() string {
 			return boolToString(cfg.GitSyncEnabled)
+		},
+		"agentEnabled": func() string {
+			return boolToString(cfg.AgentEnabled)
 		},
 	}
 }

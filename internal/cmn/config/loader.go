@@ -98,15 +98,16 @@ const (
 	SectionMonitoring                            // 128
 	SectionGitSync                               // 256
 	SectionTunnel                                // 512
+	SectionAgent                                 // 1024
 
 	// SectionAll combines all sections (useful for ServiceNone/CLI)
-	SectionAll = SectionServer | SectionScheduler | SectionWorker | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel
+	SectionAll = SectionServer | SectionScheduler | SectionWorker | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel | SectionAgent
 )
 
 // serviceRequirements maps services to their required config sections using bitwise OR.
 var serviceRequirements = map[Service]ConfigSection{
 	ServiceNone:        SectionAll,
-	ServiceServer:      SectionServer | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel,
+	ServiceServer:      SectionServer | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel | SectionAgent,
 	ServiceScheduler:   SectionScheduler | SectionCoordinator | SectionQueues,
 	ServiceWorker:      SectionWorker | SectionCoordinator,
 	ServiceCoordinator: SectionCoordinator,
@@ -252,6 +253,9 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	}
 	if l.requires(SectionTunnel) {
 		l.loadTunnelConfig(&cfg, def)
+	}
+	if l.requires(SectionAgent) {
+		l.loadAgentConfig(&cfg, def)
 	}
 
 	// Cache config is always loaded (used by all services)
@@ -983,6 +987,35 @@ func (l *ConfigLoader) loadTunnelConfig(cfg *Config, def Definition) {
 	}
 }
 
+// loadAgentConfig loads the AI agent configuration.
+func (l *ConfigLoader) loadAgentConfig(cfg *Config, def Definition) {
+	// Check if agent is enabled
+	if def.Agent != nil && def.Agent.Enabled != nil {
+		cfg.Agent.Enabled = *def.Agent.Enabled
+	}
+
+	if !cfg.Agent.Enabled {
+		return
+	}
+
+	// Load LLM configuration
+	if def.Agent != nil && def.Agent.LLM != nil {
+		llm := def.Agent.LLM
+		cfg.Agent.LLM.Provider = llm.Provider
+		cfg.Agent.LLM.Model = llm.Model
+		cfg.Agent.LLM.APIKey = llm.APIKey
+		cfg.Agent.LLM.BaseURL = llm.BaseURL
+	}
+
+	// Set defaults for LLM configuration
+	if cfg.Agent.LLM.Provider == "" {
+		cfg.Agent.LLM.Provider = "anthropic"
+	}
+	if cfg.Agent.LLM.Model == "" {
+		cfg.Agent.LLM.Model = "claude-sonnet-4-20250514"
+	}
+}
+
 // loadCacheConfig loads the cache configuration.
 func (l *ConfigLoader) loadCacheConfig(cfg *Config, def Definition) {
 	if def.Cache != nil {
@@ -1429,6 +1462,13 @@ var envBindings = []envBinding{
 	{key: "gitSync.autoSync.interval", env: "GITSYNC_AUTOSYNC_INTERVAL"},
 	{key: "gitSync.commit.authorName", env: "GITSYNC_COMMIT_AUTHOR_NAME"},
 	{key: "gitSync.commit.authorEmail", env: "GITSYNC_COMMIT_AUTHOR_EMAIL"},
+
+	// Agent configuration
+	{key: "agent.enabled", env: "AGENT_ENABLED"},
+	{key: "agent.llm.provider", env: "AGENT_LLM_PROVIDER"},
+	{key: "agent.llm.model", env: "AGENT_LLM_MODEL"},
+	{key: "agent.llm.apiKey", env: "AGENT_LLM_API_KEY"},
+	{key: "agent.llm.baseUrl", env: "AGENT_LLM_BASE_URL"},
 }
 
 // bindEnvironmentVariables binds configuration keys to environment variables using the loader's viper instance.

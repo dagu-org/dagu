@@ -15,6 +15,11 @@ import {
   UserPreferencesProvider,
   useUserPreferences,
 } from './contexts/UserPreference';
+import {
+  AgentChatProvider,
+  AgentChatButton,
+  AgentChatModal,
+} from './features/agent';
 import Layout from './layouts/Layout';
 import fetchJson from './lib/fetchJson';
 import Dashboard from './pages';
@@ -146,97 +151,106 @@ function AppInner({ config }: Props) {
                             path="/*"
                             element={
                               <ProtectedRoute>
-                                <Layout navbarColor={config.navbarColor}>
-                                  <Routes>
-                                    <Route path="/" element={<Dashboard />} />
-                                    <Route
-                                      path="/dashboard"
-                                      element={<Dashboard />}
-                                    />
-                                    <Route
-                                      path="/system-status"
-                                      element={
-                                        <ProtectedRoute requiredRole="admin">
-                                          <SystemStatus />
-                                        </ProtectedRoute>
-                                      }
-                                    />
-                                    <Route path="/dags/" element={<DAGs />} />
-                                    <Route
-                                      path="/dags/:fileName/:tab"
-                                      element={<DAGDetails />}
-                                    />
-                                    <Route
-                                      path="/dags/:fileName/"
-                                      element={<DAGDetails />}
-                                    />
-                                    <Route
-                                      path="/search/"
-                                      element={<Search />}
-                                    />
-                                    <Route
-                                      path="/queues"
-                                      element={<Queues />}
-                                    />
-                                    <Route
-                                      path="/dag-runs"
-                                      element={<DAGRuns />}
-                                    />
-                                    <Route
-                                      path="/dag-runs/:name/:dagRunId"
-                                      element={<DAGRunDetails />}
-                                    />
-                                    {/* Admin-only routes */}
-                                    <Route
-                                      path="/users"
-                                      element={
-                                        <ProtectedRoute requiredRole="admin">
-                                          <UsersPage />
-                                        </ProtectedRoute>
-                                      }
-                                    />
-                                    <Route
-                                      path="/api-keys"
-                                      element={
-                                        <ProtectedRoute requiredRole="admin">
-                                          <APIKeysPage />
-                                        </ProtectedRoute>
-                                      }
-                                    />
-                                    <Route
-                                      path="/webhooks"
-                                      element={
-                                        <ProtectedRoute requiredRole="admin">
-                                          <WebhooksPage />
-                                        </ProtectedRoute>
-                                      }
-                                    />
-                                    <Route
-                                      path="/terminal"
-                                      element={
-                                        <ProtectedRoute requiredRole="admin">
-                                          <TerminalPage />
-                                        </ProtectedRoute>
-                                      }
-                                    />
-                                    <Route
-                                      path="/audit-logs"
-                                      element={
-                                        <ProtectedRoute requiredRole="admin">
-                                          <AuditLogsPage />
-                                        </ProtectedRoute>
-                                      }
-                                    />
-                                    <Route
-                                      path="/git-sync"
-                                      element={
-                                        <ProtectedRoute requiredRole="admin">
-                                          <GitSyncPage />
-                                        </ProtectedRoute>
-                                      }
-                                    />
-                                  </Routes>
-                                </Layout>
+                                <AgentChatProvider>
+                                  <Layout navbarColor={config.navbarColor}>
+                                    <Routes>
+                                      <Route path="/" element={<Dashboard />} />
+                                      <Route
+                                        path="/dashboard"
+                                        element={<Dashboard />}
+                                      />
+                                      <Route
+                                        path="/system-status"
+                                        element={
+                                          <ProtectedRoute requiredRole="admin">
+                                            <SystemStatus />
+                                          </ProtectedRoute>
+                                        }
+                                      />
+                                      <Route path="/dags/" element={<DAGs />} />
+                                      <Route
+                                        path="/dags/:fileName/:tab"
+                                        element={<DAGDetails />}
+                                      />
+                                      <Route
+                                        path="/dags/:fileName/"
+                                        element={<DAGDetails />}
+                                      />
+                                      <Route
+                                        path="/search/"
+                                        element={<Search />}
+                                      />
+                                      <Route
+                                        path="/queues"
+                                        element={<Queues />}
+                                      />
+                                      <Route
+                                        path="/dag-runs"
+                                        element={<DAGRuns />}
+                                      />
+                                      <Route
+                                        path="/dag-runs/:name/:dagRunId"
+                                        element={<DAGRunDetails />}
+                                      />
+                                      {/* Admin-only routes */}
+                                      <Route
+                                        path="/users"
+                                        element={
+                                          <ProtectedRoute requiredRole="admin">
+                                            <UsersPage />
+                                          </ProtectedRoute>
+                                        }
+                                      />
+                                      <Route
+                                        path="/api-keys"
+                                        element={
+                                          <ProtectedRoute requiredRole="admin">
+                                            <APIKeysPage />
+                                          </ProtectedRoute>
+                                        }
+                                      />
+                                      <Route
+                                        path="/webhooks"
+                                        element={
+                                          <ProtectedRoute requiredRole="admin">
+                                            <WebhooksPage />
+                                          </ProtectedRoute>
+                                        }
+                                      />
+                                      <Route
+                                        path="/terminal"
+                                        element={
+                                          <ProtectedRoute requiredRole="admin">
+                                            <TerminalPage />
+                                          </ProtectedRoute>
+                                        }
+                                      />
+                                      <Route
+                                        path="/audit-logs"
+                                        element={
+                                          <ProtectedRoute requiredRole="admin">
+                                            <AuditLogsPage />
+                                          </ProtectedRoute>
+                                        }
+                                      />
+                                      <Route
+                                        path="/git-sync"
+                                        element={
+                                          <ProtectedRoute requiredRole="admin">
+                                            <GitSyncPage />
+                                          </ProtectedRoute>
+                                        }
+                                      />
+                                    </Routes>
+                                  </Layout>
+                                  {/* Agent Chat UI - only shown when enabled */}
+                                  {config.agentEnabled && (
+                                    <>
+                                      <AgentChatButton />
+                                      <AgentChatModal />
+                                    </>
+                                  )}
+                                </AgentChatProvider>
                               </ProtectedRoute>
                             }
                           />

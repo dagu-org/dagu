@@ -16,7 +16,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/agent"
 	authmodel "github.com/dagu-org/dagu/internal/auth"
+
+	// Import all LLM providers to register them
+	_ "github.com/dagu-org/dagu/internal/llm/allproviders"
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
@@ -25,6 +29,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/telemetry"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/gitsync"
+	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/dagu-org/dagu/internal/persis/fileapikey"
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
 	"github.com/dagu-org/dagu/internal/persis/fileuser"
@@ -51,6 +56,7 @@ import (
 // Server represents the HTTP server for the frontend application
 type Server struct {
 	apiV2           *apiv2.API
+	agentAPI        *agent.API           // Agent API for AI assistant
 	config          *config.Config
 	httpServer      *http.Server
 	funcsConfig     funcsConfig
@@ -129,6 +135,12 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		apiOpts = append(apiOpts, apiv2.WithSyncService(syncSvc))
 	}
 
+	// Initialize agent API if enabled
+	agentAPI, err := initAgentAPI(ctx, cfg)
+	if err != nil {
+		logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
+	}
+
 	// Initialize auth service if builtin mode is enabled
 	var authSvc *authservice.Service
 	if cfg.Server.Auth.Mode == config.AuthModeBuiltin {
@@ -189,6 +201,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	srv := &Server{
 		config:          cfg,
+		agentAPI:        agentAPI,
 		builtinOIDCCfg:  builtinOIDCCfg,
 		authService:     authSvc,
 		auditService:    auditSvc,
@@ -210,6 +223,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 			OIDCButtonLabel:       oidcButtonLabel,
 			TerminalEnabled:       cfg.Server.Terminal.Enabled && authSvc != nil,
 			GitSyncEnabled:        cfg.GitSync.Enabled,
+			AgentEnabled:          agentAPI != nil,
 		},
 	}
 
@@ -368,6 +382,50 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 	return svc
 }
 
+// initAgentAPI creates and returns an agent API if enabled.
+// Returns nil if agent is not enabled or LLM provider cannot be initialized.
+func initAgentAPI(ctx context.Context, cfg *config.Config) (*agent.API, error) {
+	agentCfg := cfg.Agent
+	if !agentCfg.Enabled {
+		return nil, nil
+	}
+
+	// Parse provider type
+	providerType, err := llm.ParseProviderType(agentCfg.LLM.Provider)
+	if err != nil {
+		return nil, fmt.Errorf("invalid LLM provider: %w", err)
+	}
+
+	// Create LLM provider configuration
+	llmCfg := llm.DefaultConfig()
+	if agentCfg.LLM.APIKey != "" {
+		llmCfg.APIKey = agentCfg.LLM.APIKey
+	}
+	if agentCfg.LLM.BaseURL != "" {
+		llmCfg.BaseURL = agentCfg.LLM.BaseURL
+	}
+
+	// Create LLM provider
+	provider, err := llm.NewProvider(providerType, llmCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create LLM provider: %w", err)
+	}
+
+	// Create agent API
+	api := agent.NewAPI(agent.APIConfig{
+		Provider:   provider,
+		Model:      agentCfg.LLM.Model,
+		WorkingDir: cfg.Paths.DAGsDir,
+		Logger:     slog.Default(),
+	})
+
+	logger.Info(ctx, "Agent API initialized",
+		slog.String("provider", agentCfg.LLM.Provider),
+		slog.String("model", agentCfg.LLM.Model))
+
+	return api, nil
+}
+
 // sanitizedRequestLogger returns a middleware that wraps httplog's RequestLogger
 // with URL sanitization. This ensures tokens in query strings are redacted in logs
 // regardless of httplog's internal attribute handling.
@@ -453,6 +511,11 @@ func (srv *Server) Serve(ctx context.Context) error {
 	// Configure terminal WebSocket route (admin-only, requires builtin auth)
 	if srv.config.Server.Terminal.Enabled && srv.authService != nil {
 		srv.setupTerminalRoute(ctx, r, apiV2BasePath)
+	}
+
+	// Configure agent API routes if enabled
+	if srv.agentAPI != nil {
+		srv.setupAgentRoutes(ctx, r)
 	}
 
 	// Configure SSE route for real-time DAG run status updates
@@ -651,6 +714,12 @@ func (srv *Server) registerSSEFetchers() {
 	srv.sseHub.RegisterFetcher(sse.TopicTypeStepLog, srv.apiV2.GetStepLogData)
 	srv.sseHub.RegisterFetcher(sse.TopicTypeQueues, srv.apiV2.GetQueuesListData)
 	srv.sseHub.RegisterFetcher(sse.TopicTypeQueueItems, srv.apiV2.GetQueueItemsData)
+}
+
+// setupAgentRoutes configures the agent API routes
+func (srv *Server) setupAgentRoutes(ctx context.Context, r *chi.Mux) {
+	srv.agentAPI.RegisterRoutes(r)
+	logger.Info(ctx, "Agent API routes configured")
 }
 
 // startServer starts the HTTP server with or without TLS

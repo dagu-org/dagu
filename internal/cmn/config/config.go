@@ -46,6 +46,33 @@ type Config struct {
 
 	// Tunnel contains configuration for tunnel services (Tailscale).
 	Tunnel TunnelConfig
+
+	// Agent contains configuration for the AI agent feature.
+	Agent AgentConfig
+}
+
+// AgentConfig holds the configuration for the AI agent feature.
+type AgentConfig struct {
+	// Enabled indicates whether the agent feature is enabled.
+	Enabled bool
+
+	// LLM contains the LLM provider configuration.
+	LLM AgentLLMConfig
+}
+
+// AgentLLMConfig holds LLM provider configuration for the agent.
+type AgentLLMConfig struct {
+	// Provider is the LLM provider type (anthropic, openai, gemini, openrouter, local).
+	Provider string
+
+	// Model is the model ID to use.
+	Model string
+
+	// APIKey is the API key for the LLM provider.
+	APIKey string
+
+	// BaseURL is the optional custom API endpoint URL.
+	BaseURL string
 }
 
 // GitSyncConfig holds the configuration for Git sync functionality.
