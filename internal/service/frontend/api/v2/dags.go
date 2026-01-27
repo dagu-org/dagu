@@ -121,7 +121,6 @@ func (a *API) ValidateDAGSpec(ctx context.Context, request api.ValidateDAGSpecRe
 		}
 	}
 
-	// Build response
 	details := toDAGDetails(dag)
 
 	return &api.ValidateDAGSpec200JSONResponse{
@@ -136,10 +135,8 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 		return nil, err
 	}
 
-	// Determine spec to create with: provided spec or default template
 	var yamlSpec []byte
 	if request.Body.Spec != nil && strings.TrimSpace(*request.Body.Spec) != "" {
-		// Validate provided spec before creating
 		_, err := spec.LoadYAML(ctx,
 			[]byte(*request.Body.Spec),
 			spec.WithName(request.Body.Name),
@@ -149,7 +146,6 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 		if err != nil {
 			var verrs core.ErrorList
 			if errors.As(err, &verrs) {
-				// Return 400 with summary of errors
 				return nil, &Error{
 					HTTPStatus: http.StatusBadRequest,
 					Code:       api.ErrorCodeBadRequest,
@@ -164,7 +160,6 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 		}
 		yamlSpec = []byte(*request.Body.Spec)
 	} else {
-		// Default minimal spec
 		yamlSpec = []byte(`steps:
   - command: echo hello
 `)
@@ -204,16 +199,12 @@ func (a *API) DeleteDAG(ctx context.Context, request api.DeleteDAGRequestObject)
 		return nil, fmt.Errorf("error deleting DAG: %w", err)
 	}
 
-	// Clean up associated webhook if exists (best effort - don't fail deletion if webhook cleanup fails)
 	if a.authService != nil && a.authService.HasWebhookStore() {
-		if err := a.authService.DeleteWebhook(ctx, request.FileName); err != nil {
-			// Only log if it's not a "not found" error (webhook may not exist)
-			if !errors.Is(err, auth.ErrWebhookNotFound) {
-				logger.Warn(ctx, "Failed to delete webhook for deleted DAG",
-					tag.Name(request.FileName),
-					tag.Error(err),
-				)
-			}
+		if err := a.authService.DeleteWebhook(ctx, request.FileName); err != nil && !errors.Is(err, auth.ErrWebhookNotFound) {
+			logger.Warn(ctx, "Failed to delete webhook for deleted DAG",
+				tag.Name(request.FileName),
+				tag.Error(err),
+			)
 		}
 	}
 
@@ -228,7 +219,6 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 		return nil, err
 	}
 
-	// Validate the spec - use WithAllowBuildErrors to return DAG even with errors
 	dag, err := spec.LoadYAML(ctx,
 		[]byte(yamlSpec),
 		spec.WithName(request.FileName),
@@ -241,11 +231,9 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 	if errors.As(err, &loadErrs) {
 		errs = loadErrs.ToStringList()
 	} else if err != nil {
-		// If we still get an error with AllowBuildErrors, something is seriously wrong
 		return nil, err
 	}
 
-	// If dag is still nil (shouldn't happen with AllowBuildErrors), create a minimal DAG
 	if dag == nil {
 		dag = &core.DAG{
 			Name: request.FileName,
@@ -465,10 +453,9 @@ func (a *API) readHistoryData(_ context.Context, statusList []exec.DAGRunStatus)
 }
 
 func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (api.ListDAGsResponseObject, error) {
-	// Extract sort and order parameters with config defaults
 	sortField := a.config.UI.DAGs.SortField
 	if sortField == "" {
-		sortField = "name" // fallback if config is empty
+		sortField = "name"
 	}
 	if request.Params.Sort != nil {
 		sortField = string(*request.Params.Sort)
@@ -476,19 +463,15 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 
 	sortOrder := a.config.UI.DAGs.SortOrder
 	if sortOrder == "" {
-		sortOrder = "asc" // fallback if config is empty
+		sortOrder = "asc"
 	}
 	if request.Params.Order != nil {
 		sortOrder = string(*request.Params.Order)
 	}
 
-	// Use paginator from request
 	pg := exec.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
-
-	// Parse comma-separated tags parameter
 	tags := parseCommaSeparatedTags(request.Params.Tags)
 
-	// Let persistence layer handle sorting and pagination
 	result, errList, err := a.dagStore.List(ctx, exec.ListDAGsOptions{
 		Paginator: &pg,
 		Name:      valueOf(request.Params.Name),
@@ -500,7 +483,6 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 		return nil, fmt.Errorf("error listing DAGs: %w", err)
 	}
 
-	// Build DAG files for the paginated results
 	dagFiles := make([]api.DAGFile, 0, len(result.Items))
 	for _, item := range result.Items {
 		dagStatus, err := a.dagRunMgr.GetLatestStatus(ctx, item)
@@ -508,26 +490,13 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 			errList = append(errList, err.Error())
 		}
 
-		suspended := a.dagStore.IsSuspended(ctx, item.FileName())
-		dagRun := toDAGRunSummary(dagStatus)
-
-		// Include any build errors from the DAG
-		var dagErrors []string
-		if item.BuildErrors != nil {
-			for _, err := range item.BuildErrors {
-				dagErrors = append(dagErrors, err.Error())
-			}
-		}
-
-		dagFile := api.DAGFile{
+		dagFiles = append(dagFiles, api.DAGFile{
 			FileName:     item.FileName(),
-			LatestDAGRun: dagRun,
-			Suspended:    suspended,
+			LatestDAGRun: toDAGRunSummary(dagStatus),
+			Suspended:    a.dagStore.IsSuspended(ctx, item.FileName()),
 			Dag:          toDAG(item),
-			Errors:       dagErrors,
-		}
-
-		dagFiles = append(dagFiles, dagFile)
+			Errors:       extractBuildErrors(item.BuildErrors),
+		})
 	}
 
 	resp := &api.ListDAGs200JSONResponse{
@@ -873,6 +842,27 @@ type startDAGRunOptions struct {
 	triggerType  core.TriggerType
 }
 
+// waitForDAGStatusChange waits until the DAG status transitions from NotStarted.
+// Returns true if the status changed, false if timeout or context cancelled.
+func (a *API) waitForDAGStatusChange(ctx context.Context, dag *core.DAG, dagRunID string, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	pollInterval := 100 * time.Millisecond
+
+	for time.Now().Before(deadline) {
+		select {
+		case <-ctx.Done():
+			return false
+		default:
+			status, _ := a.dagRunMgr.GetCurrentStatus(ctx, dag, dagRunID)
+			if status != nil && status.Status != core.NotStarted {
+				return true
+			}
+			time.Sleep(pollInterval)
+		}
+	}
+	return false
+}
+
 func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts startDAGRunOptions) error {
 	spec := a.subCmdBuilder.Start(dag, runtime1.StartOptions{
 		Params:       opts.params,
@@ -888,39 +878,12 @@ func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts st
 		return fmt.Errorf("error starting DAG: %w", err)
 	}
 
-	// Wait for the DAG to start
-	// Use longer timeout on Windows due to slower process startup
-	timeout := 5 * time.Second // default timeout
+	timeout := 5 * time.Second
 	if runtime.GOOS == "windows" {
 		timeout = 10 * time.Second
 	}
-	timer := time.NewTimer(timeout)
-	var running bool
-	defer timer.Stop()
 
-waitLoop:
-	for {
-		select {
-		case <-timer.C:
-			break waitLoop
-		case <-ctx.Done():
-			break waitLoop
-		default:
-			dagStatus, _ := a.dagRunMgr.GetCurrentStatus(ctx, dag, opts.dagRunID)
-			if dagStatus == nil {
-				continue
-			}
-			if dagStatus.Status != core.NotStarted {
-				// If status is not NotStarted, it means the DAG has started or even finished
-				running = true
-				timer.Stop()
-				break waitLoop
-			}
-			time.Sleep(100 * time.Millisecond)
-		}
-	}
-
-	if !running {
+	if !a.waitForDAGStatusChange(ctx, dag, opts.dagRunID, timeout) {
 		return &Error{
 			HTTPStatus: http.StatusInternalServerError,
 			Code:       api.ErrorCodeInternalError,
@@ -952,7 +915,6 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		return nil, err
 	}
 
-	// Apply queue override if provided
 	if request.Body != nil && request.Body.Queue != nil && *request.Body.Queue != "" {
 		dag.Queue = *request.Body.Queue
 	}
@@ -1025,34 +987,7 @@ func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID
 		return fmt.Errorf("error enqueuing DAG: %w", err)
 	}
 
-	// Wait for the DAG to be enqueued
-	timer := time.NewTimer(3 * time.Second)
-	var ok bool
-	defer timer.Stop()
-
-waitLoop:
-	for {
-		select {
-		case <-timer.C:
-			break waitLoop
-		case <-ctx.Done():
-			break waitLoop
-		default:
-			dagStatus, _ := a.dagRunMgr.GetCurrentStatus(ctx, dag, dagRunID)
-			if dagStatus == nil {
-				continue
-			}
-			if dagStatus.Status != core.NotStarted {
-				// If status is not NotStarted, it means the DAG has started or even finished
-				ok = true
-				timer.Stop()
-				break waitLoop
-			}
-			time.Sleep(100 * time.Millisecond)
-		}
-	}
-
-	if !ok {
+	if !a.waitForDAGStatusChange(ctx, dag, dagRunID, 3*time.Second) {
 		return &Error{
 			HTTPStatus: http.StatusInternalServerError,
 			Code:       api.ErrorCodeInternalError,

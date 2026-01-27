@@ -269,8 +269,6 @@ func (a *API) loadInlineDAG(ctx context.Context, specContent string, name *strin
 	return dag, cleanup, nil
 }
 
-// no sanitize helper: DAG name is validated by core.ValidateDAGName
-
 func (a *API) ListDAGRuns(ctx context.Context, request api.ListDAGRunsRequestObject) (api.ListDAGRunsResponseObject, error) {
 	var opts []exec.ListDAGRunStatusesOption
 	if request.Params.Status != nil {
@@ -352,8 +350,6 @@ func (a *API) listDAGRuns(ctx context.Context, opts []exec.ListDAGRunStatusesOpt
 	return dagRuns, nil
 }
 
-// parseCommaSeparatedTags parses a comma-separated string of tags into a slice.
-// Tags are normalized to lowercase and deduplicated.
 func parseCommaSeparatedTags(tagsParam *string) []string {
 	if tagsParam == nil || *tagsParam == "" {
 		return nil
@@ -1733,7 +1729,6 @@ func (a *API) getSubDAGRunDetail(ctx context.Context, parentRef exec.DAGRunRef, 
 	return detail, nil
 }
 
-// applyApproval updates a node with approval information.
 func applyApproval(ctx context.Context, node *exec.Node, body *api.ApproveStepRequest) {
 	node.Status = core.NodeSucceeded
 	node.ApprovedAt = time.Now().Format(time.RFC3339)
@@ -1755,7 +1750,6 @@ func applyApproval(ctx context.Context, node *exec.Node, body *api.ApproveStepRe
 	}
 }
 
-// applyRejection updates a node and status with rejection information.
 func applyRejection(ctx context.Context, node *exec.Node, status *exec.DAGRunStatus, reason *string) {
 	node.Status = core.NodeRejected
 	node.RejectedAt = time.Now().Format(time.RFC3339)
@@ -1772,7 +1766,6 @@ func applyRejection(ctx context.Context, node *exec.Node, status *exec.DAGRunSta
 	status.FinishedAt = time.Now().Format(time.RFC3339)
 }
 
-// resumeDAGRun attempts to resume a DAG run after approval.
 func (a *API) resumeDAGRun(ctx context.Context, ref exec.DAGRunRef, dagRunID string) error {
 	attempt, err := a.dagRunStore.FindAttempt(ctx, ref)
 	if err != nil {
@@ -1788,7 +1781,6 @@ func (a *API) resumeDAGRun(ctx context.Context, ref exec.DAGRunRef, dagRunID str
 	return runtime.Start(ctx, retrySpec)
 }
 
-// resumeSubDAGRun attempts to resume a sub-DAG run after approval.
 func (a *API) resumeSubDAGRun(ctx context.Context, rootRef exec.DAGRunRef, subDAGRunID string) error {
 	attempt, err := a.dagRunStore.FindSubAttempt(ctx, rootRef, subDAGRunID)
 	if err != nil {
@@ -1844,8 +1836,6 @@ func (a *API) logStepRejection(ctx context.Context, dagName, dagRunID, subDAGRun
 	a.logDAGRunAudit(ctx, action, detailsMap)
 }
 
-// findStepByName searches for a step by name in the given nodes.
-// Returns the step index or -1 if not found.
 func findStepByName(nodes []*exec.Node, stepName string) int {
 	for idx, n := range nodes {
 		if n.Step.Name == stepName {
@@ -1855,7 +1845,6 @@ func findStepByName(nodes []*exec.Node, stepName string) int {
 	return -1
 }
 
-// hasWaitingSteps checks if any node is in Waiting status.
 func hasWaitingSteps(nodes []*exec.Node) bool {
 	for _, n := range nodes {
 		if n.Status == core.NodeWaiting {
@@ -1865,13 +1854,11 @@ func hasWaitingSteps(nodes []*exec.Node) bool {
 	return false
 }
 
-// validateRequiredInputs checks that all required inputs from a wait step config are provided.
 func validateRequiredInputs(step core.Step, body *api.ApproveStepRequest) error {
 	if step.ExecutorConfig.Config == nil {
 		return nil
 	}
 
-	// Extract required fields from step config
 	requiredFields, ok := step.ExecutorConfig.Config["required"]
 	if !ok {
 		return nil
@@ -1882,13 +1869,11 @@ func validateRequiredInputs(step core.Step, body *api.ApproveStepRequest) error 
 		return nil
 	}
 
-	// Get provided inputs
 	var providedInputs map[string]string
 	if body != nil && body.Inputs != nil {
 		providedInputs = *body.Inputs
 	}
 
-	// Check each required field
 	var missing []string
 	for _, r := range required {
 		fieldName, ok := r.(string)
@@ -2155,12 +2140,10 @@ func (a *API) GetDAGRunsListData(ctx context.Context, queryString string) (any, 
 	}, nil
 }
 
-// clampInt restricts value to the range [minVal, maxVal].
 func clampInt(value, minVal, maxVal int) int {
 	return max(minVal, min(value, maxVal))
 }
 
-// fileExists returns true if the file at path exists.
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
