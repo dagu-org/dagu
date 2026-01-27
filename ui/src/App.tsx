@@ -37,6 +37,7 @@ import TerminalPage from './pages/terminal';
 import UsersPage from './pages/users';
 import WebhooksPage from './pages/webhooks';
 import GitSyncPage from './pages/git-sync';
+import AgentSettingsPage from './pages/agent-settings';
 
 type Props = {
   config: Config;
@@ -238,6 +239,14 @@ function AppInner({ config }: Props) {
                                         element={
                                           <ProtectedRoute requiredRole="admin">
                                             <GitSyncPage />
+                                          </ProtectedRoute>
+                                        }
+                                      />
+                                      <Route
+                                        path="/agent-settings"
+                                        element={
+                                          <ProtectedRoute requiredRole="admin">
+                                            <AgentSettingsPage />
                                           </ProtectedRoute>
                                         }
                                       />

@@ -54,6 +54,8 @@ type API struct {
 	syncService        SyncService
 	tunnelService      *tunnel.Service
 	dagWritesDisabled  bool // True when git sync read-only mode is active
+	agentConfigStore   AgentConfigStore
+	agentReloader      AgentReloader
 }
 
 // AuthService defines the interface for authentication operations.
@@ -117,6 +119,20 @@ func WithSyncService(ss SyncService) APIOption {
 func WithTunnelService(ts *tunnel.Service) APIOption {
 	return func(a *API) {
 		a.tunnelService = ts
+	}
+}
+
+// WithAgentConfigStore returns an APIOption that sets the API's AgentConfigStore.
+func WithAgentConfigStore(store AgentConfigStore) APIOption {
+	return func(a *API) {
+		a.agentConfigStore = store
+	}
+}
+
+// WithAgentReloader returns an APIOption that sets the API's AgentReloader.
+func WithAgentReloader(reloader AgentReloader) APIOption {
+	return func(a *API) {
+		a.agentReloader = reloader
 	}
 }
 

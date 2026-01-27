@@ -56,19 +56,20 @@ import (
 
 // Server represents the HTTP server for the frontend application
 type Server struct {
-	apiV2           *apiv2.API
-	agentAPI        *agent.API           // Agent API for AI assistant
-	config          *config.Config
-	httpServer      *http.Server
-	funcsConfig     funcsConfig
-	builtinOIDCCfg  *auth.BuiltinOIDCConfig // OIDC config for builtin auth mode
-	authService     *authservice.Service
-	auditService    *audit.Service
-	syncService     gitsync.Service      // Git sync service for graceful shutdown
-	listener        net.Listener         // Optional pre-bound listener (for tests)
-	sseHub          *sse.Hub             // SSE hub for real-time updates
-	metricsRegistry *prometheus.Registry // Prometheus registry for metrics
-	tunnelAPIOpts   []apiv2.APIOption    // Tunnel API options (set by WithTunnelService)
+	apiV2            *apiv2.API
+	agentAPI         *agent.API           // Agent API for AI assistant
+	agentConfigStore *fileagentconfig.Store // Agent config store for hot reload
+	config           *config.Config
+	httpServer       *http.Server
+	funcsConfig      funcsConfig
+	builtinOIDCCfg   *auth.BuiltinOIDCConfig // OIDC config for builtin auth mode
+	authService      *authservice.Service
+	auditService     *audit.Service
+	syncService      gitsync.Service      // Git sync service for graceful shutdown
+	listener         net.Listener         // Optional pre-bound listener (for tests)
+	sseHub           *sse.Hub             // SSE hub for real-time updates
+	metricsRegistry  *prometheus.Registry // Prometheus registry for metrics
+	tunnelAPIOpts    []apiv2.APIOption    // Tunnel API options (set by WithTunnelService)
 }
 
 // ServerOption is a functional option for configuring the Server
@@ -136,10 +137,19 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		apiOpts = append(apiOpts, apiv2.WithSyncService(syncSvc))
 	}
 
-	// Initialize agent API if enabled
-	agentAPI, err := initAgentAPI(ctx, cfg.Paths.DataDir, cfg.Paths.DAGsDir)
+	// Create agent config store
+	agentConfigStore, err := fileagentconfig.New(cfg.Paths.DataDir)
 	if err != nil {
-		logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
+		logger.Warn(ctx, "Failed to create agent config store", tag.Error(err))
+	}
+
+	// Initialize agent API if enabled
+	var agentAPI *agent.API
+	if agentConfigStore != nil {
+		agentAPI, err = initAgentAPI(ctx, agentConfigStore, cfg.Paths.DAGsDir)
+		if err != nil {
+			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
+		}
 	}
 
 	// Initialize auth service if builtin mode is enabled
@@ -201,13 +211,14 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	}
 
 	srv := &Server{
-		config:          cfg,
-		agentAPI:        agentAPI,
-		builtinOIDCCfg:  builtinOIDCCfg,
-		authService:     authSvc,
-		auditService:    auditSvc,
-		syncService:     syncSvc,
-		metricsRegistry: mr,
+		config:           cfg,
+		agentAPI:         agentAPI,
+		agentConfigStore: agentConfigStore,
+		builtinOIDCCfg:   builtinOIDCCfg,
+		authService:      authSvc,
+		auditService:     auditSvc,
+		syncService:      syncSvc,
+		metricsRegistry:  mr,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,
 			NavbarTitle:           cfg.UI.NavbarTitle,
@@ -235,6 +246,12 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	// Merge tunnel API options with base API options
 	allAPIOptions := append(apiOpts, srv.tunnelAPIOpts...)
+
+	// Add agent config store if available
+	if srv.agentConfigStore != nil {
+		allAPIOptions = append(allAPIOptions, apiv2.WithAgentConfigStore(srv.agentConfigStore))
+		allAPIOptions = append(allAPIOptions, apiv2.WithAgentReloader(srv))
+	}
 
 	// Create the API with all options
 	srv.apiV2 = apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, allAPIOptions...)
@@ -386,13 +403,7 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 // initAgentAPI creates and returns an agent API if enabled.
 // Returns nil if agent is not enabled or LLM provider cannot be initialized.
 // Loads configuration from the file-based agent config store with environment variable overrides.
-func initAgentAPI(ctx context.Context, dataDir, dagsDir string) (*agent.API, error) {
-	// Create agent config store
-	store, err := fileagentconfig.New(dataDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create agent config store: %w", err)
-	}
-
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, dagsDir string) (*agent.API, error) {
 	// Load agent configuration
 	agentCfg, err := store.Load(ctx)
 	if err != nil {
@@ -765,6 +776,35 @@ func (srv *Server) startServer(ctx context.Context) {
 	if err != nil && err != http.ErrServerClosed {
 		logger.Error(ctx, "Server failed to start or unexpected shutdown", tag.Error(err))
 	}
+}
+
+// ReloadAgent reloads the agent API with the current configuration.
+// This is called after the agent configuration is updated via the API.
+// Implements the AgentReloader interface.
+func (srv *Server) ReloadAgent(ctx context.Context) error {
+	if srv.agentConfigStore == nil {
+		return fmt.Errorf("agent config store not available")
+	}
+
+	// Reinitialize agent API with new config
+	agentAPI, err := initAgentAPI(ctx, srv.agentConfigStore, srv.config.Paths.DAGsDir)
+	if err != nil {
+		return fmt.Errorf("failed to reload agent: %w", err)
+	}
+
+	// Update funcsConfig.AgentEnabled based on whether agent is now enabled
+	srv.funcsConfig.AgentEnabled = agentAPI != nil
+
+	// Store new agent API (may be nil if agent is disabled)
+	srv.agentAPI = agentAPI
+
+	if agentAPI != nil {
+		logger.Info(ctx, "Agent reloaded successfully")
+	} else {
+		logger.Info(ctx, "Agent disabled")
+	}
+
+	return nil
 }
 
 // Shutdown gracefully shuts down the server
