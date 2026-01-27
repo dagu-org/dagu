@@ -17,7 +17,6 @@ import {
 } from './contexts/UserPreference';
 import {
   AgentChatProvider,
-  AgentChatButton,
   AgentChatModal,
 } from './features/agent';
 import Layout from './layouts/Layout';
@@ -252,13 +251,8 @@ function AppInner({ config }: Props) {
                                       />
                                     </Routes>
                                   </Layout>
-                                  {/* Agent Chat UI - only shown when enabled */}
-                                  {config.agentEnabled && (
-                                    <>
-                                      <AgentChatButton />
-                                      <AgentChatModal />
-                                    </>
-                                  )}
+                                  {/* Agent Chat Modal - only shown when enabled */}
+                                  {config.agentEnabled && <AgentChatModal />}
                                 </AgentChatProvider>
                               </ProtectedRoute>
                             }

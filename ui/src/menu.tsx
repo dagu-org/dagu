@@ -33,6 +33,7 @@ import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AppBarContext } from './contexts/AppBarContext';
 import { useUserPreferences } from './contexts/UserPreference';
+import { useAgentChatContext } from './features/agent';
 
 // Navigation Item Props
 type NavItemProps = {
@@ -122,6 +123,7 @@ export const mainListItems = React.forwardRef<
   const isAdmin = useIsAdmin();
   const canWrite = useCanWrite();
   const { preferences, updatePreference } = useUserPreferences();
+  const { toggleChat } = useAgentChatContext();
 
   const theme = preferences.theme || 'dark';
   const toggleTheme = () => {
@@ -395,6 +397,30 @@ export const mainListItems = React.forwardRef<
         <div
           className={cn('px-2', !isOpen && 'flex flex-col items-center gap-2')}
         >
+          {config.agentEnabled && (
+            <button
+              onClick={toggleChat}
+              className={cn(
+                'flex items-center gap-3 w-full p-2 rounded-lg transition-all duration-200 hover:bg-white/5 group',
+                !isOpen && 'justify-center border border-white/5'
+              )}
+              title={isOpen ? '' : 'Agent Console'}
+            >
+              <div
+                className={cn(
+                  'flex items-center justify-center group-hover:scale-110 transition-transform',
+                  customColor ? 'opacity-80' : 'text-primary'
+                )}
+              >
+                <Terminal size={18} />
+              </div>
+              {isOpen && (
+                <span className="text-sm font-medium text-sidebar-foreground group-hover:text-foreground">
+                  Agent Console
+                </span>
+              )}
+            </button>
+          )}
           <button
             onClick={toggleTheme}
             className={cn(

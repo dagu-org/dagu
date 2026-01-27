@@ -46,15 +46,16 @@ export function AgentChatModal() {
     <div
       className={cn(
         'fixed bottom-16 right-4 z-50',
-        'w-[420px] max-w-[calc(100vw-32px)]',
-        'h-[520px] max-h-[calc(100vh-100px)]',
+        'w-[440px] max-w-[calc(100vw-32px)]',
+        'h-[540px] max-h-[calc(100vh-100px)]',
         'flex flex-col',
-        'bg-background border border-border rounded-md shadow-xl',
+        'bg-zinc-950 border-2 border-zinc-600 rounded-lg overflow-hidden',
+        'shadow-[0_0_40px_rgba(0,0,0,0.8)]',
         'animate-in slide-in-from-bottom-4 fade-in-0 duration-200'
       )}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/50 rounded-t-md">
+        {/* Header */}
+        <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 bg-zinc-900/80">
         <div className="flex items-center gap-2">
           <Terminal className="h-4 w-4 text-muted-foreground" />
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Agent Console</span>

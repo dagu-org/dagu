@@ -247,7 +247,8 @@ func (l *Loop) processLLMRequest(ctx context.Context) error {
 	}
 
 	// Handle tool calls if any
-	if resp.FinishReason == "tool_calls" && len(resp.ToolCalls) > 0 {
+	// Note: Anthropic returns "tool_use" as stop_reason, OpenAI uses "tool_calls"
+	if (resp.FinishReason == "tool_use" || resp.FinishReason == "tool_calls") && len(resp.ToolCalls) > 0 {
 		l.logger.Debug("handling tool calls", "count", len(resp.ToolCalls))
 		return l.handleToolCalls(ctx, resp.ToolCalls)
 	}
