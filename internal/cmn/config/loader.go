@@ -272,6 +272,11 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		}
 	}
 
+	// Validate the complete configuration
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+
 	return &cfg, nil
 }
 
@@ -1026,7 +1031,7 @@ func (l *ConfigLoader) loadTunnelConfig(cfg *Config, def Definition) {
 
 	// Set default Tailscale hostname
 	if cfg.Tunnel.Provider == TunnelProviderTailscale && cfg.Tunnel.Tailscale.Hostname == "" {
-		cfg.Tunnel.Tailscale.Hostname = "dagu"
+		cfg.Tunnel.Tailscale.Hostname = AppSlug
 	}
 }
 

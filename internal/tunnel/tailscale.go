@@ -33,13 +33,8 @@ type TailscaleProvider struct {
 }
 
 // NewTailscaleProvider creates a new Tailscale tunnel provider.
+// Note: cfg.Hostname should be set by the caller (loader sets default to AppSlug)
 func NewTailscaleProvider(cfg *TailscaleConfig, dataDir string) (*TailscaleProvider, error) {
-	// Set default hostname
-	hostname := cfg.Hostname
-	if hostname == "" {
-		hostname = "dagu"
-	}
-
 	// Set state directory
 	stateDir := cfg.StateDir
 	if stateDir == "" {
@@ -82,7 +77,7 @@ func (p *TailscaleProvider) Start(ctx context.Context, localAddr string) error {
 	p.cancel = cancel
 	p.done = make(chan struct{})
 
-	// Create tsnet server using hostname from config (already defaulted in NewTailscaleProvider)
+	// Create tsnet server using hostname from config (defaulted to AppSlug by loader)
 	srv := &tsnet.Server{
 		Hostname: p.config.Hostname,
 		Dir:      p.stateDir,
