@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useAgentChatContext } from '../context/AgentChatContext';
 import {
@@ -39,6 +39,7 @@ export function useAgentChat() {
   } = useAgentChatContext();
 
   const eventSourceRef = useRef<EventSource | null>(null);
+  const [isSending, setIsSending] = useState(false);
   const baseUrl = `${config.apiURL}/agent`;
 
   // Clean up EventSource on unmount
@@ -140,25 +141,30 @@ export function useAgentChat() {
   // Send a message to existing conversation
   const sendMessage = useCallback(
     async (message: string, model?: string): Promise<void> => {
-      if (!conversationId) {
-        await startConversation(message, model);
-        return;
-      }
-
-      const response = await fetch(
-        `${baseUrl}/conversations/${conversationId}/chat`,
-        {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
-            message,
-            model,
-          } as ChatRequest),
+      setIsSending(true);
+      try {
+        if (!conversationId) {
+          await startConversation(message, model);
+          return;
         }
-      );
 
-      if (!response.ok) {
-        throw new Error(`Failed to send message: ${response.statusText}`);
+        const response = await fetch(
+          `${baseUrl}/conversations/${conversationId}/chat`,
+          {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+              message,
+              model,
+            } as ChatRequest),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to send message: ${response.statusText}`);
+        }
+      } finally {
+        setIsSending(false);
       }
     },
     [baseUrl, conversationId, startConversation]
@@ -229,7 +235,7 @@ export function useAgentChat() {
     messages,
     conversationState,
     conversations,
-    isWorking: conversationState?.working ?? false,
+    isWorking: isSending || (conversationState?.working ?? false),
     startConversation,
     sendMessage,
     cancelConversation,

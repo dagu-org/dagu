@@ -28,12 +28,27 @@ export function AgentChatModal() {
     selectConversation,
   } = useAgentChat();
 
+  const hasAutoSelectedRef = React.useRef(false);
+
   // Fetch conversations when modal opens
   React.useEffect(() => {
     if (isOpen) {
+      hasAutoSelectedRef.current = false;
       fetchConversations();
     }
   }, [isOpen, fetchConversations]);
+
+  // Auto-select latest conversation when loaded
+  React.useEffect(() => {
+    if (isOpen && conversations.length > 0 && !conversationId && !hasAutoSelectedRef.current) {
+      hasAutoSelectedRef.current = true;
+      // Find the latest conversation by updated_at
+      const latest = conversations.reduce((a, b) =>
+        new Date(a.conversation.updated_at) > new Date(b.conversation.updated_at) ? a : b
+      );
+      selectConversation(latest.conversation.id).catch(console.error);
+    }
+  }, [isOpen, conversations, conversationId, selectConversation]);
 
   const handleSend = React.useCallback(
     async (message: string) => {
