@@ -211,6 +211,12 @@ func (l *ConfigLoader) Load() (*Config, error) {
 func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	var cfg Config
 
+	// Set validation-safe defaults for fields that may not be loaded
+	// These ensure cfg.Validate() passes even if section-specific loading is skipped
+	cfg.UI.MaxDashboardPageLimit = 1    // Minimum valid value
+	cfg.Server.Port = 8080              // Default port
+	cfg.Server.Auth.Mode = AuthModeNone // Default auth mode
+
 	// Always load core and paths configuration
 	if err := l.loadCoreConfig(&cfg, def); err != nil {
 		return nil, err
@@ -259,18 +265,6 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 
 	// Finalize paths (set derived paths based on DataDir)
 	l.finalizePaths(&cfg)
-
-	// Validate configuration
-	if l.requires(SectionServer) {
-		if err := l.validateServerConfig(&cfg); err != nil {
-			return nil, err
-		}
-	}
-	if l.requires(SectionUI) {
-		if err := l.validateUIConfig(&cfg); err != nil {
-			return nil, err
-		}
-	}
 
 	// Validate the complete configuration
 	if err := cfg.Validate(); err != nil {
@@ -564,20 +558,6 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 		cfg.Server.Audit.Enabled = *def.Audit.Enabled
 	}
 }
-
-// validateServerConfig validates the server configuration.
-func (l *ConfigLoader) validateServerConfig(cfg *Config) error {
-	if cfg.Server.Port < 0 || cfg.Server.Port > 65535 {
-		return fmt.Errorf("invalid port number: %d", cfg.Server.Port)
-	}
-	if cfg.Server.TLS != nil {
-		if cfg.Server.TLS.CertFile == "" || cfg.Server.TLS.KeyFile == "" {
-			return fmt.Errorf("TLS configuration incomplete: both cert and key files are required")
-		}
-	}
-	return cfg.validateBuiltinAuth()
-}
-
 // loadUIConfig loads the UI configuration.
 func (l *ConfigLoader) loadUIConfig(cfg *Config, def Definition) {
 	// Apply defaults from viper (these include the configured defaults)
@@ -608,14 +588,6 @@ func (l *ConfigLoader) loadUIConfig(cfg *Config, def Definition) {
 			}
 		}
 	}
-}
-
-// validateUIConfig validates the UI configuration.
-func (l *ConfigLoader) validateUIConfig(cfg *Config) error {
-	if cfg.UI.MaxDashboardPageLimit < 1 {
-		return fmt.Errorf("invalid max dashboard page limit: %d", cfg.UI.MaxDashboardPageLimit)
-	}
-	return nil
 }
 
 // loadQueuesConfig loads the queue configuration.
