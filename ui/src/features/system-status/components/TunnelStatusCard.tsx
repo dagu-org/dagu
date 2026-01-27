@@ -75,14 +75,13 @@ function TunnelStatusCard({ data, isLoading, error }: TunnelStatusCardProps) {
     }
   };
 
-  const providerLabel =
-    data?.provider === 'cloudflare'
-      ? 'Cloudflare'
-      : data?.provider === 'tailscale'
-        ? 'Tailscale'
-        : data?.provider || '';
-
-  const modeLabel = data?.mode || '';
+  const providerLabels: Record<string, string> = {
+    cloudflare: 'Cloudflare',
+    tailscale: 'Tailscale',
+  };
+  const providerLabel = data?.provider
+    ? providerLabels[data.provider] || data.provider
+    : '';
 
   return (
     <div className="border rounded-lg bg-card">
@@ -138,7 +137,7 @@ function TunnelStatusCard({ data, isLoading, error }: TunnelStatusCardProps) {
               {providerLabel && (
                 <span className="font-mono text-muted-foreground">
                   {providerLabel}
-                  {modeLabel && ` (${modeLabel})`}
+                  {data?.mode && ` (${data.mode})`}
                 </span>
               )}
 

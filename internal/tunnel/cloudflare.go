@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"regexp"
@@ -150,7 +151,7 @@ func (p *CloudflareProvider) runTunnel(ctx context.Context, localAddr string) {
 }
 
 // monitorOutput monitors cloudflared stderr for connection status.
-func (p *CloudflareProvider) monitorOutput(stderr interface{ Read([]byte) (int, error) }) {
+func (p *CloudflareProvider) monitorOutput(stderr io.Reader) {
 	scanner := bufio.NewScanner(stderr)
 	connectedPattern := regexp.MustCompile(`Connection .* registered`)
 

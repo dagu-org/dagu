@@ -131,28 +131,28 @@ func initTunnelService(cfg *config.Config) (*tunnel.Service, error) {
 		return nil, nil
 	}
 
-	// Convert config.TunnelConfig to tunnel.Config
+	tc := cfg.Tunnel
 	tunnelCfg := &tunnel.Config{
-		Enabled:  cfg.Tunnel.Enabled,
-		Provider: tunnel.ProviderType(cfg.Tunnel.Provider),
+		Enabled:       tc.Enabled,
+		Provider:      tunnel.ProviderType(tc.Provider),
+		AllowTerminal: tc.AllowTerminal,
+		AllowedIPs:    tc.AllowedIPs,
 		Cloudflare: tunnel.CloudflareConfig{
-			Token:    cfg.Tunnel.Cloudflare.Token,
-			Hostname: cfg.Tunnel.Cloudflare.Hostname,
+			Token:    tc.Cloudflare.Token,
+			Hostname: tc.Cloudflare.Hostname,
 		},
 		Tailscale: tunnel.TailscaleConfig{
-			AuthKey:  cfg.Tunnel.Tailscale.AuthKey,
-			Hostname: cfg.Tunnel.Tailscale.Hostname,
-			Funnel:   cfg.Tunnel.Tailscale.Funnel,
-			HTTPS:    cfg.Tunnel.Tailscale.HTTPS,
-			StateDir: cfg.Tunnel.Tailscale.StateDir,
+			AuthKey:  tc.Tailscale.AuthKey,
+			Hostname: tc.Tailscale.Hostname,
+			Funnel:   tc.Tailscale.Funnel,
+			HTTPS:    tc.Tailscale.HTTPS,
+			StateDir: tc.Tailscale.StateDir,
 		},
-		AllowTerminal: cfg.Tunnel.AllowTerminal,
-		AllowedIPs:    cfg.Tunnel.AllowedIPs,
 		RateLimiting: tunnel.RateLimitConfig{
-			Enabled:              cfg.Tunnel.RateLimiting.Enabled,
-			LoginAttempts:        cfg.Tunnel.RateLimiting.LoginAttempts,
-			WindowSeconds:        cfg.Tunnel.RateLimiting.WindowSeconds,
-			BlockDurationSeconds: cfg.Tunnel.RateLimiting.BlockDurationSeconds,
+			Enabled:              tc.RateLimiting.Enabled,
+			LoginAttempts:        tc.RateLimiting.LoginAttempts,
+			WindowSeconds:        tc.RateLimiting.WindowSeconds,
+			BlockDurationSeconds: tc.RateLimiting.BlockDurationSeconds,
 		},
 	}
 
@@ -168,11 +168,14 @@ func logTunnelStatus(ctx *Context, svc *tunnel.Service) {
 		accessType = "Public"
 	}
 
-	authStatus := "Disabled"
-	if ctx.Config.Server.Auth.Mode == config.AuthModeBuiltin {
-		authStatus = "Builtin (enabled ✓)"
-	} else if ctx.Config.Server.Auth.Mode == config.AuthModeOIDC {
-		authStatus = "OIDC (enabled ✓)"
+	var authStatus string
+	switch ctx.Config.Server.Auth.Mode {
+	case config.AuthModeBuiltin:
+		authStatus = "Builtin (enabled)"
+	case config.AuthModeOIDC:
+		authStatus = "OIDC (enabled)"
+	default:
+		authStatus = "Disabled"
 	}
 
 	terminalStatus := "Disabled"

@@ -82,14 +82,9 @@ func (p *TailscaleProvider) Start(ctx context.Context, localAddr string) error {
 	p.cancel = cancel
 	p.done = make(chan struct{})
 
-	// Create tsnet server
-	hostname := p.config.Hostname
-	if hostname == "" {
-		hostname = "dagu"
-	}
-
+	// Create tsnet server using hostname from config (already defaulted in NewTailscaleProvider)
 	srv := &tsnet.Server{
-		Hostname: hostname,
+		Hostname: p.config.Hostname,
 		Dir:      p.stateDir,
 	}
 

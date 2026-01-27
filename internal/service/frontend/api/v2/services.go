@@ -126,59 +126,45 @@ func (a *API) GetCoordinatorStatus(ctx context.Context, _ api.GetCoordinatorStat
 func (a *API) GetTunnelStatus(ctx context.Context, _ api.GetTunnelStatusRequestObject) (api.GetTunnelStatusResponseObject, error) {
 	logger.Info(ctx, "GetTunnelStatus called")
 
-	// Check if tunnel is enabled in config
-	if !a.config.Tunnel.Enabled {
+	// Return disabled if tunnel is not configured or service unavailable
+	if !a.config.Tunnel.Enabled || a.tunnelService == nil {
 		return api.GetTunnelStatus200JSONResponse{
-			Enabled: false,
+			Enabled: a.config.Tunnel.Enabled,
 			Status:  api.TunnelStatusResponseStatusDisabled,
 		}, nil
 	}
 
-	// If no tunnel service is available, return disabled status
-	if a.tunnelService == nil {
-		return api.GetTunnelStatus200JSONResponse{
-			Enabled: true,
-			Status:  api.TunnelStatusResponseStatusDisabled,
-		}, nil
-	}
-
-	// Get tunnel info from service
 	info := a.tunnelService.Info()
 
-	// Convert tunnel.Status to API status
-	var status api.TunnelStatusResponseStatus
-	switch info.Status {
-	case tunnel.StatusConnected:
-		status = api.TunnelStatusResponseStatusConnected
-	case tunnel.StatusConnecting:
-		status = api.TunnelStatusResponseStatusConnecting
-	case tunnel.StatusReconnecting:
-		status = api.TunnelStatusResponseStatusReconnecting
-	case tunnel.StatusError:
-		status = api.TunnelStatusResponseStatusError
-	default:
-		status = api.TunnelStatusResponseStatusDisabled
+	// Map tunnel status to API status
+	statusMap := map[tunnel.Status]api.TunnelStatusResponseStatus{
+		tunnel.StatusConnected:    api.TunnelStatusResponseStatusConnected,
+		tunnel.StatusConnecting:   api.TunnelStatusResponseStatusConnecting,
+		tunnel.StatusReconnecting: api.TunnelStatusResponseStatusReconnecting,
+		tunnel.StatusError:        api.TunnelStatusResponseStatusError,
 	}
-
-	// Convert provider type
-	var provider *api.TunnelStatusResponseProvider
-	if info.Provider != "" {
-		p := api.TunnelStatusResponseProvider(info.Provider)
-		provider = &p
+	status, ok := statusMap[info.Status]
+	if !ok {
+		status = api.TunnelStatusResponseStatusDisabled
 	}
 
 	// Build response
 	response := api.GetTunnelStatus200JSONResponse{
 		Enabled:   true,
 		Status:    status,
-		Provider:  provider,
 		PublicUrl: ptrOf(info.PublicURL),
 		Error:     ptrOf(info.Error),
 		Mode:      ptrOf(info.Mode),
 		IsPublic:  ptrOf(info.IsPublic),
 	}
 
-	// Add startedAt if connected
+	// Set provider if available
+	if info.Provider != "" {
+		p := api.TunnelStatusResponseProvider(info.Provider)
+		response.Provider = &p
+	}
+
+	// Set startedAt if tunnel has been started
 	if !info.StartedAt.IsZero() {
 		startedAt := info.StartedAt.Format(time.RFC3339)
 		response.StartedAt = &startedAt
