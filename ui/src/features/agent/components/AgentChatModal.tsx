@@ -1,6 +1,13 @@
 import * as React from 'react';
-import { X, RotateCcw, Terminal } from 'lucide-react';
+import { X, RotateCcw, Terminal, Plus, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useAgentChatContext } from '../context/AgentChatContext';
 import { useAgentChat } from '../hooks/useAgentChat';
 import { ChatMessages } from './ChatMessages';
@@ -10,12 +17,23 @@ import { cn } from '@/lib/utils';
 export function AgentChatModal() {
   const { isOpen, closeChat } = useAgentChatContext();
   const {
+    conversationId,
     messages,
+    conversations,
     isWorking,
     sendMessage,
     cancelConversation,
     clearConversation,
+    fetchConversations,
+    selectConversation,
   } = useAgentChat();
+
+  // Fetch conversations when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      fetchConversations();
+    }
+  }, [isOpen, fetchConversations]);
 
   const handleSend = React.useCallback(
     async (message: string) => {
@@ -40,6 +58,32 @@ export function AgentChatModal() {
     clearConversation();
   }, [clearConversation]);
 
+  const handleSelectConversation = React.useCallback(
+    async (value: string) => {
+      if (value === 'new') {
+        clearConversation();
+      } else {
+        try {
+          await selectConversation(value);
+        } catch (err) {
+          console.error('Failed to select conversation:', err);
+        }
+      }
+    },
+    [selectConversation, clearConversation]
+  );
+
+  // Format date for display
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -56,34 +100,65 @@ export function AgentChatModal() {
     >
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 bg-zinc-900/80">
-        <div className="flex items-center gap-2">
-          <Terminal className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Agent Console</span>
-          {isWorking && (
-            <span className="text-xs text-yellow-500 font-mono">running...</span>
-          )}
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <Terminal className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <Select
+              value={conversationId || 'new'}
+              onValueChange={handleSelectConversation}
+            >
+              <SelectTrigger className="h-6 w-auto max-w-[200px] px-2 text-xs bg-transparent border-zinc-700 hover:bg-zinc-800">
+                <SelectValue placeholder="New conversation" />
+              </SelectTrigger>
+              <SelectContent className="bg-zinc-900 border-zinc-700">
+                <SelectItem value="new" className="text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <Plus className="h-3 w-3" />
+                    New conversation
+                  </div>
+                </SelectItem>
+                {conversations.map((conv) => (
+                  <SelectItem
+                    key={conv.conversation.id}
+                    value={conv.conversation.id}
+                    className="text-xs"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate">
+                        {formatDate(conv.conversation.created_at)}
+                      </span>
+                      {conv.working && (
+                        <span className="text-yellow-500 text-[10px]">...</span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {isWorking && (
+              <span className="text-xs text-yellow-500 font-mono flex-shrink-0">running...</span>
+            )}
+          </div>
+          <div className="flex items-center gap-0.5 flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClear}
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+              title="New conversation"
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={closeChat}
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+              title="Close"
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-0.5">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClear}
-            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-            title="Clear"
-          >
-            <RotateCcw className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={closeChat}
-            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-            title="Close"
-          >
-            <X className="h-3 w-3" />
-          </Button>
-        </div>
-      </div>
 
       {/* Messages */}
       <ChatMessages messages={messages} isWorking={isWorking} />

@@ -783,8 +783,17 @@ func (srv *Server) buildAgentAuthMiddleware(ctx context.Context) func(http.Handl
 
 	// Return the composed middleware
 	return func(next http.Handler) http.Handler {
-		// Apply client IP middleware first, then auth middleware
-		return auth.ClientIPMiddleware()(auth.Middleware(authOptions)(next))
+		baseMiddleware := auth.ClientIPMiddleware()(auth.Middleware(authOptions)(next))
+
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// For SSE endpoints, check for token in query parameter
+			// (EventSource doesn't support custom headers)
+			if token := r.URL.Query().Get("token"); token != "" {
+				// Add the token to Authorization header so auth middleware can process it
+				r.Header.Set("Authorization", "Bearer "+token)
+			}
+			baseMiddleware.ServeHTTP(w, r)
+		})
 	}
 }
 

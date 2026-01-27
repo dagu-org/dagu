@@ -6,7 +6,22 @@ import {
   NewConversationResponse,
   ChatRequest,
   Message,
+  ConversationWithState,
 } from '../types';
+
+const TOKEN_KEY = 'dagu_auth_token';
+
+// Helper to get auth headers
+function getAuthHeaders(): HeadersInit {
+  const token = localStorage.getItem(TOKEN_KEY);
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
 
 export function useAgentChat() {
   const config = useConfig();
@@ -14,9 +29,11 @@ export function useAgentChat() {
     conversationId,
     messages,
     conversationState,
+    conversations,
     setConversationId,
     setMessages,
     setConversationState,
+    setConversations,
     addMessage,
     clearConversation,
   } = useAgentChatContext();
@@ -49,9 +66,14 @@ export function useAgentChat() {
       eventSourceRef.current.close();
     }
 
-    // Create new SSE connection
-    const streamUrl = `${baseUrl}/conversations/${conversationId}/stream`;
-    const eventSource = new EventSource(streamUrl);
+    // Create new SSE connection with auth token as query param
+    // (EventSource doesn't support custom headers)
+    const token = localStorage.getItem(TOKEN_KEY);
+    const streamUrl = new URL(`${baseUrl}/conversations/${conversationId}/stream`, window.location.origin);
+    if (token) {
+      streamUrl.searchParams.set('token', token);
+    }
+    const eventSource = new EventSource(streamUrl.toString());
     eventSourceRef.current = eventSource;
 
     eventSource.onmessage = (event) => {
@@ -97,9 +119,7 @@ export function useAgentChat() {
     async (message: string, model?: string): Promise<string> => {
       const response = await fetch(`${baseUrl}/conversations/new`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           message,
           model,
@@ -129,9 +149,7 @@ export function useAgentChat() {
         `${baseUrl}/conversations/${conversationId}/chat`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             message,
             model,
@@ -154,6 +172,7 @@ export function useAgentChat() {
       `${baseUrl}/conversations/${conversationId}/cancel`,
       {
         method: 'POST',
+        headers: getAuthHeaders(),
       }
     );
 
@@ -162,14 +181,60 @@ export function useAgentChat() {
     }
   }, [baseUrl, conversationId]);
 
+  // Fetch all conversations for the current user
+  const fetchConversations = useCallback(async (): Promise<void> => {
+    try {
+      const response = await fetch(`${baseUrl}/conversations`, {
+        headers: getAuthHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch conversations: ${response.statusText}`);
+      }
+      const data: ConversationWithState[] = await response.json();
+      setConversations(data || []);
+    } catch (err) {
+      console.error('Failed to fetch conversations:', err);
+      setConversations([]);
+    }
+  }, [baseUrl, setConversations]);
+
+  // Select and load an existing conversation
+  const selectConversation = useCallback(
+    async (id: string): Promise<void> => {
+      try {
+        const response = await fetch(`${baseUrl}/conversations/${id}`, {
+          headers: getAuthHeaders(),
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to load conversation: ${response.statusText}`);
+        }
+        const data: StreamResponse = await response.json();
+
+        // Update state with the loaded conversation
+        setConversationId(id);
+        setMessages(data.messages || []);
+        if (data.conversation_state) {
+          setConversationState(data.conversation_state);
+        }
+      } catch (err) {
+        console.error('Failed to select conversation:', err);
+        throw err;
+      }
+    },
+    [baseUrl, setConversationId, setMessages, setConversationState]
+  );
+
   return {
     conversationId,
     messages,
     conversationState,
+    conversations,
     isWorking: conversationState?.working ?? false,
     startConversation,
     sendMessage,
     cancelConversation,
     clearConversation,
+    fetchConversations,
+    selectConversation,
   };
 }

@@ -1,18 +1,20 @@
 import * as React from 'react';
 import { createContext, useContext, useState, useCallback } from 'react';
-import { Message, ConversationState } from '../types';
+import { Message, ConversationState, ConversationWithState } from '../types';
 
 interface AgentChatContextType {
   isOpen: boolean;
   conversationId: string | null;
   messages: Message[];
   conversationState: ConversationState | null;
+  conversations: ConversationWithState[];
   openChat: () => void;
   closeChat: () => void;
   toggleChat: () => void;
   setConversationId: (id: string | null) => void;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setConversationState: (state: ConversationState | null) => void;
+  setConversations: (conversations: ConversationWithState[]) => void;
   addMessage: (message: Message) => void;
   clearConversation: () => void;
 }
@@ -25,6 +27,9 @@ export function AgentChatProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversationState, setConversationState] =
     useState<ConversationState | null>(null);
+  const [conversations, setConversations] = useState<ConversationWithState[]>(
+    []
+  );
 
   const openChat = useCallback(() => setIsOpen(true), []);
   const closeChat = useCallback(() => setIsOpen(false), []);
@@ -56,12 +61,14 @@ export function AgentChatProvider({ children }: { children: React.ReactNode }) {
         conversationId,
         messages,
         conversationState,
+        conversations,
         openChat,
         closeChat,
         toggleChat,
         setConversationId,
         setMessages,
         setConversationState,
+        setConversations,
         addMessage,
         clearConversation,
       }}
