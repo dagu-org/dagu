@@ -133,7 +133,7 @@ func (f *testFixture) setupSharedNothingWorker(workerID string, labels map[strin
 		Config:            f.coord.Config,
 	}
 
-	w := worker.NewWorker(workerID, 10, f.coordinatorClient, labels, f.coord.Config)
+	w := worker.NewWorker(workerID, "default", 10, f.coordinatorClient, labels, f.coord.Config)
 	w.SetHandler(worker.NewRemoteTaskHandler(handlerCfg))
 
 	return f.startWorker(w, workerID)
@@ -142,7 +142,7 @@ func (f *testFixture) setupSharedNothingWorker(workerID string, labels map[strin
 func (f *testFixture) setupSharedFSWorker(workerID string, labels map[string]string) *worker.Worker {
 	f.t.Helper()
 
-	w := worker.NewWorker(workerID, 10, f.coordinatorClient, labels, f.coord.Config)
+	w := worker.NewWorker(workerID, "default", 10, f.coordinatorClient, labels, f.coord.Config)
 	w.SetHandler(worker.NewTaskHandler(f.coord.Config))
 
 	return f.startWorker(w, workerID)

@@ -196,6 +196,15 @@ var (
 		bindViper: true,
 	}
 
+	// workerNamespaceFlag is the namespace the worker serves.
+	workerNamespaceFlag = commandLineFlag{
+		name:         "worker.namespace",
+		shorthand:    "n",
+		defaultValue: "default",
+		usage:        "Namespace the worker serves (default: default)",
+		bindViper:    true,
+	}
+
 	// workerMaxActiveRunsFlag is the maximum number of active runs for the worker.
 	workerMaxActiveRunsFlag = commandLineFlag{
 		name:         "worker.max-active-runs",

@@ -29,7 +29,7 @@ func TestPollerStateTracking(t *testing.T) {
 		mockHandler := &mockHandler{}
 		labels := make(map[string]string)
 
-		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockHandler, 0, labels)
+		poller := worker.NewPoller("test-worker", "default", mockCoordinatorCli, mockHandler, 0, labels)
 
 		// Check initial state
 		isConnected, consecutiveFails, lastError := poller.GetState()
@@ -55,7 +55,7 @@ func TestPollerStateTracking(t *testing.T) {
 
 		mockHandler := &mockHandler{}
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockHandler, 0, labels)
+		poller := worker.NewPoller("test-worker", "default", mockCoordinatorCli, mockHandler, 0, labels)
 
 		// State should reflect coordinator client metrics
 		isConnected, consecutiveFails, lastError := poller.GetState()
@@ -100,7 +100,7 @@ func TestPollerTaskDispatch(t *testing.T) {
 		}
 
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockHandler, 0, labels)
+		poller := worker.NewPoller("test-worker", "default", mockCoordinatorCli, mockHandler, 0, labels)
 
 		// Run poller
 		poller.Run(ctx)
@@ -148,7 +148,7 @@ func TestPollerTaskDispatch(t *testing.T) {
 		}
 
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockHandler, 0, labels)
+		poller := worker.NewPoller("test-worker", "default", mockCoordinatorCli, mockHandler, 0, labels)
 
 		// Run poller in background
 		go poller.Run(ctx)
@@ -196,7 +196,7 @@ func TestPollerErrorHandling(t *testing.T) {
 		}
 
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockHandler, 0, labels)
+		poller := worker.NewPoller("test-worker", "default", mockCoordinatorCli, mockHandler, 0, labels)
 
 		// Run poller in background
 		go poller.Run(ctx)
@@ -241,7 +241,7 @@ func TestPollerErrorHandling(t *testing.T) {
 		}
 
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockHandler, 0, labels)
+		poller := worker.NewPoller("test-worker", "default", mockCoordinatorCli, mockHandler, 0, labels)
 
 		// Run poller (will retry on errors)
 		poller.Run(ctx)
@@ -270,7 +270,7 @@ func TestPollerContextCancellation(t *testing.T) {
 
 		mockHandler := &mockHandler{}
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockHandler, 0, labels)
+		poller := worker.NewPoller("test-worker", "default", mockCoordinatorCli, mockHandler, 0, labels)
 
 		// Run poller in background
 		var wg sync.WaitGroup
@@ -314,7 +314,7 @@ func TestPollerContextCancellation(t *testing.T) {
 		}
 
 		labels := make(map[string]string)
-		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockHandler, 0, labels)
+		poller := worker.NewPoller("test-worker", "default", mockCoordinatorCli, mockHandler, 0, labels)
 
 		// Run poller in background
 		var wg sync.WaitGroup
@@ -356,7 +356,7 @@ func TestPollerWithLabels(t *testing.T) {
 		}
 
 		mockHandler := &mockHandler{}
-		poller := worker.NewPoller("test-worker", mockCoordinatorCli, mockHandler, 0, expectedLabels)
+		poller := worker.NewPoller("test-worker", "default", mockCoordinatorCli, mockHandler, 0, expectedLabels)
 
 		// Run poller
 		poller.Run(ctx)

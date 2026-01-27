@@ -16,6 +16,7 @@ import (
 // Poller handles polling for tasks from the coordinator
 type Poller struct {
 	workerID       string
+	namespace      string // Namespace this poller's worker serves
 	coordinatorCli coordinator.Client
 	handler        TaskHandler
 	index          int
@@ -23,9 +24,10 @@ type Poller struct {
 }
 
 // NewPoller creates a new poller instance
-func NewPoller(workerID string, coordinatorCli coordinator.Client, handler TaskHandler, index int, labels map[string]string) *Poller {
+func NewPoller(workerID string, namespace string, coordinatorCli coordinator.Client, handler TaskHandler, index int, labels map[string]string) *Poller {
 	return &Poller{
 		workerID:       workerID,
+		namespace:      namespace,
 		coordinatorCli: coordinatorCli,
 		handler:        handler,
 		index:          index,
@@ -101,9 +103,10 @@ func (p *Poller) pollForTask(ctx context.Context, policy backoff.RetryPolicy) (*
 	beforeMetrics := p.coordinatorCli.Metrics()
 
 	req := &coordinatorv1.PollRequest{
-		WorkerId: p.workerID,
-		PollerId: pollerID,
-		Labels:   p.labels,
+		WorkerId:  p.workerID,
+		PollerId:  pollerID,
+		Labels:    p.labels,
+		Namespace: p.namespace,
 	}
 
 	// Use coordinator client's Poll method which handles retries and failover

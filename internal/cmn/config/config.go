@@ -348,6 +348,7 @@ type PathsConfig struct {
 	UsersDir           string // Directory for user data (builtin auth)
 	APIKeysDir         string // Directory for API key data (builtin auth)
 	WebhooksDir        string // Directory for webhook data (builtin auth)
+	NamespacesDir      string // Directory for namespace metadata
 	ConfigFileUsed     string // Path to the configuration file used to load settings
 }
 
@@ -406,6 +407,7 @@ type Coordinator struct {
 // Worker represents the worker configuration
 type Worker struct {
 	ID            string            // Worker instance ID (default: hostname@PID)
+	Namespace     string            // Namespace the worker serves (required)
 	MaxActiveRuns int               // Maximum number of active runs (default: 100)
 	Labels        map[string]string // Worker labels for capability matching
 	Coordinators  []string          // Coordinator addresses for static discovery (host:port)

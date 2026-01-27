@@ -51,10 +51,17 @@ func NewScheduledJob(next time.Time, job Job, typ ScheduleType) *ScheduledJob {
 
 var _ EntryReader = (*entryReaderImpl)(nil)
 
+// dagEntry stores a DAG with its namespace context.
+type dagEntry struct {
+	dag       *core.DAG
+	namespace string
+}
+
 // entryReaderImpl manages DAGs on local filesystem.
 type entryReaderImpl struct {
 	targetDir   string
-	registry    map[string]*core.DAG
+	namespace   string // Namespace for DAGs managed by this reader
+	registry    map[string]*dagEntry
 	lock        sync.Mutex
 	dagStore    exec.DAGStore
 	dagRunMgr   runtime.Manager
@@ -66,11 +73,14 @@ type entryReaderImpl struct {
 }
 
 // NewEntryReader creates a new DAG manager with the given configuration.
+// For backwards compatibility, this creates a reader without namespace awareness.
+// Use NewNamespaceEntryReader for multi-namespace support.
 func NewEntryReader(dir string, dagCli exec.DAGStore, drm runtime.Manager, de *DAGExecutor, executable string) EntryReader {
 	return &entryReaderImpl{
 		targetDir:   dir,
+		namespace:   "", // Empty namespace for backwards compatibility
 		lock:        sync.Mutex{},
-		registry:    map[string]*core.DAG{},
+		registry:    map[string]*dagEntry{},
 		dagStore:    dagCli,
 		dagRunMgr:   drm,
 		executable:  executable,
@@ -80,8 +90,16 @@ func NewEntryReader(dir string, dagCli exec.DAGStore, drm runtime.Manager, de *D
 }
 
 func (er *entryReaderImpl) Init(ctx context.Context) error {
+	return er.initWithNamespace(ctx, er.namespace)
+}
+
+// initWithNamespace initializes the entry reader with a specific namespace.
+// This is called by NamespaceEntryReader to set up per-namespace readers.
+func (er *entryReaderImpl) initWithNamespace(ctx context.Context, namespace string) error {
 	er.lock.Lock()
 	defer er.lock.Unlock()
+
+	er.namespace = namespace
 
 	if err := er.initialize(ctx); err != nil {
 		logger.Error(ctx, "Failed to initialize DAG registry", tag.Error(err))
@@ -131,8 +149,15 @@ func (er *entryReaderImpl) Start(ctx context.Context) {
 						tag.Error(err),
 						tag.File(event.Name))
 				} else {
-					er.registry[filepath.Base(event.Name)] = dag
-					logger.Info(ctx, "DAG added/updated", tag.Name(filepath.Base(event.Name)))
+					// Set the namespace on the DAG
+					dag.Namespace = er.namespace
+					er.registry[filepath.Base(event.Name)] = &dagEntry{
+						dag:       dag,
+						namespace: er.namespace,
+					}
+					logger.Info(ctx, "DAG added/updated",
+						tag.Name(filepath.Base(event.Name)),
+						tag.Namespace(er.namespace))
 				}
 			}
 			if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
@@ -168,7 +193,8 @@ func (er *entryReaderImpl) Next(ctx context.Context, now time.Time) ([]*Schedule
 
 	var jobs []*ScheduledJob
 
-	for _, dag := range er.registry {
+	for _, entry := range er.registry {
+		dag := entry.dag
 		dagName := strings.TrimSuffix(filepath.Base(dag.Location), filepath.Ext(dag.Location))
 		if er.dagStore.IsSuspended(ctx, dagName) {
 			logger.Debug(ctx, "Skipping suspended DAG", tag.DAG(dagName))
@@ -208,9 +234,18 @@ func (er *entryReaderImpl) createJob(dag *core.DAG, next time.Time, schedule cro
 
 func (er *entryReaderImpl) initialize(ctx context.Context) error {
 	// Note: This method expects the caller to already hold er.lock
-	logger.Info(ctx, "Loading DAGs", tag.Dir(er.targetDir))
+	logger.Info(ctx, "Loading DAGs",
+		tag.Dir(er.targetDir),
+		tag.Namespace(er.namespace))
 	fis, err := os.ReadDir(er.targetDir)
 	if err != nil {
+		// If directory doesn't exist, that's OK - no DAGs to load
+		if os.IsNotExist(err) {
+			logger.Info(ctx, "DAG directory does not exist, skipping",
+				tag.Dir(er.targetDir),
+				tag.Namespace(er.namespace))
+			return nil
+		}
 		logger.Error(ctx, "Failed to read DAG directory",
 			tag.Dir(er.targetDir),
 			tag.Error(err),
@@ -234,11 +269,18 @@ func (er *entryReaderImpl) initialize(ctx context.Context) error {
 					tag.Name(fi.Name()))
 				continue
 			}
-			er.registry[fi.Name()] = dag
+			// Set the namespace on the DAG
+			dag.Namespace = er.namespace
+			er.registry[fi.Name()] = &dagEntry{
+				dag:       dag,
+				namespace: er.namespace,
+			}
 			dags = append(dags, fi.Name())
 		}
 	}
 
-	logger.Info(ctx, "DAGs loaded", slog.String("dags", strings.Join(dags, ",")))
+	logger.Info(ctx, "DAGs loaded",
+		slog.String("dags", strings.Join(dags, ",")),
+		tag.Namespace(er.namespace))
 	return nil
 }

@@ -277,6 +277,7 @@ func TestWorkerWithLabels(t *testing.T) {
 		// Create worker WITH matching labels
 		w2 := worker.NewWorker(
 			"worker-2",
+			"default",
 			1,
 			coord.GetCoordinatorClient(t),
 			map[string]string{"type": "special", "region": "us-east", "extra": "value"},
@@ -372,7 +373,7 @@ func TestWorkerStopWithoutStart(t *testing.T) {
 
 		// Create a mock coordinator client that doesn't connect
 		mockCoordinatorCli := newMockCoordinatorCli()
-		w := worker.NewWorker("test-worker", 1, mockCoordinatorCli, labels, &config.Config{})
+		w := worker.NewWorker("test-worker", "default", 1, mockCoordinatorCli, labels, &config.Config{})
 		w.SetHandler(&mockHandler{ExecutionTime: 0})
 
 		// Stop should work without error even if not started
@@ -389,7 +390,7 @@ func TestWorkerDefaultID(t *testing.T) {
 		mockCoordinatorCli := newMockCoordinatorCli()
 
 		// Create worker with empty ID
-		w := worker.NewWorker("", 1, mockCoordinatorCli, labels, &config.Config{})
+		w := worker.NewWorker("", "default", 1, mockCoordinatorCli, labels, &config.Config{})
 		require.NotNil(t, w)
 
 		// Worker should have generated a default ID (hostname@pid format)
@@ -513,7 +514,7 @@ func TestWorkerConnectionFailure(t *testing.T) {
 		}
 
 		labels := make(map[string]string)
-		w := worker.NewWorker("test-worker", 1, mockCoordinatorCli, labels, &config.Config{})
+		w := worker.NewWorker("test-worker", "default", 1, mockCoordinatorCli, labels, &config.Config{})
 		w.SetHandler(&mockHandler{})
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -573,7 +574,7 @@ func createTestWorker(t *testing.T, workerID string, maxActiveRuns int, coord *t
 	coordinatorClient := coord.GetCoordinatorClient(t)
 
 	labels := make(map[string]string)
-	return worker.NewWorker(workerID, maxActiveRuns, coordinatorClient, labels, &config.Config{})
+	return worker.NewWorker(workerID, "default", maxActiveRuns, coordinatorClient, labels, &config.Config{})
 }
 
 func TestWorkerCancellation(t *testing.T) {
@@ -601,7 +602,7 @@ func TestWorkerCancellation(t *testing.T) {
 		}
 
 		labels := make(map[string]string)
-		w := worker.NewWorker("test-worker", 1, mockCoordinatorCli, labels, &config.Config{})
+		w := worker.NewWorker("test-worker", "default", 1, mockCoordinatorCli, labels, &config.Config{})
 
 		// Track if task was cancelled via context
 		taskCancelled := make(chan bool, 1)
@@ -674,7 +675,7 @@ func TestWorkerCancellation(t *testing.T) {
 		}
 
 		labels := make(map[string]string)
-		w := worker.NewWorker("test-worker", 1, mockCoordinatorCli, labels, &config.Config{})
+		w := worker.NewWorker("test-worker", "default", 1, mockCoordinatorCli, labels, &config.Config{})
 
 		taskExecuted := make(chan bool, 1)
 		w.SetHandler(&mockHandler{
@@ -747,7 +748,7 @@ func TestWorkerCancellation(t *testing.T) {
 		}
 
 		labels := make(map[string]string)
-		w := worker.NewWorker("test-worker", 3, mockCoordinatorCli, labels, &config.Config{})
+		w := worker.NewWorker("test-worker", "default", 3, mockCoordinatorCli, labels, &config.Config{})
 
 		// Track cancelled tasks
 		cancelledTasks := make(chan string, 3)

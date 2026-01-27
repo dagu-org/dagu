@@ -25,8 +25,10 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/telemetry"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/gitsync"
+	"github.com/dagu-org/dagu/internal/persis"
 	"github.com/dagu-org/dagu/internal/persis/fileapikey"
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
+	"github.com/dagu-org/dagu/internal/persis/filens"
 	"github.com/dagu-org/dagu/internal/persis/fileuser"
 	"github.com/dagu-org/dagu/internal/persis/filewebhook"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -172,8 +174,24 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		}
 	}
 
+	// Create namespace store and factory for namespace-scoped operations
+	var nsStore *filens.Store
+	var factory *persis.Factory
+	if cfg.Paths.NamespacesDir != "" {
+		var err error
+		nsStore, err = filens.New(cfg.Paths.NamespacesDir)
+		if err != nil {
+			logger.Warn(ctx, "Failed to create namespace store, namespace features disabled",
+				tag.Error(err))
+		} else {
+			// Derive config directory from DAGsDir (typically ~/.config/dagu/dags/ -> ~/.config/dagu/)
+			configDir := filepath.Dir(cfg.Paths.DAGsDir)
+			factory = persis.NewFactory(configDir, cfg.Paths.DataDir, cfg.Paths.LogDir)
+		}
+	}
+
 	srv := &Server{
-		apiV2:          apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, apiOpts...),
+		apiV2:          apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, nsStore, factory, apiOpts...),
 		config:         cfg,
 		builtinOIDCCfg: builtinOIDCCfg,
 		authService:    authSvc,

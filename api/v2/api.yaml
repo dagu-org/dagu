@@ -45,6 +45,8 @@ tags:
     description: "Audit log operations (admin only)"
   - name: "sync"
     description: "Git synchronization operations for DAGs"
+  - name: "namespaces"
+    description: "Namespace management operations for multi-tenancy"
 
 paths:
   /health:
@@ -683,6 +685,209 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /namespaces:
+    get:
+      summary: "List all namespaces"
+      description: "Returns a list of all namespaces in the system"
+      operationId: "listNamespaces"
+      tags:
+        - "namespaces"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  namespaces:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/NamespaceInfo"
+                required:
+                  - namespaces
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Create a new namespace"
+      description: "Creates a new namespace with the specified name and metadata"
+      operationId: "createNamespace"
+      tags:
+        - "namespaces"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNamespaceRequest"
+      responses:
+        "201":
+          description: "Namespace created successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NamespaceInfo"
+        "400":
+          description: "Invalid namespace name or already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /namespaces/{namespaceName}:
+    get:
+      summary: "Get namespace details"
+      description: "Returns details of a specific namespace"
+      operationId: "getNamespace"
+      tags:
+        - "namespaces"
+      parameters:
+        - $ref: "#/components/parameters/NamespaceName"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NamespaceInfo"
+        "404":
+          description: "Namespace not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      summary: "Update namespace metadata"
+      description: "Updates the display name and description of a namespace"
+      operationId: "updateNamespace"
+      tags:
+        - "namespaces"
+      parameters:
+        - $ref: "#/components/parameters/NamespaceName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNamespaceRequest"
+      responses:
+        "200":
+          description: "Namespace updated successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NamespaceInfo"
+        "404":
+          description: "Namespace not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Delete a namespace"
+      description: "Deletes a namespace. The namespace must be empty (no DAGs)."
+      operationId: "deleteNamespace"
+      tags:
+        - "namespaces"
+      parameters:
+        - $ref: "#/components/parameters/NamespaceName"
+      responses:
+        "204":
+          description: "Namespace deleted successfully"
+        "400":
+          description: "Namespace is not empty"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Namespace not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /namespaces/{namespaceName}/rename:
+    post:
+      summary: "Rename a namespace"
+      description: "Renames a namespace to a new name"
+      operationId: "renameNamespace"
+      tags:
+        - "namespaces"
+      parameters:
+        - $ref: "#/components/parameters/NamespaceName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newName:
+                  type: string
+                  description: "The new name for the namespace"
+                  minLength: 1
+                  maxLength: 63
+                  pattern: "^[a-z0-9][a-z0-9-_]*$"
+              required:
+                - newName
+      responses:
+        "200":
+          description: "Namespace renamed successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NamespaceInfo"
+        "400":
+          description: "Invalid new name or name already taken"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Namespace not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dags:
     get:
       summary: "List all available DAGs"
@@ -694,6 +899,7 @@ paths:
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PerPage"
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Namespace"
         - name: "name"
           in: "query"
           required: false
@@ -867,6 +1073,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
@@ -914,6 +1121,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "204":
@@ -940,6 +1148,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
@@ -1001,6 +1210,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
@@ -1070,6 +1280,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
@@ -1129,6 +1340,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
@@ -1167,6 +1379,7 @@ paths:
       operationId: "getDAGDAGRunDetails"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/DAGFileName"
         - $ref: "#/components/parameters/DAGRunId"
       responses:
@@ -1197,6 +1410,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
@@ -1233,6 +1447,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
@@ -1278,6 +1493,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
@@ -1316,6 +1532,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
@@ -1360,6 +1577,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
@@ -3032,6 +3250,7 @@ paths:
         - "webhooks"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
@@ -3063,6 +3282,7 @@ paths:
         - "webhooks"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "201":
@@ -3092,6 +3312,7 @@ paths:
         - "webhooks"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "204":
@@ -3120,6 +3341,7 @@ paths:
         - "webhooks"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
@@ -3150,6 +3372,7 @@ paths:
         - "webhooks"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
@@ -3606,6 +3829,26 @@ components:
         type: string
         default: "local"
 
+    Namespace:
+      name: namespace
+      in: query
+      description: Target namespace for the operation (defaults to "default")
+      required: false
+      schema:
+        type: string
+        default: "default"
+
+    NamespaceName:
+      name: namespaceName
+      in: path
+      description: Name of the namespace
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 63
+        pattern: "^[a-z0-9][a-z0-9-_]*$"
+
     DAGRunId:
       name: dagRunId
       in: path
@@ -3700,6 +3943,72 @@ components:
         $ref: "#/components/schemas/Stream"
 
   schemas:
+    NamespaceInfo:
+      type: object
+      description: "A namespace for organizing DAGs"
+      x-go-name: "NamespaceInfo"
+      properties:
+        id:
+          type: string
+          description: "Unique internal identifier (UUID)"
+        name:
+          type: string
+          description: "Unique namespace name (lowercase, alphanumeric with hyphens/underscores)"
+          minLength: 1
+          maxLength: 63
+          pattern: "^[a-z0-9][a-z0-9-_]*$"
+        displayName:
+          type: string
+          description: "Human-friendly display name"
+        description:
+          type: string
+          description: "Optional description of the namespace"
+        createdAt:
+          type: string
+          format: date-time
+          description: "When the namespace was created"
+        createdBy:
+          type: string
+          description: "User who created the namespace"
+        updatedAt:
+          type: string
+          format: date-time
+          description: "When the namespace was last updated"
+      required:
+        - id
+        - name
+        - createdAt
+
+    CreateNamespaceRequest:
+      type: object
+      description: "Request body for creating a new namespace"
+      properties:
+        name:
+          type: string
+          description: "Unique namespace name (lowercase, alphanumeric with hyphens/underscores)"
+          minLength: 1
+          maxLength: 63
+          pattern: "^[a-z0-9][a-z0-9-_]*$"
+        displayName:
+          type: string
+          description: "Human-friendly display name"
+        description:
+          type: string
+          description: "Optional description of the namespace"
+      required:
+        - name
+
+    UpdateNamespaceRequest:
+      type: object
+      description: "Request body for updating namespace metadata"
+      properties:
+        displayName:
+          type: string
+          description: "Human-friendly display name"
+        description:
+          type: string
+          description: "Optional description of the namespace"
+
     AuditEntry:
       type: object
       description: "A single audit log entry"

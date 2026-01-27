@@ -22,6 +22,7 @@ import (
 // Worker represents a worker instance that polls for tasks from the coordinator.
 type Worker struct {
 	id             string
+	namespace      string // Namespace this worker serves (required)
 	maxActiveRuns  int
 	coordinatorCli coordinator.Client
 	handler        TaskHandler
@@ -50,7 +51,8 @@ func (w *Worker) SetHandler(executor TaskHandler) {
 }
 
 // NewWorker creates a new worker instance.
-func NewWorker(workerID string, maxActiveRuns int, coordinatorClient coordinator.Client, labels map[string]string, cfg *config.Config) *Worker {
+// The namespace parameter is required and specifies which namespace this worker serves.
+func NewWorker(workerID string, namespace string, maxActiveRuns int, coordinatorClient coordinator.Client, labels map[string]string, cfg *config.Config) *Worker {
 	// Generate default worker ID if not provided
 	if workerID == "" {
 		hostname, err := os.Hostname()
@@ -62,6 +64,7 @@ func NewWorker(workerID string, maxActiveRuns int, coordinatorClient coordinator
 
 	return &Worker{
 		id:             workerID,
+		namespace:      namespace,
 		maxActiveRuns:  maxActiveRuns,
 		coordinatorCli: coordinatorClient,
 		handler:        &taskHandler{subCmdBuilder: runtime.NewSubCmdBuilder(cfg)},
@@ -113,7 +116,7 @@ func (w *Worker) Start(ctx context.Context) error {
 				pollerIndex: pollerIndex,
 				handler:     w.handler,
 			}
-			poller := NewPoller(w.id, w.coordinatorCli, wrappedHandler, pollerIndex, w.labels)
+			poller := NewPoller(w.id, w.namespace, w.coordinatorCli, wrappedHandler, pollerIndex, w.labels)
 			poller.Run(internalCtx)
 		}(i)
 	}
@@ -300,8 +303,9 @@ func (w *Worker) sendHeartbeat(ctx context.Context) error {
 	busyCount32 := int32(min(busyCount, math.MaxInt32))        //nolint:gosec
 
 	req := &coordinatorv1.HeartbeatRequest{
-		WorkerId: w.id,
-		Labels:   w.labels,
+		WorkerId:  w.id,
+		Labels:    w.labels,
+		Namespace: w.namespace,
 		Stats: &coordinatorv1.WorkerStats{
 			TotalPollers: totalPollers,
 			BusyPollers:  busyCount32,

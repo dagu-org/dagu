@@ -212,9 +212,10 @@ func TestLoad_Env(t *testing.T) {
 			ProcDir:            filepath.Join(testPaths, "proc"),
 			QueueDir:           filepath.Join(testPaths, "queue"),
 			ServiceRegistryDir: filepath.Join(testPaths, "service-registry"),
-			UsersDir:           filepath.Join(testPaths, "data", "users"),    // Derived from DataDir
-			APIKeysDir:         filepath.Join(testPaths, "data", "apikeys"),  // Derived from DataDir
-			WebhooksDir:        filepath.Join(testPaths, "data", "webhooks"), // Derived from DataDir
+			UsersDir:           filepath.Join(testPaths, "data", "users"),      // Derived from DataDir
+			APIKeysDir:         filepath.Join(testPaths, "data", "apikeys"),    // Derived from DataDir
+			WebhooksDir:        filepath.Join(testPaths, "data", "webhooks"),   // Derived from DataDir
+			NamespacesDir:      filepath.Join(testPaths, "data", "namespaces"), // Derived from DataDir
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
@@ -461,6 +462,7 @@ scheduler:
 			UsersDir:           "/var/dagu/data/users",
 			APIKeysDir:         "/var/dagu/data/apikeys",
 			WebhooksDir:        "/var/dagu/data/webhooks",
+			NamespacesDir:      "/var/dagu/data/namespaces",
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",

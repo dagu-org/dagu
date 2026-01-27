@@ -182,6 +182,7 @@ type PollRequest struct {
 	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
 	PollerId      string                 `protobuf:"bytes,2,opt,name=poller_id,json=pollerId,proto3" json:"poller_id,omitempty"`                                                       // Unique ID for this poll request
 	Labels        map[string]string      `protobuf:"bytes,3,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Worker labels for task matching
+	Namespace     string                 `protobuf:"bytes,4,opt,name=namespace,proto3" json:"namespace,omitempty"`                                                                     // Namespace the worker serves (required)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -235,6 +236,13 @@ func (x *PollRequest) GetLabels() map[string]string {
 		return x.Labels
 	}
 	return nil
+}
+
+func (x *PollRequest) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
 }
 
 // Response message for polling a task.
@@ -385,7 +393,9 @@ type Task struct {
 	// Attempt ID created by coordinator. Workers use this to create attempts with the same ID.
 	AttemptId string `protobuf:"bytes,14,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
 	// Globally unique attempt identifier for cancellation tracking.
-	AttemptKey    string `protobuf:"bytes,15,opt,name=attempt_key,json=attemptKey,proto3" json:"attempt_key,omitempty"`
+	AttemptKey string `protobuf:"bytes,15,opt,name=attempt_key,json=attemptKey,proto3" json:"attempt_key,omitempty"`
+	// Target namespace for the task
+	Namespace     string `protobuf:"bytes,16,opt,name=namespace,proto3" json:"namespace,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -525,6 +535,13 @@ func (x *Task) GetAttemptKey() string {
 	return ""
 }
 
+func (x *Task) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
 // Request message for getting workers.
 type GetWorkersRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -620,6 +637,7 @@ type WorkerInfo struct {
 	RunningTasks    []*RunningTask     `protobuf:"bytes,7,rep,name=running_tasks,json=runningTasks,proto3" json:"running_tasks,omitempty"`
 	LastHeartbeatAt int64              `protobuf:"varint,8,opt,name=last_heartbeat_at,json=lastHeartbeatAt,proto3" json:"last_heartbeat_at,omitempty"`                             // Unix timestamp of last heartbeat
 	HealthStatus    WorkerHealthStatus `protobuf:"varint,9,opt,name=health_status,json=healthStatus,proto3,enum=coordinator.v1.WorkerHealthStatus" json:"health_status,omitempty"` // Health status based on heartbeat recency
+	Namespace       string             `protobuf:"bytes,10,opt,name=namespace,proto3" json:"namespace,omitempty"`                                                                  // Namespace the worker serves
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -717,12 +735,20 @@ func (x *WorkerInfo) GetHealthStatus() WorkerHealthStatus {
 	return WorkerHealthStatus_WORKER_HEALTH_STATUS_UNSPECIFIED
 }
 
+func (x *WorkerInfo) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
 // Request message for heartbeat.
 type HeartbeatRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
 	Labels        map[string]string      `protobuf:"bytes,2,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Stats         *WorkerStats           `protobuf:"bytes,3,opt,name=stats,proto3" json:"stats,omitempty"`
+	Namespace     string                 `protobuf:"bytes,4,opt,name=namespace,proto3" json:"namespace,omitempty"` // Namespace the worker serves (required)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -776,6 +802,13 @@ func (x *HeartbeatRequest) GetStats() *WorkerStats {
 		return x.Stats
 	}
 	return nil
+}
+
+func (x *HeartbeatRequest) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
 }
 
 // Response message for heartbeat.
@@ -1630,11 +1663,12 @@ var File_proto_coordinator_v1_coordinator_proto protoreflect.FileDescriptor
 
 const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\n" +
-	"&proto/coordinator/v1/coordinator.proto\x12\x0ecoordinator.v1\"\xc3\x01\n" +
+	"&proto/coordinator/v1/coordinator.proto\x12\x0ecoordinator.v1\"\xe1\x01\n" +
 	"\vPollRequest\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12\x1b\n" +
 	"\tpoller_id\x18\x02 \x01(\tR\bpollerId\x12?\n" +
-	"\x06labels\x18\x03 \x03(\v2'.coordinator.v1.PollRequest.LabelsEntryR\x06labels\x1a9\n" +
+	"\x06labels\x18\x03 \x03(\v2'.coordinator.v1.PollRequest.LabelsEntryR\x06labels\x12\x1c\n" +
+	"\tnamespace\x18\x04 \x01(\tR\tnamespace\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"8\n" +
@@ -1642,7 +1676,7 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\";\n" +
 	"\x0fDispatchRequest\x12(\n" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\"\x12\n" +
-	"\x10DispatchResponse\"\xac\x05\n" +
+	"\x10DispatchResponse\"\xca\x05\n" +
 	"\x04Task\x127\n" +
 	"\toperation\x18\x06 \x01(\x0e2\x19.coordinator.v1.OperationR\toperation\x12)\n" +
 	"\x11root_dag_run_name\x18\x01 \x01(\tR\x0erootDagRunName\x12%\n" +
@@ -1664,13 +1698,14 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\n" +
 	"attempt_id\x18\x0e \x01(\tR\tattemptId\x12\x1f\n" +
 	"\vattempt_key\x18\x0f \x01(\tR\n" +
-	"attemptKey\x1aA\n" +
+	"attemptKey\x12\x1c\n" +
+	"\tnamespace\x18\x10 \x01(\tR\tnamespace\x1aA\n" +
 	"\x13WorkerSelectorEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x13\n" +
 	"\x11GetWorkersRequest\"J\n" +
 	"\x12GetWorkersResponse\x124\n" +
-	"\aworkers\x18\x01 \x03(\v2\x1a.coordinator.v1.WorkerInfoR\aworkers\"\xe3\x03\n" +
+	"\aworkers\x18\x01 \x03(\v2\x1a.coordinator.v1.WorkerInfoR\aworkers\"\x81\x04\n" +
 	"\n" +
 	"WorkerInfo\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12\x1b\n" +
@@ -1681,14 +1716,17 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\fbusy_pollers\x18\x06 \x01(\x05R\vbusyPollers\x12@\n" +
 	"\rrunning_tasks\x18\a \x03(\v2\x1b.coordinator.v1.RunningTaskR\frunningTasks\x12*\n" +
 	"\x11last_heartbeat_at\x18\b \x01(\x03R\x0flastHeartbeatAt\x12G\n" +
-	"\rhealth_status\x18\t \x01(\x0e2\".coordinator.v1.WorkerHealthStatusR\fhealthStatus\x1a9\n" +
+	"\rhealth_status\x18\t \x01(\x0e2\".coordinator.v1.WorkerHealthStatusR\fhealthStatus\x12\x1c\n" +
+	"\tnamespace\x18\n" +
+	" \x01(\tR\tnamespace\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe3\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x81\x02\n" +
 	"\x10HeartbeatRequest\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12D\n" +
 	"\x06labels\x18\x02 \x03(\v2,.coordinator.v1.HeartbeatRequest.LabelsEntryR\x06labels\x121\n" +
-	"\x05stats\x18\x03 \x01(\v2\x1b.coordinator.v1.WorkerStatsR\x05stats\x1a9\n" +
+	"\x05stats\x18\x03 \x01(\v2\x1b.coordinator.v1.WorkerStatsR\x05stats\x12\x1c\n" +
+	"\tnamespace\x18\x04 \x01(\tR\tnamespace\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"X\n" +

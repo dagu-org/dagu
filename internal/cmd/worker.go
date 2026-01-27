@@ -64,6 +64,7 @@ This process runs continuously in the foreground until terminated.
 
 var workerFlags = []commandLineFlag{
 	workerIDFlag,
+	workerNamespaceFlag,
 	workerMaxActiveRunsFlag,
 	workerLabelsFlag,
 	workerCoordinatorsFlag,
@@ -86,6 +87,10 @@ func runWorker(ctx *Context, _ []string) error {
 		workerID = fmt.Sprintf("%s@%d", hostname, os.Getpid())
 	}
 
+	namespace := ctx.Config.Worker.Namespace
+	if namespace == "" {
+		namespace = "default"
+	}
 	maxActiveRuns := ctx.Config.Worker.MaxActiveRuns
 	labels := ctx.Config.Worker.Labels
 
@@ -94,7 +99,7 @@ func runWorker(ctx *Context, _ []string) error {
 		return err
 	}
 
-	w := worker.NewWorker(workerID, maxActiveRuns, coordinatorCli, labels, ctx.Config)
+	w := worker.NewWorker(workerID, namespace, maxActiveRuns, coordinatorCli, labels, ctx.Config)
 
 	if useRemoteHandler {
 		handlerCfg := worker.RemoteTaskHandlerConfig{

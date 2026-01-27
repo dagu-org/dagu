@@ -1217,7 +1217,7 @@ func TestMatchesSelector(t *testing.T) {
 		workerLabels := map[string]string{"type": "compute", "region": "us-east"}
 		selector := map[string]string{}
 
-		require.True(t, matchesSelector(workerLabels, selector))
+		require.True(t, matchesSelector(workerLabels, selector, "", ""))
 	})
 
 	t.Run("NilSelectorMatchesAll", func(t *testing.T) {
@@ -1225,7 +1225,7 @@ func TestMatchesSelector(t *testing.T) {
 
 		workerLabels := map[string]string{"type": "compute"}
 
-		require.True(t, matchesSelector(workerLabels, nil))
+		require.True(t, matchesSelector(workerLabels, nil, "", ""))
 	})
 
 	t.Run("ExactMatch", func(t *testing.T) {
@@ -1234,7 +1234,7 @@ func TestMatchesSelector(t *testing.T) {
 		workerLabels := map[string]string{"type": "compute", "region": "us-east"}
 		selector := map[string]string{"type": "compute", "region": "us-east"}
 
-		require.True(t, matchesSelector(workerLabels, selector))
+		require.True(t, matchesSelector(workerLabels, selector, "", ""))
 	})
 
 	t.Run("PartialSelectorMatch", func(t *testing.T) {
@@ -1243,7 +1243,7 @@ func TestMatchesSelector(t *testing.T) {
 		workerLabels := map[string]string{"type": "compute", "region": "us-east", "tier": "high"}
 		selector := map[string]string{"type": "compute"}
 
-		require.True(t, matchesSelector(workerLabels, selector))
+		require.True(t, matchesSelector(workerLabels, selector, "", ""))
 	})
 
 	t.Run("PartialSelectorNoMatch", func(t *testing.T) {
@@ -1252,7 +1252,7 @@ func TestMatchesSelector(t *testing.T) {
 		workerLabels := map[string]string{"type": "compute"}
 		selector := map[string]string{"type": "storage"}
 
-		require.False(t, matchesSelector(workerLabels, selector))
+		require.False(t, matchesSelector(workerLabels, selector, "", ""))
 	})
 
 	t.Run("MissingLabelNoMatch", func(t *testing.T) {
@@ -1261,7 +1261,7 @@ func TestMatchesSelector(t *testing.T) {
 		workerLabels := map[string]string{"type": "compute"}
 		selector := map[string]string{"type": "compute", "region": "us-east"}
 
-		require.False(t, matchesSelector(workerLabels, selector))
+		require.False(t, matchesSelector(workerLabels, selector, "", ""))
 	})
 
 	t.Run("EmptyWorkerLabelsWithSelectorNoMatch", func(t *testing.T) {
@@ -1270,7 +1270,7 @@ func TestMatchesSelector(t *testing.T) {
 		workerLabels := map[string]string{}
 		selector := map[string]string{"type": "compute"}
 
-		require.False(t, matchesSelector(workerLabels, selector))
+		require.False(t, matchesSelector(workerLabels, selector, "", ""))
 	})
 
 	t.Run("NilWorkerLabelsWithSelectorNoMatch", func(t *testing.T) {
@@ -1278,7 +1278,35 @@ func TestMatchesSelector(t *testing.T) {
 
 		selector := map[string]string{"type": "compute"}
 
-		require.False(t, matchesSelector(nil, selector))
+		require.False(t, matchesSelector(nil, selector, "", ""))
+	})
+
+	t.Run("NamespaceMatch", func(t *testing.T) {
+		t.Parallel()
+
+		workerLabels := map[string]string{"type": "compute"}
+		selector := map[string]string{}
+
+		require.True(t, matchesSelector(workerLabels, selector, "team-a", "team-a"))
+	})
+
+	t.Run("NamespaceMismatch", func(t *testing.T) {
+		t.Parallel()
+
+		workerLabels := map[string]string{"type": "compute"}
+		selector := map[string]string{}
+
+		require.False(t, matchesSelector(workerLabels, selector, "team-a", "team-b"))
+	})
+
+	t.Run("EmptyTaskNamespaceMatchesAny", func(t *testing.T) {
+		t.Parallel()
+
+		workerLabels := map[string]string{"type": "compute"}
+		selector := map[string]string{}
+
+		// Empty task namespace should match any worker
+		require.True(t, matchesSelector(workerLabels, selector, "team-a", ""))
 	})
 }
 

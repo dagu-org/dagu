@@ -17,6 +17,8 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/persis"
+	"github.com/dagu-org/dagu/internal/persis/filens"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
@@ -52,6 +54,10 @@ type API struct {
 	auditService       *audit.Service
 	syncService        SyncService
 	dagWritesDisabled  bool // True when git sync read-only mode is active
+
+	// Namespace support
+	namespaceStore *filens.Store  // Namespace CRUD operations
+	factory        *persis.Factory // Creates namespace-scoped stores
 }
 
 // AuthService defines the interface for authentication operations.
@@ -132,6 +138,8 @@ func New(
 	sr exec.ServiceRegistry,
 	mr *prometheus.Registry,
 	rs *resource.Service,
+	nsStore *filens.Store,
+	factory *persis.Factory,
 	opts ...APIOption,
 ) *API {
 	remoteNodes := make(map[string]config.RemoteNode)
@@ -154,6 +162,8 @@ func New(
 		serviceRegistry:    sr,
 		metricsRegistry:    mr,
 		resourceService:    rs,
+		namespaceStore:     nsStore,
+		factory:            factory,
 	}
 
 	for _, opt := range opts {
@@ -482,4 +492,95 @@ func toPagination[T any](paginatedResult exec.PaginatedResult[T]) api.Pagination
 		TotalPages:   paginatedResult.TotalPages,
 		TotalRecords: paginatedResult.TotalCount,
 	}
+}
+
+// getNamespaceID resolves a namespace name to its internal ID.
+// Returns the default namespace ID if namespaceName is empty or "default".
+func (a *API) getNamespaceID(ctx context.Context, namespaceName string) (string, error) {
+	if a.namespaceStore == nil {
+		// Namespace support not enabled, return empty string to use default stores
+		return "", nil
+	}
+
+	if namespaceName == "" {
+		namespaceName = filens.DefaultNamespaceName
+	}
+
+	ns, err := a.namespaceStore.GetByName(ctx, namespaceName)
+	if err != nil {
+		return "", &Error{
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("namespace not found: %s", namespaceName),
+			HTTPStatus: http.StatusNotFound,
+		}
+	}
+	return ns.ID, nil
+}
+
+// getNamespacedStores returns namespace-scoped stores for the given namespace name.
+// If namespace support is not enabled (factory is nil), returns the default stores.
+func (a *API) getNamespacedStores(ctx context.Context, namespaceName string) (*persis.NamespaceStores, error) {
+	if a.factory == nil || a.namespaceStore == nil {
+		// Namespace support not enabled, return nil to indicate use of default stores
+		return nil, nil
+	}
+
+	nsID, err := a.getNamespaceID(ctx, namespaceName)
+	if err != nil {
+		return nil, err
+	}
+
+	return a.factory.ForNamespace(nsID), nil
+}
+
+// getEffectiveDAGStore returns the DAG store for the given namespace.
+// Falls back to the default dagStore if namespace support is not enabled.
+func (a *API) getEffectiveDAGStore(ctx context.Context, namespaceName string) (exec.DAGStore, error) {
+	stores, err := a.getNamespacedStores(ctx, namespaceName)
+	if err != nil {
+		return nil, err
+	}
+	if stores != nil {
+		return stores.DAGs, nil
+	}
+	return a.dagStore, nil
+}
+
+// getEffectiveDAGRunStore returns the DAGRun store for the given namespace.
+// Falls back to the default dagRunStore if namespace support is not enabled.
+func (a *API) getEffectiveDAGRunStore(ctx context.Context, namespaceName string) (exec.DAGRunStore, error) {
+	stores, err := a.getNamespacedStores(ctx, namespaceName)
+	if err != nil {
+		return nil, err
+	}
+	if stores != nil {
+		return stores.DAGRuns, nil
+	}
+	return a.dagRunStore, nil
+}
+
+// getEffectiveQueueStore returns the Queue store for the given namespace.
+// Falls back to the default queueStore if namespace support is not enabled.
+func (a *API) getEffectiveQueueStore(ctx context.Context, namespaceName string) (exec.QueueStore, error) {
+	stores, err := a.getNamespacedStores(ctx, namespaceName)
+	if err != nil {
+		return nil, err
+	}
+	if stores != nil {
+		return stores.Queue, nil
+	}
+	return a.queueStore, nil
+}
+
+// getEffectiveProcStore returns the Proc store for the given namespace.
+// Falls back to the default procStore if namespace support is not enabled.
+func (a *API) getEffectiveProcStore(ctx context.Context, namespaceName string) (exec.ProcStore, error) {
+	stores, err := a.getNamespacedStores(ctx, namespaceName)
+	if err != nil {
+		return nil, err
+	}
+	if stores != nil {
+		return stores.Procs, nil
+	}
+	return a.procStore, nil
 }

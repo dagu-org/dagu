@@ -71,6 +71,11 @@ func WorkerID(id string) slog.Attr {
 	return slog.String("worker-id", id)
 }
 
+// Namespace creates a tag for namespace names.
+func Namespace(ns string) slog.Attr {
+	return slog.String("namespace", ns)
+}
+
 // Path and file tags
 
 // File creates a tag for file paths.

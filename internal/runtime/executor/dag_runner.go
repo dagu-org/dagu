@@ -25,9 +25,10 @@ import (
 )
 
 var (
-	errSubDAGCancelled  = errors.New("sub DAG execution cancelled")
-	errDAGRunIDNotSet   = errors.New("DAG run ID is not set")
-	errRootDAGRunNotSet = errors.New("root DAG run ID is not set")
+	errSubDAGCancelled       = errors.New("sub DAG execution cancelled")
+	errDAGRunIDNotSet        = errors.New("DAG run ID is not set")
+	errRootDAGRunNotSet      = errors.New("root DAG run ID is not set")
+	errCrossNamespaceSubDAG  = errors.New("cross-namespace sub-DAG calls are not allowed")
 )
 
 // SubDAGExecutor is a helper for executing sub DAGs.
@@ -98,6 +99,16 @@ func NewSubDAGExecutor(ctx context.Context, childName string) (*SubDAGExecutor, 
 	dag, err := rCtx.DB.GetDAG(ctx, childName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find DAG %q: %w", childName, err)
+	}
+
+	// Validate namespace: sub-DAG must be in the same namespace as parent
+	parentNamespace := ""
+	if rCtx.DAG != nil {
+		parentNamespace = rCtx.DAG.Namespace
+	}
+	if dag.Namespace != parentNamespace {
+		return nil, fmt.Errorf("%w: parent namespace %q, child namespace %q",
+			errCrossNamespaceSubDAG, parentNamespace, dag.Namespace)
 	}
 
 	return &SubDAGExecutor{

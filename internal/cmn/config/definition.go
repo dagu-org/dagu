@@ -292,6 +292,7 @@ type PathsDef struct {
 	UsersDir           string `mapstructure:"usersDir"`
 	APIKeysDir         string `mapstructure:"apiKeysDir"`
 	WebhooksDir        string `mapstructure:"webhooksDir"`
+	NamespacesDir      string `mapstructure:"namespacesDir"`
 }
 
 // UIDef holds the user interface configuration settings.
@@ -376,6 +377,9 @@ type MonitoringDef struct {
 type WorkerDef struct {
 	// ID is the unique identifier for the worker instance.
 	ID string `mapstructure:"id"`
+
+	// Namespace is the namespace the worker serves (required).
+	Namespace string `mapstructure:"namespace"`
 
 	// MaxActiveRuns is the maximum number of active runs for the worker.
 	MaxActiveRuns int `mapstructure:"maxActiveRuns"`

@@ -26,12 +26,14 @@ type workerInfo struct {
 	pollerID    string
 	taskChan    chan *coordinatorv1.Task
 	labels      map[string]string
+	namespace   string // Namespace the worker serves
 	connectedAt time.Time
 }
 
 type heartbeatInfo struct {
 	workerID        string
 	labels          map[string]string
+	namespace       string // Namespace the worker serves
 	stats           *coordinatorv1.WorkerStats
 	lastHeartbeatAt time.Time
 }
@@ -149,6 +151,7 @@ func (h *Handler) Poll(ctx context.Context, req *coordinatorv1.PollRequest) (*co
 		pollerID:    req.PollerId,
 		taskChan:    taskChan,
 		labels:      req.Labels,
+		namespace:   req.Namespace,
 		connectedAt: time.Now(),
 	}
 	h.mu.Unlock()
@@ -217,10 +220,10 @@ func (h *Handler) Dispatch(ctx context.Context, req *coordinatorv1.DispatchReque
 		}
 	}
 
-	// Try to find a waiting poller that matches the worker selector
+	// Try to find a waiting poller that matches the worker selector and namespace
 	for pollerID, worker := range h.waitingPollers {
-		// Check if worker matches the selector
-		if !matchesSelector(worker.labels, req.Task.WorkerSelector) {
+		// Check if worker matches the selector and namespace
+		if !matchesSelector(worker.labels, req.Task.WorkerSelector, worker.namespace, req.Task.Namespace) {
 			continue
 		}
 
@@ -242,9 +245,14 @@ func (h *Handler) Dispatch(ctx context.Context, req *coordinatorv1.DispatchReque
 	return nil, status.Error(codes.FailedPrecondition, "no available workers")
 }
 
-// matchesSelector checks if worker labels match all required selector labels
-func matchesSelector(workerLabels, selector map[string]string) bool {
-	// Empty selector matches any worker
+// matchesSelector checks if worker labels match all required selector labels and namespace
+func matchesSelector(workerLabels, selector map[string]string, workerNamespace, taskNamespace string) bool {
+	// Namespace must match if task specifies one
+	if taskNamespace != "" && workerNamespace != taskNamespace {
+		return false
+	}
+
+	// Empty selector matches any worker (that matches namespace)
 	if len(selector) == 0 {
 		return true
 	}
@@ -413,6 +421,7 @@ func (h *Handler) GetWorkers(_ context.Context, _ *coordinatorv1.GetWorkersReque
 		workerInfo := &coordinatorv1.WorkerInfo{
 			WorkerId:        hb.workerID,
 			Labels:          hb.labels,
+			Namespace:       hb.namespace,
 			LastHeartbeatAt: hb.lastHeartbeatAt.Unix(),
 			HealthStatus:    calculateHealthStatus(now.Sub(hb.lastHeartbeatAt)),
 		}
@@ -456,6 +465,7 @@ func (h *Handler) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatReq
 	h.heartbeats[req.WorkerId] = &heartbeatInfo{
 		workerID:        req.WorkerId,
 		labels:          req.Labels,
+		namespace:       req.Namespace,
 		stats:           req.Stats,
 		lastHeartbeatAt: time.Now(),
 	}

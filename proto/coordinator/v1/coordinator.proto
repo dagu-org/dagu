@@ -40,6 +40,7 @@ message PollRequest {
   string worker_id = 1;
   string poller_id = 2; // Unique ID for this poll request
   map<string, string> labels = 3; // Worker labels for task matching
+  string namespace = 4; // Namespace the worker serves (required)
 }
 
 // Response message for polling a task.
@@ -78,6 +79,8 @@ message Task {
   string attempt_id = 14;
   // Globally unique attempt identifier for cancellation tracking.
   string attempt_key = 15;
+  // Target namespace for the task
+  string namespace = 16;
 }
 
 enum Operation {
@@ -116,6 +119,7 @@ message WorkerInfo {
   repeated RunningTask running_tasks = 7;
   int64 last_heartbeat_at = 8; // Unix timestamp of last heartbeat
   WorkerHealthStatus health_status = 9; // Health status based on heartbeat recency
+  string namespace = 10; // Namespace the worker serves
 }
 
 // Request message for heartbeat.
@@ -123,6 +127,7 @@ message HeartbeatRequest {
   string worker_id = 1;
   map<string, string> labels = 2;
   WorkerStats stats = 3;
+  string namespace = 4; // Namespace the worker serves (required)
 }
 
 // Response message for heartbeat.

@@ -364,6 +364,9 @@ func (l *ConfigLoader) loadPathsConfig(cfg *Config, def Definition) error {
 	if cfg.Paths.WebhooksDir, err = l.resolvePath("WebhooksDir", def.Paths.WebhooksDir); err != nil {
 		return err
 	}
+	if cfg.Paths.NamespacesDir, err = l.resolvePath("NamespacesDir", def.Paths.NamespacesDir); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -640,6 +643,7 @@ func (l *ConfigLoader) loadCoordinatorConfig(cfg *Config, def Definition) {
 func (l *ConfigLoader) loadWorkerConfig(cfg *Config, def Definition) {
 	if def.Worker != nil {
 		cfg.Worker.ID = def.Worker.ID
+		cfg.Worker.Namespace = def.Worker.Namespace
 		cfg.Worker.MaxActiveRuns = def.Worker.MaxActiveRuns
 
 		if def.Worker.Labels != nil {
@@ -965,6 +969,9 @@ func (l *ConfigLoader) finalizePaths(cfg *Config) {
 	}
 	if cfg.Paths.WebhooksDir == "" {
 		cfg.Paths.WebhooksDir = filepath.Join(cfg.Paths.DataDir, "webhooks")
+	}
+	if cfg.Paths.NamespacesDir == "" {
+		cfg.Paths.NamespacesDir = filepath.Join(cfg.Paths.DataDir, "namespaces")
 	}
 
 	if cfg.Paths.Executable == "" {
@@ -1312,6 +1319,7 @@ var envBindings = []envBinding{
 	{key: "paths.queueDir", env: "QUEUE_DIR", isPath: true},
 	{key: "paths.serviceRegistryDir", env: "SERVICE_REGISTRY_DIR", isPath: true},
 	{key: "paths.usersDir", env: "USERS_DIR", isPath: true},
+	{key: "paths.namespacesDir", env: "NAMESPACES_DIR", isPath: true},
 
 	// Queue configuration
 	{key: "queues.enabled", env: "QUEUE_ENABLED"},
@@ -1323,6 +1331,7 @@ var envBindings = []envBinding{
 
 	// Worker configuration
 	{key: "worker.id", env: "WORKER_ID"},
+	{key: "worker.namespace", env: "WORKER_NAMESPACE"},
 	{key: "worker.maxActiveRuns", env: "WORKER_MAX_ACTIVE_RUNS"},
 	{key: "worker.labels", env: "WORKER_LABELS"},
 	{key: "worker.coordinators", env: "WORKER_COORDINATORS"},
