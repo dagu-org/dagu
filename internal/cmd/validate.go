@@ -87,7 +87,7 @@ func formatValidationErrors(file string, err error) string {
 	// Build readable, consistent output: one bullet per error, and if an
 	// error spans multiple lines, indent subsequent lines for readability.
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Validation failed for %s\n", file))
+	fmt.Fprintf(&sb, "Validation failed for %s\n", file)
 	for _, m := range msgs {
 		lines := strings.Split(strings.TrimRight(m, "\n"), "\n")
 		for i, line := range lines {

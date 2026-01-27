@@ -722,7 +722,7 @@ func (c *Config) validateTunnel() error {
 	// SECURITY: Public tunnels REQUIRE authentication
 	if isPublic && c.Server.Auth.Mode == AuthModeNone {
 		return fmt.Errorf(
-			"tunnel with public access requires authentication; "+
+			"tunnel with public access requires authentication; " +
 				"set server.auth.mode=builtin or disable tailscale funnel for private access",
 		)
 	}

@@ -164,11 +164,11 @@ func (s *Service) saveURL(url string) {
 
 	// Ensure directory exists
 	dir := filepath.Dir(s.urlFile)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return
 	}
 
-	_ = os.WriteFile(s.urlFile, []byte(url), 0644)
+	_ = os.WriteFile(s.urlFile, []byte(url), 0600)
 }
 
 // LoadLastURL loads the last known tunnel URL from file.

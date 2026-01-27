@@ -558,6 +558,7 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 		cfg.Server.Audit.Enabled = *def.Audit.Enabled
 	}
 }
+
 // loadUIConfig loads the UI configuration.
 func (l *ConfigLoader) loadUIConfig(cfg *Config, def Definition) {
 	// Apply defaults from viper (these include the configured defaults)

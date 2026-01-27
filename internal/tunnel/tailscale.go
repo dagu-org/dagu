@@ -219,12 +219,12 @@ func (p *TailscaleProvider) runTunnel(ctx context.Context, localAddr string) {
 	targetURL, err := url.Parse(fmt.Sprintf("http://%s", proxyAddr))
 	if err != nil {
 		p.setError(fmt.Sprintf("invalid local address: %v", err))
-		ln.Close()
+		_ = ln.Close()
 		return
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
-	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+	proxy.ErrorHandler = func(w http.ResponseWriter, _ *http.Request, err error) {
 		w.WriteHeader(http.StatusBadGateway)
 		_, _ = io.WriteString(w, "Tunnel proxy error: "+err.Error())
 	}

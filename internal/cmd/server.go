@@ -169,7 +169,7 @@ func logTunnelStatus(ctx *Context, svc *tunnel.Service) {
 		authStatus = "Builtin (enabled)"
 	case config.AuthModeOIDC:
 		authStatus = "OIDC (enabled)"
-	default:
+	case config.AuthModeNone:
 		authStatus = "Disabled"
 	}
 

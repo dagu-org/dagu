@@ -121,6 +121,18 @@ func TestLoad_Env(t *testing.T) {
 
 		// Audit configuration
 		"DAGU_AUDIT_ENABLED": "false",
+
+		// Tunnel configuration (funnel=false to avoid validation error with auth mode)
+		"DAGU_TUNNEL_ENABLED":                              "true",
+		"DAGU_TUNNEL_TAILSCALE_AUTH_KEY":                   "tskey-test-123",
+		"DAGU_TUNNEL_TAILSCALE_HOSTNAME":                   "test-dagu",
+		"DAGU_TUNNEL_TAILSCALE_FUNNEL":                     "false",
+		"DAGU_TUNNEL_TAILSCALE_HTTPS":                      "true",
+		"DAGU_TUNNEL_ALLOW_TERMINAL":                       "true",
+		"DAGU_TUNNEL_RATE_LIMITING_ENABLED":                "true",
+		"DAGU_TUNNEL_RATE_LIMITING_LOGIN_ATTEMPTS":         "10",
+		"DAGU_TUNNEL_RATE_LIMITING_WINDOW_SECONDS":         "600",
+		"DAGU_TUNNEL_RATE_LIMITING_BLOCK_DURATION_SECONDS": "1800",
 	}
 
 	// Save and clear existing environment variables
@@ -251,6 +263,22 @@ func TestLoad_Env(t *testing.T) {
 		Monitoring: MonitoringConfig{
 			Retention: 24 * time.Hour,
 			Interval:  5 * time.Second,
+		},
+		Tunnel: TunnelConfig{
+			Enabled:       true,
+			AllowTerminal: true,
+			Tailscale: TailscaleTunnelConfig{
+				AuthKey:  "tskey-test-123",
+				Hostname: "test-dagu",
+				Funnel:   false,
+				HTTPS:    true,
+			},
+			RateLimiting: TunnelRateLimitConfig{
+				Enabled:              true,
+				LoginAttempts:        10,
+				WindowSeconds:        600,
+				BlockDurationSeconds: 1800,
+			},
 		},
 		Warnings: []string{"Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: https://auth.example.com)"},
 		Cache:    CacheModeNormal,
@@ -1311,5 +1339,124 @@ audit:
 			"DAGU_AUDIT_ENABLED": "false",
 		})
 		assert.False(t, cfg.Server.Audit.Enabled)
+	})
+}
+
+func TestLoad_TunnelConfig(t *testing.T) {
+	t.Run("TunnelDefault", func(t *testing.T) {
+		cfg := loadFromYAML(t, "# empty")
+		assert.False(t, cfg.Tunnel.Enabled)
+		assert.Empty(t, cfg.Tunnel.Tailscale.AuthKey)
+		assert.Empty(t, cfg.Tunnel.Tailscale.Hostname)
+		assert.False(t, cfg.Tunnel.Tailscale.Funnel)
+		assert.False(t, cfg.Tunnel.Tailscale.HTTPS)
+	})
+
+	t.Run("TunnelFromYAML", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+tunnel:
+  enabled: true
+  tailscale:
+    authKey: "tskey-yaml-test"
+    hostname: "yaml-dagu"
+    funnel: false
+    https: true
+    stateDir: "/var/dagu/tailscale"
+  allowTerminal: true
+  allowedIPs:
+    - "192.168.1.0/24"
+    - "10.0.0.0/8"
+  rateLimiting:
+    enabled: true
+    loginAttempts: 5
+    windowSeconds: 300
+    blockDurationSeconds: 900
+`)
+		assert.True(t, cfg.Tunnel.Enabled)
+		assert.Equal(t, "tskey-yaml-test", cfg.Tunnel.Tailscale.AuthKey)
+		assert.Equal(t, "yaml-dagu", cfg.Tunnel.Tailscale.Hostname)
+		assert.False(t, cfg.Tunnel.Tailscale.Funnel)
+		assert.True(t, cfg.Tunnel.Tailscale.HTTPS)
+		assert.Equal(t, "/var/dagu/tailscale", cfg.Tunnel.Tailscale.StateDir)
+		assert.True(t, cfg.Tunnel.AllowTerminal)
+		assert.Equal(t, []string{"192.168.1.0/24", "10.0.0.0/8"}, cfg.Tunnel.AllowedIPs)
+		assert.True(t, cfg.Tunnel.RateLimiting.Enabled)
+		assert.Equal(t, 5, cfg.Tunnel.RateLimiting.LoginAttempts)
+		assert.Equal(t, 300, cfg.Tunnel.RateLimiting.WindowSeconds)
+		assert.Equal(t, 900, cfg.Tunnel.RateLimiting.BlockDurationSeconds)
+	})
+
+	t.Run("TunnelFromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_TUNNEL_ENABLED":                              "true",
+			"DAGU_TUNNEL_TAILSCALE_AUTH_KEY":                   "tskey-env-test",
+			"DAGU_TUNNEL_TAILSCALE_HOSTNAME":                   "env-dagu",
+			"DAGU_TUNNEL_TAILSCALE_FUNNEL":                     "false",
+			"DAGU_TUNNEL_TAILSCALE_HTTPS":                      "true",
+			"DAGU_TUNNEL_ALLOW_TERMINAL":                       "true",
+			"DAGU_TUNNEL_RATE_LIMITING_ENABLED":                "true",
+			"DAGU_TUNNEL_RATE_LIMITING_LOGIN_ATTEMPTS":         "10",
+			"DAGU_TUNNEL_RATE_LIMITING_WINDOW_SECONDS":         "600",
+			"DAGU_TUNNEL_RATE_LIMITING_BLOCK_DURATION_SECONDS": "1800",
+		})
+		assert.True(t, cfg.Tunnel.Enabled)
+		assert.Equal(t, "tskey-env-test", cfg.Tunnel.Tailscale.AuthKey)
+		assert.Equal(t, "env-dagu", cfg.Tunnel.Tailscale.Hostname)
+		assert.False(t, cfg.Tunnel.Tailscale.Funnel)
+		assert.True(t, cfg.Tunnel.Tailscale.HTTPS)
+		assert.True(t, cfg.Tunnel.AllowTerminal)
+		assert.True(t, cfg.Tunnel.RateLimiting.Enabled)
+		assert.Equal(t, 10, cfg.Tunnel.RateLimiting.LoginAttempts)
+		assert.Equal(t, 600, cfg.Tunnel.RateLimiting.WindowSeconds)
+		assert.Equal(t, 1800, cfg.Tunnel.RateLimiting.BlockDurationSeconds)
+	})
+
+	t.Run("TunnelEnvOverridesYAML", func(t *testing.T) {
+		cfg := loadWithEnv(t, `
+tunnel:
+  enabled: true
+  tailscale:
+    authKey: "yaml-key"
+    hostname: "yaml-host"
+    https: false
+`, map[string]string{
+			"DAGU_TUNNEL_TAILSCALE_AUTH_KEY": "env-key",
+			"DAGU_TUNNEL_TAILSCALE_HTTPS":    "true",
+		})
+		assert.True(t, cfg.Tunnel.Enabled)
+		assert.Equal(t, "env-key", cfg.Tunnel.Tailscale.AuthKey)
+		assert.Equal(t, "yaml-host", cfg.Tunnel.Tailscale.Hostname) // Not overridden
+		assert.True(t, cfg.Tunnel.Tailscale.HTTPS)                  // Overridden
+	})
+
+	t.Run("TunnelDefaultHostname", func(t *testing.T) {
+		// When tunnel is enabled without hostname, it should default to AppSlug
+		cfg := loadFromYAML(t, `
+tunnel:
+  enabled: true
+`)
+		assert.True(t, cfg.Tunnel.Enabled)
+		assert.Equal(t, AppSlug, cfg.Tunnel.Tailscale.Hostname)
+	})
+
+	t.Run("TunnelDefaultRateLimiting", func(t *testing.T) {
+		// When tunnel is enabled, rate limiting should have default values
+		cfg := loadFromYAML(t, `
+tunnel:
+  enabled: true
+`)
+		assert.Equal(t, 5, cfg.Tunnel.RateLimiting.LoginAttempts)
+		assert.Equal(t, 300, cfg.Tunnel.RateLimiting.WindowSeconds)
+		assert.Equal(t, 900, cfg.Tunnel.RateLimiting.BlockDurationSeconds)
+	})
+
+	t.Run("TunnelDisabledNoDefaults", func(t *testing.T) {
+		// When tunnel is disabled, no defaults should be applied
+		cfg := loadFromYAML(t, `
+tunnel:
+  enabled: false
+`)
+		assert.False(t, cfg.Tunnel.Enabled)
+		assert.Empty(t, cfg.Tunnel.Tailscale.Hostname) // No default applied when disabled
 	})
 }
