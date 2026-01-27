@@ -110,7 +110,7 @@ export const SimpleToast: React.FC<SimpleToastProps> = ({
         {/* Message */}
         <span
           className={`
-            text-[13px] font-medium text-foreground/90 text-center px-2
+            text-sm font-medium text-foreground/90 text-center px-2
             transition-all duration-200 delay-150
             ${checkAnimated ? 'opacity-100' : 'opacity-0'}
           `}

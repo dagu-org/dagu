@@ -74,7 +74,7 @@ export function RejectionModal({ visible, dismissModal, step, onReject }: Props)
 
           {/* Optional reason field */}
           <div>
-            <label htmlFor="rejection-reason" className="block text-sm font-medium mb-1">
+            <label htmlFor="rejection-reason" className="block text-sm font-semibold mb-1">
               Reason <span className="text-muted-foreground">(optional)</span>
             </label>
             <textarea

@@ -19,6 +19,8 @@ const (
 // environment variables.
 func (s Status) String() string {
 	switch s {
+	case NotStarted:
+		return "not_started"
 	case Running:
 		return "running"
 	case Failed:
@@ -31,8 +33,6 @@ func (s Status) String() string {
 		return "queued"
 	case PartiallySucceeded:
 		return "partially_succeeded"
-	case NotStarted:
-		return "not_started"
 	case Waiting:
 		return "waiting"
 	case Rejected:
@@ -96,6 +96,8 @@ func (s NodeStatus) IsDone() bool {
 // String returns the canonical lowercase token for the node lifecycle phase.
 func (s NodeStatus) String() string {
 	switch s {
+	case NodeNotStarted:
+		return "not_started"
 	case NodeRunning:
 		return "running"
 	case NodeFailed:
@@ -108,13 +110,61 @@ func (s NodeStatus) String() string {
 		return "skipped"
 	case NodePartiallySucceeded:
 		return "partially_succeeded"
-	case NodeNotStarted:
-		return "not_started"
 	case NodeWaiting:
 		return "waiting"
 	case NodeRejected:
 		return "rejected"
 	default:
 		return "unknown"
+	}
+}
+
+// TriggerType represents how a DAG run was initiated.
+type TriggerType int
+
+const (
+	TriggerTypeUnknown TriggerType = iota
+	TriggerTypeScheduler
+	TriggerTypeManual
+	TriggerTypeWebhook
+	TriggerTypeSubDAG
+	TriggerTypeRetry
+)
+
+// String returns the canonical lowercase token for the trigger type.
+func (t TriggerType) String() string {
+	switch t {
+	case TriggerTypeUnknown:
+		return "unknown"
+	case TriggerTypeScheduler:
+		return "scheduler"
+	case TriggerTypeManual:
+		return "manual"
+	case TriggerTypeWebhook:
+		return "webhook"
+	case TriggerTypeSubDAG:
+		return "subdag"
+	case TriggerTypeRetry:
+		return "retry"
+	default:
+		return "unknown"
+	}
+}
+
+// ParseTriggerType parses a string into a TriggerType.
+func ParseTriggerType(s string) TriggerType {
+	switch s {
+	case "scheduler":
+		return TriggerTypeScheduler
+	case "manual":
+		return TriggerTypeManual
+	case "webhook":
+		return TriggerTypeWebhook
+	case "subdag":
+		return TriggerTypeSubDAG
+	case "retry":
+		return TriggerTypeRetry
+	default:
+		return TriggerTypeUnknown
 	}
 }

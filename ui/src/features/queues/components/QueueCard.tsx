@@ -198,7 +198,7 @@ function QueueCard({
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               )}
               <span className="font-medium text-sm">{queue.name}</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+              <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                 {queue.type}
               </span>
             </div>

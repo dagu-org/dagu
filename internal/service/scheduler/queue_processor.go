@@ -60,7 +60,7 @@ type queue struct {
 	mu             sync.Mutex
 }
 
-func (q *queue) maxConc() int {
+func (q *queue) getMaxConcurrency() int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return q.maxConcurrency
@@ -70,6 +70,10 @@ func (q *queue) isGlobalQueue() bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return q.isGlobal
+}
+
+func (q *queue) getInflight() int {
+	return int(q.inflight.Load())
 }
 
 func (q *queue) incInflight() { q.inflight.Add(1) }
@@ -190,50 +194,29 @@ func (p *QueueProcessor) loop(ctx context.Context) {
 			continue
 		}
 
-		// init the queues
-		activeQueues := make(map[string]struct{})
+		// Initialize queues that don't exist yet
+		activeQueues := make(map[string]struct{}, len(queueList))
 		for _, queueName := range queueList {
 			if _, ok := p.queues.Load(queueName); !ok {
 				p.queues.Store(queueName, &queue{
 					maxConcurrency: 1,
-					isGlobal:       false, // Dynamically created queues are DAG-based (not global)
+					isGlobal:       false,
 				})
 			}
 			activeQueues[queueName] = struct{}{}
 		}
 
-		// clean up non active queues (but keep global queues from config)
-		nonActive := make(map[string]struct{})
-		p.queues.Range(func(key, value any) bool {
-			name, ok := key.(string)
-			if !ok {
-				return true
-			}
-			q, ok := value.(*queue)
-			if !ok {
-				return true
-			}
-			// Don't delete global queues - they should persist even when empty
-			if q.isGlobalQueue() {
-				return true
-			}
-			if _, ok := activeQueues[name]; !ok {
-				nonActive[name] = struct{}{}
-			}
-			return true
-		})
-		for name := range nonActive {
-			p.queues.Delete(name)
-		}
+		// Remove inactive non-global queues
+		p.removeInactiveQueues(activeQueues)
 
-		// process queue items
+		// Process each queue concurrently
 		var wg sync.WaitGroup
 		for name := range activeQueues {
 			wg.Add(1)
-			go func(name string) {
+			go func(queueName string) {
 				defer wg.Done()
-				ctx := logger.WithValues(ctx, tag.Queue(name))
-				p.ProcessQueueItems(ctx, name)
+				queueCtx := logger.WithValues(ctx, tag.Queue(queueName))
+				p.ProcessQueueItems(queueCtx, queueName)
 			}(name)
 		}
 		wg.Wait()
@@ -256,16 +239,13 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 		return
 	}
 
-	// Get the queue configuration
 	v, ok := p.queues.Load(queueName)
 	if !ok {
 		logger.Warn(ctx, "Queue not found in processor config")
 		return
 	}
 	q := v.(*queue)
-	logger.Debug(ctx, "Processing queue",
-		tag.MaxConcurrency(q.maxConc()),
-	)
+	logger.Debug(ctx, "Processing queue", tag.MaxConcurrency(q.getMaxConcurrency()))
 
 	items, err := p.queueStore.List(ctx, queueName)
 	if err != nil {
@@ -280,56 +260,55 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 
 	defer p.wakeUp()
 
-	alive, err := p.procStore.CountAlive(ctx, queueName)
+	aliveCount, err := p.procStore.CountAlive(ctx, queueName)
 	if err != nil {
-		logger.Error(ctx, "Failed to count alive processes",
-			tag.Error(err),
-			tag.Queue(queueName),
-		)
+		logger.Error(ctx, "Failed to count alive processes", tag.Error(err), tag.Queue(queueName))
 		return
 	}
 
-	maxConc := q.maxConc()
-	inflight := int(q.inflight.Load())
-	free := maxConc - alive - inflight
+	maxConcurrency := q.getMaxConcurrency()
+	inflightCount := q.getInflight()
+	freeSlots := maxConcurrency - aliveCount - inflightCount
+
 	logger.Debug(ctx, "Queue capacity check",
-		tag.MaxConcurrency(maxConc),
-		tag.Alive(alive),
-		tag.Count(free),
+		tag.MaxConcurrency(maxConcurrency),
+		tag.Alive(aliveCount),
+		tag.Count(freeSlots),
 	)
-	if free <= 0 {
+
+	if freeSlots <= 0 {
 		logger.Debug(ctx, "Max concurrency reached",
-			tag.MaxConcurrency(maxConc),
-			tag.Alive(alive),
+			tag.MaxConcurrency(maxConcurrency),
+			tag.Alive(aliveCount),
 		)
 		return
 	}
 
-	cap := min(free, len(items))
-	runnableItems := items[:cap]
+	batchSize := min(freeSlots, len(items))
+	runnableItems := items[:batchSize]
 	logger.Info(ctx, "Processing batch of items",
 		tag.Count(len(runnableItems)),
-		tag.MaxConcurrency(maxConc),
-		tag.Alive(alive),
+		tag.MaxConcurrency(maxConcurrency),
+		tag.Alive(aliveCount),
 	)
 
 	var wg sync.WaitGroup
 	for _, item := range runnableItems {
 		wg.Add(1)
-		go func(ctx context.Context, item exec.QueuedItemData) {
+		go func(queuedItem exec.QueuedItemData) {
 			defer wg.Done()
-			if p.processDAG(ctx, item, queueName, q.incInflight, q.decInflight) {
-				// Remove the item from the queue
-				data, err := item.Data()
-				if err != nil {
-					logger.Error(ctx, "Failed to get item data", tag.Error(err))
-					return
-				}
-				if _, err := p.queueStore.DequeueByDAGRunID(ctx, queueName, *data); err != nil {
-					logger.Error(ctx, "Failed to dequeue item", tag.Error(err))
-				}
+			if !p.processDAG(ctx, queuedItem, queueName, q.incInflight, q.decInflight) {
+				return
 			}
-		}(ctx, item)
+			data, err := queuedItem.Data()
+			if err != nil {
+				logger.Error(ctx, "Failed to get item data", tag.Error(err))
+				return
+			}
+			if _, err := p.queueStore.DequeueByDAGRunID(ctx, queueName, *data); err != nil {
+				logger.Error(ctx, "Failed to dequeue item", tag.Error(err))
+			}
+		}(item)
 	}
 	wg.Wait()
 }
@@ -345,32 +324,28 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemDat
 		return false
 	}
 
-	ctx = logger.WithValues(ctx, tag.RunID(data.ID))
-
 	runRef := *data
 	runID := runRef.ID
-	logger.Debug(ctx, "Processing queue item",
-		tag.Name(runRef.Name),
-	)
+	ctx = logger.WithValues(ctx, tag.RunID(runID))
+	logger.Debug(ctx, "Processing queue item", tag.Name(runRef.Name))
 
-	// Check if the DAG run is already running
-	if running, err := p.procStore.IsRunAlive(ctx, queueName, runRef); err != nil {
+	running, err := p.procStore.IsRunAlive(ctx, queueName, runRef)
+	if err != nil {
 		logger.Error(ctx, "Failed to check if run is alive", tag.Error(err))
 		return false
-	} else if running {
+	}
+	if running {
 		logger.Warn(ctx, "DAG run is already running, discarding")
-		return true // Discarded, so it's "processed" from the queue's perspective
+		return true
 	}
 
-	// Fetch the DAG of the dag-run attempt first to get queue configuration
 	attempt, err := p.dagRunStore.FindAttempt(ctx, runRef)
 	if err != nil {
-		logger.Error(ctx, "Failed to find run", tag.Error(err))
-		// If the attempt doesn't exist at all, mark as discard
 		if errors.Is(err, exec.ErrDAGRunIDNotFound) {
 			logger.Error(ctx, "DAG run not found, discarding")
 			return true
 		}
+		logger.Error(ctx, "Failed to find run", tag.Error(err))
 		return false
 	}
 
@@ -379,61 +354,37 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemDat
 		return true
 	}
 
-	st, err := attempt.ReadStatus(ctx)
+	status, err := attempt.ReadStatus(ctx)
 	if err != nil {
 		if errors.Is(err, exec.ErrCorruptedStatusFile) {
 			logger.Error(ctx, "Status file is corrupted, marking as invalid", tag.Error(err))
 			return true
-		} else {
-			logger.Error(ctx, "Failed to read status", tag.Error(err))
 		}
+		logger.Error(ctx, "Failed to read status", tag.Error(err))
 		return false
 	}
 
-	if st.Status != core.Queued {
-		logger.Info(ctx, "Status is not queued, skipping",
-			tag.Status(st.Status.String()),
-		)
+	if status.Status != core.Queued {
+		logger.Info(ctx, "Status is not queued, skipping", tag.Status(status.Status.String()))
 		return true
 	}
 
 	dag, err := attempt.ReadDAG(ctx)
 	if err != nil {
-		logger.Error(ctx, "Failed to read DAG",
-			tag.Error(err),
-			tag.DAG(runRef.Name),
-		)
+		logger.Error(ctx, "Failed to read DAG", tag.Error(err), tag.DAG(runRef.Name))
 		return false
 	}
 
 	incInflight()
+	defer decInflight()
 
 	go func() {
-		if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID, st); err != nil {
+		if err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY, runID, status, status.TriggerType); err != nil {
 			logger.Error(ctx, "Failed to execute DAG", tag.Error(err))
 		}
 	}()
 
-	// Use exponential backoff for retries for monitoring the execution start
-	policy := backoff.NewExponentialBackoffPolicy(p.backoffConfig.InitialInterval)
-	policy.MaxInterval = p.backoffConfig.MaxInterval
-	policy.MaxRetries = p.backoffConfig.MaxRetries
-
-	var started bool
-	operation := func(ctx context.Context) error {
-		started, err = p.monitorStartup(ctx, queueName, runRef)
-		return err
-	}
-
-	if err := backoff.Retry(ctx, operation, policy, nil); err != nil {
-		logger.Error(ctx, "Failed to execute DAG after retries", tag.Error(err))
-	}
-
-	// Decrement inflight before returning (process is now tracked by CountAlive if started)
-	decInflight()
-
-	// Successfully dispatched/started, remove from queue
-	return started
+	return p.waitForStartup(ctx, queueName, runRef)
 }
 
 func (p *QueueProcessor) wakeUp() {
@@ -443,48 +394,91 @@ func (p *QueueProcessor) wakeUp() {
 	}
 }
 
-func (p *QueueProcessor) monitorStartup(ctx context.Context, queueName string, runRef exec.DAGRunRef) (bool, error) {
-	select {
-	case <-ctx.Done():
-		logger.Debug(ctx, "Context canceled")
-		return false, backoff.PermanentError(ctx.Err())
-	case <-p.quit:
-		logger.Info(ctx, "Processor is closed")
-		return false, backoff.PermanentError(errProcessorClosed)
-	default:
+// removeInactiveQueues removes queues that are no longer active, preserving global queues from config.
+func (p *QueueProcessor) removeInactiveQueues(activeQueues map[string]struct{}) {
+	var toDelete []string
+	p.queues.Range(func(key, value any) bool {
+		name, ok := key.(string)
+		if !ok {
+			return true
+		}
+		q, ok := value.(*queue)
+		if !ok || q.isGlobalQueue() {
+			return true
+		}
+		if _, active := activeQueues[name]; !active {
+			toDelete = append(toDelete, name)
+		}
+		return true
+	})
+	for _, name := range toDelete {
+		p.queues.Delete(name)
+	}
+}
+
+// waitForStartup waits for the DAG execution to start using exponential backoff.
+func (p *QueueProcessor) waitForStartup(ctx context.Context, queueName string, runRef exec.DAGRunRef) bool {
+	policy := backoff.NewExponentialBackoffPolicy(p.backoffConfig.InitialInterval)
+	policy.MaxInterval = p.backoffConfig.MaxInterval
+	policy.MaxRetries = p.backoffConfig.MaxRetries
+
+	var started bool
+	operation := func(ctx context.Context) error {
+		var err error
+		started, err = p.checkStartupStatus(ctx, queueName, runRef)
+		return err
 	}
 
-	// Check if the process is alive (has heartbeat)
+	if err := backoff.Retry(ctx, operation, policy, nil); err != nil {
+		logger.Error(ctx, "Failed to execute DAG after retries", tag.Error(err))
+	}
+
+	return started
+}
+
+// checkStartupStatus checks if the DAG execution has started.
+func (p *QueueProcessor) checkStartupStatus(ctx context.Context, queueName string, runRef exec.DAGRunRef) (bool, error) {
+	if err := p.checkContextAndQuit(ctx); err != nil {
+		return false, err
+	}
+
 	isAlive, err := p.procStore.IsRunAlive(ctx, queueName, runRef)
 	if err != nil {
-		logger.Warn(ctx, "Failed to check run liveness",
-			tag.Error(err),
-			tag.Queue(queueName),
-			tag.RunID(runRef.ID),
-		)
-		// Continue checking on error
+		logger.Warn(ctx, "Failed to check run liveness", tag.Error(err), tag.Queue(queueName), tag.RunID(runRef.ID))
 	} else if isAlive {
 		logger.Info(ctx, "DAG run has started (heartbeat detected)")
 		return true, nil
 	}
 
-	att, err := p.dagRunStore.FindAttempt(ctx, runRef)
+	attempt, err := p.dagRunStore.FindAttempt(ctx, runRef)
 	if err != nil {
 		logger.Debug(ctx, "Failed to read attempt, keep checking")
 		return false, err
 	}
 
-	status, err := att.ReadStatus(ctx)
+	status, err := attempt.ReadStatus(ctx)
 	if err != nil {
 		return false, err
 	}
 
 	if status.Status != core.Queued && status.Status != core.Running {
-		logger.Info(ctx, "DAG execution started or finished",
-			tag.Status(status.Status.String()),
-		)
+		logger.Info(ctx, "DAG execution started or finished", tag.Status(status.Status.String()))
 		return true, nil
 	}
 
 	return false, errNotStarted
+}
+
+// checkContextAndQuit returns a permanent error if context is done or processor is closed.
+func (p *QueueProcessor) checkContextAndQuit(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		logger.Debug(ctx, "Context canceled")
+		return backoff.PermanentError(ctx.Err())
+	case <-p.quit:
+		logger.Info(ctx, "Processor is closed")
+		return backoff.PermanentError(errProcessorClosed)
+	default:
+		return nil
+	}
 }

@@ -353,6 +353,19 @@ func (c *Context) StringParam(name string) (string, error) {
 	return val, nil
 }
 
+// getWorkerID retrieves the worker ID from context, defaulting to "local" if not set or on error.
+func getWorkerID(ctx *Context) string {
+	workerID, err := ctx.StringParam("worker-id")
+	if err != nil {
+		logger.Warn(ctx, "Failed to read worker-id flag, defaulting to 'local'", tag.Error(err))
+		return "local"
+	}
+	if workerID == "" {
+		return "local"
+	}
+	return workerID
+}
+
 // dagStoreConfig contains options for creating a DAG store.
 type dagStoreConfig struct {
 	Cache                 *fileutil.Cache[*core.DAG] // Optional cache for DAG objects

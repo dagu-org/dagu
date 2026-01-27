@@ -275,7 +275,7 @@ function Graph({
       `classDef none color:${nodeColor},fill:${nodeFill},stroke:${strokeDefault},stroke-width:2.5px`
     );
     dat.push(
-      `classDef running color:${nodeColor},fill:${nodeFill},stroke:#10b981,stroke-width:2.5px`
+      `classDef running color:${nodeColor},fill:${nodeFill},stroke:#66ff66,stroke-width:2.5px`
     );
     dat.push(
       `classDef error color:${nodeColor},fill:${nodeFill},stroke:#ef4444,stroke-width:2.5px`
@@ -284,7 +284,7 @@ function Graph({
       `classDef cancel color:${nodeColor},fill:${nodeFill},stroke:#ec4899,stroke-width:2.5px`
     );
     dat.push(
-      `classDef done color:${nodeColor},fill:${nodeFill},stroke:#10b981,stroke-width:2.5px`
+      `classDef done color:${nodeColor},fill:${nodeFill},stroke:#15803d,stroke-width:2.5px`
     );
     dat.push(
       `classDef skipped color:${nodeColor},fill:${nodeFill},stroke:#64748b,stroke-width:2.5px`

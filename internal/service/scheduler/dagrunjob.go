@@ -64,18 +64,16 @@ func (j *DAGRunJob) Start(ctx context.Context) error {
 	}
 
 	// Handle the job execution (implements persistence-first for distributed execution)
-	return j.DAGExecutor.HandleJob(ctx, j.DAG, coordinatorv1.Operation_OPERATION_START, runID)
+	return j.DAGExecutor.HandleJob(ctx, j.DAG, coordinatorv1.Operation_OPERATION_START, runID, core.TriggerTypeScheduler)
 }
 
 // Ready checks whether the job can be safely started based on the latest status.
 func (j *DAGRunJob) Ready(ctx context.Context, latestStatus exec.DAGRunStatus) error {
-	ctx = logger.WithValues(ctx,
-		tag.DAG(j.DAG.Name),
-	)
-	// Prevent starting if it's already running.
 	if latestStatus.Status == core.Running {
 		return ErrJobRunning
 	}
+
+	ctx = logger.WithValues(ctx, tag.DAG(j.DAG.Name))
 
 	latestStartedAt, err := stringutil.ParseTime(latestStatus.StartedAt)
 	if err != nil {
@@ -94,7 +92,7 @@ func (j *DAGRunJob) Ready(ctx context.Context, latestStatus exec.DAGRunStatus) e
 
 	// Skip if the last successful run time is on or after the next scheduled time.
 	latestStartedAt = latestStartedAt.Truncate(time.Minute)
-	if latestStartedAt.After(j.Next) || j.Next.Equal(latestStartedAt) {
+	if !latestStartedAt.Before(j.Next) {
 		return ErrJobFinished
 	}
 
@@ -110,9 +108,8 @@ func (j *DAGRunJob) skipIfSuccessful(ctx context.Context, latestStatus exec.DAGR
 		return nil
 	}
 
-	prevExecTime := j.PrevExecTime(ctx)
-	if (latestStartedAt.After(prevExecTime) || latestStartedAt.Equal(prevExecTime)) &&
-		latestStartedAt.Before(j.Next) {
+	prevExecTime := j.PrevExecTime()
+	if !latestStartedAt.Before(prevExecTime) && latestStartedAt.Before(j.Next) {
 		logger.Info(ctx, "Skipping job due to successful prior run",
 			slog.String("start-time", latestStartedAt.Format(time.RFC3339)))
 		return ErrJobSuccess
@@ -122,10 +119,10 @@ func (j *DAGRunJob) skipIfSuccessful(ctx context.Context, latestStatus exec.DAGR
 
 // PrevExecTime calculates the previous schedule time from 'Next' by subtracting
 // the schedule duration between runs.
-func (j *DAGRunJob) PrevExecTime(_ context.Context) time.Time {
+func (j *DAGRunJob) PrevExecTime() time.Time {
 	nextNextRunTime := j.Schedule.Next(j.Next.Add(time.Second))
-	duration := nextNextRunTime.Sub(j.Next)
-	return j.Next.Add(-duration)
+	scheduleDuration := nextNextRunTime.Sub(j.Next)
+	return j.Next.Add(-scheduleDuration)
 }
 
 // Stop halts a running job if it's currently running.

@@ -5,435 +5,321 @@
  */
 import dayjs from '@/lib/dayjs';
 import {
-  Calendar,
+  Check,
   Clock,
-  Hash,
+  Copy,
   Info,
-  Layers,
+  LucideIcon,
   PlayCircle,
-  Server,
   StopCircle,
   Terminal,
-  Timer,
 } from 'lucide-react';
-import React from 'react';
-import { components, Status } from '../../../../api/v2/schema';
-import LabeledItem from '../../../../ui/LabeledItem';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { components, Status, TriggerType } from '../../../../api/v2/schema';
 
-/**
- * Props for the DAGStatusOverview component
- */
 type Props = {
-  /** DAG dagRun details */
   status?: components['schemas']['DAGRunDetails'];
-  /** Function to open log viewer */
   onViewLog?: (dagRunId: string) => void;
 };
 
-/**
- * DAGStatusOverview displays summary information about a DAG run
- * including status, request ID, timestamps, and parameters
- */
-function DAGStatusOverview({ status, onViewLog }: Props) {
+type NodeStatusConfig = {
+  key: string;
+  label: string;
+  colorClass: string;
+};
 
-  // State to store current duration for live updates
-  const [currentDuration, setCurrentDuration] = React.useState<string>('-');
+// Colors: success=green-700, running=#66ff66, error=#ef4444, cancel=#ec4899, skipped=#64748b, waiting=#f59e0b
+const NODE_STATUS_CONFIG: NodeStatusConfig[] = [
+  { key: 'succeeded', label: 'Success', colorClass: 'bg-green-700' },
+  { key: 'running', label: 'Running', colorClass: 'bg-[#66ff66]' },
+  { key: 'failed', label: 'Failed', colorClass: 'bg-red-500' },
+  { key: 'queued', label: 'Queued', colorClass: 'bg-slate-400' },
+  { key: 'not_started', label: 'Not Started', colorClass: 'bg-slate-400' },
+  { key: 'skipped', label: 'Skipped', colorClass: 'bg-slate-500' },
+  { key: 'aborted', label: 'Aborted', colorClass: 'bg-pink-500' },
+  { key: 'waiting', label: 'Waiting', colorClass: 'bg-amber-500' },
+  { key: 'rejected', label: 'Rejected', colorClass: 'bg-red-500' },
+];
 
-  // Don't render if no status is provided
+type ExecutionStatusConfig = {
+  status: Status;
+  icon: LucideIcon;
+  iconClass: string;
+  message: string;
+};
+
+const EXECUTION_STATUS_CONFIG: ExecutionStatusConfig[] = [
+  { status: Status.Running, icon: PlayCircle, iconClass: 'text-success', message: 'Execution in progress' },
+  { status: Status.Queued, icon: Clock, iconClass: 'text-info', message: 'DAGRun is queued for execution' },
+  { status: Status.Aborted, icon: StopCircle, iconClass: 'text-pink-400', message: 'Execution was aborted' },
+  { status: Status.Waiting, icon: Clock, iconClass: 'text-amber-500', message: 'Waiting for approval' },
+  { status: Status.Rejected, icon: StopCircle, iconClass: 'text-red-600', message: 'Execution was rejected' },
+];
+
+function formatTimestamp(timestamp: string | undefined): string {
+  if (!timestamp || timestamp === '-') {
+    return '-';
+  }
+  const parsed = dayjs(timestamp);
+  if (!parsed.isValid()) {
+    return timestamp;
+  }
+  return parsed.format('YYYY-MM-DD HH:mm:ss');
+}
+
+function truncateId(id: string): string {
+  if (id.length <= 16) return id;
+  return `${id.slice(0, 8)}...${id.slice(-4)}`;
+}
+
+const triggerLabels: Record<TriggerType, string> = {
+  scheduler: 'Scheduled',
+  manual: 'Manual',
+  webhook: 'Webhook',
+  subdag: 'Sub-DAG',
+  retry: 'Retry',
+  unknown: 'Unknown',
+};
+
+type PreconditionErrorsProps = {
+  preconditions?: components['schemas']['Condition'][];
+};
+
+function PreconditionErrors({ preconditions }: PreconditionErrorsProps): React.JSX.Element | null {
+  const errors = preconditions?.filter((cond) => cond.error);
+
+  if (!errors || errors.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="pb-2">
+      <div className="flex items-center mb-1">
+        <Info className="h-3.5 w-3.5 mr-1 text-warning" />
+        <span className="text-xs font-semibold text-warning">
+          DAGRun Precondition Unmet
+        </span>
+      </div>
+      <div className="space-y-2">
+        {errors.map((cond, idx) => (
+          <div
+            key={idx}
+            className="p-1.5 bg-warning-muted border border-warning/20 rounded-md text-xs text-warning font-medium whitespace-normal break-words"
+          >
+            <div className="mb-0.5 break-words">Condition: {cond.condition}</div>
+            <div className="mb-0.5 break-words">Expected: {cond.expected}</div>
+            <div className="break-words">Error: {cond.error}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function formatDuration(startedAt: string | undefined, finishedAt: string | undefined): string {
+  if (!startedAt || startedAt === '-') {
+    return '-';
+  }
+
+  const start = dayjs(startedAt);
+  if (!start.isValid()) {
+    return '-';
+  }
+
+  const end = finishedAt && finishedAt !== '-' ? dayjs(finishedAt) : dayjs();
+  if (!end.isValid()) {
+    return '-';
+  }
+
+  const diff = end.diff(start, 'second');
+  if (diff < 0) {
+    return '-';
+  }
+
+  const hours = Math.floor(diff / 3600);
+  const minutes = Math.floor((diff % 3600) / 60);
+  const seconds = diff % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${seconds}s`;
+}
+
+function DAGStatusOverview({ status, onViewLog }: Props): React.JSX.Element | null {
+  const [currentDuration, setCurrentDuration] = useState<string>('-');
+  const [copied, setCopied] = useState(false);
+
+  const isRunning = status?.status === Status.Running;
+
+  const calculateDuration = useCallback((): string => {
+    return formatDuration(status?.startedAt, status?.finishedAt);
+  }, [status?.startedAt, status?.finishedAt]);
+
+  useEffect(() => {
+    setCurrentDuration(calculateDuration());
+
+    if (isRunning && status?.startedAt) {
+      const intervalId = setInterval(() => {
+        setCurrentDuration(calculateDuration());
+      }, 1000);
+      return () => clearInterval(intervalId);
+    }
+  }, [isRunning, status?.startedAt, calculateDuration]);
+
+  const nodeStatus = useMemo(
+    () =>
+      status?.nodes?.reduce<Record<string, number>>((acc, node) => {
+        const statusKey = node.statusLabel.toLowerCase().replace(' ', '_');
+        acc[statusKey] = (acc[statusKey] || 0) + 1;
+        return acc;
+      }, {}),
+    [status?.nodes]
+  );
+
+  const totalNodes = status?.nodes?.length ?? 0;
+
+  const copyRunId = useCallback(async () => {
+    if (!status?.dagRunId) return;
+    try {
+      await navigator.clipboard.writeText(status.dagRunId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = status.dagRunId;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [status?.dagRunId]);
+
   if (!status) {
     return null;
   }
 
-  // Format timestamps for better readability if they exist
-  const formatTimestamp = (timestamp: string | undefined) => {
-    if (!timestamp || timestamp === '-') return '-';
-    try {
-      return dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss Z');
-    } catch {
-      return timestamp;
-    }
-  };
-
-  // Calculate duration between start and end times
-  const calculateDuration = () => {
-    if (!status.startedAt || status.startedAt === '-') return '-';
-
-    const end =
-      status.finishedAt && status.finishedAt !== '-'
-        ? dayjs(status.finishedAt)
-        : dayjs();
-
-    const start = dayjs(status.startedAt);
-    const diff = end.diff(start, 'second');
-
-    const hours = Math.floor(diff / 3600);
-    const minutes = Math.floor((diff % 3600) / 60);
-    const seconds = diff % 60;
-
-    return `${hours > 0 ? `${hours}h ` : ''}${minutes > 0 ? `${minutes}m ` : ''}${seconds}s`;
-  };
-
-  // Determine if the DAG is currently running
-  const isRunning = status.status === Status.Running;
-
-  // Auto-update duration every second for running DAGs
-  React.useEffect(() => {
-    if (isRunning && status.startedAt) {
-      // Initial calculation
-      setCurrentDuration(calculateDuration());
-
-      // Set up interval to update duration every second
-      const intervalId = setInterval(() => {
-        setCurrentDuration(calculateDuration());
-      }, 1000);
-
-      // Clean up interval on unmount or when status changes
-      return () => clearInterval(intervalId);
-    } else {
-      // For non-running DAGs, calculate once
-      setCurrentDuration(calculateDuration());
-    }
-  }, [isRunning, status.startedAt, status.finishedAt]);
-
-  // Count nodes by status
-  const nodeStatus = status.nodes?.reduce(
-    (acc, node) => {
-      const statusKey = node.statusLabel.toLowerCase().replace(' ', '_');
-      acc[statusKey] = (acc[statusKey] || 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>
-  );
-
-  // Calculate total nodes
-  const totalNodes = status.nodes?.length;
-
   return (
-    <div className="space-y-3">
-      {/* Parameters - Always show to prevent layout jumping */}
-      <div className="pb-3">
-        <div className="flex items-center mb-1.5">
-          <Terminal className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
-          <span className="text-xs font-semibold text-foreground/90">
-            Parameters
+    <div className="space-y-2">
+      {/* Parameters - Only show when present */}
+      {status.params && (
+        <div className="flex items-center gap-1.5 text-xs font-mono">
+          <Terminal className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+          <span className="text-foreground truncate" title={status.params}>
+            {status.params}
           </span>
-        </div>
-        <div className="flex items-center p-2 bg-accent rounded-md text-xs font-mono h-[40px] overflow-y-auto w-full border">
-          {status.params ? (
-            <span className="font-medium text-foreground">{status.params}</span>
-          ) : (
-            <span className="text-muted-foreground italic">No parameters</span>
-          )}
-        </div>
-      </div>
-
-      {/* Timing Information */}
-      <div className="pb-2 space-y-2">
-        {/* Row 1: Time info */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          {status.queuedAt && (
-            <div className="flex items-center">
-              <Clock className="w-3.5 mr-1 text-muted-foreground" />
-              <LabeledItem label="Queued">
-                <span className="font-medium text-foreground/90 text-xs">
-                  {formatTimestamp(status.queuedAt)}
-                </span>
-              </LabeledItem>
-            </div>
-          )}
-
-          <div className="flex items-center">
-            <Calendar className="w-3.5 mr-1 text-muted-foreground" />
-            <LabeledItem label="Started">
-              <span className="font-medium text-foreground/90 text-xs">
-                {formatTimestamp(status.startedAt)}
-              </span>
-            </LabeledItem>
-          </div>
-
-          <div className="flex items-center">
-            <Clock className="w-3.5 mr-1 text-muted-foreground" />
-            <LabeledItem label="Finished">
-              <span className="font-medium text-foreground/90 text-xs">
-                {formatTimestamp(status.finishedAt)}
-              </span>
-            </LabeledItem>
-          </div>
-
-          <div className="flex items-center">
-            <Timer className="w-3.5 mr-1 text-muted-foreground" />
-            <LabeledItem label="Duration">
-              <span className="font-medium text-foreground/90 text-xs flex items-center gap-1">
-                {currentDuration}
-                {isRunning && (
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                )}
-              </span>
-            </LabeledItem>
-          </div>
-        </div>
-
-        {/* Row 2: Worker and Run ID */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          {status.workerId && (
-            <div className="flex items-center">
-              <Server className="w-3.5 mr-1 text-muted-foreground" />
-              <LabeledItem label="Worker">
-                <span
-                  className="font-medium text-foreground/90 text-xs truncate inline-block max-w-[250px]"
-                  title={status.workerId}
-                >
-                  {status.workerId}
-                </span>
-              </LabeledItem>
-            </div>
-          )}
-
-          {status.dagRunId && (
-            <div className="flex items-center">
-              <Hash className="w-3.5 mr-1 text-muted-foreground" />
-              <LabeledItem label="Run ID">
-                <span className="font-medium text-foreground/90 text-xs">
-                  {status.dagRunId}
-                </span>
-              </LabeledItem>
-            </div>
-          )}
-
-          {status.dagRunId && onViewLog && (
-            <button
-              onClick={() => onViewLog(status.dagRunId)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border border-border shadow-sm bg-card hover:bg-muted transition-colors duration-200 cursor-pointer"
-              title="View Scheduler Log"
-            >
-              <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>Scheduler Log</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Node Status Summary */}
-      <div className="pb-2">
-        <div className="flex items-center mb-1">
-          <Layers className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
-          <span className="text-xs font-semibold text-foreground/90">
-            Node Status
-          </span>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <div className="flex items-center">
-            <Info className="h-3 w-3 mr-1 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">
-              Total: {totalNodes}
-            </span>
-          </div>
-
-          {nodeStatus.finished && (
-            <div className="flex items-center">
-              <div className="h-2 w-2 mr-1 rounded-full bg-success"></div>
-              <span className="text-xs text-muted-foreground">
-                Success: {nodeStatus.finished}
-              </span>
-            </div>
-          )}
-
-          {nodeStatus.running && (
-            <div className="flex items-center">
-              <div className="h-2 w-2 mr-1 rounded-full bg-success animate-pulse"></div>
-              <span className="text-xs text-muted-foreground">
-                Running: {nodeStatus.running}
-              </span>
-            </div>
-          )}
-
-          {nodeStatus.failed && (
-            <div className="flex items-center">
-              <div className="h-2 w-2 mr-1 rounded-full bg-error"></div>
-              <span className="text-xs text-muted-foreground">
-                Failed: {nodeStatus.failed}
-              </span>
-            </div>
-          )}
-
-          {nodeStatus.queued && (
-            <div className="flex items-center">
-              <div className="h-2 w-2 mr-1 rounded-full bg-info"></div>
-              <span className="text-xs text-muted-foreground">
-                Queued: {nodeStatus.queued}
-              </span>
-            </div>
-          )}
-
-          {nodeStatus.not_started && (
-            <div className="flex items-center">
-              <div className="h-2 w-2 mr-1 rounded-full bg-accent"></div>
-              <span className="text-xs text-muted-foreground">
-                Not Started: {nodeStatus.not_started}
-              </span>
-            </div>
-          )}
-
-          {nodeStatus.skipped && (
-            <div className="flex items-center">
-              <div className="h-2 w-2 mr-1 rounded-full bg-muted-foreground"></div>
-              <span className="text-xs text-muted-foreground">
-                Skipped: {nodeStatus.skipped}
-              </span>
-            </div>
-          )}
-
-          {nodeStatus.aborted && (
-            <div className="flex items-center">
-              <div className="h-2 w-2 mr-1 rounded-full bg-pink-400"></div>
-              <span className="text-xs text-muted-foreground">
-                Aborted: {nodeStatus.aborted}
-              </span>
-            </div>
-          )}
-
-          {nodeStatus.waiting && (
-            <div className="flex items-center">
-              <div className="h-2 w-2 mr-1 rounded-full bg-amber-500 animate-pulse"></div>
-              <span className="text-xs text-muted-foreground">
-                Waiting: {nodeStatus.waiting}
-              </span>
-            </div>
-          )}
-
-          {nodeStatus.rejected && (
-            <div className="flex items-center">
-              <div className="h-2 w-2 mr-1 rounded-full bg-red-600"></div>
-              <span className="text-xs text-muted-foreground">
-                Rejected: {nodeStatus.rejected}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Progress bar */}
-        {totalNodes && totalNodes > 0 && (
-          <div className="mt-1.5 h-1.5 w-full bg-accent rounded-full overflow-hidden">
-            {nodeStatus?.finished && (
-              <div
-                className="h-full bg-success float-left"
-                style={{
-                  width: `${(nodeStatus.finished / totalNodes) * 100}%`,
-                }}
-              ></div>
-            )}
-            {nodeStatus.running && (
-              <div
-                className="h-full bg-success float-left animate-pulse"
-                style={{ width: `${(nodeStatus.running / totalNodes) * 100}%` }}
-              ></div>
-            )}
-            {nodeStatus.queued && (
-              <div
-                className="h-full bg-info float-left"
-                style={{ width: `${(nodeStatus.queued / totalNodes) * 100}%` }}
-              ></div>
-            )}
-            {nodeStatus.failed && (
-              <div
-                className="h-full bg-error float-left"
-                style={{ width: `${(nodeStatus.failed / totalNodes) * 100}%` }}
-              ></div>
-            )}
-            {nodeStatus.skipped && (
-              <div
-                className="h-full bg-muted-foreground float-left"
-                style={{ width: `${(nodeStatus.skipped / totalNodes) * 100}%` }}
-              ></div>
-            )}
-            {nodeStatus.aborted && (
-              <div
-                className="h-full bg-pink-400 float-left"
-                style={{
-                  width: `${(nodeStatus.aborted / totalNodes) * 100}%`,
-                }}
-              ></div>
-            )}
-            {nodeStatus.waiting && (
-              <div
-                className="h-full bg-amber-500 float-left animate-pulse"
-                style={{
-                  width: `${(nodeStatus.waiting / totalNodes) * 100}%`,
-                }}
-              ></div>
-            )}
-            {nodeStatus.rejected && (
-              <div
-                className="h-full bg-red-600 float-left"
-                style={{
-                  width: `${(nodeStatus.rejected / totalNodes) * 100}%`,
-                }}
-              ></div>
-            )}
-          </div>
-        )}
-
-        {/* Execution controls indicator */}
-        {isRunning && (
-          <div className="mt-1.5 flex items-center text-xs text-muted-foreground">
-            <PlayCircle className="h-3 w-3 mr-1 text-success" />
-            <span>Execution in progress</span>
-          </div>
-        )}
-        {status.status === Status.Queued && (
-          <div className="mt-1.5 flex items-center text-xs text-muted-foreground">
-            <Clock className="h-3 w-3 mr-1 text-info" />
-            <span>DAGRun is queued for execution</span>
-          </div>
-        )}
-        {status.status === Status.Aborted && (
-          <div className="mt-1.5 flex items-center text-xs text-muted-foreground">
-            <StopCircle className="h-3 w-3 mr-1 text-pink-400" />
-            <span>Execution was aborted</span>
-          </div>
-        )}
-        {status.status === Status.Waiting && (
-          <div className="mt-1.5 flex items-center text-xs text-muted-foreground">
-            <Clock className="h-3 w-3 mr-1 text-amber-500" />
-            <span>Waiting for approval</span>
-          </div>
-        )}
-        {status.status === Status.Rejected && (
-          <div className="mt-1.5 flex items-center text-xs text-muted-foreground">
-            <StopCircle className="h-3 w-3 mr-1 text-red-600" />
-            <span>Execution was rejected</span>
-          </div>
-        )}
-      </div>
-
-      {/* DAGRun-level Precondition Errors */}
-      {status.preconditions?.some(
-        (cond: components['schemas']['Condition']) => cond.error
-      ) && (
-        <div className="pb-2">
-          <div className="flex items-center mb-1">
-            <Info className="h-3.5 w-3.5 mr-1 text-warning" />
-            <span className="text-xs font-semibold text-warning">
-              DAGRun Precondition Unmet
-            </span>
-          </div>
-          <div className="space-y-2">
-            {status.preconditions
-              ?.filter((cond: components['schemas']['Condition']) => cond.error)
-              .map((cond: components['schemas']['Condition'], idx: number) => (
-                <div
-                  key={idx}
-                  className="p-1.5 bg-warning-muted border border-warning/20 rounded-md text-xs text-warning font-medium"
-                >
-                  <div className="mb-0.5">Condition: {cond.condition}</div>
-                  <div className="mb-0.5">Expected: {cond.expected}</div>
-                  <div>Error: {cond.error}</div>
-                </div>
-              ))}
-          </div>
         </div>
       )}
+
+      {/* Timing & Metadata - Compact grid */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+        {status.queuedAt && (
+          <span>
+            <span className="text-muted-foreground">Queued </span>
+            <span className="font-mono text-foreground">{formatTimestamp(status.queuedAt)}</span>
+          </span>
+        )}
+        <span>
+          <span className="text-muted-foreground">Started </span>
+          <span className="font-mono text-foreground">{formatTimestamp(status.startedAt)}</span>
+        </span>
+        <span>
+          <span className="text-muted-foreground">Finished </span>
+          <span className="font-mono text-foreground">{formatTimestamp(status.finishedAt)}</span>
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="text-muted-foreground">Duration </span>
+          <span className="font-mono font-medium text-foreground">{currentDuration}</span>
+          {isRunning && (
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+          )}
+        </span>
+      </div>
+
+      {/* Metadata row */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+        {status.triggerType && (
+          <span>
+            <span className="text-muted-foreground">Trigger </span>
+            <span className="font-medium text-foreground">
+              {triggerLabels[status.triggerType] ?? status.triggerType}
+            </span>
+          </span>
+        )}
+        {status.workerId && (
+          <span className="truncate max-w-[180px]" title={status.workerId}>
+            <span className="text-muted-foreground">Worker </span>
+            <span className="font-medium text-foreground">{status.workerId}</span>
+          </span>
+        )}
+        {status.dagRunId && (
+          <button
+            onClick={copyRunId}
+            className="inline-flex items-center gap-1 font-mono text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            title={`Click to copy: ${status.dagRunId}`}
+          >
+            <span>{truncateId(status.dagRunId)}</span>
+            {copied ? (
+              <Check className="h-3 w-3 text-success" />
+            ) : (
+              <Copy className="h-3 w-3 opacity-50" />
+            )}
+          </button>
+        )}
+        {status.dagRunId && onViewLog && (
+          <button
+            onClick={() => onViewLog(status.dagRunId)}
+            className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded border border-border bg-card hover:bg-muted transition-colors cursor-pointer"
+            title="View Scheduler Log"
+          >
+            <Terminal className="h-3 w-3" />
+            <span>Log</span>
+          </button>
+        )}
+      </div>
+
+      {/* Node Status - Progress bar with inline counts */}
+      <div className="flex items-center gap-2 text-xs">
+        {totalNodes > 0 && nodeStatus && (
+          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden flex">
+            {NODE_STATUS_CONFIG.map((config) => {
+              const count = nodeStatus[config.key];
+              if (!count) return null;
+              return (
+                <div
+                  key={config.key}
+                  className={`h-full ${config.colorClass}`}
+                  style={{ width: `${(count / totalNodes) * 100}%` }}
+                />
+              );
+            })}
+          </div>
+        )}
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {nodeStatus?.succeeded ?? 0}/{totalNodes}
+        </span>
+      </div>
+
+      {/* Execution status message */}
+      {(() => {
+        const config = EXECUTION_STATUS_CONFIG.find(c => c.status === status.status);
+        if (!config) return null;
+        const Icon = config.icon;
+        return (
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Icon className={`h-3 w-3 ${config.iconClass}`} />
+            <span>{config.message}</span>
+          </div>
+        );
+      })()}
+
+      <PreconditionErrors preconditions={status.preconditions} />
     </div>
   );
 }

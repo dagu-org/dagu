@@ -27,20 +27,23 @@ function TabBar({ onAddTab }: TabBarProps) {
               key={tab.id}
               value={tab.id}
               className="tab-trigger"
+              asChild
             >
-              {/* Right angled edge for trapezoid shape */}
-              <span className="tab-edge-right" />
-              <span className="tab-title">{tab.title}</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeTab(tab.id);
-                }}
-                className="tab-close"
-                title="Close"
-              >
-                <X className="h-3 w-3" />
-              </button>
+              <div>
+                {/* Right angled edge for trapezoid shape */}
+                <span className="tab-edge-right" />
+                <span className="tab-title">{tab.title}</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeTab(tab.id);
+                  }}
+                  className="tab-close"
+                  title="Close"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
             </TabsPrimitive.Trigger>
           ))}
           {onAddTab && (

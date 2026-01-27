@@ -59,7 +59,8 @@ function dereferenceSchema(schema: JSONSchema): JSONSchema {
     if (typeof obj.$ref === 'string') {
       const resolved = resolveRef(obj.$ref);
       // Merge with any other properties (like description overrides)
-      const { $ref, ...rest } = obj;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { $ref: _ref, ...rest } = obj;
       return processNode({ ...resolved, ...rest });
     }
 

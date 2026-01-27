@@ -13,6 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
@@ -117,24 +118,10 @@ func (a *API) CreateDAGWebhook(ctx context.Context, request api.CreateDAGWebhook
 	}
 
 	logger.Info(ctx, "Webhook created", tag.Name(request.FileName))
-
-	// Log webhook creation
-	if a.auditService != nil {
-		currentUser, _ := auth.UserFromContext(ctx)
-		clientIP, _ := auth.ClientIPFromContext(ctx)
-		details, err := json.Marshal(map[string]string{
-			"dag_name":   request.FileName,
-			"webhook_id": result.Webhook.ID,
-		})
-		if err != nil {
-			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
-			details = []byte("{}")
-		}
-		entry := audit.NewEntry(audit.CategoryWebhook, "webhook_create", currentUser.ID, currentUser.Username).
-			WithDetails(string(details)).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
-	}
+	a.logWebhookAudit(ctx, "webhook_create", map[string]string{
+		"dag_name":   request.FileName,
+		"webhook_id": result.Webhook.ID,
+	})
 
 	return api.CreateDAGWebhook201JSONResponse{
 		Webhook: toWebhookDetails(result.Webhook),
@@ -170,25 +157,11 @@ func (a *API) DeleteDAGWebhook(ctx context.Context, request api.DeleteDAGWebhook
 	}
 
 	logger.Info(ctx, "Webhook deleted", tag.Name(request.FileName))
-
-	// Log webhook deletion
-	if a.auditService != nil {
-		currentUser, _ := auth.UserFromContext(ctx)
-		clientIP, _ := auth.ClientIPFromContext(ctx)
-		detailsMap := map[string]string{"dag_name": request.FileName}
-		if targetWebhook != nil {
-			detailsMap["webhook_id"] = targetWebhook.ID
-		}
-		details, err := json.Marshal(detailsMap)
-		if err != nil {
-			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
-			details = []byte("{}")
-		}
-		entry := audit.NewEntry(audit.CategoryWebhook, "webhook_delete", currentUser.ID, currentUser.Username).
-			WithDetails(string(details)).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
+	auditDetails := map[string]string{"dag_name": request.FileName}
+	if targetWebhook != nil {
+		auditDetails["webhook_id"] = targetWebhook.ID
 	}
+	a.logWebhookAudit(ctx, "webhook_delete", auditDetails)
 
 	return api.DeleteDAGWebhook204Response{}, nil
 }
@@ -218,24 +191,10 @@ func (a *API) RegenerateDAGWebhookToken(ctx context.Context, request api.Regener
 	}
 
 	logger.Info(ctx, "Webhook token regenerated", tag.Name(request.FileName))
-
-	// Log webhook token regeneration
-	if a.auditService != nil {
-		currentUser, _ := auth.UserFromContext(ctx)
-		clientIP, _ := auth.ClientIPFromContext(ctx)
-		details, err := json.Marshal(map[string]string{
-			"dag_name":   request.FileName,
-			"webhook_id": result.Webhook.ID,
-		})
-		if err != nil {
-			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
-			details = []byte("{}")
-		}
-		entry := audit.NewEntry(audit.CategoryWebhook, "webhook_token_regenerate", currentUser.ID, currentUser.Username).
-			WithDetails(string(details)).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
-	}
+	a.logWebhookAudit(ctx, "webhook_token_regenerate", map[string]string{
+		"dag_name":   request.FileName,
+		"webhook_id": result.Webhook.ID,
+	})
 
 	return api.RegenerateDAGWebhookToken200JSONResponse{
 		Webhook: toWebhookDetails(result.Webhook),
@@ -271,25 +230,11 @@ func (a *API) ToggleDAGWebhook(ctx context.Context, request api.ToggleDAGWebhook
 		tag.Name(request.FileName),
 		tag.Key("enabled"), tag.Value(request.Body.Enabled),
 	)
-
-	// Log webhook toggle
-	if a.auditService != nil {
-		currentUser, _ := auth.UserFromContext(ctx)
-		clientIP, _ := auth.ClientIPFromContext(ctx)
-		details, err := json.Marshal(map[string]any{
-			"dag_name":   request.FileName,
-			"webhook_id": webhook.ID,
-			"enabled":    request.Body.Enabled,
-		})
-		if err != nil {
-			logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
-			details = []byte("{}")
-		}
-		entry := audit.NewEntry(audit.CategoryWebhook, "webhook_toggle", currentUser.ID, currentUser.Username).
-			WithDetails(string(details)).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
-	}
+	a.logWebhookAudit(ctx, "webhook_toggle", map[string]any{
+		"dag_name":   request.FileName,
+		"webhook_id": webhook.ID,
+		"enabled":    request.Body.Enabled,
+	})
 
 	return api.ToggleDAGWebhook200JSONResponse(toWebhookDetails(webhook)), nil
 }
@@ -307,11 +252,7 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 	}
 
 	// Validate the token via auth service
-	authHeader := ""
-	if request.Params.Authorization != nil {
-		authHeader = *request.Params.Authorization
-	}
-	token := extractWebhookToken(authHeader)
+	token := extractWebhookToken(valueOf(request.Params.Authorization))
 	if token == "" {
 		logger.Warn(ctx, "Webhook: missing or invalid authorization header",
 			tag.Name(request.FileName),
@@ -373,36 +314,29 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 	}
 
 	// Prepare the WEBHOOK_PAYLOAD parameter
-	var payload string
-	if request.Body != nil && request.Body.Payload != nil {
-		payloadBytes, err := json.Marshal(*request.Body.Payload)
-		if err != nil {
-			logger.Warn(ctx, "Webhook: failed to marshal payload",
-				tag.Name(dag.Name),
-				tag.Error(err),
-			)
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    "failed to process request body",
-			}
+	payload, err := marshalWebhookPayload(request.Body)
+	if err != nil {
+		logger.Warn(ctx, "Webhook: failed to marshal payload",
+			tag.Name(dag.Name),
+			tag.Error(err),
+		)
+		return nil, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "failed to process request body",
 		}
-		// Check payload size to prevent memory exhaustion attacks
-		if len(payloadBytes) > maxWebhookPayloadSize {
-			logger.Warn(ctx, "Webhook: payload too large",
-				tag.Name(dag.Name),
-				tag.Key("size"), tag.Value(len(payloadBytes)),
-				tag.Key("maxSize"), tag.Value(maxWebhookPayloadSize),
-			)
-			return nil, &Error{
-				HTTPStatus: http.StatusRequestEntityTooLarge,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    fmt.Sprintf("webhook payload too large (max %d bytes)", maxWebhookPayloadSize),
-			}
+	}
+	if len(payload) > maxWebhookPayloadSize {
+		logger.Warn(ctx, "Webhook: payload too large",
+			tag.Name(dag.Name),
+			tag.Key("size"), tag.Value(len(payload)),
+			tag.Key("maxSize"), tag.Value(maxWebhookPayloadSize),
+		)
+		return nil, &Error{
+			HTTPStatus: http.StatusRequestEntityTooLarge,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    fmt.Sprintf("webhook payload too large (max %d bytes)", maxWebhookPayloadSize),
 		}
-		payload = string(payloadBytes)
-	} else {
-		payload = "{}"
 	}
 
 	// Create the params string with WEBHOOK_PAYLOAD
@@ -433,8 +367,8 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 		dagRunID = uuid.Must(uuid.NewV7()).String()
 	}
 
-	// Enqueue the DAG run
-	if err := a.enqueueDAGRun(ctx, dag, params, dagRunID, ""); err != nil {
+	// Enqueue the DAG run with webhook trigger type
+	if err := a.enqueueDAGRun(ctx, dag, params, dagRunID, "", core.TriggerTypeWebhook); err != nil {
 		logger.Error(ctx, "Webhook: failed to enqueue DAG run",
 			tag.Name(dag.Name),
 			tag.Error(err),
@@ -475,11 +409,11 @@ func (a *API) requireWebhookManagement(ctx context.Context) error {
 // extractWebhookToken extracts the token from the Authorization header.
 // It expects the format "Bearer <token>".
 func extractWebhookToken(authHeader string) string {
-	const bearerPrefix = "Bearer "
-	if !strings.HasPrefix(authHeader, bearerPrefix) {
+	token, found := strings.CutPrefix(authHeader, "Bearer ")
+	if !found {
 		return ""
 	}
-	return strings.TrimPrefix(authHeader, bearerPrefix)
+	return token
 }
 
 // toWebhookDetails converts an auth.Webhook to an api.WebhookDetails.
@@ -490,7 +424,7 @@ func toWebhookDetails(wh *auth.Webhook) api.WebhookDetails {
 		parsedID = uuid.Nil
 	}
 
-	details := api.WebhookDetails{
+	return api.WebhookDetails{
 		Id:          openapitypes.UUID(parsedID),
 		DagName:     wh.DAGName,
 		TokenPrefix: wh.TokenPrefix,
@@ -498,11 +432,8 @@ func toWebhookDetails(wh *auth.Webhook) api.WebhookDetails {
 		CreatedAt:   wh.CreatedAt,
 		UpdatedAt:   wh.UpdatedAt,
 		CreatedBy:   ptrOf(wh.CreatedBy),
+		LastUsedAt:  wh.LastUsedAt,
 	}
-	if wh.LastUsedAt != nil {
-		details.LastUsedAt = wh.LastUsedAt
-	}
-	return details
 }
 
 // getCreatorID extracts the user ID from context or returns a default value.
@@ -512,4 +443,42 @@ func getCreatorID(ctx context.Context) string {
 		return user.ID
 	}
 	return "system"
+}
+
+// logWebhookAudit logs a webhook-related audit entry with the given action and details.
+func (a *API) logWebhookAudit(ctx context.Context, action string, details any) {
+	if a.auditService == nil {
+		return
+	}
+	currentUser, ok := auth.UserFromContext(ctx)
+	clientIP, _ := auth.ClientIPFromContext(ctx)
+
+	var userID, username string
+	if ok && currentUser != nil {
+		userID = currentUser.ID
+		username = currentUser.Username
+	}
+
+	detailsJSON, err := json.Marshal(details)
+	if err != nil {
+		logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
+		detailsJSON = []byte("{}")
+	}
+	entry := audit.NewEntry(audit.CategoryWebhook, action, userID, username).
+		WithDetails(string(detailsJSON)).
+		WithIPAddress(clientIP)
+	_ = a.auditService.Log(ctx, entry)
+}
+
+// marshalWebhookPayload returns the JSON representation of the webhook payload.
+// Returns "{}" if no payload is provided.
+func marshalWebhookPayload(body *api.TriggerWebhookJSONRequestBody) (string, error) {
+	if body == nil || body.Payload == nil {
+		return "{}", nil
+	}
+	payloadBytes, err := json.Marshal(*body.Payload)
+	if err != nil {
+		return "", err
+	}
+	return string(payloadBytes), nil
 }

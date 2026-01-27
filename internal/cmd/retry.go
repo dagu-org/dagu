@@ -35,7 +35,6 @@ Examples:
 
 var retryFlags = []commandLineFlag{dagRunIDFlagRetry, stepNameForRetry, retryWorkerIDFlag}
 
-// retryWorkerIDFlag identifies which worker executes this DAG run retry (for distributed execution tracking)
 var retryWorkerIDFlag = commandLineFlag{
 	name:  "worker-id",
 	usage: "Worker ID executing this DAG run (auto-set in distributed mode, defaults to 'local')",
@@ -44,10 +43,7 @@ var retryWorkerIDFlag = commandLineFlag{
 func runRetry(ctx *Context, args []string) error {
 	dagRunID, _ := ctx.StringParam("run-id")
 	stepName, _ := ctx.StringParam("step")
-	workerID, _ := ctx.StringParam("worker-id")
-	if workerID == "" {
-		workerID = "local"
-	}
+	workerID := getWorkerID(ctx)
 
 	name, err := extractDAGName(ctx, args[0])
 	if err != nil {
@@ -100,15 +96,11 @@ func runRetry(ctx *Context, args []string) error {
 
 	ctx.ProcStore.Unlock(ctx, dag.ProcGroup())
 
-	if err := executeRetry(ctx, dag, status, status.DAGRun(), stepName, workerID); err != nil {
-		return fmt.Errorf("failed to execute retry: %w", err)
-	}
-
-	return nil
+	return executeRetry(ctx, dag, status, status.DAGRun(), stepName, workerID)
 }
 
-// executeRetry prepares and runs a retry of a DAG run using the original run's log file.
-func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRun exec.DAGRunRef, stepName string, workerID string) error {
+// executeRetry runs a retry of a DAG run using the original run's log file.
+func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRun exec.DAGRunRef, stepName, workerID string) error {
 	if stepName != "" {
 		ctx.Context = logger.WithValues(ctx.Context, tag.Step(stepName))
 	}
@@ -149,6 +141,7 @@ func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRu
 			ServiceRegistry: ctx.ServiceRegistry,
 			RootDAGRun:      rootRun,
 			PeerConfig:      ctx.Config.Core.Peer,
+			TriggerType:     core.TriggerTypeRetry,
 		},
 	)
 

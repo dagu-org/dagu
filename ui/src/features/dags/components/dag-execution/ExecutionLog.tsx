@@ -512,7 +512,7 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
       {/* Log content with overlay loading indicator when navigating */}
       <div
         ref={logContainerRef}
-        className={`flex-1 rounded-lg bg-slate-800 pt-4 pr-4 pb-4 relative ${preferences.logWrap ? 'overflow-auto' : 'overflow-x-auto overflow-y-auto'}`}
+        className={`flex-1 rounded-lg bg-muted pt-4 pr-4 pb-4 relative ${preferences.logWrap ? 'overflow-auto' : 'overflow-x-auto overflow-y-auto'}`}
       >
         {isNavigating && (
           <div className="absolute inset-0 bg-black/20 flex items-center justify-center z-10 pointer-events-none">
@@ -521,11 +521,11 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
             </div>
           </div>
         )}
-        <pre className={`h-full font-mono text-sm text-slate-100 log-content ${preferences.logWrap ? '' : 'min-w-max'}`}>
+        <pre className={`h-full font-mono text-sm text-foreground log-content ${preferences.logWrap ? '' : 'min-w-max'}`}>
           {lines.map((line, index) => (
             <div key={index} className="flex pr-2 py-0.5">
               <span
-                className="text-slate-500 mr-4 select-none w-14 text-right flex-shrink-0 self-start sticky left-0 bg-slate-800 pl-4 pr-2 z-10"
+                className="text-muted-foreground mr-4 select-none w-14 text-right flex-shrink-0 self-start sticky left-0 bg-muted pl-4 pr-2 z-10"
                 data-line-number={getLineNumber(index)}
               >
                 {getLineNumber(index)}

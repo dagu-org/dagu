@@ -60,7 +60,7 @@ function WorkerMetrics({ metrics, isLoading }: WorkerMetricsProps) {
                 <div className="text-xs font-medium text-muted-foreground">
                   {card.title}
                 </div>
-                <div className="text-[10px] text-muted-foreground">
+                <div className="text-xs text-muted-foreground">
                   {card.subValue}
                 </div>
               </div>

@@ -135,6 +135,9 @@ type Agent struct {
 	// workerID is the identifier of the worker executing this DAG run.
 	workerID string
 
+	// triggerType indicates how this DAG run was initiated.
+	triggerType core.TriggerType
+
 	// tracer is the OpenTelemetry tracer for the agent.
 	tracer *telemetry.Tracer
 
@@ -213,6 +216,8 @@ type Options struct {
 	RootDAGRun exec.DAGRunRef
 	// PeerConfig is the configuration for peer communication.
 	PeerConfig config.Peer
+	// TriggerType indicates how this DAG run was initiated.
+	TriggerType core.TriggerType
 }
 
 // New creates a new Agent.
@@ -245,6 +250,7 @@ func New(
 		logWriterFactory: opts.LogWriterFactory,
 		queuedRun:        opts.QueuedRun,
 		attemptID:        opts.AttemptID,
+		triggerType:      opts.TriggerType,
 	}
 
 	// Initialize progress display if enabled
@@ -277,17 +283,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	secretEnvs, secretErr := a.resolveSecrets(ctx)
 
 	// Build variables map for config evaluation (DAG env + secrets)
-	configVars := make(map[string]string)
-	for _, env := range a.dag.Env {
-		if key, value, found := strings.Cut(env, "="); found {
-			configVars[key] = value
-		}
-	}
-	for _, env := range secretEnvs {
-		if key, value, found := strings.Cut(env, "="); found {
-			configVars[key] = value
-		}
-	}
+	configVars := envSliceToMap(a.dag.Env, secretEnvs)
 
 	// Extract trace context from environment variables if present
 	// This must be done BEFORE initializing the tracer so sub DAGs
@@ -761,6 +757,19 @@ func (a *Agent) nodeToModelNode(nodeData runtime.NodeData) *exec.Node {
 	}
 }
 
+// envSliceToMap converts environment variable slices ("KEY=value") to a map.
+func envSliceToMap(envSlices ...[]string) map[string]string {
+	result := make(map[string]string)
+	for _, envs := range envSlices {
+		for _, env := range envs {
+			if key, value, found := strings.Cut(env, "="); found {
+				result[key] = value
+			}
+		}
+	}
+	return result
+}
+
 // errorString returns the error message or empty string if err is nil.
 func errorString(err error) string {
 	if err == nil {
@@ -922,6 +931,7 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 			Create(a.dagRunID, core.Failed, os.Getpid(), time.Time{},
 				transform.WithAttemptID(a.dagRunAttemptID),
 				transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
+				transform.WithTriggerType(a.triggerType),
 			)
 	}
 
@@ -947,13 +957,15 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 		transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
 		transform.WithPreconditions(a.dag.Preconditions),
 		transform.WithWorkerID(a.workerID),
+		transform.WithTriggerType(a.triggerType),
 	}
 
-	// If the current execution is a retry, we need to copy some data
-	// from the retry target to the current status.
+	// If the current execution is a retry, copy timing data from the retry target.
 	if a.retryTarget != nil {
-		opts = append(opts, transform.WithQueuedAt(a.retryTarget.QueuedAt))
-		opts = append(opts, transform.WithCreatedAt(a.retryTarget.CreatedAt))
+		opts = append(opts,
+			transform.WithQueuedAt(a.retryTarget.QueuedAt),
+			transform.WithCreatedAt(a.retryTarget.CreatedAt),
+		)
 	}
 
 	// Create the status object to record the current status.
@@ -1257,7 +1269,6 @@ func (a *Agent) evaluateRegistryAuths(ctx context.Context) error {
 // The result is stored in evaluatedWorkingDir to avoid mutating the original DAG.
 func (a *Agent) evaluateWorkingDir(ctx context.Context) error {
 	if a.dag.WorkingDir == "" {
-		a.evaluatedWorkingDir = ""
 		return nil
 	}
 
@@ -1301,12 +1312,10 @@ func (a *Agent) evaluateS3Config(ctx context.Context) error {
 // dryRun performs a dry-run of the DAG. It only simulates the execution of
 // the DAG without running the actual command.
 func (a *Agent) dryRun(ctx context.Context) error {
-	// progressCh channel receives the node when the node is progressCh.
-	// It's a way to update the status in real-time in efficient manner.
+	// progressCh channel receives the node when the node status changes.
+	// It provides a way to update the status in real-time efficiently.
 	progressCh := make(chan *runtime.Node)
-	defer func() {
-		close(progressCh)
-	}()
+	defer close(progressCh)
 
 	go func() {
 		for node := range progressCh {
@@ -1411,13 +1420,13 @@ func (a *Agent) setupRetryPlan(ctx context.Context) error {
 		nodes = append(nodes, transform.ToNode(n))
 	}
 	if a.stepRetry != "" {
-		return a.setupStepRetryPlan(ctx, nodes)
+		return a.setupStepRetryPlan(nodes)
 	}
 	return a.setupDefaultRetryPlan(ctx, nodes)
 }
 
 // setupStepRetryPlan sets up the plan for retrying a specific step.
-func (a *Agent) setupStepRetryPlan(ctx context.Context, nodes []*runtime.Node) error {
+func (a *Agent) setupStepRetryPlan(nodes []*runtime.Node) error {
 	plan, err := runtime.CreateStepRetryPlan(a.dag, nodes, a.stepRetry)
 	if err != nil {
 		return err
@@ -1437,11 +1446,10 @@ func (a *Agent) setupDefaultRetryPlan(ctx context.Context, nodes []*runtime.Node
 }
 
 func (a *Agent) setupDAGRunAttempt(ctx context.Context) (exec.DAGRunAttempt, error) {
-	// In shared-nothing mode, dagRunStore is nil - return no-op attempt
-	// Status updates are handled by statusPusher instead
+	// In shared-nothing mode, dagRunStore is nil - return no-op attempt.
+	// Status updates are handled by statusPusher instead.
 	if a.dagRunStore == nil {
 		logger.Debug(ctx, "Using no-op DAGRunAttempt in shared-nothing mode")
-		// Use coordinator-provided attemptID if available, otherwise fall back to dagRunID
 		attemptID := a.attemptID
 		if attemptID == "" {
 			attemptID = a.dagRunID
@@ -1468,15 +1476,13 @@ func (a *Agent) setupDAGRunAttempt(ctx context.Context) (exec.DAGRunAttempt, err
 	return a.dagRunStore.CreateAttempt(ctx, a.dag, time.Now(), a.dagRunID, opts)
 }
 
-// setupSocketServer create socket server instance.
+// setupSocketServer creates a socket server instance.
 func (a *Agent) setupSocketServer(ctx context.Context) error {
-	var socketAddr string
+	socketAddr := a.dag.SockAddr(a.dagRunID)
 	if a.isSubDAGRun.Load() {
-		// Use separate socket address for child
 		socketAddr = a.dag.SockAddrForSubDAGRun(a.dagRunID)
-	} else {
-		socketAddr = a.dag.SockAddr(a.dagRunID)
 	}
+
 	socketServer, err := sock.NewServer(socketAddr, a.HandleHTTP(ctx))
 	if err != nil {
 		return err

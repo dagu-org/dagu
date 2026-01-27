@@ -73,6 +73,7 @@ function DAGSpecReadOnly({ dagName, dagRunId, subDAGRunId, className }: DAGSpecR
       query: {
         remoteNode: appBarContext.selectedRemoteNode || 'local',
       },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       path: pathParams as any,
     },
   });

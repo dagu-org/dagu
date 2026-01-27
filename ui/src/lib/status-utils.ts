@@ -60,32 +60,31 @@ export function getStatusColors(
   animation: string;
 } {
   const baseClass = getStatusClass(status);
-  const isRunning = status === Status.Running || status === NodeStatus.Running;
   const isWaiting = status === Status.Waiting || status === NodeStatus.Waiting;
 
   switch (baseClass) {
     case 'status-success':
       return {
-        bgClass: 'bg-success',
-        textClass: 'text-success',
-        borderClass: 'border-success',
+        bgClass: 'bg-green-700',
+        textClass: 'text-green-700',
+        borderClass: 'border-green-700',
         animation: '',
       };
 
     case 'status-failed':
       return {
-        bgClass: 'bg-destructive',
-        textClass: 'text-destructive',
-        borderClass: 'border-destructive',
+        bgClass: 'bg-red-500',
+        textClass: 'text-red-500',
+        borderClass: 'border-red-500',
         animation: '',
       };
 
     case 'status-running':
       return {
-        bgClass: 'bg-primary',
-        textClass: 'text-primary',
-        borderClass: 'border-primary',
-        animation: 'animate-pulse',
+        bgClass: 'bg-[#66ff66]',
+        textClass: 'text-green-600',
+        borderClass: 'border-[#66ff66]',
+        animation: '',
       };
 
     case 'status-info':

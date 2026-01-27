@@ -32,7 +32,8 @@ type Props = {
 };
 
 export function SubDAGRunsList({
-  dagName,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  dagName: _dagName,
   dagRunId,
   rootDagName,
   rootDagRunId,

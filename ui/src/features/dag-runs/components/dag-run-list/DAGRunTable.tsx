@@ -308,7 +308,7 @@ function DAGRunTable({
             </div>
 
             {/* Timezone info */}
-            <div className="text-[10px] text-muted-foreground text-right pt-1">
+            <div className="text-xs text-muted-foreground text-right pt-1">
               {timezoneInfo}
             </div>
           </div>
@@ -334,13 +334,13 @@ function DAGRunTable({
             </TableHead>
             <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
               <div>Queued At</div>
-              <div className="text-[10px] text-muted-foreground font-normal">
+              <div className="text-xs text-muted-foreground font-normal">
                 {timezoneInfo}
               </div>
             </TableHead>
             <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
               <div>Started At</div>
-              <div className="text-[10px] text-muted-foreground font-normal">
+              <div className="text-xs text-muted-foreground font-normal">
                 {timezoneInfo}
               </div>
             </TableHead>

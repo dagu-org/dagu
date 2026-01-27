@@ -102,7 +102,7 @@ function WorkerList({ workers, isLoading, errors, onTaskClick }: WorkerListProps
                   {worker.labels && Object.entries(worker.labels).map(([key, value]) => (
                     <span
                       key={key}
-                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent text-foreground/90"
+                      className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-accent text-foreground/90"
                     >
                       {key}={value}
                     </span>
@@ -123,7 +123,7 @@ function WorkerList({ workers, isLoading, errors, onTaskClick }: WorkerListProps
                 <span className="text-sm font-medium">
                   {worker.runningTasks?.length || 0}/{worker.totalPollers}
                 </span>
-                <div className="text-[10px] text-muted-foreground">tasks</div>
+                <div className="text-xs text-muted-foreground">tasks</div>
               </div>
 
               {/* Last heartbeat */}
@@ -219,17 +219,17 @@ function TaskRow({ task, onTaskClick }: { task: RunningTask; onTaskClick?: (task
       <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
       <div className="flex-1 min-w-0">
         <div className="text-xs font-medium truncate">{task.dagName}</div>
-        <div className="text-[10px] text-muted-foreground font-mono truncate">
+        <div className="text-xs text-muted-foreground font-mono truncate">
           {task.dagRunId}
         </div>
         {isNestedTask && (
-          <div className="text-[10px] text-muted-foreground mt-0.5">
+          <div className="text-xs text-muted-foreground mt-0.5">
             <span className="opacity-60">root:</span> {task.rootDagRunName} 
             <span className="opacity-40 ml-1">({task.rootDagRunId})</span>
           </div>
         )}
         {task.parentDagRunName && task.parentDagRunName !== task.dagName && (
-          <div className="text-[10px] text-muted-foreground">
+          <div className="text-xs text-muted-foreground">
             <span className="opacity-60">parent:</span> {task.parentDagRunName}
           </div>
         )}

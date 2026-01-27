@@ -159,7 +159,6 @@ export function getSchemaAtPath(
   }
 
   let current: JSONSchema | null = schema;
-  let currentRequired: string[] = schema.required || [];
 
   for (let i = 0; i < path.length; i++) {
     const segment = path[i];
@@ -174,15 +173,12 @@ export function getSchemaAtPath(
       if (!current) {
         return null;
       }
-      currentRequired = current.required || [];
       continue;
     }
 
     // Try to resolve from properties
     const prop: JSONSchema | undefined = current.properties?.[segment];
     if (prop) {
-      currentRequired = current.required || [];
-
       // Check if current schema has allOf with if-then that overrides this property
       if (current.allOf) {
         const parentPath = path.slice(0, i + 1);
@@ -205,7 +201,6 @@ export function getSchemaAtPath(
     // Try to find in oneOf/anyOf schemas
     const unionMatch = findInUnionTypes(current, segment);
     if (unionMatch) {
-      currentRequired = unionMatch.required || [];
       let unionProp = unionMatch.properties?.[segment];
 
       // Check if the matched union variant has allOf with if-then that overrides this property
@@ -234,7 +229,6 @@ export function getSchemaAtPath(
 
       const allOfMatch = findInAllOfWithContext(current.allOf, segment, parentValue);
       if (allOfMatch) {
-        currentRequired = allOfMatch.required || [];
         const allOfProp = allOfMatch.properties?.[segment];
         current = allOfProp || allOfMatch;
         continue;
@@ -244,7 +238,6 @@ export function getSchemaAtPath(
     // Check additionalProperties
     if (current.additionalProperties && typeof current.additionalProperties === 'object') {
       current = current.additionalProperties;
-      currentRequired = current.required || [];
       continue;
     }
 

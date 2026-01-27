@@ -1,9 +1,9 @@
 package runtime
 
 import (
-	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -15,6 +15,64 @@ import (
 	exec1 "github.com/dagu-org/dagu/internal/core/exec"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
+
+// CommandError wraps a command execution error with captured output.
+// It preserves the original error for unwrapping (e.g., for exit code extraction).
+type CommandError struct {
+	Err    error
+	Stdout string
+	Stderr string
+}
+
+func (e *CommandError) Error() string {
+	parts := []string{fmt.Sprintf("command failed: %v", e.Err)}
+	if e.Stdout != "" {
+		parts = append(parts, fmt.Sprintf("stdout: %s", e.Stdout))
+	}
+	if e.Stderr != "" {
+		parts = append(parts, fmt.Sprintf("stderr: %s", e.Stderr))
+	}
+	return strings.Join(parts, "\n")
+}
+
+func (e *CommandError) Unwrap() error {
+	return e.Err
+}
+
+// cappedBuffer is a buffer that keeps only the last maxSize bytes.
+// This prevents memory exhaustion from verbose command output.
+type cappedBuffer struct {
+	data    []byte
+	maxSize int
+}
+
+const defaultMaxBufferSize = 64 * 1024 // 64KB
+
+func newCappedBuffer(maxSize int) *cappedBuffer {
+	return &cappedBuffer{
+		data:    make([]byte, 0, maxSize),
+		maxSize: maxSize,
+	}
+}
+
+func (b *cappedBuffer) Write(p []byte) (n int, err error) {
+	n = len(p)
+	if len(p) >= b.maxSize {
+		// If input is larger than max, keep only the last maxSize bytes
+		b.data = append(b.data[:0], p[len(p)-b.maxSize:]...)
+		return n, nil
+	}
+	// Append and trim to maxSize
+	b.data = append(b.data, p...)
+	if len(b.data) > b.maxSize {
+		b.data = b.data[len(b.data)-b.maxSize:]
+	}
+	return n, nil
+}
+
+func (b *cappedBuffer) String() string {
+	return string(b.data)
+}
 
 // SubCmdBuilder centralizes CLI command argument construction.
 type SubCmdBuilder struct {
@@ -54,6 +112,9 @@ func (b *SubCmdBuilder) Start(dag *core.DAG, opts StartOptions) CmdSpec {
 	if opts.FromRunID != "" {
 		args = append(args, fmt.Sprintf("--from-run-id=%s", opts.FromRunID))
 	}
+	if opts.TriggerType != "" {
+		args = append(args, fmt.Sprintf("--trigger-type=%s", opts.TriggerType))
+	}
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
 	}
@@ -91,6 +152,9 @@ func (b *SubCmdBuilder) Enqueue(dag *core.DAG, opts EnqueueOptions) CmdSpec {
 	}
 	if opts.Queue != "" {
 		args = append(args, "--queue", opts.Queue)
+	}
+	if opts.TriggerType != "" {
+		args = append(args, fmt.Sprintf("--trigger-type=%s", opts.TriggerType))
 	}
 	args = append(args, dag.Location)
 
@@ -245,6 +309,7 @@ type StartOptions struct {
 	NameOverride string // Optional DAG name override
 	FromRunID    string // Historic dag-run ID to use as a template
 	Target       string // Optional CLI argument override (DAG name or file path)
+	TriggerType  string // How this DAG run was initiated (scheduler, manual, webhook, subdag)
 }
 
 // EnqueueOptions contains options for enqueuing a dag-run.
@@ -254,6 +319,7 @@ type EnqueueOptions struct {
 	DAGRunID     string // ID for the dag-run
 	Queue        string // Queue name to enqueue to
 	NameOverride string // Optional DAG name override
+	TriggerType  string // How this DAG run was initiated (scheduler, manual, webhook, subdag)
 }
 
 // RestartOptions contains options for restarting a dag-run.
@@ -262,32 +328,38 @@ type RestartOptions struct {
 }
 
 // Run executes the command and waits for it to complete.
-// If the command fails, stdout/stderr output is included in the error for debugging.
+// If the command fails and output was captured, it is included in the error for debugging.
+// Uses capped buffers to prevent memory exhaustion from verbose command output.
 func Run(ctx context.Context, spec CmdSpec) error {
-	var stdout, stderr bytes.Buffer
+	stdout := newCappedBuffer(defaultMaxBufferSize)
+	stderr := newCappedBuffer(defaultMaxBufferSize)
 
 	cmd := newCommand(ctx, spec, true)
-	// Capture output for error reporting while also writing to original destinations
-	if cmd.Stdout == nil {
-		cmd.Stdout = &stdout
-	}
-	if cmd.Stderr == nil {
-		cmd.Stderr = &stderr
-	}
+	cmd.Stdout = io.MultiWriter(stdout, fileOrDefault(spec.Stdout, os.Stdout))
+	cmd.Stderr = io.MultiWriter(stderr, fileOrDefault(spec.Stderr, os.Stderr))
 
 	if err := cmd.Run(); err != nil {
-		// Build error message with captured output
-		var parts []string
-		parts = append(parts, fmt.Sprintf("command failed: %v", err))
-		if stdout.Len() > 0 {
-			parts = append(parts, fmt.Sprintf("stdout: %s", strings.TrimSpace(stdout.String())))
-		}
-		if stderr.Len() > 0 {
-			parts = append(parts, fmt.Sprintf("stderr: %s", strings.TrimSpace(stderr.String())))
-		}
-		return fmt.Errorf("%s", strings.Join(parts, "\n"))
+		return buildCommandError(err, stdout, stderr)
 	}
 	return nil
+}
+
+// buildCommandError constructs an error that includes captured output for debugging.
+// It preserves the original error for unwrapping (e.g., for exit code extraction via errors.As).
+func buildCommandError(err error, stdout, stderr *cappedBuffer) error {
+	return &CommandError{
+		Err:    err,
+		Stdout: strings.TrimSpace(stdout.String()),
+		Stderr: strings.TrimSpace(stderr.String()),
+	}
+}
+
+// fileOrDefault returns the file if non-nil, otherwise returns the default.
+func fileOrDefault(file, defaultFile *os.File) *os.File {
+	if file != nil {
+		return file
+	}
+	return defaultFile
 }
 
 // Start executes the command without waiting for it to complete.
@@ -313,15 +385,11 @@ func newCommand(ctx context.Context, spec CmdSpec, withContext bool) *exec.Cmd {
 	} else {
 		cmd = exec.Command(spec.Executable, spec.Args...)
 	}
+
 	cmdutil.SetupCommand(cmd)
 	cmd.Env = spec.Env
-	cmd.Stdout = spec.Stdout
-	cmd.Stderr = spec.Stderr
-	if cmd.Stdout == nil {
-		cmd.Stdout = os.Stdout
-	}
-	if cmd.Stderr == nil {
-		cmd.Stderr = os.Stderr
-	}
+	cmd.Stdout = fileOrDefault(spec.Stdout, os.Stdout)
+	cmd.Stderr = fileOrDefault(spec.Stderr, os.Stderr)
+
 	return cmd
 }

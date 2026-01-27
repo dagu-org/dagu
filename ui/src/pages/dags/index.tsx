@@ -2,7 +2,6 @@ import { debounce } from 'lodash';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import {
-  components,
   PathsDagsGetParametersQueryOrder,
   PathsDagsGetParametersQuerySort,
 } from '../../api/v2/schema';
@@ -396,7 +395,7 @@ function DAGsContent() {
     ) : null;
 
   return (
-    <div className="-my-4 md:-my-6 lg:-my-8 h-[calc(100%+2rem)] md:h-[calc(100%+3rem)] lg:h-[calc(100%+4rem)]">
+    <div className="-my-4 -mr-4 md:-my-6 md:-mr-6 lg:-my-8 lg:-mr-8 h-[calc(100%+2rem)] md:h-[calc(100%+3rem)] lg:h-[calc(100%+4rem)]">
       <SplitLayout
         leftPanel={leftPanel}
         rightPanel={rightPanel}
