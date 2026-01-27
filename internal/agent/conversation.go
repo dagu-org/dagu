@@ -45,6 +45,10 @@ type ConversationManagerConfig struct {
 	OnWorkingChange func(id string, working bool)
 	// OnMessage is called when a message is recorded, for persistence.
 	OnMessage func(ctx context.Context, msg Message) error
+	// History contains restored messages from persistence (for reactivation).
+	History []Message
+	// SequenceID is the latest sequence ID from persistence (for reactivation).
+	SequenceID int64
 }
 
 // NewConversationManager creates a new ConversationManager.
@@ -60,16 +64,23 @@ func NewConversationManager(cfg ConversationManagerConfig) *ConversationManager 
 	}
 	logger = logger.With("conversation_id", id)
 
+	// Initialize messages from history if provided (for reactivation)
+	messages := make([]Message, 0)
+	if len(cfg.History) > 0 {
+		messages = append(messages, cfg.History...)
+	}
+
 	return &ConversationManager{
 		id:              id,
 		userID:          cfg.UserID,
 		lastActivity:    time.Now(),
 		logger:          logger,
 		subpub:          NewSubPub[StreamResponse](),
-		messages:        make([]Message, 0),
+		messages:        messages,
 		workingDir:      cfg.WorkingDir,
 		onWorkingChange: cfg.OnWorkingChange,
 		onMessage:       cfg.OnMessage,
+		sequenceID:      cfg.SequenceID,
 	}
 }
 
@@ -251,6 +262,14 @@ func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) e
 	workingDir := cm.workingDir
 	conversationID := cm.id
 	onMessage := cm.onMessage
+
+	// Convert existing messages to LLM history (for reactivation)
+	var llmHistory []llm.Message
+	for _, msg := range cm.messages {
+		if msg.LLMData != nil {
+			llmHistory = append(llmHistory, *msg.LLMData)
+		}
+	}
 	cm.mu.Unlock()
 
 	// Create tools
@@ -314,7 +333,7 @@ func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) e
 	loopInstance := NewLoop(LoopConfig{
 		Provider:       provider,
 		Model:          model,
-		History:        nil,
+		History:        llmHistory,
 		Tools:          tools,
 		RecordMessage:  recordMessage,
 		Logger:         logger,

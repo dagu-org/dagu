@@ -312,18 +312,33 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Load existing messages for history restoration
+		messages, err := a.store.GetMessages(r.Context(), id)
+		if err != nil {
+			a.logger.Warn("Failed to load messages for reactivation", "error", err)
+			messages = []Message{}
+		}
+
+		// Get latest sequence ID
+		seqID, err := a.store.GetLatestSequenceID(r.Context(), id)
+		if err != nil {
+			seqID = int64(len(messages))
+		}
+
 		// Create OnMessage callback for persistence
 		onMessage := func(ctx context.Context, msg Message) error {
 			return a.store.AddMessage(ctx, id, &msg)
 		}
 
-		// Reactivate the conversation
+		// Reactivate the conversation with restored history
 		mgr = NewConversationManager(ConversationManagerConfig{
 			ID:         id,
 			UserID:     userID,
 			Logger:     a.logger,
 			WorkingDir: a.workingDir,
 			OnMessage:  onMessage,
+			History:    messages,
+			SequenceID: seqID,
 		})
 		a.conversations.Store(id, mgr)
 	} else {
