@@ -4,7 +4,7 @@
  * @module features/dags/components/common
  */
 import { TriggerType } from '@/api/v2/schema';
-import { Clock, GitBranch, HelpCircle, User, Webhook } from 'lucide-react';
+import { Clock, GitBranch, HelpCircle, RotateCw, User, Webhook } from 'lucide-react';
 import React from 'react';
 
 const triggerTypeConfig: Record<
@@ -30,6 +30,11 @@ const triggerTypeConfig: Record<
     icon: GitBranch,
     label: 'Sub-DAG',
     colorClass: 'text-cyan-500 dark:text-cyan-400',
+  },
+  retry: {
+    icon: RotateCw,
+    label: 'Retry',
+    colorClass: 'text-orange-500 dark:text-orange-400',
   },
   unknown: {
     icon: HelpCircle,

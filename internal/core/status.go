@@ -128,6 +128,7 @@ const (
 	TriggerTypeManual
 	TriggerTypeWebhook
 	TriggerTypeSubDAG
+	TriggerTypeRetry
 )
 
 // String returns the canonical lowercase token for the trigger type.
@@ -141,6 +142,8 @@ func (t TriggerType) String() string {
 		return "webhook"
 	case TriggerTypeSubDAG:
 		return "subdag"
+	case TriggerTypeRetry:
+		return "retry"
 	default:
 		return "unknown"
 	}
@@ -157,6 +160,8 @@ func ParseTriggerType(s string) TriggerType {
 		return TriggerTypeWebhook
 	case "subdag":
 		return TriggerTypeSubDAG
+	case "retry":
+		return TriggerTypeRetry
 	default:
 		return TriggerTypeUnknown
 	}

@@ -4292,6 +4292,7 @@ components:
         - "manual"
         - "webhook"
         - "subdag"
+        - "retry"
 
     NodeStatus:
       type: integer

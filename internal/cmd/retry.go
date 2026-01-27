@@ -149,6 +149,7 @@ func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRu
 			ServiceRegistry: ctx.ServiceRegistry,
 			RootDAGRun:      rootRun,
 			PeerConfig:      ctx.Config.Core.Peer,
+			TriggerType:     core.TriggerTypeRetry,
 		},
 	)
 

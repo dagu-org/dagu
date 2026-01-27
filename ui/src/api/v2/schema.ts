@@ -7178,7 +7178,8 @@ export enum TriggerType {
     scheduler = "scheduler",
     manual = "manual",
     webhook = "webhook",
-    subdag = "subdag"
+    subdag = "subdag",
+    retry = "retry"
 }
 export enum NodeStatus {
     NotStarted = 0,
