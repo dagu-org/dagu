@@ -517,10 +517,7 @@ func (a *API) GetDAGRunStepLog(ctx context.Context, request api.GetDAGRunStepLog
 	}
 
 	options := a.buildLogReadOptions(request.Params.Head, request.Params.Tail, request.Params.Offset, request.Params.Limit)
-	logFile := node.Stdout
-	if *request.Params.Stream == api.StreamStderr {
-		logFile = node.Stderr
-	}
+	logFile := selectLogFile(node, *request.Params.Stream)
 
 	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(logFile, options)
 	if err != nil {
@@ -763,17 +760,13 @@ func (a *API) ApproveSubDAGRunStep(ctx context.Context, request api.ApproveSubDA
 	}, nil
 }
 
-// GetDAGRunStepMessages retrieves chat messages for a specific step.
 func (a *API) GetDAGRunStepMessages(ctx context.Context, request api.GetDAGRunStepMessagesRequestObject) (api.GetDAGRunStepMessagesResponseObject, error) {
-	dagName := request.Name
-	dagRunId := request.DagRunId
-
-	ref := exec.NewDAGRunRef(dagName, dagRunId)
+	ref := exec.NewDAGRunRef(request.Name, request.DagRunId)
 	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
 		return api.GetDAGRunStepMessages404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
+			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
 		}, nil
 	}
 
@@ -781,44 +774,32 @@ func (a *API) GetDAGRunStepMessages(ctx context.Context, request api.GetDAGRunSt
 	if err != nil {
 		return api.GetDAGRunStepMessages404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, dagName),
+			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, request.Name),
 		}, nil
 	}
 
-	// Get the attempt to read messages
 	attempt, err := a.dagRunStore.FindAttempt(ctx, ref)
 	if err != nil {
 		return api.GetDAGRunStepMessages404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("dag-run attempt not found for %s/%s", dagName, dagRunId),
+			Message: fmt.Sprintf("dag-run attempt not found for %s/%s", request.Name, request.DagRunId),
 		}, nil
 	}
 
-	// Read messages for the step
 	messages, err := attempt.ReadStepMessages(ctx, request.StepName)
 	if err != nil {
 		return nil, fmt.Errorf("error reading messages: %w", err)
 	}
 
-	// Convert to API types
-	apiMessages := toChatMessages(messages)
-
-	// Get tool definitions from node state
-	toolDefinitions := toToolDefinitions(node.ToolDefinitions)
-
-	// Determine if more messages might arrive
-	hasMore := node.Status == core.NodeRunning
-
 	return api.GetDAGRunStepMessages200JSONResponse{
-		Messages:        apiMessages,
-		ToolDefinitions: toolDefinitions,
+		Messages:        toChatMessages(messages),
+		ToolDefinitions: toToolDefinitions(node.ToolDefinitions),
 		StepStatus:      api.NodeStatus(node.Status),
 		StepStatusLabel: api.NodeStatusLabel(node.Status.String()),
-		HasMore:         hasMore,
+		HasMore:         node.Status == core.NodeRunning,
 	}, nil
 }
 
-// GetSubDAGRunStepMessages retrieves chat messages for a step in a sub DAG-run.
 func (a *API) GetSubDAGRunStepMessages(ctx context.Context, request api.GetSubDAGRunStepMessagesRequestObject) (api.GetSubDAGRunStepMessagesResponseObject, error) {
 	rootRef := exec.NewDAGRunRef(request.Name, request.DagRunId)
 	dagStatus, err := a.dagRunMgr.FindSubDAGRunStatus(ctx, rootRef, request.SubDAGRunId)
@@ -837,7 +818,6 @@ func (a *API) GetSubDAGRunStepMessages(ctx context.Context, request api.GetSubDA
 		}, nil
 	}
 
-	// Get the sub-attempt to read messages
 	attempt, err := a.dagRunStore.FindSubAttempt(ctx, rootRef, request.SubDAGRunId)
 	if err != nil {
 		return api.GetSubDAGRunStepMessages404JSONResponse{
@@ -846,27 +826,17 @@ func (a *API) GetSubDAGRunStepMessages(ctx context.Context, request api.GetSubDA
 		}, nil
 	}
 
-	// Read messages for the step
 	messages, err := attempt.ReadStepMessages(ctx, request.StepName)
 	if err != nil {
 		return nil, fmt.Errorf("error reading messages: %w", err)
 	}
 
-	// Convert to API types
-	apiMessages := toChatMessages(messages)
-
-	// Get tool definitions from node state
-	toolDefinitions := toToolDefinitions(node.ToolDefinitions)
-
-	// Determine if more messages might arrive
-	hasMore := node.Status == core.NodeRunning
-
 	return api.GetSubDAGRunStepMessages200JSONResponse{
-		Messages:        apiMessages,
-		ToolDefinitions: toolDefinitions,
+		Messages:        toChatMessages(messages),
+		ToolDefinitions: toToolDefinitions(node.ToolDefinitions),
 		StepStatus:      api.NodeStatus(node.Status),
 		StepStatusLabel: api.NodeStatusLabel(node.Status.String()),
-		HasMore:         hasMore,
+		HasMore:         node.Status == core.NodeRunning,
 	}, nil
 }
 
@@ -1020,26 +990,20 @@ func (a *API) getDAGRunDetailsData(ctx context.Context, dagName, dagRunId string
 	}, nil
 }
 
-// GetDAGRunSpec implements api.StrictServerInterface.
-// This endpoint returns the YAML spec that was used for a specific DAG-run.
+// GetDAGRunSpec returns the YAML spec used for a specific DAG-run.
 // It reads from the DAG-run attempt's YamlData field to ensure we return
 // the exact spec used at execution time, not the current spec.
 func (a *API) GetDAGRunSpec(ctx context.Context, request api.GetDAGRunSpecRequestObject) (api.GetDAGRunSpecResponseObject, error) {
-	dagName := request.Name
-	dagRunId := request.DagRunId
-
 	var attempt exec.DAGRunAttempt
 	var err error
 	var notFoundMsg string
 
-	// Handle "latest" by getting the most recent attempt
-	if dagRunId == "latest" {
-		attempt, err = a.dagRunStore.LatestAttempt(ctx, dagName)
-		notFoundMsg = fmt.Sprintf("no dag-runs found for DAG %s", dagName)
+	if request.DagRunId == "latest" {
+		attempt, err = a.dagRunStore.LatestAttempt(ctx, request.Name)
+		notFoundMsg = fmt.Sprintf("no dag-runs found for DAG %s", request.Name)
 	} else {
-		// Get spec from the specific DAG-run attempt
-		attempt, err = a.dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(dagName, dagRunId))
-		notFoundMsg = fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
+		attempt, err = a.dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(request.Name, request.DagRunId))
+		notFoundMsg = fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name)
 	}
 
 	if err != nil {
@@ -1053,7 +1017,7 @@ func (a *API) GetDAGRunSpec(ctx context.Context, request api.GetDAGRunSpecReques
 	if err != nil {
 		return &api.GetDAGRunSpec404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("DAG spec not found for dag-run %s", dagRunId),
+			Message: fmt.Sprintf("DAG spec not found for dag-run %s", request.DagRunId),
 		}, nil
 	}
 
@@ -1077,12 +1041,9 @@ func (a *API) GetSubDAGRunDetails(ctx context.Context, request api.GetSubDAGRunD
 	}, nil
 }
 
-// GetSubDAGRunSpec implements api.StrictServerInterface.
-// This endpoint returns the YAML spec that was used for a specific sub-DAG run.
+// GetSubDAGRunSpec returns the YAML spec used for a specific sub-DAG run.
 func (a *API) GetSubDAGRunSpec(ctx context.Context, request api.GetSubDAGRunSpecRequestObject) (api.GetSubDAGRunSpecResponseObject, error) {
 	root := exec.NewDAGRunRef(request.Name, request.DagRunId)
-
-	// Find the sub-DAG run attempt using the existing store method
 	attempt, err := a.dagRunStore.FindSubAttempt(ctx, root, request.SubDAGRunId)
 	if err != nil {
 		return &api.GetSubDAGRunSpec404JSONResponse{
@@ -1194,10 +1155,7 @@ func (a *API) GetSubDAGRunStepLog(ctx context.Context, request api.GetSubDAGRunS
 	}
 
 	options := a.buildLogReadOptions(request.Params.Head, request.Params.Tail, request.Params.Offset, request.Params.Limit)
-	logFile := node.Stdout
-	if *request.Params.Stream == api.StreamStderr {
-		logFile = node.Stderr
-	}
+	logFile := selectLogFile(node, *request.Params.Stream)
 
 	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(logFile, options)
 	if err != nil {
@@ -1644,63 +1602,46 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 // When parentSubDAGRunId is provided, it returns sub-runs of that specific sub DAG run
 // (for multi-level nested DAGs).
 func (a *API) GetSubDAGRuns(ctx context.Context, request api.GetSubDAGRunsRequestObject) (api.GetSubDAGRunsResponseObject, error) {
-	dagName := request.Name
-	dagRunId := request.DagRunId
+	rootRef := exec.NewDAGRunRef(request.Name, request.DagRunId)
 	parentSubDAGRunId := request.Params.ParentSubDAGRunId
-
-	// The root reference is always used for storage lookups
-	rootRef := exec.NewDAGRunRef(dagName, dagRunId)
 
 	var dagStatus *exec.DAGRunStatus
 	var err error
 
 	if parentSubDAGRunId != nil && *parentSubDAGRunId != "" {
-		// For multi-level nested DAGs: get the status of the parent sub DAG run
 		dagStatus, err = a.dagRunMgr.FindSubDAGRunStatus(ctx, rootRef, *parentSubDAGRunId)
 		if err != nil {
 			return &api.GetSubDAGRuns404JSONResponse{
 				Code:    api.ErrorCodeNotFound,
-				Message: fmt.Sprintf("sub dag-run ID %s not found for root DAG %s/%s", *parentSubDAGRunId, dagName, dagRunId),
+				Message: fmt.Sprintf("sub dag-run ID %s not found for root DAG %s/%s", *parentSubDAGRunId, request.Name, request.DagRunId),
 			}, nil
 		}
 	} else {
-		// Default: get the root DAG run status
 		dagStatus, err = a.dagRunMgr.GetSavedStatus(ctx, rootRef)
 		if err != nil {
 			return &api.GetSubDAGRuns404JSONResponse{
 				Code:    api.ErrorCodeNotFound,
-				Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
+				Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
 			}, nil
 		}
 	}
 
 	subRuns := make([]api.SubDAGRunDetail, 0)
-
-	// Iterate through all nodes to find sub DAG runs
 	for _, node := range dagStatus.Nodes {
-		// Skip nodes without sub DAG runs
 		if len(node.SubRuns) == 0 && len(node.SubRunsRepeated) == 0 {
 			continue
 		}
 
-		// Collect regular sub runs
 		for _, subRun := range node.SubRuns {
-			detail, err := a.getSubDAGRunDetail(ctx, rootRef, subRun.DAGRunID, subRun.Params, subRun.DAGName)
-			if err != nil {
-				// Skip if we can't fetch details
-				continue
+			if detail, err := a.getSubDAGRunDetail(ctx, rootRef, subRun.DAGRunID, subRun.Params, subRun.DAGName); err == nil {
+				subRuns = append(subRuns, detail)
 			}
-			subRuns = append(subRuns, detail)
 		}
 
-		// Collect repeated sub runs
 		for _, subRun := range node.SubRunsRepeated {
-			detail, err := a.getSubDAGRunDetail(ctx, rootRef, subRun.DAGRunID, subRun.Params, subRun.DAGName)
-			if err != nil {
-				// Skip if we can't fetch details
-				continue
+			if detail, err := a.getSubDAGRunDetail(ctx, rootRef, subRun.DAGRunID, subRun.Params, subRun.DAGName); err == nil {
+				subRuns = append(subRuns, detail)
 			}
-			subRuns = append(subRuns, detail)
 		}
 	}
 
@@ -2154,4 +2095,11 @@ func clampInt(value, minVal, maxVal int) int {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func selectLogFile(node *exec.Node, stream api.Stream) string {
+	if stream == api.StreamStderr {
+		return node.Stderr
+	}
+	return node.Stdout
 }

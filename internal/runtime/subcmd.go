@@ -276,31 +276,33 @@ func Run(ctx context.Context, spec CmdSpec) error {
 	var stdout, stderr bytes.Buffer
 
 	cmd := newCommand(ctx, spec, true)
-
-	// Tee output to both capture buffer and original destination
-	stdoutDest := spec.Stdout
-	if stdoutDest == nil {
-		stdoutDest = os.Stdout
-	}
-	stderrDest := spec.Stderr
-	if stderrDest == nil {
-		stderrDest = os.Stderr
-	}
-
-	cmd.Stdout = io.MultiWriter(&stdout, stdoutDest)
-	cmd.Stderr = io.MultiWriter(&stderr, stderrDest)
+	cmd.Stdout = io.MultiWriter(&stdout, fileOrDefault(spec.Stdout, os.Stdout))
+	cmd.Stderr = io.MultiWriter(&stderr, fileOrDefault(spec.Stderr, os.Stderr))
 
 	if err := cmd.Run(); err != nil {
-		parts := []string{fmt.Sprintf("command failed: %v", err)}
-		if stdout.Len() > 0 {
-			parts = append(parts, fmt.Sprintf("stdout: %s", strings.TrimSpace(stdout.String())))
-		}
-		if stderr.Len() > 0 {
-			parts = append(parts, fmt.Sprintf("stderr: %s", strings.TrimSpace(stderr.String())))
-		}
-		return fmt.Errorf("%s", strings.Join(parts, "\n"))
+		return buildCommandError(err, &stdout, &stderr)
 	}
 	return nil
+}
+
+// buildCommandError constructs an error message that includes captured output for debugging.
+func buildCommandError(err error, stdout, stderr *bytes.Buffer) error {
+	parts := []string{fmt.Sprintf("command failed: %v", err)}
+	if stdout.Len() > 0 {
+		parts = append(parts, fmt.Sprintf("stdout: %s", strings.TrimSpace(stdout.String())))
+	}
+	if stderr.Len() > 0 {
+		parts = append(parts, fmt.Sprintf("stderr: %s", strings.TrimSpace(stderr.String())))
+	}
+	return fmt.Errorf("%s", strings.Join(parts, "\n"))
+}
+
+// fileOrDefault returns the file if non-nil, otherwise returns the default.
+func fileOrDefault(file, defaultFile *os.File) *os.File {
+	if file != nil {
+		return file
+	}
+	return defaultFile
 }
 
 // Start executes the command without waiting for it to complete.
@@ -329,16 +331,8 @@ func newCommand(ctx context.Context, spec CmdSpec, withContext bool) *exec.Cmd {
 
 	cmdutil.SetupCommand(cmd)
 	cmd.Env = spec.Env
-
-	cmd.Stdout = spec.Stdout
-	if cmd.Stdout == nil {
-		cmd.Stdout = os.Stdout
-	}
-
-	cmd.Stderr = spec.Stderr
-	if cmd.Stderr == nil {
-		cmd.Stderr = os.Stderr
-	}
+	cmd.Stdout = fileOrDefault(spec.Stdout, os.Stdout)
+	cmd.Stderr = fileOrDefault(spec.Stderr, os.Stderr)
 
 	return cmd
 }

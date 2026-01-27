@@ -1269,7 +1269,6 @@ func (a *Agent) evaluateRegistryAuths(ctx context.Context) error {
 // The result is stored in evaluatedWorkingDir to avoid mutating the original DAG.
 func (a *Agent) evaluateWorkingDir(ctx context.Context) error {
 	if a.dag.WorkingDir == "" {
-		a.evaluatedWorkingDir = ""
 		return nil
 	}
 
@@ -1447,11 +1446,10 @@ func (a *Agent) setupDefaultRetryPlan(ctx context.Context, nodes []*runtime.Node
 }
 
 func (a *Agent) setupDAGRunAttempt(ctx context.Context) (exec.DAGRunAttempt, error) {
-	// In shared-nothing mode, dagRunStore is nil - return no-op attempt
-	// Status updates are handled by statusPusher instead
+	// In shared-nothing mode, dagRunStore is nil - return no-op attempt.
+	// Status updates are handled by statusPusher instead.
 	if a.dagRunStore == nil {
 		logger.Debug(ctx, "Using no-op DAGRunAttempt in shared-nothing mode")
-		// Use coordinator-provided attemptID if available, otherwise fall back to dagRunID
 		attemptID := a.attemptID
 		if attemptID == "" {
 			attemptID = a.dagRunID

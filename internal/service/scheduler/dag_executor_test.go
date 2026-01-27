@@ -79,9 +79,7 @@ steps:
 			"handle-job-local-789",
 			core.TriggerTypeScheduler,
 		)
-
-		// Local execution with nil coordinator should succeed
-		require.NoError(t, err)
+		require.NoError(t, err, "local execution with nil coordinator should succeed")
 	})
 
 	t.Run("HandleJob_Retry_BypassesEnqueue", func(t *testing.T) {

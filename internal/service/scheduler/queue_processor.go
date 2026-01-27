@@ -194,13 +194,13 @@ func (p *QueueProcessor) loop(ctx context.Context) {
 			continue
 		}
 
-		// init the queues
-		activeQueues := make(map[string]struct{})
+		// Initialize queues that don't exist yet
+		activeQueues := make(map[string]struct{}, len(queueList))
 		for _, queueName := range queueList {
 			if _, ok := p.queues.Load(queueName); !ok {
 				p.queues.Store(queueName, &queue{
 					maxConcurrency: 1,
-					isGlobal:       false, // Dynamically created queues are DAG-based (not global)
+					isGlobal:       false,
 				})
 			}
 			activeQueues[queueName] = struct{}{}
@@ -209,15 +209,15 @@ func (p *QueueProcessor) loop(ctx context.Context) {
 		// Remove inactive non-global queues
 		p.removeInactiveQueues(activeQueues)
 
-		// process queue items
+		// Process each queue concurrently
 		var wg sync.WaitGroup
 		for name := range activeQueues {
 			wg.Add(1)
-			go func(name string) {
+			go func() {
 				defer wg.Done()
-				ctx := logger.WithValues(ctx, tag.Queue(name))
-				p.ProcessQueueItems(ctx, name)
-			}(name)
+				queueCtx := logger.WithValues(ctx, tag.Queue(name))
+				p.ProcessQueueItems(queueCtx, name)
+			}()
 		}
 		wg.Wait()
 	}
@@ -295,20 +295,20 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 	var wg sync.WaitGroup
 	for _, item := range runnableItems {
 		wg.Add(1)
-		go func(ctx context.Context, item exec.QueuedItemData) {
+		go func() {
 			defer wg.Done()
-			if p.processDAG(ctx, item, queueName, q.incInflight, q.decInflight) {
-				// Remove the item from the queue
-				data, err := item.Data()
-				if err != nil {
-					logger.Error(ctx, "Failed to get item data", tag.Error(err))
-					return
-				}
-				if _, err := p.queueStore.DequeueByDAGRunID(ctx, queueName, *data); err != nil {
-					logger.Error(ctx, "Failed to dequeue item", tag.Error(err))
-				}
+			if !p.processDAG(ctx, item, queueName, q.incInflight, q.decInflight) {
+				return
 			}
-		}(ctx, item)
+			data, err := item.Data()
+			if err != nil {
+				logger.Error(ctx, "Failed to get item data", tag.Error(err))
+				return
+			}
+			if _, err := p.queueStore.DequeueByDAGRunID(ctx, queueName, *data); err != nil {
+				logger.Error(ctx, "Failed to dequeue item", tag.Error(err))
+			}
+		}()
 	}
 	wg.Wait()
 }
@@ -403,10 +403,7 @@ func (p *QueueProcessor) removeInactiveQueues(activeQueues map[string]struct{}) 
 			return true
 		}
 		q, ok := value.(*queue)
-		if !ok {
-			return true
-		}
-		if q.isGlobalQueue() {
+		if !ok || q.isGlobalQueue() {
 			return true
 		}
 		if _, active := activeQueues[name]; !active {

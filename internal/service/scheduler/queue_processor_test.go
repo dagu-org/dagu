@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -107,6 +106,12 @@ func (f *queueFixture) simulateQueue(maxConcurrency int, isGlobal bool) *queueFi
 
 func (f *queueFixture) logs() string { return f.logBuffer.String() }
 
+func (f *queueFixture) getQueue(name string) *queue {
+	v, ok := f.processor.queues.Load(name)
+	require.True(f.t, ok, "Queue %s should exist", name)
+	return v.(*queue)
+}
+
 func (f *queueFixture) enqueueWithPriority(runID string, priority exec.QueuePriority) {
 	f.enqueueToQueue(f.dag.Name, runID, priority)
 }
@@ -128,15 +133,13 @@ func TestQueueProcessor_LocalQueueAlwaysFIFO(t *testing.T) {
 		withProcessor(config.Queues{}).simulateQueue(1, false)
 
 	// Verify initial maxConcurrency is 1
-	v, _ := f.processor.queues.Load("local-dag")
-	require.Equal(t, 1, v.(*queue).getMaxConcurrency())
+	require.Equal(t, 1, f.getQueue("local-dag").getMaxConcurrency())
 
 	f.processor.ProcessQueueItems(f.ctx, "local-dag")
 	time.Sleep(200 * time.Millisecond)
 
 	// Verify maxConcurrency is STILL 1 (not updated to DAG's 5)
-	v, _ = f.processor.queues.Load("local-dag")
-	assert.Equal(t, 1, v.(*queue).getMaxConcurrency(), "Local queue should always have maxConcurrency=1")
+	assert.Equal(t, 1, f.getQueue("local-dag").getMaxConcurrency(), "Local queue should always have maxConcurrency=1")
 }
 
 func TestQueueProcessor_GlobalQueue(t *testing.T) {
@@ -148,13 +151,11 @@ func TestQueueProcessor_GlobalQueue(t *testing.T) {
 		f.enqueueToQueue("global-queue", fmt.Sprintf("run-%d", i), exec.QueuePriorityHigh)
 	}
 
-	v, ok := f.processor.queues.Load("global-queue")
-	require.True(t, ok)
-	require.Equal(t, 3, v.(*queue).getMaxConcurrency())
+	require.Equal(t, 3, f.getQueue("global-queue").getMaxConcurrency())
 
 	f.processor.ProcessQueueItems(f.ctx, "global-queue")
 	time.Sleep(200 * time.Millisecond)
-	assert.True(t, strings.Contains(f.logs(), "count=3"))
+	assert.Contains(t, f.logs(), "count=3")
 }
 
 func TestQueueProcessor_ItemsRemainOnFailure(t *testing.T) {
@@ -179,30 +180,15 @@ func TestQueueProcessor_PriorityOrdering(t *testing.T) {
 	f.enqueueWithPriority("high-1", exec.QueuePriorityHigh)
 	f.enqueueWithPriority("high-2", exec.QueuePriorityHigh)
 
-	// Dequeue should return high priority first
-	item1, err := f.queueStore.DequeueByName(f.ctx, f.dag.Name)
-	require.NoError(t, err)
-	ref1, err := item1.Data()
-	require.NoError(t, err)
-	assert.Equal(t, "high-1", ref1.ID)
-
-	item2, err := f.queueStore.DequeueByName(f.ctx, f.dag.Name)
-	require.NoError(t, err)
-	ref2, err := item2.Data()
-	require.NoError(t, err)
-	assert.Equal(t, "high-2", ref2.ID)
-
-	item3, err := f.queueStore.DequeueByName(f.ctx, f.dag.Name)
-	require.NoError(t, err)
-	ref3, err := item3.Data()
-	require.NoError(t, err)
-	assert.Equal(t, "low-1", ref3.ID)
-
-	item4, err := f.queueStore.DequeueByName(f.ctx, f.dag.Name)
-	require.NoError(t, err)
-	ref4, err := item4.Data()
-	require.NoError(t, err)
-	assert.Equal(t, "low-2", ref4.ID)
+	// Dequeue should return high priority first, then low priority
+	expectedOrder := []string{"high-1", "high-2", "low-1", "low-2"}
+	for _, expectedID := range expectedOrder {
+		item, err := f.queueStore.DequeueByName(f.ctx, f.dag.Name)
+		require.NoError(t, err)
+		ref, err := item.Data()
+		require.NoError(t, err)
+		assert.Equal(t, expectedID, ref.ID)
+	}
 }
 
 func TestQueueProcessor_ConcurrencyLimit(t *testing.T) {
@@ -233,20 +219,17 @@ func TestQueueProcessor_GlobalQueueIgnoresDAGMaxActiveRuns(t *testing.T) {
 	}
 
 	// Verify initial maxConcurrency is 5 (from global config)
-	v, ok := f.processor.queues.Load("global-queue")
-	require.True(t, ok)
-	require.Equal(t, 5, v.(*queue).getMaxConcurrency(), "Global queue should have maxConcurrency=5 from config")
+	require.Equal(t, 5, f.getQueue("global-queue").getMaxConcurrency(), "Global queue should have maxConcurrency=5 from config")
 
 	// Process items
 	f.processor.ProcessQueueItems(f.ctx, "global-queue")
 	time.Sleep(200 * time.Millisecond)
 
 	// Verify maxConcurrency is STILL 5 (not overwritten by DAG's maxActiveRuns=1)
-	v, _ = f.processor.queues.Load("global-queue")
-	assert.Equal(t, 5, v.(*queue).getMaxConcurrency(), "Global queue maxConcurrency should NOT be overwritten by DAG")
+	assert.Equal(t, 5, f.getQueue("global-queue").getMaxConcurrency(), "Global queue maxConcurrency should NOT be overwritten by DAG")
 
 	// Verify all 5 items were processed in the batch (not just 1)
-	assert.True(t, strings.Contains(f.logs(), "count=5"), "Should process 5 items, not 1")
+	assert.Contains(t, f.logs(), "count=5", "Should process 5 items, not 1")
 }
 
 func TestQueueProcessor_GlobalQueueViaLoop(t *testing.T) {
@@ -267,10 +250,9 @@ func TestQueueProcessor_GlobalQueueViaLoop(t *testing.T) {
 	require.Contains(t, queueList, "global-queue")
 
 	// Simulate what loop() does: check if queue exists in p.queues
-	v, ok := f.processor.queues.Load("global-queue")
-	require.True(t, ok, "Global queue should exist in processor")
-	require.Equal(t, 3, v.(*queue).getMaxConcurrency(), "Global queue should have maxConcurrency=3")
-	require.True(t, v.(*queue).isGlobalQueue(), "Should be marked as global queue")
+	q := f.getQueue("global-queue")
+	require.Equal(t, 3, q.getMaxConcurrency(), "Global queue should have maxConcurrency=3")
+	require.True(t, q.isGlobalQueue(), "Should be marked as global queue")
 
 	// Process
 	f.processor.ProcessQueueItems(f.ctx, "global-queue")

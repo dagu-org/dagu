@@ -2,12 +2,33 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
 )
+
+// parseTriggerTypeParam parses and validates the trigger-type flag from the command context.
+// Returns TriggerTypeUnknown (zero value) if the flag is empty, otherwise validates
+// that the provided value is a known trigger type.
+func parseTriggerTypeParam(ctx *Context) (core.TriggerType, error) {
+	triggerTypeStr, _ := ctx.StringParam("trigger-type")
+	if triggerTypeStr == "" {
+		return core.TriggerTypeUnknown, nil
+	}
+
+	triggerType := core.ParseTriggerType(triggerTypeStr)
+	if triggerType == core.TriggerTypeUnknown {
+		return core.TriggerTypeUnknown, fmt.Errorf(
+			"invalid trigger-type %q: must be one of scheduler, manual, webhook, subdag, retry",
+			triggerTypeStr,
+		)
+	}
+
+	return triggerType, nil
+}
 
 // restoreDAGFromStatus restores a DAG from a previous run's status and YAML.
 // It restores params from the status, loads dotenv, and rebuilds fields excluded

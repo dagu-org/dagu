@@ -126,13 +126,15 @@ func toPrecondition(obj *core.Condition) api.Condition {
 	}
 }
 
-func toDAGRunSummary(s exec.DAGRunStatus) api.DAGRunSummary {
-	var triggerType *api.TriggerType
-	if s.TriggerType != core.TriggerTypeUnknown {
-		t := api.TriggerType(s.TriggerType.String())
-		triggerType = &t
+func toTriggerType(t core.TriggerType) *api.TriggerType {
+	if t == core.TriggerTypeUnknown {
+		return nil
 	}
+	triggerType := api.TriggerType(t.String())
+	return &triggerType
+}
 
+func toDAGRunSummary(s exec.DAGRunStatus) api.DAGRunSummary {
 	return api.DAGRunSummary{
 		RootDAGRunName:   s.Root.Name,
 		RootDAGRunId:     s.Root.ID,
@@ -148,7 +150,7 @@ func toDAGRunSummary(s exec.DAGRunStatus) api.DAGRunSummary {
 		Status:           api.Status(s.Status),
 		StatusLabel:      api.StatusLabel(s.Status.String()),
 		WorkerId:         ptrOf(s.WorkerID),
-		TriggerType:      triggerType,
+		TriggerType:      toTriggerType(s.TriggerType),
 		Tags:             &s.Tags,
 	}
 }
@@ -165,12 +167,6 @@ func ToDAGRunDetails(s exec.DAGRunStatus) api.DAGRunDetails {
 		nodes[i] = toNode(n)
 	}
 
-	var triggerType *api.TriggerType
-	if s.TriggerType != core.TriggerTypeUnknown {
-		t := api.TriggerType(s.TriggerType.String())
-		triggerType = &t
-	}
-
 	return api.DAGRunDetails{
 		RootDAGRunName:   s.Root.Name,
 		RootDAGRunId:     s.Root.ID,
@@ -185,7 +181,7 @@ func ToDAGRunDetails(s exec.DAGRunStatus) api.DAGRunDetails {
 		Status:           api.Status(s.Status),
 		StatusLabel:      api.StatusLabel(s.Status.String()),
 		WorkerId:         ptrOf(s.WorkerID),
-		TriggerType:      triggerType,
+		TriggerType:      toTriggerType(s.TriggerType),
 		Preconditions:    ptrOf(preconditions),
 		Nodes:            nodes,
 		OnSuccess:        ptrOf(toNode(s.OnSuccess)),

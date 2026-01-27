@@ -197,7 +197,7 @@ func TestPrevExecTime(t *testing.T) {
 			require.NoError(t, err)
 
 			job := &scheduler.DAGRunJob{Schedule: schedule, Next: tt.now}
-			got := job.PrevExecTime(context.Background())
+			got := job.PrevExecTime()
 			require.Equal(t, tt.want, got)
 		})
 	}

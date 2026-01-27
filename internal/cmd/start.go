@@ -90,10 +90,9 @@ func runStart(ctx *Context, args []string) error {
 
 	workerID := getWorkerID(ctx)
 
-	triggerTypeStr, _ := ctx.StringParam("trigger-type")
-	triggerType := core.ParseTriggerType(triggerTypeStr)
-	if triggerTypeStr != "" && triggerType == core.TriggerTypeUnknown {
-		return fmt.Errorf("invalid trigger-type %q: must be one of scheduler, manual, webhook, subdag, retry", triggerTypeStr)
+	triggerType, err := parseTriggerTypeParam(ctx)
+	if err != nil {
+		return err
 	}
 
 	dagRunID, rootRef, parentRef, isSubDAGRun, err := getDAGRunInfo(ctx)

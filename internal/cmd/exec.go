@@ -159,7 +159,11 @@ func resolveRunID(ctx *Context) (string, error) {
 	}
 
 	if runID == "" {
-		return genRunID()
+		generatedID, genErr := genRunID()
+		if genErr != nil {
+			return "", fmt.Errorf("failed to generate dag-run ID: %w", genErr)
+		}
+		return generatedID, nil
 	}
 
 	if err := validateRunID(runID); err != nil {
@@ -175,10 +179,8 @@ func resolveWorkingDir(ctx *Context) (string, error) {
 		return "", fmt.Errorf("failed to read workdir flag: %w", err)
 	}
 
-	var workingDir string
-	if workdirValue != "" {
-		workingDir = fileutil.ResolvePathOrBlank(workdirValue)
-	} else {
+	workingDir := fileutil.ResolvePathOrBlank(workdirValue)
+	if workingDir == "" {
 		workingDir, err = os.Getwd()
 		if err != nil {
 			return "", fmt.Errorf("failed to determine current directory: %w", err)

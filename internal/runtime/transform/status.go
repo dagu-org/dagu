@@ -54,7 +54,7 @@ func WithAttemptKey(attemptKey string) StatusOption {
 	}
 }
 
-// WithQueuedAt returns a StatusOption that sets the finished time
+// WithQueuedAt returns a StatusOption that sets the queued time
 func WithQueuedAt(formattedTime string) StatusOption {
 	return func(s *exec.DAGRunStatus) {
 		s.QueuedAt = formattedTime

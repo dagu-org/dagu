@@ -60,10 +60,9 @@ func runEnqueue(ctx *Context, args []string) error {
 		dag.Queue = queueOverride
 	}
 
-	triggerTypeStr, _ := ctx.StringParam("trigger-type")
-	triggerType := core.ParseTriggerType(triggerTypeStr)
-	if triggerTypeStr != "" && triggerType == core.TriggerTypeUnknown {
-		return fmt.Errorf("invalid trigger-type %q: must be one of scheduler, manual, webhook, subdag, retry", triggerTypeStr)
+	triggerType, err := parseTriggerTypeParam(ctx)
+	if err != nil {
+		return err
 	}
 
 	return enqueueDAGRun(ctx, dag, runID, triggerType)

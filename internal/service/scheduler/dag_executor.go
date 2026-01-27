@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 
@@ -139,6 +138,9 @@ func (e *DAGExecutor) ExecuteDAG(
 
 	// Local execution
 	switch operation {
+	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
+		return fmt.Errorf("operation not specified")
+
 	case coordinatorv1.Operation_OPERATION_START:
 		spec := e.subCmdBuilder.Start(dag, runtime.StartOptions{
 			DAGRunID:    runID,
@@ -151,9 +153,6 @@ func (e *DAGExecutor) ExecuteDAG(
 		spec := e.subCmdBuilder.Retry(dag, runID, "")
 		return runtime.Run(ctx, spec)
 
-	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
-		return errors.New("operation not specified")
-
 	default:
 		return fmt.Errorf("unsupported operation: %v", operation)
 	}
@@ -161,13 +160,13 @@ func (e *DAGExecutor) ExecuteDAG(
 
 // shouldUseDistributedExecution checks if distributed execution should be used.
 // Returns true only if:
-// 1. A coordinator client factory is configured (coordinator is available)
+// 1. A coordinator client is configured (coordinator is available)
 // 2. The DAG has workerSelector labels (DAG explicitly requests distributed execution)
 //
 // This ensures backward compatibility - DAGs without workerSelector continue
 // to run locally even when a coordinator is configured.
 func (e *DAGExecutor) shouldUseDistributedExecution(dag *core.DAG) bool {
-	return e.coordinatorCli != nil && dag != nil && len(dag.WorkerSelector) > 0
+	return e.coordinatorCli != nil && len(dag.WorkerSelector) > 0
 }
 
 // dispatchToCoordinator dispatches a task to the coordinator for distributed execution.

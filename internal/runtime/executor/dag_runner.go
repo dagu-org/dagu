@@ -244,7 +244,7 @@ func (e *SubDAGExecutor) Execute(ctx context.Context, runParams RunParams, workD
 		return nil, err
 	}
 
-	// Create pipes for stdout/stderr capture
+	// Discard subprocess output (logging is handled internally by the sub-DAG)
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
 
@@ -295,48 +295,38 @@ func (e *SubDAGExecutor) Execute(ctx context.Context, runParams RunParams, workD
 	return result, waitErr
 }
 
-// executeDistributedWithResult runs the sub DAG via coordinator and returns the result
+// dispatch runs the sub DAG via coordinator and returns the result.
 func (e *SubDAGExecutor) dispatch(ctx context.Context, runParams RunParams) (*exec1.RunStatus, error) {
-	distCtx := logger.WithValues(ctx,
+	dispatchCtx := logger.WithValues(ctx,
 		tag.RunID(runParams.RunID),
 		tag.DAG(e.DAG.Name),
 	)
 
-	// Dispatch to coordinator
-	err := e.dispatchToCoordinator(ctx, runParams)
-
-	if ctx.Err() != nil {
-		logger.Info(distCtx, "Cancellation requested for distributed sub DAG dispatch")
-		return nil, ctx.Err()
-	}
-
-	if err != nil {
-		logger.Error(distCtx, "Distributed sub DAG dispatch failed", tag.Error(err))
+	if err := e.dispatchToCoordinator(ctx, runParams); err != nil {
+		logger.Error(dispatchCtx, "Distributed sub DAG dispatch failed", tag.Error(err))
 		return nil, fmt.Errorf("distributed execution failed: %w", err)
 	}
 
-	logger.Info(distCtx, "Distributed sub DAG dispatched; awaiting completion")
+	logger.Info(dispatchCtx, "Distributed sub DAG dispatched; awaiting completion")
 	return e.waitCompletion(ctx, runParams.RunID)
 }
 
-// dispatchToCoordinator builds and dispatches a task to the coordinator
+// dispatchToCoordinator builds and dispatches a task to the coordinator.
 func (e *SubDAGExecutor) dispatchToCoordinator(ctx context.Context, runParams RunParams) error {
-	// Build the coordinator task
+	if e.coordinatorCli == nil {
+		return fmt.Errorf("no coordinator client configured for distributed execution")
+	}
+
 	task, err := e.BuildCoordinatorTask(ctx, runParams)
 	if err != nil {
 		return fmt.Errorf("failed to build coordinator task: %w", err)
 	}
 
-	if e.coordinatorCli == nil {
-		return fmt.Errorf("no coordinator client configured for distributed execution")
-	}
-
-	// Dispatch the task
-	dispatchCtx := logger.WithValues(ctx,
+	taskCtx := logger.WithValues(ctx,
 		tag.RunID(task.DagRunId),
 		tag.Target(task.Target),
 	)
-	logger.Info(dispatchCtx, "Dispatching task to coordinator",
+	logger.Info(taskCtx, "Dispatching task to coordinator",
 		slog.Any("worker-selector", task.WorkerSelector),
 	)
 
@@ -389,17 +379,12 @@ func (e *SubDAGExecutor) waitCompletion(ctx context.Context, dagRunID string) (*
 			}
 			consecutiveErrors = 0 // Reset on success
 
-			// Check if completed based on status
 			if result.Status.IsActive() {
 				logger.Debug(waitCtx, "Sub DAG run not completed yet")
-				continue // Not completed, keep polling
+				continue
 			}
 
-			// Sub DAG has completed
-			logger.Info(waitCtx, "Distributed execution completed",
-				tag.Name(result.Name),
-			)
-
+			logger.Info(waitCtx, "Distributed execution completed", tag.Name(result.Name))
 			return result, nil
 
 		case <-logTicker.C:

@@ -249,9 +249,7 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 			errs = append(errs, err.Error())
 		}
 	} else {
-		for _, buildErr := range dag.BuildErrors {
-			errs = append(errs, buildErr.Error())
-		}
+		errs = append(errs, extractBuildErrors(dag.BuildErrors)...)
 		errs = append(errs, dag.BuildWarnings...)
 	}
 
@@ -811,14 +809,10 @@ func buildErrorsToAPIError(buildErrors []error) *Error {
 	if len(buildErrors) == 0 {
 		return nil
 	}
-	var errMessages []string
-	for _, buildErr := range buildErrors {
-		errMessages = append(errMessages, buildErr.Error())
-	}
 	return &Error{
 		HTTPStatus: http.StatusBadRequest,
 		Code:       api.ErrorCodeBadRequest,
-		Message:    strings.Join(errMessages, "; "),
+		Message:    strings.Join(extractBuildErrors(buildErrors), "; "),
 	}
 }
 
@@ -1096,18 +1090,18 @@ func (a *API) StopAllDAGRuns(ctx context.Context, request api.StopAllDAGRunsRequ
 	}
 
 	// Stop each running DAG-run
-	var errors []string
+	var stopErrors []string
 	var stoppedRunIDs []string
 	for _, runningStatus := range runningStatuses {
 		runID := runningStatus.DAGRunID
-		err := a.dagRunMgr.Stop(ctx, dag, runID)
-		if err != nil {
-			errors = append(errors, fmt.Sprintf("failed to stop run %q: %s", runID, err))
+		stopErr := a.dagRunMgr.Stop(ctx, dag, runID)
+		if stopErr != nil {
+			stopErrors = append(stopErrors, fmt.Sprintf("failed to stop run %q: %s", runID, stopErr))
 		} else {
 			stoppedRunIDs = append(stoppedRunIDs, runID)
 		}
 		if ctx.Err() != nil {
-			errors = append(errors, fmt.Sprintf("context is cancelled: %s", err))
+			stopErrors = append(stopErrors, fmt.Sprintf("context is cancelled: %s", ctx.Err()))
 			break
 		}
 	}
@@ -1121,7 +1115,7 @@ func (a *API) StopAllDAGRuns(ctx context.Context, request api.StopAllDAGRunsRequ
 	}
 
 	return &api.StopAllDAGRuns200JSONResponse{
-		Errors: errors,
+		Errors: stopErrors,
 	}, nil
 }
 

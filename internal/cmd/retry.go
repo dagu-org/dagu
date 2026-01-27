@@ -99,8 +99,8 @@ func runRetry(ctx *Context, args []string) error {
 	return executeRetry(ctx, dag, status, status.DAGRun(), stepName, workerID)
 }
 
-// executeRetry prepares and runs a retry of a DAG run using the original run's log file.
-func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRun exec.DAGRunRef, stepName string, workerID string) error {
+// executeRetry runs a retry of a DAG run using the original run's log file.
+func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRun exec.DAGRunRef, stepName, workerID string) error {
 	if stepName != "" {
 		ctx.Context = logger.WithValues(ctx.Context, tag.Step(stepName))
 	}

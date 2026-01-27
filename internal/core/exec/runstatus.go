@@ -124,11 +124,9 @@ func (p PID) String() string {
 	return fmt.Sprintf("%d", p)
 }
 
-// FormatTime formats a time.Time or returns empty string if it's the zero value
+// FormatTime formats a time.Time or returns empty string if it's the zero value.
+// This is a convenience wrapper around stringutil.FormatTime.
 func FormatTime(val time.Time) string {
-	if val.IsZero() {
-		return ""
-	}
 	return stringutil.FormatTime(val)
 }
 
