@@ -63,7 +63,13 @@ export interface NewConversationResponse {
   status: string;
 }
 
+export interface DAGContext {
+  dag_file: string;
+  dag_run_id?: string;
+}
+
 export interface ChatRequest {
   message: string;
   model?: string;
+  dag_contexts?: DAGContext[];
 }

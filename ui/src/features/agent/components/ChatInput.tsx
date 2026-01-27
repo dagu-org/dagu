@@ -4,9 +4,12 @@ import { flushSync } from 'react-dom';
 import { Send, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { DAGContext } from '../types';
+import { DAGPicker } from './DAGPicker';
+import { useDagPageContext } from '../hooks/useDagPageContext';
 
 interface ChatInputProps {
-  onSend: (message: string) => void;
+  onSend: (message: string, dagContexts?: DAGContext[]) => void;
   onCancel?: () => void;
   isWorking: boolean;
   disabled?: boolean;
@@ -22,6 +25,15 @@ export function ChatInput({
 }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const [isPending, setIsPending] = useState(false);
+  const [selectedDags, setSelectedDags] = useState<DAGContext[]>([]);
+  const currentPageDag = useDagPageContext();
+
+  // Auto-add current page DAG when it changes (if not already selected)
+  useEffect(() => {
+    if (currentPageDag && !selectedDags.some((d) => d.dag_file === currentPageDag.dag_file)) {
+      setSelectedDags((prev) => [...prev, currentPageDag]);
+    }
+  }, [currentPageDag?.dag_file, currentPageDag?.dag_run_id]);
 
   // Combine local pending state with parent isWorking for immediate response
   const showPauseButton = isPending || isWorking;
@@ -47,10 +59,10 @@ export function ChatInput({
       flushSync(() => {
         setIsPending(true);
       });
-      onSend(trimmed);
+      onSend(trimmed, selectedDags.length > 0 ? selectedDags : undefined);
       setMessage('');
     }
-  }, [message, showPauseButton, disabled, onSend]);
+  }, [message, showPauseButton, disabled, onSend, selectedDags]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -69,51 +81,62 @@ export function ChatInput({
   }, [onCancel]);
 
   return (
-    <div className="flex items-end gap-2 p-2 border-t border-border/40 bg-background">
-      <textarea
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        disabled={disabled}
-        rows={1}
-        className={cn(
-          'flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm',
-          'placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-          'min-h-[36px] max-h-[120px]',
-          disabled && 'opacity-50 cursor-not-allowed'
-        )}
-        style={{
-          height: 'auto',
-          minHeight: '36px',
-        }}
-        onInput={(e) => {
-          const target = e.target as HTMLTextAreaElement;
-          target.style.height = 'auto';
-          target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
-        }}
+    <div className="p-2 border-t border-border/40 bg-background">
+      {/* DAG Picker with chips */}
+      <DAGPicker
+        selectedDags={selectedDags}
+        onChange={setSelectedDags}
+        currentPageDag={currentPageDag}
+        disabled={disabled || showPauseButton}
       />
-      {showPauseButton ? (
-        <Button
-          size="sm"
-          variant="destructive"
-          onClick={handleCancel}
-          className="h-9 w-9 p-0"
-          title="Stop"
-        >
-          <Square className="h-4 w-4" />
-        </Button>
-      ) : (
-        <Button
-          size="sm"
-          onClick={handleSend}
-          disabled={!message.trim() || disabled}
-          className="h-9 w-9 p-0"
-          title="Send"
-        >
-          <Send className="h-4 w-4" />
-        </Button>
-      )}
+
+      {/* Input row */}
+      <div className="flex items-end gap-2">
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          disabled={disabled}
+          rows={1}
+          className={cn(
+            'flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm',
+            'placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+            'min-h-[36px] max-h-[120px]',
+            disabled && 'opacity-50 cursor-not-allowed'
+          )}
+          style={{
+            height: 'auto',
+            minHeight: '36px',
+          }}
+          onInput={(e) => {
+            const target = e.target as HTMLTextAreaElement;
+            target.style.height = 'auto';
+            target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
+          }}
+        />
+        {showPauseButton ? (
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={handleCancel}
+            className="h-9 w-9 p-0"
+            title="Stop"
+          >
+            <Square className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            onClick={handleSend}
+            disabled={!message.trim() || disabled}
+            className="h-9 w-9 p-0"
+            title="Send"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

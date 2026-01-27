@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -35,6 +37,7 @@ type API struct {
 	model         string
 	workingDir    string
 	logger        *slog.Logger
+	dagStore      exec.DAGStore // For resolving DAG file paths
 	mu            sync.Mutex
 }
 
@@ -45,6 +48,7 @@ type APIConfig struct {
 	WorkingDir        string
 	Logger            *slog.Logger
 	ConversationStore ConversationStore
+	DAGStore          exec.DAGStore // For resolving DAG file paths
 }
 
 // NewAPI creates a new API instance.
@@ -60,6 +64,7 @@ func NewAPI(cfg APIConfig) *API {
 		workingDir: cfg.WorkingDir,
 		logger:     logger,
 		store:      cfg.ConversationStore,
+		dagStore:   cfg.DAGStore,
 	}
 }
 
@@ -84,6 +89,67 @@ func (a *API) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler) htt
 			r.Post("/cancel", a.handleCancel)
 		})
 	})
+}
+
+// resolveContexts resolves DAG file names to full paths using the DAG store.
+func (a *API) resolveContexts(ctx context.Context, contexts []DAGContext) []ResolvedDAGContext {
+	if len(contexts) == 0 {
+		return nil
+	}
+
+	var resolved []ResolvedDAGContext
+	for _, c := range contexts {
+		r := ResolvedDAGContext{}
+		if a.dagStore != nil && c.DAGFile != "" {
+			dag, err := a.dagStore.GetMetadata(ctx, c.DAGFile)
+			if err == nil && dag != nil {
+				r.DAGFilePath = dag.Location
+				r.DAGName = dag.Name
+			}
+		}
+		if c.DAGRunID != "" {
+			r.DAGRunID = c.DAGRunID
+		}
+		// Only include if we got some useful info
+		if r.DAGFilePath != "" || r.DAGName != "" {
+			resolved = append(resolved, r)
+		}
+	}
+	return resolved
+}
+
+// formatMessageWithContexts prepends DAG context information to the user message.
+func formatMessageWithContexts(message string, contexts []ResolvedDAGContext) string {
+	if len(contexts) == 0 {
+		return message
+	}
+
+	var contextLines []string
+	for _, ctx := range contexts {
+		var parts []string
+		if ctx.DAGFilePath != "" {
+			parts = append(parts, fmt.Sprintf("file: %s", ctx.DAGFilePath))
+		}
+		if ctx.DAGRunID != "" {
+			parts = append(parts, fmt.Sprintf("run: %s", ctx.DAGRunID))
+		}
+		if ctx.RunStatus != "" {
+			parts = append(parts, fmt.Sprintf("status: %s", ctx.RunStatus))
+		}
+		name := ctx.DAGName
+		if name == "" {
+			name = "unknown"
+		}
+		if len(parts) > 0 {
+			contextLines = append(contextLines, fmt.Sprintf("- %s (%s)", name, strings.Join(parts, ", ")))
+		}
+	}
+
+	if len(contextLines) == 0 {
+		return message
+	}
+
+	return fmt.Sprintf("[Referenced DAGs:\n%s]\n\n%s", strings.Join(contextLines, "\n"), message)
 }
 
 // handleNewConversation creates a new conversation and sends the first message.
@@ -145,8 +211,12 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 
 	a.conversations.Store(id, mgr)
 
+	// Resolve DAG contexts and format message
+	resolved := a.resolveContexts(r.Context(), req.DAGContexts)
+	messageWithContext := formatMessageWithContexts(req.Message, resolved)
+
 	// Accept the user message
-	if err := mgr.AcceptUserMessage(r.Context(), a.provider, model, req.Message); err != nil {
+	if err := mgr.AcceptUserMessage(r.Context(), a.provider, model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		http.Error(w, "Failed to process message", http.StatusInternalServerError)
 		return
@@ -366,7 +436,11 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 		model = a.model
 	}
 
-	if err := mgr.AcceptUserMessage(r.Context(), a.provider, model, req.Message); err != nil {
+	// Resolve DAG contexts and format message
+	resolved := a.resolveContexts(r.Context(), req.DAGContexts)
+	messageWithContext := formatMessageWithContexts(req.Message, resolved)
+
+	if err := mgr.AcceptUserMessage(r.Context(), a.provider, model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		http.Error(w, "Failed to process message", http.StatusInternalServerError)
 		return

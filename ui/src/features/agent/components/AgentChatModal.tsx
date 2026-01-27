@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { X, RotateCcw, Terminal, Plus, ChevronDown } from 'lucide-react';
+import { X, Terminal, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -13,6 +13,7 @@ import { useAgentChat } from '../hooks/useAgentChat';
 import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { cn } from '@/lib/utils';
+import { DAGContext } from '../types';
 
 export function AgentChatModal() {
   const { isOpen, closeChat } = useAgentChatContext();
@@ -51,9 +52,9 @@ export function AgentChatModal() {
   }, [isOpen, conversations, conversationId, selectConversation]);
 
   const handleSend = React.useCallback(
-    async (message: string) => {
+    async (message: string, dagContexts?: DAGContext[]) => {
       try {
-        await sendMessage(message);
+        await sendMessage(message, undefined, dagContexts);
       } catch (err) {
         console.error('Failed to send message:', err);
       }

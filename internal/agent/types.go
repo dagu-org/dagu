@@ -78,10 +78,25 @@ type StreamResponse struct {
 	ConversationState *ConversationState `json:"conversation_state,omitempty"`
 }
 
+// DAGContext contains a single DAG reference from the frontend.
+type DAGContext struct {
+	DAGFile  string `json:"dag_file"`
+	DAGRunID string `json:"dag_run_id,omitempty"`
+}
+
 // ChatRequest is the request body for sending a chat message.
 type ChatRequest struct {
-	Message string `json:"message"`
-	Model   string `json:"model,omitempty"`
+	Message     string       `json:"message"`
+	Model       string       `json:"model,omitempty"`
+	DAGContexts []DAGContext `json:"dag_contexts,omitempty"`
+}
+
+// ResolvedDAGContext contains server-resolved info for a single DAG.
+type ResolvedDAGContext struct {
+	DAGFilePath string // Absolute path to DAG file
+	DAGName     string // DAG name
+	DAGRunID    string // Run ID if viewing a run
+	RunStatus   string // Current run status (running/success/failed)
 }
 
 // NewConversationResponse is the response for creating a new conversation.

@@ -8,6 +8,7 @@ import {
   ChatRequest,
   Message,
   ConversationWithState,
+  DAGContext,
 } from '../types';
 
 const TOKEN_KEY = 'dagu_auth_token';
@@ -126,13 +127,14 @@ export function useAgentChat() {
 
   // Start a new conversation
   const startConversation = useCallback(
-    async (message: string, model?: string): Promise<string> => {
+    async (message: string, model?: string, dagContexts?: DAGContext[]): Promise<string> => {
       const response = await fetch(`${baseUrl}/conversations/new`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
           message,
           model,
+          dag_contexts: dagContexts,
         } as ChatRequest),
       });
 
@@ -149,11 +151,11 @@ export function useAgentChat() {
 
   // Send a message to existing conversation
   const sendMessage = useCallback(
-    async (message: string, model?: string): Promise<void> => {
+    async (message: string, model?: string, dagContexts?: DAGContext[]): Promise<void> => {
       setIsSending(true);
       try {
         if (!conversationId) {
-          await startConversation(message, model);
+          await startConversation(message, model, dagContexts);
           return;
         }
 
@@ -165,6 +167,7 @@ export function useAgentChat() {
             body: JSON.stringify({
               message,
               model,
+              dag_contexts: dagContexts,
             } as ChatRequest),
           }
         );

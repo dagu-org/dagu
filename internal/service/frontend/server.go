@@ -71,6 +71,7 @@ type Server struct {
 	sseHub           *sse.Hub             // SSE hub for real-time updates
 	metricsRegistry  *prometheus.Registry // Prometheus registry for metrics
 	tunnelAPIOpts    []apiv2.APIOption    // Tunnel API options (set by WithTunnelService)
+	dagStore         exec.DAGStore        // DAG store for agent context resolution
 }
 
 // ServerOption is a functional option for configuring the Server
@@ -147,7 +148,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	// Initialize agent API if enabled
 	var agentAPI *agent.API
 	if agentConfigStore != nil {
-		agentAPI, err = initAgentAPI(ctx, agentConfigStore, cfg.Paths.DAGsDir, cfg.Paths.ConversationsDir)
+		agentAPI, err = initAgentAPI(ctx, agentConfigStore, cfg.Paths.DAGsDir, cfg.Paths.ConversationsDir, dr)
 		if err != nil {
 			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
 		}
@@ -220,6 +221,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		auditService:     auditSvc,
 		syncService:      syncSvc,
 		metricsRegistry:  mr,
+		dagStore:         dr,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,
 			NavbarTitle:           cfg.UI.NavbarTitle,
@@ -404,7 +406,7 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 // initAgentAPI creates and returns an agent API if enabled.
 // Returns nil if agent is not enabled or LLM provider cannot be initialized.
 // Loads configuration from the file-based agent config store with environment variable overrides.
-func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, dagsDir, conversationsDir string) (*agent.API, error) {
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, dagsDir, conversationsDir string, dagStore exec.DAGStore) (*agent.API, error) {
 	// Load agent configuration
 	agentCfg, err := store.Load(ctx)
 	if err != nil {
@@ -449,6 +451,7 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, dagsDir, co
 		WorkingDir:        dagsDir,
 		Logger:            slog.Default(),
 		ConversationStore: convStore,
+		DAGStore:          dagStore,
 	})
 
 	logger.Info(ctx, "Agent API initialized",
@@ -846,7 +849,7 @@ func (srv *Server) ReloadAgent(ctx context.Context) error {
 	}
 
 	// Reinitialize agent API with new config
-	agentAPI, err := initAgentAPI(ctx, srv.agentConfigStore, srv.config.Paths.DAGsDir, srv.config.Paths.ConversationsDir)
+	agentAPI, err := initAgentAPI(ctx, srv.agentConfigStore, srv.config.Paths.DAGsDir, srv.config.Paths.ConversationsDir, srv.dagStore)
 	if err != nil {
 		return fmt.Errorf("failed to reload agent: %w", err)
 	}
