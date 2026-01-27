@@ -28,9 +28,9 @@ type NodeStatusConfig = {
   colorClass: string;
 };
 
-// Colors: success=green-600, running=#d9ff66, error=#ef4444, cancel=#ec4899, skipped=#64748b, waiting=#f59e0b
+// Colors: success=green-700, running=#66ff66, error=#ef4444, cancel=#ec4899, skipped=#64748b, waiting=#f59e0b
 const NODE_STATUS_CONFIG: NodeStatusConfig[] = [
-  { key: 'succeeded', label: 'Success', colorClass: 'bg-green-600' },
+  { key: 'succeeded', label: 'Success', colorClass: 'bg-green-700' },
   { key: 'running', label: 'Running', colorClass: 'bg-[#66ff66]' },
   { key: 'failed', label: 'Failed', colorClass: 'bg-red-500' },
   { key: 'queued', label: 'Queued', colorClass: 'bg-slate-400' },

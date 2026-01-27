@@ -280,7 +280,7 @@
   @apply px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider;
 }
 .status-success {
-  @apply bg-green-600/10 text-green-600 border border-green-600/20;
+  @apply bg-green-700/10 text-green-700 border border-green-700/20;
 }
 .status-failed {
   @apply bg-red-500/10 text-red-500 border border-red-500/20;

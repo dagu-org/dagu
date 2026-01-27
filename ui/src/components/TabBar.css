@@ -3,7 +3,6 @@
   display: flex;
   align-items: flex-end;
   padding: 8px 8px 0px;
-  background: var(--sidebar);
   border-bottom: 2px solid var(--border);
   gap: 4px;
 }

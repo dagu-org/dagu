@@ -65,9 +65,9 @@ export function getStatusColors(
   switch (baseClass) {
     case 'status-success':
       return {
-        bgClass: 'bg-green-600',
-        textClass: 'text-green-600',
-        borderClass: 'border-green-600',
+        bgClass: 'bg-green-700',
+        textClass: 'text-green-700',
+        borderClass: 'border-green-700',
         animation: '',
       };
 

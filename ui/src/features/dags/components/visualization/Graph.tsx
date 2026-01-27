@@ -284,7 +284,7 @@ function Graph({
       `classDef cancel color:${nodeColor},fill:${nodeFill},stroke:#ec4899,stroke-width:2.5px`
     );
     dat.push(
-      `classDef done color:${nodeColor},fill:${nodeFill},stroke:#16a34a,stroke-width:2.5px`
+      `classDef done color:${nodeColor},fill:${nodeFill},stroke:#15803d,stroke-width:2.5px`
     );
     dat.push(
       `classDef skipped color:${nodeColor},fill:${nodeFill},stroke:#64748b,stroke-width:2.5px`
