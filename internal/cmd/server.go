@@ -2,12 +2,17 @@ package cmd
 
 import (
 	"fmt"
+	"net"
 	"os/signal"
+	"strconv"
 	"syscall"
 
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/service/frontend"
 	"github.com/dagu-org/dagu/internal/service/resource"
+	"github.com/dagu-org/dagu/internal/tunnel"
 	"github.com/spf13/cobra"
 )
 
@@ -37,7 +42,7 @@ Example:
 	)
 }
 
-var serverFlags = []commandLineFlag{dagsFlag, hostFlag, portFlag}
+var serverFlags = []commandLineFlag{dagsFlag, hostFlag, portFlag, tunnelFlag, tunnelTokenFlag, tunnelFunnelFlag, tunnelHTTPSFlag}
 
 // runServer initializes and runs the web UI server and its resource monitoring service.
 // It logs startup info, starts the resource service (deferring its shutdown and logging any stop errors),
@@ -57,6 +62,19 @@ func runServer(ctx *Context, _ []string) error {
 		tag.Port(serviceCtx.Config.Server.Port),
 	)
 
+	// Initialize tunnel service if enabled
+	tunnelService, err := initTunnelService(ctx.Config)
+	if err != nil {
+		return fmt.Errorf("failed to initialize tunnel: %w", err)
+	}
+	if tunnelService != nil {
+		defer func() {
+			if err := tunnelService.Stop(ctx); err != nil {
+				logger.Error(ctx, "Failed to stop tunnel service", tag.Error(err))
+			}
+		}()
+	}
+
 	// Initialize resource monitoring service (defer cleanup, but don't start yet).
 	// Resource monitoring must start AFTER server init to avoid race condition
 	// with OIDC provider initialization (gopsutil conflicts with net/http dial).
@@ -67,9 +85,15 @@ func runServer(ctx *Context, _ []string) error {
 		}
 	}()
 
+	// Build server options
+	var serverOpts []frontend.ServerOption
+	if tunnelService != nil {
+		serverOpts = append(serverOpts, frontend.WithTunnelService(tunnelService))
+	}
+
 	// Initialize server (includes OIDC setup). Use serviceCtx so OIDC can
 	// respond to termination signals during potentially slow network operations.
-	server, err := serviceCtx.NewServer(resourceService)
+	server, err := serviceCtx.NewServer(resourceService, serverOpts...)
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}
@@ -79,9 +103,95 @@ func runServer(ctx *Context, _ []string) error {
 		return fmt.Errorf("failed to start resource service: %w", err)
 	}
 
+	// Start tunnel service after server is initialized
+	if tunnelService != nil {
+		localAddr := net.JoinHostPort(ctx.Config.Server.Host, strconv.Itoa(ctx.Config.Server.Port))
+		if err := tunnelService.Start(serviceCtx, localAddr); err != nil {
+			// Log warning but continue without tunnel - graceful degradation
+			logger.Warn(serviceCtx, "Tunnel failed to start (server will continue without tunnel)",
+				tag.Error(err),
+			)
+		} else {
+			// Log tunnel URL prominently on success
+			logTunnelStatus(serviceCtx, tunnelService)
+		}
+	}
+
 	if err := server.Serve(serviceCtx); err != nil {
 		return fmt.Errorf("failed to start server: %w", err)
 	}
 
 	return nil
+}
+
+// initTunnelService creates and returns a tunnel service based on configuration.
+// Returns nil if tunneling is not enabled.
+func initTunnelService(cfg *config.Config) (*tunnel.Service, error) {
+	if !cfg.Tunnel.Enabled {
+		return nil, nil
+	}
+
+	tc := cfg.Tunnel
+	tunnelCfg := &tunnel.Config{
+		Enabled:       tc.Enabled,
+		AllowTerminal: tc.AllowTerminal,
+		AllowedIPs:    tc.AllowedIPs,
+		Tailscale: tunnel.TailscaleConfig{
+			AuthKey:  tc.Tailscale.AuthKey,
+			Hostname: tc.Tailscale.Hostname,
+			Funnel:   tc.Tailscale.Funnel,
+			HTTPS:    tc.Tailscale.HTTPS,
+			StateDir: tc.Tailscale.StateDir,
+		},
+		RateLimiting: tunnel.RateLimitConfig{
+			Enabled:              tc.RateLimiting.Enabled,
+			LoginAttempts:        tc.RateLimiting.LoginAttempts,
+			WindowSeconds:        tc.RateLimiting.WindowSeconds,
+			BlockDurationSeconds: tc.RateLimiting.BlockDurationSeconds,
+		},
+	}
+
+	return tunnel.NewService(tunnelCfg, cfg.Paths.DataDir)
+}
+
+// logTunnelStatus logs the tunnel status prominently to the console.
+func logTunnelStatus(ctx *Context, svc *tunnel.Service) {
+	info := svc.Info()
+
+	accessType := "Private (tailnet only)"
+	if info.IsPublic {
+		accessType = "Public"
+	}
+
+	var authStatus string
+	switch ctx.Config.Server.Auth.Mode {
+	case config.AuthModeBuiltin:
+		authStatus = "Builtin (enabled)"
+	case config.AuthModeOIDC:
+		authStatus = "OIDC (enabled)"
+	case config.AuthModeNone:
+		authStatus = "Disabled"
+	}
+
+	terminalStatus := "Disabled"
+	if ctx.Config.Tunnel.AllowTerminal && ctx.Config.Server.Terminal.Enabled {
+		terminalStatus = "Enabled"
+	}
+
+	// Print a prominent banner for tunnel status
+	fmt.Printf("\n"+
+		"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"+
+		"  TUNNEL ACTIVE - Server is %s accessible\n"+
+		"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"+
+		"  Provider: %s (%s)\n"+
+		"  URL:      %s\n"+
+		"  Auth:     %s\n"+
+		"  Terminal: %s\n"+
+		"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n",
+		accessType,
+		info.Provider, info.Mode,
+		info.PublicURL,
+		authStatus,
+		terminalStatus,
+	)
 }

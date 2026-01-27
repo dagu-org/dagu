@@ -40,6 +40,7 @@ import (
 	"github.com/dagu-org/dagu/internal/service/frontend/terminal"
 	"github.com/dagu-org/dagu/internal/service/oidcprovision"
 	"github.com/dagu-org/dagu/internal/service/resource"
+	"github.com/dagu-org/dagu/internal/tunnel"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -60,6 +61,7 @@ type Server struct {
 	listener        net.Listener         // Optional pre-bound listener (for tests)
 	sseHub          *sse.Hub             // SSE hub for real-time updates
 	metricsRegistry *prometheus.Registry // Prometheus registry for metrics
+	tunnelAPIOpts   []apiv2.APIOption    // Tunnel API options (set by WithTunnelService)
 }
 
 // ServerOption is a functional option for configuring the Server
@@ -71,6 +73,16 @@ type ServerOption func(*Server)
 func WithListener(l net.Listener) ServerOption {
 	return func(s *Server) {
 		s.listener = l
+	}
+}
+
+// WithTunnelService sets the tunnel service for the server.
+// This enables the tunnel status API endpoint to return real-time tunnel information.
+func WithTunnelService(ts *tunnel.Service) ServerOption {
+	return func(s *Server) {
+		if ts != nil {
+			s.tunnelAPIOpts = append(s.tunnelAPIOpts, apiv2.WithTunnelService(ts))
+		}
 	}
 }
 
@@ -176,7 +188,6 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	}
 
 	srv := &Server{
-		apiV2:           apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, apiOpts...),
 		config:          cfg,
 		builtinOIDCCfg:  builtinOIDCCfg,
 		authService:     authSvc,
@@ -202,10 +213,16 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		},
 	}
 
-	// Apply server options
+	// Apply server options first to collect any additional API options (e.g., tunnel service)
 	for _, opt := range opts {
 		opt(srv)
 	}
+
+	// Merge tunnel API options with base API options
+	allAPIOptions := append(apiOpts, srv.tunnelAPIOpts...)
+
+	// Create the API with all options
+	srv.apiV2 = apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, allAPIOptions...)
 
 	return srv, nil
 }

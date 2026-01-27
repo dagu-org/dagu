@@ -2875,6 +2875,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /services/tunnel:
+    get:
+      summary: "Get tunnel service status"
+      description: "Returns status information about the tunnel service (Tailscale)"
+      operationId: "getTunnelStatus"
+      tags:
+        - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TunnelStatusResponse"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /metrics:
     get:
       summary: "Get Prometheus metrics"
@@ -4372,6 +4395,42 @@ components:
         - status
         - startedAt
         - port
+
+    TunnelStatusResponse:
+      type: object
+      description: "Response containing tunnel service status"
+      properties:
+        enabled:
+          type: boolean
+          description: "Whether tunneling is enabled in configuration"
+        provider:
+          type: string
+          enum: ["tailscale"]
+          description: "The tunnel provider in use"
+        status:
+          type: string
+          enum: ["disabled", "connecting", "connected", "reconnecting", "error"]
+          description: "Current status of the tunnel"
+        publicUrl:
+          type: string
+          format: uri
+          description: "The public URL provided by the tunnel"
+        error:
+          type: string
+          description: "Error message if tunnel failed"
+        startedAt:
+          type: string
+          format: date-time
+          description: "RFC3339 timestamp when tunnel connected"
+        mode:
+          type: string
+          description: "Tunnel mode (e.g., 'direct' or 'funnel' for Tailscale)"
+        isPublic:
+          type: boolean
+          description: "Whether the tunnel provides public internet access"
+      required:
+        - enabled
+        - status
 
     WorkerHealthStatus:
       type: string

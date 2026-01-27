@@ -97,15 +97,16 @@ const (
 	SectionQueues                                // 64
 	SectionMonitoring                            // 128
 	SectionGitSync                               // 256
+	SectionTunnel                                // 512
 
 	// SectionAll combines all sections (useful for ServiceNone/CLI)
-	SectionAll = SectionServer | SectionScheduler | SectionWorker | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync
+	SectionAll = SectionServer | SectionScheduler | SectionWorker | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel
 )
 
 // serviceRequirements maps services to their required config sections using bitwise OR.
 var serviceRequirements = map[Service]ConfigSection{
 	ServiceNone:        SectionAll,
-	ServiceServer:      SectionServer | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync,
+	ServiceServer:      SectionServer | SectionCoordinator | SectionUI | SectionQueues | SectionMonitoring | SectionGitSync | SectionTunnel,
 	ServiceScheduler:   SectionScheduler | SectionCoordinator | SectionQueues,
 	ServiceWorker:      SectionWorker | SectionCoordinator,
 	ServiceCoordinator: SectionCoordinator,
@@ -210,6 +211,12 @@ func (l *ConfigLoader) Load() (*Config, error) {
 func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	var cfg Config
 
+	// Set validation-safe defaults for fields that may not be loaded
+	// These ensure cfg.Validate() passes even if section-specific loading is skipped
+	cfg.UI.MaxDashboardPageLimit = 1    // Minimum valid value
+	cfg.Server.Port = 8080              // Default port
+	cfg.Server.Auth.Mode = AuthModeNone // Default auth mode
+
 	// Always load core and paths configuration
 	if err := l.loadCoreConfig(&cfg, def); err != nil {
 		return nil, err
@@ -243,6 +250,9 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	if l.requires(SectionGitSync) {
 		l.loadGitSyncConfig(&cfg, def)
 	}
+	if l.requires(SectionTunnel) {
+		l.loadTunnelConfig(&cfg, def)
+	}
 
 	// Cache config is always loaded (used by all services)
 	l.loadCacheConfig(&cfg, def)
@@ -256,16 +266,9 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	// Finalize paths (set derived paths based on DataDir)
 	l.finalizePaths(&cfg)
 
-	// Validate configuration
-	if l.requires(SectionServer) {
-		if err := l.validateServerConfig(&cfg); err != nil {
-			return nil, err
-		}
-	}
-	if l.requires(SectionUI) {
-		if err := l.validateUIConfig(&cfg); err != nil {
-			return nil, err
-		}
+	// Validate the complete configuration
+	if err := cfg.Validate(); err != nil {
+		return nil, err
 	}
 
 	return &cfg, nil
@@ -556,19 +559,6 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 	}
 }
 
-// validateServerConfig validates the server configuration.
-func (l *ConfigLoader) validateServerConfig(cfg *Config) error {
-	if cfg.Server.Port < 0 || cfg.Server.Port > 65535 {
-		return fmt.Errorf("invalid port number: %d", cfg.Server.Port)
-	}
-	if cfg.Server.TLS != nil {
-		if cfg.Server.TLS.CertFile == "" || cfg.Server.TLS.KeyFile == "" {
-			return fmt.Errorf("TLS configuration incomplete: both cert and key files are required")
-		}
-	}
-	return cfg.validateBuiltinAuth()
-}
-
 // loadUIConfig loads the UI configuration.
 func (l *ConfigLoader) loadUIConfig(cfg *Config, def Definition) {
 	// Apply defaults from viper (these include the configured defaults)
@@ -599,14 +589,6 @@ func (l *ConfigLoader) loadUIConfig(cfg *Config, def Definition) {
 			}
 		}
 	}
-}
-
-// validateUIConfig validates the UI configuration.
-func (l *ConfigLoader) validateUIConfig(cfg *Config) error {
-	if cfg.UI.MaxDashboardPageLimit < 1 {
-		return fmt.Errorf("invalid max dashboard page limit: %d", cfg.UI.MaxDashboardPageLimit)
-	}
-	return nil
 }
 
 // loadQueuesConfig loads the queue configuration.
@@ -925,6 +907,79 @@ func (l *ConfigLoader) loadGitSyncConfig(cfg *Config, def Definition) {
 		if def.GitSync.Commit.AuthorEmail != "" {
 			cfg.GitSync.Commit.AuthorEmail = def.GitSync.Commit.AuthorEmail
 		}
+	}
+}
+
+// loadTunnelConfig loads the tunnel configuration.
+func (l *ConfigLoader) loadTunnelConfig(cfg *Config, def Definition) {
+	// Check if tunnel is enabled - CLI flag takes precedence over config file
+	if l.v.IsSet("tunnel.enabled") {
+		cfg.Tunnel.Enabled = l.v.GetBool("tunnel.enabled")
+	} else if def.Tunnel != nil && def.Tunnel.Enabled != nil {
+		cfg.Tunnel.Enabled = *def.Tunnel.Enabled
+	}
+
+	if !cfg.Tunnel.Enabled {
+		return
+	}
+
+	// Tailscale config from definition (loaded first as base)
+	if def.Tunnel != nil && def.Tunnel.Tailscale != nil {
+		cfg.Tunnel.Tailscale.AuthKey = def.Tunnel.Tailscale.AuthKey
+		cfg.Tunnel.Tailscale.Hostname = def.Tunnel.Tailscale.Hostname
+		if def.Tunnel.Tailscale.Funnel != nil {
+			cfg.Tunnel.Tailscale.Funnel = *def.Tunnel.Tailscale.Funnel
+		}
+		if def.Tunnel.Tailscale.HTTPS != nil {
+			cfg.Tunnel.Tailscale.HTTPS = *def.Tunnel.Tailscale.HTTPS
+		}
+		cfg.Tunnel.Tailscale.StateDir = def.Tunnel.Tailscale.StateDir
+	}
+
+	// CLI flags take precedence over config file
+	if l.v.IsSet("tunnel.tailscale.funnel") {
+		cfg.Tunnel.Tailscale.Funnel = l.v.GetBool("tunnel.tailscale.funnel")
+	}
+
+	if l.v.IsSet("tunnel.tailscale.https") {
+		cfg.Tunnel.Tailscale.HTTPS = l.v.GetBool("tunnel.tailscale.https")
+	}
+
+	// Handle --tunnel-token CLI flag (takes precedence over config)
+	if l.v.IsSet("tunnel.token") {
+		cfg.Tunnel.Tailscale.AuthKey = l.v.GetString("tunnel.token")
+	}
+
+	// Security options
+	if def.Tunnel != nil && def.Tunnel.AllowTerminal != nil {
+		cfg.Tunnel.AllowTerminal = *def.Tunnel.AllowTerminal
+	}
+	cfg.Tunnel.AllowedIPs = parseStringList(l.v.Get("tunnel.allowedIPs"))
+
+	// Rate limiting
+	if def.Tunnel != nil && def.Tunnel.RateLimiting != nil {
+		if def.Tunnel.RateLimiting.Enabled != nil {
+			cfg.Tunnel.RateLimiting.Enabled = *def.Tunnel.RateLimiting.Enabled
+		}
+		cfg.Tunnel.RateLimiting.LoginAttempts = def.Tunnel.RateLimiting.LoginAttempts
+		cfg.Tunnel.RateLimiting.WindowSeconds = def.Tunnel.RateLimiting.WindowSeconds
+		cfg.Tunnel.RateLimiting.BlockDurationSeconds = def.Tunnel.RateLimiting.BlockDurationSeconds
+	}
+
+	// Set defaults for rate limiting
+	if cfg.Tunnel.RateLimiting.LoginAttempts <= 0 {
+		cfg.Tunnel.RateLimiting.LoginAttempts = 5
+	}
+	if cfg.Tunnel.RateLimiting.WindowSeconds <= 0 {
+		cfg.Tunnel.RateLimiting.WindowSeconds = 300
+	}
+	if cfg.Tunnel.RateLimiting.BlockDurationSeconds <= 0 {
+		cfg.Tunnel.RateLimiting.BlockDurationSeconds = 900
+	}
+
+	// Set default Tailscale hostname
+	if cfg.Tunnel.Tailscale.Hostname == "" {
+		cfg.Tunnel.Tailscale.Hostname = AppSlug
 	}
 }
 
@@ -1343,6 +1398,21 @@ var envBindings = []envBinding{
 	{key: "worker.postgresPool.maxIdleConns", env: "WORKER_POSTGRES_POOL_MAX_IDLE_CONNS"},
 	{key: "worker.postgresPool.connMaxLifetime", env: "WORKER_POSTGRES_POOL_CONN_MAX_LIFETIME"},
 	{key: "worker.postgresPool.connMaxIdleTime", env: "WORKER_POSTGRES_POOL_CONN_MAX_IDLE_TIME"},
+
+	// Tunnel configuration (Tailscale only)
+	{key: "tunnel.enabled", env: "TUNNEL"},         // Maps to --tunnel flag
+	{key: "tunnel.enabled", env: "TUNNEL_ENABLED"}, // Also support TUNNEL_ENABLED
+	{key: "tunnel.tailscale.authKey", env: "TUNNEL_TAILSCALE_AUTH_KEY"},
+	{key: "tunnel.tailscale.hostname", env: "TUNNEL_TAILSCALE_HOSTNAME"},
+	{key: "tunnel.tailscale.funnel", env: "TUNNEL_TAILSCALE_FUNNEL"},
+	{key: "tunnel.tailscale.https", env: "TUNNEL_TAILSCALE_HTTPS"},
+	{key: "tunnel.tailscale.stateDir", env: "TUNNEL_TAILSCALE_STATE_DIR", isPath: true},
+	{key: "tunnel.allowTerminal", env: "TUNNEL_ALLOW_TERMINAL"},
+	{key: "tunnel.allowedIPs", env: "TUNNEL_ALLOWED_IPS"},
+	{key: "tunnel.rateLimiting.enabled", env: "TUNNEL_RATE_LIMITING_ENABLED"},
+	{key: "tunnel.rateLimiting.loginAttempts", env: "TUNNEL_RATE_LIMITING_LOGIN_ATTEMPTS"},
+	{key: "tunnel.rateLimiting.windowSeconds", env: "TUNNEL_RATE_LIMITING_WINDOW_SECONDS"},
+	{key: "tunnel.rateLimiting.blockDurationSeconds", env: "TUNNEL_RATE_LIMITING_BLOCK_DURATION_SECONDS"},
 
 	// Git sync configuration
 	{key: "gitSync.enabled", env: "GITSYNC_ENABLED"},

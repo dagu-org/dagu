@@ -43,6 +43,9 @@ type Config struct {
 
 	// GitSync contains configuration for Git synchronization.
 	GitSync GitSyncConfig
+
+	// Tunnel contains configuration for tunnel services (Tailscale).
+	Tunnel TunnelConfig
 }
 
 // GitSyncConfig holds the configuration for Git sync functionality.
@@ -112,6 +115,67 @@ type GitSyncCommitConfig struct {
 	// Defaults to "dagu@localhost" if not specified.
 	AuthorEmail string
 }
+
+// TunnelConfig holds the configuration for tunnel services.
+type TunnelConfig struct {
+	// Enabled indicates whether tunneling is enabled.
+	Enabled bool
+
+	// Tailscale contains Tailscale configuration.
+	Tailscale TailscaleTunnelConfig
+
+	// AllowTerminal allows terminal access via tunnel (default: false for security).
+	AllowTerminal bool
+
+	// AllowedIPs is an IP allowlist (empty = allow all).
+	AllowedIPs []string
+
+	// RateLimiting contains rate limiting configuration for auth endpoints.
+	RateLimiting TunnelRateLimitConfig
+}
+
+// TailscaleTunnelConfig holds Tailscale settings.
+type TailscaleTunnelConfig struct {
+	// AuthKey is the Tailscale auth key for headless authentication.
+	// If empty, interactive login via URL will be required.
+	AuthKey string
+
+	// Hostname is the machine name in the tailnet (default: "dagu").
+	Hostname string
+
+	// Funnel enables Tailscale Funnel for public internet access.
+	// When false, the server is only accessible within the tailnet.
+	Funnel bool
+
+	// HTTPS enables HTTPS for tailnet-only access.
+	// Requires enabling HTTPS certificates in the Tailscale admin panel.
+	// When false, uses plain HTTP (still secure via WireGuard encryption).
+	HTTPS bool
+
+	// StateDir is the directory for Tailscale state storage.
+	// Default: $DAGU_HOME/tailscale
+	StateDir string
+}
+
+// TunnelRateLimitConfig holds rate limiting configuration.
+type TunnelRateLimitConfig struct {
+	// Enabled indicates whether rate limiting is enabled.
+	Enabled bool
+
+	// LoginAttempts is the maximum login attempts per window.
+	LoginAttempts int
+
+	// WindowSeconds is the time window in seconds.
+	WindowSeconds int
+
+	// BlockDurationSeconds is the block duration after exceeding limit.
+	BlockDurationSeconds int
+}
+
+// TunnelProvider constants
+const (
+	TunnelProviderTailscale = "tailscale"
+)
 
 // MonitoringConfig holds the configuration for system monitoring.
 // Memory estimation: Each metric point is ~16 bytes. With 4 metrics collected
@@ -518,6 +582,11 @@ func (c *Config) Validate() error {
 		return err
 	}
 
+	// Validate tunnel configuration
+	if err := c.validateTunnel(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -639,4 +708,45 @@ func (c *Config) validateGitSync() error {
 	}
 
 	return nil
+}
+
+// validateTunnel validates the tunnel configuration.
+func (c *Config) validateTunnel() error {
+	if !c.Tunnel.Enabled {
+		return nil
+	}
+
+	// Check if tunnel is public (Tailscale with Funnel)
+	isPublic := c.Tunnel.Tailscale.Funnel
+
+	// SECURITY: Public tunnels REQUIRE authentication
+	if isPublic && c.Server.Auth.Mode == AuthModeNone {
+		return fmt.Errorf(
+			"tunnel with public access requires authentication; " +
+				"set server.auth.mode=builtin or disable tailscale funnel for private access",
+		)
+	}
+
+	// Validate rate limiting config
+	if c.Tunnel.RateLimiting.Enabled {
+		if c.Tunnel.RateLimiting.LoginAttempts <= 0 {
+			return fmt.Errorf("tunnel rate limiting loginAttempts must be positive")
+		}
+		if c.Tunnel.RateLimiting.WindowSeconds <= 0 {
+			return fmt.Errorf("tunnel rate limiting windowSeconds must be positive")
+		}
+		if c.Tunnel.RateLimiting.BlockDurationSeconds <= 0 {
+			return fmt.Errorf("tunnel rate limiting blockDurationSeconds must be positive")
+		}
+	}
+
+	return nil
+}
+
+// IsTunnelPublic returns true if the tunnel exposes the service to the public internet.
+func (c *Config) IsTunnelPublic() bool {
+	if !c.Tunnel.Enabled {
+		return false
+	}
+	return c.Tunnel.Tailscale.Funnel
 }

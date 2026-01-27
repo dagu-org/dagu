@@ -8,6 +8,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/tunnel"
 )
 
 // GetSchedulerStatus returns the status of all registered scheduler instances
@@ -119,4 +120,55 @@ func (a *API) GetCoordinatorStatus(ctx context.Context, _ api.GetCoordinatorStat
 	return api.GetCoordinatorStatus200JSONResponse{
 		Coordinators: coordinators,
 	}, nil
+}
+
+// GetTunnelStatus returns the status of the tunnel service
+func (a *API) GetTunnelStatus(ctx context.Context, _ api.GetTunnelStatusRequestObject) (api.GetTunnelStatusResponseObject, error) {
+	logger.Info(ctx, "GetTunnelStatus called")
+
+	// Return disabled if tunnel is not configured or service unavailable
+	if !a.config.Tunnel.Enabled || a.tunnelService == nil {
+		return api.GetTunnelStatus200JSONResponse{
+			Enabled: a.config.Tunnel.Enabled,
+			Status:  api.TunnelStatusResponseStatusDisabled,
+		}, nil
+	}
+
+	info := a.tunnelService.Info()
+
+	// Map tunnel status to API status
+	statusMap := map[tunnel.Status]api.TunnelStatusResponseStatus{
+		tunnel.StatusConnected:    api.TunnelStatusResponseStatusConnected,
+		tunnel.StatusConnecting:   api.TunnelStatusResponseStatusConnecting,
+		tunnel.StatusReconnecting: api.TunnelStatusResponseStatusReconnecting,
+		tunnel.StatusError:        api.TunnelStatusResponseStatusError,
+	}
+	status, ok := statusMap[info.Status]
+	if !ok {
+		status = api.TunnelStatusResponseStatusDisabled
+	}
+
+	// Build response
+	response := api.GetTunnelStatus200JSONResponse{
+		Enabled:   true,
+		Status:    status,
+		PublicUrl: ptrOf(info.PublicURL),
+		Error:     ptrOf(info.Error),
+		Mode:      ptrOf(info.Mode),
+		IsPublic:  ptrOf(info.IsPublic),
+	}
+
+	// Set provider if available
+	if info.Provider != "" {
+		p := api.TunnelStatusResponseProvider(info.Provider)
+		response.Provider = &p
+	}
+
+	// Set startedAt if tunnel has been started
+	if !info.StartedAt.IsZero() {
+		startedAt := info.StartedAt
+		response.StartedAt = &startedAt
+	}
+
+	return response, nil
 }

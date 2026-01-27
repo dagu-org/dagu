@@ -281,6 +281,42 @@ var (
 		usage:     "Skip confirmation prompt",
 		isBool:    true,
 	}
+
+	// tunnelFlag enables tunnel mode.
+	tunnelFlag = commandLineFlag{
+		name:      "tunnel",
+		shorthand: "t",
+		usage:     "Enable tunnel mode for remote access",
+		isBool:    true,
+		bindViper: true,
+		viperKey:  "tunnel.enabled",
+	}
+
+	// tunnelTokenFlag provides authentication token for the tunnel.
+	tunnelTokenFlag = commandLineFlag{
+		name:      "tunnel-token",
+		usage:     "Tailscale auth key for headless authentication",
+		bindViper: true,
+		viperKey:  "tunnel.token",
+	}
+
+	// tunnelFunnelFlag enables Tailscale Funnel for public access.
+	tunnelFunnelFlag = commandLineFlag{
+		name:      "tunnel-funnel",
+		usage:     "Enable Tailscale Funnel for public internet access (requires Tailscale provider)",
+		isBool:    true,
+		bindViper: true,
+		viperKey:  "tunnel.tailscale.funnel",
+	}
+
+	// tunnelHTTPSFlag enables HTTPS for Tailscale tailnet-only access.
+	tunnelHTTPSFlag = commandLineFlag{
+		name:      "tunnel-https",
+		usage:     "Use HTTPS for Tailscale (requires enabling HTTPS in Tailscale admin panel)",
+		isBool:    true,
+		bindViper: true,
+		viperKey:  "tunnel.tailscale.https",
+	}
 )
 
 type commandLineFlag struct {
@@ -288,6 +324,7 @@ type commandLineFlag struct {
 	required                             bool
 	isBool                               bool
 	bindViper                            bool
+	viperKey                             string // Custom viper key (if different from kebab-to-camel name)
 }
 
 // initFlags registers a set of CLI flags on the provided Cobra command.
@@ -309,14 +346,18 @@ func initFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
 }
 
 // bindFlags binds command-line flags to the provided Viper instance for configuration lookup.
-// It binds only flags whose `bindViper` field is true, using the camel-cased key produced
-// from each flag's kebab-case name.
+// It binds only flags whose `bindViper` field is true, using either the custom viperKey
+// or the camel-cased key produced from each flag's kebab-case name.
 func bindFlags(viper *viper.Viper, cmd *cobra.Command, additionalFlags ...commandLineFlag) {
 	flags := append([]commandLineFlag{configFlag}, additionalFlags...)
 
 	for _, flag := range flags {
 		if flag.bindViper {
-			_ = viper.BindPFlag(stringutil.KebabToCamel(flag.name), cmd.Flags().Lookup(flag.name))
+			key := flag.viperKey
+			if key == "" {
+				key = stringutil.KebabToCamel(flag.name)
+			}
+			_ = viper.BindPFlag(key, cmd.Flags().Lookup(flag.name))
 		}
 	}
 }

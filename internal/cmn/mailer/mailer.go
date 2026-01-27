@@ -383,7 +383,7 @@ func addAttachments(attachments []string) []byte {
 	for _, fileName := range attachments {
 		data, err := readFile(fileName)
 		if err == nil {
-			_, _ = buf.WriteString(fmt.Sprintf("\r\n\n--%s\r\n", boundary))
+			_, _ = fmt.Fprintf(&buf, "\r\n\n--%s\r\n", boundary)
 			_, _ = buf.WriteString("Content-Type: text/plain;" + "\r\n")
 			_, _ = buf.WriteString("Content-Transfer-Encoding: base64" + "\r\n")
 			_, _ = buf.WriteString(

@@ -583,4 +583,91 @@ func TestConfig_Validate(t *testing.T) {
 		}
 	})
 
+	// Tunnel validation tests
+	t.Run("TunnelPublicRequiresAuth", func(t *testing.T) {
+		t.Parallel()
+		cfg := &Config{
+			Server: Server{
+				Auth: Auth{Mode: AuthModeNone},
+				Port: 8080,
+			},
+			UI: UI{MaxDashboardPageLimit: 100},
+			Tunnel: TunnelConfig{
+				Enabled: true,
+				Tailscale: TailscaleTunnelConfig{
+					Funnel: true, // Public access
+				},
+			},
+		}
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "requires authentication")
+	})
+
+	t.Run("TunnelPublicWithAuthOK", func(t *testing.T) {
+		t.Parallel()
+		cfg := &Config{
+			Server: Server{
+				Auth: Auth{
+					Mode:  AuthModeBuiltin,
+					Basic: AuthBasic{Username: "user", Password: "pass"},
+					Builtin: AuthBuiltin{
+						Admin: AdminConfig{Username: "admin"},
+						Token: TokenConfig{Secret: "secret", TTL: 1},
+					},
+				},
+				Port: 8080,
+			},
+			Paths: PathsConfig{UsersDir: "/tmp/users"},
+			UI:    UI{MaxDashboardPageLimit: 100},
+			Tunnel: TunnelConfig{
+				Enabled: true,
+				Tailscale: TailscaleTunnelConfig{
+					Funnel: true, // Public access
+				},
+			},
+		}
+		err := cfg.Validate()
+		require.NoError(t, err)
+	})
+
+	t.Run("TunnelPrivateNoAuthOK", func(t *testing.T) {
+		t.Parallel()
+		cfg := &Config{
+			Server: Server{
+				Auth: Auth{Mode: AuthModeNone},
+				Port: 8080,
+			},
+			UI: UI{MaxDashboardPageLimit: 100},
+			Tunnel: TunnelConfig{
+				Enabled: true,
+				Tailscale: TailscaleTunnelConfig{
+					Funnel: false, // Private (tailnet only)
+				},
+			},
+		}
+		err := cfg.Validate()
+		require.NoError(t, err)
+	})
+
+	t.Run("TunnelDisabledNoValidation", func(t *testing.T) {
+		t.Parallel()
+		// When tunnel is disabled, validation should pass regardless of settings
+		cfg := &Config{
+			Server: Server{
+				Auth: Auth{Mode: AuthModeNone},
+				Port: 8080,
+			},
+			UI: UI{MaxDashboardPageLimit: 100},
+			Tunnel: TunnelConfig{
+				Enabled: false,
+				Tailscale: TailscaleTunnelConfig{
+					Funnel: true, // Would require auth if enabled
+				},
+			},
+		}
+		err := cfg.Validate()
+		require.NoError(t, err)
+	})
+
 }

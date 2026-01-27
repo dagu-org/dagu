@@ -24,6 +24,7 @@ import (
 	"github.com/dagu-org/dagu/internal/service/frontend/api/pathutil"
 	frontendauth "github.com/dagu-org/dagu/internal/service/frontend/auth"
 	"github.com/dagu-org/dagu/internal/service/resource"
+	"github.com/dagu-org/dagu/internal/tunnel"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/go-chi/chi/v5"
@@ -51,6 +52,7 @@ type API struct {
 	authService        AuthService
 	auditService       *audit.Service
 	syncService        SyncService
+	tunnelService      *tunnel.Service
 	dagWritesDisabled  bool // True when git sync read-only mode is active
 }
 
@@ -108,6 +110,13 @@ func WithAuditService(as *audit.Service) APIOption {
 func WithSyncService(ss SyncService) APIOption {
 	return func(a *API) {
 		a.syncService = ss
+	}
+}
+
+// WithTunnelService returns an APIOption that sets the API's TunnelService.
+func WithTunnelService(ts *tunnel.Service) APIOption {
+	return func(a *API) {
+		a.tunnelService = ts
 	}
 }
 
