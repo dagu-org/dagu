@@ -274,7 +274,7 @@ function SystemStatus() {
       </div>
 
       {/* Footer */}
-      <div className="text-xs text-muted-foreground text-center space-y-1">
+      <div className="text-xs text-muted-foreground text-center space-y-1 mb-4">
         <div>
           Last updated: {lastUpdateTime.toLocaleTimeString()}
           {autoRefresh && ' • Refreshing every 5 seconds'}
