@@ -78,7 +78,7 @@ var startWorkerIDFlag = commandLineFlag{
 // triggerTypeFlag identifies how this DAG run was initiated
 var triggerTypeFlag = commandLineFlag{
 	name:         "trigger-type",
-	usage:        "How this DAG run was initiated (scheduler, manual, webhook, subdag)",
+	usage:        "How this DAG run was initiated (scheduler, manual, webhook, subdag, retry)",
 	defaultValue: "manual",
 }
 
@@ -92,6 +92,9 @@ func runStart(ctx *Context, args []string) error {
 
 	triggerTypeStr, _ := ctx.StringParam("trigger-type")
 	triggerType := core.ParseTriggerType(triggerTypeStr)
+	if triggerTypeStr != "" && triggerType == core.TriggerTypeUnknown {
+		return fmt.Errorf("invalid trigger-type %q: must be one of scheduler, manual, webhook, subdag, retry", triggerTypeStr)
+	}
 
 	dagRunID, rootRef, parentRef, isSubDAGRun, err := getDAGRunInfo(ctx)
 	if err != nil {

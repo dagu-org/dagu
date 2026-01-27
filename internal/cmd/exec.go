@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -133,16 +134,19 @@ func runExec(ctx *Context, args []string) error {
 
 	dagRunRef := exec.NewDAGRunRef(dag.Name, runID)
 
-	attempt, _ := ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
+	attempt, err := ctx.DAGRunStore.FindAttempt(ctx, dagRunRef)
+	if err != nil && !errors.Is(err, exec.ErrDAGRunIDNotFound) {
+		return fmt.Errorf("failed to check for existing dag-run: %w", err)
+	}
 	if attempt != nil {
 		return fmt.Errorf("dag-run ID %s already exists for DAG %s", runID, dag.Name)
 	}
 
 	logger.Info(ctx, "Executing inline dag-run",
 		tag.DAG(dag.Name),
-		tag.Command(strings.Join(args, " ")),
 		tag.RunID(runID),
 	)
+	logger.Debug(ctx, "Command details", tag.Command(strings.Join(args, " ")))
 
 	return tryExecuteDAG(ctx, dag, runID, dagRunRef, "local", core.TriggerTypeManual)
 }

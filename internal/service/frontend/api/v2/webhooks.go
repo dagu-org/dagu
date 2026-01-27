@@ -450,14 +450,21 @@ func (a *API) logWebhookAudit(ctx context.Context, action string, details any) {
 	if a.auditService == nil {
 		return
 	}
-	currentUser, _ := auth.UserFromContext(ctx)
+	currentUser, ok := auth.UserFromContext(ctx)
 	clientIP, _ := auth.ClientIPFromContext(ctx)
+
+	var userID, username string
+	if ok && currentUser != nil {
+		userID = currentUser.ID
+		username = currentUser.Username
+	}
+
 	detailsJSON, err := json.Marshal(details)
 	if err != nil {
 		logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
 		detailsJSON = []byte("{}")
 	}
-	entry := audit.NewEntry(audit.CategoryWebhook, action, currentUser.ID, currentUser.Username).
+	entry := audit.NewEntry(audit.CategoryWebhook, action, userID, username).
 		WithDetails(string(detailsJSON)).
 		WithIPAddress(clientIP)
 	_ = a.auditService.Log(ctx, entry)

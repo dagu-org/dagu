@@ -80,9 +80,8 @@ steps:
 			core.TriggerTypeScheduler,
 		)
 
-		if err != nil {
-			require.Contains(t, err.Error(), "failed to start dag-run")
-		}
+		// Local execution with nil coordinator should succeed
+		require.NoError(t, err)
 	})
 
 	t.Run("HandleJob_Retry_BypassesEnqueue", func(t *testing.T) {

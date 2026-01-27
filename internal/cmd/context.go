@@ -355,7 +355,10 @@ func (c *Context) StringParam(name string) (string, error) {
 
 // getWorkerID retrieves the worker ID from context, defaulting to "local" if not set.
 func getWorkerID(ctx *Context) string {
-	workerID, _ := ctx.StringParam("worker-id")
+	workerID, err := ctx.StringParam("worker-id")
+	if err != nil {
+		logger.Warn(ctx, "Failed to read worker-id flag, defaulting to 'local'", tag.Error(err))
+	}
 	if workerID == "" {
 		return "local"
 	}

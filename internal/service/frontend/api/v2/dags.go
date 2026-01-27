@@ -74,10 +74,17 @@ func (a *API) logDAGAudit(ctx context.Context, action string, details map[string
 	if a.auditService == nil {
 		return
 	}
-	currentUser, _ := auth.UserFromContext(ctx)
+	currentUser, ok := auth.UserFromContext(ctx)
 	clientIP, _ := auth.ClientIPFromContext(ctx)
+
+	var userID, username string
+	if ok && currentUser != nil {
+		userID = currentUser.ID
+		username = currentUser.Username
+	}
+
 	detailsJSON, _ := json.Marshal(details)
-	entry := audit.NewEntry(audit.CategoryDAG, action, currentUser.ID, currentUser.Username).
+	entry := audit.NewEntry(audit.CategoryDAG, action, userID, username).
 		WithDetails(string(detailsJSON)).
 		WithIPAddress(clientIP)
 	_ = a.auditService.Log(ctx, entry)

@@ -36,7 +36,7 @@ type NodeStatusConfig = {
 };
 
 const NODE_STATUS_CONFIG: NodeStatusConfig[] = [
-  { key: 'finished', label: 'Success', colorClass: 'bg-success' },
+  { key: 'succeeded', label: 'Success', colorClass: 'bg-success' },
   { key: 'running', label: 'Running', colorClass: 'bg-success', animate: true },
   { key: 'failed', label: 'Failed', colorClass: 'bg-error' },
   { key: 'queued', label: 'Queued', colorClass: 'bg-info' },
@@ -66,11 +66,11 @@ function formatTimestamp(timestamp: string | undefined): string {
   if (!timestamp || timestamp === '-') {
     return '-';
   }
-  try {
-    return dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss Z');
-  } catch {
+  const parsed = dayjs(timestamp);
+  if (!parsed.isValid()) {
     return timestamp;
   }
+  return parsed.format('YYYY-MM-DD HH:mm:ss Z');
 }
 
 type PreconditionErrorsProps = {
@@ -96,11 +96,11 @@ function PreconditionErrors({ preconditions }: PreconditionErrorsProps): React.J
         {errors.map((cond, idx) => (
           <div
             key={idx}
-            className="p-1.5 bg-warning-muted border border-warning/20 rounded-md text-xs text-warning font-medium"
+            className="p-1.5 bg-warning-muted border border-warning/20 rounded-md text-xs text-warning font-medium whitespace-normal break-words"
           >
-            <div className="mb-0.5">Condition: {cond.condition}</div>
-            <div className="mb-0.5">Expected: {cond.expected}</div>
-            <div>Error: {cond.error}</div>
+            <div className="mb-0.5 break-words">Condition: {cond.condition}</div>
+            <div className="mb-0.5 break-words">Expected: {cond.expected}</div>
+            <div className="break-words">Error: {cond.error}</div>
           </div>
         ))}
       </div>
@@ -114,8 +114,19 @@ function formatDuration(startedAt: string | undefined, finishedAt: string | unde
   }
 
   const start = dayjs(startedAt);
+  if (!start.isValid()) {
+    return '-';
+  }
+
   const end = finishedAt && finishedAt !== '-' ? dayjs(finishedAt) : dayjs();
+  if (!end.isValid()) {
+    return '-';
+  }
+
   const diff = end.diff(start, 'second');
+  if (diff < 0) {
+    return '-';
+  }
 
   const hours = Math.floor(diff / 3600);
   const minutes = Math.floor((diff % 3600) / 60);

@@ -57,8 +57,12 @@ export function TriggerTypeIndicator({
   const Icon = config.icon;
 
   return (
-    <div className={`flex items-center gap-1 ${config.colorClass}`}>
-      <Icon size={size} />
+    <div
+      className={`flex items-center gap-1 ${config.colorClass}`}
+      aria-label={config.label}
+      title={config.label}
+    >
+      <Icon size={size} aria-hidden="true" />
       {showLabel && <span className="text-xs">{config.label}</span>}
     </div>
   );
