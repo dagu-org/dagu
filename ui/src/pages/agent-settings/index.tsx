@@ -55,7 +55,7 @@ export default function AgentSettingsPage() {
       const token = localStorage.getItem(TOKEN_KEY);
       const remoteNode = appBarContext.selectedRemoteNode || 'local';
       const response = await fetch(
-        `${config.apiURL}/agent/config?remoteNode=${remoteNode}`,
+        `${config.apiURL}/settings/agent?remoteNode=${remoteNode}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -120,7 +120,7 @@ export default function AgentSettingsPage() {
       }
 
       const response = await fetch(
-        `${config.apiURL}/agent/config?remoteNode=${remoteNode}`,
+        `${config.apiURL}/settings/agent?remoteNode=${remoteNode}`,
         {
           method: 'PATCH',
           headers: {
@@ -248,7 +248,7 @@ export default function AgentSettingsPage() {
                   id="model"
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
-                  placeholder="claude-sonnet-4-20250514"
+                  placeholder="claude-sonnet-4-5"
                   className="h-8"
                 />
                 <p className="text-xs text-muted-foreground">

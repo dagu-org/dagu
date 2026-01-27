@@ -1,6 +1,6 @@
 // Agent chat types
 
-export type MessageType = 'user' | 'assistant' | 'tool_use' | 'tool_result';
+export type MessageType = 'user' | 'assistant' | 'tool_use' | 'tool_result' | 'error';
 
 export interface ToolCall {
   id: string;

@@ -28,10 +28,10 @@ type AgentLLMConfig struct {
 // DefaultConfig returns the default agent configuration.
 func DefaultConfig() *AgentConfig {
 	return &AgentConfig{
-		Enabled: false,
+		Enabled: true,
 		LLM: AgentLLMConfig{
 			Provider: "anthropic",
-			Model:    "claude-sonnet-4-20250514",
+			Model:    "claude-sonnet-4-5",
 		},
 	}
 }

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { X, Trash2, Minimize2 } from 'lucide-react';
+import { X, RotateCcw, Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAgentChatContext } from '../context/AgentChatContext';
 import { useAgentChat } from '../hooks/useAgentChat';
@@ -45,52 +45,41 @@ export function AgentChatModal() {
   return (
     <div
       className={cn(
-        'fixed bottom-20 right-4 z-50',
-        'w-[380px] max-w-[calc(100vw-32px)]',
-        'h-[500px] max-h-[calc(100vh-120px)]',
+        'fixed bottom-16 right-4 z-50',
+        'w-[420px] max-w-[calc(100vw-32px)]',
+        'h-[520px] max-h-[calc(100vh-100px)]',
         'flex flex-col',
-        'bg-background border border-border rounded-lg shadow-xl',
+        'bg-background border border-border rounded-md shadow-xl',
         'animate-in slide-in-from-bottom-4 fade-in-0 duration-200'
       )}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border/40 bg-muted/30 rounded-t-lg">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/50 rounded-t-md">
         <div className="flex items-center gap-2">
-          <div
-            className={cn(
-              'w-2 h-2 rounded-full',
-              isWorking ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'
-            )}
-          />
-          <span className="text-sm font-medium">Dagu Agent</span>
+          <Terminal className="h-4 w-4 text-muted-foreground" />
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Agent Console</span>
+          {isWorking && (
+            <span className="text-xs text-yellow-500 font-mono">running...</span>
+          )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <Button
             variant="ghost"
             size="sm"
             onClick={handleClear}
-            className="h-7 w-7 p-0"
-            title="New conversation"
+            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+            title="Clear"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <RotateCcw className="h-3 w-3" />
           </Button>
           <Button
             variant="ghost"
             size="sm"
             onClick={closeChat}
-            className="h-7 w-7 p-0"
-            title="Minimize"
-          >
-            <Minimize2 className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={closeChat}
-            className="h-7 w-7 p-0"
+            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
             title="Close"
           >
-            <X className="h-3.5 w-3.5" />
+            <X className="h-3 w-3" />
           </Button>
         </div>
       </div>

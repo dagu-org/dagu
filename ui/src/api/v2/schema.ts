@@ -1564,7 +1564,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/agent/config": {
+    "/settings/agent": {
         parameters: {
             query?: never;
             header?: never;

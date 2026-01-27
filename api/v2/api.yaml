@@ -3548,13 +3548,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /agent/config:
+  /settings/agent:
     get:
       summary: "Get agent configuration"
       description: "Returns the current AI agent configuration. Requires admin role."
       operationId: "getAgentConfig"
       tags:
-        - "agent"
+        - "settings"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
       responses:
@@ -3588,7 +3588,7 @@ paths:
       description: "Updates the AI agent configuration. Requires admin role."
       operationId: "updateAgentConfig"
       tags:
-        - "agent"
+        - "settings"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
       requestBody:

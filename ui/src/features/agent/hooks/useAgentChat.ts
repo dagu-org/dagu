@@ -22,7 +22,7 @@ export function useAgentChat() {
   } = useAgentChatContext();
 
   const eventSourceRef = useRef<EventSource | null>(null);
-  const baseUrl = `${config.basePath}/api/v2/agent`;
+  const baseUrl = `${config.apiURL}/agent`;
 
   // Clean up EventSource on unmount
   useEffect(() => {
