@@ -1,0 +1,19 @@
+{{- if ne .Values.persistence.accessMode "ReadWriteMany" }}
+{{- $currentMode := .Values.persistence.accessMode }}
+{{- fail (printf "Dagu requires ReadWriteMany access mode. Current accessMode is set to '%s'. Please set persistence.accessMode to 'ReadWriteMany'." $currentMode) }}
+{{- end }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "dagu.fullname" . }}-data
+  labels:
+    {{- include "dagu.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
+  {{- if .Values.persistence.storageClass }}
+  storageClassName: {{ .Values.persistence.storageClass }}
+  {{- end }}

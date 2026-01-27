@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "dagu.fullname" . }}-config
+  labels:
+    {{- include "dagu.labels" . | nindent 4 }}
+data:
+  dagu.yaml: |
+    # This config defines dagu's filesystem-based state layout.
+    # All components mount the same shared volume at /data.
+    # This layout is required by dagu's current architecture.
+    
+    dataDir: /data
+    dagsDir: /data/dags
+    logDir: /data/logs
+    suspendFlagsDir: /data/suspend
+    adminLogsDir: /data/admin/logs
+    baseConfig: /data/base.yaml
+    executable: /usr/local/bin/dagu
+    dagRunsDir: /data/dag-runs
+    queueDir: /data/queue
+    procDir: /data/proc
+    serviceRegistryDir: /data/services
+    apiKeysDir: /data/api-keys
+    webhooksDir: /data/webhooks   

@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dagu.fullname" . }}-worker
+  labels:
+    {{- include "dagu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels:
+      {{- include "dagu.labels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "dagu.labels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+    spec:
+      containers:
+        - name: worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["dagu", "worker"]
+          env:
+            - name: DAGU_DATA_DIR
+              value: "/data"
+            - name: DAGU_DAGS_DIR
+              value: "/data/dags"
+            - name: DAGU_LOG_DIR
+              value: "/data/logs"
+            - name: DAGU_COORDINATOR_HOST
+              value: "{{ include "dagu.fullname" . }}-scheduler.{{ .Release.Namespace }}.svc.cluster.local"
+            - name: WORKER_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: config
+              mountPath: /etc/dagu
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "dagu.fullname" . }}-data
+        - name: config
+          configMap:
+            name: {{ include "dagu.fullname" . }}-config
