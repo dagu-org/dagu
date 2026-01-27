@@ -28,13 +28,6 @@ export function ChatInput({
   const [selectedDags, setSelectedDags] = useState<DAGContext[]>([]);
   const currentPageDag = useDagPageContext();
 
-  // Auto-add current page DAG when it changes (if not already selected)
-  useEffect(() => {
-    if (currentPageDag && !selectedDags.some((d) => d.dag_file === currentPageDag.dag_file)) {
-      setSelectedDags((prev) => [...prev, currentPageDag]);
-    }
-  }, [currentPageDag?.dag_file, currentPageDag?.dag_run_id]);
-
   // Combine local pending state with parent isWorking for immediate response
   const showPauseButton = isPending || isWorking;
 
@@ -59,10 +52,23 @@ export function ChatInput({
       flushSync(() => {
         setIsPending(true);
       });
-      onSend(trimmed, selectedDags.length > 0 ? selectedDags : undefined);
+
+      // Always include current page DAG, plus any additional selected DAGs
+      const allContexts: DAGContext[] = [];
+      if (currentPageDag) {
+        allContexts.push(currentPageDag);
+      }
+      // Add selected DAGs that aren't the current page DAG
+      selectedDags.forEach((dag) => {
+        if (!currentPageDag || dag.dag_file !== currentPageDag.dag_file) {
+          allContexts.push(dag);
+        }
+      });
+
+      onSend(trimmed, allContexts.length > 0 ? allContexts : undefined);
       setMessage('');
     }
-  }, [message, showPauseButton, disabled, onSend, selectedDags]);
+  }, [message, showPauseButton, disabled, onSend, selectedDags, currentPageDag]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {

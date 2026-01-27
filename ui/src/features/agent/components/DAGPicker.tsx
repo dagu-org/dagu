@@ -8,8 +8,11 @@ import { AppBarContext } from '@/contexts/AppBarContext';
 import { DAGContext } from '../types';
 
 interface DAGPickerProps {
+  /** Additional DAGs selected by the user (excludes current page DAG) */
   selectedDags: DAGContext[];
+  /** Callback when user adds/removes additional DAGs */
   onChange: (dags: DAGContext[]) => void;
+  /** Current page DAG - always included automatically, shown as non-removable */
   currentPageDag?: DAGContext | null;
   disabled?: boolean;
 }
@@ -44,17 +47,25 @@ export function DAGPicker({
     }));
   }, [data]);
 
+  // Filter out current page DAG from the picker list (it's always included)
   const filteredDags = useMemo(() => {
-    if (!searchQuery.trim()) return dagFiles;
+    let dags = dagFiles;
+
+    // Exclude current page DAG since it's auto-included
+    if (currentPageDag) {
+      dags = dags.filter((d) => d.fileName !== currentPageDag.dag_file);
+    }
+
+    if (!searchQuery.trim()) return dags;
     const query = searchQuery.toLowerCase();
-    return dagFiles.filter(
+    return dags.filter(
       (d) =>
         d.fileName.toLowerCase().includes(query) ||
         d.name.toLowerCase().includes(query)
     );
-  }, [dagFiles, searchQuery]);
+  }, [dagFiles, searchQuery, currentPageDag]);
 
-  // Check if a DAG is selected
+  // Check if a DAG is selected (in additional selections)
   const isSelected = (fileName: string) =>
     selectedDags.some((d) => d.dag_file === fileName);
 
@@ -93,32 +104,43 @@ export function DAGPicker({
     }
   }, [isOpen]);
 
-  // Check if current page DAG is in selection
-  const isCurrentPageDagSelected =
-    currentPageDag && isSelected(currentPageDag.dag_file);
+  const totalCount = (currentPageDag ? 1 : 0) + selectedDags.length;
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Selected DAGs chips */}
-      {selectedDags.length > 0 && (
+      {/* Context chips: current page (non-removable) + additional selections (removable) */}
+      {(currentPageDag || selectedDags.length > 0) && (
         <div className="flex flex-wrap gap-1 mb-1">
+          {/* Current page DAG - always shown, not removable */}
+          {currentPageDag && (
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs',
+                'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+              )}
+            >
+              <Paperclip className="h-3 w-3" />
+              <span className="max-w-[120px] truncate">{currentPageDag.dag_file}</span>
+              {currentPageDag.dag_run_id && (
+                <span className="opacity-70">
+                  #{currentPageDag.dag_run_id.slice(0, 8)}
+                </span>
+              )}
+              <span className="opacity-60 text-[10px]">(current)</span>
+            </span>
+          )}
+
+          {/* Additional selected DAGs - removable */}
           {selectedDags.map((dag) => (
             <span
               key={dag.dag_file}
               className={cn(
                 'inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs',
-                'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300',
-                currentPageDag?.dag_file === dag.dag_file &&
-                  'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+                'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
               )}
             >
               <Paperclip className="h-3 w-3" />
               <span className="max-w-[120px] truncate">{dag.dag_file}</span>
-              {dag.dag_run_id && (
-                <span className="text-muted-foreground">
-                  #{dag.dag_run_id.slice(0, 8)}
-                </span>
-              )}
               <button
                 type="button"
                 onClick={() => removeDag(dag.dag_file)}
@@ -141,11 +163,11 @@ export function DAGPicker({
           onClick={() => setIsOpen(!isOpen)}
           disabled={disabled}
           className="h-7 px-2 text-muted-foreground hover:text-foreground"
-          title="Attach DAG context"
+          title="Attach additional DAG context"
         >
           <Paperclip className="h-4 w-4" />
-          {selectedDags.length > 0 && (
-            <span className="ml-1 text-xs">{selectedDags.length}</span>
+          {totalCount > 0 && (
+            <span className="ml-1 text-xs">{totalCount}</span>
           )}
         </Button>
 
@@ -167,7 +189,7 @@ export function DAGPicker({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search DAGs..."
+                  placeholder="Add more DAGs..."
                   className={cn(
                     'w-full pl-7 pr-2 py-1.5 text-sm rounded',
                     'bg-background border border-input',
@@ -177,37 +199,11 @@ export function DAGPicker({
               </div>
             </div>
 
-            {/* DAG list */}
+            {/* DAG list (excludes current page DAG) */}
             <div className="overflow-y-auto flex-1 max-h-48">
-              {currentPageDag && !isCurrentPageDagSelected && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onChange([...selectedDags, currentPageDag])
-                    }
-                    className={cn(
-                      'w-full px-3 py-1.5 text-left text-sm',
-                      'hover:bg-accent flex items-center justify-between',
-                      'bg-blue-50 dark:bg-blue-900/20'
-                    )}
-                  >
-                    <span className="flex items-center gap-2 min-w-0">
-                      <span className="truncate">
-                        {currentPageDag.dag_file}
-                      </span>
-                      <span className="text-xs text-muted-foreground shrink-0">
-                        (current)
-                      </span>
-                    </span>
-                  </button>
-                  <div className="border-b" />
-                </>
-              )}
-
               {filteredDags.length === 0 ? (
                 <div className="px-3 py-2 text-sm text-muted-foreground">
-                  No DAGs found
+                  {searchQuery ? 'No DAGs found' : 'No additional DAGs available'}
                 </div>
               ) : (
                 filteredDags.map((dag) => (
