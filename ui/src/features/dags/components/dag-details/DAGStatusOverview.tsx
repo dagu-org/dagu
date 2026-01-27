@@ -26,19 +26,19 @@ type NodeStatusConfig = {
   key: string;
   label: string;
   colorClass: string;
-  animate?: boolean;
 };
 
+// Colors: success=green-600, running=#d9ff66, error=#ef4444, cancel=#ec4899, skipped=#64748b, waiting=#f59e0b
 const NODE_STATUS_CONFIG: NodeStatusConfig[] = [
-  { key: 'succeeded', label: 'Success', colorClass: 'bg-success' },
-  { key: 'running', label: 'Running', colorClass: 'bg-success', animate: true },
-  { key: 'failed', label: 'Failed', colorClass: 'bg-error' },
-  { key: 'queued', label: 'Queued', colorClass: 'bg-info' },
-  { key: 'not_started', label: 'Not Started', colorClass: 'bg-accent' },
-  { key: 'skipped', label: 'Skipped', colorClass: 'bg-muted-foreground' },
-  { key: 'aborted', label: 'Aborted', colorClass: 'bg-pink-400' },
-  { key: 'waiting', label: 'Waiting', colorClass: 'bg-amber-500', animate: true },
-  { key: 'rejected', label: 'Rejected', colorClass: 'bg-red-600' },
+  { key: 'succeeded', label: 'Success', colorClass: 'bg-green-600' },
+  { key: 'running', label: 'Running', colorClass: 'bg-[#66ff66]' },
+  { key: 'failed', label: 'Failed', colorClass: 'bg-red-500' },
+  { key: 'queued', label: 'Queued', colorClass: 'bg-slate-400' },
+  { key: 'not_started', label: 'Not Started', colorClass: 'bg-slate-400' },
+  { key: 'skipped', label: 'Skipped', colorClass: 'bg-slate-500' },
+  { key: 'aborted', label: 'Aborted', colorClass: 'bg-pink-500' },
+  { key: 'waiting', label: 'Waiting', colorClass: 'bg-amber-500' },
+  { key: 'rejected', label: 'Rejected', colorClass: 'bg-red-500' },
 ];
 
 type ExecutionStatusConfig = {
@@ -205,17 +205,6 @@ function DAGStatusOverview({ status, onViewLog }: Props): React.JSX.Element | nu
     return null;
   }
 
-  // Build status summary for inline display
-  const statusCounts: { label: string; count: number; colorClass: string; animate?: boolean }[] = [];
-  if (nodeStatus) {
-    for (const { key, label, colorClass, animate } of NODE_STATUS_CONFIG) {
-      const count = nodeStatus[key];
-      if (count) {
-        statusCounts.push({ label, count, colorClass, animate });
-      }
-    }
-  }
-
   return (
     <div className="space-y-2">
       {/* Parameters - Compact single line */}
@@ -301,33 +290,21 @@ function DAGStatusOverview({ status, onViewLog }: Props): React.JSX.Element | nu
       <div className="flex items-center gap-2 text-xs">
         {totalNodes > 0 && nodeStatus && (
           <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden flex">
-            {NODE_STATUS_CONFIG.map(({ key, colorClass, animate }) => {
-              const count = nodeStatus[key];
+            {NODE_STATUS_CONFIG.map((config) => {
+              const count = nodeStatus[config.key];
               if (!count) return null;
               return (
                 <div
-                  key={key}
-                  className={`h-full ${colorClass} ${animate ? 'animate-pulse' : ''}`}
+                  key={config.key}
+                  className={`h-full ${config.colorClass}`}
                   style={{ width: `${(count / totalNodes) * 100}%` }}
                 />
               );
             })}
           </div>
         )}
-        <span className="text-muted-foreground whitespace-nowrap flex items-center gap-1.5">
-          {statusCounts.length > 0 ? (
-            statusCounts.map(({ label, count, colorClass }, idx) => (
-              <span key={label} className="flex items-center gap-0.5">
-                {idx > 0 && <span className="text-muted-foreground/50">·</span>}
-                <span className="font-medium text-foreground">{count}</span>
-                <span className={`${colorClass === 'bg-success' ? 'text-success' : colorClass === 'bg-error' ? 'text-error' : ''}`}>
-                  {label.toLowerCase()}
-                </span>
-              </span>
-            ))
-          ) : (
-            <span>{totalNodes} total</span>
-          )}
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {nodeStatus?.succeeded ?? 0}/{totalNodes}
         </span>
       </div>
 

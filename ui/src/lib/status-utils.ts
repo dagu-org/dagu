@@ -65,26 +65,26 @@ export function getStatusColors(
   switch (baseClass) {
     case 'status-success':
       return {
-        bgClass: 'bg-success',
-        textClass: 'text-success',
-        borderClass: 'border-success',
+        bgClass: 'bg-green-600',
+        textClass: 'text-green-600',
+        borderClass: 'border-green-600',
         animation: '',
       };
 
     case 'status-failed':
       return {
-        bgClass: 'bg-destructive',
-        textClass: 'text-destructive',
-        borderClass: 'border-destructive',
+        bgClass: 'bg-red-500',
+        textClass: 'text-red-500',
+        borderClass: 'border-red-500',
         animation: '',
       };
 
     case 'status-running':
       return {
-        bgClass: 'bg-primary',
-        textClass: 'text-primary',
-        borderClass: 'border-primary',
-        animation: 'animate-pulse',
+        bgClass: 'bg-[#66ff66]',
+        textClass: 'text-green-600',
+        borderClass: 'border-[#66ff66]',
+        animation: '',
       };
 
     case 'status-info':
