@@ -5,21 +5,44 @@ metadata:
   labels:
     {{- include "dagu.labels" . | nindent 4 }}
 data:
-  # Data directories
-  DAGU_DATA_DIR: "/data"
-  DAGU_DAGS_DIR: "/data/dags"
-  DAGU_LOG_DIR: "/data/logs"
-  DAGU_SUSPEND_FLAGS_DIR: "/data/suspend"
-  DAGU_ADMIN_LOG_DIR: "/data/admin/logs"
-  DAGU_DAG_RUNS_DIR: "/data/dag-runs"
-  DAGU_QUEUE_DIR: "/data/queue"
-  DAGU_PROC_DIR: "/data/proc"
-  DAGU_SERVICE_REGISTRY_DIR: "/data/services"
-  DAGU_API_KEYS_DIR: "/data/api-keys"
-  DAGU_WEBHOOKS_DIR: "/data/webhooks"
-  
-  # Scheduler configuration
-  DAGU_SCHEDULER_PORT: "8090"
-  
-  # Coordinator configuration
-  DAGU_COORDINATOR_PORT: "50055"
+  dagu.yaml: |
+    # Dagu configuration for Kubernetes (v0 Helm chart)
+    # This file intentionally includes only the minimal,
+    # schema-correct configuration required to run dagu
+    # in a distributed Kubernetes environment.
+
+    # Server / UI
+    host: "0.0.0.0"
+    port: 8080
+    apiBasePath: "/api/v2"
+
+    # Coordinator (distributed execution)
+    coordinator:
+      host: "0.0.0.0"
+      port: 50055
+
+    # Scheduler
+    scheduler:
+      port: 8090
+
+    # Paths (MUST be under `paths`)
+    paths:
+      dataDir: /data
+      dagsDir: /data/dags
+      logDir: /data/logs
+      suspendFlagsDir: /data/suspend
+      adminLogsDir: /data/admin/logs
+      dagRunsDir: /data/dag-runs
+      queueDir: /data/queue
+      procDir: /data/proc
+      serviceRegistryDir: /data/services
+      apiKeysDir: /data/api-keys
+      webhooksDir: /data/webhooks
+
+    # Auth (disabled for v0 simplicity)
+    auth:
+      mode: "none"
+
+    # Peer communication (required for distributed mode)
+    peer:
+      insecure: true

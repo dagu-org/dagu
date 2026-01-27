@@ -17,17 +17,19 @@ spec:
         {{- include "dagu.labels" . | nindent 8 }}
         app.kubernetes.io/component: ui
     spec:
+      # Disable Kubernetes Service env var injection to avoid overriding
+      # dagu config values (e.g., scheduler.port) with Service URLs
+      enableServiceLinks: false
       containers:
         - name: ui
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["dagu", "server"]
-          envFrom:
-            - configMapRef:
-                name: {{ include "dagu.fullname" . }}-config
+          command:
+            - dagu
+            - server
+            - --config
+            - /etc/dagu/dagu.yaml
           env:
-            - name: DAGU_HOST
-              value: "0.0.0.0"
             - name: DAGU_PORT
               value: {{ .Values.ui.service.port | quote }}
           ports:
@@ -37,6 +39,8 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+            - name: config
+              mountPath: /etc/dagu
           livenessProbe:
             httpGet:
               path: /health
@@ -55,3 +59,6 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: {{ include "dagu.fullname" . }}-data
+        - name: config
+          configMap:
+            name: {{ include "dagu.fullname" . }}-config
