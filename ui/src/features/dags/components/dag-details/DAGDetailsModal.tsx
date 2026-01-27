@@ -171,10 +171,10 @@ function DAGDetailsModal({ fileName, isOpen, onClose }: Props): React.ReactEleme
               <div className="flex justify-between items-center mb-4">
                 <p className="text-xs text-muted-foreground">
                   Use{' '}
-                  <kbd className="px-1 py-0.5 bg-muted rounded text-[10px] font-mono">
+                  <kbd className="px-1 py-0.5 bg-muted rounded text-xs font-mono">
                     ↑
                   </kbd>{' '}
-                  <kbd className="px-1 py-0.5 bg-muted rounded text-[10px] font-mono">
+                  <kbd className="px-1 py-0.5 bg-muted rounded text-xs font-mono">
                     ↓
                   </kbd>{' '}
                   to navigate DAGs
@@ -188,7 +188,7 @@ function DAGDetailsModal({ fileName, isOpen, onClose }: Props): React.ReactEleme
                     className="relative group"
                   >
                     <Maximize2 className="h-4 w-4" />
-                    <span className="absolute -bottom-1 -right-1 bg-muted text-muted-foreground text-[10px] font-medium px-1 rounded-sm border opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="absolute -bottom-1 -right-1 bg-muted text-muted-foreground text-xs font-medium px-1 rounded-sm border opacity-0 group-hover:opacity-100 transition-opacity">
                       F
                     </span>
                   </Button>
@@ -200,7 +200,7 @@ function DAGDetailsModal({ fileName, isOpen, onClose }: Props): React.ReactEleme
                     className="relative group"
                   >
                     <X className="h-4 w-4" />
-                    <span className="absolute -bottom-1 -right-1 bg-muted text-muted-foreground text-[10px] font-medium px-1 rounded-sm border opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="absolute -bottom-1 -right-1 bg-muted text-muted-foreground text-xs font-medium px-1 rounded-sm border opacity-0 group-hover:opacity-100 transition-opacity">
                       Esc
                     </span>
                   </Button>

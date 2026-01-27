@@ -277,7 +277,7 @@
 
 /* Status Indicators */
 .status-pill {
-  @apply px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider;
+  @apply px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider;
 }
 .status-success {
   @apply bg-success/10 text-success border border-success/20;

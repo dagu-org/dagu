@@ -59,7 +59,7 @@ export function ScriptDialog({
         </DialogHeader>
         <div className="flex-1 overflow-auto min-h-0 rounded-b-lg">
           <div className="bg-code-bg min-h-full rounded-b-lg">
-            <pre className="font-mono text-[12px] text-code-text p-3">
+            <pre className="font-mono text-xs text-code-text p-3">
               {lines.map((line, index) => (
                 <div key={index} className="flex hover:bg-code-bg/80 px-1">
                   <span className="text-muted-foreground mr-4 select-none w-8 text-right flex-shrink-0">

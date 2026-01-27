@@ -205,7 +205,7 @@ export function ParallelExecutionModal({
       <DialogContent className="sm:max-w-[800px] overflow-hidden p-0">
         <div className="p-4 border-b border-border">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-mono">
+            <DialogTitle className="flex items-center gap-2 text-lg font-semibold">
               <Layers className="h-4 w-4 text-info" />
               {subDAGName}
             </DialogTitle>

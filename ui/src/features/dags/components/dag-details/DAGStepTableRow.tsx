@@ -175,7 +175,7 @@ function DAGStepTableRow({ step, index }: Props) {
                 }`}
               >
                 <RefreshCw className="h-3 w-3" />
-                <span className="font-medium uppercase tracking-wider text-[10px]">
+                <span className="font-medium uppercase tracking-wider text-xs">
                   {step.repeatPolicy.repeat === 'while'
                     ? 'WHILE'
                     : step.repeatPolicy.repeat === 'until'
@@ -183,12 +183,12 @@ function DAGStepTableRow({ step, index }: Props) {
                       : 'REPEAT'}
                 </span>
                 {step.repeatPolicy.interval && (
-                  <span className="text-[10px] opacity-75">
+                  <span className="text-xs opacity-75">
                     {step.repeatPolicy.interval}s
                   </span>
                 )}
                 {step.repeatPolicy.limit && (
-                  <span className="text-[10px] opacity-75">
+                  <span className="text-xs opacity-75">
                     ×{step.repeatPolicy.limit}
                   </span>
                 )}
@@ -196,7 +196,7 @@ function DAGStepTableRow({ step, index }: Props) {
 
               {/* Repeat Condition */}
               {step.repeatPolicy.condition && (
-                <div className="text-[10px] bg-muted rounded px-1.5 py-0.5 font-mono">
+                <div className="text-xs bg-muted rounded px-1.5 py-0.5 font-mono">
                   <span className="text-muted-foreground">
                     {step.repeatPolicy.repeat === 'while'
                       ? '↻ while'
@@ -223,7 +223,7 @@ function DAGStepTableRow({ step, index }: Props) {
               {/* Exit Codes */}
               {step.repeatPolicy.exitCode &&
                 step.repeatPolicy.exitCode.length > 0 && (
-                  <div className="text-[10px] bg-muted rounded px-1.5 py-0.5">
+                  <div className="text-xs bg-muted rounded px-1.5 py-0.5">
                     <span className="text-muted-foreground">
                       exit codes:
                     </span>{' '}

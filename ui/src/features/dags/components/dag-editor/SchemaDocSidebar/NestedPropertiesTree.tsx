@@ -90,7 +90,7 @@ function PropertyItem({
         />
       </div>
       {property.description && (
-        <div className="pl-5 pr-1 text-[10px] text-muted-foreground truncate">
+        <div className="pl-5 pr-1 text-xs text-muted-foreground truncate">
           {property.description}
         </div>
       )}

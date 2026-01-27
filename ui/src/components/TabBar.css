@@ -27,7 +27,7 @@
   flex: 0 1 auto;
   cursor: pointer;
   user-select: none;
-  font-size: 13px;
+  font-size: 0.875rem; /* text-sm */
   font-weight: 600;
   border: 1px solid var(--btn-secondary-border);
   border-bottom: 2px solid transparent;

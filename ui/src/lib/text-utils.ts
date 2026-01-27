@@ -28,8 +28,8 @@ export function getResponsiveTitleClass(
 
     case 'header-mobile':
       // Mobile header (Layout.tsx)
-      if (length > 20) return 'text-[10px]';
-      if (length > 15) return 'text-[11px]';
+      if (length > 20) return 'text-xs';
+      if (length > 15) return 'text-xs';
       return 'text-xs';
 
     default:

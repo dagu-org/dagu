@@ -221,7 +221,7 @@ function TimelineChart({ status }: Props) {
               transform: 'translateX(-50%)',
             }}
           >
-            <span className="text-[10px] text-muted-foreground font-mono">
+            <span className="text-xs text-muted-foreground font-mono">
               {marker.label}
             </span>
           </div>

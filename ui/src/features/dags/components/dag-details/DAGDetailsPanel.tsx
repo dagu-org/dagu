@@ -206,10 +206,10 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
             <div className="flex justify-between items-center mb-2 flex-shrink-0">
               <p className="text-xs text-muted-foreground">
                 Use{' '}
-                <kbd className="px-1 py-0.5 bg-muted rounded text-[10px] font-mono">
+                <kbd className="px-1 py-0.5 bg-muted rounded text-xs font-mono">
                   ↑
                 </kbd>{' '}
-                <kbd className="px-1 py-0.5 bg-muted rounded text-[10px] font-mono">
+                <kbd className="px-1 py-0.5 bg-muted rounded text-xs font-mono">
                   ↓
                 </kbd>{' '}
                 to navigate DAGs

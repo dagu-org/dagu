@@ -98,7 +98,7 @@ function NavItem({ to, icon, text, isOpen, onClick, customColor }: NavItemProps)
         {isOpen && (
           <span
             className={cn(
-              'text-[13px] font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden text-ellipsis',
+              'text-sm font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden text-ellipsis',
               isActive
                 ? 'text-foreground'
                 : 'text-sidebar-foreground group-hover:text-foreground'
@@ -244,7 +244,7 @@ export const mainListItems = React.forwardRef<
         <div className="space-y-6">
           <div className="space-y-1">
             {isOpen && (
-              <div className="px-3 mb-1 text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">
+              <div className="px-3 mb-1 text-xs font-bold text-muted-foreground/50 uppercase tracking-widest">
                 System
               </div>
             )}
@@ -270,7 +270,7 @@ export const mainListItems = React.forwardRef<
 
           <div className="space-y-1">
             {isOpen && (
-              <div className="px-3 mb-1 text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">
+              <div className="px-3 mb-1 text-xs font-bold text-muted-foreground/50 uppercase tracking-widest">
                 Workflows
               </div>
             )}
@@ -311,7 +311,7 @@ export const mainListItems = React.forwardRef<
           {isAdmin && config.authMode === 'builtin' && (
             <div className="space-y-1">
               {isOpen && (
-                <div className="px-3 mb-1 text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">
+                <div className="px-3 mb-1 text-xs font-bold text-muted-foreground/50 uppercase tracking-widest">
                   Admin
                 </div>
               )}
@@ -364,7 +364,7 @@ export const mainListItems = React.forwardRef<
           {canWrite && config.gitSyncEnabled && (
             <div className="space-y-1">
               {isOpen && (
-                <div className="px-3 mb-1 text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">
+                <div className="px-3 mb-1 text-xs font-bold text-muted-foreground/50 uppercase tracking-widest">
                   Sync
                 </div>
               )}
@@ -407,7 +407,7 @@ export const mainListItems = React.forwardRef<
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </div>
             {isOpen && (
-              <span className="text-[13px] font-medium text-sidebar-foreground group-hover:text-foreground">
+              <span className="text-sm font-medium text-sidebar-foreground group-hover:text-foreground">
                 {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
               </span>
             )}
@@ -417,7 +417,7 @@ export const mainListItems = React.forwardRef<
         {config.version && (
           <div
             className={cn(
-              'px-4 pb-4 text-[10px] font-mono text-muted-foreground/70',
+              'px-4 pb-4 text-xs font-mono text-muted-foreground/70',
               !isOpen && 'text-center px-0'
             )}
           >

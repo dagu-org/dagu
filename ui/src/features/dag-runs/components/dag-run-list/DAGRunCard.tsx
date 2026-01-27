@@ -78,12 +78,12 @@ function DAGRunCard({ dagRun, timezoneInfo }: DAGRunCardProps) {
                 <Server className="h-3 w-3 mr-1" />
                 Worker:
               </span>
-              <span className="truncate ml-2 font-mono text-[11px]">
+              <span className="truncate ml-2 font-mono text-xs">
                 {dagRun.workerId}
               </span>
             </div>
           )}
-          <div className="text-[10px] text-muted-foreground text-right pt-1">
+          <div className="text-xs text-muted-foreground text-right pt-1">
             {timezoneInfo}
           </div>
         </CardContent>

@@ -32,7 +32,7 @@ export function PropertyTypeDisplay({
         <span
           key={i}
           className={cn(
-            'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium',
+            'inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium',
             typeColors[t] || typeColors.unknown
           )}
         >
@@ -40,7 +40,7 @@ export function PropertyTypeDisplay({
         </span>
       ))}
       {required && (
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium status-failed">
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium status-failed">
           required
         </span>
       )}

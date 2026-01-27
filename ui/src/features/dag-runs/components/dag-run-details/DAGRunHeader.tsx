@@ -157,7 +157,7 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
                 className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`}
               />
               <span>Refresh</span>
-              <span className="absolute -bottom-1 -right-1 bg-muted text-muted-foreground text-[10px] font-medium px-1 rounded-sm border opacity-0 group-hover:opacity-100 transition-opacity">
+              <span className="absolute -bottom-1 -right-1 bg-muted text-muted-foreground text-xs font-medium px-1 rounded-sm border opacity-0 group-hover:opacity-100 transition-opacity">
                 R
               </span>
             </button>

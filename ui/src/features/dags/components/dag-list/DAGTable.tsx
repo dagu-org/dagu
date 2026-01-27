@@ -136,18 +136,18 @@ function DAGCard({
 
       {/* Description */}
       {description && (
-        <div className="text-[10px] text-muted-foreground mb-1.5 line-clamp-1">
+        <div className="text-xs text-muted-foreground mb-1.5 line-clamp-1">
           {description}
         </div>
       )}
 
       {/* Schedule & Last Run */}
-      <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground mb-1.5">
+      <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
         {schedules.map((schedule, idx) => (
           <Badge
             key={idx}
             variant="outline"
-            className="text-[9px] font-normal px-1 py-0 h-3"
+            className="text-xs font-normal px-1 py-0 h-3"
           >
             {schedule.expression}
           </Badge>
@@ -155,7 +155,7 @@ function DAGCard({
         {dag.latestDAGRun.startedAt && dag.latestDAGRun.startedAt !== '-' && (
           <span className="flex items-center gap-0.5">
             <Calendar className="h-2.5 w-2.5" />
-            <span className="text-[9px]">{dag.latestDAGRun.startedAt}</span>
+            <span className="text-xs">{dag.latestDAGRun.startedAt}</span>
           </span>
         )}
       </div>
@@ -167,7 +167,7 @@ function DAGCard({
             <Badge
               key={tag}
               variant="outline"
-              className="text-[9px] px-1 py-0 h-3 rounded-sm border-primary/30 bg-primary/10 text-primary"
+              className="text-xs px-1 py-0 h-3 rounded-sm border-primary/30 bg-primary/10 text-primary"
               onClick={(e) => {
                 e.stopPropagation();
                 onTagClick(tag);
@@ -187,7 +187,7 @@ function DAGCard({
           onClick={(e) => e.stopPropagation()}
         >
           <LiveSwitch dag={dag} refresh={refreshFn} />
-          <span className="text-[9px] text-muted-foreground truncate">
+          <span className="text-xs text-muted-foreground truncate">
             {dag.suspended ? 'Suspended' : hasSchedule ? 'Live' : 'No schedule'}
           </span>
         </div>
@@ -394,7 +394,7 @@ const defaultColumns = [
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Name</span>
-        <span className="text-[10px] font-normal text-muted-foreground">
+        <span className="text-xs font-normal text-muted-foreground">
           Description
         </span>
       </div>
@@ -429,7 +429,7 @@ const defaultColumns = [
             </div>
 
             {description && (
-              <div className="text-[10px] text-muted-foreground whitespace-normal leading-tight line-clamp-2">
+              <div className="text-xs text-muted-foreground whitespace-normal leading-tight line-clamp-2">
                 {description}
               </div>
             )}
@@ -442,7 +442,7 @@ const defaultColumns = [
                     <Badge
                       key={tag}
                       variant="outline"
-                      className="text-[10px] px-1 py-0 h-3.5 rounded-sm border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary transition-colors duration-200 cursor-pointer font-normal whitespace-normal break-words focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                      className="text-xs px-1 py-0 h-3.5 rounded-sm border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary transition-colors duration-200 cursor-pointer font-normal whitespace-normal break-words focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => {
@@ -534,7 +534,7 @@ const defaultColumns = [
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Status</span>
-        <span className="text-[10px] font-normal text-muted-foreground">
+        <span className="text-xs font-normal text-muted-foreground">
           Latest status
         </span>
       </div>
@@ -561,7 +561,7 @@ const defaultColumns = [
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Last Run</span>
-        <span className="text-[10px] font-normal text-muted-foreground">
+        <span className="text-xs font-normal text-muted-foreground">
           {getConfig().tz || 'Local Timezone'}
         </span>
       </div>
@@ -591,7 +591,7 @@ const defaultColumns = [
 
           if (durationMs > 0) {
             durationContent = (
-              <div className="text-[10px] text-muted-foreground">
+              <div className="text-xs text-muted-foreground">
                 {formatMs(durationMs)}
               </div>
             );
@@ -599,7 +599,7 @@ const defaultColumns = [
         }
       } else if (status === Status.Running) {
         durationContent = (
-          <div className="text-[10px] text-muted-foreground">(Running)</div>
+          <div className="text-xs text-muted-foreground">(Running)</div>
         );
       }
 
@@ -620,7 +620,7 @@ const defaultColumns = [
     header: () => (
       <div className="flex flex-col py-1">
         <span className="text-xs">Live / Schedule</span>
-        <span className="text-[10px] font-normal text-muted-foreground">
+        <span className="text-xs font-normal text-muted-foreground">
           Toggle & next run
         </span>
       </div>
@@ -652,7 +652,7 @@ const defaultColumns = [
         return (
           <div className="flex items-center gap-2">
             {liveSwitch}
-            <span className="text-[10px] text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               No schedule
             </span>
           </div>
@@ -666,7 +666,7 @@ const defaultColumns = [
             <Badge
               key={schedule.expression}
               variant="outline"
-              className="text-[10px] font-normal px-1 py-0 h-3.5"
+              className="text-xs font-normal px-1 py-0 h-3.5"
             >
               {schedule.expression}
             </Badge>
@@ -680,7 +680,7 @@ const defaultColumns = [
         const nextRun = getNextSchedule(data.dag);
         if (nextRun) {
           nextRunContent = (
-            <div className="text-[10px] text-muted-foreground font-normal leading-tight">
+            <div className="text-xs text-muted-foreground font-normal leading-tight">
               <Ticker intervalMs={1000}>
                 {() => {
                   const ms = nextRun.getTime() - new Date().getTime();
@@ -692,7 +692,7 @@ const defaultColumns = [
         }
       } else if (data.dag.suspended) {
         nextRunContent = (
-          <div className="text-[10px] text-muted-foreground font-normal leading-tight">
+          <div className="text-xs text-muted-foreground font-normal leading-tight">
             Suspended
           </div>
         );
@@ -717,7 +717,7 @@ const defaultColumns = [
     header: () => (
       <div className="flex flex-col items-center py-1">
         <span className="text-xs">Actions</span>
-        <span className="text-[10px] font-normal text-muted-foreground">
+        <span className="text-xs font-normal text-muted-foreground">
           Operations
         </span>
       </div>
@@ -1360,7 +1360,7 @@ function DAGTable({
                     </div>
                     <Badge
                       variant="secondary"
-                      className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0"
+                      className="text-xs px-1.5 py-0 h-4 flex-shrink-0"
                     >
                       {row.subRows?.length || 0}
                     </Badge>

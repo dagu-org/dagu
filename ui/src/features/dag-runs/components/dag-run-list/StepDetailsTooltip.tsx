@@ -31,7 +31,7 @@ function renderStepList(title: string, nodes: Node[], colorClass: string) {
 
   return (
     <div className="space-y-1">
-      <div className={`text-[11px] font-semibold ${colorClass}`}>{title}</div>
+      <div className={`text-xs font-semibold ${colorClass}`}>{title}</div>
       <ul className="text-xs space-y-0.5">
         {visibleSteps.map((node, idx) => (
           <li key={`${node.step?.name || idx}-${idx}`}>
@@ -40,7 +40,7 @@ function renderStepList(title: string, nodes: Node[], colorClass: string) {
         ))}
       </ul>
       {remaining > 0 && (
-        <div className="text-[10px] text-muted-foreground">
+        <div className="text-xs text-muted-foreground">
           +{remaining} more step{remaining > 1 ? 's' : ''}
         </div>
       )}

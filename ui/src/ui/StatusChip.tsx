@@ -20,7 +20,7 @@ function StatusChip({
 
   // Size classes
   const sizeClasses = {
-    xs: 'text-[10px] py-0 px-1.5',
+    xs: 'text-xs py-0 px-1.5',
     sm: 'text-xs py-0.5 px-2',
     md: 'text-sm py-1 px-3',
     lg: 'text-base py-1.5 px-4',

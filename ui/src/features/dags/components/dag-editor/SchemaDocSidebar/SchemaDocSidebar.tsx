@@ -114,7 +114,7 @@ export function SchemaDocSidebar({
             ) : path.length === 0 && schema?.properties ? (
               // Root level - show all top-level properties
               <div>
-                <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
                   DAG Properties
                 </h4>
                 <div className="border border-border rounded p-1">
@@ -161,7 +161,7 @@ export function SchemaDocSidebar({
             {/* Sibling Properties */}
             {siblingProperties.length > 0 && path.length > 0 && (
               <div className="mt-4 pt-3 border-t border-border">
-                <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
                   Sibling Properties ({siblingProperties.length})
                 </h4>
                 <div className="flex flex-wrap gap-1">
@@ -171,13 +171,13 @@ export function SchemaDocSidebar({
                     .map((prop) => (
                       <span
                         key={prop}
-                        className="text-[10px] bg-muted text-foreground px-1.5 py-0.5 rounded"
+                        className="text-xs bg-muted text-foreground px-1.5 py-0.5 rounded"
                       >
                         {prop}
                       </span>
                     ))}
                   {siblingProperties.length > 21 && (
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                       +{siblingProperties.length - 20} more
                     </span>
                   )}
@@ -190,10 +190,10 @@ export function SchemaDocSidebar({
 
       {/* Footer */}
       <div className="px-3 py-1.5 border-t border-border bg-muted/20">
-        <span className="text-[10px] text-muted-foreground">
-          Press <kbd className="px-1 py-0.5 bg-muted text-foreground rounded text-[9px]">Ctrl</kbd>
-          +<kbd className="px-1 py-0.5 bg-muted text-foreground rounded text-[9px]">Shift</kbd>
-          +<kbd className="px-1 py-0.5 bg-muted text-foreground rounded text-[9px]">D</kbd> to toggle
+        <span className="text-xs text-muted-foreground">
+          Press <kbd className="px-1 py-0.5 bg-muted text-foreground rounded text-xs">Ctrl</kbd>
+          +<kbd className="px-1 py-0.5 bg-muted text-foreground rounded text-xs">Shift</kbd>
+          +<kbd className="px-1 py-0.5 bg-muted text-foreground rounded text-xs">D</kbd> to toggle
         </span>
       </div>
     </div>

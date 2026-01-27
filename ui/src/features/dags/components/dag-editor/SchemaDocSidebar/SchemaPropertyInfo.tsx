@@ -35,7 +35,7 @@ export function SchemaPropertyInfo({
       {/* Default Value */}
       {propertyInfo.default !== undefined && (
         <div>
-          <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-0.5">
+          <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">
             Default
           </h4>
           <code className="text-xs bg-muted text-foreground px-1.5 py-0.5 rounded font-mono">
@@ -47,14 +47,14 @@ export function SchemaPropertyInfo({
       {/* Enum Values */}
       {propertyInfo.enum && propertyInfo.enum.length > 0 && (
         <div>
-          <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1">
+          <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
             Allowed Values
           </h4>
           <div className="flex flex-wrap gap-1">
             {propertyInfo.enum.map((value, i) => (
               <code
                 key={i}
-                className="text-[10px] bg-muted text-foreground px-1.5 py-0.5 rounded font-mono"
+                className="text-xs bg-muted text-foreground px-1.5 py-0.5 rounded font-mono"
               >
                 {JSON.stringify(value)}
               </code>
@@ -66,7 +66,7 @@ export function SchemaPropertyInfo({
       {/* Format */}
       {propertyInfo.format && (
         <div>
-          <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-0.5">
+          <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">
             Format
           </h4>
           <code className="text-xs bg-muted text-foreground px-1.5 py-0.5 rounded font-mono">
@@ -78,10 +78,10 @@ export function SchemaPropertyInfo({
       {/* Pattern */}
       {propertyInfo.pattern && (
         <div>
-          <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-0.5">
+          <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">
             Pattern
           </h4>
-          <code className="text-[10px] bg-muted text-foreground px-1.5 py-0.5 rounded font-mono break-all">
+          <code className="text-xs bg-muted text-foreground px-1.5 py-0.5 rounded font-mono break-all">
             {propertyInfo.pattern}
           </code>
         </div>
@@ -90,14 +90,14 @@ export function SchemaPropertyInfo({
       {/* Examples */}
       {propertyInfo.examples && propertyInfo.examples.length > 0 && (
         <div>
-          <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1">
+          <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
             Examples
           </h4>
           <div className="space-y-1">
             {propertyInfo.examples.map((example, i) => (
               <code
                 key={i}
-                className="block text-[10px] bg-muted text-foreground px-1.5 py-0.5 rounded font-mono break-all"
+                className="block text-xs bg-muted text-foreground px-1.5 py-0.5 rounded font-mono break-all"
               >
                 {typeof example === 'string'
                   ? example
@@ -111,7 +111,7 @@ export function SchemaPropertyInfo({
       {/* OneOf Options */}
       {propertyInfo.oneOf && propertyInfo.oneOf.length > 0 && (
         <div>
-          <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1">
+          <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
             One Of
           </h4>
           <div className="space-y-1">
@@ -122,7 +122,7 @@ export function SchemaPropertyInfo({
               >
                 <PropertyTypeDisplay type={option.type} />
                 {option.description && (
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     {option.description}
                   </p>
                 )}
@@ -136,7 +136,7 @@ export function SchemaPropertyInfo({
       {propertyInfo.properties &&
         Object.keys(propertyInfo.properties).length > 0 && (
           <div>
-            <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1">
+            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
               Properties
             </h4>
             <div className="border border-border rounded p-1">
@@ -148,13 +148,13 @@ export function SchemaPropertyInfo({
       {/* Array Items */}
       {propertyInfo.items && (
         <div>
-          <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1">
+          <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
             Array Items
           </h4>
           <div className="text-xs p-1.5 bg-muted/50 rounded border border-border">
             <PropertyTypeDisplay type={propertyInfo.items.type} />
             {propertyInfo.items.description && (
-              <p className="text-[10px] text-muted-foreground mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 {propertyInfo.items.description}
               </p>
             )}
