@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -8,10 +9,23 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
+
+// defaultUserID is used when no user is authenticated (e.g., auth disabled).
+const defaultUserID = "admin"
+
+// getUserIDFromContext extracts the user ID from the request context.
+// Returns "admin" if no user is authenticated (e.g., auth mode is "none").
+func getUserIDFromContext(ctx context.Context) string {
+	if user, ok := auth.UserFromContext(ctx); ok && user != nil {
+		return user.ID
+	}
+	return defaultUserID
+}
 
 // API handles HTTP requests for the agent.
 type API struct {
@@ -47,8 +61,14 @@ func NewAPI(cfg APIConfig) *API {
 }
 
 // RegisterRoutes registers the agent API routes on the given router.
-func (a *API) RegisterRoutes(r chi.Router) {
+// The authMiddleware parameter should be the same auth middleware used for other API routes.
+func (a *API) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler) http.Handler) {
 	r.Route("/api/v2/agent", func(r chi.Router) {
+		// Apply auth middleware to all agent routes
+		if authMiddleware != nil {
+			r.Use(authMiddleware)
+		}
+
 		// Conversation management
 		r.Post("/conversations/new", a.handleNewConversation)
 		r.Get("/conversations", a.handleListConversations)
@@ -77,6 +97,9 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get user ID from context
+	userID := getUserIDFromContext(r.Context())
+
 	// Use request model or default
 	model := req.Model
 	if model == "" {
@@ -87,6 +110,7 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 	id := uuid.New().String()
 	mgr := NewConversationManager(ConversationManagerConfig{
 		ID:         id,
+		UserID:     userID,
 		Logger:     a.logger,
 		WorkingDir: a.workingDir,
 	})
@@ -108,13 +132,18 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleListConversations lists all active conversations.
+// handleListConversations lists all active conversations for the current user.
 // GET /api/v2/agent/conversations
 func (a *API) handleListConversations(w http.ResponseWriter, r *http.Request) {
+	userID := getUserIDFromContext(r.Context())
 	var conversations []ConversationWithState
 
 	a.conversations.Range(func(key, value any) bool {
 		mgr := value.(*ConversationManager)
+		// Only include conversations belonging to the current user
+		if mgr.UserID() != userID {
+			return true
+		}
 		conversations = append(conversations, ConversationWithState{
 			Conversation: mgr.GetConversation(),
 			Working:      mgr.IsWorking(),
@@ -138,6 +167,8 @@ type ConversationWithState struct {
 // GET /api/v2/agent/conversations/{id}
 func (a *API) handleGetConversation(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	userID := getUserIDFromContext(r.Context())
+
 	mgrValue, ok := a.conversations.Load(id)
 	if !ok {
 		http.Error(w, "Conversation not found", http.StatusNotFound)
@@ -145,6 +176,12 @@ func (a *API) handleGetConversation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mgr := mgrValue.(*ConversationManager)
+
+	// Check user ownership
+	if mgr.UserID() != userID {
+		http.Error(w, "Conversation not found", http.StatusNotFound)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(StreamResponse{
@@ -162,8 +199,18 @@ func (a *API) handleGetConversation(w http.ResponseWriter, r *http.Request) {
 // POST /api/v2/agent/conversations/{id}/chat
 func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	userID := getUserIDFromContext(r.Context())
+
 	mgrValue, ok := a.conversations.Load(id)
 	if !ok {
+		http.Error(w, "Conversation not found", http.StatusNotFound)
+		return
+	}
+
+	mgr := mgrValue.(*ConversationManager)
+
+	// Check user ownership
+	if mgr.UserID() != userID {
 		http.Error(w, "Conversation not found", http.StatusNotFound)
 		return
 	}
@@ -178,8 +225,6 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Message is required", http.StatusBadRequest)
 		return
 	}
-
-	mgr := mgrValue.(*ConversationManager)
 
 	// Use request model or conversation's model
 	model := req.Model
@@ -205,6 +250,8 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 // GET /api/v2/agent/conversations/{id}/stream
 func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	userID := getUserIDFromContext(r.Context())
+
 	mgrValue, ok := a.conversations.Load(id)
 	if !ok {
 		http.Error(w, "Conversation not found", http.StatusNotFound)
@@ -212,6 +259,12 @@ func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mgr := mgrValue.(*ConversationManager)
+
+	// Check user ownership
+	if mgr.UserID() != userID {
+		http.Error(w, "Conversation not found", http.StatusNotFound)
+		return
+	}
 
 	// Set up SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -256,6 +309,8 @@ func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 // POST /api/v2/agent/conversations/{id}/cancel
 func (a *API) handleCancel(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	userID := getUserIDFromContext(r.Context())
+
 	mgrValue, ok := a.conversations.Load(id)
 	if !ok {
 		http.Error(w, "Conversation not found", http.StatusNotFound)
@@ -263,6 +318,12 @@ func (a *API) handleCancel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mgr := mgrValue.(*ConversationManager)
+
+	// Check user ownership
+	if mgr.UserID() != userID {
+		http.Error(w, "Conversation not found", http.StatusNotFound)
+		return
+	}
 
 	if err := mgr.Cancel(r.Context()); err != nil {
 		a.logger.Error("Failed to cancel conversation", "error", err)

@@ -742,8 +742,50 @@ func (srv *Server) registerSSEFetchers() {
 
 // setupAgentRoutes configures the agent API routes
 func (srv *Server) setupAgentRoutes(ctx context.Context, r *chi.Mux) {
-	srv.agentAPI.RegisterRoutes(r)
+	// Build auth middleware for agent routes (same as main API routes)
+	authMiddleware := srv.buildAgentAuthMiddleware(ctx)
+	srv.agentAPI.RegisterRoutes(r, authMiddleware)
 	logger.Info(ctx, "Agent API routes configured")
+}
+
+// buildAgentAuthMiddleware builds the auth middleware for agent routes.
+// This reuses the same auth configuration as the main API routes.
+func (srv *Server) buildAgentAuthMiddleware(ctx context.Context) func(http.Handler) http.Handler {
+	authConfig := srv.config.Server.Auth
+
+	// Build auth options
+	authOptions := auth.Options{
+		Realm:        "Dagu Agent",
+		AuthRequired: authConfig.Mode != config.AuthModeNone,
+	}
+
+	// Configure basic auth if enabled
+	if authConfig.Basic.Username != "" && authConfig.Basic.Password != "" {
+		authOptions.BasicAuthEnabled = true
+		authOptions.Creds = map[string]string{
+			authConfig.Basic.Username: authConfig.Basic.Password,
+		}
+	}
+
+	// Configure API token if enabled
+	if authConfig.Token.Value != "" {
+		authOptions.APITokenEnabled = true
+		authOptions.APIToken = authConfig.Token.Value
+	}
+
+	// Configure JWT validation for builtin mode
+	if authConfig.Mode == config.AuthModeBuiltin && srv.authService != nil {
+		authOptions.JWTValidator = srv.authService
+		if srv.authService.HasAPIKeyStore() {
+			authOptions.APIKeyValidator = srv.authService
+		}
+	}
+
+	// Return the composed middleware
+	return func(next http.Handler) http.Handler {
+		// Apply client IP middleware first, then auth middleware
+		return auth.ClientIPMiddleware()(auth.Middleware(authOptions)(next))
+	}
 }
 
 // startServer starts the HTTP server with or without TLS

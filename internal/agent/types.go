@@ -47,6 +47,7 @@ type ToolResult struct {
 // Conversation represents a chat conversation.
 type Conversation struct {
 	ID        string    `json:"id"`
+	UserID    string    `json:"user_id,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

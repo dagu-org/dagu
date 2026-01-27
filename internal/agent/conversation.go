@@ -16,6 +16,7 @@ import (
 // Based on Shelley's server/convo.go pattern.
 type ConversationManager struct {
 	id           string
+	userID       string
 	loop         *Loop
 	loopCancel   context.CancelFunc
 	loopCtx      context.Context
@@ -36,6 +37,7 @@ type ConversationManager struct {
 // ConversationManagerConfig contains configuration for creating a ConversationManager.
 type ConversationManagerConfig struct {
 	ID              string
+	UserID          string
 	Logger          *slog.Logger
 	WorkingDir      string
 	OnWorkingChange func(id string, working bool)
@@ -56,6 +58,7 @@ func NewConversationManager(cfg ConversationManagerConfig) *ConversationManager 
 
 	return &ConversationManager{
 		id:              id,
+		userID:          cfg.UserID,
 		lastActivity:    time.Now(),
 		logger:          logger,
 		subpub:          NewSubPub[StreamResponse](),
@@ -68,6 +71,11 @@ func NewConversationManager(cfg ConversationManagerConfig) *ConversationManager 
 // ID returns the conversation ID.
 func (cm *ConversationManager) ID() string {
 	return cm.id
+}
+
+// UserID returns the user ID that owns this conversation.
+func (cm *ConversationManager) UserID() string {
+	return cm.userID
 }
 
 // SetWorking updates the agent working state and notifies subscribers.
@@ -129,6 +137,7 @@ func (cm *ConversationManager) GetConversation() Conversation {
 	defer cm.mu.Unlock()
 	return Conversation{
 		ID:        cm.id,
+		UserID:    cm.userID,
 		CreatedAt: cm.lastActivity,
 		UpdatedAt: cm.lastActivity,
 	}
