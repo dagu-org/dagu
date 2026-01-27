@@ -32,6 +32,18 @@ var (
 		shellFlag,
 		baseFlag,
 	}
+	workdirFlag = commandLineFlag{
+		name:  flagWorkdir,
+		usage: "Working directory for executing the command (default: current directory)",
+	}
+	shellFlag = commandLineFlag{
+		name:  flagShell,
+		usage: "Override shell binary for the command (default: use DAGU default shell)",
+	}
+	baseFlag = commandLineFlag{
+		name:  flagBase,
+		usage: "Path to a base DAG YAML whose defaults are applied before inline overrides",
+	}
 )
 
 // Exec returns the cobra command for executing inline commands without a DAG spec.
@@ -58,29 +70,14 @@ Examples:
 }
 
 // runExec parses flags and arguments and executes the provided command as an inline DAG run.
-// It validates inputs (run-id, working directory, base and dotenv files, env vars, worker labels),
-// builds the DAG for the inline command, and executes it locally.
-// ctx provides CLI and application context; args are the command and its arguments.
-// Returns an error for validation failures, when a dag-run with the same run-id already exists,
-// or if execution fails.
 func runExec(ctx *Context, args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("command is required (try: dagu exec -- <command>)")
 	}
 
-	runID, err := ctx.StringParam("run-id")
+	runID, err := resolveRunID(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to read run-id flag: %w", err)
-	}
-	if runID != "" {
-		if err := validateRunID(runID); err != nil {
-			return err
-		}
-	} else {
-		runID, err = genRunID()
-		if err != nil {
-			return fmt.Errorf("failed to generate dag-run ID: %w", err)
-		}
+		return err
 	}
 
 	nameOverride, err := ctx.StringParam("name")
@@ -88,26 +85,9 @@ func runExec(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read name flag: %w", err)
 	}
 
-	workdirFlag, err := ctx.Command.Flags().GetString(flagWorkdir)
+	workingDir, err := resolveWorkingDir(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to read workdir flag: %w", err)
-	}
-
-	var workingDir string
-	if workdirFlag != "" {
-		workingDir = fileutil.ResolvePathOrBlank(workdirFlag)
-	} else {
-		workingDir, err = os.Getwd()
-		if err != nil {
-			return fmt.Errorf("failed to determine current directory: %w", err)
-		}
-	}
-	info, err := os.Stat(workingDir)
-	if err != nil {
-		return fmt.Errorf("working directory %q not found: %w", workingDir, err)
-	}
-	if !info.IsDir() {
-		return fmt.Errorf("working directory %q is not a directory", workingDir)
+		return err
 	}
 
 	shellOverride, err := ctx.Command.Flags().GetString(flagShell)
@@ -115,65 +95,24 @@ func runExec(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to read shell flag: %w", err)
 	}
 
-	baseConfigFlag, err := ctx.Command.Flags().GetString(flagBase)
+	baseConfig, err := resolveBaseConfig(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to read base flag: %w", err)
-	}
-	var baseConfig string
-	if baseConfigFlag != "" {
-		baseConfig = fileutil.ResolvePathOrBlank(baseConfigFlag)
-		if baseConfig == "" || !fileutil.FileExists(baseConfig) {
-			return fmt.Errorf("base DAG file %q not found", baseConfigFlag)
-		}
+		return err
 	}
 
-	envVars, err := ctx.Command.Flags().GetStringArray(flagEnv)
+	envVars, err := parseEnvVars(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to read env flags: %w", err)
-	}
-	for _, env := range envVars {
-		if !strings.Contains(env, "=") || strings.HasPrefix(env, "=") {
-			return fmt.Errorf("invalid --env value %q: expected KEY=VALUE", env)
-		}
+		return err
 	}
 
-	dotenvPathsRaw, err := ctx.Command.Flags().GetStringArray(flagDotenv)
+	dotenvPaths, err := resolveDotenvPaths(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to read dotenv flags: %w", err)
-	}
-	var dotenvPaths []string
-	for _, path := range dotenvPathsRaw {
-		if strings.TrimSpace(path) == "" {
-			continue
-		}
-		resolved := fileutil.ResolvePathOrBlank(path)
-		if resolved == "" || !fileutil.FileExists(resolved) {
-			return fmt.Errorf("dotenv file %q not found", path)
-		}
-		dotenvPaths = append(dotenvPaths, resolved)
+		return err
 	}
 
-	workerLabelPairs, err := ctx.Command.Flags().GetStringArray(flagWorkerLabel)
+	workerLabels, err := parseWorkerLabels(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to read worker-label flags: %w", err)
-	}
-	workerLabels := make(map[string]string, len(workerLabelPairs))
-	for _, pair := range workerLabelPairs {
-		pair = strings.TrimSpace(pair)
-		if pair == "" {
-			continue
-		}
-		key, value, found := strings.Cut(pair, "=")
-		if !found || key == "" || value == "" {
-			return fmt.Errorf("invalid worker label %q: expected key=value", pair)
-		}
-		workerLabels[key] = value
-	}
-
-	if len(workerLabels) > 0 {
-		if !ctx.Config.Queues.Enabled {
-			return fmt.Errorf("worker selector requires queues; enable queues or remove --worker-label")
-		}
+		return err
 	}
 
 	opts := ExecOptions{
@@ -205,21 +144,132 @@ func runExec(ctx *Context, args []string) error {
 		tag.RunID(runID),
 	)
 
-	// exec command is always local execution with manual trigger type
 	return tryExecuteDAG(ctx, dag, runID, dagRunRef, "local", core.TriggerTypeManual)
 }
 
-var (
-	workdirFlag = commandLineFlag{
-		name:  flagWorkdir,
-		usage: "Working directory for executing the command (default: current directory)",
+// resolveRunID returns a validated run ID from the flag or generates a new one.
+func resolveRunID(ctx *Context) (string, error) {
+	runID, err := ctx.StringParam("run-id")
+	if err != nil {
+		return "", fmt.Errorf("failed to read run-id flag: %w", err)
 	}
-	shellFlag = commandLineFlag{
-		name:  flagShell,
-		usage: "Override shell binary for the command (default: use DAGU default shell)",
+
+	if runID == "" {
+		return genRunID()
 	}
-	baseFlag = commandLineFlag{
-		name:  flagBase,
-		usage: "Path to a base DAG YAML whose defaults are applied before inline overrides",
+
+	if err := validateRunID(runID); err != nil {
+		return "", err
 	}
-)
+	return runID, nil
+}
+
+// resolveWorkingDir returns the validated working directory from the flag or current directory.
+func resolveWorkingDir(ctx *Context) (string, error) {
+	workdirValue, err := ctx.Command.Flags().GetString(flagWorkdir)
+	if err != nil {
+		return "", fmt.Errorf("failed to read workdir flag: %w", err)
+	}
+
+	var workingDir string
+	if workdirValue != "" {
+		workingDir = fileutil.ResolvePathOrBlank(workdirValue)
+	} else {
+		workingDir, err = os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("failed to determine current directory: %w", err)
+		}
+	}
+
+	info, err := os.Stat(workingDir)
+	if err != nil {
+		return "", fmt.Errorf("working directory %q not found: %w", workingDir, err)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("working directory %q is not a directory", workingDir)
+	}
+
+	return workingDir, nil
+}
+
+// resolveBaseConfig returns the validated base config path from the flag.
+func resolveBaseConfig(ctx *Context) (string, error) {
+	baseConfigValue, err := ctx.Command.Flags().GetString(flagBase)
+	if err != nil {
+		return "", fmt.Errorf("failed to read base flag: %w", err)
+	}
+
+	if baseConfigValue == "" {
+		return "", nil
+	}
+
+	baseConfig := fileutil.ResolvePathOrBlank(baseConfigValue)
+	if baseConfig == "" || !fileutil.FileExists(baseConfig) {
+		return "", fmt.Errorf("base DAG file %q not found", baseConfigValue)
+	}
+	return baseConfig, nil
+}
+
+// parseEnvVars validates and returns environment variables from the flag.
+func parseEnvVars(ctx *Context) ([]string, error) {
+	envVars, err := ctx.Command.Flags().GetStringArray(flagEnv)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read env flags: %w", err)
+	}
+
+	for _, env := range envVars {
+		if !strings.Contains(env, "=") || strings.HasPrefix(env, "=") {
+			return nil, fmt.Errorf("invalid --env value %q: expected KEY=VALUE", env)
+		}
+	}
+	return envVars, nil
+}
+
+// resolveDotenvPaths validates and returns resolved dotenv file paths.
+func resolveDotenvPaths(ctx *Context) ([]string, error) {
+	dotenvPathsRaw, err := ctx.Command.Flags().GetStringArray(flagDotenv)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read dotenv flags: %w", err)
+	}
+
+	var dotenvPaths []string
+	for _, path := range dotenvPathsRaw {
+		trimmed := strings.TrimSpace(path)
+		if trimmed == "" {
+			continue
+		}
+		resolved := fileutil.ResolvePathOrBlank(trimmed)
+		if resolved == "" || !fileutil.FileExists(resolved) {
+			return nil, fmt.Errorf("dotenv file %q not found", path)
+		}
+		dotenvPaths = append(dotenvPaths, resolved)
+	}
+	return dotenvPaths, nil
+}
+
+// parseWorkerLabels validates and returns worker labels from the flag.
+func parseWorkerLabels(ctx *Context) (map[string]string, error) {
+	workerLabelPairs, err := ctx.Command.Flags().GetStringArray(flagWorkerLabel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read worker-label flags: %w", err)
+	}
+
+	workerLabels := make(map[string]string, len(workerLabelPairs))
+	for _, pair := range workerLabelPairs {
+		trimmed := strings.TrimSpace(pair)
+		if trimmed == "" {
+			continue
+		}
+		key, value, found := strings.Cut(trimmed, "=")
+		if !found || key == "" || value == "" {
+			return nil, fmt.Errorf("invalid worker label %q: expected key=value", pair)
+		}
+		workerLabels[key] = value
+	}
+
+	if len(workerLabels) > 0 && !ctx.Config.Queues.Enabled {
+		return nil, fmt.Errorf("worker selector requires queues; enable queues or remove --worker-label")
+	}
+
+	return workerLabels, nil
+}

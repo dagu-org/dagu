@@ -84,7 +84,6 @@ func (e *DAGExecutor) HandleJob(
 ) error {
 	// For distributed execution with START operation, enqueue for persistence
 	if e.shouldUseDistributedExecution(dag) && operation == coordinatorv1.Operation_OPERATION_START {
-		// Enrich context with DAG and RunID for all subsequent logging
 		ctx = logger.WithValues(ctx,
 			tag.DAG(dag.Name),
 			tag.RunID(runID),
@@ -157,7 +156,6 @@ func (e *DAGExecutor) ExecuteDAG(
 
 	default:
 		return fmt.Errorf("unsupported operation: %v", operation)
-
 	}
 }
 
@@ -181,7 +179,6 @@ func (e *DAGExecutor) shouldUseDistributedExecution(dag *core.DAG) bool {
 // 2. Forward the task to the selected worker
 // 3. Track the execution status
 func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinatorv1.Task) error {
-	// Enrich context with task-related values for subsequent logging
 	ctx = logger.WithValues(ctx,
 		tag.Target(task.Target),
 		tag.RunID(task.DagRunId),

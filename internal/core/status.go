@@ -19,6 +19,8 @@ const (
 // environment variables.
 func (s Status) String() string {
 	switch s {
+	case NotStarted:
+		return "not_started"
 	case Running:
 		return "running"
 	case Failed:
@@ -31,8 +33,6 @@ func (s Status) String() string {
 		return "queued"
 	case PartiallySucceeded:
 		return "partially_succeeded"
-	case NotStarted:
-		return "not_started"
 	case Waiting:
 		return "waiting"
 	case Rejected:
@@ -96,6 +96,8 @@ func (s NodeStatus) IsDone() bool {
 // String returns the canonical lowercase token for the node lifecycle phase.
 func (s NodeStatus) String() string {
 	switch s {
+	case NodeNotStarted:
+		return "not_started"
 	case NodeRunning:
 		return "running"
 	case NodeFailed:
@@ -108,8 +110,6 @@ func (s NodeStatus) String() string {
 		return "skipped"
 	case NodePartiallySucceeded:
 		return "partially_succeeded"
-	case NodeNotStarted:
-		return "not_started"
 	case NodeWaiting:
 		return "waiting"
 	case NodeRejected:
@@ -134,6 +134,8 @@ const (
 // String returns the canonical lowercase token for the trigger type.
 func (t TriggerType) String() string {
 	switch t {
+	case TriggerTypeUnknown:
+		return "unknown"
 	case TriggerTypeScheduler:
 		return "scheduler"
 	case TriggerTypeManual:

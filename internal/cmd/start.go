@@ -88,10 +88,7 @@ func runStart(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to get from-run-id: %w", err)
 	}
 
-	workerID, _ := ctx.StringParam("worker-id")
-	if workerID == "" {
-		workerID = "local"
-	}
+	workerID := getWorkerID(ctx)
 
 	triggerTypeStr, _ := ctx.StringParam("trigger-type")
 	triggerType := core.ParseTriggerType(triggerTypeStr)
@@ -197,7 +194,6 @@ func runStart(ctx *Context, args []string) error {
 	return tryExecuteDAG(ctx, dag, dagRunID, root, workerID, triggerType)
 }
 
-
 var errProcAcquisitionFailed = errors.New("failed to acquire process handle")
 
 // tryExecuteDAG acquires a process handle and executes the DAG.
@@ -296,10 +292,9 @@ func loadDAGWithParams(ctx *Context, args []string, isSubDAGRun bool) (*core.DAG
 
 	var params string
 
-	switch {
-	case ctx.Command.ArgsLenAtDash() != -1 && len(args) > 0:
+	if ctx.Command.ArgsLenAtDash() != -1 && len(args) > 0 {
 		loadOpts = append(loadOpts, spec.WithParams(args[ctx.Command.ArgsLenAtDash():]))
-	default:
+	} else {
 		params, err = ctx.Command.Flags().GetString("params")
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to get parameters: %w", err)
@@ -469,31 +464,31 @@ func handleDistributedCancellation(ctx context.Context, dag *core.DAG, dagRunID 
 		logger.Warn(ctx, "Failed to request cancellation", tag.Error(cancelErr))
 	}
 
-	// Poll for up to 5 seconds until status reflects cancellation
-	if progress != nil {
-		ticker := time.NewTicker(500 * time.Millisecond)
-		defer ticker.Stop()
+	if progress == nil {
+		return originalErr
+	}
 
-		for {
-			select {
-			case <-cancelCtx.Done():
-				// Timeout - set cancelled status manually
-				progress.SetCancelled()
+	// Poll for up to 5 seconds until status reflects cancellation
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-cancelCtx.Done():
+			progress.SetCancelled()
+			return originalErr
+		case <-ticker.C:
+			resp, fetchErr := coordinatorCli.GetDAGRunStatus(cancelCtx, dag.Name, dagRunID, nil)
+			if fetchErr != nil || resp == nil || resp.Status == nil {
+				continue
+			}
+			progress.Update(resp.Status)
+			dagStatus, convErr := convert.ProtoToDAGRunStatus(resp.Status)
+			if convErr == nil && dagStatus != nil && !dagStatus.Status.IsActive() {
 				return originalErr
-			case <-ticker.C:
-				if resp, fetchErr := coordinatorCli.GetDAGRunStatus(cancelCtx, dag.Name, dagRunID, nil); fetchErr == nil && resp != nil && resp.Status != nil {
-					progress.Update(resp.Status)
-					dagStatus, convErr := convert.ProtoToDAGRunStatus(resp.Status)
-					if convErr == nil && dagStatus != nil && !dagStatus.Status.IsActive() {
-						// Status is no longer running, we're done
-						return originalErr
-					}
-				}
 			}
 		}
 	}
-
-	return originalErr
 }
 
 // waitForDAGCompletionWithProgress polls the coordinator until the DAG run completes.

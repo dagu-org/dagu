@@ -94,7 +94,7 @@ func (j *DAGRunJob) Ready(ctx context.Context, latestStatus exec.DAGRunStatus) e
 
 	// Skip if the last successful run time is on or after the next scheduled time.
 	latestStartedAt = latestStartedAt.Truncate(time.Minute)
-	if latestStartedAt.After(j.Next) || j.Next.Equal(latestStartedAt) {
+	if !latestStartedAt.Before(j.Next) {
 		return ErrJobFinished
 	}
 
@@ -111,8 +111,7 @@ func (j *DAGRunJob) skipIfSuccessful(ctx context.Context, latestStatus exec.DAGR
 	}
 
 	prevExecTime := j.PrevExecTime(ctx)
-	if (latestStartedAt.After(prevExecTime) || latestStartedAt.Equal(prevExecTime)) &&
-		latestStartedAt.Before(j.Next) {
+	if !latestStartedAt.Before(prevExecTime) && latestStartedAt.Before(j.Next) {
 		logger.Info(ctx, "Skipping job due to successful prior run",
 			slog.String("start-time", latestStartedAt.Format(time.RFC3339)))
 		return ErrJobSuccess

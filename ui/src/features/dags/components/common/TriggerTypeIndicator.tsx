@@ -1,11 +1,5 @@
-/**
- * TriggerTypeIndicator component displays an icon and label for how a DAG run was triggered.
- *
- * @module features/dags/components/common
- */
 import { TriggerType } from '@/api/v2/schema';
 import { Clock, GitBranch, HelpCircle, RotateCw, User, Webhook } from 'lucide-react';
-import React from 'react';
 
 const triggerTypeConfig: Record<
   TriggerType,
@@ -44,22 +38,16 @@ const triggerTypeConfig: Record<
 };
 
 type Props = {
-  /** The trigger type to display */
   type?: TriggerType;
-  /** Whether to show the label alongside the icon */
   showLabel?: boolean;
-  /** Size of the icon (default: 14) */
   size?: number;
 };
 
-/**
- * TriggerTypeIndicator displays an icon representing how a DAG run was triggered
- */
 export function TriggerTypeIndicator({
   type,
   showLabel = true,
   size = 14,
-}: Props): React.JSX.Element | null {
+}: Props): JSX.Element | null {
   if (!type) {
     return null;
   }

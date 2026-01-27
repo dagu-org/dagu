@@ -32,12 +32,35 @@ import (
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
-// filenameUnsafeChars matches characters that are unsafe in Content-Disposition filenames.
 var filenameUnsafeChars = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
 
-// sanitizeFilename replaces unsafe characters with underscores for Content-Disposition headers.
 func sanitizeFilename(s string) string {
 	return filenameUnsafeChars.ReplaceAllString(s, "_")
+}
+
+// logDAGRunAudit logs a DAG-run related audit event.
+func (a *API) logDAGRunAudit(ctx context.Context, action string, details map[string]any) {
+	if a.auditService == nil {
+		return
+	}
+	currentUser, _ := auth.UserFromContext(ctx)
+	clientIP, _ := auth.ClientIPFromContext(ctx)
+	detailsJSON, _ := json.Marshal(details)
+	entry := audit.NewEntry(audit.CategoryDAG, action, currentUser.ID, currentUser.Username).
+		WithDetails(string(detailsJSON)).
+		WithIPAddress(clientIP)
+	_ = a.auditService.Log(ctx, entry)
+}
+
+// buildLogReadOptions constructs LogReadOptions from request parameters.
+func (a *API) buildLogReadOptions(head, tail, offset, limit *int) fileutil.LogReadOptions {
+	return fileutil.LogReadOptions{
+		Head:     valueOf(head),
+		Tail:     valueOf(tail),
+		Offset:   valueOf(offset),
+		Limit:    valueOf(limit),
+		Encoding: a.logEncodingCharset,
+	}
 }
 
 // ExecuteDAGRunFromSpec implements api.StrictServerInterface.
@@ -95,24 +118,15 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 		}
 	}
 
-	// Log DAG run execution from spec
-	if a.auditService != nil {
-		currentUser, _ := auth.UserFromContext(ctx)
-		clientIP, _ := auth.ClientIPFromContext(ctx)
-		detailsMap := map[string]any{
-			"dag_name":   dag.Name,
-			"dag_run_id": dagRunId,
-			"inline":     true,
-		}
-		if params != "" {
-			detailsMap["params"] = params
-		}
-		details, _ := json.Marshal(detailsMap)
-		entry := audit.NewEntry(audit.CategoryDAG, "dag_execute", currentUser.ID, currentUser.Username).
-			WithDetails(string(details)).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
+	detailsMap := map[string]any{
+		"dag_name":   dag.Name,
+		"dag_run_id": dagRunId,
+		"inline":     true,
 	}
+	if params != "" {
+		detailsMap["params"] = params
+	}
+	a.logDAGRunAudit(ctx, "dag_execute", detailsMap)
 
 	return api.ExecuteDAGRunFromSpec200JSONResponse{
 		DagRunId: dagRunId,
@@ -173,24 +187,15 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 		return nil, fmt.Errorf("error enqueuing dag-run: %w", err)
 	}
 
-	// Log DAG run enqueue from spec
-	if a.auditService != nil {
-		currentUser, _ := auth.UserFromContext(ctx)
-		clientIP, _ := auth.ClientIPFromContext(ctx)
-		detailsMap := map[string]any{
-			"dag_name":   dag.Name,
-			"dag_run_id": dagRunId,
-			"inline":     true,
-		}
-		if params != "" {
-			detailsMap["params"] = params
-		}
-		details, _ := json.Marshal(detailsMap)
-		entry := audit.NewEntry(audit.CategoryDAG, "dag_enqueue", currentUser.ID, currentUser.Username).
-			WithDetails(string(details)).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
+	detailsMap := map[string]any{
+		"dag_name":   dag.Name,
+		"dag_run_id": dagRunId,
+		"inline":     true,
 	}
+	if params != "" {
+		detailsMap["params"] = params
+	}
+	a.logDAGRunAudit(ctx, "dag_enqueue", detailsMap)
 
 	return api.EnqueueDAGRunFromSpec200JSONResponse{
 		DagRunId: dagRunId,
@@ -370,34 +375,22 @@ func parseCommaSeparatedTags(tagsParam *string) []string {
 }
 
 func (a *API) GetDAGRunLog(ctx context.Context, request api.GetDAGRunLogRequestObject) (api.GetDAGRunLogResponseObject, error) {
-	dagName := request.Name
-	dagRunId := request.DagRunId
-
-	ref := exec.NewDAGRunRef(dagName, dagRunId)
+	ref := exec.NewDAGRunRef(request.Name, request.DagRunId)
 	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
 		return api.GetDAGRunLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
+			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
 		}, nil
 	}
 
-	// Extract pagination parameters
-	options := fileutil.LogReadOptions{
-		Head:     valueOf(request.Params.Head),
-		Tail:     valueOf(request.Params.Tail),
-		Offset:   valueOf(request.Params.Offset),
-		Limit:    valueOf(request.Params.Limit),
-		Encoding: a.logEncodingCharset,
-	}
-
-	// Use the new log utility function
+	options := a.buildLogReadOptions(request.Params.Head, request.Params.Tail, request.Params.Offset, request.Params.Limit)
 	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(dagStatus.Log, options)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return api.GetDAGRunLog404JSONResponse{
 				Code:    api.ErrorCodeNotFound,
-				Message: fmt.Sprintf("log file not found for dag-run %s", dagRunId),
+				Message: fmt.Sprintf("log file not found for dag-run %s", request.DagRunId),
 			}, nil
 		}
 		return nil, fmt.Errorf("error reading %s: %w", dagStatus.Log, err)
@@ -412,17 +405,13 @@ func (a *API) GetDAGRunLog(ctx context.Context, request api.GetDAGRunLogRequestO
 	}, nil
 }
 
-// DownloadDAGRunLog implements api.StrictServerInterface.
 func (a *API) DownloadDAGRunLog(ctx context.Context, request api.DownloadDAGRunLogRequestObject) (api.DownloadDAGRunLogResponseObject, error) {
-	dagName := request.Name
-	dagRunId := request.DagRunId
-
-	ref := exec.NewDAGRunRef(dagName, dagRunId)
+	ref := exec.NewDAGRunRef(request.Name, request.DagRunId)
 	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
 		return api.DownloadDAGRunLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
+			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
 		}, nil
 	}
 
@@ -431,13 +420,13 @@ func (a *API) DownloadDAGRunLog(ctx context.Context, request api.DownloadDAGRunL
 		if errors.Is(err, os.ErrNotExist) {
 			return api.DownloadDAGRunLog404JSONResponse{
 				Code:    api.ErrorCodeNotFound,
-				Message: fmt.Sprintf("log file not found for dag-run %s", dagRunId),
+				Message: fmt.Sprintf("log file not found for dag-run %s", request.DagRunId),
 			}, nil
 		}
 		return nil, fmt.Errorf("error reading %s: %w", dagStatus.Log, err)
 	}
 
-	filename := fmt.Sprintf("%s-%s-scheduler.log", sanitizeFilename(dagName), sanitizeFilename(dagRunId))
+	filename := fmt.Sprintf("%s-%s-scheduler.log", sanitizeFilename(request.Name), sanitizeFilename(request.DagRunId))
 	return api.DownloadDAGRunLog200TextResponse{
 		Body: string(content),
 		Headers: api.DownloadDAGRunLog200ResponseHeaders{
@@ -446,29 +435,25 @@ func (a *API) DownloadDAGRunLog(ctx context.Context, request api.DownloadDAGRunL
 	}, nil
 }
 
-// GetDAGRunOutputs implements api.StrictServerInterface.
 func (a *API) GetDAGRunOutputs(ctx context.Context, request api.GetDAGRunOutputsRequestObject) (api.GetDAGRunOutputsResponseObject, error) {
-	dagName := request.Name
-	dagRunId := request.DagRunId
-
 	var attempt exec.DAGRunAttempt
 	var err error
 
-	if dagRunId == "latest" {
-		attempt, err = a.dagRunStore.LatestAttempt(ctx, dagName)
+	if request.DagRunId == "latest" {
+		attempt, err = a.dagRunStore.LatestAttempt(ctx, request.Name)
 		if err != nil {
 			return api.GetDAGRunOutputs404JSONResponse{
 				Code:    api.ErrorCodeNotFound,
-				Message: fmt.Sprintf("no dag-runs found for DAG %s", dagName),
+				Message: fmt.Sprintf("no dag-runs found for DAG %s", request.Name),
 			}, nil
 		}
 	} else {
-		ref := exec.NewDAGRunRef(dagName, dagRunId)
+		ref := exec.NewDAGRunRef(request.Name, request.DagRunId)
 		attempt, err = a.dagRunStore.FindAttempt(ctx, ref)
 		if err != nil {
 			return api.GetDAGRunOutputs404JSONResponse{
 				Code:    api.ErrorCodeNotFound,
-				Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
+				Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
 			}, nil
 		}
 	}
@@ -477,13 +462,12 @@ func (a *API) GetDAGRunOutputs(ctx context.Context, request api.GetDAGRunOutputs
 	if err != nil {
 		logger.Error(ctx, "Failed to read outputs",
 			tag.Error(err),
-			slog.String("dag", dagName),
-			slog.String("dagRunId", dagRunId),
+			slog.String("dag", request.Name),
+			slog.String("dagRunId", request.DagRunId),
 		)
 		return nil, fmt.Errorf("error reading outputs: %w", err)
 	}
 
-	// Return empty structure if no outputs (DAG-run exists but captured no outputs)
 	if outputs == nil {
 		outputs = &exec.DAGRunOutputs{
 			Metadata: exec.OutputsMetadata{},
@@ -491,7 +475,6 @@ func (a *API) GetDAGRunOutputs(ctx context.Context, request api.GetDAGRunOutputs
 		}
 	}
 
-	// Parse CompletedAt from RFC3339 string to time.Time
 	var completedAt time.Time
 	if outputs.Metadata.CompletedAt != "" {
 		if t, err := time.Parse(time.RFC3339, outputs.Metadata.CompletedAt); err == nil {
@@ -513,15 +496,12 @@ func (a *API) GetDAGRunOutputs(ctx context.Context, request api.GetDAGRunOutputs
 }
 
 func (a *API) GetDAGRunStepLog(ctx context.Context, request api.GetDAGRunStepLogRequestObject) (api.GetDAGRunStepLogResponseObject, error) {
-	dagName := request.Name
-	dagRunId := request.DagRunId
-
-	ref := exec.NewDAGRunRef(dagName, dagRunId)
+	ref := exec.NewDAGRunRef(request.Name, request.DagRunId)
 	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
 		return api.GetDAGRunStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
+			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
 		}, nil
 	}
 
@@ -529,25 +509,16 @@ func (a *API) GetDAGRunStepLog(ctx context.Context, request api.GetDAGRunStepLog
 	if err != nil {
 		return api.GetDAGRunStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, dagName),
+			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, request.Name),
 		}, nil
 	}
 
-	// Extract pagination parameters
-	options := fileutil.LogReadOptions{
-		Head:     valueOf(request.Params.Head),
-		Tail:     valueOf(request.Params.Tail),
-		Offset:   valueOf(request.Params.Offset),
-		Limit:    valueOf(request.Params.Limit),
-		Encoding: a.logEncodingCharset,
-	}
-
-	var logFile = node.Stdout
+	options := a.buildLogReadOptions(request.Params.Head, request.Params.Tail, request.Params.Offset, request.Params.Limit)
+	logFile := node.Stdout
 	if *request.Params.Stream == api.StreamStderr {
 		logFile = node.Stderr
 	}
 
-	// Use the new log utility function
 	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(logFile, options)
 	if err != nil {
 		if strings.Contains(err.Error(), "file not found") {
@@ -568,17 +539,13 @@ func (a *API) GetDAGRunStepLog(ctx context.Context, request api.GetDAGRunStepLog
 	}, nil
 }
 
-// DownloadDAGRunStepLog implements api.StrictServerInterface.
 func (a *API) DownloadDAGRunStepLog(ctx context.Context, request api.DownloadDAGRunStepLogRequestObject) (api.DownloadDAGRunStepLogResponseObject, error) {
-	dagName := request.Name
-	dagRunId := request.DagRunId
-
-	ref := exec.NewDAGRunRef(dagName, dagRunId)
+	ref := exec.NewDAGRunRef(request.Name, request.DagRunId)
 	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
 		return api.DownloadDAGRunStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunId, dagName),
+			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
 		}, nil
 	}
 
@@ -586,15 +553,13 @@ func (a *API) DownloadDAGRunStepLog(ctx context.Context, request api.DownloadDAG
 	if err != nil {
 		return api.DownloadDAGRunStepLog404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, dagName),
+			Message: fmt.Sprintf("step %s not found in DAG %s", request.StepName, request.Name),
 		}, nil
 	}
 
-	var logFile = node.Stdout
-	streamName := "stdout"
+	logFile, streamName := node.Stdout, "stdout"
 	if request.Params.Stream != nil && *request.Params.Stream == api.StreamStderr {
-		logFile = node.Stderr
-		streamName = "stderr"
+		logFile, streamName = node.Stderr, "stderr"
 	}
 
 	content, err := os.ReadFile(filepath.Clean(logFile))
@@ -608,7 +573,7 @@ func (a *API) DownloadDAGRunStepLog(ctx context.Context, request api.DownloadDAG
 		return nil, fmt.Errorf("error reading %s: %w", logFile, err)
 	}
 
-	filename := fmt.Sprintf("%s-%s-%s-%s.log", sanitizeFilename(dagName), sanitizeFilename(dagRunId), sanitizeFilename(request.StepName), streamName)
+	filename := fmt.Sprintf("%s-%s-%s-%s.log", sanitizeFilename(request.Name), sanitizeFilename(request.DagRunId), sanitizeFilename(request.StepName), streamName)
 	return api.DownloadDAGRunStepLog200TextResponse{
 		Body: string(content),
 		Headers: api.DownloadDAGRunStepLog200ResponseHeaders{
@@ -1146,7 +1111,6 @@ func (a *API) getSpecFromAttempt(ctx context.Context, attempt exec.DAGRunAttempt
 	return string(dag.YamlData), nil
 }
 
-// GetSubDAGRunLog implements api.StrictServerInterface.
 func (a *API) GetSubDAGRunLog(ctx context.Context, request api.GetSubDAGRunLogRequestObject) (api.GetSubDAGRunLogResponseObject, error) {
 	root := exec.NewDAGRunRef(request.Name, request.DagRunId)
 	dagStatus, err := a.dagRunMgr.FindSubDAGRunStatus(ctx, root, request.SubDAGRunId)
@@ -1157,16 +1121,7 @@ func (a *API) GetSubDAGRunLog(ctx context.Context, request api.GetSubDAGRunLogRe
 		}, nil
 	}
 
-	// Extract pagination parameters
-	options := fileutil.LogReadOptions{
-		Head:     valueOf(request.Params.Head),
-		Tail:     valueOf(request.Params.Tail),
-		Offset:   valueOf(request.Params.Offset),
-		Limit:    valueOf(request.Params.Limit),
-		Encoding: a.logEncodingCharset,
-	}
-
-	// Use the new log utility function
+	options := a.buildLogReadOptions(request.Params.Head, request.Params.Tail, request.Params.Offset, request.Params.Limit)
 	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(dagStatus.Log, options)
 	if err != nil {
 		if strings.Contains(err.Error(), "file not found") {
@@ -1187,7 +1142,6 @@ func (a *API) GetSubDAGRunLog(ctx context.Context, request api.GetSubDAGRunLogRe
 	}, nil
 }
 
-// DownloadSubDAGRunLog implements api.StrictServerInterface.
 func (a *API) DownloadSubDAGRunLog(ctx context.Context, request api.DownloadSubDAGRunLogRequestObject) (api.DownloadSubDAGRunLogResponseObject, error) {
 	root := exec.NewDAGRunRef(request.Name, request.DagRunId)
 	dagStatus, err := a.dagRunMgr.FindSubDAGRunStatus(ctx, root, request.SubDAGRunId)
@@ -1218,7 +1172,6 @@ func (a *API) DownloadSubDAGRunLog(ctx context.Context, request api.DownloadSubD
 	}, nil
 }
 
-// GetSubDAGRunStepLog implements api.StrictServerInterface.
 func (a *API) GetSubDAGRunStepLog(ctx context.Context, request api.GetSubDAGRunStepLogRequestObject) (api.GetSubDAGRunStepLogResponseObject, error) {
 	root := exec.NewDAGRunRef(request.Name, request.DagRunId)
 	dagStatus, err := a.dagRunMgr.FindSubDAGRunStatus(ctx, root, request.SubDAGRunId)
@@ -1237,21 +1190,12 @@ func (a *API) GetSubDAGRunStepLog(ctx context.Context, request api.GetSubDAGRunS
 		}, nil
 	}
 
-	// Extract pagination parameters
-	options := fileutil.LogReadOptions{
-		Head:     valueOf(request.Params.Head),
-		Tail:     valueOf(request.Params.Tail),
-		Offset:   valueOf(request.Params.Offset),
-		Limit:    valueOf(request.Params.Limit),
-		Encoding: a.logEncodingCharset,
-	}
-
-	var logFile = node.Stdout
+	options := a.buildLogReadOptions(request.Params.Head, request.Params.Tail, request.Params.Offset, request.Params.Limit)
+	logFile := node.Stdout
 	if *request.Params.Stream == api.StreamStderr {
 		logFile = node.Stderr
 	}
 
-	// Use the new log utility function
 	content, lineCount, totalLines, hasMore, isEstimate, err := fileutil.ReadLogContent(logFile, options)
 	if err != nil {
 		if strings.Contains(err.Error(), "file not found") {
@@ -1272,7 +1216,6 @@ func (a *API) GetSubDAGRunStepLog(ctx context.Context, request api.GetSubDAGRunS
 	}, nil
 }
 
-// DownloadSubDAGRunStepLog implements api.StrictServerInterface.
 func (a *API) DownloadSubDAGRunStepLog(ctx context.Context, request api.DownloadSubDAGRunStepLogRequestObject) (api.DownloadSubDAGRunStepLogResponseObject, error) {
 	root := exec.NewDAGRunRef(request.Name, request.DagRunId)
 	dagStatus, err := a.dagRunMgr.FindSubDAGRunStatus(ctx, root, request.SubDAGRunId)
@@ -1291,11 +1234,9 @@ func (a *API) DownloadSubDAGRunStepLog(ctx context.Context, request api.Download
 		}, nil
 	}
 
-	var logFile = node.Stdout
-	streamName := "stdout"
+	logFile, streamName := node.Stdout, "stdout"
 	if request.Params.Stream != nil && *request.Params.Stream == api.StreamStderr {
-		logFile = node.Stderr
-		streamName = "stderr"
+		logFile, streamName = node.Stderr, "stderr"
 	}
 
 	content, err := os.ReadFile(filepath.Clean(logFile))
@@ -1318,7 +1259,6 @@ func (a *API) DownloadSubDAGRunStepLog(ctx context.Context, request api.Download
 	}, nil
 }
 
-// UpdateSubDAGRunStepStatus implements api.StrictServerInterface.
 func (a *API) UpdateSubDAGRunStepStatus(ctx context.Context, request api.UpdateSubDAGRunStepStatusRequestObject) (api.UpdateSubDAGRunStepStatusResponseObject, error) {
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
@@ -1447,14 +1387,7 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 	return api.RetryDAGRun200Response{}, nil
 }
 
-// logRetryAudit logs a retry audit event.
 func (a *API) logRetryAudit(ctx context.Context, dagName, dagRunID, stepName string, distributed bool) {
-	if a.auditService == nil {
-		return
-	}
-
-	currentUser, _ := auth.UserFromContext(ctx)
-	clientIP, _ := auth.ClientIPFromContext(ctx)
 	detailsMap := map[string]any{
 		"dag_name":    dagName,
 		"dag_run_id":  dagRunID,
@@ -1463,11 +1396,7 @@ func (a *API) logRetryAudit(ctx context.Context, dagName, dagRunID, stepName str
 	if stepName != "" {
 		detailsMap["step_name"] = stepName
 	}
-	details, _ := json.Marshal(detailsMap)
-	entry := audit.NewEntry(audit.CategoryDAG, "dag_retry", currentUser.ID, currentUser.Username).
-		WithDetails(string(details)).
-		WithIPAddress(clientIP)
-	_ = a.auditService.Log(ctx, entry)
+	a.logDAGRunAudit(ctx, "dag_retry", detailsMap)
 }
 
 func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRequestObject) (api.TerminateDAGRunResponseObject, error) {
@@ -1548,19 +1477,10 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 		}
 	}
 
-	// Log DAG termination
-	if a.auditService != nil {
-		currentUser, _ := auth.UserFromContext(ctx)
-		clientIP, _ := auth.ClientIPFromContext(ctx)
-		details, _ := json.Marshal(map[string]string{
-			"dag_name":   request.Name,
-			"dag_run_id": request.DagRunId,
-		})
-		entry := audit.NewEntry(audit.CategoryDAG, "dag_terminate", currentUser.ID, currentUser.Username).
-			WithDetails(string(details)).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
-	}
+	a.logDAGRunAudit(ctx, "dag_terminate", map[string]any{
+		"dag_name":   request.Name,
+		"dag_run_id": request.DagRunId,
+	})
 
 	return api.TerminateDAGRun200Response{}, nil
 }
@@ -1606,19 +1526,10 @@ func (a *API) DequeueDAGRun(ctx context.Context, request api.DequeueDAGRunReques
 		return nil, fmt.Errorf("error dequeueing dag-run: %w", err)
 	}
 
-	// Log DAG dequeue
-	if a.auditService != nil {
-		currentUser, _ := auth.UserFromContext(ctx)
-		clientIP, _ := auth.ClientIPFromContext(ctx)
-		details, _ := json.Marshal(map[string]string{
-			"dag_name":   request.Name,
-			"dag_run_id": request.DagRunId,
-		})
-		entry := audit.NewEntry(audit.CategoryDAG, "dag_dequeue", currentUser.ID, currentUser.Username).
-			WithDetails(string(details)).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
-	}
+	a.logDAGRunAudit(ctx, "dag_dequeue", map[string]any{
+		"dag_name":   request.Name,
+		"dag_run_id": request.DagRunId,
+	})
 
 	return api.DequeueDAGRun200Response{}, nil
 }
@@ -1709,25 +1620,16 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 		queued = dagStatus.Status == core.Queued
 	}
 
-	// Log DAG reschedule
-	if a.auditService != nil {
-		currentUser, _ := auth.UserFromContext(ctx)
-		clientIP, _ := auth.ClientIPFromContext(ctx)
-		detailsMap := map[string]any{
-			"dag_name":        request.Name,
-			"from_dag_run_id": request.DagRunId,
-			"new_dag_run_id":  newDagRunID,
-			"queued":          queued,
-		}
-		if nameOverride != "" {
-			detailsMap["name_override"] = nameOverride
-		}
-		details, _ := json.Marshal(detailsMap)
-		entry := audit.NewEntry(audit.CategoryDAG, "dag_reschedule", currentUser.ID, currentUser.Username).
-			WithDetails(string(details)).
-			WithIPAddress(clientIP)
-		_ = a.auditService.Log(ctx, entry)
+	detailsMap := map[string]any{
+		"dag_name":        request.Name,
+		"from_dag_run_id": request.DagRunId,
+		"new_dag_run_id":  newDagRunID,
+		"queued":          queued,
 	}
+	if nameOverride != "" {
+		detailsMap["name_override"] = nameOverride
+	}
+	a.logDAGRunAudit(ctx, "dag_reschedule", detailsMap)
 
 	return api.RescheduleDAGRun200JSONResponse{
 		DagRunId: newDagRunID,
@@ -1902,15 +1804,7 @@ func (a *API) resumeSubDAGRun(ctx context.Context, rootRef exec.DAGRunRef, subDA
 	return runtime.Start(ctx, retrySpec)
 }
 
-// logStepApproval logs a step approval audit event.
 func (a *API) logStepApproval(ctx context.Context, dagName, dagRunID, subDAGRunID, stepName string, resumed bool) {
-	if a.auditService == nil {
-		return
-	}
-
-	currentUser, _ := auth.UserFromContext(ctx)
-	clientIP, _ := auth.ClientIPFromContext(ctx)
-
 	detailsMap := map[string]any{
 		"dag_name":   dagName,
 		"dag_run_id": dagRunID,
@@ -1926,22 +1820,10 @@ func (a *API) logStepApproval(ctx context.Context, dagName, dagRunID, subDAGRunI
 		action = "sub_dag_step_approve"
 	}
 
-	details, _ := json.Marshal(detailsMap)
-	entry := audit.NewEntry(audit.CategoryDAG, action, currentUser.ID, currentUser.Username).
-		WithDetails(string(details)).
-		WithIPAddress(clientIP)
-	_ = a.auditService.Log(ctx, entry)
+	a.logDAGRunAudit(ctx, action, detailsMap)
 }
 
-// logStepRejection logs a step rejection audit event.
 func (a *API) logStepRejection(ctx context.Context, dagName, dagRunID, subDAGRunID, stepName string, reason *string) {
-	if a.auditService == nil {
-		return
-	}
-
-	currentUser, _ := auth.UserFromContext(ctx)
-	clientIP, _ := auth.ClientIPFromContext(ctx)
-
 	detailsMap := map[string]any{
 		"dag_name":   dagName,
 		"dag_run_id": dagRunID,
@@ -1959,11 +1841,7 @@ func (a *API) logStepRejection(ctx context.Context, dagName, dagRunID, subDAGRun
 		action = "sub_dag_step_reject"
 	}
 
-	details, _ := json.Marshal(detailsMap)
-	entry := audit.NewEntry(audit.CategoryDAG, action, currentUser.ID, currentUser.Username).
-		WithDetails(string(details)).
-		WithIPAddress(clientIP)
-	_ = a.auditService.Log(ctx, entry)
+	a.logDAGRunAudit(ctx, action, detailsMap)
 }
 
 // findStepByName searches for a step by name in the given nodes.

@@ -129,14 +129,14 @@ func TestQueueProcessor_LocalQueueAlwaysFIFO(t *testing.T) {
 
 	// Verify initial maxConcurrency is 1
 	v, _ := f.processor.queues.Load("local-dag")
-	require.Equal(t, 1, v.(*queue).maxConc())
+	require.Equal(t, 1, v.(*queue).getMaxConcurrency())
 
 	f.processor.ProcessQueueItems(f.ctx, "local-dag")
 	time.Sleep(200 * time.Millisecond)
 
 	// Verify maxConcurrency is STILL 1 (not updated to DAG's 5)
 	v, _ = f.processor.queues.Load("local-dag")
-	assert.Equal(t, 1, v.(*queue).maxConc(), "Local queue should always have maxConcurrency=1")
+	assert.Equal(t, 1, v.(*queue).getMaxConcurrency(), "Local queue should always have maxConcurrency=1")
 }
 
 func TestQueueProcessor_GlobalQueue(t *testing.T) {
@@ -150,7 +150,7 @@ func TestQueueProcessor_GlobalQueue(t *testing.T) {
 
 	v, ok := f.processor.queues.Load("global-queue")
 	require.True(t, ok)
-	require.Equal(t, 3, v.(*queue).maxConc())
+	require.Equal(t, 3, v.(*queue).getMaxConcurrency())
 
 	f.processor.ProcessQueueItems(f.ctx, "global-queue")
 	time.Sleep(200 * time.Millisecond)
@@ -235,7 +235,7 @@ func TestQueueProcessor_GlobalQueueIgnoresDAGMaxActiveRuns(t *testing.T) {
 	// Verify initial maxConcurrency is 5 (from global config)
 	v, ok := f.processor.queues.Load("global-queue")
 	require.True(t, ok)
-	require.Equal(t, 5, v.(*queue).maxConc(), "Global queue should have maxConcurrency=5 from config")
+	require.Equal(t, 5, v.(*queue).getMaxConcurrency(), "Global queue should have maxConcurrency=5 from config")
 
 	// Process items
 	f.processor.ProcessQueueItems(f.ctx, "global-queue")
@@ -243,7 +243,7 @@ func TestQueueProcessor_GlobalQueueIgnoresDAGMaxActiveRuns(t *testing.T) {
 
 	// Verify maxConcurrency is STILL 5 (not overwritten by DAG's maxActiveRuns=1)
 	v, _ = f.processor.queues.Load("global-queue")
-	assert.Equal(t, 5, v.(*queue).maxConc(), "Global queue maxConcurrency should NOT be overwritten by DAG")
+	assert.Equal(t, 5, v.(*queue).getMaxConcurrency(), "Global queue maxConcurrency should NOT be overwritten by DAG")
 
 	// Verify all 5 items were processed in the batch (not just 1)
 	assert.True(t, strings.Contains(f.logs(), "count=5"), "Should process 5 items, not 1")
@@ -269,7 +269,7 @@ func TestQueueProcessor_GlobalQueueViaLoop(t *testing.T) {
 	// Simulate what loop() does: check if queue exists in p.queues
 	v, ok := f.processor.queues.Load("global-queue")
 	require.True(t, ok, "Global queue should exist in processor")
-	require.Equal(t, 3, v.(*queue).maxConc(), "Global queue should have maxConcurrency=3")
+	require.Equal(t, 3, v.(*queue).getMaxConcurrency(), "Global queue should have maxConcurrency=3")
 	require.True(t, v.(*queue).isGlobalQueue(), "Should be marked as global queue")
 
 	// Process

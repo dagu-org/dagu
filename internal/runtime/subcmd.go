@@ -270,23 +270,21 @@ type RestartOptions struct {
 }
 
 // Run executes the command and waits for it to complete.
-// If the command fails, stdout/stderr output is included in the error for debugging.
+// If the command fails and output was captured, it is included in the error for debugging.
 func Run(ctx context.Context, spec CmdSpec) error {
 	var stdout, stderr bytes.Buffer
 
-	cmd := newCommand(ctx, spec, true)
-	// Capture output for error reporting while also writing to original destinations
-	if cmd.Stdout == nil {
-		cmd.Stdout = &stdout
-	}
-	if cmd.Stderr == nil {
-		cmd.Stderr = &stderr
-	}
+	// Override spec's stdout/stderr to capture output for error reporting
+	captureSpec := spec
+	captureSpec.Stdout = nil
+	captureSpec.Stderr = nil
+
+	cmd := newCommand(ctx, captureSpec, true)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		// Build error message with captured output
-		var parts []string
-		parts = append(parts, fmt.Sprintf("command failed: %v", err))
+		parts := []string{fmt.Sprintf("command failed: %v", err)}
 		if stdout.Len() > 0 {
 			parts = append(parts, fmt.Sprintf("stdout: %s", strings.TrimSpace(stdout.String())))
 		}
@@ -315,21 +313,23 @@ func Start(ctx context.Context, spec CmdSpec) error {
 // newCommand creates an exec.Cmd from the spec with proper configuration.
 // nolint:gosec
 func newCommand(ctx context.Context, spec CmdSpec, withContext bool) *exec.Cmd {
-	var cmd *exec.Cmd
+	cmd := exec.Command(spec.Executable, spec.Args...)
 	if withContext {
 		cmd = exec.CommandContext(ctx, spec.Executable, spec.Args...)
-	} else {
-		cmd = exec.Command(spec.Executable, spec.Args...)
 	}
+
 	cmdutil.SetupCommand(cmd)
 	cmd.Env = spec.Env
+
 	cmd.Stdout = spec.Stdout
-	cmd.Stderr = spec.Stderr
 	if cmd.Stdout == nil {
 		cmd.Stdout = os.Stdout
 	}
+
+	cmd.Stderr = spec.Stderr
 	if cmd.Stderr == nil {
 		cmd.Stderr = os.Stderr
 	}
+
 	return cmd
 }

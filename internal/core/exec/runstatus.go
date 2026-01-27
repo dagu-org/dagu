@@ -2,6 +2,7 @@ package exec
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -73,70 +74,43 @@ func (st *DAGRunStatus) DAGRun() DAGRunRef {
 func (st *DAGRunStatus) Errors() []error {
 	var errs []error
 	if st.Error != "" {
-		errs = append(errs, fmt.Errorf("%s", st.Error))
+		errs = append(errs, errors.New(st.Error))
 	}
 	for _, node := range st.Nodes {
 		if node.Error != "" {
 			errs = append(errs, fmt.Errorf("node %s: %s", node.Step.Name, node.Error))
 		}
 	}
-	if st.OnInit != nil && st.OnInit.Error != "" {
-		errs = append(errs, fmt.Errorf("onInit: %s", st.OnInit.Error))
-	}
-	if st.OnExit != nil && st.OnExit.Error != "" {
-		errs = append(errs, fmt.Errorf("onExit: %s", st.OnExit.Error))
-	}
-	if st.OnSuccess != nil && st.OnSuccess.Error != "" {
-		errs = append(errs, fmt.Errorf("onSuccess: %s", st.OnSuccess.Error))
-	}
-	if st.OnFailure != nil && st.OnFailure.Error != "" {
-		errs = append(errs, fmt.Errorf("onFailure: %s", st.OnFailure.Error))
-	}
-	if st.OnCancel != nil && st.OnCancel.Error != "" {
-		errs = append(errs, fmt.Errorf("onCancel: %s", st.OnCancel.Error))
-	}
-	if st.OnWait != nil && st.OnWait.Error != "" {
-		errs = append(errs, fmt.Errorf("onWait: %s", st.OnWait.Error))
+	for _, handler := range st.handlerNodes() {
+		if handler.node != nil && handler.node.Error != "" {
+			errs = append(errs, fmt.Errorf("%s: %s", handler.name, handler.node.Error))
+		}
 	}
 	return errs
 }
 
-// NodesByName returns a slice of nodes with the specified name
+// NodeByName returns the node with the specified name
 func (st *DAGRunStatus) NodeByName(name string) (*Node, error) {
 	for _, node := range st.Nodes {
 		if node.Step.Name == name {
 			return node, nil
 		}
 	}
-	if st.OnInit != nil && st.OnInit.Step.Name == name {
-		return st.OnInit, nil
-	}
-	if st.OnExit != nil && st.OnExit.Step.Name == name {
-		return st.OnExit, nil
-	}
-	if st.OnSuccess != nil && st.OnSuccess.Step.Name == name {
-		return st.OnSuccess, nil
-	}
-	if st.OnFailure != nil && st.OnFailure.Step.Name == name {
-		return st.OnFailure, nil
-	}
-	if st.OnCancel != nil && st.OnCancel.Step.Name == name {
-		return st.OnCancel, nil
-	}
-	if st.OnWait != nil && st.OnWait.Step.Name == name {
-		return st.OnWait, nil
+	for _, handler := range st.handlerNodes() {
+		if handler.node != nil && handler.node.Step.Name == name {
+			return handler.node, nil
+		}
 	}
 	return nil, fmt.Errorf("node %s not found", name)
 }
 
 // StatusFromJSON deserializes a JSON string into a Status object
 func StatusFromJSON(s string) (*DAGRunStatus, error) {
-	status := new(DAGRunStatus)
-	err := json.Unmarshal([]byte(s), status)
-	if err != nil {
+	var status DAGRunStatus
+	if err := json.Unmarshal([]byte(s), &status); err != nil {
 		return nil, err
 	}
-	return status, nil
+	return &status, nil
 }
 
 // PID represents a process ID for a running dag-run
@@ -156,4 +130,22 @@ func FormatTime(val time.Time) string {
 		return ""
 	}
 	return stringutil.FormatTime(val)
+}
+
+// handlerNode pairs a handler node with its name for iteration
+type handlerNode struct {
+	name string
+	node *Node
+}
+
+// handlerNodes returns all handler nodes for iteration
+func (st *DAGRunStatus) handlerNodes() []handlerNode {
+	return []handlerNode{
+		{"onInit", st.OnInit},
+		{"onExit", st.OnExit},
+		{"onSuccess", st.OnSuccess},
+		{"onFailure", st.OnFailure},
+		{"onCancel", st.OnCancel},
+		{"onWait", st.OnWait},
+	}
 }

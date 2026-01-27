@@ -7,9 +7,9 @@ import (
 )
 
 func toDAG(dag *core.DAG) api.DAG {
-	var schedules []api.Schedule
-	for _, s := range dag.Schedule {
-		schedules = append(schedules, api.Schedule{Expression: s.Expression})
+	schedules := make([]api.Schedule, len(dag.Schedule))
+	for i, s := range dag.Schedule {
+		schedules[i] = api.Schedule{Expression: s.Expression}
 	}
 
 	return api.DAG{
@@ -24,9 +24,9 @@ func toDAG(dag *core.DAG) api.DAG {
 }
 
 func toStep(obj core.Step) api.Step {
-	var conditions []api.Condition
+	conditions := make([]api.Condition, len(obj.Preconditions))
 	for i := range obj.Preconditions {
-		conditions = append(conditions, toPrecondition(obj.Preconditions[i]))
+		conditions[i] = toPrecondition(obj.Preconditions[i])
 	}
 
 	var repeatMode *api.RepeatMode
@@ -46,13 +46,12 @@ func toStep(obj core.Step) api.Step {
 		repeatPolicy.Condition = ptrOf(toPrecondition(obj.RepeatPolicy.Condition))
 	}
 
-	// Convert Commands to API format
-	var commands []api.CommandEntry
-	for _, cmd := range obj.Commands {
-		commands = append(commands, api.CommandEntry{
+	commands := make([]api.CommandEntry, len(obj.Commands))
+	for i, cmd := range obj.Commands {
+		commands[i] = api.CommandEntry{
 			Command: cmd.Command,
 			Args:    ptrOf(cmd.Args),
-		})
+		}
 	}
 
 	step := api.Step{
@@ -69,7 +68,6 @@ func toStep(obj core.Step) api.Step {
 		Script:        ptrOf(obj.Script),
 	}
 
-	// Convert timeout duration to seconds if set
 	if obj.Timeout > 0 {
 		timeoutSec := int(obj.Timeout.Seconds())
 		step.TimeoutSec = &timeoutSec
@@ -87,19 +85,17 @@ func toStep(obj core.Step) api.Step {
 			MaxConcurrent: ptrOf(obj.Parallel.MaxConcurrent),
 		}
 
-		if obj.Parallel.Variable != "" {
-			// Variable reference (string)
+		switch {
+		case obj.Parallel.Variable != "":
 			items := &api.Step_Parallel_Items{}
 			if err := items.FromStepParallelItems1(obj.Parallel.Variable); err == nil {
 				parallel.Items = items
 			}
-		} else if len(obj.Parallel.Items) > 0 {
-			// Convert items to string array
-			var itemStrings []string
-			for _, item := range obj.Parallel.Items {
-				itemStrings = append(itemStrings, item.Value)
+		case len(obj.Parallel.Items) > 0:
+			itemStrings := make([]string, len(obj.Parallel.Items))
+			for i, item := range obj.Parallel.Items {
+				itemStrings[i] = item.Value
 			}
-			// Array of strings
 			items := &api.Step_Parallel_Items{}
 			if err := items.FromStepParallelItems0(itemStrings); err == nil {
 				parallel.Items = items
@@ -108,7 +104,6 @@ func toStep(obj core.Step) api.Step {
 		step.Parallel = &parallel
 	}
 
-	// Add executor config if present
 	if obj.ExecutorConfig.Type != "" || obj.ExecutorConfig.Config != nil {
 		step.ExecutorConfig = &struct {
 			Config *map[string]any `json:"config,omitempty"`
@@ -215,18 +210,13 @@ func toNode(node *exec.Node) api.Node {
 }
 
 func toSubDAGRuns(subDAGRuns []exec.SubDAGRun) []api.SubDAGRun {
-	var result []api.SubDAGRun
-	for _, w := range subDAGRuns {
-		subDAGRun := api.SubDAGRun{
+	result := make([]api.SubDAGRun, len(subDAGRuns))
+	for i, w := range subDAGRuns {
+		result[i] = api.SubDAGRun{
 			DagRunId: w.DAGRunID,
+			Params:   ptrOf(w.Params),
+			DagName:  ptrOf(w.DAGName),
 		}
-		if w.Params != "" {
-			subDAGRun.Params = &w.Params
-		}
-		if w.DAGName != "" {
-			subDAGRun.DagName = &w.DAGName
-		}
-		result = append(result, subDAGRun)
 	}
 	return result
 }
@@ -240,46 +230,28 @@ func toLocalDAG(dag *core.DAG) api.LocalDag {
 }
 
 func toDAGDetails(dag *core.DAG) *api.DAGDetails {
-	var details *api.DAGDetails
 	if dag == nil {
-		return details
+		return nil
 	}
 
-	var steps []api.Step
-	for _, step := range dag.Steps {
-		steps = append(steps, toStep(step))
+	steps := make([]api.Step, len(dag.Steps))
+	for i, step := range dag.Steps {
+		steps[i] = toStep(step)
 	}
 
-	handlers := dag.HandlerOn
+	handlerOn := toHandlerOn(dag.HandlerOn)
 
-	handlerOn := api.HandlerOn{}
-	if handlers.Failure != nil {
-		handlerOn.Failure = ptrOf(toStep(*handlers.Failure))
-	}
-	if handlers.Success != nil {
-		handlerOn.Success = ptrOf(toStep(*handlers.Success))
-	}
-	if handlers.Cancel != nil {
-		handlerOn.Cancel = ptrOf(toStep(*handlers.Cancel))
-	}
-	if handlers.Exit != nil {
-		handlerOn.Exit = ptrOf(toStep(*handlers.Exit))
+	schedules := make([]api.Schedule, len(dag.Schedule))
+	for i, s := range dag.Schedule {
+		schedules[i] = api.Schedule{Expression: s.Expression}
 	}
 
-	var schedules []api.Schedule
-	for _, s := range dag.Schedule {
-		schedules = append(schedules, api.Schedule{
-			Expression: s.Expression,
-		})
+	preconditions := make([]api.Condition, len(dag.Preconditions))
+	for i, p := range dag.Preconditions {
+		preconditions[i] = toPrecondition(p)
 	}
 
-	var preconditions []api.Condition
-	for _, p := range dag.Preconditions {
-		preconditions = append(preconditions, toPrecondition(p))
-	}
-
-	var runConfig *api.RunConfig = nil
-
+	var runConfig *api.RunConfig
 	if dag.RunConfig != nil {
 		runConfig = &api.RunConfig{
 			DisableParamEdit: dag.RunConfig.DisableParamEdit,
@@ -287,7 +259,7 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 		}
 	}
 
-	ret := &api.DAGDetails{
+	return &api.DAGDetails{
 		Name:              dag.Name,
 		Description:       ptrOf(dag.Description),
 		DefaultParams:     ptrOf(dag.DefaultParams),
@@ -306,66 +278,80 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 		Tags:              ptrOf(dag.Tags.Strings()),
 		RunConfig:         runConfig,
 	}
-
-	return ret
 }
 
-// toChatMessages converts exec.LLMMessage slice to api.ChatMessage slice.
+func toHandlerOn(handlers core.HandlerOn) api.HandlerOn {
+	handlerOn := api.HandlerOn{}
+	if handlers.Failure != nil {
+		handlerOn.Failure = ptrOf(toStep(*handlers.Failure))
+	}
+	if handlers.Success != nil {
+		handlerOn.Success = ptrOf(toStep(*handlers.Success))
+	}
+	if handlers.Cancel != nil {
+		handlerOn.Cancel = ptrOf(toStep(*handlers.Cancel))
+	}
+	if handlers.Exit != nil {
+		handlerOn.Exit = ptrOf(toStep(*handlers.Exit))
+	}
+	return handlerOn
+}
+
 func toChatMessages(messages []exec.LLMMessage) []api.ChatMessage {
 	if messages == nil {
 		return []api.ChatMessage{}
 	}
 
-	result := make([]api.ChatMessage, 0, len(messages))
-	for _, msg := range messages {
-		apiMsg := api.ChatMessage{
-			Role:    api.ChatMessageRole(msg.Role),
-			Content: msg.Content,
-		}
-
-		// Include tool calls for assistant messages
-		if len(msg.ToolCalls) > 0 {
-			toolCalls := make([]api.ChatToolCall, 0, len(msg.ToolCalls))
-			for _, tc := range msg.ToolCalls {
-				toolCalls = append(toolCalls, api.ChatToolCall{
-					Id:        tc.ID,
-					Name:      tc.Function.Name,
-					Arguments: ptrOf(tc.Function.Arguments),
-				})
-			}
-			apiMsg.ToolCalls = &toolCalls
-		}
-
-		if msg.Metadata != nil {
-			apiMsg.Metadata = &api.ChatMessageMetadata{
-				Provider:         ptrOf(msg.Metadata.Provider),
-				Model:            ptrOf(msg.Metadata.Model),
-				PromptTokens:     ptrOf(msg.Metadata.PromptTokens),
-				CompletionTokens: ptrOf(msg.Metadata.CompletionTokens),
-				TotalTokens:      ptrOf(msg.Metadata.TotalTokens),
-			}
-		}
-
-		result = append(result, apiMsg)
+	result := make([]api.ChatMessage, len(messages))
+	for i, msg := range messages {
+		result[i] = toChatMessage(msg)
 	}
-
 	return result
 }
 
-// toToolDefinitions converts internal tool definitions to API format.
+func toChatMessage(msg exec.LLMMessage) api.ChatMessage {
+	apiMsg := api.ChatMessage{
+		Role:    api.ChatMessageRole(msg.Role),
+		Content: msg.Content,
+	}
+
+	if len(msg.ToolCalls) > 0 {
+		toolCalls := make([]api.ChatToolCall, len(msg.ToolCalls))
+		for i, tc := range msg.ToolCalls {
+			toolCalls[i] = api.ChatToolCall{
+				Id:        tc.ID,
+				Name:      tc.Function.Name,
+				Arguments: ptrOf(tc.Function.Arguments),
+			}
+		}
+		apiMsg.ToolCalls = &toolCalls
+	}
+
+	if msg.Metadata != nil {
+		apiMsg.Metadata = &api.ChatMessageMetadata{
+			Provider:         ptrOf(msg.Metadata.Provider),
+			Model:            ptrOf(msg.Metadata.Model),
+			PromptTokens:     ptrOf(msg.Metadata.PromptTokens),
+			CompletionTokens: ptrOf(msg.Metadata.CompletionTokens),
+			TotalTokens:      ptrOf(msg.Metadata.TotalTokens),
+		}
+	}
+
+	return apiMsg
+}
+
 func toToolDefinitions(defs []exec.ToolDefinition) *[]api.ToolDefinition {
 	if len(defs) == 0 {
 		return nil
 	}
 
-	result := make([]api.ToolDefinition, 0, len(defs))
-	for _, def := range defs {
-		apiDef := api.ToolDefinition{
+	result := make([]api.ToolDefinition, len(defs))
+	for i, def := range defs {
+		result[i] = api.ToolDefinition{
 			Name:        def.Name,
 			Description: ptrOf(def.Description),
 			Parameters:  ptrOf(def.Parameters),
 		}
-		result = append(result, apiDef)
 	}
 
 	return &result

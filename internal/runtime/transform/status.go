@@ -32,14 +32,15 @@ func WithHierarchyRefs(root exec.DAGRunRef, parent exec.DAGRunRef) StatusOption 
 // WithNodes returns a StatusOption that sets the node data for the status
 func WithNodes(nodes []runtime.NodeData) StatusOption {
 	return func(s *exec.DAGRunStatus) {
-		convertedNode := make([]*exec.Node, len(nodes))
+		convertedNodes := make([]*exec.Node, len(nodes))
 		for i, n := range nodes {
-			convertedNode[i] = newNode(n)
+			convertedNodes[i] = newNode(n)
 		}
-		s.Nodes = convertedNode
+		s.Nodes = convertedNodes
 	}
 }
 
+// WithAttemptID returns a StatusOption that sets the attempt ID
 func WithAttemptID(attemptID string) StatusOption {
 	return func(s *exec.DAGRunStatus) {
 		s.AttemptID = attemptID
@@ -77,57 +78,53 @@ func WithFinishedAt(t time.Time) StatusOption {
 	}
 }
 
+// convertNodeIfPresent converts a runtime.Node to exec.Node if non-nil
+func convertNodeIfPresent(node *runtime.Node) *exec.Node {
+	if node == nil {
+		return nil
+	}
+	return newNode(node.NodeData())
+}
+
 // WithOnInitNode returns a StatusOption that sets the init handler node
 func WithOnInitNode(node *runtime.Node) StatusOption {
 	return func(s *exec.DAGRunStatus) {
-		if node != nil {
-			s.OnInit = newNode(node.NodeData())
-		}
+		s.OnInit = convertNodeIfPresent(node)
 	}
 }
 
 // WithOnExitNode returns a StatusOption that sets the exit handler node
 func WithOnExitNode(node *runtime.Node) StatusOption {
 	return func(s *exec.DAGRunStatus) {
-		if node != nil {
-			s.OnExit = newNode(node.NodeData())
-		}
+		s.OnExit = convertNodeIfPresent(node)
 	}
 }
 
 // WithOnSuccessNode returns a StatusOption that sets the success handler node
 func WithOnSuccessNode(node *runtime.Node) StatusOption {
 	return func(s *exec.DAGRunStatus) {
-		if node != nil {
-			s.OnSuccess = newNode(node.NodeData())
-		}
+		s.OnSuccess = convertNodeIfPresent(node)
 	}
 }
 
 // WithOnFailureNode returns a StatusOption that sets the failure handler node
 func WithOnFailureNode(node *runtime.Node) StatusOption {
 	return func(s *exec.DAGRunStatus) {
-		if node != nil {
-			s.OnFailure = newNode(node.NodeData())
-		}
+		s.OnFailure = convertNodeIfPresent(node)
 	}
 }
 
 // WithOnCancelNode returns a StatusOption that sets the cancel handler node
 func WithOnCancelNode(node *runtime.Node) StatusOption {
 	return func(s *exec.DAGRunStatus) {
-		if node != nil {
-			s.OnCancel = newNode(node.NodeData())
-		}
+		s.OnCancel = convertNodeIfPresent(node)
 	}
 }
 
 // WithOnWaitNode returns a StatusOption that sets the wait handler node
 func WithOnWaitNode(node *runtime.Node) StatusOption {
 	return func(s *exec.DAGRunStatus) {
-		if node != nil {
-			s.OnWait = newNode(node.NodeData())
-		}
+		s.OnWait = convertNodeIfPresent(node)
 	}
 }
 
