@@ -62,18 +62,13 @@ function getStoredRemoteNode(validNodes: string[]): string {
   return 'local';
 }
 
-type AdminRouteProps = {
-  path: string;
-  element: React.ReactElement;
-};
-
-function AdminRoute({ path, element }: AdminRouteProps): React.ReactElement {
-  return (
-    <Route
-      path={path}
-      element={<ProtectedRoute requiredRole="admin">{element}</ProtectedRoute>}
-    />
-  );
+// Helper to wrap admin-only elements
+function AdminElement({
+  children,
+}: {
+  children: React.ReactElement;
+}): React.ReactElement {
+  return <ProtectedRoute requiredRole="admin">{children}</ProtectedRoute>;
 }
 
 function AppInner({ config }: Props): React.ReactElement {
@@ -153,14 +148,14 @@ function AppInner({ config }: Props): React.ReactElement {
                                         <Route path="/queues" element={<Queues />} />
                                         <Route path="/dag-runs" element={<DAGRuns />} />
                                         <Route path="/dag-runs/:name/:dagRunId" element={<DAGRunDetails />} />
-                                        <AdminRoute path="/system-status" element={<SystemStatus />} />
-                                        <AdminRoute path="/users" element={<UsersPage />} />
-                                        <AdminRoute path="/api-keys" element={<APIKeysPage />} />
-                                        <AdminRoute path="/webhooks" element={<WebhooksPage />} />
-                                        <AdminRoute path="/terminal" element={<TerminalPage />} />
-                                        <AdminRoute path="/audit-logs" element={<AuditLogsPage />} />
-                                        <AdminRoute path="/git-sync" element={<GitSyncPage />} />
-                                        <AdminRoute path="/agent-settings" element={<AgentSettingsPage />} />
+                                        <Route path="/system-status" element={<AdminElement><SystemStatus /></AdminElement>} />
+                                        <Route path="/users" element={<AdminElement><UsersPage /></AdminElement>} />
+                                        <Route path="/api-keys" element={<AdminElement><APIKeysPage /></AdminElement>} />
+                                        <Route path="/webhooks" element={<AdminElement><WebhooksPage /></AdminElement>} />
+                                        <Route path="/terminal" element={<AdminElement><TerminalPage /></AdminElement>} />
+                                        <Route path="/audit-logs" element={<AdminElement><AuditLogsPage /></AdminElement>} />
+                                        <Route path="/git-sync" element={<AdminElement><GitSyncPage /></AdminElement>} />
+                                        <Route path="/agent-settings" element={<AdminElement><AgentSettingsPage /></AdminElement>} />
                                       </Routes>
                                     </Layout>
                                     {config.agentEnabled && <AgentChatModal />}
