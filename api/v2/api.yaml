@@ -1608,6 +1608,9 @@ paths:
                 queue:
                   type: string
                   description: "Override the queue to use for this DAG-run"
+                url:
+                  type: string
+                  description: "Filepath of DAG to run it only with given path"
               required:
                 - spec
       responses:
