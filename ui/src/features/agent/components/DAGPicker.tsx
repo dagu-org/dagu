@@ -113,7 +113,7 @@ export function DAGPicker({
             <span
               className={cn(
                 'inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs',
-                'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+                'bg-primary/15 text-primary'
               )}
             >
               <Paperclip className="h-3 w-3" />
@@ -132,7 +132,7 @@ export function DAGPicker({
               key={dag.dag_file}
               className={cn(
                 'inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs',
-                'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                'bg-muted text-muted-foreground'
               )}
             >
               <Paperclip className="h-3 w-3" />

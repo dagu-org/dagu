@@ -119,22 +119,22 @@ export function AgentChatModal(): ReactElement | null {
         'w-[440px] max-w-[calc(100vw-32px)]',
         'h-[540px] max-h-[calc(100vh-100px)]',
         'flex flex-col',
-        'bg-zinc-950 border-2 border-zinc-600 rounded-lg overflow-hidden',
-        'shadow-[0_0_40px_rgba(0,0,0,0.8)]',
+        'bg-popover dark:bg-zinc-950 border border-border rounded-lg overflow-hidden',
+        'shadow-xl dark:shadow-[0_0_30px_rgba(0,0,0,0.6)]',
         'animate-in slide-in-from-bottom-4 fade-in-0 duration-200'
       )}
     >
-      <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 bg-zinc-900/80">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/80">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <Terminal className="h-4 w-4 text-muted-foreground flex-shrink-0" />
           <Select
             value={conversationId || 'new'}
             onValueChange={handleSelectConversation}
           >
-            <SelectTrigger className="h-6 w-auto max-w-[200px] px-2 text-xs bg-transparent border-zinc-700 hover:bg-zinc-800">
+            <SelectTrigger className="h-6 w-auto max-w-[200px] px-2 text-xs bg-transparent border-border hover:bg-muted">
               <SelectValue placeholder="New conversation" />
             </SelectTrigger>
-            <SelectContent className="bg-zinc-900 border-zinc-700">
+            <SelectContent className="bg-popover border-border">
               <SelectItem value="new" className="text-xs">
                 <div className="flex items-center gap-1.5">
                   <Plus className="h-3 w-3" />
