@@ -113,6 +113,14 @@ var (
 		usage:     "dag-run ID for checking the status of a dag-run",
 	}
 
+	// Sub dag-run ID used for checking the status of a nested dag-run.
+	// Requires --run-id to be provided to identify the root dag-run.
+	subDAGRunIDFlagStatus = commandLineFlag{
+		name:      "sub-run-id",
+		shorthand: "s",
+		usage:     "Sub dag-run ID for checking the status of a nested dag-run (requires --run-id)",
+	}
+
 	// Unique dag-run reference used for dequeueing a dag-run.
 	dagRunFlagDequeue = commandLineFlag{
 		name:      "dag-run",

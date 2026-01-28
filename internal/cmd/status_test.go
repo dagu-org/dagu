@@ -645,4 +645,127 @@ steps:
 		err = statusCmd.Execute()
 		require.NoError(t, err)
 	})
+
+	t.Run("StatusSubDAGRun", func(t *testing.T) {
+		// This test verifies that the status command can query subDAG run status
+		th := test.SetupCommand(t)
+
+		// Create a parent DAG with a sub DAG (inline)
+		dagFile := th.DAG(t, `steps:
+  - name: run-child
+    call: child-dag
+    params: "NAME=World"
+
+---
+
+name: child-dag
+params:
+  - NAME
+steps:
+  - name: greet
+    command: echo "Hello, ${NAME}!"
+`)
+
+		// Run the DAG
+		parentRunID := uuid.Must(uuid.NewV7()).String()
+		startCmd := cmd.Start()
+		startCmd.SetContext(th.Context)
+		startCmd.SetArgs([]string{dagFile.Location, "--run-id=" + parentRunID})
+		startCmd.SilenceErrors = true
+		startCmd.SilenceUsage = true
+
+		err := startCmd.Execute()
+		require.NoError(t, err)
+
+		// Wait for completion
+		time.Sleep(500 * time.Millisecond)
+
+		// Get the parent run status to find the sub DAG run ID
+		parentRef := exec.NewDAGRunRef(dagFile.Location, parentRunID)
+		parentAttempt, err := th.DAGRunStore.FindAttempt(th.Context, parentRef)
+		require.NoError(t, err)
+
+		parentStatus, err := parentAttempt.ReadStatus(th.Context)
+		require.NoError(t, err)
+		require.Len(t, parentStatus.Nodes, 1, "expected 1 node in parent DAG")
+		require.NotEmpty(t, parentStatus.Nodes[0].SubRuns, "expected sub runs in call step")
+
+		subDAGRunID := parentStatus.Nodes[0].SubRuns[0].DAGRunID
+
+		// Query the sub DAG status using the new --sub-run-id flag
+		statusCmd := cmd.Status()
+		statusCmd.SetContext(th.Context)
+		statusCmd.SetArgs([]string{
+			dagFile.Location,
+			"--run-id=" + parentRunID,
+			"--sub-run-id=" + subDAGRunID,
+		})
+		statusCmd.SilenceErrors = true
+		statusCmd.SilenceUsage = true
+
+		err = statusCmd.Execute()
+		require.NoError(t, err)
+	})
+
+	t.Run("StatusSubDAGRunMissingParentRunID", func(t *testing.T) {
+		// This test verifies that --sub-run-id requires --run-id
+		th := test.SetupCommand(t)
+
+		dagFile := th.DAG(t, `steps:
+  - name: "success"
+    command: "echo 'Success!'"
+`)
+
+		// Try to query sub-run-id without run-id - should fail
+		statusCmd := cmd.Status()
+		statusCmd.SetContext(th.Context)
+		statusCmd.SetArgs([]string{
+			dagFile.Location,
+			"--sub-run-id=some-sub-id",
+		})
+		statusCmd.SilenceErrors = true
+		statusCmd.SilenceUsage = true
+
+		err := statusCmd.Execute()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "--sub-run-id requires --run-id")
+	})
+
+	t.Run("StatusSubDAGRunNotFound", func(t *testing.T) {
+		// This test verifies proper error when sub-run-id doesn't exist
+		th := test.SetupCommand(t)
+
+		dagFile := th.DAG(t, `steps:
+  - name: "success"
+    command: "echo 'Success!'"
+`)
+
+		// Create a parent run first
+		parentRunID := uuid.Must(uuid.NewV7()).String()
+		startCmd := cmd.Start()
+		startCmd.SetContext(th.Context)
+		startCmd.SetArgs([]string{dagFile.Location, "--run-id=" + parentRunID})
+		startCmd.SilenceErrors = true
+		startCmd.SilenceUsage = true
+
+		err := startCmd.Execute()
+		require.NoError(t, err)
+
+		time.Sleep(200 * time.Millisecond)
+
+		// Try to query a non-existent sub-run-id
+		statusCmd := cmd.Status()
+		statusCmd.SetContext(th.Context)
+		statusCmd.SetArgs([]string{
+			dagFile.Location,
+			"--run-id=" + parentRunID,
+			"--sub-run-id=non-existent-sub-id",
+		})
+		statusCmd.SilenceErrors = true
+		statusCmd.SilenceUsage = true
+
+		err = statusCmd.Execute()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to find sub dag-run")
+	})
 }
