@@ -3,26 +3,52 @@ import { useNavigate } from 'react-router-dom';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useAgentChatContext } from '../context/AgentChatContext';
 import {
-  StreamResponse,
-  NewConversationResponse,
   ChatRequest,
-  Message,
   ConversationWithState,
   DAGContext,
+  NewConversationResponse,
+  StreamResponse,
 } from '../types';
 
 const TOKEN_KEY = 'dagu_auth_token';
 
-// Helper to get auth headers
-function getAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem(TOKEN_KEY);
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+function getAuthToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+function getAuthHeaders(): Record<string, string> {
+  const token = getAuthToken();
+  return token
+    ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+    : { 'Content-Type': 'application/json' };
+}
+
+function buildChatRequest(
+  message: string,
+  model?: string,
+  dagContexts?: DAGContext[]
+): ChatRequest {
+  return { message, model, dag_contexts: dagContexts };
+}
+
+async function fetchWithAuth<T>(url: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(url, {
+    ...options,
+    headers: { ...getAuthHeaders(), ...options?.headers },
+  });
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.statusText}`);
   }
-  return headers;
+  return response.json();
+}
+
+function buildStreamUrl(baseUrl: string, conversationId: string): string {
+  const url = new URL(`${baseUrl}/conversations/${conversationId}/stream`, window.location.origin);
+  const token = getAuthToken();
+  if (token) {
+    url.searchParams.set('token', token);
+  }
+  return url.toString();
 }
 
 export function useAgentChat() {
@@ -45,60 +71,39 @@ export function useAgentChat() {
   const [isSending, setIsSending] = useState(false);
   const baseUrl = `${config.apiURL}/agent`;
 
-  // Clean up EventSource on unmount
-  useEffect(() => {
-    return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
-    };
+  const closeEventSource = useCallback((): void => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
   }, []);
 
-  // Subscribe to SSE when conversation ID changes
+  useEffect(() => {
+    return closeEventSource;
+  }, [closeEventSource]);
+
   useEffect(() => {
     if (!conversationId) {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
+      closeEventSource();
       return;
     }
 
-    // Close existing connection
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-    }
+    eventSourceRef.current?.close();
 
-    // Create new SSE connection with auth token as query param
-    // (EventSource doesn't support custom headers)
-    const token = localStorage.getItem(TOKEN_KEY);
-    const streamUrl = new URL(`${baseUrl}/conversations/${conversationId}/stream`, window.location.origin);
-    if (token) {
-      streamUrl.searchParams.set('token', token);
-    }
-    const eventSource = new EventSource(streamUrl.toString());
+    const eventSource = new EventSource(buildStreamUrl(baseUrl, conversationId));
     eventSourceRef.current = eventSource;
 
     eventSource.onmessage = (event) => {
       try {
         const data: StreamResponse = JSON.parse(event.data);
 
-        // Update messages
-        if (data.messages) {
-          data.messages.forEach((msg: Message) => {
-            addMessage(msg);
+        data.messages?.forEach((msg) => {
+          addMessage(msg);
+          if (msg.type === 'ui_action' && msg.ui_action?.type === 'navigate' && msg.ui_action.path) {
+            navigate(msg.ui_action.path);
+          }
+        });
 
-            // Handle UI actions
-            if (msg.type === 'ui_action' && msg.ui_action) {
-              if (msg.ui_action.type === 'navigate' && msg.ui_action.path) {
-                navigate(msg.ui_action.path);
-              }
-            }
-          });
-        }
-
-        // Update conversation state
         if (data.conversation_state) {
           setConversationState(data.conversation_state);
         }
@@ -109,11 +114,9 @@ export function useAgentChat() {
 
     eventSource.onerror = (err) => {
       console.error('SSE error:', err);
-      // Reconnect after a delay if the connection was closed
       if (eventSource.readyState === EventSource.CLOSED) {
         setTimeout(() => {
           if (conversationId && eventSourceRef.current === eventSource) {
-            // Trigger re-subscription
             setConversationId(conversationId);
           }
         }, 1000);
@@ -123,33 +126,20 @@ export function useAgentChat() {
     return () => {
       eventSource.close();
     };
-  }, [conversationId, baseUrl, addMessage, setConversationState, setConversationId, navigate]);
+  }, [conversationId, baseUrl, addMessage, setConversationState, setConversationId, navigate, closeEventSource]);
 
-  // Start a new conversation
   const startConversation = useCallback(
     async (message: string, model?: string, dagContexts?: DAGContext[]): Promise<string> => {
-      const response = await fetch(`${baseUrl}/conversations/new`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          message,
-          model,
-          dag_contexts: dagContexts,
-        } as ChatRequest),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to start conversation: ${response.statusText}`);
-      }
-
-      const data: NewConversationResponse = await response.json();
+      const data = await fetchWithAuth<NewConversationResponse>(
+        `${baseUrl}/conversations/new`,
+        { method: 'POST', body: JSON.stringify(buildChatRequest(message, model, dagContexts)) }
+      );
       setConversationId(data.conversation_id);
       return data.conversation_id;
     },
     [baseUrl, setConversationId]
   );
 
-  // Send a message to existing conversation
   const sendMessage = useCallback(
     async (message: string, model?: string, dagContexts?: DAGContext[]): Promise<void> => {
       setIsSending(true);
@@ -158,23 +148,10 @@ export function useAgentChat() {
           await startConversation(message, model, dagContexts);
           return;
         }
-
-        const response = await fetch(
-          `${baseUrl}/conversations/${conversationId}/chat`,
-          {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify({
-              message,
-              model,
-              dag_contexts: dagContexts,
-            } as ChatRequest),
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(`Failed to send message: ${response.statusText}`);
-        }
+        await fetchWithAuth(`${baseUrl}/conversations/${conversationId}/chat`, {
+          method: 'POST',
+          body: JSON.stringify(buildChatRequest(message, model, dagContexts)),
+        });
       } finally {
         setIsSending(false);
       }
@@ -182,33 +159,14 @@ export function useAgentChat() {
     [baseUrl, conversationId, startConversation]
   );
 
-  // Cancel the current conversation
   const cancelConversation = useCallback(async (): Promise<void> => {
     if (!conversationId) return;
-
-    const response = await fetch(
-      `${baseUrl}/conversations/${conversationId}/cancel`,
-      {
-        method: 'POST',
-        headers: getAuthHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to cancel conversation: ${response.statusText}`);
-    }
+    await fetchWithAuth(`${baseUrl}/conversations/${conversationId}/cancel`, { method: 'POST' });
   }, [baseUrl, conversationId]);
 
-  // Fetch all conversations for the current user
   const fetchConversations = useCallback(async (): Promise<void> => {
     try {
-      const response = await fetch(`${baseUrl}/conversations`, {
-        headers: getAuthHeaders(),
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch conversations: ${response.statusText}`);
-      }
-      const data: ConversationWithState[] = await response.json();
+      const data = await fetchWithAuth<ConversationWithState[]>(`${baseUrl}/conversations`);
       setConversations(data || []);
     } catch (err) {
       console.error('Failed to fetch conversations:', err);
@@ -216,38 +174,26 @@ export function useAgentChat() {
     }
   }, [baseUrl, setConversations]);
 
-  // Select and load an existing conversation
   const selectConversation = useCallback(
     async (id: string): Promise<void> => {
-      try {
-        const response = await fetch(`${baseUrl}/conversations/${id}`, {
-          headers: getAuthHeaders(),
-        });
-        if (!response.ok) {
-          throw new Error(`Failed to load conversation: ${response.statusText}`);
-        }
-        const data: StreamResponse = await response.json();
-
-        // Update state with the loaded conversation
-        setConversationId(id);
-        setMessages(data.messages || []);
-        if (data.conversation_state) {
-          setConversationState(data.conversation_state);
-        }
-      } catch (err) {
-        console.error('Failed to select conversation:', err);
-        throw err;
+      const data = await fetchWithAuth<StreamResponse>(`${baseUrl}/conversations/${id}`);
+      setConversationId(id);
+      setMessages(data.messages || []);
+      if (data.conversation_state) {
+        setConversationState(data.conversation_state);
       }
     },
     [baseUrl, setConversationId, setMessages, setConversationState]
   );
+
+  const isWorking = isSending || conversationState?.working === true;
 
   return {
     conversationId,
     messages,
     conversationState,
     conversations,
-    isWorking: isSending || (conversationState?.working ?? false),
+    isWorking,
     startConversation,
     sendMessage,
     cancelConversation,

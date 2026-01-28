@@ -127,9 +127,7 @@ func (l *Loop) Go(ctx context.Context) error {
 		l.mu.Lock()
 		hasQueuedMessages := len(l.messageQueue) > 0
 		if hasQueuedMessages {
-			for _, msg := range l.messageQueue {
-				l.history = append(l.history, msg)
-			}
+			l.history = append(l.history, l.messageQueue...)
 			l.messageQueue = l.messageQueue[:0]
 		}
 		l.mu.Unlock()
@@ -155,14 +153,14 @@ func (l *Loop) Go(ctx context.Context) error {
 // processLLMRequest sends a request to the LLM and handles the response.
 func (l *Loop) processLLMRequest(ctx context.Context) error {
 	l.mu.Lock()
-	messages := append([]llm.Message(nil), l.history...)
+	history := append([]llm.Message(nil), l.history...)
 	tools := l.tools
 	systemPrompt := l.systemPrompt
 	provider := l.provider
 	model := l.model
 	l.mu.Unlock()
 
-	// Build messages with system prompt
+	// Build messages with optional system prompt prefix
 	var llmMessages []llm.Message
 	if systemPrompt != "" {
 		llmMessages = append(llmMessages, llm.Message{
@@ -170,7 +168,7 @@ func (l *Loop) processLLMRequest(ctx context.Context) error {
 			Content: systemPrompt,
 		})
 	}
-	llmMessages = append(llmMessages, messages...)
+	llmMessages = append(llmMessages, history...)
 
 	// Build tool definitions for LLM
 	llmTools := make([]llm.Tool, len(tools))
@@ -190,9 +188,7 @@ func (l *Loop) processLLMRequest(ctx context.Context) error {
 		"model", model)
 
 	// Set agent as working
-	if l.onWorking != nil {
-		l.onWorking(true)
-	}
+	l.setWorking(true)
 
 	// Add a timeout for the LLM request
 	llmCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
@@ -202,9 +198,7 @@ func (l *Loop) processLLMRequest(ctx context.Context) error {
 	if err != nil {
 		// Record the error as a message
 		l.recordErrorMessage(ctx, fmt.Sprintf("LLM request failed: %v", err))
-		if l.onWorking != nil {
-			l.onWorking(false)
-		}
+		l.setWorking(false)
 		return fmt.Errorf("LLM request failed: %w", err)
 	}
 
@@ -213,7 +207,7 @@ func (l *Loop) processLLMRequest(ctx context.Context) error {
 		"finish_reason", resp.FinishReason,
 		"tool_calls", len(resp.ToolCalls))
 
-	// Update total usage
+	// Accumulate usage statistics
 	l.mu.Lock()
 	l.totalUsage.PromptTokens += resp.Usage.PromptTokens
 	l.totalUsage.CompletionTokens += resp.Usage.CompletionTokens
@@ -227,11 +221,7 @@ func (l *Loop) processLLMRequest(ctx context.Context) error {
 		ToolCalls: resp.ToolCalls,
 	}
 
-	l.mu.Lock()
-	l.history = append(l.history, assistantMessage)
-	l.sequenceID++
-	seqID := l.sequenceID
-	l.mu.Unlock()
+	seqID := l.appendToHistory(assistantMessage)
 
 	// Record assistant message
 	if l.recordMessage != nil {
@@ -251,65 +241,60 @@ func (l *Loop) processLLMRequest(ctx context.Context) error {
 	}
 
 	// Handle tool calls if any
-	// Note: Anthropic returns "tool_use" as stop_reason, OpenAI uses "tool_calls"
-	if (resp.FinishReason == "tool_use" || resp.FinishReason == "tool_calls") && len(resp.ToolCalls) > 0 {
+	if len(resp.ToolCalls) > 0 {
 		l.logger.Debug("handling tool calls", "count", len(resp.ToolCalls))
 		return l.handleToolCalls(ctx, resp.ToolCalls)
 	}
 
 	// End of turn - no more tool calls
+	l.setWorking(false)
+	return nil
+}
+
+// setWorking safely calls the onWorking callback if configured.
+func (l *Loop) setWorking(working bool) {
 	if l.onWorking != nil {
-		l.onWorking(false)
+		l.onWorking(working)
+	}
+}
+
+// appendToHistory adds a message to history and returns the new sequence ID.
+func (l *Loop) appendToHistory(msg llm.Message) int64 {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.history = append(l.history, msg)
+	l.sequenceID++
+	return l.sequenceID
+}
+
+// executeTool runs a single tool call and returns the result.
+func (l *Loop) executeTool(tc llm.ToolCall) ToolOut {
+	tool := GetToolByName(l.tools, tc.Function.Name)
+	if tool == nil {
+		l.logger.Error("tool not found", "name", tc.Function.Name)
+		return ToolOut{
+			Content: fmt.Sprintf("Tool '%s' not found", tc.Function.Name),
+			IsError: true,
+		}
 	}
 
-	return nil
+	input := json.RawMessage(tc.Function.Arguments)
+	if len(input) == 0 {
+		input = json.RawMessage("{}")
+	}
+
+	return tool.Run(ToolContext{
+		WorkingDir:   l.workingDir,
+		EmitUIAction: l.emitUIAction,
+	}, input)
 }
 
 // handleToolCalls processes tool calls from the LLM response.
 func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) error {
-	var toolResults []ToolResult
-
 	for _, tc := range toolCalls {
 		l.logger.Debug("executing tool", "name", tc.Function.Name, "id", tc.ID)
 
-		// Find the tool
-		var tool *AgentTool
-		for _, t := range l.tools {
-			if t.Function.Name == tc.Function.Name {
-				tool = t
-				break
-			}
-		}
-
-		var result ToolOut
-		if tool == nil {
-			l.logger.Error("tool not found", "name", tc.Function.Name)
-			result = ToolOut{
-				Content: fmt.Sprintf("Tool '%s' not found", tc.Function.Name),
-				IsError: true,
-			}
-		} else {
-			// Parse arguments as JSON
-			var input json.RawMessage
-			if tc.Function.Arguments != "" {
-				input = json.RawMessage(tc.Function.Arguments)
-			} else {
-				input = json.RawMessage("{}")
-			}
-
-			// Execute the tool
-			toolCtx := ToolContext{
-				WorkingDir:   l.workingDir,
-				EmitUIAction: l.emitUIAction,
-			}
-			result = tool.Run(toolCtx, input)
-		}
-
-		toolResults = append(toolResults, ToolResult{
-			ToolCallID: tc.ID,
-			Content:    result.Content,
-			IsError:    result.IsError,
-		})
+		result := l.executeTool(tc)
 
 		// Add tool result to history
 		toolMessage := llm.Message{
@@ -317,12 +302,7 @@ func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) er
 			Content:    result.Content,
 			ToolCallID: tc.ID,
 		}
-
-		l.mu.Lock()
-		l.history = append(l.history, toolMessage)
-		l.sequenceID++
-		seqID := l.sequenceID
-		l.mu.Unlock()
+		seqID := l.appendToHistory(toolMessage)
 
 		// Record tool result message
 		if l.recordMessage != nil {
@@ -344,21 +324,24 @@ func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) er
 	return l.processLLMRequest(ctx)
 }
 
+// nextSequenceID increments and returns the next sequence ID.
+func (l *Loop) nextSequenceID() int64 {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.sequenceID++
+	return l.sequenceID
+}
+
 // recordErrorMessage records an error message to the conversation.
 func (l *Loop) recordErrorMessage(ctx context.Context, errMsg string) {
 	if l.recordMessage == nil {
 		return
 	}
 
-	l.mu.Lock()
-	l.sequenceID++
-	seqID := l.sequenceID
-	l.mu.Unlock()
-
 	msg := Message{
 		ConversationID: l.conversationID,
 		Type:           MessageTypeError,
-		SequenceID:     seqID,
+		SequenceID:     l.nextSequenceID(),
 		Content:        errMsg,
 		CreatedAt:      time.Now(),
 	}

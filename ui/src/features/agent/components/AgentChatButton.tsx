@@ -1,10 +1,16 @@
-import * as React from 'react';
+import type { ReactElement } from 'react';
+
 import { Terminal } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
-import { useAgentChatContext } from '../context/AgentChatContext';
 import { cn } from '@/lib/utils';
 
-export function AgentChatButton() {
+import { useAgentChatContext } from '../context/AgentChatContext';
+
+const BASE_STYLES =
+  'fixed bottom-4 right-4 z-50 h-9 px-3 rounded-md shadow-md bg-background/95 backdrop-blur border-border transition-all duration-200';
+
+export function AgentChatButton(): ReactElement {
   const { isOpen, toggleChat, conversationState } = useAgentChatContext();
   const isWorking = conversationState?.working ?? false;
 
@@ -13,10 +19,7 @@ export function AgentChatButton() {
       variant="outline"
       onClick={toggleChat}
       className={cn(
-        'fixed bottom-4 right-4 z-50',
-        'h-9 px-3 rounded-md shadow-md',
-        'bg-background/95 backdrop-blur border-border',
-        'transition-all duration-200',
+        BASE_STYLES,
         isOpen && 'opacity-0 pointer-events-none',
         isWorking && 'border-yellow-500/50'
       )}

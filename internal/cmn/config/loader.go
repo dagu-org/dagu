@@ -136,6 +136,20 @@ func (l *ConfigLoader) resolvePath(fieldName, path string) (string, error) {
 	return resolved, nil
 }
 
+// parseDuration parses a duration string and adds a warning if parsing fails.
+// Returns the parsed duration (or zero if empty/invalid).
+func (l *ConfigLoader) parseDuration(fieldName, value string) time.Duration {
+	if value == "" {
+		return 0
+	}
+	duration, err := time.ParseDuration(value)
+	if err != nil {
+		l.warnings = append(l.warnings, fmt.Sprintf("Invalid %s value: %s", fieldName, value))
+		return 0
+	}
+	return duration
+}
+
 // NewConfigLoader creates a new ConfigLoader instance with an isolated viper instance
 // ConfigLoaderOption values (for example: service, config file path, or app home directory).
 func NewConfigLoader(viper *viper.Viper, options ...ConfigLoaderOption) *ConfigLoader {
@@ -299,22 +313,15 @@ func (l *ConfigLoader) loadCoreConfig(cfg *Config, def Definition) error {
 
 // loadPeerConfig converts PeerDef to Peer configuration.
 func (l *ConfigLoader) loadPeerConfig(def PeerDef) Peer {
-	peer := Peer{
+	return Peer{
 		CertFile:      def.CertFile,
 		KeyFile:       def.KeyFile,
 		ClientCaFile:  def.ClientCaFile,
 		SkipTLSVerify: def.SkipTLSVerify,
 		Insecure:      def.Insecure,
 		MaxRetries:    def.MaxRetries,
+		RetryInterval: l.parseDuration("peer.retryInterval", def.RetryInterval),
 	}
-
-	if def.RetryInterval != "" {
-		if d, err := time.ParseDuration(def.RetryInterval); err == nil {
-			peer.RetryInterval = d
-		}
-	}
-
-	return peer
 }
 
 // loadPathsConfig loads the file system paths configuration.
@@ -324,51 +331,35 @@ func (l *ConfigLoader) loadPathsConfig(cfg *Config, def Definition) error {
 		return nil
 	}
 
-	var err error
-	if cfg.Paths.DAGsDir, err = l.resolvePath("DAGsDir", def.Paths.DAGsDir); err != nil {
-		return err
+	// Define path mappings: target pointer and source value
+	pathMappings := []struct {
+		name   string
+		target *string
+		source string
+	}{
+		{"DAGsDir", &cfg.Paths.DAGsDir, def.Paths.DAGsDir},
+		{"SuspendFlagsDir", &cfg.Paths.SuspendFlagsDir, def.Paths.SuspendFlagsDir},
+		{"DataDir", &cfg.Paths.DataDir, def.Paths.DataDir},
+		{"LogDir", &cfg.Paths.LogDir, def.Paths.LogDir},
+		{"AdminLogsDir", &cfg.Paths.AdminLogsDir, def.Paths.AdminLogsDir},
+		{"BaseConfig", &cfg.Paths.BaseConfig, def.Paths.BaseConfig},
+		{"Executable", &cfg.Paths.Executable, def.Paths.Executable},
+		{"DAGRunsDir", &cfg.Paths.DAGRunsDir, def.Paths.DAGRunsDir},
+		{"QueueDir", &cfg.Paths.QueueDir, def.Paths.QueueDir},
+		{"ProcDir", &cfg.Paths.ProcDir, def.Paths.ProcDir},
+		{"ServiceRegistryDir", &cfg.Paths.ServiceRegistryDir, def.Paths.ServiceRegistryDir},
+		{"UsersDir", &cfg.Paths.UsersDir, def.Paths.UsersDir},
+		{"APIKeysDir", &cfg.Paths.APIKeysDir, def.Paths.APIKeysDir},
+		{"WebhooksDir", &cfg.Paths.WebhooksDir, def.Paths.WebhooksDir},
+		{"ConversationsDir", &cfg.Paths.ConversationsDir, def.Paths.ConversationsDir},
 	}
-	if cfg.Paths.SuspendFlagsDir, err = l.resolvePath("SuspendFlagsDir", def.Paths.SuspendFlagsDir); err != nil {
-		return err
-	}
-	if cfg.Paths.DataDir, err = l.resolvePath("DataDir", def.Paths.DataDir); err != nil {
-		return err
-	}
-	if cfg.Paths.LogDir, err = l.resolvePath("LogDir", def.Paths.LogDir); err != nil {
-		return err
-	}
-	if cfg.Paths.AdminLogsDir, err = l.resolvePath("AdminLogsDir", def.Paths.AdminLogsDir); err != nil {
-		return err
-	}
-	if cfg.Paths.BaseConfig, err = l.resolvePath("BaseConfig", def.Paths.BaseConfig); err != nil {
-		return err
-	}
-	if cfg.Paths.Executable, err = l.resolvePath("Executable", def.Paths.Executable); err != nil {
-		return err
-	}
-	if cfg.Paths.DAGRunsDir, err = l.resolvePath("DAGRunsDir", def.Paths.DAGRunsDir); err != nil {
-		return err
-	}
-	if cfg.Paths.QueueDir, err = l.resolvePath("QueueDir", def.Paths.QueueDir); err != nil {
-		return err
-	}
-	if cfg.Paths.ProcDir, err = l.resolvePath("ProcDir", def.Paths.ProcDir); err != nil {
-		return err
-	}
-	if cfg.Paths.ServiceRegistryDir, err = l.resolvePath("ServiceRegistryDir", def.Paths.ServiceRegistryDir); err != nil {
-		return err
-	}
-	if cfg.Paths.UsersDir, err = l.resolvePath("UsersDir", def.Paths.UsersDir); err != nil {
-		return err
-	}
-	if cfg.Paths.APIKeysDir, err = l.resolvePath("APIKeysDir", def.Paths.APIKeysDir); err != nil {
-		return err
-	}
-	if cfg.Paths.WebhooksDir, err = l.resolvePath("WebhooksDir", def.Paths.WebhooksDir); err != nil {
-		return err
-	}
-	if cfg.Paths.ConversationsDir, err = l.resolvePath("ConversationsDir", def.Paths.ConversationsDir); err != nil {
-		return err
+
+	for _, mapping := range pathMappings {
+		resolved, err := l.resolvePath(mapping.name, mapping.source)
+		if err != nil {
+			return err
+		}
+		*mapping.target = resolved
 	}
 
 	return nil
@@ -488,13 +479,7 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 			}
 			if def.Auth.Builtin.Token != nil {
 				cfg.Server.Auth.Builtin.Token.Secret = def.Auth.Builtin.Token.Secret
-				if def.Auth.Builtin.Token.TTL != "" {
-					if duration, err := time.ParseDuration(def.Auth.Builtin.Token.TTL); err == nil {
-						cfg.Server.Auth.Builtin.Token.TTL = duration
-					} else {
-						l.warnings = append(l.warnings, fmt.Sprintf("Invalid auth.builtin.token.ttl value: %s", def.Auth.Builtin.Token.TTL))
-					}
-				}
+				cfg.Server.Auth.Builtin.Token.TTL = l.parseDuration("auth.builtin.token.ttl", def.Auth.Builtin.Token.TTL)
 			}
 		}
 
@@ -564,33 +549,29 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 
 // loadUIConfig loads the UI configuration.
 func (l *ConfigLoader) loadUIConfig(cfg *Config, def Definition) {
-	// Apply defaults from viper (these include the configured defaults)
+	// Apply defaults from viper
 	cfg.UI.MaxDashboardPageLimit = l.v.GetInt("ui.maxDashboardPageLimit")
 	cfg.UI.NavbarTitle = l.v.GetString("ui.navbarTitle")
 	cfg.UI.LogEncodingCharset = l.v.GetString("ui.logEncodingCharset")
 	cfg.UI.DAGs.SortField = l.v.GetString("ui.dags.sortField")
 	cfg.UI.DAGs.SortOrder = l.v.GetString("ui.dags.sortOrder")
 
-	if def.UI != nil {
-		cfg.UI.NavbarColor = def.UI.NavbarColor
-		if def.UI.NavbarTitle != "" {
-			cfg.UI.NavbarTitle = def.UI.NavbarTitle
-		}
-		if def.UI.MaxDashboardPageLimit > 0 {
-			cfg.UI.MaxDashboardPageLimit = def.UI.MaxDashboardPageLimit
-		}
-		if def.UI.LogEncodingCharset != "" {
-			cfg.UI.LogEncodingCharset = def.UI.LogEncodingCharset
-		}
+	if def.UI == nil {
+		return
+	}
 
-		if def.UI.DAGs != nil {
-			if def.UI.DAGs.SortField != "" {
-				cfg.UI.DAGs.SortField = def.UI.DAGs.SortField
-			}
-			if def.UI.DAGs.SortOrder != "" {
-				cfg.UI.DAGs.SortOrder = def.UI.DAGs.SortOrder
-			}
-		}
+	// Apply definition overrides
+	cfg.UI.NavbarColor = def.UI.NavbarColor
+	setIfNotEmpty(&cfg.UI.NavbarTitle, def.UI.NavbarTitle)
+	setIfNotEmpty(&cfg.UI.LogEncodingCharset, def.UI.LogEncodingCharset)
+
+	if def.UI.MaxDashboardPageLimit > 0 {
+		cfg.UI.MaxDashboardPageLimit = def.UI.MaxDashboardPageLimit
+	}
+
+	if def.UI.DAGs != nil {
+		setIfNotEmpty(&cfg.UI.DAGs.SortField, def.UI.DAGs.SortField)
+		setIfNotEmpty(&cfg.UI.DAGs.SortOrder, def.UI.DAGs.SortOrder)
 	}
 }
 
@@ -628,28 +609,7 @@ func (l *ConfigLoader) loadWorkerConfig(cfg *Config, def Definition) {
 		cfg.Worker.MaxActiveRuns = def.Worker.MaxActiveRuns
 
 		if def.Worker.Labels != nil {
-			switch v := def.Worker.Labels.(type) {
-			case string:
-				if v != "" {
-					cfg.Worker.Labels = parseWorkerLabels(v)
-				}
-			case map[string]interface{}:
-				cfg.Worker.Labels = make(map[string]string)
-				for key, val := range v {
-					if strVal, ok := val.(string); ok {
-						cfg.Worker.Labels[key] = strVal
-					}
-				}
-			case map[interface{}]interface{}:
-				cfg.Worker.Labels = make(map[string]string)
-				for key, val := range v {
-					if keyStr, ok := key.(string); ok {
-						if valStr, ok := val.(string); ok {
-							cfg.Worker.Labels[keyStr] = valStr
-						}
-					}
-				}
-			}
+			cfg.Worker.Labels = parseLabels(def.Worker.Labels)
 		}
 
 		// Parse coordinators for static service discovery
@@ -659,36 +619,48 @@ func (l *ConfigLoader) loadWorkerConfig(cfg *Config, def Definition) {
 			l.warnings = append(l.warnings, addrWarnings...)
 		}
 
-		// Load PostgresPool config
+		// Load PostgresPool config from definition
 		if def.Worker.PostgresPool != nil {
-			pp := def.Worker.PostgresPool
-			if pp.MaxOpenConns > 0 {
-				cfg.Worker.PostgresPool.MaxOpenConns = pp.MaxOpenConns
-			}
-			if pp.MaxIdleConns > 0 {
-				cfg.Worker.PostgresPool.MaxIdleConns = pp.MaxIdleConns
-			}
-			if pp.ConnMaxLifetime > 0 {
-				cfg.Worker.PostgresPool.ConnMaxLifetime = pp.ConnMaxLifetime
-			}
-			if pp.ConnMaxIdleTime > 0 {
-				cfg.Worker.PostgresPool.ConnMaxIdleTime = pp.ConnMaxIdleTime
-			}
+			l.loadPostgresPoolConfig(&cfg.Worker.PostgresPool, def.Worker.PostgresPool)
 		}
 	}
 
-	// Set PostgresPool defaults if not configured
-	if cfg.Worker.PostgresPool.MaxOpenConns == 0 {
-		cfg.Worker.PostgresPool.MaxOpenConns = 25
+	// Apply PostgresPool defaults
+	l.setPostgresPoolDefaults(&cfg.Worker.PostgresPool)
+}
+
+// loadPostgresPoolConfig loads PostgreSQL pool configuration from definition.
+func (l *ConfigLoader) loadPostgresPoolConfig(pool *PostgresPoolConfig, def *PostgresPoolDef) {
+	if def.MaxOpenConns > 0 {
+		pool.MaxOpenConns = def.MaxOpenConns
 	}
-	if cfg.Worker.PostgresPool.MaxIdleConns == 0 {
-		cfg.Worker.PostgresPool.MaxIdleConns = 5
+	if def.MaxIdleConns > 0 {
+		pool.MaxIdleConns = def.MaxIdleConns
 	}
-	if cfg.Worker.PostgresPool.ConnMaxLifetime == 0 {
-		cfg.Worker.PostgresPool.ConnMaxLifetime = 300
+	if def.ConnMaxLifetime > 0 {
+		pool.ConnMaxLifetime = def.ConnMaxLifetime
 	}
-	if cfg.Worker.PostgresPool.ConnMaxIdleTime == 0 {
-		cfg.Worker.PostgresPool.ConnMaxIdleTime = 60
+	if def.ConnMaxIdleTime > 0 {
+		pool.ConnMaxIdleTime = def.ConnMaxIdleTime
+	}
+}
+
+// setPostgresPoolDefaults sets default values for PostgreSQL pool configuration.
+func (l *ConfigLoader) setPostgresPoolDefaults(pool *PostgresPoolConfig) {
+	defaults := []struct {
+		target       *int
+		defaultValue int
+	}{
+		{&pool.MaxOpenConns, 25},
+		{&pool.MaxIdleConns, 5},
+		{&pool.ConnMaxLifetime, 300},
+		{&pool.ConnMaxIdleTime, 60},
+	}
+
+	for _, d := range defaults {
+		if *d.target == 0 {
+			*d.target = d.defaultValue
+		}
 	}
 }
 
@@ -756,33 +728,17 @@ func parseCoordinatorAddresses(input interface{}) ([]string, []string) {
 func (l *ConfigLoader) loadSchedulerConfig(cfg *Config, def Definition) {
 	if def.Scheduler != nil {
 		cfg.Scheduler.Port = def.Scheduler.Port
-
-		if def.Scheduler.LockStaleThreshold != "" {
-			if duration, err := time.ParseDuration(def.Scheduler.LockStaleThreshold); err == nil {
-				cfg.Scheduler.LockStaleThreshold = duration
-			} else {
-				l.warnings = append(l.warnings, fmt.Sprintf("Invalid scheduler.lockStaleThreshold value: %s", def.Scheduler.LockStaleThreshold))
-			}
-		}
-
-		if def.Scheduler.LockRetryInterval != "" {
-			if duration, err := time.ParseDuration(def.Scheduler.LockRetryInterval); err == nil {
-				cfg.Scheduler.LockRetryInterval = duration
-			} else {
-				l.warnings = append(l.warnings, fmt.Sprintf("Invalid scheduler.lockRetryInterval value: %s", def.Scheduler.LockRetryInterval))
-			}
-		}
-
-		if def.Scheduler.ZombieDetectionInterval != "" {
-			if duration, err := time.ParseDuration(def.Scheduler.ZombieDetectionInterval); err == nil {
-				cfg.Scheduler.ZombieDetectionInterval = duration
-			} else {
-				l.warnings = append(l.warnings, fmt.Sprintf("Invalid scheduler.zombieDetectionInterval value: %s", def.Scheduler.ZombieDetectionInterval))
-			}
-		}
+		cfg.Scheduler.LockStaleThreshold = l.parseDuration("scheduler.lockStaleThreshold", def.Scheduler.LockStaleThreshold)
+		cfg.Scheduler.LockRetryInterval = l.parseDuration("scheduler.lockRetryInterval", def.Scheduler.LockRetryInterval)
+		cfg.Scheduler.ZombieDetectionInterval = l.parseDuration("scheduler.zombieDetectionInterval", def.Scheduler.ZombieDetectionInterval)
 	}
 
-	// Set defaults
+	// Apply scheduler defaults
+	l.setSchedulerDefaults(cfg)
+}
+
+// setSchedulerDefaults sets default values for scheduler configuration.
+func (l *ConfigLoader) setSchedulerDefaults(cfg *Config) {
 	if cfg.Scheduler.Port <= 0 {
 		cfg.Scheduler.Port = 8090
 	}
@@ -792,6 +748,7 @@ func (l *ConfigLoader) loadSchedulerConfig(cfg *Config, def Definition) {
 	if cfg.Scheduler.LockRetryInterval <= 0 {
 		cfg.Scheduler.LockRetryInterval = 5 * time.Second
 	}
+
 	// Default ZombieDetectionInterval only if not explicitly set.
 	// An invalid value logs a warning but falls back to 0 (disabled).
 	// Setting to 0 or negative disables zombie detection.
@@ -803,23 +760,11 @@ func (l *ConfigLoader) loadSchedulerConfig(cfg *Config, def Definition) {
 // loadMonitoringConfig loads the monitoring configuration.
 func (l *ConfigLoader) loadMonitoringConfig(cfg *Config, def Definition) {
 	if def.Monitoring != nil {
-		if def.Monitoring.Retention != "" {
-			if duration, err := time.ParseDuration(def.Monitoring.Retention); err == nil {
-				cfg.Monitoring.Retention = duration
-			} else {
-				l.warnings = append(l.warnings, fmt.Sprintf("Invalid monitoring.retention value: %s", def.Monitoring.Retention))
-			}
-		}
-		if def.Monitoring.Interval != "" {
-			if duration, err := time.ParseDuration(def.Monitoring.Interval); err == nil {
-				cfg.Monitoring.Interval = duration
-			} else {
-				l.warnings = append(l.warnings, fmt.Sprintf("Invalid monitoring.interval value: %s", def.Monitoring.Interval))
-			}
-		}
+		cfg.Monitoring.Retention = l.parseDuration("monitoring.retention", def.Monitoring.Retention)
+		cfg.Monitoring.Interval = l.parseDuration("monitoring.interval", def.Monitoring.Interval)
 	}
 
-	// Set defaults
+	// Apply defaults
 	if cfg.Monitoring.Retention <= 0 {
 		cfg.Monitoring.Retention = 24 * time.Hour
 	}
@@ -835,15 +780,20 @@ func (l *ConfigLoader) loadGitSyncConfig(cfg *Config, def Definition) {
 	}
 
 	// Check if gitSync is enabled
-	enabled := def.GitSync.Enabled != nil && *def.GitSync.Enabled
-	cfg.GitSync.Enabled = enabled
-
-	// Only apply defaults when gitSync is enabled
-	if !enabled {
+	cfg.GitSync.Enabled = def.GitSync.Enabled != nil && *def.GitSync.Enabled
+	if !cfg.GitSync.Enabled {
 		return
 	}
 
 	// Set defaults for enabled gitSync
+	l.setGitSyncDefaults(cfg)
+
+	// Apply definition values (override defaults where specified)
+	l.applyGitSyncDefinition(cfg, def.GitSync)
+}
+
+// setGitSyncDefaults sets default values for Git sync configuration.
+func (l *ConfigLoader) setGitSyncDefaults(cfg *Config) {
 	cfg.GitSync.Branch = "main"
 	cfg.GitSync.PushEnabled = true
 	cfg.GitSync.Auth.Type = "token"
@@ -851,107 +801,67 @@ func (l *ConfigLoader) loadGitSyncConfig(cfg *Config, def Definition) {
 	cfg.GitSync.AutoSync.Interval = 300
 	cfg.GitSync.Commit.AuthorName = "Dagu"
 	cfg.GitSync.Commit.AuthorEmail = "dagu@localhost"
+}
 
-	// Repository
-	if def.GitSync.Repository != "" {
-		cfg.GitSync.Repository = def.GitSync.Repository
+// applyGitSyncDefinition applies Git sync configuration from definition.
+func (l *ConfigLoader) applyGitSyncDefinition(cfg *Config, def *GitSyncDef) {
+	// Simple string fields
+	setIfNotEmpty(&cfg.GitSync.Repository, def.Repository)
+	setIfNotEmpty(&cfg.GitSync.Branch, def.Branch)
+	setIfNotEmpty(&cfg.GitSync.Path, def.Path)
+
+	if def.PushEnabled != nil {
+		cfg.GitSync.PushEnabled = *def.PushEnabled
 	}
 
-	// Branch
-	if def.GitSync.Branch != "" {
-		cfg.GitSync.Branch = def.GitSync.Branch
+	// Auth configuration
+	if def.Auth != nil {
+		setIfNotEmpty(&cfg.GitSync.Auth.Type, def.Auth.Type)
+		setIfNotEmpty(&cfg.GitSync.Auth.Token, def.Auth.Token)
+		setIfNotEmpty(&cfg.GitSync.Auth.SSHKeyPath, def.Auth.SSHKeyPath)
+		setIfNotEmpty(&cfg.GitSync.Auth.SSHPassphrase, def.Auth.SSHPassphrase)
 	}
 
-	// Path
-	if def.GitSync.Path != "" {
-		cfg.GitSync.Path = def.GitSync.Path
-	}
-
-	// PushEnabled
-	if def.GitSync.PushEnabled != nil {
-		cfg.GitSync.PushEnabled = *def.GitSync.PushEnabled
-	}
-
-	// Auth
-	if def.GitSync.Auth != nil {
-		if def.GitSync.Auth.Type != "" {
-			cfg.GitSync.Auth.Type = def.GitSync.Auth.Type
+	// AutoSync configuration
+	if def.AutoSync != nil {
+		if def.AutoSync.Enabled != nil {
+			cfg.GitSync.AutoSync.Enabled = *def.AutoSync.Enabled
 		}
-		if def.GitSync.Auth.Token != "" {
-			cfg.GitSync.Auth.Token = def.GitSync.Auth.Token
+		if def.AutoSync.OnStartup != nil {
+			cfg.GitSync.AutoSync.OnStartup = *def.AutoSync.OnStartup
 		}
-		if def.GitSync.Auth.SSHKeyPath != "" {
-			cfg.GitSync.Auth.SSHKeyPath = def.GitSync.Auth.SSHKeyPath
-		}
-		if def.GitSync.Auth.SSHPassphrase != "" {
-			cfg.GitSync.Auth.SSHPassphrase = def.GitSync.Auth.SSHPassphrase
-		}
-	}
-
-	// AutoSync
-	if def.GitSync.AutoSync != nil {
-		if def.GitSync.AutoSync.Enabled != nil {
-			cfg.GitSync.AutoSync.Enabled = *def.GitSync.AutoSync.Enabled
-		}
-		if def.GitSync.AutoSync.OnStartup != nil {
-			cfg.GitSync.AutoSync.OnStartup = *def.GitSync.AutoSync.OnStartup
-		}
-		// Use IsSet to respect explicit zero value
 		if l.v.IsSet("gitSync.autoSync.interval") {
-			cfg.GitSync.AutoSync.Interval = def.GitSync.AutoSync.Interval
+			cfg.GitSync.AutoSync.Interval = def.AutoSync.Interval
 		}
 	}
 
-	// Commit
-	if def.GitSync.Commit != nil {
-		if def.GitSync.Commit.AuthorName != "" {
-			cfg.GitSync.Commit.AuthorName = def.GitSync.Commit.AuthorName
-		}
-		if def.GitSync.Commit.AuthorEmail != "" {
-			cfg.GitSync.Commit.AuthorEmail = def.GitSync.Commit.AuthorEmail
-		}
+	// Commit configuration
+	if def.Commit != nil {
+		setIfNotEmpty(&cfg.GitSync.Commit.AuthorName, def.Commit.AuthorName)
+		setIfNotEmpty(&cfg.GitSync.Commit.AuthorEmail, def.Commit.AuthorEmail)
+	}
+}
+
+// setIfNotEmpty sets target to value if value is not empty.
+func setIfNotEmpty(target *string, value string) {
+	if value != "" {
+		*target = value
 	}
 }
 
 // loadTunnelConfig loads the tunnel configuration.
 func (l *ConfigLoader) loadTunnelConfig(cfg *Config, def Definition) {
-	// Check if tunnel is enabled - CLI flag takes precedence over config file
-	if l.v.IsSet("tunnel.enabled") {
-		cfg.Tunnel.Enabled = l.v.GetBool("tunnel.enabled")
-	} else if def.Tunnel != nil && def.Tunnel.Enabled != nil {
-		cfg.Tunnel.Enabled = *def.Tunnel.Enabled
-	}
-
+	// Determine if tunnel is enabled (CLI flag takes precedence)
+	cfg.Tunnel.Enabled = l.resolveTunnelEnabled(def)
 	if !cfg.Tunnel.Enabled {
 		return
 	}
 
-	// Tailscale config from definition (loaded first as base)
-	if def.Tunnel != nil && def.Tunnel.Tailscale != nil {
-		cfg.Tunnel.Tailscale.AuthKey = def.Tunnel.Tailscale.AuthKey
-		cfg.Tunnel.Tailscale.Hostname = def.Tunnel.Tailscale.Hostname
-		if def.Tunnel.Tailscale.Funnel != nil {
-			cfg.Tunnel.Tailscale.Funnel = *def.Tunnel.Tailscale.Funnel
-		}
-		if def.Tunnel.Tailscale.HTTPS != nil {
-			cfg.Tunnel.Tailscale.HTTPS = *def.Tunnel.Tailscale.HTTPS
-		}
-		cfg.Tunnel.Tailscale.StateDir = def.Tunnel.Tailscale.StateDir
-	}
+	// Load Tailscale config from definition
+	l.loadTailscaleConfig(cfg, def)
 
-	// CLI flags take precedence over config file
-	if l.v.IsSet("tunnel.tailscale.funnel") {
-		cfg.Tunnel.Tailscale.Funnel = l.v.GetBool("tunnel.tailscale.funnel")
-	}
-
-	if l.v.IsSet("tunnel.tailscale.https") {
-		cfg.Tunnel.Tailscale.HTTPS = l.v.GetBool("tunnel.tailscale.https")
-	}
-
-	// Handle --tunnel-token CLI flag (takes precedence over config)
-	if l.v.IsSet("tunnel.token") {
-		cfg.Tunnel.Tailscale.AuthKey = l.v.GetString("tunnel.token")
-	}
+	// Apply CLI flag overrides
+	l.applyTunnelCLIOverrides(cfg)
 
 	// Security options
 	if def.Tunnel != nil && def.Tunnel.AllowTerminal != nil {
@@ -960,74 +870,130 @@ func (l *ConfigLoader) loadTunnelConfig(cfg *Config, def Definition) {
 	cfg.Tunnel.AllowedIPs = parseStringList(l.v.Get("tunnel.allowedIPs"))
 
 	// Rate limiting
-	if def.Tunnel != nil && def.Tunnel.RateLimiting != nil {
-		if def.Tunnel.RateLimiting.Enabled != nil {
-			cfg.Tunnel.RateLimiting.Enabled = *def.Tunnel.RateLimiting.Enabled
-		}
-		cfg.Tunnel.RateLimiting.LoginAttempts = def.Tunnel.RateLimiting.LoginAttempts
-		cfg.Tunnel.RateLimiting.WindowSeconds = def.Tunnel.RateLimiting.WindowSeconds
-		cfg.Tunnel.RateLimiting.BlockDurationSeconds = def.Tunnel.RateLimiting.BlockDurationSeconds
-	}
+	l.loadTunnelRateLimiting(cfg, def)
 
-	// Set defaults for rate limiting
-	if cfg.Tunnel.RateLimiting.LoginAttempts <= 0 {
-		cfg.Tunnel.RateLimiting.LoginAttempts = 5
-	}
-	if cfg.Tunnel.RateLimiting.WindowSeconds <= 0 {
-		cfg.Tunnel.RateLimiting.WindowSeconds = 300
-	}
-	if cfg.Tunnel.RateLimiting.BlockDurationSeconds <= 0 {
-		cfg.Tunnel.RateLimiting.BlockDurationSeconds = 900
-	}
-
-	// Set default Tailscale hostname
+	// Set default hostname
 	if cfg.Tunnel.Tailscale.Hostname == "" {
 		cfg.Tunnel.Tailscale.Hostname = AppSlug
 	}
 }
 
+// resolveTunnelEnabled determines if tunnel is enabled from CLI or config.
+func (l *ConfigLoader) resolveTunnelEnabled(def Definition) bool {
+	if l.v.IsSet("tunnel.enabled") {
+		return l.v.GetBool("tunnel.enabled")
+	}
+	if def.Tunnel != nil && def.Tunnel.Enabled != nil {
+		return *def.Tunnel.Enabled
+	}
+	return false
+}
+
+// loadTailscaleConfig loads Tailscale configuration from definition.
+func (l *ConfigLoader) loadTailscaleConfig(cfg *Config, def Definition) {
+	if def.Tunnel == nil || def.Tunnel.Tailscale == nil {
+		return
+	}
+
+	ts := def.Tunnel.Tailscale
+	cfg.Tunnel.Tailscale.AuthKey = ts.AuthKey
+	cfg.Tunnel.Tailscale.Hostname = ts.Hostname
+	cfg.Tunnel.Tailscale.StateDir = ts.StateDir
+
+	if ts.Funnel != nil {
+		cfg.Tunnel.Tailscale.Funnel = *ts.Funnel
+	}
+	if ts.HTTPS != nil {
+		cfg.Tunnel.Tailscale.HTTPS = *ts.HTTPS
+	}
+}
+
+// applyTunnelCLIOverrides applies CLI flag overrides for tunnel configuration.
+func (l *ConfigLoader) applyTunnelCLIOverrides(cfg *Config) {
+	if l.v.IsSet("tunnel.tailscale.funnel") {
+		cfg.Tunnel.Tailscale.Funnel = l.v.GetBool("tunnel.tailscale.funnel")
+	}
+	if l.v.IsSet("tunnel.tailscale.https") {
+		cfg.Tunnel.Tailscale.HTTPS = l.v.GetBool("tunnel.tailscale.https")
+	}
+	if l.v.IsSet("tunnel.token") {
+		cfg.Tunnel.Tailscale.AuthKey = l.v.GetString("tunnel.token")
+	}
+}
+
+// loadTunnelRateLimiting loads rate limiting configuration for tunnel.
+func (l *ConfigLoader) loadTunnelRateLimiting(cfg *Config, def Definition) {
+	// Load from definition
+	if def.Tunnel != nil && def.Tunnel.RateLimiting != nil {
+		rl := def.Tunnel.RateLimiting
+		if rl.Enabled != nil {
+			cfg.Tunnel.RateLimiting.Enabled = *rl.Enabled
+		}
+		cfg.Tunnel.RateLimiting.LoginAttempts = rl.LoginAttempts
+		cfg.Tunnel.RateLimiting.WindowSeconds = rl.WindowSeconds
+		cfg.Tunnel.RateLimiting.BlockDurationSeconds = rl.BlockDurationSeconds
+	}
+
+	// Apply defaults for unset values
+	rateLimitDefaults := []struct {
+		target       *int
+		defaultValue int
+	}{
+		{&cfg.Tunnel.RateLimiting.LoginAttempts, 5},
+		{&cfg.Tunnel.RateLimiting.WindowSeconds, 300},
+		{&cfg.Tunnel.RateLimiting.BlockDurationSeconds, 900},
+	}
+
+	for _, d := range rateLimitDefaults {
+		if *d.target <= 0 {
+			*d.target = d.defaultValue
+		}
+	}
+}
+
 // loadCacheConfig loads the cache configuration.
 func (l *ConfigLoader) loadCacheConfig(cfg *Config, def Definition) {
-	if def.Cache != nil {
-		mode := CacheMode(*def.Cache)
-		if mode.IsValid() {
-			cfg.Cache = mode
-		} else {
-			l.warnings = append(l.warnings, fmt.Sprintf("Invalid cache mode: %q, using 'normal'", *def.Cache))
-			cfg.Cache = CacheModeNormal
-		}
+	cfg.Cache = CacheModeNormal
+	if def.Cache == nil {
+		return
+	}
+
+	mode := CacheMode(*def.Cache)
+	if mode.IsValid() {
+		cfg.Cache = mode
 	} else {
-		cfg.Cache = CacheModeNormal
+		l.warnings = append(l.warnings, fmt.Sprintf("Invalid cache mode: %q, using 'normal'", *def.Cache))
 	}
 }
 
 // finalizePaths sets up derived paths and ensures required paths are set.
 func (l *ConfigLoader) finalizePaths(cfg *Config) {
-	if cfg.Paths.DAGRunsDir == "" {
-		cfg.Paths.DAGRunsDir = filepath.Join(cfg.Paths.DataDir, "dag-runs")
+	// Define default path mappings relative to DataDir
+	derivedPaths := []struct {
+		target      *string
+		defaultPath string
+	}{
+		{&cfg.Paths.DAGRunsDir, "dag-runs"},
+		{&cfg.Paths.ProcDir, "proc"},
+		{&cfg.Paths.QueueDir, "queue"},
+		{&cfg.Paths.ServiceRegistryDir, "service-registry"},
+		{&cfg.Paths.UsersDir, "users"},
+		{&cfg.Paths.APIKeysDir, "apikeys"},
+		{&cfg.Paths.WebhooksDir, "webhooks"},
 	}
-	if cfg.Paths.ProcDir == "" {
-		cfg.Paths.ProcDir = filepath.Join(cfg.Paths.DataDir, "proc")
+
+	for _, dp := range derivedPaths {
+		if *dp.target == "" {
+			*dp.target = filepath.Join(cfg.Paths.DataDir, dp.defaultPath)
+		}
 	}
-	if cfg.Paths.QueueDir == "" {
-		cfg.Paths.QueueDir = filepath.Join(cfg.Paths.DataDir, "queue")
-	}
-	if cfg.Paths.ServiceRegistryDir == "" {
-		cfg.Paths.ServiceRegistryDir = filepath.Join(cfg.Paths.DataDir, "service-registry")
-	}
-	if cfg.Paths.UsersDir == "" {
-		cfg.Paths.UsersDir = filepath.Join(cfg.Paths.DataDir, "users")
-	}
-	if cfg.Paths.APIKeysDir == "" {
-		cfg.Paths.APIKeysDir = filepath.Join(cfg.Paths.DataDir, "apikeys")
-	}
-	if cfg.Paths.WebhooksDir == "" {
-		cfg.Paths.WebhooksDir = filepath.Join(cfg.Paths.DataDir, "webhooks")
-	}
+
+	// ConversationsDir has a nested default path
 	if cfg.Paths.ConversationsDir == "" {
 		cfg.Paths.ConversationsDir = filepath.Join(cfg.Paths.DataDir, "agent", "conversations")
 	}
 
+	// Set executable path if not already configured
 	if cfg.Paths.Executable == "" {
 		if executable, err := os.Executable(); err == nil {
 			cfg.Paths.Executable = executable
@@ -1471,27 +1437,42 @@ func (l *ConfigLoader) configureViper(configDir, configFile string) {
 	l.v.AutomaticEnv()
 }
 
-// parseWorkerLabels parses a comma-separated list of `key=value` pairs into a map[string]string.
-// Whitespace around keys and values is trimmed; empty entries and pairs with an empty key are ignored.
-func parseWorkerLabels(labelsStr string) map[string]string {
+// parseLabels parses labels from various input formats into a map[string]string.
+// Supports: comma-separated string ("key=value,key2=value2"), map[string]interface{}, map[interface{}]interface{}.
+func parseLabels(input interface{}) map[string]string {
 	labels := make(map[string]string)
-	if labelsStr == "" {
-		return labels
-	}
 
-	pairs := strings.Split(labelsStr, ",")
-	for _, pair := range pairs {
-		pair = strings.TrimSpace(pair)
-		if pair == "" {
-			continue
+	switch v := input.(type) {
+	case string:
+		if v == "" {
+			return labels
 		}
-
-		key, value, found := strings.Cut(pair, "=")
-		if found {
-			key = strings.TrimSpace(key)
-			value = strings.TrimSpace(value)
-			if key != "" {
-				labels[key] = value
+		for _, pair := range strings.Split(v, ",") {
+			pair = strings.TrimSpace(pair)
+			if pair == "" {
+				continue
+			}
+			key, value, found := strings.Cut(pair, "=")
+			if found {
+				key = strings.TrimSpace(key)
+				value = strings.TrimSpace(value)
+				if key != "" {
+					labels[key] = value
+				}
+			}
+		}
+	case map[string]interface{}:
+		for key, val := range v {
+			if strVal, ok := val.(string); ok {
+				labels[key] = strVal
+			}
+		}
+	case map[interface{}]interface{}:
+		for key, val := range v {
+			if keyStr, ok := key.(string); ok {
+				if valStr, ok := val.(string); ok {
+					labels[keyStr] = valStr
+				}
 			}
 		}
 	}
@@ -1539,16 +1520,14 @@ func cleanServerBasePath(s string) string {
 		return ""
 	}
 
-	// Clean the provided BasePath.
+	// Clean and ensure absolute path
 	cleanPath := path.Clean(s)
-
-	// Ensure the path is absolute.
 	if !path.IsAbs(cleanPath) {
 		cleanPath = path.Join("/", cleanPath)
 	}
 
+	// Root path is equivalent to no base path
 	if cleanPath == "/" {
-		// If the cleaned path is the root, reset it to an empty string.
 		return ""
 	}
 	return cleanPath

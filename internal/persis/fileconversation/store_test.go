@@ -11,20 +11,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestStore_ConversationCRUD(t *testing.T) {
-	// Create temp directory
+func setupTestStore(t *testing.T) (*Store, context.Context) {
+	t.Helper()
 	tmpDir, err := os.MkdirTemp("", "fileconversation-test-*")
-	require.NoError(t, err, "failed to create temp dir")
-	defer func() { _ = os.RemoveAll(tmpDir) }()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 
-	// Create store
 	store, err := New(tmpDir)
-	require.NoError(t, err, "failed to create store")
+	require.NoError(t, err)
 
-	ctx := context.Background()
+	return store, context.Background()
+}
+
+func TestStore_ConversationCRUD(t *testing.T) {
+	store, ctx := setupTestStore(t)
 	now := time.Now()
 
-	// Test CreateConversation
 	conv := &agent.Conversation{
 		ID:        "test-conv-1",
 		UserID:    "user-1",
@@ -32,60 +34,59 @@ func TestStore_ConversationCRUD(t *testing.T) {
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
-	err = store.CreateConversation(ctx, conv)
-	require.NoError(t, err, "CreateConversation() failed")
 
-	// Test GetConversation
-	retrieved, err := store.GetConversation(ctx, conv.ID)
-	require.NoError(t, err, "GetConversation() failed")
-	assert.Equal(t, conv.ID, retrieved.ID)
-	assert.Equal(t, conv.UserID, retrieved.UserID)
-	assert.Equal(t, conv.Title, retrieved.Title)
+	t.Run("create conversation", func(t *testing.T) {
+		err := store.CreateConversation(ctx, conv)
+		require.NoError(t, err)
+	})
 
-	// Test ListConversations
-	conversations, err := store.ListConversations(ctx, "user-1")
-	require.NoError(t, err, "ListConversations() failed")
-	assert.Len(t, conversations, 1)
-	assert.Equal(t, conv.ID, conversations[0].ID)
+	t.Run("get conversation", func(t *testing.T) {
+		retrieved, err := store.GetConversation(ctx, conv.ID)
+		require.NoError(t, err)
+		assert.Equal(t, conv.ID, retrieved.ID)
+		assert.Equal(t, conv.UserID, retrieved.UserID)
+		assert.Equal(t, conv.Title, retrieved.Title)
+	})
 
-	// Test UpdateConversation
-	conv.Title = "Updated Title"
-	conv.UpdatedAt = time.Now()
-	err = store.UpdateConversation(ctx, conv)
-	require.NoError(t, err, "UpdateConversation() failed")
-	retrieved, err = store.GetConversation(ctx, conv.ID)
-	require.NoError(t, err, "GetConversation() after Update failed")
-	assert.Equal(t, "Updated Title", retrieved.Title)
+	t.Run("list conversations", func(t *testing.T) {
+		conversations, err := store.ListConversations(ctx, "user-1")
+		require.NoError(t, err)
+		assert.Len(t, conversations, 1)
+		assert.Equal(t, conv.ID, conversations[0].ID)
+	})
 
-	// Test DeleteConversation
-	err = store.DeleteConversation(ctx, conv.ID)
-	require.NoError(t, err, "DeleteConversation() failed")
-	_, err = store.GetConversation(ctx, conv.ID)
-	assert.ErrorIs(t, err, agent.ErrConversationNotFound)
+	t.Run("update conversation", func(t *testing.T) {
+		conv.Title = "Updated Title"
+		conv.UpdatedAt = time.Now()
+		err := store.UpdateConversation(ctx, conv)
+		require.NoError(t, err)
+
+		retrieved, err := store.GetConversation(ctx, conv.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "Updated Title", retrieved.Title)
+	})
+
+	t.Run("delete conversation", func(t *testing.T) {
+		err := store.DeleteConversation(ctx, conv.ID)
+		require.NoError(t, err)
+
+		_, err = store.GetConversation(ctx, conv.ID)
+		assert.ErrorIs(t, err, agent.ErrConversationNotFound)
+	})
 }
 
 func TestStore_Messages(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "fileconversation-test-*")
-	require.NoError(t, err, "failed to create temp dir")
-	defer func() { _ = os.RemoveAll(tmpDir) }()
-
-	store, err := New(tmpDir)
-	require.NoError(t, err, "failed to create store")
-
-	ctx := context.Background()
+	store, ctx := setupTestStore(t)
 	now := time.Now()
 
-	// Create a conversation first
 	conv := &agent.Conversation{
 		ID:        "test-conv-messages",
 		UserID:    "user-1",
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
-	err = store.CreateConversation(ctx, conv)
-	require.NoError(t, err, "CreateConversation() failed")
+	require.NoError(t, store.CreateConversation(ctx, conv))
 
-	// Test AddMessage
 	msg1 := &agent.Message{
 		ID:             "msg-1",
 		ConversationID: conv.ID,
@@ -94,9 +95,6 @@ func TestStore_Messages(t *testing.T) {
 		Content:        "Hello, how can you help me?",
 		CreatedAt:      now,
 	}
-	err = store.AddMessage(ctx, conv.ID, msg1)
-	require.NoError(t, err, "AddMessage() failed")
-
 	msg2 := &agent.Message{
 		ID:             "msg-2",
 		ConversationID: conv.ID,
@@ -105,131 +103,103 @@ func TestStore_Messages(t *testing.T) {
 		Content:        "I can help you with DAG workflows.",
 		CreatedAt:      now.Add(time.Second),
 	}
-	err = store.AddMessage(ctx, conv.ID, msg2)
-	require.NoError(t, err, "AddMessage() second message failed")
 
-	// Test GetMessages
-	messages, err := store.GetMessages(ctx, conv.ID)
-	require.NoError(t, err, "GetMessages() failed")
-	assert.Len(t, messages, 2)
-	assert.Equal(t, "msg-1", messages[0].ID)
-	assert.Equal(t, "msg-2", messages[1].ID)
+	t.Run("add messages", func(t *testing.T) {
+		require.NoError(t, store.AddMessage(ctx, conv.ID, msg1))
+		require.NoError(t, store.AddMessage(ctx, conv.ID, msg2))
+	})
 
-	// Test GetLatestSequenceID
-	seqID, err := store.GetLatestSequenceID(ctx, conv.ID)
-	require.NoError(t, err, "GetLatestSequenceID() failed")
-	assert.Equal(t, int64(2), seqID)
+	t.Run("get messages", func(t *testing.T) {
+		messages, err := store.GetMessages(ctx, conv.ID)
+		require.NoError(t, err)
+		assert.Len(t, messages, 2)
+		assert.Equal(t, "msg-1", messages[0].ID)
+		assert.Equal(t, "msg-2", messages[1].ID)
+	})
 
-	// Test auto-generated title from first user message
-	retrieved, err := store.GetConversation(ctx, conv.ID)
-	require.NoError(t, err, "GetConversation() failed")
-	assert.Equal(t, "Hello, how can you help me?", retrieved.Title)
+	t.Run("get latest sequence ID", func(t *testing.T) {
+		seqID, err := store.GetLatestSequenceID(ctx, conv.ID)
+		require.NoError(t, err)
+		assert.Equal(t, int64(2), seqID)
+	})
+
+	t.Run("auto-generates title from first user message", func(t *testing.T) {
+		retrieved, err := store.GetConversation(ctx, conv.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "Hello, how can you help me?", retrieved.Title)
+	})
 }
 
 func TestStore_NotFound(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "fileconversation-test-*")
-	require.NoError(t, err, "failed to create temp dir")
-	defer func() { _ = os.RemoveAll(tmpDir) }()
+	store, ctx := setupTestStore(t)
 
-	store, err := New(tmpDir)
-	require.NoError(t, err, "failed to create store")
+	t.Run("get conversation", func(t *testing.T) {
+		_, err := store.GetConversation(ctx, "nonexistent-id")
+		assert.ErrorIs(t, err, agent.ErrConversationNotFound)
+	})
 
-	ctx := context.Background()
+	t.Run("get messages", func(t *testing.T) {
+		_, err := store.GetMessages(ctx, "nonexistent-id")
+		assert.ErrorIs(t, err, agent.ErrConversationNotFound)
+	})
 
-	// Test GetConversation not found
-	_, err = store.GetConversation(ctx, "nonexistent-id")
-	assert.ErrorIs(t, err, agent.ErrConversationNotFound)
+	t.Run("add message", func(t *testing.T) {
+		msg := &agent.Message{
+			ID:         "msg-1",
+			Type:       agent.MessageTypeUser,
+			SequenceID: 1,
+			Content:    "Hello",
+			CreatedAt:  time.Now(),
+		}
+		err := store.AddMessage(ctx, "nonexistent-id", msg)
+		assert.ErrorIs(t, err, agent.ErrConversationNotFound)
+	})
 
-	// Test GetMessages not found
-	_, err = store.GetMessages(ctx, "nonexistent-id")
-	assert.ErrorIs(t, err, agent.ErrConversationNotFound)
-
-	// Test AddMessage to nonexistent conversation
-	msg := &agent.Message{
-		ID:         "msg-1",
-		Type:       agent.MessageTypeUser,
-		SequenceID: 1,
-		Content:    "Hello",
-		CreatedAt:  time.Now(),
-	}
-	err = store.AddMessage(ctx, "nonexistent-id", msg)
-	assert.ErrorIs(t, err, agent.ErrConversationNotFound)
-
-	// Test DeleteConversation not found
-	err = store.DeleteConversation(ctx, "nonexistent-id")
-	assert.ErrorIs(t, err, agent.ErrConversationNotFound)
+	t.Run("delete conversation", func(t *testing.T) {
+		err := store.DeleteConversation(ctx, "nonexistent-id")
+		assert.ErrorIs(t, err, agent.ErrConversationNotFound)
+	})
 }
 
 func TestStore_MultipleUsers(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "fileconversation-test-*")
-	require.NoError(t, err, "failed to create temp dir")
-	defer func() { _ = os.RemoveAll(tmpDir) }()
-
-	store, err := New(tmpDir)
-	require.NoError(t, err, "failed to create store")
-
-	ctx := context.Background()
+	store, ctx := setupTestStore(t)
 	now := time.Now()
 
-	// Create conversations for user 1
-	conv1 := &agent.Conversation{
-		ID:        "conv-1",
-		UserID:    "user-1",
-		Title:     "User 1 Conv 1",
-		CreatedAt: now,
-		UpdatedAt: now,
+	conversations := []*agent.Conversation{
+		{ID: "conv-1", UserID: "user-1", Title: "User 1 Conv 1", CreatedAt: now, UpdatedAt: now},
+		{ID: "conv-2", UserID: "user-1", Title: "User 1 Conv 2", CreatedAt: now.Add(time.Second), UpdatedAt: now.Add(time.Second)},
+		{ID: "conv-3", UserID: "user-2", Title: "User 2 Conv 1", CreatedAt: now, UpdatedAt: now},
 	}
-	err = store.CreateConversation(ctx, conv1)
-	require.NoError(t, err)
-
-	conv2 := &agent.Conversation{
-		ID:        "conv-2",
-		UserID:    "user-1",
-		Title:     "User 1 Conv 2",
-		CreatedAt: now.Add(time.Second),
-		UpdatedAt: now.Add(time.Second),
+	for _, conv := range conversations {
+		require.NoError(t, store.CreateConversation(ctx, conv))
 	}
-	err = store.CreateConversation(ctx, conv2)
-	require.NoError(t, err)
 
-	// Create conversation for user 2
-	conv3 := &agent.Conversation{
-		ID:        "conv-3",
-		UserID:    "user-2",
-		Title:     "User 2 Conv 1",
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	err = store.CreateConversation(ctx, conv3)
-	require.NoError(t, err)
+	t.Run("user 1 has two conversations", func(t *testing.T) {
+		convs, err := store.ListConversations(ctx, "user-1")
+		require.NoError(t, err)
+		assert.Len(t, convs, 2)
+	})
 
-	// List conversations for user 1
-	user1Convs, err := store.ListConversations(ctx, "user-1")
-	require.NoError(t, err)
-	assert.Len(t, user1Convs, 2)
+	t.Run("user 2 has one conversation", func(t *testing.T) {
+		convs, err := store.ListConversations(ctx, "user-2")
+		require.NoError(t, err)
+		assert.Len(t, convs, 1)
+	})
 
-	// List conversations for user 2
-	user2Convs, err := store.ListConversations(ctx, "user-2")
-	require.NoError(t, err)
-	assert.Len(t, user2Convs, 1)
-
-	// List conversations for nonexistent user
-	emptyConvs, err := store.ListConversations(ctx, "user-3")
-	require.NoError(t, err)
-	assert.Len(t, emptyConvs, 0)
+	t.Run("nonexistent user has no conversations", func(t *testing.T) {
+		convs, err := store.ListConversations(ctx, "user-3")
+		require.NoError(t, err)
+		assert.Empty(t, convs)
+	})
 }
 
 func TestStore_RebuildIndex(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "fileconversation-test-*")
-	require.NoError(t, err, "failed to create temp dir")
-	defer func() { _ = os.RemoveAll(tmpDir) }()
-
+	tmpDir := t.TempDir()
 	ctx := context.Background()
 	now := time.Now()
 
-	// Create store and add data
 	store1, err := New(tmpDir)
-	require.NoError(t, err, "failed to create store")
+	require.NoError(t, err)
 
 	conv := &agent.Conversation{
 		ID:        "test-conv",
@@ -238,8 +208,7 @@ func TestStore_RebuildIndex(t *testing.T) {
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
-	err = store1.CreateConversation(ctx, conv)
-	require.NoError(t, err)
+	require.NoError(t, store1.CreateConversation(ctx, conv))
 
 	msg := &agent.Message{
 		ID:             "msg-1",
@@ -249,74 +218,69 @@ func TestStore_RebuildIndex(t *testing.T) {
 		Content:        "Hello",
 		CreatedAt:      now,
 	}
-	err = store1.AddMessage(ctx, conv.ID, msg)
+	require.NoError(t, store1.AddMessage(ctx, conv.ID, msg))
+
+	// Simulate server restart by creating a new store instance
+	store2, err := New(tmpDir)
 	require.NoError(t, err)
 
-	// Create a new store (simulating server restart)
-	store2, err := New(tmpDir)
-	require.NoError(t, err, "failed to create second store")
+	t.Run("conversation persists after reload", func(t *testing.T) {
+		retrieved, err := store2.GetConversation(ctx, conv.ID)
+		require.NoError(t, err)
+		assert.Equal(t, conv.ID, retrieved.ID)
+	})
 
-	// Verify data is available in the new store
-	retrieved, err := store2.GetConversation(ctx, conv.ID)
-	require.NoError(t, err, "GetConversation() on reloaded store failed")
-	assert.Equal(t, conv.ID, retrieved.ID)
+	t.Run("messages persist after reload", func(t *testing.T) {
+		messages, err := store2.GetMessages(ctx, conv.ID)
+		require.NoError(t, err)
+		assert.Len(t, messages, 1)
+	})
 
-	messages, err := store2.GetMessages(ctx, conv.ID)
-	require.NoError(t, err, "GetMessages() on reloaded store failed")
-	assert.Len(t, messages, 1)
-
-	conversations, err := store2.ListConversations(ctx, "user-1")
-	require.NoError(t, err, "ListConversations() on reloaded store failed")
-	assert.Len(t, conversations, 1)
+	t.Run("list conversations works after reload", func(t *testing.T) {
+		conversations, err := store2.ListConversations(ctx, "user-1")
+		require.NoError(t, err)
+		assert.Len(t, conversations, 1)
+	})
 }
 
 func TestStore_ValidationErrors(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "fileconversation-test-*")
-	require.NoError(t, err, "failed to create temp dir")
-	defer func() { _ = os.RemoveAll(tmpDir) }()
+	store, ctx := setupTestStore(t)
 
-	store, err := New(tmpDir)
-	require.NoError(t, err, "failed to create store")
-
-	ctx := context.Background()
-
-	// Test CreateConversation with nil
-	err = store.CreateConversation(ctx, nil)
-	assert.Error(t, err)
-
-	// Test CreateConversation with empty ID
-	err = store.CreateConversation(ctx, &agent.Conversation{
-		ID:     "",
-		UserID: "user-1",
+	t.Run("create conversation with nil", func(t *testing.T) {
+		err := store.CreateConversation(ctx, nil)
+		assert.Error(t, err)
 	})
-	assert.ErrorIs(t, err, agent.ErrInvalidConversationID)
 
-	// Test CreateConversation with empty UserID
-	err = store.CreateConversation(ctx, &agent.Conversation{
-		ID:     "conv-1",
-		UserID: "",
+	t.Run("create conversation with empty ID", func(t *testing.T) {
+		err := store.CreateConversation(ctx, &agent.Conversation{ID: "", UserID: "user-1"})
+		assert.ErrorIs(t, err, agent.ErrInvalidConversationID)
 	})
-	assert.ErrorIs(t, err, agent.ErrInvalidUserID)
 
-	// Test GetConversation with empty ID
-	_, err = store.GetConversation(ctx, "")
-	assert.ErrorIs(t, err, agent.ErrInvalidConversationID)
+	t.Run("create conversation with empty UserID", func(t *testing.T) {
+		err := store.CreateConversation(ctx, &agent.Conversation{ID: "conv-1", UserID: ""})
+		assert.ErrorIs(t, err, agent.ErrInvalidUserID)
+	})
 
-	// Test ListConversations with empty userID
-	_, err = store.ListConversations(ctx, "")
-	assert.ErrorIs(t, err, agent.ErrInvalidUserID)
+	t.Run("get conversation with empty ID", func(t *testing.T) {
+		_, err := store.GetConversation(ctx, "")
+		assert.ErrorIs(t, err, agent.ErrInvalidConversationID)
+	})
 
-	// Test AddMessage with nil
-	now := time.Now()
-	conv := &agent.Conversation{
-		ID:        "conv-1",
-		UserID:    "user-1",
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	err = store.CreateConversation(ctx, conv)
-	require.NoError(t, err)
+	t.Run("list conversations with empty userID", func(t *testing.T) {
+		_, err := store.ListConversations(ctx, "")
+		assert.ErrorIs(t, err, agent.ErrInvalidUserID)
+	})
 
-	err = store.AddMessage(ctx, conv.ID, nil)
-	assert.Error(t, err)
+	t.Run("add message with nil", func(t *testing.T) {
+		now := time.Now()
+		require.NoError(t, store.CreateConversation(ctx, &agent.Conversation{
+			ID:        "conv-for-nil-msg",
+			UserID:    "user-1",
+			CreatedAt: now,
+			UpdatedAt: now,
+		}))
+
+		err := store.AddMessage(ctx, "conv-for-nil-msg", nil)
+		assert.Error(t, err)
+	})
 }

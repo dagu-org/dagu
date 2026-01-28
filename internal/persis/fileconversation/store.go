@@ -17,12 +17,10 @@ import (
 )
 
 const (
-	// conversationFileExtension is the file extension for conversation files.
-	conversationFileExtension = ".json"
-	// conversationDirPermissions is the permission mode for the conversations directory.
-	conversationDirPermissions = 0750
-	// conversationFilePermissions is the permission mode for conversation files.
+	conversationFileExtension   = ".json"
+	conversationDirPermissions  = 0750
 	conversationFilePermissions = 0600
+	maxTitleLength              = 50
 )
 
 // ConversationForStorage is the JSON-serializable format for conversations.
@@ -62,16 +60,11 @@ func FromConversation(conv *agent.Conversation, messages []agent.Message) *Conve
 // Conversations are stored as individual JSON files in user-specific directories.
 // Thread-safe through internal locking.
 type Store struct {
-	baseDir string
-
-	// mu protects the index maps
-	mu sync.RWMutex
-	// byID maps conversation ID to file path
-	byID map[string]string
-	// byUser maps userID to slice of conversation IDs (sorted by UpdatedAt descending)
-	byUser map[string][]string
-	// updatedAt caches the UpdatedAt time for sorting
-	updatedAt map[string]time.Time
+	baseDir   string
+	mu        sync.RWMutex
+	byID      map[string]string    // conversation ID -> file path
+	byUser    map[string][]string  // user ID -> conversation IDs (sorted by UpdatedAt descending)
+	updatedAt map[string]time.Time // conversation ID -> last update time
 }
 
 var _ agent.ConversationStore = (*Store)(nil)
@@ -118,12 +111,10 @@ func (s *Store) rebuildIndex() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Clear existing index
 	s.byID = make(map[string]string)
 	s.byUser = make(map[string][]string)
 	s.updatedAt = make(map[string]time.Time)
 
-	// Scan directory for user subdirectories
 	userDirs, err := os.ReadDir(s.baseDir)
 	if err != nil {
 		return fmt.Errorf("failed to read directory %s: %w", s.baseDir, err)
@@ -133,46 +124,46 @@ func (s *Store) rebuildIndex() error {
 		if !userDir.IsDir() {
 			continue
 		}
-
-		userID := userDir.Name()
-		userPath := filepath.Join(s.baseDir, userID)
-
-		// Scan user directory for conversation files
-		entries, err := os.ReadDir(userPath)
-		if err != nil {
-			slog.Warn("Failed to read user directory during index rebuild",
-				slog.String("path", userPath),
-				slog.String("error", err.Error()))
-			continue
-		}
-
-		for _, entry := range entries {
-			if entry.IsDir() || filepath.Ext(entry.Name()) != conversationFileExtension {
-				continue
-			}
-
-			filePath := filepath.Join(userPath, entry.Name())
-			conv, err := s.loadConversationFromFile(filePath)
-			if err != nil {
-				// Log warning but continue - don't fail entire index for one bad file
-				slog.Warn("Failed to load conversation file during index rebuild",
-					slog.String("file", filePath),
-					slog.String("error", err.Error()))
-				continue
-			}
-
-			s.byID[conv.ID] = filePath
-			s.byUser[conv.UserID] = append(s.byUser[conv.UserID], conv.ID)
-			s.updatedAt[conv.ID] = conv.UpdatedAt
-		}
+		s.indexUserDirectory(userDir.Name())
 	}
 
-	// Sort each user's conversations by UpdatedAt descending
 	for userID := range s.byUser {
 		s.sortUserConversations(userID)
 	}
 
 	return nil
+}
+
+// indexUserDirectory indexes all conversations in a user's directory.
+// Must be called with mu held.
+func (s *Store) indexUserDirectory(userID string) {
+	userPath := filepath.Join(s.baseDir, userID)
+	entries, err := os.ReadDir(userPath)
+	if err != nil {
+		slog.Warn("Failed to read user directory during index rebuild",
+			slog.String("path", userPath),
+			slog.String("error", err.Error()))
+		return
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != conversationFileExtension {
+			continue
+		}
+
+		filePath := filepath.Join(userPath, entry.Name())
+		conv, err := s.loadConversationFromFile(filePath)
+		if err != nil {
+			slog.Warn("Failed to load conversation file during index rebuild",
+				slog.String("file", filePath),
+				slog.String("error", err.Error()))
+			continue
+		}
+
+		s.byID[conv.ID] = filePath
+		s.byUser[conv.UserID] = append(s.byUser[conv.UserID], conv.ID)
+		s.updatedAt[conv.ID] = conv.UpdatedAt
+	}
 }
 
 // sortUserConversations sorts a user's conversation list by UpdatedAt descending.
@@ -211,42 +202,54 @@ func (s *Store) userDirPath(userID string) string {
 
 // CreateConversation creates a new conversation.
 func (s *Store) CreateConversation(_ context.Context, conv *agent.Conversation) error {
+	if err := validateConversation(conv); err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.byID[conv.ID]; exists {
+		return fmt.Errorf("fileconversation: conversation %s already exists", conv.ID)
+	}
+
+	userDir := s.userDirPath(conv.UserID)
+	if err := os.MkdirAll(userDir, conversationDirPermissions); err != nil {
+		return fmt.Errorf("fileconversation: failed to create user directory %s: %w", userDir, err)
+	}
+
+	filePath := s.conversationFilePath(conv.UserID, conv.ID)
+	if err := s.writeConversationToFile(filePath, FromConversation(conv, nil)); err != nil {
+		return err
+	}
+
+	s.byID[conv.ID] = filePath
+	s.byUser[conv.UserID] = append([]string{conv.ID}, s.byUser[conv.UserID]...)
+	s.updatedAt[conv.ID] = conv.UpdatedAt
+
+	return nil
+}
+
+// validateConversation checks that a conversation is valid for storage operations.
+func validateConversation(conv *agent.Conversation) error {
+	if err := validateConversationForUpdate(conv); err != nil {
+		return err
+	}
+	if conv.UserID == "" {
+		return agent.ErrInvalidUserID
+	}
+	return nil
+}
+
+// validateConversationForUpdate checks that a conversation is valid for update operations.
+// This is a subset of validateConversation that does not require UserID.
+func validateConversationForUpdate(conv *agent.Conversation) error {
 	if conv == nil {
 		return errors.New("fileconversation: conversation cannot be nil")
 	}
 	if conv.ID == "" {
 		return agent.ErrInvalidConversationID
 	}
-	if conv.UserID == "" {
-		return agent.ErrInvalidUserID
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// Check if conversation already exists
-	if _, exists := s.byID[conv.ID]; exists {
-		return fmt.Errorf("fileconversation: conversation %s already exists", conv.ID)
-	}
-
-	// Create user directory if needed
-	userDir := s.userDirPath(conv.UserID)
-	if err := os.MkdirAll(userDir, conversationDirPermissions); err != nil {
-		return fmt.Errorf("fileconversation: failed to create user directory %s: %w", userDir, err)
-	}
-
-	// Write conversation to file
-	filePath := s.conversationFilePath(conv.UserID, conv.ID)
-	storage := FromConversation(conv, nil)
-	if err := s.writeConversationToFile(filePath, storage); err != nil {
-		return err
-	}
-
-	// Update index
-	s.byID[conv.ID] = filePath
-	s.byUser[conv.UserID] = append([]string{conv.ID}, s.byUser[conv.UserID]...)
-	s.updatedAt[conv.ID] = conv.UpdatedAt
-
 	return nil
 }
 
@@ -278,21 +281,9 @@ func (s *Store) GetConversation(_ context.Context, id string) (*agent.Conversati
 		return nil, agent.ErrInvalidConversationID
 	}
 
-	s.mu.RLock()
-	filePath, exists := s.byID[id]
-	s.mu.RUnlock()
-
-	if !exists {
-		return nil, agent.ErrConversationNotFound
-	}
-
-	stored, err := s.loadConversationFromFile(filePath)
+	stored, err := s.loadConversationByID(id)
 	if err != nil {
-		// File might have been deleted externally
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, agent.ErrConversationNotFound
-		}
-		return nil, fmt.Errorf("fileconversation: failed to load conversation %s: %w", id, err)
+		return nil, err
 	}
 
 	return stored.ToConversation(), nil
@@ -327,11 +318,8 @@ func (s *Store) ListConversations(ctx context.Context, userID string) ([]*agent.
 
 // UpdateConversation updates conversation metadata.
 func (s *Store) UpdateConversation(_ context.Context, conv *agent.Conversation) error {
-	if conv == nil {
-		return errors.New("fileconversation: conversation cannot be nil")
-	}
-	if conv.ID == "" {
-		return agent.ErrInvalidConversationID
+	if err := validateConversationForUpdate(conv); err != nil {
+		return err
 	}
 
 	s.mu.Lock()
@@ -342,22 +330,18 @@ func (s *Store) UpdateConversation(_ context.Context, conv *agent.Conversation) 
 		return agent.ErrConversationNotFound
 	}
 
-	// Load existing conversation to preserve messages
 	stored, err := s.loadConversationFromFile(filePath)
 	if err != nil {
 		return fmt.Errorf("fileconversation: failed to load existing conversation: %w", err)
 	}
 
-	// Update metadata
 	stored.Title = conv.Title
 	stored.UpdatedAt = conv.UpdatedAt
 
-	// Write back
 	if err := s.writeConversationToFile(filePath, stored); err != nil {
 		return err
 	}
 
-	// Update index
 	s.updatedAt[conv.ID] = conv.UpdatedAt
 	s.sortUserConversations(stored.UserID)
 
@@ -378,52 +362,53 @@ func (s *Store) DeleteConversation(_ context.Context, id string) error {
 		return agent.ErrConversationNotFound
 	}
 
-	// Load conversation to get userID for index cleanup
 	stored, err := s.loadConversationFromFile(filePath)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("fileconversation: failed to load conversation for deletion: %w", err)
 	}
 
-	// Remove file
 	if err := os.Remove(filePath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("fileconversation: failed to delete conversation file: %w", err)
 	}
 
-	// Update index
 	delete(s.byID, id)
 	delete(s.updatedAt, id)
-
-	if stored != nil {
-		// Remove from user's conversation list
-		userConvs := s.byUser[stored.UserID]
-		for i, convID := range userConvs {
-			if convID == id {
-				s.byUser[stored.UserID] = append(userConvs[:i], userConvs[i+1:]...)
-				break
-			}
-		}
-	} else {
-		// File was already gone; search all users for this conversation ID
-		for userID, convIDs := range s.byUser {
-			for i, convID := range convIDs {
-				if convID == id {
-					s.byUser[userID] = append(convIDs[:i], convIDs[i+1:]...)
-					break
-				}
-			}
-		}
-	}
+	s.removeConversationFromUserIndex(id, stored)
 
 	return nil
 }
 
+// removeConversationFromUserIndex removes a conversation ID from the user index.
+// If stored is nil, searches all users for the conversation ID.
+// Must be called with mu held.
+func (s *Store) removeConversationFromUserIndex(id string, stored *ConversationForStorage) {
+	if stored != nil {
+		s.byUser[stored.UserID] = removeFromSlice(s.byUser[stored.UserID], id)
+		return
+	}
+
+	for userID, convIDs := range s.byUser {
+		if updatedSlice := removeFromSlice(convIDs, id); len(updatedSlice) != len(convIDs) {
+			s.byUser[userID] = updatedSlice
+			return
+		}
+	}
+}
+
+// removeFromSlice removes the first occurrence of target from slice.
+func removeFromSlice(slice []string, target string) []string {
+	for i, v := range slice {
+		if v == target {
+			return append(slice[:i], slice[i+1:]...)
+		}
+	}
+	return slice
+}
+
 // AddMessage appends a message to a conversation.
 func (s *Store) AddMessage(_ context.Context, conversationID string, msg *agent.Message) error {
-	if conversationID == "" {
-		return agent.ErrInvalidConversationID
-	}
-	if msg == nil {
-		return errors.New("fileconversation: message cannot be nil")
+	if err := validateMessageInput(conversationID, msg); err != nil {
+		return err
 	}
 
 	s.mu.Lock()
@@ -434,35 +419,49 @@ func (s *Store) AddMessage(_ context.Context, conversationID string, msg *agent.
 		return agent.ErrConversationNotFound
 	}
 
-	// Load existing conversation
 	stored, err := s.loadConversationFromFile(filePath)
 	if err != nil {
 		return fmt.Errorf("fileconversation: failed to load conversation: %w", err)
 	}
 
-	// Append message
 	stored.Messages = append(stored.Messages, *msg)
 	stored.UpdatedAt = time.Now()
+	stored.setTitleFromMessage(msg)
 
-	// Auto-generate title from first user message if not set
-	if stored.Title == "" && msg.Type == agent.MessageTypeUser && msg.Content != "" {
-		title := msg.Content
-		if len(title) > 50 {
-			title = title[:47] + "..."
-		}
-		stored.Title = title
-	}
-
-	// Write back
 	if err := s.writeConversationToFile(filePath, stored); err != nil {
 		return err
 	}
 
-	// Update index
 	s.updatedAt[conversationID] = stored.UpdatedAt
 	s.sortUserConversations(stored.UserID)
 
 	return nil
+}
+
+// validateMessageInput validates the input parameters for AddMessage.
+func validateMessageInput(conversationID string, msg *agent.Message) error {
+	if conversationID == "" {
+		return agent.ErrInvalidConversationID
+	}
+	if msg == nil {
+		return errors.New("fileconversation: message cannot be nil")
+	}
+	return nil
+}
+
+// setTitleFromMessage sets the conversation title from the first user message if not already set.
+func (c *ConversationForStorage) setTitleFromMessage(msg *agent.Message) {
+	if c.Title == "" && msg.Type == agent.MessageTypeUser && msg.Content != "" {
+		c.Title = truncateTitle(msg.Content)
+	}
+}
+
+// truncateTitle truncates a title to maxTitleLength characters with ellipsis.
+func truncateTitle(title string) string {
+	if len(title) <= maxTitleLength {
+		return title
+	}
+	return title[:maxTitleLength-3] + "..."
 }
 
 // GetMessages retrieves all messages for a conversation.
@@ -471,8 +470,21 @@ func (s *Store) GetMessages(_ context.Context, conversationID string) ([]agent.M
 		return nil, agent.ErrInvalidConversationID
 	}
 
+	stored, err := s.loadConversationByID(conversationID)
+	if err != nil {
+		return nil, err
+	}
+
+	messages := make([]agent.Message, len(stored.Messages))
+	copy(messages, stored.Messages)
+
+	return messages, nil
+}
+
+// loadConversationByID looks up and loads a conversation by its ID.
+func (s *Store) loadConversationByID(id string) (*ConversationForStorage, error) {
 	s.mu.RLock()
-	filePath, exists := s.byID[conversationID]
+	filePath, exists := s.byID[id]
 	s.mu.RUnlock()
 
 	if !exists {
@@ -480,18 +492,14 @@ func (s *Store) GetMessages(_ context.Context, conversationID string) ([]agent.M
 	}
 
 	stored, err := s.loadConversationFromFile(filePath)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, agent.ErrConversationNotFound
+	}
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, agent.ErrConversationNotFound
-		}
 		return nil, fmt.Errorf("fileconversation: failed to load conversation: %w", err)
 	}
 
-	// Return a copy to prevent modification
-	messages := make([]agent.Message, len(stored.Messages))
-	copy(messages, stored.Messages)
-
-	return messages, nil
+	return stored, nil
 }
 
 // GetLatestSequenceID returns the highest sequence ID for a conversation.
@@ -500,20 +508,9 @@ func (s *Store) GetLatestSequenceID(_ context.Context, conversationID string) (i
 		return 0, agent.ErrInvalidConversationID
 	}
 
-	s.mu.RLock()
-	filePath, exists := s.byID[conversationID]
-	s.mu.RUnlock()
-
-	if !exists {
-		return 0, agent.ErrConversationNotFound
-	}
-
-	stored, err := s.loadConversationFromFile(filePath)
+	stored, err := s.loadConversationByID(conversationID)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return 0, agent.ErrConversationNotFound
-		}
-		return 0, fmt.Errorf("fileconversation: failed to load conversation: %w", err)
+		return 0, err
 	}
 
 	var maxSeq int64

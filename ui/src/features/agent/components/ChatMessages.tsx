@@ -1,18 +1,28 @@
-import * as React from 'react';
-import { useEffect, useRef } from 'react';
-import { ChevronRight, Terminal, CheckCircle, XCircle, Loader2, ExternalLink } from 'lucide-react';
-import { Message, ToolCall, ToolResult, UIAction } from '../types';
+import { useEffect, useRef, useState } from 'react';
+
+import {
+  CheckCircle,
+  ChevronRight,
+  ExternalLink,
+  Loader2,
+  Terminal,
+  XCircle,
+} from 'lucide-react';
+
 import { cn } from '@/lib/utils';
+import { Message, ToolCall, ToolResult, UIAction } from '../types';
 
 interface ChatMessagesProps {
   messages: Message[];
   isWorking: boolean;
 }
 
-export function ChatMessages({ messages, isWorking }: ChatMessagesProps) {
+export function ChatMessages({
+  messages,
+  isWorking,
+}: ChatMessagesProps): React.ReactNode {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -46,23 +56,23 @@ export function ChatMessages({ messages, isWorking }: ChatMessagesProps) {
   );
 }
 
-function MessageItem({ message }: { message: Message }) {
+function MessageItem({ message }: { message: Message }): React.ReactNode {
   switch (message.type) {
     case 'user':
-      return <UserMessage content={message.content || ''} />;
+      return <UserMessage content={message.content ?? ''} />;
     case 'assistant':
       return (
         <AssistantMessage
-          content={message.content || ''}
+          content={message.content ?? ''}
           toolCalls={message.tool_calls}
         />
       );
     case 'tool_use':
-      return <ToolUseMessage toolCalls={message.tool_calls || []} />;
+      return <ToolCallList toolCalls={message.tool_calls ?? []} />;
     case 'tool_result':
-      return <ToolResultMessage toolResults={message.tool_results || []} />;
+      return <ToolResultMessage toolResults={message.tool_results ?? []} />;
     case 'error':
-      return <ErrorMessage content={message.content || ''} />;
+      return <ErrorMessage content={message.content ?? ''} />;
     case 'ui_action':
       return <UIActionMessage action={message.ui_action} />;
     default:
@@ -70,7 +80,7 @@ function MessageItem({ message }: { message: Message }) {
   }
 }
 
-function ErrorMessage({ content }: { content: string }) {
+function ErrorMessage({ content }: { content: string }): React.ReactNode {
   return (
     <div className="pl-1">
       <div className="flex items-start gap-1.5 text-red-500">
@@ -81,24 +91,26 @@ function ErrorMessage({ content }: { content: string }) {
   );
 }
 
-function UIActionMessage({ action }: { action?: UIAction }) {
-  if (!action) return null;
-
-  if (action.type === 'navigate') {
-    return (
-      <div className="pl-1">
-        <div className="flex items-center gap-1.5 text-muted-foreground">
-          <ExternalLink className="h-3 w-3 flex-shrink-0" />
-          <span>Navigating to {action.path}</span>
-        </div>
-      </div>
-    );
+function UIActionMessage({
+  action,
+}: {
+  action?: UIAction;
+}): React.ReactNode {
+  if (!action || action.type !== 'navigate') {
+    return null;
   }
 
-  return null;
+  return (
+    <div className="pl-1">
+      <div className="flex items-center gap-1.5 text-muted-foreground">
+        <ExternalLink className="h-3 w-3 flex-shrink-0" />
+        <span>Navigating to {action.path}</span>
+      </div>
+    </div>
+  );
 }
 
-function UserMessage({ content }: { content: string }) {
+function UserMessage({ content }: { content: string }): React.ReactNode {
   return (
     <div className="pl-1">
       <div className="flex items-start gap-1.5 text-primary">
@@ -115,26 +127,30 @@ function AssistantMessage({
 }: {
   content: string;
   toolCalls?: ToolCall[];
-}) {
+}): React.ReactNode {
   return (
     <div className="pl-1 space-y-1">
       {content && (
-        <p className="whitespace-pre-wrap break-words text-foreground/90 pl-4">{content}</p>
+        <p className="whitespace-pre-wrap break-words text-foreground/90 pl-4">
+          {content}
+        </p>
       )}
       {toolCalls && toolCalls.length > 0 && (
-        <div className="space-y-1 pl-4">
-          {toolCalls.map((tc) => (
-            <ToolCallBadge key={tc.id} toolCall={tc} />
-          ))}
-        </div>
+        <ToolCallList toolCalls={toolCalls} className="pl-4" />
       )}
     </div>
   );
 }
 
-function ToolUseMessage({ toolCalls }: { toolCalls: ToolCall[] }) {
+function ToolCallList({
+  toolCalls,
+  className,
+}: {
+  toolCalls: ToolCall[];
+  className?: string;
+}): React.ReactNode {
   return (
-    <div className="pl-5 space-y-1">
+    <div className={cn('space-y-1', className)}>
       {toolCalls.map((tc) => (
         <ToolCallBadge key={tc.id} toolCall={tc} />
       ))}
@@ -142,15 +158,21 @@ function ToolUseMessage({ toolCalls }: { toolCalls: ToolCall[] }) {
   );
 }
 
-function ToolCallBadge({ toolCall }: { toolCall: ToolCall }) {
-  const [expanded, setExpanded] = React.useState(false);
-
-  let args: Record<string, unknown> = {};
+function parseToolArguments(jsonString: string): Record<string, unknown> {
   try {
-    args = JSON.parse(toolCall.function.arguments);
+    return JSON.parse(jsonString) as Record<string, unknown>;
   } catch {
-    // Keep empty object
+    return {};
   }
+}
+
+function ToolCallBadge({
+  toolCall,
+}: {
+  toolCall: ToolCall;
+}): React.ReactNode {
+  const [expanded, setExpanded] = useState(false);
+  const args = parseToolArguments(toolCall.function.arguments);
 
   return (
     <div className="rounded border border-border/60 bg-muted/50 text-xs overflow-hidden">
@@ -175,7 +197,11 @@ function ToolCallBadge({ toolCall }: { toolCall: ToolCall }) {
   );
 }
 
-function ToolResultMessage({ toolResults }: { toolResults: ToolResult[] }) {
+function ToolResultMessage({
+  toolResults,
+}: {
+  toolResults: ToolResult[];
+}): React.ReactNode {
   return (
     <div className="pl-5 space-y-1">
       {toolResults.map((tr) => (
@@ -185,31 +211,31 @@ function ToolResultMessage({ toolResults }: { toolResults: ToolResult[] }) {
   );
 }
 
-function ToolResultItem({ result }: { result: ToolResult }) {
-  const [expanded, setExpanded] = React.useState(false);
-  const isError = result.is_error;
-  const content = result.content || '';
-  const preview =
-    content.length > 100 ? content.substring(0, 100) + '...' : content;
+function truncateContent(content: string, maxLength: number): string {
+  if (content.length <= maxLength) {
+    return content;
+  }
+  return content.substring(0, maxLength) + '...';
+}
+
+function ToolResultItem({ result }: { result: ToolResult }): React.ReactNode {
+  const [expanded, setExpanded] = useState(false);
+  const content = result.content ?? '';
+  const preview = truncateContent(content, 100);
+
+  const StatusIcon = result.is_error ? XCircle : CheckCircle;
+  const statusColor = result.is_error ? 'text-red-500' : 'text-green-500';
+  const borderStyle = result.is_error
+    ? 'border-red-500/40 bg-red-500/10'
+    : 'border-green-500/40 bg-green-500/10';
 
   return (
-    <div
-      className={cn(
-        'rounded border text-xs overflow-hidden',
-        isError
-          ? 'border-red-500/40 bg-red-500/10'
-          : 'border-green-500/40 bg-green-500/10'
-      )}
-    >
+    <div className={cn('rounded border text-xs overflow-hidden', borderStyle)}>
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center gap-1.5 px-2 py-1.5 hover:bg-muted/30 transition-colors text-left"
       >
-        {isError ? (
-          <XCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
-        ) : (
-          <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
-        )}
+        <StatusIcon className={cn('h-3 w-3 flex-shrink-0', statusColor)} />
         <span className="font-mono truncate flex-1">
           {expanded ? 'Result' : preview}
         </span>

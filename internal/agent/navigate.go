@@ -7,13 +7,12 @@ import (
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
-// NavigateToolInput is the input schema for the navigate tool.
+// NavigateToolInput defines the input parameters for the navigate tool.
 type NavigateToolInput struct {
 	Path string `json:"path"`
 }
 
 // NewNavigateTool creates a new navigate tool for UI navigation.
-// This allows the LLM to navigate the user to specific pages in the UI.
 func NewNavigateTool() *AgentTool {
 	return &AgentTool{
 		Tool: llm.Tool{
@@ -40,20 +39,13 @@ func NewNavigateTool() *AgentTool {
 func navigateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	var args NavigateToolInput
 	if err := json.Unmarshal(input, &args); err != nil {
-		return ToolOut{
-			Content: fmt.Sprintf("Failed to parse input: %v", err),
-			IsError: true,
-		}
+		return navigateError("Failed to parse input: %v", err)
 	}
 
 	if args.Path == "" {
-		return ToolOut{
-			Content: "Path is required",
-			IsError: true,
-		}
+		return navigateError("Path is required")
 	}
 
-	// Emit the UI action if callback is available
 	if ctx.EmitUIAction != nil {
 		ctx.EmitUIAction(UIAction{
 			Type: "navigate",
@@ -61,8 +53,12 @@ func navigateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 		})
 	}
 
+	return ToolOut{Content: "Navigating user to " + args.Path}
+}
+
+func navigateError(format string, args ...any) ToolOut {
 	return ToolOut{
-		Content: fmt.Sprintf("Navigating user to %s", args.Path),
-		IsError: false,
+		Content: fmt.Sprintf(format, args...),
+		IsError: true,
 	}
 }

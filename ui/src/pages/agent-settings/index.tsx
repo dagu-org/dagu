@@ -14,10 +14,9 @@ import { AppBarContext } from '@/contexts/AppBarContext';
 import { TOKEN_KEY, useIsAdmin } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { Bot, Loader2, Save } from 'lucide-react';
-import { useCallback, useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 
 type AgentConfig = components['schemas']['AgentConfigResponse'];
-type AgentLLMConfig = components['schemas']['AgentLLMConfig'];
 
 const LLM_PROVIDERS = [
   { value: 'anthropic', label: 'Anthropic' },
@@ -27,7 +26,7 @@ const LLM_PROVIDERS = [
   { value: 'local', label: 'Local' },
 ];
 
-export default function AgentSettingsPage() {
+export default function AgentSettingsPage(): React.ReactNode {
   const config = useConfig();
   const isAdmin = useIsAdmin();
   const appBarContext = useContext(AppBarContext);
@@ -37,7 +36,6 @@ export default function AgentSettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Form state
   const [enabled, setEnabled] = useState(false);
   const [provider, setProvider] = useState('anthropic');
   const [model, setModel] = useState('');
@@ -45,15 +43,27 @@ export default function AgentSettingsPage() {
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
   const [baseUrl, setBaseUrl] = useState('');
 
-  // Set page title
   useEffect(() => {
     appBarContext.setTitle('Agent Settings');
   }, [appBarContext]);
 
+  const updateFormState = useCallback((data: AgentConfig): void => {
+    setEnabled(data.enabled ?? false);
+    if (data.llm) {
+      setProvider(data.llm.provider ?? 'anthropic');
+      setModel(data.llm.model ?? '');
+      setApiKeyConfigured(data.llm.apiKeyConfigured ?? false);
+      setBaseUrl(data.llm.baseUrl ?? '');
+    }
+  }, []);
+
   const fetchConfig = useCallback(async () => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const remoteNode = encodeURIComponent(
+      appBarContext.selectedRemoteNode || 'local'
+    );
+
     try {
-      const token = localStorage.getItem(TOKEN_KEY);
-      const remoteNode = appBarContext.selectedRemoteNode || 'local';
       const response = await fetch(
         `${config.apiURL}/settings/agent?remoteNode=${remoteNode}`,
         {
@@ -68,13 +78,7 @@ export default function AgentSettingsPage() {
       }
 
       const data: AgentConfig = await response.json();
-      setEnabled(data.enabled || false);
-      if (data.llm) {
-        setProvider(data.llm.provider || 'anthropic');
-        setModel(data.llm.model || '');
-        setApiKeyConfigured(data.llm.apiKeyConfigured || false);
-        setBaseUrl(data.llm.baseUrl || '');
-      }
+      updateFormState(data);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to load configuration'
@@ -82,43 +86,33 @@ export default function AgentSettingsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [config.apiURL, appBarContext.selectedRemoteNode]);
+  }, [config.apiURL, appBarContext.selectedRemoteNode, updateFormState]);
 
   useEffect(() => {
     fetchConfig();
   }, [fetchConfig]);
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     setIsSaving(true);
     setError(null);
     setSuccess(null);
 
+    const token = localStorage.getItem(TOKEN_KEY);
+    const remoteNode = encodeURIComponent(
+      appBarContext.selectedRemoteNode || 'local'
+    );
+
+    const llmConfig: Record<string, string | undefined> = {
+      provider,
+      model,
+      baseUrl: baseUrl || undefined,
+    };
+
+    if (apiKey) {
+      llmConfig.apiKey = apiKey;
+    }
+
     try {
-      const token = localStorage.getItem(TOKEN_KEY);
-      const remoteNode = appBarContext.selectedRemoteNode || 'local';
-
-      const body: {
-        enabled?: boolean;
-        llm?: {
-          provider?: string;
-          model?: string;
-          apiKey?: string;
-          baseUrl?: string;
-        };
-      } = {
-        enabled,
-        llm: {
-          provider,
-          model,
-          baseUrl: baseUrl || undefined,
-        },
-      };
-
-      // Only include apiKey if it was changed
-      if (apiKey) {
-        body.llm!.apiKey = apiKey;
-      }
-
       const response = await fetch(
         `${config.apiURL}/settings/agent?remoteNode=${remoteNode}`,
         {
@@ -127,7 +121,7 @@ export default function AgentSettingsPage() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify(body),
+          body: JSON.stringify({ enabled, llm: llmConfig }),
         }
       );
 
@@ -137,14 +131,8 @@ export default function AgentSettingsPage() {
       }
 
       const data: AgentConfig = await response.json();
-      setEnabled(data.enabled || false);
-      if (data.llm) {
-        setProvider(data.llm.provider || 'anthropic');
-        setModel(data.llm.model || '');
-        setApiKeyConfigured(data.llm.apiKeyConfigured || false);
-        setBaseUrl(data.llm.baseUrl || '');
-      }
-      setApiKey(''); // Clear the API key field after save
+      updateFormState(data);
+      setApiKey('');
       setSuccess('Configuration saved successfully');
     } catch (err) {
       setError(
@@ -195,7 +183,6 @@ export default function AgentSettingsPage() {
       )}
 
       <div className="card-obsidian p-4 space-y-6 max-w-xl">
-        {/* Enable/Disable Toggle */}
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="enabled" className="text-sm font-medium">
@@ -213,90 +200,83 @@ export default function AgentSettingsPage() {
         </div>
 
         {enabled && (
-          <>
-            <div className="border-t pt-4 space-y-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <Bot className="h-4 w-4" />
-                LLM Configuration
-              </div>
-
-              {/* Provider Selection */}
-              <div className="space-y-1.5">
-                <Label htmlFor="provider" className="text-sm">
-                  Provider
-                </Label>
-                <Select value={provider} onValueChange={setProvider}>
-                  <SelectTrigger id="provider" className="h-8">
-                    <SelectValue placeholder="Select provider" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LLM_PROVIDERS.map((p) => (
-                      <SelectItem key={p.value} value={p.value}>
-                        {p.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Model Input */}
-              <div className="space-y-1.5">
-                <Label htmlFor="model" className="text-sm">
-                  Model
-                </Label>
-                <Input
-                  id="model"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder="claude-sonnet-4-5"
-                  className="h-8"
-                />
-                <p className="text-xs text-muted-foreground">
-                  The model ID to use for completions
-                </p>
-              </div>
-
-              {/* API Key Input */}
-              <div className="space-y-1.5">
-                <Label htmlFor="apiKey" className="text-sm">
-                  API Key
-                </Label>
-                <Input
-                  id="apiKey"
-                  type="password"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder={apiKeyConfigured ? '********' : 'Enter API key'}
-                  className="h-8"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {apiKeyConfigured
-                    ? 'An API key is configured. Leave empty to keep it unchanged.'
-                    : 'Required for external LLM providers'}
-                </p>
-              </div>
-
-              {/* Base URL Input */}
-              <div className="space-y-1.5">
-                <Label htmlFor="baseUrl" className="text-sm">
-                  Base URL (optional)
-                </Label>
-                <Input
-                  id="baseUrl"
-                  value={baseUrl}
-                  onChange={(e) => setBaseUrl(e.target.value)}
-                  placeholder="Custom API endpoint"
-                  className="h-8"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Override the default API endpoint
-                </p>
-              </div>
+          <div className="border-t pt-4 space-y-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <Bot className="h-4 w-4" />
+              LLM Configuration
             </div>
-          </>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="provider" className="text-sm">
+                Provider
+              </Label>
+              <Select value={provider} onValueChange={setProvider}>
+                <SelectTrigger id="provider" className="h-8">
+                  <SelectValue placeholder="Select provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  {LLM_PROVIDERS.map((p) => (
+                    <SelectItem key={p.value} value={p.value}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="model" className="text-sm">
+                Model
+              </Label>
+              <Input
+                id="model"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                placeholder="claude-sonnet-4-5"
+                className="h-8"
+              />
+              <p className="text-xs text-muted-foreground">
+                The model ID to use for completions
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="apiKey" className="text-sm">
+                API Key
+              </Label>
+              <Input
+                id="apiKey"
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder={apiKeyConfigured ? '********' : 'Enter API key'}
+                className="h-8"
+              />
+              <p className="text-xs text-muted-foreground">
+                {apiKeyConfigured
+                  ? 'An API key is configured. Leave empty to keep it unchanged.'
+                  : 'Required for external LLM providers'}
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="baseUrl" className="text-sm">
+                Base URL (optional)
+              </Label>
+              <Input
+                id="baseUrl"
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+                placeholder="Custom API endpoint"
+                className="h-8"
+              />
+              <p className="text-xs text-muted-foreground">
+                Override the default API endpoint
+              </p>
+            </div>
+          </div>
         )}
 
-        {/* Save Button */}
         <div className="pt-2">
           <Button
             onClick={handleSave}

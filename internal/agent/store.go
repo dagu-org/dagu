@@ -5,14 +5,11 @@ import (
 	"errors"
 )
 
-// Common errors for conversation store operations.
+// Sentinel errors for conversation store operations.
 var (
-	// ErrConversationNotFound is returned when a conversation cannot be found.
-	ErrConversationNotFound = errors.New("conversation not found")
-	// ErrInvalidConversationID is returned when the conversation ID is invalid.
+	ErrConversationNotFound  = errors.New("conversation not found")
 	ErrInvalidConversationID = errors.New("invalid conversation ID")
-	// ErrInvalidUserID is returned when the user ID is invalid.
-	ErrInvalidUserID = errors.New("invalid user ID")
+	ErrInvalidUserID         = errors.New("invalid user ID")
 )
 
 // ConversationStore defines the interface for conversation persistence.

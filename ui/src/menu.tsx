@@ -35,7 +35,6 @@ import { AppBarContext } from './contexts/AppBarContext';
 import { useUserPreferences } from './contexts/UserPreference';
 import { useAgentChatContext } from './features/agent';
 
-// Navigation Item Props
 type NavItemProps = {
   to: string;
   icon: React.ReactNode;
@@ -45,7 +44,6 @@ type NavItemProps = {
   customColor?: boolean;
 };
 
-// Main List Items Props
 type MainListItemsProps = {
   isOpen?: boolean;
   onNavItemClick?: () => void;
@@ -53,48 +51,135 @@ type MainListItemsProps = {
   customColor?: boolean;
 };
 
-// NavItem component with Obsidian Deep styling
-function NavItem({ to, icon, text, isOpen, onClick, customColor }: NavItemProps) {
+const DEFAULT_TITLE = 'Dagu';
+
+function getTitleInitial(title: string): string {
+  return title.charAt(0).toUpperCase();
+}
+
+function getActiveIndicatorStyle(customColor: boolean): string {
+  return customColor
+    ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.4)]'
+    : 'bg-primary shadow-[0_0_8px_var(--primary)]';
+}
+
+function getActiveLinkStyle(customColor: boolean): string {
+  return customColor
+    ? 'text-foreground bg-white/10 shadow-[0_0_15px_rgba(255,255,255,0.1),inset_0_0_0_1px_rgba(255,255,255,0.2)]'
+    : 'text-foreground bg-primary/10 shadow-[0_0_15px_rgba(var(--primary-rgb),0.15),inset_0_0_0_1px_rgba(var(--primary-rgb),0.3)]';
+}
+
+function getActiveIconStyle(customColor: boolean): string {
+  return customColor ? 'text-white scale-110' : 'text-primary scale-110';
+}
+
+function getIconWrapperStyle(customColor: boolean): string {
+  return customColor ? 'opacity-80' : 'text-primary';
+}
+
+type RemoteNodeSelectContentProps = {
+  nodes: string[];
+};
+
+function RemoteNodeSelectContent({ nodes }: RemoteNodeSelectContentProps): React.ReactElement {
+  return (
+    <SelectContent>
+      {nodes.map((node) => (
+        <SelectItem key={node} value={node}>
+          {node}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  );
+}
+
+type SectionLabelProps = {
+  label: string;
+  isOpen: boolean;
+};
+
+function SectionLabel({ label, isOpen }: SectionLabelProps): React.ReactElement | null {
+  if (!isOpen) return null;
+
+  return (
+    <div className="px-3 mb-1 text-xs font-bold text-muted-foreground/50 uppercase tracking-widest">
+      {label}
+    </div>
+  );
+}
+
+type SidebarButtonProps = {
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  isOpen: boolean;
+  customColor: boolean;
+};
+
+function SidebarButton({ onClick, icon, label, isOpen, customColor }: SidebarButtonProps): React.ReactElement {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'flex items-center gap-3 w-full p-2 rounded-lg transition-all duration-200 hover:bg-white/5 group',
+        !isOpen && 'justify-center border border-white/5'
+      )}
+      title={isOpen ? '' : label}
+    >
+      <div
+        className={cn(
+          'flex items-center justify-center group-hover:scale-110 transition-transform',
+          getIconWrapperStyle(customColor)
+        )}
+      >
+        {icon}
+      </div>
+      {isOpen && (
+        <span className="text-sm font-medium text-sidebar-foreground group-hover:text-foreground">
+          {label}
+        </span>
+      )}
+    </button>
+  );
+}
+
+function NavItem({ to, icon, text, isOpen, onClick, customColor = false }: NavItemProps): React.ReactElement {
   const location = useLocation();
   const isActive =
     location.pathname === to ||
     (to !== '/' && location.pathname.startsWith(to + '/'));
+
+  const linkClassName = cn(
+    'flex items-center rounded-lg transition-all duration-200 ease-in-out px-2 group relative',
+    isOpen ? 'h-9 w-full gap-3' : 'h-10 w-10 justify-center',
+    isActive
+      ? getActiveLinkStyle(customColor)
+      : 'text-sidebar-foreground hover:text-foreground hover:bg-white/5'
+  );
+
+  const iconClassName = cn(
+    'transition-transform duration-200 flex items-center justify-center',
+    isActive
+      ? getActiveIconStyle(customColor)
+      : 'opacity-70 group-hover:opacity-100 group-hover:scale-105'
+  );
 
   return (
     <div className={cn('px-1', !isOpen && 'flex justify-center')}>
       <Link
         to={to}
         onClick={onClick}
-        className={cn(
-          'flex items-center rounded-lg transition-all duration-200 ease-in-out px-2 group relative',
-          isOpen ? 'h-9 w-full gap-3' : 'h-10 w-10 justify-center',
-          isActive
-            ? customColor
-              ? 'text-foreground bg-white/10 shadow-[0_0_15px_rgba(255,255,255,0.1),inset_0_0_0_1px_rgba(255,255,255,0.2)]'
-              : 'text-foreground bg-primary/10 shadow-[0_0_15px_rgba(var(--primary-rgb),0.15),inset_0_0_0_1px_rgba(var(--primary-rgb),0.3)]'
-            : 'text-sidebar-foreground hover:text-foreground hover:bg-white/5'
-        )}
+        className={linkClassName}
         aria-current={isActive ? 'page' : undefined}
         title={isOpen ? '' : text}
       >
         {isActive && (
           <div className={cn(
             'absolute left-0 w-1 h-4 rounded-r-full',
-            customColor
-              ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.4)]'
-              : 'bg-primary shadow-[0_0_8px_var(--primary)]'
+            getActiveIndicatorStyle(customColor)
           )} />
         )}
-        <div
-          className={cn(
-            'transition-transform duration-200 flex items-center justify-center',
-            isActive
-              ? customColor
-                ? 'text-white scale-110'
-                : 'text-primary scale-110'
-              : 'opacity-70 group-hover:opacity-100 group-hover:scale-105'
-          )}
-        >
+        <div className={iconClassName}>
           {icon}
         </div>
         {isOpen && (
@@ -114,11 +199,10 @@ function NavItem({ to, icon, text, isOpen, onClick, customColor }: NavItemProps)
   );
 }
 
-// Exported Nav Items Component
 export const mainListItems = React.forwardRef<
   HTMLDivElement,
   MainListItemsProps
->(({ isOpen = false, onNavItemClick, onToggle, customColor }, ref) => {
+>(function MainListItems({ isOpen = false, onNavItemClick, onToggle, customColor = false }, ref) {
   const config = useConfig();
   const isAdmin = useIsAdmin();
   const canWrite = useCanWrite();
@@ -126,13 +210,15 @@ export const mainListItems = React.forwardRef<
   const { toggleChat } = useAgentChatContext();
 
   const theme = preferences.theme || 'dark';
-  const toggleTheme = () => {
+  const title = config.title || DEFAULT_TITLE;
+  const titleInitial = getTitleInitial(title);
+
+  function toggleTheme(): void {
     updatePreference('theme', theme === 'dark' ? 'light' : 'dark');
-  };
+  }
 
   return (
     <div ref={ref} className="flex flex-col h-full">
-      {/* Sidebar Header */}
       <div
         className={cn(
           'h-14 relative mb-6 flex items-center border-b border-white/[0.03]',
@@ -145,17 +231,17 @@ export const mainListItems = React.forwardRef<
               {!customColor && (
                 <div className="w-7 h-7 bg-primary rounded-lg flex-shrink-0 flex items-center justify-center shadow-[0_0_15px_rgba(var(--primary),0.2)]">
                   <span className="text-white font-bold text-sm">
-                    {(config.title || 'Dagu').charAt(0).toUpperCase()}
+                    {titleInitial}
                   </span>
                 </div>
               )}
               <span
                 className={cn(
                   'font-bold tracking-tight text-sidebar-foreground select-none whitespace-normal leading-tight',
-                  getResponsiveTitleClass(config.title || 'Dagu', 'sidebar-expanded')
+                  getResponsiveTitleClass(title, 'sidebar-expanded')
                 )}
               >
-                {config.title || 'Dagu'}
+                {title}
               </span>
             </div>
             <button
@@ -178,12 +264,12 @@ export const mainListItems = React.forwardRef<
           >
             {customColor ? (
               <span className="text-xl font-bold text-sidebar-foreground">
-                {(config.title || 'Dagu').charAt(0).toUpperCase()}
+                {titleInitial}
               </span>
             ) : (
               <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(var(--primary),0.2)]">
                 <span className="text-white font-bold text-sm">
-                  {(config.title || 'Dagu').charAt(0).toUpperCase()}
+                  {titleInitial}
                 </span>
               </div>
             )}
@@ -192,50 +278,32 @@ export const mainListItems = React.forwardRef<
       </div>
 
       <nav className="flex-1 flex flex-col gap-6">
-        {/* Remote Node Selector */}
         <AppBarContext.Consumer>
           {(context) => {
-            if (!context.remoteNodes || context.remoteNodes.length === 0)
-              return null;
+            const { remoteNodes, selectedRemoteNode, selectRemoteNode } = context;
+            if (!remoteNodes || remoteNodes.length === 0) return null;
+
             return (
               <div className={cn('px-1', !isOpen && 'flex justify-center')}>
                 {isOpen ? (
-                  <Select
-                    value={context.selectedRemoteNode}
-                    onValueChange={context.selectRemoteNode}
-                  >
+                  <Select value={selectedRemoteNode} onValueChange={selectRemoteNode}>
                     <SelectTrigger className="h-9 w-full bg-white/5 border-white/5 text-xs text-sidebar-foreground hover:bg-white/10 transition-colors">
                       <div className="flex items-center gap-2 truncate">
                         <Globe size={14} className="opacity-60" />
                         <SelectValue />
                       </div>
                     </SelectTrigger>
-                    <SelectContent>
-                      {context.remoteNodes.map((node) => (
-                        <SelectItem key={node} value={node}>
-                          {node}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
+                    <RemoteNodeSelectContent nodes={remoteNodes} />
                   </Select>
                 ) : (
-                  <Select
-                    value={context.selectedRemoteNode}
-                    onValueChange={context.selectRemoteNode}
-                  >
+                  <Select value={selectedRemoteNode} onValueChange={selectRemoteNode}>
                     <SelectTrigger className="w-10 h-10 p-0 bg-white/5 border-white/5 hover:bg-white/10 [&>svg:last-child]:hidden flex items-center justify-center rounded-lg transition-all">
                       <Globe
                         size={18}
-                        className={customColor ? 'opacity-80' : 'text-primary'}
+                        className={getIconWrapperStyle(customColor)}
                       />
                     </SelectTrigger>
-                    <SelectContent>
-                      {context.remoteNodes.map((node) => (
-                        <SelectItem key={node} value={node}>
-                          {node}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
+                    <RemoteNodeSelectContent nodes={remoteNodes} />
                   </Select>
                 )}
               </div>
@@ -243,14 +311,9 @@ export const mainListItems = React.forwardRef<
           }}
         </AppBarContext.Consumer>
 
-        {/* Nav Sections */}
         <div className="space-y-6">
           <div className="space-y-1">
-            {isOpen && (
-              <div className="px-3 mb-1 text-xs font-bold text-muted-foreground/50 uppercase tracking-widest">
-                System
-              </div>
-            )}
+            <SectionLabel label="System" isOpen={isOpen} />
             <NavItem
               to="/dashboard"
               text="Dashboard"
@@ -272,11 +335,7 @@ export const mainListItems = React.forwardRef<
           </div>
 
           <div className="space-y-1">
-            {isOpen && (
-              <div className="px-3 mb-1 text-xs font-bold text-muted-foreground/50 uppercase tracking-widest">
-                Workflows
-              </div>
-            )}
+            <SectionLabel label="Workflows" isOpen={isOpen} />
             <NavItem
               to="/queues"
               text="Queues"
@@ -313,11 +372,7 @@ export const mainListItems = React.forwardRef<
 
           {isAdmin && config.authMode === 'builtin' && (
             <div className="space-y-1">
-              {isOpen && (
-                <div className="px-3 mb-1 text-xs font-bold text-muted-foreground/50 uppercase tracking-widest">
-                  Admin
-                </div>
-              )}
+              <SectionLabel label="Admin" isOpen={isOpen} />
               <NavItem
                 to="/users"
                 text="Users"
@@ -371,14 +426,9 @@ export const mainListItems = React.forwardRef<
             </div>
           )}
 
-          {/* Git Sync - visible to users with write permission when enabled */}
           {canWrite && config.gitSyncEnabled && (
             <div className="space-y-1">
-              {isOpen && (
-                <div className="px-3 mb-1 text-xs font-bold text-muted-foreground/50 uppercase tracking-widest">
-                  Sync
-                </div>
-              )}
+              <SectionLabel label="Sync" isOpen={isOpen} />
               <NavItem
                 to="/git-sync"
                 text="Git Sync"
@@ -392,61 +442,26 @@ export const mainListItems = React.forwardRef<
         </div>
       </nav>
 
-      {/* User & Version & Theme */}
       <div className="mt-auto pt-4 flex flex-col gap-3">
         <div
           className={cn('px-2', !isOpen && 'flex flex-col items-center gap-2')}
         >
           {config.agentEnabled && (
-            <button
+            <SidebarButton
               onClick={toggleChat}
-              className={cn(
-                'flex items-center gap-3 w-full p-2 rounded-lg transition-all duration-200 hover:bg-white/5 group',
-                !isOpen && 'justify-center border border-white/5'
-              )}
-              title={isOpen ? '' : 'Agent Console'}
-            >
-              <div
-                className={cn(
-                  'flex items-center justify-center group-hover:scale-110 transition-transform',
-                  customColor ? 'opacity-80' : 'text-primary'
-                )}
-              >
-                <Terminal size={18} />
-              </div>
-              {isOpen && (
-                <span className="text-sm font-medium text-sidebar-foreground group-hover:text-foreground">
-                  Agent Console
-                </span>
-              )}
-            </button>
+              icon={<Terminal size={18} />}
+              label="Agent Console"
+              isOpen={isOpen}
+              customColor={customColor}
+            />
           )}
-          <button
+          <SidebarButton
             onClick={toggleTheme}
-            className={cn(
-              'flex items-center gap-3 w-full p-2 rounded-lg transition-all duration-200 hover:bg-white/5 group',
-              !isOpen && 'justify-center border border-white/5'
-            )}
-            title={
-              isOpen
-                ? ''
-                : `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`
-            }
-          >
-            <div
-              className={cn(
-                'flex items-center justify-center group-hover:scale-110 transition-transform',
-                customColor ? 'opacity-80' : 'text-primary'
-              )}
-            >
-              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-            </div>
-            {isOpen && (
-              <span className="text-sm font-medium text-sidebar-foreground group-hover:text-foreground">
-                {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-              </span>
-            )}
-          </button>
+            icon={theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            label={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+            isOpen={isOpen}
+            customColor={customColor}
+          />
           <UserMenu isCollapsed={!isOpen} />
         </div>
         {config.version && (
@@ -463,4 +478,3 @@ export const mainListItems = React.forwardRef<
     </div>
   );
 });
-mainListItems.displayName = 'MainListItems';

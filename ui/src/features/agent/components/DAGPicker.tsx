@@ -1,18 +1,17 @@
-import * as React from 'react';
-import { useState, useContext, useMemo, useRef, useEffect } from 'react';
-import { Paperclip, X, Search, Check } from 'lucide-react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+
+import { Check, Paperclip, Search, X } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { useQuery } from '@/hooks/api';
 import { AppBarContext } from '@/contexts/AppBarContext';
+import { useQuery } from '@/hooks/api';
+import { cn } from '@/lib/utils';
+
 import { DAGContext } from '../types';
 
 interface DAGPickerProps {
-  /** Additional DAGs selected by the user (excludes current page DAG) */
   selectedDags: DAGContext[];
-  /** Callback when user adds/removes additional DAGs */
   onChange: (dags: DAGContext[]) => void;
-  /** Current page DAG - always included automatically, shown as non-removable */
   currentPageDag?: DAGContext | null;
   disabled?: boolean;
 }
@@ -47,57 +46,57 @@ export function DAGPicker({
     }));
   }, [data]);
 
-  // Filter out current page DAG from the picker list (it's always included)
   const filteredDags = useMemo(() => {
-    let dags = dagFiles;
+    const availableDags = currentPageDag
+      ? dagFiles.filter((d) => d.fileName !== currentPageDag.dag_file)
+      : dagFiles;
 
-    // Exclude current page DAG since it's auto-included
-    if (currentPageDag) {
-      dags = dags.filter((d) => d.fileName !== currentPageDag.dag_file);
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      return availableDags;
     }
 
-    if (!searchQuery.trim()) return dags;
-    const query = searchQuery.toLowerCase();
-    return dags.filter(
+    return availableDags.filter(
       (d) =>
         d.fileName.toLowerCase().includes(query) ||
         d.name.toLowerCase().includes(query)
     );
   }, [dagFiles, searchQuery, currentPageDag]);
 
-  // Check if a DAG is selected (in additional selections)
-  const isSelected = (fileName: string) =>
-    selectedDags.some((d) => d.dag_file === fileName);
+  const selectedDagFileSet = useMemo(
+    () => new Set(selectedDags.map((d) => d.dag_file)),
+    [selectedDags]
+  );
 
-  // Toggle DAG selection
-  const toggleDag = (fileName: string) => {
+  function isSelected(fileName: string): boolean {
+    return selectedDagFileSet.has(fileName);
+  }
+
+  function toggleDag(fileName: string): void {
     if (isSelected(fileName)) {
-      onChange(selectedDags.filter((d) => d.dag_file !== fileName));
+      removeDag(fileName);
     } else {
       onChange([...selectedDags, { dag_file: fileName }]);
     }
-  };
+  }
 
-  // Remove a DAG from selection
-  const removeDag = (fileName: string) => {
+  function removeDag(fileName: string): void {
     onChange(selectedDags.filter((d) => d.dag_file !== fileName));
-  };
+  }
 
-  // Close dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    function handleClickOutside(event: MouseEvent): void {
       if (
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node)
       ) {
         setIsOpen(false);
       }
-    };
+    }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Focus search input when dropdown opens
   useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
@@ -108,10 +107,8 @@ export function DAGPicker({
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Context chips: current page (non-removable) + additional selections (removable) */}
       {(currentPageDag || selectedDags.length > 0) && (
         <div className="flex flex-wrap gap-1 mb-1">
-          {/* Current page DAG - always shown, not removable */}
           {currentPageDag && (
             <span
               className={cn(
@@ -130,7 +127,6 @@ export function DAGPicker({
             </span>
           )}
 
-          {/* Additional selected DAGs - removable */}
           {selectedDags.map((dag) => (
             <span
               key={dag.dag_file}
@@ -154,7 +150,6 @@ export function DAGPicker({
         </div>
       )}
 
-      {/* Picker button and dropdown */}
       <div className="relative inline-block">
         <Button
           type="button"
@@ -180,7 +175,6 @@ export function DAGPicker({
               'flex flex-col'
             )}
           >
-            {/* Search input */}
             <div className="p-2 border-b">
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -199,14 +193,15 @@ export function DAGPicker({
               </div>
             </div>
 
-            {/* DAG list (excludes current page DAG) */}
             <div className="overflow-y-auto flex-1 max-h-48">
-              {filteredDags.length === 0 ? (
+              {filteredDags.length === 0 && (
                 <div className="px-3 py-2 text-sm text-muted-foreground">
                   {searchQuery ? 'No DAGs found' : 'No additional DAGs available'}
                 </div>
-              ) : (
-                filteredDags.map((dag) => (
+              )}
+              {filteredDags.map((dag) => {
+                const selected = isSelected(dag.fileName);
+                return (
                   <button
                     key={dag.fileName}
                     type="button"
@@ -214,16 +209,16 @@ export function DAGPicker({
                     className={cn(
                       'w-full px-3 py-1.5 text-left text-sm',
                       'hover:bg-accent flex items-center justify-between',
-                      isSelected(dag.fileName) && 'bg-accent'
+                      selected && 'bg-accent'
                     )}
                   >
                     <span className="truncate">{dag.fileName}</span>
-                    {isSelected(dag.fileName) && (
+                    {selected && (
                       <Check className="h-4 w-4 text-primary shrink-0" />
                     )}
                   </button>
-                ))
-              )}
+                );
+              })}
             </div>
           </div>
         )}

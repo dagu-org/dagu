@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Maximize2, X } from 'lucide-react';
 
@@ -18,11 +18,27 @@ import DAGDetailsContent from './DAGDetailsContent';
 
 const POLLING_INTERVAL_MS = 2000;
 
-function getPollingInterval(notFound: boolean, shouldPoll: boolean): number {
-  if (notFound || !shouldPoll) {
-    return 0;
+function formatDuration(startDate: string, endDate: string): string {
+  if (!startDate || !endDate) {
+    return '--';
   }
-  return POLLING_INTERVAL_MS;
+
+  const duration = dayjs.duration(dayjs(endDate).diff(dayjs(startDate)));
+  const hours = Math.floor(duration.asHours());
+  const minutes = duration.minutes();
+  const seconds = duration.seconds();
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${seconds}s`;
+}
+
+function getPollingInterval(notFound: boolean, shouldPoll: boolean): number {
+  return notFound || !shouldPoll ? 0 : POLLING_INTERVAL_MS;
 }
 
 type Props = {
@@ -44,9 +60,6 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
   const [notFound, setNotFound] = useState(false);
   const [lastValidData, setLastValidData] = useState<DAGDetailsData>(null);
 
-  const dagRunId = 'latest';
-  const stepName = null;
-
   // Set page context for agent chat
   useEffect(() => {
     if (fileName) {
@@ -56,14 +69,9 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
       });
     }
     return () => {
-      // Clear context when panel unmounts
       setContext(null);
     };
   }, [fileName, setContext]);
-
-  const navigateToStatusTab = useCallback(() => {
-    setActiveTab('status');
-  }, []);
 
   // SSE for real-time updates with polling fallback
   const sseResult = useDAGSSE(fileName || '', !!fileName);
@@ -110,22 +118,20 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
 
   const displayData = data || lastValidData;
 
-  const refreshFn = useCallback(() => {
+  function refreshFn(): void {
     setTimeout(() => mutate(), 500);
-  }, [mutate]);
+  }
 
-  const handleFullscreenClick = useCallback(
-    (e?: React.MouseEvent) => {
-      const url = activeTab === 'status' ? `/dags/${fileName}` : `/dags/${fileName}/${activeTab}`;
+  function handleFullscreenClick(e?: React.MouseEvent): void {
+    const tabPath = activeTab === 'status' ? '' : `/${activeTab}`;
+    const url = `/dags/${fileName}${tabPath}`;
 
-      if (e?.metaKey || e?.ctrlKey) {
-        window.open(url, '_blank');
-      } else {
-        navigate(url);
-      }
-    },
-    [fileName, activeTab, navigate]
-  );
+    if (e?.metaKey || e?.ctrlKey) {
+      window.open(url, '_blank');
+    } else {
+      navigate(url);
+    }
+  }
 
   useEffect(() => {
     if (displayData) {
@@ -140,46 +146,25 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
         return;
       }
 
-      switch (event.key) {
-        case 'Escape':
-          onClose();
-          break;
-        case 'f':
-        case 'F':
-          handleFullscreenClick();
-          break;
-        case 'ArrowDown':
-        case 'ArrowUp':
-          if (onNavigate) {
-            event.preventDefault();
-            onNavigate(event.key === 'ArrowDown' ? 'down' : 'up');
-          }
-          break;
+      if (event.key === 'Escape') {
+        onClose();
+        return;
+      }
+
+      if (event.key === 'f' || event.key === 'F') {
+        handleFullscreenClick();
+        return;
+      }
+
+      if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && onNavigate) {
+        event.preventDefault();
+        onNavigate(event.key === 'ArrowDown' ? 'down' : 'up');
       }
     }
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, onNavigate, handleFullscreenClick]);
-
-  const formatDuration = useCallback((startDate: string, endDate: string): string => {
-    if (!startDate || !endDate) {
-      return '--';
-    }
-
-    const duration = dayjs.duration(dayjs(endDate).diff(dayjs(startDate)));
-    const hours = Math.floor(duration.asHours());
-    const minutes = duration.minutes();
-    const seconds = duration.seconds();
-
-    if (hours > 0) {
-      return `${hours}h ${minutes}m ${seconds}s`;
-    }
-    if (minutes > 0) {
-      return `${minutes}m ${seconds}s`;
-    }
-    return `${seconds}s`;
-  }, []);
+  }, [onClose, onNavigate, activeTab, fileName, navigate]);
 
   // Show error state if DAG not found
   if (notFound) {
@@ -209,7 +194,7 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
         value={{
           refresh: refreshFn,
           fileName: fileName || '',
-          name: displayData.dag?.name || '',
+          name: displayData.dag.name || '',
         }}
       >
         <RootDAGRunContext.Provider
@@ -245,22 +230,20 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
             </div>
 
             <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
-              {displayData.dag && (
-                <DAGDetailsContent
-                  fileName={fileName}
-                  dag={displayData.dag}
-                  currentDAGRun={displayData.latestDAGRun}
-                  refreshFn={refreshFn}
-                  formatDuration={formatDuration}
-                  activeTab={activeTab}
-                  onTabChange={setActiveTab}
-                  dagRunId={dagRunId}
-                  stepName={stepName}
-                  isModal={true}
-                  navigateToStatusTab={navigateToStatusTab}
-                  localDags={displayData?.localDags}
-                />
-              )}
+              <DAGDetailsContent
+                fileName={fileName}
+                dag={displayData.dag}
+                currentDAGRun={displayData.latestDAGRun}
+                refreshFn={refreshFn}
+                formatDuration={formatDuration}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                dagRunId="latest"
+                stepName={null}
+                isModal={true}
+                navigateToStatusTab={() => setActiveTab('status')}
+                localDags={displayData.localDags}
+              />
             </div>
           </div>
         </RootDAGRunContext.Provider>

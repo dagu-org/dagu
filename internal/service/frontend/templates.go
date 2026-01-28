@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -19,11 +20,9 @@ import (
 //go:embed templates/* assets/*
 var assetsFS embed.FS
 
-// templatePath is the path to the templates directory.
-var templatePath = "templates/"
+const templatePath = "templates/"
 
-func (srv *Server) useTemplate(ctx context.Context, layout string, name string) func(http.ResponseWriter, any) {
-	// Skip template rendering if headless
+func (srv *Server) useTemplate(ctx context.Context, layout, name string) func(http.ResponseWriter, any) {
 	if srv.config.Server.Headless {
 		return func(w http.ResponseWriter, _ any) {
 			http.Error(w, "Web UI is disabled in headless mode", http.StatusForbidden)
@@ -31,9 +30,7 @@ func (srv *Server) useTemplate(ctx context.Context, layout string, name string) 
 	}
 
 	files := append(baseTemplates(), path.Join(templatePath, layout))
-	tmpl, err := template.New(name).Funcs(
-		defaultFunctions(srv.funcsConfig)).ParseFS(assetsFS, files...,
-	)
+	tmpl, err := template.New(name).Funcs(defaultFunctions(srv.funcsConfig)).ParseFS(assetsFS, files...)
 	if err != nil {
 		panic(err)
 	}
@@ -73,14 +70,11 @@ type funcsConfig struct {
 	AgentEnabled bool
 }
 
-// and simple utility helpers for use inside HTML templates.
 func defaultFunctions(cfg funcsConfig) template.FuncMap {
 	return template.FuncMap{
-		"defTitle": func(ip any) string {
-			if v, ok := ip.(string); ok {
-				return v
-			}
-			return ""
+		"defTitle": func(v any) string {
+			s, _ := v.(string)
+			return s
 		},
 		"version": func() string {
 			return config.Version
@@ -176,10 +170,7 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 }
 
 func boolToString(b bool) string {
-	if b {
-		return "true"
-	}
-	return "false"
+	return strconv.FormatBool(b)
 }
 
 func baseTemplates() []string {

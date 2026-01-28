@@ -551,6 +551,26 @@ type Peer struct {
 // Validate performs basic validation on the configuration to ensure required fields are set
 // and that numerical values fall within acceptable ranges.
 func (c *Config) Validate() error {
+	if err := c.validateServer(); err != nil {
+		return err
+	}
+	if err := c.validateUI(); err != nil {
+		return err
+	}
+	if err := c.validateBuiltinAuth(); err != nil {
+		return err
+	}
+	if err := c.validateGitSync(); err != nil {
+		return err
+	}
+	if err := c.validateTunnel(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// validateServer validates server-related configuration.
+func (c *Config) validateServer() error {
 	if c.Server.Port < 0 || c.Server.Port > 65535 {
 		return fmt.Errorf("invalid port number: %d", c.Server.Port)
 	}
@@ -561,11 +581,6 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if c.UI.MaxDashboardPageLimit < 1 {
-		return fmt.Errorf("invalid max dashboard page limit: %d", c.UI.MaxDashboardPageLimit)
-	}
-
-	// Validate auth mode
 	switch c.Server.Auth.Mode {
 	case AuthModeNone, AuthModeBuiltin, AuthModeOIDC:
 		// Valid modes
@@ -573,21 +588,14 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid auth mode: %q (must be one of: none, builtin, oidc)", c.Server.Auth.Mode)
 	}
 
-	// Validate builtin auth configuration
-	if err := c.validateBuiltinAuth(); err != nil {
-		return err
-	}
+	return nil
+}
 
-	// Validate Git sync configuration
-	if err := c.validateGitSync(); err != nil {
-		return err
+// validateUI validates UI-related configuration.
+func (c *Config) validateUI() error {
+	if c.UI.MaxDashboardPageLimit < 1 {
+		return fmt.Errorf("invalid max dashboard page limit: %d", c.UI.MaxDashboardPageLimit)
 	}
-
-	// Validate tunnel configuration
-	if err := c.validateTunnel(); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -628,43 +636,21 @@ func (c *Config) validateBuiltinAuth() error {
 }
 
 // validateOIDCForBuiltin validates the OIDC configuration when used under builtin auth mode.
+// Note: This is only called after IsConfigured() returns true, so required fields are already set.
 func (c *Config) validateOIDCForBuiltin() error {
 	oidc := c.Server.Auth.OIDC
 
-	// Required fields when OIDC is enabled
-	if oidc.ClientId == "" {
-		return fmt.Errorf("OIDC requires clientId to be set (auth.oidc.clientId or AUTH_OIDC_CLIENT_ID)")
-	}
-	if oidc.ClientSecret == "" {
-		return fmt.Errorf("OIDC requires clientSecret to be set (auth.oidc.clientSecret or AUTH_OIDC_CLIENT_SECRET)")
-	}
-	if oidc.ClientUrl == "" {
-		return fmt.Errorf("OIDC requires clientUrl to be set (auth.oidc.clientUrl or AUTH_OIDC_CLIENT_URL)")
-	}
-	if oidc.Issuer == "" {
-		return fmt.Errorf("OIDC requires issuer to be set (auth.oidc.issuer or AUTH_OIDC_ISSUER)")
-	}
-
-	// Validate defaultRole is a valid role
-	validRoles := map[string]bool{
-		"admin":    true,
-		"manager":  true,
-		"operator": true,
-		"viewer":   true,
-	}
-	if !validRoles[oidc.RoleMapping.DefaultRole] {
+	switch oidc.RoleMapping.DefaultRole {
+	case "admin", "manager", "operator", "viewer":
+		// Valid role
+	default:
 		return fmt.Errorf("OIDC roleMapping.defaultRole must be one of: admin, manager, operator, viewer (got: %q)", oidc.RoleMapping.DefaultRole)
 	}
 
-	// Check if email scope is included
-	hasEmailScope := slices.Contains(oidc.Scopes, "email")
-
-	// Error if access control features require email but scope is missing
-	if !hasEmailScope {
+	if !slices.Contains(oidc.Scopes, "email") {
 		if len(oidc.Whitelist) > 0 || len(oidc.AllowedDomains) > 0 {
 			return fmt.Errorf("OIDC scopes must include 'email' when whitelist or allowedDomains is configured")
 		}
-		// Just warn if no access control is configured
 		c.Warnings = append(c.Warnings,
 			"OIDC scopes do not include 'email'; access control features will not work if added later")
 	}
@@ -678,32 +664,23 @@ func (c *Config) validateGitSync() error {
 		return nil
 	}
 
-	// Repository is required when enabled
 	if c.GitSync.Repository == "" {
 		return fmt.Errorf("git sync requires repository to be set (gitSync.repository)")
 	}
-
-	// Branch is required when enabled
 	if c.GitSync.Branch == "" {
 		return fmt.Errorf("git sync requires branch to be set (gitSync.branch)")
 	}
 
-	// Validate auth type
 	switch c.GitSync.Auth.Type {
-	case "token", "ssh":
-		// Valid auth types
-	case "":
-		// Empty is allowed (defaults to token)
+	case "", "token", "ssh":
+		// Valid auth types (empty defaults to token)
 	default:
 		return fmt.Errorf("git sync auth type must be 'token' or 'ssh' (got: %q)", c.GitSync.Auth.Type)
 	}
 
-	// Validate SSH auth requires key path
 	if c.GitSync.Auth.Type == "ssh" && c.GitSync.Auth.SSHKeyPath == "" {
 		return fmt.Errorf("git sync SSH auth requires sshKeyPath to be set")
 	}
-
-	// Validate auto sync interval is non-negative
 	if c.GitSync.AutoSync.Interval < 0 {
 		return fmt.Errorf("git sync autoSync.interval must be non-negative (got: %d)", c.GitSync.AutoSync.Interval)
 	}
@@ -717,37 +694,37 @@ func (c *Config) validateTunnel() error {
 		return nil
 	}
 
-	// Check if tunnel is public (Tailscale with Funnel)
-	isPublic := c.Tunnel.Tailscale.Funnel
-
-	// SECURITY: Public tunnels REQUIRE authentication
-	if isPublic && c.Server.Auth.Mode == AuthModeNone {
+	// SECURITY: Public tunnels (Tailscale Funnel) require authentication
+	if c.Tunnel.Tailscale.Funnel && c.Server.Auth.Mode == AuthModeNone {
 		return fmt.Errorf(
 			"tunnel with public access requires authentication; " +
 				"set server.auth.mode=builtin or disable tailscale funnel for private access",
 		)
 	}
 
-	// Validate rate limiting config
-	if c.Tunnel.RateLimiting.Enabled {
-		if c.Tunnel.RateLimiting.LoginAttempts <= 0 {
-			return fmt.Errorf("tunnel rate limiting loginAttempts must be positive")
-		}
-		if c.Tunnel.RateLimiting.WindowSeconds <= 0 {
-			return fmt.Errorf("tunnel rate limiting windowSeconds must be positive")
-		}
-		if c.Tunnel.RateLimiting.BlockDurationSeconds <= 0 {
-			return fmt.Errorf("tunnel rate limiting blockDurationSeconds must be positive")
-		}
+	return c.validateTunnelRateLimiting()
+}
+
+// validateTunnelRateLimiting validates rate limiting configuration for tunnels.
+func (c *Config) validateTunnelRateLimiting() error {
+	rl := c.Tunnel.RateLimiting
+	if !rl.Enabled {
+		return nil
 	}
 
+	if rl.LoginAttempts <= 0 {
+		return fmt.Errorf("tunnel rate limiting loginAttempts must be positive")
+	}
+	if rl.WindowSeconds <= 0 {
+		return fmt.Errorf("tunnel rate limiting windowSeconds must be positive")
+	}
+	if rl.BlockDurationSeconds <= 0 {
+		return fmt.Errorf("tunnel rate limiting blockDurationSeconds must be positive")
+	}
 	return nil
 }
 
 // IsTunnelPublic returns true if the tunnel exposes the service to the public internet.
 func (c *Config) IsTunnelPublic() bool {
-	if !c.Tunnel.Enabled {
-		return false
-	}
-	return c.Tunnel.Tailscale.Funnel
+	return c.Tunnel.Enabled && c.Tunnel.Tailscale.Funnel
 }

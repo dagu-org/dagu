@@ -6,13 +6,7 @@ import (
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
-// ThinkToolInput is the input schema for the think tool.
-type ThinkToolInput struct {
-	Thought string `json:"thought"`
-}
-
-// NewThinkTool creates a new think tool for reasoning without action.
-// This allows the LLM to think through complex problems step by step.
+// NewThinkTool creates a think tool for step-by-step reasoning without action.
 func NewThinkTool() *AgentTool {
 	return &AgentTool{
 		Tool: llm.Tool{
@@ -36,18 +30,6 @@ func NewThinkTool() *AgentTool {
 	}
 }
 
-func thinkRun(ctx ToolContext, input json.RawMessage) ToolOut {
-	var args ThinkToolInput
-	if err := json.Unmarshal(input, &args); err != nil {
-		return ToolOut{
-			Content: "Thought recorded.",
-			IsError: false,
-		}
-	}
-
-	// Simply acknowledge the thought - no action needed
-	return ToolOut{
-		Content: "Thought recorded. Continue with your plan.",
-		IsError: false,
-	}
+func thinkRun(_ ToolContext, _ json.RawMessage) ToolOut {
+	return ToolOut{Content: "Thought recorded. Continue with your plan."}
 }

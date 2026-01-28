@@ -75,24 +75,14 @@ func NewPatchTool() *AgentTool {
 func patchRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	var args PatchToolInput
 	if err := json.Unmarshal(input, &args); err != nil {
-		return ToolOut{
-			Content: fmt.Sprintf("Failed to parse input: %v", err),
-			IsError: true,
-		}
+		return patchError("Failed to parse input: %v", err)
 	}
 
 	if args.Path == "" {
-		return ToolOut{
-			Content: "Path is required",
-			IsError: true,
-		}
+		return patchError("Path is required")
 	}
 
-	// Resolve path
-	path := args.Path
-	if !filepath.IsAbs(path) && ctx.WorkingDir != "" {
-		path = filepath.Join(ctx.WorkingDir, path)
-	}
+	path := resolvePath(args.Path, ctx.WorkingDir)
 
 	switch args.Operation {
 	case PatchOpCreate:
@@ -102,116 +92,78 @@ func patchRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	case PatchOpDelete:
 		return patchDelete(path)
 	default:
-		return ToolOut{
-			Content: fmt.Sprintf("Unknown operation: %s. Use 'create', 'replace', or 'delete'.", args.Operation),
-			IsError: true,
-		}
+		return patchError("Unknown operation: %s. Use 'create', 'replace', or 'delete'.", args.Operation)
 	}
 }
 
 func patchCreate(path, content string) ToolOut {
-	// Ensure parent directory exists
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return ToolOut{
-			Content: fmt.Sprintf("Failed to create directory: %v", err),
-			IsError: true,
-		}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return patchError("Failed to create directory: %v", err)
 	}
 
-	// Write file
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		return ToolOut{
-			Content: fmt.Sprintf("Failed to write file: %v", err),
-			IsError: true,
-		}
+		return patchError("Failed to write file: %v", err)
 	}
 
 	lineCount := strings.Count(content, "\n") + 1
-	return ToolOut{
-		Content: fmt.Sprintf("Created %s (%d lines)", path, lineCount),
-		IsError: false,
-	}
+	return ToolOut{Content: fmt.Sprintf("Created %s (%d lines)", path, lineCount)}
 }
 
 func patchReplace(path, oldString, newString string) ToolOut {
 	if oldString == "" {
-		return ToolOut{
-			Content: "old_string is required for replace operation",
-			IsError: true,
-		}
+		return patchError("old_string is required for replace operation")
 	}
 
-	// Read existing file
 	content, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return ToolOut{
-				Content: fmt.Sprintf("File not found: %s. Use 'create' operation to create new files.", path),
-				IsError: true,
-			}
+			return patchError("File not found: %s. Use 'create' operation to create new files.", path)
 		}
-		return ToolOut{
-			Content: fmt.Sprintf("Failed to read file: %v", err),
-			IsError: true,
-		}
+		return patchError("Failed to read file: %v", err)
 	}
 
 	contentStr := string(content)
-
-	// Check if old_string exists and is unique
 	count := strings.Count(contentStr, oldString)
+
 	if count == 0 {
-		return ToolOut{
-			Content: fmt.Sprintf("old_string not found in file. Make sure to include exact text including whitespace and indentation."),
-			IsError: true,
-		}
+		return patchError("old_string not found in file. Make sure to include exact text including whitespace and indentation.")
 	}
 	if count > 1 {
-		return ToolOut{
-			Content: fmt.Sprintf("old_string found %d times in file. It must be unique. Include more context to make it unique.", count),
-			IsError: true,
-		}
+		return patchError("old_string found %d times in file. It must be unique. Include more context to make it unique.", count)
 	}
 
-	// Replace
 	newContent := strings.Replace(contentStr, oldString, newString, 1)
-
-	// Write back
 	if err := os.WriteFile(path, []byte(newContent), 0o644); err != nil {
-		return ToolOut{
-			Content: fmt.Sprintf("Failed to write file: %v", err),
-			IsError: true,
-		}
+		return patchError("Failed to write file: %v", err)
 	}
 
 	oldLines := strings.Count(oldString, "\n") + 1
 	newLines := strings.Count(newString, "\n") + 1
-	return ToolOut{
-		Content: fmt.Sprintf("Replaced %d lines with %d lines in %s", oldLines, newLines, path),
-		IsError: false,
-	}
+	return ToolOut{Content: fmt.Sprintf("Replaced %d lines with %d lines in %s", oldLines, newLines, path)}
 }
 
 func patchDelete(path string) ToolOut {
-	// Check if file exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return ToolOut{
-			Content: fmt.Sprintf("File not found: %s", path),
-			IsError: true,
-		}
+		return patchError("File not found: %s", path)
 	}
 
-	// Delete file
 	if err := os.Remove(path); err != nil {
-		return ToolOut{
-			Content: fmt.Sprintf("Failed to delete file: %v", err),
-			IsError: true,
-		}
+		return patchError("Failed to delete file: %v", err)
 	}
 
+	return ToolOut{Content: fmt.Sprintf("Deleted %s", path)}
+}
+
+func patchError(format string, args ...any) ToolOut {
 	return ToolOut{
-		Content: fmt.Sprintf("Deleted %s", path),
-		IsError: false,
+		Content: fmt.Sprintf(format, args...),
+		IsError: true,
 	}
+}
+
+func resolvePath(path, workingDir string) string {
+	if !filepath.IsAbs(path) && workingDir != "" {
+		return filepath.Join(workingDir, path)
+	}
+	return path
 }

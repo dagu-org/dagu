@@ -1,6 +1,4 @@
-import * as React from 'react';
 import { useState, useCallback, useEffect, KeyboardEvent } from 'react';
-import { flushSync } from 'react-dom';
 import { Send, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -28,19 +26,15 @@ export function ChatInput({
   const [selectedDags, setSelectedDags] = useState<DAGContext[]>([]);
   const currentPageDag = useDagPageContext();
 
-  // Combine local pending state with parent isWorking for immediate response
   const showPauseButton = isPending || isWorking;
 
-  // Reset pending when isWorking becomes true (server confirmed processing)
+  // Reset pending state when server confirms processing or after timeout fallback
   useEffect(() => {
     if (isWorking) {
       setIsPending(false);
+      return;
     }
-  }, [isWorking]);
-
-  // Reset pending if isWorking stays false (in case of errors)
-  useEffect(() => {
-    if (!isWorking && isPending) {
+    if (isPending) {
       const timer = setTimeout(() => setIsPending(false), 500);
       return () => clearTimeout(timer);
     }
@@ -48,26 +42,22 @@ export function ChatInput({
 
   const handleSend = useCallback(() => {
     const trimmed = message.trim();
-    if (trimmed && !showPauseButton && !disabled) {
-      flushSync(() => {
-        setIsPending(true);
-      });
-
-      // Always include current page DAG, plus any additional selected DAGs
-      const allContexts: DAGContext[] = [];
-      if (currentPageDag) {
-        allContexts.push(currentPageDag);
-      }
-      // Add selected DAGs that aren't the current page DAG
-      selectedDags.forEach((dag) => {
-        if (!currentPageDag || dag.dag_file !== currentPageDag.dag_file) {
-          allContexts.push(dag);
-        }
-      });
-
-      onSend(trimmed, allContexts.length > 0 ? allContexts : undefined);
-      setMessage('');
+    if (!trimmed || showPauseButton || disabled) {
+      return;
     }
+
+    setIsPending(true);
+
+    // Build contexts: current page DAG first, then additional selected DAGs (excluding duplicates)
+    const additionalDags = selectedDags.filter(
+      (dag) => dag.dag_file !== currentPageDag?.dag_file
+    );
+    const allContexts = currentPageDag
+      ? [currentPageDag, ...additionalDags]
+      : additionalDags;
+
+    onSend(trimmed, allContexts.length > 0 ? allContexts : undefined);
+    setMessage('');
   }, [message, showPauseButton, disabled, onSend, selectedDags, currentPageDag]);
 
   const handleKeyDown = useCallback(
@@ -79,12 +69,6 @@ export function ChatInput({
     },
     [handleSend]
   );
-
-  const handleCancel = useCallback(() => {
-    if (onCancel) {
-      onCancel();
-    }
-  }, [onCancel]);
 
   return (
     <div className="p-2 border-t border-border/40 bg-background">
@@ -125,7 +109,7 @@ export function ChatInput({
           <Button
             size="sm"
             variant="destructive"
-            onClick={handleCancel}
+            onClick={onCancel}
             className="h-9 w-9 p-0"
             title="Stop"
           >

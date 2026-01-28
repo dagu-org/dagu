@@ -26,26 +26,25 @@ const (
 
 // UIAction represents an action to be performed by the UI.
 type UIAction struct {
-	// Type is the action type (e.g., "navigate", "refresh").
+	// Type specifies the action kind (e.g., "navigate", "refresh").
 	Type string `json:"type"`
-	// Path is the navigation path (for "navigate" action).
+	// Path is the navigation target for "navigate" actions.
 	Path string `json:"path,omitempty"`
 }
 
-// Message represents a message in a conversation.
-// This is the format stored and sent to the UI.
+// Message represents a message in a conversation, stored and sent to the UI.
 type Message struct {
-	ID             string           `json:"id"`
-	ConversationID string           `json:"conversation_id"`
-	Type           MessageType      `json:"type"`
-	SequenceID     int64            `json:"sequence_id"`
-	Content        string           `json:"content,omitempty"`
-	ToolCalls      []llm.ToolCall   `json:"tool_calls,omitempty"`
-	ToolResults    []ToolResult     `json:"tool_results,omitempty"`
-	Usage          *llm.Usage       `json:"usage,omitempty"`
-	CreatedAt      time.Time        `json:"created_at"`
-	LLMData        *llm.Message     `json:"llm_data,omitempty"`
-	UIAction       *UIAction        `json:"ui_action,omitempty"`
+	ID             string         `json:"id"`
+	ConversationID string         `json:"conversation_id"`
+	Type           MessageType    `json:"type"`
+	SequenceID     int64          `json:"sequence_id"`
+	Content        string         `json:"content,omitempty"`
+	ToolCalls      []llm.ToolCall `json:"tool_calls,omitempty"`
+	ToolResults    []ToolResult   `json:"tool_results,omitempty"`
+	Usage          *llm.Usage     `json:"usage,omitempty"`
+	CreatedAt      time.Time      `json:"created_at"`
+	LLMData        *llm.Message   `json:"llm_data,omitempty"`
+	UIAction       *UIAction      `json:"ui_action,omitempty"`
 }
 
 // ToolResult represents the result of a tool call.
@@ -93,10 +92,14 @@ type ChatRequest struct {
 
 // ResolvedDAGContext contains server-resolved info for a single DAG.
 type ResolvedDAGContext struct {
-	DAGFilePath string // Absolute path to DAG file
-	DAGName     string // DAG name
-	DAGRunID    string // Run ID if viewing a run
-	RunStatus   string // Current run status (running/success/failed)
+	// DAGFilePath is the absolute path to the DAG file.
+	DAGFilePath string
+	// DAGName is the name of the DAG.
+	DAGName string
+	// DAGRunID is present when viewing a specific run.
+	DAGRunID string
+	// RunStatus indicates the run state (running, success, or failed).
+	RunStatus string
 }
 
 // NewConversationResponse is the response for creating a new conversation.
@@ -106,13 +109,12 @@ type NewConversationResponse struct {
 }
 
 // ToolOut represents the output of a tool execution.
-// This follows the Shelley pattern where tools return structured output.
 type ToolOut struct {
-	// Content is the output to be sent back to the LLM.
+	// Content is the output sent back to the LLM.
 	Content string
-	// IsError indicates if the tool execution failed.
+	// IsError indicates tool execution failure.
 	IsError bool
-	// Display is optional content for the UI (e.g., rendered output).
+	// Display is optional UI content (e.g., rendered output).
 	Display any
 }
 
@@ -124,13 +126,12 @@ type UIActionFunc func(action UIAction)
 
 // ToolContext provides context to tool execution.
 type ToolContext struct {
-	WorkingDir     string
-	EmitUIAction   UIActionFunc
+	WorkingDir   string
+	EmitUIAction UIActionFunc
 }
 
 // AgentTool extends llm.Tool with an execution function.
 type AgentTool struct {
 	llm.Tool
-	// Run executes the tool with the given input.
 	Run ToolFunc
 }

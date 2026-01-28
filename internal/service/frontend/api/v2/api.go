@@ -136,16 +136,10 @@ func WithAgentReloader(reloader AgentReloader) APIOption {
 	}
 }
 
-// New constructs an API instance wired with the provided DAG, DAG-run, queue and proc stores,
-// runtime manager, configuration, coordinator client, service registry, metrics registry, and resource service.
-// It also builds the internal remote node map from cfg.Server.RemoteNodes and initializes the sub-command
-// New constructs an *API configured with the provided stores, runtime manager,
+// New constructs an API configured with the provided stores, runtime manager,
 // configuration, coordinator client, service registry, Prometheus registry,
-// and resource service.
-//
-// It builds the API instance (including the remote node map and base path) and
-// applies any supplied APIOption functions to customize the instance before
-// returning it.
+// and resource service. It builds the remote node map and base path, then
+// applies any supplied APIOption functions to customize the instance.
 func New(
 	dr exec.DAGStore,
 	drs exec.DAGRunStore,
@@ -198,7 +192,7 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 		return fmt.Errorf("failed to get swagger: %w", err)
 	}
 
-	// Create a list of server URLs
+	// Evaluate and normalize the base URL
 	if evaluatedBaseURL, err := cmdutil.EvalString(ctx, baseURL); err != nil {
 		logger.Warn(ctx, "Failed to evaluate API base URL",
 			tag.URL(baseURL),
@@ -207,12 +201,7 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 		baseURL = evaluatedBaseURL
 	}
 	baseURL = strings.TrimRight(baseURL, "/")
-	serverURLs := []string{baseURL}
-
-	// Set the server URLs in the swagger spec
-	for _, url := range serverURLs {
-		swagger.Servers = append(swagger.Servers, &openapi3.Server{URL: url})
-	}
+	swagger.Servers = append(swagger.Servers, &openapi3.Server{URL: baseURL})
 
 	// Setup the API base path
 	basePath := a.config.Server.BasePath
@@ -342,12 +331,15 @@ func (a *API) handleError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, exec.ErrDAGNotFound):
 		code = api.ErrorCodeNotFound
 		message = "DAG not found"
+		httpStatusCode = http.StatusNotFound
 	case errors.Is(err, exec.ErrDAGRunIDNotFound):
 		code = api.ErrorCodeNotFound
 		message = "dag-run ID not found"
+		httpStatusCode = http.StatusNotFound
 	case errors.Is(err, exec.ErrDAGAlreadyExists):
 		code = api.ErrorCodeAlreadyExists
 		message = "DAG already exists"
+		httpStatusCode = http.StatusConflict
 	}
 
 	if httpStatusCode == http.StatusInternalServerError {
@@ -364,11 +356,7 @@ func (a *API) handleError(w http.ResponseWriter, r *http.Request, err error) {
 
 func (a *API) isAllowed(perm config.Permission) error {
 	if !a.config.Server.Permissions[perm] {
-		return &Error{
-			Code:       api.ErrorCodeForbidden,
-			Message:    "Permission denied",
-			HTTPStatus: http.StatusForbidden,
-		}
+		return errPermissionDenied
 	}
 	return nil
 }
@@ -377,71 +365,67 @@ func (a *API) isAllowed(perm config.Permission) error {
 // Returns nil if auth is not enabled (authService is nil).
 func (a *API) requireAdmin(ctx context.Context) error {
 	if a.authService == nil {
-		return nil // Auth not enabled, allow access
+		return nil
 	}
 	user, ok := auth.UserFromContext(ctx)
 	if !ok {
-		return &Error{
-			Code:       api.ErrorCodeUnauthorized,
-			Message:    "Authentication required",
-			HTTPStatus: http.StatusUnauthorized,
-		}
+		return errAuthRequired
 	}
 	if !user.Role.IsAdmin() {
-		return &Error{
-			Code:       api.ErrorCodeForbidden,
-			Message:    "Insufficient permissions",
-			HTTPStatus: http.StatusForbidden,
-		}
+		return errInsufficientPermissions
 	}
 	return nil
 }
 
-// errDAGWritesDisabled is returned when DAG modifications are blocked in read-only mode.
-var errDAGWritesDisabled = &Error{
-	HTTPStatus: http.StatusForbidden,
-	Code:       api.ErrorCodeForbidden,
-	Message:    "DAG modifications disabled: Git sync is in read-only mode (pushEnabled: false)",
-}
+// Predefined errors for common authorization failures.
+var (
+	errDAGWritesDisabled = &Error{
+		HTTPStatus: http.StatusForbidden,
+		Code:       api.ErrorCodeForbidden,
+		Message:    "DAG modifications disabled: Git sync is in read-only mode (pushEnabled: false)",
+	}
+	errAuthRequired = &Error{
+		HTTPStatus: http.StatusUnauthorized,
+		Code:       api.ErrorCodeUnauthorized,
+		Message:    "Authentication required",
+	}
+	errPermissionDenied = &Error{
+		HTTPStatus: http.StatusForbidden,
+		Code:       api.ErrorCodeForbidden,
+		Message:    "Permission denied",
+	}
+	errInsufficientPermissions = &Error{
+		HTTPStatus: http.StatusForbidden,
+		Code:       api.ErrorCodeForbidden,
+		Message:    "Insufficient permissions",
+	}
+	errUserManagementDisabled = &Error{
+		HTTPStatus: http.StatusUnauthorized,
+		Code:       api.ErrorCodeUnauthorized,
+		Message:    "User management is not enabled",
+	}
+)
 
 // requireDAGWrite checks all permissions for DAG write operations:
 // 1. Server-level permission (PermissionWriteDAGs)
 // 2. User role permission (CanWrite)
 // 3. Git sync read-only mode (dagWritesDisabled)
 func (a *API) requireDAGWrite(ctx context.Context) error {
-	// Check server-level permission
 	if !a.config.Server.Permissions[config.PermissionWriteDAGs] {
-		return &Error{
-			Code:       api.ErrorCodeForbidden,
-			Message:    "Permission denied",
-			HTTPStatus: http.StatusForbidden,
-		}
+		return errPermissionDenied
 	}
-
-	// Check user role permission (if auth enabled)
 	if a.authService != nil {
 		user, ok := auth.UserFromContext(ctx)
 		if !ok {
-			return &Error{
-				Code:       api.ErrorCodeUnauthorized,
-				Message:    "Authentication required",
-				HTTPStatus: http.StatusUnauthorized,
-			}
+			return errAuthRequired
 		}
 		if !user.Role.CanWrite() {
-			return &Error{
-				Code:       api.ErrorCodeForbidden,
-				Message:    "Insufficient permissions",
-				HTTPStatus: http.StatusForbidden,
-			}
+			return errInsufficientPermissions
 		}
 	}
-
-	// Check git sync read-only mode
 	if a.dagWritesDisabled {
 		return errDAGWritesDisabled
 	}
-
 	return nil
 }
 
@@ -449,22 +433,14 @@ func (a *API) requireDAGWrite(ctx context.Context) error {
 // Returns nil if auth is not enabled (authService is nil).
 func (a *API) requireExecute(ctx context.Context) error {
 	if a.authService == nil {
-		return nil // Auth not enabled, allow access
+		return nil
 	}
 	user, ok := auth.UserFromContext(ctx)
 	if !ok {
-		return &Error{
-			Code:       api.ErrorCodeUnauthorized,
-			Message:    "Authentication required",
-			HTTPStatus: http.StatusUnauthorized,
-		}
+		return errAuthRequired
 	}
 	if !user.Role.CanExecute() {
-		return &Error{
-			Code:       api.ErrorCodeForbidden,
-			Message:    "Insufficient permissions",
-			HTTPStatus: http.StatusForbidden,
-		}
+		return errInsufficientPermissions
 	}
 	return nil
 }
@@ -472,11 +448,7 @@ func (a *API) requireExecute(ctx context.Context) error {
 // requireUserManagement checks if user management is enabled.
 func (a *API) requireUserManagement() error {
 	if a.authService == nil {
-		return &Error{
-			Code:       api.ErrorCodeUnauthorized,
-			Message:    "User management is not enabled",
-			HTTPStatus: http.StatusUnauthorized,
-		}
+		return errUserManagementDisabled
 	}
 	return nil
 }
@@ -486,7 +458,6 @@ func ptrOf[T any](v T) *T {
 	if reflect.ValueOf(v).IsZero() {
 		return nil
 	}
-
 	return &v
 }
 

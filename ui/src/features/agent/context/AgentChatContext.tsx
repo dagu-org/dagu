@@ -1,6 +1,15 @@
-import * as React from 'react';
-import { createContext, useContext, useState, useCallback } from 'react';
-import { Message, ConversationState, ConversationWithState } from '../types';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useState,
+} from 'react';
+import type { Dispatch, ReactNode, SetStateAction } from 'react';
+import type {
+  ConversationState,
+  ConversationWithState,
+  Message,
+} from '../types';
 
 interface AgentChatContextType {
   isOpen: boolean;
@@ -12,16 +21,20 @@ interface AgentChatContextType {
   closeChat: () => void;
   toggleChat: () => void;
   setConversationId: (id: string | null) => void;
-  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  setMessages: Dispatch<SetStateAction<Message[]>>;
   setConversationState: (state: ConversationState | null) => void;
   setConversations: (conversations: ConversationWithState[]) => void;
   addMessage: (message: Message) => void;
   clearConversation: () => void;
 }
 
+interface AgentChatProviderProps {
+  children: ReactNode;
+}
+
 const AgentChatContext = createContext<AgentChatContextType | null>(null);
 
-export function AgentChatProvider({ children }: { children: React.ReactNode }) {
+export function AgentChatProvider({ children }: AgentChatProviderProps): ReactNode {
   const [isOpen, setIsOpen] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -37,14 +50,13 @@ export function AgentChatProvider({ children }: { children: React.ReactNode }) {
 
   const addMessage = useCallback((message: Message) => {
     setMessages((prev) => {
-      // Check if message already exists (by id)
-      const exists = prev.some((m) => m.id === message.id);
-      if (exists) {
-        // Update existing message
-        return prev.map((m) => (m.id === message.id ? message : m));
+      const existingIndex = prev.findIndex((m) => m.id === message.id);
+      if (existingIndex === -1) {
+        return [...prev, message];
       }
-      // Add new message
-      return [...prev, message];
+      const updated = [...prev];
+      updated[existingIndex] = message;
+      return updated;
     });
   }, []);
 
@@ -78,7 +90,7 @@ export function AgentChatProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useAgentChatContext() {
+export function useAgentChatContext(): AgentChatContextType {
   const context = useContext(AgentChatContext);
   if (!context) {
     throw new Error(

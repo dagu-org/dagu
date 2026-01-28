@@ -1,9 +1,16 @@
-// Agent chat types
+// Message types
+export type MessageType =
+  | 'user'
+  | 'assistant'
+  | 'tool_use'
+  | 'tool_result'
+  | 'error'
+  | 'ui_action';
 
-export type MessageType = 'user' | 'assistant' | 'tool_use' | 'tool_result' | 'error' | 'ui_action';
+export type UIActionType = 'navigate' | 'refresh';
 
 export interface UIAction {
-  type: 'navigate' | 'refresh';
+  type: UIActionType;
   path?: string;
 }
 
@@ -34,6 +41,7 @@ export interface Message {
   created_at: string;
 }
 
+// Conversation types
 export interface Conversation {
   id: string;
   created_at: string;
@@ -46,16 +54,23 @@ export interface ConversationState {
   model?: string;
 }
 
-export interface StreamResponse {
-  messages?: Message[];
-  conversation?: Conversation;
-  conversation_state?: ConversationState;
-}
-
 export interface ConversationWithState {
   conversation: Conversation;
   working: boolean;
   model?: string;
+}
+
+// DAG context types
+export interface DAGContext {
+  dag_file: string;
+  dag_run_id?: string;
+}
+
+// API request/response types
+export interface ChatRequest {
+  message: string;
+  model?: string;
+  dag_contexts?: DAGContext[];
 }
 
 export interface NewConversationResponse {
@@ -63,13 +78,8 @@ export interface NewConversationResponse {
   status: string;
 }
 
-export interface DAGContext {
-  dag_file: string;
-  dag_run_id?: string;
-}
-
-export interface ChatRequest {
-  message: string;
-  model?: string;
-  dag_contexts?: DAGContext[];
+export interface StreamResponse {
+  messages?: Message[];
+  conversation?: Conversation;
+  conversation_state?: ConversationState;
 }

@@ -23,22 +23,14 @@ const (
 
 // Entry represents a single audit log entry.
 type Entry struct {
-	// ID is a unique identifier for this entry.
-	ID string `json:"id"`
-	// Timestamp is when the event occurred.
+	ID        string    `json:"id"`
 	Timestamp time.Time `json:"timestamp"`
-	// Category identifies the feature (e.g., "terminal", "user", "dag").
-	Category Category `json:"category"`
-	// Action describes what happened (e.g., "session_start", "command", "login").
-	Action string `json:"action"`
-	// UserID is the ID of the user who performed the action.
-	UserID string `json:"user_id"`
-	// Username is the username of the user who performed the action.
-	Username string `json:"username"`
-	// Details contains action-specific data as a JSON string.
-	Details string `json:"details,omitempty"`
-	// IPAddress is the client IP address if available.
-	IPAddress string `json:"ip_address,omitempty"`
+	Category  Category  `json:"category"`
+	Action    string    `json:"action"`
+	UserID    string    `json:"user_id"`
+	Username  string    `json:"username"`
+	Details   string    `json:"details,omitempty"`
+	IPAddress string    `json:"ip_address,omitempty"`
 }
 
 // NewEntry creates a new audit entry with a generated ID and current timestamp.
@@ -67,24 +59,16 @@ func (e *Entry) WithIPAddress(ip string) *Entry {
 
 // QueryFilter defines filters for querying audit entries.
 type QueryFilter struct {
-	// Category filters by audit category.
-	Category Category
-	// UserID filters by user ID.
-	UserID string
-	// StartTime filters entries after this time (inclusive).
-	StartTime time.Time
-	// EndTime filters entries before this time (exclusive).
-	EndTime time.Time
-	// Limit is the maximum number of entries to return.
-	Limit int
-	// Offset is the number of entries to skip.
-	Offset int
+	Category  Category
+	UserID    string
+	StartTime time.Time // inclusive
+	EndTime   time.Time // exclusive
+	Limit     int
+	Offset    int
 }
 
 // QueryResult contains the result of a query.
 type QueryResult struct {
-	// Entries is the list of audit entries matching the filter.
 	Entries []*Entry `json:"entries"`
-	// Total is the total number of entries matching the filter (before pagination).
-	Total int `json:"total"`
+	Total   int      `json:"total"` // total before pagination
 }

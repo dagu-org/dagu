@@ -93,27 +93,26 @@ func (a *API) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler) htt
 
 // resolveContexts resolves DAG file names to full paths using the DAG store.
 func (a *API) resolveContexts(ctx context.Context, contexts []DAGContext) []ResolvedDAGContext {
-	if len(contexts) == 0 {
+	if len(contexts) == 0 || a.dagStore == nil {
 		return nil
 	}
 
 	var resolved []ResolvedDAGContext
 	for _, c := range contexts {
-		r := ResolvedDAGContext{}
-		if a.dagStore != nil && c.DAGFile != "" {
-			dag, err := a.dagStore.GetMetadata(ctx, c.DAGFile)
-			if err == nil && dag != nil {
-				r.DAGFilePath = dag.Location
-				r.DAGName = dag.Name
-			}
+		if c.DAGFile == "" {
+			continue
 		}
-		if c.DAGRunID != "" {
-			r.DAGRunID = c.DAGRunID
+
+		dag, err := a.dagStore.GetMetadata(ctx, c.DAGFile)
+		if err != nil || dag == nil {
+			continue
 		}
-		// Only include if we got some useful info
-		if r.DAGFilePath != "" || r.DAGName != "" {
-			resolved = append(resolved, r)
-		}
+
+		resolved = append(resolved, ResolvedDAGContext{
+			DAGFilePath: dag.Location,
+			DAGName:     dag.Name,
+			DAGRunID:    c.DAGRunID,
+		})
 	}
 	return resolved
 }
@@ -126,22 +125,9 @@ func formatMessageWithContexts(message string, contexts []ResolvedDAGContext) st
 
 	var contextLines []string
 	for _, ctx := range contexts {
-		var parts []string
-		if ctx.DAGFilePath != "" {
-			parts = append(parts, fmt.Sprintf("file: %s", ctx.DAGFilePath))
-		}
-		if ctx.DAGRunID != "" {
-			parts = append(parts, fmt.Sprintf("run: %s", ctx.DAGRunID))
-		}
-		if ctx.RunStatus != "" {
-			parts = append(parts, fmt.Sprintf("status: %s", ctx.RunStatus))
-		}
-		name := ctx.DAGName
-		if name == "" {
-			name = "unknown"
-		}
-		if len(parts) > 0 {
-			contextLines = append(contextLines, fmt.Sprintf("- %s (%s)", name, strings.Join(parts, ", ")))
+		line := formatContextLine(ctx)
+		if line != "" {
+			contextLines = append(contextLines, line)
 		}
 	}
 
@@ -150,6 +136,81 @@ func formatMessageWithContexts(message string, contexts []ResolvedDAGContext) st
 	}
 
 	return fmt.Sprintf("[Referenced DAGs:\n%s]\n\n%s", strings.Join(contextLines, "\n"), message)
+}
+
+// formatContextLine formats a single DAG context as a readable line.
+func formatContextLine(ctx ResolvedDAGContext) string {
+	var parts []string
+	if ctx.DAGFilePath != "" {
+		parts = append(parts, fmt.Sprintf("file: %s", ctx.DAGFilePath))
+	}
+	if ctx.DAGRunID != "" {
+		parts = append(parts, fmt.Sprintf("run: %s", ctx.DAGRunID))
+	}
+	if ctx.RunStatus != "" {
+		parts = append(parts, fmt.Sprintf("status: %s", ctx.RunStatus))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+
+	name := ctx.DAGName
+	if name == "" {
+		name = "unknown"
+	}
+	return fmt.Sprintf("- %s (%s)", name, strings.Join(parts, ", "))
+}
+
+// selectModel returns the first non-empty model from the provided choices,
+// falling back to the API's default model.
+func (a *API) selectModel(requestModel, conversationModel string) string {
+	if requestModel != "" {
+		return requestModel
+	}
+	if conversationModel != "" {
+		return conversationModel
+	}
+	return a.model
+}
+
+// createMessageCallback returns a persistence callback for the given conversation ID.
+// Returns nil if no store is configured.
+func (a *API) createMessageCallback(id string) func(ctx context.Context, msg Message) error {
+	if a.store == nil {
+		return nil
+	}
+	return func(ctx context.Context, msg Message) error {
+		return a.store.AddMessage(ctx, id, &msg)
+	}
+}
+
+// persistNewConversation saves a new conversation to the store if configured.
+func (a *API) persistNewConversation(ctx context.Context, id, userID string, now time.Time) {
+	if a.store == nil {
+		return
+	}
+	conv := &Conversation{
+		ID:        id,
+		UserID:    userID,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := a.store.CreateConversation(ctx, conv); err != nil {
+		a.logger.Error("Failed to persist conversation", "error", err)
+	}
+}
+
+// formatMessage resolves DAG contexts and formats the message with context information.
+func (a *API) formatMessage(ctx context.Context, message string, contexts []DAGContext) string {
+	resolved := a.resolveContexts(ctx, contexts)
+	return formatMessageWithContexts(message, resolved)
+}
+
+// respondJSON writes a JSON response with the given status code.
+func (a *API) respondJSON(w http.ResponseWriter, status int, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(data)
 }
 
 // handleNewConversation creates a new conversation and sends the first message.
@@ -166,65 +227,30 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get user ID from context
 	userID := getUserIDFromContext(r.Context())
-
-	// Use request model or default
-	model := req.Model
-	if model == "" {
-		model = a.model
-	}
-
-	// Create new conversation manager
+	model := a.selectModel(req.Model, "")
 	id := uuid.New().String()
 	now := time.Now()
-
-	// Create OnMessage callback for persistence
-	var onMessage func(ctx context.Context, msg Message) error
-	if a.store != nil {
-		onMessage = func(ctx context.Context, msg Message) error {
-			return a.store.AddMessage(ctx, id, &msg)
-		}
-	}
 
 	mgr := NewConversationManager(ConversationManagerConfig{
 		ID:         id,
 		UserID:     userID,
 		Logger:     a.logger,
 		WorkingDir: a.workingDir,
-		OnMessage:  onMessage,
+		OnMessage:  a.createMessageCallback(id),
 	})
 
-	// Persist conversation to store
-	if a.store != nil {
-		conv := &Conversation{
-			ID:        id,
-			UserID:    userID,
-			CreatedAt: now,
-			UpdatedAt: now,
-		}
-		if err := a.store.CreateConversation(r.Context(), conv); err != nil {
-			a.logger.Error("Failed to persist conversation", "error", err)
-			// Continue anyway - in-memory operation should still work
-		}
-	}
-
+	a.persistNewConversation(r.Context(), id, userID, now)
 	a.conversations.Store(id, mgr)
 
-	// Resolve DAG contexts and format message
-	resolved := a.resolveContexts(r.Context(), req.DAGContexts)
-	messageWithContext := formatMessageWithContexts(req.Message, resolved)
-
-	// Accept the user message
+	messageWithContext := a.formatMessage(r.Context(), req.Message, req.DAGContexts)
 	if err := mgr.AcceptUserMessage(r.Context(), a.provider, model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		http.Error(w, "Failed to process message", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(NewConversationResponse{
+	a.respondJSON(w, http.StatusCreated, NewConversationResponse{
 		ConversationID: id,
 		Status:         "accepted",
 	})
@@ -235,14 +261,18 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 func (a *API) handleListConversations(w http.ResponseWriter, r *http.Request) {
 	userID := getUserIDFromContext(r.Context())
 
-	// Track active conversation IDs
 	activeIDs := make(map[string]bool)
-	var conversations []ConversationWithState
+	conversations := a.collectActiveConversations(userID, activeIDs)
+	conversations = a.appendPersistedConversations(r.Context(), userID, activeIDs, conversations)
 
-	// First, get active conversations from sync.Map
+	a.respondJSON(w, http.StatusOK, conversations)
+}
+
+// collectActiveConversations gathers active conversations for a user.
+func (a *API) collectActiveConversations(userID string, activeIDs map[string]bool) []ConversationWithState {
+	var conversations []ConversationWithState
 	a.conversations.Range(func(key, value any) bool {
 		mgr := value.(*ConversationManager)
-		// Only include conversations belonging to the current user
 		if mgr.UserID() != userID {
 			return true
 		}
@@ -255,28 +285,31 @@ func (a *API) handleListConversations(w http.ResponseWriter, r *http.Request) {
 		})
 		return true
 	})
+	return conversations
+}
 
-	// Then, get persisted conversations from store (if available)
-	if a.store != nil {
-		persisted, err := a.store.ListConversations(r.Context(), userID)
-		if err != nil {
-			a.logger.Warn("Failed to list persisted conversations", "error", err)
-		} else {
-			// Add persisted conversations that aren't active
-			for _, conv := range persisted {
-				if !activeIDs[conv.ID] {
-					conversations = append(conversations, ConversationWithState{
-						Conversation: *conv,
-						Working:      false,
-						Model:        "",
-					})
-				}
-			}
-		}
+// appendPersistedConversations adds non-active persisted conversations to the list.
+func (a *API) appendPersistedConversations(ctx context.Context, userID string, activeIDs map[string]bool, conversations []ConversationWithState) []ConversationWithState {
+	if a.store == nil {
+		return conversations
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(conversations)
+	persisted, err := a.store.ListConversations(ctx, userID)
+	if err != nil {
+		a.logger.Warn("Failed to list persisted conversations", "error", err)
+		return conversations
+	}
+
+	for _, conv := range persisted {
+		if activeIDs[conv.ID] {
+			continue
+		}
+		conversations = append(conversations, ConversationWithState{
+			Conversation: *conv,
+			Working:      false,
+		})
+	}
+	return conversations
 }
 
 // ConversationWithState is a conversation with its current state.
@@ -292,18 +325,9 @@ func (a *API) handleGetConversation(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	userID := getUserIDFromContext(r.Context())
 
-	// First check active conversations
-	if mgrValue, ok := a.conversations.Load(id); ok {
-		mgr := mgrValue.(*ConversationManager)
-
-		// Check user ownership
-		if mgr.UserID() != userID {
-			http.Error(w, "Conversation not found", http.StatusNotFound)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(StreamResponse{
+	// Check active conversations first
+	if mgr, ok := a.getActiveConversation(id, userID); ok {
+		a.respondJSON(w, http.StatusOK, StreamResponse{
 			Messages:     mgr.GetMessages(),
 			Conversation: ptrTo(mgr.GetConversation()),
 			ConversationState: &ConversationState{
@@ -316,40 +340,53 @@ func (a *API) handleGetConversation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fall back to store for inactive conversations
-	if a.store == nil {
+	conv, messages, ok := a.getStoredConversation(r.Context(), id, userID)
+	if !ok {
 		http.Error(w, "Conversation not found", http.StatusNotFound)
 		return
 	}
 
-	conv, err := a.store.GetConversation(r.Context(), id)
-	if err != nil {
-		http.Error(w, "Conversation not found", http.StatusNotFound)
-		return
-	}
-
-	// Verify ownership
-	if conv.UserID != userID {
-		http.Error(w, "Conversation not found", http.StatusNotFound)
-		return
-	}
-
-	// Get messages from store
-	messages, err := a.store.GetMessages(r.Context(), id)
-	if err != nil {
-		a.logger.Error("Failed to get messages from store", "error", err)
-		messages = []Message{}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(StreamResponse{
+	a.respondJSON(w, http.StatusOK, StreamResponse{
 		Messages:     messages,
 		Conversation: conv,
 		ConversationState: &ConversationState{
 			ConversationID: id,
 			Working:        false,
-			Model:          "",
 		},
 	})
+}
+
+// getActiveConversation retrieves an active conversation if it exists and belongs to the user.
+func (a *API) getActiveConversation(id, userID string) (*ConversationManager, bool) {
+	mgrValue, ok := a.conversations.Load(id)
+	if !ok {
+		return nil, false
+	}
+	mgr := mgrValue.(*ConversationManager)
+	if mgr.UserID() != userID {
+		return nil, false
+	}
+	return mgr, true
+}
+
+// getStoredConversation retrieves a conversation from the store if it exists and belongs to the user.
+func (a *API) getStoredConversation(ctx context.Context, id, userID string) (*Conversation, []Message, bool) {
+	if a.store == nil {
+		return nil, nil, false
+	}
+
+	conv, err := a.store.GetConversation(ctx, id)
+	if err != nil || conv.UserID != userID {
+		return nil, nil, false
+	}
+
+	messages, err := a.store.GetMessages(ctx, id)
+	if err != nil {
+		a.logger.Error("Failed to get messages from store", "error", err)
+		messages = []Message{}
+	}
+
+	return conv, messages, true
 }
 
 // handleChat sends a message to an existing conversation.
@@ -358,60 +395,8 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	userID := getUserIDFromContext(r.Context())
 
-	var mgr *ConversationManager
-
-	// First check if conversation is active
-	if mgrValue, ok := a.conversations.Load(id); ok {
-		mgr = mgrValue.(*ConversationManager)
-		// Check user ownership
-		if mgr.UserID() != userID {
-			http.Error(w, "Conversation not found", http.StatusNotFound)
-			return
-		}
-	} else if a.store != nil {
-		// Try to reactivate from store
-		conv, err := a.store.GetConversation(r.Context(), id)
-		if err != nil {
-			http.Error(w, "Conversation not found", http.StatusNotFound)
-			return
-		}
-
-		// Verify ownership
-		if conv.UserID != userID {
-			http.Error(w, "Conversation not found", http.StatusNotFound)
-			return
-		}
-
-		// Load existing messages for history restoration
-		messages, err := a.store.GetMessages(r.Context(), id)
-		if err != nil {
-			a.logger.Warn("Failed to load messages for reactivation", "error", err)
-			messages = []Message{}
-		}
-
-		// Get latest sequence ID
-		seqID, err := a.store.GetLatestSequenceID(r.Context(), id)
-		if err != nil {
-			seqID = int64(len(messages))
-		}
-
-		// Create OnMessage callback for persistence
-		onMessage := func(ctx context.Context, msg Message) error {
-			return a.store.AddMessage(ctx, id, &msg)
-		}
-
-		// Reactivate the conversation with restored history
-		mgr = NewConversationManager(ConversationManagerConfig{
-			ID:         id,
-			UserID:     userID,
-			Logger:     a.logger,
-			WorkingDir: a.workingDir,
-			OnMessage:  onMessage,
-			History:    messages,
-			SequenceID: seqID,
-		})
-		a.conversations.Store(id, mgr)
-	} else {
+	mgr, ok := a.getOrReactivateConversation(r.Context(), id, userID)
+	if !ok {
 		http.Error(w, "Conversation not found", http.StatusNotFound)
 		return
 	}
@@ -427,18 +412,8 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Use request model or conversation's model
-	model := req.Model
-	if model == "" {
-		model = mgr.GetModel()
-	}
-	if model == "" {
-		model = a.model
-	}
-
-	// Resolve DAG contexts and format message
-	resolved := a.resolveContexts(r.Context(), req.DAGContexts)
-	messageWithContext := formatMessageWithContexts(req.Message, resolved)
+	model := a.selectModel(req.Model, mgr.GetModel())
+	messageWithContext := a.formatMessage(r.Context(), req.Message, req.DAGContexts)
 
 	if err := mgr.AcceptUserMessage(r.Context(), a.provider, model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
@@ -446,9 +421,54 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted)
-	json.NewEncoder(w).Encode(map[string]string{"status": "accepted"})
+	a.respondJSON(w, http.StatusAccepted, map[string]string{"status": "accepted"})
+}
+
+// getOrReactivateConversation retrieves an active conversation or reactivates it from storage.
+func (a *API) getOrReactivateConversation(ctx context.Context, id, userID string) (*ConversationManager, bool) {
+	// Check active conversations first
+	if mgr, ok := a.getActiveConversation(id, userID); ok {
+		return mgr, true
+	}
+
+	// Try to reactivate from store
+	return a.reactivateConversation(ctx, id, userID)
+}
+
+// reactivateConversation restores a conversation from storage and makes it active.
+func (a *API) reactivateConversation(ctx context.Context, id, userID string) (*ConversationManager, bool) {
+	if a.store == nil {
+		return nil, false
+	}
+
+	conv, err := a.store.GetConversation(ctx, id)
+	if err != nil || conv.UserID != userID {
+		return nil, false
+	}
+
+	messages, err := a.store.GetMessages(ctx, id)
+	if err != nil {
+		a.logger.Warn("Failed to load messages for reactivation", "error", err)
+		messages = []Message{}
+	}
+
+	seqID, err := a.store.GetLatestSequenceID(ctx, id)
+	if err != nil {
+		seqID = int64(len(messages))
+	}
+
+	mgr := NewConversationManager(ConversationManagerConfig{
+		ID:         id,
+		UserID:     userID,
+		Logger:     a.logger,
+		WorkingDir: a.workingDir,
+		OnMessage:  a.createMessageCallback(id),
+		History:    messages,
+		SequenceID: seqID,
+	})
+	a.conversations.Store(id, mgr)
+
+	return mgr, true
 }
 
 // handleStream provides SSE streaming for conversation updates.
@@ -457,28 +477,45 @@ func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	userID := getUserIDFromContext(r.Context())
 
-	mgrValue, ok := a.conversations.Load(id)
+	mgr, ok := a.getActiveConversation(id, userID)
 	if !ok {
 		http.Error(w, "Conversation not found", http.StatusNotFound)
 		return
 	}
 
-	mgr := mgrValue.(*ConversationManager)
+	a.setupSSEHeaders(w)
+	a.sendSSEMessage(w, a.buildStreamResponse(id, mgr))
 
-	// Check user ownership
-	if mgr.UserID() != userID {
-		http.Error(w, "Conversation not found", http.StatusNotFound)
-		return
+	next := mgr.Subscribe(r.Context())
+	for {
+		resp, cont := next()
+		if !cont {
+			break
+		}
+		a.sendSSEMessage(w, resp)
 	}
+}
 
-	// Set up SSE headers
+// setupSSEHeaders configures the response headers for Server-Sent Events.
+func (a *API) setupSSEHeaders(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+}
 
-	// Send initial state
-	initialData := StreamResponse{
+// sendSSEMessage sends a single SSE message to the client.
+func (a *API) sendSSEMessage(w http.ResponseWriter, data any) {
+	jsonData, _ := json.Marshal(data)
+	fmt.Fprintf(w, "data: %s\n\n", jsonData)
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// buildStreamResponse constructs the initial stream response for a conversation.
+func (a *API) buildStreamResponse(id string, mgr *ConversationManager) StreamResponse {
+	return StreamResponse{
 		Messages:     mgr.GetMessages(),
 		Conversation: ptrTo(mgr.GetConversation()),
 		ConversationState: &ConversationState{
@@ -486,27 +523,6 @@ func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 			Working:        mgr.IsWorking(),
 			Model:          mgr.GetModel(),
 		},
-	}
-
-	data, _ := json.Marshal(initialData)
-	fmt.Fprintf(w, "data: %s\n\n", data)
-	if f, ok := w.(http.Flusher); ok {
-		f.Flush()
-	}
-
-	// Subscribe to updates
-	next := mgr.Subscribe(r.Context())
-	for {
-		resp, cont := next()
-		if !cont {
-			break
-		}
-
-		data, _ := json.Marshal(resp)
-		fmt.Fprintf(w, "data: %s\n\n", data)
-		if f, ok := w.(http.Flusher); ok {
-			f.Flush()
-		}
 	}
 }
 
@@ -516,16 +532,8 @@ func (a *API) handleCancel(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	userID := getUserIDFromContext(r.Context())
 
-	mgrValue, ok := a.conversations.Load(id)
+	mgr, ok := a.getActiveConversation(id, userID)
 	if !ok {
-		http.Error(w, "Conversation not found", http.StatusNotFound)
-		return
-	}
-
-	mgr := mgrValue.(*ConversationManager)
-
-	// Check user ownership
-	if mgr.UserID() != userID {
 		http.Error(w, "Conversation not found", http.StatusNotFound)
 		return
 	}
@@ -536,8 +544,7 @@ func (a *API) handleCancel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "cancelled"})
+	a.respondJSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
 }
 
 // CleanupOldConversations removes conversations that haven't been active for the given duration.

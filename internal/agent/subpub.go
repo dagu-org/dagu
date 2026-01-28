@@ -7,7 +7,6 @@ import (
 
 // SubPub provides a generic publish-subscribe mechanism for SSE streaming.
 // It uses sequence-based subscriptions to ensure efficient delivery.
-// Based on Shelley's subpub pattern.
 type SubPub[K any] struct {
 	mu          sync.Mutex
 	subscribers []*subscriber[K]
@@ -22,20 +21,16 @@ type subscriber[K any] struct {
 
 // NewSubPub creates a new SubPub instance.
 func NewSubPub[K any]() *SubPub[K] {
-	return &SubPub[K]{
-		subscribers: make([]*subscriber[K], 0),
-	}
+	return &SubPub[K]{}
 }
 
 // Subscribe registers interest in messages after the given sequence index.
-// Returns a function that blocks until a new message is available.
-// The second return value is false when the subscription is done.
+// Returns a function that blocks until the next message is available.
+// The returned bool is false when the subscription ends.
 func (sp *SubPub[K]) Subscribe(ctx context.Context, idx int64) func() (K, bool) {
-	// Create a child context for this subscription
 	subCtx, cancel := context.WithCancel(ctx)
+	ch := make(chan K, 10) // Buffered to avoid blocking publishers
 
-	// Buffered channel to avoid blocking publishers
-	ch := make(chan K, 10)
 	sub := &subscriber[K]{
 		idx:    idx,
 		ch:     ch,
@@ -47,17 +42,17 @@ func (sp *SubPub[K]) Subscribe(ctx context.Context, idx int64) func() (K, bool) 
 	sp.subscribers = append(sp.subscribers, sub)
 	sp.mu.Unlock()
 
-	// Return a function that blocks until the next message
+	var zero K
 	return func() (K, bool) {
 		select {
 		case msg, ok := <-ch:
 			if !ok {
-				var zero K
 				return zero, false
 			}
 			return msg, true
+
 		case <-subCtx.Done():
-			// Context cancelled, but drain any buffered messages first
+			// Try to drain one buffered message before returning
 			select {
 			case msg, ok := <-ch:
 				if ok {
@@ -65,81 +60,78 @@ func (sp *SubPub[K]) Subscribe(ctx context.Context, idx int64) func() (K, bool) 
 				}
 			default:
 			}
-			var zero K
 			return zero, false
 		}
 	}
 }
 
 // Publish sends a message to all subscribers waiting for messages after the given index.
-// Subscribers that are "behind" (can't keep up) will be disconnected.
+// Subscribers that cannot keep up will be disconnected.
 func (sp *SubPub[K]) Publish(idx int64, message K) {
 	sp.mu.Lock()
 	defer sp.mu.Unlock()
 
-	// Notify subscribers and filter out disconnected ones
 	remaining := sp.subscribers[:0]
 	for _, sub := range sp.subscribers {
-		// Check if context is still valid
-		select {
-		case <-sub.ctx.Done():
-			// Context cancelled, close channel and don't keep subscriber
-			close(sub.ch)
+		if sp.isContextDone(sub) {
 			continue
-		default:
 		}
 
-		// Only send to subscribers waiting for messages after an index < idx
-		if sub.idx < idx {
-			// Try to send the message
-			select {
-			case sub.ch <- message:
-				// Success, update subscriber's index and keep them
-				sub.idx = idx
-				remaining = append(remaining, sub)
-			default:
-				// Channel full, subscriber is behind - disconnect them
-				close(sub.ch)
-				sub.cancel()
-			}
-		} else {
-			// This subscriber is not interested yet (already has this index or beyond)
+		if sub.idx >= idx {
+			// Subscriber already has this index or beyond
+			remaining = append(remaining, sub)
+			continue
+		}
+
+		if sp.trySend(sub, message) {
+			sub.idx = idx
 			remaining = append(remaining, sub)
 		}
 	}
 	sp.subscribers = remaining
 }
 
-// Broadcast sends a message to ALL subscribers regardless of their current index.
-// This is used for out-of-band notifications like state changes.
+// Broadcast sends a message to all subscribers regardless of their current index.
+// Used for out-of-band notifications like state changes.
 func (sp *SubPub[K]) Broadcast(message K) {
 	sp.mu.Lock()
 	defer sp.mu.Unlock()
 
 	remaining := sp.subscribers[:0]
 	for _, sub := range sp.subscribers {
-		select {
-		case <-sub.ctx.Done():
-			close(sub.ch)
+		if sp.isContextDone(sub) {
 			continue
-		default:
 		}
 
-		select {
-		case sub.ch <- message:
+		if sp.trySend(sub, message) {
 			remaining = append(remaining, sub)
-		default:
-			// Channel full, disconnect
-			close(sub.ch)
-			sub.cancel()
 		}
 	}
 	sp.subscribers = remaining
 }
 
-// SubscriberCount returns the number of active subscribers.
-func (sp *SubPub[K]) SubscriberCount() int {
-	sp.mu.Lock()
-	defer sp.mu.Unlock()
-	return len(sp.subscribers)
+// isContextDone checks if a subscriber's context is cancelled and cleans up if so.
+// Must be called with sp.mu held.
+func (*SubPub[K]) isContextDone(sub *subscriber[K]) bool {
+	select {
+	case <-sub.ctx.Done():
+		close(sub.ch)
+		return true
+	default:
+		return false
+	}
+}
+
+// trySend attempts to send a message to a subscriber.
+// Returns false and disconnects the subscriber if the channel is full.
+// Must be called with sp.mu held.
+func (*SubPub[K]) trySend(sub *subscriber[K], message K) bool {
+	select {
+	case sub.ch <- message:
+		return true
+	default:
+		close(sub.ch)
+		sub.cancel()
+		return false
+	}
 }
