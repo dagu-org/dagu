@@ -1,9 +1,10 @@
 import { Button } from '@/components/ui/button';
 import { Loader2, Maximize2, X } from 'lucide-react';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { components } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { usePageContext } from '../../../../contexts/PageContext';
 import { useQuery } from '../../../../hooks/api';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
@@ -25,6 +26,7 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
 }) => {
   const navigate = useNavigate();
   const appBarContext = React.useContext(AppBarContext);
+  const { setContext } = usePageContext();
 
   // Track if modal should be rendered and if it's visible (for animation)
   const [shouldRender, setShouldRender] = React.useState(isOpen);
@@ -145,6 +147,19 @@ const DAGRunDetailsModal: React.FC<DAGRunDetailsModalProps> = ({
     previousDataRef.current &&
     (previousDataRef.current.dagRunId !== dagRunId ||
       previousDataRef.current.name !== name);
+
+  // Set page context for agent chat when modal is open
+  useEffect(() => {
+    if (isOpen && name) {
+      setContext({
+        dagFile: name,
+        dagRunId: dagRunId || undefined,
+        dagRunName: name,
+        source: 'dag-run-details-modal',
+      });
+    }
+    // Don't clear context on close - let the underlying page context remain
+  }, [isOpen, name, dagRunId, setContext]);
 
   const refreshFn = React.useCallback(() => {
     setTimeout(() => mutate(), 500);

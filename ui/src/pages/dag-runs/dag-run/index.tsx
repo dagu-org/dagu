@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { AppBarContext } from '../../../contexts/AppBarContext';
+import { usePageContext } from '../../../contexts/PageContext';
 import { DAGRunDetailsContent } from '../../../features/dag-runs/components/dag-run-details';
 import { DAGRunContext } from '../../../features/dag-runs/contexts/DAGRunContext';
 import { useQuery } from '../../../hooks/api';
@@ -8,6 +9,7 @@ import { useQuery } from '../../../hooks/api';
 function DAGRunDetailsPage() {
   const { name, dagRunId = 'latest' } = useParams();
   const appBarContext = React.useContext(AppBarContext);
+  const { setContext } = usePageContext();
   const location = window.location.search;
 
   // Parse URL search params to check for subDAGRunId
@@ -109,6 +111,21 @@ function DAGRunDetailsPage() {
   const displayName = subDAGRunId
     ? dagRunDetails?.name || parentName || ''
     : name || '';
+
+  // Set page context for agent chat
+  useEffect(() => {
+    if (displayName) {
+      setContext({
+        dagFile: displayName,
+        dagRunId: displayDAGRunId || undefined,
+        dagRunName: displayName,
+        source: 'dag-run-details-page',
+      });
+    }
+    return () => {
+      setContext(null);
+    };
+  }, [displayName, displayDAGRunId, setContext]);
 
   return (
     <div className="w-full px-4">

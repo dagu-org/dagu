@@ -19,6 +19,7 @@ import {
   AgentChatProvider,
   AgentChatModal,
 } from './features/agent';
+import { PageContextProvider } from './contexts/PageContext';
 import Layout from './layouts/Layout';
 import fetchJson from './lib/fetchJson';
 import Dashboard from './pages';
@@ -152,7 +153,8 @@ function AppInner({ config }: Props) {
                             element={
                               <ProtectedRoute>
                                 <AgentChatProvider>
-                                  <Layout navbarColor={config.navbarColor}>
+                                  <PageContextProvider>
+                                    <Layout navbarColor={config.navbarColor}>
                                     <Routes>
                                       <Route path="/" element={<Dashboard />} />
                                       <Route
@@ -250,9 +252,10 @@ function AppInner({ config }: Props) {
                                         }
                                       />
                                     </Routes>
-                                  </Layout>
-                                  {/* Agent Chat Modal - only shown when enabled */}
-                                  {config.agentEnabled && <AgentChatModal />}
+                                    </Layout>
+                                    {/* Agent Chat Modal - only shown when enabled */}
+                                    {config.agentEnabled && <AgentChatModal />}
+                                  </PageContextProvider>
                                 </AgentChatProvider>
                               </ProtectedRoute>
                             }

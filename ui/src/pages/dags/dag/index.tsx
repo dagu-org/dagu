@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { components } from '../../../api/v2/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
+import { usePageContext } from '../../../contexts/PageContext';
 import { UnsavedChangesProvider } from '../../../contexts/UnsavedChangesContext';
 import {
   DAGDetailsContent,
@@ -25,6 +26,7 @@ function DAGDetails() {
   const params = useParams<Params>();
   const navigate = useNavigate();
   const appBarContext = React.useContext(AppBarContext);
+  const { setContext } = usePageContext();
   const [searchParams] = useSearchParams();
 
   // Extract query parameters
@@ -35,6 +37,20 @@ function DAGDetails() {
   // Use remoteNode from URL if present, otherwise from app bar context
   const remoteNode = searchParams.get('remoteNode') || appBarContext.selectedRemoteNode || 'local';
   const fileName = params.fileName || '';
+
+  // Set page context for agent chat
+  useEffect(() => {
+    if (fileName) {
+      setContext({
+        dagFile: fileName,
+        dagRunId: dagRunId || undefined,
+        source: 'dag-details-page',
+      });
+    }
+    return () => {
+      setContext(null);
+    };
+  }, [fileName, dagRunId, setContext]);
 
   // SSE for real-time updates with polling fallback
   const sseResult = useDAGSSE(fileName || '', !!fileName);

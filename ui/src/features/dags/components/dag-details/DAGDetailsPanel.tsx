@@ -5,6 +5,7 @@ import { Maximize2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { components } from '../../../../api/v2/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { usePageContext } from '../../../../contexts/PageContext';
 import { UnsavedChangesProvider } from '../../../../contexts/UnsavedChangesContext';
 import { useQuery } from '../../../../hooks/api';
 import { useDAGSSE } from '../../../../hooks/useDAGSSE';
@@ -36,6 +37,7 @@ type DAGDetailsData = ReturnType<typeof useDAGSSE>['data'];
 function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactElement | null {
   const navigate = useNavigate();
   const appBarContext = useContext(AppBarContext);
+  const { setContext } = usePageContext();
 
   const [currentDAGRun, setCurrentDAGRun] = useState<DAGRunDetails | undefined>();
   const [activeTab, setActiveTab] = useState('status');
@@ -44,6 +46,20 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
 
   const dagRunId = 'latest';
   const stepName = null;
+
+  // Set page context for agent chat
+  useEffect(() => {
+    if (fileName) {
+      setContext({
+        dagFile: fileName,
+        source: 'dag-details-panel',
+      });
+    }
+    return () => {
+      // Clear context when panel unmounts
+      setContext(null);
+    };
+  }, [fileName, setContext]);
 
   const navigateToStatusTab = useCallback(() => {
     setActiveTab('status');
