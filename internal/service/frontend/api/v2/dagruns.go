@@ -149,15 +149,22 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 		return nil, err
 	}
 
-	if request.Body == nil || request.Body.Spec == "" {
+	if request.Body == nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeBadRequest,
-			Message:    "spec is required",
+			Message:    "no body was given",
 		}
 	}
 
-	var dagRunId, params string
+	if request.Body.Spec == "" && request.Body.Url == nil || request.Body.Spec != "" && request.Body.Url != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "either give spec or url; don't give both",
+		}
+	}
+	var dagRunId, params, fileurl string
 	if request.Body.DagRunId != nil {
 		dagRunId = *request.Body.DagRunId
 	}
@@ -171,8 +178,30 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 	if request.Body.Params != nil {
 		params = *request.Body.Params
 	}
+	if request.Body.Url != nil {
+		fileurl = *request.Body.Url
+	}
 
-	dag, cleanup, err := a.loadInlineDAG(ctx, request.Body.Spec, request.Body.Name, dagRunId)
+	var finalSpec string
+	if strings.HasPrefix(fileurl, "file:///") {
+		_, url, _ := strings.Cut(fileurl, "file://")
+
+		data, err := os.ReadFile(url)
+		if err != nil {
+			return nil, fmt.Errorf("Error reading file: %w", err)
+		}
+		finalSpec = string(data)
+	} else if request.Body.Spec != "" {
+		finalSpec = request.Body.Spec
+	} else {
+		return nil, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "Url should start with file:///",
+		}
+	}
+
+	dag, cleanup, err := a.loadInlineDAG(ctx, finalSpec, request.Body.Name, dagRunId)
 	if err != nil {
 		return nil, err
 	}
