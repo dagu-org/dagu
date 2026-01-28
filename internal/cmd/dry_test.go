@@ -5,6 +5,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/test"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDryCommand(t *testing.T) {
@@ -45,5 +46,21 @@ steps:
 				th.RunCommand(t, cmd.Dry(), tc)
 			})
 		}
+	})
+
+	t.Run("InvalidDependency", func(t *testing.T) {
+		th := test.SetupCommand(t)
+		dagFile := th.CreateDAGFile(t, "invalid.yaml", `
+steps:
+  - echo A
+  - name: "b"
+    command: echo B
+    depends: ["missing_step"]
+`)
+		err := th.RunCommandWithError(t, cmd.Dry(), test.CmdTest{
+			Args: []string{"dry", dagFile},
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "depends on non-existent step")
 	})
 }

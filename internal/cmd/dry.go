@@ -71,6 +71,11 @@ func runDry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}
 
+	// Validate DAG structure before dry-run
+	if err := dag.Validate(); err != nil {
+		return fmt.Errorf("validation failed for %s: %w", args[0], err)
+	}
+
 	dagRunID, err := genRunID()
 	if err != nil {
 		return fmt.Errorf("failed to generate dag-run ID: %w", err)
