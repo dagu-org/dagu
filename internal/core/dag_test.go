@@ -3,6 +3,7 @@ package core_test
 import (
 	"crypto/md5"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -483,6 +484,36 @@ func TestDAG_Validate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDAG_Validate_MultipleErrors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("collects_all_validation_errors", func(t *testing.T) {
+		t.Parallel()
+
+		dag := &core.DAG{
+			Name: "", // error 1: empty name
+			Steps: []core.Step{
+				{Name: "a", Depends: []string{"missing1"}}, // error 2
+				{Name: "b", Depends: []string{"missing2"}}, // error 3
+				{Name: "c", Depends: []string{"missing3"}}, // error 4
+			},
+		}
+
+		err := dag.Validate()
+		require.Error(t, err)
+
+		var errList core.ErrorList
+		require.True(t, errors.As(err, &errList), "error should be an ErrorList")
+		assert.Len(t, errList, 4, "should collect all 4 errors (1 name + 3 dependencies)")
+
+		errStr := err.Error()
+		assert.Contains(t, errStr, "DAG name is required")
+		assert.Contains(t, errStr, "missing1")
+		assert.Contains(t, errStr, "missing2")
+		assert.Contains(t, errStr, "missing3")
+	})
 }
 
 func TestDAG_HasTag(t *testing.T) {

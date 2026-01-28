@@ -287,9 +287,12 @@ func (d *DAG) String() string {
 }
 
 // Validate performs basic validation of the DAG structure.
+// It collects all validation errors instead of returning on first error.
 func (d *DAG) Validate() error {
+	var errs ErrorList
+
 	if d.Name == "" {
-		return fmt.Errorf("DAG name is required")
+		errs = append(errs, fmt.Errorf("DAG name is required"))
 	}
 
 	stepExists := make(map[string]bool)
@@ -299,15 +302,18 @@ func (d *DAG) Validate() error {
 
 	for _, step := range d.Steps {
 		for _, dep := range step.Depends {
-			if !stepExists[dep] {
-				return ErrorList{
-					NewValidationError("depends", dep, fmt.Errorf("step %s depends on non-existent step", step.Name)),
-				}
+			if stepExists[dep] {
+				continue
 			}
+			errs = append(errs, NewValidationError("depends", dep,
+				fmt.Errorf("step %s depends on non-existent step", step.Name)))
 		}
 	}
 
-	return nil
+	if len(errs) == 0 {
+		return nil
+	}
+	return errs
 }
 
 // NextRun returns the next scheduled run time based on the DAG's schedules.

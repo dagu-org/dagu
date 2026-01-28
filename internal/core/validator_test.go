@@ -635,31 +635,31 @@ func TestValidateStep(t *testing.T) {
 	t.Run("valid step passes", func(t *testing.T) {
 		t.Parallel()
 		step := Step{Name: "validStep", ExecutorConfig: ExecutorConfig{Type: testExecutorType}}
-		err := validateStep(step)
-		assert.NoError(t, err)
+		errs := validateStep(step)
+		assert.Empty(t, errs)
 	})
 
 	t.Run("empty name fails", func(t *testing.T) {
 		t.Parallel()
 		step := Step{Name: "", ExecutorConfig: ExecutorConfig{Type: testExecutorType}}
-		err := validateStep(step)
-		require.Error(t, err)
-		assert.True(t, errors.Is(err, ErrStepNameRequired))
+		errs := validateStep(step)
+		require.NotEmpty(t, errs)
+		assert.True(t, errors.Is(errs, ErrStepNameRequired))
 	})
 
 	t.Run("name too long fails", func(t *testing.T) {
 		t.Parallel()
 		step := Step{Name: strings.Repeat("x", 41), ExecutorConfig: ExecutorConfig{Type: testExecutorType}}
-		err := validateStep(step)
-		require.Error(t, err)
-		assert.True(t, errors.Is(err, ErrStepNameTooLong))
+		errs := validateStep(step)
+		require.NotEmpty(t, errs)
+		assert.True(t, errors.Is(errs, ErrStepNameTooLong))
 	})
 
 	t.Run("name at exactly max length passes", func(t *testing.T) {
 		t.Parallel()
 		step := Step{Name: strings.Repeat("x", 40), ExecutorConfig: ExecutorConfig{Type: testExecutorType}}
-		err := validateStep(step)
-		assert.NoError(t, err)
+		errs := validateStep(step)
+		assert.Empty(t, errs)
 	})
 }
 
@@ -770,5 +770,75 @@ func TestValidateSteps_ComplexScenarios(t *testing.T) {
 		}
 		err := ValidateSteps(dag)
 		assert.NoError(t, err)
+	})
+}
+
+func TestValidateSteps_MultipleErrors(t *testing.T) {
+	t.Parallel()
+
+	testExecutorType := "test-no-validator"
+
+	t.Run("duplicate_names", func(t *testing.T) {
+		t.Parallel()
+
+		dag := &DAG{
+			Steps: []Step{
+				{Name: "step1", ExecutorConfig: ExecutorConfig{Type: testExecutorType}},
+				{Name: "step1", ExecutorConfig: ExecutorConfig{Type: testExecutorType}}, // duplicate
+				{Name: "step2", ExecutorConfig: ExecutorConfig{Type: testExecutorType}},
+				{Name: "step2", ExecutorConfig: ExecutorConfig{Type: testExecutorType}}, // duplicate
+			},
+		}
+
+		err := ValidateSteps(dag)
+		require.Error(t, err)
+
+		var errList ErrorList
+		require.True(t, errors.As(err, &errList), "error should be an ErrorList")
+		assert.Len(t, errList, 2, "should collect both duplicate name errors")
+	})
+
+	t.Run("missing_dependencies", func(t *testing.T) {
+		t.Parallel()
+
+		dag := &DAG{
+			Steps: []Step{
+				{Name: "step1", Depends: []string{"missing1"}, ExecutorConfig: ExecutorConfig{Type: testExecutorType}},
+				{Name: "step2", Depends: []string{"missing2"}, ExecutorConfig: ExecutorConfig{Type: testExecutorType}},
+				{Name: "step3", Depends: []string{"missing3"}, ExecutorConfig: ExecutorConfig{Type: testExecutorType}},
+			},
+		}
+
+		err := ValidateSteps(dag)
+		require.Error(t, err)
+
+		var errList ErrorList
+		require.True(t, errors.As(err, &errList), "error should be an ErrorList")
+		assert.Len(t, errList, 3, "should collect all 3 missing dependency errors")
+
+		errStr := err.Error()
+		assert.Contains(t, errStr, "missing1")
+		assert.Contains(t, errStr, "missing2")
+		assert.Contains(t, errStr, "missing3")
+	})
+
+	t.Run("mixed_validation_errors", func(t *testing.T) {
+		t.Parallel()
+
+		dag := &DAG{
+			Steps: []Step{
+				{Name: "step1", ID: "123invalid", ExecutorConfig: ExecutorConfig{Type: testExecutorType}}, // invalid ID format
+				{Name: "step1", ExecutorConfig: ExecutorConfig{Type: testExecutorType}},                   // duplicate name
+				{Name: "step2", ID: "env", ExecutorConfig: ExecutorConfig{Type: testExecutorType}},        // reserved word
+				{Name: "step3", Depends: []string{"missing"}, ExecutorConfig: ExecutorConfig{Type: testExecutorType}},
+			},
+		}
+
+		err := ValidateSteps(dag)
+		require.Error(t, err)
+
+		var errList ErrorList
+		require.True(t, errors.As(err, &errList), "error should be an ErrorList")
+		assert.GreaterOrEqual(t, len(errList), 3, "should collect multiple validation errors")
 	})
 }
