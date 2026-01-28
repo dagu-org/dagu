@@ -110,6 +110,11 @@ func (r *Renderer) RenderDAGStatus(dag *core.DAG, status *exec.DAGRunStatus) str
 	buf.WriteString(r.renderDAGLine(dag, status))
 	buf.WriteString("\n")
 
+	// Scheduler log path (if exists)
+	if status.Log != "" {
+		buf.WriteString(r.renderSchedulerLog(status.Log, len(status.Nodes) > 0))
+	}
+
 	// Tree continuation after DAG line (if there are steps)
 	if len(status.Nodes) > 0 {
 		buf.WriteString("│\n")
@@ -454,6 +459,7 @@ func (r *Renderer) renderOutputs(node *exec.Node, isLast bool, prefix string) st
 }
 
 // renderOutput renders a single output stream (stdout or stderr) with content.
+// Shows the file path on the label line, then content indented below.
 func (r *Renderer) renderOutput(label string, filePath string, isLast bool, prefix string) string {
 	// Read log content with tail limit
 	lines, truncated, err := ReadLogFileTail(filePath, r.config.MaxOutputLines)
@@ -502,30 +508,18 @@ func (r *Renderer) renderOutput(label string, filePath string, isLast bool, pref
 		}
 	}
 
-	// Show truncation indicator first if lines were omitted
+	// Always show label with file path on the first line
+	buf.WriteString(prefix + branch + r.text(label+": ") + r.gray(filePath) + "\n")
+
+	// Show truncation indicator if lines were omitted
 	if truncated > 0 {
 		truncMsg := fmt.Sprintf("... (%d more lines)", truncated)
-		buf.WriteString(prefix + branch + r.text(label+": "+truncMsg) + "\n")
+		buf.WriteString(contentPrefix + "  " + r.gray(truncMsg) + "\n")
+	}
 
-		for _, line := range lines {
-			writeContentLine(line)
-		}
-	} else if len(lines) == 1 {
-		// Single line - show inline with label if short enough
-		trimmed := strings.TrimSpace(lines[0])
-		labelLine := label + ": " + trimmed
-		if len(labelLine) <= maxContentWidth {
-			buf.WriteString(prefix + branch + r.text(labelLine) + "\n")
-		} else {
-			buf.WriteString(prefix + branch + r.text(label+":") + "\n")
-			writeContentLine(trimmed)
-		}
-	} else {
-		// Multiple lines - show label on its own line, then content
-		buf.WriteString(prefix + branch + r.text(label+":") + "\n")
-		for _, line := range lines {
-			writeContentLine(line)
-		}
+	// Render all content lines indented
+	for _, line := range lines {
+		writeContentLine(line)
 	}
 
 	return buf.String()
@@ -608,6 +602,15 @@ func (r *Renderer) renderFinalStatus(status *exec.DAGRunStatus) string {
 		prefix = "Status"
 	}
 	return fmt.Sprintf("\n%s: %s\n", prefix, StatusText(status.Status))
+}
+
+// renderSchedulerLog renders the DAG-level scheduler log path.
+func (r *Renderer) renderSchedulerLog(logPath string, hasSteps bool) string {
+	branch := TreeBranch
+	if !hasSteps {
+		branch = TreeLastBranch
+	}
+	return branch + r.text("log: ") + r.gray(logPath) + "\n"
 }
 
 // calculateDuration calculates the duration string between start and finish times.

@@ -1159,3 +1159,120 @@ func TestReadLogFileTail_WithCarriageReturns(t *testing.T) {
 	// First line should be the final progress state (after \r)
 	require.Contains(t, lines[0], "100", "First line should contain '100' (final progress)")
 }
+
+func TestRenderDAGStatus_ShowsLogFilePaths(t *testing.T) {
+	t.Parallel()
+	// Create temporary log files
+	stdoutFile, err := os.CreateTemp("", "stdout-*.log")
+	require.NoError(t, err)
+	defer func() { _ = os.Remove(stdoutFile.Name()) }()
+	_, _ = stdoutFile.WriteString("Hello from stdout\n")
+	_ = stdoutFile.Close()
+
+	stderrFile, err := os.CreateTemp("", "stderr-*.log")
+	require.NoError(t, err)
+	defer func() { _ = os.Remove(stderrFile.Name()) }()
+	_, _ = stderrFile.WriteString("Warning message\n")
+	_ = stderrFile.Close()
+
+	dag := &core.DAG{Name: "test-dag"}
+	status := &exec.DAGRunStatus{
+		Status:     core.Succeeded,
+		StartedAt:  "2024-01-15 10:00:00",
+		FinishedAt: "2024-01-15 10:00:30",
+		Nodes: []*exec.Node{
+			{
+				Step:       core.Step{Name: "step1", Command: "echo"},
+				Status:     core.NodeSucceeded,
+				StartedAt:  "2024-01-15 10:00:00",
+				FinishedAt: "2024-01-15 10:00:30",
+				Stdout:     stdoutFile.Name(),
+				Stderr:     stderrFile.Name(),
+			},
+		},
+	}
+
+	config := DefaultConfig()
+	config.ColorEnabled = false
+
+	renderer := NewRenderer(config)
+	output := renderer.RenderDAGStatus(dag, status)
+
+	// Verify file paths are displayed
+	require.Contains(t, output, "stdout: "+stdoutFile.Name(), "Output should contain stdout file path")
+	require.Contains(t, output, "stderr: "+stderrFile.Name(), "Output should contain stderr file path")
+	// Verify content is also displayed
+	require.Contains(t, output, "Hello from stdout", "Output should contain stdout content")
+	require.Contains(t, output, "Warning message", "Output should contain stderr content")
+}
+
+func TestRenderDAGStatus_ShowsSchedulerLog(t *testing.T) {
+	t.Parallel()
+	dag := &core.DAG{Name: "test-dag"}
+	status := &exec.DAGRunStatus{
+		Status:     core.Succeeded,
+		StartedAt:  "2024-01-15 10:00:00",
+		FinishedAt: "2024-01-15 10:00:30",
+		Log:        "/path/to/scheduler.log",
+		Nodes: []*exec.Node{
+			{
+				Step:   core.Step{Name: "step1"},
+				Status: core.NodeSucceeded,
+			},
+		},
+	}
+
+	config := DefaultConfig()
+	config.ColorEnabled = false
+
+	renderer := NewRenderer(config)
+	output := renderer.RenderDAGStatus(dag, status)
+
+	require.Contains(t, output, "log: /path/to/scheduler.log", "Output should contain scheduler log path")
+}
+
+func TestRenderDAGStatus_NoSchedulerLogWhenEmpty(t *testing.T) {
+	t.Parallel()
+	dag := &core.DAG{Name: "test-dag"}
+	status := &exec.DAGRunStatus{
+		Status:     core.Succeeded,
+		StartedAt:  "2024-01-15 10:00:00",
+		FinishedAt: "2024-01-15 10:00:30",
+		Log:        "", // Empty log path
+		Nodes: []*exec.Node{
+			{
+				Step:   core.Step{Name: "step1"},
+				Status: core.NodeSucceeded,
+			},
+		},
+	}
+
+	config := DefaultConfig()
+	config.ColorEnabled = false
+
+	renderer := NewRenderer(config)
+	output := renderer.RenderDAGStatus(dag, status)
+
+	require.NotContains(t, output, "log:", "Output should not contain log: when path is empty")
+}
+
+func TestRenderDAGStatus_SchedulerLogLastBranchWhenNoSteps(t *testing.T) {
+	t.Parallel()
+	dag := &core.DAG{Name: "test-dag"}
+	status := &exec.DAGRunStatus{
+		Status:     core.Succeeded,
+		StartedAt:  "2024-01-15 10:00:00",
+		FinishedAt: "2024-01-15 10:00:30",
+		Log:        "/path/to/scheduler.log",
+		Nodes:      []*exec.Node{}, // No steps
+	}
+
+	config := DefaultConfig()
+	config.ColorEnabled = false
+
+	renderer := NewRenderer(config)
+	output := renderer.RenderDAGStatus(dag, status)
+
+	// Should use └─ (last branch) when there are no steps
+	require.Contains(t, output, "└─log:", "Output should use last branch for log when no steps")
+}
