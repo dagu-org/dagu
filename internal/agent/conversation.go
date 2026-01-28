@@ -29,6 +29,7 @@ type ConversationManager struct {
 	logger       *slog.Logger
 	workingDir   string
 	sequenceID   int64
+	environment  EnvironmentInfo
 
 	// onWorkingChange is called when the working state changes.
 	onWorkingChange func(id string, working bool)
@@ -49,6 +50,8 @@ type ConversationManagerConfig struct {
 	History []Message
 	// SequenceID is the latest sequence ID from persistence (for reactivation).
 	SequenceID int64
+	// Environment contains Dagu paths for the system prompt.
+	Environment EnvironmentInfo
 }
 
 // NewConversationManager creates a new ConversationManager.
@@ -76,6 +79,7 @@ func NewConversationManager(cfg ConversationManagerConfig) *ConversationManager 
 		onWorkingChange: cfg.OnWorkingChange,
 		onMessage:       cfg.OnMessage,
 		sequenceID:      cfg.SequenceID,
+		environment:     cfg.Environment,
 	}
 }
 
@@ -266,7 +270,7 @@ func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) e
 		Tools:          tools,
 		RecordMessage:  cm.createRecordMessageFunc(),
 		Logger:         cm.logger,
-		SystemPrompt:   defaultSystemPrompt(),
+		SystemPrompt:   generateSystemPrompt(cm.environment),
 		WorkingDir:     cm.workingDir,
 		ConversationID: cm.id,
 		OnWorking:      cm.SetWorking,
@@ -356,9 +360,15 @@ func (cm *ConversationManager) createEmitUIActionFunc() UIActionFunc {
 	}
 }
 
-// defaultSystemPrompt returns the default system prompt for the agent.
-func defaultSystemPrompt() string {
-	return `You are Dagu Agent, an AI assistant that helps users manage DAG workflows.
+// generateSystemPrompt creates the system prompt with environment information.
+func generateSystemPrompt(env EnvironmentInfo) string {
+	return fmt.Sprintf(`You are Dagu Agent, an AI assistant that helps users manage DAG workflows.
+
+## Environment
+- DAGs Directory: %s
+- Logs Directory: %s
+- Data Directory: %s
+- Config File: %s
 
 ## Tools
 - bash: Execute shell commands
@@ -367,8 +377,33 @@ func defaultSystemPrompt() string {
 - think: Plan and reason through complex tasks
 - get_dag_reference: Get DAG YAML documentation (ALWAYS call before creating/editing DAGs)
 
+## Command
+Usage:
+  dagu [command]
+
+Available Commands:
+  cleanup     Remove old DAG run history
+  dequeue     Dequeue a DAG-run from the specified queue
+  dry         Simulate a DAG-run without executing actual commands
+  enqueue     Enqueue a DAG-run to the queue.
+  help        Help about any command
+  retry       Retry a previously executed DAG-run with the same run ID
+  status      Display the current status of a DAG-run
+  stop        Stop a running DAG-run gracefully
+  validate    Validate a DAG specification
+  version     Display the Dagu version information
+  worker      Start a worker that polls the coordinator for tasks
+
+## DAG Writing Guidelines
+- No 'name:' field in root level
+- Use '---' to define subDAGs
+- Check schema for fields and types
+- Default is 'type: chain' if not specified, making steps execute sequentially
+- Use 'type: graph' for complex DAGs with parallel steps with 'depends:' field
+- Use 'call: <subdag_name>' to invoke subDAGs or external DAGs
+
 ## DAG Files
-DAGs are YAML files in the DAGs directory. Use 'dagu home' to find the location.
+DAGs are YAML files. Create new DAGs in the DAGs directory shown above.
 
 ## Workflow for DAG Creation/Editing
 1. Call get_dag_reference("overview") to understand DAG structure
@@ -380,5 +415,5 @@ DAGs are YAML files in the DAGs directory. Use 'dagu home' to find the location.
 ## Important
 - YAML indentation matters (2 spaces)
 - Use 'dagu dry-run' before confirming changes
-- Ask for confirmation before significant changes`
+- Ask for confirmation before significant changes`, env.DAGsDir, env.LogDir, env.DataDir, env.ConfigFile)
 }

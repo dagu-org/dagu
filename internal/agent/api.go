@@ -38,6 +38,7 @@ type API struct {
 	workingDir    string
 	logger        *slog.Logger
 	dagStore      exec.DAGStore // For resolving DAG file paths
+	environment   EnvironmentInfo
 	mu            sync.Mutex
 }
 
@@ -49,6 +50,7 @@ type APIConfig struct {
 	Logger            *slog.Logger
 	ConversationStore ConversationStore
 	DAGStore          exec.DAGStore // For resolving DAG file paths
+	Environment       EnvironmentInfo
 }
 
 // NewAPI creates a new API instance.
@@ -59,12 +61,13 @@ func NewAPI(cfg APIConfig) *API {
 	}
 
 	return &API{
-		provider:   cfg.Provider,
-		model:      cfg.Model,
-		workingDir: cfg.WorkingDir,
-		logger:     logger,
-		store:      cfg.ConversationStore,
-		dagStore:   cfg.DAGStore,
+		provider:    cfg.Provider,
+		model:       cfg.Model,
+		workingDir:  cfg.WorkingDir,
+		logger:      logger,
+		store:       cfg.ConversationStore,
+		dagStore:    cfg.DAGStore,
+		environment: cfg.Environment,
 	}
 }
 
@@ -233,11 +236,12 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 
 	mgr := NewConversationManager(ConversationManagerConfig{
-		ID:         id,
-		UserID:     userID,
-		Logger:     a.logger,
-		WorkingDir: a.workingDir,
-		OnMessage:  a.createMessageCallback(id),
+		ID:          id,
+		UserID:      userID,
+		Logger:      a.logger,
+		WorkingDir:  a.workingDir,
+		OnMessage:   a.createMessageCallback(id),
+		Environment: a.environment,
 	})
 
 	a.persistNewConversation(r.Context(), id, userID, now)
@@ -458,13 +462,14 @@ func (a *API) reactivateConversation(ctx context.Context, id, userID string) (*C
 	}
 
 	mgr := NewConversationManager(ConversationManagerConfig{
-		ID:         id,
-		UserID:     userID,
-		Logger:     a.logger,
-		WorkingDir: a.workingDir,
-		OnMessage:  a.createMessageCallback(id),
-		History:    messages,
-		SequenceID: seqID,
+		ID:          id,
+		UserID:      userID,
+		Logger:      a.logger,
+		WorkingDir:  a.workingDir,
+		OnMessage:   a.createMessageCallback(id),
+		History:     messages,
+		SequenceID:  seqID,
+		Environment: a.environment,
 	})
 	a.conversations.Store(id, mgr)
 

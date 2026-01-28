@@ -135,3 +135,11 @@ type AgentTool struct {
 	llm.Tool
 	Run ToolFunc
 }
+
+// EnvironmentInfo contains Dagu environment paths for the system prompt.
+type EnvironmentInfo struct {
+	DAGsDir    string
+	LogDir     string
+	DataDir    string
+	ConfigFile string
+}

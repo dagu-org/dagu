@@ -131,7 +131,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	var agentAPI *agent.API
 	if agentConfigStore != nil {
-		agentAPI, err = initAgentAPI(ctx, agentConfigStore, cfg.Paths.DAGsDir, cfg.Paths.ConversationsDir, dr)
+		agentAPI, err = initAgentAPI(ctx, agentConfigStore, &cfg.Paths, dr)
 		if err != nil {
 			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
 		}
@@ -355,7 +355,7 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 }
 
 // initAgentAPI creates and returns an agent API if enabled.
-func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, dagsDir, conversationsDir string, dagStore exec.DAGStore) (*agent.API, error) {
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, paths *config.PathsConfig, dagStore exec.DAGStore) (*agent.API, error) {
 	agentCfg, err := store.Load(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load agent config: %w", err)
@@ -370,7 +370,7 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, dagsDir, co
 		return nil, err
 	}
 
-	convStore, err := fileconversation.New(conversationsDir)
+	convStore, err := fileconversation.New(paths.ConversationsDir)
 	if err != nil {
 		logger.Warn(ctx, "Failed to create conversation store, persistence disabled", tag.Error(err))
 	}
@@ -378,10 +378,16 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, dagsDir, co
 	api := agent.NewAPI(agent.APIConfig{
 		Provider:          provider,
 		Model:             agentCfg.LLM.Model,
-		WorkingDir:        dagsDir,
+		WorkingDir:        paths.DAGsDir,
 		Logger:            slog.Default(),
 		ConversationStore: convStore,
 		DAGStore:          dagStore,
+		Environment: agent.EnvironmentInfo{
+			DAGsDir:    paths.DAGsDir,
+			LogDir:     paths.LogDir,
+			DataDir:    paths.DataDir,
+			ConfigFile: paths.ConfigFileUsed,
+		},
 	})
 
 	logger.Info(ctx, "Agent API initialized",
@@ -743,7 +749,7 @@ func (srv *Server) ReloadAgent(ctx context.Context) error {
 		return fmt.Errorf("agent config store not available")
 	}
 
-	agentAPI, err := initAgentAPI(ctx, srv.agentConfigStore, srv.config.Paths.DAGsDir, srv.config.Paths.ConversationsDir, srv.dagStore)
+	agentAPI, err := initAgentAPI(ctx, srv.agentConfigStore, &srv.config.Paths, srv.dagStore)
 	if err != nil {
 		return fmt.Errorf("failed to reload agent: %w", err)
 	}
