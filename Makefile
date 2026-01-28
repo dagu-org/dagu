@@ -324,7 +324,7 @@ build-keepalive:
 
 .PHONY: ui
 # ui builds the frontend codes.
-ui: build-ui cp-assets
+ui: clean-ui build-ui cp-assets
 
 # build-ui builds the frontend codes.
 .PHONY: build-ui
