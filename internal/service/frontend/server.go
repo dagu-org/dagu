@@ -387,6 +387,7 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, paths *conf
 			LogDir:     paths.LogDir,
 			DataDir:    paths.DataDir,
 			ConfigFile: paths.ConfigFileUsed,
+			WorkingDir: paths.DAGsDir,
 		},
 	})
 

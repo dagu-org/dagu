@@ -142,4 +142,5 @@ type EnvironmentInfo struct {
 	LogDir     string
 	DataDir    string
 	ConfigFile string
+	WorkingDir string
 }
