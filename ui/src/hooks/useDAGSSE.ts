@@ -11,6 +11,7 @@ interface DAGSSEResponse {
   suspended: boolean;
   localDags: LocalDag[];
   errors: string[];
+  spec?: string;
 }
 
 export function useDAGSSE(

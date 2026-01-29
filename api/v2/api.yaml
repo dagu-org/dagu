@@ -896,6 +896,9 @@ paths:
                     description: "List of errors encountered during the request"
                     items:
                       type: string
+                  spec:
+                    type: string
+                    description: "The DAG specification in YAML format"
                 required:
                   - latestDAGRun
                   - suspended

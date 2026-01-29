@@ -52,6 +52,7 @@ Sections: overview, steps, executors, containers, subdags, examples
 - Default type is 'chain' (sequential execution)
 - Use 'type: graph' with 'depends:' for parallel steps
 - YAML indentation: 2 spaces
+- use step 'output:' field for defining result of the DAG
 
 ## Workflows
 
@@ -62,9 +63,10 @@ Sections: overview, steps, executors, containers, subdags, examples
 4. Confirm with user
 
 ### Debugging a Failed Run
-1. dagu status <dag>
-2. Read log file from status output
+1. dagu status <dag> [--run-id=<run-id>]
+2. Read log file from status output and actual log file
 3. Identify failed step and check command
+4. Review DAG definition before running the DAG
 
 ## Important
 - ALWAYS dry-run before confirming changes

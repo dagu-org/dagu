@@ -3913,6 +3913,8 @@ export interface operations {
                         suspended: boolean;
                         /** @description List of errors encountered during the request */
                         errors: string[];
+                        /** @description The DAG specification in YAML format */
+                        spec?: string;
                     };
                 };
             };
