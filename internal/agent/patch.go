@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	dirPermission  = 0o755
-	filePermission = 0o644
+	dirPermission  = 0o750
+	filePermission = 0o600
 )
 
 // PatchOperation defines the type of patch operation.
