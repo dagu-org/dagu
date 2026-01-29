@@ -18,8 +18,7 @@ func CreateTools() []*AgentTool {
 	}
 }
 
-// GetToolByName finds a tool by name from the given slice.
-// Returns nil if the tool is not found.
+// GetToolByName finds a tool by name from the given slice, or nil if not found.
 func GetToolByName(tools []*AgentTool, name string) *AgentTool {
 	for _, tool := range tools {
 		if tool.Function.Name == name {
@@ -37,8 +36,7 @@ func toolError(format string, args ...any) ToolOut {
 	}
 }
 
-// resolvePath converts a relative path to absolute using the working directory.
-// If the path is already absolute or workingDir is empty, returns path unchanged.
+// resolvePath joins path with workingDir if path is relative and workingDir is set.
 func resolvePath(path, workingDir string) string {
 	if !filepath.IsAbs(path) && workingDir != "" {
 		return filepath.Join(workingDir, path)

@@ -182,42 +182,35 @@ func (n *navigator) normalizeForNavigation(node map[string]any) map[string]any {
 
 // findNavigableInOneOf finds a variant that can be navigated (has properties or leads to properties).
 func (n *navigator) findNavigableInOneOf(oneOf []any) map[string]any {
-	// First pass: look for direct $ref that leads to object with properties
+	// First pass: look for object with properties (resolves refs automatically)
 	for _, opt := range oneOf {
-		if optMap, ok := opt.(map[string]any); ok {
-			if _, hasRef := optMap["$ref"]; hasRef {
-				resolved := n.resolveRef(optMap)
-				if _, hasProps := resolved["properties"]; hasProps {
-					return resolved
-				}
-			}
+		optMap, ok := opt.(map[string]any)
+		if !ok {
+			continue
+		}
+		resolved := n.resolveRef(optMap)
+		if _, hasProps := resolved["properties"]; hasProps {
+			return resolved
 		}
 	}
 
-	// Second pass: look for direct object with properties
+	// Second pass: look for arrays with navigable items
 	for _, opt := range oneOf {
-		if optMap, ok := opt.(map[string]any); ok {
-			resolved := n.resolveRef(optMap)
-			if _, hasProps := resolved["properties"]; hasProps {
-				return resolved
-			}
+		optMap, ok := opt.(map[string]any)
+		if !ok {
+			continue
 		}
-	}
-
-	// Third pass: look for arrays with navigable items
-	for _, opt := range oneOf {
-		if optMap, ok := opt.(map[string]any); ok {
-			resolved := n.resolveRef(optMap)
-			if typ, _ := resolved["type"].(string); typ == "array" {
-				if items, ok := resolved["items"].(map[string]any); ok {
-					itemsResolved := n.resolveRef(items)
-					// Recursively normalize items
-					normalized := n.normalizeForNavigation(itemsResolved)
-					if _, hasProps := normalized["properties"]; hasProps {
-						return normalized
-					}
-				}
-			}
+		resolved := n.resolveRef(optMap)
+		if typ, _ := resolved["type"].(string); typ != "array" {
+			continue
+		}
+		items, ok := resolved["items"].(map[string]any)
+		if !ok {
+			continue
+		}
+		normalized := n.normalizeForNavigation(n.resolveRef(items))
+		if _, hasProps := normalized["properties"]; hasProps {
+			return normalized
 		}
 	}
 
@@ -239,48 +232,6 @@ func (n *navigator) resolveRef(node map[string]any) map[string]any {
 	}
 
 	return node
-}
-
-func (n *navigator) findObjectInOneOf(oneOf []any) map[string]any {
-	// Prefer object types with properties for navigation
-	for _, opt := range oneOf {
-		if optMap, ok := opt.(map[string]any); ok {
-			resolved := n.resolveRef(optMap)
-			if typ, _ := resolved["type"].(string); typ == "object" {
-				if _, hasProps := resolved["properties"]; hasProps {
-					return resolved
-				}
-			}
-			if _, hasProps := resolved["properties"]; hasProps {
-				return resolved
-			}
-		}
-	}
-	// Try array types - navigate into items
-	for _, opt := range oneOf {
-		if optMap, ok := opt.(map[string]any); ok {
-			resolved := n.resolveRef(optMap)
-			if typ, _ := resolved["type"].(string); typ == "array" {
-				if items, ok := resolved["items"].(map[string]any); ok {
-					itemsResolved := n.resolveRef(items)
-					// If items is also oneOf, recurse
-					if itemOneOf, ok := itemsResolved["oneOf"].([]any); ok {
-						return n.findObjectInOneOf(itemOneOf)
-					}
-					if _, hasProps := itemsResolved["properties"]; hasProps {
-						return itemsResolved
-					}
-				}
-			}
-		}
-	}
-	// Fall back to first option that's a map
-	for _, opt := range oneOf {
-		if optMap, ok := opt.(map[string]any); ok {
-			return n.resolveRef(optMap)
-		}
-	}
-	return nil
 }
 
 func (n *navigator) mergeAllOf(allOf []any) map[string]any {
@@ -412,33 +363,23 @@ func (n *navigator) formatOneOf(options []any) {
 }
 
 func (n *navigator) formatProperties(props map[string]any, parent map[string]any) {
-	required := getRequired(parent)
-	reqMap := make(map[string]bool)
-	for _, r := range required {
-		reqMap[r] = true
-	}
+	requiredSet := getRequiredSet(parent)
 
 	n.output.WriteString("Properties:\n")
 
 	for name, prop := range props {
-		if propMap, ok := prop.(map[string]any); ok {
-			resolved := n.resolveRef(propMap)
-			typ := getType(resolved)
-			reqStr := ""
-			if reqMap[name] {
-				reqStr = ", required"
-			}
-			desc := ""
-			if d, ok := resolved["description"].(string); ok {
-				// Truncate long descriptions
-				if len(d) > 100 {
-					desc = d[:97] + "..."
-				} else {
-					desc = d
-				}
-			}
-			n.output.WriteString(fmt.Sprintf("- %s (%s%s): %s\n", name, typ, reqStr, desc))
+		propMap, ok := prop.(map[string]any)
+		if !ok {
+			continue
 		}
+		resolved := n.resolveRef(propMap)
+		typ := getType(resolved)
+		reqStr := ""
+		if requiredSet[name] {
+			reqStr = ", required"
+		}
+		desc := truncateDescription(resolved["description"])
+		n.output.WriteString(fmt.Sprintf("- %s (%s%s): %s\n", name, typ, reqStr, desc))
 	}
 }
 
@@ -473,16 +414,28 @@ func getType(node map[string]any) string {
 	return "unknown"
 }
 
-func getRequired(node map[string]any) []string {
+func getRequiredSet(node map[string]any) map[string]bool {
 	req, ok := node["required"].([]any)
 	if !ok {
 		return nil
 	}
-	result := make([]string, 0, len(req))
+	result := make(map[string]bool, len(req))
 	for _, r := range req {
 		if s, ok := r.(string); ok {
-			result = append(result, s)
+			result[s] = true
 		}
 	}
 	return result
+}
+
+func truncateDescription(v any) string {
+	desc, ok := v.(string)
+	if !ok {
+		return ""
+	}
+	const maxLen = 100
+	if len(desc) > maxLen {
+		return desc[:maxLen-3] + "..."
+	}
+	return desc
 }

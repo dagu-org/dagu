@@ -11,43 +11,37 @@ func TestNavigateDeepPaths(t *testing.T) {
 		name    string
 		path    string
 		wantErr bool
-		want    []string // strings that should appear in result
+		want    []string
 	}{
 		{
-			name:    "root level",
-			path:    "",
-			wantErr: false,
-			want:    []string{"Properties:", "name", "steps", "schedule"},
+			name: "root level",
+			path: "",
+			want: []string{"Properties:", "name", "steps", "schedule"},
 		},
 		{
-			name:    "steps (oneOf)",
-			path:    "steps",
-			wantErr: false,
-			want:    []string{"oneOf", "array", "object"},
+			name: "steps (oneOf)",
+			path: "steps",
+			want: []string{"oneOf", "array", "object"},
 		},
 		{
-			name:    "steps.name (through oneOf and ref)",
-			path:    "steps.name",
-			wantErr: false,
-			want:    []string{"string", "Unique identifier"},
+			name: "steps.name (through oneOf and ref)",
+			path: "steps.name",
+			want: []string{"string", "Unique identifier"},
 		},
 		{
-			name:    "steps.container (nested oneOf)",
-			path:    "steps.container",
-			wantErr: false,
-			want:    []string{"oneOf", "image", "volumes"},
+			name: "steps.container (nested oneOf)",
+			path: "steps.container",
+			want: []string{"oneOf", "image", "volumes"},
 		},
 		{
-			name:    "schedule (oneOf with object)",
-			path:    "schedule",
-			wantErr: false,
-			want:    []string{"oneOf", "cron", "start", "stop"},
+			name: "schedule (oneOf with object)",
+			path: "schedule",
+			want: []string{"oneOf", "cron", "start", "stop"},
 		},
 		{
-			name:    "handlerOn.success",
-			path:    "handlerOn.success",
-			wantErr: false,
-			want:    []string{"object"},
+			name: "handlerOn.success",
+			path: "handlerOn.success",
+			want: []string{"object"},
 		},
 		{
 			name:    "invalid path",

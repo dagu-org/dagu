@@ -50,7 +50,7 @@ func NewBashTool() *AgentTool {
 	}
 }
 
-func bashRun(ctx ToolContext, input json.RawMessage) ToolOut {
+func bashRun(toolCtx ToolContext, input json.RawMessage) ToolOut {
 	var args BashToolInput
 	if err := json.Unmarshal(input, &args); err != nil {
 		return toolError("Failed to parse input: %v", err)
@@ -61,12 +61,12 @@ func bashRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	}
 
 	timeout := resolveTimeout(args.Timeout)
-	cmdCtx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(cmdCtx, "bash", "-c", args.Command)
-	if ctx.WorkingDir != "" {
-		cmd.Dir = ctx.WorkingDir
+	cmd := exec.CommandContext(ctx, "bash", "-c", args.Command)
+	if toolCtx.WorkingDir != "" {
+		cmd.Dir = toolCtx.WorkingDir
 	}
 
 	var stdout, stderr bytes.Buffer
@@ -77,14 +77,14 @@ func bashRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	output := buildOutput(stdout.String(), stderr.String())
 
 	if err != nil {
-		if cmdCtx.Err() == context.DeadlineExceeded {
+		if ctx.Err() == context.DeadlineExceeded {
 			return toolError("Command timed out after %v\n%s", timeout, output)
 		}
 		return toolError("Command failed: %v\n%s", err, output)
 	}
 
 	if output == "" {
-		output = "(no output)"
+		return ToolOut{Content: "(no output)"}
 	}
 
 	return ToolOut{Content: output}
@@ -101,15 +101,14 @@ func buildOutput(stdout, stderr string) string {
 	stdout = truncateOutput(stdout)
 	stderr = truncateOutput(stderr)
 
-	if stderr == "" {
+	switch {
+	case stderr == "":
 		return stdout
-	}
-
-	if stdout == "" {
+	case stdout == "":
 		return "STDERR:\n" + stderr
+	default:
+		return stdout + "\nSTDERR:\n" + stderr
 	}
-
-	return stdout + "\nSTDERR:\n" + stderr
 }
 
 func truncateOutput(s string) string {

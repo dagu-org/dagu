@@ -14,6 +14,10 @@ type ReadSchemaInput struct {
 	Path   string `json:"path"`
 }
 
+const readSchemaDescription = "Navigate JSON schema documentation to understand DAG YAML structure. " +
+	"Use this before creating or editing DAG files to ensure correct syntax. " +
+	"Call with empty path to see root-level fields, or specify a path to drill down (e.g., 'steps.container')."
+
 // NewReadSchemaTool creates a new tool for navigating JSON schemas.
 func NewReadSchemaTool() *AgentTool {
 	available := schema.DefaultRegistry.AvailableSchemas()
@@ -23,7 +27,7 @@ func NewReadSchemaTool() *AgentTool {
 			Type: "function",
 			Function: llm.ToolFunction{
 				Name:        "read_schema",
-				Description: "Navigate JSON schema documentation to understand DAG YAML structure. Use this before creating or editing DAG files to ensure correct syntax. Call with empty path to see root-level fields, or specify a path to drill down (e.g., 'steps.container').",
+				Description: readSchemaDescription,
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{

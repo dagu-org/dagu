@@ -13,6 +13,30 @@ type subscriber[K any] struct {
 	cancel context.CancelFunc
 }
 
+// isDone checks if the subscriber's context is cancelled and closes the channel if so.
+func (s *subscriber[K]) isDone() bool {
+	select {
+	case <-s.ctx.Done():
+		close(s.ch)
+		return true
+	default:
+		return false
+	}
+}
+
+// send attempts to send a message to the subscriber.
+// Returns false and disconnects if the channel is full.
+func (s *subscriber[K]) send(message K) bool {
+	select {
+	case s.ch <- message:
+		return true
+	default:
+		close(s.ch)
+		s.cancel()
+		return false
+	}
+}
+
 // SubPub provides a generic publish-subscribe mechanism for SSE streaming.
 // It uses sequence-based subscriptions to ensure efficient delivery.
 type SubPub[K any] struct {
@@ -43,11 +67,11 @@ func (sp *SubPub[K]) Subscribe(ctx context.Context, seqID int64) func() (K, bool
 	sp.subscribers = append(sp.subscribers, sub)
 	sp.mu.Unlock()
 
-	return sp.createReceiver(ch, subCtx)
+	return makeReceiver(ch, subCtx)
 }
 
-// createReceiver returns a function that receives messages from the channel.
-func (*SubPub[K]) createReceiver(ch chan K, ctx context.Context) func() (K, bool) {
+// makeReceiver returns a function that receives messages from the channel.
+func makeReceiver[K any](ch chan K, ctx context.Context) func() (K, bool) {
 	var zero K
 	return func() (K, bool) {
 		select {
@@ -58,7 +82,7 @@ func (*SubPub[K]) createReceiver(ch chan K, ctx context.Context) func() (K, bool
 			return msg, true
 
 		case <-ctx.Done():
-			// Try to drain one buffered message before returning
+			// Drain one buffered message before returning if available
 			select {
 			case msg, ok := <-ch:
 				if ok {
@@ -79,17 +103,16 @@ func (sp *SubPub[K]) Publish(seqID int64, message K) {
 
 	remaining := sp.subscribers[:0]
 	for _, sub := range sp.subscribers {
-		if isContextDone(sub) {
+		if sub.isDone() {
 			continue
 		}
 
-		// Skip if subscriber already has this sequence or beyond
 		if sub.seqID >= seqID {
 			remaining = append(remaining, sub)
 			continue
 		}
 
-		if trySend(sub, message) {
+		if sub.send(message) {
 			sub.seqID = seqID
 			remaining = append(remaining, sub)
 		}
@@ -105,37 +128,13 @@ func (sp *SubPub[K]) Broadcast(message K) {
 
 	remaining := sp.subscribers[:0]
 	for _, sub := range sp.subscribers {
-		if isContextDone(sub) {
+		if sub.isDone() {
 			continue
 		}
 
-		if trySend(sub, message) {
+		if sub.send(message) {
 			remaining = append(remaining, sub)
 		}
 	}
 	sp.subscribers = remaining
-}
-
-// isContextDone checks if a subscriber's context is cancelled and cleans up if so.
-func isContextDone[K any](sub *subscriber[K]) bool {
-	select {
-	case <-sub.ctx.Done():
-		close(sub.ch)
-		return true
-	default:
-		return false
-	}
-}
-
-// trySend attempts to send a message to a subscriber.
-// Returns false and disconnects the subscriber if the channel is full.
-func trySend[K any](sub *subscriber[K], message K) bool {
-	select {
-	case sub.ch <- message:
-		return true
-	default:
-		close(sub.ch)
-		sub.cancel()
-		return false
-	}
 }

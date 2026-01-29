@@ -31,8 +31,6 @@ func NewThinkTool() *AgentTool {
 }
 
 // thinkRun acknowledges the thought without performing any action.
-// Both parameters are intentionally ignored since this tool only records
-// that the agent paused to reason, without requiring context or input.
 func thinkRun(_ ToolContext, _ json.RawMessage) ToolOut {
 	return ToolOut{Content: "Thought recorded. Continue with your plan."}
 }

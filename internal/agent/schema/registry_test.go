@@ -1,30 +1,42 @@
 package schema
 
 import (
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
+func newTestRegistry() *Registry {
+	return &Registry{schemas: make(map[string]map[string]any)}
+}
+
 func TestRegistry_Register(t *testing.T) {
-	r := &Registry{schemas: make(map[string]map[string]any)}
+	t.Parallel()
 
-	// Valid JSON schema
-	validSchema := []byte(`{"type": "object", "properties": {"name": {"type": "string"}}}`)
-	err := r.Register("test", validSchema)
-	if err != nil {
-		t.Errorf("Register() error = %v, want nil", err)
-	}
+	t.Run("valid JSON schema", func(t *testing.T) {
+		t.Parallel()
+		r := newTestRegistry()
+		validSchema := []byte(`{"type": "object", "properties": {"name": {"type": "string"}}}`)
+		err := r.Register("test", validSchema)
+		assert.NoError(t, err)
+	})
 
-	// Invalid JSON
-	invalidJSON := []byte(`{invalid}`)
-	err = r.Register("invalid", invalidJSON)
-	if err == nil {
-		t.Error("Register() with invalid JSON should return error")
-	}
+	t.Run("invalid JSON returns error", func(t *testing.T) {
+		t.Parallel()
+		r := newTestRegistry()
+		invalidJSON := []byte(`{invalid}`)
+		err := r.Register("invalid", invalidJSON)
+		assert.Error(t, err)
+	})
 }
 
 func TestRegistry_Navigate_RootLevel(t *testing.T) {
-	r := &Registry{schemas: make(map[string]map[string]any)}
+	t.Parallel()
+
+	r := newTestRegistry()
 	schema := []byte(`{
 		"type": "object",
 		"description": "Test schema",
@@ -33,24 +45,19 @@ func TestRegistry_Navigate_RootLevel(t *testing.T) {
 			"count": {"type": "integer", "description": "A counter"}
 		}
 	}`)
-	_ = r.Register("test", schema)
+	require.NoError(t, r.Register("test", schema))
 
 	result, err := r.Navigate("test", "")
-	if err != nil {
-		t.Fatalf("Navigate() error = %v", err)
-	}
+	require.NoError(t, err)
 
-	// Should contain properties
-	if !strings.Contains(result, "name") {
-		t.Error("Navigate() result should contain 'name' property")
-	}
-	if !strings.Contains(result, "count") {
-		t.Error("Navigate() result should contain 'count' property")
-	}
+	assert.Contains(t, result, "name")
+	assert.Contains(t, result, "count")
 }
 
 func TestRegistry_Navigate_Path(t *testing.T) {
-	r := &Registry{schemas: make(map[string]map[string]any)}
+	t.Parallel()
+
+	r := newTestRegistry()
 	schema := []byte(`{
 		"type": "object",
 		"properties": {
@@ -64,48 +71,43 @@ func TestRegistry_Navigate_Path(t *testing.T) {
 			}
 		}
 	}`)
-	_ = r.Register("test", schema)
+	require.NoError(t, r.Register("test", schema))
 
 	result, err := r.Navigate("test", "config")
-	if err != nil {
-		t.Fatalf("Navigate() error = %v", err)
-	}
+	require.NoError(t, err)
 
-	if !strings.Contains(result, "host") {
-		t.Error("Navigate() result should contain 'host' property")
-	}
-	if !strings.Contains(result, "port") {
-		t.Error("Navigate() result should contain 'port' property")
-	}
+	assert.Contains(t, result, "host")
+	assert.Contains(t, result, "port")
 }
 
 func TestRegistry_Navigate_InvalidPath(t *testing.T) {
-	r := &Registry{schemas: make(map[string]map[string]any)}
+	t.Parallel()
+
+	r := newTestRegistry()
 	schema := []byte(`{
 		"type": "object",
 		"properties": {
 			"name": {"type": "string"}
 		}
 	}`)
-	_ = r.Register("test", schema)
+	require.NoError(t, r.Register("test", schema))
 
 	_, err := r.Navigate("test", "nonexistent")
-	if err == nil {
-		t.Error("Navigate() with invalid path should return error")
-	}
+	assert.Error(t, err)
 }
 
 func TestRegistry_Navigate_UnknownSchema(t *testing.T) {
-	r := &Registry{schemas: make(map[string]map[string]any)}
+	t.Parallel()
 
+	r := newTestRegistry()
 	_, err := r.Navigate("unknown", "")
-	if err == nil {
-		t.Error("Navigate() with unknown schema should return error")
-	}
+	assert.Error(t, err)
 }
 
 func TestRegistry_Navigate_RefResolution(t *testing.T) {
-	r := &Registry{schemas: make(map[string]map[string]any)}
+	t.Parallel()
+
+	r := newTestRegistry()
 	schema := []byte(`{
 		"type": "object",
 		"properties": {
@@ -121,20 +123,18 @@ func TestRegistry_Navigate_RefResolution(t *testing.T) {
 			}
 		}
 	}`)
-	_ = r.Register("test", schema)
+	require.NoError(t, r.Register("test", schema))
 
 	result, err := r.Navigate("test", "item")
-	if err != nil {
-		t.Fatalf("Navigate() error = %v", err)
-	}
+	require.NoError(t, err)
 
-	if !strings.Contains(result, "value") {
-		t.Error("Navigate() should resolve $ref and show 'value' property")
-	}
+	assert.Contains(t, result, "value")
 }
 
 func TestRegistry_Navigate_ArrayItems(t *testing.T) {
-	r := &Registry{schemas: make(map[string]map[string]any)}
+	t.Parallel()
+
+	r := newTestRegistry()
 	schema := []byte(`{
 		"type": "object",
 		"properties": {
@@ -151,21 +151,18 @@ func TestRegistry_Navigate_ArrayItems(t *testing.T) {
 			}
 		}
 	}`)
-	_ = r.Register("test", schema)
+	require.NoError(t, r.Register("test", schema))
 
-	// Navigate into array items
 	result, err := r.Navigate("test", "items.name")
-	if err != nil {
-		t.Fatalf("Navigate() into array items error = %v", err)
-	}
+	require.NoError(t, err)
 
-	if !strings.Contains(result, "string") {
-		t.Error("Navigate() into array items should show item property type")
-	}
+	assert.Contains(t, result, "string")
 }
 
 func TestRegistry_Navigate_OneOf(t *testing.T) {
-	r := &Registry{schemas: make(map[string]map[string]any)}
+	t.Parallel()
+
+	r := newTestRegistry()
 	schema := []byte(`{
 		"type": "object",
 		"properties": {
@@ -178,20 +175,19 @@ func TestRegistry_Navigate_OneOf(t *testing.T) {
 			}
 		}
 	}`)
-	_ = r.Register("test", schema)
+	require.NoError(t, r.Register("test", schema))
 
 	result, err := r.Navigate("test", "value")
-	if err != nil {
-		t.Fatalf("Navigate() error = %v", err)
-	}
+	require.NoError(t, err)
 
-	if !strings.Contains(result, "oneOf") || !strings.Contains(result, "Option") {
-		t.Error("Navigate() should show oneOf options")
-	}
+	assert.Contains(t, result, "oneOf")
+	assert.Contains(t, result, "Option")
 }
 
 func TestRegistry_Navigate_AllOf(t *testing.T) {
-	r := &Registry{schemas: make(map[string]map[string]any)}
+	t.Parallel()
+
+	r := newTestRegistry()
 	schema := []byte(`{
 		"type": "object",
 		"properties": {
@@ -203,46 +199,35 @@ func TestRegistry_Navigate_AllOf(t *testing.T) {
 			}
 		}
 	}`)
-	_ = r.Register("test", schema)
+	require.NoError(t, r.Register("test", schema))
 
 	result, err := r.Navigate("test", "combined")
-	if err != nil {
-		t.Fatalf("Navigate() error = %v", err)
-	}
+	require.NoError(t, err)
 
-	// Should show merged properties
-	if !strings.Contains(result, "field1") || !strings.Contains(result, "field2") {
-		t.Error("Navigate() should merge allOf properties")
-	}
+	assert.Contains(t, result, "field1")
+	assert.Contains(t, result, "field2")
 }
 
 func TestRegistry_AvailableSchemas(t *testing.T) {
-	r := &Registry{schemas: make(map[string]map[string]any)}
-	_ = r.Register("schema1", []byte(`{"type": "object"}`))
-	_ = r.Register("schema2", []byte(`{"type": "object"}`))
+	t.Parallel()
+
+	r := newTestRegistry()
+	require.NoError(t, r.Register("schema1", []byte(`{"type": "object"}`)))
+	require.NoError(t, r.Register("schema2", []byte(`{"type": "object"}`)))
 
 	available := r.AvailableSchemas()
-	if len(available) != 2 {
-		t.Errorf("AvailableSchemas() = %d schemas, want 2", len(available))
-	}
+	assert.Len(t, available, 2)
 }
 
-// Test with real DAG schema
 func TestRegistry_Navigate_DagSchema(t *testing.T) {
-	// DefaultRegistry should have "dag" schema registered via embed.go init()
+	t.Parallel()
+
 	available := DefaultRegistry.AvailableSchemas()
 	if len(available) == 0 {
 		t.Skip("No schemas registered (embed may not have run)")
 	}
 
-	hasDAG := false
-	for _, s := range available {
-		if s == "dag" {
-			hasDAG = true
-			break
-		}
-	}
-	if !hasDAG {
+	if !slices.Contains(available, "dag") {
 		t.Skip("dag schema not registered")
 	}
 
@@ -250,7 +235,7 @@ func TestRegistry_Navigate_DagSchema(t *testing.T) {
 		name    string
 		path    string
 		wantErr bool
-		want    []string // strings that should appear in result
+		want    []string
 	}{
 		{
 			name:    "root level",
@@ -280,14 +265,15 @@ func TestRegistry_Navigate_DagSchema(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result, err := DefaultRegistry.Navigate("dag", tt.path)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Navigate() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err)
 				return
 			}
-			if err != nil {
-				return
-			}
+			require.NoError(t, err)
+
 			for _, want := range tt.want {
 				if !strings.Contains(result, want) {
 					t.Errorf("Navigate() result missing %q\nGot: %s", want, result)

@@ -12,6 +12,14 @@ type NavigateToolInput struct {
 	Path string `json:"path"`
 }
 
+const navigateDescription = "Navigate the user to a specific page in the Dagu UI. " +
+	"Only use this when the user explicitly asks to navigate or view a page. " +
+	"Available paths: '/dags' for DAG list, '/dags/<dag-name>' for DAG details, " +
+	"'/dags/<dag-name>/<tab>' for specific tab (spec, history), '/dag-runs' for all DAG runs, " +
+	"'/dag-runs/<dag-name>/<run-id>' for specific run details, '/queues' for queues. " +
+	"Admin pages: '/system-status', '/users', '/api-keys', '/webhooks', '/terminal', " +
+	"'/audit-logs', '/git-sync', '/agent-settings'."
+
 // NewNavigateTool creates a new navigate tool for UI navigation.
 func NewNavigateTool() *AgentTool {
 	return &AgentTool{
@@ -19,7 +27,7 @@ func NewNavigateTool() *AgentTool {
 			Type: "function",
 			Function: llm.ToolFunction{
 				Name:        "navigate",
-				Description: "Navigate the user to a specific page in the Dagu UI. Only use this when the user explicitly asks to navigate or view a page. Available paths: '/dags' for DAG list, '/dags/<dag-name>' for DAG details, '/dags/<dag-name>/<tab>' for specific tab (spec, history), '/dag-runs' for all DAG runs, '/dag-runs/<dag-name>/<run-id>' for specific run details, '/queues' for queues. Admin pages: '/system-status', '/users', '/api-keys', '/webhooks', '/terminal', '/audit-logs', '/git-sync', '/agent-settings'.",
+				Description: navigateDescription,
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{

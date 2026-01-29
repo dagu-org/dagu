@@ -135,34 +135,28 @@ func (l *Loop) Go(ctx context.Context) error {
 
 // processLLMRequest sends a request to the LLM and handles the response.
 func (l *Loop) processLLMRequest(ctx context.Context) error {
-	l.mu.Lock()
-	history := append([]llm.Message(nil), l.history...)
-	l.mu.Unlock()
-
-	llmMessages := l.buildMessages(history)
-	llmTools := l.buildToolDefinitions()
+	history := l.copyHistory()
+	messages := l.buildMessages(history)
+	tools := l.buildToolDefinitions()
 
 	req := &llm.ChatRequest{
 		Model:    l.model,
-		Messages: llmMessages,
-		Tools:    llmTools,
+		Messages: messages,
+		Tools:    tools,
 	}
 
 	l.logger.Debug("sending LLM request",
-		"message_count", len(llmMessages),
-		"tool_count", len(llmTools),
+		"message_count", len(messages),
+		"tool_count", len(tools),
 		"model", l.model)
 
-	// Set agent as working
 	l.setWorking(true)
 
-	// Add a timeout for the LLM request
 	llmCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
 	resp, err := l.provider.Chat(llmCtx, req)
 	if err != nil {
-		// Record the error as a message
 		l.recordErrorMessage(ctx, fmt.Sprintf("LLM request failed: %v", err))
 		l.setWorking(false)
 		return fmt.Errorf("LLM request failed: %w", err)
@@ -192,6 +186,13 @@ func (l *Loop) setWorking(working bool) {
 	}
 }
 
+// copyHistory returns a thread-safe copy of the conversation history.
+func (l *Loop) copyHistory() []llm.Message {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return append([]llm.Message(nil), l.history...)
+}
+
 // appendToHistory adds a message to history and returns the new sequence ID.
 func (l *Loop) appendToHistory(msg llm.Message) int64 {
 	l.mu.Lock()
@@ -206,10 +207,7 @@ func (l *Loop) executeTool(tc llm.ToolCall) ToolOut {
 	tool := GetToolByName(l.tools, tc.Function.Name)
 	if tool == nil {
 		l.logger.Error("tool not found", "name", tc.Function.Name)
-		return ToolOut{
-			Content: fmt.Sprintf("Tool '%s' not found", tc.Function.Name),
-			IsError: true,
-		}
+		return toolError("Tool '%s' not found", tc.Function.Name)
 	}
 
 	input := json.RawMessage(tc.Function.Arguments)

@@ -61,6 +61,13 @@ type APIConfig struct {
 	Environment       EnvironmentInfo
 }
 
+// ConversationWithState is a conversation with its current state.
+type ConversationWithState struct {
+	Conversation Conversation `json:"conversation"`
+	Working      bool         `json:"working"`
+	Model        string       `json:"model,omitempty"`
+}
+
 // NewAPI creates a new API instance.
 func NewAPI(cfg APIConfig) *API {
 	logger := cfg.Logger
@@ -346,13 +353,6 @@ func (a *API) appendPersistedConversations(ctx context.Context, userID string, a
 	return conversations
 }
 
-// ConversationWithState is a conversation with its current state.
-type ConversationWithState struct {
-	Conversation Conversation `json:"conversation"`
-	Working      bool         `json:"working"`
-	Model        string       `json:"model,omitempty"`
-}
-
 // handleGetConversation returns conversation details and messages.
 // GET /api/v2/agent/conversations/{id}
 func (a *API) handleGetConversation(w http.ResponseWriter, r *http.Request) {
@@ -559,19 +559,6 @@ func (a *API) sendSSEMessage(w http.ResponseWriter, data any) {
 	fmt.Fprintf(w, "data: %s\n\n", jsonData)
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()
-	}
-}
-
-// buildStreamResponse constructs the initial stream response for a conversation.
-func (a *API) buildStreamResponse(id string, mgr *ConversationManager) StreamResponse {
-	return StreamResponse{
-		Messages:     mgr.GetMessages(),
-		Conversation: ptrTo(mgr.GetConversation()),
-		ConversationState: &ConversationState{
-			ConversationID: id,
-			Working:        mgr.IsWorking(),
-			Model:          mgr.GetModel(),
-		},
 	}
 }
 

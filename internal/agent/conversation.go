@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -14,25 +15,22 @@ import (
 // ConversationManager manages a single active conversation.
 // It links the Loop with SSE streaming and handles state management.
 type ConversationManager struct {
-	id         string
-	userID     string
-	loop       *Loop
-	loopCancel context.CancelFunc
-	mu         sync.Mutex
-	lastActivity time.Time
-	model        string
-	messages     []Message
-	subpub       *SubPub[StreamResponse]
-	working      bool
-	logger       *slog.Logger
-	workingDir   string
-	sequenceID   int64
-	environment  EnvironmentInfo
-
-	// onWorkingChange is called when the working state changes.
+	id              string
+	userID          string
+	loop            *Loop
+	loopCancel      context.CancelFunc
+	mu              sync.Mutex
+	lastActivity    time.Time
+	model           string
+	messages        []Message
+	subpub          *SubPub[StreamResponse]
+	working         bool
+	logger          *slog.Logger
+	workingDir      string
+	sequenceID      int64
+	environment     EnvironmentInfo
 	onWorkingChange func(id string, working bool)
-	// onMessage is called when a message is recorded, for persistence.
-	onMessage func(ctx context.Context, msg Message) error
+	onMessage       func(ctx context.Context, msg Message) error
 }
 
 // ConversationManagerConfig contains configuration for creating a ConversationManager.
@@ -42,14 +40,10 @@ type ConversationManagerConfig struct {
 	Logger          *slog.Logger
 	WorkingDir      string
 	OnWorkingChange func(id string, working bool)
-	// OnMessage is called when a message is recorded, for persistence.
-	OnMessage func(ctx context.Context, msg Message) error
-	// History contains restored messages from persistence (for reactivation).
-	History []Message
-	// SequenceID is the latest sequence ID from persistence (for reactivation).
-	SequenceID int64
-	// Environment contains Dagu paths for the system prompt.
-	Environment EnvironmentInfo
+	OnMessage       func(ctx context.Context, msg Message) error
+	History         []Message
+	SequenceID      int64
+	Environment     EnvironmentInfo
 }
 
 // NewConversationManager creates a new ConversationManager.
@@ -173,29 +167,28 @@ func (cm *ConversationManager) GetConversation() Conversation {
 // AcceptUserMessage enqueues a user message, ensuring the loop is ready first.
 func (cm *ConversationManager) AcceptUserMessage(ctx context.Context, provider llm.Provider, model string, content string) error {
 	if provider == nil {
-		return fmt.Errorf("LLM provider is required")
+		return errors.New("LLM provider is required")
 	}
 
 	if err := cm.ensureLoop(provider, model); err != nil {
 		return err
 	}
 
-	userLLMMessage := llm.Message{
+	llmMsg := llm.Message{
 		Role:    llm.RoleUser,
 		Content: content,
 	}
 
-	userMessage, loopInstance := cm.recordUserMessage(content, &userLLMMessage)
-
+	userMessage, loopInstance := cm.recordUserMessage(content, &llmMsg)
 	if loopInstance == nil {
-		return fmt.Errorf("conversation loop not initialized")
+		return errors.New("conversation loop not initialized")
 	}
 
 	cm.subpub.Publish(userMessage.SequenceID, StreamResponse{
 		Messages: []Message{userMessage},
 	})
 
-	loopInstance.QueueUserMessage(userLLMMessage)
+	loopInstance.QueueUserMessage(llmMsg)
 	cm.SetWorking(true)
 
 	return nil
@@ -206,7 +199,8 @@ func (cm *ConversationManager) recordUserMessage(content string, llmMsg *llm.Mes
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	cm.lastActivity = time.Now()
+	now := time.Now()
+	cm.lastActivity = now
 	cm.sequenceID++
 
 	msg := Message{
@@ -215,7 +209,7 @@ func (cm *ConversationManager) recordUserMessage(content string, llmMsg *llm.Mes
 		Type:           MessageTypeUser,
 		SequenceID:     cm.sequenceID,
 		Content:        content,
-		CreatedAt:      time.Now(),
+		CreatedAt:      now,
 		LLMData:        llmMsg,
 	}
 
@@ -322,12 +316,16 @@ func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) e
 			cm.logger.Info("conversation loop goroutine exiting")
 			cm.clearLoop()
 		}()
-		if err := loopInstance.Go(loopCtx); err != nil {
-			if err == context.Canceled {
-				cm.logger.Info("conversation loop canceled normally")
-			} else {
-				cm.logger.Error("conversation loop stopped with error", "error", err)
-			}
+
+		err := loopInstance.Go(loopCtx)
+		if err == nil {
+			return
+		}
+
+		if errors.Is(err, context.Canceled) {
+			cm.logger.Info("conversation loop canceled normally")
+		} else {
+			cm.logger.Error("conversation loop stopped with error", "error", err)
 		}
 	}()
 
@@ -383,10 +381,9 @@ func (cm *ConversationManager) createRecordMessageFunc() MessageRecordFunc {
 			msg.ID = uuid.New().String()
 		}
 
-		seqID := cm.appendMessage(msg)
-		msg.SequenceID = seqID
+		msg.SequenceID = cm.appendMessage(msg)
 
-		cm.subpub.Publish(seqID, StreamResponse{
+		cm.subpub.Publish(msg.SequenceID, StreamResponse{
 			Messages: []Message{msg},
 		})
 

@@ -126,12 +126,10 @@ func patchReplace(path, oldString, newString string) ToolOut {
 	contentStr := string(content)
 	count := strings.Count(contentStr, oldString)
 
-	switch count {
-	case 0:
+	if count == 0 {
 		return toolError("old_string not found in file. Make sure to include exact text including whitespace and indentation.")
-	case 1:
-		// Valid: exactly one match found
-	default:
+	}
+	if count > 1 {
 		return toolError("old_string found %d times in file. It must be unique. Include more context to make it unique.", count)
 	}
 
@@ -144,14 +142,13 @@ func patchReplace(path, oldString, newString string) ToolOut {
 }
 
 func patchDelete(path string) ToolOut {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return toolError("File not found: %s", path)
-	}
-
-	if err := os.Remove(path); err != nil {
+	err := os.Remove(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return toolError("File not found: %s", path)
+		}
 		return toolError("Failed to delete file: %v", err)
 	}
-
 	return ToolOut{Content: fmt.Sprintf("Deleted %s", path)}
 }
 
