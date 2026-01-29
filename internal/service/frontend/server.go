@@ -136,12 +136,6 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		}
 	}
 
-	// Check if agent is enabled (for UI flag)
-	var agentEnabled bool
-	if agentConfigStore != nil {
-		agentEnabled = agentConfigStore.IsEnabled(ctx)
-	}
-
 	var authSvc *authservice.Service
 	if cfg.Server.Auth.Mode == config.AuthModeBuiltin {
 		result, err := initBuiltinAuthService(cfg, collector)
@@ -220,7 +214,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 			OIDCButtonLabel:       oidcButtonLabel,
 			TerminalEnabled:       cfg.Server.Terminal.Enabled && authSvc != nil,
 			GitSyncEnabled:        cfg.GitSync.Enabled,
-			AgentEnabled:          agentEnabled,
+			AgentEnabledChecker:   agentConfigStore,
 		},
 	}
 
@@ -230,7 +224,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	allAPIOptions := append(apiOpts, srv.tunnelAPIOpts...)
 	if srv.agentConfigStore != nil {
-		allAPIOptions = append(allAPIOptions, apiv2.WithAgentConfigStore(srv.agentConfigStore), apiv2.WithAgentFlagUpdater(srv))
+		allAPIOptions = append(allAPIOptions, apiv2.WithAgentConfigStore(srv.agentConfigStore))
 	}
 
 	srv.apiV2 = apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, allAPIOptions...)
@@ -744,15 +738,6 @@ func (srv *Server) serveHTTP(tlsCfg *config.TLSConfig, hasListener bool) error {
 	default:
 		return srv.httpServer.ListenAndServe()
 	}
-}
-
-// UpdateAgentEnabledFlag updates the UI flag for agent enabled status.
-// This is called after config is saved to reflect the new enabled state.
-func (srv *Server) UpdateAgentEnabledFlag(ctx context.Context) {
-	if srv.agentConfigStore == nil {
-		return
-	}
-	srv.funcsConfig.AgentEnabled = srv.agentConfigStore.IsEnabled(ctx)
 }
 
 // Shutdown gracefully shuts down the server.

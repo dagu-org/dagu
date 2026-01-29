@@ -36,7 +36,16 @@ async function fetchWithAuth<T>(url: string, options?: RequestInit): Promise<T> 
     headers: { ...getAuthHeaders(), ...options?.headers },
   });
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.statusText}`);
+    let errorMessage = response.statusText || 'Request failed';
+    try {
+      const errorData = await response.json();
+      if (errorData.message) {
+        errorMessage = errorData.message;
+      }
+    } catch {
+      // Ignore JSON parse errors
+    }
+    throw new Error(errorMessage);
   }
   return response.json();
 }
@@ -71,6 +80,7 @@ export function useAgentChat() {
   const eventSourceRef = useRef<EventSource | null>(null);
   const retryCountRef = useRef(0);
   const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const baseUrl = `${config.apiURL}/agent`;
 
   const closeEventSource = useCallback((): void => {
@@ -147,6 +157,7 @@ export function useAgentChat() {
   const sendMessage = useCallback(
     async (message: string, model?: string, dagContexts?: DAGContext[]): Promise<void> => {
       setIsSending(true);
+      setError(null);
       try {
         if (!conversationId) {
           await startConversation(message, model, dagContexts);
@@ -156,6 +167,10 @@ export function useAgentChat() {
           method: 'POST',
           body: JSON.stringify(buildChatRequest(message, model, dagContexts)),
         });
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
+        setError(errorMessage);
+        throw err;
       } finally {
         setIsSending(false);
       }
@@ -192,16 +207,20 @@ export function useAgentChat() {
 
   const isWorking = isSending || conversationState?.working === true;
 
+  const clearError = useCallback(() => setError(null), []);
+
   return {
     conversationId,
     messages,
     conversationState,
     conversations,
     isWorking,
+    error,
     startConversation,
     sendMessage,
     cancelConversation,
     clearConversation,
+    clearError,
     fetchConversations,
     selectConversation,
   };

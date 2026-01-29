@@ -36,7 +36,7 @@ func (srv *Server) useTemplate(ctx context.Context, layout, name string) func(ht
 		path.Join(templatePath, baseTemplateFile),
 		path.Join(templatePath, layout),
 	}
-	tmpl, err := template.New(name).Funcs(defaultFunctions(srv.funcsConfig)).ParseFS(assetsFS, files...)
+	tmpl, err := template.New(name).Funcs(defaultFunctions(&srv.funcsConfig)).ParseFS(assetsFS, files...)
 	if err != nil {
 		panic(err)
 	}
@@ -51,6 +51,12 @@ func (srv *Server) useTemplate(ctx context.Context, layout, name string) func(ht
 		w.WriteHeader(http.StatusOK)
 		_, _ = io.Copy(w, &buf)
 	}
+}
+
+// AgentEnabledChecker provides the agent enabled status.
+// This interface allows template functions to query the store directly.
+type AgentEnabledChecker interface {
+	IsEnabled(ctx context.Context) bool
 }
 
 type funcsConfig struct {
@@ -69,10 +75,12 @@ type funcsConfig struct {
 	OIDCButtonLabel       string
 	TerminalEnabled       bool
 	GitSyncEnabled        bool
-	AgentEnabled          bool
+
+	// Dynamic config sources (queried on each render)
+	AgentEnabledChecker AgentEnabledChecker
 }
 
-func defaultFunctions(cfg funcsConfig) template.FuncMap {
+func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 	boolStr := func(b bool) string { return strconv.FormatBool(b) }
 
 	return template.FuncMap{
@@ -97,7 +105,12 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 		"oidcEnabled":     func() string { return boolStr(cfg.OIDCEnabled) },
 		"terminalEnabled": func() string { return boolStr(cfg.TerminalEnabled) },
 		"gitSyncEnabled":  func() string { return boolStr(cfg.GitSyncEnabled) },
-		"agentEnabled":    func() string { return boolStr(cfg.AgentEnabled) },
+		"agentEnabled": func() string {
+			if cfg.AgentEnabledChecker == nil {
+				return "false"
+			}
+			return boolStr(cfg.AgentEnabledChecker.IsEnabled(context.Background()))
+		},
 
 		// Path configuration functions
 		"pathDAGsDir":            func() string { return cfg.Paths.DAGsDir },

@@ -134,6 +134,9 @@ export default function AgentSettingsPage(): React.ReactNode {
       updateFormState(data);
       setApiKey('');
       setSuccess('Configuration saved successfully');
+
+      // Reload page to apply new config across the UI
+      setTimeout(() => window.location.reload(), 500);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to save configuration'

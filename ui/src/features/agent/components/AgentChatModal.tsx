@@ -1,6 +1,6 @@
 import { ReactElement, useCallback, useEffect, useRef } from 'react';
 
-import { Plus, Terminal, X } from 'lucide-react';
+import { AlertCircle, Plus, Terminal, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -51,9 +51,11 @@ export function AgentChatModal(): ReactElement | null {
     messages,
     conversations,
     isWorking,
+    error,
     sendMessage,
     cancelConversation,
     clearConversation,
+    clearError,
     fetchConversations,
     selectConversation,
   } = useAgentChat();
@@ -186,6 +188,21 @@ export function AgentChatModal(): ReactElement | null {
           </Button>
         </div>
       </div>
+
+      {error && (
+        <div className="mx-3 mt-2 p-2 bg-destructive/10 border border-destructive/20 rounded-md flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-destructive">{error}</p>
+          </div>
+          <button
+            onClick={clearError}
+            className="text-destructive/60 hover:text-destructive flex-shrink-0"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      )}
 
       <ChatMessages messages={messages} isWorking={isWorking} />
 

@@ -17,11 +17,6 @@ type AgentConfigStore interface {
 	Save(ctx context.Context, cfg *fileagentconfig.AgentConfig) error
 }
 
-// AgentEnabledFlagUpdater defines the interface for updating the agent enabled flag.
-type AgentEnabledFlagUpdater interface {
-	UpdateAgentEnabledFlag(ctx context.Context)
-}
-
 var (
 	errAgentConfigNotAvailable = &Error{
 		Code:       api.ErrorCodeForbidden,
@@ -89,7 +84,6 @@ func (a *API) UpdateAgentConfig(ctx context.Context, request api.UpdateAgentConf
 	}
 
 	a.logAgentAudit(ctx, "agent_config_update", buildAgentConfigChanges(request.Body))
-	a.updateAgentEnabledFlag(ctx)
 
 	return api.UpdateAgentConfig200JSONResponse(toAgentConfigResponse(cfg)), nil
 }
@@ -99,13 +93,6 @@ func (a *API) requireAgentConfigManagement() error {
 		return errAgentConfigNotAvailable
 	}
 	return nil
-}
-
-func (a *API) updateAgentEnabledFlag(ctx context.Context) {
-	if a.agentFlagUpdater == nil {
-		return
-	}
-	a.agentFlagUpdater.UpdateAgentEnabledFlag(ctx)
 }
 
 func (a *API) logAgentAudit(ctx context.Context, action string, details map[string]any) {

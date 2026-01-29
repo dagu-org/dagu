@@ -53,9 +53,8 @@ type API struct {
 	auditService       *audit.Service
 	syncService        SyncService
 	tunnelService      *tunnel.Service
-	dagWritesDisabled  bool // True when git sync read-only mode is active
-	agentConfigStore   AgentConfigStore
-	agentFlagUpdater   AgentEnabledFlagUpdater
+	dagWritesDisabled bool // True when git sync read-only mode is active
+	agentConfigStore  AgentConfigStore
 }
 
 // AuthService defines the interface for authentication operations.
@@ -126,13 +125,6 @@ func WithTunnelService(ts *tunnel.Service) APIOption {
 func WithAgentConfigStore(store AgentConfigStore) APIOption {
 	return func(a *API) {
 		a.agentConfigStore = store
-	}
-}
-
-// WithAgentFlagUpdater returns an APIOption that sets the API's AgentEnabledFlagUpdater.
-func WithAgentFlagUpdater(updater AgentEnabledFlagUpdater) APIOption {
-	return func(a *API) {
-		a.agentFlagUpdater = updater
 	}
 }
 
