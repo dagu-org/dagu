@@ -207,7 +207,7 @@ function DAGDetailsModal({ fileName, isOpen, onClose }: Props): React.ReactEleme
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden pr-4">
                 {data.dag && (
                   <DAGDetailsContent
                     fileName={fileName}
