@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -182,26 +183,14 @@ func formatContextLine(ctx ResolvedDAGContext) string {
 		return ""
 	}
 
-	name := ctx.DAGName
-	if name == "" {
-		name = "unknown"
-	}
-
-	return fmt.Sprintf("- %s (%s)", name, strings.Join(parts, ", "))
+	return fmt.Sprintf("- %s (%s)", cmp.Or(ctx.DAGName, "unknown"), strings.Join(parts, ", "))
 }
 
 // selectModel returns the first non-empty model from the provided choices,
 // falling back to the default model from config.
 // Priority: requestModel > conversationModel > config default.
 func selectModel(requestModel, conversationModel, configModel string) string {
-	switch {
-	case requestModel != "":
-		return requestModel
-	case conversationModel != "":
-		return conversationModel
-	default:
-		return configModel
-	}
+	return cmp.Or(requestModel, conversationModel, configModel)
 }
 
 // createMessageCallback returns a persistence callback for the given conversation ID.

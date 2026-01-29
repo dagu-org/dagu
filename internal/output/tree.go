@@ -525,21 +525,23 @@ func (r *Renderer) calculateNodeDuration(node *exec.Node) string {
 }
 
 // nodeStatusToStatus converts NodeStatus to Status for duration calculation.
-var nodeStatusMap = map[core.NodeStatus]core.Status{
-	core.NodeRunning:            core.Running,
-	core.NodeSucceeded:          core.Succeeded,
-	core.NodeFailed:             core.Failed,
-	core.NodeAborted:            core.Aborted,
-	core.NodePartiallySucceeded: core.PartiallySucceeded,
-	core.NodeNotStarted:         core.NotStarted,
-	core.NodeSkipped:            core.NotStarted,
-	core.NodeWaiting:            core.Waiting,
-	core.NodeRejected:           core.Rejected,
-}
-
 func nodeStatusToStatus(ns core.NodeStatus) core.Status {
-	if status, ok := nodeStatusMap[ns]; ok {
-		return status
+	switch ns {
+	case core.NodeRunning:
+		return core.Running
+	case core.NodeSucceeded:
+		return core.Succeeded
+	case core.NodeFailed:
+		return core.Failed
+	case core.NodeAborted:
+		return core.Aborted
+	case core.NodePartiallySucceeded:
+		return core.PartiallySucceeded
+	case core.NodeWaiting:
+		return core.Waiting
+	case core.NodeRejected:
+		return core.Rejected
+	default:
+		return core.NotStarted
 	}
-	return core.NotStarted
 }
