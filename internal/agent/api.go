@@ -29,12 +29,21 @@ func getUserIDFromContext(ctx context.Context) string {
 	return defaultUserID
 }
 
+// ConfigStore provides access to agent configuration.
+// The implementation should handle caching and provide thread-safe access.
+type ConfigStore interface {
+	// IsEnabled returns whether the agent feature is enabled.
+	IsEnabled(ctx context.Context) bool
+	// GetProvider returns the LLM provider and model name.
+	// Returns error if agent is disabled or provider cannot be created.
+	GetProvider(ctx context.Context) (llm.Provider, string, error)
+}
+
 // API handles HTTP requests for the agent.
 type API struct {
 	conversations sync.Map // id -> *ConversationManager (active conversations)
 	store         ConversationStore
-	provider      llm.Provider
-	model         string
+	configStore   ConfigStore
 	workingDir    string
 	logger        *slog.Logger
 	dagStore      exec.DAGStore // For resolving DAG file paths
@@ -43,8 +52,7 @@ type API struct {
 
 // APIConfig contains configuration for the API.
 type APIConfig struct {
-	Provider          llm.Provider
-	Model             string
+	ConfigStore       ConfigStore
 	WorkingDir        string
 	Logger            *slog.Logger
 	ConversationStore ConversationStore
@@ -60,8 +68,7 @@ func NewAPI(cfg APIConfig) *API {
 	}
 
 	return &API{
-		provider:    cfg.Provider,
-		model:       cfg.Model,
+		configStore: cfg.ConfigStore,
 		workingDir:  cfg.WorkingDir,
 		logger:      logger,
 		store:       cfg.ConversationStore,
@@ -74,6 +81,9 @@ func NewAPI(cfg APIConfig) *API {
 // The authMiddleware parameter should be the same auth middleware used for other API routes.
 func (a *API) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler) http.Handler) {
 	r.Route("/api/v2/agent", func(r chi.Router) {
+		// Check if agent is enabled (must be first middleware)
+		r.Use(a.enabledMiddleware())
+
 		// Apply auth middleware to all agent routes
 		if authMiddleware != nil {
 			r.Use(authMiddleware)
@@ -91,6 +101,21 @@ func (a *API) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler) htt
 			r.Post("/cancel", a.handleCancel)
 		})
 	})
+}
+
+// enabledMiddleware returns middleware that checks if agent is enabled.
+func (a *API) enabledMiddleware() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !a.configStore.IsEnabled(r.Context()) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write([]byte(`{"code":"not_found","message":"Agent feature is disabled"}`))
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // resolveContexts resolves DAG file names to full paths using the DAG store.
@@ -166,16 +191,16 @@ func formatContextLine(ctx ResolvedDAGContext) string {
 }
 
 // selectModel returns the first non-empty model from the provided choices,
-// falling back to the API's default model.
-// Priority: requestModel > conversationModel > default model.
-func (a *API) selectModel(requestModel, conversationModel string) string {
+// falling back to the default model from config.
+// Priority: requestModel > conversationModel > config default.
+func selectModel(requestModel, conversationModel, configModel string) string {
 	switch {
 	case requestModel != "":
 		return requestModel
 	case conversationModel != "":
 		return conversationModel
 	default:
-		return a.model
+		return configModel
 	}
 }
 
@@ -235,8 +260,15 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	provider, configModel, err := a.configStore.GetProvider(r.Context())
+	if err != nil {
+		a.logger.Error("Failed to get LLM provider", "error", err)
+		http.Error(w, "Agent is not configured properly", http.StatusServiceUnavailable)
+		return
+	}
+
 	userID := getUserIDFromContext(r.Context())
-	model := a.selectModel(req.Model, "")
+	model := selectModel(req.Model, "", configModel)
 	id := uuid.New().String()
 	now := time.Now()
 
@@ -253,7 +285,7 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 	a.conversations.Store(id, mgr)
 
 	messageWithContext := a.formatMessage(r.Context(), req.Message, req.DAGContexts)
-	if err := mgr.AcceptUserMessage(r.Context(), a.provider, model, messageWithContext); err != nil {
+	if err := mgr.AcceptUserMessage(r.Context(), provider, model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		http.Error(w, "Failed to process message", http.StatusInternalServerError)
 		return
@@ -425,10 +457,17 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	model := a.selectModel(req.Model, mgr.GetModel())
+	provider, configModel, err := a.configStore.GetProvider(r.Context())
+	if err != nil {
+		a.logger.Error("Failed to get LLM provider", "error", err)
+		http.Error(w, "Agent is not configured properly", http.StatusServiceUnavailable)
+		return
+	}
+
+	model := selectModel(req.Model, mgr.GetModel(), configModel)
 	messageWithContext := a.formatMessage(r.Context(), req.Message, req.DAGContexts)
 
-	if err := mgr.AcceptUserMessage(r.Context(), a.provider, model, messageWithContext); err != nil {
+	if err := mgr.AcceptUserMessage(r.Context(), provider, model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
 		http.Error(w, "Failed to process message", http.StatusInternalServerError)
 		return

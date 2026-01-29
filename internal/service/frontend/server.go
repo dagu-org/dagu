@@ -1,7 +1,6 @@
 package frontend
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"log/slog"
@@ -33,7 +32,6 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/telemetry"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/gitsync"
-	"github.com/dagu-org/dagu/internal/llm"
 	_ "github.com/dagu-org/dagu/internal/llm/allproviders" // Register LLM providers
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
 	"github.com/dagu-org/dagu/internal/persis/fileapikey"
@@ -138,6 +136,12 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		}
 	}
 
+	// Check if agent is enabled (for UI flag)
+	var agentEnabled bool
+	if agentConfigStore != nil {
+		agentEnabled = agentConfigStore.IsEnabled(ctx)
+	}
+
 	var authSvc *authservice.Service
 	if cfg.Server.Auth.Mode == config.AuthModeBuiltin {
 		result, err := initBuiltinAuthService(cfg, collector)
@@ -216,7 +220,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 			OIDCButtonLabel:       oidcButtonLabel,
 			TerminalEnabled:       cfg.Server.Terminal.Enabled && authSvc != nil,
 			GitSyncEnabled:        cfg.GitSync.Enabled,
-			AgentEnabled:          agentAPI != nil,
+			AgentEnabled:          agentEnabled,
 		},
 	}
 
@@ -226,7 +230,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	allAPIOptions := append(apiOpts, srv.tunnelAPIOpts...)
 	if srv.agentConfigStore != nil {
-		allAPIOptions = append(allAPIOptions, apiv2.WithAgentConfigStore(srv.agentConfigStore), apiv2.WithAgentReloader(srv))
+		allAPIOptions = append(allAPIOptions, apiv2.WithAgentConfigStore(srv.agentConfigStore), apiv2.WithAgentFlagUpdater(srv))
 	}
 
 	srv.apiV2 = apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, allAPIOptions...)
@@ -355,30 +359,16 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 	return svc
 }
 
-// initAgentAPI creates and returns an agent API if enabled.
+// initAgentAPI creates and returns an agent API.
+// The API uses the config store to check enabled status and get provider dynamically.
 func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, paths *config.PathsConfig, dagStore exec.DAGStore) (*agent.API, error) {
-	agentCfg, err := store.Load(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load agent config: %w", err)
-	}
-
-	if !agentCfg.Enabled {
-		return nil, nil
-	}
-
-	provider, err := createLLMProvider(agentCfg.LLM)
-	if err != nil {
-		return nil, err
-	}
-
 	convStore, err := fileconversation.New(paths.ConversationsDir)
 	if err != nil {
 		logger.Warn(ctx, "Failed to create conversation store, persistence disabled", tag.Error(err))
 	}
 
 	api := agent.NewAPI(agent.APIConfig{
-		Provider:          provider,
-		Model:             agentCfg.LLM.Model,
+		ConfigStore:       store,
 		WorkingDir:        paths.DAGsDir,
 		Logger:            slog.Default(),
 		ConversationStore: convStore,
@@ -392,25 +382,9 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, paths *conf
 		},
 	})
 
-	logger.Info(ctx, "Agent API initialized",
-		slog.String("provider", agentCfg.LLM.Provider),
-		slog.String("model", agentCfg.LLM.Model))
+	logger.Info(ctx, "Agent API initialized")
 
 	return api, nil
-}
-
-// createLLMProvider creates an LLM provider from the agent configuration.
-func createLLMProvider(agentCfg fileagentconfig.AgentLLMConfig) (llm.Provider, error) {
-	providerType, err := llm.ParseProviderType(agentCfg.Provider)
-	if err != nil {
-		return nil, fmt.Errorf("invalid LLM provider: %w", err)
-	}
-
-	cfg := llm.DefaultConfig()
-	cfg.APIKey = cmp.Or(agentCfg.APIKey, cfg.APIKey)
-	cfg.BaseURL = cmp.Or(agentCfg.BaseURL, cfg.BaseURL)
-
-	return llm.NewProvider(providerType, cfg)
 }
 
 // sanitizedRequestLogger wraps httplog's RequestLogger with URL sanitization
@@ -499,7 +473,7 @@ func (srv *Server) Serve(ctx context.Context) error {
 		srv.setupTerminalRoute(ctx, r, apiV2BasePath)
 	}
 
-	if srv.agentAPI != nil {
+	if srv.agentAPI != nil && srv.agentConfigStore != nil {
 		srv.setupAgentRoutes(ctx, r)
 	}
 
@@ -772,27 +746,13 @@ func (srv *Server) serveHTTP(tlsCfg *config.TLSConfig, hasListener bool) error {
 	}
 }
 
-// ReloadAgent reloads the agent API with the current configuration.
-func (srv *Server) ReloadAgent(ctx context.Context) error {
+// UpdateAgentEnabledFlag updates the UI flag for agent enabled status.
+// This is called after config is saved to reflect the new enabled state.
+func (srv *Server) UpdateAgentEnabledFlag(ctx context.Context) {
 	if srv.agentConfigStore == nil {
-		return fmt.Errorf("agent config store not available")
+		return
 	}
-
-	api, err := initAgentAPI(ctx, srv.agentConfigStore, &srv.config.Paths, srv.dagStore)
-	if err != nil {
-		return fmt.Errorf("failed to reload agent: %w", err)
-	}
-
-	srv.agentAPI = api
-	srv.funcsConfig.AgentEnabled = api != nil
-
-	if api == nil {
-		logger.Info(ctx, "Agent disabled")
-	} else {
-		logger.Info(ctx, "Agent reloaded successfully")
-	}
-
-	return nil
+	srv.funcsConfig.AgentEnabled = srv.agentConfigStore.IsEnabled(ctx)
 }
 
 // Shutdown gracefully shuts down the server.

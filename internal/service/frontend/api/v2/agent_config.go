@@ -7,8 +7,6 @@ import (
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/cmn/logger"
-	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
 	"github.com/dagu-org/dagu/internal/service/audit"
 )
@@ -19,9 +17,9 @@ type AgentConfigStore interface {
 	Save(ctx context.Context, cfg *fileagentconfig.AgentConfig) error
 }
 
-// AgentReloader defines the interface for reloading the agent.
-type AgentReloader interface {
-	ReloadAgent(ctx context.Context) error
+// AgentEnabledFlagUpdater defines the interface for updating the agent enabled flag.
+type AgentEnabledFlagUpdater interface {
+	UpdateAgentEnabledFlag(ctx context.Context)
 }
 
 var (
@@ -91,7 +89,7 @@ func (a *API) UpdateAgentConfig(ctx context.Context, request api.UpdateAgentConf
 	}
 
 	a.logAgentAudit(ctx, "agent_config_update", buildAgentConfigChanges(request.Body))
-	a.reloadAgentIfConfigured(ctx)
+	a.updateAgentEnabledFlag(ctx)
 
 	return api.UpdateAgentConfig200JSONResponse(toAgentConfigResponse(cfg)), nil
 }
@@ -103,13 +101,11 @@ func (a *API) requireAgentConfigManagement() error {
 	return nil
 }
 
-func (a *API) reloadAgentIfConfigured(ctx context.Context) {
-	if a.agentReloader == nil {
+func (a *API) updateAgentEnabledFlag(ctx context.Context) {
+	if a.agentFlagUpdater == nil {
 		return
 	}
-	if err := a.agentReloader.ReloadAgent(ctx); err != nil {
-		logger.Warn(ctx, "Failed to reload agent after config update", tag.Error(err))
-	}
+	a.agentFlagUpdater.UpdateAgentEnabledFlag(ctx)
 }
 
 func (a *API) logAgentAudit(ctx context.Context, action string, details map[string]any) {

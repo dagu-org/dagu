@@ -1,7 +1,10 @@
 package fileagentconfig
 
 import (
+	"cmp"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +12,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagu-org/dagu/internal/llm"
 )
 
 const (
@@ -31,14 +37,88 @@ const (
 // The config is stored as a JSON file at {dataDir}/agent/config.json.
 // Thread-safe through internal locking.
 type Store struct {
-	baseDir string
-	mu      sync.RWMutex
+	baseDir       string
+	mu            sync.RWMutex
+	configCache   *fileutil.Cache[*AgentConfig]
+	providerCache *providerCache
+}
+
+// Option is a functional option for configuring the Store.
+type Option func(*Store)
+
+// WithConfigCache sets the config cache for the store.
+func WithConfigCache(cache *fileutil.Cache[*AgentConfig]) Option {
+	return func(s *Store) {
+		s.configCache = cache
+	}
+}
+
+// providerCache caches the LLM provider by config hash.
+type providerCache struct {
+	mu       sync.RWMutex
+	provider llm.Provider
+	model    string
+	cfgHash  string
+}
+
+func newProviderCache() *providerCache {
+	return &providerCache{}
+}
+
+func (c *providerCache) get(llmCfg AgentLLMConfig) (llm.Provider, string, error) {
+	hash := hashLLMConfig(llmCfg)
+
+	c.mu.RLock()
+	if c.cfgHash == hash && c.provider != nil {
+		defer c.mu.RUnlock()
+		return c.provider, c.model, nil
+	}
+	c.mu.RUnlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Double-check after acquiring write lock
+	if c.cfgHash == hash && c.provider != nil {
+		return c.provider, c.model, nil
+	}
+
+	provider, err := createLLMProvider(llmCfg)
+	if err != nil {
+		return nil, "", err
+	}
+
+	c.provider = provider
+	c.model = llmCfg.Model
+	c.cfgHash = hash
+	return provider, c.model, nil
+}
+
+// hashLLMConfig creates a hash of the LLM config for cache invalidation.
+func hashLLMConfig(cfg AgentLLMConfig) string {
+	data := fmt.Sprintf("%s:%s:%s:%s", cfg.Provider, cfg.Model, cfg.APIKey, cfg.BaseURL)
+	hash := sha256.Sum256([]byte(data))
+	return hex.EncodeToString(hash[:8])
+}
+
+// createLLMProvider creates an LLM provider from the config.
+func createLLMProvider(agentCfg AgentLLMConfig) (llm.Provider, error) {
+	providerType, err := llm.ParseProviderType(agentCfg.Provider)
+	if err != nil {
+		return nil, fmt.Errorf("invalid LLM provider: %w", err)
+	}
+
+	cfg := llm.DefaultConfig()
+	cfg.APIKey = cmp.Or(agentCfg.APIKey, cfg.APIKey)
+	cfg.BaseURL = cmp.Or(agentCfg.BaseURL, cfg.BaseURL)
+
+	return llm.NewProvider(providerType, cfg)
 }
 
 // New creates a new file-based agent config store.
 // The dataDir is the base data directory (e.g., DAGU_HOME/data).
 // The config will be stored at {dataDir}/agent/config.json.
-func New(dataDir string) (*Store, error) {
+func New(dataDir string, opts ...Option) (*Store, error) {
 	if dataDir == "" {
 		return nil, errors.New("fileagentconfig: dataDir cannot be empty")
 	}
@@ -48,13 +128,31 @@ func New(dataDir string) (*Store, error) {
 		return nil, fmt.Errorf("fileagentconfig: failed to create directory %s: %w", baseDir, err)
 	}
 
-	return &Store{baseDir: baseDir}, nil
+	s := &Store{
+		baseDir:       baseDir,
+		providerCache: newProviderCache(),
+	}
+
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	return s, nil
 }
 
 // Load reads the agent configuration from the JSON file.
 // If the file doesn't exist, returns the default configuration.
 // Priority: Environment variables > JSON file > Defaults
+// Uses cache if available to avoid reading file on every request.
 func (s *Store) Load(_ context.Context) (*AgentConfig, error) {
+	if s.configCache != nil {
+		return s.configCache.LoadLatest(s.configPath(), s.loadFromFile)
+	}
+	return s.loadFromFile()
+}
+
+// loadFromFile reads config directly from file.
+func (s *Store) loadFromFile() (*AgentConfig, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -72,6 +170,29 @@ func (s *Store) Load(_ context.Context) (*AgentConfig, error) {
 	applyEnvOverrides(cfg)
 
 	return cfg, nil
+}
+
+// IsEnabled returns whether the agent is enabled.
+// Reads from cache if available.
+func (s *Store) IsEnabled(ctx context.Context) bool {
+	cfg, err := s.Load(ctx)
+	if err != nil {
+		return false
+	}
+	return cfg.Enabled
+}
+
+// GetProvider returns the cached LLM provider and model.
+// Creates the provider if config has changed since last call.
+func (s *Store) GetProvider(ctx context.Context) (llm.Provider, string, error) {
+	cfg, err := s.Load(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+	if !cfg.Enabled {
+		return nil, "", errors.New("agent is disabled")
+	}
+	return s.providerCache.get(cfg.LLM)
 }
 
 // Save writes the agent configuration to the JSON file.
