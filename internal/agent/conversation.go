@@ -232,39 +232,33 @@ func (cm *ConversationManager) Subscribe(ctx context.Context) func() (StreamResp
 	return cm.subpub.Subscribe(ctx, lastSeq)
 }
 
-// SubscribeWithSnapshot atomically subscribes and returns the current state.
-// This prevents race conditions where messages could be missed between
-// getting the initial state and subscribing.
+// SubscribeWithSnapshot atomically captures current state and subscribes.
 func (cm *ConversationManager) SubscribeWithSnapshot(ctx context.Context) (StreamResponse, func() (StreamResponse, bool)) {
 	cm.mu.Lock()
-	// Get snapshot while holding lock
 	msgs := make([]Message, len(cm.messages))
 	copy(msgs, cm.messages)
 	lastSeq := cm.sequenceID
 	working := cm.working
 	model := cm.model
+	id := cm.id
 	conv := Conversation{
-		ID:        cm.id,
+		ID:        id,
 		UserID:    cm.userID,
 		CreatedAt: cm.lastActivity,
 		UpdatedAt: cm.lastActivity,
 	}
+	next := cm.subpub.Subscribe(ctx, lastSeq)
 	cm.mu.Unlock()
 
-	// Subscribe with the same sequence we captured
-	next := cm.subpub.Subscribe(ctx, lastSeq)
-
-	snapshot := StreamResponse{
+	return StreamResponse{
 		Messages:     msgs,
 		Conversation: &conv,
 		ConversationState: &ConversationState{
-			ConversationID: cm.id,
+			ConversationID: id,
 			Working:        working,
 			Model:          model,
 		},
-	}
-
-	return snapshot, next
+	}, next
 }
 
 // Cancel stops the conversation loop.
