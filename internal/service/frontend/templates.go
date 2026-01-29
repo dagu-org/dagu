@@ -53,8 +53,7 @@ func (srv *Server) useTemplate(ctx context.Context, layout, name string) func(ht
 	}
 }
 
-// AgentEnabledChecker provides the agent enabled status.
-// This interface allows template functions to query the store directly.
+// AgentEnabledChecker provides the agent enabled status for template rendering.
 type AgentEnabledChecker interface {
 	IsEnabled(ctx context.Context) bool
 }
