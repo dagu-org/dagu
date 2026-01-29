@@ -120,7 +120,7 @@ PB_RELEASE_NAME=protoc-${PB_VERSION}-${OS}-${ARCH}
 .PHONY: run
 run: ${FE_BUNDLE_JS}
 	@echo "${COLOR_GREEN}Starting the frontend server and the scheduler...${COLOR_RESET}"
-	@go run ./cmd start-all
+	@DAGU_DEBUG=1 go run ./cmd start-all
 
 # server build the binary and start the server.
 .PHONY: run-server
