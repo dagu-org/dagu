@@ -12,25 +12,19 @@ import (
 type MessageType string
 
 const (
-	// MessageTypeUser is a message from the user.
-	MessageTypeUser MessageType = "user"
-	// MessageTypeAssistant is a message from the AI assistant.
+	MessageTypeUser      MessageType = "user"
 	MessageTypeAssistant MessageType = "assistant"
-	// MessageTypeError is an error message.
-	MessageTypeError MessageType = "error"
-	// MessageTypeUIAction is a UI action message (e.g., navigate to page).
-	MessageTypeUIAction MessageType = "ui_action"
+	MessageTypeError     MessageType = "error"
+	MessageTypeUIAction  MessageType = "ui_action"
 )
 
-// UIAction represents an action to be performed by the UI.
+// UIAction represents an action to be performed by the UI (e.g., navigate).
 type UIAction struct {
-	// Type specifies the action kind (e.g., "navigate", "refresh").
 	Type string `json:"type"`
-	// Path is the navigation target for "navigate" actions.
 	Path string `json:"path,omitempty"`
 }
 
-// Message represents a message in a conversation, stored and sent to the UI.
+// Message represents a message in a conversation.
 type Message struct {
 	ID             string         `json:"id"`
 	ConversationID string         `json:"conversation_id"`
@@ -52,7 +46,7 @@ type ToolResult struct {
 	IsError    bool   `json:"is_error,omitempty"`
 }
 
-// Conversation represents a chat conversation.
+// Conversation represents a chat conversation with metadata.
 type Conversation struct {
 	ID        string    `json:"id"`
 	UserID    string    `json:"user_id,omitempty"`
@@ -75,7 +69,7 @@ type StreamResponse struct {
 	ConversationState *ConversationState `json:"conversation_state,omitempty"`
 }
 
-// DAGContext contains a single DAG reference from the frontend.
+// DAGContext contains a DAG reference from the frontend.
 type DAGContext struct {
 	DAGFile  string `json:"dag_file"`
 	DAGRunID string `json:"dag_run_id,omitempty"`
@@ -88,16 +82,12 @@ type ChatRequest struct {
 	DAGContexts []DAGContext `json:"dag_contexts,omitempty"`
 }
 
-// ResolvedDAGContext contains server-resolved info for a single DAG.
+// ResolvedDAGContext contains server-resolved information for a DAG.
 type ResolvedDAGContext struct {
-	// DAGFilePath is the absolute path to the DAG file.
-	DAGFilePath string
-	// DAGName is the name of the DAG.
-	DAGName string
-	// DAGRunID is present when viewing a specific run.
-	DAGRunID string
-	// RunStatus indicates the run state (running, success, or failed).
-	RunStatus string
+	DAGFilePath string // Absolute path to the DAG file
+	DAGName     string
+	DAGRunID    string // Present when viewing a specific run
+	RunStatus   string // Running, success, or failed
 }
 
 // NewConversationResponse is the response for creating a new conversation.
@@ -108,19 +98,17 @@ type NewConversationResponse struct {
 
 // ToolOut represents the output of a tool execution.
 type ToolOut struct {
-	// Content is the output sent back to the LLM.
-	Content string
-	// IsError indicates tool execution failure.
+	Content string // Output sent back to the LLM
 	IsError bool
 }
 
 // ToolFunc is the function signature for tool execution.
 type ToolFunc func(ctx ToolContext, input json.RawMessage) ToolOut
 
-// UIActionFunc is the function signature for emitting UI actions.
+// UIActionFunc emits UI actions during tool execution.
 type UIActionFunc func(action UIAction)
 
-// ToolContext provides context to tool execution.
+// ToolContext provides context for tool execution.
 type ToolContext struct {
 	WorkingDir   string
 	EmitUIAction UIActionFunc

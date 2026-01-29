@@ -39,27 +39,20 @@ func TestSockAddr(t *testing.T) {
 	t.Run("BasicFunctionality", func(t *testing.T) {
 		t.Parallel()
 
-		// Test basic socket address generation
 		addr := core.SockAddr("mydag", "run123")
 
-		// Should start with /tmp/@dagu_
 		require.True(t, strings.HasPrefix(addr, "/tmp/@dagu_"))
-
-		// Should end with .sock
 		require.True(t, strings.HasSuffix(addr, ".sock"))
-
-		// Should contain the safe name
 		require.Contains(t, addr, "mydag")
 
-		// Should have a 6-character hash
+		// Verify 6-character hash
 		parts := strings.Split(addr, "_")
 		lastPart := parts[len(parts)-1]
 		hashPart := strings.TrimSuffix(lastPart, ".sock")
 		require.Len(t, hashPart, 6)
 
-		// Should be deterministic - same inputs produce same output
-		addr2 := core.SockAddr("mydag", "run123")
-		require.Equal(t, addr, addr2)
+		// Deterministic: same inputs produce same output
+		require.Equal(t, addr, core.SockAddr("mydag", "run123"))
 	})
 
 	t.Run("DifferentInputsProduceDifferentHashes", func(t *testing.T) {
@@ -69,45 +62,29 @@ func TestSockAddr(t *testing.T) {
 		addr2 := core.SockAddr("dag1", "run2")
 		addr3 := core.SockAddr("dag2", "run1")
 
-		// Different dagRunIDs should produce different addresses
-		require.NotEqual(t, addr1, addr2)
-
-		// Different names should produce different addresses
-		require.NotEqual(t, addr1, addr3)
+		require.NotEqual(t, addr1, addr2, "different dagRunIDs should produce different addresses")
+		require.NotEqual(t, addr1, addr3, "different names should produce different addresses")
 	})
 
 	t.Run("SafeNameHandling", func(t *testing.T) {
 		t.Parallel()
 
-		// Test that unsafe characters are handled properly
 		addr := core.SockAddr("my/dag\\with:special*chars", "run|with<>chars")
-
-		// Extract just the socket name part (after /tmp/)
 		socketName := strings.TrimPrefix(addr, "/tmp/")
 
-		// Should not contain any of the unsafe characters in the socket name
-		// (but "/" is expected in the full path as "/tmp/")
-		require.NotContains(t, socketName, "/")
-		require.NotContains(t, socketName, "\\")
-		require.NotContains(t, socketName, ":")
-		require.NotContains(t, socketName, "*")
-		require.NotContains(t, socketName, "|")
-		require.NotContains(t, socketName, "<")
-		require.NotContains(t, socketName, ">")
+		// Verify unsafe characters are sanitized
+		for _, char := range []string{"/", "\\", ":", "*", "|", "<", ">"} {
+			require.NotContains(t, socketName, char)
+		}
 	})
 
 	t.Run("MaxSocketLengthEnforcement", func(t *testing.T) {
 		t.Parallel()
 
-		// Test that very long names are truncated to keep total length <= 50
-		veryLongName := strings.Repeat("a", 100)
-		addr := core.SockAddr(veryLongName, "run123")
-
-		// Extract just the socket name part (after /tmp/)
+		addr := core.SockAddr(strings.Repeat("a", 100), "run123")
 		socketName := strings.TrimPrefix(addr, "/tmp/")
-		require.LessOrEqual(t, len(socketName), 50)
 
-		// Should still have all required parts
+		require.LessOrEqual(t, len(socketName), 50)
 		require.True(t, strings.HasPrefix(socketName, "@dagu_"))
 		require.True(t, strings.HasSuffix(socketName, ".sock"))
 	})
@@ -115,105 +92,68 @@ func TestSockAddr(t *testing.T) {
 	t.Run("EdgeCaseTruncation", func(t *testing.T) {
 		t.Parallel()
 
-		// Test edge case where name needs to be truncated to exactly fit
 		// Format: @dagu_ (6) + name (?) + _ (1) + hash (6) + .sock (5) = 50
-		// So max name length = 50 - 6 - 1 - 6 - 5 = 32
-
-		// Test with name that will need truncation
+		// Max name length = 50 - 6 - 1 - 6 - 5 = 32
 		name32 := strings.Repeat("x", 32)
 		name33 := strings.Repeat("x", 33)
 
-		addr32 := core.SockAddr(name32, "run123")
-		addr33 := core.SockAddr(name33, "run123")
+		socketName32 := strings.TrimPrefix(core.SockAddr(name32, "run123"), "/tmp/")
+		socketName33 := strings.TrimPrefix(core.SockAddr(name33, "run123"), "/tmp/")
 
-		socketName32 := strings.TrimPrefix(addr32, "/tmp/")
-		socketName33 := strings.TrimPrefix(addr33, "/tmp/")
-
-		// Both should be exactly 50 characters or less
 		require.LessOrEqual(t, len(socketName32), 50)
 		require.LessOrEqual(t, len(socketName33), 50)
-
-		// The 33-char name should be truncated
 		require.Contains(t, socketName32, name32)
-		require.NotContains(t, socketName33, name33) // Full name won't fit
+		require.NotContains(t, socketName33, name33, "33-char name should be truncated")
 	})
 
 	t.Run("EmptyInputs", func(t *testing.T) {
 		t.Parallel()
 
-		// Test with empty strings
-		addr1 := core.SockAddr("", "")
-		addr2 := core.SockAddr("dag", "")
-		addr3 := core.SockAddr("", "run")
+		addrs := []string{
+			core.SockAddr("", ""),
+			core.SockAddr("dag", ""),
+			core.SockAddr("", "run"),
+		}
 
-		// All should produce valid socket addresses
-		require.True(t, strings.HasPrefix(addr1, "/tmp/@dagu_"))
-		require.True(t, strings.HasPrefix(addr2, "/tmp/@dagu_"))
-		require.True(t, strings.HasPrefix(addr3, "/tmp/@dagu_"))
-
-		// All should end with .sock
-		require.True(t, strings.HasSuffix(addr1, ".sock"))
-		require.True(t, strings.HasSuffix(addr2, ".sock"))
-		require.True(t, strings.HasSuffix(addr3, ".sock"))
+		for _, addr := range addrs {
+			require.True(t, strings.HasPrefix(addr, "/tmp/@dagu_"))
+			require.True(t, strings.HasSuffix(addr, ".sock"))
+		}
 	})
 
 	t.Run("HashConsistency", func(t *testing.T) {
 		t.Parallel()
 
-		// Verify that the hash is based on the combined name+dagRunID
-		name := "testdag"
-		runID := "testrun"
-
+		name, runID := "testdag", "testrun"
 		addr := core.SockAddr(name, runID)
 
-		// Extract the hash part
 		parts := strings.Split(addr, "_")
-		lastPart := parts[len(parts)-1]
-		hash := strings.TrimSuffix(lastPart, ".sock")
-
-		// The hash should be the first 6 characters of MD5(name+runID)
+		hash := strings.TrimSuffix(parts[len(parts)-1], ".sock")
 		expectedHash := fmt.Sprintf("%x", md5.Sum([]byte(name+runID)))[:6]
+
 		require.Equal(t, expectedHash, hash)
 	})
 
 	t.Run("DAGMethodsUseSockAddr", func(t *testing.T) {
 		t.Parallel()
 
-		// Test DAG.SockAddr method behavior
+		// With Location set: uses Location
+		dag1 := &core.DAG{Name: "mydag", Location: "path/to/dag.yml"}
+		require.Equal(t, core.SockAddr("path/to/dag.yml", ""), dag1.SockAddr("run123"))
 
-		// When Location is set, it uses Location
-		dag1 := &core.DAG{
-			Name:     "mydag",
-			Location: "path/to/dag.yml",
-		}
-		addr1 := dag1.SockAddr("run123")
-		expectedAddr1 := core.SockAddr("path/to/dag.yml", "")
-		require.Equal(t, expectedAddr1, addr1)
-
-		// When Location is not set, it uses Name and dagRunID
-		dag2 := &core.DAG{
-			Name: "mydag",
-		}
-		addr2 := dag2.SockAddr("run123")
-		expectedAddr2 := core.SockAddr("mydag", "run123")
-		require.Equal(t, expectedAddr2, addr2)
+		// Without Location: uses Name and dagRunID
+		dag2 := &core.DAG{Name: "mydag"}
+		require.Equal(t, core.SockAddr("mydag", "run123"), dag2.SockAddr("run123"))
 	})
 
 	t.Run("SockAddrForSubDAGRun", func(t *testing.T) {
 		t.Parallel()
 
-		// Test SockAddrForSubDAGRun always uses GetName() and dagRunID
-		dag := &core.DAG{
-			Name:     "parentdag",
-			Location: "path/to/parent.yml",
-		}
-
+		dag := &core.DAG{Name: "parentdag", Location: "path/to/parent.yml"}
 		subRunID := "child-run-456"
-		addr := dag.SockAddrForSubDAGRun(subRunID)
 
-		// Should use the DAG name (not location) with the sub run ID
-		expectedAddr := core.SockAddr("parentdag", subRunID)
-		require.Equal(t, expectedAddr, addr)
+		// Uses DAG name (not location) with the sub run ID
+		require.Equal(t, core.SockAddr("parentdag", subRunID), dag.SockAddrForSubDAGRun(subRunID))
 	})
 }
 
@@ -235,53 +175,33 @@ func TestScheduleJSON(t *testing.T) {
 	t.Run("MarshalUnmarshalJSON", func(t *testing.T) {
 		t.Parallel()
 
-		// Create a Schedule with a valid cron expression
-		original := core.Schedule{
-			Expression: "0 0 * * *", // Run at midnight every day
-		}
-
-		// Parse the expression to populate the Parsed field
+		original := core.Schedule{Expression: "0 0 * * *"}
 		parsed, err := cron.ParseStandard(original.Expression)
 		require.NoError(t, err)
 		original.Parsed = parsed
 
-		// Marshal to JSON
 		data, err := json.Marshal(original)
 		require.NoError(t, err)
 
-		// Verify JSON format (camelCase field names)
 		jsonStr := string(data)
 		require.Contains(t, jsonStr, `"expression":"0 0 * * *"`)
 		require.NotContains(t, jsonStr, `"Expression"`)
 		require.NotContains(t, jsonStr, `"Parsed"`)
 
-		// Unmarshal back to a Schedule struct
 		var unmarshaled core.Schedule
-		err = json.Unmarshal(data, &unmarshaled)
-		require.NoError(t, err)
-
-		// Verify the unmarshaled struct has the correct values
+		require.NoError(t, json.Unmarshal(data, &unmarshaled))
 		require.Equal(t, original.Expression, unmarshaled.Expression)
-
-		// Verify the Parsed field was populated correctly
 		require.NotNil(t, unmarshaled.Parsed)
 
-		// Test that the next scheduled time is the same for both objects
-		// This verifies that the Parsed field was correctly populated during unmarshaling
 		now := time.Now()
-		expectedNext := original.Parsed.Next(now)
-		actualNext := unmarshaled.Parsed.Next(now)
-		require.Equal(t, expectedNext, actualNext)
+		require.Equal(t, original.Parsed.Next(now), unmarshaled.Parsed.Next(now))
 	})
 
 	t.Run("UnmarshalInvalidCron", func(t *testing.T) {
 		t.Parallel()
 
-		// Test unmarshaling with an invalid cron expression
-		invalidJSON := `{"expression":"invalid cron"}`
-
 		var schedule core.Schedule
-		err := json.Unmarshal([]byte(invalidJSON), &schedule)
+		err := json.Unmarshal([]byte(`{"expression":"invalid cron"}`), &schedule)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "invalid cron expression")
 	})
@@ -291,20 +211,16 @@ func TestNextRun(t *testing.T) {
 	t.Parallel()
 
 	dag := &core.DAG{
-		Schedule: []core.Schedule{
-			{Expression: "0 1 * * *"}, // Daily at 1 AM
-		},
+		Schedule: []core.Schedule{{Expression: "0 1 * * *"}},
 	}
-	parsedCron, err := cron.ParseStandard(dag.Schedule[0].Expression)
+	parsed, err := cron.ParseStandard(dag.Schedule[0].Expression)
 	require.NoError(t, err)
-	dag.Schedule[0].Parsed = parsedCron
+	dag.Schedule[0].Parsed = parsed
 
 	now := time.Date(2023, 10, 1, 1, 0, 0, 0, time.UTC)
-	nextRun := dag.NextRun(now)
+	expected := time.Date(2023, 10, 2, 1, 0, 0, 0, time.UTC)
 
-	// Next run should be the next day at 1 AM
-	expectedNext := time.Date(2023, 10, 2, 1, 0, 0, 0, time.UTC)
-	require.Equal(t, expectedNext, nextRun)
+	require.Equal(t, expected, dag.NextRun(now))
 }
 
 func TestEffectiveLogOutput(t *testing.T) {
@@ -399,26 +315,21 @@ func TestDAG_Validate(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		dag     *core.DAG
-		wantErr bool
-		errMsg  string
+		name   string
+		dag    *core.DAG
+		errMsg string
 	}{
 		{
 			name: "valid DAG with name passes",
 			dag: &core.DAG{
-				Name: "test-dag",
-				Steps: []core.Step{
-					{Name: "step1"},
-				},
+				Name:  "test-dag",
+				Steps: []core.Step{{Name: "step1"}},
 			},
-			wantErr: false,
 		},
 		{
-			name:    "empty name fails",
-			dag:     &core.DAG{Name: ""},
-			wantErr: true,
-			errMsg:  "DAG name is required",
+			name:   "empty name fails",
+			dag:    &core.DAG{Name: ""},
+			errMsg: "DAG name is required",
 		},
 		{
 			name: "valid dependencies pass",
@@ -429,7 +340,6 @@ func TestDAG_Validate(t *testing.T) {
 					{Name: "step2", Depends: []string{"step1"}},
 				},
 			},
-			wantErr: false,
 		},
 		{
 			name: "missing dependency fails",
@@ -440,8 +350,7 @@ func TestDAG_Validate(t *testing.T) {
 					{Name: "step2", Depends: []string{"nonexistent"}},
 				},
 			},
-			wantErr: true,
-			errMsg:  "non-existent step",
+			errMsg: "non-existent step",
 		},
 		{
 			name: "complex multi-level dependencies pass",
@@ -454,7 +363,6 @@ func TestDAG_Validate(t *testing.T) {
 					{Name: "step4", Depends: []string{"step3"}},
 				},
 			},
-			wantErr: false,
 		},
 		{
 			name: "steps with no dependencies pass",
@@ -466,7 +374,6 @@ func TestDAG_Validate(t *testing.T) {
 					{Name: "step3"},
 				},
 			},
-			wantErr: false,
 		},
 	}
 
@@ -474,11 +381,9 @@ func TestDAG_Validate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			err := tt.dag.Validate()
-			if tt.wantErr {
+			if tt.errMsg != "" {
 				require.Error(t, err)
-				if tt.errMsg != "" {
-					assert.Contains(t, err.Error(), tt.errMsg)
-				}
+				assert.Contains(t, err.Error(), tt.errMsg)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -489,31 +394,26 @@ func TestDAG_Validate(t *testing.T) {
 func TestDAG_Validate_MultipleErrors(t *testing.T) {
 	t.Parallel()
 
-	t.Run("collects_all_validation_errors", func(t *testing.T) {
-		t.Parallel()
+	dag := &core.DAG{
+		Name: "",
+		Steps: []core.Step{
+			{Name: "a", Depends: []string{"missing1"}},
+			{Name: "b", Depends: []string{"missing2"}},
+			{Name: "c", Depends: []string{"missing3"}},
+		},
+	}
 
-		dag := &core.DAG{
-			Name: "", // error 1: empty name
-			Steps: []core.Step{
-				{Name: "a", Depends: []string{"missing1"}}, // error 2
-				{Name: "b", Depends: []string{"missing2"}}, // error 3
-				{Name: "c", Depends: []string{"missing3"}}, // error 4
-			},
-		}
+	err := dag.Validate()
+	require.Error(t, err)
 
-		err := dag.Validate()
-		require.Error(t, err)
+	var errList core.ErrorList
+	require.True(t, errors.As(err, &errList), "error should be an ErrorList")
+	assert.Len(t, errList, 4, "should collect all 4 errors (1 name + 3 dependencies)")
 
-		var errList core.ErrorList
-		require.True(t, errors.As(err, &errList), "error should be an ErrorList")
-		assert.Len(t, errList, 4, "should collect all 4 errors (1 name + 3 dependencies)")
-
-		errStr := err.Error()
-		assert.Contains(t, errStr, "DAG name is required")
-		assert.Contains(t, errStr, "missing1")
-		assert.Contains(t, errStr, "missing2")
-		assert.Contains(t, errStr, "missing3")
-	})
+	errStr := err.Error()
+	for _, expected := range []string{"DAG name is required", "missing1", "missing2", "missing3"} {
+		assert.Contains(t, errStr, expected)
+	}
 }
 
 func TestDAG_HasTag(t *testing.T) {
@@ -758,34 +658,29 @@ func TestDAG_String(t *testing.T) {
 
 	t.Run("full DAG formatted output", func(t *testing.T) {
 		t.Parallel()
+
 		dag := &core.DAG{
 			Name:        "test-dag",
 			Description: "A test DAG",
 			Params:      []string{"param1=value1", "param2=value2"},
 			LogDir:      "/var/log/dags",
-			Steps: []core.Step{
-				{Name: "step1"},
-				{Name: "step2"},
-			},
+			Steps:       []core.Step{{Name: "step1"}, {Name: "step2"}},
 		}
 		result := dag.String()
 
-		// Verify key fields are included
-		assert.Contains(t, result, "test-dag")
-		assert.Contains(t, result, "A test DAG")
-		assert.Contains(t, result, "param1=value1")
-		assert.Contains(t, result, "/var/log/dags")
+		for _, expected := range []string{"test-dag", "A test DAG", "param1=value1", "/var/log/dags"} {
+			assert.Contains(t, result, expected)
+		}
 	})
 
 	t.Run("minimal DAG basic output", func(t *testing.T) {
 		t.Parallel()
-		dag := &core.DAG{
-			Name: "minimal",
+
+		result := (&core.DAG{Name: "minimal"}).String()
+
+		for _, expected := range []string{"minimal", "{", "}"} {
+			assert.Contains(t, result, expected)
 		}
-		result := dag.String()
-		assert.Contains(t, result, "minimal")
-		assert.Contains(t, result, "{")
-		assert.Contains(t, result, "}")
 	})
 }
 
@@ -844,41 +739,32 @@ func TestDAG_NextRun_Extended(t *testing.T) {
 
 	t.Run("empty schedule returns zero time", func(t *testing.T) {
 		t.Parallel()
+
 		dag := &core.DAG{Schedule: []core.Schedule{}}
-		now := time.Now()
-		result := dag.NextRun(now)
-		assert.True(t, result.IsZero())
+		assert.True(t, dag.NextRun(time.Now()).IsZero())
 	})
 
 	t.Run("single schedule returns correct next time", func(t *testing.T) {
 		t.Parallel()
 
-		// Schedule for every hour at minute 0
 		parsed, err := cron.ParseStandard("0 * * * *")
 		require.NoError(t, err)
 
 		dag := &core.DAG{
-			Schedule: []core.Schedule{
-				{Expression: "0 * * * *", Parsed: parsed},
-			},
+			Schedule: []core.Schedule{{Expression: "0 * * * *", Parsed: parsed}},
 		}
 
 		now := time.Date(2023, 10, 1, 12, 30, 0, 0, time.UTC)
-		result := dag.NextRun(now)
-
-		// Should be the next hour
 		expected := time.Date(2023, 10, 1, 13, 0, 0, 0, time.UTC)
-		assert.Equal(t, expected, result)
+
+		assert.Equal(t, expected, dag.NextRun(now))
 	})
 
 	t.Run("multiple schedules returns earliest", func(t *testing.T) {
 		t.Parallel()
 
-		// First schedule: every hour at minute 0
 		hourly, err := cron.ParseStandard("0 * * * *")
 		require.NoError(t, err)
-
-		// Second schedule: every 30 minutes
 		halfHourly, err := cron.ParseStandard("*/30 * * * *")
 		require.NoError(t, err)
 
@@ -890,11 +776,9 @@ func TestDAG_NextRun_Extended(t *testing.T) {
 		}
 
 		now := time.Date(2023, 10, 1, 12, 15, 0, 0, time.UTC)
-		result := dag.NextRun(now)
-
-		// Should be at 12:30 (every 30 min) before 13:00 (hourly)
 		expected := time.Date(2023, 10, 1, 12, 30, 0, 0, time.UTC)
-		assert.Equal(t, expected, result)
+
+		assert.Equal(t, expected, dag.NextRun(now))
 	})
 
 	t.Run("nil Parsed in schedule is skipped", func(t *testing.T) {
@@ -905,39 +789,49 @@ func TestDAG_NextRun_Extended(t *testing.T) {
 
 		dag := &core.DAG{
 			Schedule: []core.Schedule{
-				{Expression: "invalid", Parsed: nil},      // nil Parsed should be skipped
-				{Expression: "0 * * * *", Parsed: parsed}, // valid
+				{Expression: "invalid", Parsed: nil},
+				{Expression: "0 * * * *", Parsed: parsed},
 			},
 		}
 
 		now := time.Date(2023, 10, 1, 12, 30, 0, 0, time.UTC)
-		result := dag.NextRun(now)
-
 		expected := time.Date(2023, 10, 1, 13, 0, 0, 0, time.UTC)
-		assert.Equal(t, expected, result)
+
+		assert.Equal(t, expected, dag.NextRun(now))
 	})
 }
 
 func TestDAG_GetName(t *testing.T) {
 	t.Parallel()
 
-	t.Run("name set returns name", func(t *testing.T) {
-		t.Parallel()
-		dag := &core.DAG{Name: "my-dag", Location: "/path/to/other.yaml"}
-		assert.Equal(t, "my-dag", dag.GetName())
-	})
+	tests := []struct {
+		name     string
+		dag      *core.DAG
+		expected string
+	}{
+		{
+			name:     "name set returns name",
+			dag:      &core.DAG{Name: "my-dag", Location: "/path/to/other.yaml"},
+			expected: "my-dag",
+		},
+		{
+			name:     "name empty returns filename from location",
+			dag:      &core.DAG{Name: "", Location: "/path/to/mydag.yaml"},
+			expected: "mydag",
+		},
+		{
+			name:     "name empty and location empty returns empty",
+			dag:      &core.DAG{Name: "", Location: ""},
+			expected: "",
+		},
+	}
 
-	t.Run("name empty returns filename from location", func(t *testing.T) {
-		t.Parallel()
-		dag := &core.DAG{Name: "", Location: "/path/to/mydag.yaml"}
-		assert.Equal(t, "mydag", dag.GetName())
-	})
-
-	t.Run("name empty and location empty returns empty", func(t *testing.T) {
-		t.Parallel()
-		dag := &core.DAG{Name: "", Location: ""}
-		assert.Equal(t, "", dag.GetName())
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, tt.dag.GetName())
+		})
+	}
 }
 
 func TestDAGHasHITLSteps(t *testing.T) {

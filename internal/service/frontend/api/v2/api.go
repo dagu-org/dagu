@@ -192,59 +192,81 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 		return fmt.Errorf("failed to get swagger: %w", err)
 	}
 
-	// Evaluate and normalize the base URL
-	if evaluatedBaseURL, err := cmdutil.EvalString(ctx, baseURL); err != nil {
-		logger.Warn(ctx, "Failed to evaluate API base URL",
-			tag.URL(baseURL),
-			tag.Error(err))
-	} else {
-		baseURL = evaluatedBaseURL
-	}
-	baseURL = strings.TrimRight(baseURL, "/")
+	baseURL = a.evaluateAndNormalizeURL(ctx, baseURL)
 	swagger.Servers = append(swagger.Servers, &openapi3.Server{URL: baseURL})
 
-	// Setup the API base path
-	basePath := a.config.Server.BasePath
-	if evaluatedBasePath, err := cmdutil.EvalString(ctx, basePath); err != nil {
-		logger.Warn(ctx, "Failed to evaluate server base path",
-			tag.Path(basePath),
-			tag.Error(err))
-	} else {
-		basePath = evaluatedBasePath
-	}
+	basePath := a.evaluateBasePath(ctx)
 	if basePath != "" {
 		swagger.Servers = append(swagger.Servers, &openapi3.Server{
 			URL: path.Join(baseURL, basePath),
 		})
 	}
 
-	// Create the oapi-codegen validator middleware
 	if a.config.Server.StrictValidation {
-		// It is problematic to use the validator behind a reverse proxy
-		validator := oapimiddleware.OapiRequestValidatorWithOptions(
-			swagger, &oapimiddleware.Options{
-				SilenceServersWarning: true,
-				Options: openapi3filter.Options{
-					AuthenticationFunc: func(_ context.Context, _ *openapi3filter.AuthenticationInput) error {
-						return nil
-					},
+		r.Use(a.createValidatorMiddleware(swagger))
+	}
+
+	authOptions, err := a.buildAuthOptions(ctx, basePath)
+	if err != nil {
+		return err
+	}
+
+	r.Group(func(r chi.Router) {
+		r.Use(frontendauth.ClientIPMiddleware())
+		r.Use(frontendauth.Middleware(authOptions))
+		r.Use(WithRemoteNode(a.remoteNodes, a.apiBasePath))
+
+		options := api.StrictHTTPServerOptions{
+			ResponseErrorHandlerFunc: a.handleError,
+		}
+		handler := api.NewStrictHandlerWithOptions(a, nil, options)
+		r.Mount("/", api.Handler(handler))
+	})
+
+	return nil
+}
+
+func (a *API) evaluateAndNormalizeURL(ctx context.Context, baseURL string) string {
+	if evaluated, err := cmdutil.EvalString(ctx, baseURL); err != nil {
+		logger.Warn(ctx, "Failed to evaluate API base URL",
+			tag.URL(baseURL),
+			tag.Error(err))
+	} else {
+		baseURL = evaluated
+	}
+	return strings.TrimRight(baseURL, "/")
+}
+
+func (a *API) evaluateBasePath(ctx context.Context) string {
+	basePath := a.config.Server.BasePath
+	if evaluated, err := cmdutil.EvalString(ctx, basePath); err != nil {
+		logger.Warn(ctx, "Failed to evaluate server base path",
+			tag.Path(basePath),
+			tag.Error(err))
+	} else {
+		basePath = evaluated
+	}
+	return basePath
+}
+
+func (a *API) createValidatorMiddleware(swagger *openapi3.T) func(http.Handler) http.Handler {
+	return oapimiddleware.OapiRequestValidatorWithOptions(
+		swagger, &oapimiddleware.Options{
+			SilenceServersWarning: true,
+			Options: openapi3filter.Options{
+				AuthenticationFunc: func(_ context.Context, _ *openapi3filter.AuthenticationInput) error {
+					return nil
 				},
 			},
-		)
-		r.Use(validator)
-	}
+		},
+	)
+}
 
-	options := api.StrictHTTPServerOptions{
-		ResponseErrorHandlerFunc: a.handleError,
-	}
-
-	// Initialize auth configuration
+func (a *API) buildAuthOptions(ctx context.Context, basePath string) (frontendauth.Options, error) {
 	authConfig := a.config.Server.Auth
-	// Basic auth works independently if credentials are configured
 	basicAuthEnabled := authConfig.Basic.Username != "" && authConfig.Basic.Password != ""
-	// Auth is required unless mode is explicitly set to "none" and no credentials are configured
 	authRequired := authConfig.Mode != config.AuthModeNone || basicAuthEnabled || authConfig.Token.Value != ""
-	// Build public paths list - metrics is only public if explicitly configured
+
 	publicPaths := []string{
 		pathutil.BuildPublicEndpointPath(basePath, "api/v2/health"),
 		pathutil.BuildPublicEndpointPath(basePath, "api/v2/auth/login"),
@@ -261,86 +283,58 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 		AuthRequired:     authRequired,
 		Creds:            map[string]string{authConfig.Basic.Username: authConfig.Basic.Password},
 		PublicPaths:      publicPaths,
-		// Webhook trigger endpoints use their own authentication (DAG-specific token)
-		// Note: We must append "/" to ensure only /api/v2/webhooks/{fileName} is public,
-		// not /api/v2/webhooks itself (the list endpoint which requires admin auth)
 		PublicPathPrefixes: []string{
 			pathutil.BuildPublicEndpointPath(basePath, "api/v2/webhooks") + "/",
 		},
 	}
 
-	// Initialize OIDC if enabled
-	authOIDC := authConfig.OIDC
-	if authOIDC.ClientId != "" && authOIDC.ClientSecret != "" && authOIDC.Issuer != "" {
-		oidcCfg, err := frontendauth.InitVerifierAndConfig(ctx, authOIDC)
-		if err != nil {
-			return fmt.Errorf("failed to initialize OIDC: %w", err)
-		}
-		authOptions.OIDCAuthEnabled = true
-		authOptions.OIDCWhitelist = authOIDC.Whitelist
-		authOptions.OIDCProvider = oidcCfg.Provider
-		authOptions.OIDCVerify = oidcCfg.Verifier
-		authOptions.OIDCConfig = oidcCfg.Config
+	if err := a.configureOIDC(ctx, authConfig.OIDC, &authOptions); err != nil {
+		return frontendauth.Options{}, err
 	}
 
-	// Apply authentication middleware
-	// For builtin mode, we need to add JWT validation in addition to other auth methods
-	if authConfig.Mode == config.AuthModeBuiltin {
-		if a.authService == nil {
-			return fmt.Errorf("builtin auth mode configured but auth service not initialized")
-		}
-		// Add JWT as an additional auth method for builtin mode
-		authOptions.JWTValidator = a.authService
-		// Add API key validation for builtin mode (if API key store is configured)
-		if a.authService.HasAPIKeyStore() {
-			authOptions.APIKeyValidator = a.authService
-		}
+	if err := a.configureBuiltinAuth(authConfig, &authOptions); err != nil {
+		return frontendauth.Options{}, err
 	}
 
-	r.Group(func(r chi.Router) {
-		// Add client IP to context for audit logging (must be before auth middleware)
-		r.Use(frontendauth.ClientIPMiddleware())
-		// Use the unified middleware that handles all auth methods:
-		// - Basic auth (if configured)
-		// - API token (if configured)
-		// - OIDC (if configured)
-		// - JWT tokens (if builtin mode with JWTValidator)
-		r.Use(frontendauth.Middleware(authOptions))
-		r.Use(WithRemoteNode(a.remoteNodes, a.apiBasePath))
+	return authOptions, nil
+}
 
-		handler := api.NewStrictHandlerWithOptions(a, nil, options)
-		r.Mount("/", api.Handler(handler))
-	})
+func (a *API) configureOIDC(ctx context.Context, oidcConfig config.AuthOIDC, opts *frontendauth.Options) error {
+	if oidcConfig.ClientId == "" || oidcConfig.ClientSecret == "" || oidcConfig.Issuer == "" {
+		return nil
+	}
 
+	oidcCfg, err := frontendauth.InitVerifierAndConfig(ctx, oidcConfig)
+	if err != nil {
+		return fmt.Errorf("failed to initialize OIDC: %w", err)
+	}
+
+	opts.OIDCAuthEnabled = true
+	opts.OIDCWhitelist = oidcConfig.Whitelist
+	opts.OIDCProvider = oidcCfg.Provider
+	opts.OIDCVerify = oidcCfg.Verifier
+	opts.OIDCConfig = oidcCfg.Config
+	return nil
+}
+
+func (a *API) configureBuiltinAuth(authConfig config.Auth, opts *frontendauth.Options) error {
+	if authConfig.Mode != config.AuthModeBuiltin {
+		return nil
+	}
+
+	if a.authService == nil {
+		return fmt.Errorf("builtin auth mode configured but auth service not initialized")
+	}
+
+	opts.JWTValidator = a.authService
+	if a.authService.HasAPIKeyStore() {
+		opts.APIKeyValidator = a.authService
+	}
 	return nil
 }
 
 func (a *API) handleError(w http.ResponseWriter, r *http.Request, err error) {
-	code := api.ErrorCodeInternalError
-	message := "An unexpected error occurred"
-	httpStatusCode := http.StatusInternalServerError
-
-	var apiErr *Error
-	if errors.As(err, &apiErr) {
-		code = apiErr.Code
-		message = apiErr.Message
-		httpStatusCode = apiErr.HTTPStatus
-	}
-
-	switch {
-	case errors.Is(err, exec.ErrDAGNotFound):
-		code = api.ErrorCodeNotFound
-		message = "DAG not found"
-		httpStatusCode = http.StatusNotFound
-	case errors.Is(err, exec.ErrDAGRunIDNotFound):
-		code = api.ErrorCodeNotFound
-		message = "dag-run ID not found"
-		httpStatusCode = http.StatusNotFound
-	case errors.Is(err, exec.ErrDAGAlreadyExists):
-		code = api.ErrorCodeAlreadyExists
-		message = "DAG already exists"
-		httpStatusCode = http.StatusConflict
-	}
+	code, message, httpStatusCode := a.resolveError(err)
 
 	if httpStatusCode == http.StatusInternalServerError {
 		logger.Errorf(r.Context(), "Internal server error: %v", err)
@@ -352,6 +346,25 @@ func (a *API) handleError(w http.ResponseWriter, r *http.Request, err error) {
 		Code:    code,
 		Message: message,
 	})
+}
+
+func (a *API) resolveError(err error) (api.ErrorCode, string, int) {
+	var apiErr *Error
+	if errors.As(err, &apiErr) {
+		return apiErr.Code, apiErr.Message, apiErr.HTTPStatus
+	}
+
+	if errors.Is(err, exec.ErrDAGNotFound) {
+		return api.ErrorCodeNotFound, "DAG not found", http.StatusNotFound
+	}
+	if errors.Is(err, exec.ErrDAGRunIDNotFound) {
+		return api.ErrorCodeNotFound, "dag-run ID not found", http.StatusNotFound
+	}
+	if errors.Is(err, exec.ErrDAGAlreadyExists) {
+		return api.ErrorCodeAlreadyExists, "DAG already exists", http.StatusConflict
+	}
+
+	return api.ErrorCodeInternalError, "An unexpected error occurred", http.StatusInternalServerError
 }
 
 func (a *API) isAllowed(perm config.Permission) error {

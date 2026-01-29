@@ -7,7 +7,10 @@ import (
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
-// DagReferenceInput is the input schema for the DAG reference tool.
+// availableSections defines the valid section names for DAG reference documentation.
+var availableSections = []string{"overview", "steps", "executors", "containers", "subdags", "examples"}
+
+// DagReferenceInput represents the input parameters for the DAG reference tool.
 type DagReferenceInput struct {
 	Section string `json:"section"`
 }
@@ -25,8 +28,8 @@ func NewDagReferenceTool() *AgentTool {
 					"properties": map[string]any{
 						"section": map[string]any{
 							"type":        "string",
-							"description": "Section to retrieve: overview, steps, executors, containers, subdags, examples",
-							"enum":        []string{"overview", "steps", "executors", "containers", "subdags", "examples"},
+							"description": "Section to retrieve: " + strings.Join(availableSections, ", "),
+							"enum":        availableSections,
 						},
 					},
 					"required": []string{"section"},
@@ -37,6 +40,7 @@ func NewDagReferenceTool() *AgentTool {
 	}
 }
 
+// dagReferenceSections maps section names to their documentation content.
 var dagReferenceSections = map[string]string{
 	"overview": `# DAG YAML Overview
 
@@ -285,9 +289,10 @@ func dagReferenceRun(_ ToolContext, input json.RawMessage) ToolOut {
 		return toolError("Failed to parse input: %v", err)
 	}
 
-	content, ok := dagReferenceSections[strings.ToLower(params.Section)]
+	section := strings.ToLower(params.Section)
+	content, ok := dagReferenceSections[section]
 	if !ok {
-		return toolError("Unknown section: %s. Available: overview, steps, executors, containers, subdags, examples", params.Section)
+		return toolError("Unknown section: %s. Available: %s", params.Section, strings.Join(availableSections, ", "))
 	}
 
 	return ToolOut{Content: content}

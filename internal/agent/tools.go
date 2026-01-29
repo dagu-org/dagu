@@ -5,7 +5,8 @@ import (
 	"path/filepath"
 )
 
-// CreateTools creates all available tools for the agent.
+// CreateTools returns all available tools for the agent including bash, read,
+// patch, think, navigate, and DAG reference tools.
 func CreateTools() []*AgentTool {
 	return []*AgentTool{
 		NewBashTool(),
@@ -17,7 +18,8 @@ func CreateTools() []*AgentTool {
 	}
 }
 
-// GetToolByName returns a tool by its name, or nil if not found.
+// GetToolByName finds a tool by name from the given slice.
+// Returns nil if the tool is not found.
 func GetToolByName(tools []*AgentTool, name string) *AgentTool {
 	for _, tool := range tools {
 		if tool.Function.Name == name {
@@ -27,7 +29,7 @@ func GetToolByName(tools []*AgentTool, name string) *AgentTool {
 	return nil
 }
 
-// toolError creates a ToolOut with an error message.
+// toolError creates a ToolOut marked as an error with a formatted message.
 func toolError(format string, args ...any) ToolOut {
 	return ToolOut{
 		Content: fmt.Sprintf(format, args...),
@@ -35,7 +37,8 @@ func toolError(format string, args ...any) ToolOut {
 	}
 }
 
-// resolvePath resolves a relative path against a working directory.
+// resolvePath converts a relative path to absolute using the working directory.
+// If the path is already absolute or workingDir is empty, returns path unchanged.
 func resolvePath(path, workingDir string) string {
 	if !filepath.IsAbs(path) && workingDir != "" {
 		return filepath.Join(workingDir, path)

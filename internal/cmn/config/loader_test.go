@@ -826,10 +826,9 @@ func TestBindEnv_AsPath(t *testing.T) {
 			loader.bindEnvironmentVariables()
 
 			result := os.Getenv(envKey)
-			switch {
-			case tt.envValue == "":
+			if tt.envValue == "" {
 				assert.Empty(t, result)
-			case tt.wantAbs:
+			} else if tt.wantAbs {
 				assert.True(t, filepath.IsAbs(result), "expected absolute path, got: %s", result)
 			}
 		})

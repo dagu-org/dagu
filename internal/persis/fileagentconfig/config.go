@@ -1,10 +1,11 @@
 // Package fileagentconfig provides a file-based storage for agent configuration.
 package fileagentconfig
 
-// Default values for agent configuration.
 const (
+	// DefaultProvider is the default LLM provider for the agent.
 	DefaultProvider = "anthropic"
-	DefaultModel    = "claude-sonnet-4-5"
+	// DefaultModel is the default LLM model for the agent.
+	DefaultModel = "claude-sonnet-4-5"
 )
 
 // AgentConfig holds the configuration for the AI agent feature.

@@ -2,7 +2,6 @@ package fileconversation
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -13,13 +12,8 @@ import (
 
 func setupTestStore(t *testing.T) (*Store, context.Context) {
 	t.Helper()
-	tmpDir, err := os.MkdirTemp("", "fileconversation-test-*")
+	store, err := New(t.TempDir())
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
-
-	store, err := New(tmpDir)
-	require.NoError(t, err)
-
 	return store, context.Background()
 }
 
@@ -131,15 +125,17 @@ func TestStore_Messages(t *testing.T) {
 }
 
 func TestStore_NotFound(t *testing.T) {
+	t.Parallel()
 	store, ctx := setupTestStore(t)
+	const nonexistentID = "nonexistent-id"
 
 	t.Run("get conversation", func(t *testing.T) {
-		_, err := store.GetConversation(ctx, "nonexistent-id")
+		_, err := store.GetConversation(ctx, nonexistentID)
 		assert.ErrorIs(t, err, agent.ErrConversationNotFound)
 	})
 
 	t.Run("get messages", func(t *testing.T) {
-		_, err := store.GetMessages(ctx, "nonexistent-id")
+		_, err := store.GetMessages(ctx, nonexistentID)
 		assert.ErrorIs(t, err, agent.ErrConversationNotFound)
 	})
 
@@ -151,17 +147,18 @@ func TestStore_NotFound(t *testing.T) {
 			Content:    "Hello",
 			CreatedAt:  time.Now(),
 		}
-		err := store.AddMessage(ctx, "nonexistent-id", msg)
+		err := store.AddMessage(ctx, nonexistentID, msg)
 		assert.ErrorIs(t, err, agent.ErrConversationNotFound)
 	})
 
 	t.Run("delete conversation", func(t *testing.T) {
-		err := store.DeleteConversation(ctx, "nonexistent-id")
+		err := store.DeleteConversation(ctx, nonexistentID)
 		assert.ErrorIs(t, err, agent.ErrConversationNotFound)
 	})
 }
 
 func TestStore_MultipleUsers(t *testing.T) {
+	t.Parallel()
 	store, ctx := setupTestStore(t)
 	now := time.Now()
 
@@ -244,6 +241,7 @@ func TestStore_RebuildIndex(t *testing.T) {
 }
 
 func TestStore_ValidationErrors(t *testing.T) {
+	t.Parallel()
 	store, ctx := setupTestStore(t)
 
 	t.Run("create conversation with nil", func(t *testing.T) {
@@ -279,7 +277,6 @@ func TestStore_ValidationErrors(t *testing.T) {
 			CreatedAt: now,
 			UpdatedAt: now,
 		}))
-
 		err := store.AddMessage(ctx, "conv-for-nil-msg", nil)
 		assert.Error(t, err)
 	})

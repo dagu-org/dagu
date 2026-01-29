@@ -24,64 +24,6 @@ type AgentReloader interface {
 	ReloadAgent(ctx context.Context) error
 }
 
-// GetAgentConfig returns the current agent configuration.
-// Requires admin role.
-func (a *API) GetAgentConfig(ctx context.Context, _ api.GetAgentConfigRequestObject) (api.GetAgentConfigResponseObject, error) {
-	if err := a.requireAgentConfigManagement(); err != nil {
-		return nil, err
-	}
-	if err := a.requireAdmin(ctx); err != nil {
-		return nil, err
-	}
-
-	cfg, err := a.agentConfigStore.Load(ctx)
-	if err != nil {
-		return nil, errFailedToLoadAgentConfig
-	}
-
-	return api.GetAgentConfig200JSONResponse(toAgentConfigResponse(cfg)), nil
-}
-
-// UpdateAgentConfig updates the agent configuration.
-// Requires admin role.
-func (a *API) UpdateAgentConfig(ctx context.Context, request api.UpdateAgentConfigRequestObject) (api.UpdateAgentConfigResponseObject, error) {
-	if err := a.requireAgentConfigManagement(); err != nil {
-		return nil, err
-	}
-	if err := a.requireAdmin(ctx); err != nil {
-		return nil, err
-	}
-
-	if request.Body == nil {
-		return nil, errInvalidRequestBody
-	}
-
-	cfg, err := a.agentConfigStore.Load(ctx)
-	if err != nil {
-		return nil, errFailedToLoadAgentConfig
-	}
-
-	applyAgentConfigUpdates(cfg, request.Body)
-
-	if err := a.agentConfigStore.Save(ctx, cfg); err != nil {
-		return nil, errFailedToSaveAgentConfig
-	}
-
-	a.logAgentConfigUpdate(ctx, request.Body)
-	a.reloadAgentIfConfigured(ctx)
-
-	return api.UpdateAgentConfig200JSONResponse(toAgentConfigResponse(cfg)), nil
-}
-
-// requireAgentConfigManagement checks if agent config management is available.
-func (a *API) requireAgentConfigManagement() error {
-	if a.agentConfigStore == nil {
-		return errAgentConfigNotAvailable
-	}
-	return nil
-}
-
-// Common errors for agent configuration operations.
 var (
 	errAgentConfigNotAvailable = &Error{
 		Code:       api.ErrorCodeForbidden,
@@ -108,7 +50,84 @@ var (
 	}
 )
 
-// toAgentConfigResponse converts internal agent config to API response format.
+// GetAgentConfig returns the current agent configuration. Requires admin role.
+func (a *API) GetAgentConfig(ctx context.Context, _ api.GetAgentConfigRequestObject) (api.GetAgentConfigResponseObject, error) {
+	if err := a.requireAgentConfigManagement(); err != nil {
+		return nil, err
+	}
+	if err := a.requireAdmin(ctx); err != nil {
+		return nil, err
+	}
+
+	cfg, err := a.agentConfigStore.Load(ctx)
+	if err != nil {
+		return nil, errFailedToLoadAgentConfig
+	}
+
+	return api.GetAgentConfig200JSONResponse(toAgentConfigResponse(cfg)), nil
+}
+
+// UpdateAgentConfig updates the agent configuration. Requires admin role.
+func (a *API) UpdateAgentConfig(ctx context.Context, request api.UpdateAgentConfigRequestObject) (api.UpdateAgentConfigResponseObject, error) {
+	if err := a.requireAgentConfigManagement(); err != nil {
+		return nil, err
+	}
+	if err := a.requireAdmin(ctx); err != nil {
+		return nil, err
+	}
+	if request.Body == nil {
+		return nil, errInvalidRequestBody
+	}
+
+	cfg, err := a.agentConfigStore.Load(ctx)
+	if err != nil {
+		return nil, errFailedToLoadAgentConfig
+	}
+
+	applyAgentConfigUpdates(cfg, request.Body)
+
+	if err := a.agentConfigStore.Save(ctx, cfg); err != nil {
+		return nil, errFailedToSaveAgentConfig
+	}
+
+	a.logAgentAudit(ctx, "agent_config_update", buildAgentConfigChanges(request.Body))
+	a.reloadAgentIfConfigured(ctx)
+
+	return api.UpdateAgentConfig200JSONResponse(toAgentConfigResponse(cfg)), nil
+}
+
+func (a *API) requireAgentConfigManagement() error {
+	if a.agentConfigStore == nil {
+		return errAgentConfigNotAvailable
+	}
+	return nil
+}
+
+func (a *API) reloadAgentIfConfigured(ctx context.Context) {
+	if a.agentReloader == nil {
+		return
+	}
+	if err := a.agentReloader.ReloadAgent(ctx); err != nil {
+		logger.Warn(ctx, "Failed to reload agent after config update", tag.Error(err))
+	}
+}
+
+func (a *API) logAgentAudit(ctx context.Context, action string, details map[string]any) {
+	if a.auditService == nil {
+		return
+	}
+	currentUser, ok := auth.UserFromContext(ctx)
+	if !ok || currentUser == nil {
+		return
+	}
+	clientIP, _ := auth.ClientIPFromContext(ctx)
+	detailsJSON, _ := json.Marshal(details)
+	entry := audit.NewEntry(audit.CategoryAgent, action, currentUser.ID, currentUser.Username).
+		WithDetails(string(detailsJSON)).
+		WithIPAddress(clientIP)
+	_ = a.auditService.Log(ctx, entry)
+}
+
 func toAgentConfigResponse(cfg *fileagentconfig.AgentConfig) api.AgentConfigResponse {
 	return api.AgentConfigResponse{
 		Enabled: ptrOf(cfg.Enabled),
@@ -121,99 +140,50 @@ func toAgentConfigResponse(cfg *fileagentconfig.AgentConfig) api.AgentConfigResp
 	}
 }
 
-// applyAgentConfigUpdates applies the update request fields to the config.
 func applyAgentConfigUpdates(cfg *fileagentconfig.AgentConfig, update *api.UpdateAgentConfigRequest) {
 	if update.Enabled != nil {
 		cfg.Enabled = *update.Enabled
 	}
-
-	if update.Llm != nil {
-		applyLLMConfigUpdates(&cfg.LLM, update.Llm)
-	}
-}
-
-// applyLLMConfigUpdates applies LLM-specific updates to the config.
-func applyLLMConfigUpdates(cfg *fileagentconfig.AgentLLMConfig, update *api.UpdateAgentLLMConfig) {
-	if update.Provider != nil {
-		cfg.Provider = *update.Provider
-	}
-	if update.Model != nil {
-		cfg.Model = *update.Model
-	}
-	if update.ApiKey != nil {
-		cfg.APIKey = *update.ApiKey
-	}
-	if update.BaseUrl != nil {
-		cfg.BaseURL = *update.BaseUrl
-	}
-}
-
-// logAgentConfigUpdate logs the configuration change to the audit service.
-func (a *API) logAgentConfigUpdate(ctx context.Context, update *api.UpdateAgentConfigRequest) {
-	if a.auditService == nil {
+	if update.Llm == nil {
 		return
 	}
-
-	currentUser, _ := auth.UserFromContext(ctx)
-	clientIP, _ := auth.ClientIPFromContext(ctx)
-
-	details, err := json.Marshal(buildAgentConfigChanges(update))
-	if err != nil {
-		logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
-		details = []byte("{}")
+	if update.Llm.Provider != nil {
+		cfg.LLM.Provider = *update.Llm.Provider
 	}
-
-	entry := audit.NewEntry(audit.CategoryAgent, "agent_config_update", currentUser.ID, currentUser.Username).
-		WithDetails(string(details)).
-		WithIPAddress(clientIP)
-	_ = a.auditService.Log(ctx, entry)
+	if update.Llm.Model != nil {
+		cfg.LLM.Model = *update.Llm.Model
+	}
+	if update.Llm.ApiKey != nil {
+		cfg.LLM.APIKey = *update.Llm.ApiKey
+	}
+	if update.Llm.BaseUrl != nil {
+		cfg.LLM.BaseURL = *update.Llm.BaseUrl
+	}
 }
 
-// buildAgentConfigChanges builds a map of changes for audit logging.
 func buildAgentConfigChanges(update *api.UpdateAgentConfigRequest) map[string]any {
 	changes := make(map[string]any)
-
 	if update.Enabled != nil {
 		changes["enabled"] = *update.Enabled
 	}
-
-	if update.Llm != nil {
-		llmChanges := buildLLMChanges(update.Llm)
-		if len(llmChanges) > 0 {
-			changes["llm"] = llmChanges
-		}
+	if update.Llm == nil {
+		return changes
 	}
-
+	llmChanges := make(map[string]any)
+	if update.Llm.Provider != nil {
+		llmChanges["provider"] = *update.Llm.Provider
+	}
+	if update.Llm.Model != nil {
+		llmChanges["model"] = *update.Llm.Model
+	}
+	if update.Llm.ApiKey != nil {
+		llmChanges["api_key_changed"] = true
+	}
+	if update.Llm.BaseUrl != nil {
+		llmChanges["base_url"] = *update.Llm.BaseUrl
+	}
+	if len(llmChanges) > 0 {
+		changes["llm"] = llmChanges
+	}
 	return changes
-}
-
-// buildLLMChanges builds a map of LLM-related changes for audit logging.
-func buildLLMChanges(llm *api.UpdateAgentLLMConfig) map[string]any {
-	changes := make(map[string]any)
-
-	if llm.Provider != nil {
-		changes["provider"] = *llm.Provider
-	}
-	if llm.Model != nil {
-		changes["model"] = *llm.Model
-	}
-	if llm.ApiKey != nil {
-		changes["api_key_changed"] = true
-	}
-	if llm.BaseUrl != nil {
-		changes["base_url"] = *llm.BaseUrl
-	}
-
-	return changes
-}
-
-// reloadAgentIfConfigured triggers agent reload if a reloader is configured.
-func (a *API) reloadAgentIfConfigured(ctx context.Context) {
-	if a.agentReloader == nil {
-		return
-	}
-
-	if err := a.agentReloader.ReloadAgent(ctx); err != nil {
-		logger.Warn(ctx, "Failed to reload agent after config update", tag.Error(err))
-	}
 }

@@ -202,7 +202,7 @@ func (s *Store) userDirPath(userID string) string {
 
 // CreateConversation creates a new conversation.
 func (s *Store) CreateConversation(_ context.Context, conv *agent.Conversation) error {
-	if err := validateConversation(conv); err != nil {
+	if err := validateConversation(conv, true); err != nil {
 		return err
 	}
 
@@ -231,24 +231,15 @@ func (s *Store) CreateConversation(_ context.Context, conv *agent.Conversation) 
 }
 
 // validateConversation checks that a conversation is valid for storage operations.
-func validateConversation(conv *agent.Conversation) error {
-	if err := validateConversationForUpdate(conv); err != nil {
-		return err
-	}
-	if conv.UserID == "" {
-		return agent.ErrInvalidUserID
-	}
-	return nil
-}
-
-// validateConversationForUpdate checks that a conversation is valid for update operations.
-// This is a subset of validateConversation that does not require UserID.
-func validateConversationForUpdate(conv *agent.Conversation) error {
+func validateConversation(conv *agent.Conversation, requireUserID bool) error {
 	if conv == nil {
 		return errors.New("fileconversation: conversation cannot be nil")
 	}
 	if conv.ID == "" {
 		return agent.ErrInvalidConversationID
+	}
+	if requireUserID && conv.UserID == "" {
+		return agent.ErrInvalidUserID
 	}
 	return nil
 }
@@ -318,7 +309,7 @@ func (s *Store) ListConversations(ctx context.Context, userID string) ([]*agent.
 
 // UpdateConversation updates conversation metadata.
 func (s *Store) UpdateConversation(_ context.Context, conv *agent.Conversation) error {
-	if err := validateConversationForUpdate(conv); err != nil {
+	if err := validateConversation(conv, false); err != nil {
 		return err
 	}
 
@@ -373,23 +364,27 @@ func (s *Store) DeleteConversation(_ context.Context, id string) error {
 
 	delete(s.byID, id)
 	delete(s.updatedAt, id)
-	s.removeConversationFromUserIndex(id, stored)
+
+	userID := ""
+	if stored != nil {
+		userID = stored.UserID
+	}
+	s.removeConversationFromUserIndex(id, userID)
 
 	return nil
 }
 
 // removeConversationFromUserIndex removes a conversation ID from the user index.
-// If stored is nil, searches all users for the conversation ID.
 // Must be called with mu held.
-func (s *Store) removeConversationFromUserIndex(id string, stored *ConversationForStorage) {
-	if stored != nil {
-		s.byUser[stored.UserID] = removeFromSlice(s.byUser[stored.UserID], id)
+func (s *Store) removeConversationFromUserIndex(id string, userID string) {
+	if userID != "" {
+		s.byUser[userID] = removeFromSlice(s.byUser[userID], id)
 		return
 	}
 
-	for userID, convIDs := range s.byUser {
-		if updatedSlice := removeFromSlice(convIDs, id); len(updatedSlice) != len(convIDs) {
-			s.byUser[userID] = updatedSlice
+	for uid, convIDs := range s.byUser {
+		if updated := removeFromSlice(convIDs, id); len(updated) != len(convIDs) {
+			s.byUser[uid] = updated
 			return
 		}
 	}
@@ -456,12 +451,13 @@ func (c *ConversationForStorage) setTitleFromMessage(msg *agent.Message) {
 	}
 }
 
-// truncateTitle truncates a title to maxTitleLength characters with ellipsis.
+// truncateTitle truncates a title to maxTitleLength runes with ellipsis.
 func truncateTitle(title string) string {
-	if len(title) <= maxTitleLength {
+	runes := []rune(title)
+	if len(runes) <= maxTitleLength {
 		return title
 	}
-	return title[:maxTitleLength-3] + "..."
+	return string(runes[:maxTitleLength-3]) + "..."
 }
 
 // GetMessages retrieves all messages for a conversation.
@@ -492,10 +488,10 @@ func (s *Store) loadConversationByID(id string) (*ConversationForStorage, error)
 	}
 
 	stored, err := s.loadConversationFromFile(filePath)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, agent.ErrConversationNotFound
-	}
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, agent.ErrConversationNotFound
+		}
 		return nil, fmt.Errorf("fileconversation: failed to load conversation: %w", err)
 	}
 

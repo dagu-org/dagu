@@ -2,13 +2,17 @@ package core
 
 import (
 	"errors"
-	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// testExecConfig provides a non-empty executor type to avoid triggering
+// command validators that may be registered via init() from other packages.
+var testExecConfig = ExecutorConfig{Type: "test-no-validator"}
 
 func TestIsValidStepID(t *testing.T) {
 	t.Parallel()
@@ -122,46 +126,38 @@ func TestIsReservedWord(t *testing.T) {
 func TestValidateSteps(t *testing.T) {
 	t.Parallel()
 
-	// Use a non-empty executor type to avoid triggering command validators
-	// that may be registered via init() from other packages
-	testExec := ExecutorConfig{Type: "test-no-validator"}
-
 	t.Run("valid DAG with steps passes validation", func(t *testing.T) {
 		t.Parallel()
 		dag := &DAG{
 			Steps: []Step{
-				{Name: "step1", ExecutorConfig: testExec},
-				{Name: "step2", Depends: []string{"step1"}, ExecutorConfig: testExec},
+				{Name: "step1", ExecutorConfig: testExecConfig},
+				{Name: "step2", Depends: []string{"step1"}, ExecutorConfig: testExecConfig},
 			},
 		}
-		err := ValidateSteps(dag)
-		assert.NoError(t, err)
+		assert.NoError(t, ValidateSteps(dag))
 	})
 
 	t.Run("empty DAG passes validation", func(t *testing.T) {
 		t.Parallel()
 		dag := &DAG{Steps: []Step{}}
-		err := ValidateSteps(dag)
-		assert.NoError(t, err)
+		assert.NoError(t, ValidateSteps(dag))
 	})
 
-	// Pass 1: ID validation tests
 	t.Run("step with valid ID passes", func(t *testing.T) {
 		t.Parallel()
 		dag := &DAG{
 			Steps: []Step{
-				{Name: "step1", ID: "myStepId", ExecutorConfig: testExec},
+				{Name: "step1", ID: "myStepId", ExecutorConfig: testExecConfig},
 			},
 		}
-		err := ValidateSteps(dag)
-		assert.NoError(t, err)
+		assert.NoError(t, ValidateSteps(dag))
 	})
 
 	t.Run("step with invalid ID format fails", func(t *testing.T) {
 		t.Parallel()
 		dag := &DAG{
 			Steps: []Step{
-				{Name: "step1", ID: "1invalid"}, // starts with number
+				{Name: "step1", ID: "1invalid"},
 			},
 		}
 		err := ValidateSteps(dag)
@@ -194,7 +190,7 @@ func TestValidateSteps(t *testing.T) {
 		}
 		err := ValidateSteps(dag)
 		require.Error(t, err)
-		assert.True(t, errors.Is(err, ErrStepNameDuplicate))
+		assert.ErrorIs(t, err, ErrStepNameDuplicate)
 	})
 
 	t.Run("duplicate step IDs fail", func(t *testing.T) {
@@ -210,18 +206,16 @@ func TestValidateSteps(t *testing.T) {
 		assert.Contains(t, err.Error(), "duplicate step ID")
 	})
 
-	// Pass 2: Name/ID conflict tests
 	t.Run("step ID conflicts with another step name fails", func(t *testing.T) {
 		t.Parallel()
 		dag := &DAG{
 			Steps: []Step{
-				{Name: "conflictName", ExecutorConfig: testExec},
-				{Name: "step2", ID: "conflictName", ExecutorConfig: testExec},
+				{Name: "conflictName", ExecutorConfig: testExecConfig},
+				{Name: "step2", ID: "conflictName", ExecutorConfig: testExecConfig},
 			},
 		}
 		err := ValidateSteps(dag)
 		require.Error(t, err)
-		// The validator detects that step name "conflictName" conflicts with another step's ID
 		assert.Contains(t, err.Error(), "conflicts")
 	})
 
@@ -229,13 +223,12 @@ func TestValidateSteps(t *testing.T) {
 		t.Parallel()
 		dag := &DAG{
 			Steps: []Step{
-				{Name: "step1", ID: "conflictId", ExecutorConfig: testExec},
-				{Name: "conflictId", ExecutorConfig: testExec},
+				{Name: "step1", ID: "conflictId", ExecutorConfig: testExecConfig},
+				{Name: "conflictId", ExecutorConfig: testExecConfig},
 			},
 		}
 		err := ValidateSteps(dag)
 		require.Error(t, err)
-		// The validator detects that step ID "conflictId" conflicts with another step's name
 		assert.Contains(t, err.Error(), "conflicts")
 	})
 
@@ -243,25 +236,22 @@ func TestValidateSteps(t *testing.T) {
 		t.Parallel()
 		dag := &DAG{
 			Steps: []Step{
-				{Name: "sameName", ID: "sameName", ExecutorConfig: testExec},
+				{Name: "sameName", ID: "sameName", ExecutorConfig: testExecConfig},
 			},
 		}
-		err := ValidateSteps(dag)
-		assert.NoError(t, err)
+		assert.NoError(t, ValidateSteps(dag))
 	})
 
-	// Pass 3 & 4: Dependency tests
 	t.Run("valid dependencies pass", func(t *testing.T) {
 		t.Parallel()
 		dag := &DAG{
 			Steps: []Step{
-				{Name: "step1", ExecutorConfig: testExec},
-				{Name: "step2", Depends: []string{"step1"}, ExecutorConfig: testExec},
-				{Name: "step3", Depends: []string{"step1", "step2"}, ExecutorConfig: testExec},
+				{Name: "step1", ExecutorConfig: testExecConfig},
+				{Name: "step2", Depends: []string{"step1"}, ExecutorConfig: testExecConfig},
+				{Name: "step3", Depends: []string{"step1", "step2"}, ExecutorConfig: testExecConfig},
 			},
 		}
-		err := ValidateSteps(dag)
-		assert.NoError(t, err)
+		assert.NoError(t, ValidateSteps(dag))
 	})
 
 	t.Run("non-existent dependency fails", func(t *testing.T) {
@@ -281,17 +271,14 @@ func TestValidateSteps(t *testing.T) {
 		t.Parallel()
 		dag := &DAG{
 			Steps: []Step{
-				{Name: "step1", ID: "s1", ExecutorConfig: testExec},
-				{Name: "step2", Depends: []string{"s1"}, ExecutorConfig: testExec}, // references ID
+				{Name: "step1", ID: "s1", ExecutorConfig: testExecConfig},
+				{Name: "step2", Depends: []string{"s1"}, ExecutorConfig: testExecConfig},
 			},
 		}
-		err := ValidateSteps(dag)
-		assert.NoError(t, err)
-		// After validation, depends should be resolved to name
+		assert.NoError(t, ValidateSteps(dag))
 		assert.Contains(t, dag.Steps[1].Depends, "step1")
 	})
 
-	// Pass 5: Step validation tests
 	t.Run("step with empty name fails", func(t *testing.T) {
 		t.Parallel()
 		dag := &DAG{
@@ -301,36 +288,31 @@ func TestValidateSteps(t *testing.T) {
 		}
 		err := ValidateSteps(dag)
 		require.Error(t, err)
-		// The internal error is "step name not generated"
 		assert.Contains(t, err.Error(), "step name")
 	})
 
 	t.Run("step name too long fails", func(t *testing.T) {
 		t.Parallel()
-		longName := strings.Repeat("a", 41) // 41 chars, max is 40
 		dag := &DAG{
 			Steps: []Step{
-				{Name: longName},
+				{Name: strings.Repeat("a", 41)},
 			},
 		}
 		err := ValidateSteps(dag)
 		require.Error(t, err)
-		assert.True(t, errors.Is(err, ErrStepNameTooLong))
+		assert.ErrorIs(t, err, ErrStepNameTooLong)
 	})
 
 	t.Run("step name at max length passes", func(t *testing.T) {
 		t.Parallel()
-		maxName := strings.Repeat("a", 40) // exactly 40 chars
 		dag := &DAG{
 			Steps: []Step{
-				{Name: maxName, ExecutorConfig: testExec},
+				{Name: strings.Repeat("a", 40), ExecutorConfig: testExecConfig},
 			},
 		}
-		err := ValidateSteps(dag)
-		assert.NoError(t, err)
+		assert.NoError(t, ValidateSteps(dag))
 	})
 
-	// Parallel config validation
 	t.Run("parallel config without SubDAG fails", func(t *testing.T) {
 		t.Parallel()
 		dag := &DAG{
@@ -341,7 +323,6 @@ func TestValidateSteps(t *testing.T) {
 						MaxConcurrent: 2,
 						Items:         []ParallelItem{{Value: "a"}, {Value: "b"}},
 					},
-					// SubDAG is nil
 				},
 			},
 		}
@@ -396,7 +377,6 @@ func TestValidateSteps(t *testing.T) {
 					Name: "step1",
 					Parallel: &ParallelConfig{
 						MaxConcurrent: 2,
-						// no items, no variable
 					},
 					SubDAG: &SubDAG{Name: "child"},
 				},
@@ -421,8 +401,7 @@ func TestValidateSteps(t *testing.T) {
 				},
 			},
 		}
-		err := ValidateSteps(dag)
-		assert.NoError(t, err)
+		assert.NoError(t, ValidateSteps(dag))
 	})
 
 	t.Run("valid parallel config with variable passes", func(t *testing.T) {
@@ -439,8 +418,7 @@ func TestValidateSteps(t *testing.T) {
 				},
 			},
 		}
-		err := ValidateSteps(dag)
-		assert.NoError(t, err)
+		assert.NoError(t, ValidateSteps(dag))
 	})
 }
 
@@ -560,8 +538,7 @@ func TestResolveStepDependencies(t *testing.T) {
 			},
 		}
 
-		err := resolveStepDependencies(dag)
-		require.NoError(t, err)
+		resolveStepDependencies(dag)
 
 		// Dependencies should be resolved to names
 		assert.Contains(t, dag.Steps[2].Depends, "firstStep")
@@ -577,8 +554,7 @@ func TestResolveStepDependencies(t *testing.T) {
 			},
 		}
 
-		err := resolveStepDependencies(dag)
-		require.NoError(t, err)
+		resolveStepDependencies(dag)
 
 		// Name reference should remain unchanged
 		assert.Contains(t, dag.Steps[1].Depends, "step1")
@@ -594,8 +570,7 @@ func TestResolveStepDependencies(t *testing.T) {
 			},
 		}
 
-		err := resolveStepDependencies(dag)
-		require.NoError(t, err)
+		resolveStepDependencies(dag)
 
 		// ID should be resolved, name should remain
 		assert.Contains(t, dag.Steps[2].Depends, "step1") // s1 resolved to step1
@@ -606,8 +581,8 @@ func TestResolveStepDependencies(t *testing.T) {
 		t.Parallel()
 		dag := &DAG{Steps: []Step{}}
 
-		err := resolveStepDependencies(dag)
-		assert.NoError(t, err)
+		resolveStepDependencies(dag)
+		// No panic is expected
 	})
 
 	t.Run("steps without dependencies", func(t *testing.T) {
@@ -619,8 +594,8 @@ func TestResolveStepDependencies(t *testing.T) {
 			},
 		}
 
-		err := resolveStepDependencies(dag)
-		assert.NoError(t, err)
+		resolveStepDependencies(dag)
+
 		assert.Empty(t, dag.Steps[0].Depends)
 		assert.Empty(t, dag.Steps[1].Depends)
 	})
@@ -629,37 +604,32 @@ func TestResolveStepDependencies(t *testing.T) {
 func TestValidateStep(t *testing.T) {
 	t.Parallel()
 
-	// Use a non-empty executor type to avoid triggering command validators
-	testExecutorType := "test-no-validator"
-
 	t.Run("valid step passes", func(t *testing.T) {
 		t.Parallel()
-		step := Step{Name: "validStep", ExecutorConfig: ExecutorConfig{Type: testExecutorType}}
-		errs := validateStep(step)
-		assert.Empty(t, errs)
+		step := Step{Name: "validStep", ExecutorConfig: testExecConfig}
+		assert.Empty(t, validateStep(step))
 	})
 
 	t.Run("empty name fails", func(t *testing.T) {
 		t.Parallel()
-		step := Step{Name: "", ExecutorConfig: ExecutorConfig{Type: testExecutorType}}
+		step := Step{Name: "", ExecutorConfig: testExecConfig}
 		errs := validateStep(step)
 		require.NotEmpty(t, errs)
-		assert.True(t, errors.Is(errs, ErrStepNameRequired))
+		assert.ErrorIs(t, errs, ErrStepNameRequired)
 	})
 
 	t.Run("name too long fails", func(t *testing.T) {
 		t.Parallel()
-		step := Step{Name: strings.Repeat("x", 41), ExecutorConfig: ExecutorConfig{Type: testExecutorType}}
+		step := Step{Name: strings.Repeat("x", 41), ExecutorConfig: testExecConfig}
 		errs := validateStep(step)
 		require.NotEmpty(t, errs)
-		assert.True(t, errors.Is(errs, ErrStepNameTooLong))
+		assert.ErrorIs(t, errs, ErrStepNameTooLong)
 	})
 
 	t.Run("name at exactly max length passes", func(t *testing.T) {
 		t.Parallel()
-		step := Step{Name: strings.Repeat("x", 40), ExecutorConfig: ExecutorConfig{Type: testExecutorType}}
-		errs := validateStep(step)
-		assert.Empty(t, errs)
+		step := Step{Name: strings.Repeat("x", 40), ExecutorConfig: testExecConfig}
+		assert.Empty(t, validateStep(step))
 	})
 }
 
@@ -669,8 +639,7 @@ func TestValidateStepWithValidator(t *testing.T) {
 			Name:           "step1",
 			ExecutorConfig: ExecutorConfig{Type: "unknown-type"},
 		}
-		err := validateStepWithValidator(step)
-		assert.NoError(t, err)
+		assert.NoError(t, validateStepWithValidator(step))
 	})
 
 	t.Run("nil validator returns nil", func(t *testing.T) {
@@ -681,8 +650,7 @@ func TestValidateStepWithValidator(t *testing.T) {
 			Name:           "step1",
 			ExecutorConfig: ExecutorConfig{Type: "nil-validator-type"},
 		}
-		err := validateStepWithValidator(step)
-		assert.NoError(t, err)
+		assert.NoError(t, validateStepWithValidator(step))
 	})
 
 	t.Run("validator error is wrapped", func(t *testing.T) {
@@ -700,59 +668,47 @@ func TestValidateStepWithValidator(t *testing.T) {
 		err := validateStepWithValidator(step)
 		require.Error(t, err)
 
-		// Should be wrapped in ValidationError
 		var ve *ValidationError
-		require.True(t, errors.As(err, &ve))
+		require.ErrorAs(t, err, &ve)
 		assert.Equal(t, "executorConfig", ve.Field)
-		assert.True(t, errors.Is(err, customErr))
+		assert.ErrorIs(t, err, customErr)
 	})
 }
 
 func TestValidateSteps_ComplexScenarios(t *testing.T) {
 	t.Parallel()
 
-	// Use a non-empty executor type to avoid triggering command validators
-	// that may be registered via init() from other packages
-	testExecutorType := "test-no-validator"
-
 	t.Run("large DAG with many steps", func(t *testing.T) {
 		t.Parallel()
 
-		// Create a DAG with 100 steps in a chain
-		steps := make([]Step, 100)
-		for i := 0; i < 100; i++ {
+		const stepCount = 100
+		steps := make([]Step, stepCount)
+		for i := range stepCount {
 			steps[i] = Step{
-				Name:           fmt.Sprintf("step%d", i),
-				ExecutorConfig: ExecutorConfig{Type: testExecutorType},
+				Name:           "step" + strconv.Itoa(i),
+				ExecutorConfig: testExecConfig,
 			}
 			if i > 0 {
-				steps[i].Depends = []string{fmt.Sprintf("step%d", i-1)}
+				steps[i].Depends = []string{"step" + strconv.Itoa(i-1)}
 			}
 		}
 
 		dag := &DAG{Steps: steps}
-		err := ValidateSteps(dag)
-		assert.NoError(t, err)
+		assert.NoError(t, ValidateSteps(dag))
 	})
 
 	t.Run("diamond dependency pattern", func(t *testing.T) {
 		t.Parallel()
 
-		//     A
-		//    / \
-		//   B   C
-		//    \ /
-		//     D
 		dag := &DAG{
 			Steps: []Step{
-				{Name: "A", ExecutorConfig: ExecutorConfig{Type: testExecutorType}},
-				{Name: "B", Depends: []string{"A"}, ExecutorConfig: ExecutorConfig{Type: testExecutorType}},
-				{Name: "C", Depends: []string{"A"}, ExecutorConfig: ExecutorConfig{Type: testExecutorType}},
-				{Name: "D", Depends: []string{"B", "C"}, ExecutorConfig: ExecutorConfig{Type: testExecutorType}},
+				{Name: "A", ExecutorConfig: testExecConfig},
+				{Name: "B", Depends: []string{"A"}, ExecutorConfig: testExecConfig},
+				{Name: "C", Depends: []string{"A"}, ExecutorConfig: testExecConfig},
+				{Name: "D", Depends: []string{"B", "C"}, ExecutorConfig: testExecConfig},
 			},
 		}
-		err := ValidateSteps(dag)
-		assert.NoError(t, err)
+		assert.NoError(t, ValidateSteps(dag))
 	})
 
 	t.Run("multiple independent chains", func(t *testing.T) {
@@ -760,33 +716,28 @@ func TestValidateSteps_ComplexScenarios(t *testing.T) {
 
 		dag := &DAG{
 			Steps: []Step{
-				// Chain 1
-				{Name: "chain1-step1", ExecutorConfig: ExecutorConfig{Type: testExecutorType}},
-				{Name: "chain1-step2", Depends: []string{"chain1-step1"}, ExecutorConfig: ExecutorConfig{Type: testExecutorType}},
-				// Chain 2
-				{Name: "chain2-step1", ExecutorConfig: ExecutorConfig{Type: testExecutorType}},
-				{Name: "chain2-step2", Depends: []string{"chain2-step1"}, ExecutorConfig: ExecutorConfig{Type: testExecutorType}},
+				{Name: "chain1-step1", ExecutorConfig: testExecConfig},
+				{Name: "chain1-step2", Depends: []string{"chain1-step1"}, ExecutorConfig: testExecConfig},
+				{Name: "chain2-step1", ExecutorConfig: testExecConfig},
+				{Name: "chain2-step2", Depends: []string{"chain2-step1"}, ExecutorConfig: testExecConfig},
 			},
 		}
-		err := ValidateSteps(dag)
-		assert.NoError(t, err)
+		assert.NoError(t, ValidateSteps(dag))
 	})
 }
 
 func TestValidateSteps_MultipleErrors(t *testing.T) {
 	t.Parallel()
 
-	testExecutorType := "test-no-validator"
-
 	t.Run("duplicate_names", func(t *testing.T) {
 		t.Parallel()
 
 		dag := &DAG{
 			Steps: []Step{
-				{Name: "step1", ExecutorConfig: ExecutorConfig{Type: testExecutorType}},
-				{Name: "step1", ExecutorConfig: ExecutorConfig{Type: testExecutorType}}, // duplicate
-				{Name: "step2", ExecutorConfig: ExecutorConfig{Type: testExecutorType}},
-				{Name: "step2", ExecutorConfig: ExecutorConfig{Type: testExecutorType}}, // duplicate
+				{Name: "step1", ExecutorConfig: testExecConfig},
+				{Name: "step1", ExecutorConfig: testExecConfig},
+				{Name: "step2", ExecutorConfig: testExecConfig},
+				{Name: "step2", ExecutorConfig: testExecConfig},
 			},
 		}
 
@@ -794,7 +745,7 @@ func TestValidateSteps_MultipleErrors(t *testing.T) {
 		require.Error(t, err)
 
 		var errList ErrorList
-		require.True(t, errors.As(err, &errList), "error should be an ErrorList")
+		require.ErrorAs(t, err, &errList)
 		assert.Len(t, errList, 2, "should collect both duplicate name errors")
 	})
 
@@ -803,9 +754,9 @@ func TestValidateSteps_MultipleErrors(t *testing.T) {
 
 		dag := &DAG{
 			Steps: []Step{
-				{Name: "step1", Depends: []string{"missing1"}, ExecutorConfig: ExecutorConfig{Type: testExecutorType}},
-				{Name: "step2", Depends: []string{"missing2"}, ExecutorConfig: ExecutorConfig{Type: testExecutorType}},
-				{Name: "step3", Depends: []string{"missing3"}, ExecutorConfig: ExecutorConfig{Type: testExecutorType}},
+				{Name: "step1", Depends: []string{"missing1"}, ExecutorConfig: testExecConfig},
+				{Name: "step2", Depends: []string{"missing2"}, ExecutorConfig: testExecConfig},
+				{Name: "step3", Depends: []string{"missing3"}, ExecutorConfig: testExecConfig},
 			},
 		}
 
@@ -813,7 +764,7 @@ func TestValidateSteps_MultipleErrors(t *testing.T) {
 		require.Error(t, err)
 
 		var errList ErrorList
-		require.True(t, errors.As(err, &errList), "error should be an ErrorList")
+		require.ErrorAs(t, err, &errList)
 		assert.Len(t, errList, 3, "should collect all 3 missing dependency errors")
 
 		errStr := err.Error()
@@ -827,10 +778,10 @@ func TestValidateSteps_MultipleErrors(t *testing.T) {
 
 		dag := &DAG{
 			Steps: []Step{
-				{Name: "step1", ID: "123invalid", ExecutorConfig: ExecutorConfig{Type: testExecutorType}}, // invalid ID format
-				{Name: "step1", ExecutorConfig: ExecutorConfig{Type: testExecutorType}},                   // duplicate name
-				{Name: "step2", ID: "env", ExecutorConfig: ExecutorConfig{Type: testExecutorType}},        // reserved word
-				{Name: "step3", Depends: []string{"missing"}, ExecutorConfig: ExecutorConfig{Type: testExecutorType}},
+				{Name: "step1", ID: "123invalid", ExecutorConfig: testExecConfig},
+				{Name: "step1", ExecutorConfig: testExecConfig},
+				{Name: "step2", ID: "env", ExecutorConfig: testExecConfig},
+				{Name: "step3", Depends: []string{"missing"}, ExecutorConfig: testExecConfig},
 			},
 		}
 
@@ -838,7 +789,7 @@ func TestValidateSteps_MultipleErrors(t *testing.T) {
 		require.Error(t, err)
 
 		var errList ErrorList
-		require.True(t, errors.As(err, &errList), "error should be an ErrorList")
+		require.ErrorAs(t, err, &errList)
 		assert.GreaterOrEqual(t, len(errList), 3, "should collect multiple validation errors")
 	})
 }

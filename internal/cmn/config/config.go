@@ -8,281 +8,128 @@ import (
 
 // Config holds the overall configuration for the application.
 type Config struct {
-	// Core contains global configuration settings.
-	Core Core
-
-	// Server contains the API server configuration.
-	Server Server
-
-	// Paths holds various filesystem path configurations used throughout the application.
-	Paths PathsConfig
-
-	// UI contains settings specific to the application's user interface.
-	UI UI
-
-	// Queues contains global queue configuration settings.
-	Queues Queues
-
-	// Coordinator defines the coordinator service configuration.
+	Core        Core
+	Server      Server
+	Paths       PathsConfig
+	UI          UI
+	Queues      Queues
 	Coordinator Coordinator
-
-	// Worker defines the worker configuration.
-	Worker Worker
-
-	// Scheduler defines the scheduler configuration.
-	Scheduler Scheduler
-
-	// Warnings contains a list of warnings generated during the configuration loading process.
-	Warnings []string
-
-	// Monitoring contains configuration for system monitoring.
-	Monitoring MonitoringConfig
-
-	// Cache defines the cache mode preset (low, normal, high).
-	Cache CacheMode
-
-	// GitSync contains configuration for Git synchronization.
-	GitSync GitSyncConfig
-
-	// Tunnel contains configuration for tunnel services (Tailscale).
-	Tunnel TunnelConfig
+	Worker      Worker
+	Scheduler   Scheduler
+	Monitoring  MonitoringConfig
+	Cache       CacheMode
+	GitSync     GitSyncConfig
+	Tunnel      TunnelConfig
+	Warnings    []string
 }
 
 // GitSyncConfig holds the configuration for Git sync functionality.
 type GitSyncConfig struct {
-	// Enabled indicates whether Git sync is enabled.
-	Enabled bool
-
-	// Repository is the Git repository URL.
-	// Format: github.com/org/repo or https://github.com/org/repo.git
-	Repository string
-
-	// Branch is the branch to sync with.
-	Branch string
-
-	// Path is the subdirectory within the repository to sync.
-	// Empty string means root directory.
-	Path string
-
-	// Auth contains authentication configuration.
-	Auth GitSyncAuthConfig
-
-	// AutoSync contains auto-sync configuration.
-	AutoSync GitSyncAutoSyncConfig
-
-	// PushEnabled indicates whether pushing changes is allowed.
+	Enabled     bool
+	Repository  string // Format: github.com/org/repo or https://github.com/org/repo.git
+	Branch      string
+	Path        string // Subdirectory to sync (empty = root)
+	Auth        GitSyncAuthConfig
+	AutoSync    GitSyncAutoSyncConfig
 	PushEnabled bool
-
-	// Commit contains commit configuration.
-	Commit GitSyncCommitConfig
+	Commit      GitSyncCommitConfig
 }
 
 // GitSyncAuthConfig holds authentication configuration for Git operations.
 type GitSyncAuthConfig struct {
-	// Type is the authentication type: "token" or "ssh".
-	Type string
-
-	// Token is the personal access token for HTTPS authentication.
-	Token string
-
-	// SSHKeyPath is the path to the SSH private key file.
-	SSHKeyPath string
-
-	// SSHPassphrase is the passphrase for the SSH key (optional).
+	Type          string // "token" or "ssh"
+	Token         string // Personal access token for HTTPS
+	SSHKeyPath    string
 	SSHPassphrase string
 }
 
 // GitSyncAutoSyncConfig holds configuration for automatic synchronization.
 type GitSyncAutoSyncConfig struct {
-	// Enabled indicates whether auto-sync is enabled.
-	Enabled bool
-
-	// OnStartup indicates whether to sync on server startup.
+	Enabled   bool
 	OnStartup bool
-
-	// Interval is the sync interval in seconds.
-	// 0 means auto-sync is disabled (pull on startup only).
-	Interval int
+	Interval  int // Seconds; 0 disables periodic sync
 }
 
 // GitSyncCommitConfig holds configuration for Git commits.
 type GitSyncCommitConfig struct {
-	// AuthorName is the name to use for commits.
-	// Defaults to "Dagu" if not specified.
-	AuthorName string
-
-	// AuthorEmail is the email to use for commits.
-	// Defaults to "dagu@localhost" if not specified.
-	AuthorEmail string
+	AuthorName  string // Default: "Dagu"
+	AuthorEmail string // Default: "dagu@localhost"
 }
 
 // TunnelConfig holds the configuration for tunnel services.
 type TunnelConfig struct {
-	// Enabled indicates whether tunneling is enabled.
-	Enabled bool
-
-	// Tailscale contains Tailscale configuration.
-	Tailscale TailscaleTunnelConfig
-
-	// AllowTerminal allows terminal access via tunnel (default: false for security).
-	AllowTerminal bool
-
-	// AllowedIPs is an IP allowlist (empty = allow all).
-	AllowedIPs []string
-
-	// RateLimiting contains rate limiting configuration for auth endpoints.
-	RateLimiting TunnelRateLimitConfig
+	Enabled       bool
+	Tailscale     TailscaleTunnelConfig
+	AllowTerminal bool     // Default: false for security
+	AllowedIPs    []string // IP allowlist (empty = allow all)
+	RateLimiting  TunnelRateLimitConfig
 }
 
 // TailscaleTunnelConfig holds Tailscale settings.
 type TailscaleTunnelConfig struct {
-	// AuthKey is the Tailscale auth key for headless authentication.
-	// If empty, interactive login via URL will be required.
-	AuthKey string
-
-	// Hostname is the machine name in the tailnet (default: "dagu").
-	Hostname string
-
-	// Funnel enables Tailscale Funnel for public internet access.
-	// When false, the server is only accessible within the tailnet.
-	Funnel bool
-
-	// HTTPS enables HTTPS for tailnet-only access.
-	// Requires enabling HTTPS certificates in the Tailscale admin panel.
-	// When false, uses plain HTTP (still secure via WireGuard encryption).
-	HTTPS bool
-
-	// StateDir is the directory for Tailscale state storage.
-	// Default: $DAGU_HOME/tailscale
-	StateDir string
+	AuthKey  string // Empty requires interactive login
+	Hostname string // Machine name in tailnet (default: "dagu")
+	Funnel   bool   // Enable public internet access
+	HTTPS    bool   // Enable HTTPS for tailnet-only access
+	StateDir string // Default: $DAGU_HOME/tailscale
 }
 
-// TunnelRateLimitConfig holds rate limiting configuration.
+// TunnelRateLimitConfig holds rate limiting configuration for auth endpoints.
 type TunnelRateLimitConfig struct {
-	// Enabled indicates whether rate limiting is enabled.
-	Enabled bool
-
-	// LoginAttempts is the maximum login attempts per window.
-	LoginAttempts int
-
-	// WindowSeconds is the time window in seconds.
-	WindowSeconds int
-
-	// BlockDurationSeconds is the block duration after exceeding limit.
+	Enabled              bool
+	LoginAttempts        int
+	WindowSeconds        int
 	BlockDurationSeconds int
 }
 
-// TunnelProvider constants
-const (
-	TunnelProviderTailscale = "tailscale"
-)
+const TunnelProviderTailscale = "tailscale"
 
 // MonitoringConfig holds the configuration for system monitoring.
-// Memory estimation: Each metric point is ~16 bytes. With 4 metrics collected
-// every 5 seconds for 24 hours, that's ~1.1MB of memory usage.
-// Formula: 4 metrics × (retention / interval) × 16 bytes
+// Memory usage: ~4 metrics * (retention / interval) * 16 bytes per point.
 type MonitoringConfig struct {
-	// Retention specifies how long to keep system resource history.
 	Retention time.Duration
-	// Interval specifies how often to collect resource metrics.
-	Interval time.Duration
+	Interval  time.Duration
 }
 
 // Core contains global configuration settings.
 type Core struct {
-	// Debug toggles debug mode; when true, the application may output extra logs and error details.
-	Debug bool
-
-	// LogFormat defines the output format for log messages (e.g., JSON, plain text).
-	LogFormat string
-
-	// TZ represents the timezone setting for the application (for example, "UTC" or "America/New_York").
-	TZ string
-
-	// TzOffsetInSec is the offset from UTC in seconds.
+	Debug         bool
+	LogFormat     string // "json" or "text"
+	TZ            string // e.g., "UTC", "America/New_York"
 	TzOffsetInSec int
-
-	// Location represents the time location for the application based on the TZ setting.
-	Location *time.Location
-
-	// DefaultShell specifies the default shell to use for command execution.
-	// If not provided, platform-specific defaults are used (PowerShell on Windows, $SHELL on Unix).
-	DefaultShell string
-
-	// SkipExamples disables the automatic creation of example DAGs when the DAGs directory is empty.
-	SkipExamples bool
-
-	// Peer contains configuration for peer connections over gRPC.
-	Peer Peer
-
-	// BaseEnv holds base environment variables to be used for child processes.
-	BaseEnv BaseEnv
+	Location      *time.Location
+	DefaultShell  string // Platform default if empty
+	SkipExamples  bool   // Skip auto-creation of example DAGs
+	Peer          Peer
+	BaseEnv       BaseEnv
 }
 
-// Server contains the API server configuration
+// Server contains the API server configuration.
 type Server struct {
-	// Host defines the hostname or IP address on which the application will run.
-	Host string
-
-	// Port specifies the network port for incoming connections.
-	Port int
-
-	// BasePath is the root URL path from which the application is served.
-	// This is useful when hosting the app behind a reverse proxy under a subpath.
-	BasePath string
-
-	// APIBasePath sets the base path for all API endpoints provided by the application.
-	APIBasePath string
-
-	// Headless determines if the application should run without a graphical user interface.
-	// Useful for automated or headless server environments.
-	Headless bool
-
-	// LatestStatusToday indicates whether the application should display only the most recent status for the current day.
+	Host              string
+	Port              int
+	BasePath          string // URL path for reverse proxy subpath hosting
+	APIBasePath       string
+	Headless          bool
 	LatestStatusToday bool
-
-	// TLS contains configuration details for enabling TLS/SSL encryption,
-	// such as certificate and key file paths.
-	TLS *TLSConfig
-
-	// Auth contains authentication settings (such as credentials or tokens) needed to secure the application.
-	Auth Auth
-
-	// RemoteNodes holds a list of configurations for connecting to remote nodes.
-	// This enables the management of DAGs on external servers.
-	RemoteNodes []RemoteNode
-
-	// Permissions defines the permissions allowed in the UI and API.
-	Permissions map[Permission]bool
-
-	// StrictValidation enables strict validation of API requests.
-	StrictValidation bool
-
-	// Metrics controls access to the /api/v2/metrics endpoint.
-	// "private" (default) requires authentication, "public" allows unauthenticated access.
-	Metrics MetricsAccess
-
-	// Terminal contains configuration for the web-based terminal feature.
-	Terminal TerminalConfig
-
-	// Audit contains configuration for the audit logging feature.
-	Audit AuditConfig
+	TLS               *TLSConfig
+	Auth              Auth
+	RemoteNodes       []RemoteNode
+	Permissions       map[Permission]bool
+	StrictValidation  bool
+	Metrics           MetricsAccess // "private" or "public"
+	Terminal          TerminalConfig
+	Audit             AuditConfig
 }
 
 // TerminalConfig contains configuration for the web-based terminal feature.
 type TerminalConfig struct {
-	// Enabled determines if the terminal feature is available.
-	// Default: false
-	// Env: DAGU_TERMINAL_ENABLED
-	Enabled bool
+	Enabled bool // Default: false
 }
 
 // AuditConfig contains configuration for the audit logging feature.
 type AuditConfig struct {
-	// Enabled determines if audit logging is active.
-	// Default: true
-	// Env: DAGU_AUDIT_ENABLED
-	Enabled bool
+	Enabled bool // Default: true
 }
 
 // Permission represents a permission string used in the application.
@@ -297,25 +144,20 @@ const (
 type AuthMode string
 
 const (
-	// AuthModeNone disables authentication.
-	AuthModeNone AuthMode = "none"
-	// AuthModeBuiltin enables builtin user management with RBAC.
+	AuthModeNone    AuthMode = "none"
 	AuthModeBuiltin AuthMode = "builtin"
-	// AuthModeOIDC enables OIDC authentication.
-	AuthModeOIDC AuthMode = "oidc"
+	AuthModeOIDC    AuthMode = "oidc"
 )
 
 // MetricsAccess represents the access mode for the metrics endpoint.
 type MetricsAccess string
 
 const (
-	// MetricsAccessPrivate requires authentication to access the metrics endpoint.
 	MetricsAccessPrivate MetricsAccess = "private"
-	// MetricsAccessPublic allows unauthenticated access to the metrics endpoint.
-	MetricsAccessPublic MetricsAccess = "public"
+	MetricsAccessPublic  MetricsAccess = "public"
 )
 
-// Auth represents the authentication configuration
+// Auth represents the authentication configuration.
 type Auth struct {
 	Mode    AuthMode
 	Basic   AuthBasic
@@ -324,79 +166,70 @@ type Auth struct {
 	Builtin AuthBuiltin
 }
 
-// AuthBuiltin represents the builtin authentication configuration
-type AuthBuiltin struct {
-	Admin AdminConfig
-	Token TokenConfig
-}
-
-// OIDCRoleMapping defines how OIDC claims are mapped to Dagu roles
-type OIDCRoleMapping struct {
-	// DefaultRole is the role assigned to new OIDC users when no mapping matches (default: "viewer")
-	DefaultRole string
-	// GroupsClaim specifies the claim name containing groups (default: "groups")
-	GroupsClaim string
-	// GroupMappings maps IdP group names to Dagu roles
-	GroupMappings map[string]string
-	// RoleAttributePath is a jq expression to extract role from claims
-	RoleAttributePath string
-	// RoleAttributeStrict denies login when no valid role is found
-	RoleAttributeStrict bool
-	// SkipOrgRoleSync skips role sync on subsequent logins
-	SkipOrgRoleSync bool
-}
-
-// AdminConfig represents the initial admin user configuration
-type AdminConfig struct {
-	Username string
-	Password string
-}
-
-// TokenConfig represents the JWT token configuration
-type TokenConfig struct {
-	Secret string
-	TTL    time.Duration
-}
-
-// AuthBasic represents the basic authentication configuration
+// AuthBasic represents basic authentication credentials.
 type AuthBasic struct {
 	Username string
 	Password string
 }
 
-// AuthToken represents the authentication token configuration
+// AuthToken represents token-based authentication.
 type AuthToken struct {
 	Value string
 }
 
-// AuthOIDC represents the OIDC authentication configuration.
-// Core fields (ClientId, ClientSecret, etc.) are used by both standalone OIDC mode
-// and builtin auth mode with OIDC login. Builtin-specific fields (AutoSignup,
-// DefaultRole, etc.) are only used when auth.mode=builtin.
-// OIDC is automatically enabled when all required fields are configured.
-type AuthOIDC struct {
-	// Core OIDC fields (used by both standalone and builtin modes)
-	ClientId     string   // OIDC client ID from the authorization service
-	ClientSecret string   // OIDC client secret from the authorization service
-	ClientUrl    string   // Application URL for callback (e.g., "https://mydomain.com")
-	Issuer       string   // OIDC provider URL (e.g., "https://accounts.google.com")
-	Scopes       []string // OAuth scopes (default: openid, profile, email)
-	Whitelist    []string // Specific email addresses always allowed
+// AuthBuiltin represents builtin authentication with RBAC.
+type AuthBuiltin struct {
+	Admin AdminConfig
+	Token TokenConfig
+}
 
-	// Builtin-specific fields (only used when auth.mode=builtin)
-	AutoSignup     bool            // Auto-create users on first login (default: true)
+// AdminConfig represents the initial admin user configuration.
+type AdminConfig struct {
+	Username string
+	Password string
+}
+
+// TokenConfig represents JWT token configuration.
+type TokenConfig struct {
+	Secret string
+	TTL    time.Duration
+}
+
+// AuthOIDC represents OIDC authentication configuration.
+// Core fields are used by both standalone and builtin auth modes.
+// Builtin-specific fields only apply when auth.mode=builtin.
+type AuthOIDC struct {
+	// Core fields
+	ClientId     string
+	ClientSecret string
+	ClientUrl    string   // Application URL for callback
+	Issuer       string   // OIDC provider URL
+	Scopes       []string // Default: openid, profile, email
+	Whitelist    []string // Email addresses always allowed
+
+	// Builtin-specific fields
+	AutoSignup     bool            // Default: true
 	AllowedDomains []string        // Email domain whitelist
-	ButtonLabel    string          // Login button text (default: "Login with SSO")
-	RoleMapping    OIDCRoleMapping // Role mapping configuration
+	ButtonLabel    string          // Default: "Login with SSO"
+	RoleMapping    OIDCRoleMapping
 }
 
 // IsConfigured returns true if all required OIDC fields are set.
-// When true, OIDC login is automatically enabled under builtin auth mode.
 func (o AuthOIDC) IsConfigured() bool {
 	return o.ClientId != "" && o.ClientSecret != "" && o.ClientUrl != "" && o.Issuer != ""
 }
 
-// Paths represents the file system paths configuration
+// OIDCRoleMapping defines how OIDC claims are mapped to Dagu roles.
+type OIDCRoleMapping struct {
+	DefaultRole         string            // Default: "viewer"
+	GroupsClaim         string            // Default: "groups"
+	GroupMappings       map[string]string // IdP group -> Dagu role
+	RoleAttributePath   string            // jq expression for role extraction
+	RoleAttributeStrict bool              // Deny login if no valid role found
+	SkipOrgRoleSync     bool              // Only assign roles on first login
+}
+
+// PathsConfig represents the file system paths configuration.
 type PathsConfig struct {
 	DAGsDir            string
 	Executable         string
@@ -408,14 +241,15 @@ type PathsConfig struct {
 	DAGRunsDir         string
 	QueueDir           string
 	ProcDir            string
-	ServiceRegistryDir string // Directory for service registry files
-	UsersDir           string // Directory for user data (builtin auth)
-	APIKeysDir         string // Directory for API key data (builtin auth)
-	WebhooksDir        string // Directory for webhook data (builtin auth)
-	ConversationsDir   string // Directory for AI agent conversation data
-	ConfigFileUsed     string // Path to the configuration file used to load settings
+	ServiceRegistryDir string
+	UsersDir           string
+	APIKeysDir         string
+	WebhooksDir        string
+	ConversationsDir   string
+	ConfigFileUsed     string
 }
 
+// UI holds user interface configuration.
 type UI struct {
 	LogEncodingCharset    string
 	NavbarColor           string
@@ -424,12 +258,13 @@ type UI struct {
 	DAGs                  DAGsConfig
 }
 
+// DAGsConfig holds DAG list page configuration.
 type DAGsConfig struct {
 	SortField string
 	SortOrder string
 }
 
-// RemoteNode represents a remote node configuration
+// RemoteNode represents a remote node configuration.
 type RemoteNode struct {
 	Name              string
 	APIBaseURL        string
@@ -441,111 +276,67 @@ type RemoteNode struct {
 	SkipTLSVerify     bool
 }
 
-// TLSConfig represents TLS configuration
+// TLSConfig represents TLS configuration.
 type TLSConfig struct {
 	CertFile string
 	KeyFile  string
 	CAFile   string
 }
 
-// Queues represents the global queue configuration
+// Queues represents global queue configuration.
 type Queues struct {
 	Enabled bool
 	Config  []QueueConfig
 }
 
-// QueueConfig represents individual queue configuration
+// QueueConfig represents individual queue configuration.
 type QueueConfig struct {
 	Name          string
 	MaxActiveRuns int
 }
 
-// Coordinator represents the coordinator service configuration
+// Coordinator represents the coordinator service configuration.
 type Coordinator struct {
-	ID        string // Coordinator instance ID (default: hostname@port)
-	Host      string // gRPC server bind address (e.g., 0.0.0.0, 127.0.0.1)
-	Advertise string // Address to advertise in service registry (default: auto-detected hostname)
-	Port      int    // gRPC server port number
+	ID        string // Default: hostname@port
+	Host      string // gRPC bind address
+	Advertise string // Registry address (auto-detected if empty)
+	Port      int
 }
 
-// Worker represents the worker configuration
+// Worker represents the worker configuration.
 type Worker struct {
-	ID            string            // Worker instance ID (default: hostname@PID)
-	MaxActiveRuns int               // Maximum number of active runs (default: 100)
-	Labels        map[string]string // Worker labels for capability matching
-	Coordinators  []string          // Coordinator addresses for static discovery (host:port)
-
-	// PostgresPool holds connection pool settings for shared-nothing mode.
-	// When multiple DAGs run concurrently in a worker, they share this pool.
-	PostgresPool PostgresPoolConfig
+	ID            string            // Default: hostname@PID
+	MaxActiveRuns int               // Default: 100
+	Labels        map[string]string // Capability matching labels
+	Coordinators  []string          // Static discovery addresses (host:port)
+	PostgresPool  PostgresPoolConfig
 }
 
-// Scheduler represents the scheduler configuration
+// Scheduler represents the scheduler configuration.
 type Scheduler struct {
-	// Port is the port on which the scheduler's health check server listens.
-	Port int // Health check server port (default: 8090)
-
-	// SchedulerLockStaleThreshold is the time after which a scheduler lock is considered stale.
-	// Default is 30 seconds.
-	LockStaleThreshold time.Duration
-
-	// SchedulerLockRetryInterval is the interval between lock acquisition attempts.
-	// Default is 5 seconds.
-	LockRetryInterval time.Duration
-
-	// ZombieDetectionInterval is the interval between checks for zombie DAG runs.
-	// A zombie DAG run is one marked as running but whose process is no longer alive.
-	// Set to 0 to disable zombie detection. Default is 45 seconds.
-	ZombieDetectionInterval time.Duration
+	Port                    int           // Health check port (default: 8090)
+	LockStaleThreshold      time.Duration // Default: 30s
+	LockRetryInterval       time.Duration // Default: 5s
+	ZombieDetectionInterval time.Duration // Default: 45s; 0 disables
 }
 
 // PostgresPoolConfig holds PostgreSQL connection pool settings for workers.
-// Used in shared-nothing worker mode to prevent connection exhaustion
-// when multiple DAGs run concurrently in a single worker process.
 type PostgresPoolConfig struct {
-	// MaxOpenConns is the maximum total open connections across ALL PostgreSQL DSNs.
-	// This is the hard limit shared across all database connections.
-	// Default: 25
-	MaxOpenConns int
-
-	// MaxIdleConns is the maximum number of idle connections per DSN.
-	// Default: 5
-	MaxIdleConns int
-
-	// ConnMaxLifetime is the maximum lifetime of a connection in seconds.
-	// Default: 300 (5 minutes)
-	ConnMaxLifetime int
-
-	// ConnMaxIdleTime is the maximum idle time for a connection in seconds.
-	// Default: 60 (1 minute)
-	ConnMaxIdleTime int
+	MaxOpenConns    int // Default: 25
+	MaxIdleConns    int // Default: 5
+	ConnMaxLifetime int // Seconds (default: 300)
+	ConnMaxIdleTime int // Seconds (default: 60)
 }
 
-// Peer holds the certificate and TLS configuration for peer connections over gRPC.
+// Peer holds the TLS configuration for peer connections over gRPC.
 type Peer struct {
-	// CertFile is the path to the server's TLS certificate file.
-	CertFile string
-
-	// KeyFile is the path to the server's TLS key file.
-	KeyFile string
-
-	// ClientCaFile is the path to the CA certificate file used for client verification.
-	ClientCaFile string
-
-	// SkipTLSVerify indicates whether to skip TLS certificate verification.
+	CertFile      string
+	KeyFile       string
+	ClientCaFile  string
 	SkipTLSVerify bool
-
-	// Insecure indicates whether to use insecure connection (h2c) instead of TLS.
-	Insecure bool
-
-	// MaxRetries is the maximum number of retry attempts for coordinator connections.
-	// Uses exponential backoff: interval * 2^attempt, capped at 30s.
-	// Default is 10 for better resilience during startup.
-	MaxRetries int
-
-	// RetryInterval is the base interval between retry attempts.
-	// Default is 1 second.
-	RetryInterval time.Duration
+	Insecure      bool          // Use h2c instead of TLS
+	MaxRetries    int           // Default: 10 (exponential backoff, capped at 30s)
+	RetryInterval time.Duration // Default: 1s
 }
 
 // Validate performs basic validation on the configuration to ensure required fields are set
@@ -605,44 +396,31 @@ func (c *Config) validateBuiltinAuth() error {
 		return nil
 	}
 
-	// When builtin auth is enabled, users directory must be set
 	if c.Paths.UsersDir == "" {
 		return fmt.Errorf("builtin auth requires paths.usersDir to be set")
 	}
-
-	// Admin username must be set (has default, but check anyway)
 	if c.Server.Auth.Builtin.Admin.Username == "" {
 		return fmt.Errorf("builtin auth requires admin username to be set")
 	}
-
-	// Token secret must be set for JWT signing
 	if c.Server.Auth.Builtin.Token.Secret == "" {
 		return fmt.Errorf("builtin auth requires token secret to be set (auth.builtin.token.secret or AUTH_TOKEN_SECRET env var)")
 	}
-
-	// Token TTL must be positive
 	if c.Server.Auth.Builtin.Token.TTL <= 0 {
 		return fmt.Errorf("builtin auth requires a positive token TTL")
 	}
-
-	// Validate OIDC configuration if configured under builtin auth
 	if c.Server.Auth.OIDC.IsConfigured() {
-		if err := c.validateOIDCForBuiltin(); err != nil {
-			return err
-		}
+		return c.validateOIDCForBuiltin()
 	}
-
 	return nil
 }
 
-// validateOIDCForBuiltin validates the OIDC configuration when used under builtin auth mode.
-// Note: This is only called after IsConfigured() returns true, so required fields are already set.
+// validateOIDCForBuiltin validates OIDC configuration under builtin auth mode.
 func (c *Config) validateOIDCForBuiltin() error {
 	oidc := c.Server.Auth.OIDC
 
 	switch oidc.RoleMapping.DefaultRole {
 	case "admin", "manager", "operator", "viewer":
-		// Valid role
+		// Valid roles
 	default:
 		return fmt.Errorf("OIDC roleMapping.defaultRole must be one of: admin, manager, operator, viewer (got: %q)", oidc.RoleMapping.DefaultRole)
 	}
@@ -651,8 +429,7 @@ func (c *Config) validateOIDCForBuiltin() error {
 		if len(oidc.Whitelist) > 0 || len(oidc.AllowedDomains) > 0 {
 			return fmt.Errorf("OIDC scopes must include 'email' when whitelist or allowedDomains is configured")
 		}
-		c.Warnings = append(c.Warnings,
-			"OIDC scopes do not include 'email'; access control features will not work if added later")
+		c.Warnings = append(c.Warnings, "OIDC scopes do not include 'email'; access control features will not work if added later")
 	}
 
 	return nil
@@ -663,7 +440,6 @@ func (c *Config) validateGitSync() error {
 	if !c.GitSync.Enabled {
 		return nil
 	}
-
 	if c.GitSync.Repository == "" {
 		return fmt.Errorf("git sync requires repository to be set (gitSync.repository)")
 	}
@@ -673,7 +449,7 @@ func (c *Config) validateGitSync() error {
 
 	switch c.GitSync.Auth.Type {
 	case "", "token", "ssh":
-		// Valid auth types (empty defaults to token)
+		// Valid (empty defaults to token)
 	default:
 		return fmt.Errorf("git sync auth type must be 'token' or 'ssh' (got: %q)", c.GitSync.Auth.Type)
 	}
@@ -684,7 +460,6 @@ func (c *Config) validateGitSync() error {
 	if c.GitSync.AutoSync.Interval < 0 {
 		return fmt.Errorf("git sync autoSync.interval must be non-negative (got: %d)", c.GitSync.AutoSync.Interval)
 	}
-
 	return nil
 }
 
@@ -693,15 +468,10 @@ func (c *Config) validateTunnel() error {
 	if !c.Tunnel.Enabled {
 		return nil
 	}
-
-	// SECURITY: Public tunnels (Tailscale Funnel) require authentication
+	// Public tunnels (Tailscale Funnel) require authentication
 	if c.Tunnel.Tailscale.Funnel && c.Server.Auth.Mode == AuthModeNone {
-		return fmt.Errorf(
-			"tunnel with public access requires authentication; " +
-				"set server.auth.mode=builtin or disable tailscale funnel for private access",
-		)
+		return fmt.Errorf("tunnel with public access requires authentication; set server.auth.mode=builtin or disable tailscale funnel for private access")
 	}
-
 	return c.validateTunnelRateLimiting()
 }
 
@@ -711,7 +481,6 @@ func (c *Config) validateTunnelRateLimiting() error {
 	if !rl.Enabled {
 		return nil
 	}
-
 	if rl.LoginAttempts <= 0 {
 		return fmt.Errorf("tunnel rate limiting loginAttempts must be positive")
 	}

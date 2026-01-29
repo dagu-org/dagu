@@ -58,20 +58,15 @@ func (s *Store) Load(_ context.Context) (*AgentConfig, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	configPath := s.configPath()
 	cfg := DefaultConfig()
 
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			applyEnvOverrides(cfg)
-			return cfg, nil
+	data, err := os.ReadFile(s.configPath())
+	if err == nil {
+		if err := json.Unmarshal(data, cfg); err != nil {
+			return nil, fmt.Errorf("fileagentconfig: failed to parse config file: %w", err)
 		}
+	} else if !os.IsNotExist(err) {
 		return nil, fmt.Errorf("fileagentconfig: failed to read config file: %w", err)
-	}
-
-	if err := json.Unmarshal(data, cfg); err != nil {
-		return nil, fmt.Errorf("fileagentconfig: failed to parse config file: %w", err)
 	}
 
 	applyEnvOverrides(cfg)
@@ -89,19 +84,23 @@ func (s *Store) Save(_ context.Context, cfg *AgentConfig) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	configPath := s.configPath()
+	return s.writeConfigToFile(s.configPath(), cfg)
+}
+
+// writeConfigToFile writes the config to a JSON file atomically.
+func (s *Store) writeConfigToFile(filePath string, cfg *AgentConfig) error {
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return fmt.Errorf("fileagentconfig: failed to marshal config: %w", err)
 	}
 
-	tempFile := configPath + ".tmp"
-	if err := os.WriteFile(tempFile, data, filePermissions); err != nil {
+	tempPath := filePath + ".tmp"
+	if err := os.WriteFile(tempPath, data, filePermissions); err != nil {
 		return fmt.Errorf("fileagentconfig: failed to write temp file: %w", err)
 	}
 
-	if err := os.Rename(tempFile, configPath); err != nil {
-		_ = os.Remove(tempFile)
+	if err := os.Rename(tempPath, filePath); err != nil {
+		_ = os.Remove(tempPath)
 		return fmt.Errorf("fileagentconfig: failed to rename temp file: %w", err)
 	}
 

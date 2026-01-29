@@ -81,14 +81,12 @@ func NewConversationManager(cfg ConversationManagerConfig) *ConversationManager 
 	}
 }
 
-// copyMessages returns a copy of the messages slice.
+// copyMessages returns a shallow copy of the messages slice.
 func copyMessages(src []Message) []Message {
 	if len(src) == 0 {
 		return nil
 	}
-	dst := make([]Message, len(src))
-	copy(dst, src)
-	return dst
+	return append([]Message(nil), src...)
 }
 
 // ID returns the conversation ID.
@@ -103,16 +101,10 @@ func (cm *ConversationManager) UserID() string {
 
 // SetWorking updates the agent working state and notifies subscribers.
 func (cm *ConversationManager) SetWorking(working bool) {
-	cm.mu.Lock()
-	if cm.working == working {
-		cm.mu.Unlock()
+	id, model, callback, changed := cm.updateWorkingState(working)
+	if !changed {
 		return
 	}
-	cm.working = working
-	id := cm.id
-	model := cm.model
-	callback := cm.onWorkingChange
-	cm.mu.Unlock()
 
 	cm.logger.Debug("agent working state changed", "working", working)
 
@@ -127,6 +119,20 @@ func (cm *ConversationManager) SetWorking(working bool) {
 	if callback != nil {
 		callback(id, working)
 	}
+}
+
+// updateWorkingState atomically updates the working state and returns relevant data.
+// Returns (id, model, callback, changed) where changed indicates if the state actually changed.
+func (cm *ConversationManager) updateWorkingState(working bool) (string, string, func(string, bool), bool) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	if cm.working == working {
+		return "", "", nil, false
+	}
+
+	cm.working = working
+	return cm.id, cm.model, cm.onWorkingChange, true
 }
 
 // IsWorking returns the current agent working state.
@@ -179,30 +185,13 @@ func (cm *ConversationManager) AcceptUserMessage(ctx context.Context, provider l
 		Content: content,
 	}
 
-	cm.mu.Lock()
-	cm.lastActivity = time.Now()
-	cm.sequenceID++
-	seqID := cm.sequenceID
-
-	userMessage := Message{
-		ID:             uuid.New().String(),
-		ConversationID: cm.id,
-		Type:           MessageTypeUser,
-		SequenceID:     seqID,
-		Content:        content,
-		CreatedAt:      time.Now(),
-		LLMData:        &userLLMMessage,
-	}
-
-	cm.messages = append(cm.messages, userMessage)
-	loopInstance := cm.loop
-	cm.mu.Unlock()
+	userMessage, loopInstance := cm.recordUserMessage(content, &userLLMMessage)
 
 	if loopInstance == nil {
 		return fmt.Errorf("conversation loop not initialized")
 	}
 
-	cm.subpub.Publish(seqID, StreamResponse{
+	cm.subpub.Publish(userMessage.SequenceID, StreamResponse{
 		Messages: []Message{userMessage},
 	})
 
@@ -210,6 +199,28 @@ func (cm *ConversationManager) AcceptUserMessage(ctx context.Context, provider l
 	cm.SetWorking(true)
 
 	return nil
+}
+
+// recordUserMessage adds a user message to the conversation and returns it with the loop instance.
+func (cm *ConversationManager) recordUserMessage(content string, llmMsg *llm.Message) (Message, *Loop) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	cm.lastActivity = time.Now()
+	cm.sequenceID++
+
+	msg := Message{
+		ID:             uuid.New().String(),
+		ConversationID: cm.id,
+		Type:           MessageTypeUser,
+		SequenceID:     cm.sequenceID,
+		Content:        content,
+		CreatedAt:      time.Now(),
+		LLMData:        llmMsg,
+	}
+
+	cm.messages = append(cm.messages, msg)
+	return msg, cm.loop
 }
 
 // Subscribe returns a function that blocks until the next message is available.
@@ -222,12 +233,8 @@ func (cm *ConversationManager) Subscribe(ctx context.Context) func() (StreamResp
 }
 
 // Cancel stops the conversation loop.
-func (cm *ConversationManager) Cancel(ctx context.Context) error {
-	cm.mu.Lock()
-	cancel := cm.loopCancel
-	cm.loopCancel = nil
-	cm.loop = nil
-	cm.mu.Unlock()
+func (cm *ConversationManager) Cancel(_ context.Context) error {
+	cancel := cm.clearLoop()
 
 	if cancel != nil {
 		cancel()
@@ -238,17 +245,23 @@ func (cm *ConversationManager) Cancel(ctx context.Context) error {
 	return nil
 }
 
+// clearLoop resets the loop state and returns the cancel function.
+func (cm *ConversationManager) clearLoop() context.CancelFunc {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	cancel := cm.loopCancel
+	cm.loopCancel = nil
+	cm.loop = nil
+	return cancel
+}
+
 // ensureLoop creates the loop if it doesn't exist.
 func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) error {
-	cm.mu.Lock()
-	if cm.loop != nil {
-		cm.mu.Unlock()
+	history, needsInit := cm.prepareLoopInit(model)
+	if !needsInit {
 		return nil
 	}
-
-	cm.model = model
-	llmHistory := cm.extractLLMHistory()
-	cm.mu.Unlock()
 
 	tools := CreateTools()
 	loopCtx, cancel := context.WithCancel(context.Background())
@@ -256,7 +269,7 @@ func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) e
 	loopInstance := NewLoop(LoopConfig{
 		Provider:       provider,
 		Model:          model,
-		History:        llmHistory,
+		History:        history,
 		Tools:          tools,
 		RecordMessage:  cm.createRecordMessageFunc(),
 		Logger:         cm.logger,
@@ -267,15 +280,10 @@ func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) e
 		EmitUIAction:   cm.createEmitUIActionFunc(),
 	})
 
-	cm.mu.Lock()
-	if cm.loop != nil {
-		cm.mu.Unlock()
+	if !cm.trySetLoop(loopInstance, cancel) {
 		cancel()
 		return nil
 	}
-	cm.loop = loopInstance
-	cm.loopCancel = cancel
-	cm.mu.Unlock()
 
 	go func() {
 		if err := loopInstance.Go(loopCtx); err != nil && err != context.Canceled {
@@ -286,10 +294,39 @@ func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) e
 	return nil
 }
 
-// extractLLMHistory converts stored messages to LLM format.
+// prepareLoopInit checks if loop initialization is needed and extracts history.
+// Returns (history, needsInit) where needsInit is false if loop already exists.
+func (cm *ConversationManager) prepareLoopInit(model string) ([]llm.Message, bool) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	if cm.loop != nil {
+		return nil, false
+	}
+
+	cm.model = model
+	return cm.extractLLMHistoryLocked(), true
+}
+
+// trySetLoop attempts to set the loop instance atomically.
+// Returns true if successful, false if another goroutine already set it.
+func (cm *ConversationManager) trySetLoop(loop *Loop, cancel context.CancelFunc) bool {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	if cm.loop != nil {
+		return false
+	}
+
+	cm.loop = loop
+	cm.loopCancel = cancel
+	return true
+}
+
+// extractLLMHistoryLocked converts stored messages to LLM format.
 // Must be called with cm.mu held.
-func (cm *ConversationManager) extractLLMHistory() []llm.Message {
-	var history []llm.Message
+func (cm *ConversationManager) extractLLMHistoryLocked() []llm.Message {
+	history := make([]llm.Message, 0, len(cm.messages))
 	for _, msg := range cm.messages {
 		if msg.LLMData != nil {
 			history = append(history, *msg.LLMData)
@@ -306,12 +343,7 @@ func (cm *ConversationManager) createRecordMessageFunc() MessageRecordFunc {
 			msg.ID = uuid.New().String()
 		}
 
-		cm.mu.Lock()
-		cm.messages = append(cm.messages, msg)
-		cm.sequenceID++
-		seqID := cm.sequenceID
-		cm.mu.Unlock()
-
+		seqID := cm.appendMessage(msg)
 		msg.SequenceID = seqID
 
 		cm.subpub.Publish(seqID, StreamResponse{
@@ -320,7 +352,7 @@ func (cm *ConversationManager) createRecordMessageFunc() MessageRecordFunc {
 
 		if cm.onMessage != nil {
 			if err := cm.onMessage(ctx, msg); err != nil {
-				cm.logger.Warn("Failed to persist message", "error", err)
+				cm.logger.Warn("failed to persist message", "error", err)
 			}
 		}
 
@@ -328,13 +360,20 @@ func (cm *ConversationManager) createRecordMessageFunc() MessageRecordFunc {
 	}
 }
 
+// appendMessage adds a message to the conversation and returns the new sequence ID.
+func (cm *ConversationManager) appendMessage(msg Message) int64 {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	cm.messages = append(cm.messages, msg)
+	cm.sequenceID++
+	return cm.sequenceID
+}
+
 // createEmitUIActionFunc returns a function for emitting UI actions.
 func (cm *ConversationManager) createEmitUIActionFunc() UIActionFunc {
 	return func(action UIAction) {
-		cm.mu.Lock()
-		cm.sequenceID++
-		seqID := cm.sequenceID
-		cm.mu.Unlock()
+		seqID := cm.nextSequenceID()
 
 		cm.subpub.Publish(seqID, StreamResponse{
 			Messages: []Message{{
@@ -347,5 +386,14 @@ func (cm *ConversationManager) createEmitUIActionFunc() UIActionFunc {
 			}},
 		})
 	}
+}
+
+// nextSequenceID increments and returns the next sequence ID.
+func (cm *ConversationManager) nextSequenceID() int64 {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	cm.sequenceID++
+	return cm.sequenceID
 }
 

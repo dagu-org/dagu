@@ -143,14 +143,15 @@ func formatMessageWithContexts(message string, contexts []ResolvedDAGContext) st
 // formatContextLine formats a single DAG context as a readable line.
 func formatContextLine(ctx ResolvedDAGContext) string {
 	var parts []string
+
 	if ctx.DAGFilePath != "" {
-		parts = append(parts, fmt.Sprintf("file: %s", ctx.DAGFilePath))
+		parts = append(parts, "file: "+ctx.DAGFilePath)
 	}
 	if ctx.DAGRunID != "" {
-		parts = append(parts, fmt.Sprintf("run: %s", ctx.DAGRunID))
+		parts = append(parts, "run: "+ctx.DAGRunID)
 	}
 	if ctx.RunStatus != "" {
-		parts = append(parts, fmt.Sprintf("status: %s", ctx.RunStatus))
+		parts = append(parts, "status: "+ctx.RunStatus)
 	}
 	if len(parts) == 0 {
 		return ""
@@ -160,19 +161,22 @@ func formatContextLine(ctx ResolvedDAGContext) string {
 	if name == "" {
 		name = "unknown"
 	}
+
 	return fmt.Sprintf("- %s (%s)", name, strings.Join(parts, ", "))
 }
 
 // selectModel returns the first non-empty model from the provided choices,
 // falling back to the API's default model.
+// Priority: requestModel > conversationModel > default model.
 func (a *API) selectModel(requestModel, conversationModel string) string {
-	if requestModel != "" {
+	switch {
+	case requestModel != "":
 		return requestModel
-	}
-	if conversationModel != "" {
+	case conversationModel != "":
 		return conversationModel
+	default:
+		return a.model
 	}
-	return a.model
 }
 
 // createMessageCallback returns a persistence callback for the given conversation ID.
@@ -266,7 +270,7 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 func (a *API) handleListConversations(w http.ResponseWriter, r *http.Request) {
 	userID := getUserIDFromContext(r.Context())
 
-	activeIDs := make(map[string]bool)
+	activeIDs := make(map[string]struct{})
 	conversations := a.collectActiveConversations(userID, activeIDs)
 	conversations = a.appendPersistedConversations(r.Context(), userID, activeIDs, conversations)
 
@@ -274,15 +278,17 @@ func (a *API) handleListConversations(w http.ResponseWriter, r *http.Request) {
 }
 
 // collectActiveConversations gathers active conversations for a user.
-func (a *API) collectActiveConversations(userID string, activeIDs map[string]bool) []ConversationWithState {
+func (a *API) collectActiveConversations(userID string, activeIDs map[string]struct{}) []ConversationWithState {
 	var conversations []ConversationWithState
+
 	a.conversations.Range(func(key, value any) bool {
 		mgr := value.(*ConversationManager)
 		if mgr.UserID() != userID {
 			return true
 		}
+
 		id := key.(string)
-		activeIDs[id] = true
+		activeIDs[id] = struct{}{}
 		conversations = append(conversations, ConversationWithState{
 			Conversation: mgr.GetConversation(),
 			Working:      mgr.IsWorking(),
@@ -290,11 +296,12 @@ func (a *API) collectActiveConversations(userID string, activeIDs map[string]boo
 		})
 		return true
 	})
+
 	return conversations
 }
 
 // appendPersistedConversations adds non-active persisted conversations to the list.
-func (a *API) appendPersistedConversations(ctx context.Context, userID string, activeIDs map[string]bool, conversations []ConversationWithState) []ConversationWithState {
+func (a *API) appendPersistedConversations(ctx context.Context, userID string, activeIDs map[string]struct{}, conversations []ConversationWithState) []ConversationWithState {
 	if a.store == nil {
 		return conversations
 	}
@@ -306,7 +313,7 @@ func (a *API) appendPersistedConversations(ctx context.Context, userID string, a
 	}
 
 	for _, conv := range persisted {
-		if activeIDs[conv.ID] {
+		if _, exists := activeIDs[conv.ID]; exists {
 			continue
 		}
 		conversations = append(conversations, ConversationWithState{
@@ -314,6 +321,7 @@ func (a *API) appendPersistedConversations(ctx context.Context, userID string, a
 			Working:      false,
 		})
 	}
+
 	return conversations
 }
 
@@ -557,7 +565,7 @@ func (a *API) handleCancel(w http.ResponseWriter, r *http.Request) {
 	a.respondJSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
 }
 
-// helper function
+// ptrTo returns a pointer to the given value.
 func ptrTo[T any](v T) *T {
 	return &v
 }

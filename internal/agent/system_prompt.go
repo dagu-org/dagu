@@ -17,39 +17,26 @@ type CurrentDAG struct {
 	Status   string
 }
 
-// SystemPromptData contains all data for template rendering.
-type SystemPromptData struct {
-	WorkingDir string
-	DAGsDir    string
-	LogDir     string
-	DataDir    string
-	ConfigFile string
+// systemPromptData contains all data for template rendering.
+type systemPromptData struct {
+	EnvironmentInfo
 	CurrentDAG *CurrentDAG
 }
 
 // GenerateSystemPrompt renders the system prompt template.
 func GenerateSystemPrompt(env EnvironmentInfo, currentDAG *CurrentDAG) string {
-	tmplContent, err := systemPromptFS.ReadFile("system_prompt.txt")
+	content, err := systemPromptFS.ReadFile("system_prompt.txt")
 	if err != nil {
 		return fallbackPrompt(env)
 	}
 
-	tmpl, err := template.New("system_prompt").Parse(string(tmplContent))
+	tmpl, err := template.New("system_prompt").Parse(string(content))
 	if err != nil {
 		return fallbackPrompt(env)
-	}
-
-	data := SystemPromptData{
-		WorkingDir: env.WorkingDir,
-		DAGsDir:    env.DAGsDir,
-		LogDir:     env.LogDir,
-		DataDir:    env.DataDir,
-		ConfigFile: env.ConfigFile,
-		CurrentDAG: currentDAG,
 	}
 
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
+	if err := tmpl.Execute(&buf, systemPromptData{env, currentDAG}); err != nil {
 		return fallbackPrompt(env)
 	}
 
@@ -58,6 +45,5 @@ func GenerateSystemPrompt(env EnvironmentInfo, currentDAG *CurrentDAG) string {
 
 // fallbackPrompt returns a basic prompt when template fails.
 func fallbackPrompt(env EnvironmentInfo) string {
-	return "You are Hermio, an AI assistant for DAG workflows. " +
-		"DAGs Directory: " + env.DAGsDir
+	return "You are Hermio, an AI assistant for DAG workflows. DAGs Directory: " + env.DAGsDir
 }

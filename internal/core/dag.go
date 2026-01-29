@@ -2,7 +2,7 @@ package core
 
 import (
 	"context"
-	"crypto/md5" // nolint:gosec
+	"crypto/md5" //nolint:gosec
 	"encoding/json"
 	"fmt"
 	"os"
@@ -47,13 +47,14 @@ const (
 // EffectiveLogOutput returns the effective log output mode for a step.
 // Priority: step-level > DAG-level > default (LogOutputSeparate).
 func EffectiveLogOutput(dag *DAG, step *Step) LogOutputMode {
-	if step != nil && step.LogOutput != "" {
+	switch {
+	case step != nil && step.LogOutput != "":
 		return step.LogOutput
-	}
-	if dag != nil && dag.LogOutput != "" {
+	case dag != nil && dag.LogOutput != "":
 		return dag.LogOutput
+	default:
+		return LogOutputSeparate
 	}
-	return LogOutputSeparate
 }
 
 // DAG contains all information about a DAG.
@@ -295,18 +296,17 @@ func (d *DAG) Validate() error {
 		errs = append(errs, fmt.Errorf("DAG name is required"))
 	}
 
-	stepExists := make(map[string]bool)
+	stepExists := make(map[string]bool, len(d.Steps))
 	for _, step := range d.Steps {
 		stepExists[step.Name] = true
 	}
 
 	for _, step := range d.Steps {
 		for _, dep := range step.Depends {
-			if stepExists[dep] {
-				continue
+			if !stepExists[dep] {
+				errs = append(errs, NewValidationError("depends", dep,
+					fmt.Errorf("step %s depends on non-existent step", step.Name)))
 			}
-			errs = append(errs, NewValidationError("depends", dep,
-				fmt.Errorf("step %s depends on non-existent step", step.Name)))
 		}
 	}
 
@@ -318,16 +318,14 @@ func (d *DAG) Validate() error {
 
 // NextRun returns the next scheduled run time based on the DAG's schedules.
 func (d *DAG) NextRun(now time.Time) time.Time {
-	if len(d.Schedule) == 0 {
-		return time.Time{}
-	}
 	var next time.Time
 	for _, sched := range d.Schedule {
-		if sched.Parsed != nil {
-			t := sched.Parsed.Next(now)
-			if next.IsZero() || t.Before(next) {
-				next = t
-			}
+		if sched.Parsed == nil {
+			continue
+		}
+		t := sched.Parsed.Next(now)
+		if next.IsZero() || t.Before(next) {
+			next = t
 		}
 	}
 	return next
@@ -335,13 +333,14 @@ func (d *DAG) NextRun(now time.Time) time.Time {
 
 // deduplicateStrings removes duplicate strings while preserving order.
 func deduplicateStrings(input []string) []string {
-	seen := make(map[string]bool)
+	seen := make(map[string]bool, len(input))
 	result := make([]string, 0, len(input))
 	for _, s := range input {
-		if !seen[s] {
-			seen[s] = true
-			result = append(result, s)
+		if seen[s] {
+			continue
 		}
+		seen[s] = true
+		result = append(result, s)
 	}
 	return result
 }
@@ -350,89 +349,84 @@ func deduplicateStrings(input []string) []string {
 // This method is thread-safe and idempotent - concurrent calls will only load once.
 func (d *DAG) LoadDotEnv(ctx context.Context) {
 	d.dotenvOnce.Do(func() {
-		if len(d.Dotenv) == 0 {
-			return
-		}
-
-		relativeTos := []string{d.WorkingDir}
-		fileDir := filepath.Dir(d.Location)
-		if d.Location != "" && fileDir != d.WorkingDir {
-			relativeTos = append(relativeTos, fileDir)
-		}
-
-		resolver := fileutil.NewFileResolver(relativeTos)
-		candidates := deduplicateStrings(append([]string{".env"}, d.Dotenv...))
-
-		for _, filePath := range candidates {
-			if strings.TrimSpace(filePath) == "" {
-				continue
-			}
-			filePath, err := cmdutil.EvalString(ctx, filePath)
-			if err != nil {
-				logger.Warn(ctx, "Failed to evaluate filepath",
-					tag.File(filePath),
-					tag.Error(err),
-				)
-				continue
-			}
-			resolvedPath, err := resolver.ResolveFilePath(filePath)
-			if err != nil {
-				continue
-			}
-			if !fileutil.FileExists(resolvedPath) {
-				continue
-			}
-			// Use godotenv.Read instead of godotenv.Load to avoid os.Setenv
-			vars, err := godotenv.Read(resolvedPath)
-			if err != nil {
-				logger.Warn(ctx, "Failed to load .env file",
-					tag.File(resolvedPath),
-					tag.Error(err),
-				)
-				continue
-			}
-			// Add dotenv vars to DAG.Env so they're included in AllEnvs()
-			// Note: We no longer call os.Setenv to avoid race conditions when
-			// multiple DAGs are loaded concurrently. The vars are stored in
-			// d.Env and will be passed to step execution via cmd.Env.
-			for k, v := range vars {
-				d.Env = append(d.Env, fmt.Sprintf("%s=%s", k, v))
-			}
-			logger.Info(ctx, "Loaded dotenv file", tag.File(resolvedPath))
-		}
+		d.loadDotEnvFiles(ctx)
 	})
+}
+
+// loadDotEnvFiles performs the actual dotenv file loading.
+func (d *DAG) loadDotEnvFiles(ctx context.Context) {
+	if len(d.Dotenv) == 0 {
+		return
+	}
+
+	relativeTos := []string{d.WorkingDir}
+	if fileDir := filepath.Dir(d.Location); d.Location != "" && fileDir != d.WorkingDir {
+		relativeTos = append(relativeTos, fileDir)
+	}
+
+	resolver := fileutil.NewFileResolver(relativeTos)
+	candidates := deduplicateStrings(append([]string{".env"}, d.Dotenv...))
+
+	for _, filePath := range candidates {
+		d.loadSingleDotEnvFile(ctx, resolver, filePath)
+	}
+}
+
+// loadSingleDotEnvFile loads a single dotenv file and appends its variables to d.Env.
+func (d *DAG) loadSingleDotEnvFile(ctx context.Context, resolver *fileutil.FileResolver, filePath string) {
+	if strings.TrimSpace(filePath) == "" {
+		return
+	}
+
+	evaluatedPath, err := cmdutil.EvalString(ctx, filePath)
+	if err != nil {
+		logger.Warn(ctx, "Failed to evaluate filepath", tag.File(filePath), tag.Error(err))
+		return
+	}
+
+	resolvedPath, err := resolver.ResolveFilePath(evaluatedPath)
+	if err != nil || !fileutil.FileExists(resolvedPath) {
+		return
+	}
+
+	vars, err := godotenv.Read(resolvedPath)
+	if err != nil {
+		logger.Warn(ctx, "Failed to load .env file", tag.File(resolvedPath), tag.Error(err))
+		return
+	}
+
+	for k, v := range vars {
+		d.Env = append(d.Env, fmt.Sprintf("%s=%s", k, v))
+	}
+	logger.Info(ctx, "Loaded dotenv file", tag.File(resolvedPath))
 }
 
 // initializeDefaults sets the default values for the DAG.
 func (d *DAG) initializeDefaults() {
-	// Set default type to chain if not specified.
+	const (
+		defaultHistRetentionDays = 30
+		defaultMaxCleanUpTime    = 5 * time.Second
+		defaultMaxActiveRuns     = 1
+		defaultMaxOutputSize     = 1024 * 1024 // 1MB
+	)
+
 	if d.Type == "" {
 		d.Type = TypeChain
 	}
-
-	// Set default log output mode to separate if not specified.
 	if d.LogOutput == "" {
 		d.LogOutput = LogOutputSeparate
 	}
-
-	// Set default history retention days to 30 if not specified.
 	if d.HistRetentionDays == 0 {
-		d.HistRetentionDays = 30
+		d.HistRetentionDays = defaultHistRetentionDays
 	}
-
-	// Set default max cleanup time to 60 seconds if not specified.
 	if d.MaxCleanUpTime == 0 {
-		d.MaxCleanUpTime = 5 * time.Second
+		d.MaxCleanUpTime = defaultMaxCleanUpTime
 	}
-
-	// Set default max active runs to 1 only when not specified (0).
 	if d.MaxActiveRuns == 0 {
-		d.MaxActiveRuns = 1
+		d.MaxActiveRuns = defaultMaxActiveRuns
 	}
-
-	// Set default max output size to 1MB if not specified.
 	if d.MaxOutputSize == 0 {
-		d.MaxOutputSize = 1024 * 1024 // 1MB
+		d.MaxOutputSize = defaultMaxOutputSize
 	}
 }
 
@@ -609,40 +603,33 @@ type Schedule struct {
 
 // MarshalJSON implements the json.Marshaler interface.
 func (s Schedule) MarshalJSON() ([]byte, error) {
-	// Create a temporary struct for marshaling
-	type ScheduleAlias struct {
+	return json.Marshal(struct {
 		Expression string `json:"expression"`
-	}
-
-	return json.Marshal(ScheduleAlias{
+	}{
 		Expression: s.Expression,
 	})
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
-// and also parses the cron expression to populate the Parsed field.
+// It also parses the cron expression to populate the Parsed field.
 func (s *Schedule) UnmarshalJSON(data []byte) error {
-	// Create a temporary struct for unmarshaling
-	type ScheduleAlias struct {
+	var alias struct {
 		Expression string `json:"expression"`
 	}
-
-	var alias ScheduleAlias
 	if err := json.Unmarshal(data, &alias); err != nil {
 		return err
 	}
 
 	s.Expression = alias.Expression
-
-	// Parse the cron expression to populate the Parsed field
-	if s.Expression != "" {
-		parsed, err := cron.ParseStandard(s.Expression)
-		if err != nil {
-			return fmt.Errorf("invalid cron expression %q: %w", s.Expression, err)
-		}
-		s.Parsed = parsed
+	if s.Expression == "" {
+		return nil
 	}
 
+	parsed, err := cron.ParseStandard(s.Expression)
+	if err != nil {
+		return fmt.Errorf("invalid cron expression %q: %w", s.Expression, err)
+	}
+	s.Parsed = parsed
 	return nil
 }
 
@@ -712,30 +699,28 @@ func SockAddr(name, dagRunID string) string {
 		hashLength          = 6
 		maxSocketNameLength = 50
 		prefix              = "@dagu_"
-		connector           = "_"
 		suffix              = ".sock"
 	)
 
-	hash := fmt.Sprintf("%x", md5.Sum([]byte(name+dagRunID)))[:hashLength] // nolint:gosec
-	name = fileutil.SafeName(name)
+	hash := fmt.Sprintf("%x", md5.Sum([]byte(name+dagRunID)))[:hashLength] //nolint:gosec
+	safeName := fileutil.SafeName(name)
 
-	totalLen := len(prefix) + len(name) + len(connector) + len(hash) + len(suffix)
-	if totalLen > maxSocketNameLength {
-		excessLen := totalLen - maxSocketNameLength
-		name = name[:len(name)-excessLen]
+	// Calculate available space for the name
+	fixedLen := len(prefix) + 1 + len(hash) + len(suffix) // +1 for underscore connector
+	maxNameLen := maxSocketNameLength - fixedLen
+	if len(safeName) > maxNameLen {
+		safeName = safeName[:maxNameLen]
 	}
 
-	return getSocketPath(prefix + name + connector + hash + suffix)
+	return getSocketPath(fmt.Sprintf("%s%s_%s%s", prefix, safeName, hash, suffix))
 }
 
 // getSocketPath returns the appropriate socket path for the current platform.
-// On Unix systems, it uses /tmp directory.
-// On Windows, it uses the system temp directory.
+// On Unix systems, it uses /tmp directory. On Windows, it uses the system temp directory.
 func getSocketPath(socketName string) string {
+	baseDir := "/tmp"
 	if runtime.GOOS == "windows" {
-		// On Windows, use the system temp directory instead of /tmp
-		return filepath.Join(os.TempDir(), socketName)
+		baseDir = os.TempDir()
 	}
-	// On Unix systems, use /tmp
-	return filepath.Join("/tmp", socketName)
+	return filepath.Join(baseDir, socketName)
 }

@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/llm"
@@ -14,13 +13,13 @@ import (
 const (
 	defaultBashTimeout = 120 * time.Second
 	maxBashTimeout     = 10 * time.Minute
-	maxOutputLength    = 100000 // 100KB max output
+	maxOutputLength    = 100000
 )
 
-// BashToolInput is the input schema for the bash tool.
+// BashToolInput defines the input parameters for the bash tool.
 type BashToolInput struct {
 	Command string `json:"command"`
-	Timeout int    `json:"timeout,omitempty"` // timeout in seconds
+	Timeout int    `json:"timeout,omitempty"`
 }
 
 // NewBashTool creates a new bash tool for shell command execution.
@@ -61,7 +60,7 @@ func bashRun(ctx ToolContext, input json.RawMessage) ToolOut {
 		return toolError("Command is required")
 	}
 
-	timeout := calcTimeout(args.Timeout)
+	timeout := resolveTimeout(args.Timeout)
 	cmdCtx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -91,29 +90,26 @@ func bashRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	return ToolOut{Content: output}
 }
 
-func calcTimeout(seconds int) time.Duration {
+func resolveTimeout(seconds int) time.Duration {
 	if seconds <= 0 {
 		return defaultBashTimeout
 	}
 	return min(time.Duration(seconds)*time.Second, maxBashTimeout)
 }
 
-func buildOutput(stdoutStr, stderrStr string) string {
-	stdoutStr = truncateOutput(stdoutStr)
-	stderrStr = truncateOutput(stderrStr)
+func buildOutput(stdout, stderr string) string {
+	stdout = truncateOutput(stdout)
+	stderr = truncateOutput(stderr)
 
-	var output strings.Builder
-	output.WriteString(stdoutStr)
-
-	if stderrStr != "" {
-		if output.Len() > 0 {
-			output.WriteString("\n")
-		}
-		output.WriteString("STDERR:\n")
-		output.WriteString(stderrStr)
+	if stderr == "" {
+		return stdout
 	}
 
-	return output.String()
+	if stdout == "" {
+		return "STDERR:\n" + stderr
+	}
+
+	return stdout + "\nSTDERR:\n" + stderr
 }
 
 func truncateOutput(s string) string {

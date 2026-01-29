@@ -2,11 +2,12 @@ package agent
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
-// NavigateToolInput defines the input parameters for the navigate tool.
+// NavigateToolInput is the input schema for the navigate tool.
 type NavigateToolInput struct {
 	Path string `json:"path"`
 }
@@ -52,5 +53,5 @@ func navigateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 		})
 	}
 
-	return ToolOut{Content: "Navigating user to " + args.Path}
+	return ToolOut{Content: fmt.Sprintf("Navigating user to %s", args.Path)}
 }

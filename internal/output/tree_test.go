@@ -10,6 +10,36 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// newTestRenderer creates a renderer with colors disabled for consistent test output.
+func newTestRenderer() *Renderer {
+	config := DefaultConfig()
+	config.ColorEnabled = false
+	return NewRenderer(config)
+}
+
+// newTestRendererWithConfig creates a renderer with custom config options.
+func newTestRendererWithConfig(opts ...func(*Config)) *Renderer {
+	config := DefaultConfig()
+	config.ColorEnabled = false
+	for _, opt := range opts {
+		opt(&config)
+	}
+	return NewRenderer(config)
+}
+
+// createTempLogFile creates a temporary log file with the given content.
+// Returns the file path and a cleanup function.
+func createTempLogFile(t *testing.T, pattern, content string) (string, func()) {
+	t.Helper()
+	file, err := os.CreateTemp("", pattern)
+	require.NoError(t, err)
+	if content != "" {
+		_, _ = file.WriteString(content)
+	}
+	_ = file.Close()
+	return file.Name(), func() { _ = os.Remove(file.Name()) }
+}
+
 func TestRenderDAGStatus_BasicSuccess(t *testing.T) {
 	t.Parallel()
 	dag := &core.DAG{Name: "test-dag"}
@@ -27,17 +57,12 @@ func TestRenderDAGStatus_BasicSuccess(t *testing.T) {
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	// Verify key elements
-	require.Contains(t, output, "test-dag", "Output should contain DAG name")
-	require.Contains(t, output, "step1", "Output should contain step name")
-	require.Contains(t, output, "[succeeded]", "Output should contain succeeded label")
-	require.Contains(t, output, "Result: Succeeded", "Output should contain succeeded result")
+	require.Contains(t, output, "test-dag")
+	require.Contains(t, output, "step1")
+	require.Contains(t, output, "[succeeded]")
+	require.Contains(t, output, "Result: Succeeded")
 }
 
 func TestRenderDAGStatus_FailedStep(t *testing.T) {
@@ -54,16 +79,12 @@ func TestRenderDAGStatus_FailedStep(t *testing.T) {
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	require.Contains(t, output, "[failed]", "Output should contain failed label")
-	require.Contains(t, output, "error:", "Output should contain error label")
-	require.Contains(t, output, "command exited with code 1", "Output should contain error message")
-	require.Contains(t, output, "Result: Failed", "Output should contain failed result")
+	require.Contains(t, output, "[failed]")
+	require.Contains(t, output, "error:")
+	require.Contains(t, output, "command exited with code 1")
+	require.Contains(t, output, "Result: Failed")
 }
 
 func TestRenderDAGStatus_MultipleSteps(t *testing.T) {
@@ -78,20 +99,13 @@ func TestRenderDAGStatus_MultipleSteps(t *testing.T) {
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	// Verify tree structure characters
-	require.Contains(t, output, "├─", "Output should contain branch characters for non-last steps")
-	require.Contains(t, output, "└─", "Output should contain last branch character")
-
-	// Verify all step names are present
-	require.Contains(t, output, "step1", "Output should contain step1")
-	require.Contains(t, output, "step2", "Output should contain step2")
-	require.Contains(t, output, "step3", "Output should contain step3")
+	require.Contains(t, output, "├─")
+	require.Contains(t, output, "└─")
+	require.Contains(t, output, "step1")
+	require.Contains(t, output, "step2")
+	require.Contains(t, output, "step3")
 }
 
 func TestRenderDAGStatus_RunningStatus(t *testing.T) {
@@ -105,14 +119,10 @@ func TestRenderDAGStatus_RunningStatus(t *testing.T) {
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	require.Contains(t, output, "[running]", "Output should contain running label")
-	require.Contains(t, output, "Running", "Output should contain Running status")
+	require.Contains(t, output, "[running]")
+	require.Contains(t, output, "Running")
 }
 
 func TestRenderDAGStatus_AbortedStatus(t *testing.T) {
@@ -127,14 +137,10 @@ func TestRenderDAGStatus_AbortedStatus(t *testing.T) {
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	require.Contains(t, output, "[aborted]", "Output should contain aborted label")
-	require.Contains(t, output, "Result: Aborted", "Output should contain Aborted result")
+	require.Contains(t, output, "[aborted]")
+	require.Contains(t, output, "Result: Aborted")
 }
 
 func TestRenderDAGStatus_PartiallySucceededStatus(t *testing.T) {
@@ -149,14 +155,10 @@ func TestRenderDAGStatus_PartiallySucceededStatus(t *testing.T) {
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	require.Contains(t, output, "[partially_succeeded]", "Output should contain partial label")
-	require.Contains(t, output, "Result: Partially Succeeded", "Output should contain Partially Succeeded result")
+	require.Contains(t, output, "[partially_succeeded]")
+	require.Contains(t, output, "Result: Partially Succeeded")
 }
 
 func TestRenderDAGStatus_QueuedStatus(t *testing.T) {
@@ -167,13 +169,9 @@ func TestRenderDAGStatus_QueuedStatus(t *testing.T) {
 		Nodes:  []*exec.Node{},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	require.Contains(t, output, "Queued", "Output should contain Queued status")
+	require.Contains(t, output, "Queued")
 }
 
 func TestRenderDAGStatus_NotStartedStatus(t *testing.T) {
@@ -186,13 +184,9 @@ func TestRenderDAGStatus_NotStartedStatus(t *testing.T) {
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	require.Contains(t, output, "Not Started", "Output should contain Not Started status")
+	require.Contains(t, output, "Not Started")
 }
 
 func TestRenderDAGStatus_SkippedStep(t *testing.T) {
@@ -205,13 +199,9 @@ func TestRenderDAGStatus_SkippedStep(t *testing.T) {
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	require.Contains(t, output, "[skipped]", "Output should contain skipped label")
+	require.Contains(t, output, "[skipped]")
 }
 
 func TestRenderDAGStatus_WithSubRuns(t *testing.T) {
@@ -230,15 +220,11 @@ func TestRenderDAGStatus_WithSubRuns(t *testing.T) {
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	require.Contains(t, output, "subdag:", "Output should contain subdag label")
-	require.Contains(t, output, "sub-run-123", "Output should contain sub-run ID")
-	require.Contains(t, output, "param1=value1", "Output should contain sub-run params")
+	require.Contains(t, output, "subdag:")
+	require.Contains(t, output, "sub-run-123")
+	require.Contains(t, output, "param1=value1")
 }
 
 func TestRenderDAGStatus_WithSubRunsNoParams(t *testing.T) {
@@ -257,13 +243,9 @@ func TestRenderDAGStatus_WithSubRunsNoParams(t *testing.T) {
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	require.Contains(t, output, "sub-run-456", "Output should contain sub-run ID")
+	require.Contains(t, output, "sub-run-456")
 }
 
 func TestRenderDAGStatus_DisabledOutputs(t *testing.T) {
@@ -281,32 +263,24 @@ func TestRenderDAGStatus_DisabledOutputs(t *testing.T) {
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
-	config.ShowStdout = false
-	config.ShowStderr = false
-
-	renderer := NewRenderer(config)
+	renderer := newTestRendererWithConfig(func(c *Config) {
+		c.ShowStdout = false
+		c.ShowStderr = false
+	})
 	output := renderer.RenderDAGStatus(dag, status)
 
-	require.NotContains(t, output, "stdout:", "Output should not contain stdout when disabled")
-	require.NotContains(t, output, "stderr:", "Output should not contain stderr when disabled")
+	require.NotContains(t, output, "stdout:")
+	require.NotContains(t, output, "stderr:")
 }
 
 func TestRenderDAGStatus_WithActualLogFiles(t *testing.T) {
 	t.Parallel()
-	// Create temporary log files
-	stdoutFile, err := os.CreateTemp("", "stdout-*.log")
-	require.NoError(t, err)
-	defer func() { _ = os.Remove(stdoutFile.Name()) }()
-	_, _ = stdoutFile.WriteString("Hello from stdout\nLine 2\n")
-	_ = stdoutFile.Close()
 
-	stderrFile, err := os.CreateTemp("", "stderr-*.log")
-	require.NoError(t, err)
-	defer func() { _ = os.Remove(stderrFile.Name()) }()
-	_, _ = stderrFile.WriteString("Warning: something happened\n")
-	_ = stderrFile.Close()
+	stdoutPath, cleanupStdout := createTempLogFile(t, "stdout-*.log", "Hello from stdout\nLine 2\n")
+	defer cleanupStdout()
+
+	stderrPath, cleanupStderr := createTempLogFile(t, "stderr-*.log", "Warning: something happened\n")
+	defer cleanupStderr()
 
 	dag := &core.DAG{Name: "test-dag"}
 	status := &exec.DAGRunStatus{
@@ -319,32 +293,28 @@ func TestRenderDAGStatus_WithActualLogFiles(t *testing.T) {
 				Status:     core.NodeSucceeded,
 				StartedAt:  "2024-01-15 10:00:00",
 				FinishedAt: "2024-01-15 10:00:30",
-				Stdout:     stdoutFile.Name(),
-				Stderr:     stderrFile.Name(),
+				Stdout:     stdoutPath,
+				Stderr:     stderrPath,
 			},
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	require.Contains(t, output, "Hello from stdout", "Output should contain stdout content")
-	require.Contains(t, output, "Warning: something happened", "Output should contain stderr content")
+	require.Contains(t, output, "Hello from stdout")
+	require.Contains(t, output, "Warning: something happened")
 }
 
 func TestRenderDAGStatus_WithTruncatedOutput(t *testing.T) {
 	t.Parallel()
-	// Create temporary log file with many lines
-	stdoutFile, err := os.CreateTemp("", "stdout-*.log")
+
+	tmpfile, err := os.CreateTemp("", "stdout-*.log")
 	require.NoError(t, err)
-	defer func() { _ = os.Remove(stdoutFile.Name()) }()
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
 	for i := 1; i <= 100; i++ {
-		_, _ = fmt.Fprintf(stdoutFile, "Line %d\n", i)
+		_, _ = fmt.Fprintf(tmpfile, "Line %d\n", i)
 	}
-	_ = stdoutFile.Close()
+	_ = tmpfile.Close()
 
 	dag := &core.DAG{Name: "test-dag"}
 	status := &exec.DAGRunStatus{
@@ -353,20 +323,18 @@ func TestRenderDAGStatus_WithTruncatedOutput(t *testing.T) {
 			{
 				Step:   core.Step{Name: "step1"},
 				Status: core.NodeSucceeded,
-				Stdout: stdoutFile.Name(),
+				Stdout: tmpfile.Name(),
 			},
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
-	config.MaxOutputLines = 10
-
-	renderer := NewRenderer(config)
+	renderer := newTestRendererWithConfig(func(c *Config) {
+		c.MaxOutputLines = 10
+	})
 	output := renderer.RenderDAGStatus(dag, status)
 
-	require.Contains(t, output, "... (90 more lines)", "Output should contain truncation indicator")
-	require.Contains(t, output, "Line 91", "Output should contain tail lines starting from Line 91")
+	require.Contains(t, output, "... (90 more lines)")
+	require.Contains(t, output, "Line 91")
 }
 
 func TestRenderDAGStatus_StartTimeFallback(t *testing.T) {
@@ -380,7 +348,6 @@ func TestRenderDAGStatus_StartTimeFallback(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dag := &core.DAG{Name: "test-dag"}
@@ -390,14 +357,9 @@ func TestRenderDAGStatus_StartTimeFallback(t *testing.T) {
 				Nodes:     []*exec.Node{},
 			}
 
-			config := DefaultConfig()
-			config.ColorEnabled = false
+			output := newTestRenderer().RenderDAGStatus(dag, status)
 
-			renderer := NewRenderer(config)
-			output := renderer.RenderDAGStatus(dag, status)
-
-			// Should use current time as fallback
-			require.Contains(t, output, "dag: test-dag", "Output should contain DAG name")
+			require.Contains(t, output, "dag: test-dag")
 		})
 	}
 }
@@ -411,14 +373,9 @@ func TestRenderDAGStatus_NoDuration(t *testing.T) {
 		Nodes:     []*exec.Node{},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	// Should not have duration in parentheses
-	require.NotContains(t, output, "dag: test-dag (", "Output should not contain duration when not started")
+	require.NotContains(t, output, "dag: test-dag (")
 }
 
 func TestRenderDAGStatus_InvalidTimeFormat(t *testing.T) {
@@ -431,128 +388,110 @@ func TestRenderDAGStatus_InvalidTimeFormat(t *testing.T) {
 		Nodes:      []*exec.Node{},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	// Should handle gracefully without duration
-	require.Contains(t, output, "dag: test-dag", "Output should contain DAG name even with invalid times")
+	require.Contains(t, output, "dag: test-dag")
 }
 
 func TestReadLogFileTail_AllLines(t *testing.T) {
 	t.Parallel()
-	// Create a temporary file
+
 	tmpfile, err := os.CreateTemp("", "test-log-*.txt")
 	require.NoError(t, err)
 	defer func() { _ = os.Remove(tmpfile.Name()) }()
-
-	// Write 10 lines
 	for i := 1; i <= 10; i++ {
 		_, _ = fmt.Fprintf(tmpfile, "Line %d\n", i)
 	}
 	_ = tmpfile.Close()
 
-	// Test reading all lines (no limit)
 	lines, truncated, err := ReadLogFileTail(tmpfile.Name(), 0)
 	require.NoError(t, err)
-	require.Len(t, lines, 10, "Expected 10 lines")
-	require.Equal(t, 0, truncated, "Expected 0 truncated")
+	require.Len(t, lines, 10)
+	require.Equal(t, 0, truncated)
 }
 
 func TestReadLogFileTail_WithLimit(t *testing.T) {
 	t.Parallel()
-	// Create a temporary file
+
 	tmpfile, err := os.CreateTemp("", "test-log-*.txt")
 	require.NoError(t, err)
 	defer func() { _ = os.Remove(tmpfile.Name()) }()
-
-	// Write 100 lines
 	for i := 1; i <= 100; i++ {
 		_, _ = fmt.Fprintf(tmpfile, "Line %d\n", i)
 	}
 	_ = tmpfile.Close()
 
-	// Test reading last 10 lines
 	lines, truncated, err := ReadLogFileTail(tmpfile.Name(), 10)
 	require.NoError(t, err)
-	require.Len(t, lines, 10, "Expected 10 lines")
-	require.Equal(t, 90, truncated, "Expected 90 truncated")
-	require.Equal(t, "Line 91", lines[0], "Expected first line to be 'Line 91'")
-	require.Equal(t, "Line 100", lines[9], "Expected last line to be 'Line 100'")
+	require.Len(t, lines, 10)
+	require.Equal(t, 90, truncated)
+	require.Equal(t, "Line 91", lines[0])
+	require.Equal(t, "Line 100", lines[9])
 }
 
 func TestReadLogFileTail_NegativeLimit(t *testing.T) {
 	t.Parallel()
-	tmpfile, err := os.CreateTemp("", "test-log-*.txt")
-	require.NoError(t, err)
-	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
-	_, _ = tmpfile.WriteString("Line 1\nLine 2\n")
-	_ = tmpfile.Close()
+	path, cleanup := createTempLogFile(t, "test-log-*.txt", "Line 1\nLine 2\n")
+	defer cleanup()
 
-	// Negative limit should return all lines
-	lines, truncated, err := ReadLogFileTail(tmpfile.Name(), -5)
+	lines, truncated, err := ReadLogFileTail(path, -5)
 	require.NoError(t, err)
-	require.Len(t, lines, 2, "Expected 2 lines with negative limit")
-	require.Equal(t, 0, truncated, "Expected 0 truncated")
+	require.Len(t, lines, 2)
+	require.Equal(t, 0, truncated)
 }
 
 func TestReadLogFileTail_EmptyFile(t *testing.T) {
 	t.Parallel()
-	// Create an empty temporary file
-	tmpfile, err := os.CreateTemp("", "test-log-*.txt")
-	require.NoError(t, err)
-	defer func() { _ = os.Remove(tmpfile.Name()) }()
-	_ = tmpfile.Close()
 
-	lines, truncated, err := ReadLogFileTail(tmpfile.Name(), 10)
+	path, cleanup := createTempLogFile(t, "test-log-*.txt", "")
+	defer cleanup()
+
+	lines, truncated, err := ReadLogFileTail(path, 10)
 	require.NoError(t, err)
-	require.Len(t, lines, 0, "Expected 0 lines for empty file")
-	require.Equal(t, 0, truncated, "Expected 0 truncated")
+	require.Len(t, lines, 0)
+	require.Equal(t, 0, truncated)
 }
 
 func TestReadLogFileTail_NonexistentFile(t *testing.T) {
 	t.Parallel()
+
 	lines, truncated, err := ReadLogFileTail("/nonexistent/path/file.log", 10)
-	require.NoError(t, err, "Should not return error for nonexistent file")
-	require.Nil(t, lines, "Should return nil lines for nonexistent file")
-	require.Equal(t, 0, truncated, "Expected 0 truncated")
+	require.NoError(t, err)
+	require.Nil(t, lines)
+	require.Equal(t, 0, truncated)
 }
 
 func TestReadLogFileTail_EmptyPath(t *testing.T) {
 	t.Parallel()
+
 	lines, truncated, err := ReadLogFileTail("", 10)
-	require.NoError(t, err, "Should not return error for empty path")
-	require.Nil(t, lines, "Should return nil lines for empty path")
-	require.Equal(t, 0, truncated, "Expected 0 truncated")
+	require.NoError(t, err)
+	require.Nil(t, lines)
+	require.Equal(t, 0, truncated)
 }
 
 func TestReadLogFileTail_BinaryContent(t *testing.T) {
 	t.Parallel()
-	// Create a temporary file with binary content
+
 	tmpfile, err := os.CreateTemp("", "test-log-*.bin")
 	require.NoError(t, err)
 	defer func() { _ = os.Remove(tmpfile.Name()) }()
-
-	// Write binary content with null bytes
 	_, _ = tmpfile.Write([]byte{0x00, 0x01, 0x02, 0xFF, 0xFE})
 	_ = tmpfile.Close()
 
 	lines, _, err := ReadLogFileTail(tmpfile.Name(), 10)
 	require.NoError(t, err)
-	require.Len(t, lines, 1, "Expected 1 line for binary detection")
-	require.Equal(t, "(binary data)", lines[0], "Expected '(binary data)'")
+	require.Len(t, lines, 1)
+	require.Equal(t, "(binary data)", lines[0])
 }
 
 func TestReadLogFileTail_LargeFile(t *testing.T) {
 	t.Parallel()
+
 	tmpfile, err := os.CreateTemp("", "test-large-*.txt")
 	require.NoError(t, err)
 	defer func() { _ = os.Remove(tmpfile.Name()) }()
-
-	// Write more than 10MB
 	data := make([]byte, 11*1024*1024)
 	for i := range data {
 		data[i] = 'x'
@@ -562,9 +501,9 @@ func TestReadLogFileTail_LargeFile(t *testing.T) {
 
 	lines, truncated, err := ReadLogFileTail(tmpfile.Name(), 10)
 	require.NoError(t, err)
-	require.Equal(t, 0, truncated, "Expected truncated=0")
-	require.Len(t, lines, 1, "Expected file too large message")
-	require.Equal(t, "(file too large, >10MB)", lines[0], "Expected file too large message")
+	require.Equal(t, 0, truncated)
+	require.Len(t, lines, 1)
+	require.Equal(t, "(file too large, >10MB)", lines[0])
 }
 
 func TestStatusText(t *testing.T) {
@@ -585,7 +524,7 @@ func TestStatusText(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.status.String(), func(t *testing.T) {
 			t.Parallel()
-			require.Equal(t, tt.text, StatusText(tt.status), "StatusText(%v) mismatch", tt.status)
+			require.Equal(t, tt.text, StatusText(tt.status))
 		})
 	}
 }
@@ -594,11 +533,10 @@ func TestDefaultConfig(t *testing.T) {
 	t.Parallel()
 	config := DefaultConfig()
 
-	require.True(t, config.ColorEnabled, "ColorEnabled should be true by default")
-	require.True(t, config.ShowStdout, "ShowStdout should be true by default")
-	require.True(t, config.ShowStderr, "ShowStderr should be true by default")
-	require.Equal(t, DefaultMaxOutputLines, config.MaxOutputLines,
-		"MaxOutputLines should be %d by default", DefaultMaxOutputLines)
+	require.True(t, config.ColorEnabled)
+	require.True(t, config.ShowStdout)
+	require.True(t, config.ShowStderr)
+	require.Equal(t, DefaultMaxOutputLines, config.MaxOutputLines)
 }
 
 func TestRenderDAGStatus_TreeStructure(t *testing.T) {
@@ -612,19 +550,14 @@ func TestRenderDAGStatus_TreeStructure(t *testing.T) {
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
-	config.ShowStdout = false
-	config.ShowStderr = false
-
-	renderer := NewRenderer(config)
+	renderer := newTestRendererWithConfig(func(c *Config) {
+		c.ShowStdout = false
+		c.ShowStderr = false
+	})
 	output := renderer.RenderDAGStatus(dag, status)
 
-	// Check that tree structure is correct
-	require.Contains(t, output, "├─first_step",
-		"First step should use branch character '├─'")
-	require.Contains(t, output, "└─last_step",
-		"Last step should use last branch character '└─'")
+	require.Contains(t, output, "├─first_step")
+	require.Contains(t, output, "└─last_step")
 }
 
 func TestIsBinaryContent(t *testing.T) {
@@ -643,7 +576,7 @@ func TestIsBinaryContent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.expected, isBinaryContent(tt.data), "isBinaryContent(%q) mismatch", tt.data)
+			require.Equal(t, tt.expected, isBinaryContent(tt.data))
 		})
 	}
 }
@@ -667,16 +600,14 @@ func TestRenderDAGStatus_WithMultipleCommands(t *testing.T) {
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
-	config.ShowStdout = false
-	config.ShowStderr = false
-
-	renderer := NewRenderer(config)
+	renderer := newTestRendererWithConfig(func(c *Config) {
+		c.ShowStdout = false
+		c.ShowStderr = false
+	})
 	output := renderer.RenderDAGStatus(dag, status)
 
-	require.Contains(t, output, "echo first", "Output should contain first command")
-	require.Contains(t, output, "echo second", "Output should contain second command")
+	require.Contains(t, output, "echo first")
+	require.Contains(t, output, "echo second")
 }
 
 func TestRenderDAGStatus_WithLegacyCommand(t *testing.T) {
@@ -695,13 +626,9 @@ func TestRenderDAGStatus_WithLegacyCommand(t *testing.T) {
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	require.Contains(t, output, "echo hello world", "Output should contain legacy command")
+	require.Contains(t, output, "echo hello world")
 }
 
 func TestRenderDAGStatus_WithLegacyCommandAndArgs(t *testing.T) {
@@ -721,13 +648,9 @@ func TestRenderDAGStatus_WithLegacyCommandAndArgs(t *testing.T) {
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	require.Contains(t, output, "echo hello world", "Output should contain legacy command with args")
+	require.Contains(t, output, "echo hello world")
 }
 
 func TestRenderDAGStatus_NoCommand(t *testing.T) {
@@ -743,13 +666,9 @@ func TestRenderDAGStatus_NoCommand(t *testing.T) {
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	require.Contains(t, output, "no-cmd-step", "Output should contain step name")
+	require.Contains(t, output, "no-cmd-step")
 }
 
 func TestTrimTrailingEmptyLines(t *testing.T) {
@@ -768,8 +687,7 @@ func TestTrimTrailingEmptyLines(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := trimTrailingEmptyLines(tt.input)
-			require.Equal(t, tt.expected, got, "trimTrailingEmptyLines() mismatch")
+			require.Equal(t, tt.expected, trimTrailingEmptyLines(tt.input))
 		})
 	}
 }
@@ -787,13 +705,12 @@ func TestNodeStatusToStatus(t *testing.T) {
 		{core.NodePartiallySucceeded, core.PartiallySucceeded},
 		{core.NodeSkipped, core.NotStarted},
 		{core.NodeNotStarted, core.NotStarted},
-		{core.NodeStatus(999), core.NotStarted}, // Unknown
+		{core.NodeStatus(999), core.NotStarted},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.nodeStatus.String(), func(t *testing.T) {
-			require.Equal(t, tt.expected, nodeStatusToStatus(tt.nodeStatus),
-				"nodeStatusToStatus(%v) mismatch", tt.nodeStatus)
+			require.Equal(t, tt.expected, nodeStatusToStatus(tt.nodeStatus))
 		})
 	}
 }
@@ -802,27 +719,20 @@ func TestRenderDAGStatus_UnknownStatus(t *testing.T) {
 	t.Parallel()
 	dag := &core.DAG{Name: "unknown-dag"}
 	status := &exec.DAGRunStatus{
-		Status: core.Status(999), // Unknown status
+		Status: core.Status(999),
 		Nodes:  []*exec.Node{},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	// Should handle unknown status gracefully
-	require.Contains(t, output, "Result:", "Output should contain result line")
+	require.Contains(t, output, "Result:")
 }
 
 func TestRenderDAGStatus_OnlyStdout(t *testing.T) {
 	t.Parallel()
-	stdoutFile, err := os.CreateTemp("", "stdout-*.log")
-	require.NoError(t, err)
-	defer func() { _ = os.Remove(stdoutFile.Name()) }()
-	_, _ = stdoutFile.WriteString("Hello stdout\n")
-	_ = stdoutFile.Close()
+
+	stdoutPath, cleanup := createTempLogFile(t, "stdout-*.log", "Hello stdout\n")
+	defer cleanup()
 
 	dag := &core.DAG{Name: "test-dag"}
 	status := &exec.DAGRunStatus{
@@ -831,30 +741,26 @@ func TestRenderDAGStatus_OnlyStdout(t *testing.T) {
 			{
 				Step:   core.Step{Name: "step1", Command: "echo"},
 				Status: core.NodeSucceeded,
-				Stdout: stdoutFile.Name(),
+				Stdout: stdoutPath,
 			},
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
-	config.ShowStdout = true
-	config.ShowStderr = false
-
-	renderer := NewRenderer(config)
+	renderer := newTestRendererWithConfig(func(c *Config) {
+		c.ShowStdout = true
+		c.ShowStderr = false
+	})
 	output := renderer.RenderDAGStatus(dag, status)
 
-	require.Contains(t, output, "stdout:", "Output should contain stdout")
-	require.NotContains(t, output, "stderr:", "Output should not contain stderr")
+	require.Contains(t, output, "stdout:")
+	require.NotContains(t, output, "stderr:")
 }
 
 func TestRenderDAGStatus_OnlyStderr(t *testing.T) {
 	t.Parallel()
-	stderrFile, err := os.CreateTemp("", "stderr-*.log")
-	require.NoError(t, err)
-	defer func() { _ = os.Remove(stderrFile.Name()) }()
-	_, _ = stderrFile.WriteString("Hello stderr\n")
-	_ = stderrFile.Close()
+
+	stderrPath, cleanup := createTempLogFile(t, "stderr-*.log", "Hello stderr\n")
+	defer cleanup()
 
 	dag := &core.DAG{Name: "test-dag"}
 	status := &exec.DAGRunStatus{
@@ -863,52 +769,42 @@ func TestRenderDAGStatus_OnlyStderr(t *testing.T) {
 			{
 				Step:   core.Step{Name: "step1", Command: "echo"},
 				Status: core.NodeSucceeded,
-				Stderr: stderrFile.Name(),
+				Stderr: stderrPath,
 			},
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
-	config.ShowStdout = false
-	config.ShowStderr = true
-
-	renderer := NewRenderer(config)
+	renderer := newTestRendererWithConfig(func(c *Config) {
+		c.ShowStdout = false
+		c.ShowStderr = true
+	})
 	output := renderer.RenderDAGStatus(dag, status)
 
-	require.NotContains(t, output, "stdout:", "Output should not contain stdout")
-	require.Contains(t, output, "stderr:", "Output should contain stderr")
+	require.NotContains(t, output, "stdout:")
+	require.Contains(t, output, "stderr:")
 }
 
 func TestReadLogFileTail_PermissionDenied(t *testing.T) {
 	t.Parallel()
-	// Create a temporary file
-	tmpfile, err := os.CreateTemp("", "test-perm-*.txt")
-	require.NoError(t, err)
-	tmpfileName := tmpfile.Name()
-	_, _ = tmpfile.WriteString("test content\n")
-	_ = tmpfile.Close()
-	defer func() { _ = os.Remove(tmpfileName) }()
 
-	// Remove read permissions
-	if err := os.Chmod(tmpfileName, 0o000); err != nil {
+	path, cleanup := createTempLogFile(t, "test-perm-*.txt", "test content\n")
+	defer cleanup()
+
+	if err := os.Chmod(path, 0o000); err != nil {
 		t.Skip("Cannot change permissions on this system")
 	}
-	defer func() { _ = os.Chmod(tmpfileName, 0o644) }()
+	defer func() { _ = os.Chmod(path, 0o644) }()
 
-	lines, truncated, err := ReadLogFileTail(tmpfileName, 10)
-	// Should return an error for permission denied
+	lines, truncated, err := ReadLogFileTail(path, 10)
 	if err == nil {
-		// Some systems (e.g., root user) can still read the file
 		t.Skip("System allows reading file without read permission")
 	}
-	require.Nil(t, lines, "Should return nil lines on permission error")
-	require.Equal(t, 0, truncated, "Should return 0 truncated on error")
+	require.Nil(t, lines)
+	require.Equal(t, 0, truncated)
 }
 
 func TestCalculateDuration_InvalidFinishedAt(t *testing.T) {
 	t.Parallel()
-	// Test when finishedAt is an invalid time string
 	dag := &core.DAG{Name: "test-dag"}
 	status := &exec.DAGRunStatus{
 		Status:     core.Succeeded,
@@ -917,19 +813,13 @@ func TestCalculateDuration_InvalidFinishedAt(t *testing.T) {
 		Nodes:      []*exec.Node{},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	// Should still render, falling back to time.Now() for duration calculation
-	require.Contains(t, output, "dag: test-dag", "Output should contain DAG name even with invalid finishedAt")
+	require.Contains(t, output, "dag: test-dag")
 }
 
 func TestCalculateDuration_NotRunningWithDashFinishedAt(t *testing.T) {
 	t.Parallel()
-	// Test when status is not Running and finishedAt is "-"
 	dag := &core.DAG{Name: "test-dag"}
 	status := &exec.DAGRunStatus{
 		Status:     core.Succeeded,
@@ -938,20 +828,13 @@ func TestCalculateDuration_NotRunningWithDashFinishedAt(t *testing.T) {
 		Nodes:      []*exec.Node{},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	// When finishedAt is "-" and status is not Running, duration should be empty
-	// So output should just have "dag: test-dag" without duration in parentheses
-	require.Contains(t, output, "dag: test-dag", "Output should contain DAG name")
+	require.Contains(t, output, "dag: test-dag")
 }
 
 func TestCalculateDuration_NotRunningWithEmptyFinishedAt(t *testing.T) {
 	t.Parallel()
-	// Test when status is not Running and finishedAt is empty
 	dag := &core.DAG{Name: "test-dag"}
 	status := &exec.DAGRunStatus{
 		Status:     core.Succeeded,
@@ -960,14 +843,9 @@ func TestCalculateDuration_NotRunningWithEmptyFinishedAt(t *testing.T) {
 		Nodes:      []*exec.Node{},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	// When finishedAt is "" and status is not Running, duration should be empty
-	require.Contains(t, output, "dag: test-dag", "Output should contain DAG name")
+	require.Contains(t, output, "dag: test-dag")
 }
 
 func TestRenderDAGStatus_NodeDurationWithInvalidTime(t *testing.T) {
@@ -985,14 +863,9 @@ func TestRenderDAGStatus_NodeDurationWithInvalidTime(t *testing.T) {
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	// Should still render the step
-	require.Contains(t, output, "step1", "Output should contain step name")
+	require.Contains(t, output, "step1")
 }
 
 func TestRenderDAGStatus_RunningNodeCalculatesDuration(t *testing.T) {
@@ -1010,16 +883,10 @@ func TestRenderDAGStatus_RunningNodeCalculatesDuration(t *testing.T) {
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	// Running status should calculate duration using time.Now()
-	require.Contains(t, output, "running-step", "Output should contain step name")
-	// Duration should be present
-	require.Contains(t, output, "(", "Output should contain duration for running step")
+	require.Contains(t, output, "running-step")
+	require.Contains(t, output, "(")
 }
 
 func TestCleanLogLine_CarriageReturn(t *testing.T) {
@@ -1029,52 +896,19 @@ func TestCleanLogLine_CarriageReturn(t *testing.T) {
 		input    string
 		expected []string
 	}{
-		{
-			name:     "no carriage return",
-			input:    "hello world",
-			expected: []string{"hello world"},
-		},
-		{
-			name:     "single carriage return",
-			input:    "first\rsecond",
-			expected: []string{"second"},
-		},
-		{
-			name:     "multiple carriage returns",
-			input:    "a\rb\rc\rd",
-			expected: []string{"d"},
-		},
-		{
-			name:     "curl progress bar",
-			input:    "  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r100   123  100   123    0     0   1000      0 --:--:-- --:--:-- --:--:--  1000",
-			expected: []string{"100   123  100   123    0     0   1000      0 --:--:-- --:--:-- --:--:--  1000"},
-		},
-		{
-			name:     "empty after carriage return",
-			input:    "something\r",
-			expected: []string{"something"},
-		},
-		{
-			name:     "all empty segments",
-			input:    "\r\r\r",
-			expected: nil,
-		},
-		{
-			name:     "empty line",
-			input:    "",
-			expected: nil,
-		},
-		{
-			name:     "whitespace only",
-			input:    "   ",
-			expected: nil,
-		},
+		{"no carriage return", "hello world", []string{"hello world"}},
+		{"single carriage return", "first\rsecond", []string{"second"}},
+		{"multiple carriage returns", "a\rb\rc\rd", []string{"d"}},
+		{"curl progress bar", "  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r100   123  100   123    0     0   1000      0 --:--:-- --:--:-- --:--:--  1000", []string{"100   123  100   123    0     0   1000      0 --:--:-- --:--:-- --:--:--  1000"}},
+		{"empty after carriage return", "something\r", []string{"something"}},
+		{"all empty segments", "\r\r\r", nil},
+		{"empty line", "", nil},
+		{"whitespace only", "   ", nil},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := cleanLogLine(tt.input)
-			require.Equal(t, tt.expected, got, "cleanLogLine(%q) mismatch", tt.input)
+			require.Equal(t, tt.expected, cleanLogLine(tt.input))
 		})
 	}
 }
@@ -1096,8 +930,7 @@ func TestCleanControlChars(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := cleanControlChars(tt.input)
-			require.Equal(t, tt.expected, got, "cleanControlChars(%q) mismatch", tt.input)
+			require.Equal(t, tt.expected, cleanControlChars(tt.input))
 		})
 	}
 }
@@ -1109,71 +942,41 @@ func TestCleanErrorMessage(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{
-			name:     "no stderr tail",
-			input:    "command failed: exit status 1",
-			expected: "command failed: exit status 1",
-		},
-		{
-			name:     "with stderr tail newline prefix",
-			input:    "command failed: exit status 1\nrecent stderr (tail):\nsome error output",
-			expected: "command failed: exit status 1",
-		},
-		{
-			name:     "with stderr tail no newline prefix",
-			input:    "failed to execute: exit status 56recent stderr (tail):\nerror details",
-			expected: "failed to execute: exit status 56",
-		},
-		{
-			name:     "empty string",
-			input:    "",
-			expected: "",
-		},
+		{"no stderr tail", "command failed: exit status 1", "command failed: exit status 1"},
+		{"with stderr tail newline prefix", "command failed: exit status 1\nrecent stderr (tail):\nsome error output", "command failed: exit status 1"},
+		{"with stderr tail no newline prefix", "failed to execute: exit status 56recent stderr (tail):\nerror details", "failed to execute: exit status 56"},
+		{"empty string", "", ""},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := cleanErrorMessage(tt.input)
-			require.Equal(t, tt.expected, got, "cleanErrorMessage() mismatch")
+			require.Equal(t, tt.expected, cleanErrorMessage(tt.input))
 		})
 	}
 }
 
 func TestReadLogFileTail_WithCarriageReturns(t *testing.T) {
 	t.Parallel()
-	// Create a temporary file with curl-like progress output
-	tmpfile, err := os.CreateTemp("", "test-curl-*.txt")
-	require.NoError(t, err)
-	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
-	// Write curl-like progress output
-	_, _ = tmpfile.WriteString("  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r100   123  100   123    0     0   1000      0 --:--:-- --:--:-- --:--:--  1000\n")
-	_, _ = tmpfile.WriteString("Downloaded file.txt\n")
-	_ = tmpfile.Close()
+	content := "  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r100   123  100   123    0     0   1000      0 --:--:-- --:--:-- --:--:--  1000\nDownloaded file.txt\n"
+	path, cleanup := createTempLogFile(t, "test-curl-*.txt", content)
+	defer cleanup()
 
-	lines, truncated, err := ReadLogFileTail(tmpfile.Name(), 0)
+	lines, truncated, err := ReadLogFileTail(path, 0)
 	require.NoError(t, err)
-	require.Equal(t, 0, truncated, "Expected 0 truncated")
-	// Should have cleaned up the progress line
-	require.Len(t, lines, 2, "Expected 2 lines")
-	// First line should be the final progress state (after \r)
-	require.Contains(t, lines[0], "100", "First line should contain '100' (final progress)")
+	require.Equal(t, 0, truncated)
+	require.Len(t, lines, 2)
+	require.Contains(t, lines[0], "100")
 }
 
 func TestRenderDAGStatus_ShowsLogFilePaths(t *testing.T) {
 	t.Parallel()
-	// Create temporary log files
-	stdoutFile, err := os.CreateTemp("", "stdout-*.log")
-	require.NoError(t, err)
-	defer func() { _ = os.Remove(stdoutFile.Name()) }()
-	_, _ = stdoutFile.WriteString("Hello from stdout\n")
-	_ = stdoutFile.Close()
 
-	stderrFile, err := os.CreateTemp("", "stderr-*.log")
-	require.NoError(t, err)
-	defer func() { _ = os.Remove(stderrFile.Name()) }()
-	_, _ = stderrFile.WriteString("Warning message\n")
-	_ = stderrFile.Close()
+	stdoutPath, cleanupStdout := createTempLogFile(t, "stdout-*.log", "Hello from stdout\n")
+	defer cleanupStdout()
+
+	stderrPath, cleanupStderr := createTempLogFile(t, "stderr-*.log", "Warning message\n")
+	defer cleanupStderr()
 
 	dag := &core.DAG{Name: "test-dag"}
 	status := &exec.DAGRunStatus{
@@ -1186,24 +989,18 @@ func TestRenderDAGStatus_ShowsLogFilePaths(t *testing.T) {
 				Status:     core.NodeSucceeded,
 				StartedAt:  "2024-01-15 10:00:00",
 				FinishedAt: "2024-01-15 10:00:30",
-				Stdout:     stdoutFile.Name(),
-				Stderr:     stderrFile.Name(),
+				Stdout:     stdoutPath,
+				Stderr:     stderrPath,
 			},
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	// Verify file paths are displayed
-	require.Contains(t, output, "stdout: "+stdoutFile.Name(), "Output should contain stdout file path")
-	require.Contains(t, output, "stderr: "+stderrFile.Name(), "Output should contain stderr file path")
-	// Verify content is also displayed
-	require.Contains(t, output, "Hello from stdout", "Output should contain stdout content")
-	require.Contains(t, output, "Warning message", "Output should contain stderr content")
+	require.Contains(t, output, "stdout: "+stdoutPath)
+	require.Contains(t, output, "stderr: "+stderrPath)
+	require.Contains(t, output, "Hello from stdout")
+	require.Contains(t, output, "Warning message")
 }
 
 func TestRenderDAGStatus_ShowsSchedulerLog(t *testing.T) {
@@ -1222,13 +1019,9 @@ func TestRenderDAGStatus_ShowsSchedulerLog(t *testing.T) {
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	require.Contains(t, output, "log: /path/to/scheduler.log", "Output should contain scheduler log path")
+	require.Contains(t, output, "log: /path/to/scheduler.log")
 }
 
 func TestRenderDAGStatus_NoSchedulerLogWhenEmpty(t *testing.T) {
@@ -1238,7 +1031,7 @@ func TestRenderDAGStatus_NoSchedulerLogWhenEmpty(t *testing.T) {
 		Status:     core.Succeeded,
 		StartedAt:  "2024-01-15 10:00:00",
 		FinishedAt: "2024-01-15 10:00:30",
-		Log:        "", // Empty log path
+		Log:        "",
 		Nodes: []*exec.Node{
 			{
 				Step:   core.Step{Name: "step1"},
@@ -1247,13 +1040,9 @@ func TestRenderDAGStatus_NoSchedulerLogWhenEmpty(t *testing.T) {
 		},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	require.NotContains(t, output, "log:", "Output should not contain log: when path is empty")
+	require.NotContains(t, output, "log:")
 }
 
 func TestRenderDAGStatus_SchedulerLogLastBranchWhenNoSteps(t *testing.T) {
@@ -1264,15 +1053,10 @@ func TestRenderDAGStatus_SchedulerLogLastBranchWhenNoSteps(t *testing.T) {
 		StartedAt:  "2024-01-15 10:00:00",
 		FinishedAt: "2024-01-15 10:00:30",
 		Log:        "/path/to/scheduler.log",
-		Nodes:      []*exec.Node{}, // No steps
+		Nodes:      []*exec.Node{},
 	}
 
-	config := DefaultConfig()
-	config.ColorEnabled = false
+	output := newTestRenderer().RenderDAGStatus(dag, status)
 
-	renderer := NewRenderer(config)
-	output := renderer.RenderDAGStatus(dag, status)
-
-	// Should use └─ (last branch) when there are no steps
-	require.Contains(t, output, "└─log:", "Output should use last branch for log when no steps")
+	require.Contains(t, output, "└─log:")
 }

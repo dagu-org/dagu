@@ -10,16 +10,18 @@ import (
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
+const (
+	dirPermission  = 0o755
+	filePermission = 0o644
+)
+
 // PatchOperation defines the type of patch operation.
 type PatchOperation string
 
 const (
-	// PatchOpCreate creates a new file with the given content.
-	PatchOpCreate PatchOperation = "create"
-	// PatchOpReplace replaces old_string with new_string in the file.
+	PatchOpCreate  PatchOperation = "create"
 	PatchOpReplace PatchOperation = "replace"
-	// PatchOpDelete deletes the file.
-	PatchOpDelete PatchOperation = "delete"
+	PatchOpDelete  PatchOperation = "delete"
 )
 
 // PatchToolInput is the input schema for the patch tool.
@@ -97,16 +99,15 @@ func patchRun(ctx ToolContext, input json.RawMessage) ToolOut {
 }
 
 func patchCreate(path, content string) ToolOut {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), dirPermission); err != nil {
 		return toolError("Failed to create directory: %v", err)
 	}
 
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(content), filePermission); err != nil {
 		return toolError("Failed to write file: %v", err)
 	}
 
-	lineCount := strings.Count(content, "\n") + 1
-	return ToolOut{Content: fmt.Sprintf("Created %s (%d lines)", path, lineCount)}
+	return ToolOut{Content: fmt.Sprintf("Created %s (%d lines)", path, countLines(content))}
 }
 
 func patchReplace(path, oldString, newString string) ToolOut {
@@ -125,21 +126,21 @@ func patchReplace(path, oldString, newString string) ToolOut {
 	contentStr := string(content)
 	count := strings.Count(contentStr, oldString)
 
-	if count == 0 {
+	switch count {
+	case 0:
 		return toolError("old_string not found in file. Make sure to include exact text including whitespace and indentation.")
-	}
-	if count > 1 {
+	case 1:
+		// Valid: exactly one match found
+	default:
 		return toolError("old_string found %d times in file. It must be unique. Include more context to make it unique.", count)
 	}
 
 	newContent := strings.Replace(contentStr, oldString, newString, 1)
-	if err := os.WriteFile(path, []byte(newContent), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(newContent), filePermission); err != nil {
 		return toolError("Failed to write file: %v", err)
 	}
 
-	oldLines := strings.Count(oldString, "\n") + 1
-	newLines := strings.Count(newString, "\n") + 1
-	return ToolOut{Content: fmt.Sprintf("Replaced %d lines with %d lines in %s", oldLines, newLines, path)}
+	return ToolOut{Content: fmt.Sprintf("Replaced %d lines with %d lines in %s", countLines(oldString), countLines(newString), path)}
 }
 
 func patchDelete(path string) ToolOut {
@@ -152,4 +153,8 @@ func patchDelete(path string) ToolOut {
 	}
 
 	return ToolOut{Content: fmt.Sprintf("Deleted %s", path)}
+}
+
+func countLines(s string) int {
+	return strings.Count(s, "\n") + 1
 }

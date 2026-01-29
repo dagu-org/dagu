@@ -1,6 +1,7 @@
 package frontend
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"log/slog"
@@ -399,53 +400,56 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, paths *conf
 }
 
 // createLLMProvider creates an LLM provider from the agent configuration.
-func createLLMProvider(llmAgentCfg fileagentconfig.AgentLLMConfig) (llm.Provider, error) {
-	providerType, err := llm.ParseProviderType(llmAgentCfg.Provider)
+func createLLMProvider(agentCfg fileagentconfig.AgentLLMConfig) (llm.Provider, error) {
+	providerType, err := llm.ParseProviderType(agentCfg.Provider)
 	if err != nil {
 		return nil, fmt.Errorf("invalid LLM provider: %w", err)
 	}
 
-	llmCfg := llm.DefaultConfig()
-	if llmAgentCfg.APIKey != "" {
-		llmCfg.APIKey = llmAgentCfg.APIKey
-	}
-	if llmAgentCfg.BaseURL != "" {
-		llmCfg.BaseURL = llmAgentCfg.BaseURL
-	}
+	cfg := llm.DefaultConfig()
+	cfg.APIKey = cmp.Or(agentCfg.APIKey, cfg.APIKey)
+	cfg.BaseURL = cmp.Or(agentCfg.BaseURL, cfg.BaseURL)
 
-	provider, err := llm.NewProvider(providerType, llmCfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create LLM provider: %w", err)
-	}
-
-	return provider, nil
+	return llm.NewProvider(providerType, cfg)
 }
 
 // sanitizedRequestLogger wraps httplog's RequestLogger with URL sanitization
 // to redact tokens in query strings.
-func sanitizedRequestLogger(logger *httplog.Logger) func(next http.Handler) http.Handler {
-	httplogMw := httplog.RequestLogger(logger)
+func sanitizedRequestLogger(httpLogger *httplog.Logger) func(next http.Handler) http.Handler {
+	loggerMiddleware := httplog.RequestLogger(httpLogger)
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			logReq := r
-			if r.URL.RawQuery != "" && strings.Contains(r.URL.RawQuery, "token=") {
-				logReq = r.Clone(r.Context())
-				q := logReq.URL.Query()
-				if q.Has("token") {
-					q.Set("token", "[REDACTED]")
-					logReq.URL.RawQuery = q.Encode()
-					logReq.RequestURI = logReq.URL.RequestURI()
-				}
-			}
+			logReq := redactTokenFromRequest(r)
 
-			innerHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			// Pass original request to next handler, but redacted request to logger
+			passthrough := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				next.ServeHTTP(w, r)
 			})
 
-			httplogMw(innerHandler).ServeHTTP(w, logReq)
+			loggerMiddleware(passthrough).ServeHTTP(w, logReq)
 		})
 	}
+}
+
+// redactTokenFromRequest returns a request with the token query parameter redacted.
+// If no token is present, the original request is returned unchanged.
+func redactTokenFromRequest(r *http.Request) *http.Request {
+	if r.URL.RawQuery == "" || !strings.Contains(r.URL.RawQuery, "token=") {
+		return r
+	}
+
+	q := r.URL.Query()
+	if !q.Has("token") {
+		return r
+	}
+
+	redacted := r.Clone(r.Context())
+	q.Set("token", "[REDACTED]")
+	redacted.URL.RawQuery = q.Encode()
+	redacted.RequestURI = redacted.URL.RequestURI()
+
+	return redacted
 }
 
 // Serve starts the HTTP server and configures routes.
@@ -525,10 +529,10 @@ func (srv *Server) configureAPIPath() string {
 }
 
 func (srv *Server) getScheme() string {
-	if srv.config.Server.TLS != nil {
-		return "https"
+	if srv.config.Server.TLS == nil {
+		return "http"
 	}
-	return "http"
+	return "https"
 }
 
 // ensureLeadingSlash ensures the path starts with a forward slash.
@@ -545,13 +549,39 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 		return nil
 	}
 
-	basePath := srv.config.Server.BasePath
-	if evaluatedBasePath, err := cmdutil.EvalString(ctx, basePath); err != nil {
-		logger.Warn(ctx, "Failed to evaluate server base path", tag.Path(basePath), tag.Error(err))
-	} else {
-		basePath = evaluatedBasePath
+	basePath := srv.evaluateBasePath(ctx)
+	srv.setupAssetRoutes(r, basePath)
+	srv.setupOIDCRoutes(r)
+
+	oidcAuthOptions, err := srv.buildOIDCAuthOptions(ctx)
+	if err != nil {
+		return err
 	}
 
+	indexHandler := srv.useTemplate(ctx, "index.gohtml", "index")
+	r.Route("/", func(r chi.Router) {
+		if oidcAuthOptions != nil {
+			r.Use(auth.OIDCMiddleware(*oidcAuthOptions))
+		}
+		r.Get("/*", func(w http.ResponseWriter, _ *http.Request) {
+			indexHandler(w, nil)
+		})
+	})
+
+	return nil
+}
+
+func (srv *Server) evaluateBasePath(ctx context.Context) string {
+	basePath := srv.config.Server.BasePath
+	evaluated, err := cmdutil.EvalString(ctx, basePath)
+	if err != nil {
+		logger.Warn(ctx, "Failed to evaluate server base path", tag.Path(basePath), tag.Error(err))
+		return basePath
+	}
+	return evaluated
+}
+
+func (srv *Server) setupAssetRoutes(r *chi.Mux, basePath string) {
 	assetsPath := ensureLeadingSlash(path.Join(strings.TrimRight(basePath, "/"), "assets/*"))
 
 	fileServer := http.FileServer(http.FS(assetsFS))
@@ -566,40 +596,39 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 		}
 		fileServer.ServeHTTP(w, r)
 	})
+}
 
-	indexHandler := srv.useTemplate(ctx, "index.gohtml", "index")
+func (srv *Server) setupOIDCRoutes(r *chi.Mux) {
+	if srv.builtinOIDCCfg == nil {
+		return
+	}
+	r.Get("/oidc-login", auth.BuiltinOIDCLoginHandler(srv.builtinOIDCCfg))
+	r.Get("/oidc-callback", auth.BuiltinOIDCCallbackHandler(srv.builtinOIDCCfg))
+}
 
-	authConfig := srv.config.Server.Auth
-	var oidcAuthOptions *auth.Options
-	if authConfig.Mode == config.AuthModeOIDC && authConfig.OIDC.ClientId != "" && authConfig.OIDC.ClientSecret != "" && authConfig.OIDC.Issuer != "" {
-		oidcCfg, err := auth.InitVerifierAndConfig(ctx, authConfig.OIDC)
-		if err != nil {
-			return fmt.Errorf("failed to initialize OIDC: %w", err)
-		}
-		oidcAuthOptions = &auth.Options{
-			OIDCAuthEnabled: true,
-			OIDCWhitelist:   authConfig.OIDC.Whitelist,
-			OIDCProvider:    oidcCfg.Provider,
-			OIDCVerify:      oidcCfg.Verifier,
-			OIDCConfig:      oidcCfg.Config,
-		}
+func (srv *Server) buildOIDCAuthOptions(ctx context.Context) (*auth.Options, error) {
+	authCfg := srv.config.Server.Auth
+	oidcCfg := authCfg.OIDC
+
+	if authCfg.Mode != config.AuthModeOIDC {
+		return nil, nil
+	}
+	if oidcCfg.ClientId == "" || oidcCfg.ClientSecret == "" || oidcCfg.Issuer == "" {
+		return nil, nil
 	}
 
-	if srv.builtinOIDCCfg != nil {
-		r.Get("/oidc-login", auth.BuiltinOIDCLoginHandler(srv.builtinOIDCCfg))
-		r.Get("/oidc-callback", auth.BuiltinOIDCCallbackHandler(srv.builtinOIDCCfg))
+	verifierCfg, err := auth.InitVerifierAndConfig(ctx, oidcCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize OIDC: %w", err)
 	}
 
-	r.Route("/", func(r chi.Router) {
-		if oidcAuthOptions != nil {
-			r.Use(auth.OIDCMiddleware(*oidcAuthOptions))
-		}
-		r.Get("/*", func(w http.ResponseWriter, _ *http.Request) {
-			indexHandler(w, nil)
-		})
-	})
-
-	return nil
+	return &auth.Options{
+		OIDCAuthEnabled: true,
+		OIDCWhitelist:   oidcCfg.Whitelist,
+		OIDCProvider:    verifierCfg.Provider,
+		OIDCVerify:      verifierCfg.Verifier,
+		OIDCConfig:      verifierCfg.Config,
+	}, nil
 }
 
 func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV2BasePath, scheme string) error {
@@ -685,41 +714,38 @@ func (srv *Server) buildAgentAuthMiddleware(_ context.Context) func(http.Handler
 }
 
 func (srv *Server) buildAgentAuthOptions() auth.Options {
-	authConfig := srv.config.Server.Auth
+	authCfg := srv.config.Server.Auth
 
-	authOptions := auth.Options{
+	opts := auth.Options{
 		Realm:        "Dagu Agent",
-		AuthRequired: authConfig.Mode != config.AuthModeNone,
+		AuthRequired: authCfg.Mode != config.AuthModeNone,
 	}
 
-	if authConfig.Basic.Username != "" && authConfig.Basic.Password != "" {
-		authOptions.BasicAuthEnabled = true
-		authOptions.Creds = map[string]string{
-			authConfig.Basic.Username: authConfig.Basic.Password,
-		}
+	if authCfg.Basic.Username != "" && authCfg.Basic.Password != "" {
+		opts.BasicAuthEnabled = true
+		opts.Creds = map[string]string{authCfg.Basic.Username: authCfg.Basic.Password}
 	}
 
-	if authConfig.Token.Value != "" {
-		authOptions.APITokenEnabled = true
-		authOptions.APIToken = authConfig.Token.Value
+	if authCfg.Token.Value != "" {
+		opts.APITokenEnabled = true
+		opts.APIToken = authCfg.Token.Value
 	}
 
-	if authConfig.Mode == config.AuthModeBuiltin && srv.authService != nil {
-		authOptions.JWTValidator = srv.authService
+	if authCfg.Mode == config.AuthModeBuiltin && srv.authService != nil {
+		opts.JWTValidator = srv.authService
 		if srv.authService.HasAPIKeyStore() {
-			authOptions.APIKeyValidator = srv.authService
+			opts.APIKeyValidator = srv.authService
 		}
 	}
 
-	return authOptions
+	return opts
 }
 
 func (srv *Server) startServer(ctx context.Context) {
 	tlsCfg := srv.config.Server.TLS
-	hasTLS := tlsCfg != nil
 	hasListener := srv.listener != nil
 
-	if hasTLS {
+	if tlsCfg != nil {
 		logger.Info(ctx, "Starting TLS server",
 			tag.Cert(tlsCfg.CertFile), slog.String("key", tlsCfg.KeyFile),
 			slog.Bool("preBoundListener", hasListener))
@@ -727,20 +753,22 @@ func (srv *Server) startServer(ctx context.Context) {
 		logger.Info(ctx, "Starting server on pre-bound listener")
 	}
 
-	var err error
-	switch {
-	case hasListener && hasTLS:
-		err = srv.httpServer.ServeTLS(srv.listener, tlsCfg.CertFile, tlsCfg.KeyFile)
-	case hasListener:
-		err = srv.httpServer.Serve(srv.listener)
-	case hasTLS:
-		err = srv.httpServer.ListenAndServeTLS(tlsCfg.CertFile, tlsCfg.KeyFile)
-	default:
-		err = srv.httpServer.ListenAndServe()
-	}
-
+	err := srv.serveHTTP(tlsCfg, hasListener)
 	if err != nil && err != http.ErrServerClosed {
 		logger.Error(ctx, "Server failed to start or unexpected shutdown", tag.Error(err))
+	}
+}
+
+func (srv *Server) serveHTTP(tlsCfg *config.TLSConfig, hasListener bool) error {
+	switch {
+	case hasListener && tlsCfg != nil:
+		return srv.httpServer.ServeTLS(srv.listener, tlsCfg.CertFile, tlsCfg.KeyFile)
+	case hasListener:
+		return srv.httpServer.Serve(srv.listener)
+	case tlsCfg != nil:
+		return srv.httpServer.ListenAndServeTLS(tlsCfg.CertFile, tlsCfg.KeyFile)
+	default:
+		return srv.httpServer.ListenAndServe()
 	}
 }
 
@@ -750,18 +778,18 @@ func (srv *Server) ReloadAgent(ctx context.Context) error {
 		return fmt.Errorf("agent config store not available")
 	}
 
-	agentAPI, err := initAgentAPI(ctx, srv.agentConfigStore, &srv.config.Paths, srv.dagStore)
+	api, err := initAgentAPI(ctx, srv.agentConfigStore, &srv.config.Paths, srv.dagStore)
 	if err != nil {
 		return fmt.Errorf("failed to reload agent: %w", err)
 	}
 
-	srv.funcsConfig.AgentEnabled = agentAPI != nil
-	srv.agentAPI = agentAPI
+	srv.agentAPI = api
+	srv.funcsConfig.AgentEnabled = api != nil
 
-	if agentAPI != nil {
-		logger.Info(ctx, "Agent reloaded successfully")
-	} else {
+	if api == nil {
 		logger.Info(ctx, "Agent disabled")
+	} else {
+		logger.Info(ctx, "Agent reloaded successfully")
 	}
 
 	return nil

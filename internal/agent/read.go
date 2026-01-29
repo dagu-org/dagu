@@ -10,15 +10,15 @@ import (
 )
 
 const (
-	maxReadSize  = 1024 * 1024 // 1MB max file size
-	defaultLines = 2000        // Default max lines to read
+	maxReadSize      = 1024 * 1024
+	defaultLineLimit = 2000
 )
 
-// ReadToolInput is the input schema for the read tool.
+// ReadToolInput defines the input parameters for the read tool.
 type ReadToolInput struct {
 	Path   string `json:"path"`
-	Offset int    `json:"offset,omitempty"` // Line offset (1-based)
-	Limit  int    `json:"limit,omitempty"`  // Max lines to read
+	Offset int    `json:"offset,omitempty"`
+	Limit  int    `json:"limit,omitempty"`
 }
 
 // NewReadTool creates a new read tool for file reading.
@@ -65,20 +65,8 @@ func readRun(ctx ToolContext, input json.RawMessage) ToolOut {
 
 	path := resolvePath(args.Path, ctx.WorkingDir)
 
-	info, err := os.Stat(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return toolError("File not found: %s", args.Path)
-		}
-		return toolError("Failed to access file: %v", err)
-	}
-
-	if info.IsDir() {
-		return toolError("%s is a directory, not a file. Use bash with 'ls' to list directory contents.", args.Path)
-	}
-
-	if info.Size() > maxReadSize {
-		return toolError("File too large (%d bytes). Maximum size is %d bytes. Use offset and limit to read portions.", info.Size(), maxReadSize)
+	if err := validateReadableFile(path, args.Path); err != nil {
+		return err.(ToolOut)
 	}
 
 	content, err := os.ReadFile(path)
@@ -86,29 +74,55 @@ func readRun(ctx ToolContext, input json.RawMessage) ToolOut {
 		return toolError("Failed to read file: %v", err)
 	}
 
-	lines := strings.Split(string(content), "\n")
+	return formatFileContent(string(content), args.Offset, args.Limit)
+}
 
-	offset := max(0, args.Offset-1)
-	limit := defaultLines
-	if args.Limit > 0 {
-		limit = args.Limit
+func validateReadableFile(path, displayPath string) any {
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return toolError("File not found: %s", displayPath)
+		}
+		return toolError("Failed to access file: %v", err)
 	}
 
-	if offset >= len(lines) {
-		return toolError("Offset %d is beyond file length (%d lines)", args.Offset, len(lines))
+	if info.IsDir() {
+		return toolError("%s is a directory, not a file. Use bash with 'ls' to list directory contents.", displayPath)
 	}
 
-	end := min(offset+limit, len(lines))
+	if info.Size() > maxReadSize {
+		return toolError("File too large (%d bytes). Maximum size is %d bytes. Use offset and limit to read portions.", info.Size(), maxReadSize)
+	}
+
+	return nil
+}
+
+func formatFileContent(content string, offsetArg, limitArg int) ToolOut {
+	lines := strings.Split(content, "\n")
+	totalLines := len(lines)
+
+	offset := max(0, offsetArg-1)
+	limit := defaultLineLimit
+	if limitArg > 0 {
+		limit = limitArg
+	}
+
+	if offset >= totalLines {
+		return toolError("Offset %d is beyond file length (%d lines)", offsetArg, totalLines)
+	}
+
+	end := min(offset+limit, totalLines)
 	selectedLines := lines[offset:end]
 
 	var result strings.Builder
 	for i, line := range selectedLines {
 		lineNum := offset + i + 1
-		result.WriteString(fmt.Sprintf("%6d\t%s\n", lineNum, line))
+		fmt.Fprintf(&result, "%6d\t%s\n", lineNum, line)
 	}
 
-	if end < len(lines) {
-		result.WriteString(fmt.Sprintf("\n... [%d more lines, use offset=%d to continue]", len(lines)-end, end+1))
+	remainingLines := totalLines - end
+	if remainingLines > 0 {
+		fmt.Fprintf(&result, "\n... [%d more lines, use offset=%d to continue]", remainingLines, end+1)
 	}
 
 	return ToolOut{Content: result.String()}

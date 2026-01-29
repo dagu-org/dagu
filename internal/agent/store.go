@@ -8,12 +8,12 @@ import (
 // Sentinel errors for conversation store operations.
 var (
 	ErrConversationNotFound  = errors.New("conversation not found")
-	ErrInvalidConversationID = errors.New("invalid conversation ID")
-	ErrInvalidUserID         = errors.New("invalid user ID")
+	ErrInvalidConversationID = errors.New("conversation ID is invalid")
+	ErrInvalidUserID         = errors.New("user ID is invalid")
 )
 
 // ConversationStore defines the interface for conversation persistence.
-// Implementations must be safe for concurrent use.
+// All implementations must be safe for concurrent use.
 type ConversationStore interface {
 	// CreateConversation creates a new conversation.
 	// The conversation must have a valid ID and UserID.
