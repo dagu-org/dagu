@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 
 import { useAgentChatContext } from '../context/AgentChatContext';
 import { useAgentChat } from '../hooks/useAgentChat';
+import { useResizableDraggable } from '../hooks/useResizableDraggable';
 import { ConversationWithState, DAGContext } from '../types';
 import { ChatInput } from './ChatInput';
 import { ChatMessages } from './ChatMessages';
@@ -59,6 +60,7 @@ export function AgentChatModal(): ReactElement | null {
     fetchConversations,
     selectConversation,
   } = useAgentChat();
+  const { bounds, dragHandlers, resizeHandlers } = useResizableDraggable();
 
   const hasAutoSelectedRef = useRef(false);
 
@@ -117,16 +119,59 @@ export function AgentChatModal(): ReactElement | null {
   return (
     <div
       className={cn(
-        'fixed bottom-16 right-4 z-50',
-        'w-[440px] max-w-[calc(100vw-32px)]',
-        'h-[540px] max-h-[calc(100vh-100px)]',
+        'fixed z-50',
         'flex flex-col',
         'bg-popover dark:bg-zinc-950 border border-border rounded-lg overflow-hidden',
         'shadow-xl dark:shadow-[0_0_30px_rgba(0,0,0,0.6)]',
         'animate-in slide-in-from-bottom-4 fade-in-0 duration-200'
       )}
+      style={{
+        right: bounds.right,
+        bottom: bounds.bottom,
+        width: bounds.width,
+        height: bounds.height,
+        maxWidth: 'calc(100vw - 32px)',
+        maxHeight: 'calc(100vh - 100px)',
+      }}
     >
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/80">
+      {/* Resize handles */}
+      <div
+        className="absolute top-0 left-2 right-2 h-1.5 cursor-n-resize"
+        {...resizeHandlers.top}
+      />
+      <div
+        className="absolute bottom-0 left-2 right-2 h-1.5 cursor-s-resize"
+        {...resizeHandlers.bottom}
+      />
+      <div
+        className="absolute left-0 top-2 bottom-2 w-1.5 cursor-w-resize"
+        {...resizeHandlers.left}
+      />
+      <div
+        className="absolute right-0 top-2 bottom-2 w-1.5 cursor-e-resize"
+        {...resizeHandlers.right}
+      />
+      <div
+        className="absolute top-0 left-0 w-3 h-3 cursor-nw-resize"
+        {...resizeHandlers.topLeft}
+      />
+      <div
+        className="absolute top-0 right-0 w-3 h-3 cursor-ne-resize"
+        {...resizeHandlers.topRight}
+      />
+      <div
+        className="absolute bottom-0 left-0 w-3 h-3 cursor-sw-resize"
+        {...resizeHandlers.bottomLeft}
+      />
+      <div
+        className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize"
+        {...resizeHandlers.bottomRight}
+      />
+
+      <div
+        className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/80 cursor-move"
+        {...dragHandlers}
+      >
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <Terminal className="h-4 w-4 text-muted-foreground flex-shrink-0" />
           <Select
