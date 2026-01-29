@@ -13,14 +13,12 @@ import (
 
 // ConversationManager manages a single active conversation.
 // It links the Loop with SSE streaming and handles state management.
-// Based on Shelley's server/convo.go pattern.
 type ConversationManager struct {
-	id           string
-	userID       string
-	loop         *Loop
-	loopCancel   context.CancelFunc
-	loopCtx      context.Context
-	mu           sync.Mutex
+	id         string
+	userID     string
+	loop       *Loop
+	loopCancel context.CancelFunc
+	mu         sync.Mutex
 	lastActivity time.Time
 	model        string
 	messages     []Message
@@ -228,7 +226,6 @@ func (cm *ConversationManager) Cancel(ctx context.Context) error {
 	cm.mu.Lock()
 	cancel := cm.loopCancel
 	cm.loopCancel = nil
-	cm.loopCtx = nil
 	cm.loop = nil
 	cm.mu.Unlock()
 
@@ -239,13 +236,6 @@ func (cm *ConversationManager) Cancel(ctx context.Context) error {
 	cm.SetWorking(false)
 	cm.logger.Info("conversation cancelled")
 	return nil
-}
-
-// Touch updates the last activity timestamp.
-func (cm *ConversationManager) Touch() {
-	cm.mu.Lock()
-	cm.lastActivity = time.Now()
-	cm.mu.Unlock()
 }
 
 // ensureLoop creates the loop if it doesn't exist.
@@ -285,7 +275,6 @@ func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) e
 	}
 	cm.loop = loopInstance
 	cm.loopCancel = cancel
-	cm.loopCtx = loopCtx
 	cm.mu.Unlock()
 
 	go func() {

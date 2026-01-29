@@ -2,7 +2,6 @@ package agent
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/dagu-org/dagu/internal/llm"
 )
@@ -39,11 +38,11 @@ func NewNavigateTool() *AgentTool {
 func navigateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	var args NavigateToolInput
 	if err := json.Unmarshal(input, &args); err != nil {
-		return navigateError("Failed to parse input: %v", err)
+		return toolError("Failed to parse input: %v", err)
 	}
 
 	if args.Path == "" {
-		return navigateError("Path is required")
+		return toolError("Path is required")
 	}
 
 	if ctx.EmitUIAction != nil {
@@ -54,11 +53,4 @@ func navigateRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	}
 
 	return ToolOut{Content: "Navigating user to " + args.Path}
-}
-
-func navigateError(format string, args ...any) ToolOut {
-	return ToolOut{
-		Content: fmt.Sprintf(format, args...),
-		IsError: true,
-	}
 }

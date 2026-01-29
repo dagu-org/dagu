@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/llm"
@@ -57,37 +56,34 @@ func NewReadTool() *AgentTool {
 func readRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	var args ReadToolInput
 	if err := json.Unmarshal(input, &args); err != nil {
-		return readError("Failed to parse input: %v", err)
+		return toolError("Failed to parse input: %v", err)
 	}
 
 	if args.Path == "" {
-		return readError("Path is required")
+		return toolError("Path is required")
 	}
 
-	path := args.Path
-	if !filepath.IsAbs(path) && ctx.WorkingDir != "" {
-		path = filepath.Join(ctx.WorkingDir, path)
-	}
+	path := resolvePath(args.Path, ctx.WorkingDir)
 
 	info, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return readError("File not found: %s", args.Path)
+			return toolError("File not found: %s", args.Path)
 		}
-		return readError("Failed to access file: %v", err)
+		return toolError("Failed to access file: %v", err)
 	}
 
 	if info.IsDir() {
-		return readError("%s is a directory, not a file. Use bash with 'ls' to list directory contents.", args.Path)
+		return toolError("%s is a directory, not a file. Use bash with 'ls' to list directory contents.", args.Path)
 	}
 
 	if info.Size() > maxReadSize {
-		return readError("File too large (%d bytes). Maximum size is %d bytes. Use offset and limit to read portions.", info.Size(), maxReadSize)
+		return toolError("File too large (%d bytes). Maximum size is %d bytes. Use offset and limit to read portions.", info.Size(), maxReadSize)
 	}
 
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return readError("Failed to read file: %v", err)
+		return toolError("Failed to read file: %v", err)
 	}
 
 	lines := strings.Split(string(content), "\n")
@@ -99,7 +95,7 @@ func readRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	}
 
 	if offset >= len(lines) {
-		return readError("Offset %d is beyond file length (%d lines)", args.Offset, len(lines))
+		return toolError("Offset %d is beyond file length (%d lines)", args.Offset, len(lines))
 	}
 
 	end := min(offset+limit, len(lines))
@@ -116,11 +112,4 @@ func readRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	}
 
 	return ToolOut{Content: result.String()}
-}
-
-func readError(format string, args ...any) ToolOut {
-	return ToolOut{
-		Content: fmt.Sprintf(format, args...),
-		IsError: true,
-	}
 }

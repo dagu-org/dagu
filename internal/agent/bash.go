@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"os/exec"
 	"strings"
 	"time"
@@ -55,11 +54,11 @@ func NewBashTool() *AgentTool {
 func bashRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	var args BashToolInput
 	if err := json.Unmarshal(input, &args); err != nil {
-		return bashError("Failed to parse input: %v", err)
+		return toolError("Failed to parse input: %v", err)
 	}
 
 	if args.Command == "" {
-		return bashError("Command is required")
+		return toolError("Command is required")
 	}
 
 	timeout := calcTimeout(args.Timeout)
@@ -80,9 +79,9 @@ func bashRun(ctx ToolContext, input json.RawMessage) ToolOut {
 
 	if err != nil {
 		if cmdCtx.Err() == context.DeadlineExceeded {
-			return bashError("Command timed out after %v\n%s", timeout, output)
+			return toolError("Command timed out after %v\n%s", timeout, output)
 		}
-		return bashError("Command failed: %v\n%s", err, output)
+		return toolError("Command failed: %v\n%s", err, output)
 	}
 
 	if output == "" {
@@ -122,11 +121,4 @@ func truncateOutput(s string) string {
 		return s[:maxOutputLength] + "\n... [output truncated]"
 	}
 	return s
-}
-
-func bashError(format string, args ...any) ToolOut {
-	return ToolOut{
-		Content: fmt.Sprintf(format, args...),
-		IsError: true,
-	}
 }

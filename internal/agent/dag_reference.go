@@ -2,7 +2,6 @@ package agent
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/llm"
@@ -283,20 +282,13 @@ steps:
 func dagReferenceRun(_ ToolContext, input json.RawMessage) ToolOut {
 	var params DagReferenceInput
 	if err := json.Unmarshal(input, &params); err != nil {
-		return dagRefError("Failed to parse input: %v", err)
+		return toolError("Failed to parse input: %v", err)
 	}
 
 	content, ok := dagReferenceSections[strings.ToLower(params.Section)]
 	if !ok {
-		return dagRefError("Unknown section: %s. Available: overview, steps, executors, containers, subdags, examples", params.Section)
+		return toolError("Unknown section: %s. Available: overview, steps, executors, containers, subdags, examples", params.Section)
 	}
 
 	return ToolOut{Content: content}
-}
-
-func dagRefError(format string, args ...any) ToolOut {
-	return ToolOut{
-		Content: fmt.Sprintf(format, args...),
-		IsError: true,
-	}
 }

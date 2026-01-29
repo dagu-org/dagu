@@ -16,8 +16,6 @@ const (
 	MessageTypeUser MessageType = "user"
 	// MessageTypeAssistant is a message from the AI assistant.
 	MessageTypeAssistant MessageType = "assistant"
-	// MessageTypeSystem is a system message (e.g., system prompt).
-	MessageTypeSystem MessageType = "system"
 	// MessageTypeError is an error message.
 	MessageTypeError MessageType = "error"
 	// MessageTypeUIAction is a UI action message (e.g., navigate to page).
@@ -114,8 +112,6 @@ type ToolOut struct {
 	Content string
 	// IsError indicates tool execution failure.
 	IsError bool
-	// Display is optional UI content (e.g., rendered output).
-	Display any
 }
 
 // ToolFunc is the function signature for tool execution.

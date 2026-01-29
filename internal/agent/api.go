@@ -39,7 +39,6 @@ type API struct {
 	logger        *slog.Logger
 	dagStore      exec.DAGStore // For resolving DAG file paths
 	environment   EnvironmentInfo
-	mu            sync.Mutex
 }
 
 // APIConfig contains configuration for the API.
@@ -213,7 +212,9 @@ func (a *API) formatMessage(ctx context.Context, message string, contexts []DAGC
 func (a *API) respondJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		slog.Error("failed to encode JSON response", "error", err)
+	}
 }
 
 // handleNewConversation creates a new conversation and sends the first message.
@@ -380,7 +381,7 @@ func (a *API) getStoredConversation(ctx context.Context, id, userID string) (*Co
 	}
 
 	conv, err := a.store.GetConversation(ctx, id)
-	if err != nil || conv.UserID != userID {
+	if err != nil || conv == nil || conv.UserID != userID {
 		return nil, nil, false
 	}
 
@@ -446,7 +447,7 @@ func (a *API) reactivateConversation(ctx context.Context, id, userID string) (*C
 	}
 
 	conv, err := a.store.GetConversation(ctx, id)
-	if err != nil || conv.UserID != userID {
+	if err != nil || conv == nil || conv.UserID != userID {
 		return nil, false
 	}
 
@@ -511,7 +512,11 @@ func (a *API) setupSSEHeaders(w http.ResponseWriter) {
 
 // sendSSEMessage sends a single SSE message to the client.
 func (a *API) sendSSEMessage(w http.ResponseWriter, data any) {
-	jsonData, _ := json.Marshal(data)
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		slog.Error("failed to marshal SSE data", "error", err)
+		return
+	}
 	fmt.Fprintf(w, "data: %s\n\n", jsonData)
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()
@@ -550,27 +555,6 @@ func (a *API) handleCancel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.respondJSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
-}
-
-// CleanupOldConversations removes conversations that haven't been active for the given duration.
-func (a *API) CleanupOldConversations(maxAge time.Duration) {
-	threshold := time.Now().Add(-maxAge)
-
-	a.conversations.Range(func(key, value any) bool {
-		id := key.(string)
-		mgr := value.(*ConversationManager)
-
-		mgr.mu.Lock()
-		lastActivity := mgr.lastActivity
-		mgr.mu.Unlock()
-
-		if lastActivity.Before(threshold) {
-			mgr.Cancel(nil)
-			a.conversations.Delete(id)
-			a.logger.Info("Cleaned up old conversation", "id", id)
-		}
-		return true
-	})
 }
 
 // helper function

@@ -41,7 +41,6 @@ type LoopConfig struct {
 }
 
 // Loop manages a conversation turn with an LLM including tool execution.
-// Based on Shelley's loop/loop.go pattern.
 type Loop struct {
 	provider       llm.Provider
 	model          string
@@ -89,22 +88,6 @@ func (l *Loop) QueueUserMessage(message llm.Message) {
 	defer l.mu.Unlock()
 	l.messageQueue = append(l.messageQueue, message)
 	l.logger.Debug("queued user message", "content_length", len(message.Content))
-}
-
-// GetUsage returns the total usage accumulated by this loop.
-func (l *Loop) GetUsage() llm.Usage {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return l.totalUsage
-}
-
-// GetHistory returns a copy of the current conversation history.
-func (l *Loop) GetHistory() []llm.Message {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	historyCopy := make([]llm.Message, len(l.history))
-	copy(historyCopy, l.history)
-	return historyCopy
 }
 
 // Go runs the conversation loop until the context is canceled.

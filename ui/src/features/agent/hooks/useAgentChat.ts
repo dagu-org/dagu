@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useConfig } from '@/contexts/ConfigContext';
+import { TOKEN_KEY } from '@/contexts/AuthContext';
 import { useAgentChatContext } from '../context/AgentChatContext';
 import {
   ChatRequest,
@@ -9,8 +10,6 @@ import {
   NewConversationResponse,
   StreamResponse,
 } from '../types';
-
-const TOKEN_KEY = 'dagu_auth_token';
 
 function getAuthToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -51,6 +50,8 @@ function buildStreamUrl(baseUrl: string, conversationId: string): string {
   return url.toString();
 }
 
+const MAX_SSE_RETRIES = 3;
+
 export function useAgentChat() {
   const config = useConfig();
   const navigate = useNavigate();
@@ -68,6 +69,7 @@ export function useAgentChat() {
   } = useAgentChatContext();
 
   const eventSourceRef = useRef<EventSource | null>(null);
+  const retryCountRef = useRef(0);
   const [isSending, setIsSending] = useState(false);
   const baseUrl = `${config.apiURL}/agent`;
 
@@ -96,6 +98,7 @@ export function useAgentChat() {
     eventSource.onmessage = (event) => {
       try {
         const data: StreamResponse = JSON.parse(event.data);
+        retryCountRef.current = 0; // Reset retry count on successful message
 
         data.messages?.forEach((msg) => {
           addMessage(msg);
@@ -114,7 +117,8 @@ export function useAgentChat() {
 
     eventSource.onerror = (err) => {
       console.error('SSE error:', err);
-      if (eventSource.readyState === EventSource.CLOSED) {
+      if (eventSource.readyState === EventSource.CLOSED && retryCountRef.current < MAX_SSE_RETRIES) {
+        retryCountRef.current++;
         setTimeout(() => {
           if (conversationId && eventSourceRef.current === eventSource) {
             setConversationId(conversationId);
