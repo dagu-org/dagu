@@ -35,7 +35,8 @@ export function ChatInput({
       return;
     }
     if (isPending) {
-      const timer = setTimeout(() => setIsPending(false), 500);
+      // Use longer timeout to ensure SSE has time to confirm working state
+      const timer = setTimeout(() => setIsPending(false), 3000);
       return () => clearTimeout(timer);
     }
   }, [isWorking, isPending]);

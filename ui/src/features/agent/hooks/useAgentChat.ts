@@ -158,6 +158,18 @@ export function useAgentChat() {
     async (message: string, model?: string, dagContexts?: DAGContext[]): Promise<void> => {
       setIsSending(true);
       setError(null);
+
+      // Optimistic update - show user message immediately
+      const optimisticMessage = {
+        id: `optimistic-${Date.now()}`,
+        conversation_id: conversationId || '',
+        type: 'user' as const,
+        sequence_id: Date.now(),
+        content: message,
+        created_at: new Date().toISOString(),
+      };
+      addMessage(optimisticMessage);
+
       try {
         if (!conversationId) {
           await startConversation(message, model, dagContexts);
@@ -175,7 +187,7 @@ export function useAgentChat() {
         setIsSending(false);
       }
     },
-    [baseUrl, conversationId, startConversation]
+    [baseUrl, conversationId, startConversation, addMessage]
   );
 
   const cancelConversation = useCallback(async (): Promise<void> => {

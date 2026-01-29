@@ -286,6 +286,7 @@ func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) e
 	}
 
 	go func() {
+		defer cm.clearLoop() // Reset loop state when goroutine exits
 		if err := loopInstance.Go(loopCtx); err != nil && err != context.Canceled {
 			cm.logger.Error("conversation loop stopped", "error", err)
 		}
