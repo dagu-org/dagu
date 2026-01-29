@@ -6,7 +6,7 @@ import (
 )
 
 // CreateTools returns all available tools for the agent including bash, read,
-// patch, think, navigate, and DAG reference tools.
+// patch, think, navigate, and schema tools.
 func CreateTools() []*AgentTool {
 	return []*AgentTool{
 		NewBashTool(),
@@ -14,7 +14,7 @@ func CreateTools() []*AgentTool {
 		NewPatchTool(),
 		NewThinkTool(),
 		NewNavigateTool(),
-		NewDagReferenceTool(),
+		NewReadSchemaTool(),
 	}
 }
 
