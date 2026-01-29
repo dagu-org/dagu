@@ -232,6 +232,41 @@ func (cm *ConversationManager) Subscribe(ctx context.Context) func() (StreamResp
 	return cm.subpub.Subscribe(ctx, lastSeq)
 }
 
+// SubscribeWithSnapshot atomically subscribes and returns the current state.
+// This prevents race conditions where messages could be missed between
+// getting the initial state and subscribing.
+func (cm *ConversationManager) SubscribeWithSnapshot(ctx context.Context) (StreamResponse, func() (StreamResponse, bool)) {
+	cm.mu.Lock()
+	// Get snapshot while holding lock
+	msgs := make([]Message, len(cm.messages))
+	copy(msgs, cm.messages)
+	lastSeq := cm.sequenceID
+	working := cm.working
+	model := cm.model
+	conv := Conversation{
+		ID:        cm.id,
+		UserID:    cm.userID,
+		CreatedAt: cm.lastActivity,
+		UpdatedAt: cm.lastActivity,
+	}
+	cm.mu.Unlock()
+
+	// Subscribe with the same sequence we captured
+	next := cm.subpub.Subscribe(ctx, lastSeq)
+
+	snapshot := StreamResponse{
+		Messages:     msgs,
+		Conversation: &conv,
+		ConversationState: &ConversationState{
+			ConversationID: cm.id,
+			Working:        working,
+			Model:          model,
+		},
+	}
+
+	return snapshot, next
+}
+
 // Cancel stops the conversation loop.
 func (cm *ConversationManager) Cancel(_ context.Context) error {
 	cancel := cm.clearLoop()
@@ -286,9 +321,19 @@ func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) e
 	}
 
 	go func() {
-		defer cm.clearLoop() // Reset loop state when goroutine exits
-		if err := loopInstance.Go(loopCtx); err != nil && err != context.Canceled {
-			cm.logger.Error("conversation loop stopped", "error", err)
+		defer func() {
+			if r := recover(); r != nil {
+				cm.logger.Error("conversation loop panicked", "panic", r)
+			}
+			cm.logger.Info("conversation loop goroutine exiting")
+			cm.clearLoop()
+		}()
+		if err := loopInstance.Go(loopCtx); err != nil {
+			if err == context.Canceled {
+				cm.logger.Info("conversation loop canceled normally")
+			} else {
+				cm.logger.Error("conversation loop stopped with error", "error", err)
+			}
 		}
 	}()
 

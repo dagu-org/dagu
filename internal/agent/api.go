@@ -526,9 +526,12 @@ func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.setupSSEHeaders(w)
-	a.sendSSEMessage(w, a.buildStreamResponse(id, mgr))
 
-	next := mgr.Subscribe(r.Context())
+	// Use atomic subscribe+snapshot to prevent race condition
+	// where messages could be missed between getting initial state and subscribing
+	snapshot, next := mgr.SubscribeWithSnapshot(r.Context())
+	a.sendSSEMessage(w, snapshot)
+
 	for {
 		resp, cont := next()
 		if !cont {

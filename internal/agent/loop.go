@@ -87,7 +87,7 @@ func (l *Loop) QueueUserMessage(message llm.Message) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.messageQueue = append(l.messageQueue, message)
-	l.logger.Debug("queued user message", "content_length", len(message.Content))
+	l.logger.Info("queued user message", "queue_size", len(l.messageQueue))
 }
 
 // Go runs the conversation loop until the context is canceled.
@@ -116,13 +116,13 @@ func (l *Loop) Go(ctx context.Context) error {
 		l.mu.Unlock()
 
 		if hasQueuedMessages {
-			l.logger.Debug("processing queued messages")
+			l.logger.Info("processing queued messages", "history_count", len(l.history))
 			if err := l.processLLMRequest(ctx); err != nil {
 				l.logger.Error("failed to process LLM request", "error", err)
 				time.Sleep(time.Second)
 				continue
 			}
-			l.logger.Debug("finished processing queued messages")
+			l.logger.Info("finished processing queued messages")
 		} else {
 			select {
 			case <-ctx.Done():
@@ -177,7 +177,7 @@ func (l *Loop) processLLMRequest(ctx context.Context) error {
 	l.recordAssistantMessage(ctx, resp)
 
 	if len(resp.ToolCalls) > 0 {
-		l.logger.Debug("handling tool calls", "count", len(resp.ToolCalls))
+		l.logger.Info("handling tool calls", "count", len(resp.ToolCalls))
 		return l.handleToolCalls(ctx, resp.ToolCalls)
 	}
 
