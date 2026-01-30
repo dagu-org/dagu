@@ -43,7 +43,9 @@ export function ChatInput({
 
   const handleSend = useCallback(() => {
     const trimmed = message.trim();
-    if (!trimmed || showPauseButton || disabled) {
+    // Allow sending while working (isWorking=true) - message will be queued
+    // Only block during brief isPending state or when disabled
+    if (!trimmed || isPending || disabled) {
       return;
     }
 
@@ -59,7 +61,7 @@ export function ChatInput({
 
     onSend(trimmed, allContexts.length > 0 ? allContexts : undefined);
     setMessage('');
-  }, [message, showPauseButton, disabled, onSend, selectedDags, currentPageDag]);
+  }, [message, isPending, disabled, onSend, selectedDags, currentPageDag]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
