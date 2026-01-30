@@ -203,7 +203,7 @@ func (l *Loop) appendToHistory(msg llm.Message) int64 {
 }
 
 // executeTool runs a single tool call and returns the result.
-func (l *Loop) executeTool(tc llm.ToolCall) ToolOut {
+func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 	tool := GetToolByName(l.tools, tc.Function.Name)
 	if tool == nil {
 		l.logger.Error("tool not found", "name", tc.Function.Name)
@@ -216,6 +216,7 @@ func (l *Loop) executeTool(tc llm.ToolCall) ToolOut {
 	}
 
 	return tool.Run(ToolContext{
+		Context:      ctx,
 		WorkingDir:   l.workingDir,
 		EmitUIAction: l.emitUIAction,
 	}, input)
@@ -225,7 +226,7 @@ func (l *Loop) executeTool(tc llm.ToolCall) ToolOut {
 func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) error {
 	for _, tc := range toolCalls {
 		l.logger.Debug("executing tool", "name", tc.Function.Name, "id", tc.ID)
-		l.recordToolResult(ctx, tc, l.executeTool(tc))
+		l.recordToolResult(ctx, tc, l.executeTool(ctx, tc))
 	}
 	return l.processLLMRequest(ctx)
 }

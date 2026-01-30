@@ -2,6 +2,7 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -154,6 +155,8 @@ type UIActionFunc func(action UIAction)
 
 // ToolContext provides context for tool execution.
 type ToolContext struct {
+	// Context is the parent context for cancellation propagation.
+	Context context.Context
 	// WorkingDir is the current working directory for the tool.
 	WorkingDir string
 	// EmitUIAction is a callback to emit UI actions during execution.

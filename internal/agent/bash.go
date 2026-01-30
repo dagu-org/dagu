@@ -61,7 +61,11 @@ func bashRun(toolCtx ToolContext, input json.RawMessage) ToolOut {
 	}
 
 	timeout := resolveTimeout(args.Timeout)
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	parentCtx := toolCtx.Context
+	if parentCtx == nil {
+		parentCtx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parentCtx, timeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "bash", "-c", args.Command)
