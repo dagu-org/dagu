@@ -17,6 +17,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
@@ -54,7 +55,7 @@ type API struct {
 	syncService        SyncService
 	tunnelService      *tunnel.Service
 	dagWritesDisabled bool // True when git sync read-only mode is active
-	agentConfigStore  AgentConfigStore
+	agentConfigStore  *fileagentconfig.Store
 }
 
 // AuthService defines the interface for authentication operations.
@@ -121,8 +122,8 @@ func WithTunnelService(ts *tunnel.Service) APIOption {
 	}
 }
 
-// WithAgentConfigStore returns an APIOption that sets the API's AgentConfigStore.
-func WithAgentConfigStore(store AgentConfigStore) APIOption {
+// WithAgentConfigStore returns an APIOption that sets the API's agent config store.
+func WithAgentConfigStore(store *fileagentconfig.Store) APIOption {
 	return func(a *API) {
 		a.agentConfigStore = store
 	}

@@ -11,12 +11,6 @@ import (
 	"github.com/dagu-org/dagu/internal/service/audit"
 )
 
-// AgentConfigStore defines the interface for agent configuration storage.
-type AgentConfigStore interface {
-	Load(ctx context.Context) (*fileagentconfig.AgentConfig, error)
-	Save(ctx context.Context, cfg *fileagentconfig.AgentConfig) error
-}
-
 var (
 	errAgentConfigNotAvailable = &Error{
 		Code:       api.ErrorCodeForbidden,
