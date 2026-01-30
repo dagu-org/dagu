@@ -13,9 +13,13 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/llm"
 )
+
+// Verify Store implements agent.ConfigStore at compile time.
+var _ agent.ConfigStore = (*Store)(nil)
 
 const (
 	configFileName  = "config.json"
