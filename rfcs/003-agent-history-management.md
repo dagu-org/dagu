@@ -1,6 +1,7 @@
 ---
 id: "003"
 title: "Agent Conversation History Management"
+status: draft
 ---
 
 # RFC 003: Agent Conversation History Management

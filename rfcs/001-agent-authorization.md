@@ -1,6 +1,7 @@
 ---
 id: "001"
 title: "Agent Authorization"
+status: draft
 ---
 
 # RFC 001: Agent Authorization
