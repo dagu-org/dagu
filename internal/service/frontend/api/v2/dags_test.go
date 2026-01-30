@@ -253,7 +253,7 @@ steps:
 		name := "inline_enqueue_spec"
 
 		resp := server.Client().Post("/api/v2/dag-runs/enqueue", api.EnqueueDAGRunFromSpecJSONRequestBody{
-			Spec: spec,
+			Spec: &spec,
 			Name: &name,
 		}).
 			ExpectStatus(http.StatusOK).

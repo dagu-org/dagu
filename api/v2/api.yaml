@@ -1611,8 +1611,9 @@ paths:
                 url:
                   type: string
                   description: "Filepath of DAG to run it only with given path"
-              required:
-                - spec
+              oneOf:
+                 - required: [spec]
+                 - required: [url]
       responses:
         "200":
           description: "DAG-run successfully enqueued"

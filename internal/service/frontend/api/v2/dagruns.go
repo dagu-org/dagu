@@ -157,7 +157,7 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 		}
 	}
 
-	if request.Body.Spec == "" && request.Body.Url == nil || request.Body.Spec != "" && request.Body.Url != nil {
+	if *request.Body.Spec == "" && request.Body.Url == nil || *request.Body.Spec != "" && request.Body.Url != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeBadRequest,
@@ -183,16 +183,40 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 	}
 
 	var finalSpec string
+	baseDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("Can't get User's Home Directory")
+	}
 	if strings.HasPrefix(fileurl, "file:///") {
 		_, url, _ := strings.Cut(fileurl, "file://")
+		cleanPath := filepath.Clean(url)
 
-		data, err := os.ReadFile(url)
+		// Join with base directory
+		fullPath := filepath.Join(baseDir, cleanPath)
+
+		// Ensure the final path is still inside baseDir
+		if !strings.HasPrefix(fullPath, filepath.Clean(baseDir)+string(os.PathSeparator)) {
+			return nil, fmt.Errorf("invalid file path")
+		}
+		const maxSpecBytes = 1 << 20
+		info, err := os.Stat(url)
+		if err != nil {
+			return nil, fmt.Errorf("error stating file: %w", err)
+		}
+		if info.Size() > maxSpecBytes {
+			return nil, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "spec file too large",
+			}
+		}
+		data, err := os.ReadFile(fullPath)
 		if err != nil {
 			return nil, fmt.Errorf("Error reading file: %w", err)
 		}
 		finalSpec = string(data)
-	} else if request.Body.Spec != "" {
-		finalSpec = request.Body.Spec
+	} else if *request.Body.Spec != "" {
+		finalSpec = *request.Body.Spec
 	} else {
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,
