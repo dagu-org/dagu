@@ -3,14 +3,61 @@ package agent
 import (
 	"context"
 	"errors"
+
+	"github.com/dagu-org/dagu/internal/llm"
 )
 
-// Sentinel errors for conversation store operations.
+// Sentinel errors for store operations.
 var (
 	ErrConversationNotFound  = errors.New("conversation not found")
 	ErrInvalidConversationID = errors.New("invalid conversation ID")
 	ErrInvalidUserID         = errors.New("invalid user ID")
 )
+
+// Default configuration values.
+const (
+	DefaultProvider = "anthropic"
+	DefaultModel    = "claude-sonnet-4-5"
+)
+
+// Config holds the configuration for the AI agent feature.
+type Config struct {
+	Enabled bool      `json:"enabled"`
+	LLM     LLMConfig `json:"llm"`
+}
+
+// LLMConfig holds LLM provider configuration for the agent.
+// Supported providers: anthropic, openai, gemini, openrouter, or local.
+type LLMConfig struct {
+	Provider string `json:"provider"`
+	Model    string `json:"model"`
+	APIKey   string `json:"apiKey"`
+	BaseURL  string `json:"baseUrl,omitempty"`
+}
+
+// DefaultConfig returns the default agent configuration.
+func DefaultConfig() *Config {
+	return &Config{
+		Enabled: true,
+		LLM: LLMConfig{
+			Provider: DefaultProvider,
+			Model:    DefaultModel,
+		},
+	}
+}
+
+// ConfigStore provides access to agent configuration.
+// All implementations must be safe for concurrent use.
+type ConfigStore interface {
+	// Load reads the agent configuration.
+	Load(ctx context.Context) (*Config, error)
+	// Save writes the agent configuration.
+	Save(ctx context.Context, cfg *Config) error
+	// IsEnabled returns whether the agent feature is enabled.
+	IsEnabled(ctx context.Context) bool
+	// GetProvider returns the LLM provider and model name.
+	GetProvider(ctx context.Context) (llm.Provider, string, error)
+}
 
 // ConversationStore defines the interface for conversation persistence.
 // All implementations must be safe for concurrent use.

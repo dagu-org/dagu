@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"github.com/dagu-org/dagu/api/v2"
+	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
 	"github.com/dagu-org/dagu/internal/service/audit"
 )
 
@@ -105,7 +105,7 @@ func (a *API) logAgentAudit(ctx context.Context, action string, details map[stri
 	_ = a.auditService.Log(ctx, entry)
 }
 
-func toAgentConfigResponse(cfg *fileagentconfig.AgentConfig) api.AgentConfigResponse {
+func toAgentConfigResponse(cfg *agent.Config) api.AgentConfigResponse {
 	return api.AgentConfigResponse{
 		Enabled: ptrOf(cfg.Enabled),
 		Llm: &api.AgentLLMConfig{
@@ -117,7 +117,7 @@ func toAgentConfigResponse(cfg *fileagentconfig.AgentConfig) api.AgentConfigResp
 	}
 }
 
-func applyAgentConfigUpdates(cfg *fileagentconfig.AgentConfig, update *api.UpdateAgentConfigRequest) {
+func applyAgentConfigUpdates(cfg *agent.Config, update *api.UpdateAgentConfigRequest) {
 	if update.Enabled != nil {
 		cfg.Enabled = *update.Enabled
 	}

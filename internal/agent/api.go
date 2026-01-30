@@ -13,7 +13,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -28,16 +27,6 @@ func getUserIDFromContext(ctx context.Context) string {
 		return user.ID
 	}
 	return defaultUserID
-}
-
-// ConfigStore provides access to agent configuration.
-// The implementation should handle caching and provide thread-safe access.
-type ConfigStore interface {
-	// IsEnabled returns whether the agent feature is enabled.
-	IsEnabled(ctx context.Context) bool
-	// GetProvider returns the LLM provider and model name.
-	// Returns error if agent is disabled or provider cannot be created.
-	GetProvider(ctx context.Context) (llm.Provider, string, error)
 }
 
 // API handles HTTP requests for the agent.

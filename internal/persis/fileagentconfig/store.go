@@ -43,7 +43,7 @@ const (
 type Store struct {
 	baseDir       string
 	mu            sync.RWMutex
-	configCache   *fileutil.Cache[*AgentConfig]
+	configCache   *fileutil.Cache[*agent.Config]
 	providerCache *providerCache
 }
 
@@ -51,7 +51,7 @@ type Store struct {
 type Option func(*Store)
 
 // WithConfigCache sets the config cache for the store.
-func WithConfigCache(cache *fileutil.Cache[*AgentConfig]) Option {
+func WithConfigCache(cache *fileutil.Cache[*agent.Config]) Option {
 	return func(s *Store) {
 		s.configCache = cache
 	}
@@ -69,7 +69,7 @@ func newProviderCache() *providerCache {
 	return &providerCache{}
 }
 
-func (c *providerCache) get(llmCfg AgentLLMConfig) (llm.Provider, string, error) {
+func (c *providerCache) get(llmCfg agent.LLMConfig) (llm.Provider, string, error) {
 	hash := hashLLMConfig(llmCfg)
 
 	c.mu.RLock()
@@ -99,14 +99,14 @@ func (c *providerCache) get(llmCfg AgentLLMConfig) (llm.Provider, string, error)
 }
 
 // hashLLMConfig creates a hash of the LLM config for cache invalidation.
-func hashLLMConfig(cfg AgentLLMConfig) string {
+func hashLLMConfig(cfg agent.LLMConfig) string {
 	data := fmt.Sprintf("%s:%s:%s:%s", cfg.Provider, cfg.Model, cfg.APIKey, cfg.BaseURL)
 	hash := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(hash[:8])
 }
 
 // createLLMProvider creates an LLM provider from the config.
-func createLLMProvider(agentCfg AgentLLMConfig) (llm.Provider, error) {
+func createLLMProvider(agentCfg agent.LLMConfig) (llm.Provider, error) {
 	providerType, err := llm.ParseProviderType(agentCfg.Provider)
 	if err != nil {
 		return nil, fmt.Errorf("invalid LLM provider: %w", err)
@@ -148,7 +148,7 @@ func New(dataDir string, opts ...Option) (*Store, error) {
 // If the file doesn't exist, returns the default configuration.
 // Priority: Environment variables > JSON file > Defaults
 // Uses cache if available to avoid reading file on every request.
-func (s *Store) Load(_ context.Context) (*AgentConfig, error) {
+func (s *Store) Load(_ context.Context) (*agent.Config, error) {
 	if s.configCache != nil {
 		return s.configCache.LoadLatest(s.configPath(), s.loadFromFile)
 	}
@@ -156,11 +156,11 @@ func (s *Store) Load(_ context.Context) (*AgentConfig, error) {
 }
 
 // loadFromFile reads config directly from file.
-func (s *Store) loadFromFile() (*AgentConfig, error) {
+func (s *Store) loadFromFile() (*agent.Config, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	cfg := DefaultConfig()
+	cfg := agent.DefaultConfig()
 
 	data, err := os.ReadFile(s.configPath())
 	if err == nil {
@@ -201,7 +201,7 @@ func (s *Store) GetProvider(ctx context.Context) (llm.Provider, string, error) {
 
 // Save writes the agent configuration to the JSON file.
 // Uses atomic write (temp file + rename) to prevent corruption.
-func (s *Store) Save(_ context.Context, cfg *AgentConfig) error {
+func (s *Store) Save(_ context.Context, cfg *agent.Config) error {
 	if cfg == nil {
 		return errors.New("fileagentconfig: config cannot be nil")
 	}
@@ -213,7 +213,7 @@ func (s *Store) Save(_ context.Context, cfg *AgentConfig) error {
 }
 
 // writeConfigToFile writes the config to a JSON file atomically.
-func (s *Store) writeConfigToFile(filePath string, cfg *AgentConfig) error {
+func (s *Store) writeConfigToFile(filePath string, cfg *agent.Config) error {
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return fmt.Errorf("fileagentconfig: failed to marshal config: %w", err)
@@ -248,7 +248,7 @@ func (s *Store) configPath() string {
 
 // applyEnvOverrides applies environment variable overrides to the config.
 // Environment variables take precedence over JSON file values.
-func applyEnvOverrides(cfg *AgentConfig) {
+func applyEnvOverrides(cfg *agent.Config) {
 	if v := os.Getenv(envAgentEnabled); v != "" {
 		if enabled, err := strconv.ParseBool(v); err == nil {
 			cfg.Enabled = enabled
