@@ -48,46 +48,26 @@ export function JsonPatchViewer({ patch }: JsonPatchViewerProps): React.ReactNod
   );
 }
 
+const DIFF_STYLES = {
+  prefix: { addition: '+', deletion: '-', context: ' ' },
+  light: {
+    bg: { addition: '#d1fae5', deletion: '#fee2e2', context: 'transparent' },
+    text: { addition: '#14532d', deletion: '#7f1d1d', context: 'inherit' },
+  },
+  dark: {
+    bg: { addition: 'rgba(34,197,94,0.1)', deletion: 'rgba(239,68,68,0.1)', context: 'transparent' },
+    text: { addition: '#4ade80', deletion: '#f87171', context: 'inherit' },
+  },
+} as const;
+
 function DiffLineRow({ line, isDark }: { line: DiffLine; isDark: boolean }): React.ReactNode {
-  const prefix = {
-    addition: '+',
-    deletion: '-',
-    context: ' ',
-  };
-
-  const bgColor = {
-    addition: '#d1fae5', // green-100
-    deletion: '#fee2e2', // red-100
-    context: 'transparent',
-  };
-
-  const darkBgColor = {
-    addition: 'rgba(34, 197, 94, 0.1)',
-    deletion: 'rgba(239, 68, 68, 0.1)',
-    context: 'transparent',
-  };
-
-  const textColor = {
-    addition: '#14532d', // green-900
-    deletion: '#7f1d1d', // red-900
-    context: 'inherit',
-  };
-
-  const darkTextColor = {
-    addition: '#4ade80', // green-400
-    deletion: '#f87171', // red-400
-    context: 'inherit',
-  };
-
+  const theme = isDark ? DIFF_STYLES.dark : DIFF_STYLES.light;
   return (
     <div
       className="px-2 py-0.5 whitespace-pre"
-      style={{
-        backgroundColor: isDark ? darkBgColor[line.type] : bgColor[line.type],
-        color: isDark ? darkTextColor[line.type] : textColor[line.type],
-      }}
+      style={{ backgroundColor: theme.bg[line.type], color: theme.text[line.type] }}
     >
-      <span className="select-none mr-1">{prefix[line.type]}</span>
+      <span className="select-none mr-1">{DIFF_STYLES.prefix[line.type]}</span>
       {line.content}
     </div>
   );

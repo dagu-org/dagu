@@ -212,15 +212,8 @@ function parseToolArguments(jsonString: string): Record<string, unknown> {
   }
 }
 
-function ToolCallBadge({
-  toolCall,
-}: {
-  toolCall: ToolCall;
-}): React.ReactNode {
-  const [expanded, setExpanded] = useState(false);
-  const args = parseToolArguments(toolCall.function.arguments);
-
-  // Check if arguments represent a JSON patch (has old_string/new_string)
+function ToolCallBadge({ toolCall }: { toolCall: ToolCall }): React.ReactNode {
+  const [expanded, setExpanded] = useState(true);
   const jsonPatch = useMemo(() => isJsonPatch(toolCall.function.arguments), [toolCall.function.arguments]);
 
   return (
@@ -231,9 +224,7 @@ function ToolCallBadge({
       >
         <Terminal className="h-3 w-3 text-muted-foreground" />
         <span className="font-mono font-medium">{toolCall.function.name}</span>
-        <span className="text-muted-foreground ml-auto">
-          {expanded ? '[-]' : '[+]'}
-        </span>
+        <span className="text-muted-foreground ml-auto">{expanded ? '[-]' : '[+]'}</span>
       </button>
       {expanded && (
         <div className="px-2 py-1.5 border-t border-border bg-card dark:bg-surface">
@@ -241,7 +232,7 @@ function ToolCallBadge({
             <JsonPatchViewer patch={jsonPatch} />
           ) : (
             <pre className="text-xs overflow-x-auto whitespace-pre-wrap break-words">
-              {JSON.stringify(args, null, 2)}
+              {JSON.stringify(parseToolArguments(toolCall.function.arguments), null, 2)}
             </pre>
           )}
         </div>
