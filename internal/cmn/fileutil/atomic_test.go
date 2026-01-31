@@ -3,6 +3,7 @@ package fileutil
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -49,11 +50,14 @@ func TestWriteFileAtomic(t *testing.T) {
 		t.Parallel()
 		err := WriteFileAtomic("/nonexistent/dir/file.txt", []byte("data"), 0600)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to write temp file")
+		assert.Contains(t, err.Error(), "failed to create temp file")
 	})
 
 	t.Run("sets correct permissions", func(t *testing.T) {
 		t.Parallel()
+		if runtime.GOOS == "windows" {
+			t.Skip("Unix file permissions not applicable on Windows")
+		}
 		dir := t.TempDir()
 		filePath := filepath.Join(dir, "test.txt")
 
@@ -116,6 +120,6 @@ func TestWriteJSONAtomic(t *testing.T) {
 		t.Parallel()
 		err := WriteJSONAtomic("/nonexistent/dir/file.json", "data", 0600)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to write temp file")
+		assert.Contains(t, err.Error(), "failed to create temp file")
 	})
 }

@@ -3,7 +3,10 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -35,8 +38,22 @@ type SearchResult struct {
 	Description string
 }
 
+// HTTPDoer is an interface for HTTP clients to enable testing.
+type HTTPDoer interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 // NewWebSearchTool creates a new web search tool for internet search.
 func NewWebSearchTool() *AgentTool {
+	return newWebSearchToolInternal(nil, "")
+}
+
+// NewWebSearchToolWithClient creates a web search tool with a custom HTTP client for testing.
+func NewWebSearchToolWithClient(client HTTPDoer, baseURL string) *AgentTool {
+	return newWebSearchToolInternal(client, baseURL)
+}
+
+func newWebSearchToolInternal(client HTTPDoer, baseURL string) *AgentTool {
 	return &AgentTool{
 		Tool: llm.Tool{
 			Type: "function",
@@ -59,11 +76,17 @@ func NewWebSearchTool() *AgentTool {
 				},
 			},
 		},
-		Run: webSearchRun,
+		Run: func(toolCtx ToolContext, input json.RawMessage) ToolOut {
+			return webSearchRunWithClient(toolCtx, input, client, baseURL)
+		},
 	}
 }
 
 func webSearchRun(toolCtx ToolContext, input json.RawMessage) ToolOut {
+	return webSearchRunWithClient(toolCtx, input, nil, "")
+}
+
+func webSearchRunWithClient(toolCtx ToolContext, input json.RawMessage, client HTTPDoer, baseURL string) ToolOut {
 	var args WebSearchToolInput
 	if err := json.Unmarshal(input, &args); err != nil {
 		return toolError("Failed to parse input: %v", err)
@@ -82,7 +105,7 @@ func webSearchRun(toolCtx ToolContext, input json.RawMessage) ToolOut {
 	ctx, cancel := context.WithTimeout(parentCtx, defaultWebSearchTimeout)
 	defer cancel()
 
-	results, err := performSearch(ctx, args.Query, maxResults)
+	results, err := performSearchWithClient(ctx, args.Query, maxResults, client, baseURL)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return toolError("Search timed out after %v", defaultWebSearchTimeout)
@@ -105,23 +128,41 @@ func resolveMaxResults(maxResults int) int {
 }
 
 func performSearch(ctx context.Context, query string, maxResults int) ([]SearchResult, error) {
+	return performSearchWithClient(ctx, query, maxResults, nil, "")
+}
+
+func performSearchWithClient(ctx context.Context, query string, maxResults int, httpClient HTTPDoer, baseURL string) ([]SearchResult, error) {
+	searchURL := duckDuckGoURL
+	if baseURL != "" {
+		searchURL = baseURL
+	}
+
 	client := resty.New().
 		SetTimeout(defaultWebSearchTimeout).
 		SetRetryCount(maxRetries).
 		SetRetryWaitTime(retryWaitTime).
 		AddRetryCondition(func(r *resty.Response, err error) bool {
 			if err != nil {
-				return true
+				// Only retry on transient errors (timeout/connection errors)
+				var netErr net.Error
+				if errors.As(err, &netErr) && netErr.Timeout() {
+					return true
+				}
+				return false
 			}
 			code := r.StatusCode()
 			return code == 429 || code >= 500
 		})
 
+	if httpClient != nil {
+		client.SetTransport(&httpClientTransport{client: httpClient})
+	}
+
 	resp, err := client.R().
 		SetContext(ctx).
 		SetFormData(map[string]string{"q": query}).
 		SetHeader("User-Agent", "Mozilla/5.0 (compatible; DaguBot/1.0)").
-		Post(duckDuckGoURL)
+		Post(searchURL)
 
 	if err != nil {
 		return nil, fmt.Errorf("HTTP request failed: %w", err)
@@ -132,6 +173,15 @@ func performSearch(ctx context.Context, query string, maxResults int) ([]SearchR
 	}
 
 	return parseSearchResults(resp.String(), maxResults)
+}
+
+// httpClientTransport wraps an HTTPDoer to implement http.RoundTripper.
+type httpClientTransport struct {
+	client HTTPDoer
+}
+
+func (t *httpClientTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return t.client.Do(req)
 }
 
 func parseSearchResults(htmlContent string, maxResults int) ([]SearchResult, error) {

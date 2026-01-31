@@ -200,9 +200,11 @@ type TokenConfig struct {
 // Builtin-specific fields only apply when auth.mode=builtin.
 type AuthOIDC struct {
 	// Core fields
-	ClientId     string
+	// ClientID is the OAuth client identifier (Go naming: ID not Id).
+	ClientID     string
 	ClientSecret string
-	ClientUrl    string   // Application URL for callback
+	// ClientURL is the application callback URL (Go naming: URL not Url).
+	ClientURL    string   // Application URL for callback
 	Issuer       string   // OIDC provider URL
 	Scopes       []string // Default: openid, profile, email
 	Whitelist    []string // Email addresses always allowed
@@ -216,7 +218,7 @@ type AuthOIDC struct {
 
 // IsConfigured returns true if all required OIDC fields are set.
 func (o AuthOIDC) IsConfigured() bool {
-	return o.ClientId != "" && o.ClientSecret != "" && o.ClientUrl != "" && o.Issuer != ""
+	return o.ClientID != "" && o.ClientSecret != "" && o.ClientURL != "" && o.Issuer != ""
 }
 
 // OIDCRoleMapping defines how OIDC claims are mapped to Dagu roles.
@@ -384,8 +386,8 @@ func (c *Config) validateServer() error {
 
 // validateUI validates UI-related configuration.
 func (c *Config) validateUI() error {
-	if c.UI.MaxDashboardPageLimit < 1 {
-		return fmt.Errorf("invalid max dashboard page limit: %d", c.UI.MaxDashboardPageLimit)
+	if c.UI.MaxDashboardPageLimit < 1 || c.UI.MaxDashboardPageLimit > 1000 {
+		return fmt.Errorf("invalid max dashboard page limit: %d (must be 1-1000)", c.UI.MaxDashboardPageLimit)
 	}
 	return nil
 }

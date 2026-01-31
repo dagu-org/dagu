@@ -83,7 +83,12 @@ func runStatus(ctx *Context, args []string) error {
 	// For running root DAGs, fetch real-time status via socket connection.
 	// Sub DAGs use stored status since they may run on different workers.
 	if dagStatus.Status == core.Running && subDAGRunID == "" {
-		realtimeStatus, err := ctx.DAGRunMgr.GetCurrentStatus(ctx, dag, dagRunID)
+		// Use dagStatus.DAGRunID as fallback when --run-id flag is omitted
+		runIDForLookup := dagRunID
+		if runIDForLookup == "" {
+			runIDForLookup = dagStatus.DAGRunID
+		}
+		realtimeStatus, err := ctx.DAGRunMgr.GetCurrentStatus(ctx, dag, runIDForLookup)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve current status: %w", err)
 		}

@@ -143,7 +143,8 @@ ${FE_BUNDLE_JS}:
 .PHONY: run-server-https
 run-server-https: ${SERVER_CERT_FILE} ${SERVER_KEY_FILE}
 	@echo "${COLOR_GREEN}Starting the server with HTTPS...${COLOR_RESET}"
-	@DAGU_CERT_FILE=${SERVER_CERT_FILE} \
+	@DAGU_DEBUG=1 \
+		DAGU_CERT_FILE=${SERVER_CERT_FILE} \
 		DAGU_KEY_FILE=${SERVER_KEY_FILE} \
 		go run ./cmd start-all
 

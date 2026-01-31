@@ -4,6 +4,7 @@ package schema
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -52,7 +53,7 @@ func (r *Registry) Navigate(schemaName, path string) (string, error) {
 	return nav.navigate()
 }
 
-// AvailableSchemas returns the list of registered schema names.
+// AvailableSchemas returns the list of registered schema names in sorted order.
 func (r *Registry) AvailableSchemas() []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -60,6 +61,7 @@ func (r *Registry) AvailableSchemas() []string {
 	for name := range r.schemas {
 		names = append(names, name)
 	}
+	sort.Strings(names)
 	return names
 }
 
@@ -243,13 +245,16 @@ func (n *navigator) mergeAllOf(allOf []any) map[string]any {
 	merged := make(map[string]any)
 	mergedProps := make(map[string]any)
 
+	// Collect all required fields from each allOf item and deduplicate
+	requiredSet := make(map[string]struct{})
+
 	for _, item := range allOf {
 		if itemMap, ok := item.(map[string]any); ok {
 			resolved := n.resolveRef(itemMap)
 
-			// Copy top-level fields
+			// Copy top-level fields (except properties and required which we handle specially)
 			for k, v := range resolved {
-				if k != "properties" {
+				if k != "properties" && k != "required" {
 					merged[k] = v
 				}
 			}
@@ -260,11 +265,33 @@ func (n *navigator) mergeAllOf(allOf []any) map[string]any {
 					mergedProps[k] = v
 				}
 			}
+
+			// Collect required fields
+			if req, ok := resolved["required"].([]any); ok {
+				for _, r := range req {
+					if s, ok := r.(string); ok {
+						requiredSet[s] = struct{}{}
+					}
+				}
+			}
 		}
 	}
 
 	if len(mergedProps) > 0 {
 		merged["properties"] = mergedProps
+	}
+
+	// Deduplicate and set merged required fields
+	if len(requiredSet) > 0 {
+		allRequired := make([]any, 0, len(requiredSet))
+		for r := range requiredSet {
+			allRequired = append(allRequired, r)
+		}
+		// Sort for deterministic output
+		sort.Slice(allRequired, func(i, j int) bool {
+			return allRequired[i].(string) < allRequired[j].(string)
+		})
+		merged["required"] = allRequired
 	}
 
 	return merged

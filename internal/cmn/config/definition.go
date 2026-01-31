@@ -133,9 +133,13 @@ type TokenConfigDef struct {
 // Core fields are used by both standalone and builtin auth modes.
 // Builtin-specific fields are only used when auth.mode=builtin.
 type AuthOIDCDef struct {
-	ClientId       string              `mapstructure:"clientId"`
+	// ClientID is the OAuth client identifier (Go naming: ID not Id).
+	// mapstructure tag uses lowercase "clientId" for YAML compatibility.
+	ClientID       string              `mapstructure:"clientId"`
 	ClientSecret   string              `mapstructure:"clientSecret"`
-	ClientUrl      string              `mapstructure:"clientUrl"`
+	// ClientURL is the application callback URL (Go naming: URL not Url).
+	// mapstructure tag uses lowercase "clientUrl" for YAML compatibility.
+	ClientURL      string              `mapstructure:"clientUrl"`
 	Issuer         string              `mapstructure:"issuer"`
 	Scopes         []string            `mapstructure:"scopes"`
 	Whitelist      []string            `mapstructure:"whitelist"`
@@ -243,19 +247,24 @@ type CoordinatorDef struct {
 
 // WorkerDef configures the worker.
 type WorkerDef struct {
-	ID            string           `mapstructure:"id"`
-	MaxActiveRuns int              `mapstructure:"maxActiveRuns"`
-	Labels        interface{}      `mapstructure:"labels"`       // String or map
-	Coordinators  interface{}      `mapstructure:"coordinators"` // String or list
-	PostgresPool  *PostgresPoolDef `mapstructure:"postgresPool"`
+	ID            string `mapstructure:"id"`
+	MaxActiveRuns int    `mapstructure:"maxActiveRuns"`
+	// Labels accepts either a string "key=value,key2=value2,..." or map[string]string.
+	// When string, parsed as comma-separated key=value pairs.
+	Labels interface{} `mapstructure:"labels"`
+	// Coordinators accepts either a single string URL or []string of URLs.
+	// When string, used as single coordinator address.
+	Coordinators interface{}      `mapstructure:"coordinators"`
+	PostgresPool *PostgresPoolDef `mapstructure:"postgresPool"`
 }
 
 // PostgresPoolDef configures PostgreSQL connection pooling.
+// Lifetime fields are specified in seconds.
 type PostgresPoolDef struct {
-	MaxOpenConns    int `mapstructure:"maxOpenConns"`    // Default: 25
-	MaxIdleConns    int `mapstructure:"maxIdleConns"`    // Default: 5
-	ConnMaxLifetime int `mapstructure:"connMaxLifetime"` // Seconds, default: 300
-	ConnMaxIdleTime int `mapstructure:"connMaxIdleTime"` // Seconds, default: 60
+	MaxOpenConns    int `mapstructure:"maxOpenConns"`    // Maximum open connections (default: 25)
+	MaxIdleConns    int `mapstructure:"maxIdleConns"`    // Maximum idle connections (default: 5)
+	ConnMaxLifetime int `mapstructure:"connMaxLifetime"` // Maximum connection lifetime in seconds (default: 300)
+	ConnMaxIdleTime int `mapstructure:"connMaxIdleTime"` // Maximum idle time in seconds (default: 60)
 }
 
 // SchedulerDef configures the scheduler.

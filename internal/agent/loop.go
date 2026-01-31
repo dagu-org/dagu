@@ -21,6 +21,10 @@ const (
 
 	// llmRequestTimeout is the maximum time allowed for an LLM request.
 	llmRequestTimeout = 5 * time.Minute
+
+	// maxToolCallDepth limits nested tool call chains to prevent infinite recursion.
+	// This can happen if an LLM continuously makes tool calls without producing a final response.
+	maxToolCallDepth = 50
 )
 
 // MessageRecordFunc is called to record new messages to persistent storage.
@@ -261,13 +265,65 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 	}, input)
 }
 
-// handleToolCalls processes tool calls from the LLM response.
+// handleToolCalls processes tool calls from the LLM response using iteration
+// instead of recursion to prevent stack overflow with long tool call chains.
 func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) error {
-	for _, tc := range toolCalls {
-		l.logger.Debug("executing tool", "name", tc.Function.Name, "id", tc.ID)
-		l.recordToolResult(ctx, tc, l.executeTool(ctx, tc))
+	for depth := 0; depth < maxToolCallDepth; depth++ {
+		for _, tc := range toolCalls {
+			l.logger.Debug("executing tool", "name", tc.Function.Name, "id", tc.ID, "depth", depth)
+			l.recordToolResult(ctx, tc, l.executeTool(ctx, tc))
+		}
+
+		// Process the next LLM request
+		history := l.copyHistory()
+		messages := l.buildMessages(history)
+		tools := l.buildToolDefinitions()
+
+		req := &llm.ChatRequest{
+			Model:    l.model,
+			Messages: messages,
+			Tools:    tools,
+		}
+
+		l.logger.Debug("sending LLM request (tool chain)",
+			"message_count", len(messages),
+			"tool_count", len(tools),
+			"model", l.model,
+			"depth", depth)
+
+		l.setWorking(true)
+
+		llmCtx, cancel := context.WithTimeout(ctx, llmRequestTimeout)
+		resp, err := l.provider.Chat(llmCtx, req)
+		cancel()
+
+		if err != nil {
+			l.recordErrorMessage(ctx, fmt.Sprintf("LLM request failed: %v", err))
+			l.setWorking(false)
+			return fmt.Errorf("LLM request failed: %w", err)
+		}
+
+		l.logger.Debug("received LLM response (tool chain)",
+			"content_length", len(resp.Content),
+			"finish_reason", resp.FinishReason,
+			"tool_calls", len(resp.ToolCalls),
+			"depth", depth)
+
+		l.accumulateUsage(resp.Usage)
+		l.recordAssistantMessage(ctx, resp)
+
+		if len(resp.ToolCalls) == 0 {
+			l.setWorking(false)
+			return nil
+		}
+
+		l.logger.Info("continuing tool calls", "count", len(resp.ToolCalls), "depth", depth+1)
+		toolCalls = resp.ToolCalls
 	}
-	return l.processLLMRequest(ctx)
+
+	l.setWorking(false)
+	l.logger.Warn("max tool call depth reached", "depth", maxToolCallDepth)
+	return fmt.Errorf("max tool call depth (%d) reached", maxToolCallDepth)
 }
 
 // recordToolResult adds a tool result to history and records it.

@@ -317,12 +317,18 @@ func (a *API) collectActiveConversations(userID string, activeIDs map[string]str
 	var conversations []ConversationWithState
 
 	a.conversations.Range(func(key, value any) bool {
-		mgr := value.(*ConversationManager)
+		mgr, ok := value.(*ConversationManager)
+		if !ok {
+			return true // skip invalid entry
+		}
 		if mgr.UserID() != userID {
 			return true
 		}
 
-		id := key.(string)
+		id, ok := key.(string)
+		if !ok {
+			return true // skip invalid key
+		}
 		activeIDs[id] = struct{}{}
 		conversations = append(conversations, ConversationWithState{
 			Conversation: mgr.GetConversation(),
@@ -549,11 +555,14 @@ func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 }
 
 // setupSSEHeaders configures the response headers for Server-Sent Events.
+// Note: CORS headers are typically handled by middleware at the router level.
+// If SSE-specific CORS headers are needed, configure them via the server config.
 func (a *API) setupSSEHeaders(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	// CORS headers are managed by the server's CORS middleware configuration.
+	// Do not set Access-Control-Allow-Origin here to avoid security issues.
 }
 
 // sendSSEMessage sends a single SSE message to the client.

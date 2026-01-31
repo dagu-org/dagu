@@ -143,7 +143,7 @@ func TestLoad_Env(t *testing.T) {
 				Basic: AuthBasic{Username: "testuser", Password: "testpass"},
 				Token: AuthToken{Value: "test-token-123"},
 				OIDC: AuthOIDC{
-					ClientId:     "test-client-id",
+					ClientID:     "test-client-id",
 					ClientSecret: "test-secret",
 					Issuer:       "https://auth.example.com",
 					Scopes:       []string{"openid", "profile", "email"},
@@ -380,9 +380,9 @@ scheduler:
 				Basic: AuthBasic{Username: "admin", Password: "secret"},
 				Token: AuthToken{Value: "api-token"},
 				OIDC: AuthOIDC{
-					ClientId:     "test-client-id",
+					ClientID:     "test-client-id",
 					ClientSecret: "test-client-secret",
-					ClientUrl:    "http://localhost:8081",
+					ClientURL:    "http://localhost:8081",
 					Issuer:       "https://accounts.example.com",
 					Scopes:       []string{"openid", "profile", "email"},
 					Whitelist:    []string{"user@example.com"},
@@ -903,7 +903,7 @@ auth:
       - "profile"
 `)
 		assert.Equal(t, AuthModeOIDC, cfg.Server.Auth.Mode)
-		assert.Equal(t, "my-client-id", cfg.Server.Auth.OIDC.ClientId)
+		assert.Equal(t, "my-client-id", cfg.Server.Auth.OIDC.ClientID)
 		assert.Equal(t, "my-client-secret", cfg.Server.Auth.OIDC.ClientSecret)
 		assert.Equal(t, "https://auth.example.com", cfg.Server.Auth.OIDC.Issuer)
 		assert.Equal(t, []string{"openid", "profile"}, cfg.Server.Auth.OIDC.Scopes)

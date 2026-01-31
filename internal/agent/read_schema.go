@@ -19,6 +19,8 @@ const readSchemaDescription = "Navigate JSON schema documentation to understand 
 	"Call with empty path to see root-level fields, or specify a path to drill down (e.g., 'steps.container')."
 
 // NewReadSchemaTool creates a new tool for navigating JSON schemas.
+// NOTE: The schema enum is captured at tool creation time. If schemas are
+// registered after this tool is created, the enum won't include them.
 func NewReadSchemaTool() *AgentTool {
 	available := schema.DefaultRegistry.AvailableSchemas()
 

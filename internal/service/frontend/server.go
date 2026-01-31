@@ -591,7 +591,7 @@ func (srv *Server) buildOIDCAuthOptions(ctx context.Context) (*auth.Options, err
 	if authCfg.Mode != config.AuthModeOIDC {
 		return nil, nil
 	}
-	if oidcCfg.ClientId == "" || oidcCfg.ClientSecret == "" || oidcCfg.Issuer == "" {
+	if oidcCfg.ClientID == "" || oidcCfg.ClientSecret == "" || oidcCfg.Issuer == "" {
 		return nil, nil
 	}
 

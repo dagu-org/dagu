@@ -303,6 +303,12 @@ func TestIsDAGFile(t *testing.T) {
 			dagsDir:  "/dags",
 			expected: false,
 		},
+		{
+			name:     "path prefix bypass attempt",
+			path:     "/dags-malicious/workflow.yaml",
+			dagsDir:  "/dags",
+			expected: false,
+		},
 	}
 
 	for _, tc := range tests {

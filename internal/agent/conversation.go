@@ -490,6 +490,7 @@ func (cm *ConversationManager) SubmitUserResponse(response UserPromptResponse) b
 	cm.promptsMu.Unlock()
 
 	if !exists {
+		slog.Warn("no pending prompt for response", "promptID", response.PromptID)
 		return false
 	}
 
@@ -497,6 +498,7 @@ func (cm *ConversationManager) SubmitUserResponse(response UserPromptResponse) b
 	case ch <- response:
 		return true
 	default:
+		slog.Warn("response dropped, channel full", "promptID", response.PromptID)
 		return false
 	}
 }

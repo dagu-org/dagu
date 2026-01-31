@@ -293,7 +293,7 @@ func (a *API) buildAuthOptions(ctx context.Context, basePath string) (frontendau
 }
 
 func (a *API) configureOIDC(ctx context.Context, oidcConfig config.AuthOIDC, opts *frontendauth.Options) error {
-	if oidcConfig.ClientId == "" || oidcConfig.ClientSecret == "" || oidcConfig.Issuer == "" {
+	if oidcConfig.ClientID == "" || oidcConfig.ClientSecret == "" || oidcConfig.Issuer == "" {
 		return nil
 	}
 

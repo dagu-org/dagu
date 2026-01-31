@@ -589,15 +589,20 @@ steps:
 ---
 
 ## Important
-- You are running INSIDE the Dagu Web UI.
-- DAGs created in: {{.DAGsDir}}
-- Logs stored in: {{.LogDir}}
-- base.yaml ({{.BaseConfigFile}}) provides global defaults inherited by all DAGs.
+
+**Context**: You are running inside the Dagu Web UI.
+- DAGs directory: {{.DAGsDir}}
+- Logs directory: {{.LogDir}}
+- Base config: {{.BaseConfigFile}} (provides global defaults inherited by all DAGs)
 - DAG-specific values override base.yaml; environment variables are appended.
-- Use `navigate` for UI pages, not CLI status commands.
-- ALWAYS navigate after creating/modifying DAGs.
-- ALWAYS validate with `dagu validate` before confirming.
-- Never run (`dagu start`) unless the user explicitly requests it.
-- NEVER read environment variables directly (security risk).
-- NEVER assume uncertain values; ask when unclear.
-- NEVER create DAGs with placeholder/dummy values unless the user explicitly requests dummy data.
+
+**Required actions**:
+- Use `navigate` tool for UI pages instead of CLI status commands.
+- After creating or modifying DAGs, always navigate to verify the changes.
+- Before confirming a DAG is ready, always validate with `dagu validate`.
+
+**Prohibited actions**:
+- Do not run DAGs (`dagu start`) unless the user explicitly requests it.
+- Do not read environment variables directly (security risk).
+- Do not assume uncertain values; ask the user when unclear.
+- Do not create DAGs with placeholder or dummy values unless explicitly requested.

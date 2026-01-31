@@ -427,11 +427,20 @@ steps:
 		err := executeCommand(th.Context, cmd.Start(), []string{dagFile.Location, "--run-id=" + parentRunID})
 		require.NoError(t, err)
 
-		time.Sleep(500 * time.Millisecond)
-
 		parentRef := exec.NewDAGRunRef(dagFile.Location, parentRunID)
-		parentAttempt, err := th.DAGRunStore.FindAttempt(th.Context, parentRef)
-		require.NoError(t, err)
+		var parentAttempt exec.DAGRunAttempt
+		require.Eventually(t, func() bool {
+			var err error
+			parentAttempt, err = th.DAGRunStore.FindAttempt(th.Context, parentRef)
+			if err != nil {
+				return false
+			}
+			parentStatus, err := parentAttempt.ReadStatus(th.Context)
+			if err != nil {
+				return false
+			}
+			return len(parentStatus.Nodes) > 0 && len(parentStatus.Nodes[0].SubRuns) > 0
+		}, 5*time.Second, 50*time.Millisecond, "parent status should have nodes with sub-runs")
 
 		parentStatus, err := parentAttempt.ReadStatus(th.Context)
 		require.NoError(t, err)
@@ -470,7 +479,18 @@ steps:
 		err := executeCommand(th.Context, cmd.Start(), []string{dagFile.Location, "--run-id=" + parentRunID})
 		require.NoError(t, err)
 
-		time.Sleep(200 * time.Millisecond)
+		parentRef := exec.NewDAGRunRef(dagFile.Location, parentRunID)
+		require.Eventually(t, func() bool {
+			attempt, err := th.DAGRunStore.FindAttempt(th.Context, parentRef)
+			if err != nil {
+				return false
+			}
+			status, err := attempt.ReadStatus(th.Context)
+			if err != nil {
+				return false
+			}
+			return status.Status != core.Running
+		}, 5*time.Second, 50*time.Millisecond, "DAG run should complete")
 
 		err = executeCommand(th.Context, cmd.Status(), []string{
 			dagFile.Location,

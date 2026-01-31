@@ -20,7 +20,9 @@ func createTestFile(t *testing.T, content string) string {
 }
 
 func readInput(path string) json.RawMessage {
-	return json.RawMessage(`{"path": "` + path + `"}`)
+	input := map[string]string{"path": path}
+	b, _ := json.Marshal(input)
+	return b
 }
 
 func TestReadTool_Run(t *testing.T) {

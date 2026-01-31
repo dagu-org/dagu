@@ -172,13 +172,20 @@ func countLines(s string) int {
 }
 
 // isDAGFile checks if the path is a YAML file within the DAGs directory.
+// Uses filepath.Rel to prevent path containment bypass attacks (e.g., /dags-malicious/).
 func isDAGFile(path, dagsDir string) bool {
 	if dagsDir == "" || !strings.HasSuffix(path, ".yaml") {
 		return false
 	}
 	cleanPath := filepath.Clean(path)
 	cleanDAGsDir := filepath.Clean(dagsDir)
-	return strings.HasPrefix(cleanPath, cleanDAGsDir)
+
+	// Use filepath.Rel to properly check path containment
+	rel, err := filepath.Rel(cleanDAGsDir, cleanPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return false
+	}
+	return true
 }
 
 // validateIfDAGFile validates the file if it's a DAG file, returning any validation errors.

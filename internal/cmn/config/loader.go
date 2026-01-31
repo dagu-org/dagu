@@ -86,6 +86,8 @@ func WithService(service Service) ConfigLoaderOption {
 type ConfigSection uint16
 
 const (
+	// SectionNone means "always load regardless of service type".
+	// Use this for settings that apply universally across all services.
 	SectionNone        ConfigSection = 0
 	SectionServer      ConfigSection = 1 << iota // 2
 	SectionScheduler                             // 4
@@ -450,9 +452,9 @@ func (l *ConfigLoader) loadOIDCAuth(cfg *Config, auth *AuthDef) {
 	}
 
 	oidc := auth.OIDC
-	cfg.Server.Auth.OIDC.ClientId = oidc.ClientId
+	cfg.Server.Auth.OIDC.ClientID = oidc.ClientID
 	cfg.Server.Auth.OIDC.ClientSecret = oidc.ClientSecret
-	cfg.Server.Auth.OIDC.ClientUrl = oidc.ClientUrl
+	cfg.Server.Auth.OIDC.ClientURL = oidc.ClientURL
 	cfg.Server.Auth.OIDC.Issuer = oidc.Issuer
 	cfg.Server.Auth.OIDC.Scopes = parseStringList(l.v.Get("auth.oidc.scopes"))
 	cfg.Server.Auth.OIDC.Whitelist = parseStringList(l.v.Get("auth.oidc.whitelist"))
@@ -505,7 +507,7 @@ func (l *ConfigLoader) autoDetectAuthMode(cfg *Config, explicitAuthMode bool) {
 	}
 
 	oidc := cfg.Server.Auth.OIDC
-	if oidc.ClientId != "" && oidc.ClientSecret != "" && oidc.Issuer != "" {
+	if oidc.ClientID != "" && oidc.ClientSecret != "" && oidc.Issuer != "" {
 		cfg.Server.Auth.Mode = AuthModeOIDC
 		l.warnings = append(l.warnings, fmt.Sprintf("Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: %s)", oidc.Issuer))
 	}

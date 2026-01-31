@@ -252,13 +252,42 @@ func CreateTempDAGFile(subDir, dagName string, yamlData []byte, extraDocs ...[]b
 
 // WriteFileAtomic writes data to a file atomically using a temp file and rename.
 // This ensures the file is never left in a partial state.
+// Uses os.CreateTemp with a unique filename to prevent race conditions with
+// concurrent writers to the same file.
 func WriteFileAtomic(filePath string, data []byte, perm os.FileMode) error {
-	tempPath := filePath + ".tmp"
-	if err := os.WriteFile(tempPath, data, perm); err != nil {
+	dir := filepath.Dir(filePath)
+	base := filepath.Base(filePath)
+
+	// Create temp file in the same directory to ensure atomic rename works
+	// (rename across filesystems would fail)
+	tempFile, err := os.CreateTemp(dir, base+".tmp.*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file in %s: %w", dir, err)
+	}
+	tempPath := tempFile.Name()
+
+	// Clean up temp file on any error
+	cleanup := func() { _ = os.Remove(tempPath) }
+
+	if _, err := tempFile.Write(data); err != nil {
+		_ = tempFile.Close()
+		cleanup()
 		return fmt.Errorf("failed to write temp file %s: %w", tempPath, err)
 	}
+
+	if err := tempFile.Chmod(perm); err != nil {
+		_ = tempFile.Close()
+		cleanup()
+		return fmt.Errorf("failed to set permissions on temp file %s: %w", tempPath, err)
+	}
+
+	if err := tempFile.Close(); err != nil {
+		cleanup()
+		return fmt.Errorf("failed to close temp file %s: %w", tempPath, err)
+	}
+
 	if err := os.Rename(tempPath, filePath); err != nil {
-		_ = os.Remove(tempPath)
+		cleanup()
 		return fmt.Errorf("failed to rename %s to %s: %w", tempPath, filePath, err)
 	}
 	return nil

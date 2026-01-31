@@ -7,6 +7,8 @@ import (
 
 // TestNavigateDeepPaths tests navigation through complex nested schema constructs.
 func TestNavigateDeepPaths(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		path    string
@@ -52,6 +54,7 @@ func TestNavigateDeepPaths(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result, err := DefaultRegistry.Navigate("dag", tt.path)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Navigate() error = %v, wantErr %v", err, tt.wantErr)

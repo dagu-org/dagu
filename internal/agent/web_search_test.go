@@ -3,6 +3,8 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -38,15 +40,24 @@ func TestWebSearchTool_Run(t *testing.T) {
 		assert.Contains(t, result.Content, "parse")
 	})
 
-	t.Run("works with nil context", func(t *testing.T) {
+	t.Run("works with nil context using mock server", func(t *testing.T) {
 		t.Parallel()
 
-		tool := NewWebSearchTool()
 		input := json.RawMessage(`{"query": "golang"}`)
 
-		// This will actually make a real HTTP request, but tests the nil context handling
-		_ = tool.Run(ToolContext{}, input)
-		// We don't assert on the result since it depends on network availability
+		// Test with a mock server to avoid real HTTP requests
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`<html><body><div class="result link"><a class="result__a" href="https://golang.org">Go</a></div></body></html>`))
+		}))
+		defer server.Close()
+
+		// Create tool with custom client for testing
+		toolWithClient := NewWebSearchToolWithClient(server.Client(), server.URL)
+		result := toolWithClient.Run(ToolContext{}, input)
+		// Should not error with nil context
+		assert.False(t, result.IsError)
+		assert.Contains(t, result.Content, "golang.org")
 	})
 }
 
