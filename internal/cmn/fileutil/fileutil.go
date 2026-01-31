@@ -1,6 +1,7 @@
 package fileutil
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -247,4 +248,27 @@ func CreateTempDAGFile(subDir, dagName string, yamlData []byte, extraDocs ...[]b
 	}
 
 	return tempFileName, nil
+}
+
+// WriteFileAtomic writes data to a file atomically using a temp file and rename.
+// This ensures the file is never left in a partial state.
+func WriteFileAtomic(filePath string, data []byte, perm os.FileMode) error {
+	tempPath := filePath + ".tmp"
+	if err := os.WriteFile(tempPath, data, perm); err != nil {
+		return fmt.Errorf("failed to write temp file %s: %w", tempPath, err)
+	}
+	if err := os.Rename(tempPath, filePath); err != nil {
+		_ = os.Remove(tempPath)
+		return fmt.Errorf("failed to rename %s to %s: %w", tempPath, filePath, err)
+	}
+	return nil
+}
+
+// WriteJSONAtomic marshals v to indented JSON and writes it atomically to filePath.
+func WriteJSONAtomic(filePath string, v any, perm os.FileMode) error {
+	data, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+	return WriteFileAtomic(filePath, data, perm)
 }

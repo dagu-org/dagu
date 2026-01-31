@@ -4,12 +4,12 @@ package config
 // Fields are organized into logical groups for clarity.
 type Definition struct {
 	// Server settings
-	Host        string `mapstructure:"host"`
-	Port        int    `mapstructure:"port"`
-	BasePath    string `mapstructure:"basePath"`
-	APIBasePath string `mapstructure:"apiBasePath"`
-	APIBaseURL  string `mapstructure:"apiBaseURL"` // Deprecated: use APIBasePath
-	Headless    *bool  `mapstructure:"headless"`
+	Host        string  `mapstructure:"host"`
+	Port        int     `mapstructure:"port"`
+	BasePath    string  `mapstructure:"basePath"`
+	APIBasePath string  `mapstructure:"apiBasePath"`
+	APIBaseURL  string  `mapstructure:"apiBaseURL"` // Deprecated: use APIBasePath
+	Headless    *bool   `mapstructure:"headless"`
 	TLS         *TLSDef `mapstructure:"tls"`
 
 	// Core settings

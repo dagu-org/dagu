@@ -433,7 +433,7 @@ func TestStore_WriteError(t *testing.T) {
 
 			err = tc.action(store, ctx, wh)
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "failed to write file")
+			assert.Contains(t, err.Error(), "failed to write")
 		})
 	}
 }

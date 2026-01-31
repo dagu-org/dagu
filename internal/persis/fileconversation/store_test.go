@@ -1216,7 +1216,7 @@ func TestStore_RebuildIndex_NonDirectorySkipped(t *testing.T) {
 
 func TestStore_Options(t *testing.T) {
 	optionCalled := false
-	testOption := func(s *Store) {
+	testOption := func(_ *Store) {
 		optionCalled = true
 	}
 

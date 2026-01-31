@@ -54,8 +54,8 @@ type API struct {
 	auditService       *audit.Service
 	syncService        SyncService
 	tunnelService      *tunnel.Service
-	dagWritesDisabled bool // True when git sync read-only mode is active
-	agentConfigStore  agent.ConfigStore
+	dagWritesDisabled  bool // True when git sync read-only mode is active
+	agentConfigStore   agent.ConfigStore
 }
 
 // AuthService defines the interface for authentication operations.

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 )
 
 const (
@@ -246,23 +247,9 @@ func validateConversation(conv *agent.Conversation, requireUserID bool) error {
 
 // writeConversationToFile writes a conversation to a JSON file atomically.
 func (s *Store) writeConversationToFile(filePath string, conv *ConversationForStorage) error {
-	data, err := json.MarshalIndent(conv, "", "  ")
-	if err != nil {
-		return fmt.Errorf("fileconversation: failed to marshal conversation: %w", err)
+	if err := fileutil.WriteJSONAtomic(filePath, conv, conversationFilePermissions); err != nil {
+		return fmt.Errorf("fileconversation: %w", err)
 	}
-
-	// Write to temp file first, then rename for atomicity
-	tempPath := filePath + ".tmp"
-	if err := os.WriteFile(tempPath, data, conversationFilePermissions); err != nil {
-		return fmt.Errorf("fileconversation: failed to write file %s: %w", tempPath, err)
-	}
-
-	if err := os.Rename(tempPath, filePath); err != nil {
-		// Clean up temp file on failure
-		_ = os.Remove(tempPath)
-		return fmt.Errorf("fileconversation: failed to rename file %s: %w", filePath, err)
-	}
-
 	return nil
 }
 

@@ -433,4 +433,3 @@ func (cm *ConversationManager) nextSequenceID() int64 {
 	cm.sequenceID++
 	return cm.sequenceID
 }
-

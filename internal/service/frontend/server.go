@@ -29,6 +29,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	cmnschema "github.com/dagu-org/dagu/internal/cmn/schema"
 	"github.com/dagu-org/dagu/internal/cmn/telemetry"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/gitsync"
@@ -559,6 +560,14 @@ func (srv *Server) setupAssetRoutes(r *chi.Mux, basePath string) {
 
 	r.Get(assetsPath, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "max-age=86400")
+
+		// Serve schema from shared package instead of embedded assets
+		if strings.HasSuffix(r.URL.Path, "dag.schema.json") {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(cmnschema.DAGSchemaJSON)
+			return
+		}
+
 		if ctype := mime.TypeByExtension(path.Ext(r.URL.Path)); ctype != "" {
 			w.Header().Set("Content-Type", ctype)
 		}

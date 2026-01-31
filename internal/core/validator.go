@@ -8,14 +8,14 @@ import (
 
 // Constants for validation limits.
 const (
-	DAGNameMaxLen = 40
+	DAGNameMaxLen  = 40
 	maxStepNameLen = 40
 )
 
 // Regex patterns for validation.
 var (
-	dagNameRegex   = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
-	stepIDPattern  = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_-]*$`)
+	dagNameRegex  = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
+	stepIDPattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_-]*$`)
 )
 
 // reservedWords contains IDs that cannot be used as step IDs.

@@ -163,12 +163,12 @@ func TestFormatFileContent(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name          string
-		content       string
-		offset        int
-		limit         int
-		wantContains  []string
-		wantExcludes  []string
+		name         string
+		content      string
+		offset       int
+		limit        int
+		wantContains []string
+		wantExcludes []string
 	}{
 		{
 			name:         "formats with line numbers",

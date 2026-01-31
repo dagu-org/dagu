@@ -541,6 +541,8 @@ func nodeStatusToStatus(ns core.NodeStatus) core.Status {
 		return core.Waiting
 	case core.NodeRejected:
 		return core.Rejected
+	case core.NodeNotStarted, core.NodeSkipped:
+		return core.NotStarted
 	default:
 		return core.NotStarted
 	}

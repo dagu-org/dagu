@@ -44,9 +44,7 @@ jobs:
         working-directory: ui
 
       - name: Copy web assets
-        run: |
-          cp ui/dist/* ./internal/service/frontend/assets/
-          cp schemas/dag.schema.json ./internal/service/frontend/assets/
+        run: cp ui/dist/* ./internal/service/frontend/assets/
 
       - name: Install Snapcraft
         run: sudo snap install snapcraft --classic

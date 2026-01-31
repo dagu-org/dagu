@@ -214,21 +214,9 @@ func (s *Store) Save(_ context.Context, cfg *agent.Config) error {
 
 // writeConfigToFile writes the config to a JSON file atomically.
 func (s *Store) writeConfigToFile(filePath string, cfg *agent.Config) error {
-	data, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return fmt.Errorf("fileagentconfig: failed to marshal config: %w", err)
+	if err := fileutil.WriteJSONAtomic(filePath, cfg, filePermissions); err != nil {
+		return fmt.Errorf("fileagentconfig: %w", err)
 	}
-
-	tempPath := filePath + ".tmp"
-	if err := os.WriteFile(tempPath, data, filePermissions); err != nil {
-		return fmt.Errorf("fileagentconfig: failed to write temp file: %w", err)
-	}
-
-	if err := os.Rename(tempPath, filePath); err != nil {
-		_ = os.Remove(tempPath)
-		return fmt.Errorf("fileagentconfig: failed to rename temp file: %w", err)
-	}
-
 	return nil
 }
 

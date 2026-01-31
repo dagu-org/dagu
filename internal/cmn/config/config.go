@@ -208,9 +208,9 @@ type AuthOIDC struct {
 	Whitelist    []string // Email addresses always allowed
 
 	// Builtin-specific fields
-	AutoSignup     bool            // Default: true
-	AllowedDomains []string        // Email domain whitelist
-	ButtonLabel    string          // Default: "Login with SSO"
+	AutoSignup     bool     // Default: true
+	AllowedDomains []string // Email domain whitelist
+	ButtonLabel    string   // Default: "Login with SSO"
 	RoleMapping    OIDCRoleMapping
 }
 
