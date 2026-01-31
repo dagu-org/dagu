@@ -474,9 +474,11 @@ steps:
 
 ### Creating a New DAG
 1. Use `read_schema` to understand available fields
-2. Create YAML with `patch` in DAGs directory
-3. Validate: `dagu validate <dag.yaml>`
-4. **ALWAYS navigate user to new DAG page**: `navigate` to `/dags/<dag-name>`
+2. **Verify configurations**: Check all required secrets/env/services are configured
+3. If missing: Guide user to configure (do NOT use placeholders)
+4. Create YAML with `patch` in DAGs directory (only real values)
+5. Validate: `dagu validate <dag.yaml>`
+6. **ALWAYS navigate user to new DAG page**: `navigate` to `/dags/<dag-name>`
 
 ### Executing a DAG
 1. **Ask user first** before running (DAGs may have side effects)
@@ -501,6 +503,32 @@ steps:
 6. **Output limit**: Use `output` (4KB) for data, `stdout`/`stderr` for files
 7. **Set timeouts**: Prevent runaway processes with `timeoutSec`
 8. **Verify after execution**: ALWAYS check `dagu status` and read logs on failure
+9. **No placeholders**: NEVER use placeholder values like `your-api-key`, `example.com`, `user:pass`. Guide user to configure real values first.
+
+## Configuration Requirements
+
+Before creating or updating a DAG, verify ALL required configurations exist. **NO PLACEHOLDERS ALLOWED**.
+
+### Pre-Creation Checklist
+- **Secrets**: Verify secret provider is configured and keys exist
+- **Environment**: Check required env vars are set (use `bash` to verify)
+- **SMTP/Mail**: Confirm SMTP settings in base config or DAG before using mail steps
+- **SSH**: Verify SSH keys exist at specified paths
+- **S3**: Confirm AWS credentials/endpoint are configured
+- **Database**: Verify connection strings are valid (not placeholder DSNs)
+- **Docker**: Ensure images are accessible
+- **LLM/Chat**: Verify API keys are set for the provider
+
+### If Configuration Missing
+1. **Stop** - Do not create DAG with placeholders
+2. **Explain** what configuration is needed
+3. **Guide** user step-by-step:
+   - For secrets: Show how to set env var or configure secret provider
+   - For SMTP: Show base config smtp section format
+   - For SSH: Show how to generate/locate SSH keys
+   - For S3: Show AWS credential setup
+   - For LLM: Show how to set API key env var
+4. **Confirm** configuration is complete before proceeding
 
 ## Important
 
@@ -512,3 +540,4 @@ steps:
 - Base config (if set in paths.baseConfig) provides defaults for all DAGs
 - Base config is merged with each DAG; DAG values override base config
 - Ask confirmation before significant changes
+- NEVER create DAGs with placeholder values - guide user to configure real values first
