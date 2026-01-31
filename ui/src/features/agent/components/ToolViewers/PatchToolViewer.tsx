@@ -46,6 +46,17 @@ export function PatchToolViewer({ args, toolName }: ToolViewerProps): React.Reac
     );
   }
 
+  // Create operation without content - show just the file creation indicator
+  if (operation === 'create') {
+    const filename = path?.split('/').pop() || path;
+    return (
+      <div className="flex items-center gap-2 px-2 py-1 text-xs font-mono text-green-600 dark:text-green-400">
+        <FilePlus className="h-3 w-3" />
+        <span className="truncate" title={path}>{filename}</span>
+      </div>
+    );
+  }
+
   // Delete operation - show file deletion indicator
   if (operation === 'delete') {
     return (
