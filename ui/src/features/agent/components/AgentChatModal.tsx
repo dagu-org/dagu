@@ -209,24 +209,24 @@ export function AgentChatModal(): ReactElement | null {
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-center gap-0.5 flex-shrink-0">
+        <div className="flex items-center gap-1 flex-shrink-0">
           <Button
             variant="ghost"
             size="sm"
             onClick={clearConversation}
-            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
             title="New conversation"
           >
-            <Plus className="h-3 w-3" />
+            <Plus className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
             size="sm"
             onClick={closeChat}
-            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
             title="Close"
           >
-            <X className="h-3 w-3" />
+            <X className="h-4 w-4" />
           </Button>
         </div>
       </div>
