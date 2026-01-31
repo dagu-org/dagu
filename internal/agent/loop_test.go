@@ -405,7 +405,7 @@ func TestLoop_BuildToolDefinitions(t *testing.T) {
 
 		tools := loop.buildToolDefinitions()
 
-		assert.Len(t, tools, 7)
+		assert.Len(t, tools, 8)
 		for _, tool := range tools {
 			assert.Equal(t, "function", tool.Type)
 			assert.NotEmpty(t, tool.Function.Name)

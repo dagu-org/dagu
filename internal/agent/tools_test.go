@@ -11,9 +11,9 @@ func TestCreateTools(t *testing.T) {
 	t.Parallel()
 
 	tools := CreateTools("")
-	assert.Len(t, tools, 7)
+	assert.Len(t, tools, 8)
 
-	expectedTools := []string{"bash", "read", "patch", "think", "navigate", "read_schema", "ask_user"}
+	expectedTools := []string{"bash", "read", "patch", "think", "navigate", "read_schema", "ask_user", "web_search"}
 	for _, name := range expectedTools {
 		tool := GetToolByName(tools, name)
 		require.NotNil(t, tool, "expected tool %s to exist", name)
