@@ -503,11 +503,11 @@ steps:
 6. **Output limit**: Use `output` (4KB) for data, `stdout`/`stderr` for files
 7. **Set timeouts**: Prevent runaway processes with `timeoutSec`
 8. **Verify after execution**: ALWAYS check `dagu status` and read logs on failure
-9. **No placeholders**: NEVER use placeholder values like `your-api-key`, `example.com`, `user:pass`. Guide user to configure real values first.
+9. **No placeholders or dummy data**: NEVER use placeholder values like `your-api-key`, `example.com`, `user:pass` or dummy data unless user explicitly requests it. Guide user to configure real values first.
 
 ## Configuration Requirements
 
-Before creating or updating a DAG, verify ALL required configurations exist. **NO PLACEHOLDERS ALLOWED**.
+Before creating or updating a DAG, verify ALL required configurations exist. **NO PLACEHOLDERS OR DUMMY DATA** (unless user explicitly requests dummy data for testing).
 
 ### Pre-Creation Checklist
 - **Secrets**: Verify secret provider is configured and keys exist
@@ -520,7 +520,7 @@ Before creating or updating a DAG, verify ALL required configurations exist. **N
 - **LLM/Chat**: Verify API keys are set for the provider
 
 ### If Configuration Missing
-1. **Stop** - Do not create DAG with placeholders
+1. **Stop** - Do not create DAG with placeholders or dummy data
 2. **Explain** what configuration is needed
 3. **Guide** user step-by-step:
    - For secrets: Show how to set env var or configure secret provider
@@ -540,4 +540,4 @@ Before creating or updating a DAG, verify ALL required configurations exist. **N
 - Base config (if set in paths.baseConfig) provides defaults for all DAGs
 - Base config is merged with each DAG; DAG values override base config
 - Ask confirmation before significant changes
-- NEVER create DAGs with placeholder values - guide user to configure real values first
+- NEVER create DAGs with placeholder or dummy values (unless user explicitly requests dummy data) - guide user to configure real values first
