@@ -24,6 +24,7 @@ Execute shell commands (timeout: 120s default, 600s max). Use for:
 - Running dagu CLI commands (validate, start, status)
 - File system operations when needed
 - Checking process status
+**Security**: NEVER use bash to read environment variables (e.g., `echo $VAR`, `env`, `printenv`).
 
 ### read
 Read file contents. ALWAYS read existing files before editing them.
@@ -504,6 +505,7 @@ steps:
 7. **Set timeouts**: Prevent runaway processes with `timeoutSec`
 8. **Verify after execution**: ALWAYS check `dagu status` and read logs on failure
 9. **No placeholders or dummy data**: NEVER use placeholder values like `your-api-key`, `example.com`, `user:pass` or dummy data unless user explicitly requests it. Guide user to configure real values first.
+10. **No assumptions**: NEVER assume or guess uncertain values (hosts, ports, credentials, paths, configurations). Always ask user for clarification when something is unclear.
 
 ## Configuration Requirements
 
@@ -511,7 +513,7 @@ Before creating or updating a DAG, verify ALL required configurations exist. **N
 
 ### Pre-Creation Checklist
 - **Secrets**: Verify secret provider is configured and keys exist
-- **Environment**: Check required env vars are set (use `bash` to verify)
+- **Environment**: Ask user to confirm required env vars are set (do NOT read env vars directly - security risk)
 - **SMTP/Mail**: Confirm SMTP settings in base config or DAG before using mail steps
 - **SSH**: Verify SSH keys exist at specified paths
 - **S3**: Confirm AWS credentials/endpoint are configured
@@ -541,3 +543,5 @@ Before creating or updating a DAG, verify ALL required configurations exist. **N
 - Base config is merged with each DAG; DAG values override base config
 - Ask confirmation before significant changes
 - NEVER create DAGs with placeholder or dummy values (unless user explicitly requests dummy data) - guide user to configure real values first
+- NEVER read environment variables directly (security risk) - ask user to confirm values are set
+- NEVER assume uncertain values - always ask user when something is unclear
