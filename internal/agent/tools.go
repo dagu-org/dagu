@@ -6,7 +6,7 @@ import (
 )
 
 // CreateTools returns all available tools for the agent including bash, read,
-// patch, think, navigate, and schema tools.
+// patch, think, navigate, schema, and ask_user tools.
 // The dagsDir parameter is used by the patch tool for DAG file validation.
 func CreateTools(dagsDir string) []*AgentTool {
 	return []*AgentTool{
@@ -16,6 +16,7 @@ func CreateTools(dagsDir string) []*AgentTool {
 		NewThinkTool(),
 		NewNavigateTool(),
 		NewReadSchemaTool(),
+		NewAskUserTool(),
 	}
 }
 

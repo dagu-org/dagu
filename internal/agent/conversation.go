@@ -31,6 +31,8 @@ type ConversationManager struct {
 	environment     EnvironmentInfo
 	onWorkingChange func(id string, working bool)
 	onMessage       func(ctx context.Context, msg Message) error
+	pendingPrompts  map[string]chan UserPromptResponse
+	promptsMu       sync.Mutex
 }
 
 // ConversationManagerConfig contains configuration for creating a ConversationManager.
@@ -291,17 +293,19 @@ func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) e
 	loopCtx, cancel := context.WithCancel(context.Background())
 
 	loopInstance := NewLoop(LoopConfig{
-		Provider:       provider,
-		Model:          model,
-		History:        history,
-		Tools:          tools,
-		RecordMessage:  cm.createRecordMessageFunc(),
-		Logger:         cm.logger,
-		SystemPrompt:   GenerateSystemPrompt(cm.environment, nil),
-		WorkingDir:     cm.workingDir,
-		ConversationID: cm.id,
-		OnWorking:      cm.SetWorking,
-		EmitUIAction:   cm.createEmitUIActionFunc(),
+		Provider:         provider,
+		Model:            model,
+		History:          history,
+		Tools:            tools,
+		RecordMessage:    cm.createRecordMessageFunc(),
+		Logger:           cm.logger,
+		SystemPrompt:     GenerateSystemPrompt(cm.environment, nil),
+		WorkingDir:       cm.workingDir,
+		ConversationID:   cm.id,
+		OnWorking:        cm.SetWorking,
+		EmitUIAction:     cm.createEmitUIActionFunc(),
+		EmitUserPrompt:   cm.createEmitUserPromptFunc(),
+		WaitUserResponse: cm.createWaitUserResponseFunc(),
 	})
 
 	if !cm.trySetLoop(loopInstance, cancel) {
@@ -423,6 +427,77 @@ func (cm *ConversationManager) createEmitUIActionFunc() UIActionFunc {
 				CreatedAt:      time.Now(),
 			}},
 		})
+	}
+}
+
+// createEmitUserPromptFunc returns a function for emitting user prompts.
+func (cm *ConversationManager) createEmitUserPromptFunc() EmitUserPromptFunc {
+	return func(prompt UserPrompt) {
+		msg := Message{
+			ID:             fmt.Sprintf("prompt-%s", prompt.PromptID),
+			ConversationID: cm.id,
+			Type:           MessageTypeUserPrompt,
+			UserPrompt:     &prompt,
+			CreatedAt:      time.Now(),
+		}
+
+		msg.SequenceID = cm.appendMessage(msg)
+
+		cm.subpub.Publish(msg.SequenceID, StreamResponse{
+			Messages: []Message{msg},
+		})
+
+		if cm.onMessage != nil {
+			if err := cm.onMessage(context.Background(), msg); err != nil {
+				cm.logger.Warn("failed to persist user prompt message", "error", err)
+			}
+		}
+	}
+}
+
+// createWaitUserResponseFunc returns a function that blocks until user responds.
+func (cm *ConversationManager) createWaitUserResponseFunc() WaitUserResponseFunc {
+	return func(ctx context.Context, promptID string) (UserPromptResponse, error) {
+		ch := make(chan UserPromptResponse, 1)
+
+		cm.promptsMu.Lock()
+		if cm.pendingPrompts == nil {
+			cm.pendingPrompts = make(map[string]chan UserPromptResponse)
+		}
+		cm.pendingPrompts[promptID] = ch
+		cm.promptsMu.Unlock()
+
+		defer func() {
+			cm.promptsMu.Lock()
+			delete(cm.pendingPrompts, promptID)
+			cm.promptsMu.Unlock()
+		}()
+
+		select {
+		case resp := <-ch:
+			return resp, nil
+		case <-ctx.Done():
+			return UserPromptResponse{}, ctx.Err()
+		}
+	}
+}
+
+// SubmitUserResponse delivers a user's response to a pending prompt.
+// Returns true if the response was delivered, false if no pending prompt exists.
+func (cm *ConversationManager) SubmitUserResponse(response UserPromptResponse) bool {
+	cm.promptsMu.Lock()
+	ch, exists := cm.pendingPrompts[response.PromptID]
+	cm.promptsMu.Unlock()
+
+	if !exists {
+		return false
+	}
+
+	select {
+	case ch <- response:
+		return true
+	default:
+		return false
 	}
 }
 

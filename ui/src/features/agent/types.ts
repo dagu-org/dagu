@@ -5,7 +5,8 @@ export type MessageType =
   | 'tool_use'
   | 'tool_result'
   | 'error'
-  | 'ui_action';
+  | 'ui_action'
+  | 'user_prompt';
 
 export type UIActionType = 'navigate' | 'refresh';
 
@@ -29,6 +30,28 @@ export interface ToolResult {
   is_error?: boolean;
 }
 
+export interface UserPromptOption {
+  id: string;
+  label: string;
+  description?: string;
+}
+
+export interface UserPrompt {
+  prompt_id: string;
+  question: string;
+  options?: UserPromptOption[];
+  allow_free_text: boolean;
+  free_text_placeholder?: string;
+  multi_select: boolean;
+}
+
+export interface UserPromptResponse {
+  prompt_id: string;
+  selected_option_ids?: string[];
+  free_text_response?: string;
+  cancelled?: boolean;
+}
+
 export interface Message {
   id: string;
   conversation_id: string;
@@ -38,6 +61,7 @@ export interface Message {
   tool_calls?: ToolCall[];
   tool_results?: ToolResult[];
   ui_action?: UIAction;
+  user_prompt?: UserPrompt;
   created_at: string;
 }
 

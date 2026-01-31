@@ -10,18 +10,23 @@ import {
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { Message, ToolCall, ToolResult, UIAction } from '../types';
+import { Message, ToolCall, ToolResult, UIAction, UserPromptResponse } from '../types';
+import { UserPromptMessage } from './UserPromptMessage';
 
 interface ChatMessagesProps {
   messages: Message[];
   pendingUserMessage: string | null;
   isWorking: boolean;
+  onPromptRespond?: (response: UserPromptResponse, displayValue: string) => void;
+  answeredPrompts?: Record<string, string>;
 }
 
 export function ChatMessages({
   messages,
   pendingUserMessage,
   isWorking,
+  onPromptRespond,
+  answeredPrompts,
 }: ChatMessagesProps): React.ReactNode {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -42,16 +47,26 @@ export function ChatMessages({
     );
   }
 
+  // Check if there's a pending user prompt (not yet answered)
+  const hasPendingPrompt = messages.some(
+    (m) => m.type === 'user_prompt' && m.user_prompt && !answeredPrompts?.[m.user_prompt.prompt_id]
+  );
+
   return (
     <div className="flex-1 overflow-y-auto p-2 space-y-2 font-mono text-xs bg-popover">
       {messages.map((message) => (
-        <MessageItem key={message.id} message={message} />
+        <MessageItem
+          key={message.id}
+          message={message}
+          onPromptRespond={onPromptRespond}
+          answeredPrompts={answeredPrompts}
+        />
       ))}
       {pendingUserMessage && (
         <UserMessage content={pendingUserMessage} isPending />
       )}
-      {isWorking && (
-        <div className="flex items-center gap-1.5 text-yellow-500 pl-1">
+      {isWorking && !hasPendingPrompt && (
+        <div className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 pl-1">
           <Loader2 className="h-3 w-3 animate-spin" />
           <span>processing...</span>
         </div>
@@ -61,7 +76,13 @@ export function ChatMessages({
   );
 }
 
-function MessageItem({ message }: { message: Message }): React.ReactNode {
+interface MessageItemProps {
+  message: Message;
+  onPromptRespond?: (response: UserPromptResponse, displayValue: string) => void;
+  answeredPrompts?: Record<string, string>;
+}
+
+function MessageItem({ message, onPromptRespond, answeredPrompts }: MessageItemProps): React.ReactNode {
   switch (message.type) {
     case 'user':
       return <UserMessage content={message.content ?? ''} />;
@@ -80,6 +101,16 @@ function MessageItem({ message }: { message: Message }): React.ReactNode {
       return <ErrorMessage content={message.content ?? ''} />;
     case 'ui_action':
       return <UIActionMessage action={message.ui_action} />;
+    case 'user_prompt':
+      if (!message.user_prompt || !onPromptRespond) return null;
+      return (
+        <UserPromptMessage
+          prompt={message.user_prompt}
+          onRespond={onPromptRespond}
+          isAnswered={answeredPrompts?.[message.user_prompt.prompt_id] !== undefined}
+          answeredValue={answeredPrompts?.[message.user_prompt.prompt_id]}
+        />
+      );
     default:
       return null;
   }

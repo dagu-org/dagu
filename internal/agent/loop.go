@@ -50,25 +50,31 @@ type LoopConfig struct {
 	OnWorking func(working bool)
 	// EmitUIAction is called when a tool wants to emit a UI action.
 	EmitUIAction UIActionFunc
+	// EmitUserPrompt is called when a tool wants to emit a user prompt.
+	EmitUserPrompt EmitUserPromptFunc
+	// WaitUserResponse blocks until user responds to a prompt.
+	WaitUserResponse WaitUserResponseFunc
 }
 
 // Loop manages a conversation turn with an LLM including tool execution.
 type Loop struct {
-	provider       llm.Provider
-	model          string
-	tools          []*AgentTool
-	recordMessage  MessageRecordFunc
-	history        []llm.Message
-	messageQueue   []llm.Message
-	totalUsage     llm.Usage
-	mu             sync.Mutex
-	logger         *slog.Logger
-	systemPrompt   string
-	workingDir     string
-	conversationID string
-	onWorking      func(working bool)
-	sequenceID     int64
-	emitUIAction   UIActionFunc
+	provider         llm.Provider
+	model            string
+	tools            []*AgentTool
+	recordMessage    MessageRecordFunc
+	history          []llm.Message
+	messageQueue     []llm.Message
+	totalUsage       llm.Usage
+	mu               sync.Mutex
+	logger           *slog.Logger
+	systemPrompt     string
+	workingDir       string
+	conversationID   string
+	onWorking        func(working bool)
+	sequenceID       int64
+	emitUIAction     UIActionFunc
+	emitUserPrompt   EmitUserPromptFunc
+	waitUserResponse WaitUserResponseFunc
 }
 
 // NewLoop creates a new Loop instance.
@@ -79,18 +85,20 @@ func NewLoop(config LoopConfig) *Loop {
 	}
 
 	return &Loop{
-		provider:       config.Provider,
-		model:          config.Model,
-		history:        config.History,
-		tools:          config.Tools,
-		recordMessage:  config.RecordMessage,
-		messageQueue:   make([]llm.Message, 0),
-		logger:         logger,
-		systemPrompt:   config.SystemPrompt,
-		workingDir:     config.WorkingDir,
-		conversationID: config.ConversationID,
-		onWorking:      config.OnWorking,
-		emitUIAction:   config.EmitUIAction,
+		provider:         config.Provider,
+		model:            config.Model,
+		history:          config.History,
+		tools:            config.Tools,
+		recordMessage:    config.RecordMessage,
+		messageQueue:     make([]llm.Message, 0),
+		logger:           logger,
+		systemPrompt:     config.SystemPrompt,
+		workingDir:       config.WorkingDir,
+		conversationID:   config.ConversationID,
+		onWorking:        config.OnWorking,
+		emitUIAction:     config.EmitUIAction,
+		emitUserPrompt:   config.EmitUserPrompt,
+		waitUserResponse: config.WaitUserResponse,
 	}
 }
 
@@ -245,9 +253,11 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 	}
 
 	return tool.Run(ToolContext{
-		Context:      ctx,
-		WorkingDir:   l.workingDir,
-		EmitUIAction: l.emitUIAction,
+		Context:          ctx,
+		WorkingDir:       l.workingDir,
+		EmitUIAction:     l.emitUIAction,
+		EmitUserPrompt:   l.emitUserPrompt,
+		WaitUserResponse: l.waitUserResponse,
 	}, input)
 }
 

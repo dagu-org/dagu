@@ -110,6 +110,7 @@ func (a *API) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler) htt
 			r.Post("/chat", a.handleChat)
 			r.Get("/stream", a.handleStream)
 			r.Post("/cancel", a.handleCancel)
+			r.Post("/respond", a.handleUserResponse)
 		})
 	})
 }
@@ -587,6 +588,37 @@ func (a *API) handleCancel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.respondJSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
+}
+
+// handleUserResponse submits a user's response to an agent prompt.
+// POST /api/v2/agent/conversations/{id}/respond
+func (a *API) handleUserResponse(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	userID := getUserIDFromContext(r.Context())
+
+	mgr, ok := a.getActiveConversation(id, userID)
+	if !ok {
+		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Conversation not found")
+		return
+	}
+
+	var req UserPromptResponse
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		a.respondError(w, http.StatusBadRequest, api.ErrorCodeBadRequest, "Invalid JSON")
+		return
+	}
+
+	if req.PromptID == "" {
+		a.respondError(w, http.StatusBadRequest, api.ErrorCodeBadRequest, "prompt_id is required")
+		return
+	}
+
+	if !mgr.SubmitUserResponse(req) {
+		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Prompt not found or already answered")
+		return
+	}
+
+	a.respondJSON(w, http.StatusOK, map[string]string{"status": "accepted"})
 }
 
 // ptrTo returns a pointer to the given value.

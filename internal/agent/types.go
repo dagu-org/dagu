@@ -21,6 +21,8 @@ const (
 	MessageTypeError MessageType = "error"
 	// MessageTypeUIAction represents a UI action to be performed.
 	MessageTypeUIAction MessageType = "ui_action"
+	// MessageTypeUserPrompt represents a question from agent to user.
+	MessageTypeUserPrompt MessageType = "user_prompt"
 )
 
 // UIAction represents an action to be performed by the UI (e.g., navigate).
@@ -31,13 +33,51 @@ type UIAction struct {
 	Path string `json:"path,omitempty"`
 }
 
+// UserPromptOption represents a single option for a user prompt.
+type UserPromptOption struct {
+	// ID is the unique identifier for this option.
+	ID string `json:"id"`
+	// Label is the display text for this option.
+	Label string `json:"label"`
+	// Description provides additional context for this option.
+	Description string `json:"description,omitempty"`
+}
+
+// UserPrompt represents a question from agent to user.
+type UserPrompt struct {
+	// PromptID is the unique identifier for this prompt.
+	PromptID string `json:"prompt_id"`
+	// Question is the question text to display.
+	Question string `json:"question"`
+	// Options are the predefined choices (2-4 options).
+	Options []UserPromptOption `json:"options,omitempty"`
+	// AllowFreeText enables an optional text input field.
+	AllowFreeText bool `json:"allow_free_text"`
+	// FreeTextPlaceholder is the placeholder for the text input.
+	FreeTextPlaceholder string `json:"free_text_placeholder,omitempty"`
+	// MultiSelect allows selecting multiple options.
+	MultiSelect bool `json:"multi_select"`
+}
+
+// UserPromptResponse is the user's answer to a prompt.
+type UserPromptResponse struct {
+	// PromptID identifies which prompt this responds to.
+	PromptID string `json:"prompt_id"`
+	// SelectedOptionIDs are the IDs of selected options.
+	SelectedOptionIDs []string `json:"selected_option_ids,omitempty"`
+	// FreeTextResponse is the user's text input.
+	FreeTextResponse string `json:"free_text_response,omitempty"`
+	// Cancelled indicates the user skipped the prompt.
+	Cancelled bool `json:"cancelled,omitempty"`
+}
+
 // Message represents a message in a conversation.
 type Message struct {
 	// ID is the unique identifier for this message.
 	ID string `json:"id"`
 	// ConversationID links this message to its parent conversation.
 	ConversationID string `json:"conversation_id"`
-	// Type identifies the message type (user, assistant, error, ui_action).
+	// Type identifies the message type (user, assistant, error, ui_action, user_prompt).
 	Type MessageType `json:"type"`
 	// SequenceID orders messages within a conversation.
 	SequenceID int64 `json:"sequence_id"`
@@ -55,6 +95,8 @@ type Message struct {
 	LLMData *llm.Message `json:"llm_data,omitempty"`
 	// UIAction contains a UI action when Type is MessageTypeUIAction.
 	UIAction *UIAction `json:"ui_action,omitempty"`
+	// UserPrompt contains a prompt when Type is MessageTypeUserPrompt.
+	UserPrompt *UserPrompt `json:"user_prompt,omitempty"`
 }
 
 // ToolResult represents the result of a tool call.
@@ -153,6 +195,12 @@ type ToolFunc func(ctx ToolContext, input json.RawMessage) ToolOut
 // UIActionFunc emits UI actions during tool execution.
 type UIActionFunc func(action UIAction)
 
+// EmitUserPromptFunc emits a user prompt during tool execution.
+type EmitUserPromptFunc func(prompt UserPrompt)
+
+// WaitUserResponseFunc blocks until user responds to a prompt.
+type WaitUserResponseFunc func(ctx context.Context, promptID string) (UserPromptResponse, error)
+
 // ToolContext provides context for tool execution.
 type ToolContext struct {
 	// Context is the parent context for cancellation propagation.
@@ -161,6 +209,10 @@ type ToolContext struct {
 	WorkingDir string
 	// EmitUIAction is a callback to emit UI actions during execution.
 	EmitUIAction UIActionFunc
+	// EmitUserPrompt is a callback to emit user prompts during execution.
+	EmitUserPrompt EmitUserPromptFunc
+	// WaitUserResponse blocks until user responds to a prompt.
+	WaitUserResponse WaitUserResponseFunc
 }
 
 // AgentTool extends llm.Tool with an execution function.

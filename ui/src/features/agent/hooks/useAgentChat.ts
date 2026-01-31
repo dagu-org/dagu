@@ -9,6 +9,7 @@ import {
   DAGContext,
   NewConversationResponse,
   StreamResponse,
+  UserPromptResponse,
 } from '../types';
 
 function buildChatRequest(
@@ -20,9 +21,14 @@ function buildChatRequest(
 }
 
 async function fetchWithAuth<T>(url: string, options?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {
+    ...getAuthHeaders(),
+    ...(options?.body ? { 'Content-Type': 'application/json' } : {}),
+    ...options?.headers as Record<string, string>,
+  };
   const response = await fetch(url, {
     ...options,
-    headers: { ...getAuthHeaders(), ...options?.headers },
+    headers,
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
@@ -65,6 +71,7 @@ export function useAgentChat() {
   const retryCountRef = useRef(0);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [answeredPrompts, setAnsweredPrompts] = useState<Record<string, string>>({});
   const baseUrl = `${config.apiURL}/agent`;
 
   const closeEventSource = useCallback((): void => {
@@ -171,6 +178,22 @@ export function useAgentChat() {
     await fetchWithAuth(`${baseUrl}/conversations/${conversationId}/cancel`, { method: 'POST' });
   }, [baseUrl, conversationId]);
 
+  const respondToPrompt = useCallback(async (response: UserPromptResponse, displayValue: string): Promise<void> => {
+    if (!conversationId) return;
+
+    try {
+      await fetchWithAuth(`${baseUrl}/conversations/${conversationId}/respond`, {
+        method: 'POST',
+        body: JSON.stringify(response),
+      });
+      setAnsweredPrompts(prev => ({ ...prev, [response.prompt_id]: displayValue }));
+    } catch (err) {
+      // If prompt not found (e.g., after reload), mark as answered anyway to update UI
+      setAnsweredPrompts(prev => ({ ...prev, [response.prompt_id]: displayValue }));
+      setError(err instanceof Error ? err.message : 'Failed to submit response');
+    }
+  }, [baseUrl, conversationId]);
+
   const fetchConversations = useCallback(async (): Promise<void> => {
     try {
       const data = await fetchWithAuth<ConversationWithState[]>(`${baseUrl}/conversations`);
@@ -186,6 +209,7 @@ export function useAgentChat() {
       const data = await fetchWithAuth<StreamResponse>(`${baseUrl}/conversations/${id}`);
       setConversationId(id);
       setMessages(data.messages || []);
+      setAnsweredPrompts({}); // Clear answered prompts when switching conversations
       if (data.conversation_state) {
         setConversationState(data.conversation_state);
       }
@@ -197,6 +221,11 @@ export function useAgentChat() {
 
   const clearError = useCallback(() => setError(null), []);
 
+  const handleClearConversation = useCallback(() => {
+    clearConversation();
+    setAnsweredPrompts({});
+  }, [clearConversation]);
+
   return {
     conversationId,
     messages,
@@ -205,13 +234,15 @@ export function useAgentChat() {
     conversations,
     isWorking,
     error,
+    answeredPrompts,
     setError,
     startConversation,
     sendMessage,
     cancelConversation,
-    clearConversation,
+    clearConversation: handleClearConversation,
     clearError,
     fetchConversations,
     selectConversation,
+    respondToPrompt,
   };
 }

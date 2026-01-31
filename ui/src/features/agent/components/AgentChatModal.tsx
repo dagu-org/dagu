@@ -54,6 +54,7 @@ export function AgentChatModal(): ReactElement | null {
     conversations,
     isWorking,
     error,
+    answeredPrompts,
     setError,
     sendMessage,
     cancelConversation,
@@ -61,6 +62,7 @@ export function AgentChatModal(): ReactElement | null {
     clearError,
     fetchConversations,
     selectConversation,
+    respondToPrompt,
   } = useAgentChat();
   const { bounds, dragHandlers, resizeHandlers } = useResizableDraggable();
 
@@ -206,11 +208,6 @@ export function AgentChatModal(): ReactElement | null {
               ))}
             </SelectContent>
           </Select>
-          {isWorking && (
-            <span className="text-xs text-yellow-500 font-mono flex-shrink-0">
-              running...
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-0.5 flex-shrink-0">
           <Button
@@ -249,7 +246,13 @@ export function AgentChatModal(): ReactElement | null {
         </div>
       )}
 
-      <ChatMessages messages={messages} pendingUserMessage={pendingUserMessage} isWorking={isWorking} />
+      <ChatMessages
+        messages={messages}
+        pendingUserMessage={pendingUserMessage}
+        isWorking={isWorking}
+        onPromptRespond={respondToPrompt}
+        answeredPrompts={answeredPrompts}
+      />
 
       <ChatInput
         onSend={handleSend}
