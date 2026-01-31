@@ -11,21 +11,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func createTestFile(t *testing.T, content string) string {
+	t.Helper()
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "test.txt")
+	require.NoError(t, os.WriteFile(filePath, []byte(content), 0o600))
+	return filePath
+}
+
+func readInput(path string) json.RawMessage {
+	return json.RawMessage(`{"path": "` + path + `"}`)
+}
+
 func TestReadTool_Run(t *testing.T) {
 	t.Parallel()
+	tool := NewReadTool()
 
 	t.Run("reads existing file", func(t *testing.T) {
 		t.Parallel()
+		filePath := createTestFile(t, "line1\nline2\nline3")
 
-		dir := t.TempDir()
-		filePath := filepath.Join(dir, "test.txt")
-		content := "line1\nline2\nline3"
-		require.NoError(t, os.WriteFile(filePath, []byte(content), 0o600))
-
-		tool := NewReadTool()
-		input := json.RawMessage(`{"path": "` + filePath + `"}`)
-
-		result := tool.Run(ToolContext{}, input)
+		result := tool.Run(ToolContext{}, readInput(filePath))
 
 		assert.False(t, result.IsError)
 		assert.Contains(t, result.Content, "line1")
@@ -35,15 +41,9 @@ func TestReadTool_Run(t *testing.T) {
 
 	t.Run("includes line numbers", func(t *testing.T) {
 		t.Parallel()
+		filePath := createTestFile(t, "first\nsecond")
 
-		dir := t.TempDir()
-		filePath := filepath.Join(dir, "test.txt")
-		require.NoError(t, os.WriteFile(filePath, []byte("first\nsecond"), 0o600))
-
-		tool := NewReadTool()
-		input := json.RawMessage(`{"path": "` + filePath + `"}`)
-
-		result := tool.Run(ToolContext{}, input)
+		result := tool.Run(ToolContext{}, readInput(filePath))
 
 		assert.False(t, result.IsError)
 		assert.Contains(t, result.Content, "1\t")
@@ -53,10 +53,7 @@ func TestReadTool_Run(t *testing.T) {
 	t.Run("file not found returns error", func(t *testing.T) {
 		t.Parallel()
 
-		tool := NewReadTool()
-		input := json.RawMessage(`{"path": "/nonexistent/path/file.txt"}`)
-
-		result := tool.Run(ToolContext{}, input)
+		result := tool.Run(ToolContext{}, readInput("/nonexistent/path/file.txt"))
 
 		assert.True(t, result.IsError)
 		assert.Contains(t, result.Content, "not found")
@@ -64,13 +61,9 @@ func TestReadTool_Run(t *testing.T) {
 
 	t.Run("directory returns error", func(t *testing.T) {
 		t.Parallel()
-
 		dir := t.TempDir()
 
-		tool := NewReadTool()
-		input := json.RawMessage(`{"path": "` + dir + `"}`)
-
-		result := tool.Run(ToolContext{}, input)
+		result := tool.Run(ToolContext{}, readInput(dir))
 
 		assert.True(t, result.IsError)
 		assert.Contains(t, result.Content, "directory")
@@ -79,10 +72,7 @@ func TestReadTool_Run(t *testing.T) {
 	t.Run("empty path returns error", func(t *testing.T) {
 		t.Parallel()
 
-		tool := NewReadTool()
-		input := json.RawMessage(`{"path": ""}`)
-
-		result := tool.Run(ToolContext{}, input)
+		result := tool.Run(ToolContext{}, json.RawMessage(`{"path": ""}`))
 
 		assert.True(t, result.IsError)
 		assert.Contains(t, result.Content, "required")
@@ -91,10 +81,7 @@ func TestReadTool_Run(t *testing.T) {
 	t.Run("invalid JSON returns error", func(t *testing.T) {
 		t.Parallel()
 
-		tool := NewReadTool()
-		input := json.RawMessage(`{invalid}`)
-
-		result := tool.Run(ToolContext{}, input)
+		result := tool.Run(ToolContext{}, json.RawMessage(`{invalid}`))
 
 		assert.True(t, result.IsError)
 		assert.Contains(t, result.Content, "parse")
@@ -102,51 +89,31 @@ func TestReadTool_Run(t *testing.T) {
 
 	t.Run("respects offset parameter", func(t *testing.T) {
 		t.Parallel()
-
-		dir := t.TempDir()
-		filePath := filepath.Join(dir, "test.txt")
-		content := "line1\nline2\nline3\nline4\nline5"
-		require.NoError(t, os.WriteFile(filePath, []byte(content), 0o600))
-
-		tool := NewReadTool()
+		filePath := createTestFile(t, "line1\nline2\nline3\nline4\nline5")
 		input := json.RawMessage(`{"path": "` + filePath + `", "offset": 3}`)
 
 		result := tool.Run(ToolContext{}, input)
 
 		assert.False(t, result.IsError)
-		// Should start from line 3
 		assert.Contains(t, result.Content, "3\t")
 		assert.Contains(t, result.Content, "line3")
-		// Should not contain lines 1-2
 		assert.NotContains(t, result.Content, "1\tline1")
 	})
 
 	t.Run("respects limit parameter", func(t *testing.T) {
 		t.Parallel()
-
-		dir := t.TempDir()
-		filePath := filepath.Join(dir, "test.txt")
-		content := "line1\nline2\nline3\nline4\nline5"
-		require.NoError(t, os.WriteFile(filePath, []byte(content), 0o600))
-
-		tool := NewReadTool()
+		filePath := createTestFile(t, "line1\nline2\nline3\nline4\nline5")
 		input := json.RawMessage(`{"path": "` + filePath + `", "limit": 2}`)
 
 		result := tool.Run(ToolContext{}, input)
 
 		assert.False(t, result.IsError)
-		// Should show "more lines" indicator
 		assert.Contains(t, result.Content, "more lines")
 	})
 
 	t.Run("offset beyond file length returns error", func(t *testing.T) {
 		t.Parallel()
-
-		dir := t.TempDir()
-		filePath := filepath.Join(dir, "test.txt")
-		require.NoError(t, os.WriteFile(filePath, []byte("short"), 0o600))
-
-		tool := NewReadTool()
+		filePath := createTestFile(t, "short")
 		input := json.RawMessage(`{"path": "` + filePath + `", "offset": 100}`)
 
 		result := tool.Run(ToolContext{}, input)
@@ -157,16 +124,11 @@ func TestReadTool_Run(t *testing.T) {
 
 	t.Run("uses working directory for relative paths", func(t *testing.T) {
 		t.Parallel()
-
 		dir := t.TempDir()
-		filePath := filepath.Join(dir, "test.txt")
-		require.NoError(t, os.WriteFile(filePath, []byte("content"), 0o600))
-
-		tool := NewReadTool()
-		input := json.RawMessage(`{"path": "test.txt"}`)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "test.txt"), []byte("content"), 0o600))
 		ctx := ToolContext{WorkingDir: dir}
 
-		result := tool.Run(ctx, input)
+		result := tool.Run(ctx, json.RawMessage(`{"path": "test.txt"}`))
 
 		assert.False(t, result.IsError)
 		assert.Contains(t, result.Content, "content")
@@ -176,24 +138,14 @@ func TestReadTool_Run(t *testing.T) {
 func TestReadTool_LargeFile(t *testing.T) {
 	t.Parallel()
 
-	t.Run("rejects file larger than max size", func(t *testing.T) {
-		t.Parallel()
+	tool := NewReadTool()
+	largeContent := strings.Repeat("x", 1024*1024+100)
+	filePath := createTestFile(t, largeContent)
 
-		dir := t.TempDir()
-		filePath := filepath.Join(dir, "large.txt")
+	result := tool.Run(ToolContext{}, readInput(filePath))
 
-		// Create a file larger than maxReadSize (1MB)
-		largeContent := strings.Repeat("x", 1024*1024+100)
-		require.NoError(t, os.WriteFile(filePath, []byte(largeContent), 0o600))
-
-		tool := NewReadTool()
-		input := json.RawMessage(`{"path": "` + filePath + `"}`)
-
-		result := tool.Run(ToolContext{}, input)
-
-		assert.True(t, result.IsError)
-		assert.Contains(t, result.Content, "too large")
-	})
+	assert.True(t, result.IsError)
+	assert.Contains(t, result.Content, "too large")
 }
 
 func TestNewReadTool(t *testing.T) {
@@ -210,34 +162,47 @@ func TestNewReadTool(t *testing.T) {
 func TestFormatFileContent(t *testing.T) {
 	t.Parallel()
 
-	t.Run("formats with line numbers", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name          string
+		content       string
+		offset        int
+		limit         int
+		wantContains  []string
+		wantExcludes  []string
+	}{
+		{
+			name:         "formats with line numbers",
+			content:      "a\nb\nc",
+			wantContains: []string{"1\t", "2\t", "3\t"},
+		},
+		{
+			name:         "applies offset correctly",
+			content:      "a\nb\nc\nd",
+			offset:       2,
+			wantContains: []string{"2\tb"},
+			wantExcludes: []string{"1\ta"},
+		},
+		{
+			name:         "applies limit correctly",
+			content:      "a\nb\nc\nd\ne",
+			limit:        2,
+			wantContains: []string{"more lines"},
+		},
+	}
 
-		result := formatFileContent("a\nb\nc", 0, 0)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		assert.False(t, result.IsError)
-		assert.Contains(t, result.Content, "1\t")
-		assert.Contains(t, result.Content, "2\t")
-		assert.Contains(t, result.Content, "3\t")
-	})
+			result := formatFileContent(tc.content, tc.offset, tc.limit)
 
-	t.Run("applies offset correctly", func(t *testing.T) {
-		t.Parallel()
-
-		result := formatFileContent("a\nb\nc\nd", 2, 0)
-
-		assert.False(t, result.IsError)
-		// Line numbers should start from 2
-		assert.Contains(t, result.Content, "2\tb")
-		assert.NotContains(t, result.Content, "1\ta")
-	})
-
-	t.Run("applies limit correctly", func(t *testing.T) {
-		t.Parallel()
-
-		result := formatFileContent("a\nb\nc\nd\ne", 0, 2)
-
-		assert.False(t, result.IsError)
-		assert.Contains(t, result.Content, "more lines")
-	})
+			assert.False(t, result.IsError)
+			for _, want := range tc.wantContains {
+				assert.Contains(t, result.Content, want)
+			}
+			for _, exclude := range tc.wantExcludes {
+				assert.NotContains(t, result.Content, exclude)
+			}
+		})
+	}
 }

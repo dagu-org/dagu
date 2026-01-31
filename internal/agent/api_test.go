@@ -14,9 +14,69 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// =============================================================================
-// Unit Tests for API Constructor and Middleware
-// =============================================================================
+// apiTestSetup contains the common test infrastructure for API tests.
+type apiTestSetup struct {
+	api         *API
+	router      chi.Router
+	configStore *mockConfigStore
+}
+
+// newAPITestSetup creates a new API test setup with the given options.
+func newAPITestSetup(t *testing.T, enabled bool, withProvider bool, workingDir string) *apiTestSetup {
+	t.Helper()
+
+	configStore := newMockConfigStore(enabled)
+	if withProvider {
+		configStore.provider = &mockLLMProvider{}
+	}
+
+	if workingDir == "" {
+		workingDir = t.TempDir()
+	}
+
+	api := NewAPI(APIConfig{
+		ConfigStore: configStore,
+		WorkingDir:  workingDir,
+	})
+
+	r := chi.NewRouter()
+	api.RegisterRoutes(r, nil)
+
+	return &apiTestSetup{
+		api:         api,
+		router:      r,
+		configStore: configStore,
+	}
+}
+
+// postJSON sends a POST request with JSON body and returns the recorder.
+func (s *apiTestSetup) postJSON(path string, body any) *httptest.ResponseRecorder {
+	data, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	s.router.ServeHTTP(rec, req)
+	return rec
+}
+
+// get sends a GET request and returns the recorder.
+func (s *apiTestSetup) get(path string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	rec := httptest.NewRecorder()
+	s.router.ServeHTTP(rec, req)
+	return rec
+}
+
+// createConversation creates a new conversation and returns its ID.
+func (s *apiTestSetup) createConversation(t *testing.T, message string) string {
+	t.Helper()
+	rec := s.postJSON("/api/v2/agent/conversations/new", ChatRequest{Message: message})
+	require.Equal(t, http.StatusCreated, rec.Code)
+
+	var resp NewConversationResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	return resp.ConversationID
+}
 
 func TestNewAPI(t *testing.T) {
 	t.Parallel()
@@ -58,7 +118,7 @@ func TestAPI_EnabledMiddleware(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 		}))
 
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 
@@ -76,7 +136,7 @@ func TestAPI_EnabledMiddleware(t *testing.T) {
 			t.Fatal("should not be called")
 		}))
 
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 
@@ -84,39 +144,19 @@ func TestAPI_EnabledMiddleware(t *testing.T) {
 	})
 }
 
-// =============================================================================
-// HTTP Handler Tests using httptest
-// =============================================================================
-
 func TestAPI_HandleNewConversation(t *testing.T) {
 	t.Parallel()
 
 	t.Run("creates conversation", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-		configStore.provider = &mockLLMProvider{}
-
-		api := NewAPI(APIConfig{
-			ConfigStore: configStore,
-			WorkingDir:  t.TempDir(),
-		})
-
-		r := chi.NewRouter()
-		api.RegisterRoutes(r, nil)
-
-		body, _ := json.Marshal(ChatRequest{Message: "hello"})
-		req := httptest.NewRequest("POST", "/api/v2/agent/conversations/new", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-
-		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
+		setup := newAPITestSetup(t, true, true, "")
+		rec := setup.postJSON("/api/v2/agent/conversations/new", ChatRequest{Message: "hello"})
 
 		assert.Equal(t, http.StatusCreated, rec.Code)
 
 		var resp NewConversationResponse
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
-		require.NoError(t, err)
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 		assert.NotEmpty(t, resp.ConversationID)
 		assert.Equal(t, "accepted", resp.Status)
 	})
@@ -124,20 +164,8 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 	t.Run("empty message returns bad request", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-		configStore.provider = &mockLLMProvider{}
-
-		api := NewAPI(APIConfig{ConfigStore: configStore})
-
-		r := chi.NewRouter()
-		api.RegisterRoutes(r, nil)
-
-		body, _ := json.Marshal(ChatRequest{Message: ""})
-		req := httptest.NewRequest("POST", "/api/v2/agent/conversations/new", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-
-		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
+		setup := newAPITestSetup(t, true, true, "")
+		rec := setup.postJSON("/api/v2/agent/conversations/new", ChatRequest{Message: ""})
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
@@ -145,19 +173,8 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 	t.Run("agent disabled returns not found", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(false)
-
-		api := NewAPI(APIConfig{ConfigStore: configStore})
-
-		r := chi.NewRouter()
-		api.RegisterRoutes(r, nil)
-
-		body, _ := json.Marshal(ChatRequest{Message: "hello"})
-		req := httptest.NewRequest("POST", "/api/v2/agent/conversations/new", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-
-		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
+		setup := newAPITestSetup(t, false, false, "")
+		rec := setup.postJSON("/api/v2/agent/conversations/new", ChatRequest{Message: "hello"})
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
@@ -165,19 +182,12 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 	t.Run("invalid JSON returns bad request", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-		configStore.provider = &mockLLMProvider{}
+		setup := newAPITestSetup(t, true, true, "")
 
-		api := NewAPI(APIConfig{ConfigStore: configStore})
-
-		r := chi.NewRouter()
-		api.RegisterRoutes(r, nil)
-
-		req := httptest.NewRequest("POST", "/api/v2/agent/conversations/new", bytes.NewReader([]byte("invalid")))
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/agent/conversations/new", bytes.NewReader([]byte("invalid")))
 		req.Header.Set("Content-Type", "application/json")
-
 		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
+		setup.router.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
@@ -185,20 +195,8 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 	t.Run("provider error returns service unavailable", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-		configStore.provider = nil // No provider set
-
-		api := NewAPI(APIConfig{ConfigStore: configStore})
-
-		r := chi.NewRouter()
-		api.RegisterRoutes(r, nil)
-
-		body, _ := json.Marshal(ChatRequest{Message: "hello"})
-		req := httptest.NewRequest("POST", "/api/v2/agent/conversations/new", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-
-		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
+		setup := newAPITestSetup(t, true, false, "")
+		rec := setup.postJSON("/api/v2/agent/conversations/new", ChatRequest{Message: "hello"})
 
 		assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
 	})
@@ -206,26 +204,11 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 	t.Run("with model override", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-		configStore.provider = &mockLLMProvider{}
-
-		api := NewAPI(APIConfig{
-			ConfigStore: configStore,
-			WorkingDir:  t.TempDir(),
-		})
-
-		r := chi.NewRouter()
-		api.RegisterRoutes(r, nil)
-
-		body, _ := json.Marshal(ChatRequest{
+		setup := newAPITestSetup(t, true, true, "")
+		rec := setup.postJSON("/api/v2/agent/conversations/new", ChatRequest{
 			Message: "hello",
 			Model:   "custom-model",
 		})
-		req := httptest.NewRequest("POST", "/api/v2/agent/conversations/new", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-
-		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusCreated, rec.Code)
 	})
@@ -247,18 +230,15 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 		api.RegisterRoutes(r, nil)
 
 		body, _ := json.Marshal(ChatRequest{Message: "hello"})
-		req := httptest.NewRequest("POST", "/api/v2/agent/conversations/new", bytes.NewReader(body))
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/agent/conversations/new", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusCreated, rec.Code)
 
-		// Verify conversation was persisted
 		var resp NewConversationResponse
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
-		require.NoError(t, err)
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 
 		convStore.mu.Lock()
 		_, exists := convStore.conversations[resp.ConversationID]
@@ -273,72 +253,36 @@ func TestAPI_HandleListConversations(t *testing.T) {
 	t.Run("returns empty list", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-
-		api := NewAPI(APIConfig{ConfigStore: configStore})
-
-		r := chi.NewRouter()
-		api.RegisterRoutes(r, nil)
-
-		req := httptest.NewRequest("GET", "/api/v2/agent/conversations", nil)
-		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
+		setup := newAPITestSetup(t, true, false, "")
+		rec := setup.get("/api/v2/agent/conversations")
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 
 		var conversations []ConversationWithState
-		err := json.Unmarshal(rec.Body.Bytes(), &conversations)
-		require.NoError(t, err)
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &conversations))
 		assert.Empty(t, conversations)
 	})
 
 	t.Run("returns active conversations", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-		configStore.provider = &mockLLMProvider{}
+		setup := newAPITestSetup(t, true, true, "")
+		setup.createConversation(t, "hello")
 
-		api := NewAPI(APIConfig{
-			ConfigStore: configStore,
-			WorkingDir:  t.TempDir(),
-		})
-
-		r := chi.NewRouter()
-		api.RegisterRoutes(r, nil)
-
-		// Create a conversation first
-		body, _ := json.Marshal(ChatRequest{Message: "hello"})
-		req := httptest.NewRequest("POST", "/api/v2/agent/conversations/new", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
-		require.Equal(t, http.StatusCreated, rec.Code)
-
-		// List conversations
-		req = httptest.NewRequest("GET", "/api/v2/agent/conversations", nil)
-		rec = httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
+		rec := setup.get("/api/v2/agent/conversations")
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 
 		var conversations []ConversationWithState
-		err := json.Unmarshal(rec.Body.Bytes(), &conversations)
-		require.NoError(t, err)
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &conversations))
 		assert.Len(t, conversations, 1)
 	})
 
 	t.Run("agent disabled returns not found", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(false)
-		api := NewAPI(APIConfig{ConfigStore: configStore})
-
-		r := chi.NewRouter()
-		api.RegisterRoutes(r, nil)
-
-		req := httptest.NewRequest("GET", "/api/v2/agent/conversations", nil)
-		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
+		setup := newAPITestSetup(t, false, false, "")
+		rec := setup.get("/api/v2/agent/conversations")
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
@@ -350,16 +294,8 @@ func TestAPI_HandleCancel(t *testing.T) {
 	t.Run("not found for non-existent conversation", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-
-		api := NewAPI(APIConfig{ConfigStore: configStore})
-
-		r := chi.NewRouter()
-		api.RegisterRoutes(r, nil)
-
-		req := httptest.NewRequest("POST", "/api/v2/agent/conversations/non-existent/cancel", nil)
-		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
+		setup := newAPITestSetup(t, true, false, "")
+		rec := setup.postJSON("/api/v2/agent/conversations/non-existent/cancel", nil)
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
@@ -367,39 +303,15 @@ func TestAPI_HandleCancel(t *testing.T) {
 	t.Run("cancels active conversation", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-		configStore.provider = &mockLLMProvider{}
+		setup := newAPITestSetup(t, true, true, "")
+		convID := setup.createConversation(t, "hello")
 
-		api := NewAPI(APIConfig{
-			ConfigStore: configStore,
-			WorkingDir:  t.TempDir(),
-		})
-
-		r := chi.NewRouter()
-		api.RegisterRoutes(r, nil)
-
-		// Create a conversation first
-		body, _ := json.Marshal(ChatRequest{Message: "hello"})
-		req := httptest.NewRequest("POST", "/api/v2/agent/conversations/new", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
-		require.Equal(t, http.StatusCreated, rec.Code)
-
-		var createResp NewConversationResponse
-		err := json.Unmarshal(rec.Body.Bytes(), &createResp)
-		require.NoError(t, err)
-
-		// Cancel the conversation
-		req = httptest.NewRequest("POST", "/api/v2/agent/conversations/"+createResp.ConversationID+"/cancel", nil)
-		rec = httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
+		rec := setup.postJSON("/api/v2/agent/conversations/"+convID+"/cancel", nil)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 
 		var cancelResp map[string]string
-		err = json.Unmarshal(rec.Body.Bytes(), &cancelResp)
-		require.NoError(t, err)
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &cancelResp))
 		assert.Equal(t, "cancelled", cancelResp["status"])
 	})
 }
@@ -410,16 +322,8 @@ func TestAPI_HandleGetConversation(t *testing.T) {
 	t.Run("not found for non-existent conversation", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-
-		api := NewAPI(APIConfig{ConfigStore: configStore})
-
-		r := chi.NewRouter()
-		api.RegisterRoutes(r, nil)
-
-		req := httptest.NewRequest("GET", "/api/v2/agent/conversations/non-existent", nil)
-		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
+		setup := newAPITestSetup(t, true, false, "")
+		rec := setup.get("/api/v2/agent/conversations/non-existent")
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
@@ -427,41 +331,17 @@ func TestAPI_HandleGetConversation(t *testing.T) {
 	t.Run("returns active conversation", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-		configStore.provider = &mockLLMProvider{}
+		setup := newAPITestSetup(t, true, true, "")
+		convID := setup.createConversation(t, "hello")
 
-		api := NewAPI(APIConfig{
-			ConfigStore: configStore,
-			WorkingDir:  t.TempDir(),
-		})
-
-		r := chi.NewRouter()
-		api.RegisterRoutes(r, nil)
-
-		// Create a conversation first
-		body, _ := json.Marshal(ChatRequest{Message: "hello"})
-		req := httptest.NewRequest("POST", "/api/v2/agent/conversations/new", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
-		require.Equal(t, http.StatusCreated, rec.Code)
-
-		var createResp NewConversationResponse
-		err := json.Unmarshal(rec.Body.Bytes(), &createResp)
-		require.NoError(t, err)
-
-		// Get the conversation
-		req = httptest.NewRequest("GET", "/api/v2/agent/conversations/"+createResp.ConversationID, nil)
-		rec = httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
+		rec := setup.get("/api/v2/agent/conversations/" + convID)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 
 		var getResp StreamResponse
-		err = json.Unmarshal(rec.Body.Bytes(), &getResp)
-		require.NoError(t, err)
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &getResp))
 		assert.NotNil(t, getResp.ConversationState)
-		assert.Equal(t, createResp.ConversationID, getResp.ConversationState.ConversationID)
+		assert.Equal(t, convID, getResp.ConversationState.ConversationID)
 	})
 }
 
@@ -471,19 +351,8 @@ func TestAPI_HandleChat(t *testing.T) {
 	t.Run("not found for non-existent conversation", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-
-		api := NewAPI(APIConfig{ConfigStore: configStore})
-
-		r := chi.NewRouter()
-		api.RegisterRoutes(r, nil)
-
-		body, _ := json.Marshal(ChatRequest{Message: "hello"})
-		req := httptest.NewRequest("POST", "/api/v2/agent/conversations/non-existent/chat", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-
-		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
+		setup := newAPITestSetup(t, true, false, "")
+		rec := setup.postJSON("/api/v2/agent/conversations/non-existent/chat", ChatRequest{Message: "hello"})
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
@@ -491,76 +360,25 @@ func TestAPI_HandleChat(t *testing.T) {
 	t.Run("sends message to existing conversation", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-		configStore.provider = &mockLLMProvider{}
+		setup := newAPITestSetup(t, true, true, "")
+		convID := setup.createConversation(t, "hello")
 
-		api := NewAPI(APIConfig{
-			ConfigStore: configStore,
-			WorkingDir:  t.TempDir(),
-		})
-
-		r := chi.NewRouter()
-		api.RegisterRoutes(r, nil)
-
-		// Create a conversation first
-		body, _ := json.Marshal(ChatRequest{Message: "hello"})
-		req := httptest.NewRequest("POST", "/api/v2/agent/conversations/new", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
-		require.Equal(t, http.StatusCreated, rec.Code)
-
-		var createResp NewConversationResponse
-		err := json.Unmarshal(rec.Body.Bytes(), &createResp)
-		require.NoError(t, err)
-
-		// Send follow-up message
-		body, _ = json.Marshal(ChatRequest{Message: "follow up"})
-		req = httptest.NewRequest("POST", "/api/v2/agent/conversations/"+createResp.ConversationID+"/chat", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		rec = httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
+		rec := setup.postJSON("/api/v2/agent/conversations/"+convID+"/chat", ChatRequest{Message: "follow up"})
 
 		assert.Equal(t, http.StatusAccepted, rec.Code)
 
 		var chatResp map[string]string
-		err = json.Unmarshal(rec.Body.Bytes(), &chatResp)
-		require.NoError(t, err)
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &chatResp))
 		assert.Equal(t, "accepted", chatResp["status"])
 	})
 
 	t.Run("empty message returns bad request", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-		configStore.provider = &mockLLMProvider{}
+		setup := newAPITestSetup(t, true, true, "")
+		convID := setup.createConversation(t, "hello")
 
-		api := NewAPI(APIConfig{
-			ConfigStore: configStore,
-			WorkingDir:  t.TempDir(),
-		})
-
-		r := chi.NewRouter()
-		api.RegisterRoutes(r, nil)
-
-		// Create a conversation first
-		body, _ := json.Marshal(ChatRequest{Message: "hello"})
-		req := httptest.NewRequest("POST", "/api/v2/agent/conversations/new", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
-		require.Equal(t, http.StatusCreated, rec.Code)
-
-		var createResp NewConversationResponse
-		err := json.Unmarshal(rec.Body.Bytes(), &createResp)
-		require.NoError(t, err)
-
-		// Send empty message
-		body, _ = json.Marshal(ChatRequest{Message: ""})
-		req = httptest.NewRequest("POST", "/api/v2/agent/conversations/"+createResp.ConversationID+"/chat", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		rec = httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
+		rec := setup.postJSON("/api/v2/agent/conversations/"+convID+"/chat", ChatRequest{Message: ""})
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
@@ -568,34 +386,13 @@ func TestAPI_HandleChat(t *testing.T) {
 	t.Run("invalid JSON returns bad request", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-		configStore.provider = &mockLLMProvider{}
+		setup := newAPITestSetup(t, true, true, "")
+		convID := setup.createConversation(t, "hello")
 
-		api := NewAPI(APIConfig{
-			ConfigStore: configStore,
-			WorkingDir:  t.TempDir(),
-		})
-
-		r := chi.NewRouter()
-		api.RegisterRoutes(r, nil)
-
-		// Create a conversation first
-		body, _ := json.Marshal(ChatRequest{Message: "hello"})
-		req := httptest.NewRequest("POST", "/api/v2/agent/conversations/new", bytes.NewReader(body))
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/agent/conversations/"+convID+"/chat", bytes.NewReader([]byte("invalid")))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
-		require.Equal(t, http.StatusCreated, rec.Code)
-
-		var createResp NewConversationResponse
-		err := json.Unmarshal(rec.Body.Bytes(), &createResp)
-		require.NoError(t, err)
-
-		// Send invalid JSON
-		req = httptest.NewRequest("POST", "/api/v2/agent/conversations/"+createResp.ConversationID+"/chat", bytes.NewReader([]byte("invalid")))
-		req.Header.Set("Content-Type", "application/json")
-		rec = httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
+		setup.router.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
@@ -607,16 +404,8 @@ func TestAPI_HandleStream(t *testing.T) {
 	t.Run("not found for non-existent conversation", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-
-		api := NewAPI(APIConfig{ConfigStore: configStore})
-
-		r := chi.NewRouter()
-		api.RegisterRoutes(r, nil)
-
-		req := httptest.NewRequest("GET", "/api/v2/agent/conversations/non-existent/stream", nil)
-		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
+		setup := newAPITestSetup(t, true, false, "")
+		rec := setup.get("/api/v2/agent/conversations/non-existent/stream")
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
@@ -624,57 +413,27 @@ func TestAPI_HandleStream(t *testing.T) {
 	t.Run("returns SSE headers for active conversation", func(t *testing.T) {
 		t.Parallel()
 
-		configStore := newMockConfigStore(true)
-		configStore.provider = &mockLLMProvider{}
+		setup := newAPITestSetup(t, true, true, "")
+		convID := setup.createConversation(t, "hello")
 
-		api := NewAPI(APIConfig{
-			ConfigStore: configStore,
-			WorkingDir:  t.TempDir(),
-		})
-
-		r := chi.NewRouter()
-		api.RegisterRoutes(r, nil)
-
-		// Create a conversation first
-		body, _ := json.Marshal(ChatRequest{Message: "hello"})
-		req := httptest.NewRequest("POST", "/api/v2/agent/conversations/new", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
-		require.Equal(t, http.StatusCreated, rec.Code)
-
-		var createResp NewConversationResponse
-		err := json.Unmarshal(rec.Body.Bytes(), &createResp)
-		require.NoError(t, err)
-
-		// Stream the conversation with a context that will be canceled
 		ctx, cancel := context.WithCancel(context.Background())
-		req = httptest.NewRequest("GET", "/api/v2/agent/conversations/"+createResp.ConversationID+"/stream", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/agent/conversations/"+convID+"/stream", nil)
 		req = req.WithContext(ctx)
-		rec = httptest.NewRecorder()
+		rec := httptest.NewRecorder()
 
-		// Run in goroutine since streaming blocks
 		done := make(chan struct{})
 		go func() {
 			defer close(done)
-			r.ServeHTTP(rec, req)
+			setup.router.ServeHTTP(rec, req)
 		}()
 
-		// Give some time for the response to start, then cancel
 		time.Sleep(50 * time.Millisecond)
 		cancel()
-
-		// Wait for the handler to finish
 		<-done
 
-		// Verify SSE content type
 		assert.Equal(t, "text/event-stream", rec.Header().Get("Content-Type"))
 	})
 }
-
-// =============================================================================
-// Pure Function Tests (No HTTP, No Dependencies)
-// =============================================================================
 
 func TestFormatMessageWithContexts(t *testing.T) {
 	t.Parallel()
@@ -727,6 +486,7 @@ func TestFormatMessageWithContexts(t *testing.T) {
 	}
 
 	for _, tc := range tests {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -841,6 +601,7 @@ func TestSelectModel(t *testing.T) {
 	}
 
 	for _, tc := range tests {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 

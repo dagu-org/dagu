@@ -3,11 +3,16 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func backgroundCtx() ToolContext {
+	return ToolContext{Context: context.Background()}
+}
 
 func TestBashTool_Run(t *testing.T) {
 	t.Parallel()
@@ -18,7 +23,7 @@ func TestBashTool_Run(t *testing.T) {
 		tool := NewBashTool()
 		input := json.RawMessage(`{"command": "echo hello"}`)
 
-		result := tool.Run(ToolContext{Context: context.Background()}, input)
+		result := tool.Run(backgroundCtx(), input)
 
 		assert.False(t, result.IsError)
 		assert.Contains(t, result.Content, "hello")
@@ -30,7 +35,7 @@ func TestBashTool_Run(t *testing.T) {
 		tool := NewBashTool()
 		input := json.RawMessage(`{"command": ""}`)
 
-		result := tool.Run(ToolContext{Context: context.Background()}, input)
+		result := tool.Run(backgroundCtx(), input)
 
 		assert.True(t, result.IsError)
 		assert.Contains(t, result.Content, "required")
@@ -42,7 +47,7 @@ func TestBashTool_Run(t *testing.T) {
 		tool := NewBashTool()
 		input := json.RawMessage(`{"command": "true"}`)
 
-		result := tool.Run(ToolContext{Context: context.Background()}, input)
+		result := tool.Run(backgroundCtx(), input)
 
 		assert.False(t, result.IsError)
 		assert.Equal(t, "(no output)", result.Content)
@@ -54,7 +59,7 @@ func TestBashTool_Run(t *testing.T) {
 		tool := NewBashTool()
 		input := json.RawMessage(`{"command": "echo error >&2"}`)
 
-		result := tool.Run(ToolContext{Context: context.Background()}, input)
+		result := tool.Run(backgroundCtx(), input)
 
 		assert.False(t, result.IsError)
 		assert.Contains(t, result.Content, "STDERR")
@@ -67,7 +72,7 @@ func TestBashTool_Run(t *testing.T) {
 		tool := NewBashTool()
 		input := json.RawMessage(`{"command": "exit 1"}`)
 
-		result := tool.Run(ToolContext{Context: context.Background()}, input)
+		result := tool.Run(backgroundCtx(), input)
 
 		assert.True(t, result.IsError)
 		assert.Contains(t, result.Content, "failed")
@@ -97,7 +102,7 @@ func TestBashTool_Run(t *testing.T) {
 		tool := NewBashTool()
 		input := json.RawMessage(`{invalid}`)
 
-		result := tool.Run(ToolContext{Context: context.Background()}, input)
+		result := tool.Run(backgroundCtx(), input)
 
 		assert.True(t, result.IsError)
 		assert.Contains(t, result.Content, "parse")
@@ -123,16 +128,14 @@ func TestBashTool_Timeout(t *testing.T) {
 		t.Parallel()
 
 		tool := NewBashTool()
-		// Sleep for 2 seconds with 1 second timeout
 		input := json.RawMessage(`{"command": "sleep 2", "timeout": 1}`)
 
 		start := time.Now()
-		result := tool.Run(ToolContext{Context: context.Background()}, input)
+		result := tool.Run(backgroundCtx(), input)
 		elapsed := time.Since(start)
 
 		assert.True(t, result.IsError)
 		assert.Contains(t, result.Content, "timed out")
-		// Should have timed out around 1 second
 		assert.Less(t, elapsed, 2*time.Second)
 	})
 
@@ -255,13 +258,8 @@ func TestTruncateOutput(t *testing.T) {
 	t.Run("long string truncated", func(t *testing.T) {
 		t.Parallel()
 
-		// Create a string longer than maxOutputLength
-		longString := make([]byte, maxOutputLength+100)
-		for i := range longString {
-			longString[i] = 'x'
-		}
-
-		result := truncateOutput(string(longString))
+		longString := strings.Repeat("x", maxOutputLength+100)
+		result := truncateOutput(longString)
 
 		assert.Len(t, result, maxOutputLength+len("\n... [output truncated]"))
 		assert.Contains(t, result, "truncated")
@@ -270,13 +268,10 @@ func TestTruncateOutput(t *testing.T) {
 	t.Run("exactly at limit unchanged", func(t *testing.T) {
 		t.Parallel()
 
-		exactString := make([]byte, maxOutputLength)
-		for i := range exactString {
-			exactString[i] = 'x'
-		}
+		exactString := strings.Repeat("x", maxOutputLength)
+		result := truncateOutput(exactString)
 
-		result := truncateOutput(string(exactString))
-		assert.Equal(t, string(exactString), result)
+		assert.Equal(t, exactString, result)
 	})
 }
 

@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -22,7 +23,6 @@ func TestSubPub_Subscribe(t *testing.T) {
 
 		next := sp.Subscribe(ctx, 0)
 
-		// Publish a message
 		go func() {
 			time.Sleep(10 * time.Millisecond)
 			sp.Publish(1, "hello")
@@ -68,39 +68,17 @@ func TestSubPub_Publish(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		// Subscribe with seqID 5 - should only receive messages with seqID > 5
 		next := sp.Subscribe(ctx, 5)
+		received := collectMessages(ctx, cancel, next)
 
-		received := make(chan string, 10)
-		go func() {
-			for {
-				msg, ok := next()
-				if !ok {
-					close(received)
-					return
-				}
-				received <- msg
-			}
-		}()
+		sp.Publish(3, "old")     // seqID 3 <= 5, should NOT be received
+		sp.Publish(5, "current") // seqID 5 <= 5, should NOT be received
+		sp.Publish(6, "new")     // seqID 6 > 5, SHOULD be received
 
-		// This should NOT be received (seqID 3 <= 5)
-		sp.Publish(3, "old")
-		// This should NOT be received (seqID 5 <= 5)
-		sp.Publish(5, "current")
-		// This SHOULD be received (seqID 6 > 5)
-		sp.Publish(6, "new")
-
-		// Give time for processing
 		time.Sleep(50 * time.Millisecond)
 		cancel()
 
-		// Collect received messages
-		var msgs []string
-		for msg := range received {
-			msgs = append(msgs, msg)
-		}
-
-		assert.Equal(t, []string{"new"}, msgs)
+		assert.Equal(t, []string{"new"}, <-received)
 	})
 
 	t.Run("updates subscriber seqID after receiving", func(t *testing.T) {
@@ -111,20 +89,8 @@ func TestSubPub_Publish(t *testing.T) {
 		defer cancel()
 
 		next := sp.Subscribe(ctx, 0)
+		received := collectMessages(ctx, cancel, next)
 
-		received := make(chan int, 10)
-		go func() {
-			for {
-				msg, ok := next()
-				if !ok {
-					close(received)
-					return
-				}
-				received <- msg
-			}
-		}()
-
-		// Publish sequentially
 		sp.Publish(1, 1)
 		sp.Publish(2, 2)
 		sp.Publish(3, 3)
@@ -132,12 +98,7 @@ func TestSubPub_Publish(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 		cancel()
 
-		var msgs []int
-		for msg := range received {
-			msgs = append(msgs, msg)
-		}
-
-		assert.Equal(t, []int{1, 2, 3}, msgs)
+		assert.Equal(t, []int{1, 2, 3}, <-received)
 	})
 }
 
@@ -151,7 +112,6 @@ func TestSubPub_Broadcast(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		// Subscribe with different seqIDs
 		next1 := sp.Subscribe(ctx, 0)
 		next2 := sp.Subscribe(ctx, 100) // High seqID
 
@@ -177,11 +137,8 @@ func TestSubPub_Broadcast(t *testing.T) {
 		sp.Broadcast("announcement")
 		time.Sleep(50 * time.Millisecond)
 
-		msg1 := <-received1
-		msg2 := <-received2
-
-		assert.Equal(t, "announcement", msg1)
-		assert.Equal(t, "announcement", msg2)
+		assert.Equal(t, "announcement", <-received1)
+		assert.Equal(t, "announcement", <-received2)
 	})
 }
 
@@ -202,7 +159,6 @@ func TestSubPub_ContextCancellation(t *testing.T) {
 			done <- ok
 		}()
 
-		// Cancel context
 		time.Sleep(10 * time.Millisecond)
 		cancel()
 
@@ -223,13 +179,10 @@ func TestSubPub_ContextCancellation(t *testing.T) {
 		_ = sp.Subscribe(ctx, 0)
 		cancel()
 
-		// Give time for subscriber to be cleaned up
 		time.Sleep(10 * time.Millisecond)
 
-		// Publishing should clean up dead subscribers
+		// Publishing should clean up dead subscribers without panic
 		sp.Publish(1, "test")
-
-		// Verify no panic or issues
 	})
 }
 
@@ -250,7 +203,6 @@ func TestSubPub_SlowSubscriberDisconnect(t *testing.T) {
 			sp.Publish(int64(i), i)
 		}
 
-		// Now try to read - should get some messages then false
 		var received []int
 		for {
 			msg, ok := next()
@@ -263,7 +215,6 @@ func TestSubPub_SlowSubscriberDisconnect(t *testing.T) {
 			}
 		}
 
-		// Should have received some messages before disconnect
 		assert.NotEmpty(t, received)
 	})
 }
@@ -282,9 +233,8 @@ func TestSubPub_ConcurrentAccess(t *testing.T) {
 		const numMessages = 100
 
 		var wg sync.WaitGroup
+		receivedCounts := make([]atomic.Int32, numSubscribers)
 
-		// Start subscribers
-		receivedCounts := make([]int, numSubscribers)
 		for i := 0; i < numSubscribers; i++ {
 			wg.Add(1)
 			go func(idx int) {
@@ -295,15 +245,13 @@ func TestSubPub_ConcurrentAccess(t *testing.T) {
 					if !ok {
 						return
 					}
-					receivedCounts[idx]++
+					receivedCounts[idx].Add(1)
 				}
 			}(i)
 		}
 
-		// Give subscribers time to register
 		time.Sleep(20 * time.Millisecond)
 
-		// Publish messages concurrently
 		var publishWg sync.WaitGroup
 		for i := 0; i < numMessages; i++ {
 			publishWg.Add(1)
@@ -314,14 +262,12 @@ func TestSubPub_ConcurrentAccess(t *testing.T) {
 		}
 		publishWg.Wait()
 
-		// Give time for delivery
 		time.Sleep(100 * time.Millisecond)
 		cancel()
 		wg.Wait()
 
-		// Each subscriber should have received some messages
-		for i, count := range receivedCounts {
-			assert.Greater(t, count, 0, "subscriber %d received no messages", i)
+		for i := range receivedCounts {
+			assert.Greater(t, receivedCounts[i].Load(), int32(0), "subscriber %d received no messages", i)
 		}
 	})
 
@@ -336,7 +282,6 @@ func TestSubPub_ConcurrentAccess(t *testing.T) {
 
 		var wg sync.WaitGroup
 
-		// Concurrent publishes
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -345,7 +290,6 @@ func TestSubPub_ConcurrentAccess(t *testing.T) {
 			}
 		}()
 
-		// Concurrent broadcasts
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -354,7 +298,6 @@ func TestSubPub_ConcurrentAccess(t *testing.T) {
 			}
 		}()
 
-		// Concurrent reads
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -381,17 +324,33 @@ func TestMakeReceiver(t *testing.T) {
 
 		receiver := makeReceiver(ch, ctx)
 
-		// Buffer a message before canceling
 		ch <- "buffered"
 		cancel()
 
-		// Should still receive the buffered message
 		msg, ok := receiver()
 		require.True(t, ok)
 		assert.Equal(t, "buffered", msg)
 
-		// Next call should return false
 		_, ok = receiver()
 		assert.False(t, ok)
 	})
+}
+
+// collectMessages starts a goroutine that collects all messages from the next function
+// until the context is canceled. Returns a channel that receives the collected slice.
+func collectMessages[K any](ctx context.Context, cancel context.CancelFunc, next func() (K, bool)) <-chan []K {
+	result := make(chan []K, 1)
+	go func() {
+		var msgs []K
+		for {
+			msg, ok := next()
+			if !ok {
+				result <- msgs
+				close(result)
+				return
+			}
+			msgs = append(msgs, msg)
+		}
+	}()
+	return result
 }

@@ -38,19 +38,24 @@ func TestDefaultConfig(t *testing.T) {
 func TestErrorConstants(t *testing.T) {
 	t.Parallel()
 
-	t.Run("errors are defined", func(t *testing.T) {
+	t.Run("ErrConversationNotFound has descriptive message", func(t *testing.T) {
 		t.Parallel()
 
 		assert.NotNil(t, ErrConversationNotFound)
-		assert.NotNil(t, ErrInvalidConversationID)
-		assert.NotNil(t, ErrInvalidUserID)
+		assert.Contains(t, ErrConversationNotFound.Error(), "not found")
 	})
 
-	t.Run("errors have descriptive messages", func(t *testing.T) {
+	t.Run("ErrInvalidConversationID has descriptive message", func(t *testing.T) {
 		t.Parallel()
 
-		assert.Contains(t, ErrConversationNotFound.Error(), "not found")
+		assert.NotNil(t, ErrInvalidConversationID)
 		assert.Contains(t, ErrInvalidConversationID.Error(), "invalid")
+	})
+
+	t.Run("ErrInvalidUserID has descriptive message", func(t *testing.T) {
+		t.Parallel()
+
+		assert.NotNil(t, ErrInvalidUserID)
 		assert.Contains(t, ErrInvalidUserID.Error(), "invalid")
 	})
 }

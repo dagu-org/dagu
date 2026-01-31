@@ -10,39 +10,40 @@ import (
 func TestThinkTool_Run(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns acknowledgment", func(t *testing.T) {
-		t.Parallel()
+	tool := NewThinkTool()
 
-		tool := NewThinkTool()
-		input := json.RawMessage(`{"thought": "Let me think about this..."}`)
+	tests := []struct {
+		name         string
+		input        string
+		wantContains string
+	}{
+		{
+			name:         "returns acknowledgment",
+			input:        `{"thought": "Let me think about this..."}`,
+			wantContains: "Thought recorded",
+		},
+		{
+			name:  "works with empty thought",
+			input: `{"thought": ""}`,
+		},
+		{
+			name:  "works with empty input",
+			input: `{}`,
+		},
+	}
 
-		result := tool.Run(ToolContext{}, input)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		assert.False(t, result.IsError)
-		assert.Contains(t, result.Content, "Thought recorded")
-	})
+			result := tool.Run(ToolContext{}, json.RawMessage(tc.input))
 
-	t.Run("works with empty thought", func(t *testing.T) {
-		t.Parallel()
-
-		tool := NewThinkTool()
-		input := json.RawMessage(`{"thought": ""}`)
-
-		result := tool.Run(ToolContext{}, input)
-
-		assert.False(t, result.IsError)
-	})
-
-	t.Run("works with empty input", func(t *testing.T) {
-		t.Parallel()
-
-		tool := NewThinkTool()
-		input := json.RawMessage(`{}`)
-
-		result := tool.Run(ToolContext{}, input)
-
-		assert.False(t, result.IsError)
-	})
+			assert.False(t, result.IsError)
+			if tc.wantContains != "" {
+				assert.Contains(t, result.Content, tc.wantContains)
+			}
+		})
+	}
 }
 
 func TestNewThinkTool(t *testing.T) {

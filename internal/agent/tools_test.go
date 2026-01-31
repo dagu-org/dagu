@@ -11,8 +11,6 @@ func TestCreateTools(t *testing.T) {
 	t.Parallel()
 
 	tools := CreateTools()
-
-	// Should return all expected tools
 	assert.Len(t, tools, 6)
 
 	expectedTools := []string{"bash", "read", "patch", "think", "navigate", "read_schema"}
@@ -28,54 +26,87 @@ func TestGetToolByName(t *testing.T) {
 
 	tools := CreateTools()
 
-	t.Run("finds existing tool", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name         string
+		tools        []*AgentTool
+		toolName     string
+		expectNil    bool
+		expectedName string
+	}{
+		{
+			name:         "finds existing tool",
+			tools:        tools,
+			toolName:     "bash",
+			expectNil:    false,
+			expectedName: "bash",
+		},
+		{
+			name:      "returns nil for unknown tool",
+			tools:     tools,
+			toolName:  "unknown",
+			expectNil: true,
+		},
+		{
+			name:      "returns nil for empty name",
+			tools:     tools,
+			toolName:  "",
+			expectNil: true,
+		},
+		{
+			name:      "returns nil for empty tools slice",
+			tools:     []*AgentTool{},
+			toolName:  "bash",
+			expectNil: true,
+		},
+	}
 
-		tool := GetToolByName(tools, "bash")
-		require.NotNil(t, tool)
-		assert.Equal(t, "bash", tool.Function.Name)
-	})
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("returns nil for unknown tool", func(t *testing.T) {
-		t.Parallel()
-
-		tool := GetToolByName(tools, "unknown")
-		assert.Nil(t, tool)
-	})
-
-	t.Run("returns nil for empty name", func(t *testing.T) {
-		t.Parallel()
-
-		tool := GetToolByName(tools, "")
-		assert.Nil(t, tool)
-	})
-
-	t.Run("returns nil for empty tools slice", func(t *testing.T) {
-		t.Parallel()
-
-		tool := GetToolByName([]*AgentTool{}, "bash")
-		assert.Nil(t, tool)
-	})
+			tool := GetToolByName(tc.tools, tc.toolName)
+			if tc.expectNil {
+				assert.Nil(t, tool)
+			} else {
+				require.NotNil(t, tool)
+				assert.Equal(t, tc.expectedName, tool.Function.Name)
+			}
+		})
+	}
 }
 
 func TestToolError(t *testing.T) {
 	t.Parallel()
 
-	t.Run("creates error with message", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name     string
+		format   string
+		args     []any
+		expected string
+	}{
+		{
+			name:     "creates error with formatted message",
+			format:   "Error: %s",
+			args:     []any{"test"},
+			expected: "Error: test",
+		},
+		{
+			name:     "creates error without format arguments",
+			format:   "Simple error",
+			args:     nil,
+			expected: "Simple error",
+		},
+	}
 
-		result := toolError("Error: %s", "test")
-		assert.True(t, result.IsError)
-		assert.Equal(t, "Error: test", result.Content)
-	})
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("formats without arguments", func(t *testing.T) {
-		t.Parallel()
-
-		result := toolError("Simple error")
-		assert.True(t, result.IsError)
-		assert.Equal(t, "Simple error", result.Content)
-	})
+			result := toolError(tc.format, tc.args...)
+			assert.True(t, result.IsError)
+			assert.Equal(t, tc.expected, result.Content)
+		})
+	}
 }
 
 func TestResolvePath(t *testing.T) {

@@ -18,9 +18,8 @@ func TestNewLoop(t *testing.T) {
 	t.Run("initializes with config", func(t *testing.T) {
 		t.Parallel()
 
-		provider := &mockLLMProvider{name: "test"}
 		loop := NewLoop(LoopConfig{
-			Provider: provider,
+			Provider: &mockLLMProvider{name: "test"},
 			Model:    "test-model",
 			Tools:    CreateTools(),
 		})
@@ -45,14 +44,10 @@ func TestLoop_QueueUserMessage(t *testing.T) {
 	t.Run("adds message to queue", func(t *testing.T) {
 		t.Parallel()
 
-		loop := NewLoop(LoopConfig{
-			Provider: &mockLLMProvider{},
-		})
+		loop := NewLoop(LoopConfig{Provider: &mockLLMProvider{}})
 
-		msg := llm.Message{Role: llm.RoleUser, Content: "test"}
-		loop.QueueUserMessage(msg)
+		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
 
-		// Verify message is queued by checking internal state
 		loop.mu.Lock()
 		defer loop.mu.Unlock()
 		assert.Len(t, loop.messageQueue, 1)
@@ -78,39 +73,22 @@ func TestLoop_Go(t *testing.T) {
 		t.Parallel()
 
 		requestCh := make(chan *llm.ChatRequest, 1)
-		provider := &mockLLMProvider{
-			chatFunc: func(_ context.Context, req *llm.ChatRequest) (*llm.ChatResponse, error) {
-				select {
-				case requestCh <- req:
-				default:
-				}
-				return &llm.ChatResponse{Content: "response", FinishReason: "stop"}, nil
-			},
-		}
+		provider := newCapturingProvider(requestCh, simpleStopResponse("response"))
 
 		loop := NewLoop(LoopConfig{
 			Provider: provider,
 			Model:    "test-model",
 		})
-
 		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "hello"})
 
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
 
-		go func() {
-			_ = loop.Go(ctx)
-		}()
+		go func() { _ = loop.Go(ctx) }()
 
-		// Wait for captured request
-		select {
-		case capturedRequest := <-requestCh:
-			require.NotNil(t, capturedRequest)
-			assert.Equal(t, "test-model", capturedRequest.Model)
-			assert.NotEmpty(t, capturedRequest.Messages)
-		case <-time.After(400 * time.Millisecond):
-			t.Fatal("timeout waiting for LLM request")
-		}
+		capturedRequest := waitForRequest(t, requestCh, 400*time.Millisecond)
+		assert.Equal(t, "test-model", capturedRequest.Model)
+		assert.NotEmpty(t, capturedRequest.Messages)
 	})
 
 	t.Run("respects context cancellation", func(t *testing.T) {
@@ -142,37 +120,23 @@ func TestLoop_Go(t *testing.T) {
 
 		var mu sync.Mutex
 		var workingStates []bool
-		provider := &mockLLMProvider{
-			chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
-				return &llm.ChatResponse{Content: "done", FinishReason: "stop"}, nil
-			},
-		}
 
 		loop := NewLoop(LoopConfig{
-			Provider: provider,
+			Provider: newStopProvider("done"),
 			OnWorking: func(working bool) {
 				mu.Lock()
 				workingStates = append(workingStates, working)
 				mu.Unlock()
 			},
 		})
-
 		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
 
-		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-		defer cancel()
-
-		go func() {
-			_ = loop.Go(ctx)
-		}()
-
-		time.Sleep(200 * time.Millisecond)
+		runLoopForDuration(t, loop, 200*time.Millisecond)
 
 		mu.Lock()
 		states := append([]bool{}, workingStates...)
 		mu.Unlock()
 
-		// Should have called with true (working) and false (done)
 		assert.Contains(t, states, true)
 		assert.Contains(t, states, false)
 	})
@@ -182,14 +146,9 @@ func TestLoop_Go(t *testing.T) {
 
 		var mu sync.Mutex
 		var recordedMessages []Message
-		provider := &mockLLMProvider{
-			chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
-				return &llm.ChatResponse{Content: "response", FinishReason: "stop"}, nil
-			},
-		}
 
 		loop := NewLoop(LoopConfig{
-			Provider:       provider,
+			Provider:       newStopProvider("response"),
 			ConversationID: "conv-1",
 			RecordMessage: func(_ context.Context, msg Message) error {
 				mu.Lock()
@@ -198,17 +157,9 @@ func TestLoop_Go(t *testing.T) {
 				return nil
 			},
 		})
-
 		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
 
-		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-		defer cancel()
-
-		go func() {
-			_ = loop.Go(ctx)
-		}()
-
-		time.Sleep(200 * time.Millisecond)
+		runLoopForDuration(t, loop, 200*time.Millisecond)
 
 		mu.Lock()
 		msgs := append([]Message{}, recordedMessages...)
@@ -228,7 +179,6 @@ func TestLoop_Go(t *testing.T) {
 			chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
 				count := callCount.Add(1)
 				if count == 1 {
-					// First call: request tool call
 					return &llm.ChatResponse{
 						FinishReason: "tool_calls",
 						ToolCalls: []llm.ToolCall{{
@@ -241,9 +191,8 @@ func TestLoop_Go(t *testing.T) {
 						}},
 					}, nil
 				}
-				// Second call: return final response
 				close(done)
-				return &llm.ChatResponse{Content: "done", FinishReason: "stop"}, nil
+				return simpleStopResponse("done"), nil
 			},
 		}
 
@@ -251,24 +200,19 @@ func TestLoop_Go(t *testing.T) {
 			Provider: provider,
 			Tools:    CreateTools(),
 		})
-
 		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
-		go func() {
-			_ = loop.Go(ctx)
-		}()
+		go func() { _ = loop.Go(ctx) }()
 
 		select {
 		case <-done:
-			// Success - tool handling completed
 		case <-time.After(800 * time.Millisecond):
 			t.Fatal("timeout waiting for tool handling")
 		}
 
-		// Should have made two LLM calls (initial + after tool)
 		assert.Equal(t, int32(2), callCount.Load())
 	})
 
@@ -276,39 +220,23 @@ func TestLoop_Go(t *testing.T) {
 		t.Parallel()
 
 		requestCh := make(chan *llm.ChatRequest, 1)
-		provider := &mockLLMProvider{
-			chatFunc: func(_ context.Context, req *llm.ChatRequest) (*llm.ChatResponse, error) {
-				select {
-				case requestCh <- req:
-				default:
-				}
-				return &llm.ChatResponse{Content: "response", FinishReason: "stop"}, nil
-			},
-		}
+		provider := newCapturingProvider(requestCh, simpleStopResponse("response"))
 
 		loop := NewLoop(LoopConfig{
 			Provider:     provider,
 			SystemPrompt: "You are a helpful assistant.",
 		})
-
 		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "hello"})
 
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
 
-		go func() {
-			_ = loop.Go(ctx)
-		}()
+		go func() { _ = loop.Go(ctx) }()
 
-		select {
-		case capturedRequest := <-requestCh:
-			require.NotNil(t, capturedRequest)
-			require.NotEmpty(t, capturedRequest.Messages)
-			assert.Equal(t, llm.RoleSystem, capturedRequest.Messages[0].Role)
-			assert.Equal(t, "You are a helpful assistant.", capturedRequest.Messages[0].Content)
-		case <-time.After(400 * time.Millisecond):
-			t.Fatal("timeout waiting for LLM request")
-		}
+		capturedRequest := waitForRequest(t, requestCh, 400*time.Millisecond)
+		require.NotEmpty(t, capturedRequest.Messages)
+		assert.Equal(t, llm.RoleSystem, capturedRequest.Messages[0].Role)
+		assert.Equal(t, "You are a helpful assistant.", capturedRequest.Messages[0].Content)
 	})
 
 	t.Run("accumulates token usage", func(t *testing.T) {
@@ -341,13 +269,10 @@ func TestLoop_Go(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
 
-		go func() {
-			_ = loop.Go(ctx)
-		}()
+		go func() { _ = loop.Go(ctx) }()
 
 		select {
 		case <-done:
-			// Wait a tiny bit for accumulateUsage to complete
 			time.Sleep(10 * time.Millisecond)
 		case <-time.After(400 * time.Millisecond):
 			t.Fatal("timeout waiting for LLM call")
@@ -374,16 +299,14 @@ func TestLoop_ExecuteTool(t *testing.T) {
 			Tools:    CreateTools(),
 		})
 
-		tc := llm.ToolCall{
+		result := loop.executeTool(context.Background(), llm.ToolCall{
 			ID:   "test-id",
 			Type: "function",
 			Function: llm.ToolCallFunction{
 				Name:      "think",
 				Arguments: `{"thought": "testing"}`,
 			},
-		}
-
-		result := loop.executeTool(context.Background(), tc)
+		})
 
 		assert.False(t, result.IsError)
 		assert.Contains(t, result.Content, "Thought recorded")
@@ -397,16 +320,14 @@ func TestLoop_ExecuteTool(t *testing.T) {
 			Tools:    CreateTools(),
 		})
 
-		tc := llm.ToolCall{
+		result := loop.executeTool(context.Background(), llm.ToolCall{
 			ID:   "test-id",
 			Type: "function",
 			Function: llm.ToolCallFunction{
 				Name:      "unknown_tool",
 				Arguments: `{}`,
 			},
-		}
-
-		result := loop.executeTool(context.Background(), tc)
+		})
 
 		assert.True(t, result.IsError)
 		assert.Contains(t, result.Content, "not found")
@@ -420,18 +341,15 @@ func TestLoop_ExecuteTool(t *testing.T) {
 			Tools:    CreateTools(),
 		})
 
-		tc := llm.ToolCall{
+		result := loop.executeTool(context.Background(), llm.ToolCall{
 			ID:   "test-id",
 			Type: "function",
 			Function: llm.ToolCallFunction{
 				Name:      "think",
 				Arguments: "",
 			},
-		}
+		})
 
-		result := loop.executeTool(context.Background(), tc)
-
-		// Should work with empty arguments (defaults to {})
 		assert.False(t, result.IsError)
 	})
 }
@@ -447,11 +365,9 @@ func TestLoop_BuildMessages(t *testing.T) {
 			SystemPrompt: "",
 		})
 
-		history := []llm.Message{
+		messages := loop.buildMessages([]llm.Message{
 			{Role: llm.RoleUser, Content: "hello"},
-		}
-
-		messages := loop.buildMessages(history)
+		})
 
 		assert.Len(t, messages, 1)
 		assert.Equal(t, llm.RoleUser, messages[0].Role)
@@ -465,11 +381,9 @@ func TestLoop_BuildMessages(t *testing.T) {
 			SystemPrompt: "Be helpful.",
 		})
 
-		history := []llm.Message{
+		messages := loop.buildMessages([]llm.Message{
 			{Role: llm.RoleUser, Content: "hello"},
-		}
-
-		messages := loop.buildMessages(history)
+		})
 
 		assert.Len(t, messages, 2)
 		assert.Equal(t, llm.RoleSystem, messages[0].Role)
@@ -497,4 +411,44 @@ func TestLoop_BuildToolDefinitions(t *testing.T) {
 			assert.NotEmpty(t, tool.Function.Name)
 		}
 	})
+}
+
+// Test helpers
+
+func simpleStopResponse(content string) *llm.ChatResponse {
+	return &llm.ChatResponse{Content: content, FinishReason: "stop"}
+}
+
+func newCapturingProvider(requestCh chan<- *llm.ChatRequest, response *llm.ChatResponse) *mockLLMProvider {
+	return &mockLLMProvider{
+		chatFunc: func(_ context.Context, req *llm.ChatRequest) (*llm.ChatResponse, error) {
+			select {
+			case requestCh <- req:
+			default:
+			}
+			return response, nil
+		},
+	}
+}
+
+func waitForRequest(t *testing.T, requestCh <-chan *llm.ChatRequest, timeout time.Duration) *llm.ChatRequest {
+	t.Helper()
+	select {
+	case req := <-requestCh:
+		require.NotNil(t, req)
+		return req
+	case <-time.After(timeout):
+		t.Fatal("timeout waiting for LLM request")
+		return nil
+	}
+}
+
+func runLoopForDuration(t *testing.T, loop *Loop, duration time.Duration) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	go func() { _ = loop.Go(ctx) }()
+
+	time.Sleep(duration)
 }

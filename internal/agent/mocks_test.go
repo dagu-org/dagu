@@ -8,7 +8,6 @@ import (
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
-// Test-only sentinel errors
 var errProviderNotConfigured = errors.New("provider not configured")
 
 // mockLLMProvider implements llm.Provider for testing.
@@ -36,13 +35,12 @@ func (m *mockLLMProvider) ChatStream(ctx context.Context, req *llm.ChatRequest) 
 }
 
 func (m *mockLLMProvider) Name() string {
-	if m.name != "" {
-		return m.name
+	if m.name == "" {
+		return "mock"
 	}
-	return "mock"
+	return m.name
 }
 
-// Compile-time interface verification
 var _ llm.Provider = (*mockLLMProvider)(nil)
 
 // mockConfigStore implements ConfigStore for testing.
@@ -91,7 +89,6 @@ func (m *mockConfigStore) GetProvider(_ context.Context) (llm.Provider, string, 
 	return m.provider, m.model, nil
 }
 
-// Compile-time interface verification
 var _ ConfigStore = (*mockConfigStore)(nil)
 
 // mockConversationStore implements ConversationStore for testing.
@@ -100,15 +97,14 @@ type mockConversationStore struct {
 	messages      map[string][]Message
 	mu            sync.Mutex
 
-	// Error injection for testing error paths
-	createErr     error
-	getErr        error
-	listErr       error
-	updateErr     error
-	deleteErr     error
-	addMessageErr error
+	createErr      error
+	getErr         error
+	listErr        error
+	updateErr      error
+	deleteErr      error
+	addMessageErr  error
 	getMessagesErr error
-	getSeqIDErr   error
+	getSeqIDErr    error
 }
 
 func newMockConversationStore() *mockConversationStore {
@@ -116,6 +112,13 @@ func newMockConversationStore() *mockConversationStore {
 		conversations: make(map[string]*Conversation),
 		messages:      make(map[string][]Message),
 	}
+}
+
+func (m *mockConversationStore) requireConversation(id string) error {
+	if _, exists := m.conversations[id]; !exists {
+		return ErrConversationNotFound
+	}
+	return nil
 }
 
 func (m *mockConversationStore) CreateConversation(_ context.Context, conv *Conversation) error {
@@ -131,6 +134,7 @@ func (m *mockConversationStore) CreateConversation(_ context.Context, conv *Conv
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
 	m.conversations[conv.ID] = conv
 	m.messages[conv.ID] = []Message{}
 	return nil
@@ -146,11 +150,11 @@ func (m *mockConversationStore) GetConversation(_ context.Context, id string) (*
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	conv, ok := m.conversations[id]
-	if !ok {
-		return nil, ErrConversationNotFound
+
+	if err := m.requireConversation(id); err != nil {
+		return nil, err
 	}
-	return conv, nil
+	return m.conversations[id], nil
 }
 
 func (m *mockConversationStore) ListConversations(_ context.Context, userID string) ([]*Conversation, error) {
@@ -180,8 +184,9 @@ func (m *mockConversationStore) UpdateConversation(_ context.Context, conv *Conv
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if _, ok := m.conversations[conv.ID]; !ok {
-		return ErrConversationNotFound
+
+	if err := m.requireConversation(conv.ID); err != nil {
+		return err
 	}
 	m.conversations[conv.ID] = conv
 	return nil
@@ -197,8 +202,9 @@ func (m *mockConversationStore) DeleteConversation(_ context.Context, id string)
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if _, ok := m.conversations[id]; !ok {
-		return ErrConversationNotFound
+
+	if err := m.requireConversation(id); err != nil {
+		return err
 	}
 	delete(m.conversations, id)
 	delete(m.messages, id)
@@ -215,8 +221,9 @@ func (m *mockConversationStore) AddMessage(_ context.Context, conversationID str
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if _, ok := m.conversations[conversationID]; !ok {
-		return ErrConversationNotFound
+
+	if err := m.requireConversation(conversationID); err != nil {
+		return err
 	}
 	m.messages[conversationID] = append(m.messages[conversationID], *msg)
 	return nil
@@ -232,8 +239,9 @@ func (m *mockConversationStore) GetMessages(_ context.Context, conversationID st
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if _, ok := m.conversations[conversationID]; !ok {
-		return nil, ErrConversationNotFound
+
+	if err := m.requireConversation(conversationID); err != nil {
+		return nil, err
 	}
 	return m.messages[conversationID], nil
 }
@@ -248,17 +256,13 @@ func (m *mockConversationStore) GetLatestSequenceID(_ context.Context, conversat
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if _, ok := m.conversations[conversationID]; !ok {
-		return 0, ErrConversationNotFound
-	}
 
-	msgs := m.messages[conversationID]
-	if len(msgs) == 0 {
-		return 0, nil
+	if err := m.requireConversation(conversationID); err != nil {
+		return 0, err
 	}
 
 	var maxSeq int64
-	for _, msg := range msgs {
+	for _, msg := range m.messages[conversationID] {
 		if msg.SequenceID > maxSeq {
 			maxSeq = msg.SequenceID
 		}
@@ -266,5 +270,4 @@ func (m *mockConversationStore) GetLatestSequenceID(_ context.Context, conversat
 	return maxSeq, nil
 }
 
-// Compile-time interface verification
 var _ ConversationStore = (*mockConversationStore)(nil)

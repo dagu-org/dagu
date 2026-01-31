@@ -2,6 +2,7 @@ package agent
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,19 +11,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func patchInput(path, operation string, extra ...string) json.RawMessage {
+	base := fmt.Sprintf(`{"path": %q, "operation": %q`, path, operation)
+	for i := 0; i < len(extra)-1; i += 2 {
+		base += fmt.Sprintf(`, %q: %q`, extra[i], extra[i+1])
+	}
+	return json.RawMessage(base + "}")
+}
+
 func TestPatchTool_Create(t *testing.T) {
 	t.Parallel()
+	tool := NewPatchTool()
 
 	t.Run("creates new file", func(t *testing.T) {
 		t.Parallel()
 
-		dir := t.TempDir()
-		filePath := filepath.Join(dir, "new.txt")
-
-		tool := NewPatchTool()
-		input := json.RawMessage(`{"path": "` + filePath + `", "operation": "create", "content": "hello world"}`)
-
-		result := tool.Run(ToolContext{}, input)
+		filePath := filepath.Join(t.TempDir(), "new.txt")
+		result := tool.Run(ToolContext{}, patchInput(filePath, "create", "content", "hello world"))
 
 		assert.False(t, result.IsError)
 		assert.Contains(t, result.Content, "Created")
@@ -35,13 +40,8 @@ func TestPatchTool_Create(t *testing.T) {
 	t.Run("creates parent directories", func(t *testing.T) {
 		t.Parallel()
 
-		dir := t.TempDir()
-		filePath := filepath.Join(dir, "nested", "deep", "file.txt")
-
-		tool := NewPatchTool()
-		input := json.RawMessage(`{"path": "` + filePath + `", "operation": "create", "content": "nested content"}`)
-
-		result := tool.Run(ToolContext{}, input)
+		filePath := filepath.Join(t.TempDir(), "nested", "deep", "file.txt")
+		result := tool.Run(ToolContext{}, patchInput(filePath, "create", "content", "nested content"))
 
 		assert.False(t, result.IsError)
 
@@ -53,14 +53,10 @@ func TestPatchTool_Create(t *testing.T) {
 	t.Run("overwrites existing file", func(t *testing.T) {
 		t.Parallel()
 
-		dir := t.TempDir()
-		filePath := filepath.Join(dir, "existing.txt")
+		filePath := filepath.Join(t.TempDir(), "existing.txt")
 		require.NoError(t, os.WriteFile(filePath, []byte("old content"), 0o600))
 
-		tool := NewPatchTool()
-		input := json.RawMessage(`{"path": "` + filePath + `", "operation": "create", "content": "new content"}`)
-
-		result := tool.Run(ToolContext{}, input)
+		result := tool.Run(ToolContext{}, patchInput(filePath, "create", "content", "new content"))
 
 		assert.False(t, result.IsError)
 
@@ -72,18 +68,15 @@ func TestPatchTool_Create(t *testing.T) {
 
 func TestPatchTool_Replace(t *testing.T) {
 	t.Parallel()
+	tool := NewPatchTool()
 
 	t.Run("replaces unique string", func(t *testing.T) {
 		t.Parallel()
 
-		dir := t.TempDir()
-		filePath := filepath.Join(dir, "test.txt")
+		filePath := filepath.Join(t.TempDir(), "test.txt")
 		require.NoError(t, os.WriteFile(filePath, []byte("hello world"), 0o600))
 
-		tool := NewPatchTool()
-		input := json.RawMessage(`{"path": "` + filePath + `", "operation": "replace", "old_string": "world", "new_string": "universe"}`)
-
-		result := tool.Run(ToolContext{}, input)
+		result := tool.Run(ToolContext{}, patchInput(filePath, "replace", "old_string", "world", "new_string", "universe"))
 
 		assert.False(t, result.IsError)
 		assert.Contains(t, result.Content, "Replaced")
@@ -96,14 +89,10 @@ func TestPatchTool_Replace(t *testing.T) {
 	t.Run("errors when old_string not found", func(t *testing.T) {
 		t.Parallel()
 
-		dir := t.TempDir()
-		filePath := filepath.Join(dir, "test.txt")
+		filePath := filepath.Join(t.TempDir(), "test.txt")
 		require.NoError(t, os.WriteFile(filePath, []byte("hello world"), 0o600))
 
-		tool := NewPatchTool()
-		input := json.RawMessage(`{"path": "` + filePath + `", "operation": "replace", "old_string": "missing", "new_string": "replacement"}`)
-
-		result := tool.Run(ToolContext{}, input)
+		result := tool.Run(ToolContext{}, patchInput(filePath, "replace", "old_string", "missing", "new_string", "replacement"))
 
 		assert.True(t, result.IsError)
 		assert.Contains(t, result.Content, "not found")
@@ -112,14 +101,10 @@ func TestPatchTool_Replace(t *testing.T) {
 	t.Run("errors when old_string found multiple times", func(t *testing.T) {
 		t.Parallel()
 
-		dir := t.TempDir()
-		filePath := filepath.Join(dir, "test.txt")
+		filePath := filepath.Join(t.TempDir(), "test.txt")
 		require.NoError(t, os.WriteFile(filePath, []byte("hello hello hello"), 0o600))
 
-		tool := NewPatchTool()
-		input := json.RawMessage(`{"path": "` + filePath + `", "operation": "replace", "old_string": "hello", "new_string": "hi"}`)
-
-		result := tool.Run(ToolContext{}, input)
+		result := tool.Run(ToolContext{}, patchInput(filePath, "replace", "old_string", "hello", "new_string", "hi"))
 
 		assert.True(t, result.IsError)
 		assert.Contains(t, result.Content, "3 times")
@@ -128,10 +113,7 @@ func TestPatchTool_Replace(t *testing.T) {
 	t.Run("errors when file not found", func(t *testing.T) {
 		t.Parallel()
 
-		tool := NewPatchTool()
-		input := json.RawMessage(`{"path": "/nonexistent/file.txt", "operation": "replace", "old_string": "a", "new_string": "b"}`)
-
-		result := tool.Run(ToolContext{}, input)
+		result := tool.Run(ToolContext{}, patchInput("/nonexistent/file.txt", "replace", "old_string", "a", "new_string", "b"))
 
 		assert.True(t, result.IsError)
 		assert.Contains(t, result.Content, "not found")
@@ -140,14 +122,10 @@ func TestPatchTool_Replace(t *testing.T) {
 	t.Run("errors when old_string is empty", func(t *testing.T) {
 		t.Parallel()
 
-		dir := t.TempDir()
-		filePath := filepath.Join(dir, "test.txt")
+		filePath := filepath.Join(t.TempDir(), "test.txt")
 		require.NoError(t, os.WriteFile(filePath, []byte("content"), 0o600))
 
-		tool := NewPatchTool()
-		input := json.RawMessage(`{"path": "` + filePath + `", "operation": "replace", "old_string": "", "new_string": "b"}`)
-
-		result := tool.Run(ToolContext{}, input)
+		result := tool.Run(ToolContext{}, patchInput(filePath, "replace", "old_string", "", "new_string", "b"))
 
 		assert.True(t, result.IsError)
 		assert.Contains(t, result.Content, "required")
@@ -156,18 +134,15 @@ func TestPatchTool_Replace(t *testing.T) {
 
 func TestPatchTool_Delete(t *testing.T) {
 	t.Parallel()
+	tool := NewPatchTool()
 
 	t.Run("deletes existing file", func(t *testing.T) {
 		t.Parallel()
 
-		dir := t.TempDir()
-		filePath := filepath.Join(dir, "delete-me.txt")
+		filePath := filepath.Join(t.TempDir(), "delete-me.txt")
 		require.NoError(t, os.WriteFile(filePath, []byte("content"), 0o600))
 
-		tool := NewPatchTool()
-		input := json.RawMessage(`{"path": "` + filePath + `", "operation": "delete"}`)
-
-		result := tool.Run(ToolContext{}, input)
+		result := tool.Run(ToolContext{}, patchInput(filePath, "delete"))
 
 		assert.False(t, result.IsError)
 		assert.Contains(t, result.Content, "Deleted")
@@ -179,10 +154,7 @@ func TestPatchTool_Delete(t *testing.T) {
 	t.Run("errors when file not found", func(t *testing.T) {
 		t.Parallel()
 
-		tool := NewPatchTool()
-		input := json.RawMessage(`{"path": "/nonexistent/file.txt", "operation": "delete"}`)
-
-		result := tool.Run(ToolContext{}, input)
+		result := tool.Run(ToolContext{}, patchInput("/nonexistent/file.txt", "delete"))
 
 		assert.True(t, result.IsError)
 		assert.Contains(t, result.Content, "not found")
@@ -191,64 +163,54 @@ func TestPatchTool_Delete(t *testing.T) {
 
 func TestPatchTool_Validation(t *testing.T) {
 	t.Parallel()
+	tool := NewPatchTool()
 
-	t.Run("empty path returns error", func(t *testing.T) {
-		t.Parallel()
+	tests := []struct {
+		name     string
+		input    json.RawMessage
+		contains string
+	}{
+		{
+			name:     "empty path returns error",
+			input:    patchInput("", "create", "content", "test"),
+			contains: "required",
+		},
+		{
+			name:     "unknown operation returns error",
+			input:    patchInput("/test.txt", "unknown"),
+			contains: "Unknown operation",
+		},
+		{
+			name:     "invalid JSON returns error",
+			input:    json.RawMessage(`{invalid}`),
+			contains: "parse",
+		},
+	}
 
-		tool := NewPatchTool()
-		input := json.RawMessage(`{"path": "", "operation": "create", "content": "test"}`)
-
-		result := tool.Run(ToolContext{}, input)
-
-		assert.True(t, result.IsError)
-		assert.Contains(t, result.Content, "required")
-	})
-
-	t.Run("unknown operation returns error", func(t *testing.T) {
-		t.Parallel()
-
-		tool := NewPatchTool()
-		input := json.RawMessage(`{"path": "/test.txt", "operation": "unknown"}`)
-
-		result := tool.Run(ToolContext{}, input)
-
-		assert.True(t, result.IsError)
-		assert.Contains(t, result.Content, "Unknown operation")
-	})
-
-	t.Run("invalid JSON returns error", func(t *testing.T) {
-		t.Parallel()
-
-		tool := NewPatchTool()
-		input := json.RawMessage(`{invalid}`)
-
-		result := tool.Run(ToolContext{}, input)
-
-		assert.True(t, result.IsError)
-		assert.Contains(t, result.Content, "parse")
-	})
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			result := tool.Run(ToolContext{}, tc.input)
+			assert.True(t, result.IsError)
+			assert.Contains(t, result.Content, tc.contains)
+		})
+	}
 }
 
 func TestPatchTool_WorkingDirectory(t *testing.T) {
 	t.Parallel()
 
-	t.Run("uses working directory for relative paths", func(t *testing.T) {
-		t.Parallel()
+	dir := t.TempDir()
+	result := NewPatchTool().Run(
+		ToolContext{WorkingDir: dir},
+		patchInput("test.txt", "create", "content", "content"),
+	)
 
-		dir := t.TempDir()
+	assert.False(t, result.IsError)
 
-		tool := NewPatchTool()
-		input := json.RawMessage(`{"path": "test.txt", "operation": "create", "content": "content"}`)
-		ctx := ToolContext{WorkingDir: dir}
-
-		result := tool.Run(ctx, input)
-
-		assert.False(t, result.IsError)
-
-		content, err := os.ReadFile(filepath.Join(dir, "test.txt"))
-		require.NoError(t, err)
-		assert.Equal(t, "content", string(content))
-	})
+	content, err := os.ReadFile(filepath.Join(dir, "test.txt"))
+	require.NoError(t, err)
+	assert.Equal(t, "content", string(content))
 }
 
 func TestNewPatchTool(t *testing.T) {
@@ -277,7 +239,9 @@ func TestCountLines(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		result := countLines(tc.input)
-		assert.Equal(t, tc.expected, result, "for input %q", tc.input)
+		t.Run(tc.input, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.expected, countLines(tc.input))
+		})
 	}
 }

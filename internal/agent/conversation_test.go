@@ -74,20 +74,19 @@ func TestConversationManager_SetWorking(t *testing.T) {
 	t.Run("calls callback on state change", func(t *testing.T) {
 		t.Parallel()
 
-		var mu sync.Mutex
-		var callbackCalls []struct {
+		type workingChange struct {
 			id      string
 			working bool
 		}
+
+		var mu sync.Mutex
+		var callbackCalls []workingChange
 
 		cm := NewConversationManager(ConversationManagerConfig{
 			ID: "test-conv",
 			OnWorkingChange: func(id string, working bool) {
 				mu.Lock()
-				callbackCalls = append(callbackCalls, struct {
-					id      string
-					working bool
-				}{id, working})
+				callbackCalls = append(callbackCalls, workingChange{id, working})
 				mu.Unlock()
 			},
 		})
@@ -97,13 +96,10 @@ func TestConversationManager_SetWorking(t *testing.T) {
 		cm.SetWorking(false)
 
 		mu.Lock()
-		calls := append([]struct {
-			id      string
-			working bool
-		}{}, callbackCalls...)
+		calls := append([]workingChange{}, callbackCalls...)
 		mu.Unlock()
 
-		assert.Len(t, calls, 2)
+		require.Len(t, calls, 2)
 		assert.True(t, calls[0].working)
 		assert.False(t, calls[1].working)
 		assert.Equal(t, "test-conv", calls[0].id)
@@ -124,14 +120,20 @@ func TestConversationManager_SetWorking(t *testing.T) {
 			cm.SetWorking(true)
 		}()
 
-		select {
-		case <-time.After(500 * time.Millisecond):
-			t.Fatal("timeout waiting for broadcast")
-		default:
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
 			resp, ok := next()
 			if ok && resp.ConversationState != nil {
 				assert.True(t, resp.ConversationState.Working)
 			}
+		}()
+
+		select {
+		case <-done:
+			// Success - broadcast received
+		case <-time.After(500 * time.Millisecond):
+			t.Fatal("timeout waiting for broadcast")
 		}
 	})
 }
@@ -144,18 +146,15 @@ func TestConversationManager_AcceptUserMessage(t *testing.T) {
 
 		cm := NewConversationManager(ConversationManagerConfig{})
 		err := cm.AcceptUserMessage(context.Background(), nil, "model", "hello")
-		assert.Error(t, err)
+
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "required")
 	})
 
 	t.Run("starts loop and queues message", func(t *testing.T) {
 		t.Parallel()
 
-		provider := &mockLLMProvider{
-			chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
-				return &llm.ChatResponse{Content: "hi", FinishReason: "stop"}, nil
-			},
-		}
+		provider := newStopProvider("hi")
 
 		cm := NewConversationManager(ConversationManagerConfig{})
 		err := cm.AcceptUserMessage(context.Background(), provider, "model", "hello")
@@ -163,18 +162,13 @@ func TestConversationManager_AcceptUserMessage(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, cm.IsWorking())
 
-		// Cleanup
 		_ = cm.Cancel(context.Background())
 	})
 
 	t.Run("adds message to conversation", func(t *testing.T) {
 		t.Parallel()
 
-		provider := &mockLLMProvider{
-			chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
-				return &llm.ChatResponse{Content: "response", FinishReason: "stop"}, nil
-			},
-		}
+		provider := newStopProvider("response")
 
 		cm := NewConversationManager(ConversationManagerConfig{})
 		_ = cm.AcceptUserMessage(context.Background(), provider, "model", "hello")
@@ -331,11 +325,7 @@ func TestConversationManager_GetModel(t *testing.T) {
 	t.Run("returns model after accept", func(t *testing.T) {
 		t.Parallel()
 
-		provider := &mockLLMProvider{
-			chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
-				return &llm.ChatResponse{Content: "hi", FinishReason: "stop"}, nil
-			},
-		}
+		provider := newStopProvider("hi")
 
 		cm := NewConversationManager(ConversationManagerConfig{})
 		_ = cm.AcceptUserMessage(context.Background(), provider, "test-model", "hello")
@@ -371,4 +361,13 @@ func TestCopyMessages(t *testing.T) {
 		result[0].Content = "modified"
 		assert.Equal(t, "test", original[0].Content)
 	})
+}
+
+// newStopProvider creates a mock provider that returns a simple stop response.
+func newStopProvider(content string) *mockLLMProvider {
+	return &mockLLMProvider{
+		chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+			return &llm.ChatResponse{Content: content, FinishReason: "stop"}, nil
+		},
+	}
 }
