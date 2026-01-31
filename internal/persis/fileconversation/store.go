@@ -118,7 +118,7 @@ func (s *Store) rebuildIndex() error {
 
 	userDirs, err := os.ReadDir(s.baseDir)
 	if err != nil {
-		return fmt.Errorf("failed to read directory %s: %w", s.baseDir, err)
+		return fmt.Errorf("fileconversation: failed to read directory %s: %w", s.baseDir, err)
 	}
 
 	for _, userDir := range userDirs {
@@ -180,12 +180,12 @@ func (s *Store) sortUserConversations(userID string) {
 func (s *Store) loadConversationFromFile(filePath string) (*ConversationForStorage, error) {
 	data, err := os.ReadFile(filePath) //nolint:gosec // filePath is constructed internally
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file %s: %w", filePath, err)
+		return nil, fmt.Errorf("fileconversation: failed to read file %s: %w", filePath, err)
 	}
 
 	var stored ConversationForStorage
 	if err := json.Unmarshal(data, &stored); err != nil {
-		return nil, fmt.Errorf("failed to parse conversation file %s: %w", filePath, err)
+		return nil, fmt.Errorf("fileconversation: failed to parse conversation file %s: %w", filePath, err)
 	}
 
 	return &stored, nil

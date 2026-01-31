@@ -6,6 +6,8 @@ import (
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/audit"
 )
 
@@ -46,6 +48,7 @@ func (a *API) GetAgentConfig(ctx context.Context, _ api.GetAgentConfigRequestObj
 
 	cfg, err := a.agentConfigStore.Load(ctx)
 	if err != nil {
+		logger.Error(ctx, "Failed to load agent config", tag.Error(err))
 		return nil, errFailedToLoadAgentConfig
 	}
 
@@ -66,12 +69,14 @@ func (a *API) UpdateAgentConfig(ctx context.Context, request api.UpdateAgentConf
 
 	cfg, err := a.agentConfigStore.Load(ctx)
 	if err != nil {
+		logger.Error(ctx, "Failed to load agent config", tag.Error(err))
 		return nil, errFailedToLoadAgentConfig
 	}
 
 	applyAgentConfigUpdates(cfg, request.Body)
 
 	if err := a.agentConfigStore.Save(ctx, cfg); err != nil {
+		logger.Error(ctx, "Failed to save agent config", tag.Error(err))
 		return nil, errFailedToSaveAgentConfig
 	}
 

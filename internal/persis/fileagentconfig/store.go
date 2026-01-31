@@ -194,7 +194,7 @@ func (s *Store) GetProvider(ctx context.Context) (llm.Provider, string, error) {
 		return nil, "", err
 	}
 	if !cfg.Enabled {
-		return nil, "", errors.New("agent is disabled")
+		return nil, "", errors.New("fileagentconfig: agent is disabled")
 	}
 	return s.providerCache.get(cfg.LLM)
 }
