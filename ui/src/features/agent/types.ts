@@ -107,3 +107,44 @@ export interface StreamResponse {
   conversation?: Conversation;
   conversation_state?: ConversationState;
 }
+
+// Tool input types for specialized viewers
+export interface BashToolInput {
+  command: string;
+  timeout?: number;
+}
+
+export interface ReadToolInput {
+  path: string;
+  offset?: number;
+  limit?: number;
+}
+
+export interface PatchToolInput {
+  path: string;
+  operation?: 'create' | 'replace' | 'delete';
+  content?: string;
+  old_string?: string;
+  new_string?: string;
+}
+
+export interface ThinkToolInput {
+  thought: string;
+}
+
+export interface NavigateToolInput {
+  path: string;
+}
+
+export interface ReadSchemaToolInput {
+  schema: string;
+  path?: string;
+}
+
+export interface AskUserToolInput {
+  question: string;
+  options?: UserPromptOption[];
+  allow_free_text?: boolean;
+  free_text_placeholder?: string;
+  multi_select?: boolean;
+}

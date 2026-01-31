@@ -11,8 +11,7 @@ import {
 
 import { cn } from '@/lib/utils';
 import { Message, ToolCall, ToolResult, UIAction, UserPromptResponse } from '../types';
-import { isJsonPatch } from '../utils/diffUtils';
-import { JsonPatchViewer } from './JsonPatchViewer';
+import { ToolContentViewer } from './ToolViewers';
 import { UserPromptMessage } from './UserPromptMessage';
 
 interface ChatMessagesProps {
@@ -214,7 +213,7 @@ function parseToolArguments(jsonString: string): Record<string, unknown> {
 
 function ToolCallBadge({ toolCall }: { toolCall: ToolCall }): React.ReactNode {
   const [expanded, setExpanded] = useState(true);
-  const jsonPatch = useMemo(() => isJsonPatch(toolCall.function.arguments), [toolCall.function.arguments]);
+  const args = useMemo(() => parseToolArguments(toolCall.function.arguments), [toolCall.function.arguments]);
 
   return (
     <div className="rounded border border-border bg-muted dark:bg-surface text-xs overflow-hidden">
@@ -228,13 +227,7 @@ function ToolCallBadge({ toolCall }: { toolCall: ToolCall }): React.ReactNode {
       </button>
       {expanded && (
         <div className="px-2 py-1.5 border-t border-border bg-card dark:bg-surface">
-          {jsonPatch ? (
-            <JsonPatchViewer patch={jsonPatch} />
-          ) : (
-            <pre className="text-xs overflow-x-auto whitespace-pre-wrap break-words">
-              {JSON.stringify(parseToolArguments(toolCall.function.arguments), null, 2)}
-            </pre>
-          )}
+          <ToolContentViewer toolName={toolCall.function.name} args={args} />
         </div>
       )}
     </div>
