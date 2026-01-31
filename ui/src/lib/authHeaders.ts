@@ -8,12 +8,9 @@ export function getAuthHeaders(
   additionalHeaders?: Record<string, string>
 ): Record<string, string> {
   const token = getAuthToken();
-  const headers: Record<string, string> = {
+  return {
     'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...additionalHeaders,
   };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
 }

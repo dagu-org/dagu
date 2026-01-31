@@ -103,20 +103,24 @@ func applyAgentConfigUpdates(cfg *agent.Config, update *api.UpdateAgentConfigReq
 	if update.Enabled != nil {
 		cfg.Enabled = *update.Enabled
 	}
-	if update.Llm == nil {
+	applyLLMConfigUpdates(&cfg.LLM, update.Llm)
+}
+
+func applyLLMConfigUpdates(cfg *agent.LLMConfig, update *api.UpdateAgentLLMConfig) {
+	if update == nil {
 		return
 	}
-	if update.Llm.Provider != nil {
-		cfg.LLM.Provider = *update.Llm.Provider
+	if update.Provider != nil {
+		cfg.Provider = *update.Provider
 	}
-	if update.Llm.Model != nil {
-		cfg.LLM.Model = *update.Llm.Model
+	if update.Model != nil {
+		cfg.Model = *update.Model
 	}
-	if update.Llm.ApiKey != nil {
-		cfg.LLM.APIKey = *update.Llm.ApiKey
+	if update.ApiKey != nil {
+		cfg.APIKey = *update.ApiKey
 	}
-	if update.Llm.BaseUrl != nil {
-		cfg.LLM.BaseURL = *update.Llm.BaseUrl
+	if update.BaseUrl != nil {
+		cfg.BaseURL = *update.BaseUrl
 	}
 }
 
@@ -125,24 +129,28 @@ func buildAgentConfigChanges(update *api.UpdateAgentConfigRequest) map[string]an
 	if update.Enabled != nil {
 		changes["enabled"] = *update.Enabled
 	}
-	if update.Llm == nil {
-		return changes
-	}
-	llmChanges := make(map[string]any)
-	if update.Llm.Provider != nil {
-		llmChanges["provider"] = *update.Llm.Provider
-	}
-	if update.Llm.Model != nil {
-		llmChanges["model"] = *update.Llm.Model
-	}
-	if update.Llm.ApiKey != nil {
-		llmChanges["api_key_changed"] = true
-	}
-	if update.Llm.BaseUrl != nil {
-		llmChanges["base_url"] = *update.Llm.BaseUrl
-	}
-	if len(llmChanges) > 0 {
+	if llmChanges := buildLLMConfigChanges(update.Llm); len(llmChanges) > 0 {
 		changes["llm"] = llmChanges
+	}
+	return changes
+}
+
+func buildLLMConfigChanges(update *api.UpdateAgentLLMConfig) map[string]any {
+	if update == nil {
+		return nil
+	}
+	changes := make(map[string]any)
+	if update.Provider != nil {
+		changes["provider"] = *update.Provider
+	}
+	if update.Model != nil {
+		changes["model"] = *update.Model
+	}
+	if update.ApiKey != nil {
+		changes["api_key_changed"] = true
+	}
+	if update.BaseUrl != nil {
+		changes["base_url"] = *update.BaseUrl
 	}
 	return changes
 }

@@ -118,24 +118,23 @@ func (n *navigator) navigatePath(node map[string]any, parts []string) (map[strin
 	return n.resolveRef(current), nil
 }
 
+// maxNormalizationDepth limits recursion when normalizing nested schema constructs.
+const maxNormalizationDepth = 10
+
 // normalizeForNavigation resolves refs, oneOf, allOf, and arrays to get to an object with properties.
 func (n *navigator) normalizeForNavigation(node map[string]any) map[string]any {
 	current := n.resolveRef(node)
 
-	// Loop to handle nested constructs
-	for i := 0; i < 10; i++ { // Max depth to prevent infinite loops
+	for i := 0; i < maxNormalizationDepth; i++ {
 		changed := false
 
 		// Handle oneOf/anyOf - find variant with properties
-		for _, key := range []string{"oneOf", "anyOf"} {
-			if union, ok := current[key].([]any); ok {
-				if found := n.findNavigableInOneOf(union); found != nil {
-					current = found
-					changed = true
-					if _, hasProps := current["properties"]; hasProps {
-						return current
-					}
-				}
+		if found := n.findUnionVariant(current); found != nil {
+			current = found
+			changed = true
+			// Early return if properties found immediately
+			if _, hasProps := current["properties"]; hasProps {
+				return current
 			}
 		}
 
@@ -153,7 +152,7 @@ func (n *navigator) normalizeForNavigation(node map[string]any) map[string]any {
 			}
 		}
 
-		// Resolve any new refs (check by looking for $ref key)
+		// Resolve any new refs
 		if _, hasRef := current["$ref"]; hasRef {
 			current = n.resolveRef(current)
 			changed = true
@@ -170,6 +169,18 @@ func (n *navigator) normalizeForNavigation(node map[string]any) map[string]any {
 	}
 
 	return current
+}
+
+// findUnionVariant checks for oneOf/anyOf and returns a navigable variant if found.
+func (n *navigator) findUnionVariant(node map[string]any) map[string]any {
+	for _, key := range []string{"oneOf", "anyOf"} {
+		if union, ok := node[key].([]any); ok {
+			if found := n.findNavigableInOneOf(union); found != nil {
+				return found
+			}
+		}
+	}
+	return nil
 }
 
 // findNavigableInOneOf finds a variant that can be navigated (has properties or leads to properties).
@@ -276,12 +287,10 @@ func (n *navigator) formatNode(node map[string]any, path string) {
 		n.output.WriteString(fmt.Sprintf("Description: %s\n\n", desc))
 	}
 
-	// Handle oneOf/anyOf
-	for _, key := range []string{"oneOf", "anyOf"} {
-		if union, ok := node[key].([]any); ok {
-			n.formatOneOf(union)
-			return
-		}
+	// Handle oneOf/anyOf - display union type options
+	if union := getUnionOptions(node); union != nil {
+		n.formatOneOf(union)
+		return
 	}
 
 	// Handle allOf
@@ -374,6 +383,16 @@ func (n *navigator) formatProperties(props map[string]any, parent map[string]any
 }
 
 // Helper functions
+
+// getUnionOptions returns the oneOf or anyOf array if present, nil otherwise.
+func getUnionOptions(node map[string]any) []any {
+	for _, key := range []string{"oneOf", "anyOf"} {
+		if union, ok := node[key].([]any); ok {
+			return union
+		}
+	}
+	return nil
+}
 
 func getDefinitions(schema map[string]any) map[string]any {
 	if defs, ok := schema["definitions"].(map[string]any); ok {

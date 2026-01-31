@@ -48,7 +48,6 @@ func internalError(err error) *Error {
 	}
 }
 
-
 // GetSyncStatus returns the overall Git sync status.
 func (a *API) GetSyncStatus(ctx context.Context, _ api.GetSyncStatusRequestObject) (api.GetSyncStatusResponseObject, error) {
 	if a.syncService == nil {
@@ -121,8 +120,8 @@ func (a *API) SyncPublishAll(ctx context.Context, req api.SyncPublishAllRequestO
 	}
 
 	var message string
-	if req.Body != nil && req.Body.Message != nil {
-		message = *req.Body.Message
+	if req.Body != nil {
+		message = valueOf(req.Body.Message)
 	}
 
 	result, err := a.syncService.PublishAll(ctx, message)
@@ -366,27 +365,29 @@ func toAPISyncCounts(counts gitsync.StatusCounts) api.SyncStatusCounts {
 }
 
 func toAPISyncResult(result *gitsync.SyncResult) api.SyncResultResponse {
-	var errors *[]api.SyncError
-	if len(result.Errors) > 0 {
-		errList := make([]api.SyncError, len(result.Errors))
-		for i, e := range result.Errors {
-			errList[i] = api.SyncError{
-				DagId:   ptrOf(e.DAGID),
-				Message: e.Message,
-			}
-		}
-		errors = &errList
-	}
-
 	return api.SyncResultResponse{
 		Success:   result.Success,
 		Message:   ptrOf(result.Message),
 		Synced:    ptrOf(result.Synced),
 		Modified:  ptrOf(result.Modified),
 		Conflicts: ptrOf(result.Conflicts),
-		Errors:    errors,
+		Errors:    toAPISyncErrors(result.Errors),
 		Timestamp: result.Timestamp,
 	}
+}
+
+func toAPISyncErrors(errors []gitsync.SyncError) *[]api.SyncError {
+	if len(errors) == 0 {
+		return nil
+	}
+	result := make([]api.SyncError, len(errors))
+	for i, e := range errors {
+		result[i] = api.SyncError{
+			DagId:   ptrOf(e.DAGID),
+			Message: e.Message,
+		}
+	}
+	return &result
 }
 
 // toAPISyncConfig converts a gitsync.Config to the API response format.

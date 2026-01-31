@@ -460,19 +460,20 @@ func (a *API) requireUserManagement() error {
 }
 
 // logAuditEntry logs an audit entry with the specified category and action details.
+// It silently returns if the audit service is not configured or if no user is present in the context.
 func (a *API) logAuditEntry(ctx context.Context, category audit.Category, action string, details any) {
-	if a.auditService == nil {
+	user, ok := auth.UserFromContext(ctx)
+	if a.auditService == nil || !ok {
 		return
 	}
-	currentUser, ok := auth.UserFromContext(ctx)
-	if !ok || currentUser == nil {
-		return
-	}
-	clientIP, _ := auth.ClientIPFromContext(ctx)
+
 	detailsJSON, _ := json.Marshal(details)
-	entry := audit.NewEntry(category, action, currentUser.ID, currentUser.Username).
+	clientIP, _ := auth.ClientIPFromContext(ctx)
+
+	entry := audit.NewEntry(category, action, user.ID, user.Username).
 		WithDetails(string(detailsJSON)).
 		WithIPAddress(clientIP)
+
 	_ = a.auditService.Log(ctx, entry)
 }
 

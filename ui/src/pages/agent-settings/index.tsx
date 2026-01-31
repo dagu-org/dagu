@@ -1,3 +1,5 @@
+import React, { useContext, useEffect, useState } from 'react';
+import { Bot, Loader2, Save } from 'lucide-react';
 import { components } from '@/api/v2/schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,8 +16,6 @@ import { AppBarContext } from '@/contexts/AppBarContext';
 import { useIsAdmin } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { getAuthHeaders } from '@/lib/authHeaders';
-import { Bot, Loader2, Save } from 'lucide-react';
-import React, { useCallback, useContext, useEffect, useState } from 'react';
 
 type AgentConfig = components['schemas']['AgentConfigResponse'];
 
@@ -44,11 +44,16 @@ export default function AgentSettingsPage(): React.ReactNode {
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
   const [baseUrl, setBaseUrl] = useState('');
 
+  const remoteNode = encodeURIComponent(
+    appBarContext.selectedRemoteNode || 'local'
+  );
+  const agentSettingsUrl = `${config.apiURL}/settings/agent?remoteNode=${remoteNode}`;
+
   useEffect(() => {
     appBarContext.setTitle('Agent Settings');
   }, [appBarContext]);
 
-  const updateFormState = useCallback((data: AgentConfig): void => {
+  function updateFormState(data: AgentConfig): void {
     setEnabled(data.enabled ?? false);
     if (data.llm) {
       setProvider(data.llm.provider ?? 'anthropic');
@@ -56,48 +61,37 @@ export default function AgentSettingsPage(): React.ReactNode {
       setApiKeyConfigured(data.llm.apiKeyConfigured ?? false);
       setBaseUrl(data.llm.baseUrl ?? '');
     }
-  }, []);
-
-  const fetchConfig = useCallback(async () => {
-    const remoteNode = encodeURIComponent(
-      appBarContext.selectedRemoteNode || 'local'
-    );
-
-    try {
-      const response = await fetch(
-        `${config.apiURL}/settings/agent?remoteNode=${remoteNode}`,
-        {
-          headers: getAuthHeaders(),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch agent configuration');
-      }
-
-      const data: AgentConfig = await response.json();
-      updateFormState(data);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to load configuration'
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, [config.apiURL, appBarContext.selectedRemoteNode, updateFormState]);
+  }
 
   useEffect(() => {
-    fetchConfig();
-  }, [fetchConfig]);
+    async function fetchConfig(): Promise<void> {
+      try {
+        const response = await fetch(agentSettingsUrl, {
+          headers: getAuthHeaders(),
+        });
 
-  const handleSave = async (): Promise<void> => {
+        if (!response.ok) {
+          throw new Error('Failed to fetch agent configuration');
+        }
+
+        const data: AgentConfig = await response.json();
+        updateFormState(data);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'Failed to load configuration'
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchConfig();
+  }, [agentSettingsUrl]);
+
+  async function handleSave(): Promise<void> {
     setIsSaving(true);
     setError(null);
     setSuccess(null);
-
-    const remoteNode = encodeURIComponent(
-      appBarContext.selectedRemoteNode || 'local'
-    );
 
     const llmConfig: Record<string, string | undefined> = {
       provider,
@@ -110,14 +104,11 @@ export default function AgentSettingsPage(): React.ReactNode {
     }
 
     try {
-      const response = await fetch(
-        `${config.apiURL}/settings/agent?remoteNode=${remoteNode}`,
-        {
-          method: 'PATCH',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ enabled, llm: llmConfig }),
-        }
-      );
+      const response = await fetch(agentSettingsUrl, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ enabled, llm: llmConfig }),
+      });
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
@@ -129,7 +120,6 @@ export default function AgentSettingsPage(): React.ReactNode {
       setApiKey('');
       setSuccess('Configuration saved successfully');
 
-      // Reload page to apply new config across the UI
       setTimeout(() => window.location.reload(), 500);
     } catch (err) {
       setError(
@@ -138,7 +128,7 @@ export default function AgentSettingsPage(): React.ReactNode {
     } finally {
       setIsSaving(false);
     }
-  };
+  }
 
   if (!isAdmin) {
     return (

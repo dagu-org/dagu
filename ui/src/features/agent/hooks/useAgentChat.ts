@@ -25,15 +25,8 @@ async function fetchWithAuth<T>(url: string, options?: RequestInit): Promise<T> 
     headers: { ...getAuthHeaders(), ...options?.headers },
   });
   if (!response.ok) {
-    let errorMessage = response.statusText || 'Request failed';
-    try {
-      const errorData = await response.json();
-      if (errorData.message) {
-        errorMessage = errorData.message;
-      }
-    } catch {
-      // Ignore JSON parse errors
-    }
+    const errorData = await response.json().catch(() => null);
+    const errorMessage = errorData?.message || response.statusText || 'Request failed';
     throw new Error(errorMessage);
   }
   return response.json();
@@ -99,14 +92,14 @@ export function useAgentChat() {
     eventSource.onmessage = (event) => {
       try {
         const data: StreamResponse = JSON.parse(event.data);
-        retryCountRef.current = 0; // Reset retry count on successful message
+        retryCountRef.current = 0;
 
-        data.messages?.forEach((msg) => {
+        for (const msg of data.messages ?? []) {
           addMessage(msg);
           if (msg.type === 'ui_action' && msg.ui_action?.type === 'navigate' && msg.ui_action.path) {
             navigate(msg.ui_action.path);
           }
-        });
+        }
 
         if (data.conversation_state) {
           setConversationState(data.conversation_state);
@@ -201,7 +194,7 @@ export function useAgentChat() {
     [baseUrl, setConversationId, setMessages, setConversationState]
   );
 
-  const isWorking = isSending || conversationState?.working === true;
+  const isWorking = isSending || conversationState?.working;
 
   const clearError = useCallback(() => setError(null), []);
 
