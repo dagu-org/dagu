@@ -459,6 +459,23 @@ func (a *API) requireUserManagement() error {
 	return nil
 }
 
+// logAuditEntry logs an audit entry with the specified category and action details.
+func (a *API) logAuditEntry(ctx context.Context, category audit.Category, action string, details any) {
+	if a.auditService == nil {
+		return
+	}
+	currentUser, ok := auth.UserFromContext(ctx)
+	if !ok || currentUser == nil {
+		return
+	}
+	clientIP, _ := auth.ClientIPFromContext(ctx)
+	detailsJSON, _ := json.Marshal(details)
+	entry := audit.NewEntry(category, action, currentUser.ID, currentUser.Username).
+		WithDetails(string(detailsJSON)).
+		WithIPAddress(clientIP)
+	_ = a.auditService.Log(ctx, entry)
+}
+
 // ptrOf returns a pointer to v, or nil if v is the zero value for its type.
 func ptrOf[T any](v T) *T {
 	if reflect.ValueOf(v).IsZero() {

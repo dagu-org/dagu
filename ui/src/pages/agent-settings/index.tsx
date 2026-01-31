@@ -11,8 +11,9 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { TOKEN_KEY, useIsAdmin } from '@/contexts/AuthContext';
+import { useIsAdmin } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
+import { getAuthHeaders } from '@/lib/authHeaders';
 import { Bot, Loader2, Save } from 'lucide-react';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
 
@@ -58,7 +59,6 @@ export default function AgentSettingsPage(): React.ReactNode {
   }, []);
 
   const fetchConfig = useCallback(async () => {
-    const token = localStorage.getItem(TOKEN_KEY);
     const remoteNode = encodeURIComponent(
       appBarContext.selectedRemoteNode || 'local'
     );
@@ -67,9 +67,7 @@ export default function AgentSettingsPage(): React.ReactNode {
       const response = await fetch(
         `${config.apiURL}/settings/agent?remoteNode=${remoteNode}`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: getAuthHeaders(),
         }
       );
 
@@ -97,7 +95,6 @@ export default function AgentSettingsPage(): React.ReactNode {
     setError(null);
     setSuccess(null);
 
-    const token = localStorage.getItem(TOKEN_KEY);
     const remoteNode = encodeURIComponent(
       appBarContext.selectedRemoteNode || 'local'
     );
@@ -117,10 +114,7 @@ export default function AgentSettingsPage(): React.ReactNode {
         `${config.apiURL}/settings/agent?remoteNode=${remoteNode}`,
         {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers: getAuthHeaders(),
           body: JSON.stringify({ enabled, llm: llmConfig }),
         }
       );

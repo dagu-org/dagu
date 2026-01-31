@@ -2,12 +2,10 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/service/audit"
 )
 
@@ -77,7 +75,7 @@ func (a *API) UpdateAgentConfig(ctx context.Context, request api.UpdateAgentConf
 		return nil, errFailedToSaveAgentConfig
 	}
 
-	a.logAgentAudit(ctx, "agent_config_update", buildAgentConfigChanges(request.Body))
+	a.logAuditEntry(ctx, audit.CategoryAgent, "agent_config_update", buildAgentConfigChanges(request.Body))
 
 	return api.UpdateAgentConfig200JSONResponse(toAgentConfigResponse(cfg)), nil
 }
@@ -87,22 +85,6 @@ func (a *API) requireAgentConfigManagement() error {
 		return errAgentConfigNotAvailable
 	}
 	return nil
-}
-
-func (a *API) logAgentAudit(ctx context.Context, action string, details map[string]any) {
-	if a.auditService == nil {
-		return
-	}
-	currentUser, ok := auth.UserFromContext(ctx)
-	if !ok || currentUser == nil {
-		return
-	}
-	clientIP, _ := auth.ClientIPFromContext(ctx)
-	detailsJSON, _ := json.Marshal(details)
-	entry := audit.NewEntry(audit.CategoryAgent, action, currentUser.ID, currentUser.Username).
-		WithDetails(string(detailsJSON)).
-		WithIPAddress(clientIP)
-	_ = a.auditService.Log(ctx, entry)
 }
 
 func toAgentConfigResponse(cfg *agent.Config) api.AgentConfigResponse {

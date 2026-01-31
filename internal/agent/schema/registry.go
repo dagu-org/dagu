@@ -127,22 +127,14 @@ func (n *navigator) normalizeForNavigation(node map[string]any) map[string]any {
 		changed := false
 
 		// Handle oneOf/anyOf - find variant with properties
-		if oneOf, ok := current["oneOf"].([]any); ok {
-			if found := n.findNavigableInOneOf(oneOf); found != nil {
-				current = found
-				changed = true
-				// Check immediately if found has properties
-				if _, hasProps := current["properties"]; hasProps {
-					return current
-				}
-			}
-		}
-		if anyOf, ok := current["anyOf"].([]any); ok {
-			if found := n.findNavigableInOneOf(anyOf); found != nil {
-				current = found
-				changed = true
-				if _, hasProps := current["properties"]; hasProps {
-					return current
+		for _, key := range []string{"oneOf", "anyOf"} {
+			if union, ok := current[key].([]any); ok {
+				if found := n.findNavigableInOneOf(union); found != nil {
+					current = found
+					changed = true
+					if _, hasProps := current["properties"]; hasProps {
+						return current
+					}
 				}
 			}
 		}
@@ -285,13 +277,11 @@ func (n *navigator) formatNode(node map[string]any, path string) {
 	}
 
 	// Handle oneOf/anyOf
-	if oneOf, ok := node["oneOf"].([]any); ok {
-		n.formatOneOf(oneOf)
-		return
-	}
-	if anyOf, ok := node["anyOf"].([]any); ok {
-		n.formatOneOf(anyOf)
-		return
+	for _, key := range []string{"oneOf", "anyOf"} {
+		if union, ok := node[key].([]any); ok {
+			n.formatOneOf(union)
+			return
+		}
 	}
 
 	// Handle allOf

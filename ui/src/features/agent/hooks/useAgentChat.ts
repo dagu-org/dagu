@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useConfig } from '@/contexts/ConfigContext';
-import { TOKEN_KEY } from '@/contexts/AuthContext';
 import { useAgentChatContext } from '../context/AgentChatContext';
+import { getAuthToken, getAuthHeaders } from '@/lib/authHeaders';
 import {
   ChatRequest,
   ConversationWithState,
@@ -10,17 +10,6 @@ import {
   NewConversationResponse,
   StreamResponse,
 } from '../types';
-
-function getAuthToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-function getAuthHeaders(): Record<string, string> {
-  const token = getAuthToken();
-  return token
-    ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
-    : { 'Content-Type': 'application/json' };
-}
 
 function buildChatRequest(
   message: string,
