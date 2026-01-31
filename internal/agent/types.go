@@ -234,4 +234,6 @@ type EnvironmentInfo struct {
 	ConfigFile string
 	// WorkingDir is the current working directory.
 	WorkingDir string
+	// BaseConfigFile is the path to the base configuration file.
+	BaseConfigFile string
 }

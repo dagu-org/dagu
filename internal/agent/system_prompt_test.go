@@ -12,15 +12,17 @@ func TestGenerateSystemPrompt(t *testing.T) {
 	t.Run("includes environment info", func(t *testing.T) {
 		t.Parallel()
 		env := EnvironmentInfo{
-			DAGsDir:    "/dags",
-			LogDir:     "/logs",
-			WorkingDir: "/work",
+			DAGsDir:        "/dags",
+			LogDir:         "/logs",
+			WorkingDir:     "/work",
+			BaseConfigFile: "/config/base.yaml",
 		}
 
 		result := GenerateSystemPrompt(env, nil)
 
 		assert.NotEmpty(t, result)
 		assert.Contains(t, result, "/dags")
+		assert.Contains(t, result, "/config/base.yaml")
 	})
 
 	t.Run("includes current DAG context", func(t *testing.T) {

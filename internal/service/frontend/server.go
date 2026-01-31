@@ -369,11 +369,12 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, paths *conf
 		ConversationStore: convStore,
 		DAGStore:          dagStore,
 		Environment: agent.EnvironmentInfo{
-			DAGsDir:    paths.DAGsDir,
-			LogDir:     paths.LogDir,
-			DataDir:    paths.DataDir,
-			ConfigFile: paths.ConfigFileUsed,
-			WorkingDir: paths.DAGsDir,
+			DAGsDir:        paths.DAGsDir,
+			LogDir:         paths.LogDir,
+			DataDir:        paths.DataDir,
+			ConfigFile:     paths.ConfigFileUsed,
+			WorkingDir:     paths.DAGsDir,
+			BaseConfigFile: paths.BaseConfig,
 		},
 	})
 
