@@ -104,13 +104,12 @@ export function useAgentChat() {
         if (data.conversation_state) {
           setConversationState(data.conversation_state);
         }
-      } catch (err) {
-        console.error('Failed to parse SSE data:', err);
+      } catch {
+        // SSE parse errors are transient, stream will continue
       }
     };
 
-    eventSource.onerror = (err) => {
-      console.error('SSE error:', err);
+    eventSource.onerror = () => {
       if (eventSource.readyState === EventSource.CLOSED && retryCountRef.current < MAX_SSE_RETRIES) {
         retryCountRef.current++;
         setTimeout(() => {
@@ -177,7 +176,7 @@ export function useAgentChat() {
       const data = await fetchWithAuth<ConversationWithState[]>(`${baseUrl}/conversations`);
       setConversations(data || []);
     } catch (err) {
-      console.error('Failed to fetch conversations:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch conversations');
       setConversations([]);
     }
   }, [baseUrl, setConversations]);
@@ -194,7 +193,7 @@ export function useAgentChat() {
     [baseUrl, setConversationId, setMessages, setConversationState]
   );
 
-  const isWorking = isSending || conversationState?.working;
+  const isWorking = isSending || conversationState?.working || false;
 
   const clearError = useCallback(() => setError(null), []);
 
@@ -206,6 +205,7 @@ export function useAgentChat() {
     conversations,
     isWorking,
     error,
+    setError,
     startConversation,
     sendMessage,
     cancelConversation,

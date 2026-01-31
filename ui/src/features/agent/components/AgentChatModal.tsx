@@ -54,6 +54,7 @@ export function AgentChatModal(): ReactElement | null {
     conversations,
     isWorking,
     error,
+    setError,
     sendMessage,
     cancelConversation,
     clearConversation,
@@ -82,23 +83,21 @@ export function AgentChatModal(): ReactElement | null {
       hasAutoSelectedRef.current = true;
       const latest = findLatestConversation(conversations);
       if (latest) {
-        selectConversation(latest.conversation.id).catch(console.error);
+        selectConversation(latest.conversation.id).catch(() => {});
       }
     }
   }, [isOpen, conversations, conversationId, selectConversation]);
 
   const handleSend = useCallback(
     (message: string, dagContexts?: DAGContext[]): void => {
-      sendMessage(message, undefined, dagContexts).catch((err) =>
-        console.error('Failed to send message:', err)
-      );
+      sendMessage(message, undefined, dagContexts).catch(() => {});
     },
     [sendMessage]
   );
 
   const handleCancel = useCallback((): void => {
     cancelConversation().catch((err) =>
-      console.error('Failed to cancel:', err)
+      setError(err instanceof Error ? err.message : 'Failed to cancel')
     );
   }, [cancelConversation]);
 
@@ -109,7 +108,7 @@ export function AgentChatModal(): ReactElement | null {
         return;
       }
       selectConversation(value).catch((err) =>
-        console.error('Failed to select conversation:', err)
+        setError(err instanceof Error ? err.message : 'Failed to select conversation')
       );
     },
     [selectConversation, clearConversation]
