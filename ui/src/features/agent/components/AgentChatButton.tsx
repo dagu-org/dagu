@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { useAgentChatContext } from '../context/AgentChatContext';
 
 const BASE_STYLES =
-  'fixed bottom-4 right-4 z-50 h-9 px-3 rounded-md shadow-md bg-background/95 backdrop-blur border-border transition-all duration-200';
+  'fixed bottom-4 right-4 z-50 h-9 px-3 rounded-md shadow-md bg-card border border-border backdrop-blur transition-all duration-200';
 
 export function AgentChatButton(): ReactElement {
   const { isOpen, toggleChat, conversationState } = useAgentChatContext();

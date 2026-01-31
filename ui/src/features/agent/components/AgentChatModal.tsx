@@ -169,7 +169,7 @@ export function AgentChatModal(): ReactElement | null {
       />
 
       <div
-        className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/80 cursor-move"
+        className="flex items-center justify-between px-3 py-2 border-b border-border bg-secondary dark:bg-surface cursor-move"
         {...dragHandlers}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -178,7 +178,7 @@ export function AgentChatModal(): ReactElement | null {
             value={conversationId || 'new'}
             onValueChange={handleSelectConversation}
           >
-            <SelectTrigger className="h-6 w-auto max-w-[200px] px-2 text-xs bg-transparent border-border hover:bg-muted">
+            <SelectTrigger className="h-6 w-auto max-w-[200px] px-2 text-xs bg-transparent border-border hover:bg-accent">
               <SelectValue placeholder="New conversation" />
             </SelectTrigger>
             <SelectContent className="bg-popover border-border">

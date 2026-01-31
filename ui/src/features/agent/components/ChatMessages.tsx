@@ -31,7 +31,7 @@ export function ChatMessages({
 
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center text-muted-foreground p-4">
+      <div className="flex-1 flex items-center justify-center text-muted-foreground p-4 bg-popover">
         <div className="text-center">
           <Terminal className="h-8 w-8 mx-auto mb-2 opacity-30" />
           <p className="text-xs text-muted-foreground">
@@ -43,7 +43,7 @@ export function ChatMessages({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-2 space-y-2 font-mono text-xs">
+    <div className="flex-1 overflow-y-auto p-2 space-y-2 font-mono text-xs bg-popover">
       {messages.map((message) => (
         <MessageItem key={message.id} message={message} />
       ))}
@@ -116,6 +116,8 @@ function UIActionMessage({
 }
 
 function UserMessage({ content, isPending }: { content: string; isPending?: boolean }): React.ReactNode {
+  if (!content) return null;
+
   return (
     <div className="pl-1">
       <div className={cn("flex items-start gap-1.5 text-primary", isPending && "opacity-60")}>
@@ -180,10 +182,10 @@ function ToolCallBadge({
   const args = parseToolArguments(toolCall.function.arguments);
 
   return (
-    <div className="rounded border border-border/60 bg-muted/50 text-xs overflow-hidden">
+    <div className="rounded border border-border bg-muted dark:bg-surface text-xs overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-1.5 px-2 py-1.5 hover:bg-muted/80 transition-colors"
+        className="w-full flex items-center gap-1.5 px-2 py-1.5 hover:bg-secondary transition-colors"
       >
         <Terminal className="h-3 w-3 text-muted-foreground" />
         <span className="font-mono font-medium">{toolCall.function.name}</span>
@@ -192,7 +194,7 @@ function ToolCallBadge({
         </span>
       </button>
       {expanded && (
-        <div className="px-2 py-1.5 border-t border-border/40 bg-background/50">
+        <div className="px-2 py-1.5 border-t border-border bg-card dark:bg-surface">
           <pre className="text-xs overflow-x-auto whitespace-pre-wrap break-words">
             {JSON.stringify(args, null, 2)}
           </pre>
@@ -238,7 +240,7 @@ function ToolResultItem({ result }: { result: ToolResult }): React.ReactNode {
     <div className={cn('rounded border text-xs overflow-hidden', borderStyle)}>
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-1.5 px-2 py-1.5 hover:bg-muted/30 transition-colors text-left"
+        className="w-full flex items-center gap-1.5 px-2 py-1.5 hover:bg-accent transition-colors text-left"
       >
         <StatusIcon className={cn('h-3 w-3 flex-shrink-0', statusColor)} />
         <span className="font-mono truncate flex-1">
@@ -249,7 +251,7 @@ function ToolResultItem({ result }: { result: ToolResult }): React.ReactNode {
         </span>
       </button>
       {expanded && (
-        <div className="px-2 py-1.5 border-t border-border/40 bg-background/50">
+        <div className="px-2 py-1.5 border-t border-border bg-card dark:bg-surface">
           <pre className="text-xs overflow-x-auto whitespace-pre-wrap break-words max-h-[200px] overflow-y-auto">
             {content}
           </pre>

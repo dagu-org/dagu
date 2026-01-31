@@ -132,7 +132,7 @@ export function DAGPicker({
               key={dag.dag_file}
               className={cn(
                 'inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs',
-                'bg-muted text-muted-foreground'
+                'bg-secondary text-secondary-foreground'
               )}
             >
               <Paperclip className="h-3 w-3" />
@@ -171,7 +171,7 @@ export function DAGPicker({
             className={cn(
               'absolute bottom-full left-0 mb-1 z-50',
               'w-64 max-h-64 overflow-hidden',
-              'bg-popover border rounded-md shadow-lg',
+              'bg-popover border border-border rounded-md shadow-lg',
               'flex flex-col'
             )}
           >

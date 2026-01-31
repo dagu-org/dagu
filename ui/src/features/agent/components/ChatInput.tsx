@@ -74,7 +74,7 @@ export function ChatInput({
   );
 
   return (
-    <div className="p-2 border-t border-border/40 bg-background">
+    <div className="p-2 border-t border-border bg-background">
       {/* DAG Picker with chips */}
       <DAGPicker
         selectedDags={selectedDags}
