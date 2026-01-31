@@ -22,13 +22,16 @@ import (
 func respondErrorDirect(w http.ResponseWriter, status int, code api.ErrorCode, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"code":    string(code),
 		"message": message,
-	})
+	}); err != nil {
+		slog.Error("failed to encode error response", "error", err)
+	}
 }
 
 // defaultUserID is used when no user is authenticated (e.g., auth disabled).
+// This value should match the system's expected default user identifier.
 const defaultUserID = "admin"
 
 // getUserIDFromContext extracts the user ID from the request context.
@@ -221,7 +224,7 @@ func (a *API) persistNewConversation(ctx context.Context, id, userID string, now
 		UpdatedAt: now,
 	}
 	if err := a.store.CreateConversation(ctx, conv); err != nil {
-		a.logger.Error("Failed to persist conversation", "error", err)
+		a.logger.Warn("Failed to persist conversation", "error", err)
 	}
 }
 

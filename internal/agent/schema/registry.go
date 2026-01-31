@@ -74,7 +74,6 @@ type navigator struct {
 func (n *navigator) navigate() (string, error) {
 	node := n.root
 
-	// Navigate to the target path
 	if n.path != "" {
 		parts := strings.Split(n.path, ".")
 		var err error
@@ -84,7 +83,6 @@ func (n *navigator) navigate() (string, error) {
 		}
 	}
 
-	// Format the node
 	n.formatNode(node, n.path)
 
 	return n.output.String(), nil
@@ -94,10 +92,8 @@ func (n *navigator) navigatePath(node map[string]any, parts []string) (map[strin
 	current := node
 
 	for i, part := range parts {
-		// Normalize the current node to get to properties
 		current = n.normalizeForNavigation(current)
 
-		// Navigate into properties
 		props, ok := current["properties"].(map[string]any)
 		if !ok {
 			return nil, fmt.Errorf("path %q: no properties at %q", n.path, strings.Join(parts[:i], "."))
@@ -204,6 +200,9 @@ func (n *navigator) findNavigableInOneOf(oneOf []any) map[string]any {
 			continue
 		}
 		resolved := n.resolveRef(optMap)
+		if resolved == nil {
+			continue
+		}
 		if typ, _ := resolved["type"].(string); typ != "array" {
 			continue
 		}
@@ -212,6 +211,9 @@ func (n *navigator) findNavigableInOneOf(oneOf []any) map[string]any {
 			continue
 		}
 		normalized := n.normalizeForNavigation(n.resolveRef(items))
+		if normalized == nil {
+			continue
+		}
 		if _, hasProps := normalized["properties"]; hasProps {
 			return normalized
 		}

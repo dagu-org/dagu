@@ -8,7 +8,19 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/backoff"
 	"github.com/dagu-org/dagu/internal/llm"
+)
+
+const (
+	// llmRetryInitialInterval is the initial backoff interval for LLM request retries.
+	llmRetryInitialInterval = time.Second
+
+	// idlePollingInterval is the interval for polling when no messages are queued.
+	idlePollingInterval = 100 * time.Millisecond
+
+	// llmRequestTimeout is the maximum time allowed for an LLM request.
+	llmRequestTimeout = 5 * time.Minute
 )
 
 // MessageRecordFunc is called to record new messages to persistent storage.
@@ -98,6 +110,8 @@ func (l *Loop) Go(ctx context.Context) error {
 
 	l.logger.Info("starting conversation loop", "tools", len(l.tools))
 
+	retrier := backoff.NewRetrier(backoff.NewExponentialBackoffPolicy(llmRetryInitialInterval))
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -119,17 +133,32 @@ func (l *Loop) Go(ctx context.Context) error {
 			l.logger.Info("processing queued messages", "history_count", len(l.history))
 			if err := l.processLLMRequest(ctx); err != nil {
 				l.logger.Error("failed to process LLM request", "error", err)
-				time.Sleep(time.Second)
+				interval, _ := retrier.Next(err)
+				l.sleepWithContext(ctx, interval)
 				continue
 			}
+			retrier.Reset()
 			l.logger.Info("finished processing queued messages")
 		} else {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case <-time.After(100 * time.Millisecond):
+			case <-time.After(idlePollingInterval):
 			}
 		}
+	}
+}
+
+// sleepWithContext sleeps for the given duration or until the context is canceled.
+func (l *Loop) sleepWithContext(ctx context.Context, d time.Duration) {
+	if d <= 0 {
+		return
+	}
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+	case <-ctx.Done():
 	}
 }
 
@@ -152,7 +181,7 @@ func (l *Loop) processLLMRequest(ctx context.Context) error {
 
 	l.setWorking(true)
 
-	llmCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	llmCtx, cancel := context.WithTimeout(ctx, llmRequestTimeout)
 	defer cancel()
 
 	resp, err := l.provider.Chat(llmCtx, req)

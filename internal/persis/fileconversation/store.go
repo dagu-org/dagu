@@ -225,8 +225,9 @@ func (s *Store) CreateConversation(_ context.Context, conv *agent.Conversation) 
 	}
 
 	s.byID[conv.ID] = filePath
-	s.byUser[conv.UserID] = append([]string{conv.ID}, s.byUser[conv.UserID]...)
+	s.byUser[conv.UserID] = append(s.byUser[conv.UserID], conv.ID)
 	s.updatedAt[conv.ID] = conv.UpdatedAt
+	s.sortUserConversations(conv.UserID)
 
 	return nil
 }
@@ -237,10 +238,10 @@ func validateConversation(conv *agent.Conversation, requireUserID bool) error {
 		return errors.New("fileconversation: conversation cannot be nil")
 	}
 	if conv.ID == "" {
-		return agent.ErrInvalidConversationID
+		return fmt.Errorf("fileconversation: %w", agent.ErrInvalidConversationID)
 	}
 	if requireUserID && conv.UserID == "" {
-		return agent.ErrInvalidUserID
+		return fmt.Errorf("fileconversation: %w", agent.ErrInvalidUserID)
 	}
 	return nil
 }
@@ -444,6 +445,9 @@ func truncateTitle(title string) string {
 	if len(runes) <= maxTitleLength {
 		return title
 	}
+	if maxTitleLength < 3 {
+		return string(runes[:maxTitleLength])
+	}
 	return string(runes[:maxTitleLength-3]) + "..."
 }
 
@@ -465,6 +469,9 @@ func (s *Store) GetMessages(_ context.Context, conversationID string) ([]agent.M
 }
 
 // loadConversationByID looks up and loads a conversation by its ID.
+// Note: Uses explicit RUnlock instead of defer since file I/O follows the lock.
+// The file could be deleted between index lookup and read, but loadConversationFromFile
+// handles os.ErrNotExist gracefully.
 func (s *Store) loadConversationByID(id string) (*ConversationForStorage, error) {
 	s.mu.RLock()
 	filePath, exists := s.byID[id]

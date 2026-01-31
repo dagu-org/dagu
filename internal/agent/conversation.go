@@ -255,7 +255,8 @@ func (cm *ConversationManager) SubscribeWithSnapshot(ctx context.Context) (Strea
 	}, next
 }
 
-// Cancel stops the conversation loop.
+// Cancel stops the conversation loop. The context parameter is unused
+// because cancellation is performed synchronously via the internal cancel function.
 func (cm *ConversationManager) Cancel(_ context.Context) error {
 	cancel := cm.clearLoop()
 

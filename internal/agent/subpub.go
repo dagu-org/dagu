@@ -5,6 +5,9 @@ import (
 	"sync"
 )
 
+// defaultSubscriberBuffer is the buffer size for subscriber channels.
+const defaultSubscriberBuffer = 10
+
 // subscriber holds the state for a single subscription.
 type subscriber[K any] struct {
 	seqID  int64
@@ -54,7 +57,7 @@ func NewSubPub[K any]() *SubPub[K] {
 // The returned bool is false when the subscription ends.
 func (sp *SubPub[K]) Subscribe(ctx context.Context, seqID int64) func() (K, bool) {
 	subCtx, cancel := context.WithCancel(ctx)
-	ch := make(chan K, 10) // Buffered to avoid blocking publishers
+	ch := make(chan K, defaultSubscriberBuffer) // Buffered to avoid blocking publishers
 
 	sub := &subscriber[K]{
 		seqID:  seqID,

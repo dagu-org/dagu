@@ -11,6 +11,16 @@ import (
 	"github.com/dagu-org/dagu/internal/service/audit"
 )
 
+const (
+	auditActionAgentConfigUpdate = "agent_config_update"
+	auditFieldEnabled            = "enabled"
+	auditFieldLLM                = "llm"
+	auditFieldProvider           = "provider"
+	auditFieldModel              = "model"
+	auditFieldAPIKeyChanged      = "api_key_changed"
+	auditFieldBaseURL            = "base_url"
+)
+
 var (
 	errAgentConfigNotAvailable = &Error{
 		Code:       api.ErrorCodeForbidden,
@@ -80,7 +90,7 @@ func (a *API) UpdateAgentConfig(ctx context.Context, request api.UpdateAgentConf
 		return nil, errFailedToSaveAgentConfig
 	}
 
-	a.logAuditEntry(ctx, audit.CategoryAgent, "agent_config_update", buildAgentConfigChanges(request.Body))
+	a.logAuditEntry(ctx, audit.CategoryAgent, auditActionAgentConfigUpdate, buildAgentConfigChanges(request.Body))
 
 	return api.UpdateAgentConfig200JSONResponse(toAgentConfigResponse(cfg)), nil
 }
@@ -104,6 +114,8 @@ func toAgentConfigResponse(cfg *agent.Config) api.AgentConfigResponse {
 	}
 }
 
+// applyAgentConfigUpdates applies non-nil fields from the update request to the agent configuration.
+// Only fields present in the update are modified, allowing partial updates.
 func applyAgentConfigUpdates(cfg *agent.Config, update *api.UpdateAgentConfigRequest) {
 	if update.Enabled != nil {
 		cfg.Enabled = *update.Enabled
@@ -129,13 +141,15 @@ func applyLLMConfigUpdates(cfg *agent.LLMConfig, update *api.UpdateAgentLLMConfi
 	}
 }
 
+// buildAgentConfigChanges constructs a map of changed fields for audit logging.
+// Only non-nil fields from the update are included in the returned map.
 func buildAgentConfigChanges(update *api.UpdateAgentConfigRequest) map[string]any {
 	changes := make(map[string]any)
 	if update.Enabled != nil {
-		changes["enabled"] = *update.Enabled
+		changes[auditFieldEnabled] = *update.Enabled
 	}
 	if llmChanges := buildLLMConfigChanges(update.Llm); len(llmChanges) > 0 {
-		changes["llm"] = llmChanges
+		changes[auditFieldLLM] = llmChanges
 	}
 	return changes
 }
@@ -146,16 +160,16 @@ func buildLLMConfigChanges(update *api.UpdateAgentLLMConfig) map[string]any {
 	}
 	changes := make(map[string]any)
 	if update.Provider != nil {
-		changes["provider"] = *update.Provider
+		changes[auditFieldProvider] = *update.Provider
 	}
 	if update.Model != nil {
-		changes["model"] = *update.Model
+		changes[auditFieldModel] = *update.Model
 	}
 	if update.ApiKey != nil {
-		changes["api_key_changed"] = true
+		changes[auditFieldAPIKeyChanged] = true
 	}
 	if update.BaseUrl != nil {
-		changes["base_url"] = *update.BaseUrl
+		changes[auditFieldBaseURL] = *update.BaseUrl
 	}
 	return changes
 }
