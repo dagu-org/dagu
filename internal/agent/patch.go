@@ -1,12 +1,16 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
@@ -34,7 +38,8 @@ type PatchToolInput struct {
 }
 
 // NewPatchTool creates a new patch tool for file editing.
-func NewPatchTool() *AgentTool {
+// The dagsDir parameter is used to auto-validate DAG files after write operations.
+func NewPatchTool(dagsDir string) *AgentTool {
 	return &AgentTool{
 		Tool: llm.Tool{
 			Type: "function",
@@ -70,11 +75,13 @@ func NewPatchTool() *AgentTool {
 				},
 			},
 		},
-		Run: patchRun,
+		Run: func(ctx ToolContext, input json.RawMessage) ToolOut {
+			return patchRun(ctx, input, dagsDir)
+		},
 	}
 }
 
-func patchRun(ctx ToolContext, input json.RawMessage) ToolOut {
+func patchRun(ctx ToolContext, input json.RawMessage, dagsDir string) ToolOut {
 	var args PatchToolInput
 	if err := json.Unmarshal(input, &args); err != nil {
 		return toolError("Failed to parse input: %v", err)
@@ -88,9 +95,9 @@ func patchRun(ctx ToolContext, input json.RawMessage) ToolOut {
 
 	switch args.Operation {
 	case PatchOpCreate:
-		return patchCreate(path, args.Content)
+		return patchCreate(ctx.Context, path, args.Content, dagsDir)
 	case PatchOpReplace:
-		return patchReplace(path, args.OldString, args.NewString)
+		return patchReplace(ctx.Context, path, args.OldString, args.NewString, dagsDir)
 	case PatchOpDelete:
 		return patchDelete(path)
 	default:
@@ -98,7 +105,7 @@ func patchRun(ctx ToolContext, input json.RawMessage) ToolOut {
 	}
 }
 
-func patchCreate(path, content string) ToolOut {
+func patchCreate(ctx context.Context, path, content, dagsDir string) ToolOut {
 	if err := os.MkdirAll(filepath.Dir(path), dirPermission); err != nil {
 		return toolError("Failed to create directory: %v", err)
 	}
@@ -107,10 +114,14 @@ func patchCreate(path, content string) ToolOut {
 		return toolError("Failed to write file: %v", err)
 	}
 
-	return ToolOut{Content: fmt.Sprintf("Created %s (%d lines)", path, countLines(content))}
+	msg := fmt.Sprintf("Created %s (%d lines)", path, countLines(content))
+	if errs := validateIfDAGFile(ctx, path, dagsDir); len(errs) > 0 {
+		msg += "\n\nDAG Validation Errors:\n- " + strings.Join(errs, "\n- ")
+	}
+	return ToolOut{Content: msg}
 }
 
-func patchReplace(path, oldString, newString string) ToolOut {
+func patchReplace(ctx context.Context, path, oldString, newString, dagsDir string) ToolOut {
 	if oldString == "" {
 		return toolError("old_string is required for replace operation")
 	}
@@ -138,7 +149,11 @@ func patchReplace(path, oldString, newString string) ToolOut {
 		return toolError("Failed to write file: %v", err)
 	}
 
-	return ToolOut{Content: fmt.Sprintf("Replaced %d lines with %d lines in %s", countLines(oldString), countLines(newString), path)}
+	msg := fmt.Sprintf("Replaced %d lines with %d lines in %s", countLines(oldString), countLines(newString), path)
+	if errs := validateIfDAGFile(ctx, path, dagsDir); len(errs) > 0 {
+		msg += "\n\nDAG Validation Errors:\n- " + strings.Join(errs, "\n- ")
+	}
+	return ToolOut{Content: msg}
 }
 
 func patchDelete(path string) ToolOut {
@@ -154,4 +169,36 @@ func patchDelete(path string) ToolOut {
 
 func countLines(s string) int {
 	return strings.Count(s, "\n") + 1
+}
+
+// isDAGFile checks if the path is a YAML file within the DAGs directory.
+func isDAGFile(path, dagsDir string) bool {
+	if dagsDir == "" || !strings.HasSuffix(path, ".yaml") {
+		return false
+	}
+	cleanPath := filepath.Clean(path)
+	cleanDAGsDir := filepath.Clean(dagsDir)
+	return strings.HasPrefix(cleanPath, cleanDAGsDir)
+}
+
+// validateIfDAGFile validates the file if it's a DAG file, returning any validation errors.
+func validateIfDAGFile(ctx context.Context, path, dagsDir string) []string {
+	if !isDAGFile(path, dagsDir) {
+		return nil
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return []string{fmt.Sprintf("failed to read for validation: %v", err)}
+	}
+
+	_, err = spec.LoadYAML(ctx, data, spec.WithoutEval())
+	if err != nil {
+		var errList core.ErrorList
+		if errors.As(err, &errList) {
+			return errList.ToStringList()
+		}
+		return []string{err.Error()}
+	}
+	return nil
 }

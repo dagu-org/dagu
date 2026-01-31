@@ -7,11 +7,12 @@ import (
 
 // CreateTools returns all available tools for the agent including bash, read,
 // patch, think, navigate, and schema tools.
-func CreateTools() []*AgentTool {
+// The dagsDir parameter is used by the patch tool for DAG file validation.
+func CreateTools(dagsDir string) []*AgentTool {
 	return []*AgentTool{
 		NewBashTool(),
 		NewReadTool(),
-		NewPatchTool(),
+		NewPatchTool(dagsDir),
 		NewThinkTool(),
 		NewNavigateTool(),
 		NewReadSchemaTool(),

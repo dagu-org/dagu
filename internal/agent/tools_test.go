@@ -10,7 +10,7 @@ import (
 func TestCreateTools(t *testing.T) {
 	t.Parallel()
 
-	tools := CreateTools()
+	tools := CreateTools("")
 	assert.Len(t, tools, 6)
 
 	expectedTools := []string{"bash", "read", "patch", "think", "navigate", "read_schema"}
@@ -24,7 +24,7 @@ func TestCreateTools(t *testing.T) {
 func TestGetToolByName(t *testing.T) {
 	t.Parallel()
 
-	tools := CreateTools()
+	tools := CreateTools("")
 
 	tests := []struct {
 		name         string

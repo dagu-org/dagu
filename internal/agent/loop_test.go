@@ -21,7 +21,7 @@ func TestNewLoop(t *testing.T) {
 		loop := NewLoop(LoopConfig{
 			Provider: &mockLLMProvider{name: "test"},
 			Model:    "test-model",
-			Tools:    CreateTools(),
+			Tools:    CreateTools(""),
 		})
 
 		assert.NotNil(t, loop)
@@ -198,7 +198,7 @@ func TestLoop_Go(t *testing.T) {
 
 		loop := NewLoop(LoopConfig{
 			Provider: provider,
-			Tools:    CreateTools(),
+			Tools:    CreateTools(""),
 		})
 		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
 
@@ -296,7 +296,7 @@ func TestLoop_ExecuteTool(t *testing.T) {
 
 		loop := NewLoop(LoopConfig{
 			Provider: &mockLLMProvider{},
-			Tools:    CreateTools(),
+			Tools:    CreateTools(""),
 		})
 
 		result := loop.executeTool(context.Background(), llm.ToolCall{
@@ -317,7 +317,7 @@ func TestLoop_ExecuteTool(t *testing.T) {
 
 		loop := NewLoop(LoopConfig{
 			Provider: &mockLLMProvider{},
-			Tools:    CreateTools(),
+			Tools:    CreateTools(""),
 		})
 
 		result := loop.executeTool(context.Background(), llm.ToolCall{
@@ -338,7 +338,7 @@ func TestLoop_ExecuteTool(t *testing.T) {
 
 		loop := NewLoop(LoopConfig{
 			Provider: &mockLLMProvider{},
-			Tools:    CreateTools(),
+			Tools:    CreateTools(""),
 		})
 
 		result := loop.executeTool(context.Background(), llm.ToolCall{
@@ -400,7 +400,7 @@ func TestLoop_BuildToolDefinitions(t *testing.T) {
 
 		loop := NewLoop(LoopConfig{
 			Provider: &mockLLMProvider{},
-			Tools:    CreateTools(),
+			Tools:    CreateTools(""),
 		})
 
 		tools := loop.buildToolDefinitions()

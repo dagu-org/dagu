@@ -287,7 +287,7 @@ func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) e
 		return nil
 	}
 
-	tools := CreateTools()
+	tools := CreateTools(cm.environment.DAGsDir)
 	loopCtx, cancel := context.WithCancel(context.Background())
 
 	loopInstance := NewLoop(LoopConfig{

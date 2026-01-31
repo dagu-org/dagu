@@ -71,11 +71,27 @@ steps: []                 # Step definitions
 schedule: "0 * * * *"     # Cron expression
 skipIfSuccessful: bool    # Skip if already succeeded
 
-# Environment
-env: {KEY: value}         # Environment variables
+# Environment Variables (multiple formats)
+env:
+  KEY: value              # Map format
+env:                      # Array of maps
+  - KEY1: value1
+  - KEY2: value2
+env:                      # KEY=value strings
+  - KEY1=value1
+  - KEY2=value2
+# Supports: ${VAR} expansion, `command` substitution
+
 params: {key: value}      # Runtime parameters
 dotenv: ".env"            # Load .env file
 workingDir: /path         # Working directory
+
+# Secrets (resolved at runtime, masked in logs)
+secrets:
+  - name: DB_PASSWORD     # Env var name (required)
+    provider: env         # Provider: env, file, gcp-secrets, etc.
+    key: MY_DB_SECRET     # Provider-specific key (required)
+    options: {}           # Provider-specific options
 
 # Timeouts & Limits
 timeoutSec: 3600          # DAG timeout
@@ -485,4 +501,6 @@ steps:
 - Use `navigate` for UI pages, not CLI status commands
 - DAGs created in: {{.DAGsDir}}
 - Logs stored in: {{.LogDir}}
+- Base config (if set in paths.baseConfig) provides defaults for all DAGs
+- Base config is merged with each DAG; DAG values override base config
 - Ask confirmation before significant changes
