@@ -178,7 +178,7 @@ export function AgentChatModal(): ReactElement | null {
             value={conversationId || 'new'}
             onValueChange={handleSelectConversation}
           >
-            <SelectTrigger className="h-6 w-auto max-w-[200px] px-2 text-xs bg-transparent border-border hover:bg-accent">
+            <SelectTrigger className="h-6 w-auto max-w-[200px] px-2 text-xs bg-transparent border-none shadow-none hover:bg-accent">
               <SelectValue placeholder="New conversation" />
             </SelectTrigger>
             <SelectContent className="bg-popover border-border">
