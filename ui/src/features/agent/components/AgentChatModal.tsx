@@ -50,6 +50,7 @@ export function AgentChatModal(): ReactElement | null {
   const {
     conversationId,
     messages,
+    pendingUserMessage,
     conversations,
     isWorking,
     error,
@@ -249,7 +250,7 @@ export function AgentChatModal(): ReactElement | null {
         </div>
       )}
 
-      <ChatMessages messages={messages} isWorking={isWorking} />
+      <ChatMessages messages={messages} pendingUserMessage={pendingUserMessage} isWorking={isWorking} />
 
       <ChatInput
         onSend={handleSend}

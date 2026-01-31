@@ -14,11 +14,13 @@ import { Message, ToolCall, ToolResult, UIAction } from '../types';
 
 interface ChatMessagesProps {
   messages: Message[];
+  pendingUserMessage: string | null;
   isWorking: boolean;
 }
 
 export function ChatMessages({
   messages,
+  pendingUserMessage,
   isWorking,
 }: ChatMessagesProps): React.ReactNode {
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -45,6 +47,9 @@ export function ChatMessages({
       {messages.map((message) => (
         <MessageItem key={message.id} message={message} />
       ))}
+      {pendingUserMessage && (
+        <UserMessage content={pendingUserMessage} isPending />
+      )}
       {isWorking && (
         <div className="flex items-center gap-1.5 text-yellow-500 pl-1">
           <Loader2 className="h-3 w-3 animate-spin" />
@@ -110,10 +115,10 @@ function UIActionMessage({
   );
 }
 
-function UserMessage({ content }: { content: string }): React.ReactNode {
+function UserMessage({ content, isPending }: { content: string; isPending?: boolean }): React.ReactNode {
   return (
     <div className="pl-1">
-      <div className="flex items-start gap-1.5 text-primary">
+      <div className={cn("flex items-start gap-1.5 text-primary", isPending && "opacity-60")}>
         <ChevronRight className="h-3 w-3 mt-0.5 flex-shrink-0" />
         <p className="whitespace-pre-wrap break-words">{content}</p>
       </div>

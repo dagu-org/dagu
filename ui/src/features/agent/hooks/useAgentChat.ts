@@ -67,6 +67,7 @@ export function useAgentChat() {
   const {
     conversationId,
     messages,
+    pendingUserMessage,
     conversationState,
     conversations,
     setConversationId,
@@ -74,6 +75,7 @@ export function useAgentChat() {
     setConversationState,
     setConversations,
     addMessage,
+    setPendingUserMessage,
     clearConversation,
   } = useAgentChatContext();
 
@@ -159,16 +161,8 @@ export function useAgentChat() {
       setIsSending(true);
       setError(null);
 
-      // Optimistic update - show user message immediately
-      const optimisticMessage = {
-        id: `optimistic-${Date.now()}`,
-        conversation_id: conversationId || '',
-        type: 'user' as const,
-        sequence_id: Date.now(),
-        content: message,
-        created_at: new Date().toISOString(),
-      };
-      addMessage(optimisticMessage);
+      // Show pending message immediately (will be cleared when real message arrives via SSE)
+      setPendingUserMessage(message);
 
       try {
         if (!conversationId) {
@@ -182,12 +176,13 @@ export function useAgentChat() {
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
         setError(errorMessage);
+        setPendingUserMessage(null); // Clear pending on error
         throw err;
       } finally {
         setIsSending(false);
       }
     },
-    [baseUrl, conversationId, startConversation, addMessage]
+    [baseUrl, conversationId, startConversation, setPendingUserMessage]
   );
 
   const cancelConversation = useCallback(async (): Promise<void> => {
@@ -224,6 +219,7 @@ export function useAgentChat() {
   return {
     conversationId,
     messages,
+    pendingUserMessage,
     conversationState,
     conversations,
     isWorking,

@@ -15,6 +15,7 @@ interface AgentChatContextType {
   isOpen: boolean;
   conversationId: string | null;
   messages: Message[];
+  pendingUserMessage: string | null;
   conversationState: ConversationState | null;
   conversations: ConversationWithState[];
   openChat: () => void;
@@ -25,6 +26,7 @@ interface AgentChatContextType {
   setConversationState: (state: ConversationState | null) => void;
   setConversations: (conversations: ConversationWithState[]) => void;
   addMessage: (message: Message) => void;
+  setPendingUserMessage: (message: string | null) => void;
   clearConversation: () => void;
 }
 
@@ -38,6 +40,7 @@ export function AgentChatProvider({ children }: AgentChatProviderProps): ReactNo
   const [isOpen, setIsOpen] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
   const [conversationState, setConversationState] =
     useState<ConversationState | null>(null);
   const [conversations, setConversations] = useState<ConversationWithState[]>(
@@ -49,20 +52,29 @@ export function AgentChatProvider({ children }: AgentChatProviderProps): ReactNo
   const toggleChat = useCallback(() => setIsOpen((prev) => !prev), []);
 
   const addMessage = useCallback((message: Message) => {
+    // When a user message arrives from SSE, clear the pending message
+    if (message.type === 'user') {
+      setPendingUserMessage(null);
+    }
+
     setMessages((prev) => {
+      // Check for exact ID match - update existing
       const existingIndex = prev.findIndex((m) => m.id === message.id);
-      if (existingIndex === -1) {
-        return [...prev, message];
+      if (existingIndex !== -1) {
+        const updated = [...prev];
+        updated[existingIndex] = message;
+        return updated;
       }
-      const updated = [...prev];
-      updated[existingIndex] = message;
-      return updated;
+
+      // Add as new message
+      return [...prev, message];
     });
   }, []);
 
   const clearConversation = useCallback(() => {
     setConversationId(null);
     setMessages([]);
+    setPendingUserMessage(null);
     setConversationState(null);
   }, []);
 
@@ -72,6 +84,7 @@ export function AgentChatProvider({ children }: AgentChatProviderProps): ReactNo
         isOpen,
         conversationId,
         messages,
+        pendingUserMessage,
         conversationState,
         conversations,
         openChat,
@@ -82,6 +95,7 @@ export function AgentChatProvider({ children }: AgentChatProviderProps): ReactNo
         setConversationState,
         setConversations,
         addMessage,
+        setPendingUserMessage,
         clearConversation,
       }}
     >
