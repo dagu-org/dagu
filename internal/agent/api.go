@@ -11,11 +11,22 @@ import (
 	"sync"
 	"time"
 
+	api "github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
+
+// respondErrorDirect writes a JSON error response (for use outside API methods).
+func respondErrorDirect(w http.ResponseWriter, status int, code api.ErrorCode, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"code":    string(code),
+		"message": message,
+	})
+}
 
 // defaultUserID is used when no user is authenticated (e.g., auth disabled).
 const defaultUserID = "admin"
@@ -105,9 +116,7 @@ func (a *API) enabledMiddleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !a.configStore.IsEnabled(r.Context()) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusNotFound)
-				_, _ = w.Write([]byte(`{"code":"not_found","message":"Agent feature is disabled"}`))
+				respondErrorDirect(w, http.StatusNotFound, api.ErrorCodeNotFound, "Agent feature is disabled")
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -231,24 +240,29 @@ func (a *API) respondJSON(w http.ResponseWriter, status int, data any) {
 	}
 }
 
+// respondError writes a JSON error response matching the v2 API format.
+func (a *API) respondError(w http.ResponseWriter, status int, code api.ErrorCode, message string) {
+	respondErrorDirect(w, status, code, message)
+}
+
 // handleNewConversation creates a new conversation and sends the first message.
 // POST /api/v2/agent/conversations/new
 func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 	var req ChatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		a.respondError(w, http.StatusBadRequest, api.ErrorCodeBadRequest, "Invalid JSON")
 		return
 	}
 
 	if req.Message == "" {
-		http.Error(w, "Message is required", http.StatusBadRequest)
+		a.respondError(w, http.StatusBadRequest, api.ErrorCodeBadRequest, "Message is required")
 		return
 	}
 
 	provider, configModel, err := a.configStore.GetProvider(r.Context())
 	if err != nil {
 		a.logger.Error("Failed to get LLM provider", "error", err)
-		http.Error(w, "Agent is not configured properly", http.StatusServiceUnavailable)
+		a.respondError(w, http.StatusServiceUnavailable, api.ErrorCodeInternalError, "Agent is not configured properly")
 		return
 	}
 
@@ -272,7 +286,7 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 	messageWithContext := a.formatMessage(r.Context(), req.Message, req.DAGContexts)
 	if err := mgr.AcceptUserMessage(r.Context(), provider, model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
-		http.Error(w, "Failed to process message", http.StatusInternalServerError)
+		a.respondError(w, http.StatusInternalServerError, api.ErrorCodeInternalError, "Failed to process message")
 		return
 	}
 
@@ -365,7 +379,7 @@ func (a *API) handleGetConversation(w http.ResponseWriter, r *http.Request) {
 	// Fall back to store for inactive conversations
 	conv, messages, ok := a.getStoredConversation(r.Context(), id, userID)
 	if !ok {
-		http.Error(w, "Conversation not found", http.StatusNotFound)
+		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Conversation not found")
 		return
 	}
 
@@ -420,25 +434,25 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 
 	mgr, ok := a.getOrReactivateConversation(r.Context(), id, userID)
 	if !ok {
-		http.Error(w, "Conversation not found", http.StatusNotFound)
+		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Conversation not found")
 		return
 	}
 
 	var req ChatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		a.respondError(w, http.StatusBadRequest, api.ErrorCodeBadRequest, "Invalid JSON")
 		return
 	}
 
 	if req.Message == "" {
-		http.Error(w, "Message is required", http.StatusBadRequest)
+		a.respondError(w, http.StatusBadRequest, api.ErrorCodeBadRequest, "Message is required")
 		return
 	}
 
 	provider, configModel, err := a.configStore.GetProvider(r.Context())
 	if err != nil {
 		a.logger.Error("Failed to get LLM provider", "error", err)
-		http.Error(w, "Agent is not configured properly", http.StatusServiceUnavailable)
+		a.respondError(w, http.StatusServiceUnavailable, api.ErrorCodeInternalError, "Agent is not configured properly")
 		return
 	}
 
@@ -447,7 +461,7 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 
 	if err := mgr.AcceptUserMessage(r.Context(), provider, model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)
-		http.Error(w, "Failed to process message", http.StatusInternalServerError)
+		a.respondError(w, http.StatusInternalServerError, api.ErrorCodeInternalError, "Failed to process message")
 		return
 	}
 
@@ -510,7 +524,7 @@ func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 
 	mgr, ok := a.getActiveConversation(id, userID)
 	if !ok {
-		http.Error(w, "Conversation not found", http.StatusNotFound)
+		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Conversation not found")
 		return
 	}
 
@@ -559,13 +573,13 @@ func (a *API) handleCancel(w http.ResponseWriter, r *http.Request) {
 
 	mgr, ok := a.getActiveConversation(id, userID)
 	if !ok {
-		http.Error(w, "Conversation not found", http.StatusNotFound)
+		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Conversation not found")
 		return
 	}
 
 	if err := mgr.Cancel(r.Context()); err != nil {
 		a.logger.Error("Failed to cancel conversation", "error", err)
-		http.Error(w, "Failed to cancel conversation", http.StatusInternalServerError)
+		a.respondError(w, http.StatusInternalServerError, api.ErrorCodeInternalError, "Failed to cancel conversation")
 		return
 	}
 
