@@ -139,9 +139,12 @@ export function useAgentChat() {
         { method: 'POST', body: JSON.stringify(buildChatRequest(message, model, dagContexts)) }
       );
       setConversationId(data.conversation_id);
+      // Refresh conversations list to include the new one
+      const convs = await fetchWithAuth<ConversationWithState[]>(`${baseUrl}/conversations`);
+      setConversations(convs || []);
       return data.conversation_id;
     },
-    [baseUrl, setConversationId]
+    [baseUrl, setConversationId, setConversations]
   );
 
   const sendMessage = useCallback(
