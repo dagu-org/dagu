@@ -311,6 +311,29 @@ export const mainListItems = React.forwardRef<
           }}
         </AppBarContext.Consumer>
 
+        {config.agentEnabled && (
+          <div className={cn('px-1', !isOpen && 'flex justify-center')}>
+            <button
+              onClick={toggleChat}
+              className={cn(
+                'flex items-center rounded-lg transition-all duration-200 ease-in-out px-2 group',
+                isOpen ? 'h-9 w-full gap-3' : 'h-10 w-10 justify-center',
+                'text-sidebar-foreground hover:text-foreground hover:bg-white/5'
+              )}
+              title={isOpen ? '' : 'Agent'}
+            >
+              <div className="transition-transform duration-200 flex items-center justify-center opacity-70 group-hover:opacity-100 group-hover:scale-105">
+                <Terminal size={18} />
+              </div>
+              {isOpen && (
+                <span className="text-sm font-medium transition-colors duration-200 whitespace-nowrap">
+                  Agent
+                </span>
+              )}
+            </button>
+          </div>
+        )}
+
         <div className="space-y-6">
           <div className="space-y-1">
             <SectionLabel label="System" isOpen={isOpen} />
@@ -446,15 +469,6 @@ export const mainListItems = React.forwardRef<
         <div
           className={cn('px-2', !isOpen && 'flex flex-col items-center gap-2')}
         >
-          {config.agentEnabled && (
-            <SidebarButton
-              onClick={toggleChat}
-              icon={<Terminal size={18} />}
-              label="Agent Console"
-              isOpen={isOpen}
-              customColor={customColor}
-            />
-          )}
           <SidebarButton
             onClick={toggleTheme}
             icon={theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
