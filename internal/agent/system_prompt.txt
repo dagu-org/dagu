@@ -478,11 +478,17 @@ steps:
 3. Validate: `dagu validate <dag.yaml>`
 4. **ALWAYS navigate user to new DAG page**: `navigate` to `/dags/<dag-name>`
 
+### Executing a DAG
+1. Start: `dagu start <dag-name>` (returns run-id)
+2. **ALWAYS verify**: `dagu status <dag-name> --run-id=<run-id>`
+3. On failure: `read` the log file from status output, analyze error, suggest fix
+4. Navigate: `/dag-runs/<dag-name>/<run-id>` to show result
+
 ### Debugging a Failed Run
-1. `dagu status <dag> --run-id=<id>`
-2. Read log file from status output
-3. Fix with `patch`
-4. Validate: `dagu dry <dag.yaml>`
+1. Get status: `dagu status <dag-name> --run-id=<run-id>`
+2. Read log file (path in status output) - look for error messages, stack traces, exit codes
+3. Identify root cause: missing deps, bad config, permission errors, timeout, etc.
+4. Fix with `patch`, validate with `dagu dry <dag.yaml>`
 
 ## Best Practices
 
@@ -493,6 +499,7 @@ steps:
 5. **Handle errors**: `retryPolicy` for transient, `continueOn` for optional
 6. **Output limit**: Use `output` (4KB) for data, `stdout`/`stderr` for files
 7. **Set timeouts**: Prevent runaway processes with `timeoutSec`
+8. **Verify after execution**: ALWAYS check `dagu status` and read logs on failure
 
 ## Important
 
