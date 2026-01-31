@@ -14,12 +14,12 @@ import (
 )
 
 const (
-	defaultWebSearchTimeout    = 30 * time.Second
-	defaultMaxResults          = 5
-	maxAllowedResults          = 10
-	duckDuckGoURL              = "https://html.duckduckgo.com/html/"
-	maxRetries                 = 3
-	retryWaitTime              = time.Second
+	defaultWebSearchTimeout = 30 * time.Second
+	defaultMaxResults       = 5
+	maxAllowedResults       = 10
+	duckDuckGoURL           = "https://html.duckduckgo.com/html/"
+	maxRetries              = 3
+	retryWaitTime           = time.Second
 )
 
 // WebSearchToolInput defines the input parameters for the web search tool.
