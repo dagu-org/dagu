@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, KeyboardEvent } from 'react';
+import { useState, useCallback, useEffect, useRef, KeyboardEvent } from 'react';
 import { Send, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -25,6 +25,8 @@ export function ChatInput({
   const [isPending, setIsPending] = useState(false);
   const [selectedDags, setSelectedDags] = useState<DAGContext[]>([]);
   const currentPageDag = useDagPageContext();
+  // Track IME composition state manually for reliable Japanese/Chinese input handling
+  const isComposingRef = useRef(false);
 
   const showPauseButton = isPending || isWorking;
 
@@ -65,13 +67,23 @@ export function ChatInput({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      // Ignore Enter during IME composition (e.g., Japanese input conversion)
+      // Check both isComposing and our manual ref for cross-browser compatibility
+      if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && !isComposingRef.current) {
         e.preventDefault();
         handleSend();
       }
     },
     [handleSend]
   );
+
+  const handleCompositionStart = useCallback(() => {
+    isComposingRef.current = true;
+  }, []);
+
+  const handleCompositionEnd = useCallback(() => {
+    isComposingRef.current = false;
+  }, []);
 
   return (
     <div className="p-2 border-t border-border bg-background">
@@ -89,6 +101,8 @@ export function ChatInput({
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
           placeholder={placeholder}
           disabled={disabled}
           rows={1}
