@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   CheckCircle,
@@ -11,6 +11,8 @@ import {
 
 import { cn } from '@/lib/utils';
 import { Message, ToolCall, ToolResult, UIAction, UserPromptResponse } from '../types';
+import { isJsonPatch } from '../utils/diffUtils';
+import { JsonPatchViewer } from './JsonPatchViewer';
 import { UserPromptMessage } from './UserPromptMessage';
 
 interface ChatMessagesProps {
@@ -218,6 +220,9 @@ function ToolCallBadge({
   const [expanded, setExpanded] = useState(false);
   const args = parseToolArguments(toolCall.function.arguments);
 
+  // Check if arguments represent a JSON patch (has old_string/new_string)
+  const jsonPatch = useMemo(() => isJsonPatch(toolCall.function.arguments), [toolCall.function.arguments]);
+
   return (
     <div className="rounded border border-border bg-muted dark:bg-surface text-xs overflow-hidden">
       <button
@@ -232,9 +237,13 @@ function ToolCallBadge({
       </button>
       {expanded && (
         <div className="px-2 py-1.5 border-t border-border bg-card dark:bg-surface">
-          <pre className="text-xs overflow-x-auto whitespace-pre-wrap break-words">
-            {JSON.stringify(args, null, 2)}
-          </pre>
+          {jsonPatch ? (
+            <JsonPatchViewer patch={jsonPatch} />
+          ) : (
+            <pre className="text-xs overflow-x-auto whitespace-pre-wrap break-words">
+              {JSON.stringify(args, null, 2)}
+            </pre>
+          )}
         </div>
       )}
     </div>
