@@ -38,10 +38,18 @@ data:
       serviceRegistryDir: /data/services
       apiKeysDir: /data/api-keys
       webhooksDir: /data/webhooks
+      usersDir: /data/users
 
-    # Auth (disabled for v0 simplicity)
+    # Auth
     auth:
-      mode: "none"
+      mode: {{ .Values.auth.mode | quote }}
+      builtin:
+        admin:
+          username: {{ .Values.auth.builtin.admin.username | quote }}
+          password: {{ .Values.auth.builtin.admin.password | quote }}
+        token:
+          secret: {{ .Values.auth.builtin.token.secret | quote }}
+          ttl: {{ .Values.auth.builtin.token.ttl | quote }}
 
     # Peer communication (required for distributed mode)
     peer:

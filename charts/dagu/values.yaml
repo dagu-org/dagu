@@ -53,6 +53,17 @@ ui:
       memory: "512Mi"
       cpu: "500m"
 
+# Authentication configuration
+auth:
+  mode: "builtin"  # Options: "none", "builtin", "oidc"
+  builtin:
+    admin:
+      username: "admin"
+      password: "adminpass"  # CHANGEME
+    token:
+      secret: "dagu-secret-key"  # CHANGEME
+      ttl: "24h"
+
 # Persistence - REQUIRED: Dagu needs a shared filesystem (RWX)
 # Use NFS, EFS, CephFS, or similar storage that supports ReadWriteMany
 persistence:
