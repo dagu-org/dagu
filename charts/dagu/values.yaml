@@ -73,3 +73,5 @@ persistence:
   # Set this to your storage class that supports RWX
   # Example: "nfs-client", "efs-sc", "cephfs"
   storageClass: ""
+  # Skip RWX validation for local testing (Kind, Docker Desktop)
+  skipValidation: false

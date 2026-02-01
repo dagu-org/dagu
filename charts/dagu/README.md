@@ -48,6 +48,17 @@ persistence:
   storageClass: "nfs-client"  # REQUIRED: Must support RWX
 ```
 
+### Local Testing (Kind, Docker Desktop)
+
+For local single-node clusters that don't support RWX:
+
+```bash
+helm install dagu charts/dagu \
+  --set persistence.accessMode=ReadWriteOnce \
+  --set persistence.skipValidation=true \
+  --set worker.replicas=1
+```
+
 ### Authentication
 
 By default, the chart uses builtin authentication. **Change these values in production!**

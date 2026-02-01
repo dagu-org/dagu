@@ -2,8 +2,8 @@
 {{- fail "Dagu requires persistence.enabled=true with a shared filesystem (ReadWriteMany)." }}
 {{- end }}
 
-{{- if ne .Values.persistence.accessMode "ReadWriteMany" }}
-{{- fail (printf "Dagu requires ReadWriteMany access mode. Current persistence.accessMode is '%s'." .Values.persistence.accessMode) }}
+{{- if and (ne .Values.persistence.accessMode "ReadWriteMany") (not .Values.persistence.skipValidation) }}
+{{- fail (printf "Dagu requires ReadWriteMany access mode. Current persistence.accessMode is '%s'. Use --set persistence.skipValidation=true for local testing." .Values.persistence.accessMode) }}
 {{- end }}
 
 apiVersion: v1
