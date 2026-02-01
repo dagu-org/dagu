@@ -270,4 +270,39 @@ func (m *mockConversationStore) GetLatestSequenceID(_ context.Context, conversat
 	return maxSeq, nil
 }
 
+// HasConversation checks if a conversation exists without returning an error.
+func (m *mockConversationStore) HasConversation(id string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, exists := m.conversations[id]
+	return exists
+}
+
 var _ ConversationStore = (*mockConversationStore)(nil)
+
+// newStopProvider creates a mock provider that returns a simple stop response.
+func newStopProvider(content string) *mockLLMProvider {
+	return &mockLLMProvider{
+		chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+			return &llm.ChatResponse{Content: content, FinishReason: "stop"}, nil
+		},
+	}
+}
+
+// newCapturingProvider creates a mock provider that captures requests to a channel.
+func newCapturingProvider(requestCh chan<- *llm.ChatRequest, response *llm.ChatResponse) *mockLLMProvider {
+	return &mockLLMProvider{
+		chatFunc: func(_ context.Context, req *llm.ChatRequest) (*llm.ChatResponse, error) {
+			select {
+			case requestCh <- req:
+			default:
+			}
+			return response, nil
+		},
+	}
+}
+
+// simpleStopResponse creates a simple stop response for testing.
+func simpleStopResponse(content string) *llm.ChatResponse {
+	return &llm.ChatResponse{Content: content, FinishReason: "stop"}
+}

@@ -135,8 +135,8 @@ type TokenConfigDef struct {
 type AuthOIDCDef struct {
 	// ClientID is the OAuth client identifier (Go naming: ID not Id).
 	// mapstructure tag uses lowercase "clientId" for YAML compatibility.
-	ClientID       string              `mapstructure:"clientId"`
-	ClientSecret   string              `mapstructure:"clientSecret"`
+	ClientID     string `mapstructure:"clientId"`
+	ClientSecret string `mapstructure:"clientSecret"`
 	// ClientURL is the application callback URL (Go naming: URL not Url).
 	// mapstructure tag uses lowercase "clientUrl" for YAML compatibility.
 	ClientURL      string              `mapstructure:"clientUrl"`

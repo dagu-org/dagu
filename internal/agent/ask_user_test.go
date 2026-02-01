@@ -9,17 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewAskUserTool(t *testing.T) {
-	t.Parallel()
-
-	tool := NewAskUserTool()
-
-	assert.Equal(t, "function", tool.Type)
-	assert.Equal(t, "ask_user", tool.Function.Name)
-	assert.NotEmpty(t, tool.Function.Description)
-	assert.NotNil(t, tool.Run)
-}
-
 func TestAskUserRun(t *testing.T) {
 	t.Parallel()
 

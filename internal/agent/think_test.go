@@ -45,14 +45,3 @@ func TestThinkTool_Run(t *testing.T) {
 		})
 	}
 }
-
-func TestNewThinkTool(t *testing.T) {
-	t.Parallel()
-
-	tool := NewThinkTool()
-
-	assert.Equal(t, "function", tool.Type)
-	assert.Equal(t, "think", tool.Function.Name)
-	assert.NotEmpty(t, tool.Function.Description)
-	assert.NotNil(t, tool.Run)
-}

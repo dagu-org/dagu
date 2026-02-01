@@ -294,8 +294,9 @@ func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) er
 		l.setWorking(true)
 
 		llmCtx, cancel := context.WithTimeout(ctx, llmRequestTimeout)
+		defer cancel()
+
 		resp, err := l.provider.Chat(llmCtx, req)
-		cancel()
 
 		if err != nil {
 			l.recordErrorMessage(ctx, fmt.Sprintf("LLM request failed: %v", err))

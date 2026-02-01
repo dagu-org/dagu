@@ -150,17 +150,6 @@ func TestReadTool_LargeFile(t *testing.T) {
 	assert.Contains(t, result.Content, "too large")
 }
 
-func TestNewReadTool(t *testing.T) {
-	t.Parallel()
-
-	tool := NewReadTool()
-
-	assert.Equal(t, "function", tool.Type)
-	assert.Equal(t, "read", tool.Function.Name)
-	assert.NotEmpty(t, tool.Function.Description)
-	assert.NotNil(t, tool.Run)
-}
-
 func TestFormatFileContent(t *testing.T) {
 	t.Parallel()
 

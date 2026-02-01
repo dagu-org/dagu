@@ -415,22 +415,6 @@ func TestLoop_BuildToolDefinitions(t *testing.T) {
 
 // Test helpers
 
-func simpleStopResponse(content string) *llm.ChatResponse {
-	return &llm.ChatResponse{Content: content, FinishReason: "stop"}
-}
-
-func newCapturingProvider(requestCh chan<- *llm.ChatRequest, response *llm.ChatResponse) *mockLLMProvider {
-	return &mockLLMProvider{
-		chatFunc: func(_ context.Context, req *llm.ChatRequest) (*llm.ChatResponse, error) {
-			select {
-			case requestCh <- req:
-			default:
-			}
-			return response, nil
-		},
-	}
-}
-
 func waitForRequest(t *testing.T, requestCh <-chan *llm.ChatRequest, timeout time.Duration) *llm.ChatRequest {
 	t.Helper()
 	select {

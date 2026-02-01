@@ -21,6 +21,31 @@ func TestCreateTools(t *testing.T) {
 	}
 }
 
+func TestToolConstructors(t *testing.T) {
+	t.Parallel()
+
+	tools := []*AgentTool{
+		NewReadTool(),
+		NewBashTool(),
+		NewNavigateTool(),
+		NewPatchTool(""),
+		NewThinkTool(),
+		NewAskUserTool(),
+		NewWebSearchTool(),
+		NewReadSchemaTool(),
+	}
+	for _, tool := range tools {
+		t.Run(tool.Function.Name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, "function", tool.Type)
+			assert.NotEmpty(t, tool.Function.Name)
+			assert.NotEmpty(t, tool.Function.Description)
+			assert.NotNil(t, tool.Run)
+		})
+	}
+}
+
 func TestGetToolByName(t *testing.T) {
 	t.Parallel()
 

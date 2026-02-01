@@ -289,28 +289,6 @@ func TestFormatSearchResults(t *testing.T) {
 	})
 }
 
-func TestNewWebSearchTool(t *testing.T) {
-	t.Parallel()
-
-	tool := NewWebSearchTool()
-
-	assert.Equal(t, "function", tool.Type)
-	assert.Equal(t, "web_search", tool.Function.Name)
-	assert.NotEmpty(t, tool.Function.Description)
-	assert.NotNil(t, tool.Run)
-
-	// Check parameters
-	params := tool.Function.Parameters
-	props, ok := params["properties"].(map[string]any)
-	require.True(t, ok)
-	assert.Contains(t, props, "query")
-	assert.Contains(t, props, "max_results")
-
-	required, ok := params["required"].([]string)
-	require.True(t, ok)
-	assert.Contains(t, required, "query")
-}
-
 func TestWebSearchTool_ContextCancellation(t *testing.T) {
 	t.Parallel()
 

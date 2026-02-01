@@ -2,12 +2,14 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/dagu-org/dagu/api/v2"
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/dagu-org/dagu/internal/service/audit"
 )
 
@@ -83,7 +85,13 @@ func (a *API) UpdateAgentConfig(ctx context.Context, request api.UpdateAgentConf
 		return nil, errFailedToLoadAgentConfig
 	}
 
-	applyAgentConfigUpdates(cfg, request.Body)
+	if err := applyAgentConfigUpdates(cfg, request.Body); err != nil {
+		return nil, &Error{
+			Code:       api.ErrorCodeBadRequest,
+			Message:    err.Error(),
+			HTTPStatus: http.StatusBadRequest,
+		}
+	}
 
 	if err := a.agentConfigStore.Save(ctx, cfg); err != nil {
 		logger.Error(ctx, "Failed to save agent config", tag.Error(err))
@@ -116,18 +124,21 @@ func toAgentConfigResponse(cfg *agent.Config) api.AgentConfigResponse {
 
 // applyAgentConfigUpdates applies non-nil fields from the update request to the agent configuration.
 // Only fields present in the update are modified, allowing partial updates.
-func applyAgentConfigUpdates(cfg *agent.Config, update *api.UpdateAgentConfigRequest) {
+func applyAgentConfigUpdates(cfg *agent.Config, update *api.UpdateAgentConfigRequest) error {
 	if update.Enabled != nil {
 		cfg.Enabled = *update.Enabled
 	}
-	applyLLMConfigUpdates(&cfg.LLM, update.Llm)
+	return applyLLMConfigUpdates(&cfg.LLM, update.Llm)
 }
 
-func applyLLMConfigUpdates(cfg *agent.LLMConfig, update *api.UpdateAgentLLMConfig) {
+func applyLLMConfigUpdates(cfg *agent.LLMConfig, update *api.UpdateAgentLLMConfig) error {
 	if update == nil {
-		return
+		return nil
 	}
 	if update.Provider != nil {
+		if _, err := llm.ParseProviderType(*update.Provider); err != nil {
+			return fmt.Errorf("invalid provider '%s': valid options are anthropic, openai, gemini, openrouter, local", *update.Provider)
+		}
 		cfg.Provider = *update.Provider
 	}
 	if update.Model != nil {
@@ -139,6 +150,7 @@ func applyLLMConfigUpdates(cfg *agent.LLMConfig, update *api.UpdateAgentLLMConfi
 	if update.BaseUrl != nil {
 		cfg.BaseURL = *update.BaseUrl
 	}
+	return nil
 }
 
 // buildAgentConfigChanges constructs a map of changed fields for audit logging.

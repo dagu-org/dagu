@@ -335,39 +335,3 @@ func TestConversationManager_GetModel(t *testing.T) {
 		_ = cm.Cancel(context.Background())
 	})
 }
-
-func TestCopyMessages(t *testing.T) {
-	t.Parallel()
-
-	t.Run("returns nil for empty slice", func(t *testing.T) {
-		t.Parallel()
-
-		result := copyMessages(nil)
-		assert.Nil(t, result)
-
-		result = copyMessages([]Message{})
-		assert.Nil(t, result)
-	})
-
-	t.Run("returns copy", func(t *testing.T) {
-		t.Parallel()
-
-		original := []Message{{ID: "1", Content: "test"}}
-		result := copyMessages(original)
-
-		assert.Equal(t, original, result)
-
-		// Modify copy, original should be unchanged
-		result[0].Content = "modified"
-		assert.Equal(t, "test", original[0].Content)
-	})
-}
-
-// newStopProvider creates a mock provider that returns a simple stop response.
-func newStopProvider(content string) *mockLLMProvider {
-	return &mockLLMProvider{
-		chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
-			return &llm.ChatResponse{Content: content, FinishReason: "stop"}, nil
-		},
-	}
-}

@@ -274,14 +274,3 @@ func TestTruncateOutput(t *testing.T) {
 		assert.Equal(t, exactString, result)
 	})
 }
-
-func TestNewBashTool(t *testing.T) {
-	t.Parallel()
-
-	tool := NewBashTool()
-
-	assert.Equal(t, "function", tool.Type)
-	assert.Equal(t, "bash", tool.Function.Name)
-	assert.NotEmpty(t, tool.Function.Description)
-	assert.NotNil(t, tool.Run)
-}

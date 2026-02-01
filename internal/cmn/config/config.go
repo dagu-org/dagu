@@ -204,10 +204,10 @@ type AuthOIDC struct {
 	ClientID     string
 	ClientSecret string
 	// ClientURL is the application callback URL (Go naming: URL not Url).
-	ClientURL    string   // Application URL for callback
-	Issuer       string   // OIDC provider URL
-	Scopes       []string // Default: openid, profile, email
-	Whitelist    []string // Email addresses always allowed
+	ClientURL string   // Application URL for callback
+	Issuer    string   // OIDC provider URL
+	Scopes    []string // Default: openid, profile, email
+	Whitelist []string // Email addresses always allowed
 
 	// Builtin-specific fields
 	AutoSignup     bool     // Default: true

@@ -10,17 +10,20 @@ const defaultSubscriberBuffer = 10
 
 // subscriber holds the state for a single subscription.
 type subscriber[K any] struct {
-	seqID  int64
-	ch     chan K
-	ctx    context.Context
-	cancel context.CancelFunc
+	seqID     int64
+	ch        chan K
+	ctx       context.Context
+	cancel    context.CancelFunc
+	closeOnce sync.Once
 }
 
 // isDone checks if the subscriber's context is cancelled and closes the channel if so.
 func (s *subscriber[K]) isDone() bool {
 	select {
 	case <-s.ctx.Done():
-		close(s.ch)
+		s.closeOnce.Do(func() {
+			close(s.ch)
+		})
 		return true
 	default:
 		return false
@@ -34,8 +37,10 @@ func (s *subscriber[K]) send(message K) bool {
 	case s.ch <- message:
 		return true
 	default:
-		close(s.ch)
-		s.cancel()
+		s.closeOnce.Do(func() {
+			close(s.ch)
+			s.cancel()
+		})
 		return false
 	}
 }

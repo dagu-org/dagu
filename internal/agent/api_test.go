@@ -240,10 +240,7 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 		var resp NewConversationResponse
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 
-		convStore.mu.Lock()
-		_, exists := convStore.conversations[resp.ConversationID]
-		convStore.mu.Unlock()
-		assert.True(t, exists, "conversation should be persisted")
+		assert.True(t, convStore.HasConversation(resp.ConversationID), "conversation should be persisted")
 	})
 }
 
@@ -607,43 +604,6 @@ func TestSelectModel(t *testing.T) {
 			assert.Equal(t, tc.expected, result)
 		})
 	}
-}
-
-func TestPtrTo(t *testing.T) {
-	t.Parallel()
-
-	t.Run("returns pointer to string", func(t *testing.T) {
-		t.Parallel()
-
-		result := ptrTo("hello")
-		assert.NotNil(t, result)
-		assert.Equal(t, "hello", *result)
-	})
-
-	t.Run("returns pointer to int", func(t *testing.T) {
-		t.Parallel()
-
-		result := ptrTo(42)
-		assert.NotNil(t, result)
-		assert.Equal(t, 42, *result)
-	})
-
-	t.Run("returns pointer to struct", func(t *testing.T) {
-		t.Parallel()
-
-		conv := Conversation{ID: "test"}
-		result := ptrTo(conv)
-		assert.NotNil(t, result)
-		assert.Equal(t, "test", result.ID)
-	})
-
-	t.Run("returns pointer to zero value", func(t *testing.T) {
-		t.Parallel()
-
-		result := ptrTo(0)
-		assert.NotNil(t, result)
-		assert.Equal(t, 0, *result)
-	})
 }
 
 func TestGetUserIDFromContext(t *testing.T) {

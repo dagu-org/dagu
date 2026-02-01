@@ -225,17 +225,6 @@ func TestPatchTool_WorkingDirectory(t *testing.T) {
 	assert.Equal(t, "content", string(content))
 }
 
-func TestNewPatchTool(t *testing.T) {
-	t.Parallel()
-
-	tool := NewPatchTool("")
-
-	assert.Equal(t, "function", tool.Type)
-	assert.Equal(t, "patch", tool.Function.Name)
-	assert.NotEmpty(t, tool.Function.Description)
-	assert.NotNil(t, tool.Run)
-}
-
 func TestCountLines(t *testing.T) {
 	t.Parallel()
 

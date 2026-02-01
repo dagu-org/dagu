@@ -17,15 +17,15 @@ var (
 	ErrUnknownEscapeSequence = errors.New("unknown escape sequence")
 )
 
-// MustGetUserHomeDir returns current working directory.
-// Panics is os.UserHomeDir() returns error
+// MustGetUserHomeDir returns user home directory.
+// Returns empty string if os.UserHomeDir() fails.
 func MustGetUserHomeDir() string {
 	hd, _ := os.UserHomeDir()
 	return hd
 }
 
 // MustGetwd returns current working directory.
-// Panics is os.Getwd() returns error
+// Returns empty string if os.Getwd() fails.
 func MustGetwd() string {
 	wd, _ := os.Getwd()
 	return wd
@@ -57,7 +57,6 @@ func IsFile(path string) bool {
 	return stat.Mode().IsRegular()
 }
 
-// OpenOrCreateFile opens (or creates) the log file with flags for creation, write-only access,
 // OpenOrCreateFile opens or creates the named file for appending with synchronous I/O and sets permissions to 0600.
 // It returns the opened *os.File or a non-nil error if the operation fails.
 func OpenOrCreateFile(filepath string) (*os.File, error) {
@@ -80,7 +79,7 @@ func MustTempDir(pattern string) string {
 	return t
 }
 
-// TruncString TurnString returns truncated string.
+// TruncString truncates string to max length.
 func TruncString(val string, max int) string {
 	if len(val) > max {
 		return val[:max]
@@ -183,7 +182,7 @@ func ResolvePath(path string) (string, error) {
 	return cleanPath, nil
 }
 
-// ResolvePathOrBlank works like ResolvePath but panics on error.
+// ResolvePathOrBlank works like ResolvePath but returns original path on error.
 // Useful when you're confident the path resolution will succeed.
 func ResolvePathOrBlank(path string) string {
 	resolvedPath, err := ResolvePath(path)

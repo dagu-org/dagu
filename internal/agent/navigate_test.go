@@ -78,14 +78,3 @@ func TestNavigateTool_Run(t *testing.T) {
 		assert.Contains(t, result.Content, "/dags")
 	})
 }
-
-func TestNewNavigateTool(t *testing.T) {
-	t.Parallel()
-
-	tool := NewNavigateTool()
-
-	assert.Equal(t, "function", tool.Type)
-	assert.Equal(t, "navigate", tool.Function.Name)
-	assert.NotEmpty(t, tool.Function.Description)
-	assert.NotNil(t, tool.Run)
-}
