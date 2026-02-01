@@ -372,7 +372,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
             Create a webhook to trigger this DAG via HTTP
           </CardDescription>
         </CardHeader>
-        <CardContent className="px-4 pb-3 pt-0">
+        <CardContent className="px-4 pb-3 pt-3">
           <Button
             variant="default"
             size="sm"

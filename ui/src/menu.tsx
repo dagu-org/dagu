@@ -57,24 +57,25 @@ function getTitleInitial(title: string): string {
   return title.charAt(0).toUpperCase();
 }
 
+// GCP-Style Active States - Clean & Minimal
 function getActiveIndicatorStyle(customColor: boolean): string {
   return customColor
-    ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.4)]'
-    : 'bg-primary shadow-[0_0_8px_var(--primary)]';
+    ? 'bg-white'
+    : 'bg-sidebar-primary';
 }
 
 function getActiveLinkStyle(customColor: boolean): string {
   return customColor
-    ? 'text-foreground bg-white/10 shadow-[0_0_15px_rgba(255,255,255,0.1),inset_0_0_0_1px_rgba(255,255,255,0.2)]'
-    : 'text-foreground bg-primary/10 shadow-[0_0_15px_rgba(var(--primary-rgb),0.15),inset_0_0_0_1px_rgba(var(--primary-rgb),0.3)]';
+    ? 'bg-sidebar-active'
+    : 'bg-sidebar-active';
 }
 
 function getActiveIconStyle(customColor: boolean): string {
-  return customColor ? 'text-white scale-110' : 'text-primary scale-110';
+  return customColor ? 'text-foreground' : 'text-sidebar-primary';
 }
 
 function getIconWrapperStyle(customColor: boolean): string {
-  return customColor ? 'opacity-80' : 'text-primary';
+  return customColor ? 'text-sidebar-foreground' : 'text-sidebar-foreground';
 }
 
 type RemoteNodeSelectContentProps = {
@@ -98,11 +99,12 @@ type SectionLabelProps = {
   isOpen: boolean;
 };
 
+// GCP-Style Section Labels - Subtle & Professional
 function SectionLabel({ label, isOpen }: SectionLabelProps): React.ReactElement | null {
   if (!isOpen) return null;
 
   return (
-    <div className="px-3 mb-1 text-xs font-bold text-muted-foreground/50 uppercase tracking-widest">
+    <div className="px-3 mb-2 mt-1 text-[11px] font-medium text-sidebar-foreground/60 uppercase tracking-wide">
       {label}
     </div>
   );
@@ -116,26 +118,27 @@ type SidebarButtonProps = {
   customColor: boolean;
 };
 
+// GCP-Style Sidebar Button - Clean & Minimal
 function SidebarButton({ onClick, icon, label, isOpen, customColor }: SidebarButtonProps): React.ReactElement {
   return (
     <button
       onClick={onClick}
       className={cn(
-        'flex items-center gap-3 w-full p-2 rounded-lg transition-all duration-200 hover:bg-white/5 group',
-        !isOpen && 'justify-center border border-white/5'
+        'flex items-center gap-3 w-full p-2 rounded-md transition-all duration-150 hover:bg-sidebar-hover group',
+        !isOpen && 'justify-center'
       )}
       title={isOpen ? '' : label}
     >
       <div
         className={cn(
-          'flex items-center justify-center group-hover:scale-110 transition-transform',
-          getIconWrapperStyle(customColor)
+          'flex items-center justify-center transition-colors',
+          'text-sidebar-foreground group-hover:text-foreground'
         )}
       >
         {icon}
       </div>
       {isOpen && (
-        <span className="text-sm font-medium text-sidebar-foreground group-hover:text-foreground">
+        <span className="text-sm font-medium text-sidebar-foreground group-hover:text-foreground transition-colors">
           {label}
         </span>
       )}
@@ -143,6 +146,7 @@ function SidebarButton({ onClick, icon, label, isOpen, customColor }: SidebarBut
   );
 }
 
+// GCP-Style Navigation Item - Clean Active States with Left Border
 function NavItem({ to, icon, text, isOpen, onClick, customColor = false }: NavItemProps): React.ReactElement {
   const location = useLocation();
   const isActive =
@@ -150,18 +154,18 @@ function NavItem({ to, icon, text, isOpen, onClick, customColor = false }: NavIt
     (to !== '/' && location.pathname.startsWith(to + '/'));
 
   const linkClassName = cn(
-    'flex items-center rounded-lg transition-all duration-200 ease-in-out px-2 group relative',
-    isOpen ? 'h-9 w-full gap-3' : 'h-10 w-10 justify-center',
+    'flex items-center rounded-md transition-all duration-150 ease-in-out px-2 group relative',
+    isOpen ? 'h-9 w-full gap-3' : 'h-9 w-9 justify-center',
     isActive
       ? getActiveLinkStyle(customColor)
-      : 'text-sidebar-foreground hover:text-foreground hover:bg-white/5'
+      : 'text-sidebar-foreground hover:text-foreground hover:bg-sidebar-hover'
   );
 
   const iconClassName = cn(
-    'transition-transform duration-200 flex items-center justify-center',
+    'transition-colors duration-150 flex items-center justify-center',
     isActive
       ? getActiveIconStyle(customColor)
-      : 'opacity-70 group-hover:opacity-100 group-hover:scale-105'
+      : 'text-sidebar-foreground group-hover:text-foreground'
   );
 
   return (
@@ -175,7 +179,7 @@ function NavItem({ to, icon, text, isOpen, onClick, customColor = false }: NavIt
       >
         {isActive && (
           <div className={cn(
-            'absolute left-0 w-1 h-4 rounded-r-full',
+            'absolute left-0 w-[3px] h-6 rounded-r-sm',
             getActiveIndicatorStyle(customColor)
           )} />
         )}
@@ -185,7 +189,7 @@ function NavItem({ to, icon, text, isOpen, onClick, customColor = false }: NavIt
         {isOpen && (
           <span
             className={cn(
-              'text-sm font-medium transition-colors duration-200 whitespace-nowrap overflow-hidden text-ellipsis',
+              'text-sm font-medium transition-colors duration-150 whitespace-nowrap overflow-hidden text-ellipsis',
               isActive
                 ? 'text-foreground'
                 : 'text-sidebar-foreground group-hover:text-foreground'
@@ -219,25 +223,26 @@ export const mainListItems = React.forwardRef<
 
   return (
     <div ref={ref} className="flex flex-col h-full">
+      {/* GCP-Style Header - Clean & Minimal */}
       <div
         className={cn(
-          'h-14 relative mb-6 flex items-center border-b border-white/[0.03]',
+          'h-14 relative mb-4 flex items-center border-b border-sidebar-border',
           isOpen ? 'px-3' : 'justify-center'
         )}
       >
         {isOpen ? (
           <>
-            <div className="flex-1 flex items-center gap-2">
+            <div className="flex-1 flex items-center gap-2.5">
               {!customColor && (
-                <div className="w-7 h-7 bg-primary rounded-lg flex-shrink-0 flex items-center justify-center shadow-[0_0_15px_rgba(var(--primary),0.2)]">
-                  <span className="text-white font-bold text-sm">
+                <div className="w-8 h-8 bg-sidebar-primary rounded-lg flex-shrink-0 flex items-center justify-center">
+                  <span className="text-white font-semibold text-sm">
                     {titleInitial}
                   </span>
                 </div>
               )}
               <span
                 className={cn(
-                  'font-bold tracking-tight text-sidebar-foreground select-none whitespace-normal leading-tight',
+                  'font-semibold tracking-tight text-foreground select-none whitespace-normal leading-tight',
                   getResponsiveTitleClass(title, 'sidebar-expanded')
                 )}
               >
@@ -246,7 +251,7 @@ export const mainListItems = React.forwardRef<
             </div>
             <button
               onClick={onToggle}
-              className="p-1.5 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-white/5 rounded-lg transition-all"
+              className="p-1.5 text-sidebar-foreground hover:text-foreground hover:bg-sidebar-hover rounded-md transition-all"
               aria-label="Collapse sidebar"
             >
               <PanelLeft size={18} />
@@ -256,19 +261,18 @@ export const mainListItems = React.forwardRef<
           <button
             onClick={onToggle}
             className={cn(
-              'w-10 h-10 flex items-center justify-center rounded-xl transition-all active:scale-95',
-              !customColor &&
-                'bg-white/5 hover:bg-white/10 text-foreground glow-sm'
+              'w-9 h-9 flex items-center justify-center rounded-lg transition-all',
+              !customColor && 'hover:bg-sidebar-hover'
             )}
             aria-label="Expand sidebar"
           >
             {customColor ? (
-              <span className="text-xl font-bold text-sidebar-foreground">
+              <span className="text-lg font-semibold text-sidebar-foreground">
                 {titleInitial}
               </span>
             ) : (
-              <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(var(--primary),0.2)]">
-                <span className="text-white font-bold text-sm">
+              <div className="w-8 h-8 bg-sidebar-primary rounded-lg flex items-center justify-center">
+                <span className="text-white font-semibold text-sm">
                   {titleInitial}
                 </span>
               </div>
@@ -277,7 +281,8 @@ export const mainListItems = React.forwardRef<
         )}
       </div>
 
-      <nav className="flex-1 flex flex-col gap-6">
+      {/* GCP-Style Navigation - Compact Spacing */}
+      <nav className="flex-1 flex flex-col gap-4">
         <AppBarContext.Consumer>
           {(context) => {
             const { remoteNodes, selectedRemoteNode, selectRemoteNode } = context;
@@ -287,9 +292,9 @@ export const mainListItems = React.forwardRef<
               <div className={cn('px-1', !isOpen && 'flex justify-center')}>
                 {isOpen ? (
                   <Select value={selectedRemoteNode} onValueChange={selectRemoteNode}>
-                    <SelectTrigger className="h-9 w-full bg-white/5 border-white/5 text-xs text-sidebar-foreground hover:bg-white/10 transition-colors">
+                    <SelectTrigger className="h-9 w-full bg-sidebar-hover border-sidebar-border text-xs text-sidebar-foreground hover:bg-sidebar-active transition-colors">
                       <div className="flex items-center gap-2 truncate">
-                        <Globe size={14} className="opacity-60" />
+                        <Globe size={14} className="text-sidebar-foreground" />
                         <SelectValue />
                       </div>
                     </SelectTrigger>
@@ -297,10 +302,10 @@ export const mainListItems = React.forwardRef<
                   </Select>
                 ) : (
                   <Select value={selectedRemoteNode} onValueChange={selectRemoteNode}>
-                    <SelectTrigger className="w-10 h-10 p-0 bg-white/5 border-white/5 hover:bg-white/10 [&>svg:last-child]:hidden flex items-center justify-center rounded-lg transition-all">
+                    <SelectTrigger className="w-9 h-9 p-0 bg-transparent border-transparent hover:bg-sidebar-hover [&>svg:last-child]:hidden flex items-center justify-center rounded-md transition-all">
                       <Globe
                         size={18}
-                        className={getIconWrapperStyle(customColor)}
+                        className="text-sidebar-foreground"
                       />
                     </SelectTrigger>
                     <RemoteNodeSelectContent nodes={remoteNodes} />
@@ -311,8 +316,8 @@ export const mainListItems = React.forwardRef<
           }}
         </AppBarContext.Consumer>
 
-        <div className="space-y-6">
-          <div className="space-y-1">
+        <div className="space-y-4">
+          <div className="space-y-0.5">
             <SectionLabel label="System" isOpen={isOpen} />
             <NavItem
               to="/dashboard"
@@ -334,7 +339,7 @@ export const mainListItems = React.forwardRef<
             )}
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             <SectionLabel label="Workflows" isOpen={isOpen} />
             <NavItem
               to="/queues"
@@ -371,7 +376,7 @@ export const mainListItems = React.forwardRef<
           </div>
 
           {isAdmin && config.authMode === 'builtin' && (
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               <SectionLabel label="Admin" isOpen={isOpen} />
               <NavItem
                 to="/users"
@@ -427,7 +432,7 @@ export const mainListItems = React.forwardRef<
           )}
 
           {canWrite && config.gitSyncEnabled && (
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               <SectionLabel label="Sync" isOpen={isOpen} />
               <NavItem
                 to="/git-sync"
@@ -442,9 +447,10 @@ export const mainListItems = React.forwardRef<
         </div>
       </nav>
 
-      <div className="mt-auto pt-4 flex flex-col gap-3">
+      {/* GCP-Style Footer - Clean Controls */}
+      <div className="mt-auto pt-3 border-t border-sidebar-border flex flex-col gap-2">
         <div
-          className={cn('px-2', !isOpen && 'flex flex-col items-center gap-2')}
+          className={cn('px-2', !isOpen && 'flex flex-col items-center gap-1.5')}
         >
           {config.agentEnabled && (
             <SidebarButton
@@ -467,7 +473,7 @@ export const mainListItems = React.forwardRef<
         {config.version && (
           <div
             className={cn(
-              'px-4 pb-4 text-xs font-mono text-muted-foreground/70',
+              'px-3 pb-3 text-[11px] font-mono text-sidebar-foreground/50',
               !isOpen && 'text-center px-0'
             )}
           >

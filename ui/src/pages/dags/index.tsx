@@ -322,7 +322,7 @@ function DAGsContent() {
   const displayData = data ?? lastValidData;
 
   const leftPanel = (
-    <div className="pr-2 pt-4 md:pt-6 lg:pt-8">
+    <div className="pr-2 pt-4 md:pt-6 lg:pt-8 pb-6">
       <DAGListHeader onRefresh={refreshFn} />
       {displayData ? (
         <>

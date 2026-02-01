@@ -110,7 +110,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             navigateToStatusTab={navigateToStatusTab}
           />
         )}
-        <div className="flex flex-col lg:flex-row justify-between items-center gap-3 lg:gap-0 mb-4">
+        <div className="flex flex-col lg:flex-row justify-between items-center gap-3 lg:gap-0 mb-4 mt-3">
           {/* Desktop Tabs (lg and up) */}
           <div className="hidden lg:block flex-1 min-w-0">
             <Tabs className="whitespace-nowrap">
