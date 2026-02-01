@@ -187,7 +187,7 @@ export function DAGPicker({
                   className={cn(
                     'w-full pl-7 pr-2 py-1.5 text-sm rounded',
                     'bg-background border border-input',
-                    'focus:outline-none focus:ring-1 focus:ring-ring'
+                    'focus:outline-none focus:border-ring'
                   )}
                 />
               </div>

@@ -44,7 +44,7 @@ function PathRow({ label, path }: PathRowProps) {
       aria-label={`Copy ${label} path`}
       className={cn(
         'w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all text-left',
-        'hover:bg-accent/50 group focus:outline-none focus:ring-2 focus:ring-ring'
+        'hover:bg-accent/50 group focus:outline-none'
       )}
     >
       <span className="text-xs text-muted-foreground shrink-0 w-20">

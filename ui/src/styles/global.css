@@ -292,8 +292,7 @@
   opacity: 0.9;
 }
 .btn-primary:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
+  outline: none;
 }
 
 /* Secondary Button - Neutral Border */
@@ -310,8 +309,7 @@
   background-color: var(--secondary);
 }
 .btn-secondary:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
+  outline: none;
 }
 
 /* Outline Button */
@@ -655,25 +653,17 @@
   display: none;
 }
 
-/* Focus Indicators - Accessibility */
-*:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-  border-radius: var(--radius-xs);
-}
-
 /* Remove default focus outline */
 *:focus {
   outline: none;
 }
 
-/* Input Focus States */
+/* Input Focus States - subtle border change only */
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
   border-color: var(--ring);
-  outline: 2px solid var(--ring);
-  outline-offset: 0;
+  outline: none;
 }
 
 /* Table Styles - GCP Information Dense */

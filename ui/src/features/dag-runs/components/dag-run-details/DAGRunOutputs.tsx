@@ -196,7 +196,7 @@ function DAGRunOutputs({ dagName, dagRunId }: Props) {
                 <button
                   type="button"
                   onClick={() => handleSort('name')}
-                  className="flex items-center gap-1 cursor-pointer select-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 rounded"
+                  className="flex items-center gap-1 cursor-pointer select-none focus:outline-none rounded"
                   aria-label="Sort by key"
                 >
                   Key
@@ -207,7 +207,7 @@ function DAGRunOutputs({ dagName, dagRunId }: Props) {
                 <button
                   type="button"
                   onClick={() => handleSort('value')}
-                  className="flex items-center gap-1 cursor-pointer select-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 rounded"
+                  className="flex items-center gap-1 cursor-pointer select-none focus:outline-none rounded"
                   aria-label="Sort by value"
                 >
                   Value
@@ -240,7 +240,7 @@ function DAGRunOutputs({ dagName, dagRunId }: Props) {
                     <button
                       type="button"
                       onClick={() => handleCopy(key, value)}
-                      className="p-1 hover:bg-accent rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+                      className="p-1 hover:bg-accent rounded focus:outline-none"
                       title="Copy value"
                       aria-label={`Copy value for ${key}`}
                     >

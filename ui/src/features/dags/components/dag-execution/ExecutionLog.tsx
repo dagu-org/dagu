@@ -376,7 +376,7 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
           </div>
 
           <select
-            className="h-7 px-2 text-xs border border-border rounded-md bg-surface text-foreground flex-shrink-0 focus:outline-none focus:ring-1 focus:ring-ring"
+            className="h-7 px-2 text-xs border border-border rounded-md bg-surface text-foreground flex-shrink-0 focus:outline-none focus:border-ring"
             value={pageSize}
             onChange={(e) => setPageSize(Number(e.target.value))}
             disabled={isNavigating}

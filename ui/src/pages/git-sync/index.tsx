@@ -374,7 +374,7 @@ export default function GitSyncPage() {
               }
             }}
             className={cn(
-              'px-3 py-1.5 border-b-2 -mb-px transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              'px-3 py-1.5 border-b-2 -mb-px transition-colors focus:outline-none',
               filter === f
                 ? 'border-foreground text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
