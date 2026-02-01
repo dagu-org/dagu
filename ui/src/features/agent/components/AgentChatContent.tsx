@@ -32,18 +32,14 @@ function formatDate(dateStr: string): string {
 function findLatestConversation(
   conversations: ConversationWithState[]
 ): ConversationWithState | null {
-  if (conversations.length === 0) return null;
-
-  let latest = conversations[0]!;
-  for (const conv of conversations) {
-    if (
-      new Date(conv.conversation.updated_at) >
-      new Date(latest.conversation.updated_at)
-    ) {
-      latest = conv;
-    }
+  if (conversations.length === 0) {
+    return null;
   }
-  return latest;
+  return conversations.reduce((latest, conv) => {
+    const latestDate = new Date(latest.conversation.updated_at);
+    const convDate = new Date(conv.conversation.updated_at);
+    return convDate > latestDate ? conv : latest;
+  });
 }
 
 export interface AgentChatContentProps {

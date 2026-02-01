@@ -178,7 +178,6 @@ func formatMessageWithContexts(message string, contexts []ResolvedDAGContext) st
 // formatContextLine formats a single DAG context as a readable line.
 func formatContextLine(ctx ResolvedDAGContext) string {
 	var parts []string
-
 	if ctx.DAGFilePath != "" {
 		parts = append(parts, "file: "+ctx.DAGFilePath)
 	}
@@ -191,7 +190,6 @@ func formatContextLine(ctx ResolvedDAGContext) string {
 	if len(parts) == 0 {
 		return ""
 	}
-
 	return fmt.Sprintf("- %s (%s)", cmp.Or(ctx.DAGName, "unknown"), strings.Join(parts, ", "))
 }
 

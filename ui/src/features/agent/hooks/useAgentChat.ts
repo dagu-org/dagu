@@ -23,19 +23,17 @@ function buildChatRequest(
 }
 
 async function fetchWithAuth<T>(url: string, options?: RequestInit): Promise<T> {
+  const hasBody = Boolean(options?.body);
   const headers: Record<string, string> = {
     ...getAuthHeaders(),
-    ...(options?.body ? { 'Content-Type': 'application/json' } : {}),
-    ...options?.headers as Record<string, string>,
+    ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+    ...(options?.headers as Record<string, string>),
   };
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+
+  const response = await fetch(url, { ...options, headers });
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
-    const errorMessage = errorData?.message || response.statusText || 'Request failed';
-    throw new Error(errorMessage);
+    throw new Error(errorData?.message || response.statusText || 'Request failed');
   }
   return response.json();
 }
@@ -154,8 +152,6 @@ export function useAgentChat() {
     async (message: string, model?: string, dagContexts?: DAGContext[]): Promise<void> => {
       setIsSending(true);
       setError(null);
-
-      // Show pending message immediately (will be cleared when real message arrives via SSE)
       setPendingUserMessage(message);
 
       try {
@@ -168,9 +164,8 @@ export function useAgentChat() {
           body: JSON.stringify(buildChatRequest(message, model, dagContexts, preferences.safeMode)),
         });
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
-        setError(errorMessage);
-        setPendingUserMessage(null); // Clear pending on error
+        setError(err instanceof Error ? err.message : 'Failed to send message');
+        setPendingUserMessage(null);
         throw err;
       } finally {
         setIsSending(false);

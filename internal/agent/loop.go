@@ -273,50 +273,13 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 // handleToolCalls processes tool calls from the LLM response using iteration
 // instead of recursion to prevent stack overflow with long tool call chains.
 func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) error {
-	for depth := 0; depth < maxToolCallDepth; depth++ {
-		for _, tc := range toolCalls {
-			l.logger.Debug("executing tool", "name", tc.Function.Name, "id", tc.ID, "depth", depth)
-			l.recordToolResult(ctx, tc, l.executeTool(ctx, tc))
-		}
+	for depth := range maxToolCallDepth {
+		l.executeToolCalls(ctx, toolCalls, depth)
 
-		// Process the next LLM request
-		history := l.copyHistory()
-		messages := l.buildMessages(history)
-		tools := l.buildToolDefinitions()
-
-		req := &llm.ChatRequest{
-			Model:    l.model,
-			Messages: messages,
-			Tools:    tools,
-		}
-
-		l.logger.Debug("sending LLM request (tool chain)",
-			"message_count", len(messages),
-			"tool_count", len(tools),
-			"model", l.model,
-			"depth", depth)
-
-		l.setWorking(true)
-
-		llmCtx, cancel := context.WithTimeout(ctx, llmRequestTimeout)
-		defer cancel()
-
-		resp, err := l.provider.Chat(llmCtx, req)
-
+		resp, err := l.sendToolChainRequest(ctx, depth)
 		if err != nil {
-			l.recordErrorMessage(ctx, fmt.Sprintf("LLM request failed: %v", err))
-			l.setWorking(false)
-			return fmt.Errorf("LLM request failed: %w", err)
+			return err
 		}
-
-		l.logger.Debug("received LLM response (tool chain)",
-			"content_length", len(resp.Content),
-			"finish_reason", resp.FinishReason,
-			"tool_calls", len(resp.ToolCalls),
-			"depth", depth)
-
-		l.accumulateUsage(resp.Usage)
-		l.recordAssistantMessage(ctx, resp)
 
 		if len(resp.ToolCalls) == 0 {
 			l.setWorking(false)
@@ -330,6 +293,55 @@ func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) er
 	l.setWorking(false)
 	l.logger.Warn("max tool call depth reached", "depth", maxToolCallDepth)
 	return fmt.Errorf("max tool call depth (%d) reached", maxToolCallDepth)
+}
+
+// executeToolCalls runs all tool calls at the current depth level.
+func (l *Loop) executeToolCalls(ctx context.Context, toolCalls []llm.ToolCall, depth int) {
+	for _, tc := range toolCalls {
+		l.logger.Debug("executing tool", "name", tc.Function.Name, "id", tc.ID, "depth", depth)
+		l.recordToolResult(ctx, tc, l.executeTool(ctx, tc))
+	}
+}
+
+// sendToolChainRequest sends an LLM request after tool execution.
+func (l *Loop) sendToolChainRequest(ctx context.Context, depth int) (*llm.ChatResponse, error) {
+	history := l.copyHistory()
+	messages := l.buildMessages(history)
+	tools := l.buildToolDefinitions()
+
+	req := &llm.ChatRequest{
+		Model:    l.model,
+		Messages: messages,
+		Tools:    tools,
+	}
+
+	l.logger.Debug("sending LLM request (tool chain)",
+		"message_count", len(messages),
+		"tool_count", len(tools),
+		"model", l.model,
+		"depth", depth)
+
+	l.setWorking(true)
+
+	llmCtx, cancel := context.WithTimeout(ctx, llmRequestTimeout)
+	defer cancel()
+
+	resp, err := l.provider.Chat(llmCtx, req)
+	if err != nil {
+		l.recordErrorMessage(ctx, fmt.Sprintf("LLM request failed: %v", err))
+		l.setWorking(false)
+		return nil, fmt.Errorf("LLM request failed: %w", err)
+	}
+
+	l.logger.Debug("received LLM response (tool chain)",
+		"content_length", len(resp.Content),
+		"finish_reason", resp.FinishReason,
+		"tool_calls", len(resp.ToolCalls),
+		"depth", depth)
+
+	l.accumulateUsage(resp.Usage)
+	l.recordAssistantMessage(ctx, resp)
+	return resp, nil
 }
 
 // recordToolResult adds a tool result to history and records it.

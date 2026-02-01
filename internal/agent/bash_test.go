@@ -335,8 +335,8 @@ func TestBashTool_SafeMode_SkipsApproval(t *testing.T) {
 	// Should execute without calling approval (promptCalled stays false)
 	promptCalled := false
 	ctx := ToolContext{
-		Context:  context.Background(),
-		SafeMode: false,
+		Context:        context.Background(),
+		SafeMode:       false,
 		EmitUserPrompt: func(_ UserPrompt) { promptCalled = true },
 	}
 
@@ -383,8 +383,8 @@ func TestBashTool_SafeMode_UserRejects(t *testing.T) {
 	input := json.RawMessage(`{"command": "rm testfile"}`)
 
 	ctx := ToolContext{
-		Context:  context.Background(),
-		SafeMode: true,
+		Context:        context.Background(),
+		SafeMode:       true,
 		EmitUserPrompt: func(_ UserPrompt) {},
 		WaitUserResponse: func(_ context.Context, _ string) (UserPromptResponse, error) {
 			return UserPromptResponse{SelectedOptionIDs: []string{"reject"}}, nil
@@ -405,8 +405,8 @@ func TestBashTool_SafeMode_SafeCommandNoApproval(t *testing.T) {
 
 	promptCalled := false
 	ctx := ToolContext{
-		Context:  context.Background(),
-		SafeMode: true,
+		Context:        context.Background(),
+		SafeMode:       true,
 		EmitUserPrompt: func(_ UserPrompt) { promptCalled = true },
 	}
 

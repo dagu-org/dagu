@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"slices"
 	"strings"
 	"time"
 
@@ -61,17 +62,23 @@ func NewBashTool() *AgentTool {
 // commandRequiresApproval checks if a command matches dangerous patterns.
 func commandRequiresApproval(cmd string) bool {
 	cmd = strings.TrimSpace(cmd)
-	for _, p := range dangerousPatterns {
-		if strings.HasPrefix(cmd, p) ||
-			strings.Contains(cmd, " "+p) ||
-			strings.Contains(cmd, "|"+p) ||
-			strings.Contains(cmd, "| "+p) ||
-			strings.Contains(cmd, ";"+p) ||
-			strings.Contains(cmd, "; "+p) {
+	for _, pattern := range dangerousPatterns {
+		if matchesDangerousPattern(cmd, pattern) {
 			return true
 		}
 	}
 	return false
+}
+
+// matchesDangerousPattern checks if a command contains a dangerous pattern
+// either at the start or after common shell operators.
+func matchesDangerousPattern(cmd, pattern string) bool {
+	return strings.HasPrefix(cmd, pattern) ||
+		strings.Contains(cmd, " "+pattern) ||
+		strings.Contains(cmd, "|"+pattern) ||
+		strings.Contains(cmd, "| "+pattern) ||
+		strings.Contains(cmd, ";"+pattern) ||
+		strings.Contains(cmd, "; "+pattern)
 }
 
 // requestApproval asks the user to approve a command before execution.
@@ -112,12 +119,7 @@ func requestApproval(ctx ToolContext, cmd string) (bool, error) {
 		return false, nil
 	}
 
-	for _, id := range resp.SelectedOptionIDs {
-		if id == "approve" {
-			return true, nil
-		}
-	}
-	return false, nil
+	return slices.Contains(resp.SelectedOptionIDs, "approve"), nil
 }
 
 func bashRun(toolCtx ToolContext, input json.RawMessage) ToolOut {
@@ -125,12 +127,10 @@ func bashRun(toolCtx ToolContext, input json.RawMessage) ToolOut {
 	if err := json.Unmarshal(input, &args); err != nil {
 		return toolError("Failed to parse input: %v", err)
 	}
-
 	if args.Command == "" {
 		return toolError("Command is required")
 	}
 
-	// Check if command requires approval (only when SafeMode is enabled)
 	if toolCtx.SafeMode && commandRequiresApproval(args.Command) {
 		approved, err := requestApproval(toolCtx, args.Command)
 		if err != nil {
@@ -141,6 +141,10 @@ func bashRun(toolCtx ToolContext, input json.RawMessage) ToolOut {
 		}
 	}
 
+	return executeCommand(toolCtx, args)
+}
+
+func executeCommand(toolCtx ToolContext, args BashToolInput) ToolOut {
 	timeout := resolveTimeout(args.Timeout)
 	parentCtx := toolCtx.Context
 	if parentCtx == nil {
@@ -167,11 +171,9 @@ func bashRun(toolCtx ToolContext, input json.RawMessage) ToolOut {
 		}
 		return toolError("Command failed: %v\n%s", err, output)
 	}
-
 	if output == "" {
 		return ToolOut{Content: "(no output)"}
 	}
-
 	return ToolOut{Content: output}
 }
 
