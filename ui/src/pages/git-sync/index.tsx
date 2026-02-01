@@ -274,7 +274,7 @@ export default function GitSyncPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 max-w-7xl mx-auto pb-8">
+    <div className="flex flex-col gap-4 max-w-7xl pb-8">
       {/* Compact Header */}
       <div className="flex items-center justify-between py-2">
         <div className="flex items-center gap-4">

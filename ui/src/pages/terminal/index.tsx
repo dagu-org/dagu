@@ -248,7 +248,7 @@ export default function TerminalPage() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full max-w-7xl">
       <div className="flex items-center justify-between mb-2">
         <div>
           <h1 className="text-lg font-semibold">Terminal</h1>

@@ -128,7 +128,7 @@ function DAGRunDetailsPage() {
   }
 
   return (
-    <div className="w-full px-4">
+    <div className="max-w-7xl px-4">
       <DAGRunContext.Provider
         value={{
           refresh: refreshFn,

@@ -214,7 +214,7 @@ function DAGDetails() {
             setData: setRootDAGRunData,
           }}
         >
-          <div className="w-full flex flex-col">
+          <div className="max-w-7xl flex flex-col">
             {isDataReady && (
               <>
                 <DAGHeader
