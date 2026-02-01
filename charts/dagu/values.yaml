@@ -1,0 +1,77 @@
+# Default values for dagu
+# Dagu requires a shared filesystem (ReadWriteMany) for state persistence
+
+# Image configuration
+image:
+  repository: ghcr.io/dagu-org/dagu
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Scheduler configuration
+scheduler:
+  replicas: 1
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# Coordinator configuration (gRPC server for distributed task execution)
+coordinator:
+  replicas: 1
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+# Worker configuration
+worker:
+  replicas: 2
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+# UI configuration
+ui:
+  replicas: 1
+  service:
+    port: 8080
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# Authentication configuration
+auth:
+  mode: "builtin"  # Options: "none", "builtin", "oidc"
+  builtin:
+    admin:
+      username: "admin"
+      password: "adminpass"  # CHANGEME
+    token:
+      secret: "dagu-secret-key"  # CHANGEME
+      ttl: "24h"
+
+# Persistence - REQUIRED: Dagu needs a shared filesystem (RWX)
+# Use NFS, EFS, CephFS, or similar storage that supports ReadWriteMany
+persistence:
+  enabled: true
+  accessMode: ReadWriteMany
+  size: 10Gi
+  # Set this to your storage class that supports RWX
+  # Example: "nfs-client", "efs-sc", "cephfs"
+  storageClass: ""
+  # Skip RWX validation for local testing (Kind, Docker Desktop)
+  skipValidation: false

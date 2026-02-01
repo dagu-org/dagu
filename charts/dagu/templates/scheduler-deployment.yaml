@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dagu.fullname" . }}-scheduler
+  labels:
+    {{- include "dagu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: scheduler
+spec:
+  replicas: {{ .Values.scheduler.replicas }}
+  selector:
+    matchLabels:
+      {{- include "dagu.labels" . | nindent 6 }}
+      app.kubernetes.io/component: scheduler
+  template:
+    metadata:
+      labels:
+        {{- include "dagu.labels" . | nindent 8 }}
+        app.kubernetes.io/component: scheduler
+    spec:
+      # Disable Kubernetes Service env var injection to avoid overriding
+      # dagu config values (e.g., scheduler.port) with Service URLs
+      enableServiceLinks: false
+      containers:
+        - name: scheduler
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: 
+            - dagu
+            - scheduler
+            - --config
+            - /etc/dagu/dagu.yaml
+          ports:
+            - name: health
+              containerPort: 8090
+              protocol: TCP
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: config
+              mountPath: /etc/dagu
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: health
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.scheduler.resources | nindent 12 }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "dagu.fullname" . }}-data
+        - name: config
+          configMap:
+            name: {{ include "dagu.fullname" . }}-config

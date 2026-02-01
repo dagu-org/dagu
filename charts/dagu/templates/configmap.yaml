@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "dagu.fullname" . }}-config
+  labels:
+    {{- include "dagu.labels" . | nindent 4 }}
+data:
+  dagu.yaml: |
+    # Dagu configuration for Kubernetes (v0 Helm chart)
+    # This file intentionally includes only the minimal,
+    # schema-correct configuration required to run dagu
+    # in a distributed Kubernetes environment.
+
+    # Server / UI
+    host: "0.0.0.0"
+    port: 8080
+    apiBasePath: "/api/v2"
+
+    # Coordinator (distributed execution)
+    coordinator:
+      host: "0.0.0.0"
+      port: 50055
+
+    # Scheduler
+    scheduler:
+      port: 8090
+
+    # Paths (MUST be under `paths`)
+    paths:
+      dataDir: /data
+      dagsDir: /data/dags
+      logDir: /data/logs
+      suspendFlagsDir: /data/suspend
+      adminLogsDir: /data/admin/logs
+      dagRunsDir: /data/dag-runs
+      queueDir: /data/queue
+      procDir: /data/proc
+      serviceRegistryDir: /data/services
+      apiKeysDir: /data/api-keys
+      webhooksDir: /data/webhooks
+      usersDir: /data/users
+
+    # Auth
+    auth:
+      mode: {{ .Values.auth.mode | quote }}
+      builtin:
+        admin:
+          username: {{ .Values.auth.builtin.admin.username | quote }}
+          password: {{ .Values.auth.builtin.admin.password | quote }}
+        token:
+          secret: {{ .Values.auth.builtin.token.secret | quote }}
+          ttl: {{ .Values.auth.builtin.token.ttl | quote }}
+
+    # Peer communication (required for distributed mode)
+    peer:
+      insecure: true
