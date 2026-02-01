@@ -970,7 +970,7 @@ func TestStore_WriteConversationToFile_Errors(t *testing.T) {
 
 		err = store.writeConversationToFile(filePath, conv)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to write")
+		assert.Contains(t, err.Error(), "failed to create temp file")
 	})
 
 	t.Run("rename blocked by existing directory", func(t *testing.T) {

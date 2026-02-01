@@ -549,7 +549,7 @@ func TestStore_Save_WriteError(t *testing.T) {
 	cfg := newTestConfig(true, "anthropic", "model")
 	err := store.Save(context.Background(), cfg)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to write")
+	assert.Contains(t, err.Error(), "failed to create temp file")
 }
 
 func TestProviderCache_Error(t *testing.T) {
