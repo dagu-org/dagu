@@ -1,6 +1,6 @@
 # Dagu Helm Chart
 
-A simple Helm chart for deploying Dagu on Kubernetes.
+A Helm chart for deploying Dagu on Kubernetes.
 
 ## Prerequisites
 
@@ -28,15 +28,18 @@ helm install dagu ./charts/dagu --set persistence.storageClass=nfs-client
 helm install dagu ./charts/dagu --set image.tag=v1.12.0
 ```
 
-## Configuration
+## Architecture
 
-The chart deploys three components:
+The chart deploys four components:
 
-- **Scheduler**: Manages DAG execution schedules (1 replica)
+- **Coordinator**: gRPC server for distributed task execution (port 50055)
+- **Scheduler**: Manages DAG execution schedules (port 8090 for health)
 - **Worker**: Executes DAG steps (2 replicas by default)
-- **UI**: Web interface for managing DAGs (1 replica)
+- **UI**: Web interface for managing DAGs (port 8080)
 
 All components share a single PersistentVolumeClaim with `ReadWriteMany` access mode.
+
+## Configuration
 
 ### Required Values
 
@@ -45,12 +48,40 @@ persistence:
   storageClass: "nfs-client"  # REQUIRED: Must support RWX
 ```
 
-### Optional Values
+### Authentication
+
+By default, the chart uses builtin authentication. **Change these values in production!**
+
+```yaml
+auth:
+  mode: "builtin"  # Options: "none", "builtin", "oidc"
+  builtin:
+    admin:
+      username: "admin"
+      password: "adminpass"  # CHANGEME
+    token:
+      secret: "dagu-secret-key"  # CHANGEME
+      ttl: "24h"
+```
+
+To disable authentication:
+```bash
+helm install dagu ./charts/dagu --set auth.mode=none
+```
+
+### Component Resources
 
 ```yaml
 image:
   repository: ghcr.io/dagu-org/dagu
   tag: latest
+
+coordinator:
+  replicas: 1
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
 
 scheduler:
   replicas: 1
@@ -81,6 +112,7 @@ ui:
 kubectl port-forward svc/dagu-ui 8080:8080
 
 # Then visit http://localhost:8080
+# Default credentials: admin / adminpass
 ```
 
 ## Current Constraints
