@@ -45,6 +45,8 @@ tags:
     description: "Audit log operations (admin only)"
   - name: "sync"
     description: "Git synchronization operations for DAGs"
+  - name: "agent"
+    description: "AI Agent configuration operations (admin only)"
 
 paths:
   /health:
@@ -894,6 +896,9 @@ paths:
                     description: "List of errors encountered during the request"
                     items:
                       type: string
+                  spec:
+                    type: string
+                    description: "The DAG specification in YAML format"
                 required:
                   - latestDAGRun
                   - suspended
@@ -3546,6 +3551,87 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /settings/agent:
+    get:
+      summary: "Get agent configuration"
+      description: "Returns the current AI agent configuration. Requires admin role."
+      operationId: "getAgentConfig"
+      tags:
+        - "settings"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "Agent configuration"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentConfigResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    patch:
+      summary: "Update agent configuration"
+      description: "Updates the AI agent configuration. Requires admin role."
+      operationId: "updateAgentConfig"
+      tags:
+        - "settings"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentConfigRequest"
+      responses:
+        "200":
+          description: "Updated agent configuration"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentConfigResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   securitySchemes:
     basicAuth:
@@ -5898,6 +5984,60 @@ components:
           type: boolean
         commit:
           $ref: "#/components/schemas/SyncCommitConfig"
+
+    AgentConfigResponse:
+      type: object
+      description: "AI Agent configuration"
+      properties:
+        enabled:
+          type: boolean
+          description: "Whether the AI agent is enabled"
+        llm:
+          $ref: "#/components/schemas/AgentLLMConfig"
+
+    AgentLLMConfig:
+      type: object
+      description: "LLM configuration for the AI agent"
+      properties:
+        provider:
+          type: string
+          description: "LLM provider (anthropic, openai, gemini, openrouter, local)"
+        model:
+          type: string
+          description: "Model ID"
+        apiKeyConfigured:
+          type: boolean
+          description: "Whether an API key is configured (actual key is not returned)"
+        baseUrl:
+          type: string
+          description: "Custom API endpoint URL (optional)"
+
+    UpdateAgentConfigRequest:
+      type: object
+      description: "Request to update AI agent configuration"
+      properties:
+        enabled:
+          type: boolean
+          description: "Whether the AI agent is enabled"
+        llm:
+          $ref: "#/components/schemas/UpdateAgentLLMConfig"
+
+    UpdateAgentLLMConfig:
+      type: object
+      description: "LLM configuration updates"
+      properties:
+        provider:
+          type: string
+          description: "LLM provider (anthropic, openai, gemini, openrouter, local)"
+        model:
+          type: string
+          description: "Model ID"
+        apiKey:
+          type: string
+          description: "API key (only set if changing)"
+        baseUrl:
+          type: string
+          description: "Custom API endpoint URL"
 
 # Apply security requirements globally
 security:

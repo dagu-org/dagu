@@ -377,6 +377,13 @@ func (a *API) getDAGDetailsData(ctx context.Context, fileName string) (api.GetDA
 	}
 	// If ErrNoStatusData, dagStatus will be zero-value (empty), which is fine for DAGs with no runs
 
+	// Get the raw spec YAML for SSE updates
+	yamlSpec, err := a.dagStore.GetSpec(ctx, fileName)
+	if err != nil {
+		// Continue even if spec fetch fails - it's optional for SSE
+		yamlSpec = ""
+	}
+
 	details := toDAGDetails(dag)
 
 	localDAGs := make([]api.LocalDag, 0, len(dag.LocalDAGs))
@@ -394,6 +401,7 @@ func (a *API) getDAGDetailsData(ctx context.Context, fileName string) (api.GetDA
 		Suspended:    a.dagStore.IsSuspended(ctx, fileName),
 		LocalDags:    localDAGs,
 		Errors:       extractBuildErrors(dag.BuildErrors),
+		Spec:         &yamlSpec,
 	}, nil
 }
 

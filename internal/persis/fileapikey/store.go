@@ -182,23 +182,9 @@ func (s *Store) Create(_ context.Context, key *auth.APIKey) error {
 
 // writeAPIKeyToFile writes an API key to a JSON file atomically.
 func (s *Store) writeAPIKeyToFile(filePath string, key *auth.APIKey) error {
-	data, err := json.MarshalIndent(key.ToStorage(), "", "  ")
-	if err != nil {
-		return fmt.Errorf("fileapikey: failed to marshal API key: %w", err)
+	if err := fileutil.WriteJSONAtomic(filePath, key.ToStorage(), apiKeyFilePermissions); err != nil {
+		return fmt.Errorf("fileapikey: %w", err)
 	}
-
-	// Write to temp file first, then rename for atomicity
-	tempPath := filePath + ".tmp"
-	if err := os.WriteFile(tempPath, data, apiKeyFilePermissions); err != nil {
-		return fmt.Errorf("fileapikey: failed to write file %s: %w", tempPath, err)
-	}
-
-	if err := os.Rename(tempPath, filePath); err != nil {
-		// Clean up temp file on failure
-		_ = os.Remove(tempPath)
-		return fmt.Errorf("fileapikey: failed to rename file %s: %w", filePath, err)
-	}
-
 	return nil
 }
 

@@ -6,15 +6,32 @@ import (
 	"strings"
 )
 
-// DAGNameMaxLen defines the maximum allowed length for a DAG name.
-const DAGNameMaxLen = 40
+// Constants for validation limits.
+const (
+	DAGNameMaxLen  = 40
+	maxStepNameLen = 40
+)
 
-// dagNameRegex matches valid DAG names: alphanumeric, underscore, dash, dot.
-var dagNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
+// Regex patterns for validation.
+var (
+	dagNameRegex  = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
+	stepIDPattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_-]*$`)
+)
+
+// reservedWords contains IDs that cannot be used as step IDs.
+var reservedWords = map[string]bool{
+	"env":     true,
+	"params":  true,
+	"args":    true,
+	"stdout":  true,
+	"stderr":  true,
+	"output":  true,
+	"outputs": true,
+}
 
 // ValidateDAGName validates a DAG name according to shared rules.
-// - Empty name is allowed (caller may provide one via context or filename).
-// - Non-empty name must satisfy length and allowed character constraints.
+// Empty name is allowed (caller may provide one via context or filename).
+// Non-empty name must satisfy length and allowed character constraints.
 func ValidateDAGName(name string) error {
 	if name == "" {
 		return nil
@@ -31,134 +48,157 @@ func ValidateDAGName(name string) error {
 // StepValidator is a function type for validating step configurations.
 type StepValidator func(step Step) error
 
+// stepValidators holds registered validators for each executor type.
 var stepValidators = make(map[string]StepValidator)
 
+// RegisterStepValidator registers a validator for a specific executor type.
 func RegisterStepValidator(executorType string, validator StepValidator) {
 	stepValidators[executorType] = validator
 }
 
-// ValidateSteps exposes validateSteps for packages that need to perform validation during DAG construction.
+// ValidateSteps validates all steps in a DAG, collecting all validation errors.
 func ValidateSteps(dag *DAG) error {
-	// First pass: collect all names and IDs
-	stepNames := make(map[string]struct{})
-	stepIDs := make(map[string]struct{})
+	var errs ErrorList
+
+	stepNames, stepIDs := collectNamesAndIDs(dag, &errs)
+	validateNameIDConflicts(dag, stepNames, stepIDs, &errs)
+	resolveStepDependencies(dag)
+	validateDependenciesExist(dag, stepNames, &errs)
 
 	for _, step := range dag.Steps {
-		// Names should always exist at this point (explicit or auto-generated)
+		errs = append(errs, validateStep(step)...)
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+	return errs
+}
+
+// collectNamesAndIDs collects all step names and IDs, validating uniqueness and format.
+func collectNamesAndIDs(dag *DAG, errs *ErrorList) (stepNames, stepIDs map[string]struct{}) {
+	stepNames = make(map[string]struct{})
+	stepIDs = make(map[string]struct{})
+
+	for _, step := range dag.Steps {
 		if step.Name == "" {
-			// This should not happen if generation works correctly
-			return NewValidationError("steps", step, fmt.Errorf("internal error: step name not generated"))
+			*errs = append(*errs, NewValidationError("steps", step, fmt.Errorf("internal error: step name not generated")))
+			continue
 		}
 
 		if _, exists := stepNames[step.Name]; exists {
-			return NewValidationError("steps", step.Name, ErrStepNameDuplicate)
+			*errs = append(*errs, NewValidationError("steps", step.Name, ErrStepNameDuplicate))
+		} else {
+			stepNames[step.Name] = struct{}{}
 		}
-		stepNames[step.Name] = struct{}{}
 
-		// Collect IDs if present
-		if step.ID != "" {
-			// Check ID format
-			if !isValidStepID(step.ID) {
-				return NewValidationError("steps", step.ID, fmt.Errorf("invalid step ID format: must match pattern ^[a-zA-Z][a-zA-Z0-9_-]*$"))
-			}
+		if step.ID == "" {
+			continue
+		}
 
-			// Check for duplicate IDs
-			if _, exists := stepIDs[step.ID]; exists {
-				return NewValidationError("steps", step.ID, fmt.Errorf("duplicate step ID: %s", step.ID))
-			}
+		if !isValidStepID(step.ID) {
+			*errs = append(*errs, NewValidationError("steps", step.ID, fmt.Errorf("invalid step ID format: must match pattern ^[a-zA-Z][a-zA-Z0-9_-]*$")))
+		}
+
+		if _, exists := stepIDs[step.ID]; exists {
+			*errs = append(*errs, NewValidationError("steps", step.ID, fmt.Errorf("duplicate step ID: %s", step.ID)))
+		} else {
 			stepIDs[step.ID] = struct{}{}
+		}
 
-			// Check for reserved words
-			if isReservedWord(step.ID) {
-				return NewValidationError("steps", step.ID, fmt.Errorf("step ID '%s' is a reserved word", step.ID))
-			}
+		if isReservedWord(step.ID) {
+			*errs = append(*errs, NewValidationError("steps", step.ID, fmt.Errorf("step ID '%s' is a reserved word", step.ID)))
 		}
 	}
 
-	// Second pass: check for conflicts between names and IDs
+	return stepNames, stepIDs
+}
+
+// validateNameIDConflicts checks for conflicts between step names and IDs.
+func validateNameIDConflicts(dag *DAG, stepNames, stepIDs map[string]struct{}, errs *ErrorList) {
+	// Build a map of step name to its own ID for conflict checking
+	nameToOwnID := make(map[string]string)
 	for _, step := range dag.Steps {
+		if step.Name != "" {
+			nameToOwnID[step.Name] = step.ID
+		}
+	}
+
+	for _, step := range dag.Steps {
+		if step.Name == "" {
+			continue
+		}
+
+		// Check that ID doesn't conflict with any step name (except its own)
 		if step.ID != "" {
-			// Check that ID doesn't conflict with any step name
 			if _, exists := stepNames[step.ID]; exists && step.ID != step.Name {
-				return NewValidationError("steps", step.ID, fmt.Errorf("step ID '%s' conflicts with another step's name", step.ID))
+				*errs = append(*errs, NewValidationError("steps", step.ID, fmt.Errorf("step ID '%s' conflicts with another step's name", step.ID)))
 			}
 		}
 
 		// Check that name doesn't conflict with any ID (unless it's the same step)
-		if _, exists := stepIDs[step.Name]; exists {
-			// Find if this is the same step
-			sameStep := false
-			for _, s := range dag.Steps {
-				if s.Name == step.Name && s.ID == step.Name {
-					sameStep = true
-					break
-				}
-			}
-			if !sameStep {
-				return NewValidationError("steps", step.Name, fmt.Errorf("step name '%s' conflicts with another step's ID", step.Name))
-			}
+		if _, exists := stepIDs[step.Name]; exists && nameToOwnID[step.Name] != step.Name {
+			*errs = append(*errs, NewValidationError("steps", step.Name, fmt.Errorf("step name '%s' conflicts with another step's ID", step.Name)))
 		}
 	}
+}
 
-	// Third pass: resolve step IDs to names in depends fields
-	if err := resolveStepDependencies(dag); err != nil {
-		return err
-	}
-
-	// Fourth pass: validate dependencies exist
+// validateDependenciesExist checks that all dependencies reference existing steps.
+func validateDependenciesExist(dag *DAG, stepNames map[string]struct{}, errs *ErrorList) {
 	for _, step := range dag.Steps {
 		for _, dep := range step.Depends {
 			if _, exists := stepNames[dep]; !exists {
-				return NewValidationError("depends", dep, fmt.Errorf("step %s depends on non-existent step %s", step.Name, dep))
+				*errs = append(*errs, NewValidationError("depends", dep, fmt.Errorf("step %s depends on non-existent step %s", step.Name, dep)))
 			}
 		}
 	}
-
-	// Final pass: validate each step
-	for _, step := range dag.Steps {
-		// Validate individual step configuration
-		if err := validateStep(step); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
-func validateStep(step Step) error {
+func validateStep(step Step) ErrorList {
+	var errs ErrorList
+
 	if step.Name == "" {
-		return NewValidationError("name", step.Name, ErrStepNameRequired)
+		errs = append(errs, NewValidationError("name", step.Name, ErrStepNameRequired))
 	}
 
 	if len(step.Name) > maxStepNameLen {
-		return NewValidationError("name", step.Name, ErrStepNameTooLong)
+		errs = append(errs, NewValidationError("name", step.Name, ErrStepNameTooLong))
 	}
 
-	if step.Parallel != nil {
-		// Parallel steps must have a run field (child-DAG only for MVP)
-		if step.SubDAG == nil {
-			return NewValidationError("parallel", step.Parallel, fmt.Errorf("parallel execution is only supported for child-DAGs (must have 'run' field)"))
-		}
+	errs = append(errs, validateParallelConfig(step)...)
 
-		// MaxConcurrent must be positive
-		if step.Parallel.MaxConcurrent <= 0 {
-			return NewValidationError("parallel.maxConcurrent", step.Parallel.MaxConcurrent, fmt.Errorf("maxConcurrent must be greater than 0"))
-		}
-
-		// Must have either items or variable reference
-		if len(step.Parallel.Items) == 0 && step.Parallel.Variable == "" {
-			return NewValidationError("parallel", step.Parallel, fmt.Errorf("parallel must have either items array or variable reference"))
-		}
+	if err := validateStepWithValidator(step); err != nil {
+		errs = append(errs, err)
 	}
 
-	// Validate executor-specific configuration if validator exists
-	return validateStepWithValidator(step)
+	return errs
+}
+
+func validateParallelConfig(step Step) ErrorList {
+	if step.Parallel == nil {
+		return nil
+	}
+
+	var errs ErrorList
+
+	if step.SubDAG == nil {
+		errs = append(errs, NewValidationError("parallel", step.Parallel, fmt.Errorf("parallel execution is only supported for child-DAGs (must have 'run' field)")))
+	}
+
+	if step.Parallel.MaxConcurrent <= 0 {
+		errs = append(errs, NewValidationError("parallel.maxConcurrent", step.Parallel.MaxConcurrent, fmt.Errorf("maxConcurrent must be greater than 0")))
+	}
+
+	if len(step.Parallel.Items) == 0 && step.Parallel.Variable == "" {
+		errs = append(errs, NewValidationError("parallel", step.Parallel, fmt.Errorf("parallel must have either items array or variable reference")))
+	}
+
+	return errs
 }
 
 func validateStepWithValidator(step Step) error {
-	validator, exists := stepValidators[step.ExecutorConfig.Type]
-	if !exists || validator == nil {
-		// No validator registered for this executor type
+	validator := stepValidators[step.ExecutorConfig.Type]
+	if validator == nil {
 		return nil
 	}
 	if err := validator(step); err != nil {
@@ -167,49 +207,28 @@ func validateStepWithValidator(step Step) error {
 	return nil
 }
 
-// maxStepNameLen is the maximum length of a step name.
-const maxStepNameLen = 40
-
-// stepIDPattern defines the valid format for step IDs.
-var stepIDPattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_-]*$`)
-
-// isValidStepID checks if the given ID matches the required pattern.
 func isValidStepID(id string) bool {
 	return stepIDPattern.MatchString(id)
 }
 
-// isReservedWord checks if the given ID is a reserved word.
 func isReservedWord(id string) bool {
-	reservedWords := map[string]bool{
-		"env":     true,
-		"params":  true,
-		"args":    true,
-		"stdout":  true,
-		"stderr":  true,
-		"output":  true,
-		"outputs": true,
-	}
 	return reservedWords[strings.ToLower(id)]
 }
 
 // resolveStepDependencies resolves step IDs to step names in the depends field.
-func resolveStepDependencies(dag *DAG) error {
+func resolveStepDependencies(dag *DAG) {
 	idToName := make(map[string]string)
 	for i := range dag.Steps {
-		step := &dag.Steps[i]
-		if step.ID != "" {
-			idToName[step.ID] = step.Name
+		if dag.Steps[i].ID != "" {
+			idToName[dag.Steps[i].ID] = dag.Steps[i].Name
 		}
 	}
 
 	for i := range dag.Steps {
-		step := &dag.Steps[i]
-		for j, dep := range step.Depends {
+		for j, dep := range dag.Steps[i].Depends {
 			if name, exists := idToName[dep]; exists {
-				step.Depends[j] = name
+				dag.Steps[i].Depends[j] = name
 			}
 		}
 	}
-
-	return nil
 }

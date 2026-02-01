@@ -1564,6 +1564,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/agent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get agent configuration
+         * @description Returns the current AI agent configuration. Requires admin role.
+         */
+        get: operations["getAgentConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update agent configuration
+         * @description Updates the AI agent configuration. Requires admin role.
+         */
+        patch: operations["updateAgentConfig"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2728,6 +2752,40 @@ export interface components {
             pushEnabled?: boolean;
             commit?: components["schemas"]["SyncCommitConfig"];
         };
+        /** @description AI Agent configuration */
+        AgentConfigResponse: {
+            /** @description Whether the AI agent is enabled */
+            enabled?: boolean;
+            llm?: components["schemas"]["AgentLLMConfig"];
+        };
+        /** @description LLM configuration for the AI agent */
+        AgentLLMConfig: {
+            /** @description LLM provider (anthropic, openai, gemini, openrouter, local) */
+            provider?: string;
+            /** @description Model ID */
+            model?: string;
+            /** @description Whether an API key is configured (actual key is not returned) */
+            apiKeyConfigured?: boolean;
+            /** @description Custom API endpoint URL (optional) */
+            baseUrl?: string;
+        };
+        /** @description Request to update AI agent configuration */
+        UpdateAgentConfigRequest: {
+            /** @description Whether the AI agent is enabled */
+            enabled?: boolean;
+            llm?: components["schemas"]["UpdateAgentLLMConfig"];
+        };
+        /** @description LLM configuration updates */
+        UpdateAgentLLMConfig: {
+            /** @description LLM provider (anthropic, openai, gemini, openrouter, local) */
+            provider?: string;
+            /** @description Model ID */
+            model?: string;
+            /** @description API key (only set if changing) */
+            apiKey?: string;
+            /** @description Custom API endpoint URL */
+            baseUrl?: string;
+        };
     };
     responses: never;
     parameters: {
@@ -3855,6 +3913,8 @@ export interface operations {
                         suspended: boolean;
                         /** @description List of errors encountered during the request */
                         errors: string[];
+                        /** @description The DAG specification in YAML format */
+                        spec?: string;
                     };
                 };
             };
@@ -7090,6 +7150,119 @@ export interface operations {
             };
             /** @description DAG not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getAgentConfig: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Agent configuration */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentConfigResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateAgentConfig: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAgentConfigRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated agent configuration */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentConfigResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

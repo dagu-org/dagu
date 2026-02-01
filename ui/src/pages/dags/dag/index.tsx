@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { components } from '../../../api/v2/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
+import { usePageContext } from '../../../contexts/PageContext';
 import { UnsavedChangesProvider } from '../../../contexts/UnsavedChangesContext';
 import {
   DAGDetailsContent,
@@ -24,17 +25,30 @@ type DAGRunDetails = components['schemas']['DAGRunDetails'];
 function DAGDetails() {
   const params = useParams<Params>();
   const navigate = useNavigate();
-  const appBarContext = React.useContext(AppBarContext);
+  const appBarContext = useContext(AppBarContext);
+  const { setContext } = usePageContext();
   const [searchParams] = useSearchParams();
 
-  // Extract query parameters
   const dagRunId = searchParams.get('dagRunId');
   const stepName = searchParams.get('step');
   const subDAGRunId = searchParams.get('subDAGRunId');
   const queriedDAGRunName = searchParams.get('dagRunName');
-  // Use remoteNode from URL if present, otherwise from app bar context
   const remoteNode = searchParams.get('remoteNode') || appBarContext.selectedRemoteNode || 'local';
   const fileName = params.fileName || '';
+
+  // Set page context for agent chat
+  useEffect(() => {
+    if (fileName) {
+      setContext({
+        dagFile: fileName,
+        dagRunId: dagRunId || undefined,
+        source: 'dag-details-page',
+      });
+    }
+    return () => {
+      setContext(null);
+    };
+  }, [fileName, dagRunId, setContext]);
 
   // SSE for real-time updates with polling fallback
   const sseResult = useDAGSSE(fileName || '', !!fileName);
@@ -71,24 +85,22 @@ function DAGDetails() {
     [remoteNode]
   );
 
-  // Navigate to status tab
-  const navigateToStatusTab = useCallback(() => {
-    if (fileName && tab !== 'status') {
-      navigate(buildUrl(`/dags/${fileName}`));
-    }
-  }, [fileName, tab, navigate, buildUrl]);
-
-  // Handle tab changes
+  // Handle tab changes - navigates to the appropriate URL for the given tab
   const handleTabChange = useCallback(
     (newTab: string) => {
-      if (newTab === 'status' && fileName) {
-        navigate(buildUrl(`/dags/${fileName}`));
-      } else if (fileName) {
-        navigate(buildUrl(`/dags/${fileName}/${newTab}`));
-      }
+      if (!fileName) return;
+      const path = newTab === 'status' ? `/dags/${fileName}` : `/dags/${fileName}/${newTab}`;
+      navigate(buildUrl(path));
     },
     [fileName, navigate, buildUrl]
   );
+
+  // Navigate to status tab - convenience wrapper for handleTabChange
+  const navigateToStatusTab = useCallback(() => {
+    if (tab !== 'status') {
+      handleTabChange('status');
+    }
+  }, [tab, handleTabChange]);
 
   // Fetch DAG details - use polling only as fallback when SSE is not connected
   const { data: pollingDagData, mutate: mutateDag } = useQuery(
@@ -150,56 +162,42 @@ function DAGDetails() {
     }
   );
 
-  // Determine the current DAG-run to display
-  let currentDAGRun: DAGRunDetails | undefined;
-  if (subDAGRunId && subDAGRunResponse?.dagRunDetails) {
-    currentDAGRun = subDAGRunResponse.dagRunDetails;
-  } else if (dagRunId && !subDAGRunId && dagRunResponse?.dagRunDetails) {
-    currentDAGRun = dagRunResponse.dagRunDetails;
-  } else if (!subDAGRunId) {
-    currentDAGRun = dagData?.latestDAGRun;
+  // Determine the current DAG-run to display based on URL parameters
+  function getCurrentDAGRun(): DAGRunDetails | undefined {
+    if (subDAGRunId) {
+      return subDAGRunResponse?.dagRunDetails;
+    }
+    if (dagRunId) {
+      return dagRunResponse?.dagRunDetails;
+    }
+    return dagData?.latestDAGRun;
   }
+  const currentDAGRun = getCurrentDAGRun();
 
-  // Root DAG-run context state
-  const [rootDAGRunData, setRootDAGRunData] = useState<
-    DAGRunDetails | undefined
-  >(undefined);
+  // Root DAG-run context state for header display
+  const [rootDAGRunData, setRootDAGRunData] = useState<DAGRunDetails | undefined>(undefined);
 
-  // Update root DAG-run data when current DAG-run changes
-  // This is now the only place that updates the rootDAGRunContext
-  // The history page only changes the URL parameters
+  // Update root DAG-run data when current DAG-run or latest DAG-run changes
   useEffect(() => {
-    // Set the initial value if rootDAGRunData is undefined
-    if (!rootDAGRunData) {
-      if (currentDAGRun) {
-        setRootDAGRunData(currentDAGRun);
-      } else if (dagData?.latestDAGRun) {
-        setRootDAGRunData(dagData.latestDAGRun);
-      }
+    const newData = currentDAGRun || dagData?.latestDAGRun;
+    if (newData) {
+      setRootDAGRunData(newData);
     }
-    // Always update when currentDAGRun changes, regardless of the tab
-    // This ensures the header is updated when navigating through history
-    else if (currentDAGRun) {
-      setRootDAGRunData(currentDAGRun);
-    } else if (dagData?.latestDAGRun) {
-      setRootDAGRunData(dagData.latestDAGRun);
-    }
-  }, [currentDAGRun, dagData?.latestDAGRun, rootDAGRunData]);
+  }, [currentDAGRun, dagData?.latestDAGRun]);
 
-  // Refresh function
+  // Refresh all relevant data based on current view
   const refreshData = useCallback(() => {
     mutateDag();
-    if (dagRunId && !subDAGRunId) {
-      mutateDagRun();
-    }
     if (subDAGRunId) {
       mutateSubDagRun();
+    } else if (dagRunId) {
+      mutateDagRun();
     }
   }, [mutateDag, mutateDagRun, mutateSubDagRun, dagRunId, subDAGRunId]);
 
-  // Determine which DAG-run to display in the header
-  // We want to show the header even when content is loading
-  const headerDAGRun = currentDAGRun || dagData?.latestDAGRun;
+  // Determine which DAG-run to display - fallback to latest when specific run is loading
+  const displayDAGRun = currentDAGRun || dagData?.latestDAGRun;
+  const isDataReady = dagData?.dag && displayDAGRun;
 
   return (
     <UnsavedChangesProvider>
@@ -217,35 +215,32 @@ function DAGDetails() {
           }}
         >
           <div className="w-full flex flex-col">
-            {/* Always render the DAG Header when basic data is available */}
-            {dagData?.dag && headerDAGRun && (
-              <DAGHeader
-                dag={dagData.dag}
-                currentDAGRun={headerDAGRun}
-                fileName={fileName}
-                refreshFn={refreshData}
-                formatDuration={formatDuration}
-                navigateToStatusTab={navigateToStatusTab}
-              />
-            )}
-
-            {/* Render content */}
-            {dagData?.dag && headerDAGRun && (
-              <DAGDetailsContent
-                fileName={fileName}
-                dag={dagData.dag}
-                currentDAGRun={headerDAGRun}
-                refreshFn={refreshData}
-                formatDuration={formatDuration}
-                activeTab={tab}
-                onTabChange={handleTabChange}
-                dagRunId={currentDAGRun?.dagRunId}
-                stepName={stepName}
-                isModal={false}
-                navigateToStatusTab={navigateToStatusTab}
-                skipHeader={true}
-                localDags={dagData?.localDags}
-              />
+            {isDataReady && (
+              <>
+                <DAGHeader
+                  dag={dagData.dag!}
+                  currentDAGRun={displayDAGRun}
+                  fileName={fileName}
+                  refreshFn={refreshData}
+                  formatDuration={formatDuration}
+                  navigateToStatusTab={navigateToStatusTab}
+                />
+                <DAGDetailsContent
+                  fileName={fileName}
+                  dag={dagData.dag!}
+                  currentDAGRun={displayDAGRun}
+                  refreshFn={refreshData}
+                  formatDuration={formatDuration}
+                  activeTab={tab}
+                  onTabChange={handleTabChange}
+                  dagRunId={currentDAGRun?.dagRunId}
+                  stepName={stepName}
+                  isModal={false}
+                  navigateToStatusTab={navigateToStatusTab}
+                  skipHeader={true}
+                  localDags={dagData?.localDags}
+                />
+              </>
             )}
           </div>
         </RootDAGRunContext.Provider>

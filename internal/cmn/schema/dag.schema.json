@@ -1,0 +1,3014 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "description": "Schema for Dagu DAG YAML format. Dagu uses YAML files to define Directed Acyclic Graphs (DAGs) for workflow orchestration.",
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the DAG. If omitted, defaults to the YAML filename without extension."
+    },
+    "description": {
+      "type": "string",
+      "description": "A brief description explaining what this DAG does. This helps document the DAG's purpose."
+    },
+    "group": {
+      "type": "string",
+      "description": "An organizational label used to group related DAGs together. Useful for categorizing DAGs in the UI, e.g., 'DailyJobs', 'Analytics'."
+    },
+    "dotenv": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Path to a .env file to load environment variables from"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of paths to .env files to load environment variables from. Files can be specified as absolute paths, or relative to: DAG file directory, base config directory, or user's home directory."
+        }
+      ],
+      "description": "Specifies .env files to load environment variables from. By default, '.env' is loaded. When files are specified, '.env' is automatically prepended to the list. All files are loaded sequentially with later files overriding earlier values. Set to empty array [] to disable all .env loading. Files are loaded relative to the DAG's workingDir."
+    },
+    "workingDir": {
+      "type": "string",
+      "description": "Working directory for the DAG. All relative paths (including dotenv files) are resolved relative to this directory. Defaults to the directory containing the DAG file."
+    },
+    "schedule": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Single cron expression for starting the DAG (e.g., '5 4 * * *' runs daily at 04:05)"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Multiple cron expressions for starting the DAG at different times"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "start": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Single cron expression for starting the DAG"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Multiple cron expressions for starting the DAG"
+                }
+              ]
+            },
+            "stop": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Single cron expression for stopping the DAG"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Multiple cron expressions for stopping the DAG"
+                }
+              ]
+            },
+            "restart": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Single cron expression for restarting the DAG"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Multiple cron expressions for restarting the DAG"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "description": "Advanced scheduling with separate start, stop, and restart schedules"
+        }
+      ],
+      "description": "Schedule configuration for the DAG. Can be a simple cron expression, multiple cron expressions, or an object with start/stop/restart schedules. If omitted, the DAG will only run manually."
+    },
+    "skipIfSuccessful": {
+      "type": "boolean",
+      "description": "When true, Dagu checks if this DAG has already succeeded since the last scheduled time. If it has, Dagu will skip the current scheduled run. This is useful for resource-intensive tasks or data processing jobs that shouldn't run twice. Note: Manual triggers always run regardless of this setting."
+    },
+    "tags": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Tags as a string. Can be comma-separated (\"tag1, tag2\") or space-separated key=value format (\"env=prod team=platform\")"
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Tags as key-value pairs in map notation"
+        },
+        {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string",
+                "description": "Simple tag or key=value format"
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "maxProperties": 1,
+                "description": "Single key-value pair"
+              }
+            ]
+          },
+          "description": "Array of tags (strings or key-value objects)"
+        }
+      ],
+      "description": "Tags for categorizing and filtering DAGs. Supports multiple formats: string (\"tag1, tag2\" or \"env=prod team=platform\"), map ({ env: prod }), or array ([\"tag1\", { env: prod }])"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["graph", "chain", "agent"],
+      "default": "chain",
+      "description": "Execution type for steps. 'chain' (default) executes steps sequentially in the order they are defined, with each step automatically depending on the previous one. 'graph' uses dependency-based execution where steps run based on their 'depends' field. 'agent' is reserved for future agent-based execution."
+    },
+    "env": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Map format: {KEY: value}"
+              },
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*=.*$",
+                "description": "Key=Value format: 'KEY=value'"
+              }
+            ]
+          },
+          "description": "Array of environment variable definitions (map format or Key=Value strings)"
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Map format: {KEY1: value1, KEY2: value2}"
+        }
+      ],
+      "description": "Environment variables available to all steps in the DAG. Supports three formats: 1) Map format: env: {KEY: value}, 2) Array of maps: env: [{KEY: value}], 3) Array of Key=Value strings: env: ['KEY=value'] (Docker/docker-compose compatible). Can use shell expansions (${VAR}), references to other environment variables, or command substitutions (`cmd`). Note: These won't be stored in execution history data for security."
+    },
+    "secrets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/secretRef"
+      },
+      "description": "List of external secret references resolved at runtime and exposed as environment variables. Each entry declares the target environment variable name, provider, key, and optional provider-specific options."
+    },
+    "logDir": {
+      "type": "string",
+      "description": "Base directory for storing logs. Defaults to ${HOME}/.local/share/logs if not specified."
+    },
+    "logOutput": {
+      "type": "string",
+      "enum": ["separate", "merged"],
+      "default": "separate",
+      "description": "Controls how stdout and stderr are logged. 'separate' writes stdout to .out and stderr to .err files. 'merged' writes both to a single .log file with interleaved output."
+    },
+    "handlerOn": {
+      "type": "object",
+      "properties": {
+        "init": {
+          "$ref": "#/definitions/step",
+          "description": "Step to execute before any workflow steps run (after preconditions pass). If this fails, the DAG fails and no steps execute."
+        },
+        "failure": {
+          "$ref": "#/definitions/step"
+        },
+        "success": {
+          "$ref": "#/definitions/step"
+        },
+        "abort": {
+          "$ref": "#/definitions/step",
+          "description": "Step to execute when the DAG is aborted."
+        },
+        "exit": {
+          "$ref": "#/definitions/step"
+        }
+      },
+      "description": "Lifecycle event hooks that define commands to execute at various points in the DAG lifecycle: init (before steps), success, failure, abort, and exit (always runs last)."
+    },
+    "smtp": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "SMTP server hostname"
+        },
+        "port": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "SMTP server port as string"
+            },
+            {
+              "type": "integer",
+              "description": "SMTP server port as number"
+            }
+          ],
+          "description": "SMTP server port"
+        },
+        "username": {
+          "type": "string",
+          "description": "SMTP authentication username"
+        },
+        "password": {
+          "type": "string",
+          "description": "SMTP authentication password"
+        }
+      },
+      "description": "SMTP server configuration for sending email notifications."
+    },
+    "mailOn": {
+      "type": "object",
+      "properties": {
+        "failure": {
+          "type": "boolean",
+          "description": "Send email notification when DAG fails"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Send email notification when DAG succeeds"
+        }
+      },
+      "description": "Configuration for sending email notifications on DAG success or failure."
+    },
+    "errorMail": {
+      "$ref": "#/definitions/mailConfig",
+      "description": "Email configuration specifically for error notifications."
+    },
+    "infoMail": {
+      "$ref": "#/definitions/mailConfig",
+      "description": "Email configuration for informational notifications."
+    },
+    "timeoutSec": {
+      "type": "integer",
+      "description": "Maximum number of seconds allowed for the entire DAG to finish. If exceeded, the DAG is considered timed out."
+    },
+    "delaySec": {
+      "type": "integer",
+      "description": "Delay in seconds before starting the first node. Useful for staggering workloads."
+    },
+    "restartWaitSec": {
+      "type": "integer",
+      "description": "Number of seconds to wait before restarting a failed or stopped DAG. Typically used with a process supervisor."
+    },
+    "histRetentionDays": {
+      "type": "integer",
+      "description": "Number of days to retain execution history. After this period, older run logs/history can be purged."
+    },
+    "maxActiveRuns": {
+      "type": "integer",
+      "default": 1,
+      "description": "DEPRECATED: This field is ignored for local (DAG-based) queues. For concurrency control, define a global queue in config and use the 'queue' field.",
+      "deprecated": true
+    },
+    "queue": {
+      "type": "string",
+      "description": "Name of the queue to assign this DAG to. If not specified, defaults to the DAG name. Used with global queue configuration to control concurrent execution across multiple DAGs."
+    },
+    "maxActiveSteps": {
+      "type": "integer",
+      "description": "Maximum number of concurrent steps that can be active at once. Useful for limiting resource usage."
+    },
+    "maxCleanUpTimeSec": {
+      "type": "integer",
+      "description": "Maximum time in seconds to spend cleaning up (stopping steps, finalizing logs) before forcing shutdown. If exceeded, processes will be killed."
+    },
+    "maxOutputSize": {
+      "type": "integer",
+      "default": 1048576,
+      "description": "Maximum size in bytes for the output of each step. If a step's output exceeds this limit, it will fail with an error. Defaults to 1MB (1048576 bytes). This limit also applies to pattern matching in preconditions and continueOn conditions."
+    },
+    "preconditions": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/condition"
+          }
+        }
+      ],
+      "description": "Conditions that must be satisfied before the DAG can run. Can use shell expansions or command substitutions to validate external states."
+    },
+    "params": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Space-separated positional parameters accessible as $1, $2, etc."
+        },
+        {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "additionalProperties": true
+              }
+            ]
+          },
+          "description": "Named parameters as key-value pairs, accessible as ${KEY}"
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Named parameters as key-value pairs, accessible as ${KEY}"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema": {
+              "type": "string",
+              "description": "Path to JSON Schema file (local file or remote URL) for parameter validation"
+            },
+            "values": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Default parameter values to be validated against the schema"
+            }
+          },
+          "required": ["schema"],
+          "additionalProperties": false,
+          "description": "JSON Schema validation mode: validates parameters against a schema. 'schema' field is required, 'values' field is optional."
+        }
+      ],
+      "description": "Default parameters that can be overridden when triggering the DAG. Supports three formats: 1) String format: space-separated positional parameters (e.g., 'arg1 arg2') accessible as $1, $2. 2) Array/Object format: named parameters as key-value pairs accessible as ${KEY}, supporting rich types (numbers, booleans, nested objects). 3) Schema validation format: object with 'schema' (path to JSON Schema file) and optional 'values' (parameter values) for runtime validation and defaults."
+    },
+    "container": {
+      "$ref": "#/definitions/container",
+      "description": "Default container configuration for all steps in the DAG. Steps can override this configuration with their own container settings."
+    },
+    "registryAuths": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Entire Docker authentication configuration as a JSON string, using the same format as DOCKER_AUTH_CONFIG or ~/.docker/config.json. Example: {\"auths\":{\"docker.io\":{\"auth\":\"base64(username:password)\"}}}"
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "string",
+                "description": "Authentication value as a string. Can be: 1) base64-encoded 'username:password', 2) JSON string with username/password fields, or 3) environment variable reference like ${DOCKER_AUTH}"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "description": "Registry username. Supports environment variable expansion (e.g., ${DOCKER_USERNAME})."
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "Registry password or access token. Supports environment variable expansion (e.g., ${DOCKER_PASSWORD})."
+                  },
+                  "auth": {
+                    "type": "string",
+                    "description": "Pre-encoded authentication string. Should be base64(username:password) or a JSON string with credentials. Use this instead of username/password for pre-encoded credentials."
+                  }
+                },
+                "description": "Authentication configuration object with username/password or pre-encoded auth string."
+              }
+            ]
+          },
+          "description": "Map of registry hostnames to authentication configurations. Registry hostnames should match the registry in your image names (e.g., 'docker.io', 'ghcr.io', 'gcr.io', '123456789012.dkr.ecr.us-east-1.amazonaws.com')."
+        }
+      ],
+      "description": "Authentication configuration for Docker container registries. Allows pulling images from private registries. Can be specified as a complete DOCKER_AUTH_CONFIG JSON string, or as a map of individual registry credentials. Authentication priority: 1) DAG-level registryAuths, 2) DOCKER_AUTH_CONFIG environment variable, 3) No authentication (public registries). Supports environment variable expansion with ${VAR} syntax."
+    },
+    "ssh": {
+      "$ref": "#/definitions/sshConfig",
+      "description": "Default SSH configuration for all steps in the DAG. Steps can override this configuration with their own SSH settings. Note: SSH and container configurations are mutually exclusive at the DAG level."
+    },
+    "s3": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/s3ConnectionConfig"
+        }
+      ],
+      "description": "Default S3 configuration for all S3 steps in the DAG. Steps can override this configuration with their own S3 settings. Supports AWS S3 and S3-compatible services like MinIO."
+    },
+    "llm": {
+      "$ref": "#/definitions/llmConfig",
+      "description": "Default LLM configuration for all chat steps in the DAG. Steps with type: chat inherit this configuration if they don't specify their own llm field. If a step specifies llm, it completely overrides the DAG-level configuration."
+    },
+    "steps": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/stepItem"
+          },
+          "description": "List of steps that define the DAG. Steps can be: 1) Step objects with full configuration, 2) Strings for simple commands (shorthand syntax), or 3) Nested arrays containing parallel steps that run simultaneously."
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/step"
+          },
+          "description": "Map of step names to step definitions. Steps can depend on each other, forming a directed acyclic graph."
+        }
+      ]
+    },
+    "otel": {
+      "$ref": "#/definitions/otelConfig",
+      "description": "OpenTelemetry tracing configuration for distributed tracing of DAG execution."
+    },
+    "runConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "disableParamEdit": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, prevents users from modifying DAG parameters when starting the DAG. Defaults to false (users can edit parameters)."
+        },
+        "disableRunIdEdit": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, prevents users from entering custom run IDs when starting the DAG. Defaults to false (users can enter custom run IDs)."
+        }
+      },
+      "description": "Configuration for controlling user interactions when starting DAG runs. Allows restricting parameter editing and custom run ID input."
+    },
+    "workerSelector": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Key-value pairs specifying worker label requirements for executing this DAG. The DAG will only run on workers that have all specified labels with matching values. For example: {\"gpu\": \"true\", \"memory\": \"64G\"} requires a worker with both gpu=true and memory=64G labels. This setting applies to the entire DAG; individual steps can override this with their own workerSelector."
+    },
+    "shell": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Shell command with optional arguments (e.g., '/bin/bash -e', 'bash -eo pipefail')"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Shell command as array (e.g., ['/bin/bash', '-e', '-o', 'pipefail'])"
+        }
+      ],
+      "description": "Default shell to use for all steps in this DAG. Can be specified as a string with arguments (e.g., '/bin/bash -e') which will be automatically tokenized, or as an array for explicit argument separation. If not specified, the system default shell ($SHELL or /bin/sh) is used. Can be overridden at the step level."
+    },
+    "redis": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/redisConnectionConfig"
+        }
+      ],
+      "description": "Default Redis configuration for all steps in the DAG. Steps with type: redis inherit this configuration if they don't specify their own connection settings."
+    }
+  },
+  "definitions": {
+    "secretRef": {
+      "type": "object",
+      "required": ["name", "provider", "key"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Environment variable name that will receive the secret value."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Secret provider identifier (e.g., env, file, custom providers)."
+        },
+        "key": {
+          "type": "string",
+          "description": "Provider-specific key or identifier used to look up the secret."
+        },
+        "options": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Provider-specific configuration options. Values must be strings to support serialization."
+        }
+      },
+      "description": "Reference to an external secret that Dagu resolves at runtime. The resolved value is injected as an environment variable and masked in logs/output."
+    },
+    "stepItem": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/step"
+        },
+        {
+          "type": "string",
+          "description": "Shorthand syntax: a simple command string that will be converted to a step with 'command' field"
+        },
+        {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/definitions/step"
+              },
+              {
+                "type": "string",
+                "description": "Shorthand syntax: a simple command string"
+              }
+            ]
+          },
+          "description": "Nested array representing parallel steps. All steps in this array will run simultaneously, automatically depending on the previous sequential step, and the next sequential step will depend on all of them."
+        }
+      ]
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique identifier for the step within this DAG. If omitted, Dagu will automatically generate a name."
+        },
+        "id": {
+          "type": "string",
+          "description": "Optional short identifier for the step. Can be used in variable references like ${id.stdout} to access step properties. Must be unique within the DAG if specified."
+        },
+        "description": {
+          "type": "string",
+          "description": "Brief description of what this step does. Helps document the step's purpose."
+        },
+        "workingDir": {
+          "type": "string",
+          "description": "Working directory for the step. Inherits from DAG's workingDir if not specified. Overrides DAG-level workingDir for this step."
+        },
+        "command": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Single command to execute"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": ["string", "number", "boolean"]
+              },
+              "description": "Multiple commands to execute sequentially. Each string is a separate command."
+            }
+          ],
+          "description": "Command(s) to execute. Can be a single shell command string, or an array of commands to run sequentially (stops on first failure)."
+        },
+        "shell": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Shell command with optional arguments (e.g., '/bin/bash -e', 'bash -eo pipefail')"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Shell command as array (e.g., ['/bin/bash', '-e', '-o', 'pipefail'])"
+            }
+          ],
+          "description": "Shell to use for executing the command. Can be specified as a string with arguments (e.g., '/bin/bash -e') which will be automatically tokenized, or as an array for explicit argument separation. Overrides DAG-level shell if specified. Defaults to DAG-level shell, or $SHELL/sh if not specified."
+        },
+        "shellPackages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of packages to install before executing the step. Useful for ensuring dependencies are available. It's only available when the shell is nix-shell."
+        },
+        "script": {
+          "type": "string",
+          "description": "Multi-line script content that will be executed. Gets piped into the command if specified, otherwise uses default shell."
+        },
+        "stdout": {
+          "type": "string",
+          "description": "File path where the step's standard output (stdout) will be written."
+        },
+        "stderr": {
+          "type": "string",
+          "description": "File path where the step's standard error (stderr) will be written."
+        },
+        "logOutput": {
+          "type": "string",
+          "enum": ["separate", "merged"],
+          "description": "Override DAG-level log output mode. 'separate' writes stdout to .out and stderr to .err files. 'merged' writes both to a single .log file."
+        },
+        "output": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Variable name to capture the command's stdout."
+            },
+            {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Variable name to capture the command's stdout (required)."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "Custom key for this output in outputs.json. If not specified, the variable name is converted to camelCase."
+                },
+                "omit": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "When true, excludes this output from outputs.json."
+                }
+              },
+              "required": ["name"],
+              "additionalProperties": false
+            }
+          ],
+          "description": "Variable name to capture the command's stdout. Can be a string or an object with name, key, and omit fields. This output can be referenced in subsequent steps."
+        },
+        "depends": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Name of a step that must complete successfully before this step can start."
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of step names that must complete successfully before this step can start."
+            }
+          ]
+        },
+        "continueOn": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["skipped", "failed"],
+              "description": "Shorthand: 'skipped' to continue if step is skipped, 'failed' to continue if step fails"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "failure": {
+                  "type": "boolean",
+                  "description": "Continue dag-run even if this step fails"
+                },
+                "skipped": {
+                  "type": "boolean",
+                  "description": "Continue dag-run even if this step is skipped due to preconditions"
+                },
+                "exitCode": {
+                  "oneOf": [
+                    {
+                      "type": "integer",
+                      "description": "Exit code that should be treated as successful"
+                    },
+                    {
+                      "type": "string",
+                      "description": "Exit code represented as a string (parsed as integer at runtime)"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      },
+                      "description": "List of exit codes that should be treated as successful"
+                    }
+                  ]
+                },
+                "output": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "description": "Output text or pattern that indicates success. Supports regex with 're:' prefix."
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "Output text or patterns that indicate success. Supports regex with 're:' prefix."
+                      }
+                    }
+                  ]
+                },
+                "markSuccess": {
+                  "type": "boolean",
+                  "description": "Mark the step as successful even if it technically failed but met continue conditions"
+                }
+              }
+            }
+          ],
+          "description": "Conditions under which the DAG should continue executing even if this step fails or is skipped. Can be a string ('skipped' or 'failed') or an object with detailed configuration."
+        },
+        "retryPolicy": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "oneOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "description": "Maximum number of retry attempts"
+            },
+            "intervalSec": {
+              "oneOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "description": "Seconds to wait between retry attempts"
+            },
+            "backoff": {
+              "oneOf": [
+                {
+                  "type": "boolean",
+                  "description": "When true, uses default multiplier of 2.0"
+                },
+                {
+                  "type": "number",
+                  "description": "Custom exponential backoff multiplier"
+                }
+              ],
+              "description": "Exponential backoff multiplier for retry delays"
+            },
+            "maxIntervalSec": {
+              "type": "integer",
+              "description": "Maximum interval in seconds (caps exponential growth)"
+            },
+            "exitCode": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              },
+              "description": "List of exit codes that should trigger a retry. If not specified, all non-zero exit codes will trigger a retry."
+            }
+          },
+          "description": "Configuration for automatically retrying failed steps."
+        },
+        "repeatPolicy": {
+          "type": "object",
+          "properties": {
+            "repeat": {
+              "oneOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "enum": ["while", "until"]
+                }
+              ],
+              "description": "Determines if and how the step should be repeated. Can be a boolean or a string ('while' or 'until')."
+            },
+            "intervalSec": {
+              "type": "integer",
+              "description": "Interval in seconds between repetitions"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Maximum number of times this step will be executed. Once reached, the step stops repeating regardless of other conditions."
+            },
+            "backoff": {
+              "oneOf": [
+                {
+                  "type": "boolean",
+                  "description": "When true, uses default multiplier of 2.0"
+                },
+                {
+                  "type": "number",
+                  "description": "Custom exponential backoff multiplier"
+                }
+              ],
+              "description": "Exponential backoff multiplier for repeat delays"
+            },
+            "maxIntervalSec": {
+              "type": "integer",
+              "description": "Maximum interval in seconds (caps exponential growth)"
+            },
+            "condition": {
+              "type": "string",
+              "description": "Command or expression to evaluate for repeat-until. Can include shell commands, environment variables, or command substitutions."
+            },
+            "expected": {
+              "type": "string",
+              "description": "Expected value or pattern to match against the condition result. Supports regex patterns with 're:' prefix."
+            },
+            "exitCode": {
+              "oneOf": [
+                { "type": "integer" },
+                { "type": "array", "items": { "type": "integer" } }
+              ],
+              "description": "Exit code or list of exit codes that will stop repetition. If not specified, all non-zero exit codes will trigger repetition."
+            }
+          },
+          "description": "Configuration for repeatedly executing this step at fixed intervals or until a condition is met. Supports string matching, command substitution, and exit code checks."
+        },
+        "mailOnError": {
+          "type": "boolean",
+          "description": "Send an email notification if this specific step fails."
+        },
+        "precondition": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/condition"
+              }
+            }
+          ],
+          "description": "Conditions that must be met before this step can run. Supports command exit codes, environment variables, and regex matching."
+        },
+        "preconditions": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/condition"
+              }
+            }
+          ],
+          "description": "Alternative name for precondition. Works exactly the same way."
+        },
+        "signalOnStop": {
+          "type": "string",
+          "description": "Signal to send when stopping this step (e.g., SIGINT). If empty, uses same signal as parent process."
+        },
+        "timeoutSec": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum execution time for the step in seconds. If set, this timeout takes precedence over the DAG-level timeout for this step."
+        },
+        "call": {
+          "type": "string",
+          "description": "Name of a DAG to execute as a sub dag-run."
+        },
+        "params": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Space-separated positional parameters accessible as $1, $2, etc."
+            },
+            {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                ]
+              },
+              "description": "Named parameters as key-value pairs"
+            },
+            {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Named parameters as key-value pairs"
+            }
+          ],
+          "description": "Parameters for the step. Supports three formats: 1) String format: space-separated positional parameters (e.g., 'arg1 arg2') accessible as $1, $2. 2) Array format: named parameters as key-value objects preserving rich types (numbers, booleans, nested objects). 3) Object format: named parameters as simple key-value pairs. For sub-DAG execution (when 'call' or 'run' is specified), these are passed to the sub DAG and accessible as ${KEY}. For 'gha' executor, these are passed as action inputs (the 'with:' section in GitHub Actions syntax). Rich types are preserved when passing to executors that support them."
+        },
+        "parallel": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Variable containing array of items to process in parallel"
+            },
+            {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                ]
+              },
+              "description": "Array of items to process in parallel"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "description": "Variable containing array of items"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": true
+                          }
+                        ]
+                      },
+                      "description": "Array of items to process in parallel"
+                    }
+                  ]
+                },
+                "maxConcurrent": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000,
+                  "default": 10,
+                  "description": "Maximum number of concurrent executions (default: 10, maximum: 1000)"
+                }
+              },
+              "required": ["items"],
+              "additionalProperties": false,
+              "description": "Parallel execution configuration with concurrency control"
+            }
+          ],
+          "description": "Configuration for parallel execution of sub DAGs. Only applicable when 'run' is specified. Allows processing multiple items concurrently using the same workflow definition."
+        },
+        "workerSelector": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Key-value pairs specifying worker label requirements for executing this step. The step will only run on workers that have all specified labels with matching values. For example: {\"gpu\": \"true\", \"memory\": \"64G\"} requires a worker with both gpu=true and memory=64G labels."
+        },
+        "env": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Map format: {KEY: value}"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*=.*$",
+                    "description": "Key=Value format: 'KEY=value'"
+                  }
+                ]
+              },
+              "description": "Array of environment variable definitions (map format or Key=Value strings)"
+            },
+            {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Map format: {KEY1: value1, KEY2: value2}"
+            }
+          ],
+          "description": "Environment variables specific to this step. These override DAG-level environment variables with the same name. Supports three formats: 1) Map format: env: {KEY: value}, 2) Array of maps: env: [{KEY: value}], 3) Array of Key=Value strings: env: ['KEY=value'] (Docker/docker-compose compatible). Can use shell expansions (${VAR}), references to other environment variables, or command substitutions (`cmd`). When used with 'container' field, these are merged with container.env."
+        },
+        "container": {
+          "$ref": "#/definitions/container",
+          "description": "Container configuration for this step. When specified, the step runs in its own container instead of the DAG-level container. Uses the same configuration format as the DAG-level container field. Note: Cannot be used together with 'executor'."
+        },
+        "type": {
+          "$ref": "#/definitions/executorType",
+          "description": "Executor type for this step. This is the new format replacing executor.type. Cannot be used together with 'executor' field."
+        },
+        "config": {
+          "$ref": "#/definitions/executorConfig",
+          "description": "Executor-specific configuration. This is the new format replacing executor.config. Cannot be used together with 'executor' field."
+        },
+        "llm": {
+          "$ref": "#/definitions/llmConfig",
+          "description": "LLM configuration for AI-powered steps. Required when type is 'chat' (or future type: agent)."
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/llmMessage"
+          },
+          "description": "Conversation messages for chat steps. Only valid when type is 'chat'. Supports variable substitution with ${VAR}."
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of tool DAG names available to the LLM for function calling. Only valid when type is 'chat'. Tools are other DAGs that can be called by the LLM to perform specific tasks."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "http" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/httpExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "ssh" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/sshExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "enum": ["docker", "container"] } }
+          },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/dockerExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "mail" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/mailExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "jq" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/jqExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "enum": ["gha", "github_action", "github-action"] }
+            }
+          },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/ghaExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "archive" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/archiveExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "postgres" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/postgresExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "sqlite" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/sqliteExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "hitl" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/hitlExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "redis" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/redisExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "s3" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/s3ExecutorConfig" }
+            }
+          }
+        }
+      ]
+    },
+    "condition": {
+      "type": "object",
+      "properties": {
+        "condition": {
+          "type": "string",
+          "description": "Command or expression to evaluate. Can include shell commands, environment variables, or command substitutions with backticks."
+        },
+        "command": {
+          "type": "string",
+          "description": "Deprecated alias for condition. Still accepted for backward compatibility."
+        },
+        "expected": {
+          "type": "string",
+          "description": "Expected value or pattern to match against the condition result. Supports regex patterns with 're:' prefix (e.g., 're:0[1-9]' for matching numbers 01-09)."
+        },
+        "negate": {
+          "type": "boolean",
+          "description": "If true, inverts the condition result. The DAG/step will run when the condition does NOT match the expected value."
+        }
+      },
+      "description": "Defines a condition that must be met before execution. Used in preconditions at both DAG and step levels."
+    },
+    "mailConfig": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "type": "string",
+          "description": "Email address to use as the sender address for notifications."
+        },
+        "to": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Single email address to receive notifications."
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of email addresses to receive notifications."
+            }
+          ],
+          "description": "Email address(es) to receive notifications. Can be a single string or an array of strings."
+        },
+        "prefix": {
+          "type": "string",
+          "description": "Text to prepend to the email subject line. Useful for filtering or categorizing notification emails."
+        },
+        "attachLogs": {
+          "type": "boolean",
+          "description": "When true, relevant log files will be attached to the notification email."
+        }
+      },
+      "description": "Configuration for email notifications, used by errorMail and infoMail settings."
+    },
+    "otelConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable or disable OpenTelemetry tracing for this DAG. When false, no traces will be exported."
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "OTLP endpoint URL for exporting traces. Supports both gRPC (e.g., http://localhost:4317) and HTTP (e.g., http://localhost:4318/v1/traces) protocols."
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Custom headers to include with OTLP export requests. Useful for authentication (e.g., Authorization: Bearer token)."
+        },
+        "insecure": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip TLS certificate verification when connecting to the OTLP endpoint. Only use in development environments."
+        },
+        "timeout": {
+          "type": "string",
+          "description": "Timeout for exporting traces to the OTLP endpoint. Accepts duration strings like '30s', '1m', '5m'."
+        },
+        "resource": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "service.name": {
+              "type": "string",
+              "description": "Service name for the traces. Defaults to 'dagu' if not specified. Can use variables like ${DAG_NAME}."
+            },
+            "service.version": {
+              "type": "string",
+              "description": "Version of the service producing the traces."
+            },
+            "deployment.environment": {
+              "type": "string",
+              "description": "Deployment environment (e.g., production, staging, development)."
+            }
+          },
+          "description": "Resource attributes to attach to all spans. Common attributes include service.name, service.version, and deployment.environment."
+        }
+      },
+      "description": "OpenTelemetry configuration for distributed tracing. Enables detailed execution traces for DAGs and steps, providing visibility into workflow performance and debugging."
+    },
+    "container": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Name of an existing running container to exec into. Dagu waits up to 120 seconds for the container to be in running state; fails if not running within timeout."
+        },
+        {
+          "$ref": "#/definitions/containerConfig"
+        }
+      ],
+      "description": "Container configuration. Can be either a string (name of existing container to exec into) or an object (container configuration with image or exec field)."
+    },
+    "containerConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": { "startup": { "const": "command" } },
+            "required": ["startup"]
+          },
+          "then": {
+            "required": ["command"],
+            "properties": {
+              "command": { "minItems": 1 }
+            }
+          }
+        }
+      ],
+      "oneOf": [
+        {
+          "required": ["exec"],
+          "not": { "required": ["image"] }
+        },
+        {
+          "required": ["image"],
+          "not": { "required": ["exec"] }
+        }
+      ],
+      "properties": {
+        "exec": {
+          "type": "string",
+          "description": "Name of an existing running container to exec into. Dagu waits up to 120 seconds for the container to be running; fails if not running within timeout. Mutually exclusive with 'image'. When used, only 'user', 'workingDir', and 'env' are applicable."
+        },
+        "name": {
+          "type": "string",
+          "description": "Custom container name. If empty, Docker generates a random name. Must be unique - if a container with this name already exists (running or stopped), the DAG will fail. Not applicable in exec mode."
+        },
+        "image": {
+          "type": "string",
+          "description": "Container image to use (e.g., 'python:3.11', 'node:20'). Mutually exclusive with 'exec'."
+        },
+        "pullPolicy": {
+          "oneOf": [
+            {
+              "type": "boolean",
+              "description": "Boolean shorthand: true = 'always', false = 'never'"
+            },
+            {
+              "type": "string",
+              "enum": ["always", "never", "missing"],
+              "description": "String policy: 'always' pulls the image every time, 'never' uses only local images, 'missing' pulls only if not present locally"
+            }
+          ],
+          "default": "missing",
+          "description": "Image pull policy. Accepts boolean (true='always', false='never') or string ('always', 'never', 'missing'). Default is 'missing'. Not applicable in exec mode."
+        },
+        "env": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*=.*$"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": true
+            }
+          ],
+          "description": "Environment variables to set in the container. Supports maps or arrays combining maps and KEY=value strings. Values can include variable expansion (e.g., 'API_KEY=${API_KEY}')."
+        },
+        "volumes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Volume mounts for the container. Format: 'host_path:container_path[:mode]' where mode is 'ro' for read-only or 'rw' (default) for read-write. Relative paths (starting with './' or '.') are resolved relative to the DAG's workingDir. Not applicable in exec mode."
+        },
+        "user": {
+          "type": "string",
+          "description": "User (and optionally group) to run the container as. Format: 'user' or 'user:group' (e.g., '1000' or '1000:1000')."
+        },
+        "workingDir": {
+          "type": "string",
+          "description": "Working directory inside the container. Commands will be executed from this directory."
+        },
+        "platform": {
+          "type": "string",
+          "description": "Platform for the container (e.g., 'linux/amd64', 'linux/arm64'). Useful for ensuring compatibility on different architectures. Not applicable in exec mode."
+        },
+        "ports": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ports to expose from the container. Format: 'host_port:container_port' or just 'container_port'. Not applicable in exec mode."
+        },
+        "network": {
+          "type": "string",
+          "description": "Network mode for the container (e.g., 'host', 'bridge', 'none', or a custom network name). Not applicable in exec mode."
+        },
+        "startup": {
+          "type": "string",
+          "enum": ["keepalive", "entrypoint", "command"],
+          "default": "keepalive",
+          "description": "Startup mode for the DAG-level container: 'keepalive' uses an internal keepalive/sleep, 'entrypoint' honors the image's ENTRYPOINT/CMD, 'command' runs the provided command array. Not applicable in exec mode."
+        },
+        "command": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Command to execute when startup is 'command'. Must be a non-empty array. Not applicable in exec mode."
+        },
+        "waitFor": {
+          "type": "string",
+          "enum": ["running", "healthy"],
+          "default": "running",
+          "description": "Readiness condition before steps execute: 'running' waits for container to run; 'healthy' waits for Docker healthcheck to report healthy. Not applicable in exec mode."
+        },
+        "logPattern": {
+          "type": "string",
+          "description": "Optional regex; if set, waits for this pattern to appear in container logs before steps run. Not applicable in exec mode."
+        },
+        "restartPolicy": {
+          "type": "string",
+          "description": "Docker restart policy for the container: 'no', 'always', or 'unless-stopped'. Not applicable in exec mode."
+        },
+        "keepContainer": {
+          "type": "boolean",
+          "default": false,
+          "description": "Keep the container running after the step completes. Useful for debugging or when running services that need to persist between steps. Not applicable in exec mode."
+        },
+        "healthcheck": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "test": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1,
+              "description": "Command to run to check health. Must start with 'NONE' (disable healthcheck), 'CMD' (run command directly), or 'CMD-SHELL' (run command in shell). Examples: ['CMD', 'pg_isready', '-U', 'postgres'] or ['CMD-SHELL', 'curl -f http://localhost/ || exit 1']."
+            },
+            "interval": {
+              "type": "string",
+              "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$",
+              "description": "Time between health checks (e.g., '5s', '1m'). Default is 30s."
+            },
+            "timeout": {
+              "type": "string",
+              "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$",
+              "description": "Maximum time to wait for a health check to complete (e.g., '3s', '10s'). Default is 30s."
+            },
+            "startPeriod": {
+              "type": "string",
+              "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$",
+              "description": "Grace period for the container to initialize before health checks start counting failures (e.g., '10s', '1m'). Default is 0s."
+            },
+            "retries": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of consecutive failures needed to mark the container as unhealthy. Default is 3."
+            }
+          },
+          "required": ["test"],
+          "description": "Custom healthcheck configuration for the container. Allows 'waitFor: healthy' to work with images that don't have built-in healthchecks (e.g., postgres, mysql). Not applicable in exec mode."
+        },
+        "shell": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "Shell wrapper for executing step commands. Format: first element is the shell executable, remaining elements are flags, and the step command is appended as the final argument. Example: [\"/bin/bash\", \"-o\", \"errexit\", \"-c\"]. The '-c' flag (or equivalent) should be the last flag. Works in both exec and image modes."
+        }
+      },
+      "description": "Container configuration object. Either 'exec' (to run in an existing container) or 'image' (to create a new container) must be specified, but not both."
+    },
+    "sshConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user": {
+          "type": "string",
+          "description": "SSH username for authentication."
+        },
+        "host": {
+          "type": "string",
+          "description": "Hostname or IP address of the SSH server."
+        },
+        "port": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "default": "22",
+          "description": "SSH port number. Defaults to 22."
+        },
+        "key": {
+          "type": "string",
+          "description": "Path to the SSH private key file. If not specified, defaults are tried: ~/.ssh/id_rsa, ~/.ssh/id_ecdsa, ~/.ssh/id_ed25519, ~/.ssh/id_dsa."
+        },
+        "password": {
+          "type": "string",
+          "description": "SSH password for authentication (not recommended; prefer key-based auth)."
+        },
+        "strictHostKey": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable strict host key checking. When true (default), verifies the server's host key against known_hosts. Set to false only for testing."
+        },
+        "knownHostFile": {
+          "type": "string",
+          "default": "~/.ssh/known_hosts",
+          "description": "Path to the known_hosts file for host key verification. Defaults to ~/.ssh/known_hosts."
+        },
+        "shell": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Shell command with optional arguments (e.g., '/bin/bash -e')."
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Shell command expressed as an array for explicit argument separation (e.g., ['/bin/bash', '-e', '-o', 'pipefail'])."
+            }
+          ],
+          "description": "Shell for remote command execution. Commands are wrapped as: shell -c 'command'. Providing arguments (via string or array form) enables shell features like variable expansion, pipes, and command chaining on the remote server."
+        }
+      },
+      "required": ["user", "host"],
+      "description": "SSH configuration for remote command execution. Can be specified at DAG level for reuse across steps, or at step level for specific overrides. Password authentication is supported but key-based auth is recommended."
+    },
+    "s3ConnectionConfig": {
+      "type": "object",
+      "properties": {
+        "region": {
+          "type": "string",
+          "description": "AWS region (e.g., 'us-east-1', 'eu-west-1'). If not specified, uses AWS SDK default resolution."
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "Custom S3-compatible endpoint URL. Use for MinIO, LocalStack, or other S3-compatible services (e.g., 'http://localhost:9000')."
+        },
+        "accessKeyId": {
+          "type": "string",
+          "description": "AWS access key ID. Supports environment variable expansion (e.g., '${AWS_ACCESS_KEY_ID}')."
+        },
+        "secretAccessKey": {
+          "type": "string",
+          "description": "AWS secret access key. Supports environment variable expansion (e.g., '${AWS_SECRET_ACCESS_KEY}')."
+        },
+        "sessionToken": {
+          "type": "string",
+          "description": "AWS session token for temporary credentials. Supports environment variable expansion."
+        },
+        "profile": {
+          "type": "string",
+          "description": "AWS credentials profile name from ~/.aws/credentials."
+        },
+        "bucket": {
+          "type": "string",
+          "description": "Default S3 bucket name. Can be overridden at step level."
+        },
+        "forcePathStyle": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use path-style addressing (bucket in path instead of subdomain). Required for most S3-compatible services like MinIO."
+        },
+        "disableSSL": {
+          "type": "boolean",
+          "default": false,
+          "description": "Disable SSL/TLS for connections. Only use for local development with non-TLS endpoints."
+        }
+      },
+      "description": "Common S3 connection configuration shared between DAG-level and step-level S3 settings."
+    },
+    "s3ExecutorConfig": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/s3ConnectionConfig"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "description": "S3 object key (path). Required for upload, download, and single-object delete operations."
+            },
+            "source": {
+              "type": "string",
+              "description": "Local file path for upload operations. Required for 'upload' command."
+            },
+            "destination": {
+              "type": "string",
+              "description": "Local file path for download operations. Required for 'download' command."
+            },
+            "prefix": {
+              "type": "string",
+              "description": "S3 key prefix for list and batch delete operations."
+            },
+            "contentType": {
+              "type": "string",
+              "description": "Content-Type header for uploaded objects. Auto-detected from file extension if not specified."
+            },
+            "storageClass": {
+              "type": "string",
+              "enum": [
+                "STANDARD",
+                "REDUCED_REDUNDANCY",
+                "STANDARD_IA",
+                "ONEZONE_IA",
+                "INTELLIGENT_TIERING",
+                "GLACIER",
+                "DEEP_ARCHIVE",
+                "GLACIER_IR"
+              ],
+              "description": "S3 storage class for uploaded objects."
+            },
+            "metadata": {
+              "type": "object",
+              "additionalProperties": { "type": "string" },
+              "description": "Custom metadata key-value pairs for uploaded objects."
+            },
+            "tags": {
+              "type": "object",
+              "additionalProperties": { "type": "string" },
+              "description": "S3 object tags as key-value pairs."
+            },
+            "sse": {
+              "type": "string",
+              "enum": ["AES256", "aws:kms"],
+              "description": "Server-side encryption algorithm."
+            },
+            "sseKmsKeyId": {
+              "type": "string",
+              "description": "KMS key ID for SSE-KMS encryption."
+            },
+            "acl": {
+              "type": "string",
+              "enum": [
+                "private",
+                "public-read",
+                "public-read-write",
+                "authenticated-read",
+                "aws-exec-read",
+                "bucket-owner-read",
+                "bucket-owner-full-control"
+              ],
+              "description": "Canned ACL for uploaded objects."
+            },
+            "partSize": {
+              "type": "integer",
+              "minimum": 5,
+              "default": 10,
+              "description": "Part size in MB for multipart uploads. Minimum 5MB. Default: 10MB."
+            },
+            "concurrency": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 5,
+              "description": "Number of concurrent upload/download parts. Default: 5."
+            },
+            "maxKeys": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 1000,
+              "description": "Maximum keys to return per list request. Default: 1000."
+            },
+            "delimiter": {
+              "type": "string",
+              "description": "Delimiter for grouping keys in list operations (e.g., '/')."
+            },
+            "recursive": {
+              "type": "boolean",
+              "default": false,
+              "description": "Recursively list all objects under prefix. Default: false."
+            },
+            "outputFormat": {
+              "type": "string",
+              "enum": ["json", "jsonl"],
+              "default": "json",
+              "description": "Output format for list results. Default: json."
+            },
+            "quiet": {
+              "type": "boolean",
+              "default": false,
+              "description": "Suppress output for delete operations. Default: false."
+            }
+          }
+        }
+      ],
+      "description": "S3 executor configuration. Command specifies the operation: upload, download, list, or delete."
+    },
+    "httpExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeout": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Request timeout in seconds. If exceeded, the request is cancelled."
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "HTTP headers to include in the request. Key-value pairs where values are strings."
+        },
+        "query": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Query parameters to append to the URL. Key-value pairs where values are strings."
+        },
+        "body": {
+          "type": "string",
+          "description": "Request body content. Can be JSON, XML, or plain text depending on Content-Type header."
+        },
+        "silent": {
+          "type": "boolean",
+          "description": "When true, suppresses response headers and status in output on success."
+        },
+        "debug": {
+          "type": "boolean",
+          "description": "Enable debug mode to log detailed request/response information."
+        },
+        "json": {
+          "type": "boolean",
+          "description": "When true, formats output as JSON including status_code, headers, and parsed body."
+        },
+        "skipTLSVerify": {
+          "type": "boolean",
+          "description": "Skip TLS certificate verification. WARNING: Only use for testing with self-signed certificates."
+        }
+      },
+      "description": "Configuration options for HTTP executor requests."
+    },
+    "sshExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user": {
+          "type": "string",
+          "description": "SSH username for authentication. Required."
+        },
+        "host": {
+          "type": "string",
+          "description": "Hostname or IP address of the SSH server. Required."
+        },
+        "ip": {
+          "type": "string",
+          "description": "Alias for 'host'. IP address of the SSH server."
+        },
+        "port": {
+          "oneOf": [{ "type": "string" }, { "type": "integer" }],
+          "default": "22",
+          "description": "SSH port number. Defaults to 22."
+        },
+        "key": {
+          "type": "string",
+          "description": "Path to SSH private key file. If not specified, defaults are tried: ~/.ssh/id_rsa, ~/.ssh/id_ecdsa, ~/.ssh/id_ed25519, ~/.ssh/id_dsa."
+        },
+        "password": {
+          "type": "string",
+          "description": "SSH password for authentication. Not recommended; prefer key-based authentication."
+        },
+        "strictHostKey": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable strict host key checking. When true (default), verifies server's host key against known_hosts."
+        },
+        "knownHostFile": {
+          "type": "string",
+          "default": "~/.ssh/known_hosts",
+          "description": "Path to known_hosts file for host key verification."
+        },
+        "shell": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Shell command with optional arguments (e.g., '/bin/bash -e')."
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Shell command expressed as an array for explicit argument separation (e.g., ['/bin/bash', '-e', '-o', 'pipefail'])."
+            }
+          ],
+          "description": "Shell for remote command execution. Commands are wrapped as: shell -c 'command'. Providing arguments (via string or array form) enables shell features like variable expansion, pipes, and command chaining on the remote server."
+        }
+      },
+      "description": "SSH executor configuration for remote command execution."
+    },
+    "dockerExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "Docker image to use for creating a new container (e.g., 'python:3.11', 'alpine:latest')."
+        },
+        "containerName": {
+          "type": "string",
+          "description": "Name or ID of an existing container to exec into. Use this instead of image to run commands in an existing container."
+        },
+        "platform": {
+          "type": "string",
+          "description": "Target platform for the container (e.g., 'linux/amd64', 'linux/arm64')."
+        },
+        "pull": {
+          "oneOf": [
+            {
+              "type": "boolean",
+              "description": "Boolean shorthand: true = 'always', false = 'never'"
+            },
+            {
+              "type": "string",
+              "enum": ["always", "never", "missing"],
+              "description": "Pull policy string"
+            }
+          ],
+          "default": "missing",
+          "description": "Image pull policy. 'always' pulls every time, 'never' uses only local, 'missing' pulls if not present."
+        },
+        "autoRemove": {
+          "oneOf": [{ "type": "boolean" }, { "type": "string" }],
+          "description": "Automatically remove the container after it exits."
+        },
+        "workingDir": {
+          "type": "string",
+          "description": "Working directory inside the container. Shortcut that maps to container.WorkingDir."
+        },
+        "volumes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Volume mounts. Format: 'host_path:container_path[:mode]'. Shortcut that maps to host.Binds."
+        },
+        "container": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Docker container configuration (docker/api/types/container.Config). See Docker API documentation."
+        },
+        "host": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Docker host configuration (docker/api/types/container.HostConfig). See Docker API documentation."
+        },
+        "network": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Docker network configuration (docker/api/types/network.NetworkingConfig). See Docker API documentation."
+        },
+        "exec": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Docker exec options (docker/api/types/container.ExecOptions). Only valid with containerName."
+        }
+      },
+      "description": "Docker executor configuration for running commands in containers."
+    },
+    "mailExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "subject", "message"],
+      "properties": {
+        "from": {
+          "type": "string",
+          "description": "Sender email address. Required."
+        },
+        "to": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Single recipient email address"
+            },
+            {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "List of recipient email addresses"
+            }
+          ],
+          "description": "Recipient email address(es). Required."
+        },
+        "subject": {
+          "type": "string",
+          "description": "Email subject line. Required."
+        },
+        "message": {
+          "type": "string",
+          "description": "Email body content. Required."
+        },
+        "attachments": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of file paths to attach to the email."
+        }
+      },
+      "description": "Configuration for sending emails via the mail executor."
+    },
+    "jqExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "raw": {
+          "type": "boolean",
+          "description": "When true, outputs values without JSON formatting. Strings are printed without quotes, nulls print empty lines."
+        }
+      },
+      "description": "Configuration for JQ JSON query executor."
+    },
+    "ghaExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "runner": {
+          "type": "string",
+          "default": "node:24-bookworm",
+          "description": "Docker image to use as the runner for executing the GitHub Action."
+        },
+        "autoRemove": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically remove containers after execution."
+        },
+        "network": {
+          "type": "string",
+          "description": "Docker network mode (e.g., 'host', 'bridge', or custom network name)."
+        },
+        "githubInstance": {
+          "type": "string",
+          "default": "github.com",
+          "description": "GitHub instance hostname for action resolution. Use for GitHub Enterprise."
+        },
+        "dockerSocket": {
+          "type": "string",
+          "description": "Custom Docker socket path. Leave empty for default."
+        },
+        "artifacts": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Path for artifact server storage."
+            },
+            "port": {
+              "type": "string",
+              "description": "Port for artifact server."
+            }
+          },
+          "description": "Artifact server configuration for GitHub Actions."
+        },
+        "reuseContainers": {
+          "type": "boolean",
+          "default": false,
+          "description": "Reuse containers between runs for faster execution."
+        },
+        "forceRebuild": {
+          "type": "boolean",
+          "default": false,
+          "description": "Force rebuild of action images."
+        },
+        "containerOptions": {
+          "type": "string",
+          "description": "Additional Docker run options as a string."
+        },
+        "privileged": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run containers in privileged mode. WARNING: Security risk, avoid in production."
+        },
+        "capabilities": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "add": {
+              "oneOf": [
+                { "type": "string" },
+                { "type": "array", "items": { "type": "string" } }
+              ],
+              "description": "Linux capabilities to add to the container."
+            },
+            "drop": {
+              "oneOf": [
+                { "type": "string" },
+                { "type": "array", "items": { "type": "string" } }
+              ],
+              "description": "Linux capabilities to drop from the container."
+            }
+          },
+          "description": "Linux capabilities configuration for container security."
+        }
+      },
+      "description": "Configuration for running GitHub Actions locally using nektos/act."
+    },
+    "archiveExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Source path for archive operations. Required for all operations."
+        },
+        "destination": {
+          "type": "string",
+          "description": "Destination path for archive operations. Required for 'create' operation (unless dryRun)."
+        },
+        "format": {
+          "type": "string",
+          "description": "Archive format (auto-detected from extension if not specified). Supports: tar, tar.gz, tar.bz2, zip, etc."
+        },
+        "compressionLevel": {
+          "type": "integer",
+          "default": -1,
+          "description": "Compression level. -1 for default, 0 for no compression, 1-9 for gzip/bzip2 levels."
+        },
+        "password": {
+          "type": "string",
+          "description": "Password for encrypted archives. Only supported for extract/list operations."
+        },
+        "overwrite": {
+          "type": "boolean",
+          "description": "Overwrite existing files during extraction."
+        },
+        "preservePaths": {
+          "type": "boolean",
+          "default": true,
+          "description": "Preserve directory structure in archive."
+        },
+        "stripComponents": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of leading path components to strip during extraction."
+        },
+        "include": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Glob patterns for files to include. If specified, only matching files are processed."
+        },
+        "exclude": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Glob patterns for files to exclude."
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Simulate the operation without making changes."
+        },
+        "verbose": {
+          "type": "boolean",
+          "description": "Enable verbose output showing processed files."
+        },
+        "followSymlinks": {
+          "type": "boolean",
+          "description": "Follow symbolic links when creating archives."
+        },
+        "verifyIntegrity": {
+          "type": "boolean",
+          "description": "Verify archive integrity after creation."
+        },
+        "continueOnError": {
+          "type": "boolean",
+          "description": "Continue processing even if individual files fail."
+        }
+      },
+      "description": "Configuration for archive operations (create, extract, list)."
+    },
+    "sqlImportConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputFile", "table"],
+      "properties": {
+        "inputFile": {
+          "type": "string",
+          "description": "Path to input file (CSV, TSV, or JSONL). Required."
+        },
+        "table": {
+          "type": "string",
+          "description": "Target table name. Required."
+        },
+        "format": {
+          "type": "string",
+          "enum": ["csv", "tsv", "jsonl"],
+          "description": "Input format. Auto-detected from file extension if not specified."
+        },
+        "hasHeader": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether first row is a header row. Default: true for CSV/TSV files."
+        },
+        "delimiter": {
+          "type": "string",
+          "description": "Field delimiter. Default: ',' for csv, '\\t' for tsv."
+        },
+        "columns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Explicit column names. Overrides header row if specified."
+        },
+        "nullValues": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Values to treat as NULL. Default: ['', 'NULL', 'null', '\\N']."
+        },
+        "batchSize": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1000,
+          "description": "Number of rows per INSERT statement. Default: 1000."
+        },
+        "onConflict": {
+          "type": "string",
+          "enum": ["error", "ignore", "replace"],
+          "default": "error",
+          "description": "Conflict handling strategy. Default: 'error'. For PostgreSQL, 'replace' requires 'conflictTarget' to perform UPSERT (ON CONFLICT DO UPDATE); without it, falls back to DO NOTHING. SQLite uses INSERT OR REPLACE which replaces the entire row."
+        },
+        "skipRows": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Skip first N data rows."
+        },
+        "maxRows": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum rows to import. 0 = unlimited."
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Validate without actually importing data."
+        }
+      },
+      "description": "Configuration for importing data from CSV/TSV/JSONL files into a database table."
+    },
+    "postgresExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dsn"],
+      "properties": {
+        "dsn": {
+          "type": "string",
+          "description": "PostgreSQL connection string. Format: postgres://user:pass@host:port/dbname?sslmode=disable"
+        },
+        "maxOpenConns": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5,
+          "description": "Maximum number of open connections. Default: 5."
+        },
+        "maxIdleConns": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 2,
+          "description": "Maximum number of idle connections. Default: 2."
+        },
+        "connMaxLifetime": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 300,
+          "description": "Maximum connection lifetime in seconds. 0 = no limit. Default: 300."
+        },
+        "params": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Named parameters as map (e.g., {name: 'value'}). Use :name in query."
+            },
+            {
+              "type": "array",
+              "items": {},
+              "description": "Positional parameters as array. Use $1, $2, etc. in query."
+            }
+          ],
+          "description": "Query parameters for SQL injection prevention."
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 60,
+          "description": "Query timeout in seconds. Default: 60."
+        },
+        "transaction": {
+          "type": "boolean",
+          "description": "Wrap execution in a transaction."
+        },
+        "isolationLevel": {
+          "type": "string",
+          "enum": [
+            "default",
+            "read_committed",
+            "repeatable_read",
+            "serializable"
+          ],
+          "description": "Transaction isolation level."
+        },
+        "advisoryLock": {
+          "type": "string",
+          "description": "Named advisory lock. Prevents concurrent execution across distributed workers."
+        },
+        "outputFormat": {
+          "type": "string",
+          "enum": ["jsonl", "json", "csv"],
+          "default": "jsonl",
+          "description": "Output format for query results. Default: jsonl."
+        },
+        "headers": {
+          "type": "boolean",
+          "description": "Include headers in CSV output."
+        },
+        "nullString": {
+          "type": "string",
+          "default": "null",
+          "description": "String representation for NULL values. Default: 'null'."
+        },
+        "maxRows": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum rows to return. 0 = unlimited."
+        },
+        "streaming": {
+          "type": "boolean",
+          "description": "Stream results to file instead of stdout."
+        },
+        "outputFile": {
+          "type": "string",
+          "description": "File path for streaming output."
+        },
+        "import": {
+          "$ref": "#/definitions/sqlImportConfig",
+          "description": "Import data from CSV/TSV/JSONL file into a table."
+        }
+      },
+      "description": "PostgreSQL executor configuration for database operations."
+    },
+    "sqliteExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dsn"],
+      "properties": {
+        "dsn": {
+          "type": "string",
+          "description": "SQLite connection string. Format: file:./path/to/db.sqlite or :memory: for in-memory database."
+        },
+        "maxOpenConns": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5,
+          "description": "Maximum number of open connections. Default: 5. Recommended: 1 for SQLite."
+        },
+        "maxIdleConns": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 2,
+          "description": "Maximum number of idle connections. Default: 2."
+        },
+        "params": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Named parameters as map (e.g., {name: 'value'}). Use :name in query."
+            },
+            {
+              "type": "array",
+              "items": {},
+              "description": "Positional parameters as array. Use ? placeholders in query."
+            }
+          ],
+          "description": "Query parameters for SQL injection prevention."
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 60,
+          "description": "Query timeout in seconds. Default: 60."
+        },
+        "transaction": {
+          "type": "boolean",
+          "description": "Wrap execution in a transaction."
+        },
+        "fileLock": {
+          "type": "boolean",
+          "description": "Use file locking for exclusive database access. Creates a .lock file."
+        },
+        "outputFormat": {
+          "type": "string",
+          "enum": ["jsonl", "json", "csv"],
+          "default": "jsonl",
+          "description": "Output format for query results. Default: jsonl."
+        },
+        "headers": {
+          "type": "boolean",
+          "description": "Include headers in CSV output."
+        },
+        "nullString": {
+          "type": "string",
+          "default": "null",
+          "description": "String representation for NULL values. Default: 'null'."
+        },
+        "maxRows": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum rows to return. 0 = unlimited."
+        },
+        "streaming": {
+          "type": "boolean",
+          "description": "Stream results to file instead of stdout."
+        },
+        "outputFile": {
+          "type": "string",
+          "description": "File path for streaming output."
+        },
+        "import": {
+          "$ref": "#/definitions/sqlImportConfig",
+          "description": "Import data from CSV/TSV/JSONL file into a table."
+        }
+      },
+      "description": "SQLite executor configuration for database operations. Uses pure Go SQLite with automatic pragmas: foreign_keys=ON, busy_timeout=5000."
+    },
+    "redisConnectionConfig": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Redis connection URL (redis://[user:pass@]host:port[/db]). Alternative to host/port."
+        },
+        "host": {
+          "type": "string",
+          "default": "localhost",
+          "description": "Redis server hostname. Required if URL not provided."
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 6379,
+          "description": "Redis server port. Default: 6379."
+        },
+        "password": {
+          "type": "string",
+          "description": "Authentication password."
+        },
+        "username": {
+          "type": "string",
+          "description": "ACL username (Redis 6+)."
+        },
+        "db": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15,
+          "default": 0,
+          "description": "Database number (0-15). Default: 0."
+        },
+        "tls": {
+          "type": "boolean",
+          "description": "Enable TLS connection."
+        },
+        "tlsCert": {
+          "type": "string",
+          "description": "Client certificate path for mTLS."
+        },
+        "tlsKey": {
+          "type": "string",
+          "description": "Client key path for mTLS. Must be provided with tlsCert."
+        },
+        "tlsCA": {
+          "type": "string",
+          "description": "CA certificate path for TLS verification."
+        },
+        "tlsSkipVerify": {
+          "type": "boolean",
+          "description": "Skip TLS certificate verification. WARNING: Only use for testing."
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["standalone", "sentinel", "cluster"],
+          "default": "standalone",
+          "description": "Connection mode. Default: standalone."
+        },
+        "sentinelMaster": {
+          "type": "string",
+          "description": "Sentinel master name. Required when mode is 'sentinel'."
+        },
+        "sentinelAddrs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Sentinel server addresses. Required when mode is 'sentinel'."
+        },
+        "clusterAddrs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Cluster node addresses. Required when mode is 'cluster'."
+        },
+        "maxRetries": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 3,
+          "description": "Maximum retry attempts. Default: 3."
+        }
+      },
+      "description": "Common Redis connection configuration shared between DAG-level and step-level Redis settings."
+    },
+    "redisExecutorConfig": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/redisConnectionConfig"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "command": {
+              "type": "string",
+              "description": "Redis command to execute (e.g., 'GET', 'SET', 'HSET'). Required unless using script/pipeline."
+            },
+            "key": {
+              "type": "string",
+              "description": "Primary key for the command."
+            },
+            "keys": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Multiple keys for commands like MGET, DEL."
+            },
+            "value": {
+              "description": "Value for SET, LPUSH, etc. Can be string, number, boolean, or object."
+            },
+            "values": {
+              "type": "array",
+              "description": "Multiple values for commands like MSET, LPUSH."
+            },
+            "field": {
+              "type": "string",
+              "description": "Hash field for HGET, HSET."
+            },
+            "fields": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Multiple hash fields for HMSET, HGETALL."
+            },
+            "ttl": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Expiration time in seconds for SET with EX option."
+            },
+            "nx": {
+              "type": "boolean",
+              "description": "SET only if key does not exist."
+            },
+            "xx": {
+              "type": "boolean",
+              "description": "SET only if key exists."
+            },
+            "keepTTL": {
+              "type": "boolean",
+              "description": "Preserve existing TTL when updating key (Redis 6+)."
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Count parameter for SCAN, LPOP, RPOP."
+            },
+            "match": {
+              "type": "string",
+              "description": "Pattern for SCAN command (e.g., 'user:*')."
+            },
+            "position": {
+              "type": "string",
+              "enum": ["BEFORE", "AFTER"],
+              "description": "Position for LINSERT command."
+            },
+            "pivot": {
+              "type": "string",
+              "description": "Pivot value for LINSERT command."
+            },
+            "start": {
+              "type": "integer",
+              "description": "Range start index for LRANGE, ZRANGE."
+            },
+            "stop": {
+              "type": "integer",
+              "description": "Range stop index for LRANGE, ZRANGE."
+            },
+            "score": {
+              "type": "number",
+              "description": "Member score for ZADD, ZINCRBY."
+            },
+            "min": {
+              "type": "string",
+              "description": "Minimum score/value for ZRANGEBYSCORE, ZCOUNT."
+            },
+            "max": {
+              "type": "string",
+              "description": "Maximum score/value for ZRANGEBYSCORE, ZCOUNT."
+            },
+            "withScores": {
+              "type": "boolean",
+              "description": "Include scores in ZRANGE output."
+            },
+            "channel": {
+              "type": "string",
+              "description": "Pub/Sub channel name."
+            },
+            "channels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Multiple Pub/Sub channels."
+            },
+            "message": {
+              "description": "Message to publish. Can be string, number, boolean, or object."
+            },
+            "stream": {
+              "type": "string",
+              "description": "Stream key for XADD, XREAD."
+            },
+            "streamID": {
+              "type": "string",
+              "description": "Stream message ID. Use '*' for auto-generation."
+            },
+            "group": {
+              "type": "string",
+              "description": "Consumer group name for XREADGROUP."
+            },
+            "consumer": {
+              "type": "string",
+              "description": "Consumer name for XREADGROUP."
+            },
+            "streamFields": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Stream entry fields for XADD."
+            },
+            "maxLen": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Maximum stream length for XADD."
+            },
+            "block": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Block timeout in milliseconds for XREAD, XREADGROUP."
+            },
+            "noAck": {
+              "type": "boolean",
+              "description": "Skip acknowledging messages in XREADGROUP."
+            },
+            "script": {
+              "type": "string",
+              "description": "Inline Lua script to execute."
+            },
+            "scriptFile": {
+              "type": "string",
+              "description": "Path to Lua script file."
+            },
+            "scriptSHA": {
+              "type": "string",
+              "description": "SHA of pre-loaded script. Use EVALSHA instead of EVAL."
+            },
+            "scriptKeys": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "KEYS array for Lua script."
+            },
+            "scriptArgs": {
+              "type": "array",
+              "description": "ARGV array for Lua script."
+            },
+            "pipeline": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["command"],
+                "properties": {
+                  "command": {
+                    "type": "string"
+                  },
+                  "key": {
+                    "type": "string"
+                  },
+                  "keys": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "value": {},
+                  "values": {
+                    "type": "array"
+                  },
+                  "field": {
+                    "type": "string"
+                  },
+                  "fields": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "ttl": {
+                    "type": "integer"
+                  },
+                  "nx": {
+                    "type": "boolean"
+                  },
+                  "xx": {
+                    "type": "boolean"
+                  },
+                  "score": {
+                    "type": "number"
+                  }
+                }
+              },
+              "description": "Batch of commands to execute in a pipeline."
+            },
+            "watch": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Keys to WATCH for optimistic locking."
+            },
+            "multi": {
+              "type": "boolean",
+              "description": "Wrap pipeline in MULTI/EXEC transaction."
+            },
+            "lock": {
+              "type": "string",
+              "description": "Distributed lock name. Acquires lock before executing command."
+            },
+            "lockTimeout": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 30,
+              "description": "Lock expiry in seconds. Default: 30."
+            },
+            "lockRetry": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 10,
+              "description": "Lock acquisition retry attempts. Default: 10."
+            },
+            "lockWait": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 100,
+              "description": "Wait between lock retries in milliseconds. Default: 100."
+            },
+            "outputFormat": {
+              "type": "string",
+              "enum": ["json", "jsonl", "raw", "csv"],
+              "default": "json",
+              "description": "Output format. Default: json."
+            },
+            "nullValue": {
+              "type": "string",
+              "default": "null",
+              "description": "String representation for nil values. Default: 'null'."
+            },
+            "timeout": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 30,
+              "description": "Command timeout in seconds. Default: 30."
+            },
+            "maxResultSize": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 10485760,
+              "description": "Maximum result size in bytes. Default: 10MB."
+            }
+          }
+        }
+      ],
+      "description": "Redis executor configuration for executing Redis commands, managing cache, pub/sub, streams, and distributed locks."
+    },
+    "hitlExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "description": "Message displayed to the approver explaining what approval is needed."
+        },
+        "input": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of input field names expected from the approver."
+        },
+        "required": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Subset of input fields that must be provided. All values must exist in 'input' array."
+        }
+      },
+      "description": "Human-in-the-loop executor configuration. Pauses workflow execution until human approval is received."
+    },
+    "llmProvider": {
+      "type": "string",
+      "enum": [
+        "openai",
+        "anthropic",
+        "gemini",
+        "google",
+        "openrouter",
+        "local",
+        "ollama",
+        "vllm",
+        "llama"
+      ]
+    },
+    "llmConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "$ref": "#/definitions/llmProvider",
+          "description": "LLM provider to use (for single model config). Aliases 'ollama', 'vllm', 'llama' map to 'local'. Not required when using model array."
+        },
+        "model": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["provider", "name"],
+                "properties": {
+                  "provider": { "$ref": "#/definitions/llmProvider" },
+                  "name": { "type": "string" },
+                  "temperature": { "type": "number" },
+                  "maxTokens": { "type": "integer" },
+                  "topP": { "type": "number" },
+                  "baseURL": { "type": "string" },
+                  "apiKeyName": { "type": "string" }
+                }
+              }
+            }
+          ],
+          "description": "Model name (string) or array of model objects for fallback."
+        },
+        "system": {
+          "type": "string",
+          "description": "Default system prompt for conversations. Prepended to messages if specified."
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Controls randomness in responses (0.0-2.0). Lower values are more deterministic."
+        },
+        "maxTokens": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of tokens to generate in the response."
+        },
+        "topP": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Nucleus sampling parameter (0.0-1.0). Alternative to temperature for controlling randomness."
+        },
+        "baseURL": {
+          "type": "string",
+          "description": "Custom API endpoint URL. Overrides the default endpoint for the provider."
+        },
+        "apiKeyName": {
+          "type": "string",
+          "description": "Name of the environment variable containing the API key. If not specified, the default for the provider is used (e.g., OPENAI_API_KEY)."
+        },
+        "stream": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable streaming output. When true (default), response tokens are streamed to stdout as they arrive."
+        },
+        "thinking": {
+          "$ref": "#/definitions/thinkingConfig",
+          "description": "Extended thinking/reasoning configuration. Enables deeper reasoning for complex tasks."
+        }
+      },
+      "description": "LLM configuration. Supports OpenAI, Anthropic, Google Gemini, OpenRouter, and local models (Ollama/vLLM)."
+    },
+    "thinkingConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable extended thinking/reasoning mode. When true, the model uses additional computation for more thorough reasoning."
+        },
+        "effort": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "xhigh"],
+          "description": "Reasoning effort level. Maps to provider-specific settings: low (minimal reasoning), medium (default), high (thorough), xhigh (maximum, OpenAI GPT-5.2+ only)."
+        },
+        "budgetTokens": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Explicit token budget for thinking (provider-specific). Anthropic: 1024-128K, Gemini 2.5: 128-32768. Overrides effort-based defaults."
+        },
+        "includeInOutput": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include thinking blocks in stdout output. When false (default), only the final response is shown."
+        }
+      },
+      "description": "Configuration for extended thinking/reasoning capabilities. Provider support varies: Anthropic (Claude 3.7+), OpenAI (o1/o3/GPT-5), Gemini (2.5+), OpenRouter (unified)."
+    },
+    "llmMessage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "content"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": ["system", "user", "assistant"],
+          "description": "Message role. 'system' for instructions, 'user' for prompts, 'assistant' for model responses."
+        },
+        "content": {
+          "type": "string",
+          "description": "Message content. Supports variable substitution with ${VAR} syntax."
+        }
+      },
+      "description": "A single message in an LLM conversation."
+    },
+    "executorType": {
+      "type": "string",
+      "enum": [
+        "command",
+        "shell",
+        "docker",
+        "container",
+        "http",
+        "mail",
+        "ssh",
+        "s3",
+        "jq",
+        "gha",
+        "github_action",
+        "github-action",
+        "dag",
+        "subworkflow",
+        "parallel",
+        "archive",
+        "chat",
+        "hitl",
+        "postgres",
+        "sqlite",
+        "redis"
+      ],
+      "description": "Type of executor to use for this step."
+    },
+    "executorConfig": {
+      "type": "object",
+      "description": "Executor-specific configuration. Schema depends on executor type.",
+      "additionalProperties": true
+    },
+    "executorObject": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/executorType"
+        },
+        "config": {
+          "$ref": "#/definitions/executorConfig"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "http" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/httpExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "ssh" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/sshExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "enum": ["docker", "container"] } }
+          },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/dockerExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "mail" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/mailExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "jq" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/jqExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "enum": ["gha", "github_action", "github-action"] }
+            }
+          },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/ghaExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "archive" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/archiveExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "postgres" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/postgresExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "sqlite" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/sqliteExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "hitl" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/hitlExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "redis" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/redisExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "s3" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/s3ExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "enum": ["command", "shell"] } } },
+          "then": {
+            "properties": {
+              "config": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "Command/shell executors do not use executor.config. Configure at step level."
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "enum": ["dag", "subworkflow"] } }
+          },
+          "then": {
+            "properties": {
+              "config": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "DAG/subworkflow executors do not use executor.config. Use step.call or step.run field."
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "parallel" } } },
+          "then": {
+            "properties": {
+              "config": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "Parallel executor does not use executor.config. Use step.parallel field."
+              }
+            }
+          }
+        }
+      ],
+      "description": "Executor configuration object with type-specific config validation."
+    }
+  }
+}

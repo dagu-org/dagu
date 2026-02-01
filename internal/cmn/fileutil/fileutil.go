@@ -1,6 +1,7 @@
 package fileutil
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -16,15 +17,15 @@ var (
 	ErrUnknownEscapeSequence = errors.New("unknown escape sequence")
 )
 
-// MustGetUserHomeDir returns current working directory.
-// Panics is os.UserHomeDir() returns error
+// MustGetUserHomeDir returns user home directory.
+// Returns empty string if os.UserHomeDir() fails.
 func MustGetUserHomeDir() string {
 	hd, _ := os.UserHomeDir()
 	return hd
 }
 
 // MustGetwd returns current working directory.
-// Panics is os.Getwd() returns error
+// Returns empty string if os.Getwd() fails.
 func MustGetwd() string {
 	wd, _ := os.Getwd()
 	return wd
@@ -56,7 +57,6 @@ func IsFile(path string) bool {
 	return stat.Mode().IsRegular()
 }
 
-// OpenOrCreateFile opens (or creates) the log file with flags for creation, write-only access,
 // OpenOrCreateFile opens or creates the named file for appending with synchronous I/O and sets permissions to 0600.
 // It returns the opened *os.File or a non-nil error if the operation fails.
 func OpenOrCreateFile(filepath string) (*os.File, error) {
@@ -79,7 +79,7 @@ func MustTempDir(pattern string) string {
 	return t
 }
 
-// TruncString TurnString returns truncated string.
+// TruncString truncates string to max length.
 func TruncString(val string, max int) string {
 	if len(val) > max {
 		return val[:max]
@@ -182,7 +182,7 @@ func ResolvePath(path string) (string, error) {
 	return cleanPath, nil
 }
 
-// ResolvePathOrBlank works like ResolvePath but panics on error.
+// ResolvePathOrBlank works like ResolvePath but returns original path on error.
 // Useful when you're confident the path resolution will succeed.
 func ResolvePathOrBlank(path string) string {
 	resolvedPath, err := ResolvePath(path)
@@ -247,4 +247,56 @@ func CreateTempDAGFile(subDir, dagName string, yamlData []byte, extraDocs ...[]b
 	}
 
 	return tempFileName, nil
+}
+
+// WriteFileAtomic writes data to a file atomically using a temp file and rename.
+// This ensures the file is never left in a partial state.
+// Uses os.CreateTemp with a unique filename to prevent race conditions with
+// concurrent writers to the same file.
+func WriteFileAtomic(filePath string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(filePath)
+	base := filepath.Base(filePath)
+
+	// Create temp file in the same directory to ensure atomic rename works
+	// (rename across filesystems would fail)
+	tempFile, err := os.CreateTemp(dir, base+".tmp.*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file in %s: %w", dir, err)
+	}
+	tempPath := tempFile.Name()
+
+	// Clean up temp file on any error
+	cleanup := func() { _ = os.Remove(tempPath) }
+
+	if _, err := tempFile.Write(data); err != nil {
+		_ = tempFile.Close()
+		cleanup()
+		return fmt.Errorf("failed to write temp file %s: %w", tempPath, err)
+	}
+
+	if err := tempFile.Chmod(perm); err != nil {
+		_ = tempFile.Close()
+		cleanup()
+		return fmt.Errorf("failed to set permissions on temp file %s: %w", tempPath, err)
+	}
+
+	if err := tempFile.Close(); err != nil {
+		cleanup()
+		return fmt.Errorf("failed to close temp file %s: %w", tempPath, err)
+	}
+
+	if err := os.Rename(tempPath, filePath); err != nil {
+		cleanup()
+		return fmt.Errorf("failed to rename %s to %s: %w", tempPath, filePath, err)
+	}
+	return nil
+}
+
+// WriteJSONAtomic marshals v to indented JSON and writes it atomically to filePath.
+func WriteJSONAtomic(filePath string, v any, perm os.FileMode) error {
+	data, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+	return WriteFileAtomic(filePath, data, perm)
 }

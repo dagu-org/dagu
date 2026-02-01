@@ -120,7 +120,7 @@ PB_RELEASE_NAME=protoc-${PB_VERSION}-${OS}-${ARCH}
 .PHONY: run
 run: ${FE_BUNDLE_JS}
 	@echo "${COLOR_GREEN}Starting the frontend server and the scheduler...${COLOR_RESET}"
-	@go run ./cmd start-all
+	@DAGU_DEBUG=1 go run ./cmd start-all
 
 # server build the binary and start the server.
 .PHONY: run-server
@@ -143,7 +143,8 @@ ${FE_BUNDLE_JS}:
 .PHONY: run-server-https
 run-server-https: ${SERVER_CERT_FILE} ${SERVER_KEY_FILE}
 	@echo "${COLOR_GREEN}Starting the server with HTTPS...${COLOR_RESET}"
-	@DAGU_CERT_FILE=${SERVER_CERT_FILE} \
+	@DAGU_DEBUG=1 \
+		DAGU_CERT_FILE=${SERVER_CERT_FILE} \
 		DAGU_KEY_FILE=${SERVER_KEY_FILE} \
 		go run ./cmd start-all
 
@@ -343,7 +344,6 @@ cp-assets:
 	@echo "${COLOR_GREEN}Copying UI assets...${COLOR_RESET}"
 	@rm -f ${FE_ASSETS_DIR}/*
 	@cp ${FE_BUILD_DIR}/* ${FE_ASSETS_DIR}
-	@cp ${SCRIPT_DIR}/schemas/dag.schema.json ${FE_ASSETS_DIR}/dag.schema.json
 
 # clean-ui removes the UI build cache.
 .PHONY: clean-ui

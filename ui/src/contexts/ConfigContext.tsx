@@ -32,6 +32,7 @@ export type Config = {
   oidcButtonLabel: string;
   terminalEnabled: boolean;
   gitSyncEnabled: boolean;
+  agentEnabled: boolean;
   permissions: {
     writeDags: boolean;
     runDags: boolean;
@@ -41,6 +42,11 @@ export type Config = {
 
 export const ConfigContext = createContext<Config>(null!);
 
-export function useConfig() {
+/**
+ * Access the application configuration from the nearest ConfigContext provider.
+ *
+ * @returns The Config object containing API URL, paths, permissions, and feature flags.
+ */
+export function useConfig(): Config {
   return useContext(ConfigContext);
 }

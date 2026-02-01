@@ -21,9 +21,9 @@ func TestInitVerifierAndConfigRecoversFromPanic(t *testing.T) {
 	}
 
 	_, err := InitVerifierAndConfig(context.Background(), config.AuthOIDC{
-		ClientId:     "client",
+		ClientID:     "client",
 		ClientSecret: "secret",
-		ClientUrl:    "http://localhost",
+		ClientURL:    "http://localhost",
 		Issuer:       "http://issuer",
 		Scopes:       []string{oidc.ScopeOpenID},
 	})
@@ -41,9 +41,9 @@ func TestInitVerifierAndConfigHandlesNilProvider(t *testing.T) {
 	}
 
 	_, err := InitVerifierAndConfig(context.Background(), config.AuthOIDC{
-		ClientId:     "client",
+		ClientID:     "client",
 		ClientSecret: "secret",
-		ClientUrl:    "http://localhost",
+		ClientURL:    "http://localhost",
 		Issuer:       "http://issuer",
 		Scopes:       []string{oidc.ScopeOpenID},
 	})
@@ -67,9 +67,9 @@ func TestInitVerifierAndConfigKeepsProviderContextAlive(t *testing.T) {
 	}
 
 	cfg, err := InitVerifierAndConfig(context.Background(), config.AuthOIDC{
-		ClientId:     "client",
+		ClientID:     "client",
 		ClientSecret: "secret",
-		ClientUrl:    "http://localhost",
+		ClientURL:    "http://localhost",
 		Issuer:       server.URL,
 		Scopes:       []string{oidc.ScopeOpenID},
 	})

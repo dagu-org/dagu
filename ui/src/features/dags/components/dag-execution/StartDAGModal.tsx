@@ -81,8 +81,8 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
       // Only handle events when modal is visible
       if (!visible) return;
 
-      // Handle Enter key
-      if (e.key === 'Enter') {
+      // Handle Enter key (skip during IME composition)
+      if (e.key === 'Enter' && !e.isComposing) {
         // Get the active element
         const activeElement = document.activeElement;
 

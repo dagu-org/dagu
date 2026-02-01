@@ -16,12 +16,14 @@ import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';
 import { useClient, useQuery } from '../../../../hooks/api';
+import { useDAGSpecWithConflictDetection } from '../../../../hooks/useDAGSpecWithConflictDetection';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
 import { DAGStepTable } from '../dag-details';
 import { FlowchartType, Graph } from '../visualization';
 import DAGAttributes from './DAGAttributes';
 import DAGEditorWithDocs from './DAGEditorWithDocs';
+import ExternalChangeDialog from './ExternalChangeDialog';
 
 /**
  * Props for the DAGSpec component
@@ -43,11 +45,10 @@ function DAGSpec({ fileName, localDags }: Props) {
   const config = useConfig();
   const { showError } = useErrorModal();
   const { showToast } = useSimpleToast();
-  const { hasUnsavedChanges, setHasUnsavedChanges } = useUnsavedChanges();
+  const { setHasUnsavedChanges } = useUnsavedChanges();
 
   // Editability is derived from permissions; no explicit toggle
   const editable = !!config.permissions.writeDags;
-  const [currentValue, setCurrentValue] = React.useState<string | undefined>();
   const [scrollPosition, setScrollPosition] = React.useState(0);
   const [activeTab, setActiveTab] = React.useState('parent');
 
@@ -57,7 +58,6 @@ function DAGSpec({ fileName, localDags }: Props) {
 
   // Reference to the main container div
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const lastFetchedSpecRef = React.useRef<string | undefined>(undefined);
 
   // Reference to save function and refresh callback for keyboard shortcut
   const saveHandlerRef = React.useRef<(() => Promise<void>) | null>(null);
@@ -77,53 +77,50 @@ function DAGSpec({ fileName, localDags }: Props) {
     [setCookie, flowchart, setFlowchart]
   );
 
-  // Fetch DAG specification data (spec YAML content) - no polling needed
-  // The spec is static and only changes when the user saves
-  const { data, isLoading } = useQuery('/dags/{fileName}/spec', {
-    params: {
-      query: {
-        remoteNode: appBarContext.selectedRemoteNode || 'local',
-      },
-      path: {
-        fileName: fileName,
-      },
-    },
+  // SSE-based spec watching with conflict detection
+  const {
+    dag: sseData,
+    isConnected,
+    shouldUseFallback,
+    currentValue,
+    setCurrentValue,
+    hasUnsavedChanges: localHasUnsavedChanges,
+    conflict,
+    resolveConflict,
+    markAsSaved,
+  } = useDAGSpecWithConflictDetection({
+    fileName,
+    enabled: true,
   });
 
-  // localDags is passed from parent via SSE/polling - no need for redundant fetch
+  // Fallback to REST polling when SSE fails
+  const { data: pollingData, isLoading } = useQuery(
+    '/dags/{fileName}/spec',
+    {
+      params: {
+        query: {
+          remoteNode: appBarContext.selectedRemoteNode || 'local',
+        },
+        path: {
+          fileName: fileName,
+        },
+      },
+    },
+    {
+      revalidateIfStale: shouldUseFallback,
+      revalidateOnFocus: shouldUseFallback,
+      refreshInterval: shouldUseFallback ? 5000 : 0,
+      isPaused: () => !shouldUseFallback && isConnected,
+    }
+  );
 
-  // Update current value when data changes
+  // Use SSE data when connected, fallback to polling data
+  const data = isConnected && sseData ? sseData : pollingData;
+
+  // Sync unsaved changes context
   useEffect(() => {
-    if (typeof data?.spec === 'undefined') {
-      return;
-    }
-
-    const fetchedSpec = data.spec;
-
-    if (lastFetchedSpecRef.current === fetchedSpec) {
-      // Ensure the editor initializes with the fetched value on first load.
-      setCurrentValue((prev) =>
-        typeof prev === 'undefined' ? fetchedSpec : prev
-      );
-      return;
-    }
-
-    lastFetchedSpecRef.current = fetchedSpec;
-    setCurrentValue(fetchedSpec);
-  }, [data?.spec]);
-
-  // Track unsaved changes
-  useEffect(() => {
-    if (
-      typeof currentValue === 'undefined' ||
-      typeof data?.spec === 'undefined'
-    ) {
-      setHasUnsavedChanges(false);
-      return;
-    }
-    const hasChanges = currentValue !== data.spec;
-    setHasUnsavedChanges(hasChanges);
-  }, [currentValue, data?.spec, setHasUnsavedChanges]);
+    setHasUnsavedChanges(localHasUnsavedChanges);
+  }, [localHasUnsavedChanges, setHasUnsavedChanges]);
 
   // Clean up unsaved changes state on unmount
   useEffect(() => {
@@ -175,18 +172,12 @@ function DAGSpec({ fileName, localDags }: Props) {
     }
 
     if (responseData?.errors) {
-      showError(
-        'Validation errors',
-        responseData.errors.join('\n')
-      );
+      showError('Validation errors', responseData.errors.join('\n'));
       return;
     }
 
-    // Update the ref to prevent stale comparison until SWR refreshes
-    lastFetchedSpecRef.current = currentValue;
-
-    // Clear unsaved changes immediately after successful save
-    setHasUnsavedChanges(false);
+    // Mark as saved to prevent false conflict detection on our own save
+    markAsSaved(currentValue);
 
     // Show success toast notification
     showToast('Changes saved successfully');
@@ -197,7 +188,7 @@ function DAGSpec({ fileName, localDags }: Props) {
     client,
     saveScrollPosition,
     showToast,
-    setHasUnsavedChanges,
+    markAsSaved,
   ]);
 
   // Restore scroll position after render
@@ -330,6 +321,13 @@ function DAGSpec({ fileName, localDags }: Props) {
         return (
           data?.dag && (
             <React.Fragment>
+              {/* External changes conflict dialog */}
+              <ExternalChangeDialog
+                visible={conflict.hasConflict}
+                onDiscard={() => resolveConflict('discard')}
+                onIgnore={() => resolveConflict('ignore')}
+              />
+
               <div
                 className="flex flex-col flex-1 min-h-0 space-y-6 mb-6"
                 ref={containerRef}
@@ -389,7 +387,11 @@ function DAGSpec({ fileName, localDags }: Props) {
                 })()}
 
                 <DAGEditorWithDocs
-                  value={editable ? (currentValue ?? data.spec) : data.spec}
+                  value={
+                    editable
+                      ? currentValue || data.spec || ''
+                      : data.spec || ''
+                  }
                   readOnly={!editable}
                   onChange={
                     editable
@@ -404,7 +406,7 @@ function DAGSpec({ fileName, localDags }: Props) {
                       <Button
                         id="save-config"
                         title="Save changes (Ctrl+S / Cmd+S)"
-                        disabled={!hasUnsavedChanges}
+                        disabled={!localHasUnsavedChanges}
                         onClick={async () => {
                           await handleSave();
                           props.refresh();
