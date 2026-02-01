@@ -143,7 +143,7 @@ export function UserPromptMessage({
             className={cn(
               'px-2 py-1 text-xs rounded transition-colors font-medium',
               canSubmit
-                ? 'bg-amber-600 dark:bg-amber-500 text-white hover:bg-amber-700 dark:hover:bg-amber-600'
+                ? 'bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-500 dark:text-black dark:hover:bg-amber-400'
                 : 'bg-muted text-muted-foreground cursor-not-allowed'
             )}
           >
