@@ -6,9 +6,20 @@ import (
 	"github.com/spf13/viper"
 )
 
+// commandLineFlag defines a CLI flag with its configuration options.
+type commandLineFlag struct {
+	name         string
+	shorthand    string
+	defaultValue string
+	usage        string
+	required     bool
+	isBool       bool
+	bindViper    bool
+	viperKey     string // Custom viper key (if different from kebab-to-camel name)
+}
+
+// Base flags included in all commands
 var (
-	// Path to the configuration file.
-	// If not provided, the default is "$HOME/.config/dagu/config.yaml".
 	configFlag = commandLineFlag{
 		name:      "config",
 		shorthand: "c",
@@ -16,14 +27,27 @@ var (
 		bindViper: true,
 	}
 
-	// Override DAGU_HOME for this command invocation.
 	daguHomeFlag = commandLineFlag{
 		name:  "dagu-home",
 		usage: "Override DAGU_HOME for this command",
 	}
 
-	// Directory where DAG definition files are stored.
-	// If not provided, the default is "$HOME/.config/dagu/dags".
+	quietFlag = commandLineFlag{
+		name:      "quiet",
+		shorthand: "q",
+		usage:     "Suppress output during dag-run",
+		isBool:    true,
+	}
+
+	cpuProfileFlag = commandLineFlag{
+		name:   "cpu-profile",
+		usage:  "Enable CPU profiling (saves to cpu.pprof)",
+		isBool: true,
+	}
+)
+
+// Server and directory flags
+var (
 	dagsFlag = commandLineFlag{
 		name:      "dags",
 		shorthand: "d",
@@ -31,7 +55,6 @@ var (
 		bindViper: true,
 	}
 
-	// The hostname or IP address on which the server will listen.
 	hostFlag = commandLineFlag{
 		name:         "host",
 		shorthand:    "s",
@@ -40,7 +63,6 @@ var (
 		bindViper:    true,
 	}
 
-	// The port number for the server.
 	portFlag = commandLineFlag{
 		name:         "port",
 		shorthand:    "p",
@@ -48,27 +70,42 @@ var (
 		usage:        "Server port number (default: 8080)",
 		bindViper:    true,
 	}
+)
 
-	// Additional parameters to pass to the dag-run.
-	// These parameters override the default values defined in the DAG.
-	// They can be specified either inline or following a "--" separator to distinguish them from other flags.
-	// Accepted formats include positional parameters and key=value pairs (e.g., "P1=foo P2=bar").
+// DAG execution flags
+var (
 	paramsFlag = commandLineFlag{
 		name:      "params",
 		shorthand: "p",
 		usage:     "Parameters to pass to the dag-run (overrides DAG defaults; supports positional values and key=value pairs, e.g., P1=foo P2=bar)",
 	}
 
-	// nameFlag is used to override the DAG name from the CLI.
-	// If not provided, the DAG name will be determined from the DAG definition or filename.
 	nameFlag = commandLineFlag{
 		name:      "name",
 		shorthand: "N",
 		usage:     "Override the DAG name (default: name from DAG definition or filename)",
 	}
 
-	// Unique dag-run ID required for retrying a dag-run.
-	// This flag must be provided when using the retry command.
+	queueFlag = commandLineFlag{
+		name:      "queue",
+		shorthand: "u",
+		usage:     "Override the DAG-level queue definition",
+	}
+
+	defaultWorkingDirFlag = commandLineFlag{
+		name:  "default-working-dir",
+		usage: "Default working directory for DAGs without explicit workingDir",
+	}
+)
+
+// DAG run ID flags for different commands
+var (
+	dagRunIDFlag = commandLineFlag{
+		name:      "run-id",
+		shorthand: "r",
+		usage:     "Unique dag-run ID for starting a new dag-run",
+	}
+
 	dagRunIDFlagRetry = commandLineFlag{
 		name:      "run-id",
 		shorthand: "r",
@@ -76,92 +113,57 @@ var (
 		required:  true,
 	}
 
-	// stepNameForRetry is used to indicate a specific step to retry
-	stepNameForRetry = commandLineFlag{
-		name:         "step",
-		shorthand:    "",
-		usage:        "Retry only the specified step (optional)",
-		defaultValue: "",
-	}
-
-	// Unique dag-run ID used for starting a new dag-run.
-	// This is used to track and identify the execution instance and its status.
-	dagRunIDFlag = commandLineFlag{
-		name:      "run-id",
-		shorthand: "r",
-		usage:     "Unique dag-run ID for starting a new dag-run",
-	}
-
-	// Unique dag-run ID used for stopping a dag-run.
 	dagRunIDFlagStop = commandLineFlag{
 		name:      "run-id",
 		shorthand: "r",
 		usage:     "dag-run ID for stopping a dag-run",
 	}
 
-	// Unique dag-run ID used for restarting a dag-run.
 	dagRunIDFlagRestart = commandLineFlag{
 		name:      "run-id",
 		shorthand: "r",
 		usage:     "dag-run ID for restarting a dag-run",
 	}
 
-	// Unique dag-run ID used for checking the status of a dag-run.
 	dagRunIDFlagStatus = commandLineFlag{
 		name:      "run-id",
 		shorthand: "r",
 		usage:     "dag-run ID for checking the status of a dag-run",
 	}
 
-	// Unique dag-run reference used for dequeueing a dag-run.
+	subDAGRunIDFlagStatus = commandLineFlag{
+		name:      "sub-run-id",
+		shorthand: "s",
+		usage:     "Sub dag-run ID for checking the status of a nested dag-run (requires --run-id)",
+	}
+
 	dagRunFlagDequeue = commandLineFlag{
 		name:      "dag-run",
 		shorthand: "d",
 		usage:     "<DAG-name>:<run-id> to dequeue a dag-run",
 	}
 
-	// queueFlag is used to override the DAG-level queue definition.
-	queueFlag = commandLineFlag{
-		name:      "queue",
-		shorthand: "u",
-		usage:     "Override the DAG-level queue definition",
+	stepNameForRetry = commandLineFlag{
+		name:  "step",
+		usage: "Retry only the specified step (optional)",
 	}
+)
 
-	// rootDAGRunFlag reads the root DAG name for starting a sub dag-run.
+// Sub DAG run flags
+var (
 	rootDAGRunFlag = commandLineFlag{
 		name:  "root",
 		usage: "[only for sub dag-runs] reference for the root dag-run",
 	}
 
-	// parentDAGRunFlag reads the parent ref for starting a sub dag-run.
 	parentDAGRunFlag = commandLineFlag{
 		name:  "parent",
 		usage: "[only for sub dag-runs] reference for the parent dag-run",
 	}
+)
 
-	// defaultWorkingDirFlag is the default working directory for DAGs without explicit workingDir.
-	// This is used for sub-DAG execution to inherit the parent's working directory.
-	defaultWorkingDirFlag = commandLineFlag{
-		name:  "default-working-dir",
-		usage: "Default working directory for DAGs without explicit workingDir",
-	}
-
-	// quietFlag is used to suppress output during command execution.
-	quietFlag = commandLineFlag{
-		name:      "quiet",
-		shorthand: "q",
-		usage:     "Suppress output during dag-run",
-		isBool:    true,
-	}
-
-	// cpuProfileFlag is used to enable CPU profiling.
-	cpuProfileFlag = commandLineFlag{
-		name:   "cpu-profile",
-		usage:  "Enable CPU profiling (saves to cpu.pprof)",
-		isBool: true,
-	}
-
-	// coordinatorHostFlag is the hostname or IP address for the coordinator gRPC server.
+// Coordinator flags
+var (
 	coordinatorHostFlag = commandLineFlag{
 		name:         "coordinator.host",
 		shorthand:    "H",
@@ -170,7 +172,6 @@ var (
 		bindViper:    true,
 	}
 
-	// coordinatorPortFlag is the port number for the coordinator gRPC server.
 	coordinatorPortFlag = commandLineFlag{
 		name:         "coordinator.port",
 		shorthand:    "P",
@@ -179,16 +180,16 @@ var (
 		bindViper:    true,
 	}
 
-	// coordinatorAdvertiseFlag is the address to advertise in the service registry.
 	coordinatorAdvertiseFlag = commandLineFlag{
-		name:         "coordinator.advertise",
-		shorthand:    "A",
-		defaultValue: "",
-		usage:        "Address to advertise in service registry (default: auto-detected hostname)",
-		bindViper:    true,
+		name:      "coordinator.advertise",
+		shorthand: "A",
+		usage:     "Address to advertise in service registry (default: auto-detected hostname)",
+		bindViper: true,
 	}
+)
 
-	// workerIDFlag is the unique identifier for the worker instance.
+// Worker flags
+var (
 	workerIDFlag = commandLineFlag{
 		name:      "worker.id",
 		shorthand: "w",
@@ -196,7 +197,6 @@ var (
 		bindViper: true,
 	}
 
-	// workerMaxActiveRunsFlag is the maximum number of active runs for the worker.
 	workerMaxActiveRunsFlag = commandLineFlag{
 		name:         "worker.max-active-runs",
 		shorthand:    "m",
@@ -205,7 +205,6 @@ var (
 		bindViper:    true,
 	}
 
-	// workerLabelsFlag is the labels for worker capabilities.
 	workerLabelsFlag = commandLineFlag{
 		name:      "worker.labels",
 		shorthand: "l",
@@ -213,15 +212,15 @@ var (
 		bindViper: true,
 	}
 
-	// workerCoordinatorsFlag specifies coordinator addresses for static service discovery.
-	// This enables shared-nothing deployment where workers don't need access to the service registry.
 	workerCoordinatorsFlag = commandLineFlag{
 		name:      "worker.coordinators",
 		usage:     "Coordinator addresses for static discovery (format: host1:port1,host2:port2)",
 		bindViper: true,
 	}
+)
 
-	// peerInsecureFlag disables TLS for peer connections.
+// Peer TLS flags
+var (
 	peerInsecureFlag = commandLineFlag{
 		name:      "peer.insecure",
 		usage:     "Use insecure connection (h2c) instead of TLS",
@@ -229,60 +228,56 @@ var (
 		bindViper: true,
 	}
 
-	// peerCertFileFlag is the TLS certificate for peer connections.
 	peerCertFileFlag = commandLineFlag{
 		name:      "peer.cert-file",
 		usage:     "Path to TLS certificate file for mutual TLS",
 		bindViper: true,
 	}
 
-	// peerKeyFileFlag is the TLS key for peer connections.
 	peerKeyFileFlag = commandLineFlag{
 		name:      "peer.key-file",
 		usage:     "Path to TLS key file for mutual TLS",
 		bindViper: true,
 	}
 
-	// peerClientCAFileFlag is the CA certificate for peer connections.
 	peerClientCAFileFlag = commandLineFlag{
 		name:      "peer.client-ca-file",
 		usage:     "Path to CA certificate file for server verification",
 		bindViper: true,
 	}
 
-	// peerSkipTLSVerifyFlag skips TLS certificate verification for peer connections.
 	peerSkipTLSVerifyFlag = commandLineFlag{
 		name:      "peer.skip-tls-verify",
 		usage:     "Skip TLS certificate verification (insecure)",
 		isBool:    true,
 		bindViper: true,
 	}
+)
 
-	// retentionDaysFlag specifies the number of days to retain history.
-	// Records older than this will be deleted.
-	// If set to 0, all records (except active) will be deleted.
+// Cleanup and utility flags
+var (
 	retentionDaysFlag = commandLineFlag{
 		name:         "retention-days",
 		defaultValue: "0",
 		usage:        "Number of days to retain history (0 = delete all, except active runs)",
 	}
 
-	// dryRunFlag enables preview mode without actual deletion.
 	dryRunFlag = commandLineFlag{
 		name:   "dry-run",
 		usage:  "Preview what would be deleted without actually deleting",
 		isBool: true,
 	}
 
-	// yesFlag skips the confirmation prompt.
 	yesFlag = commandLineFlag{
 		name:      "yes",
 		shorthand: "y",
 		usage:     "Skip confirmation prompt",
 		isBool:    true,
 	}
+)
 
-	// tunnelFlag enables tunnel mode.
+// Tunnel flags
+var (
 	tunnelFlag = commandLineFlag{
 		name:      "tunnel",
 		shorthand: "t",
@@ -292,7 +287,6 @@ var (
 		viperKey:  "tunnel.enabled",
 	}
 
-	// tunnelTokenFlag provides authentication token for the tunnel.
 	tunnelTokenFlag = commandLineFlag{
 		name:      "tunnel-token",
 		usage:     "Tailscale auth key for headless authentication",
@@ -300,7 +294,6 @@ var (
 		viperKey:  "tunnel.token",
 	}
 
-	// tunnelFunnelFlag enables Tailscale Funnel for public access.
 	tunnelFunnelFlag = commandLineFlag{
 		name:      "tunnel-funnel",
 		usage:     "Enable Tailscale Funnel for public internet access (requires Tailscale provider)",
@@ -309,7 +302,6 @@ var (
 		viperKey:  "tunnel.tailscale.funnel",
 	}
 
-	// tunnelHTTPSFlag enables HTTPS for Tailscale tailnet-only access.
 	tunnelHTTPSFlag = commandLineFlag{
 		name:      "tunnel-https",
 		usage:     "Use HTTPS for Tailscale (requires enabling HTTPS in Tailscale admin panel)",
@@ -319,45 +311,46 @@ var (
 	}
 )
 
-type commandLineFlag struct {
-	name, shorthand, defaultValue, usage string
-	required                             bool
-	isBool                               bool
-	bindViper                            bool
-	viperKey                             string // Custom viper key (if different from kebab-to-camel name)
-}
+// baseFlags are included in every command.
+var baseFlags = []commandLineFlag{configFlag, daguHomeFlag, quietFlag, cpuProfileFlag}
 
-// initFlags registers a set of CLI flags on the provided Cobra command.
-// It always includes the base flags (config, dagu-home, quiet, cpu-profile) and then the provided additionalFlags.
-// Boolean flags are registered as boolean flags and others as string flags with their default values, and any flag marked required will be recorded as required.
+// initFlags registers CLI flags on the provided Cobra command.
+// Base flags (config, dagu-home, quiet, cpu-profile) are always included.
 func initFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
-	flags := append([]commandLineFlag{configFlag, daguHomeFlag, quietFlag, cpuProfileFlag}, additionalFlags...)
+	allFlags := append(baseFlags, additionalFlags...)
 
-	for _, flag := range flags {
-		if flag.isBool {
-			cmd.Flags().BoolP(flag.name, flag.shorthand, false, flag.usage)
-		} else {
-			cmd.Flags().StringP(flag.name, flag.shorthand, flag.defaultValue, flag.usage)
-		}
-		if flag.required {
-			_ = cmd.MarkFlagRequired(flag.name)
-		}
+	for _, flag := range allFlags {
+		registerFlag(cmd, flag)
 	}
 }
 
-// bindFlags binds command-line flags to the provided Viper instance for configuration lookup.
-// It binds only flags whose `bindViper` field is true, using either the custom viperKey
-// or the camel-cased key produced from each flag's kebab-case name.
-func bindFlags(viper *viper.Viper, cmd *cobra.Command, additionalFlags ...commandLineFlag) {
-	flags := append([]commandLineFlag{configFlag}, additionalFlags...)
+// registerFlag adds a single flag to the command and marks it required if needed.
+func registerFlag(cmd *cobra.Command, flag commandLineFlag) {
+	if flag.isBool {
+		cmd.Flags().BoolP(flag.name, flag.shorthand, false, flag.usage)
+	} else {
+		cmd.Flags().StringP(flag.name, flag.shorthand, flag.defaultValue, flag.usage)
+	}
 
-	for _, flag := range flags {
-		if flag.bindViper {
-			key := flag.viperKey
-			if key == "" {
-				key = stringutil.KebabToCamel(flag.name)
-			}
-			_ = viper.BindPFlag(key, cmd.Flags().Lookup(flag.name))
+	if flag.required {
+		_ = cmd.MarkFlagRequired(flag.name)
+	}
+}
+
+// bindFlags binds command-line flags to Viper for configuration lookup.
+// Only flags with bindViper=true are bound.
+func bindFlags(v *viper.Viper, cmd *cobra.Command, additionalFlags ...commandLineFlag) {
+	allFlags := append([]commandLineFlag{configFlag}, additionalFlags...)
+
+	for _, flag := range allFlags {
+		if !flag.bindViper {
+			continue
 		}
+
+		key := flag.viperKey
+		if key == "" {
+			key = stringutil.KebabToCamel(flag.name)
+		}
+		_ = v.BindPFlag(key, cmd.Flags().Lookup(flag.name))
 	}
 }

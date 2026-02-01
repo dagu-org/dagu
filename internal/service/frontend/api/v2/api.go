@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/api/v2"
+	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/cmn/config"
@@ -54,6 +55,7 @@ type API struct {
 	syncService        SyncService
 	tunnelService      *tunnel.Service
 	dagWritesDisabled  bool // True when git sync read-only mode is active
+	agentConfigStore   agent.ConfigStore
 }
 
 // AuthService defines the interface for authentication operations.
@@ -120,16 +122,17 @@ func WithTunnelService(ts *tunnel.Service) APIOption {
 	}
 }
 
-// New constructs an API instance wired with the provided DAG, DAG-run, queue and proc stores,
-// runtime manager, configuration, coordinator client, service registry, metrics registry, and resource service.
-// It also builds the internal remote node map from cfg.Server.RemoteNodes and initializes the sub-command
-// New constructs an *API configured with the provided stores, runtime manager,
+// WithAgentConfigStore returns an APIOption that sets the API's agent config store.
+func WithAgentConfigStore(store agent.ConfigStore) APIOption {
+	return func(a *API) {
+		a.agentConfigStore = store
+	}
+}
+
+// New constructs an API configured with the provided stores, runtime manager,
 // configuration, coordinator client, service registry, Prometheus registry,
-// and resource service.
-//
-// It builds the API instance (including the remote node map and base path) and
-// applies any supplied APIOption functions to customize the instance before
-// returning it.
+// and resource service. It builds the remote node map and base path, then
+// applies any supplied APIOption functions to customize the instance.
 func New(
 	dr exec.DAGStore,
 	drs exec.DAGRunStore,
@@ -182,64 +185,81 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 		return fmt.Errorf("failed to get swagger: %w", err)
 	}
 
-	// Create a list of server URLs
-	if evaluatedBaseURL, err := cmdutil.EvalString(ctx, baseURL); err != nil {
-		logger.Warn(ctx, "Failed to evaluate API base URL",
-			tag.URL(baseURL),
-			tag.Error(err))
-	} else {
-		baseURL = evaluatedBaseURL
-	}
-	baseURL = strings.TrimRight(baseURL, "/")
-	serverURLs := []string{baseURL}
+	baseURL = a.evaluateAndNormalizeURL(ctx, baseURL)
+	swagger.Servers = append(swagger.Servers, &openapi3.Server{URL: baseURL})
 
-	// Set the server URLs in the swagger spec
-	for _, url := range serverURLs {
-		swagger.Servers = append(swagger.Servers, &openapi3.Server{URL: url})
-	}
-
-	// Setup the API base path
-	basePath := a.config.Server.BasePath
-	if evaluatedBasePath, err := cmdutil.EvalString(ctx, basePath); err != nil {
-		logger.Warn(ctx, "Failed to evaluate server base path",
-			tag.Path(basePath),
-			tag.Error(err))
-	} else {
-		basePath = evaluatedBasePath
-	}
+	basePath := a.evaluateBasePath(ctx)
 	if basePath != "" {
 		swagger.Servers = append(swagger.Servers, &openapi3.Server{
 			URL: path.Join(baseURL, basePath),
 		})
 	}
 
-	// Create the oapi-codegen validator middleware
 	if a.config.Server.StrictValidation {
-		// It is problematic to use the validator behind a reverse proxy
-		validator := oapimiddleware.OapiRequestValidatorWithOptions(
-			swagger, &oapimiddleware.Options{
-				SilenceServersWarning: true,
-				Options: openapi3filter.Options{
-					AuthenticationFunc: func(_ context.Context, _ *openapi3filter.AuthenticationInput) error {
-						return nil
-					},
+		r.Use(a.createValidatorMiddleware(swagger))
+	}
+
+	authOptions, err := a.buildAuthOptions(ctx, basePath)
+	if err != nil {
+		return err
+	}
+
+	r.Group(func(r chi.Router) {
+		r.Use(frontendauth.ClientIPMiddleware())
+		r.Use(frontendauth.Middleware(authOptions))
+		r.Use(WithRemoteNode(a.remoteNodes, a.apiBasePath))
+
+		options := api.StrictHTTPServerOptions{
+			ResponseErrorHandlerFunc: a.handleError,
+		}
+		handler := api.NewStrictHandlerWithOptions(a, nil, options)
+		r.Mount("/", api.Handler(handler))
+	})
+
+	return nil
+}
+
+func (a *API) evaluateAndNormalizeURL(ctx context.Context, baseURL string) string {
+	if evaluated, err := cmdutil.EvalString(ctx, baseURL); err != nil {
+		logger.Warn(ctx, "Failed to evaluate API base URL",
+			tag.URL(baseURL),
+			tag.Error(err))
+	} else {
+		baseURL = evaluated
+	}
+	return strings.TrimRight(baseURL, "/")
+}
+
+func (a *API) evaluateBasePath(ctx context.Context) string {
+	basePath := a.config.Server.BasePath
+	if evaluated, err := cmdutil.EvalString(ctx, basePath); err != nil {
+		logger.Warn(ctx, "Failed to evaluate server base path",
+			tag.Path(basePath),
+			tag.Error(err))
+	} else {
+		basePath = evaluated
+	}
+	return basePath
+}
+
+func (a *API) createValidatorMiddleware(swagger *openapi3.T) func(http.Handler) http.Handler {
+	return oapimiddleware.OapiRequestValidatorWithOptions(
+		swagger, &oapimiddleware.Options{
+			SilenceServersWarning: true,
+			Options: openapi3filter.Options{
+				AuthenticationFunc: func(_ context.Context, _ *openapi3filter.AuthenticationInput) error {
+					return nil
 				},
 			},
-		)
-		r.Use(validator)
-	}
+		},
+	)
+}
 
-	options := api.StrictHTTPServerOptions{
-		ResponseErrorHandlerFunc: a.handleError,
-	}
-
-	// Initialize auth configuration
+func (a *API) buildAuthOptions(ctx context.Context, basePath string) (frontendauth.Options, error) {
 	authConfig := a.config.Server.Auth
-	// Basic auth works independently if credentials are configured
 	basicAuthEnabled := authConfig.Basic.Username != "" && authConfig.Basic.Password != ""
-	// Auth is required unless mode is explicitly set to "none" and no credentials are configured
 	authRequired := authConfig.Mode != config.AuthModeNone || basicAuthEnabled || authConfig.Token.Value != ""
-	// Build public paths list - metrics is only public if explicitly configured
+
 	publicPaths := []string{
 		pathutil.BuildPublicEndpointPath(basePath, "api/v2/health"),
 		pathutil.BuildPublicEndpointPath(basePath, "api/v2/auth/login"),
@@ -256,83 +276,58 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 		AuthRequired:     authRequired,
 		Creds:            map[string]string{authConfig.Basic.Username: authConfig.Basic.Password},
 		PublicPaths:      publicPaths,
-		// Webhook trigger endpoints use their own authentication (DAG-specific token)
-		// Note: We must append "/" to ensure only /api/v2/webhooks/{fileName} is public,
-		// not /api/v2/webhooks itself (the list endpoint which requires admin auth)
 		PublicPathPrefixes: []string{
 			pathutil.BuildPublicEndpointPath(basePath, "api/v2/webhooks") + "/",
 		},
 	}
 
-	// Initialize OIDC if enabled
-	authOIDC := authConfig.OIDC
-	if authOIDC.ClientId != "" && authOIDC.ClientSecret != "" && authOIDC.Issuer != "" {
-		oidcCfg, err := frontendauth.InitVerifierAndConfig(ctx, authOIDC)
-		if err != nil {
-			return fmt.Errorf("failed to initialize OIDC: %w", err)
-		}
-		authOptions.OIDCAuthEnabled = true
-		authOptions.OIDCWhitelist = authOIDC.Whitelist
-		authOptions.OIDCProvider = oidcCfg.Provider
-		authOptions.OIDCVerify = oidcCfg.Verifier
-		authOptions.OIDCConfig = oidcCfg.Config
+	if err := a.configureOIDC(ctx, authConfig.OIDC, &authOptions); err != nil {
+		return frontendauth.Options{}, err
 	}
 
-	// Apply authentication middleware
-	// For builtin mode, we need to add JWT validation in addition to other auth methods
-	if authConfig.Mode == config.AuthModeBuiltin {
-		if a.authService == nil {
-			return fmt.Errorf("builtin auth mode configured but auth service not initialized")
-		}
-		// Add JWT as an additional auth method for builtin mode
-		authOptions.JWTValidator = a.authService
-		// Add API key validation for builtin mode (if API key store is configured)
-		if a.authService.HasAPIKeyStore() {
-			authOptions.APIKeyValidator = a.authService
-		}
+	if err := a.configureBuiltinAuth(authConfig, &authOptions); err != nil {
+		return frontendauth.Options{}, err
 	}
 
-	r.Group(func(r chi.Router) {
-		// Add client IP to context for audit logging (must be before auth middleware)
-		r.Use(frontendauth.ClientIPMiddleware())
-		// Use the unified middleware that handles all auth methods:
-		// - Basic auth (if configured)
-		// - API token (if configured)
-		// - OIDC (if configured)
-		// - JWT tokens (if builtin mode with JWTValidator)
-		r.Use(frontendauth.Middleware(authOptions))
-		r.Use(WithRemoteNode(a.remoteNodes, a.apiBasePath))
+	return authOptions, nil
+}
 
-		handler := api.NewStrictHandlerWithOptions(a, nil, options)
-		r.Mount("/", api.Handler(handler))
-	})
+func (a *API) configureOIDC(ctx context.Context, oidcConfig config.AuthOIDC, opts *frontendauth.Options) error {
+	if oidcConfig.ClientID == "" || oidcConfig.ClientSecret == "" || oidcConfig.Issuer == "" {
+		return nil
+	}
 
+	oidcCfg, err := frontendauth.InitVerifierAndConfig(ctx, oidcConfig)
+	if err != nil {
+		return fmt.Errorf("failed to initialize OIDC: %w", err)
+	}
+
+	opts.OIDCAuthEnabled = true
+	opts.OIDCWhitelist = oidcConfig.Whitelist
+	opts.OIDCProvider = oidcCfg.Provider
+	opts.OIDCVerify = oidcCfg.Verifier
+	opts.OIDCConfig = oidcCfg.Config
+	return nil
+}
+
+func (a *API) configureBuiltinAuth(authConfig config.Auth, opts *frontendauth.Options) error {
+	if authConfig.Mode != config.AuthModeBuiltin {
+		return nil
+	}
+
+	if a.authService == nil {
+		return fmt.Errorf("builtin auth mode configured but auth service not initialized")
+	}
+
+	opts.JWTValidator = a.authService
+	if a.authService.HasAPIKeyStore() {
+		opts.APIKeyValidator = a.authService
+	}
 	return nil
 }
 
 func (a *API) handleError(w http.ResponseWriter, r *http.Request, err error) {
-	code := api.ErrorCodeInternalError
-	message := "An unexpected error occurred"
-	httpStatusCode := http.StatusInternalServerError
-
-	var apiErr *Error
-	if errors.As(err, &apiErr) {
-		code = apiErr.Code
-		message = apiErr.Message
-		httpStatusCode = apiErr.HTTPStatus
-	}
-
-	switch {
-	case errors.Is(err, exec.ErrDAGNotFound):
-		code = api.ErrorCodeNotFound
-		message = "DAG not found"
-	case errors.Is(err, exec.ErrDAGRunIDNotFound):
-		code = api.ErrorCodeNotFound
-		message = "dag-run ID not found"
-	case errors.Is(err, exec.ErrDAGAlreadyExists):
-		code = api.ErrorCodeAlreadyExists
-		message = "DAG already exists"
-	}
+	code, message, httpStatusCode := a.resolveError(err)
 
 	if httpStatusCode == http.StatusInternalServerError {
 		logger.Errorf(r.Context(), "Internal server error: %v", err)
@@ -346,13 +341,28 @@ func (a *API) handleError(w http.ResponseWriter, r *http.Request, err error) {
 	})
 }
 
+func (a *API) resolveError(err error) (api.ErrorCode, string, int) {
+	var apiErr *Error
+	if errors.As(err, &apiErr) {
+		return apiErr.Code, apiErr.Message, apiErr.HTTPStatus
+	}
+
+	if errors.Is(err, exec.ErrDAGNotFound) {
+		return api.ErrorCodeNotFound, "DAG not found", http.StatusNotFound
+	}
+	if errors.Is(err, exec.ErrDAGRunIDNotFound) {
+		return api.ErrorCodeNotFound, "dag-run ID not found", http.StatusNotFound
+	}
+	if errors.Is(err, exec.ErrDAGAlreadyExists) {
+		return api.ErrorCodeAlreadyExists, "DAG already exists", http.StatusConflict
+	}
+
+	return api.ErrorCodeInternalError, "An unexpected error occurred", http.StatusInternalServerError
+}
+
 func (a *API) isAllowed(perm config.Permission) error {
 	if !a.config.Server.Permissions[perm] {
-		return &Error{
-			Code:       api.ErrorCodeForbidden,
-			Message:    "Permission denied",
-			HTTPStatus: http.StatusForbidden,
-		}
+		return errPermissionDenied
 	}
 	return nil
 }
@@ -361,71 +371,67 @@ func (a *API) isAllowed(perm config.Permission) error {
 // Returns nil if auth is not enabled (authService is nil).
 func (a *API) requireAdmin(ctx context.Context) error {
 	if a.authService == nil {
-		return nil // Auth not enabled, allow access
+		return nil
 	}
 	user, ok := auth.UserFromContext(ctx)
 	if !ok {
-		return &Error{
-			Code:       api.ErrorCodeUnauthorized,
-			Message:    "Authentication required",
-			HTTPStatus: http.StatusUnauthorized,
-		}
+		return errAuthRequired
 	}
 	if !user.Role.IsAdmin() {
-		return &Error{
-			Code:       api.ErrorCodeForbidden,
-			Message:    "Insufficient permissions",
-			HTTPStatus: http.StatusForbidden,
-		}
+		return errInsufficientPermissions
 	}
 	return nil
 }
 
-// errDAGWritesDisabled is returned when DAG modifications are blocked in read-only mode.
-var errDAGWritesDisabled = &Error{
-	HTTPStatus: http.StatusForbidden,
-	Code:       api.ErrorCodeForbidden,
-	Message:    "DAG modifications disabled: Git sync is in read-only mode (pushEnabled: false)",
-}
+// Predefined errors for common authorization failures.
+var (
+	errDAGWritesDisabled = &Error{
+		HTTPStatus: http.StatusForbidden,
+		Code:       api.ErrorCodeForbidden,
+		Message:    "DAG modifications disabled: Git sync is in read-only mode (pushEnabled: false)",
+	}
+	errAuthRequired = &Error{
+		HTTPStatus: http.StatusUnauthorized,
+		Code:       api.ErrorCodeUnauthorized,
+		Message:    "Authentication required",
+	}
+	errPermissionDenied = &Error{
+		HTTPStatus: http.StatusForbidden,
+		Code:       api.ErrorCodeForbidden,
+		Message:    "Permission denied",
+	}
+	errInsufficientPermissions = &Error{
+		HTTPStatus: http.StatusForbidden,
+		Code:       api.ErrorCodeForbidden,
+		Message:    "Insufficient permissions",
+	}
+	errUserManagementDisabled = &Error{
+		HTTPStatus: http.StatusUnauthorized,
+		Code:       api.ErrorCodeUnauthorized,
+		Message:    "User management is not enabled",
+	}
+)
 
 // requireDAGWrite checks all permissions for DAG write operations:
 // 1. Server-level permission (PermissionWriteDAGs)
 // 2. User role permission (CanWrite)
 // 3. Git sync read-only mode (dagWritesDisabled)
 func (a *API) requireDAGWrite(ctx context.Context) error {
-	// Check server-level permission
 	if !a.config.Server.Permissions[config.PermissionWriteDAGs] {
-		return &Error{
-			Code:       api.ErrorCodeForbidden,
-			Message:    "Permission denied",
-			HTTPStatus: http.StatusForbidden,
-		}
+		return errPermissionDenied
 	}
-
-	// Check user role permission (if auth enabled)
 	if a.authService != nil {
 		user, ok := auth.UserFromContext(ctx)
 		if !ok {
-			return &Error{
-				Code:       api.ErrorCodeUnauthorized,
-				Message:    "Authentication required",
-				HTTPStatus: http.StatusUnauthorized,
-			}
+			return errAuthRequired
 		}
 		if !user.Role.CanWrite() {
-			return &Error{
-				Code:       api.ErrorCodeForbidden,
-				Message:    "Insufficient permissions",
-				HTTPStatus: http.StatusForbidden,
-			}
+			return errInsufficientPermissions
 		}
 	}
-
-	// Check git sync read-only mode
 	if a.dagWritesDisabled {
 		return errDAGWritesDisabled
 	}
-
 	return nil
 }
 
@@ -433,22 +439,14 @@ func (a *API) requireDAGWrite(ctx context.Context) error {
 // Returns nil if auth is not enabled (authService is nil).
 func (a *API) requireExecute(ctx context.Context) error {
 	if a.authService == nil {
-		return nil // Auth not enabled, allow access
+		return nil
 	}
 	user, ok := auth.UserFromContext(ctx)
 	if !ok {
-		return &Error{
-			Code:       api.ErrorCodeUnauthorized,
-			Message:    "Authentication required",
-			HTTPStatus: http.StatusUnauthorized,
-		}
+		return errAuthRequired
 	}
 	if !user.Role.CanExecute() {
-		return &Error{
-			Code:       api.ErrorCodeForbidden,
-			Message:    "Insufficient permissions",
-			HTTPStatus: http.StatusForbidden,
-		}
+		return errInsufficientPermissions
 	}
 	return nil
 }
@@ -456,13 +454,27 @@ func (a *API) requireExecute(ctx context.Context) error {
 // requireUserManagement checks if user management is enabled.
 func (a *API) requireUserManagement() error {
 	if a.authService == nil {
-		return &Error{
-			Code:       api.ErrorCodeUnauthorized,
-			Message:    "User management is not enabled",
-			HTTPStatus: http.StatusUnauthorized,
-		}
+		return errUserManagementDisabled
 	}
 	return nil
+}
+
+// logAuditEntry logs an audit entry with the specified category and action details.
+// It silently returns if the audit service is not configured or if no user is present in the context.
+func (a *API) logAuditEntry(ctx context.Context, category audit.Category, action string, details any) {
+	user, ok := auth.UserFromContext(ctx)
+	if a.auditService == nil || !ok {
+		return
+	}
+
+	detailsJSON, _ := json.Marshal(details)
+	clientIP, _ := auth.ClientIPFromContext(ctx)
+
+	entry := audit.NewEntry(category, action, user.ID, user.Username).
+		WithDetails(string(detailsJSON)).
+		WithIPAddress(clientIP)
+
+	_ = a.auditService.Log(ctx, entry)
 }
 
 // ptrOf returns a pointer to v, or nil if v is the zero value for its type.
@@ -470,7 +482,6 @@ func ptrOf[T any](v T) *T {
 	if reflect.ValueOf(v).IsZero() {
 		return nil
 	}
-
 	return &v
 }
 

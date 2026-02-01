@@ -10,7 +10,7 @@ import (
 // Category represents the type of feature being audited.
 type Category string
 
-// Predefined audit categories.
+// Audit categories for different system components.
 const (
 	CategoryTerminal Category = "terminal"
 	CategoryUser     Category = "user"
@@ -18,25 +18,26 @@ const (
 	CategoryAPIKey   Category = "api_key"
 	CategoryWebhook  Category = "webhook"
 	CategoryGitSync  Category = "git_sync"
+	CategoryAgent    Category = "agent"
 )
 
 // Entry represents a single audit log entry.
 type Entry struct {
-	// ID is a unique identifier for this entry.
+	// ID is the unique identifier for the audit entry (UUID).
 	ID string `json:"id"`
-	// Timestamp is when the event occurred.
+	// Timestamp is when the audit event occurred (UTC).
 	Timestamp time.Time `json:"timestamp"`
-	// Category identifies the feature (e.g., "terminal", "user", "dag").
+	// Category indicates the type of feature being audited.
 	Category Category `json:"category"`
-	// Action describes what happened (e.g., "session_start", "command", "login").
+	// Action describes the specific action performed.
 	Action string `json:"action"`
-	// UserID is the ID of the user who performed the action.
+	// UserID is the unique identifier of the user who performed the action.
 	UserID string `json:"user_id"`
-	// Username is the username of the user who performed the action.
+	// Username is the human-readable name of the user.
 	Username string `json:"username"`
-	// Details contains action-specific data as a JSON string.
+	// Details contains additional context about the action (JSON-encoded).
 	Details string `json:"details,omitempty"`
-	// IPAddress is the client IP address if available.
+	// IPAddress is the IP address from which the action was performed.
 	IPAddress string `json:"ip_address,omitempty"`
 }
 
@@ -66,24 +67,24 @@ func (e *Entry) WithIPAddress(ip string) *Entry {
 
 // QueryFilter defines filters for querying audit entries.
 type QueryFilter struct {
-	// Category filters by audit category.
+	// Category filters entries by audit category.
 	Category Category
-	// UserID filters by user ID.
+	// UserID filters entries by the user who performed the action.
 	UserID string
-	// StartTime filters entries after this time (inclusive).
+	// StartTime is the inclusive start of the time range.
 	StartTime time.Time
-	// EndTime filters entries before this time (exclusive).
+	// EndTime is the exclusive end of the time range.
 	EndTime time.Time
 	// Limit is the maximum number of entries to return.
 	Limit int
-	// Offset is the number of entries to skip.
+	// Offset is the number of entries to skip for pagination.
 	Offset int
 }
 
 // QueryResult contains the result of a query.
 type QueryResult struct {
-	// Entries is the list of audit entries matching the filter.
+	// Entries contains the audit entries matching the query.
 	Entries []*Entry `json:"entries"`
-	// Total is the total number of entries matching the filter (before pagination).
+	// Total is the total count of matching entries before pagination.
 	Total int `json:"total"`
 }

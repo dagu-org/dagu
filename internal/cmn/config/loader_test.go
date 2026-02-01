@@ -12,8 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// testLoad is a helper function that creates a new ConfigLoader with a fresh viper instance
-// and loads the configuration. This replaces the old config.Load() function in tests.
 func testLoad(t *testing.T, opts ...ConfigLoaderOption) *Config {
 	t.Helper()
 	cfg, err := NewConfigLoader(viper.New(), opts...).Load()
@@ -21,7 +19,6 @@ func testLoad(t *testing.T, opts ...ConfigLoaderOption) *Config {
 	return cfg
 }
 
-// testLoadWithError is a helper for tests that expect loading to fail.
 func testLoadWithError(t *testing.T, opts ...ConfigLoaderOption) error {
 	t.Helper()
 	_, err := NewConfigLoader(viper.New(), opts...).Load()
@@ -29,23 +26,14 @@ func testLoadWithError(t *testing.T, opts ...ConfigLoaderOption) error {
 }
 
 func TestLoad_Env(t *testing.T) {
-	// Reset viper to ensure clean state
-	viper.Reset()
-	defer viper.Reset()
-
-	// Create a minimal config file
 	tempDir := t.TempDir()
 	configFile := filepath.Join(tempDir, "config.yaml")
-
 	err := os.WriteFile(configFile, []byte("# minimal config"), 0600)
 	require.NoError(t, err)
 
-	// Use temp directory for path-related env vars to ensure cross-platform compatibility
 	testPaths := filepath.Join(tempDir, "test")
 
-	// Define all environment variables that should be bound according to bindEnvironmentVariables()
 	testEnvs := map[string]string{
-		// Server configurations
 		"DAGU_LOG_FORMAT":   "json",
 		"DAGU_BASE_PATH":    "/test/base",
 		"DAGU_API_BASE_URL": "/test/api",
@@ -55,26 +43,21 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_DEBUG":        "true",
 		"DAGU_HEADLESS":     "true",
 
-		// Global configurations
 		"DAGU_WORK_DIR":      filepath.Join(testPaths, "work"),
 		"DAGU_DEFAULT_SHELL": "/bin/zsh",
 
-		// UI configurations (new keys)
 		"DAGU_UI_MAX_DASHBOARD_PAGE_LIMIT": "250",
 		"DAGU_UI_LOG_ENCODING_CHARSET":     "iso-8859-1",
 		"DAGU_UI_NAVBAR_COLOR":             "#123456",
 		"DAGU_UI_NAVBAR_TITLE":             "Test Dagu",
 
-		// Authentication configurations (new keys)
 		"DAGU_AUTH_BASIC_USERNAME": "testuser",
 		"DAGU_AUTH_BASIC_PASSWORD": "testpass",
 		"DAGU_AUTH_TOKEN":          "test-token-123",
 
-		// TLS configurations
 		"DAGU_CERT_FILE": filepath.Join(testPaths, "cert.pem"),
 		"DAGU_KEY_FILE":  filepath.Join(testPaths, "key.pem"),
 
-		// File paths
 		"DAGU_DAGS_DIR":             filepath.Join(testPaths, "dags"),
 		"DAGU_EXECUTABLE":           filepath.Join(testPaths, "bin", "dagu"),
 		"DAGU_LOG_DIR":              filepath.Join(testPaths, "logs"),
@@ -87,42 +70,32 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_QUEUE_DIR":            filepath.Join(testPaths, "queue"),
 		"DAGU_SERVICE_REGISTRY_DIR": filepath.Join(testPaths, "service-registry"),
 
-		// UI customization
 		"DAGU_LATEST_STATUS_TODAY": "true",
 
-		// Queue configuration
 		"DAGU_QUEUE_ENABLED": "false",
 
-		// Coordinator configuration
 		"DAGU_COORDINATOR_HOST":      "0.0.0.0",
 		"DAGU_COORDINATOR_ADVERTISE": "dagu-coordinator",
 		"DAGU_COORDINATOR_PORT":      "50099",
 
-		// Worker configuration - env vars still bound but to nested structure
 		"DAGU_WORKER_ID":              "test-worker-123",
 		"DAGU_WORKER_MAX_ACTIVE_RUNS": "200",
 
-		// Scheduler configuration
 		"DAGU_SCHEDULER_PORT":                      "9999",
 		"DAGU_SCHEDULER_ZOMBIE_DETECTION_INTERVAL": "90s",
 
-		// OIDC Authentication configurations
 		"DAGU_AUTH_OIDC_CLIENT_ID":     "test-client-id",
 		"DAGU_AUTH_OIDC_CLIENT_SECRET": "test-secret",
 		"DAGU_AUTH_OIDC_ISSUER":        "https://auth.example.com",
 		"DAGU_AUTH_OIDC_SCOPES":        "openid,profile,email",
 
-		// UI DAGs configuration
 		"DAGU_UI_DAGS_SORT_FIELD": "status",
 		"DAGU_UI_DAGS_SORT_ORDER": "desc",
 
-		// Terminal configuration
 		"DAGU_TERMINAL_ENABLED": "true",
 
-		// Audit configuration
 		"DAGU_AUDIT_ENABLED": "false",
 
-		// Tunnel configuration (funnel=false to avoid validation error with auth mode)
 		"DAGU_TUNNEL_ENABLED":                              "true",
 		"DAGU_TUNNEL_TAILSCALE_AUTH_KEY":                   "tskey-test-123",
 		"DAGU_TUNNEL_TAILSCALE_HOSTNAME":                   "test-dagu",
@@ -135,26 +108,8 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_TUNNEL_RATE_LIMITING_BLOCK_DURATION_SECONDS": "1800",
 	}
 
-	// Save and clear existing environment variables
-	savedEnvs := make(map[string]string)
-	for key := range testEnvs {
-		savedEnvs[key] = os.Getenv(key)
-		os.Unsetenv(key)
-	}
-	defer func() {
-		// Restore original environment
-		for key, val := range savedEnvs {
-			if val != "" {
-				os.Setenv(key, val)
-			} else {
-				os.Unsetenv(key)
-			}
-		}
-	}()
-
-	// Set test environment variables
 	for key, val := range testEnvs {
-		os.Setenv(key, val)
+		t.Setenv(key, val)
 	}
 
 	cfg := testLoad(t, WithConfigFile(configFile))
@@ -188,7 +143,7 @@ func TestLoad_Env(t *testing.T) {
 				Basic: AuthBasic{Username: "testuser", Password: "testpass"},
 				Token: AuthToken{Value: "test-token-123"},
 				OIDC: AuthOIDC{
-					ClientId:     "test-client-id",
+					ClientID:     "test-client-id",
 					ClientSecret: "test-secret",
 					Issuer:       "https://auth.example.com",
 					Scopes:       []string{"openid", "profile", "email"},
@@ -224,9 +179,10 @@ func TestLoad_Env(t *testing.T) {
 			ProcDir:            filepath.Join(testPaths, "proc"),
 			QueueDir:           filepath.Join(testPaths, "queue"),
 			ServiceRegistryDir: filepath.Join(testPaths, "service-registry"),
-			UsersDir:           filepath.Join(testPaths, "data", "users"),    // Derived from DataDir
-			APIKeysDir:         filepath.Join(testPaths, "data", "apikeys"),  // Derived from DataDir
-			WebhooksDir:        filepath.Join(testPaths, "data", "webhooks"), // Derived from DataDir
+			UsersDir:           filepath.Join(testPaths, "data", "users"),                  // Derived from DataDir
+			APIKeysDir:         filepath.Join(testPaths, "data", "apikeys"),                // Derived from DataDir
+			WebhooksDir:        filepath.Join(testPaths, "data", "webhooks"),               // Derived from DataDir
+			ConversationsDir:   filepath.Join(testPaths, "data", "agent", "conversations"), // Derived from DataDir
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
@@ -288,21 +244,15 @@ func TestLoad_Env(t *testing.T) {
 }
 
 func TestLoad_WithAppHomeDir(t *testing.T) {
-	// Reset viper to ensure clean state
-	viper.Reset()
-	defer viper.Reset()
-
 	tempDir := t.TempDir()
-
 	cfg := testLoad(t, WithAppHomeDir(tempDir))
 
-	resolved := filepath.Clean(tempDir)
-	assert.Equal(t, filepath.Join(resolved, "dags"), cfg.Paths.DAGsDir)
-	assert.Equal(t, filepath.Join(resolved, "data"), cfg.Paths.DataDir)
-	assert.Equal(t, filepath.Join(resolved, "logs"), cfg.Paths.LogDir)
+	assert.Equal(t, filepath.Join(tempDir, "dags"), cfg.Paths.DAGsDir)
+	assert.Equal(t, filepath.Join(tempDir, "data"), cfg.Paths.DataDir)
+	assert.Equal(t, filepath.Join(tempDir, "logs"), cfg.Paths.LogDir)
 
 	baseEnv := cfg.Core.BaseEnv.AsSlice()
-	require.Contains(t, baseEnv, fmt.Sprintf("DAGU_HOME=%s", resolved))
+	require.Contains(t, baseEnv, fmt.Sprintf("DAGU_HOME=%s", tempDir))
 }
 
 func TestLoad_YAML(t *testing.T) {
@@ -430,9 +380,9 @@ scheduler:
 				Basic: AuthBasic{Username: "admin", Password: "secret"},
 				Token: AuthToken{Value: "api-token"},
 				OIDC: AuthOIDC{
-					ClientId:     "test-client-id",
+					ClientID:     "test-client-id",
 					ClientSecret: "test-client-secret",
-					ClientUrl:    "http://localhost:8081",
+					ClientURL:    "http://localhost:8081",
 					Issuer:       "https://accounts.example.com",
 					Scopes:       []string{"openid", "profile", "email"},
 					Whitelist:    []string{"user@example.com"},
@@ -489,6 +439,7 @@ scheduler:
 			UsersDir:           "/var/dagu/data/users",
 			APIKeysDir:         "/var/dagu/data/apikeys",
 			WebhooksDir:        "/var/dagu/data/webhooks",
+			ConversationsDir:   "/var/dagu/data/agent/conversations",
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
@@ -596,60 +547,38 @@ paths:
 
 func TestLoad_EdgeCases_Errors(t *testing.T) {
 	t.Run("InvalidTimezone", func(t *testing.T) {
-		tempDir := t.TempDir()
-		configFile := filepath.Join(tempDir, "config.yaml")
-		err := os.WriteFile(configFile, []byte(`tz: "Invalid/Timezone"`), 0600)
-		require.NoError(t, err)
-
-		err = testLoadWithError(t, WithConfigFile(configFile))
+		err := loadWithErrorFromYAML(t, `tz: "Invalid/Timezone"`)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to load timezone")
 	})
 
 	t.Run("IncompleteTLS", func(t *testing.T) {
-		tempDir := t.TempDir()
-		configFile := filepath.Join(tempDir, "config.yaml")
-		err := os.WriteFile(configFile, []byte(`
+		err := loadWithErrorFromYAML(t, `
 tls:
   certFile: "/path/to/cert.pem"
   keyFile: ""
-`), 0600)
-		require.NoError(t, err)
-
-		err = testLoadWithError(t, WithConfigFile(configFile))
+`)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "TLS configuration incomplete")
 	})
 
-	t.Run("InvalidPort", func(t *testing.T) {
-		tempDir := t.TempDir()
-		configFile := filepath.Join(tempDir, "config.yaml")
-
-		// Test negative port
-		err := os.WriteFile(configFile, []byte(`port: -1`), 0600)
-		require.NoError(t, err)
-		err = testLoadWithError(t, WithConfigFile(configFile))
+	t.Run("InvalidPort_Negative", func(t *testing.T) {
+		err := loadWithErrorFromYAML(t, `port: -1`)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid port number")
+	})
 
-		// Test port > 65535
-		err = os.WriteFile(configFile, []byte(`port: 99999`), 0600)
-		require.NoError(t, err)
-		err = testLoadWithError(t, WithConfigFile(configFile))
+	t.Run("InvalidPort_TooLarge", func(t *testing.T) {
+		err := loadWithErrorFromYAML(t, `port: 99999`)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid port number")
 	})
 
 	t.Run("InvalidMaxDashboardPageLimit", func(t *testing.T) {
-		tempDir := t.TempDir()
-		configFile := filepath.Join(tempDir, "config.yaml")
-		err := os.WriteFile(configFile, []byte(`
+		err := loadWithErrorFromYAML(t, `
 ui:
   maxDashboardPageLimit: 0
-`), 0600)
-		require.NoError(t, err)
-
-		err = testLoadWithError(t, WithConfigFile(configFile))
+`)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid max dashboard page limit")
 	})
@@ -693,7 +622,6 @@ paths:
 }
 
 func TestLoad_LegacyEnv(t *testing.T) {
-	// Use temp directory for cross-platform compatibility
 	tempDir := t.TempDir()
 
 	cfg := loadWithEnv(t, "# empty", map[string]string{
@@ -721,7 +649,6 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 
 	t.Run("AllFieldsSet", func(t *testing.T) {
 		t.Parallel()
-		// Use temp directory for cross-platform compatibility
 		tempDir := t.TempDir()
 		testPaths := filepath.Join(tempDir, "test")
 
@@ -773,10 +700,8 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 
 	t.Run("DAGsPrecedence", func(t *testing.T) {
 		t.Parallel()
-		// Use temp directory for cross-platform compatibility
 		tempDir := t.TempDir()
 
-		// Test that DAGsDir takes precedence over DAGs
 		def := Definition{
 			DAGs:    filepath.Join(tempDir, "legacy", "dags"),
 			DAGsDir: filepath.Join(tempDir, "new", "dags"),
@@ -786,7 +711,6 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, filepath.Join(tempDir, "new", "dags"), cfg.Paths.DAGsDir)
 
-		// Test that DAGs is used when DAGsDir is not set
 		def2 := Definition{
 			DAGs: filepath.Join(tempDir, "legacy", "dags"),
 		}
@@ -797,78 +721,58 @@ func TestLoad_LoadLegacyFields(t *testing.T) {
 	})
 }
 
-// loadWithEnv loads config with environment variables set
-func loadWithEnv(t *testing.T, yaml string, env map[string]string) *Config {
+func loadWithEnv(t *testing.T, yamlContent string, env map[string]string) *Config {
 	t.Helper()
 	viper.Reset()
 
-	// Set environment variables
 	for k, v := range env {
-		original := os.Getenv(k)
-		os.Setenv(k, v)
-		t.Cleanup(func() {
-			if original == "" {
-				os.Unsetenv(k)
-			} else {
-				os.Setenv(k, original)
-			}
-		})
+		t.Setenv(k, v)
 	}
 
-	return loadFromYAML(t, yaml)
+	return loadFromYAML(t, yamlContent)
 }
 
-func unsetEnv(t *testing.T, key string) {
-	t.Helper()
-	original, existed := os.LookupEnv(key)
-	os.Unsetenv(key)
-	t.Cleanup(func() {
-		if existed {
-			os.Setenv(key, original)
-			return
-		}
-		os.Unsetenv(key)
-	})
-}
-
-// loadFromYAML loads config from YAML string
-func loadFromYAML(t *testing.T, yaml string) *Config {
+func loadFromYAML(t *testing.T, yamlContent string) *Config {
 	t.Helper()
 	viper.Reset()
 
 	configFile := filepath.Join(t.TempDir(), "config.yaml")
-
-	err := os.WriteFile(configFile, []byte(yaml), 0600)
+	err := os.WriteFile(configFile, []byte(yamlContent), 0600)
 	require.NoError(t, err)
 
 	cfg := testLoad(t, WithConfigFile(configFile))
-
 	cfg.Paths.ConfigFileUsed = ""
 	return cfg
 }
 
+func loadWithErrorFromYAML(t *testing.T, yamlContent string) error {
+	t.Helper()
+	viper.Reset()
+
+	configFile := filepath.Join(t.TempDir(), "config.yaml")
+	err := os.WriteFile(configFile, []byte(yamlContent), 0600)
+	require.NoError(t, err)
+
+	return testLoadWithError(t, WithConfigFile(configFile))
+}
+
 func TestLoad_ConfigFileUsed(t *testing.T) {
-	// Create a temp config file
 	tempDir := t.TempDir()
 	configFile := filepath.Join(tempDir, "config.yaml")
 	err := os.WriteFile(configFile, []byte("host: 127.0.0.1"), 0600)
 	require.NoError(t, err)
 
-	// Load configuration
 	cfg := testLoad(t, WithConfigFile(configFile))
 
-	// Verify ConfigFileUsed is set correctly
 	assert.Equal(t, configFile, cfg.Paths.ConfigFileUsed)
 }
 
 func TestLoad_ConfigFileUsed_RelativePath(t *testing.T) {
-	// Create a temp config file
 	tempDir := t.TempDir()
 	configFile := filepath.Join(tempDir, "config.yaml")
 	err := os.WriteFile(configFile, []byte("host: 127.0.0.1"), 0600)
 	require.NoError(t, err)
 
-	// Change to temp directory and use relative path
 	origDir, err := os.Getwd()
 	require.NoError(t, err)
 	defer func() {
@@ -878,14 +782,11 @@ func TestLoad_ConfigFileUsed_RelativePath(t *testing.T) {
 	err = os.Chdir(tempDir)
 	require.NoError(t, err)
 
-	// Load with relative path
 	cfg := testLoad(t, WithConfigFile("config.yaml"))
 
-	// Verify ConfigFileUsed is resolved to absolute path
 	assert.True(t, filepath.IsAbs(cfg.Paths.ConfigFileUsed),
 		"ConfigFileUsed should be absolute, got: %s", cfg.Paths.ConfigFileUsed)
 
-	// Compare using EvalSymlinks to handle macOS /var -> /private/var symlink
 	expectedPath, err := filepath.EvalSymlinks(configFile)
 	require.NoError(t, err)
 	actualPath, err := filepath.EvalSymlinks(cfg.Paths.ConfigFileUsed)
@@ -918,16 +819,9 @@ func TestBindEnv_AsPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Use DAGU_DAGS_DIR as a real path binding that uses isPath: true
-			envKey := "DAGU_DAGS_DIR"
-			os.Unsetenv(envKey)
-			defer os.Unsetenv(envKey)
+			const envKey = "DAGU_DAGS_DIR"
+			t.Setenv(envKey, tt.envValue)
 
-			if tt.envValue != "" {
-				os.Setenv(envKey, tt.envValue)
-			}
-
-			// Create a ConfigLoader and call bindEnvironmentVariables on it
 			loader := NewConfigLoader(viper.New())
 			loader.bindEnvironmentVariables()
 
@@ -1009,7 +903,7 @@ auth:
       - "profile"
 `)
 		assert.Equal(t, AuthModeOIDC, cfg.Server.Auth.Mode)
-		assert.Equal(t, "my-client-id", cfg.Server.Auth.OIDC.ClientId)
+		assert.Equal(t, "my-client-id", cfg.Server.Auth.OIDC.ClientID)
 		assert.Equal(t, "my-client-secret", cfg.Server.Auth.OIDC.ClientSecret)
 		assert.Equal(t, "https://auth.example.com", cfg.Server.Auth.OIDC.Issuer)
 		assert.Equal(t, []string{"openid", "profile"}, cfg.Server.Auth.OIDC.Scopes)
@@ -1034,7 +928,6 @@ auth:
 auth:
   mode: "invalid_mode"
 `)
-		// Invalid mode should default to none with a warning
 		assert.Equal(t, AuthModeNone, cfg.Server.Auth.Mode)
 		require.Len(t, cfg.Warnings, 1)
 		assert.Contains(t, cfg.Warnings[0], "Invalid auth.mode value")
@@ -1103,7 +996,6 @@ auth:
     token:
       secret: "secret"
 `)
-		// TTL defaults to 24 hours when not specified
 		assert.Equal(t, 24*time.Hour, cfg.Server.Auth.Builtin.Token.TTL)
 	})
 }
@@ -1177,7 +1069,6 @@ cache: high
 		cfg := loadFromYAML(t, `
 cache: invalid
 `)
-		// Invalid mode defaults to normal
 		assert.Equal(t, CacheModeNormal, cfg.Cache)
 		require.Len(t, cfg.Warnings, 1)
 		assert.Contains(t, cfg.Warnings[0], "Invalid cache mode")
@@ -1425,12 +1316,11 @@ tunnel:
 		})
 		assert.True(t, cfg.Tunnel.Enabled)
 		assert.Equal(t, "env-key", cfg.Tunnel.Tailscale.AuthKey)
-		assert.Equal(t, "yaml-host", cfg.Tunnel.Tailscale.Hostname) // Not overridden
-		assert.True(t, cfg.Tunnel.Tailscale.HTTPS)                  // Overridden
+		assert.Equal(t, "yaml-host", cfg.Tunnel.Tailscale.Hostname)
+		assert.True(t, cfg.Tunnel.Tailscale.HTTPS)
 	})
 
 	t.Run("TunnelDefaultHostname", func(t *testing.T) {
-		// When tunnel is enabled without hostname, it should default to AppSlug
 		cfg := loadFromYAML(t, `
 tunnel:
   enabled: true
@@ -1440,7 +1330,6 @@ tunnel:
 	})
 
 	t.Run("TunnelDefaultRateLimiting", func(t *testing.T) {
-		// When tunnel is enabled, rate limiting should have default values
 		cfg := loadFromYAML(t, `
 tunnel:
   enabled: true
@@ -1451,12 +1340,11 @@ tunnel:
 	})
 
 	t.Run("TunnelDisabledNoDefaults", func(t *testing.T) {
-		// When tunnel is disabled, no defaults should be applied
 		cfg := loadFromYAML(t, `
 tunnel:
   enabled: false
 `)
 		assert.False(t, cfg.Tunnel.Enabled)
-		assert.Empty(t, cfg.Tunnel.Tailscale.Hostname) // No default applied when disabled
+		assert.Empty(t, cfg.Tunnel.Tailscale.Hostname)
 	})
 }

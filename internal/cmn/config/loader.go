@@ -47,14 +47,14 @@ const (
 	ServiceAgent
 )
 
-// ConfigLoader is responsible for reading and merging configuration from various sources.
+// ConfigLoader reads and merges configuration from various sources.
 type ConfigLoader struct {
-	v                 *viper.Viper // Isolated viper instance for this loader
-	configFile        string       // Optional explicit path to the configuration file.
-	warnings          []string     // Collected warnings during configuration resolution.
-	additionalBaseEnv []string     // Additional environment variables to append to the base environment.
-	appHomeDir        string       // Optional override for DAGU_HOME style directory.
-	service           Service      // The service type being configured (determines which config sections to load).
+	v                 *viper.Viper
+	configFile        string
+	warnings          []string
+	additionalBaseEnv []string
+	appHomeDir        string
+	service           Service
 }
 
 // ConfigLoaderOption defines a functional option for configuring a ConfigLoader.
@@ -75,9 +75,7 @@ func WithAppHomeDir(dir string) ConfigLoaderOption {
 	}
 }
 
-// WithService sets the service type for configuration loading.
-// This allows the loader to only process configuration sections
-// ConfigLoader to determine which configuration sections to load.
+// WithService sets the service type, determining which configuration sections to load.
 func WithService(service Service) ConfigLoaderOption {
 	return func(l *ConfigLoader) {
 		l.service = service
@@ -88,6 +86,8 @@ func WithService(service Service) ConfigLoaderOption {
 type ConfigSection uint16
 
 const (
+	// SectionNone means "always load regardless of service type".
+	// Use this for settings that apply universally across all services.
 	SectionNone        ConfigSection = 0
 	SectionServer      ConfigSection = 1 << iota // 2
 	SectionScheduler                             // 4
@@ -122,63 +122,75 @@ func (l *ConfigLoader) requires(section ConfigSection) bool {
 	return req&section != 0
 }
 
-// resolvePath resolves a path to an absolute path with a descriptive error message.
-// Returns the resolved path, or an error if resolution fails.
-// Empty paths are returned as-is without error.
-func (l *ConfigLoader) resolvePath(fieldName, path string) (string, error) {
-	if path == "" {
+// resolvePath resolves a path to an absolute path. Empty paths are returned as-is.
+func (l *ConfigLoader) resolvePath(fieldName, pathValue string) (string, error) {
+	if pathValue == "" {
 		return "", nil
 	}
-	resolved, err := fileutil.ResolvePath(path)
+	resolved, err := fileutil.ResolvePath(pathValue)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve %s path %q: %w", fieldName, path, err)
+		return "", fmt.Errorf("failed to resolve %s path %q: %w", fieldName, pathValue, err)
 	}
 	return resolved, nil
 }
 
-// NewConfigLoader creates a new ConfigLoader instance with an isolated viper instance
-// ConfigLoaderOption values (for example: service, config file path, or app home directory).
-func NewConfigLoader(viper *viper.Viper, options ...ConfigLoaderOption) *ConfigLoader {
-	loader := &ConfigLoader{v: viper}
-	for _, option := range options {
-		option(loader)
+// parseDuration parses a duration string, returning zero and adding a warning if invalid.
+func (l *ConfigLoader) parseDuration(fieldName, value string) time.Duration {
+	if value == "" {
+		return 0
+	}
+	duration, err := time.ParseDuration(value)
+	if err != nil {
+		l.warnings = append(l.warnings, fmt.Sprintf("Invalid %s value: %s", fieldName, value))
+		return 0
+	}
+	return duration
+}
+
+// NewConfigLoader creates a ConfigLoader with the given viper instance and options.
+func NewConfigLoader(v *viper.Viper, options ...ConfigLoaderOption) *ConfigLoader {
+	loader := &ConfigLoader{v: v}
+	for _, opt := range options {
+		opt(loader)
 	}
 	return loader
 }
 
-// Load initializes viper, reads configuration files, handles legacy configuration,
-// and returns a fully built and validated Config instance.
+// Load reads configuration files, applies defaults and environment overrides,
+// and returns a validated Config instance.
 func (l *ConfigLoader) Load() (*Config, error) {
-	// Initialize viper with proper defaults, environment binding and warnings.
 	homeDir, err := getHomeDir()
 	if err != nil {
 		return nil, err
 	}
+
 	xdgConfig := XDGConfig{
 		DataHome:   xdg.DataHome,
 		ConfigHome: filepath.Join(homeDir, ".config"),
 	}
+
 	if l.appHomeDir != "" {
 		l.additionalBaseEnv = append(l.additionalBaseEnv, fmt.Sprintf("DAGU_HOME=%s", fileutil.ResolvePathOrBlank(l.appHomeDir)))
 	}
+
 	warnings, err := l.setupViper(xdgConfig, homeDir, l.configFile, l.appHomeDir)
 	if err != nil {
 		return nil, err
 	}
 	l.warnings = append(l.warnings, warnings...)
 
-	// Attempt to read the main config file. If not found, we proceed without error.
 	if err := l.v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, fmt.Errorf("failed to read config: %w", err)
 		}
 	}
+
 	configFileUsed, err := l.resolvePath("config file", l.v.ConfigFileUsed())
 	if err != nil {
 		return nil, err
 	}
 
-	// For backward compatibility, try merging in the "admin.yaml" config.
+	// Merge legacy admin.yaml for backward compatibility
 	l.v.SetConfigName("admin")
 	if err := l.v.MergeInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
@@ -186,38 +198,30 @@ func (l *ConfigLoader) Load() (*Config, error) {
 		}
 	}
 
-	// Unmarshal the merged configuration into our Definition structure.
 	var def Definition
 	if err := l.v.Unmarshal(&def); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-	// Build the final Config from the definition (including legacy fields and validations).
 	cfg, err := l.buildConfig(def)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build config: %w", err)
 	}
 
 	cfg.Paths.ConfigFileUsed = configFileUsed
-
-	// Attach any warnings collected during the resolution process.
 	cfg.Warnings = l.warnings
 
 	return cfg, nil
 }
 
-// buildConfig transforms the intermediate Definition (raw config data) into a final Config structure.
-// It uses the service requirements to load only necessary configuration sections.
+// buildConfig transforms the Definition into a validated Config structure,
+// loading only sections required by the configured service.
 func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
-	var cfg Config
+	cfg := Config{
+		UI:     UI{MaxDashboardPageLimit: 1},
+		Server: Server{Port: 8080, Auth: Auth{Mode: AuthModeNone}},
+	}
 
-	// Set validation-safe defaults for fields that may not be loaded
-	// These ensure cfg.Validate() passes even if section-specific loading is skipped
-	cfg.UI.MaxDashboardPageLimit = 1    // Minimum valid value
-	cfg.Server.Port = 8080              // Default port
-	cfg.Server.Auth.Mode = AuthModeNone // Default auth mode
-
-	// Always load core and paths configuration
 	if err := l.loadCoreConfig(&cfg, def); err != nil {
 		return nil, err
 	}
@@ -225,48 +229,36 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		return nil, err
 	}
 
-	// Load service-specific configuration based on requirements
-	if l.requires(SectionServer) {
-		l.loadServerConfig(&cfg, def)
-	}
-	if l.requires(SectionUI) {
-		l.loadUIConfig(&cfg, def)
-	}
-	if l.requires(SectionQueues) {
-		l.loadQueuesConfig(&cfg, def)
-	}
-	if l.requires(SectionCoordinator) {
-		l.loadCoordinatorConfig(&cfg, def)
-	}
-	if l.requires(SectionWorker) {
-		l.loadWorkerConfig(&cfg, def)
-	}
-	if l.requires(SectionScheduler) {
-		l.loadSchedulerConfig(&cfg, def)
-	}
-	if l.requires(SectionMonitoring) {
-		l.loadMonitoringConfig(&cfg, def)
-	}
-	if l.requires(SectionGitSync) {
-		l.loadGitSyncConfig(&cfg, def)
-	}
-	if l.requires(SectionTunnel) {
-		l.loadTunnelConfig(&cfg, def)
+	// Load service-specific sections
+	sectionLoaders := []struct {
+		section ConfigSection
+		load    func()
+	}{
+		{SectionServer, func() { l.loadServerConfig(&cfg, def) }},
+		{SectionUI, func() { l.loadUIConfig(&cfg, def) }},
+		{SectionQueues, func() { l.loadQueuesConfig(&cfg, def) }},
+		{SectionCoordinator, func() { l.loadCoordinatorConfig(&cfg, def) }},
+		{SectionWorker, func() { l.loadWorkerConfig(&cfg, def) }},
+		{SectionScheduler, func() { l.loadSchedulerConfig(&cfg, def) }},
+		{SectionMonitoring, func() { l.loadMonitoringConfig(&cfg, def) }},
+		{SectionGitSync, func() { l.loadGitSyncConfig(&cfg, def) }},
+		{SectionTunnel, func() { l.loadTunnelConfig(&cfg, def) }},
 	}
 
-	// Cache config is always loaded (used by all services)
+	for _, sl := range sectionLoaders {
+		if l.requires(sl.section) {
+			sl.load()
+		}
+	}
+
 	l.loadCacheConfig(&cfg, def)
 
-	// Incorporate legacy field values and environment variable overrides
 	if err := l.LoadLegacyFields(&cfg, def); err != nil {
 		return nil, err
 	}
 	l.loadLegacyEnv(&cfg)
-
-	// Finalize paths (set derived paths based on DataDir)
 	l.finalizePaths(&cfg)
 
-	// Validate the complete configuration
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -274,7 +266,6 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 	return &cfg, nil
 }
 
-// loadCoreConfig loads the core configuration settings.
 func (l *ConfigLoader) loadCoreConfig(cfg *Config, def Definition) error {
 	baseEnv := LoadBaseEnv()
 	baseEnv.variables = append(baseEnv.variables, l.additionalBaseEnv...)
@@ -289,7 +280,6 @@ func (l *ConfigLoader) loadCoreConfig(cfg *Config, def Definition) error {
 		Peer:         l.loadPeerConfig(def.Peer),
 	}
 
-	// Initialize the timezone
 	if err := setTimezone(&cfg.Core); err != nil {
 		return fmt.Errorf("failed to set timezone: %w", err)
 	}
@@ -297,81 +287,57 @@ func (l *ConfigLoader) loadCoreConfig(cfg *Config, def Definition) error {
 	return nil
 }
 
-// loadPeerConfig converts PeerDef to Peer configuration.
 func (l *ConfigLoader) loadPeerConfig(def PeerDef) Peer {
-	peer := Peer{
+	return Peer{
 		CertFile:      def.CertFile,
 		KeyFile:       def.KeyFile,
 		ClientCaFile:  def.ClientCaFile,
 		SkipTLSVerify: def.SkipTLSVerify,
 		Insecure:      def.Insecure,
 		MaxRetries:    def.MaxRetries,
+		RetryInterval: l.parseDuration("peer.retryInterval", def.RetryInterval),
 	}
-
-	if def.RetryInterval != "" {
-		if d, err := time.ParseDuration(def.RetryInterval); err == nil {
-			peer.RetryInterval = d
-		}
-	}
-
-	return peer
 }
 
-// loadPathsConfig loads the file system paths configuration.
-// All paths are resolved to absolute paths. Returns an error if any path resolution fails.
+// loadPathsConfig resolves all file system paths to absolute paths.
 func (l *ConfigLoader) loadPathsConfig(cfg *Config, def Definition) error {
 	if def.Paths == nil {
 		return nil
 	}
 
-	var err error
-	if cfg.Paths.DAGsDir, err = l.resolvePath("DAGsDir", def.Paths.DAGsDir); err != nil {
-		return err
+	pathMappings := []struct {
+		name   string
+		target *string
+		source string
+	}{
+		{"DAGsDir", &cfg.Paths.DAGsDir, def.Paths.DAGsDir},
+		{"SuspendFlagsDir", &cfg.Paths.SuspendFlagsDir, def.Paths.SuspendFlagsDir},
+		{"DataDir", &cfg.Paths.DataDir, def.Paths.DataDir},
+		{"LogDir", &cfg.Paths.LogDir, def.Paths.LogDir},
+		{"AdminLogsDir", &cfg.Paths.AdminLogsDir, def.Paths.AdminLogsDir},
+		{"BaseConfig", &cfg.Paths.BaseConfig, def.Paths.BaseConfig},
+		{"Executable", &cfg.Paths.Executable, def.Paths.Executable},
+		{"DAGRunsDir", &cfg.Paths.DAGRunsDir, def.Paths.DAGRunsDir},
+		{"QueueDir", &cfg.Paths.QueueDir, def.Paths.QueueDir},
+		{"ProcDir", &cfg.Paths.ProcDir, def.Paths.ProcDir},
+		{"ServiceRegistryDir", &cfg.Paths.ServiceRegistryDir, def.Paths.ServiceRegistryDir},
+		{"UsersDir", &cfg.Paths.UsersDir, def.Paths.UsersDir},
+		{"APIKeysDir", &cfg.Paths.APIKeysDir, def.Paths.APIKeysDir},
+		{"WebhooksDir", &cfg.Paths.WebhooksDir, def.Paths.WebhooksDir},
+		{"ConversationsDir", &cfg.Paths.ConversationsDir, def.Paths.ConversationsDir},
 	}
-	if cfg.Paths.SuspendFlagsDir, err = l.resolvePath("SuspendFlagsDir", def.Paths.SuspendFlagsDir); err != nil {
-		return err
-	}
-	if cfg.Paths.DataDir, err = l.resolvePath("DataDir", def.Paths.DataDir); err != nil {
-		return err
-	}
-	if cfg.Paths.LogDir, err = l.resolvePath("LogDir", def.Paths.LogDir); err != nil {
-		return err
-	}
-	if cfg.Paths.AdminLogsDir, err = l.resolvePath("AdminLogsDir", def.Paths.AdminLogsDir); err != nil {
-		return err
-	}
-	if cfg.Paths.BaseConfig, err = l.resolvePath("BaseConfig", def.Paths.BaseConfig); err != nil {
-		return err
-	}
-	if cfg.Paths.Executable, err = l.resolvePath("Executable", def.Paths.Executable); err != nil {
-		return err
-	}
-	if cfg.Paths.DAGRunsDir, err = l.resolvePath("DAGRunsDir", def.Paths.DAGRunsDir); err != nil {
-		return err
-	}
-	if cfg.Paths.QueueDir, err = l.resolvePath("QueueDir", def.Paths.QueueDir); err != nil {
-		return err
-	}
-	if cfg.Paths.ProcDir, err = l.resolvePath("ProcDir", def.Paths.ProcDir); err != nil {
-		return err
-	}
-	if cfg.Paths.ServiceRegistryDir, err = l.resolvePath("ServiceRegistryDir", def.Paths.ServiceRegistryDir); err != nil {
-		return err
-	}
-	if cfg.Paths.UsersDir, err = l.resolvePath("UsersDir", def.Paths.UsersDir); err != nil {
-		return err
-	}
-	if cfg.Paths.APIKeysDir, err = l.resolvePath("APIKeysDir", def.Paths.APIKeysDir); err != nil {
-		return err
-	}
-	if cfg.Paths.WebhooksDir, err = l.resolvePath("WebhooksDir", def.Paths.WebhooksDir); err != nil {
-		return err
+
+	for _, m := range pathMappings {
+		resolved, err := l.resolvePath(m.name, m.source)
+		if err != nil {
+			return err
+		}
+		*m.target = resolved
 	}
 
 	return nil
 }
 
-// loadServerConfig loads the server configuration.
 func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 	cfg.Server = Server{
 		Host:        def.Host,
@@ -384,7 +350,15 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 		},
 	}
 
-	// Permissions can be nil, so we check before dereferencing.
+	l.loadServerPermissions(cfg, def)
+	l.loadServerRemoteNodes(cfg, def)
+	l.loadServerFlags(cfg, def)
+	l.loadServerTLS(cfg, def)
+	l.loadServerAuth(cfg, def)
+	l.loadServerDefaults(cfg, def)
+}
+
+func (l *ConfigLoader) loadServerPermissions(cfg *Config, def Definition) {
 	if def.Permissions.WriteDAGs != nil {
 		cfg.Server.Permissions[PermissionWriteDAGs] = *def.Permissions.WriteDAGs
 	}
@@ -397,21 +371,24 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 	if def.PermissionRunDAGs != nil {
 		cfg.Server.Permissions[PermissionRunDAGs] = *def.PermissionRunDAGs
 	}
+}
 
-	// Process remote node definitions.
+func (l *ConfigLoader) loadServerRemoteNodes(cfg *Config, def Definition) {
 	for _, node := range def.RemoteNodes {
 		cfg.Server.RemoteNodes = append(cfg.Server.RemoteNodes, RemoteNode(node))
 	}
+}
 
-	// Dereference pointer fields if they are provided.
+func (l *ConfigLoader) loadServerFlags(cfg *Config, def Definition) {
 	if def.Headless != nil {
 		cfg.Server.Headless = *def.Headless
 	}
 	if def.LatestStatusToday != nil {
 		cfg.Server.LatestStatusToday = *def.LatestStatusToday
 	}
+}
 
-	// Set TLS configuration if available.
+func (l *ConfigLoader) loadServerTLS(cfg *Config, def Definition) {
 	if def.TLS != nil {
 		cfg.Server.TLS = &TLSConfig{
 			CertFile: def.TLS.CertFile,
@@ -419,109 +396,140 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 			CAFile:   def.TLS.CAFile,
 		}
 	}
+}
 
-	// Process authentication settings.
-	var explicitAuthMode bool
-	if def.Auth != nil && def.Auth.Mode != nil {
-		mode := AuthMode(*def.Auth.Mode)
-		switch mode {
-		case AuthModeNone, AuthModeBuiltin, AuthModeOIDC:
-			cfg.Server.Auth.Mode = mode
-			explicitAuthMode = true
-		default:
-			l.warnings = append(l.warnings, fmt.Sprintf("Invalid auth.mode value: %q, defaulting to 'none'", *def.Auth.Mode))
-			cfg.Server.Auth.Mode = AuthModeNone
-		}
-	} else {
+func (l *ConfigLoader) loadServerAuth(cfg *Config, def Definition) {
+	explicitAuthMode := l.loadAuthMode(cfg, def)
+
+	if def.Auth == nil {
+		l.setAuthDefaults(cfg)
+		return
+	}
+
+	l.loadBasicAuth(cfg, def.Auth)
+	l.loadTokenAuth(cfg, def.Auth)
+	l.loadOIDCAuth(cfg, def.Auth)
+	l.loadBuiltinAuth(cfg, def.Auth)
+	l.autoDetectAuthMode(cfg, explicitAuthMode)
+	l.warnBasicAuthWithBuiltin(cfg)
+	l.setAuthDefaults(cfg)
+}
+
+func (l *ConfigLoader) loadAuthMode(cfg *Config, def Definition) bool {
+	if def.Auth == nil || def.Auth.Mode == nil {
 		cfg.Server.Auth.Mode = AuthModeNone
+		return false
 	}
 
-	if def.Auth != nil {
-		if def.Auth.Basic != nil {
-			cfg.Server.Auth.Basic.Username = def.Auth.Basic.Username
-			cfg.Server.Auth.Basic.Password = def.Auth.Basic.Password
-		}
-		if def.Auth.Token != nil {
-			cfg.Server.Auth.Token.Value = def.Auth.Token.Value
-		}
-		if def.Auth.OIDC != nil {
-			oidc := def.Auth.OIDC
-			// Core OIDC fields (used by both standalone and builtin modes)
-			cfg.Server.Auth.OIDC.ClientId = oidc.ClientId
-			cfg.Server.Auth.OIDC.ClientSecret = oidc.ClientSecret
-			cfg.Server.Auth.OIDC.ClientUrl = oidc.ClientUrl
-			cfg.Server.Auth.OIDC.Issuer = oidc.Issuer
-			// Use parseStringList to support both comma-separated strings and YAML lists
-			cfg.Server.Auth.OIDC.Scopes = parseStringList(l.v.Get("auth.oidc.scopes"))
-			cfg.Server.Auth.OIDC.Whitelist = parseStringList(l.v.Get("auth.oidc.whitelist"))
-			// Builtin-specific fields (only used when auth.mode=builtin)
-			if oidc.AutoSignup != nil {
-				cfg.Server.Auth.OIDC.AutoSignup = *oidc.AutoSignup
-			} else {
-				// Default to true - if OIDC is configured, auto-signup is expected
-				cfg.Server.Auth.OIDC.AutoSignup = true
-			}
-			cfg.Server.Auth.OIDC.AllowedDomains = parseStringList(l.v.Get("auth.oidc.allowedDomains"))
-			cfg.Server.Auth.OIDC.ButtonLabel = oidc.ButtonLabel
-			// Load role mapping configuration
-			if oidc.RoleMapping != nil {
-				rm := oidc.RoleMapping
-				cfg.Server.Auth.OIDC.RoleMapping.DefaultRole = rm.DefaultRole
-				cfg.Server.Auth.OIDC.RoleMapping.GroupsClaim = rm.GroupsClaim
-				cfg.Server.Auth.OIDC.RoleMapping.GroupMappings = rm.GroupMappings
-				cfg.Server.Auth.OIDC.RoleMapping.RoleAttributePath = rm.RoleAttributePath
-				if rm.RoleAttributeStrict != nil {
-					cfg.Server.Auth.OIDC.RoleMapping.RoleAttributeStrict = *rm.RoleAttributeStrict
-				}
-				if rm.SkipOrgRoleSync != nil {
-					cfg.Server.Auth.OIDC.RoleMapping.SkipOrgRoleSync = *rm.SkipOrgRoleSync
-				}
-			}
-		}
-		if def.Auth.Builtin != nil {
-			if def.Auth.Builtin.Admin != nil {
-				cfg.Server.Auth.Builtin.Admin.Username = def.Auth.Builtin.Admin.Username
-				cfg.Server.Auth.Builtin.Admin.Password = def.Auth.Builtin.Admin.Password
-			}
-			if def.Auth.Builtin.Token != nil {
-				cfg.Server.Auth.Builtin.Token.Secret = def.Auth.Builtin.Token.Secret
-				if def.Auth.Builtin.Token.TTL != "" {
-					if duration, err := time.ParseDuration(def.Auth.Builtin.Token.TTL); err == nil {
-						cfg.Server.Auth.Builtin.Token.TTL = duration
-					} else {
-						l.warnings = append(l.warnings, fmt.Sprintf("Invalid auth.builtin.token.ttl value: %s", def.Auth.Builtin.Token.TTL))
-					}
-				}
-			}
-		}
+	mode := AuthMode(*def.Auth.Mode)
+	switch mode {
+	case AuthModeNone, AuthModeBuiltin, AuthModeOIDC:
+		cfg.Server.Auth.Mode = mode
+		return true
+	default:
+		l.warnings = append(l.warnings, fmt.Sprintf("Invalid auth.mode value: %q, defaulting to 'none'", *def.Auth.Mode))
+		cfg.Server.Auth.Mode = AuthModeNone
+		return false
+	}
+}
 
-		// Auto-detect auth mode if not explicitly set
-		if !explicitAuthMode {
-			oidc := cfg.Server.Auth.OIDC
-			if oidc.ClientId != "" && oidc.ClientSecret != "" && oidc.Issuer != "" {
-				cfg.Server.Auth.Mode = AuthModeOIDC
-				l.warnings = append(l.warnings, fmt.Sprintf("Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: %s)", oidc.Issuer))
-			}
-		}
+func (l *ConfigLoader) loadBasicAuth(cfg *Config, auth *AuthDef) {
+	if auth.Basic != nil {
+		cfg.Server.Auth.Basic.Username = auth.Basic.Username
+		cfg.Server.Auth.Basic.Password = auth.Basic.Password
+	}
+}
 
-		// Warn if basic auth is configured with builtin auth mode (it will be ignored)
-		if cfg.Server.Auth.Mode == AuthModeBuiltin {
-			if cfg.Server.Auth.Basic.Username != "" || cfg.Server.Auth.Basic.Password != "" {
-				l.warnings = append(l.warnings, "Basic auth configuration is ignored when auth mode is 'builtin'; use builtin auth's admin credentials instead")
-			}
-		}
+func (l *ConfigLoader) loadTokenAuth(cfg *Config, auth *AuthDef) {
+	if auth.Token != nil {
+		cfg.Server.Auth.Token.Value = auth.Token.Value
+	}
+}
+
+func (l *ConfigLoader) loadOIDCAuth(cfg *Config, auth *AuthDef) {
+	if auth.OIDC == nil {
+		return
 	}
 
-	// Set default token TTL if not specified
+	oidc := auth.OIDC
+	cfg.Server.Auth.OIDC.ClientID = oidc.ClientID
+	cfg.Server.Auth.OIDC.ClientSecret = oidc.ClientSecret
+	cfg.Server.Auth.OIDC.ClientURL = oidc.ClientURL
+	cfg.Server.Auth.OIDC.Issuer = oidc.Issuer
+	cfg.Server.Auth.OIDC.Scopes = parseStringList(l.v.Get("auth.oidc.scopes"))
+	cfg.Server.Auth.OIDC.Whitelist = parseStringList(l.v.Get("auth.oidc.whitelist"))
+	cfg.Server.Auth.OIDC.AllowedDomains = parseStringList(l.v.Get("auth.oidc.allowedDomains"))
+	cfg.Server.Auth.OIDC.ButtonLabel = oidc.ButtonLabel
+
+	if oidc.AutoSignup != nil {
+		cfg.Server.Auth.OIDC.AutoSignup = *oidc.AutoSignup
+	} else {
+		cfg.Server.Auth.OIDC.AutoSignup = true
+	}
+
+	if oidc.RoleMapping != nil {
+		l.loadOIDCRoleMapping(cfg, oidc.RoleMapping)
+	}
+}
+
+func (l *ConfigLoader) loadOIDCRoleMapping(cfg *Config, rm *OIDCRoleMappingDef) {
+	cfg.Server.Auth.OIDC.RoleMapping.DefaultRole = rm.DefaultRole
+	cfg.Server.Auth.OIDC.RoleMapping.GroupsClaim = rm.GroupsClaim
+	cfg.Server.Auth.OIDC.RoleMapping.GroupMappings = rm.GroupMappings
+	cfg.Server.Auth.OIDC.RoleMapping.RoleAttributePath = rm.RoleAttributePath
+
+	if rm.RoleAttributeStrict != nil {
+		cfg.Server.Auth.OIDC.RoleMapping.RoleAttributeStrict = *rm.RoleAttributeStrict
+	}
+	if rm.SkipOrgRoleSync != nil {
+		cfg.Server.Auth.OIDC.RoleMapping.SkipOrgRoleSync = *rm.SkipOrgRoleSync
+	}
+}
+
+func (l *ConfigLoader) loadBuiltinAuth(cfg *Config, auth *AuthDef) {
+	if auth.Builtin == nil {
+		return
+	}
+
+	if auth.Builtin.Admin != nil {
+		cfg.Server.Auth.Builtin.Admin.Username = auth.Builtin.Admin.Username
+		cfg.Server.Auth.Builtin.Admin.Password = auth.Builtin.Admin.Password
+	}
+	if auth.Builtin.Token != nil {
+		cfg.Server.Auth.Builtin.Token.Secret = auth.Builtin.Token.Secret
+		cfg.Server.Auth.Builtin.Token.TTL = l.parseDuration("auth.builtin.token.ttl", auth.Builtin.Token.TTL)
+	}
+}
+
+func (l *ConfigLoader) autoDetectAuthMode(cfg *Config, explicitAuthMode bool) {
+	if explicitAuthMode {
+		return
+	}
+
+	oidc := cfg.Server.Auth.OIDC
+	if oidc.ClientID != "" && oidc.ClientSecret != "" && oidc.Issuer != "" {
+		cfg.Server.Auth.Mode = AuthModeOIDC
+		l.warnings = append(l.warnings, fmt.Sprintf("Auth mode auto-detected as 'oidc' based on OIDC configuration (issuer: %s)", oidc.Issuer))
+	}
+}
+
+func (l *ConfigLoader) warnBasicAuthWithBuiltin(cfg *Config) {
+	if cfg.Server.Auth.Mode != AuthModeBuiltin {
+		return
+	}
+
+	if cfg.Server.Auth.Basic.Username != "" || cfg.Server.Auth.Basic.Password != "" {
+		l.warnings = append(l.warnings, "Basic auth configuration is ignored when auth mode is 'builtin'; use builtin auth's admin credentials instead")
+	}
+}
+
+func (l *ConfigLoader) setAuthDefaults(cfg *Config) {
 	if cfg.Server.Auth.Builtin.Token.TTL <= 0 {
 		cfg.Server.Auth.Builtin.Token.TTL = 24 * time.Hour
 	}
-	// Set default admin username if not specified
 	if cfg.Server.Auth.Builtin.Admin.Username == "" {
 		cfg.Server.Auth.Builtin.Admin.Username = "admin"
 	}
-
-	// Set defaults for OIDC configuration (used by both standalone and builtin modes)
 	if len(cfg.Server.Auth.OIDC.Scopes) == 0 {
 		cfg.Server.Auth.OIDC.Scopes = []string{"openid", "profile", "email"}
 	}
@@ -531,11 +539,11 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 	if cfg.Server.Auth.OIDC.ButtonLabel == "" {
 		cfg.Server.Auth.OIDC.ButtonLabel = "Login with SSO"
 	}
+}
 
-	// Normalize the BasePath value for proper URL construction.
+func (l *ConfigLoader) loadServerDefaults(cfg *Config, def Definition) {
 	cfg.Server.BasePath = cleanServerBasePath(cfg.Server.BasePath)
 
-	// Set metrics access mode (default: private)
 	cfg.Server.Metrics = MetricsAccessPrivate
 	if def.Metrics != nil {
 		switch MetricsAccess(*def.Metrics) {
@@ -546,163 +554,130 @@ func (l *ConfigLoader) loadServerConfig(cfg *Config, def Definition) {
 		}
 	}
 
-	// Set terminal configuration (default: disabled)
 	cfg.Server.Terminal.Enabled = false
 	if def.Terminal != nil && def.Terminal.Enabled != nil {
 		cfg.Server.Terminal.Enabled = *def.Terminal.Enabled
 	}
 
-	// Set audit configuration (default: enabled)
 	cfg.Server.Audit.Enabled = true
 	if def.Audit != nil && def.Audit.Enabled != nil {
 		cfg.Server.Audit.Enabled = *def.Audit.Enabled
 	}
 }
 
-// loadUIConfig loads the UI configuration.
 func (l *ConfigLoader) loadUIConfig(cfg *Config, def Definition) {
-	// Apply defaults from viper (these include the configured defaults)
 	cfg.UI.MaxDashboardPageLimit = l.v.GetInt("ui.maxDashboardPageLimit")
 	cfg.UI.NavbarTitle = l.v.GetString("ui.navbarTitle")
 	cfg.UI.LogEncodingCharset = l.v.GetString("ui.logEncodingCharset")
 	cfg.UI.DAGs.SortField = l.v.GetString("ui.dags.sortField")
 	cfg.UI.DAGs.SortOrder = l.v.GetString("ui.dags.sortOrder")
 
-	if def.UI != nil {
-		cfg.UI.NavbarColor = def.UI.NavbarColor
-		if def.UI.NavbarTitle != "" {
-			cfg.UI.NavbarTitle = def.UI.NavbarTitle
-		}
-		if def.UI.MaxDashboardPageLimit > 0 {
-			cfg.UI.MaxDashboardPageLimit = def.UI.MaxDashboardPageLimit
-		}
-		if def.UI.LogEncodingCharset != "" {
-			cfg.UI.LogEncodingCharset = def.UI.LogEncodingCharset
-		}
+	if def.UI == nil {
+		return
+	}
 
-		if def.UI.DAGs != nil {
-			if def.UI.DAGs.SortField != "" {
-				cfg.UI.DAGs.SortField = def.UI.DAGs.SortField
-			}
-			if def.UI.DAGs.SortOrder != "" {
-				cfg.UI.DAGs.SortOrder = def.UI.DAGs.SortOrder
-			}
-		}
+	cfg.UI.NavbarColor = def.UI.NavbarColor
+	setIfNotEmpty(&cfg.UI.NavbarTitle, def.UI.NavbarTitle)
+	setIfNotEmpty(&cfg.UI.LogEncodingCharset, def.UI.LogEncodingCharset)
+
+	if def.UI.MaxDashboardPageLimit > 0 {
+		cfg.UI.MaxDashboardPageLimit = def.UI.MaxDashboardPageLimit
+	}
+
+	if def.UI.DAGs != nil {
+		setIfNotEmpty(&cfg.UI.DAGs.SortField, def.UI.DAGs.SortField)
+		setIfNotEmpty(&cfg.UI.DAGs.SortOrder, def.UI.DAGs.SortOrder)
 	}
 }
 
-// loadQueuesConfig loads the queue configuration.
 func (l *ConfigLoader) loadQueuesConfig(cfg *Config, def Definition) {
-	cfg.Queues.Enabled = true // Default to enabled
-	if def.Queues != nil {
-		cfg.Queues.Enabled = def.Queues.Enabled
-		for _, queueDef := range def.Queues.Config {
-			queueConfig := QueueConfig{
-				Name:          queueDef.Name,
-				MaxActiveRuns: queueDef.MaxConcurrency,
-			}
-			if queueDef.MaxActiveRuns != nil {
-				queueConfig.MaxActiveRuns = *queueDef.MaxActiveRuns
-			}
-			cfg.Queues.Config = append(cfg.Queues.Config, queueConfig)
+	cfg.Queues.Enabled = true
+	if def.Queues == nil {
+		return
+	}
+
+	cfg.Queues.Enabled = def.Queues.Enabled
+	for _, qd := range def.Queues.Config {
+		qc := QueueConfig{
+			Name:          qd.Name,
+			MaxActiveRuns: qd.MaxConcurrency,
 		}
+		if qd.MaxActiveRuns != nil {
+			qc.MaxActiveRuns = *qd.MaxActiveRuns
+		}
+		cfg.Queues.Config = append(cfg.Queues.Config, qc)
 	}
 }
 
-// loadCoordinatorConfig loads the coordinator configuration.
 func (l *ConfigLoader) loadCoordinatorConfig(cfg *Config, def Definition) {
-	if def.Coordinator != nil {
-		cfg.Coordinator.Host = def.Coordinator.Host
-		cfg.Coordinator.Advertise = def.Coordinator.Advertise
-		cfg.Coordinator.Port = def.Coordinator.Port
+	if def.Coordinator == nil {
+		return
 	}
+
+	cfg.Coordinator.Host = def.Coordinator.Host
+	cfg.Coordinator.Advertise = def.Coordinator.Advertise
+	cfg.Coordinator.Port = def.Coordinator.Port
 }
 
-// loadWorkerConfig loads the worker configuration.
 func (l *ConfigLoader) loadWorkerConfig(cfg *Config, def Definition) {
 	if def.Worker != nil {
 		cfg.Worker.ID = def.Worker.ID
 		cfg.Worker.MaxActiveRuns = def.Worker.MaxActiveRuns
 
 		if def.Worker.Labels != nil {
-			switch v := def.Worker.Labels.(type) {
-			case string:
-				if v != "" {
-					cfg.Worker.Labels = parseWorkerLabels(v)
-				}
-			case map[string]interface{}:
-				cfg.Worker.Labels = make(map[string]string)
-				for key, val := range v {
-					if strVal, ok := val.(string); ok {
-						cfg.Worker.Labels[key] = strVal
-					}
-				}
-			case map[interface{}]interface{}:
-				cfg.Worker.Labels = make(map[string]string)
-				for key, val := range v {
-					if keyStr, ok := key.(string); ok {
-						if valStr, ok := val.(string); ok {
-							cfg.Worker.Labels[keyStr] = valStr
-						}
-					}
-				}
-			}
+			cfg.Worker.Labels = parseLabels(def.Worker.Labels)
 		}
 
-		// Parse coordinators for static service discovery
 		if def.Worker.Coordinators != nil {
 			addresses, addrWarnings := parseCoordinatorAddresses(def.Worker.Coordinators)
 			cfg.Worker.Coordinators = addresses
 			l.warnings = append(l.warnings, addrWarnings...)
 		}
 
-		// Load PostgresPool config
 		if def.Worker.PostgresPool != nil {
-			pp := def.Worker.PostgresPool
-			if pp.MaxOpenConns > 0 {
-				cfg.Worker.PostgresPool.MaxOpenConns = pp.MaxOpenConns
-			}
-			if pp.MaxIdleConns > 0 {
-				cfg.Worker.PostgresPool.MaxIdleConns = pp.MaxIdleConns
-			}
-			if pp.ConnMaxLifetime > 0 {
-				cfg.Worker.PostgresPool.ConnMaxLifetime = pp.ConnMaxLifetime
-			}
-			if pp.ConnMaxIdleTime > 0 {
-				cfg.Worker.PostgresPool.ConnMaxIdleTime = pp.ConnMaxIdleTime
-			}
+			l.loadPostgresPoolConfig(&cfg.Worker.PostgresPool, def.Worker.PostgresPool)
 		}
 	}
 
-	// Set PostgresPool defaults if not configured
-	if cfg.Worker.PostgresPool.MaxOpenConns == 0 {
-		cfg.Worker.PostgresPool.MaxOpenConns = 25
-	}
-	if cfg.Worker.PostgresPool.MaxIdleConns == 0 {
-		cfg.Worker.PostgresPool.MaxIdleConns = 5
-	}
-	if cfg.Worker.PostgresPool.ConnMaxLifetime == 0 {
-		cfg.Worker.PostgresPool.ConnMaxLifetime = 300
-	}
-	if cfg.Worker.PostgresPool.ConnMaxIdleTime == 0 {
-		cfg.Worker.PostgresPool.ConnMaxIdleTime = 60
+	l.setPostgresPoolDefaults(&cfg.Worker.PostgresPool)
+}
+
+func (l *ConfigLoader) loadPostgresPoolConfig(pool *PostgresPoolConfig, def *PostgresPoolDef) {
+	setIfPositive(&pool.MaxOpenConns, def.MaxOpenConns)
+	setIfPositive(&pool.MaxIdleConns, def.MaxIdleConns)
+	setIfPositive(&pool.ConnMaxLifetime, def.ConnMaxLifetime)
+	setIfPositive(&pool.ConnMaxIdleTime, def.ConnMaxIdleTime)
+}
+
+func setIfPositive(target *int, value int) {
+	if value > 0 {
+		*target = value
 	}
 }
 
-// parseCoordinatorAddresses parses and validates coordinator addresses from various input formats.
-// It accepts either a comma-separated string or a list of strings.
-// Returns the list of valid addresses and any warnings for invalid ones.
-func parseCoordinatorAddresses(input interface{}) ([]string, []string) {
-	var addresses []string
-	var warnings []string
+func (l *ConfigLoader) setPostgresPoolDefaults(pool *PostgresPoolConfig) {
+	setDefaultIfZero(&pool.MaxOpenConns, 25)
+	setDefaultIfZero(&pool.MaxIdleConns, 5)
+	setDefaultIfZero(&pool.ConnMaxLifetime, 300)
+	setDefaultIfZero(&pool.ConnMaxIdleTime, 60)
+}
 
-	processAddr := func(addr string) {
+func setDefaultIfZero(target *int, defaultValue int) {
+	if *target == 0 {
+		*target = defaultValue
+	}
+}
+
+// parseCoordinatorAddresses parses coordinator addresses from comma-separated strings or string slices.
+func parseCoordinatorAddresses(input interface{}) ([]string, []string) {
+	var addresses, warnings []string
+
+	validateAndAdd := func(addr string) {
 		addr = strings.TrimSpace(addr)
 		if addr == "" {
 			return
 		}
 
-		// Validate host:port format using net.SplitHostPort
 		host, portStr, err := net.SplitHostPort(addr)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf("Invalid coordinator address %q: %v", addr, err))
@@ -725,61 +700,38 @@ func parseCoordinatorAddresses(input interface{}) ([]string, []string) {
 
 	switch v := input.(type) {
 	case string:
-		// Parse comma-separated string: "host1:port1,host2:port2"
 		if v != "" {
-			parts := strings.Split(v, ",")
-			for _, part := range parts {
-				processAddr(part)
+			for _, part := range strings.Split(v, ",") {
+				validateAndAdd(part)
 			}
 		}
 	case []interface{}:
-		// Parse list from YAML
 		for _, item := range v {
 			if addr, ok := item.(string); ok {
-				processAddr(addr)
+				validateAndAdd(addr)
 			}
 		}
 	case []string:
-		// Already a string slice
 		for _, addr := range v {
-			processAddr(addr)
+			validateAndAdd(addr)
 		}
 	}
 
 	return addresses, warnings
 }
 
-// loadSchedulerConfig loads the scheduler configuration.
 func (l *ConfigLoader) loadSchedulerConfig(cfg *Config, def Definition) {
 	if def.Scheduler != nil {
 		cfg.Scheduler.Port = def.Scheduler.Port
-
-		if def.Scheduler.LockStaleThreshold != "" {
-			if duration, err := time.ParseDuration(def.Scheduler.LockStaleThreshold); err == nil {
-				cfg.Scheduler.LockStaleThreshold = duration
-			} else {
-				l.warnings = append(l.warnings, fmt.Sprintf("Invalid scheduler.lockStaleThreshold value: %s", def.Scheduler.LockStaleThreshold))
-			}
-		}
-
-		if def.Scheduler.LockRetryInterval != "" {
-			if duration, err := time.ParseDuration(def.Scheduler.LockRetryInterval); err == nil {
-				cfg.Scheduler.LockRetryInterval = duration
-			} else {
-				l.warnings = append(l.warnings, fmt.Sprintf("Invalid scheduler.lockRetryInterval value: %s", def.Scheduler.LockRetryInterval))
-			}
-		}
-
-		if def.Scheduler.ZombieDetectionInterval != "" {
-			if duration, err := time.ParseDuration(def.Scheduler.ZombieDetectionInterval); err == nil {
-				cfg.Scheduler.ZombieDetectionInterval = duration
-			} else {
-				l.warnings = append(l.warnings, fmt.Sprintf("Invalid scheduler.zombieDetectionInterval value: %s", def.Scheduler.ZombieDetectionInterval))
-			}
-		}
+		cfg.Scheduler.LockStaleThreshold = l.parseDuration("scheduler.lockStaleThreshold", def.Scheduler.LockStaleThreshold)
+		cfg.Scheduler.LockRetryInterval = l.parseDuration("scheduler.lockRetryInterval", def.Scheduler.LockRetryInterval)
+		cfg.Scheduler.ZombieDetectionInterval = l.parseDuration("scheduler.zombieDetectionInterval", def.Scheduler.ZombieDetectionInterval)
 	}
 
-	// Set defaults
+	l.setSchedulerDefaults(cfg)
+}
+
+func (l *ConfigLoader) setSchedulerDefaults(cfg *Config) {
 	if cfg.Scheduler.Port <= 0 {
 		cfg.Scheduler.Port = 8090
 	}
@@ -789,34 +741,18 @@ func (l *ConfigLoader) loadSchedulerConfig(cfg *Config, def Definition) {
 	if cfg.Scheduler.LockRetryInterval <= 0 {
 		cfg.Scheduler.LockRetryInterval = 5 * time.Second
 	}
-	// Default ZombieDetectionInterval only if not explicitly set.
-	// An invalid value logs a warning but falls back to 0 (disabled).
-	// Setting to 0 or negative disables zombie detection.
+	// Default ZombieDetectionInterval only if not explicitly set (0 disables detection)
 	if cfg.Scheduler.ZombieDetectionInterval <= 0 && !l.v.IsSet("scheduler.zombieDetectionInterval") {
 		cfg.Scheduler.ZombieDetectionInterval = 45 * time.Second
 	}
 }
 
-// loadMonitoringConfig loads the monitoring configuration.
 func (l *ConfigLoader) loadMonitoringConfig(cfg *Config, def Definition) {
 	if def.Monitoring != nil {
-		if def.Monitoring.Retention != "" {
-			if duration, err := time.ParseDuration(def.Monitoring.Retention); err == nil {
-				cfg.Monitoring.Retention = duration
-			} else {
-				l.warnings = append(l.warnings, fmt.Sprintf("Invalid monitoring.retention value: %s", def.Monitoring.Retention))
-			}
-		}
-		if def.Monitoring.Interval != "" {
-			if duration, err := time.ParseDuration(def.Monitoring.Interval); err == nil {
-				cfg.Monitoring.Interval = duration
-			} else {
-				l.warnings = append(l.warnings, fmt.Sprintf("Invalid monitoring.interval value: %s", def.Monitoring.Interval))
-			}
-		}
+		cfg.Monitoring.Retention = l.parseDuration("monitoring.retention", def.Monitoring.Retention)
+		cfg.Monitoring.Interval = l.parseDuration("monitoring.interval", def.Monitoring.Interval)
 	}
 
-	// Set defaults
 	if cfg.Monitoring.Retention <= 0 {
 		cfg.Monitoring.Retention = 24 * time.Hour
 	}
@@ -825,22 +761,21 @@ func (l *ConfigLoader) loadMonitoringConfig(cfg *Config, def Definition) {
 	}
 }
 
-// loadGitSyncConfig loads the Git synchronization configuration.
 func (l *ConfigLoader) loadGitSyncConfig(cfg *Config, def Definition) {
 	if def.GitSync == nil {
 		return
 	}
 
-	// Check if gitSync is enabled
-	enabled := def.GitSync.Enabled != nil && *def.GitSync.Enabled
-	cfg.GitSync.Enabled = enabled
-
-	// Only apply defaults when gitSync is enabled
-	if !enabled {
+	cfg.GitSync.Enabled = def.GitSync.Enabled != nil && *def.GitSync.Enabled
+	if !cfg.GitSync.Enabled {
 		return
 	}
 
-	// Set defaults for enabled gitSync
+	l.setGitSyncDefaults(cfg)
+	l.applyGitSyncDefinition(cfg, def.GitSync)
+}
+
+func (l *ConfigLoader) setGitSyncDefaults(cfg *Config) {
 	cfg.GitSync.Branch = "main"
 	cfg.GitSync.PushEnabled = true
 	cfg.GitSync.Auth.Type = "token"
@@ -848,178 +783,167 @@ func (l *ConfigLoader) loadGitSyncConfig(cfg *Config, def Definition) {
 	cfg.GitSync.AutoSync.Interval = 300
 	cfg.GitSync.Commit.AuthorName = "Dagu"
 	cfg.GitSync.Commit.AuthorEmail = "dagu@localhost"
+}
 
-	// Repository
-	if def.GitSync.Repository != "" {
-		cfg.GitSync.Repository = def.GitSync.Repository
+func (l *ConfigLoader) applyGitSyncDefinition(cfg *Config, def *GitSyncDef) {
+	setIfNotEmpty(&cfg.GitSync.Repository, def.Repository)
+	setIfNotEmpty(&cfg.GitSync.Branch, def.Branch)
+	setIfNotEmpty(&cfg.GitSync.Path, def.Path)
+
+	if def.PushEnabled != nil {
+		cfg.GitSync.PushEnabled = *def.PushEnabled
 	}
 
-	// Branch
-	if def.GitSync.Branch != "" {
-		cfg.GitSync.Branch = def.GitSync.Branch
+	if def.Auth != nil {
+		setIfNotEmpty(&cfg.GitSync.Auth.Type, def.Auth.Type)
+		setIfNotEmpty(&cfg.GitSync.Auth.Token, def.Auth.Token)
+		setIfNotEmpty(&cfg.GitSync.Auth.SSHKeyPath, def.Auth.SSHKeyPath)
+		setIfNotEmpty(&cfg.GitSync.Auth.SSHPassphrase, def.Auth.SSHPassphrase)
 	}
 
-	// Path
-	if def.GitSync.Path != "" {
-		cfg.GitSync.Path = def.GitSync.Path
-	}
-
-	// PushEnabled
-	if def.GitSync.PushEnabled != nil {
-		cfg.GitSync.PushEnabled = *def.GitSync.PushEnabled
-	}
-
-	// Auth
-	if def.GitSync.Auth != nil {
-		if def.GitSync.Auth.Type != "" {
-			cfg.GitSync.Auth.Type = def.GitSync.Auth.Type
+	if def.AutoSync != nil {
+		if def.AutoSync.Enabled != nil {
+			cfg.GitSync.AutoSync.Enabled = *def.AutoSync.Enabled
 		}
-		if def.GitSync.Auth.Token != "" {
-			cfg.GitSync.Auth.Token = def.GitSync.Auth.Token
+		if def.AutoSync.OnStartup != nil {
+			cfg.GitSync.AutoSync.OnStartup = *def.AutoSync.OnStartup
 		}
-		if def.GitSync.Auth.SSHKeyPath != "" {
-			cfg.GitSync.Auth.SSHKeyPath = def.GitSync.Auth.SSHKeyPath
-		}
-		if def.GitSync.Auth.SSHPassphrase != "" {
-			cfg.GitSync.Auth.SSHPassphrase = def.GitSync.Auth.SSHPassphrase
-		}
-	}
-
-	// AutoSync
-	if def.GitSync.AutoSync != nil {
-		if def.GitSync.AutoSync.Enabled != nil {
-			cfg.GitSync.AutoSync.Enabled = *def.GitSync.AutoSync.Enabled
-		}
-		if def.GitSync.AutoSync.OnStartup != nil {
-			cfg.GitSync.AutoSync.OnStartup = *def.GitSync.AutoSync.OnStartup
-		}
-		// Use IsSet to respect explicit zero value
 		if l.v.IsSet("gitSync.autoSync.interval") {
-			cfg.GitSync.AutoSync.Interval = def.GitSync.AutoSync.Interval
+			cfg.GitSync.AutoSync.Interval = def.AutoSync.Interval
 		}
 	}
 
-	// Commit
-	if def.GitSync.Commit != nil {
-		if def.GitSync.Commit.AuthorName != "" {
-			cfg.GitSync.Commit.AuthorName = def.GitSync.Commit.AuthorName
-		}
-		if def.GitSync.Commit.AuthorEmail != "" {
-			cfg.GitSync.Commit.AuthorEmail = def.GitSync.Commit.AuthorEmail
-		}
+	if def.Commit != nil {
+		setIfNotEmpty(&cfg.GitSync.Commit.AuthorName, def.Commit.AuthorName)
+		setIfNotEmpty(&cfg.GitSync.Commit.AuthorEmail, def.Commit.AuthorEmail)
 	}
 }
 
-// loadTunnelConfig loads the tunnel configuration.
-func (l *ConfigLoader) loadTunnelConfig(cfg *Config, def Definition) {
-	// Check if tunnel is enabled - CLI flag takes precedence over config file
-	if l.v.IsSet("tunnel.enabled") {
-		cfg.Tunnel.Enabled = l.v.GetBool("tunnel.enabled")
-	} else if def.Tunnel != nil && def.Tunnel.Enabled != nil {
-		cfg.Tunnel.Enabled = *def.Tunnel.Enabled
+func setIfNotEmpty(target *string, value string) {
+	if value != "" {
+		*target = value
 	}
+}
 
+func (l *ConfigLoader) loadTunnelConfig(cfg *Config, def Definition) {
+	cfg.Tunnel.Enabled = l.resolveTunnelEnabled(def)
 	if !cfg.Tunnel.Enabled {
 		return
 	}
 
-	// Tailscale config from definition (loaded first as base)
-	if def.Tunnel != nil && def.Tunnel.Tailscale != nil {
-		cfg.Tunnel.Tailscale.AuthKey = def.Tunnel.Tailscale.AuthKey
-		cfg.Tunnel.Tailscale.Hostname = def.Tunnel.Tailscale.Hostname
-		if def.Tunnel.Tailscale.Funnel != nil {
-			cfg.Tunnel.Tailscale.Funnel = *def.Tunnel.Tailscale.Funnel
-		}
-		if def.Tunnel.Tailscale.HTTPS != nil {
-			cfg.Tunnel.Tailscale.HTTPS = *def.Tunnel.Tailscale.HTTPS
-		}
-		cfg.Tunnel.Tailscale.StateDir = def.Tunnel.Tailscale.StateDir
-	}
+	l.loadTailscaleConfig(cfg, def)
+	l.applyTunnelCLIOverrides(cfg)
 
-	// CLI flags take precedence over config file
-	if l.v.IsSet("tunnel.tailscale.funnel") {
-		cfg.Tunnel.Tailscale.Funnel = l.v.GetBool("tunnel.tailscale.funnel")
-	}
-
-	if l.v.IsSet("tunnel.tailscale.https") {
-		cfg.Tunnel.Tailscale.HTTPS = l.v.GetBool("tunnel.tailscale.https")
-	}
-
-	// Handle --tunnel-token CLI flag (takes precedence over config)
-	if l.v.IsSet("tunnel.token") {
-		cfg.Tunnel.Tailscale.AuthKey = l.v.GetString("tunnel.token")
-	}
-
-	// Security options
 	if def.Tunnel != nil && def.Tunnel.AllowTerminal != nil {
 		cfg.Tunnel.AllowTerminal = *def.Tunnel.AllowTerminal
 	}
 	cfg.Tunnel.AllowedIPs = parseStringList(l.v.Get("tunnel.allowedIPs"))
 
-	// Rate limiting
-	if def.Tunnel != nil && def.Tunnel.RateLimiting != nil {
-		if def.Tunnel.RateLimiting.Enabled != nil {
-			cfg.Tunnel.RateLimiting.Enabled = *def.Tunnel.RateLimiting.Enabled
-		}
-		cfg.Tunnel.RateLimiting.LoginAttempts = def.Tunnel.RateLimiting.LoginAttempts
-		cfg.Tunnel.RateLimiting.WindowSeconds = def.Tunnel.RateLimiting.WindowSeconds
-		cfg.Tunnel.RateLimiting.BlockDurationSeconds = def.Tunnel.RateLimiting.BlockDurationSeconds
-	}
+	l.loadTunnelRateLimiting(cfg, def)
 
-	// Set defaults for rate limiting
-	if cfg.Tunnel.RateLimiting.LoginAttempts <= 0 {
-		cfg.Tunnel.RateLimiting.LoginAttempts = 5
-	}
-	if cfg.Tunnel.RateLimiting.WindowSeconds <= 0 {
-		cfg.Tunnel.RateLimiting.WindowSeconds = 300
-	}
-	if cfg.Tunnel.RateLimiting.BlockDurationSeconds <= 0 {
-		cfg.Tunnel.RateLimiting.BlockDurationSeconds = 900
-	}
-
-	// Set default Tailscale hostname
 	if cfg.Tunnel.Tailscale.Hostname == "" {
 		cfg.Tunnel.Tailscale.Hostname = AppSlug
 	}
 }
 
-// loadCacheConfig loads the cache configuration.
-func (l *ConfigLoader) loadCacheConfig(cfg *Config, def Definition) {
-	if def.Cache != nil {
-		mode := CacheMode(*def.Cache)
-		if mode.IsValid() {
-			cfg.Cache = mode
-		} else {
-			l.warnings = append(l.warnings, fmt.Sprintf("Invalid cache mode: %q, using 'normal'", *def.Cache))
-			cfg.Cache = CacheModeNormal
-		}
-	} else {
-		cfg.Cache = CacheModeNormal
+func (l *ConfigLoader) resolveTunnelEnabled(def Definition) bool {
+	if l.v.IsSet("tunnel.enabled") {
+		return l.v.GetBool("tunnel.enabled")
+	}
+	if def.Tunnel != nil && def.Tunnel.Enabled != nil {
+		return *def.Tunnel.Enabled
+	}
+	return false
+}
+
+func (l *ConfigLoader) loadTailscaleConfig(cfg *Config, def Definition) {
+	if def.Tunnel == nil || def.Tunnel.Tailscale == nil {
+		return
+	}
+
+	ts := def.Tunnel.Tailscale
+	cfg.Tunnel.Tailscale.AuthKey = ts.AuthKey
+	cfg.Tunnel.Tailscale.Hostname = ts.Hostname
+	cfg.Tunnel.Tailscale.StateDir = ts.StateDir
+
+	if ts.Funnel != nil {
+		cfg.Tunnel.Tailscale.Funnel = *ts.Funnel
+	}
+	if ts.HTTPS != nil {
+		cfg.Tunnel.Tailscale.HTTPS = *ts.HTTPS
 	}
 }
 
-// finalizePaths sets up derived paths and ensures required paths are set.
+func (l *ConfigLoader) applyTunnelCLIOverrides(cfg *Config) {
+	if l.v.IsSet("tunnel.tailscale.funnel") {
+		cfg.Tunnel.Tailscale.Funnel = l.v.GetBool("tunnel.tailscale.funnel")
+	}
+	if l.v.IsSet("tunnel.tailscale.https") {
+		cfg.Tunnel.Tailscale.HTTPS = l.v.GetBool("tunnel.tailscale.https")
+	}
+	if l.v.IsSet("tunnel.token") {
+		cfg.Tunnel.Tailscale.AuthKey = l.v.GetString("tunnel.token")
+	}
+}
+
+func (l *ConfigLoader) loadTunnelRateLimiting(cfg *Config, def Definition) {
+	if def.Tunnel != nil && def.Tunnel.RateLimiting != nil {
+		rl := def.Tunnel.RateLimiting
+		if rl.Enabled != nil {
+			cfg.Tunnel.RateLimiting.Enabled = *rl.Enabled
+		}
+		cfg.Tunnel.RateLimiting.LoginAttempts = rl.LoginAttempts
+		cfg.Tunnel.RateLimiting.WindowSeconds = rl.WindowSeconds
+		cfg.Tunnel.RateLimiting.BlockDurationSeconds = rl.BlockDurationSeconds
+	}
+
+	setDefaultIfNotPositive(&cfg.Tunnel.RateLimiting.LoginAttempts, 5)
+	setDefaultIfNotPositive(&cfg.Tunnel.RateLimiting.WindowSeconds, 300)
+	setDefaultIfNotPositive(&cfg.Tunnel.RateLimiting.BlockDurationSeconds, 900)
+}
+
+func setDefaultIfNotPositive(target *int, defaultValue int) {
+	if *target <= 0 {
+		*target = defaultValue
+	}
+}
+
+func (l *ConfigLoader) loadCacheConfig(cfg *Config, def Definition) {
+	cfg.Cache = CacheModeNormal
+	if def.Cache == nil {
+		return
+	}
+
+	mode := CacheMode(*def.Cache)
+	if mode.IsValid() {
+		cfg.Cache = mode
+	} else {
+		l.warnings = append(l.warnings, fmt.Sprintf("Invalid cache mode: %q, using 'normal'", *def.Cache))
+	}
+}
+
 func (l *ConfigLoader) finalizePaths(cfg *Config) {
-	if cfg.Paths.DAGRunsDir == "" {
-		cfg.Paths.DAGRunsDir = filepath.Join(cfg.Paths.DataDir, "dag-runs")
+	derivedPaths := []struct {
+		target      *string
+		defaultPath string
+	}{
+		{&cfg.Paths.DAGRunsDir, "dag-runs"},
+		{&cfg.Paths.ProcDir, "proc"},
+		{&cfg.Paths.QueueDir, "queue"},
+		{&cfg.Paths.ServiceRegistryDir, "service-registry"},
+		{&cfg.Paths.UsersDir, "users"},
+		{&cfg.Paths.APIKeysDir, "apikeys"},
+		{&cfg.Paths.WebhooksDir, "webhooks"},
 	}
-	if cfg.Paths.ProcDir == "" {
-		cfg.Paths.ProcDir = filepath.Join(cfg.Paths.DataDir, "proc")
+
+	for _, dp := range derivedPaths {
+		if *dp.target == "" {
+			*dp.target = filepath.Join(cfg.Paths.DataDir, dp.defaultPath)
+		}
 	}
-	if cfg.Paths.QueueDir == "" {
-		cfg.Paths.QueueDir = filepath.Join(cfg.Paths.DataDir, "queue")
-	}
-	if cfg.Paths.ServiceRegistryDir == "" {
-		cfg.Paths.ServiceRegistryDir = filepath.Join(cfg.Paths.DataDir, "service-registry")
-	}
-	if cfg.Paths.UsersDir == "" {
-		cfg.Paths.UsersDir = filepath.Join(cfg.Paths.DataDir, "users")
-	}
-	if cfg.Paths.APIKeysDir == "" {
-		cfg.Paths.APIKeysDir = filepath.Join(cfg.Paths.DataDir, "apikeys")
-	}
-	if cfg.Paths.WebhooksDir == "" {
-		cfg.Paths.WebhooksDir = filepath.Join(cfg.Paths.DataDir, "webhooks")
+
+	if cfg.Paths.ConversationsDir == "" {
+		cfg.Paths.ConversationsDir = filepath.Join(cfg.Paths.DataDir, "agent", "conversations")
 	}
 
 	if cfg.Paths.Executable == "" {
@@ -1029,81 +953,25 @@ func (l *ConfigLoader) finalizePaths(cfg *Config) {
 	}
 }
 
-// LoadLegacyFields copies values from legacy configuration fields into the current Config structure.
-// Legacy fields are only applied if they are non-empty or non-zero, and may override the new settings.
-// It respects the service requirements to only apply relevant legacy fields.
-// Returns an error if any path resolution fails.
+// LoadLegacyFields applies deprecated configuration fields to the current Config.
 func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) error {
-	// Server-related legacy fields
 	if l.requires(SectionServer) {
-		if def.BasicAuthUsername != "" {
-			cfg.Server.Auth.Basic.Username = def.BasicAuthUsername
-		}
-		if def.BasicAuthPassword != "" {
-			cfg.Server.Auth.Basic.Password = def.BasicAuthPassword
-		}
-		if def.APIBaseURL != "" {
-			cfg.Server.APIBasePath = def.APIBaseURL
-		}
+		setIfNotEmpty(&cfg.Server.Auth.Basic.Username, def.BasicAuthUsername)
+		setIfNotEmpty(&cfg.Server.Auth.Basic.Password, def.BasicAuthPassword)
+		setIfNotEmpty(&cfg.Server.APIBasePath, def.APIBaseURL)
 		if def.IsAuthToken {
 			cfg.Server.Auth.Token.Value = def.AuthToken
 		}
 	}
 
-	// Path-related legacy fields (always applied)
-	var err error
-	if def.DAGs != "" {
-		if cfg.Paths.DAGsDir, err = l.resolvePath("legacy DAGs", def.DAGs); err != nil {
-			return err
-		}
-	}
-	if def.DAGsDir != "" {
-		if cfg.Paths.DAGsDir, err = l.resolvePath("legacy DAGsDir", def.DAGsDir); err != nil {
-			return err
-		}
-	}
-	if def.Executable != "" {
-		if cfg.Paths.Executable, err = l.resolvePath("legacy Executable", def.Executable); err != nil {
-			return err
-		}
-	}
-	if def.LogDir != "" {
-		if cfg.Paths.LogDir, err = l.resolvePath("legacy LogDir", def.LogDir); err != nil {
-			return err
-		}
-	}
-	if def.DataDir != "" {
-		if cfg.Paths.DataDir, err = l.resolvePath("legacy DataDir", def.DataDir); err != nil {
-			return err
-		}
-	}
-	if def.SuspendFlagsDir != "" {
-		if cfg.Paths.SuspendFlagsDir, err = l.resolvePath("legacy SuspendFlagsDir", def.SuspendFlagsDir); err != nil {
-			return err
-		}
-	}
-	if def.AdminLogsDir != "" {
-		if cfg.Paths.AdminLogsDir, err = l.resolvePath("legacy AdminLogsDir", def.AdminLogsDir); err != nil {
-			return err
-		}
-	}
-	if def.BaseConfig != "" {
-		if cfg.Paths.BaseConfig, err = l.resolvePath("legacy BaseConfig", def.BaseConfig); err != nil {
-			return err
-		}
+	if err := l.loadLegacyPaths(cfg, def); err != nil {
+		return err
 	}
 
-	// UI-related legacy fields
 	if l.requires(SectionUI) {
-		if def.LogEncodingCharset != "" {
-			cfg.UI.LogEncodingCharset = def.LogEncodingCharset
-		}
-		if def.NavbarColor != "" {
-			cfg.UI.NavbarColor = def.NavbarColor
-		}
-		if def.NavbarTitle != "" {
-			cfg.UI.NavbarTitle = def.NavbarTitle
-		}
+		setIfNotEmpty(&cfg.UI.LogEncodingCharset, def.LogEncodingCharset)
+		setIfNotEmpty(&cfg.UI.NavbarColor, def.NavbarColor)
+		setIfNotEmpty(&cfg.UI.NavbarTitle, def.NavbarTitle)
 		if def.MaxDashboardPageLimit > 0 {
 			cfg.UI.MaxDashboardPageLimit = def.MaxDashboardPageLimit
 		}
@@ -1112,9 +980,37 @@ func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) error {
 	return nil
 }
 
-// loadLegacyEnv maps legacy environment variables to their new counterparts in the configuration.
-// If a legacy env var is set, a warning is logged and the corresponding setter function is called.
-// It respects the service requirements to only apply relevant legacy environment variables.
+func (l *ConfigLoader) loadLegacyPaths(cfg *Config, def Definition) error {
+	legacyPaths := []struct {
+		name   string
+		target *string
+		source string
+	}{
+		{"legacy DAGs", &cfg.Paths.DAGsDir, def.DAGs},
+		{"legacy DAGsDir", &cfg.Paths.DAGsDir, def.DAGsDir},
+		{"legacy Executable", &cfg.Paths.Executable, def.Executable},
+		{"legacy LogDir", &cfg.Paths.LogDir, def.LogDir},
+		{"legacy DataDir", &cfg.Paths.DataDir, def.DataDir},
+		{"legacy SuspendFlagsDir", &cfg.Paths.SuspendFlagsDir, def.SuspendFlagsDir},
+		{"legacy AdminLogsDir", &cfg.Paths.AdminLogsDir, def.AdminLogsDir},
+		{"legacy BaseConfig", &cfg.Paths.BaseConfig, def.BaseConfig},
+	}
+
+	for _, lp := range legacyPaths {
+		if lp.source == "" {
+			continue
+		}
+		resolved, err := l.resolvePath(lp.name, lp.source)
+		if err != nil {
+			return err
+		}
+		*lp.target = resolved
+	}
+
+	return nil
+}
+
+// loadLegacyEnv maps deprecated environment variables to current configuration.
 func (l *ConfigLoader) loadLegacyEnv(cfg *Config) {
 	type legacyEnvMapping struct {
 		newKey   string
@@ -1150,23 +1046,21 @@ func (l *ConfigLoader) loadLegacyEnv(cfg *Config) {
 		"DAGU__DATA": {
 			newKey:   "DAGU_DATA_DIR",
 			setter:   func(c *Config, v string) { c.Paths.DataDir = fileutil.ResolvePathOrBlank(v) },
-			requires: SectionNone, // Always applies
+			requires: SectionNone,
 		},
 		"DAGU__SUSPEND_FLAGS_DIR": {
 			newKey:   "DAGU_SUSPEND_FLAGS_DIR",
 			setter:   func(c *Config, v string) { c.Paths.SuspendFlagsDir = fileutil.ResolvePathOrBlank(v) },
-			requires: SectionNone, // Always applies
+			requires: SectionNone,
 		},
 		"DAGU__ADMIN_LOGS_DIR": {
 			newKey:   "DAGU_ADMIN_LOG_DIR",
 			setter:   func(c *Config, v string) { c.Paths.AdminLogsDir = fileutil.ResolvePathOrBlank(v) },
-			requires: SectionNone, // Always applies
+			requires: SectionNone,
 		},
 	}
 
-	// For each legacy variable, if it is set and requirements are met, apply it.
 	for oldKey, mapping := range legacyEnvs {
-		// Skip if requirements not met (SectionNone always passes)
 		if mapping.requires != SectionNone && !l.requires(mapping.requires) {
 			continue
 		}
@@ -1178,11 +1072,12 @@ func (l *ConfigLoader) loadLegacyEnv(cfg *Config) {
 	}
 }
 
-func (l *ConfigLoader) setupViper(xdgConfig XDGConfig, homeDir, configFile, appHomeOverride string) (warnings []string, err error) {
+func (l *ConfigLoader) setupViper(xdgConfig XDGConfig, homeDir, configFile, appHomeOverride string) ([]string, error) {
 	var paths Paths
+	var err error
+
 	if appHomeOverride != "" {
-		resolved := fileutil.ResolvePathOrBlank(appHomeOverride)
-		paths = setUnifiedPaths(resolved)
+		paths = setUnifiedPaths(fileutil.ResolvePathOrBlank(appHomeOverride))
 	} else {
 		paths, err = ResolvePaths("DAGU_HOME", filepath.Join(homeDir, ".dagu"), xdgConfig)
 		if err != nil {
@@ -1197,11 +1092,10 @@ func (l *ConfigLoader) setupViper(xdgConfig XDGConfig, homeDir, configFile, appH
 	return paths.Warnings, nil
 }
 
-// setViperDefaultValues sets the default configuration values for viper.
 func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
-	// File paths
-	l.v.SetDefault("workDir", "")         // Defaults to DAG location if empty.
-	l.v.SetDefault("skipExamples", false) // Defaults to creating examples
+	// Paths
+	l.v.SetDefault("workDir", "")
+	l.v.SetDefault("skipExamples", false)
 	l.v.SetDefault("paths.dagsDir", paths.DAGsDir)
 	l.v.SetDefault("paths.suspendFlagsDir", paths.SuspendFlagsDir)
 	l.v.SetDefault("paths.dataDir", paths.DataDir)
@@ -1209,7 +1103,7 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("paths.adminLogsDir", paths.AdminLogsDir)
 	l.v.SetDefault("paths.baseConfig", paths.BaseConfigFile)
 
-	// Server settings
+	// Server
 	l.v.SetDefault("host", "127.0.0.1")
 	l.v.SetDefault("port", 8080)
 	l.v.SetDefault("debug", false)
@@ -1218,57 +1112,50 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("latestStatusToday", false)
 	l.v.SetDefault("metrics", "private")
 	l.v.SetDefault("cache", "normal")
+	l.v.SetDefault("logFormat", "text")
 
-	// Coordinator settings
+	// Coordinator
 	l.v.SetDefault("coordinator.host", "127.0.0.1")
-	l.v.SetDefault("coordinator.advertise", "") // Empty means auto-detect hostname
+	l.v.SetDefault("coordinator.advertise", "")
 	l.v.SetDefault("coordinator.port", 50055)
 
-	// Worker settings - nested structure
+	// Worker
 	l.v.SetDefault("worker.maxActiveRuns", 100)
+	l.v.SetDefault("worker.postgresPool.maxOpenConns", 25)
+	l.v.SetDefault("worker.postgresPool.maxIdleConns", 5)
+	l.v.SetDefault("worker.postgresPool.connMaxLifetime", 300)
+	l.v.SetDefault("worker.postgresPool.connMaxIdleTime", 60)
 
-	// UI settings
+	// UI
 	l.v.SetDefault("ui.navbarTitle", AppName)
 	l.v.SetDefault("ui.maxDashboardPageLimit", 100)
 	l.v.SetDefault("ui.logEncodingCharset", getDefaultLogEncodingCharset())
 	l.v.SetDefault("ui.dags.sortField", "name")
 	l.v.SetDefault("ui.dags.sortOrder", "asc")
 
-	// Logging settings
-	l.v.SetDefault("logFormat", "text")
-
-	// Queue settings
+	// Queues
 	l.v.SetDefault("queues.enabled", true)
 
-	// Scheduler settings
+	// Scheduler
 	l.v.SetDefault("scheduler.lockStaleThreshold", "30s")
 	l.v.SetDefault("scheduler.lockRetryInterval", "5s")
 
-	// Peer settings
-	l.v.SetDefault("peer.insecure", true) // Default to insecure (h2c)
+	// Peer
+	l.v.SetDefault("peer.insecure", true)
 
-	// Monitoring settings
+	// Monitoring
 	l.v.SetDefault("monitoring.retention", "24h")
 	l.v.SetDefault("monitoring.interval", "5s")
-
-	// Worker PostgreSQL pool settings (for shared-nothing mode)
-	l.v.SetDefault("worker.postgresPool.maxOpenConns", 25)
-	l.v.SetDefault("worker.postgresPool.maxIdleConns", 5)
-	l.v.SetDefault("worker.postgresPool.connMaxLifetime", 300)
-	l.v.SetDefault("worker.postgresPool.connMaxIdleTime", 60)
 }
 
-// envBinding defines a mapping between a config key and its environment variable.
 type envBinding struct {
-	key    string // Viper config key
-	env    string // Environment variable suffix (without DAGU_ prefix)
-	isPath bool   // Whether to normalize as a file path
+	key    string
+	env    string
+	isPath bool
 }
 
-// envBindings defines all environment variable bindings for configuration.
-// This declarative approach makes it easy to see and maintain all bindings.
 var envBindings = []envBinding{
-	// Server configurations
+	// Server
 	{key: "logFormat", env: "LOG_FORMAT"},
 	{key: "basePath", env: "BASE_PATH"},
 	{key: "apiBaseURL", env: "API_BASE_URL"},
@@ -1281,79 +1168,70 @@ var envBindings = []envBinding{
 	{key: "metrics", env: "SERVER_METRICS"},
 	{key: "cache", env: "CACHE"},
 
-	// Terminal configuration
 	{key: "terminal.enabled", env: "TERMINAL_ENABLED"},
-
-	// Audit configuration
 	{key: "audit.enabled", env: "AUDIT_ENABLED"},
 
-	// Core configurations
+	// Core
 	{key: "workDir", env: "WORK_DIR", isPath: true},
 	{key: "defaultShell", env: "DEFAULT_SHELL"},
 	{key: "skipExamples", env: "SKIP_EXAMPLES"},
 
-	// Scheduler configurations
+	// Scheduler
 	{key: "scheduler.port", env: "SCHEDULER_PORT"},
 	{key: "scheduler.lockStaleThreshold", env: "SCHEDULER_LOCK_STALE_THRESHOLD"},
 	{key: "scheduler.lockRetryInterval", env: "SCHEDULER_LOCK_RETRY_INTERVAL"},
 	{key: "scheduler.zombieDetectionInterval", env: "SCHEDULER_ZOMBIE_DETECTION_INTERVAL"},
 
-	// UI configurations
+	// UI
 	{key: "ui.maxDashboardPageLimit", env: "UI_MAX_DASHBOARD_PAGE_LIMIT"},
 	{key: "ui.logEncodingCharset", env: "UI_LOG_ENCODING_CHARSET"},
 	{key: "ui.navbarColor", env: "UI_NAVBAR_COLOR"},
 	{key: "ui.navbarTitle", env: "UI_NAVBAR_TITLE"},
 	{key: "ui.dags.sortField", env: "UI_DAGS_SORT_FIELD"},
 	{key: "ui.dags.sortOrder", env: "UI_DAGS_SORT_ORDER"},
-
-	// UI configurations (legacy keys)
+	// UI (legacy)
 	{key: "ui.maxDashboardPageLimit", env: "MAX_DASHBOARD_PAGE_LIMIT"},
 	{key: "ui.logEncodingCharset", env: "LOG_ENCODING_CHARSET"},
 	{key: "ui.navbarColor", env: "NAVBAR_COLOR"},
 	{key: "ui.navbarTitle", env: "NAVBAR_TITLE"},
 
-	// Authentication configurations
+	// Auth
 	{key: "auth.mode", env: "AUTH_MODE"},
 	{key: "auth.basic.username", env: "AUTH_BASIC_USERNAME"},
 	{key: "auth.basic.password", env: "AUTH_BASIC_PASSWORD"},
 	{key: "auth.token.value", env: "AUTH_TOKEN"},
-
-	// Authentication configurations (OIDC)
-	// Core OIDC fields (used by both standalone and builtin modes)
+	// Auth OIDC
 	{key: "auth.oidc.clientId", env: "AUTH_OIDC_CLIENT_ID"},
 	{key: "auth.oidc.clientSecret", env: "AUTH_OIDC_CLIENT_SECRET"},
 	{key: "auth.oidc.clientUrl", env: "AUTH_OIDC_CLIENT_URL"},
 	{key: "auth.oidc.issuer", env: "AUTH_OIDC_ISSUER"},
 	{key: "auth.oidc.scopes", env: "AUTH_OIDC_SCOPES"},
 	{key: "auth.oidc.whitelist", env: "AUTH_OIDC_WHITELIST"},
-	// Builtin-specific OIDC fields (only used when auth.mode=builtin)
 	{key: "auth.oidc.autoSignup", env: "AUTH_OIDC_AUTO_SIGNUP"},
 	{key: "auth.oidc.allowedDomains", env: "AUTH_OIDC_ALLOWED_DOMAINS"},
 	{key: "auth.oidc.buttonLabel", env: "AUTH_OIDC_BUTTON_LABEL"},
-	// OIDC Role Mapping configuration (builtin-specific)
+	// Auth OIDC Role Mapping
 	{key: "auth.oidc.roleMapping.defaultRole", env: "AUTH_OIDC_DEFAULT_ROLE"},
 	{key: "auth.oidc.roleMapping.groupsClaim", env: "AUTH_OIDC_GROUPS_CLAIM"},
 	{key: "auth.oidc.roleMapping.groupMappings", env: "AUTH_OIDC_GROUP_MAPPINGS"},
 	{key: "auth.oidc.roleMapping.roleAttributePath", env: "AUTH_OIDC_ROLE_ATTRIBUTE_PATH"},
 	{key: "auth.oidc.roleMapping.roleAttributeStrict", env: "AUTH_OIDC_ROLE_ATTRIBUTE_STRICT"},
 	{key: "auth.oidc.roleMapping.skipOrgRoleSync", env: "AUTH_OIDC_SKIP_ORG_ROLE_SYNC"},
-
-	// Authentication configurations (legacy keys)
+	// Auth (legacy)
 	{key: "auth.basic.username", env: "BASICAUTH_USERNAME"},
 	{key: "auth.basic.password", env: "BASICAUTH_PASSWORD"},
 	{key: "auth.token.value", env: "AUTHTOKEN"},
-
-	// Authentication configurations (builtin)
+	// Auth (builtin)
 	{key: "auth.builtin.admin.username", env: "AUTH_ADMIN_USERNAME"},
 	{key: "auth.builtin.admin.password", env: "AUTH_ADMIN_PASSWORD"},
 	{key: "auth.builtin.token.secret", env: "AUTH_TOKEN_SECRET"},
 	{key: "auth.builtin.token.ttl", env: "AUTH_TOKEN_TTL"},
 
-	// TLS configurations
+	// TLS
 	{key: "tls.certFile", env: "CERT_FILE"},
 	{key: "tls.keyFile", env: "KEY_FILE"},
 
-	// File paths
+	// Paths
 	{key: "paths.dagsDir", env: "DAGS", isPath: true},
 	{key: "paths.dagsDir", env: "DAGS_DIR", isPath: true},
 	{key: "paths.executable", env: "EXECUTABLE", isPath: true},
@@ -1368,40 +1246,40 @@ var envBindings = []envBinding{
 	{key: "paths.serviceRegistryDir", env: "SERVICE_REGISTRY_DIR", isPath: true},
 	{key: "paths.usersDir", env: "USERS_DIR", isPath: true},
 
-	// Queue configuration
+	// Queues
 	{key: "queues.enabled", env: "QUEUE_ENABLED"},
 
-	// Coordinator configuration
+	// Coordinator
 	{key: "coordinator.host", env: "COORDINATOR_HOST"},
 	{key: "coordinator.advertise", env: "COORDINATOR_ADVERTISE"},
 	{key: "coordinator.port", env: "COORDINATOR_PORT"},
 
-	// Worker configuration
+	// Worker
 	{key: "worker.id", env: "WORKER_ID"},
 	{key: "worker.maxActiveRuns", env: "WORKER_MAX_ACTIVE_RUNS"},
 	{key: "worker.labels", env: "WORKER_LABELS"},
 	{key: "worker.coordinators", env: "WORKER_COORDINATORS"},
 
-	// Peer configuration
+	// Peer
 	{key: "peer.certFile", env: "PEER_CERT_FILE"},
 	{key: "peer.keyFile", env: "PEER_KEY_FILE"},
 	{key: "peer.clientCaFile", env: "PEER_CLIENT_CA_FILE"},
 	{key: "peer.skipTlsVerify", env: "PEER_SKIP_TLS_VERIFY"},
 	{key: "peer.insecure", env: "PEER_INSECURE"},
 
-	// Monitoring configuration
+	// Monitoring
 	{key: "monitoring.retention", env: "MONITORING_RETENTION"},
 	{key: "monitoring.interval", env: "MONITORING_INTERVAL"},
 
-	// Worker PostgreSQL pool configuration (for shared-nothing mode)
+	// Worker PostgreSQL pool
 	{key: "worker.postgresPool.maxOpenConns", env: "WORKER_POSTGRES_POOL_MAX_OPEN_CONNS"},
 	{key: "worker.postgresPool.maxIdleConns", env: "WORKER_POSTGRES_POOL_MAX_IDLE_CONNS"},
 	{key: "worker.postgresPool.connMaxLifetime", env: "WORKER_POSTGRES_POOL_CONN_MAX_LIFETIME"},
 	{key: "worker.postgresPool.connMaxIdleTime", env: "WORKER_POSTGRES_POOL_CONN_MAX_IDLE_TIME"},
 
-	// Tunnel configuration (Tailscale only)
-	{key: "tunnel.enabled", env: "TUNNEL"},         // Maps to --tunnel flag
-	{key: "tunnel.enabled", env: "TUNNEL_ENABLED"}, // Also support TUNNEL_ENABLED
+	// Tunnel
+	{key: "tunnel.enabled", env: "TUNNEL"},
+	{key: "tunnel.enabled", env: "TUNNEL_ENABLED"},
 	{key: "tunnel.tailscale.authKey", env: "TUNNEL_TAILSCALE_AUTH_KEY"},
 	{key: "tunnel.tailscale.hostname", env: "TUNNEL_TAILSCALE_HOSTNAME"},
 	{key: "tunnel.tailscale.funnel", env: "TUNNEL_TAILSCALE_FUNNEL"},
@@ -1414,7 +1292,7 @@ var envBindings = []envBinding{
 	{key: "tunnel.rateLimiting.windowSeconds", env: "TUNNEL_RATE_LIMITING_WINDOW_SECONDS"},
 	{key: "tunnel.rateLimiting.blockDurationSeconds", env: "TUNNEL_RATE_LIMITING_BLOCK_DURATION_SECONDS"},
 
-	// Git sync configuration
+	// GitSync
 	{key: "gitSync.enabled", env: "GITSYNC_ENABLED"},
 	{key: "gitSync.repository", env: "GITSYNC_REPOSITORY"},
 	{key: "gitSync.branch", env: "GITSYNC_BRANCH"},
@@ -1431,14 +1309,12 @@ var envBindings = []envBinding{
 	{key: "gitSync.commit.authorEmail", env: "GITSYNC_COMMIT_AUTHOR_EMAIL"},
 }
 
-// bindEnvironmentVariables binds configuration keys to environment variables using the loader's viper instance.
 func (l *ConfigLoader) bindEnvironmentVariables() {
 	prefix := strings.ToUpper(AppSlug) + "_"
 
 	for _, b := range envBindings {
 		fullEnv := prefix + b.env
 
-		// Normalize path if needed
 		if b.isPath {
 			if val := os.Getenv(fullEnv); val != "" {
 				if abs, err := filepath.Abs(val); err == nil && abs != val {
@@ -1451,7 +1327,6 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	}
 }
 
-// configureViper sets up the viper instance with config file paths and environment settings.
 func (l *ConfigLoader) configureViper(configDir, configFile string) {
 	if configFile == "" {
 		l.v.AddConfigPath(configDir)
@@ -1465,27 +1340,40 @@ func (l *ConfigLoader) configureViper(configDir, configFile string) {
 	l.v.AutomaticEnv()
 }
 
-// parseWorkerLabels parses a comma-separated list of `key=value` pairs into a map[string]string.
-// Whitespace around keys and values is trimmed; empty entries and pairs with an empty key are ignored.
-func parseWorkerLabels(labelsStr string) map[string]string {
+// parseLabels parses labels from comma-separated strings or map types.
+func parseLabels(input interface{}) map[string]string {
 	labels := make(map[string]string)
-	if labelsStr == "" {
-		return labels
-	}
 
-	pairs := strings.Split(labelsStr, ",")
-	for _, pair := range pairs {
-		pair = strings.TrimSpace(pair)
-		if pair == "" {
-			continue
+	switch v := input.(type) {
+	case string:
+		if v == "" {
+			return labels
 		}
-
-		key, value, found := strings.Cut(pair, "=")
-		if found {
-			key = strings.TrimSpace(key)
-			value = strings.TrimSpace(value)
-			if key != "" {
-				labels[key] = value
+		for _, pair := range strings.Split(v, ",") {
+			pair = strings.TrimSpace(pair)
+			if pair == "" {
+				continue
+			}
+			if key, value, found := strings.Cut(pair, "="); found {
+				key = strings.TrimSpace(key)
+				value = strings.TrimSpace(value)
+				if key != "" {
+					labels[key] = value
+				}
+			}
+		}
+	case map[string]interface{}:
+		for key, val := range v {
+			if strVal, ok := val.(string); ok {
+				labels[key] = strVal
+			}
+		}
+	case map[interface{}]interface{}:
+		for key, val := range v {
+			if keyStr, ok := key.(string); ok {
+				if valStr, ok := val.(string); ok {
+					labels[keyStr] = valStr
+				}
 			}
 		}
 	}
@@ -1493,14 +1381,10 @@ func parseWorkerLabels(labelsStr string) map[string]string {
 	return labels
 }
 
-// parseStringList parses input that can be either a comma-separated string or a list of strings.
-// This allows config values to be specified as either:
-//   - YAML list: ["a", "b", "c"]
-//   - Comma-separated string: "a,b,c"
-//
-// Empty strings and whitespace-only entries are filtered out.
+// parseStringList parses comma-separated strings or string slices, filtering empty entries.
 func parseStringList(input interface{}) []string {
 	var result []string
+
 	switch v := input.(type) {
 	case string:
 		if v != "" {
@@ -1525,6 +1409,7 @@ func parseStringList(input interface{}) []string {
 			}
 		}
 	}
+
 	return result
 }
 
@@ -1533,16 +1418,14 @@ func cleanServerBasePath(s string) string {
 		return ""
 	}
 
-	// Clean the provided BasePath.
+	// Clean and ensure absolute path
 	cleanPath := path.Clean(s)
-
-	// Ensure the path is absolute.
 	if !path.IsAbs(cleanPath) {
 		cleanPath = path.Join("/", cleanPath)
 	}
 
+	// Root path is equivalent to no base path
 	if cleanPath == "/" {
-		// If the cleaned path is the root, reset it to an empty string.
 		return ""
 	}
 	return cleanPath

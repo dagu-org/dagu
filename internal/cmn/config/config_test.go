@@ -396,9 +396,9 @@ func TestConfig_Validate(t *testing.T) {
 						Token: TokenConfig{Secret: "secret", TTL: 1},
 					},
 					OIDC: AuthOIDC{
-						ClientId:     "", // Missing
+						ClientID:     "", // Missing
 						ClientSecret: "secret",
-						ClientUrl:    "https://example.com",
+						ClientURL:    "https://example.com",
 						Issuer:       "https://issuer.com",
 						RoleMapping:  OIDCRoleMapping{DefaultRole: "viewer"},
 					},
@@ -428,9 +428,9 @@ func TestConfig_Validate(t *testing.T) {
 						Token: TokenConfig{Secret: "secret", TTL: 1},
 					},
 					OIDC: AuthOIDC{
-						ClientId:     "client-id",
+						ClientID:     "client-id",
 						ClientSecret: "secret",
-						ClientUrl:    "https://example.com",
+						ClientURL:    "https://example.com",
 						Issuer:       "https://issuer.com",
 						RoleMapping:  OIDCRoleMapping{DefaultRole: "invalid-role"},
 					},
@@ -460,9 +460,9 @@ func TestConfig_Validate(t *testing.T) {
 						Token: TokenConfig{Secret: "secret", TTL: 1},
 					},
 					OIDC: AuthOIDC{
-						ClientId:     "client-id",
+						ClientID:     "client-id",
 						ClientSecret: "secret",
-						ClientUrl:    "https://example.com",
+						ClientURL:    "https://example.com",
 						Issuer:       "https://issuer.com",
 						Scopes:       []string{"openid", "profile", "email"},
 						RoleMapping:  OIDCRoleMapping{DefaultRole: "viewer"},
@@ -492,9 +492,9 @@ func TestConfig_Validate(t *testing.T) {
 						Token: TokenConfig{Secret: "secret", TTL: 1},
 					},
 					OIDC: AuthOIDC{
-						ClientId:     "client-id",
+						ClientID:     "client-id",
 						ClientSecret: "secret",
-						ClientUrl:    "https://example.com",
+						ClientURL:    "https://example.com",
 						Issuer:       "https://issuer.com",
 						Scopes:       []string{"openid", "profile"}, // No email scope
 						RoleMapping:  OIDCRoleMapping{DefaultRole: "viewer"},
@@ -526,9 +526,9 @@ func TestConfig_Validate(t *testing.T) {
 						Token: TokenConfig{Secret: "secret", TTL: 1},
 					},
 					OIDC: AuthOIDC{
-						ClientId:     "client-id",
+						ClientID:     "client-id",
 						ClientSecret: "secret",
-						ClientUrl:    "https://example.com",
+						ClientURL:    "https://example.com",
 						Issuer:       "https://issuer.com",
 						Scopes:       []string{"openid", "profile"}, // No email scope
 						Whitelist:    []string{"user@example.com"},  // But whitelist is set
@@ -562,9 +562,9 @@ func TestConfig_Validate(t *testing.T) {
 							Token: TokenConfig{Secret: "secret", TTL: 1},
 						},
 						OIDC: AuthOIDC{
-							ClientId:     "client-id",
+							ClientID:     "client-id",
 							ClientSecret: "secret",
-							ClientUrl:    "https://example.com",
+							ClientURL:    "https://example.com",
 							Issuer:       "https://issuer.com",
 							Scopes:       []string{"openid", "email"},
 							RoleMapping:  OIDCRoleMapping{DefaultRole: role},

@@ -1511,15 +1511,28 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 			Message:    fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
 		}
 	}
+	if attempt == nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
+		}
+	}
 
 	status, err := attempt.ReadStatus(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
+	if status == nil {
+		return nil, fmt.Errorf("failed to read status: status data is nil")
+	}
 
 	dag, err := attempt.ReadDAG(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read DAG snapshot: %w", err)
+	}
+	if dag == nil {
+		return nil, fmt.Errorf("failed to read DAG snapshot: DAG data is nil")
 	}
 
 	dag.Params = status.ParamsList

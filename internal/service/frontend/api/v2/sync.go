@@ -2,12 +2,10 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 
 	"github.com/dagu-org/dagu/api/v2"
-	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/gitsync"
 	"github.com/dagu-org/dagu/internal/service/audit"
 )
@@ -48,23 +46,6 @@ func internalError(err error) *Error {
 		Message:    err.Error(),
 		HTTPStatus: http.StatusInternalServerError,
 	}
-}
-
-// logAudit logs an audit entry if the audit service is available.
-func (a *API) logAudit(ctx context.Context, action string, details any) {
-	if a.auditService == nil {
-		return
-	}
-	currentUser, ok := auth.UserFromContext(ctx)
-	if !ok || currentUser == nil {
-		return
-	}
-	clientIP, _ := auth.ClientIPFromContext(ctx)
-	detailsJSON, _ := json.Marshal(details)
-	entry := audit.NewEntry(audit.CategoryGitSync, action, currentUser.ID, currentUser.Username).
-		WithDetails(string(detailsJSON)).
-		WithIPAddress(clientIP)
-	_ = a.auditService.Log(ctx, entry)
 }
 
 // GetSyncStatus returns the overall Git sync status.
@@ -120,7 +101,7 @@ func (a *API) SyncPull(ctx context.Context, _ api.SyncPullRequestObject) (api.Sy
 		return nil, internalError(err)
 	}
 
-	a.logAudit(ctx, "sync_pull", map[string]any{
+	a.logAuditEntry(ctx, audit.CategoryGitSync, "sync_pull", map[string]any{
 		"synced":    result.Synced,
 		"modified":  result.Modified,
 		"conflicts": result.Conflicts,
@@ -139,8 +120,8 @@ func (a *API) SyncPublishAll(ctx context.Context, req api.SyncPublishAllRequestO
 	}
 
 	var message string
-	if req.Body != nil && req.Body.Message != nil {
-		message = *req.Body.Message
+	if req.Body != nil {
+		message = valueOf(req.Body.Message)
 	}
 
 	result, err := a.syncService.PublishAll(ctx, message)
@@ -151,7 +132,7 @@ func (a *API) SyncPublishAll(ctx context.Context, req api.SyncPublishAllRequestO
 		return nil, internalError(err)
 	}
 
-	a.logAudit(ctx, "sync_publish_all", map[string]any{
+	a.logAuditEntry(ctx, audit.CategoryGitSync, "sync_publish_all", map[string]any{
 		"message":  message,
 		"synced":   result.Synced,
 		"modified": result.Modified,
@@ -259,7 +240,7 @@ func (a *API) UpdateSyncConfig(ctx context.Context, req api.UpdateSyncConfigRequ
 		return nil, internalError(err)
 	}
 
-	a.logAudit(ctx, "sync_config_update", map[string]any{
+	a.logAuditEntry(ctx, audit.CategoryGitSync, "sync_config_update", map[string]any{
 		"enabled":      cfg.Enabled,
 		"repository":   cfg.Repository,
 		"branch":       cfg.Branch,
@@ -285,7 +266,7 @@ func (a *API) PublishDag(ctx context.Context, req api.PublishDagRequestObject) (
 		return handlePublishError(err)
 	}
 
-	a.logAudit(ctx, "sync_publish", map[string]any{
+	a.logAuditEntry(ctx, audit.CategoryGitSync, "sync_publish", map[string]any{
 		"dag_id":  req.Name,
 		"message": message,
 		"force":   force,
@@ -313,7 +294,7 @@ func (a *API) DiscardDagChanges(ctx context.Context, req api.DiscardDagChangesRe
 		return nil, internalError(err)
 	}
 
-	a.logAudit(ctx, "sync_discard", map[string]string{"dag_id": req.Name})
+	a.logAuditEntry(ctx, audit.CategoryGitSync, "sync_discard", map[string]string{"dag_id": req.Name})
 
 	return api.DiscardDagChanges200JSONResponse{
 		Message: "Changes discarded successfully",
@@ -384,27 +365,29 @@ func toAPISyncCounts(counts gitsync.StatusCounts) api.SyncStatusCounts {
 }
 
 func toAPISyncResult(result *gitsync.SyncResult) api.SyncResultResponse {
-	var errors *[]api.SyncError
-	if len(result.Errors) > 0 {
-		errList := make([]api.SyncError, len(result.Errors))
-		for i, e := range result.Errors {
-			errList[i] = api.SyncError{
-				DagId:   ptrOf(e.DAGID),
-				Message: e.Message,
-			}
-		}
-		errors = &errList
-	}
-
 	return api.SyncResultResponse{
 		Success:   result.Success,
 		Message:   ptrOf(result.Message),
 		Synced:    ptrOf(result.Synced),
 		Modified:  ptrOf(result.Modified),
 		Conflicts: ptrOf(result.Conflicts),
-		Errors:    errors,
+		Errors:    toAPISyncErrors(result.Errors),
 		Timestamp: result.Timestamp,
 	}
+}
+
+func toAPISyncErrors(errors []gitsync.SyncError) *[]api.SyncError {
+	if len(errors) == 0 {
+		return nil
+	}
+	result := make([]api.SyncError, len(errors))
+	for i, e := range errors {
+		result[i] = api.SyncError{
+			DagId:   ptrOf(e.DAGID),
+			Message: e.Message,
+		}
+	}
+	return &result
 }
 
 // toAPISyncConfig converts a gitsync.Config to the API response format.

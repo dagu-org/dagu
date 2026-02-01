@@ -182,23 +182,9 @@ func (s *Store) Create(_ context.Context, webhook *auth.Webhook) error {
 
 // writeWebhookToFile writes a webhook to a JSON file atomically.
 func (s *Store) writeWebhookToFile(filePath string, webhook *auth.Webhook) error {
-	data, err := json.MarshalIndent(webhook.ToStorage(), "", "  ")
-	if err != nil {
-		return fmt.Errorf("filewebhook: failed to marshal webhook: %w", err)
+	if err := fileutil.WriteJSONAtomic(filePath, webhook.ToStorage(), webhookFilePermissions); err != nil {
+		return fmt.Errorf("filewebhook: %w", err)
 	}
-
-	// Write to temp file first, then rename for atomicity
-	tempPath := filePath + ".tmp"
-	if err := os.WriteFile(tempPath, data, webhookFilePermissions); err != nil {
-		return fmt.Errorf("filewebhook: failed to write file %s: %w", tempPath, err)
-	}
-
-	if err := os.Rename(tempPath, filePath); err != nil {
-		// Clean up temp file on failure
-		_ = os.Remove(tempPath)
-		return fmt.Errorf("filewebhook: failed to rename file %s: %w", filePath, err)
-	}
-
 	return nil
 }
 

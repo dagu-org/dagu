@@ -119,7 +119,7 @@ function Content({ navbarColor, children }: LayoutProps) {
         style={sidebarStyle}
       >
         <div className="flex flex-col h-full">
-          <nav className="flex-1 px-3 py-4">
+          <nav className="flex-1 overflow-y-auto min-h-0 px-3 py-4">
             <MainListItems
               isOpen={isSidebarExpanded}
               onToggle={toggleSidebar}
@@ -196,7 +196,7 @@ function Content({ navbarColor, children }: LayoutProps) {
               </button>
             </div>
             <div className="flex flex-col h-full pt-2">
-              <nav className="flex-1 px-3">
+              <nav className="flex-1 overflow-y-auto min-h-0 px-3">
                 <MainListItems
                   isOpen={true}
                   onNavItemClick={() => setIsMobileSidebarOpen(false)}

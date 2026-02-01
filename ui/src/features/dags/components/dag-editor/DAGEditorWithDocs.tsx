@@ -105,7 +105,7 @@ function DAGEditorWithDocs({
   return (
     <div
       className={cn(
-        'flex flex-col bg-surface border border-border rounded-lg overflow-hidden min-h-[300px] max-h-[70vh]',
+        'flex flex-col bg-surface border border-border rounded-lg overflow-hidden min-h-[300px] h-[70vh]',
         className
       )}
     >

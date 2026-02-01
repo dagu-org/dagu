@@ -173,9 +173,9 @@ func InitVerifierAndConfig(ctx context.Context, i config.AuthOIDC) (_ *OIDCConfi
 
 	result, err := initOIDCProviderCore(ctx, oidcProviderParams{
 		Issuer:       i.Issuer,
-		ClientID:     i.ClientId,
+		ClientID:     i.ClientID,
 		ClientSecret: i.ClientSecret,
-		ClientURL:    i.ClientUrl,
+		ClientURL:    i.ClientURL,
 		Scopes:       i.Scopes,
 	})
 	if err != nil {
@@ -395,9 +395,9 @@ type BuiltinOIDCConfig struct {
 func InitBuiltinOIDCConfig(ctx context.Context, cfg config.AuthOIDC, authSvc *authservice.Service, provisionSvc *oidcprovision.Service, basePath string) (*BuiltinOIDCConfig, error) {
 	result, err := initOIDCProviderCore(ctx, oidcProviderParams{
 		Issuer:       cfg.Issuer,
-		ClientID:     cfg.ClientId,
+		ClientID:     cfg.ClientID,
 		ClientSecret: cfg.ClientSecret,
-		ClientURL:    cfg.ClientUrl,
+		ClientURL:    cfg.ClientURL,
 		Scopes:       cfg.Scopes,
 	})
 	if err != nil {

@@ -12,38 +12,26 @@ import (
 
 // Tree drawing characters using Unicode box-drawing characters.
 const (
-	TreeBranch     = "├─" // Branch with siblings below
-	TreeLastBranch = "└─" // Last branch (no siblings below)
-	TreePipe       = "│ " // Vertical continuation line
-	TreeSpace      = "  " // Empty space (no vertical line needed)
+	TreeBranch     = "├─"
+	TreeLastBranch = "└─"
+	TreePipe       = "│ "
+	TreeSpace      = "  "
 )
 
-// DefaultMaxOutputLines is the default number of lines to show for stdout/stderr.
-// Only the last N lines are shown (tail) when output exceeds this limit.
-const DefaultMaxOutputLines = 50
-
-// DefaultMaxWidth is the maximum line width before wrapping.
-const DefaultMaxWidth = 80
+const (
+	// DefaultMaxOutputLines is the default number of lines to show for stdout/stderr.
+	DefaultMaxOutputLines = 50
+	// DefaultMaxWidth is the maximum line width before wrapping.
+	DefaultMaxWidth = 80
+)
 
 // Config holds configuration for tree rendering.
 type Config struct {
-	// ColorEnabled enables colored output using ANSI escape codes.
-	// Should be auto-detected based on terminal capability.
-	ColorEnabled bool
-
-	// ShowStdout enables display of stdout content in the tree.
-	ShowStdout bool
-
-	// ShowStderr enables display of stderr content in the tree.
-	ShowStderr bool
-
-	// MaxOutputLines limits stdout/stderr to last N lines (tail).
-	// Set to 0 for unlimited output.
-	MaxOutputLines int
-
-	// MaxWidth is the maximum line width before wrapping.
-	// Set to 0 for no wrapping.
-	MaxWidth int
+	ColorEnabled   bool // Enable colored output using ANSI escape codes.
+	ShowStdout     bool // Display stdout content in the tree.
+	ShowStderr     bool // Display stderr content in the tree.
+	MaxOutputLines int  // Limit stdout/stderr to last N lines (0 = unlimited).
+	MaxWidth       int  // Maximum line width before wrapping (0 = no wrapping).
 }
 
 // DefaultConfig returns the default configuration with sensible defaults.
@@ -62,22 +50,36 @@ type Renderer struct {
 	config Config
 }
 
-// text returns text with a soft light blue color for visual distinction.
+// text applies a soft light blue color (ANSI 256 color 110) for visual distinction.
 func (r *Renderer) text(s string) string {
 	if !r.config.ColorEnabled {
 		return s
 	}
-	// Use ANSI 256 color 110 - a soft, muted light blue
 	return "\033[38;5;110m" + s + "\033[0m"
 }
 
-// gray returns text in gray color for secondary information like duration.
+// gray applies a medium gray color (ANSI 256 color 245) for secondary information.
 func (r *Renderer) gray(s string) string {
 	if !r.config.ColorEnabled {
 		return s
 	}
-	// Use ANSI 256 color 245 - a medium gray
 	return "\033[38;5;245m" + s + "\033[0m"
+}
+
+// branchChar returns the appropriate tree branch character based on position.
+func branchChar(isLast bool) string {
+	if isLast {
+		return TreeLastBranch
+	}
+	return TreeBranch
+}
+
+// childPrefix returns the prefix for child elements based on parent position.
+func childPrefix(prefix string, isLast bool) string {
+	if isLast {
+		return prefix + TreeSpace
+	}
+	return prefix + TreePipe
 }
 
 // NewRenderer creates a new tree renderer with the given configuration.
@@ -85,67 +87,44 @@ func NewRenderer(config Config) *Renderer {
 	return &Renderer{config: config}
 }
 
-// RenderDAGStatus renders the complete DAG status as a pipelight-style tree.
-// The output format is:
-//
-//	● Running - 2024-01-15 16:52:58
-//	dag: my_dag (6s 619ms)
-//	├─step: build (4s)
-//	│ ├─echo hello
-//	│ │ ├─stdout: hello
-//	│ │ └─stderr:
-//	│ └─result: ✓
-//	└─step: test (2s)
-//	  └─npm test
-//	    ├─stdout: All tests passed
-//	    └─stderr:
+// RenderDAGStatus renders the complete DAG status as a tree structure.
 func (r *Renderer) RenderDAGStatus(dag *core.DAG, status *exec.DAGRunStatus) string {
 	var buf strings.Builder
 
-	// Header line
 	buf.WriteString(r.renderHeader(status))
 	buf.WriteString("\n\n")
-
-	// DAG line
 	buf.WriteString(r.renderDAGLine(dag, status))
 	buf.WriteString("\n")
 
-	// Tree continuation after DAG line (if there are steps)
+	if status.Log != "" {
+		buf.WriteString(r.renderSchedulerLog(status.Log, len(status.Nodes) > 0))
+	}
+
 	if len(status.Nodes) > 0 {
 		buf.WriteString("│\n")
 	}
 
-	// Render each step as a tree branch
 	for i, node := range status.Nodes {
-		isLast := i == len(status.Nodes)-1
-		buf.WriteString(r.renderStep(node, isLast, ""))
+		buf.WriteString(r.renderStep(node, i == len(status.Nodes)-1, ""))
 	}
 
-	// Final status line
 	buf.WriteString(r.renderFinalStatus(status))
 
 	return buf.String()
 }
 
 // renderHeader renders the status header line with status text and timestamp.
-// White color (default).
 func (r *Renderer) renderHeader(status *exec.DAGRunStatus) string {
-	statusText := StatusText(status.Status)
-
-	// Parse start time, fallback to current time if not set
 	startTime := status.StartedAt
 	if startTime == "" || startTime == "-" {
 		startTime = time.Now().Format("2006-01-02 15:04:05")
 	}
-
-	return fmt.Sprintf("%s - %s", statusText, startTime)
+	return fmt.Sprintf("%s - %s", StatusText(status.Status), startTime)
 }
 
 // renderDAGLine renders the DAG name with total duration.
-// White color (default) - root of the tree.
 func (r *Renderer) renderDAGLine(dag *core.DAG, status *exec.DAGRunStatus) string {
 	duration := r.calculateDuration(status.StartedAt, status.FinishedAt, status.Status)
-
 	if duration != "" {
 		return fmt.Sprintf("dag: %s %s", dag.Name, r.gray("("+duration+")"))
 	}
@@ -156,126 +135,18 @@ func (r *Renderer) renderDAGLine(dag *core.DAG, status *exec.DAGRunStatus) strin
 func (r *Renderer) renderStep(node *exec.Node, isLast bool, prefix string) string {
 	var buf strings.Builder
 
-	// Determine branch character based on position
-	branch := TreeBranch
-	if isLast {
-		branch = TreeLastBranch
-	}
+	buf.WriteString(r.renderStepHeader(node, isLast, prefix))
 
-	// Build step line with separate coloring for name and duration
-	var lineParts []string
-	lineParts = append(lineParts, r.text(node.Step.Name))
-
-	// Add duration for steps that ran (in gray)
-	if node.Status == core.NodeSucceeded || node.Status == core.NodeFailed ||
-		node.Status == core.NodeRunning || node.Status == core.NodePartiallySucceeded {
-		duration := r.calculateNodeDuration(node)
-		if duration != "" {
-			lineParts = append(lineParts, r.gray("("+duration+")"))
-		}
-	}
-
-	// Add status label
-	statusLabel := r.getStatusLabel(node.Status)
-	if statusLabel != "" {
-		lineParts = append(lineParts, r.text(statusLabel))
-	}
-
-	buf.WriteString(prefix + branch + strings.Join(lineParts, " "))
-	buf.WriteString("\n")
-
-	// For skipped/aborted/not-started steps, don't show details
-	if node.Status == core.NodeSkipped || node.Status == core.NodeAborted || node.Status == core.NodeNotStarted {
-		// Add spacing after step (with tree continuation if not last)
+	// Skip details for non-executed steps
+	if isSkippedStatus(node.Status) {
 		if !isLast {
 			buf.WriteString(prefix + TreePipe + "\n")
 		}
 		return buf.String()
 	}
 
-	// Calculate prefix for child elements
-	childPrefix := prefix
-	if isLast {
-		childPrefix += TreeSpace
-	} else {
-		childPrefix += TreePipe
-	}
+	buf.WriteString(r.renderStepContent(node, isLast, prefix))
 
-	// Check what child elements we have
-	hasOutput := r.hasOutput(node)
-	hasError := node.Error != "" && node.Status == core.NodeFailed
-	hasSubRuns := len(node.SubRuns) > 0
-
-	// Count remaining fields for proper spacing
-	fieldCount := 0
-	if hasOutput {
-		fieldCount++
-	}
-	if hasSubRuns {
-		fieldCount++
-	}
-	if hasError {
-		fieldCount++
-	}
-
-	// Track if we've written any field (for spacing)
-	wroteField := false
-	remainingFields := fieldCount
-
-	// Helper to add vertical spacing between fields with tree continuation
-	addFieldSpacing := func() {
-		if wroteField && remainingFields > 0 {
-			// Show tree continuation: childPrefix + "│" for connected look
-			buf.WriteString(childPrefix + "│\n")
-		}
-		wroteField = true
-	}
-
-	// Render commands
-	commands := node.Step.Commands
-	hasCommands := len(commands) > 0
-
-	if !hasCommands {
-		// Handle legacy single command format
-		cmdStr := r.getLegacyCommand(node)
-		if cmdStr != "" {
-			isLastChild := !hasOutput && !hasError && !hasSubRuns
-			buf.WriteString(r.renderCommandLine(cmdStr, isLastChild, childPrefix))
-			wroteField = true
-		}
-	} else {
-		// Modern multi-command format
-		for i, cmd := range commands {
-			isLastCmd := i == len(commands)-1 && !hasOutput && !hasError && !hasSubRuns
-			buf.WriteString(r.renderCommandLine(cmd.String(), isLastCmd, childPrefix))
-		}
-		wroteField = true
-	}
-
-	// Render stdout/stderr
-	if hasOutput {
-		addFieldSpacing()
-		remainingFields--
-		isLastOutput := !hasError && !hasSubRuns
-		buf.WriteString(r.renderOutputs(node, isLastOutput, childPrefix))
-	}
-
-	// Render sub-DAG runs if present
-	if hasSubRuns {
-		addFieldSpacing()
-		remainingFields--
-		isLastSubRuns := !hasError
-		buf.WriteString(r.renderSubRuns(node.SubRuns, isLastSubRuns, childPrefix))
-	}
-
-	// Render error message if step failed
-	if hasError {
-		addFieldSpacing()
-		remainingFields--
-		buf.WriteString(r.renderError(node.Error, childPrefix))
-	}
-
-	// Add spacing after step (with tree continuation if not last step)
 	if !isLast {
 		buf.WriteString(prefix + TreePipe + "\n")
 	}
@@ -283,8 +154,94 @@ func (r *Renderer) renderStep(node *exec.Node, isLast bool, prefix string) strin
 	return buf.String()
 }
 
+// renderStepHeader renders the step name line with duration and status.
+func (r *Renderer) renderStepHeader(node *exec.Node, isLast bool, prefix string) string {
+	lineParts := []string{r.text(node.Step.Name)}
+
+	if shouldShowDuration(node.Status) {
+		if duration := r.calculateNodeDuration(node); duration != "" {
+			lineParts = append(lineParts, r.gray("("+duration+")"))
+		}
+	}
+
+	if label := r.getStatusLabel(node.Status); label != "" {
+		lineParts = append(lineParts, r.text(label))
+	}
+
+	return prefix + branchChar(isLast) + strings.Join(lineParts, " ") + "\n"
+}
+
+// renderStepContent renders commands, outputs, sub-runs, and errors for a step.
+func (r *Renderer) renderStepContent(node *exec.Node, isLast bool, prefix string) string {
+	var buf strings.Builder
+	cPrefix := childPrefix(prefix, isLast)
+
+	hasOutput := r.hasOutput(node)
+	hasError := node.Error != "" && node.Status == core.NodeFailed
+	hasSubRuns := len(node.SubRuns) > 0
+
+	wroteField := r.renderCommands(&buf, node, cPrefix, hasOutput, hasError, hasSubRuns)
+
+	if hasOutput {
+		r.addFieldSpacing(&buf, wroteField, cPrefix)
+		buf.WriteString(r.renderOutputs(node, !hasError && !hasSubRuns, cPrefix))
+		wroteField = true
+	}
+
+	if hasSubRuns {
+		r.addFieldSpacing(&buf, wroteField, cPrefix)
+		buf.WriteString(r.renderSubRuns(node.SubRuns, !hasError, cPrefix))
+		wroteField = true
+	}
+
+	if hasError {
+		r.addFieldSpacing(&buf, wroteField, cPrefix)
+		buf.WriteString(r.renderError(node.Error, cPrefix))
+	}
+
+	return buf.String()
+}
+
+// renderCommands renders step commands and returns true if any were written.
+func (r *Renderer) renderCommands(buf *strings.Builder, node *exec.Node, cPrefix string, hasOutput, hasError, hasSubRuns bool) bool {
+	hasFollowingContent := hasOutput || hasError || hasSubRuns
+
+	if len(node.Step.Commands) > 0 {
+		for i, cmd := range node.Step.Commands {
+			isLastCmd := i == len(node.Step.Commands)-1 && !hasFollowingContent
+			buf.WriteString(r.renderCommandLine(cmd.String(), isLastCmd, cPrefix))
+		}
+		return true
+	}
+
+	// Handle legacy single command format
+	if cmdStr := r.getLegacyCommand(node); cmdStr != "" {
+		buf.WriteString(r.renderCommandLine(cmdStr, !hasFollowingContent, cPrefix))
+		return true
+	}
+
+	return false
+}
+
+// addFieldSpacing adds vertical spacing between fields if needed.
+func (r *Renderer) addFieldSpacing(buf *strings.Builder, wroteField bool, cPrefix string) {
+	if wroteField {
+		buf.WriteString(cPrefix + "│\n")
+	}
+}
+
+// isSkippedStatus returns true for statuses that should not show details.
+func isSkippedStatus(status core.NodeStatus) bool {
+	return status == core.NodeSkipped || status == core.NodeAborted || status == core.NodeNotStarted
+}
+
+// shouldShowDuration returns true for statuses that should display duration.
+func shouldShowDuration(status core.NodeStatus) bool {
+	return status == core.NodeSucceeded || status == core.NodeFailed ||
+		status == core.NodeRunning || status == core.NodePartiallySucceeded
+}
+
 // getStatusLabel returns a text label for the node status.
-// All labels are plain text - no colors.
 func (r *Renderer) getStatusLabel(status core.NodeStatus) string {
 	if status == core.NodeNotStarted {
 		return ""
@@ -314,12 +271,8 @@ func (r *Renderer) hasOutput(node *exec.Node) bool {
 
 // renderCommandLine renders a single command line with optional wrapping.
 func (r *Renderer) renderCommandLine(cmdStr string, isLast bool, prefix string) string {
-	branch := TreeBranch
-	if isLast {
-		branch = TreeLastBranch
-	}
+	branch := branchChar(isLast)
 
-	// Apply wrapping if configured
 	if r.config.MaxWidth > 0 {
 		prefixLen := len(prefix) + len(branch)
 		maxContentWidth := r.config.MaxWidth - prefixLen
@@ -328,7 +281,6 @@ func (r *Renderer) renderCommandLine(cmdStr string, isLast bool, prefix string) 
 		}
 	}
 
-	// Tree lines faint, text sepia
 	return prefix + branch + r.text(cmdStr) + "\n"
 }
 
@@ -336,27 +288,14 @@ func (r *Renderer) renderCommandLine(cmdStr string, isLast bool, prefix string) 
 func (r *Renderer) renderWrappedLine(text string, branch string, isLast bool, prefix string) string {
 	var buf strings.Builder
 
-	prefixLen := len(prefix) + len(branch)
-	maxContentWidth := r.config.MaxWidth - prefixLen
-	if maxContentWidth < 20 {
-		maxContentWidth = 20
-	}
-
-	// Calculate continuation prefix (tree lines faint)
-	contPrefix := prefix
-	if isLast {
-		contPrefix += TreeSpace
-	} else {
-		contPrefix += TreePipe
-	}
-
+	maxContentWidth := max(r.config.MaxWidth-len(prefix)-len(branch), 20)
+	contPrefix := childPrefix(prefix, isLast)
 	lines := wrapText(text, maxContentWidth)
+
 	for i, line := range lines {
 		if i == 0 {
-			// First line: tree branch faint, text sepia
 			buf.WriteString(prefix + branch + r.text(line) + "\n")
 		} else {
-			// Continuation lines: indented, text sepia
 			buf.WriteString(contPrefix + "  " + r.text(line) + "\n")
 		}
 	}
@@ -428,24 +367,12 @@ func (r *Renderer) getLegacyCommand(node *exec.Node) string {
 func (r *Renderer) renderOutputs(node *exec.Node, isLast bool, prefix string) string {
 	var buf strings.Builder
 
-	// Check which outputs have content
-	hasStdoutContent := false
-	hasStderrContent := false
-
-	if r.config.ShowStdout && node.Stdout != "" {
-		lines, _, _ := ReadLogFileTail(node.Stdout, 1)
-		hasStdoutContent = len(lines) > 0
-	}
-	if r.config.ShowStderr && node.Stderr != "" {
-		lines, _, _ := ReadLogFileTail(node.Stderr, 1)
-		hasStderrContent = len(lines) > 0
-	}
+	hasStdoutContent := r.config.ShowStdout && r.hasLogContent(node.Stdout)
+	hasStderrContent := r.config.ShowStderr && r.hasLogContent(node.Stderr)
 
 	if hasStdoutContent {
-		isLastOutput := isLast && !hasStderrContent
-		buf.WriteString(r.renderOutput("stdout", node.Stdout, isLastOutput, prefix))
+		buf.WriteString(r.renderOutput("stdout", node.Stdout, isLast && !hasStderrContent, prefix))
 	}
-
 	if hasStderrContent {
 		buf.WriteString(r.renderOutput("stderr", node.Stderr, isLast, prefix))
 	}
@@ -453,82 +380,54 @@ func (r *Renderer) renderOutputs(node *exec.Node, isLast bool, prefix string) st
 	return buf.String()
 }
 
+// hasLogContent checks if a log file has any content.
+func (r *Renderer) hasLogContent(path string) bool {
+	if path == "" {
+		return false
+	}
+	lines, _, _ := ReadLogFileTail(path, 1)
+	return len(lines) > 0
+}
+
 // renderOutput renders a single output stream (stdout or stderr) with content.
 func (r *Renderer) renderOutput(label string, filePath string, isLast bool, prefix string) string {
-	// Read log content with tail limit
 	lines, truncated, err := ReadLogFileTail(filePath, r.config.MaxOutputLines)
-
-	// Skip empty output entirely - don't show empty labels
 	if err != nil || len(lines) == 0 {
 		return ""
 	}
 
 	var buf strings.Builder
+	branch := branchChar(isLast)
+	contPrefix := childPrefix(prefix, isLast)
+	maxContentWidth := max(r.config.MaxWidth-len(contPrefix)-2, 20)
 
-	branch := TreeBranch
-	if isLast {
-		branch = TreeLastBranch
-	}
+	buf.WriteString(prefix + branch + r.text(label+": ") + r.gray(filePath) + "\n")
 
-	// Calculate content prefix for multi-line output
-	contentPrefix := prefix
-	if isLast {
-		contentPrefix += TreeSpace
-	} else {
-		contentPrefix += TreePipe
-	}
-
-	// Calculate max width for content wrapping
-	contentIndent := len(contentPrefix) + 2 // "  " indent
-	maxContentWidth := r.config.MaxWidth - contentIndent
-	if maxContentWidth < 20 {
-		maxContentWidth = 20
-	}
-
-	// Helper to write wrapped content lines
-	writeContentLine := func(line string) {
-		trimmedLine := strings.TrimSpace(line)
-		if trimmedLine == "" {
-			return
-		}
-		if len(trimmedLine) > maxContentWidth {
-			// Wrap long lines
-			wrapped := wrapText(trimmedLine, maxContentWidth)
-			for _, wl := range wrapped {
-				buf.WriteString(contentPrefix + "  " + r.text(wl) + "\n")
-			}
-		} else {
-			buf.WriteString(contentPrefix + "  " + r.text(trimmedLine) + "\n")
-		}
-	}
-
-	// Show truncation indicator first if lines were omitted
 	if truncated > 0 {
-		truncMsg := fmt.Sprintf("... (%d more lines)", truncated)
-		buf.WriteString(prefix + branch + r.text(label+": "+truncMsg) + "\n")
+		buf.WriteString(contPrefix + "  " + r.gray(fmt.Sprintf("... (%d more lines)", truncated)) + "\n")
+	}
 
-		for _, line := range lines {
-			writeContentLine(line)
-		}
-	} else if len(lines) == 1 {
-		// Single line - show inline with label if short enough
-		trimmed := strings.TrimSpace(lines[0])
-		labelLine := label + ": " + trimmed
-		if len(labelLine) <= maxContentWidth {
-			buf.WriteString(prefix + branch + r.text(labelLine) + "\n")
-		} else {
-			buf.WriteString(prefix + branch + r.text(label+":") + "\n")
-			writeContentLine(trimmed)
-		}
-	} else {
-		// Multiple lines - show label on its own line, then content
-		buf.WriteString(prefix + branch + r.text(label+":") + "\n")
-		for _, line := range lines {
-			writeContentLine(line)
-		}
+	for _, line := range lines {
+		r.writeContentLine(&buf, line, contPrefix, maxContentWidth)
 	}
 
 	return buf.String()
+}
+
+// writeContentLine writes a content line with optional wrapping.
+func (r *Renderer) writeContentLine(buf *strings.Builder, line string, contPrefix string, maxWidth int) {
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" {
+		return
+	}
+
+	if len(trimmed) > maxWidth {
+		for _, wl := range wrapText(trimmed, maxWidth) {
+			buf.WriteString(contPrefix + "  " + r.text(wl) + "\n")
+		}
+	} else {
+		buf.WriteString(contPrefix + "  " + r.text(trimmed) + "\n")
+	}
 }
 
 // renderSubRuns renders references to sub-DAG runs.
@@ -536,19 +435,12 @@ func (r *Renderer) renderSubRuns(subRuns []exec.SubDAGRun, isLastSection bool, p
 	var buf strings.Builder
 
 	for i, sub := range subRuns {
-		isLastItem := i == len(subRuns)-1
-		branch := TreeBranch
-		if isLastItem && isLastSection {
-			branch = TreeLastBranch
-		}
-
+		isLastItem := i == len(subRuns)-1 && isLastSection
 		subInfo := fmt.Sprintf("subdag: %s", sub.DAGRunID)
 		if sub.Params != "" {
 			subInfo += fmt.Sprintf(" [%s]", sub.Params)
 		}
-
-		// Tree lines faint, text sepia
-		buf.WriteString(prefix + branch + r.text(subInfo) + "\n")
+		buf.WriteString(prefix + branchChar(isLastItem) + r.text(subInfo) + "\n")
 	}
 
 	return buf.String()
@@ -556,58 +448,48 @@ func (r *Renderer) renderSubRuns(subRuns []exec.SubDAGRun, isLastSection bool, p
 
 // renderError renders an error message with wrapping.
 func (r *Renderer) renderError(errMsg string, prefix string) string {
-	// Clean the error message - remove "recent stderr (tail):" section
-	// since we already display stderr separately in the tree
-	cleanedErr := cleanErrorMessage(errMsg)
-
-	errStr := fmt.Sprintf("error: %s", cleanedErr)
-
-	// Calculate max width for wrapping
-	prefixLen := len(prefix) + len(TreeLastBranch)
-	maxWidth := r.config.MaxWidth - prefixLen
-	if maxWidth < 20 {
-		maxWidth = 20
-	}
+	errStr := "error: " + cleanErrorMessage(errMsg)
+	maxWidth := max(r.config.MaxWidth-len(prefix)-len(TreeLastBranch), 20)
 
 	if len(errStr) <= maxWidth {
 		return prefix + TreeLastBranch + r.text(errStr) + "\n"
 	}
 
-	// Wrap long error messages
 	var buf strings.Builder
-	wrapped := wrapText(errStr, maxWidth)
-	for i, line := range wrapped {
+	for i, line := range wrapText(errStr, maxWidth) {
 		if i == 0 {
 			buf.WriteString(prefix + TreeLastBranch + r.text(line) + "\n")
 		} else {
-			// 4 spaces to match width of "└─" + indent (2 spaces)
 			buf.WriteString(prefix + "    " + r.text(line) + "\n")
 		}
 	}
 	return buf.String()
 }
 
-// cleanErrorMessage removes the "recent stderr (tail):" section from error messages
-// since stderr is already displayed separately in the tree output.
+// cleanErrorMessage removes the "recent stderr (tail):" section from error messages.
 func cleanErrorMessage(errMsg string) string {
-	// Find and remove the "recent stderr (tail):" section
-	if idx := strings.Index(errMsg, "\nrecent stderr (tail):"); idx != -1 {
+	const stderrMarker = "recent stderr (tail):"
+	if idx := strings.Index(errMsg, "\n"+stderrMarker); idx != -1 {
 		return strings.TrimSpace(errMsg[:idx])
 	}
-	if idx := strings.Index(errMsg, "recent stderr (tail):"); idx != -1 {
+	if idx := strings.Index(errMsg, stderrMarker); idx != -1 {
 		return strings.TrimSpace(errMsg[:idx])
 	}
 	return errMsg
 }
 
 // renderFinalStatus renders the final result line at the bottom of the tree.
-// White color (default).
 func (r *Renderer) renderFinalStatus(status *exec.DAGRunStatus) string {
-	prefix := "Result"
+	label := "Result"
 	if status.Status == core.Running {
-		prefix = "Status"
+		label = "Status"
 	}
-	return fmt.Sprintf("\n%s: %s\n", prefix, StatusText(status.Status))
+	return fmt.Sprintf("\n%s: %s\n", label, StatusText(status.Status))
+}
+
+// renderSchedulerLog renders the DAG-level scheduler log path.
+func (r *Renderer) renderSchedulerLog(logPath string, hasSteps bool) string {
+	return branchChar(!hasSteps) + r.text("log: ") + r.gray(logPath) + "\n"
 }
 
 // calculateDuration calculates the duration string between start and finish times.
@@ -655,14 +537,13 @@ func nodeStatusToStatus(ns core.NodeStatus) core.Status {
 		return core.Aborted
 	case core.NodePartiallySucceeded:
 		return core.PartiallySucceeded
-	case core.NodeNotStarted:
-		return core.NotStarted
-	case core.NodeSkipped:
-		return core.NotStarted
 	case core.NodeWaiting:
 		return core.Waiting
 	case core.NodeRejected:
 		return core.Rejected
+	case core.NodeNotStarted, core.NodeSkipped:
+		return core.NotStarted
+	default:
+		return core.NotStarted
 	}
-	return core.NotStarted
 }

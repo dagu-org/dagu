@@ -16,17 +16,28 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
+	"github.com/go-chi/httplog/v2"
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/dagu-org/dagu/internal/agent"
 	authmodel "github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	cmnschema "github.com/dagu-org/dagu/internal/cmn/schema"
 	"github.com/dagu-org/dagu/internal/cmn/telemetry"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/gitsync"
+	_ "github.com/dagu-org/dagu/internal/llm/allproviders" // Register LLM providers
+	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
 	"github.com/dagu-org/dagu/internal/persis/fileapikey"
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
+	"github.com/dagu-org/dagu/internal/persis/fileconversation"
 	"github.com/dagu-org/dagu/internal/persis/fileuser"
 	"github.com/dagu-org/dagu/internal/persis/filewebhook"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -41,43 +52,38 @@ import (
 	"github.com/dagu-org/dagu/internal/service/oidcprovision"
 	"github.com/dagu-org/dagu/internal/service/resource"
 	"github.com/dagu-org/dagu/internal/tunnel"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
-	"github.com/go-chi/httplog/v2"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
-// Server represents the HTTP server for the frontend application
+// Server represents the HTTP server for the frontend application.
 type Server struct {
-	apiV2           *apiv2.API
-	config          *config.Config
-	httpServer      *http.Server
-	funcsConfig     funcsConfig
-	builtinOIDCCfg  *auth.BuiltinOIDCConfig // OIDC config for builtin auth mode
-	authService     *authservice.Service
-	auditService    *audit.Service
-	syncService     gitsync.Service      // Git sync service for graceful shutdown
-	listener        net.Listener         // Optional pre-bound listener (for tests)
-	sseHub          *sse.Hub             // SSE hub for real-time updates
-	metricsRegistry *prometheus.Registry // Prometheus registry for metrics
-	tunnelAPIOpts   []apiv2.APIOption    // Tunnel API options (set by WithTunnelService)
+	apiV2            *apiv2.API
+	agentAPI         *agent.API
+	agentConfigStore *fileagentconfig.Store
+	config           *config.Config
+	httpServer       *http.Server
+	funcsConfig      funcsConfig
+	builtinOIDCCfg   *auth.BuiltinOIDCConfig
+	authService      *authservice.Service
+	auditService     *audit.Service
+	syncService      gitsync.Service
+	listener         net.Listener
+	sseHub           *sse.Hub
+	metricsRegistry  *prometheus.Registry
+	tunnelAPIOpts    []apiv2.APIOption
+	dagStore         exec.DAGStore
 }
 
-// ServerOption is a functional option for configuring the Server
+// ServerOption is a functional option for configuring the Server.
 type ServerOption func(*Server)
 
-// WithListener sets a pre-bound listener for the server.
-// When set, the server will use this listener instead of creating its own.
-// This is useful for tests to avoid race conditions with port allocation.
+// WithListener sets a pre-bound listener for the server (useful for tests).
 func WithListener(l net.Listener) ServerOption {
 	return func(s *Server) {
 		s.listener = l
 	}
 }
 
-// WithTunnelService sets the tunnel service for the server.
-// This enables the tunnel status API endpoint to return real-time tunnel information.
+// WithTunnelService enables real-time tunnel status via the API.
 func WithTunnelService(ts *tunnel.Service) ServerOption {
 	return func(s *Server) {
 		if ts != nil {
@@ -86,35 +92,25 @@ func WithTunnelService(ts *tunnel.Service) ServerOption {
 	}
 }
 
-// NewServer constructs and returns a Server configured from the provided configuration,
-// stores, managers, and services.
-// It initializes API v2, populates the server configuration (including UI function
-// configuration), and wires an initialized builtin auth service into API v2 when
-// cfg.Server.Auth.Mode is set to builtin.
-// Returns the constructed *Server, or an error if initialization fails (for example,
-// when the configured builtin auth service fails to initialize).
-// The context is used for OIDC provider initialization and should be cancellable
-// to allow graceful shutdown during startup.
+// NewServer constructs a Server from the provided configuration, stores, and services.
+// Returns an error if initialization fails (e.g., when builtin auth fails to initialize).
 func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs exec.DAGRunStore, qs exec.QueueStore, ps exec.ProcStore, drm runtime.Manager, cc coordinator.Client, sr exec.ServiceRegistry, mr *prometheus.Registry, collector *telemetry.Collector, rs *resource.Service, opts ...ServerOption) (*Server, error) {
-	// Defensive nil-context guard to prevent surprising crashes from older call sites
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
-	var remoteNodes []string
+	remoteNodes := make([]string, 0, len(cfg.Server.RemoteNodes))
 	for _, n := range cfg.Server.RemoteNodes {
 		remoteNodes = append(remoteNodes, n.Name)
 	}
 
-	// Build API options
-	var apiOpts []apiv2.APIOption
+	var (
+		apiOpts         []apiv2.APIOption
+		builtinOIDCCfg  *auth.BuiltinOIDCConfig
+		oidcEnabled     bool
+		oidcButtonLabel string
+	)
 
-	// OIDC config for builtin mode
-	var builtinOIDCCfg *auth.BuiltinOIDCConfig
-	var oidcEnabled bool
-	var oidcButtonLabel string
-
-	// Initialize audit service
 	auditSvc, err := initAuditService(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize audit service: %w", err)
@@ -123,31 +119,38 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		apiOpts = append(apiOpts, apiv2.WithAuditService(auditSvc))
 	}
 
-	// Initialize git sync service if enabled
 	syncSvc := initSyncService(ctx, cfg)
 	if syncSvc != nil {
 		apiOpts = append(apiOpts, apiv2.WithSyncService(syncSvc))
 	}
 
-	// Initialize auth service if builtin mode is enabled
+	agentConfigStore, err := fileagentconfig.New(cfg.Paths.DataDir)
+	if err != nil {
+		logger.Warn(ctx, "Failed to create agent config store", tag.Error(err))
+	}
+
+	var agentAPI *agent.API
+	if agentConfigStore != nil {
+		agentAPI, err = initAgentAPI(ctx, agentConfigStore, &cfg.Paths, dr)
+		if err != nil {
+			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
+		}
+	}
+
 	var authSvc *authservice.Service
 	if cfg.Server.Auth.Mode == config.AuthModeBuiltin {
 		result, err := initBuiltinAuthService(cfg, collector)
 		if err != nil {
-			// Fail fast: if auth is configured but fails to initialize, return error
-			// to prevent server from running without expected authentication
 			return nil, fmt.Errorf("failed to initialize builtin auth service: %w", err)
 		}
 		authSvc = result.AuthService
 		apiOpts = append(apiOpts, apiv2.WithAuthService(result.AuthService))
 
-		// Initialize OIDC if configured under builtin mode
 		oidcCfg := cfg.Server.Auth.OIDC
 		if oidcCfg.IsConfigured() {
 			oidcEnabled = true
 			oidcButtonLabel = oidcCfg.ButtonLabel
 
-			// Create OIDC provisioning service
 			provisionCfg := oidcprovision.Config{
 				Issuer:         oidcCfg.Issuer,
 				AutoSignup:     oidcCfg.AutoSignup,
@@ -168,7 +171,6 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 				return nil, fmt.Errorf("failed to create OIDC provisioning service: %w", err)
 			}
 
-			// Initialize OIDC provider
 			builtinOIDCCfg, err = auth.InitBuiltinOIDCConfig(
 				ctx,
 				oidcCfg,
@@ -188,12 +190,15 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	}
 
 	srv := &Server{
-		config:          cfg,
-		builtinOIDCCfg:  builtinOIDCCfg,
-		authService:     authSvc,
-		auditService:    auditSvc,
-		syncService:     syncSvc,
-		metricsRegistry: mr,
+		config:           cfg,
+		agentAPI:         agentAPI,
+		agentConfigStore: agentConfigStore,
+		builtinOIDCCfg:   builtinOIDCCfg,
+		authService:      authSvc,
+		auditService:     auditSvc,
+		syncService:      syncSvc,
+		metricsRegistry:  mr,
+		dagStore:         dr,
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,
 			NavbarTitle:           cfg.UI.NavbarTitle,
@@ -210,49 +215,44 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 			OIDCButtonLabel:       oidcButtonLabel,
 			TerminalEnabled:       cfg.Server.Terminal.Enabled && authSvc != nil,
 			GitSyncEnabled:        cfg.GitSync.Enabled,
+			AgentEnabledChecker:   agentConfigStore,
 		},
 	}
 
-	// Apply server options first to collect any additional API options (e.g., tunnel service)
 	for _, opt := range opts {
 		opt(srv)
 	}
 
-	// Merge tunnel API options with base API options
 	allAPIOptions := append(apiOpts, srv.tunnelAPIOpts...)
+	if srv.agentConfigStore != nil {
+		allAPIOptions = append(allAPIOptions, apiv2.WithAgentConfigStore(srv.agentConfigStore))
+	}
 
-	// Create the API with all options
 	srv.apiV2 = apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, allAPIOptions...)
 
 	return srv, nil
 }
 
-// builtinAuthResult holds the result of initializing builtin auth.
 type builtinAuthResult struct {
 	AuthService *authservice.Service
 	UserStore   authmodel.UserStore
 }
 
-// initBuiltinAuthService creates a file-based user store, constructs the builtin
-// authentication service, and ensures a default admin user exists.
-// If the admin password is auto-generated, the password is printed to stdout.
-// It returns the initialized auth service and user store, or an error if any step fails.
+// initBuiltinAuthService creates a file-based user store and authentication service.
 func initBuiltinAuthService(cfg *config.Config, collector *telemetry.Collector) (*builtinAuthResult, error) {
 	ctx := context.Background()
 
-	// Validate token secret is configured
 	if cfg.Server.Auth.Builtin.Token.Secret == "" {
 		return nil, fmt.Errorf("builtin auth requires a non-empty token secret (set DAGU_AUTH_TOKEN_SECRET or server.auth.builtin.token.secret)")
 	}
 
-	// Create file-based user store
 	userStore, err := fileuser.New(cfg.Paths.UsersDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user store: %w", err)
 	}
 
-	// Create file-based API key store with cache
 	cacheLimits := cfg.Cache.Limits()
+
 	apiKeyCache := fileutil.NewCache[*authmodel.APIKey]("api_key", cacheLimits.APIKey.Limit, cacheLimits.APIKey.TTL)
 	apiKeyCache.StartEviction(ctx)
 	if collector != nil {
@@ -263,7 +263,6 @@ func initBuiltinAuthService(cfg *config.Config, collector *telemetry.Collector) 
 		return nil, fmt.Errorf("failed to create API key store: %w", err)
 	}
 
-	// Create file-based webhook store with cache
 	webhookCache := fileutil.NewCache[*authmodel.Webhook]("webhook", cacheLimits.Webhook.Limit, cacheLimits.Webhook.TTL)
 	webhookCache.StartEviction(ctx)
 	if collector != nil {
@@ -274,17 +273,14 @@ func initBuiltinAuthService(cfg *config.Config, collector *telemetry.Collector) 
 		return nil, fmt.Errorf("failed to create webhook store: %w", err)
 	}
 
-	// Create auth service with configuration
-	authConfig := authservice.Config{
+	authSvc := authservice.New(userStore, authservice.Config{
 		TokenSecret: cfg.Server.Auth.Builtin.Token.Secret,
 		TokenTTL:    cfg.Server.Auth.Builtin.Token.TTL,
-	}
-	authSvc := authservice.New(userStore, authConfig,
+	},
 		authservice.WithAPIKeyStore(apiKeyStore),
 		authservice.WithWebhookStore(webhookStore),
 	)
 
-	// Ensure admin user exists
 	password, created, err := authSvc.EnsureAdminUser(
 		ctx,
 		cfg.Server.Auth.Builtin.Admin.Username,
@@ -296,8 +292,7 @@ func initBuiltinAuthService(cfg *config.Config, collector *telemetry.Collector) 
 
 	if created {
 		if cfg.Server.Auth.Builtin.Admin.Password == "" {
-			// Password was auto-generated, print to stdout (not to structured logs)
-			// which may be shipped to external systems)
+			// Auto-generated password: print to stdout (not structured logs)
 			fmt.Printf("\n"+
 				"================================================================================\n"+
 				"  ADMIN USER CREATED\n"+
@@ -319,17 +314,12 @@ func initBuiltinAuthService(cfg *config.Config, collector *telemetry.Collector) 
 }
 
 // initAuditService creates a file-based audit store and service.
-// Returns nil service if audit logging is disabled or cannot be configured.
 func initAuditService(cfg *config.Config) (*audit.Service, error) {
-	// Check if audit logging is enabled
 	if !cfg.Server.Audit.Enabled {
 		return nil, nil
 	}
 
-	// Use AdminLogsDir for audit logs
-	auditDir := filepath.Join(cfg.Paths.AdminLogsDir, "audit")
-
-	store, err := fileaudit.New(auditDir)
+	store, err := fileaudit.New(filepath.Join(cfg.Paths.AdminLogsDir, "audit"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create audit store: %w", err)
 	}
@@ -338,18 +328,14 @@ func initAuditService(cfg *config.Config) (*audit.Service, error) {
 }
 
 // initSyncService creates and returns a Git sync service if enabled.
-// Returns nil if Git sync is not enabled or not configured.
 func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
-	gitSyncCfg := cfg.GitSync
-	if !gitSyncCfg.Enabled {
+	if !cfg.GitSync.Enabled {
 		return nil
 	}
 
-	syncCfg := gitsync.NewConfigFromGlobal(gitSyncCfg)
-
+	syncCfg := gitsync.NewConfigFromGlobal(cfg.GitSync)
 	svc := gitsync.NewService(syncCfg, cfg.Paths.DAGsDir, cfg.Paths.DataDir)
 
-	// Start auto-sync if enabled
 	if syncCfg.AutoSync.Enabled {
 		if err := svc.Start(ctx); err != nil {
 			logger.Error(ctx, "Failed to start git sync auto-sync", tag.Error(err))
@@ -368,48 +354,81 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 	return svc
 }
 
-// sanitizedRequestLogger returns a middleware that wraps httplog's RequestLogger
-// with URL sanitization. This ensures tokens in query strings are redacted in logs
-// regardless of httplog's internal attribute handling.
-func sanitizedRequestLogger(logger *httplog.Logger) func(next http.Handler) http.Handler {
-	httplogMw := httplog.RequestLogger(logger)
+// initAgentAPI creates and returns an agent API.
+// The API uses the config store to check enabled status and get provider dynamically.
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, paths *config.PathsConfig, dagStore exec.DAGStore) (*agent.API, error) {
+	convStore, err := fileconversation.New(paths.ConversationsDir)
+	if err != nil {
+		logger.Warn(ctx, "Failed to create conversation store, persistence disabled", tag.Error(err))
+	}
+
+	api := agent.NewAPI(agent.APIConfig{
+		ConfigStore:       store,
+		WorkingDir:        paths.DAGsDir,
+		Logger:            slog.Default(),
+		ConversationStore: convStore,
+		DAGStore:          dagStore,
+		Environment: agent.EnvironmentInfo{
+			DAGsDir:        paths.DAGsDir,
+			LogDir:         paths.LogDir,
+			DataDir:        paths.DataDir,
+			ConfigFile:     paths.ConfigFileUsed,
+			WorkingDir:     paths.DAGsDir,
+			BaseConfigFile: paths.BaseConfig,
+		},
+	})
+
+	logger.Info(ctx, "Agent API initialized")
+
+	return api, nil
+}
+
+// sanitizedRequestLogger wraps httplog's RequestLogger with URL sanitization
+// to redact tokens in query strings.
+func sanitizedRequestLogger(httpLogger *httplog.Logger) func(next http.Handler) http.Handler {
+	loggerMiddleware := httplog.RequestLogger(httpLogger)
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Check if URL has token parameter that needs sanitization
-			logReq := r
-			if r.URL.RawQuery != "" && strings.Contains(r.URL.RawQuery, "token=") {
-				// Clone request with sanitized URL for logging
-				logReq = r.Clone(r.Context())
-				q := logReq.URL.Query()
-				if q.Has("token") {
-					q.Set("token", "[REDACTED]")
-					logReq.URL.RawQuery = q.Encode()
-					// httplog uses r.RequestURI (not r.URL) to construct the logged URL,
-					// so we must update RequestURI to match the sanitized URL.
-					logReq.RequestURI = logReq.URL.RequestURI()
-				}
-			}
+			logReq := redactTokenFromRequest(r)
 
-			// Create inner handler that receives sanitized request from httplog
-			// but passes the original request to actual handlers
-			innerHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				next.ServeHTTP(w, r) // Use original request with real token
+			// Pass original request to next handler, but redacted request to logger
+			passthrough := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				next.ServeHTTP(w, r)
 			})
 
-			// httplog sees sanitized URL, actual handlers get original
-			httplogMw(innerHandler).ServeHTTP(w, logReq)
+			loggerMiddleware(passthrough).ServeHTTP(w, logReq)
 		})
 	}
 }
 
-// Serve starts the HTTP server and configures routes
+// redactTokenFromRequest returns a request with the token query parameter redacted.
+// If no token is present, the original request is returned unchanged.
+func redactTokenFromRequest(r *http.Request) *http.Request {
+	if r.URL.RawQuery == "" || !strings.Contains(r.URL.RawQuery, "token=") {
+		return r
+	}
+
+	q := r.URL.Query()
+	if !q.Has("token") {
+		return r
+	}
+
+	redacted := r.Clone(r.Context())
+	q.Set("token", "[REDACTED]")
+	redacted.URL.RawQuery = q.Encode()
+	redacted.RequestURI = redacted.URL.RequestURI()
+
+	return redacted
+}
+
+// Serve starts the HTTP server and configures routes.
 func (srv *Server) Serve(ctx context.Context) error {
-	// Setup logger for HTTP requests
 	logLevel := slog.LevelInfo
 	if srv.config.Core.Debug {
 		logLevel = slog.LevelDebug
 	}
+
 	requestLogger := httplog.NewLogger("http", httplog.Options{
 		LogLevel:         logLevel,
 		JSON:             srv.config.Core.LogFormat == "json",
@@ -421,151 +440,95 @@ func (srv *Server) Serve(ctx context.Context) error {
 		QuietDownPeriod:  10 * time.Second,
 	})
 
-	// Create router with middleware
 	r := chi.NewMux()
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Compress(5))
 	r.Use(sanitizedRequestLogger(requestLogger))
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"}, // TODO: Update to specific origins for better security
+		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Content-Type", "Authorization", "Content-Encoding", "Accept"},
 		AllowCredentials: true,
-		MaxAge:           300, // Maximum value not ignored by any of major browsers
+		MaxAge:           300,
 	}))
 	r.Use(middleware.RedirectSlashes)
 
-	// Configure API paths
 	apiV2BasePath := srv.configureAPIPath()
-	schema := srv.getSchema()
+	scheme := srv.getScheme()
 
-	// Set up routes
 	if err := srv.setupRoutes(ctx, r); err != nil {
 		return err
 	}
 
-	// Configure API routes
-	if err := srv.setupAPIRoutes(ctx, r, apiV2BasePath, schema); err != nil {
+	if err := srv.setupAPIRoutes(ctx, r, apiV2BasePath, scheme); err != nil {
 		return err
 	}
 
-	// Configure terminal WebSocket route (admin-only, requires builtin auth)
 	if srv.config.Server.Terminal.Enabled && srv.authService != nil {
 		srv.setupTerminalRoute(ctx, r, apiV2BasePath)
 	}
 
-	// Configure SSE route for real-time DAG run status updates
+	if srv.agentAPI != nil && srv.agentConfigStore != nil {
+		srv.setupAgentRoutes(ctx, r)
+	}
+
 	srv.setupSSERoute(ctx, r, apiV2BasePath)
 
-	// Configure and start the server
 	addr := net.JoinHostPort(srv.config.Server.Host, strconv.Itoa(srv.config.Server.Port))
 	srv.httpServer = &http.Server{
 		Handler:           r,
 		Addr:              addr,
 		ReadHeaderTimeout: 10 * time.Second,
-		IdleTimeout:       120 * time.Second, // Added IdleTimeout for better resource management
-		WriteTimeout:      60 * time.Second,  // Added WriteTimeout for better resource management
+		IdleTimeout:       120 * time.Second,
+		WriteTimeout:      60 * time.Second,
 	}
 
-	// Start metrics collection
 	metrics.StartUptime(ctx)
-
-	// Log before starting goroutine to avoid race condition in tests
 	logger.Info(ctx, "Server is starting", tag.Addr(addr))
 
-	// Start the server in a goroutine
 	go srv.startServer(ctx)
-
-	// Set up graceful shutdown
 	srv.setupGracefulShutdown(ctx)
+
 	return nil
 }
 
-// configureAPIPath returns the properly formatted API v2 path
 func (srv *Server) configureAPIPath() string {
 	apiV2BasePath := path.Join(srv.config.Server.BasePath, "api/v2")
-	if !strings.HasPrefix(apiV2BasePath, "/") {
-		apiV2BasePath = "/" + apiV2BasePath
-	}
-
-	return apiV2BasePath
+	return ensureLeadingSlash(apiV2BasePath)
 }
 
-// getSchema returns the schema (http or https) based on TLS configuration
-func (srv *Server) getSchema() string {
-	if srv.config.Server.TLS != nil {
-		return "https"
+func (srv *Server) getScheme() string {
+	if srv.config.Server.TLS == nil {
+		return "http"
 	}
-	return "http"
+	return "https"
 }
 
-// setupRoutes configures the web UI routes
+// ensureLeadingSlash ensures the path starts with a forward slash.
+func ensureLeadingSlash(p string) string {
+	if strings.HasPrefix(p, "/") {
+		return p
+	}
+	return "/" + p
+}
+
 func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
-	// Skip UI routes in headless mode
 	if srv.config.Server.Headless {
 		logger.Info(ctx, "Headless mode enabled: UI is disabled, but API remains active")
 		return nil
 	}
 
-	// Serve assets with proper cache control
-	basePath := srv.config.Server.BasePath
-	if evaluatedBasePath, err := cmdutil.EvalString(ctx, basePath); err != nil {
-		logger.Warn(ctx, "Failed to evaluate server base path",
-			tag.Path(basePath),
-			tag.Error(err))
-	} else {
-		basePath = evaluatedBasePath
-	}
-	assetsPath := path.Join(strings.TrimRight(basePath, "/"), "assets/*")
-	if !strings.HasPrefix(assetsPath, "/") {
-		assetsPath = "/" + assetsPath
+	basePath := srv.evaluateBasePath(ctx)
+	srv.setupAssetRoutes(r, basePath)
+	srv.setupOIDCRoutes(r)
+
+	oidcAuthOptions, err := srv.buildOIDCAuthOptions(ctx)
+	if err != nil {
+		return err
 	}
 
-	// Create a file server for the embedded assets
-	fileServer := http.FileServer(http.FS(assetsFS))
-
-	// If there's a base path, we need to strip it from the request URL
-	if basePath != "" && basePath != "/" {
-		fileServer = http.StripPrefix(strings.TrimRight(basePath, "/"), fileServer)
-	}
-
-	r.Get(assetsPath, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "max-age=86400")
-		if ctype := mime.TypeByExtension(path.Ext(r.URL.Path)); ctype != "" {
-			w.Header().Set("Content-Type", ctype)
-		}
-		fileServer.ServeHTTP(w, r)
-	})
-
-	// Serve UI pages
 	indexHandler := srv.useTemplate(ctx, "index.gohtml", "index")
-
-	// Initialize OIDC if enabled (legacy mode: oidc)
-	authConfig := srv.config.Server.Auth
-	authOIDC := authConfig.OIDC
-
-	var oidcAuthOptions *auth.Options
-	if authConfig.Mode == config.AuthModeOIDC && authConfig.OIDC.ClientId != "" && authConfig.OIDC.ClientSecret != "" && authOIDC.Issuer != "" {
-		oidcCfg, err := auth.InitVerifierAndConfig(ctx, authOIDC)
-		if err != nil {
-			return fmt.Errorf("failed to initialize OIDC: %w", err)
-		}
-		oidcAuthOptions = &auth.Options{
-			OIDCAuthEnabled: true,
-			OIDCWhitelist:   authConfig.OIDC.Whitelist,
-			OIDCProvider:    oidcCfg.Provider,
-			OIDCVerify:      oidcCfg.Verifier,
-			OIDCConfig:      oidcCfg.Config,
-		}
-	}
-
-	// Add OIDC routes for builtin auth mode (if configured)
-	if srv.builtinOIDCCfg != nil {
-		r.Get("/oidc-login", auth.BuiltinOIDCLoginHandler(srv.builtinOIDCCfg))
-		r.Get("/oidc-callback", auth.BuiltinOIDCCallbackHandler(srv.builtinOIDCCfg))
-	}
-
 	r.Route("/", func(r chi.Router) {
 		if oidcAuthOptions != nil {
 			r.Use(auth.OIDCMiddleware(*oidcAuthOptions))
@@ -574,14 +537,82 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 			indexHandler(w, nil)
 		})
 	})
+
 	return nil
 }
 
-// setupAPIRoutes configures the API v2 routes
-func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV2BasePath, schema string) error {
+func (srv *Server) evaluateBasePath(ctx context.Context) string {
+	basePath := srv.config.Server.BasePath
+	evaluated, err := cmdutil.EvalString(ctx, basePath)
+	if err != nil {
+		logger.Warn(ctx, "Failed to evaluate server base path", tag.Path(basePath), tag.Error(err))
+		return basePath
+	}
+	return evaluated
+}
+
+func (srv *Server) setupAssetRoutes(r *chi.Mux, basePath string) {
+	assetsPath := ensureLeadingSlash(path.Join(strings.TrimRight(basePath, "/"), "assets/*"))
+
+	fileServer := http.FileServer(http.FS(assetsFS))
+	if basePath != "" && basePath != "/" {
+		fileServer = http.StripPrefix(strings.TrimRight(basePath, "/"), fileServer)
+	}
+
+	r.Get(assetsPath, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "max-age=86400")
+
+		// Serve schema from shared package instead of embedded assets
+		if strings.HasSuffix(r.URL.Path, "dag.schema.json") {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(cmnschema.DAGSchemaJSON)
+			return
+		}
+
+		if ctype := mime.TypeByExtension(path.Ext(r.URL.Path)); ctype != "" {
+			w.Header().Set("Content-Type", ctype)
+		}
+		fileServer.ServeHTTP(w, r)
+	})
+}
+
+func (srv *Server) setupOIDCRoutes(r *chi.Mux) {
+	if srv.builtinOIDCCfg == nil {
+		return
+	}
+	r.Get("/oidc-login", auth.BuiltinOIDCLoginHandler(srv.builtinOIDCCfg))
+	r.Get("/oidc-callback", auth.BuiltinOIDCCallbackHandler(srv.builtinOIDCCfg))
+}
+
+func (srv *Server) buildOIDCAuthOptions(ctx context.Context) (*auth.Options, error) {
+	authCfg := srv.config.Server.Auth
+	oidcCfg := authCfg.OIDC
+
+	if authCfg.Mode != config.AuthModeOIDC {
+		return nil, nil
+	}
+	if oidcCfg.ClientID == "" || oidcCfg.ClientSecret == "" || oidcCfg.Issuer == "" {
+		return nil, nil
+	}
+
+	verifierCfg, err := auth.InitVerifierAndConfig(ctx, oidcCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize OIDC: %w", err)
+	}
+
+	return &auth.Options{
+		OIDCAuthEnabled: true,
+		OIDCWhitelist:   oidcCfg.Whitelist,
+		OIDCProvider:    verifierCfg.Provider,
+		OIDCVerify:      verifierCfg.Verifier,
+		OIDCConfig:      verifierCfg.Config,
+	}, nil
+}
+
+func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV2BasePath, scheme string) error {
 	var setupErr error
 	r.Route(apiV2BasePath, func(r chi.Router) {
-		url := fmt.Sprintf("%s://%s:%d%s", schema, srv.config.Server.Host, srv.config.Server.Port, apiV2BasePath)
+		url := fmt.Sprintf("%s://%s:%d%s", scheme, srv.config.Server.Host, srv.config.Server.Port, apiV2BasePath)
 		if err := srv.apiV2.ConfigureRoutes(ctx, r, url); err != nil {
 			logger.Error(ctx, "Failed to configure API routes", tag.Error(err))
 			setupErr = err
@@ -590,23 +621,14 @@ func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV2BasePath
 	return setupErr
 }
 
-// setupTerminalRoute configures the terminal WebSocket route
 func (srv *Server) setupTerminalRoute(ctx context.Context, r *chi.Mux, apiV2BasePath string) {
-	termHandler := terminal.NewHandler(
-		srv.authService,
-		srv.auditService,
-		terminal.GetDefaultShell(),
-	)
-
+	termHandler := terminal.NewHandler(srv.authService, srv.auditService, terminal.GetDefaultShell())
 	wsPath := path.Join(apiV2BasePath, "terminal/ws")
 	r.Get(wsPath, termHandler.ServeHTTP)
-
 	logger.Info(ctx, "Terminal WebSocket route configured", slog.String("path", wsPath))
 }
 
-// setupSSERoute configures SSE routes for real-time updates
 func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV2BasePath string) {
-	// Create SSE metrics if metrics registry is available
 	var sseMetrics *sse.Metrics
 	if srv.metricsRegistry != nil {
 		sseMetrics = sse.NewMetrics(srv.metricsRegistry)
@@ -623,7 +645,6 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV2BasePath 
 
 	handler := sse.NewHandler(srv.sseHub, remoteNodes, srv.authService)
 
-	// DAG and DAG run events
 	r.Get(path.Join(apiV2BasePath, "events/dags"), handler.HandleDAGsListEvents)
 	r.Get(path.Join(apiV2BasePath, "events/dags/{fileName}"), handler.HandleDAGEvents)
 	r.Get(path.Join(apiV2BasePath, "events/dags/{fileName}/dag-runs"), handler.HandleDAGHistoryEvents)
@@ -631,16 +652,12 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV2BasePath 
 	r.Get(path.Join(apiV2BasePath, "events/dag-runs/{name}/{dagRunId}"), handler.HandleDAGRunEvents)
 	r.Get(path.Join(apiV2BasePath, "events/dag-runs/{name}/{dagRunId}/logs"), handler.HandleDAGRunLogsEvents)
 	r.Get(path.Join(apiV2BasePath, "events/dag-runs/{name}/{dagRunId}/logs/steps/{stepName}"), handler.HandleStepLogEvents)
-
-	// Queue events
 	r.Get(path.Join(apiV2BasePath, "events/queues"), handler.HandleQueuesListEvents)
 	r.Get(path.Join(apiV2BasePath, "events/queues/{name}/items"), handler.HandleQueueItemsEvents)
 
 	logger.Info(ctx, "SSE routes configured", slog.String("basePath", apiV2BasePath))
 }
 
-// registerSSEFetchers registers data fetchers for all SSE topic types.
-// See sse.TopicType constants for identifier format documentation.
 func (srv *Server) registerSSEFetchers() {
 	srv.sseHub.RegisterFetcher(sse.TopicTypeDAG, srv.apiV2.GetDAGDetailsData)
 	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGHistory, srv.apiV2.GetDAGHistoryData)
@@ -653,74 +670,116 @@ func (srv *Server) registerSSEFetchers() {
 	srv.sseHub.RegisterFetcher(sse.TopicTypeQueueItems, srv.apiV2.GetQueueItemsData)
 }
 
-// startServer starts the HTTP server with or without TLS
-func (srv *Server) startServer(ctx context.Context) {
-	var err error
+func (srv *Server) setupAgentRoutes(ctx context.Context, r *chi.Mux) {
+	authMiddleware := srv.buildAgentAuthMiddleware(ctx)
+	srv.agentAPI.RegisterRoutes(r, authMiddleware)
+	logger.Info(ctx, "Agent API routes configured")
+}
 
-	if srv.listener != nil {
-		// Use pre-bound listener (for tests or external listener management)
-		if srv.config.Server.TLS != nil {
-			logger.Info(ctx, "Starting TLS server on pre-bound listener",
-				tag.Cert(srv.config.Server.TLS.CertFile),
-				slog.String("key", srv.config.Server.TLS.KeyFile))
-			err = srv.httpServer.ServeTLS(srv.listener, srv.config.Server.TLS.CertFile, srv.config.Server.TLS.KeyFile)
-		} else {
-			logger.Info(ctx, "Starting server on pre-bound listener")
-			err = srv.httpServer.Serve(srv.listener)
-		}
-	} else {
-		// Original behavior: create listener internally
-		if srv.config.Server.TLS != nil {
-			logger.Info(ctx, "Starting TLS server",
-				tag.Cert(srv.config.Server.TLS.CertFile),
-				slog.String("key", srv.config.Server.TLS.KeyFile))
-			err = srv.httpServer.ListenAndServeTLS(srv.config.Server.TLS.CertFile, srv.config.Server.TLS.KeyFile)
-		} else {
-			err = srv.httpServer.ListenAndServe()
+func (srv *Server) buildAgentAuthMiddleware(_ context.Context) func(http.Handler) http.Handler {
+	authOptions := srv.buildAgentAuthOptions()
+
+	return func(next http.Handler) http.Handler {
+		baseMiddleware := auth.ClientIPMiddleware()(auth.Middleware(authOptions)(next))
+
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if token := r.URL.Query().Get("token"); token != "" {
+				r.Header.Set("Authorization", "Bearer "+token)
+			}
+			baseMiddleware.ServeHTTP(w, r)
+		})
+	}
+}
+
+func (srv *Server) buildAgentAuthOptions() auth.Options {
+	authCfg := srv.config.Server.Auth
+
+	opts := auth.Options{
+		Realm:        "Dagu Agent",
+		AuthRequired: authCfg.Mode != config.AuthModeNone,
+	}
+
+	if authCfg.Basic.Username != "" && authCfg.Basic.Password != "" {
+		opts.BasicAuthEnabled = true
+		opts.Creds = map[string]string{authCfg.Basic.Username: authCfg.Basic.Password}
+	}
+
+	if authCfg.Token.Value != "" {
+		opts.APITokenEnabled = true
+		opts.APIToken = authCfg.Token.Value
+	}
+
+	if authCfg.Mode == config.AuthModeBuiltin && srv.authService != nil {
+		opts.JWTValidator = srv.authService
+		if srv.authService.HasAPIKeyStore() {
+			opts.APIKeyValidator = srv.authService
 		}
 	}
 
+	return opts
+}
+
+func (srv *Server) startServer(ctx context.Context) {
+	tlsCfg := srv.config.Server.TLS
+	hasListener := srv.listener != nil
+
+	if tlsCfg != nil {
+		logger.Info(ctx, "Starting TLS server",
+			tag.Cert(tlsCfg.CertFile), slog.String("key", tlsCfg.KeyFile),
+			slog.Bool("preBoundListener", hasListener))
+	} else if hasListener {
+		logger.Info(ctx, "Starting server on pre-bound listener")
+	}
+
+	err := srv.serveHTTP(tlsCfg, hasListener)
 	if err != nil && err != http.ErrServerClosed {
 		logger.Error(ctx, "Server failed to start or unexpected shutdown", tag.Error(err))
 	}
 }
 
-// Shutdown gracefully shuts down the server
+func (srv *Server) serveHTTP(tlsCfg *config.TLSConfig, hasListener bool) error {
+	switch {
+	case hasListener && tlsCfg != nil:
+		return srv.httpServer.ServeTLS(srv.listener, tlsCfg.CertFile, tlsCfg.KeyFile)
+	case hasListener:
+		return srv.httpServer.Serve(srv.listener)
+	case tlsCfg != nil:
+		return srv.httpServer.ListenAndServeTLS(tlsCfg.CertFile, tlsCfg.KeyFile)
+	default:
+		return srv.httpServer.ListenAndServe()
+	}
+}
+
+// Shutdown gracefully shuts down the server.
 func (srv *Server) Shutdown(ctx context.Context) error {
-	// Stop Git sync service if running
 	if srv.syncService != nil {
 		if err := srv.syncService.Stop(); err != nil {
 			logger.Warn(ctx, "Failed to stop git sync service", tag.Error(err))
 		}
 	}
 
-	// Stop SSE hub if running
 	if srv.sseHub != nil {
 		srv.sseHub.Shutdown()
 		logger.Info(ctx, "SSE hub shut down")
 	}
 
-	if srv.httpServer != nil {
-		logger.Info(ctx, "Server is shutting down", tag.Addr(srv.httpServer.Addr))
-
-		// Create a context with timeout for shutdown
-		shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		defer cancel()
-
-		srv.httpServer.SetKeepAlivesEnabled(false)
-		return srv.httpServer.Shutdown(shutdownCtx)
+	if srv.httpServer == nil {
+		return nil
 	}
-	return nil
+
+	logger.Info(ctx, "Server is shutting down", tag.Addr(srv.httpServer.Addr))
+
+	shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	srv.httpServer.SetKeepAlivesEnabled(false)
+	return srv.httpServer.Shutdown(shutdownCtx)
 }
 
-// setupGracefulShutdown configures signal handling for graceful server shutdown
 func (srv *Server) setupGracefulShutdown(ctx context.Context) {
-	// In the original implementation, this was blocking, which is likely why
-	// our modified version exits immediately. Let's make it block again.
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	// Block here until context is done or signal is received
 	select {
 	case <-ctx.Done():
 		logger.Info(ctx, "Context done, shutting down server")
