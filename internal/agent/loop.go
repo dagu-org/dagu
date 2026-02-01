@@ -58,6 +58,8 @@ type LoopConfig struct {
 	EmitUserPrompt EmitUserPromptFunc
 	// WaitUserResponse blocks until user responds to a prompt.
 	WaitUserResponse WaitUserResponseFunc
+	// SafeMode enables approval prompts for dangerous commands when true.
+	SafeMode bool
 }
 
 // Loop manages a conversation turn with an LLM including tool execution.
@@ -79,6 +81,7 @@ type Loop struct {
 	emitUIAction     UIActionFunc
 	emitUserPrompt   EmitUserPromptFunc
 	waitUserResponse WaitUserResponseFunc
+	safeMode         bool
 }
 
 // NewLoop creates a new Loop instance.
@@ -103,6 +106,7 @@ func NewLoop(config LoopConfig) *Loop {
 		emitUIAction:     config.EmitUIAction,
 		emitUserPrompt:   config.EmitUserPrompt,
 		waitUserResponse: config.WaitUserResponse,
+		safeMode:         config.SafeMode,
 	}
 }
 
@@ -262,6 +266,7 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		EmitUIAction:     l.emitUIAction,
 		EmitUserPrompt:   l.emitUserPrompt,
 		WaitUserResponse: l.waitUserResponse,
+		SafeMode:         l.safeMode,
 	}, input)
 }
 

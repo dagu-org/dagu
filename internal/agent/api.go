@@ -282,6 +282,7 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 		WorkingDir:  a.workingDir,
 		OnMessage:   a.createMessageCallback(id),
 		Environment: a.environment,
+		SafeMode:    req.SafeMode,
 	})
 
 	a.persistNewConversation(r.Context(), id, userID, now)
@@ -468,6 +469,9 @@ func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 
 	model := selectModel(req.Model, mgr.GetModel(), configModel)
 	messageWithContext := a.formatMessage(r.Context(), req.Message, req.DAGContexts)
+
+	// Update safe mode setting per request (allows toggling mid-conversation)
+	mgr.SetSafeMode(req.SafeMode)
 
 	if err := mgr.AcceptUserMessage(r.Context(), provider, model, messageWithContext); err != nil {
 		a.logger.Error("Failed to accept user message", "error", err)

@@ -29,6 +29,7 @@ type ConversationManager struct {
 	workingDir      string
 	sequenceID      int64
 	environment     EnvironmentInfo
+	safeMode        bool
 	onWorkingChange func(id string, working bool)
 	onMessage       func(ctx context.Context, msg Message) error
 	pendingPrompts  map[string]chan UserPromptResponse
@@ -46,6 +47,7 @@ type ConversationManagerConfig struct {
 	History         []Message
 	SequenceID      int64
 	Environment     EnvironmentInfo
+	SafeMode        bool
 }
 
 // NewConversationManager creates a new ConversationManager.
@@ -74,7 +76,15 @@ func NewConversationManager(cfg ConversationManagerConfig) *ConversationManager 
 		onMessage:       cfg.OnMessage,
 		sequenceID:      cfg.SequenceID,
 		environment:     cfg.Environment,
+		safeMode:        cfg.SafeMode,
 	}
+}
+
+// SetSafeMode updates the safe mode setting for this conversation.
+func (cm *ConversationManager) SetSafeMode(enabled bool) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	cm.safeMode = enabled
 }
 
 // copyMessages returns a shallow copy of the messages slice.
@@ -306,6 +316,7 @@ func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) e
 		EmitUIAction:     cm.createEmitUIActionFunc(),
 		EmitUserPrompt:   cm.createEmitUserPromptFunc(),
 		WaitUserResponse: cm.createWaitUserResponseFunc(),
+		SafeMode:         cm.safeMode,
 	})
 
 	if !cm.trySetLoop(loopInstance, cancel) {

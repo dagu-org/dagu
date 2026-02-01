@@ -324,3 +324,95 @@ func TestCommandRequiresApproval(t *testing.T) {
 		})
 	}
 }
+
+func TestBashTool_SafeMode_SkipsApproval(t *testing.T) {
+	t.Parallel()
+
+	tool := NewBashTool()
+	// Dangerous command with SafeMode=false (default)
+	input := json.RawMessage(`{"command": "rm -rf /tmp/nonexistent_test_file_12345"}`)
+
+	// Should execute without calling approval (promptCalled stays false)
+	promptCalled := false
+	ctx := ToolContext{
+		Context:  context.Background(),
+		SafeMode: false,
+		EmitUserPrompt: func(_ UserPrompt) { promptCalled = true },
+	}
+
+	_ = tool.Run(ctx, input)
+
+	assert.False(t, promptCalled, "approval should not be requested when SafeMode is false")
+}
+
+func TestBashTool_SafeMode_RequestsApproval(t *testing.T) {
+	t.Parallel()
+
+	tool := NewBashTool()
+	input := json.RawMessage(`{"command": "rm testfile"}`)
+
+	var capturedPrompt UserPrompt
+	responseCh := make(chan UserPromptResponse, 1)
+	responseCh <- UserPromptResponse{
+		PromptID:          "test-id",
+		SelectedOptionIDs: []string{"approve"},
+	}
+
+	ctx := ToolContext{
+		Context:  context.Background(),
+		SafeMode: true,
+		EmitUserPrompt: func(p UserPrompt) {
+			capturedPrompt = p
+		},
+		WaitUserResponse: func(_ context.Context, _ string) (UserPromptResponse, error) {
+			return <-responseCh, nil
+		},
+	}
+
+	_ = tool.Run(ctx, input)
+
+	assert.Equal(t, PromptTypeCommandApproval, capturedPrompt.PromptType)
+	assert.Equal(t, "rm testfile", capturedPrompt.Command)
+	assert.Equal(t, "Approve command?", capturedPrompt.Question)
+}
+
+func TestBashTool_SafeMode_UserRejects(t *testing.T) {
+	t.Parallel()
+
+	tool := NewBashTool()
+	input := json.RawMessage(`{"command": "rm testfile"}`)
+
+	ctx := ToolContext{
+		Context:  context.Background(),
+		SafeMode: true,
+		EmitUserPrompt: func(_ UserPrompt) {},
+		WaitUserResponse: func(_ context.Context, _ string) (UserPromptResponse, error) {
+			return UserPromptResponse{SelectedOptionIDs: []string{"reject"}}, nil
+		},
+	}
+
+	result := tool.Run(ctx, input)
+
+	assert.False(t, result.IsError)
+	assert.Contains(t, result.Content, "rejected by user")
+}
+
+func TestBashTool_SafeMode_SafeCommandNoApproval(t *testing.T) {
+	t.Parallel()
+
+	tool := NewBashTool()
+	input := json.RawMessage(`{"command": "echo hello"}`)
+
+	promptCalled := false
+	ctx := ToolContext{
+		Context:  context.Background(),
+		SafeMode: true,
+		EmitUserPrompt: func(_ UserPrompt) { promptCalled = true },
+	}
+
+	result := tool.Run(ctx, input)
+
+	assert.False(t, promptCalled, "safe commands should not request approval even with SafeMode=true")
+	assert.False(t, result.IsError)
+	assert.Contains(t, result.Content, "hello")
+}

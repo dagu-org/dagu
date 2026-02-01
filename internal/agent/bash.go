@@ -130,8 +130,8 @@ func bashRun(toolCtx ToolContext, input json.RawMessage) ToolOut {
 		return toolError("Command is required")
 	}
 
-	// Check if command requires approval
-	if commandRequiresApproval(args.Command) {
+	// Check if command requires approval (only when SafeMode is enabled)
+	if toolCtx.SafeMode && commandRequiresApproval(args.Command) {
 		approved, err := requestApproval(toolCtx, args.Command)
 		if err != nil {
 			return toolError("Approval failed: %v", err)

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useConfig } from '@/contexts/ConfigContext';
+import { useUserPreferences } from '@/contexts/UserPreference';
 import { useAgentChatContext } from '../context/AgentChatContext';
 import { getAuthToken, getAuthHeaders } from '@/lib/authHeaders';
 import {
@@ -15,9 +16,10 @@ import {
 function buildChatRequest(
   message: string,
   model?: string,
-  dagContexts?: DAGContext[]
+  dagContexts?: DAGContext[],
+  safeMode?: boolean
 ): ChatRequest {
-  return { message, model, dag_contexts: dagContexts };
+  return { message, model, dag_contexts: dagContexts, safe_mode: safeMode };
 }
 
 async function fetchWithAuth<T>(url: string, options?: RequestInit): Promise<T> {
@@ -52,6 +54,7 @@ const MAX_SSE_RETRIES = 3;
 export function useAgentChat() {
   const config = useConfig();
   const navigate = useNavigate();
+  const { preferences } = useUserPreferences();
   const {
     conversationId,
     messages,
@@ -136,7 +139,7 @@ export function useAgentChat() {
     async (message: string, model?: string, dagContexts?: DAGContext[]): Promise<string> => {
       const data = await fetchWithAuth<NewConversationResponse>(
         `${baseUrl}/conversations/new`,
-        { method: 'POST', body: JSON.stringify(buildChatRequest(message, model, dagContexts)) }
+        { method: 'POST', body: JSON.stringify(buildChatRequest(message, model, dagContexts, preferences.safeMode)) }
       );
       setConversationId(data.conversation_id);
       // Refresh conversations list to include the new one
@@ -144,7 +147,7 @@ export function useAgentChat() {
       setConversations(convs || []);
       return data.conversation_id;
     },
-    [baseUrl, setConversationId, setConversations]
+    [baseUrl, setConversationId, setConversations, preferences.safeMode]
   );
 
   const sendMessage = useCallback(
@@ -162,7 +165,7 @@ export function useAgentChat() {
         }
         await fetchWithAuth(`${baseUrl}/conversations/${conversationId}/chat`, {
           method: 'POST',
-          body: JSON.stringify(buildChatRequest(message, model, dagContexts)),
+          body: JSON.stringify(buildChatRequest(message, model, dagContexts, preferences.safeMode)),
         });
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
@@ -173,7 +176,7 @@ export function useAgentChat() {
         setIsSending(false);
       }
     },
-    [baseUrl, conversationId, startConversation, setPendingUserMessage]
+    [baseUrl, conversationId, startConversation, setPendingUserMessage, preferences.safeMode]
   );
 
   const cancelConversation = useCallback(async (): Promise<void> => {

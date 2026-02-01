@@ -7,6 +7,7 @@ export type UserPreferences = {
   dagRunsViewMode: DAGRunsViewMode;
   logWrap: boolean;
   theme: 'light' | 'dark';
+  safeMode: boolean;
 };
 
 const UserPreferencesContext = createContext<{
@@ -30,6 +31,7 @@ export function UserPreferencesProvider({
         dagRunsViewMode: 'list', // Default to list view
         logWrap: true, // Default to wrapped text
         theme: 'dark', // Default to dark theme
+        safeMode: false, // Default to off (no approval dialogs)
       };
       return saved ? { ...defaultPrefs, ...JSON.parse(saved) } : defaultPrefs;
     } catch {
@@ -39,6 +41,7 @@ export function UserPreferencesProvider({
         dagRunsViewMode: 'list' as DAGRunsViewMode,
         logWrap: true,
         theme: 'dark',
+        safeMode: false,
       };
     }
   });

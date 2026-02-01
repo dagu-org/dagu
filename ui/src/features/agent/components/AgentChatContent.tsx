@@ -1,6 +1,6 @@
 import { HTMLAttributes, ReactElement, useCallback, useEffect, useRef } from 'react';
 
-import { AlertCircle, Plus, Terminal, X } from 'lucide-react';
+import { AlertCircle, Plus, Shield, ShieldOff, Terminal, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -10,7 +10,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import { useUserPreferences } from '@/contexts/UserPreference';
 
 import { useAgentChatContext } from '../context/AgentChatContext';
 import { useAgentChat } from '../hooks/useAgentChat';
@@ -68,6 +70,7 @@ export function AgentChatContent({
   autoSelectLatest = true,
 }: AgentChatContentProps): ReactElement {
   const { isOpen } = useAgentChatContext();
+  const { preferences, updatePreference } = useUserPreferences();
   const {
     conversationId,
     messages,
@@ -187,6 +190,23 @@ export function AgentChatContent({
           </Select>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
+          <div
+            className="flex items-center gap-1 px-1"
+            title={preferences.safeMode
+              ? "Safe Mode ON: Dangerous commands require approval"
+              : "Safe Mode OFF: All commands execute immediately"}
+          >
+            <Switch
+              checked={preferences.safeMode}
+              onCheckedChange={(checked) => updatePreference('safeMode', checked)}
+              className="h-4 w-7 data-[state=checked]:bg-green-600"
+            />
+            {preferences.safeMode ? (
+              <Shield className="h-3.5 w-3.5 text-green-500" />
+            ) : (
+              <ShieldOff className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+          </div>
           <Button
             variant="ghost"
             size="sm"
