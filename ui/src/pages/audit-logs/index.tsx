@@ -9,14 +9,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { TOKEN_KEY, useIsAdmin } from '@/contexts/AuthContext';
@@ -372,8 +364,8 @@ export default function AuditLogsPage() {
   };
 
   return (
-    <div className="space-y-4 max-w-7xl">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-4 max-w-7xl h-full">
+      <div className="flex items-center justify-between flex-shrink-0">
         <div>
           <h1 className="text-lg font-semibold">Audit Logs</h1>
           <p className="text-sm text-muted-foreground">
@@ -405,7 +397,7 @@ export default function AuditLogsPage() {
       </div>
 
       {/* Date Filter Row */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
         <ToggleGroup aria-label="Date range mode">
           <ToggleButton
             value="preset"
@@ -517,81 +509,78 @@ export default function AuditLogsPage() {
       </div>
 
       {error && (
-        <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
+        <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md flex-shrink-0">
           {error}
         </div>
       )}
 
-      <div className="card-obsidian">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[180px]">Timestamp</TableHead>
-              <TableHead className="w-[100px]">Category</TableHead>
-              <TableHead className="w-[120px]">Action</TableHead>
-              <TableHead className="w-[120px]">User</TableHead>
-              <TableHead>Details</TableHead>
-              <TableHead className="w-[120px]">IP Address</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="text-center text-muted-foreground py-8"
-                >
-                  Loading audit logs...
-                </TableCell>
-              </TableRow>
-            ) : entries.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="text-center text-muted-foreground py-8"
-                >
-                  <ScrollText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  No audit log entries found
-                </TableCell>
-              </TableRow>
-            ) : (
-              entries.map((entry) => (
-                <TableRow key={entry.id}>
-                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                    {config.tzOffsetInSec !== undefined
-                      ? dayjs(entry.timestamp)
-                          .utcOffset(config.tzOffsetInSec / 60)
-                          .format('MMM D, YYYY HH:mm:ss')
-                      : dayjs(entry.timestamp).format('MMM D, YYYY HH:mm:ss')}
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize">
-                      {entry.category}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-xs font-mono">{entry.action}</span>
-                  </TableCell>
-                  <TableCell className="text-sm">{entry.username}</TableCell>
-                  <TableCell
-                    className="text-sm text-muted-foreground max-w-[300px] truncate"
-                    title={entry.details}
-                  >
-                    {formatDetails(entry)}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground font-mono">
-                    {entry.ipAddress || '-'}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      <div className="border border-border rounded-md flex-1 min-h-0 flex flex-col bg-background overflow-hidden">
+        <div className="flex-shrink-0 border-b border-border bg-background">
+          <table className="w-full table-fixed bg-background">
+            <thead>
+              <tr>
+                <th className="w-[180px] px-4 py-3 text-left text-sm font-medium text-muted-foreground">Timestamp</th>
+                <th className="w-[100px] px-4 py-3 text-left text-sm font-medium text-muted-foreground">Category</th>
+                <th className="w-[120px] px-4 py-3 text-left text-sm font-medium text-muted-foreground">Action</th>
+                <th className="w-[120px] px-4 py-3 text-left text-sm font-medium text-muted-foreground">User</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Details</th>
+                <th className="w-[120px] px-4 py-3 text-left text-sm font-medium text-muted-foreground">IP Address</th>
+              </tr>
+            </thead>
+          </table>
+        </div>
+        <div className="flex-1 min-h-0 overflow-auto bg-background">
+          <table className="w-full table-fixed bg-background">
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={6} className="text-center text-muted-foreground py-8">
+                    Loading audit logs...
+                  </td>
+                </tr>
+              ) : entries.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="text-center text-muted-foreground py-8">
+                    <ScrollText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    No audit log entries found
+                  </td>
+                </tr>
+              ) : (
+                entries.map((entry) => (
+                  <tr key={entry.id} className="border-b border-border bg-background hover:bg-muted/50">
+                    <td className="w-[180px] px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
+                      {config.tzOffsetInSec !== undefined
+                        ? dayjs(entry.timestamp)
+                            .utcOffset(config.tzOffsetInSec / 60)
+                            .format('MMM D, YYYY HH:mm:ss')
+                        : dayjs(entry.timestamp).format('MMM D, YYYY HH:mm:ss')}
+                    </td>
+                    <td className="w-[100px] px-4 py-3">
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize">
+                        {entry.category}
+                      </span>
+                    </td>
+                    <td className="w-[120px] px-4 py-3">
+                      <span className="text-xs font-mono">{entry.action}</span>
+                    </td>
+                    <td className="w-[120px] px-4 py-3 text-sm">{entry.username}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground truncate" title={entry.details}>
+                      {formatDetails(entry)}
+                    </td>
+                    <td className="w-[120px] px-4 py-3 text-sm text-muted-foreground font-mono">
+                      {entry.ipAddress || '-'}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Pagination */}
       {total > PAGE_SIZE && (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-shrink-0">
           <p className="text-sm text-muted-foreground">
             Showing {offset + 1} - {Math.min(offset + PAGE_SIZE, total)} of{' '}
             {total} entries
