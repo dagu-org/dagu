@@ -623,7 +623,7 @@ func (a *API) handleUserResponse(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !mgr.SubmitUserResponse(req) {
-		a.respondError(w, http.StatusNotFound, api.ErrorCodeNotFound, "Prompt not found or already answered")
+		a.respondError(w, http.StatusGone, api.ErrorCodeNotFound, "Prompt expired or already answered")
 		return
 	}
 

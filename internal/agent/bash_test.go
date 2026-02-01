@@ -274,3 +274,53 @@ func TestTruncateOutput(t *testing.T) {
 		assert.Equal(t, exactString, result)
 	})
 }
+
+func TestCommandRequiresApproval(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		cmd      string
+		expected bool
+	}{
+		// Safe commands
+		{"ls command", "ls -la", false},
+		{"echo command", "echo hello", false},
+		{"cat command", "cat file.txt", false},
+		{"pwd command", "pwd", false},
+		{"git status", "git status", false},
+
+		// rm commands (dangerous)
+		{"rm direct", "rm file.txt", true},
+		{"rm with flags", "rm -rf /tmp/test", true},
+		{"rm in pipe", "find . | rm somefile", true},
+		{"rm in pipe with space", "find . | rm somefile", true},
+		{"rm after semicolon", "echo test;rm file", true},
+		{"rm after semicolon with space", "echo test; rm file", true},
+		{"rm with && operator", "echo test && rm file", true},
+		{"command then rm", "ls && rm file", true},
+
+		// chmod commands (dangerous)
+		{"chmod direct", "chmod 755 script.sh", true},
+		{"chmod in pipe", "ls |chmod 644 file", true},
+		{"chmod after semicolon", "echo test;chmod 777 file", true},
+
+		// dagu start commands (dangerous)
+		{"dagu start direct", "dagu start mydag", true},
+		{"dagu start with path", "dagu start /path/to/dag", true},
+
+		// Edge cases
+		{"empty command", "", false},
+		{"whitespace only", "   ", false},
+		{"similar but safe", "remove file.txt", false},
+		{"chmod in string", "echo 'chmod 755'", false}, // This is safe - just echo
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			result := commandRequiresApproval(tc.cmd)
+			assert.Equal(t, tc.expected, result, "command: %q", tc.cmd)
+		})
+	}
+}

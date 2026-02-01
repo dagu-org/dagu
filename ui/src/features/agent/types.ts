@@ -36,6 +36,8 @@ export interface UserPromptOption {
   description?: string;
 }
 
+export type PromptType = 'general' | 'command_approval';
+
 export interface UserPrompt {
   prompt_id: string;
   question: string;
@@ -43,6 +45,9 @@ export interface UserPrompt {
   allow_free_text: boolean;
   free_text_placeholder?: string;
   multi_select: boolean;
+  prompt_type?: PromptType;
+  command?: string;
+  working_dir?: string;
 }
 
 export interface UserPromptResponse {

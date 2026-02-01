@@ -12,6 +12,16 @@ import (
 // MessageType identifies the type of message in a conversation.
 type MessageType string
 
+// PromptType identifies the type of user prompt.
+type PromptType string
+
+const (
+	// PromptTypeGeneral represents a general question prompt.
+	PromptTypeGeneral PromptType = "general"
+	// PromptTypeCommandApproval represents a command approval prompt.
+	PromptTypeCommandApproval PromptType = "command_approval"
+)
+
 const (
 	// MessageTypeUser represents a message from the user.
 	MessageTypeUser MessageType = "user"
@@ -57,6 +67,12 @@ type UserPrompt struct {
 	FreeTextPlaceholder string `json:"free_text_placeholder,omitempty"`
 	// MultiSelect allows selecting multiple options.
 	MultiSelect bool `json:"multi_select"`
+	// PromptType identifies the type of prompt (general, command_approval).
+	PromptType PromptType `json:"prompt_type,omitempty"`
+	// Command is the shell command requiring approval (for command_approval type).
+	Command string `json:"command,omitempty"`
+	// WorkingDir is the working directory for the command (for command_approval type).
+	WorkingDir string `json:"working_dir,omitempty"`
 }
 
 // UserPromptResponse is the user's answer to a prompt.

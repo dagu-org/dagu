@@ -11,6 +11,7 @@ import {
 
 import { cn } from '@/lib/utils';
 import { Message, ToolCall, ToolResult, UIAction, UserPromptResponse } from '../types';
+import { CommandApprovalMessage } from './CommandApprovalMessage';
 import { ToolContentViewer } from './ToolViewers';
 import { UserPromptMessage } from './UserPromptMessage';
 
@@ -104,6 +105,16 @@ function MessageItem({ message, onPromptRespond, answeredPrompts }: MessageItemP
       return <UIActionMessage action={message.ui_action} />;
     case 'user_prompt':
       if (!message.user_prompt || !onPromptRespond) return null;
+      if (message.user_prompt.prompt_type === 'command_approval') {
+        return (
+          <CommandApprovalMessage
+            prompt={message.user_prompt}
+            onRespond={onPromptRespond}
+            isAnswered={answeredPrompts?.[message.user_prompt.prompt_id] !== undefined}
+            answeredValue={answeredPrompts?.[message.user_prompt.prompt_id]}
+          />
+        );
+      }
       return (
         <UserPromptMessage
           prompt={message.user_prompt}
