@@ -18,6 +18,17 @@ scheduler:
       memory: "512Mi"
       cpu: "500m"
 
+# Coordinator configuration (gRPC server for distributed task execution)
+coordinator:
+  replicas: 1
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
 # Worker configuration
 worker:
   replicas: 2

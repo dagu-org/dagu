@@ -33,9 +33,6 @@ spec:
             - name: health
               containerPort: 8090
               protocol: TCP
-            - name: grpc
-              containerPort: 50055
-              protocol: TCP
           volumeMounts:
             - name: data
               mountPath: /data

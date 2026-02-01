@@ -30,8 +30,6 @@ spec:
             - --config
             - /etc/dagu/dagu.yaml
           env:
-            - name: DAGU_COORDINATOR_HOST
-              value: "{{ include "dagu.fullname" . }}-scheduler.{{ .Release.Namespace }}.svc.cluster.local"
             - name: WORKER_ID
               valueFrom:
                 fieldRef:
