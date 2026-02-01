@@ -386,7 +386,7 @@ export default function GitSyncPage() {
       </div>
 
       {/* DAGs Table */}
-      <div className="card-obsidian">
+      <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm">
         <Table className="text-sm">
           <TableHeader>
             <TableRow className="text-xs">
