@@ -155,7 +155,7 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold">Users</h1>
