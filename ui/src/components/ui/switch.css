@@ -32,7 +32,7 @@
   background-color: #334155;
 }
 
-/* Dark mode checked */
+/* Dark mode checked - filled with primary color */
 .dark .switch-root[data-state='checked'] {
   background-color: var(--primary);
 }

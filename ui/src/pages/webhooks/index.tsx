@@ -242,7 +242,7 @@ export default function WebhooksPage() {
       )}
 
       <div className="card-obsidian">
-        <Table>
+        <Table className="text-xs">
           <TableHeader>
             <TableRow>
               <TableHead className="w-[250px]">DAG</TableHead>

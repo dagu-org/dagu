@@ -191,7 +191,7 @@ function DAGRunOutputs({ dagName, dagRunId }: Props) {
       <div className="border border-border rounded-lg overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow className="hover:bg-transparent">
+            <TableRow>
               <TableHead className="w-[200px]">
                 <button
                   type="button"
@@ -229,11 +229,11 @@ function DAGRunOutputs({ dagName, dagRunId }: Props) {
               </TableRow>
             ) : (
               filteredOutputs.map(([key, value]) => (
-                <TableRow key={key}>
-                  <TableCell className="font-mono text-sm font-medium">
+                <TableRow key={key} className="hover:bg-muted/50">
+                  <TableCell className="font-mono font-medium">
                     {key}
                   </TableCell>
-                  <TableCell className="font-mono text-sm text-muted-foreground whitespace-normal break-words">
+                  <TableCell className="font-mono text-muted-foreground whitespace-normal break-words">
                     {value}
                   </TableCell>
                   <TableCell>

@@ -138,7 +138,7 @@ export default function APIKeysPage() {
       )}
 
       <div className="card-obsidian">
-        <Table>
+        <Table className="text-xs">
           <TableHeader>
             <TableRow>
               <TableHead className="w-[200px]">Name</TableHead>

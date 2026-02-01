@@ -387,13 +387,13 @@ export default function GitSyncPage() {
 
       {/* DAGs Table */}
       <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm">
-        <Table className="text-sm">
+        <Table className="text-xs">
           <TableHeader>
-            <TableRow className="text-xs">
-              <TableHead className="py-2">DAG</TableHead>
-              <TableHead className="py-2 w-24">Status</TableHead>
-              <TableHead className="py-2 w-28">Synced</TableHead>
-              <TableHead className="py-2 w-16"></TableHead>
+            <TableRow>
+              <TableHead>DAG</TableHead>
+              <TableHead className="w-24">Status</TableHead>
+              <TableHead className="w-28">Synced</TableHead>
+              <TableHead className="w-16"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -413,27 +413,21 @@ export default function GitSyncPage() {
                   className="h-9 cursor-pointer hover:bg-muted/50"
                   onClick={() => handleViewDiff(dagId)}
                 >
-                  <TableCell
-                    className="py-1"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     <a
                       href={`/dags/${encodeURIComponent(dagId)}`}
-                      className="font-mono text-xs hover:underline"
+                      className="font-mono hover:underline"
                     >
                       {dagId}
                     </a>
                   </TableCell>
-                  <TableCell className="py-1">
+                  <TableCell>
                     <StatusDot status={dag.status} />
                   </TableCell>
-                  <TableCell className="py-1 text-xs text-muted-foreground">
+                  <TableCell className="text-muted-foreground">
                     {dag.lastSyncedAt ? dayjs(dag.lastSyncedAt).fromNow() : '-'}
                   </TableCell>
-                  <TableCell
-                    className="py-1"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-0.5">
                       <Button
                         variant="ghost"

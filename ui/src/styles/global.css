@@ -86,10 +86,10 @@
     --surface: #ffffff;
     --surface-variant: #f1f3f4;
 
-    /* Brand Colors - Dagu Orange (selective use) */
-    --primary: #ea580c;
+    /* Brand Colors - Black for professional look */
+    --primary: #000000;
     --primary-foreground: #ffffff;
-    --primary-hover: #c2410c;
+    --primary-hover: #262626;
 
     /* Neutral Backgrounds */
     --secondary: #f1f3f4;
@@ -113,7 +113,7 @@
     --border: #dadce0;
     --border-strong: #bdc1c6;
     --input: #dadce0;
-    --ring: #ea580c;
+    --ring: #000000;
 
     /* Text Hierarchy */
     --text-primary: #202124;
@@ -127,11 +127,11 @@
     --sidebar-border: #e8eaed;
     --sidebar-hover: #e8eaed;
     --sidebar-active: #e8eaed;
-    --sidebar-primary: #ea580c;
+    --sidebar-primary: #000000;
     --sidebar-primary-foreground: #ffffff;
     --sidebar-accent: #f1f3f4;
     --sidebar-accent-foreground: #5f6368;
-    --sidebar-ring: #ea580c;
+    --sidebar-ring: #000000;
 
     /* Elevation (Subtle Shadows) */
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -143,7 +143,7 @@
     --text: 32 33 36;
     --sidebar-bg: 248 249 250;
     --sidebar-text: 95 99 104;
-    --primary-rgb: 234 88 12;
+    --primary-rgb: 0 0 0;
   }
 
   .dark {
@@ -159,10 +159,10 @@
     --surface: #202124;
     --surface-variant: #35363a;
 
-    /* Brand Colors - Brighter Orange for Dark Mode */
-    --primary: #ff6d00;
-    --primary-foreground: #ffffff;
-    --primary-hover: #ff8800;
+    /* Brand Colors - Blue outline style for Dark Mode */
+    --primary: #8ab4f8;
+    --primary-foreground: #8ab4f8;
+    --primary-hover: #aecbfa;
 
     /* Neutral Backgrounds */
     --secondary: #35363a;
@@ -186,7 +186,7 @@
     --border: #5f6368;
     --border-strong: #80868b;
     --input: #5f6368;
-    --ring: #ff6d00;
+    --ring: #8ab4f8;
 
     /* Text Hierarchy */
     --text-primary: #e8eaed;
@@ -200,11 +200,11 @@
     --sidebar-border: #3c4043;
     --sidebar-hover: #35363a;
     --sidebar-active: #3c4043;
-    --sidebar-primary: #ff6d00;
-    --sidebar-primary-foreground: #ffffff;
+    --sidebar-primary: #8ab4f8;
+    --sidebar-primary-foreground: #8ab4f8;
     --sidebar-accent: #35363a;
     --sidebar-accent-foreground: #9aa0a6;
-    --sidebar-ring: #ff6d00;
+    --sidebar-ring: #8ab4f8;
 
     /* Elevation (More Subtle in Dark Mode) */
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
@@ -216,7 +216,7 @@
     --text: 232 234 237;
     --sidebar-bg: 41 42 45;
     --sidebar-text: 154 160 166;
-    --primary-rgb: 255 109 0;
+    --primary-rgb: 138 180 248;
   }
 
   * {

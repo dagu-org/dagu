@@ -180,7 +180,7 @@ export default function UsersPage() {
       )}
 
       <div className="card-obsidian">
-        <Table>
+        <Table className="text-xs">
           <TableHeader>
             <TableRow>
               <TableHead className="w-[200px]">Username</TableHead>

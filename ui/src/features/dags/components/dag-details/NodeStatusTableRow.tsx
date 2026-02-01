@@ -582,7 +582,7 @@ function NodeStatusTableRow({
       <>
         <StyledTableRow
           className={cn(
-            'hover:bg-muted transition-colors duration-200 h-auto cursor-pointer',
+            'hover:bg-muted/50 transition-colors duration-200 h-auto cursor-pointer',
             getRowHighlight()
           )}
           onClick={() => {
