@@ -137,7 +137,7 @@ export default function APIKeysPage() {
         </div>
       )}
 
-      <div className="card-obsidian">
+      <div className="card-obsidian overflow-auto">
         <Table className="text-xs">
           <TableHeader>
             <TableRow>
