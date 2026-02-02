@@ -86,15 +86,33 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 	}
 	e.mu.Unlock()
 
-	if err := e.cmd.Wait(); err != nil {
-		e.exitCode = exitCodeFromError(err)
-		if tail := e.stderrTail.Tail(); tail != "" {
-			return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tail)
-		}
-		return err
-	}
+	// Wait for the command to finish or the context to be cancelled.
+	// This ensures timeout is enforced even if cmd.Wait() blocks due to
+	// stuck I/O or unkillable child processes.
+	waitDone := make(chan error, 1)
+	go func() {
+		waitDone <- e.cmd.Wait()
+	}()
 
-	return nil
+	select {
+	case <-ctx.Done():
+		// Context cancelled (timeout or manual cancellation)
+		// Kill the process to ensure it doesn't hang
+		_ = e.Kill(os.Kill)
+		// Wait for cmd.Wait() to return after killing
+		<-waitDone
+		e.exitCode = 124 // Standard timeout exit code
+		return ctx.Err()
+	case err := <-waitDone:
+		if err != nil {
+			e.exitCode = exitCodeFromError(err)
+			if tail := e.stderrTail.Tail(); tail != "" {
+				return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tail)
+			}
+			return err
+		}
+		return nil
+	}
 }
 
 func (e *commandExecutor) SetStdout(out io.Writer) {

@@ -23,10 +23,11 @@ func setupCommand(cmd *exec.Cmd) {
 	// No special configuration needed
 }
 
-// KillProcessGroup kills the process on Windows systems
+// KillProcessGroup kills the process and its subprocess tree on Windows systems
 func KillProcessGroup(cmd *exec.Cmd, sig os.Signal) error {
 	if cmd != nil && cmd.Process != nil {
-		return cmd.Process.Kill()
+		// Kill the entire process tree to ensure child processes are terminated
+		return killProcessTree(uint32(cmd.Process.Pid))
 	}
 	return nil
 }
