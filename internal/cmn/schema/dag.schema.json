@@ -1066,7 +1066,7 @@
               "type": "string"
             }
           },
-          "description": "Map of patterns to target step names for routing. Keys are patterns (exact match or 're:regex'), values are arrays of step names. Only used when type is 'router'."
+          "description": "Map of patterns to target step names for routing. Keys are patterns (exact match or 're:regex'), values are arrays of step names. Target steps automatically depend on the router (no explicit depends needed). Each step can only be targeted by one route. Only used when type is 'router'."
         }
       },
       "allOf": [
