@@ -35,7 +35,7 @@ func Install(ctx context.Context, opts InstallOptions) (*InstallResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Extract the archive
 	if err := extractArchive(ctx, opts.ArchivePath, tempDir); err != nil {
@@ -77,11 +77,11 @@ func Install(ctx context.Context, opts InstallOptions) (*InstallResult, error) {
 
 // extractArchive extracts a tar.gz archive to the destination directory.
 func extractArchive(ctx context.Context, archivePath, destDir string) error {
-	srcFile, err := os.Open(archivePath)
+	srcFile, err := os.Open(archivePath) //nolint:gosec // archivePath is from controlled internal source
 	if err != nil {
 		return fmt.Errorf("failed to open archive: %w", err)
 	}
-	defer srcFile.Close()
+	defer func() { _ = srcFile.Close() }()
 
 	// Identify the archive format
 	format, _, err := archives.Identify(ctx, filepath.Base(archivePath), srcFile)
@@ -100,7 +100,7 @@ func extractArchive(ctx context.Context, archivePath, destDir string) error {
 	}
 
 	// Extract files
-	err = extractor.Extract(ctx, srcFile, func(ctx context.Context, f archives.FileInfo) error {
+	err = extractor.Extract(ctx, srcFile, func(_ context.Context, f archives.FileInfo) error {
 		if f.IsDir() {
 			return nil
 		}
@@ -114,7 +114,7 @@ func extractArchive(ctx context.Context, archivePath, destDir string) error {
 		targetPath := filepath.Join(destDir, name)
 
 		// Create parent directories
-		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0750); err != nil {
 			return err
 		}
 
@@ -123,16 +123,17 @@ func extractArchive(ctx context.Context, archivePath, destDir string) error {
 		if err != nil {
 			return err
 		}
-		defer src.Close()
 
-		dst, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, f.Mode())
+		dst, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, f.Mode()) //nolint:gosec // targetPath is constructed from destDir which is a temp directory
 		if err != nil {
+			_ = src.Close()
 			return err
 		}
-		defer dst.Close()
 
-		_, err = io.Copy(dst, src)
-		return err
+		_, copyErr := io.Copy(dst, src)
+		_ = src.Close()
+		_ = dst.Close()
+		return copyErr
 	})
 
 	return err
@@ -197,23 +198,23 @@ func replaceUnixBinary(src, target string, perm os.FileMode) error {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
 	tempPath := tempFile.Name()
-	tempFile.Close()
+	_ = tempFile.Close()
 
 	// Copy source to temp file
 	if err := copyFile(src, tempPath); err != nil {
-		os.Remove(tempPath)
+		_ = os.Remove(tempPath)
 		return err
 	}
 
 	// Set permissions
 	if err := os.Chmod(tempPath, perm); err != nil {
-		os.Remove(tempPath)
+		_ = os.Remove(tempPath)
 		return fmt.Errorf("failed to set permissions: %w", err)
 	}
 
 	// Atomic rename
 	if err := os.Rename(tempPath, target); err != nil {
-		os.Remove(tempPath)
+		_ = os.Remove(tempPath)
 		return fmt.Errorf("failed to replace binary: %w", err)
 	}
 
@@ -256,22 +257,22 @@ func replaceWindowsBinary(src, target string, perm os.FileMode) error {
 
 // copyFile copies a file from src to dst.
 func copyFile(src, dst string) error {
-	srcFile, err := os.Open(src)
+	srcFile, err := os.Open(src) //nolint:gosec // src is from controlled internal source
 	if err != nil {
 		return fmt.Errorf("failed to open source file: %w", err)
 	}
-	defer srcFile.Close()
+	defer func() { _ = srcFile.Close() }()
 
 	srcInfo, err := srcFile.Stat()
 	if err != nil {
 		return fmt.Errorf("failed to stat source file: %w", err)
 	}
 
-	dstFile, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, srcInfo.Mode())
+	dstFile, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, srcInfo.Mode()) //nolint:gosec // dst is from controlled internal source
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
 	}
-	defer dstFile.Close()
+	defer func() { _ = dstFile.Close() }()
 
 	if _, err := io.Copy(dstFile, srcFile); err != nil {
 		return fmt.Errorf("failed to copy file: %w", err)

@@ -49,6 +49,8 @@ const (
 // String returns a human-readable name for the install method.
 func (m InstallMethod) String() string {
 	switch m {
+	case InstallMethodUnknown:
+		return "unknown"
 	case InstallMethodBinary:
 		return "binary"
 	case InstallMethodHomebrew:
@@ -59,9 +61,8 @@ func (m InstallMethod) String() string {
 		return "docker"
 	case InstallMethodGoInstall:
 		return "go install"
-	default:
-		return "unknown"
 	}
+	return "unknown"
 }
 
 // DetectInstallMethod checks how dagu was installed.
@@ -109,9 +110,10 @@ func CanSelfUpgrade() (bool, string) {
 		return false, "Installed via Snap. Use 'snap refresh dagu' instead."
 	case InstallMethodDocker:
 		return false, "Running in Docker. Pull the latest image instead."
-	default:
+	case InstallMethodUnknown, InstallMethodBinary, InstallMethodGoInstall:
 		return true, ""
 	}
+	return true, ""
 }
 
 // Upgrade performs the upgrade operation.
@@ -215,7 +217,7 @@ func Upgrade(ctx context.Context, opts Options) (*Result, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	archivePath := filepath.Join(tempDir, asset.Name)
 
@@ -259,8 +261,8 @@ func FormatResult(r *Result) string {
 		sb.WriteString("Dry run - no changes will be made\n\n")
 	}
 
-	sb.WriteString(fmt.Sprintf("Current version: %s\n", r.CurrentVersion))
-	sb.WriteString(fmt.Sprintf("Target version:  %s\n", r.TargetVersion))
+	fmt.Fprintf(&sb, "Current version: %s\n", r.CurrentVersion)
+	fmt.Fprintf(&sb, "Target version:  %s\n", r.TargetVersion)
 
 	if !r.UpgradeNeeded && !r.WasUpgraded {
 		sb.WriteString("\nAlready running the latest version.\n")
@@ -269,16 +271,16 @@ func FormatResult(r *Result) string {
 
 	if r.DryRun {
 		sb.WriteString("\nThe following changes will be made:\n")
-		sb.WriteString(fmt.Sprintf("  - Download: %s (%s)\n", r.AssetName, FormatBytes(r.AssetSize)))
+		fmt.Fprintf(&sb, "  - Download: %s (%s)\n", r.AssetName, FormatBytes(r.AssetSize))
 		sb.WriteString("  - Verify:   SHA256 checksum\n")
-		sb.WriteString(fmt.Sprintf("  - Replace:  %s\n", r.ExecutablePath))
+		fmt.Fprintf(&sb, "  - Replace:  %s\n", r.ExecutablePath)
 		return sb.String()
 	}
 
 	if r.WasUpgraded {
 		sb.WriteString("\nUpgrade successful!\n")
 		if r.BackupPath != "" {
-			sb.WriteString(fmt.Sprintf("Backup created: %s\n", r.BackupPath))
+			fmt.Fprintf(&sb, "Backup created: %s\n", r.BackupPath)
 		}
 	}
 
@@ -289,8 +291,8 @@ func FormatResult(r *Result) string {
 func FormatCheckResult(r *Result) string {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("Current version: %s\n", r.CurrentVersion))
-	sb.WriteString(fmt.Sprintf("Latest version:  %s\n", r.TargetVersion))
+	fmt.Fprintf(&sb, "Current version: %s\n", r.CurrentVersion)
+	fmt.Fprintf(&sb, "Latest version:  %s\n", r.TargetVersion)
 
 	if r.UpgradeNeeded {
 		sb.WriteString("\nAn update is available. Run 'dagu upgrade' to update.\n")

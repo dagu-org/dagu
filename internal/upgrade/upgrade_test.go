@@ -93,11 +93,11 @@ func TestParseVersion(t *testing.T) {
 
 func TestCompareVersions(t *testing.T) {
 	tests := []struct {
-		name     string
-		current  string
-		target   string
-		want     int
-		isNewer  bool
+		name    string
+		current string
+		target  string
+		want    int
+		isNewer bool
 	}{
 		{
 			name:    "target is newer",
@@ -262,7 +262,7 @@ func TestParseChecksums(t *testing.T) {
 			},
 		},
 		{
-			name: "single space fallback",
+			name:    "single space fallback",
 			content: `abc123def456 dagu_1.30.3_darwin_arm64.tar.gz`,
 			want: map[string]string{
 				"dagu_1.30.3_darwin_arm64.tar.gz": "abc123def456",

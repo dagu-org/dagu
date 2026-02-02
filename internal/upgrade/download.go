@@ -25,7 +25,7 @@ func Download(ctx context.Context, opts DownloadOptions) error {
 	// Create a temporary file in the same directory as destination
 	// to ensure atomic rename works (same filesystem)
 	dir := filepath.Dir(opts.Destination)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
@@ -97,11 +97,11 @@ func Download(ctx context.Context, opts DownloadOptions) error {
 
 // VerifyChecksum computes SHA256 and compares with expected hash.
 func VerifyChecksum(filePath, expectedHash string) error {
-	f, err := os.Open(filePath)
+	f, err := os.Open(filePath) //nolint:gosec // filePath is from controlled internal source
 	if err != nil {
 		return fmt.Errorf("failed to open file for checksum verification: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {

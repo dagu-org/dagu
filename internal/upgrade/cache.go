@@ -38,7 +38,7 @@ func GetCacheDir() (string, error) {
 	}
 
 	cacheDir := filepath.Join(configDir, "dagu")
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+	if err := os.MkdirAll(cacheDir, 0750); err != nil {
 		return "", fmt.Errorf("failed to create cache directory: %w", err)
 	}
 
@@ -61,7 +61,7 @@ func LoadCache() (*UpgradeCheckCache, error) {
 		return nil, err
 	}
 
-	data, err := os.ReadFile(cachePath)
+	data, err := os.ReadFile(cachePath) //nolint:gosec // cachePath is from GetCachePath, not user input
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil // No cache yet
@@ -90,7 +90,7 @@ func SaveCache(cache *UpgradeCheckCache) error {
 		return fmt.Errorf("failed to marshal cache: %w", err)
 	}
 
-	if err := os.WriteFile(cachePath, data, 0644); err != nil {
+	if err := os.WriteFile(cachePath, data, 0600); err != nil {
 		return fmt.Errorf("failed to write cache file: %w", err)
 	}
 
