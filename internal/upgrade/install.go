@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -15,9 +16,10 @@ import (
 
 // InstallOptions configures the installation operation.
 type InstallOptions struct {
-	ArchivePath  string // Downloaded .tar.gz
-	TargetPath   string // Path to current dagu binary
-	CreateBackup bool
+	ArchivePath     string // Downloaded .tar.gz
+	TargetPath      string // Path to current dagu binary
+	CreateBackup    bool
+	ExpectedVersion string // for verification after install
 }
 
 // InstallResult contains information about the installation.
@@ -295,4 +297,34 @@ func GetExecutablePath() (string, error) {
 	}
 
 	return execPath, nil
+}
+
+// CheckWritePermission verifies we can write to the target directory.
+func CheckWritePermission(targetPath string) error {
+	dir := filepath.Dir(targetPath)
+	tempFile, err := os.CreateTemp(dir, ".dagu-permission-check-*")
+	if err != nil {
+		if os.IsPermission(err) {
+			return fmt.Errorf("permission denied: cannot write to %s (try running with sudo)", dir)
+		}
+		return fmt.Errorf("cannot write to directory %s: %w", dir, err)
+	}
+	name := tempFile.Name()
+	_ = tempFile.Close()
+	_ = os.Remove(name)
+	return nil
+}
+
+// VerifyBinary runs the installed binary with "version" argument to verify it works.
+func VerifyBinary(binaryPath, expectedVersion string) error {
+	cmd := exec.Command(binaryPath, "version") //nolint:gosec // binaryPath is the path we just installed to
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("binary verification failed: %w", err)
+	}
+	if !strings.Contains(string(output), ExtractVersionFromTag(expectedVersion)) {
+		return fmt.Errorf("version mismatch after install: expected %s in output, got: %s",
+			ExtractVersionFromTag(expectedVersion), strings.TrimSpace(string(output)))
+	}
+	return nil
 }

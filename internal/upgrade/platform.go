@@ -2,6 +2,7 @@ package upgrade
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 	"slices"
 	"strings"
@@ -26,9 +27,15 @@ func Detect() Platform {
 	case "386":
 		p.Arch = "386"
 	case "arm":
-		// ARM versions are differentiated by GOARM
-		// Default to armv7 as it's more common
-		p.Arch = "armv7"
+		// ARM versions are differentiated by GOARM env var
+		goarm := os.Getenv("GOARM")
+		switch goarm {
+		case "5", "6":
+			p.Arch = "armv6"
+		default:
+			// Default to armv7 as it's more common
+			p.Arch = "armv7"
+		}
 	case "ppc64le":
 		p.Arch = "ppc64le"
 	case "s390x":

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 )
 
@@ -18,6 +19,15 @@ type Options struct {
 	CreateBackup      bool
 	Force             bool
 	IncludePreRelease bool
+	OnProgress        func(downloaded, total int64)
+}
+
+// ReleaseInfo contains pre-fetched release data to avoid multiple API calls.
+type ReleaseInfo struct {
+	Release       *Release
+	Checksums     map[string]string
+	Asset         *Asset
+	TargetVersion *semver.Version
 }
 
 // Result contains the result of an upgrade operation.
@@ -110,7 +120,9 @@ func CanSelfUpgrade() (bool, string) {
 		return false, "Installed via Snap. Use 'snap refresh dagu' instead."
 	case InstallMethodDocker:
 		return false, "Running in Docker. Pull the latest image instead."
-	case InstallMethodUnknown, InstallMethodBinary, InstallMethodGoInstall:
+	case InstallMethodGoInstall:
+		return false, "Installed via go install. Use 'go install github.com/dagu-org/dagu@latest' instead."
+	case InstallMethodUnknown, InstallMethodBinary:
 		return true, ""
 	}
 	return true, ""
@@ -212,6 +224,11 @@ func Upgrade(ctx context.Context, opts Options) (*Result, error) {
 		return result, nil
 	}
 
+	// Check write permission early (fail fast)
+	if err := CheckWritePermission(execPath); err != nil {
+		return nil, err
+	}
+
 	// Create temp directory for download
 	tempDir, err := os.MkdirTemp("", "dagu-upgrade-*")
 	if err != nil {
@@ -226,15 +243,17 @@ func Upgrade(ctx context.Context, opts Options) (*Result, error) {
 		URL:          asset.BrowserDownloadURL,
 		Destination:  archivePath,
 		ExpectedHash: expectedHash,
+		OnProgress:   opts.OnProgress,
 	}); err != nil {
 		return nil, fmt.Errorf("download failed: %w", err)
 	}
 
 	// Install (extract + replace)
 	installResult, err := Install(ctx, InstallOptions{
-		ArchivePath:  archivePath,
-		TargetPath:   execPath,
-		CreateBackup: opts.CreateBackup,
+		ArchivePath:     archivePath,
+		TargetPath:      execPath,
+		CreateBackup:    opts.CreateBackup,
+		ExpectedVersion: release.TagName,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("installation failed: %w", err)
@@ -242,6 +261,17 @@ func Upgrade(ctx context.Context, opts Options) (*Result, error) {
 
 	result.WasUpgraded = installResult.Installed
 	result.BackupPath = installResult.BackupPath
+
+	// Verify the installed binary
+	if err := VerifyBinary(execPath, release.TagName); err != nil {
+		// If verification fails and we have a backup, restore it
+		if result.BackupPath != "" {
+			if restoreErr := copyFile(result.BackupPath, execPath); restoreErr == nil {
+				return nil, fmt.Errorf("upgrade verification failed (restored backup): %w", err)
+			}
+		}
+		return nil, fmt.Errorf("upgrade verification failed: %w", err)
+	}
 
 	// Update cache with new version info
 	_ = SaveCache(&UpgradeCheckCache{
@@ -301,4 +331,170 @@ func FormatCheckResult(r *Result) string {
 	}
 
 	return sb.String()
+}
+
+// FetchReleaseInfo fetches all release information in a single set of API calls.
+// This allows checking and upgrading without making duplicate requests.
+func FetchReleaseInfo(ctx context.Context, opts Options) (*ReleaseInfo, error) {
+	// Check if we can self-upgrade
+	canUpgrade, reason := CanSelfUpgrade()
+	if !canUpgrade {
+		return nil, fmt.Errorf("%s", reason)
+	}
+
+	// Check platform support
+	platform := Detect()
+	if !platform.IsSupported() {
+		return nil, fmt.Errorf("platform %s is not supported\n%s", platform, SupportedPlatformsMessage())
+	}
+
+	// Create GitHub client
+	client := NewGitHubClient()
+
+	// Fetch target release
+	var release *Release
+	var err error
+	if opts.TargetVersion != "" {
+		release, err = client.GetRelease(ctx, opts.TargetVersion)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch release %s: %w", opts.TargetVersion, err)
+		}
+	} else {
+		release, err = client.GetLatestRelease(ctx, opts.IncludePreRelease)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch latest release: %w", err)
+		}
+	}
+
+	// Parse target version
+	targetV, err := ParseVersion(release.TagName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse target version: %w", err)
+	}
+
+	// Find asset for current platform
+	asset, err := FindAsset(release, platform, release.TagName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get checksums
+	checksums, err := client.GetChecksums(ctx, release)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get checksums: %w", err)
+	}
+
+	return &ReleaseInfo{
+		Release:       release,
+		Checksums:     checksums,
+		Asset:         asset,
+		TargetVersion: targetV,
+	}, nil
+}
+
+// UpgradeWithReleaseInfo performs the upgrade using pre-fetched release information.
+func UpgradeWithReleaseInfo(ctx context.Context, opts Options, info *ReleaseInfo) (*Result, error) {
+	result := &Result{
+		CurrentVersion: config.Version,
+		DryRun:         opts.DryRun,
+		TargetVersion:  info.Release.TagName,
+		AssetName:      info.Asset.Name,
+		AssetSize:      info.Asset.Size,
+		DownloadURL:    info.Asset.BrowserDownloadURL,
+	}
+
+	// Get executable path
+	execPath, err := GetExecutablePath()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get executable path: %w", err)
+	}
+	result.ExecutablePath = execPath
+
+	// Parse current version
+	currentV, err := ParseVersion(config.Version)
+	if err != nil {
+		return nil, fmt.Errorf("cannot determine current version: %w", err)
+	}
+
+	// Compare versions
+	result.UpgradeNeeded = IsNewer(currentV, info.TargetVersion)
+
+	// If check-only, return result now
+	if opts.CheckOnly {
+		return result, nil
+	}
+
+	// If not an upgrade (same or older), exit unless forced
+	if !result.UpgradeNeeded && !opts.Force {
+		return result, nil
+	}
+
+	// If dry-run, return plan without making changes
+	if opts.DryRun {
+		return result, nil
+	}
+
+	// Check write permission early (fail fast)
+	if err := CheckWritePermission(execPath); err != nil {
+		return nil, err
+	}
+
+	// Get expected checksum
+	expectedHash, ok := info.Checksums[info.Asset.Name]
+	if !ok {
+		return nil, fmt.Errorf("checksum for %s not found", info.Asset.Name)
+	}
+
+	// Create temp directory for download
+	tempDir, err := os.MkdirTemp("", "dagu-upgrade-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer func() { _ = os.RemoveAll(tempDir) }()
+
+	archivePath := filepath.Join(tempDir, info.Asset.Name)
+
+	// Download archive
+	if err := Download(ctx, DownloadOptions{
+		URL:          info.Asset.BrowserDownloadURL,
+		Destination:  archivePath,
+		ExpectedHash: expectedHash,
+		OnProgress:   opts.OnProgress,
+	}); err != nil {
+		return nil, fmt.Errorf("download failed: %w", err)
+	}
+
+	// Install (extract + replace)
+	installResult, err := Install(ctx, InstallOptions{
+		ArchivePath:     archivePath,
+		TargetPath:      execPath,
+		CreateBackup:    opts.CreateBackup,
+		ExpectedVersion: info.Release.TagName,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("installation failed: %w", err)
+	}
+
+	result.WasUpgraded = installResult.Installed
+	result.BackupPath = installResult.BackupPath
+
+	// Verify the installed binary
+	if err := VerifyBinary(execPath, info.Release.TagName); err != nil {
+		// If verification fails and we have a backup, restore it
+		if result.BackupPath != "" {
+			if restoreErr := copyFile(result.BackupPath, execPath); restoreErr == nil {
+				return nil, fmt.Errorf("upgrade verification failed (restored backup): %w", err)
+			}
+		}
+		return nil, fmt.Errorf("upgrade verification failed: %w", err)
+	}
+
+	// Update cache with new version info
+	_ = SaveCache(&UpgradeCheckCache{
+		CurrentVersion:  info.Release.TagName,
+		LatestVersion:   info.Release.TagName,
+		UpdateAvailable: false,
+	})
+
+	return result, nil
 }

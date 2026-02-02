@@ -17,6 +17,7 @@ var upgradeFlags = []commandLineFlag{
 	{name: "dry-run", usage: "Show what would happen without making changes", isBool: true},
 	{name: "backup", usage: "Create backup of current binary before upgrade", isBool: true},
 	yesFlag,
+	{name: "force", shorthand: "f", usage: "Allow downgrading to an older version", isBool: true},
 	{name: "pre-release", usage: "Include pre-release versions", isBool: true},
 }
 
@@ -38,9 +39,11 @@ Examples:
   dagu upgrade --dry-run          # Show what would happen
   dagu upgrade --backup           # Create backup before upgrade
   dagu upgrade -y                 # Skip confirmation prompt
+  dagu upgrade -f                 # Allow downgrade to older version
+  dagu upgrade -y -f              # Skip prompt and allow downgrade
 
-Note: This command cannot be used if dagu was installed via Homebrew, Snap, or
-is running in Docker. Use the appropriate package manager instead.`,
+Note: This command cannot be used if dagu was installed via Homebrew, Snap,
+go install, or is running in Docker. Use the appropriate package manager instead.`,
 		},
 		upgradeFlags,
 		runUpgrade,
@@ -74,6 +77,11 @@ func runUpgrade(ctx *Context, _ []string) error {
 		return fmt.Errorf("failed to get yes flag: %w", err)
 	}
 
+	forceDowngrade, err := ctx.Command.Flags().GetBool("force")
+	if err != nil {
+		return fmt.Errorf("failed to get force flag: %w", err)
+	}
+
 	includePreRelease, err := ctx.Command.Flags().GetBool("pre-release")
 	if err != nil {
 		return fmt.Errorf("failed to get pre-release flag: %w", err)
@@ -90,30 +98,32 @@ func runUpgrade(ctx *Context, _ []string) error {
 		CheckOnly:         checkOnly,
 		DryRun:            dryRun,
 		CreateBackup:      createBackup,
-		Force:             skipConfirm,
+		Force:             forceDowngrade,
 		IncludePreRelease: includePreRelease,
 	}
 
-	// If check-only, just show the result
-	if checkOnly {
-		result, err := upgrade.Upgrade(ctx, opts)
-		if err != nil {
-			return err
-		}
-		fmt.Print(upgrade.FormatCheckResult(result))
-		return nil
-	}
-
-	// First, check what will happen
-	checkOpts := opts
-	checkOpts.DryRun = true
-	result, err := upgrade.Upgrade(ctx, checkOpts)
+	// Fetch release info once (single API call)
+	releaseInfo, err := upgrade.FetchReleaseInfo(ctx, opts)
 	if err != nil {
 		return err
 	}
 
+	// Use UpgradeWithReleaseInfo to get initial result for display
+	checkOpts := opts
+	checkOpts.DryRun = true
+	result, err := upgrade.UpgradeWithReleaseInfo(ctx, checkOpts, releaseInfo)
+	if err != nil {
+		return err
+	}
+
+	// If check-only, just show the result
+	if checkOnly {
+		fmt.Print(upgrade.FormatCheckResult(result))
+		return nil
+	}
+
 	// If already on latest and not forced, exit early
-	if !result.UpgradeNeeded && !skipConfirm {
+	if !result.UpgradeNeeded && !forceDowngrade {
 		fmt.Println("Already running the latest version.")
 		return nil
 	}
@@ -139,9 +149,11 @@ func runUpgrade(ctx *Context, _ []string) error {
 		}
 	}
 
-	// Perform the actual upgrade
-	fmt.Println("Downloading...")
-	result, err = upgrade.Upgrade(ctx, opts)
+	// Add progress callback for download feedback
+	opts.OnProgress = createProgressCallback()
+
+	// Perform the actual upgrade using the already-fetched release info
+	result, err = upgrade.UpgradeWithReleaseInfo(ctx, opts, releaseInfo)
 	if err != nil {
 		return err
 	}
@@ -154,6 +166,26 @@ func runUpgrade(ctx *Context, _ []string) error {
 	}
 
 	return nil
+}
+
+// createProgressCallback returns a callback function for download progress display.
+func createProgressCallback() func(downloaded, total int64) {
+	var lastPercent int
+	return func(downloaded, total int64) {
+		if total <= 0 {
+			return
+		}
+		percent := int(downloaded * 100 / total)
+		// Update display every 5%
+		if percent/5 > lastPercent/5 {
+			lastPercent = percent
+			fmt.Printf("\rDownloading... %d%% (%s / %s)",
+				percent, upgrade.FormatBytes(downloaded), upgrade.FormatBytes(total))
+		}
+		if downloaded >= total {
+			fmt.Println()
+		}
+	}
 }
 
 // confirmAction prompts the user for confirmation.

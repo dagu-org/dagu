@@ -19,7 +19,7 @@ func ParseVersion(s string) (*semver.Version, error) {
 
 	// Handle "dev" or other development versions
 	if s == "dev" || s == "0.0.0" {
-		return nil, fmt.Errorf("development version")
+		return nil, fmt.Errorf("cannot upgrade from development build (version: %s). Install a release version first: https://github.com/dagu-org/dagu/releases", s)
 	}
 
 	// Remove 'v' prefix if present

@@ -20,6 +20,23 @@ type DownloadOptions struct {
 	OnProgress   func(downloaded, total int64)
 }
 
+// progressWriter wraps an io.Writer to track download progress.
+type progressWriter struct {
+	writer     io.Writer
+	total      int64
+	written    int64
+	onProgress func(downloaded, total int64)
+}
+
+func (pw *progressWriter) Write(p []byte) (int, error) {
+	n, err := pw.writer.Write(p)
+	pw.written += int64(n)
+	if pw.onProgress != nil {
+		pw.onProgress(pw.written, pw.total)
+	}
+	return n, err
+}
+
 // Download downloads a file with checksum verification.
 func Download(ctx context.Context, opts DownloadOptions) error {
 	// Create a temporary file in the same directory as destination
@@ -55,10 +72,30 @@ func Download(ctx context.Context, opts DownloadOptions) error {
 			return code == 429 || (code >= 500 && code <= 504)
 		})
 
+	// If progress callback is provided, get Content-Length first via HEAD request
+	var contentLength int64
+	if opts.OnProgress != nil {
+		headResp, headErr := client.R().
+			SetContext(ctx).
+			Head(opts.URL)
+		if headErr == nil && headResp.StatusCode() == 200 {
+			contentLength = headResp.RawResponse.ContentLength
+		}
+	}
+
+	// Create progress writer if callback is provided
+	var writer io.Writer = tempFile
+	if opts.OnProgress != nil {
+		writer = &progressWriter{
+			writer:     tempFile,
+			total:      contentLength,
+			onProgress: opts.OnProgress,
+		}
+	}
+
 	// Download with progress tracking
 	resp, err := client.R().
 		SetContext(ctx).
-		SetOutput(tempPath).
 		SetDoNotParseResponse(true).
 		Get(opts.URL)
 
@@ -67,12 +104,19 @@ func Download(ctx context.Context, opts DownloadOptions) error {
 	}
 
 	if resp.StatusCode() != 200 {
+		if resp.RawBody() != nil {
+			_ = resp.RawBody().Close()
+		}
 		return fmt.Errorf("download failed with status %d", resp.StatusCode())
 	}
 
-	// Close the response body if it exists
+	// Copy response body to file (with progress tracking if enabled)
 	if resp.RawBody() != nil {
+		_, copyErr := io.Copy(writer, resp.RawBody())
 		_ = resp.RawBody().Close()
+		if copyErr != nil {
+			return fmt.Errorf("failed to write downloaded data: %w", copyErr)
+		}
 	}
 
 	// Close the temp file before verifying checksum
