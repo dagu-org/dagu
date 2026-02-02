@@ -208,21 +208,20 @@ export function AgentChatModal(): ReactElement | null {
           <button
             onClick={() => updatePreference('safeMode', !preferences.safeMode)}
             className={cn(
-              "flex items-center gap-1.5 px-2 py-1 rounded border text-[11px] font-medium uppercase tracking-wide cursor-pointer transition-all select-none",
+              "flex items-center justify-center px-2 py-1 rounded border cursor-pointer transition-all select-none",
               preferences.safeMode
                 ? "bg-muted border-border text-foreground hover:bg-muted/80"
                 : "bg-background border-border/50 text-muted-foreground hover:border-border"
             )}
             title={preferences.safeMode
-              ? "Safe Mode ON - Click to disable"
-              : "Safe Mode OFF - Click to enable"}
+              ? "Safe Mode ON: Dangerous commands require approval"
+              : "Safe Mode OFF: All commands execute immediately"}
           >
             {preferences.safeMode ? (
               <Shield className="h-3 w-3" />
             ) : (
               <ShieldOff className="h-3 w-3" />
             )}
-            <span>Safe</span>
           </button>
           <Button
             variant="ghost"
