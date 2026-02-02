@@ -497,7 +497,7 @@ func formatTimestamp(ts string) string {
 
 	t := parseTimeString(ts)
 	if t.IsZero() {
-		return ts // Return as-is if unparseable
+		return ts // Return as-is if unparsable
 	}
 
 	return t.Format("2006-01-02 15:04:05")
