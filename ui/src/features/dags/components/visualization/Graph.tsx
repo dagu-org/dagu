@@ -271,32 +271,45 @@ function Graph({
     const nodeColor = isDarkMode ? '#f1f5f9' : '#0f1129'; // --foreground for dark, --background for light
     const strokeDefault = isDarkMode ? '#2d336d' : '#94a3b8';
 
+    // Unified status colors
+    const statusColors = {
+      none: '#5f6368',      // neutral gray
+      running: '#34a853',   // subdued green
+      done: '#1e8e3e',      // success green
+      error: '#d93025',     // error red
+      cancel: '#d946ef',    // pink/magenta for aborted
+      skipped: '#5f6368',   // neutral gray
+      partial: '#e37400',   // warning amber
+      waiting: '#e37400',   // warning amber
+      rejected: '#d93025',  // error red
+    };
+
     dat.push(
-      `classDef none color:${nodeColor},fill:${nodeFill},stroke:${strokeDefault},stroke-width:2.5px`
+      `classDef none color:${nodeColor},fill:${nodeFill},stroke:${statusColors.none},stroke-width:2.5px`
     );
     dat.push(
-      `classDef running color:${nodeColor},fill:${nodeFill},stroke:#66ff66,stroke-width:2.5px`
+      `classDef running color:${nodeColor},fill:${nodeFill},stroke:${statusColors.running},stroke-width:2.5px`
     );
     dat.push(
-      `classDef error color:${nodeColor},fill:${nodeFill},stroke:#ef4444,stroke-width:2.5px`
+      `classDef error color:${nodeColor},fill:${nodeFill},stroke:${statusColors.error},stroke-width:2.5px`
     );
     dat.push(
-      `classDef cancel color:${nodeColor},fill:${nodeFill},stroke:#ec4899,stroke-width:2.5px`
+      `classDef cancel color:${nodeColor},fill:${nodeFill},stroke:${statusColors.cancel},stroke-width:2.5px`
     );
     dat.push(
-      `classDef done color:${nodeColor},fill:${nodeFill},stroke:#15803d,stroke-width:2.5px`
+      `classDef done color:${nodeColor},fill:${nodeFill},stroke:${statusColors.done},stroke-width:2.5px`
     );
     dat.push(
-      `classDef skipped color:${nodeColor},fill:${nodeFill},stroke:#64748b,stroke-width:2.5px`
+      `classDef skipped color:${nodeColor},fill:${nodeFill},stroke:${statusColors.skipped},stroke-width:2.5px`
     );
     dat.push(
-      `classDef partial color:${nodeColor},fill:${nodeFill},stroke:#f59e0b,stroke-width:2.5px`
+      `classDef partial color:${nodeColor},fill:${nodeFill},stroke:${statusColors.partial},stroke-width:2.5px`
     );
     dat.push(
-      `classDef waiting color:${nodeColor},fill:${nodeFill},stroke:#f59e0b,stroke-width:2.5px`
+      `classDef waiting color:${nodeColor},fill:${nodeFill},stroke:${statusColors.waiting},stroke-width:2.5px`
     );
     dat.push(
-      `classDef rejected color:${nodeColor},fill:${nodeFill},stroke:#ef4444,stroke-width:2.5px`
+      `classDef rejected color:${nodeColor},fill:${nodeFill},stroke:${statusColors.rejected},stroke-width:2.5px`
     );
 
     // Add custom link styles

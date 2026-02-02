@@ -1002,8 +1002,8 @@ function NodeStatusTableRow({
                         className={cn(
                           'px-3 py-1 text-xs font-medium transition-colors rounded',
                           activeLogTab === 'stdout'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted text-foreground hover:bg-muted/80'
+                            ? 'bg-primary text-white'
+                            : 'bg-card text-foreground hover:bg-muted border border-border'
                         )}
                       >
                         out
@@ -1016,8 +1016,8 @@ function NodeStatusTableRow({
                         className={cn(
                           'px-3 py-1 text-xs font-medium transition-colors rounded',
                           activeLogTab === 'stderr'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted text-foreground hover:bg-muted/80'
+                            ? 'bg-primary text-white'
+                            : 'bg-card text-foreground hover:bg-muted border border-border'
                         )}
                       >
                         err

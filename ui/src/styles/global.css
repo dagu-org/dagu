@@ -104,10 +104,18 @@
     --destructive-foreground: #ffffff;
     --success: #1e8e3e;
     --success-foreground: #ffffff;
-    --warning: #f9ab00;
+    --warning: #e37400;
     --warning-foreground: #202124;
     --info: #1967d2;
     --info-foreground: #ffffff;
+
+    /* Unified Status Colors */
+    --status-success: #1e8e3e;
+    --status-error: #d93025;
+    --status-running: #34a853;
+    --status-neutral: #5f6368;
+    --status-warning: #e37400;
+    --status-aborted: #d946ef;
 
     /* Borders & Inputs */
     --border: #dadce0;
@@ -181,6 +189,14 @@
     --warning-foreground: #202124;
     --info: #8ab4f8;
     --info-foreground: #202124;
+
+    /* Unified Status Colors - Dark Mode */
+    --status-success: #81c995;
+    --status-error: #f28b82;
+    --status-running: #81c995;
+    --status-neutral: #9aa0a6;
+    --status-warning: #fdd663;
+    --status-aborted: #e879f9;
 
     /* Borders & Inputs */
     --border: #5f6368;
@@ -419,7 +435,7 @@
   letter-spacing: -0.025em;
 }
 
-/* Status Indicators - GCP Style */
+/* Status Indicators - Minimal Text-Only Style */
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -428,75 +444,109 @@
   padding: 0 8px;
   font-size: 11px;
   font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
   border-radius: var(--radius-sm);
   border: 1px solid;
   white-space: nowrap;
 }
 
 .status-success {
-  background-color: rgba(30, 142, 62, 0.1);
-  color: var(--success);
-  border-color: rgba(30, 142, 62, 0.2);
+  color: var(--status-success);
+  background-color: rgba(30, 142, 62, 0.08);
+  border: 1px solid rgba(30, 142, 62, 0.15);
+  border-radius: 4px;
 }
 .dark .status-success {
-  background-color: rgba(129, 201, 149, 0.15);
-  color: var(--success);
-  border-color: rgba(129, 201, 149, 0.3);
+  color: var(--status-success);
+  background-color: rgba(129, 201, 149, 0.08);
+  border-color: rgba(129, 201, 149, 0.15);
 }
 
 .status-failed,
 .status-error {
-  background-color: rgba(217, 48, 37, 0.1);
-  color: var(--destructive);
-  border-color: rgba(217, 48, 37, 0.2);
+  color: var(--status-error);
+  background-color: rgba(217, 48, 37, 0.08);
+  border: 1px solid rgba(217, 48, 37, 0.15);
+  border-radius: 4px;
 }
 .dark .status-failed,
 .dark .status-error {
-  background-color: rgba(242, 139, 130, 0.15);
-  color: var(--destructive);
-  border-color: rgba(242, 139, 130, 0.3);
+  color: var(--status-error);
+  background-color: rgba(242, 139, 130, 0.08);
+  border-color: rgba(242, 139, 130, 0.15);
 }
 
 .status-running {
-  background-color: rgba(25, 103, 210, 0.1);
-  color: var(--info);
-  border-color: rgba(25, 103, 210, 0.2);
+  color: var(--status-running);
+  background-color: rgba(52, 168, 83, 0.08);
+  border: 1px solid rgba(52, 168, 83, 0.15);
+  border-radius: 4px;
 }
 .dark .status-running {
-  background-color: rgba(138, 180, 248, 0.15);
-  color: var(--info);
-  border-color: rgba(138, 180, 248, 0.3);
+  color: var(--status-running);
+  background-color: rgba(129, 201, 149, 0.08);
+  border-color: rgba(129, 201, 149, 0.15);
 }
 
 .status-warning {
-  background-color: rgba(249, 171, 0, 0.1);
-  color: var(--warning);
-  border-color: rgba(249, 171, 0, 0.2);
+  color: var(--status-warning);
+  background-color: rgba(227, 116, 0, 0.08);
+  border: 1px solid rgba(227, 116, 0, 0.15);
+  border-radius: 4px;
 }
 .dark .status-warning {
-  background-color: rgba(253, 214, 99, 0.15);
-  color: var(--warning);
-  border-color: rgba(253, 214, 99, 0.3);
+  color: var(--status-warning);
+  background-color: rgba(253, 214, 99, 0.08);
+  border-color: rgba(253, 214, 99, 0.15);
+}
+
+.status-aborted {
+  color: var(--status-aborted);
+  background-color: rgba(217, 70, 239, 0.08);
+  border: 1px solid rgba(217, 70, 239, 0.15);
+  border-radius: 4px;
+}
+.dark .status-aborted {
+  color: var(--status-aborted);
+  background-color: rgba(232, 121, 249, 0.08);
+  border-color: rgba(232, 121, 249, 0.15);
+}
+
+.status-neutral {
+  color: var(--status-neutral);
+  background-color: rgba(95, 99, 104, 0.08);
+  border: 1px solid rgba(95, 99, 104, 0.15);
+  border-radius: 4px;
+}
+.dark .status-neutral {
+  color: var(--status-neutral);
+  background-color: rgba(154, 160, 166, 0.08);
+  border-color: rgba(154, 160, 166, 0.15);
 }
 
 .status-info {
-  background-color: rgba(25, 103, 210, 0.1);
   color: var(--info);
-  border-color: rgba(25, 103, 210, 0.2);
+  background-color: rgba(25, 103, 210, 0.08);
+  border: 1px solid rgba(25, 103, 210, 0.15);
+  border-radius: 4px;
 }
 .dark .status-info {
-  background-color: rgba(138, 180, 248, 0.15);
   color: var(--info);
-  border-color: rgba(138, 180, 248, 0.3);
+  background-color: rgba(138, 180, 248, 0.08);
+  border-color: rgba(138, 180, 248, 0.15);
 }
 
 .status-muted,
 .status-cancelled {
-  background-color: var(--muted);
-  color: var(--muted-foreground);
-  border-color: var(--border);
+  color: var(--status-neutral);
+  background-color: rgba(95, 99, 104, 0.08);
+  border: 1px solid rgba(95, 99, 104, 0.15);
+  border-radius: 4px;
+}
+.dark .status-muted,
+.dark .status-cancelled {
+  color: var(--status-neutral);
+  background-color: rgba(154, 160, 166, 0.08);
+  border-color: rgba(154, 160, 166, 0.15);
 }
 
 /* Status Dot Indicator (for running states) */
