@@ -67,7 +67,6 @@ func NewGitHubClient() *GitHubClient {
 // If includePreRelease is true, it may return a pre-release version.
 func (c *GitHubClient) GetLatestRelease(ctx context.Context, includePreRelease bool) (*Release, error) {
 	if !includePreRelease {
-		// Use the /latest endpoint which excludes pre-releases and drafts
 		var release Release
 		resp, err := c.client.R().
 			SetContext(ctx).
@@ -85,7 +84,6 @@ func (c *GitHubClient) GetLatestRelease(ctx context.Context, includePreRelease b
 		return &release, nil
 	}
 
-	// For pre-releases, we need to list all releases and find the newest
 	var releases []Release
 	resp, err := c.client.R().
 		SetContext(ctx).
@@ -101,7 +99,6 @@ func (c *GitHubClient) GetLatestRelease(ctx context.Context, includePreRelease b
 		return nil, fmt.Errorf("GitHub API returned status %d: %s", resp.StatusCode(), resp.String())
 	}
 
-	// Find the first non-draft release (may be pre-release)
 	for i := range releases {
 		if !releases[i].Draft {
 			return &releases[i], nil
@@ -113,7 +110,6 @@ func (c *GitHubClient) GetLatestRelease(ctx context.Context, includePreRelease b
 
 // GetRelease fetches a specific release by tag.
 func (c *GitHubClient) GetRelease(ctx context.Context, tag string) (*Release, error) {
-	// Ensure tag has 'v' prefix
 	tag = NormalizeVersionTag(tag)
 
 	var release Release
@@ -140,7 +136,6 @@ func (c *GitHubClient) GetRelease(ctx context.Context, tag string) (*Release, er
 // GetChecksums downloads and parses checksums.txt from a release.
 // Returns a map of filename to SHA256 hash.
 func (c *GitHubClient) GetChecksums(ctx context.Context, release *Release) (map[string]string, error) {
-	// Find checksums.txt asset
 	var checksumsURL string
 	for _, asset := range release.Assets {
 		if asset.Name == "checksums.txt" {
@@ -168,8 +163,7 @@ func (c *GitHubClient) GetChecksums(ctx context.Context, release *Release) (map[
 	return parseChecksums(resp.String())
 }
 
-// parseChecksums parses the checksums.txt format.
-// Format: <sha256_hash>  <filename> (two spaces between hash and filename)
+// parseChecksums parses the checksums.txt format (sha256sum output format).
 func parseChecksums(content string) (map[string]string, error) {
 	checksums := make(map[string]string)
 	scanner := bufio.NewScanner(strings.NewReader(content))
@@ -180,10 +174,8 @@ func parseChecksums(content string) (map[string]string, error) {
 			continue
 		}
 
-		// Split on two spaces (standard sha256sum format)
 		parts := strings.SplitN(line, "  ", 2)
 		if len(parts) != 2 {
-			// Try single space as fallback
 			parts = strings.Fields(line)
 			if len(parts) != 2 {
 				continue

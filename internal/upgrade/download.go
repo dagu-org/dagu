@@ -39,8 +39,6 @@ func (pw *progressWriter) Write(p []byte) (int, error) {
 
 // Download downloads a file with checksum verification.
 func Download(ctx context.Context, opts DownloadOptions) error {
-	// Create a temporary file in the same directory as destination
-	// to ensure atomic rename works (same filesystem)
 	dir := filepath.Dir(opts.Destination)
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
@@ -51,8 +49,6 @@ func Download(ctx context.Context, opts DownloadOptions) error {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
 	tempPath := tempFile.Name()
-
-	// Clean up on any error
 	defer func() {
 		_ = tempFile.Close()
 		if _, err := os.Stat(tempPath); err == nil {
@@ -60,7 +56,6 @@ func Download(ctx context.Context, opts DownloadOptions) error {
 		}
 	}()
 
-	// Create HTTP client for download
 	client := resty.New().
 		SetTimeout(0). // No timeout for downloads
 		SetRetryCount(3).
@@ -72,7 +67,6 @@ func Download(ctx context.Context, opts DownloadOptions) error {
 			return code == 429 || (code >= 500 && code <= 504)
 		})
 
-	// If progress callback is provided, get Content-Length first via HEAD request
 	var contentLength int64
 	if opts.OnProgress != nil {
 		headResp, headErr := client.R().
@@ -83,7 +77,6 @@ func Download(ctx context.Context, opts DownloadOptions) error {
 		}
 	}
 
-	// Create progress writer if callback is provided
 	var writer io.Writer = tempFile
 	if opts.OnProgress != nil {
 		writer = &progressWriter{
@@ -93,7 +86,6 @@ func Download(ctx context.Context, opts DownloadOptions) error {
 		}
 	}
 
-	// Download with progress tracking
 	resp, err := client.R().
 		SetContext(ctx).
 		SetDoNotParseResponse(true).
@@ -110,7 +102,6 @@ func Download(ctx context.Context, opts DownloadOptions) error {
 		return fmt.Errorf("download failed with status %d", resp.StatusCode())
 	}
 
-	// Copy response body to file (with progress tracking if enabled)
 	if resp.RawBody() != nil {
 		_, copyErr := io.Copy(writer, resp.RawBody())
 		_ = resp.RawBody().Close()
@@ -119,19 +110,16 @@ func Download(ctx context.Context, opts DownloadOptions) error {
 		}
 	}
 
-	// Close the temp file before verifying checksum
 	if err := tempFile.Close(); err != nil {
 		return fmt.Errorf("failed to close temp file: %w", err)
 	}
 
-	// Verify checksum
 	if opts.ExpectedHash != "" {
 		if err := VerifyChecksum(tempPath, opts.ExpectedHash); err != nil {
 			return err
 		}
 	}
 
-	// Atomically move temp file to destination
 	if err := os.Rename(tempPath, opts.Destination); err != nil {
 		return fmt.Errorf("failed to move downloaded file: %w", err)
 	}

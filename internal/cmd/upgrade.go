@@ -51,7 +51,6 @@ go install, or is running in Docker. Use the appropriate package manager instead
 }
 
 func runUpgrade(ctx *Context, _ []string) error {
-	// Parse flags
 	checkOnly, err := ctx.Command.Flags().GetBool("check")
 	if err != nil {
 		return fmt.Errorf("failed to get check flag: %w", err)
@@ -87,7 +86,6 @@ func runUpgrade(ctx *Context, _ []string) error {
 		return fmt.Errorf("failed to get pre-release flag: %w", err)
 	}
 
-	// Check if self-upgrade is possible
 	canUpgrade, reason := upgrade.CanSelfUpgrade()
 	if !canUpgrade {
 		return fmt.Errorf("%s", reason)
@@ -102,13 +100,11 @@ func runUpgrade(ctx *Context, _ []string) error {
 		IncludePreRelease: includePreRelease,
 	}
 
-	// Fetch release info once (single API call)
 	releaseInfo, err := upgrade.FetchReleaseInfo(ctx, opts)
 	if err != nil {
 		return err
 	}
 
-	// Use UpgradeWithReleaseInfo to get initial result for display
 	checkOpts := opts
 	checkOpts.DryRun = true
 	result, err := upgrade.UpgradeWithReleaseInfo(ctx, checkOpts, releaseInfo)
@@ -116,25 +112,21 @@ func runUpgrade(ctx *Context, _ []string) error {
 		return err
 	}
 
-	// If check-only, just show the result
 	if checkOnly {
 		fmt.Print(upgrade.FormatCheckResult(result))
 		return nil
 	}
 
-	// If already on latest and not forced, exit early
 	if !result.UpgradeNeeded && !forceDowngrade {
 		fmt.Println("Already running the latest version.")
 		return nil
 	}
 
-	// Show what will happen
 	if dryRun {
 		fmt.Print(upgrade.FormatResult(result))
 		return nil
 	}
 
-	// Confirmation prompt (unless skipped with -y)
 	if !skipConfirm {
 		fmt.Printf("Current version: %s\n", result.CurrentVersion)
 		fmt.Printf("Target version:  %s\n\n", result.TargetVersion)
@@ -149,10 +141,7 @@ func runUpgrade(ctx *Context, _ []string) error {
 		}
 	}
 
-	// Add progress callback for download feedback
 	opts.OnProgress = createProgressCallback()
-
-	// Perform the actual upgrade using the already-fetched release info
 	result, err = upgrade.UpgradeWithReleaseInfo(ctx, opts, releaseInfo)
 	if err != nil {
 		return err

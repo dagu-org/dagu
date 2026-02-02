@@ -27,7 +27,6 @@ type UpgradeCheckCache struct {
 
 // GetCacheDir returns the directory for storing the cache file.
 func GetCacheDir() (string, error) {
-	// Use XDG config directory or fallback to ~/.config/dagu
 	configDir := os.Getenv("XDG_CONFIG_HOME")
 	if configDir == "" {
 		homeDir, err := os.UserHomeDir()
@@ -108,38 +107,29 @@ func IsCacheValid(cache *UpgradeCheckCache) bool {
 // CheckAndUpdateCache checks for updates if cache is stale and updates the cache.
 // This function is designed to be called asynchronously.
 func CheckAndUpdateCache(currentVersion string) (*UpgradeCheckCache, error) {
-	cache, err := LoadCache()
-	if err != nil {
-		// Log but don't fail
-		cache = nil
-	}
+	cache, _ := LoadCache()
 
 	// If cache is valid and current version matches, return cached result
 	if cache != nil && IsCacheValid(cache) && cache.CurrentVersion == currentVersion {
 		return cache, nil
 	}
 
-	// Parse current version
 	currentV, err := ParseVersion(currentVersion)
 	if err != nil {
-		// Development version or invalid - can't check for updates
 		return nil, err
 	}
 
-	// Fetch latest release
 	client := NewGitHubClient()
 	release, err := client.GetLatestRelease(context.Background(), false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check for updates: %w", err)
 	}
 
-	// Parse latest version
 	latestV, err := ParseVersion(release.TagName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse latest version: %w", err)
 	}
 
-	// Create new cache
 	newCache := &UpgradeCheckCache{
 		LastCheck:       time.Now(),
 		LatestVersion:   release.TagName,
@@ -147,7 +137,6 @@ func CheckAndUpdateCache(currentVersion string) (*UpgradeCheckCache, error) {
 		UpdateAvailable: IsNewer(currentV, latestV),
 	}
 
-	// Save cache (ignore errors)
 	_ = SaveCache(newCache)
 
 	return newCache, nil

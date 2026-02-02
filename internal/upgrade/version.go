@@ -10,26 +10,20 @@ import (
 )
 
 // ParseVersion parses a version string into a semver.Version.
-// Handles formats: "v1.2.3", "1.2.3", "v1.2.3-rc.1", "dev"
 func ParseVersion(s string) (*semver.Version, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return nil, fmt.Errorf("empty version string")
 	}
 
-	// Handle "dev" or other development versions
 	if s == "dev" || s == "0.0.0" {
 		return nil, fmt.Errorf("cannot upgrade from development build (version: %s). Install a release version first: https://github.com/dagu-org/dagu/releases", s)
 	}
 
-	// Remove 'v' prefix if present
 	s = strings.TrimPrefix(s, "v")
 
-	// Handle build-time format like "1.30.3-260204123456"
-	// Extract just the semver portion (before any build metadata that's not semver-compliant)
 	if idx := strings.Index(s, "-"); idx != -1 {
 		suffix := s[idx+1:]
-		// Check if suffix looks like a build timestamp (all digits)
 		if isNumeric(suffix) {
 			s = s[:idx]
 		}

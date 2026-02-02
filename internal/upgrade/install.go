@@ -32,19 +32,16 @@ type InstallResult struct {
 func Install(ctx context.Context, opts InstallOptions) (*InstallResult, error) {
 	result := &InstallResult{}
 
-	// Extract archive to a temporary directory
 	tempDir, err := os.MkdirTemp("", "dagu-upgrade-*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
-	// Extract the archive
 	if err := extractArchive(ctx, opts.ArchivePath, tempDir); err != nil {
 		return nil, fmt.Errorf("failed to extract archive: %w", err)
 	}
 
-	// Find the dagu binary in extracted files
 	binaryName := "dagu"
 	if runtime.GOOS == "windows" {
 		binaryName = "dagu.exe"
@@ -55,7 +52,6 @@ func Install(ctx context.Context, opts InstallOptions) (*InstallResult, error) {
 		return nil, err
 	}
 
-	// Create backup if requested
 	if opts.CreateBackup {
 		backupPath := opts.TargetPath + ".bak"
 		if err := copyFile(opts.TargetPath, backupPath); err != nil {
@@ -64,9 +60,7 @@ func Install(ctx context.Context, opts InstallOptions) (*InstallResult, error) {
 		result.BackupPath = backupPath
 	}
 
-	// Replace the binary atomically
 	if err := replaceBinary(extractedBinary, opts.TargetPath); err != nil {
-		// Try to restore from backup if we created one
 		if result.BackupPath != "" {
 			_ = copyFile(result.BackupPath, opts.TargetPath)
 		}
@@ -85,13 +79,11 @@ func extractArchive(ctx context.Context, archivePath, destDir string) error {
 	}
 	defer func() { _ = srcFile.Close() }()
 
-	// Identify the archive format
 	format, _, err := archives.Identify(ctx, filepath.Base(archivePath), srcFile)
 	if err != nil {
 		return fmt.Errorf("failed to identify archive format: %w", err)
 	}
 
-	// Reset file position after Identify
 	if _, err := srcFile.Seek(0, io.SeekStart); err != nil {
 		return fmt.Errorf("failed to reset file position: %w", err)
 	}
@@ -101,26 +93,21 @@ func extractArchive(ctx context.Context, archivePath, destDir string) error {
 		return fmt.Errorf("archive format does not support extraction")
 	}
 
-	// Extract files
 	err = extractor.Extract(ctx, srcFile, func(_ context.Context, f archives.FileInfo) error {
 		if f.IsDir() {
 			return nil
 		}
 
-		// Security: prevent path traversal
 		name := filepath.Clean(f.NameInArchive)
 		if strings.HasPrefix(name, "..") {
 			return fmt.Errorf("invalid path in archive: %s", f.NameInArchive)
 		}
 
 		targetPath := filepath.Join(destDir, name)
-
-		// Create parent directories
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0750); err != nil {
 			return err
 		}
 
-		// Extract file
 		src, err := f.Open()
 		if err != nil {
 			return err
@@ -175,14 +162,10 @@ func findBinary(dir, binaryName string) (string, error) {
 
 // replaceBinary atomically replaces the target binary with the source.
 func replaceBinary(src, target string) error {
-	// Get the permissions of the target file (if it exists)
 	perm := os.FileMode(0755)
 	if info, err := os.Stat(target); err == nil {
 		perm = info.Mode().Perm()
 	}
-
-	// On Unix: os.Rename is atomic on same filesystem
-	// On Windows: we need a different approach
 
 	if runtime.GOOS == "windows" {
 		return replaceWindowsBinary(src, target, perm)
@@ -193,7 +176,6 @@ func replaceBinary(src, target string) error {
 
 // replaceUnixBinary replaces the binary on Unix systems.
 func replaceUnixBinary(src, target string, perm os.FileMode) error {
-	// Create a temp file in the same directory as target
 	dir := filepath.Dir(target)
 	tempFile, err := os.CreateTemp(dir, "dagu-new-*")
 	if err != nil {
@@ -202,7 +184,6 @@ func replaceUnixBinary(src, target string, perm os.FileMode) error {
 	tempPath := tempFile.Name()
 	_ = tempFile.Close()
 
-	// Copy source to temp file
 	if err := copyFile(src, tempPath); err != nil {
 		_ = os.Remove(tempPath)
 		return err
@@ -214,7 +195,6 @@ func replaceUnixBinary(src, target string, perm os.FileMode) error {
 		return fmt.Errorf("failed to set permissions: %w", err)
 	}
 
-	// Atomic rename
 	if err := os.Rename(tempPath, target); err != nil {
 		_ = os.Remove(tempPath)
 		return fmt.Errorf("failed to replace binary: %w", err)
@@ -225,33 +205,21 @@ func replaceUnixBinary(src, target string, perm os.FileMode) error {
 
 // replaceWindowsBinary replaces the binary on Windows systems.
 func replaceWindowsBinary(src, target string, perm os.FileMode) error {
-	// On Windows, we can't rename over a running binary
-	// So we rename the old one first, then copy the new one
-
 	oldPath := target + ".old"
-
-	// Remove any existing .old file
 	_ = os.Remove(oldPath)
 
-	// Rename current binary to .old
 	if err := os.Rename(target, oldPath); err != nil {
-		// If target doesn't exist, that's fine
 		if !os.IsNotExist(err) {
 			return fmt.Errorf("failed to rename old binary: %w", err)
 		}
 	}
 
-	// Copy new binary to target
 	if err := copyFile(src, target); err != nil {
-		// Try to restore old binary
 		_ = os.Rename(oldPath, target)
 		return err
 	}
 
-	// Chmod may fail on Windows - ignore error
 	_ = os.Chmod(target, perm)
-
-	// Remove old binary (will fail if it's running, but that's okay)
 	_ = os.Remove(oldPath)
 
 	return nil
@@ -290,7 +258,6 @@ func GetExecutablePath() (string, error) {
 		return "", fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	// Resolve symlinks
 	execPath, err = filepath.EvalSymlinks(execPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve symlinks: %w", err)
