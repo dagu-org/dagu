@@ -347,31 +347,6 @@ func TestExtractVersionFromTag(t *testing.T) {
 	}
 }
 
-func TestLooksLikeVersion(t *testing.T) {
-	tests := []struct {
-		input string
-		want  bool
-	}{
-		{"v1.30.3", true},
-		{"1.30.3", true},
-		{"v1.2.3-rc.1", true},
-		{"dev", false},
-		{"main", false},
-		{"", false},
-		{"v1", false},
-		{"v1.2", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			got := LooksLikeVersion(tt.input)
-			if got != tt.want {
-				t.Errorf("LooksLikeVersion(%q) = %v, want %v", tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestFindAsset(t *testing.T) {
 	release := &Release{
 		TagName: "v1.30.3",

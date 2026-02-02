@@ -2,11 +2,9 @@ package upgrade
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/dagu-org/dagu/internal/cmn/config"
 )
 
 // ParseVersion parses a version string into a semver.Version.
@@ -35,11 +33,6 @@ func ParseVersion(s string) (*semver.Version, error) {
 	}
 
 	return v, nil
-}
-
-// CurrentVersion returns the current version from config.Version.
-func CurrentVersion() (*semver.Version, error) {
-	return ParseVersion(config.Version)
 }
 
 // CompareVersions compares two versions.
@@ -78,12 +71,4 @@ func NormalizeVersionTag(version string) string {
 // ExtractVersionFromTag extracts the version number from a tag like "v1.30.3".
 func ExtractVersionFromTag(tag string) string {
 	return strings.TrimPrefix(tag, "v")
-}
-
-// versionPattern matches semver-like version strings.
-var versionPattern = regexp.MustCompile(`^v?\d+\.\d+\.\d+`)
-
-// LooksLikeVersion checks if a string looks like a version number.
-func LooksLikeVersion(s string) bool {
-	return versionPattern.MatchString(s)
 }

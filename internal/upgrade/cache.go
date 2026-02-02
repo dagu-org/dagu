@@ -7,6 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/adrg/xdg"
+	"github.com/dagu-org/dagu/internal/cmn/config"
 )
 
 const (
@@ -27,21 +30,24 @@ type UpgradeCheckCache struct {
 
 // GetCacheDir returns the directory for storing the cache file.
 func GetCacheDir() (string, error) {
-	configDir := os.Getenv("XDG_CONFIG_HOME")
-	if configDir == "" {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("failed to get home directory: %w", err)
-		}
-		configDir = filepath.Join(homeDir, ".config")
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get home directory: %w", err)
 	}
 
-	cacheDir := filepath.Join(configDir, "dagu")
-	if err := os.MkdirAll(cacheDir, 0750); err != nil {
+	paths, err := config.ResolvePaths("DAGU_HOME", filepath.Join(homeDir, ".dagu"), config.XDGConfig{
+		DataHome:   xdg.DataHome,
+		ConfigHome: filepath.Join(homeDir, ".config"),
+	})
+	if err != nil {
+		return "", err
+	}
+
+	if err := os.MkdirAll(paths.ConfigDir, 0750); err != nil {
 		return "", fmt.Errorf("failed to create cache directory: %w", err)
 	}
 
-	return cacheDir, nil
+	return paths.ConfigDir, nil
 }
 
 // GetCachePath returns the full path to the cache file.
@@ -107,6 +113,11 @@ func IsCacheValid(cache *UpgradeCheckCache) bool {
 // CheckAndUpdateCache checks for updates if cache is stale and updates the cache.
 // This function is designed to be called asynchronously.
 func CheckAndUpdateCache(currentVersion string) (*UpgradeCheckCache, error) {
+	// Skip update check for dev builds
+	if currentVersion == "dev" || currentVersion == "0.0.0" {
+		return nil, nil
+	}
+
 	cache, _ := LoadCache()
 
 	// If cache is valid and current version matches, return cached result

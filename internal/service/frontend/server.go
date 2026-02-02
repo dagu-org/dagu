@@ -190,6 +190,9 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		}
 	}
 
+	// Check for updates asynchronously (populates cache for next startup)
+	go func() { _, _ = upgrade.CheckAndUpdateCache(config.Version) }()
+
 	updateAvailable, latestVersion := getUpdateInfo()
 
 	srv := &Server{
