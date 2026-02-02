@@ -214,21 +214,18 @@ export function AgentChatModal(): ReactElement | null {
           <div className="flex items-center gap-1 flex-shrink-0">
             <Tooltip>
               <TooltipTrigger asChild>
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => updatePreference('safeMode', !preferences.safeMode)}
-                  className={cn(
-                    "flex items-center justify-center px-2 py-1 rounded border cursor-pointer transition-all select-none",
-                    preferences.safeMode
-                      ? "bg-muted border-border text-foreground hover:bg-muted/80"
-                      : "bg-background border-border/50 text-muted-foreground hover:border-border"
-                  )}
+                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
                 >
                   {preferences.safeMode ? (
-                    <Shield className="h-3 w-3" />
+                    <Shield className="h-4 w-4" />
                   ) : (
-                    <ShieldOff className="h-3 w-3" />
+                    <ShieldOff className="h-4 w-4" />
                   )}
-                </button>
+                </Button>
               </TooltipTrigger>
               <TooltipContent>
                 <p>
