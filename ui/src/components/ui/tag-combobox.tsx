@@ -24,19 +24,24 @@ function TagCombobox({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
-  // Filter suggestions based on input value
+  // Filter suggestions based on input value and sort alphabetically
   const filteredSuggestions = React.useMemo(() => {
     const selectedLower = new Set(selectedTags.map((t) => t.toLowerCase()));
     const available = availableTags.filter(
       (tag) => !selectedLower.has(tag.toLowerCase())
     );
 
+    const sortAlphabetically = (a: string, b: string) =>
+      a.toLowerCase().localeCompare(b.toLowerCase());
+
     if (!inputValue.trim()) {
-      return available;
+      return available.sort(sortAlphabetically);
     }
 
     const searchLower = inputValue.toLowerCase().trim();
-    return available.filter((tag) => tag.toLowerCase().includes(searchLower));
+    return available
+      .filter((tag) => tag.toLowerCase().includes(searchLower))
+      .sort(sortAlphabetically);
   }, [inputValue, availableTags, selectedTags]);
 
   // Reset highlighted index when suggestions change

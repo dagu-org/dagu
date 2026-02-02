@@ -163,7 +163,7 @@ function DAGCard({
       {/* Tags */}
       {tags.length > 0 && (
         <div className="flex flex-wrap gap-0.5 mb-1.5">
-          {tags.map((tag) => (
+          {[...tags].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())).map((tag) => (
             <Badge
               key={tag}
               variant="outline"
@@ -436,7 +436,7 @@ const defaultColumns = [
 
             {tags.length > 0 && (
               <div className="flex flex-wrap gap-0.5">
-                {tags.map((tag) => {
+                {[...tags].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())).map((tag) => {
                   const { key, value } = parseTagParts(tag);
                   return (
                     <Badge
