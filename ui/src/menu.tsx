@@ -132,7 +132,7 @@ function SidebarButton({ onClick, icon, label, isOpen, customColor }: SidebarBut
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-3 w-full p-2 rounded-md hover:bg-sidebar-hover group"
+      className="flex items-center gap-3 w-full p-2 rounded-md hover:bg-sidebar-hover group focus-visible:ring-1 focus-visible:ring-ring"
       style={{ transition: 'background-color 150ms ease' }}
       title={isOpen ? '' : label}
     >

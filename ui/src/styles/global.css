@@ -703,8 +703,8 @@
   display: none;
 }
 
-/* Remove default focus outline */
-*:focus {
+/* Remove default focus outline, but preserve focus-visible for accessibility */
+*:focus:not(:focus-visible) {
   outline: none;
 }
 

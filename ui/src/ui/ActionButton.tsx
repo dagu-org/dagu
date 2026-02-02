@@ -14,7 +14,7 @@ const ActionButton = forwardRef<HTMLButtonElement, ActionButtonProps>(
   ({ label, children, icon, className, disabled, onClick, ...props }, ref) => {
     // Common base styles for all action buttons
     const baseStyles =
-      'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded text-sm font-semibold transition-all disabled:pointer-events-none disabled:opacity-50 outline-none cursor-pointer';
+      'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded text-sm font-semibold transition-all disabled:pointer-events-none disabled:opacity-50 outline-none cursor-pointer focus-visible:ring-1 focus-visible:ring-ring';
 
     return label ? (
       // Labeled button (with text)

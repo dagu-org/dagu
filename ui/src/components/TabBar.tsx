@@ -33,6 +33,22 @@ export function TabBar({ className, onAddTab }: TabBarProps) {
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
       closeTab(tabId);
+    } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const currentIndex = tabs.findIndex((tab) => tab.id === tabId);
+      if (currentIndex === -1) return;
+
+      let nextIndex: number;
+      if (e.key === 'ArrowRight') {
+        nextIndex = currentIndex + 1 >= tabs.length ? 0 : currentIndex + 1;
+      } else {
+        nextIndex = currentIndex - 1 < 0 ? tabs.length - 1 : currentIndex - 1;
+      }
+
+      const nextTab = tabs[nextIndex];
+      if (nextTab) {
+        setActiveTab(nextTab.id);
+      }
     }
   };
 

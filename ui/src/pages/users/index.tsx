@@ -179,7 +179,7 @@ export default function UsersPage() {
         </div>
       )}
 
-      <div className="card-obsidian overflow-auto">
+      <div className="card-obsidian overflow-auto min-h-0">
         <Table className="text-xs">
           <TableHeader>
             <TableRow>
