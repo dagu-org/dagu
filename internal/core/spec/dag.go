@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -1690,6 +1691,10 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 		for _, st := range builtSteps {
 			steps = append(steps, *st)
 		}
+		// Transform router steps: inject preconditions into targets
+		if err := transformRouterSteps(steps); err != nil {
+			return nil, err
+		}
 		return steps, nil
 
 	case map[string]any:
@@ -1717,6 +1722,10 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 			}
 
 			steps = append(steps, *builtStep)
+		}
+		// Transform router steps: inject preconditions into targets
+		if err := transformRouterSteps(steps); err != nil {
+			return nil, err
 		}
 		return steps, nil
 
@@ -1761,5 +1770,55 @@ func validateNoDependsForChainType(dag *core.DAG, step *core.Step) error {
 		return core.NewValidationError("depends", step.Depends,
 			fmt.Errorf("step '%s': %w", step.Name, core.ErrDependsNotAllowedInChainType))
 	}
+	return nil
+}
+
+// transformRouterSteps processes router-type steps and injects preconditions
+// into their target steps. It modifies the steps slice in place.
+func transformRouterSteps(steps []core.Step) error {
+	// Build step index for lookup (using pointers to modify in place)
+	stepIndex := make(map[string]*core.Step)
+	for i := range steps {
+		stepIndex[steps[i].Name] = &steps[i]
+	}
+
+	for i := range steps {
+		if steps[i].Router == nil {
+			continue
+		}
+
+		router := steps[i].Router
+		routerName := steps[i].Name
+
+		// For each route, inject precondition into target steps
+		for _, route := range router.Routes {
+			for _, targetName := range route.Targets {
+				target, ok := stepIndex[targetName]
+				if !ok {
+					return core.NewValidationError("routes", targetName,
+						fmt.Errorf("router %q references non-existent step %q", routerName, targetName))
+				}
+
+				// Inject precondition: check if value matches pattern
+				condition := &core.Condition{
+					Condition: router.Value,
+					Expected:  route.Pattern,
+				}
+				target.Preconditions = append(target.Preconditions, condition)
+
+				// Add router as dependency if not already present
+				if !slices.Contains(target.Depends, routerName) {
+					target.Depends = append(target.Depends, routerName)
+				}
+
+				// Enable continueOn.skipped for proper flow
+				target.ContinueOn.Skipped = true
+			}
+		}
+
+		// Router itself allows downstream to continue
+		steps[i].ContinueOn.Skipped = true
+	}
+
 	return nil
 }

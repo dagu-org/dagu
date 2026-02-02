@@ -100,6 +100,9 @@ type Step struct {
 	// Messages contains the conversation messages for chat executor.
 	// Only used when type is "chat".
 	Messages []LLMMessage `json:"messages,omitempty"`
+	// Router contains the routing configuration for router-type steps.
+	// Only used when type is "router".
+	Router *RouterConfig `json:"router,omitempty"`
 }
 
 // String returns a formatted string representation of the step
@@ -328,4 +331,19 @@ const (
 
 	// ExecutorTypeHITL is the executor type for HITL (Human In The Loop) steps.
 	ExecutorTypeHITL = "hitl"
+
+	// ExecutorTypeRouter is the executor type for router steps.
+	ExecutorTypeRouter = "router"
 )
+
+// RouterConfig contains routing configuration for router-type steps.
+type RouterConfig struct {
+	Value  string       `json:"value"`  // Value expression to evaluate (e.g., "${STATUS}")
+	Routes []RouteEntry `json:"routes"` // Ordered list of pattern → targets
+}
+
+// RouteEntry represents a single routing rule.
+type RouteEntry struct {
+	Pattern string   `json:"pattern"` // Match pattern (exact or "re:regex")
+	Targets []string `json:"targets"` // Step names to route to when pattern matches
+}
