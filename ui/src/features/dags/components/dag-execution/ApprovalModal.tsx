@@ -122,7 +122,7 @@ export function ApprovalModal({ visible, dismissModal, step, onApprove }: Props)
                         }))
                       }
                       onKeyDown={handleKeyDown}
-                      className="w-full px-3 py-1 text-sm border border-border rounded bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      className="w-full px-3 py-1 text-sm border border-border rounded bg-background focus:outline-none focus:border-ring"
                       placeholder={`Enter ${field}`}
                     />
                   </div>

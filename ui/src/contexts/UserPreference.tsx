@@ -29,7 +29,7 @@ export function UserPreferencesProvider({
         pageLimit: 50,
         dagRunsViewMode: 'list', // Default to list view
         logWrap: true, // Default to wrapped text
-        theme: 'dark', // Default to dark theme
+        theme: 'light', // Default to light theme (GCP-inspired)
       };
       return saved ? { ...defaultPrefs, ...JSON.parse(saved) } : defaultPrefs;
     } catch {
@@ -38,7 +38,7 @@ export function UserPreferencesProvider({
         pageLimit: 50,
         dagRunsViewMode: 'list' as DAGRunsViewMode,
         logWrap: true,
-        theme: 'dark',
+        theme: 'light',
       };
     }
   });

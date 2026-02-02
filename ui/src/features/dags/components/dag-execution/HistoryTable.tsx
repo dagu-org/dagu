@@ -67,9 +67,9 @@ function HistoryTable({ dagRuns, gridData, onSelect, idx }: Props) {
                 <TableHead
                   key={`date-${i}`}
                   className={cn(
-                    'max-w-[22px] min-w-[22px] text-left p-2 cursor-pointer text-xs font-medium',
-                    'hover:bg-muted transition-colors duration-200',
-                    i === idx && 'bg-muted'
+                    'max-w-[22px] min-w-[22px] text-left p-2 cursor-pointer',
+                    'hover:bg-muted/50 transition-colors duration-200',
+                    i === idx && 'bg-muted/50'
                   )}
                   onClick={() => {
                     onSelect(i);

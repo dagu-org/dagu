@@ -151,7 +151,7 @@ function TagCombobox({
       <div
         className={cn(
           'flex flex-wrap items-center gap-1 min-h-[36px] px-2 py-1 rounded-md border border-border bg-input cursor-text',
-          'focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]'
+          'focus-within:border-ring'
         )}
         onClick={() => inputRef.current?.focus()}
       >

@@ -6,7 +6,7 @@ import {
   PathsDagsGetParametersQuerySort,
 } from '../../api/v2/schema';
 import SplitLayout from '../../components/SplitLayout';
-import TabBar from '../../components/TabBar';
+import { TabBar } from '../../components/TabBar';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
 import { TabProvider, useTabContext } from '../../contexts/TabContext';
@@ -322,7 +322,7 @@ function DAGsContent() {
   const displayData = data ?? lastValidData;
 
   const leftPanel = (
-    <div className="pr-2 pt-4 md:pt-6 lg:pt-8">
+    <div className="pl-4 md:pl-6 pr-2 pt-4 md:pt-6 pb-6">
       <DAGListHeader onRefresh={refreshFn} />
       {displayData ? (
         <>
@@ -395,7 +395,7 @@ function DAGsContent() {
     ) : null;
 
   return (
-    <div className="-my-4 -mr-4 md:-my-6 md:-mr-6 lg:-my-8 lg:-mr-8 h-[calc(100%+2rem)] md:h-[calc(100%+3rem)] lg:h-[calc(100%+4rem)]">
+    <div className="-m-4 md:-m-6 w-[calc(100%+2rem)] md:w-[calc(100%+3rem)] h-[calc(100%+2rem)] md:h-[calc(100%+3rem)]">
       <SplitLayout
         leftPanel={leftPanel}
         rightPanel={rightPanel}

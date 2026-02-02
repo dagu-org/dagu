@@ -196,14 +196,7 @@ export function AgentChatModal(): ReactElement | null {
                   value={conv.conversation.id}
                   className="text-xs"
                 >
-                  <div className="flex items-center gap-1.5">
-                    <span className="truncate">
-                      {formatDate(conv.conversation.created_at)}
-                    </span>
-                    {conv.working && (
-                      <span className="text-yellow-500 text-[10px]">...</span>
-                    )}
-                  </div>
+                  {formatDate(conv.conversation.created_at)}
                 </SelectItem>
               ))}
             </SelectContent>

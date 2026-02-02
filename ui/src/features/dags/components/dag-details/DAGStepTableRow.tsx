@@ -46,7 +46,7 @@ function DAGStepTableRow({ step, index }: Props) {
   ));
 
   return (
-    <TableRow className="hover:bg-muted transition-colors duration-200 h-auto">
+    <TableRow className="hover:bg-muted/50 transition-colors duration-200 h-auto">
       {/* Number */}
       <TableCell className="text-center font-semibold text-foreground/90 text-xs py-2">
         {index + 1}

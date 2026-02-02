@@ -249,7 +249,7 @@ function Dashboard(): React.ReactElement | null {
   const hasRunning = metrics[Status.Running] > 0;
 
   return (
-    <div className="flex flex-col w-full h-full overflow-hidden">
+    <div className="flex flex-col max-w-7xl h-full overflow-hidden">
       <Title>Dashboard</Title>
 
       {/* Main Content Area */}

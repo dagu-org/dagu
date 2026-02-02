@@ -6,9 +6,10 @@ interface TabsProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
 }
 
+// GCP-Style Tabs Container
 function Tabs({ className, children, ...props }: Omit<TabsProps, 'value'>) {
   return (
-    <div className={cn('inline-flex items-center gap-1', className)} {...props}>
+    <div className={cn('inline-flex items-center border-b border-border', className)} {...props}>
       {children}
     </div>
   );
@@ -20,6 +21,7 @@ interface TabProps extends React.HTMLAttributes<HTMLElement> {
   asChild?: boolean;
 }
 
+// GCP-Style Tab - Clean with Bottom Border Indicator
 function Tab({
   className,
   isActive,
@@ -28,12 +30,13 @@ function Tab({
   ...props
 }: Omit<TabProps, 'value'>) {
   const classes = cn(
-    'inline-flex items-center justify-center whitespace-nowrap px-3 py-1.5 text-sm font-semibold',
-    'transition-colors duration-200 ease-in-out focus-visible:outline-none',
+    'inline-flex items-center justify-center whitespace-nowrap h-12 px-4 text-sm font-medium relative',
+    'transition-all duration-150 ease-in-out focus-visible:outline-none',
     'disabled:pointer-events-none disabled:opacity-50',
+    'border-b-2',
     isActive
-      ? 'text-primary border-b-2 border-primary [&_svg]:text-primary'
-      : 'text-muted-foreground hover:text-foreground border-b-2 border-transparent',
+      ? 'text-foreground border-primary [&_svg]:text-primary'
+      : 'text-text-secondary hover:text-foreground hover:bg-muted border-transparent',
     className
   );
 

@@ -623,7 +623,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
           top: 50%;
           white-space: nowrap;
           font-size: 10px !important;
-          font-weight: 600;
+          font-weight: 400;
           color: var(--foreground) !important;
         }
         .vis-item {

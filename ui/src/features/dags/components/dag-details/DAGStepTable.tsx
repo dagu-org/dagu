@@ -35,24 +35,24 @@ function DAGStepTable({ steps }: Props) {
   return (
     <div className="w-full overflow-x-auto">
       <Table>
-        <TableHeader className="bg-muted">
+        <TableHeader>
           <TableRow className="h-8">
-            <TableHead className="w-[4%] py-1.5 text-xs font-semibold text-foreground/90 text-center">
+            <TableHead className="w-[4%] text-center">
               No
             </TableHead>
-            <TableHead className="w-[20%] py-1.5 text-xs font-semibold text-foreground/90">
+            <TableHead className="w-[20%]">
               Step Details
             </TableHead>
-            <TableHead className="w-[22%] py-1.5 text-xs font-semibold text-foreground/90">
+            <TableHead className="w-[22%]">
               Execution
             </TableHead>
-            <TableHead className="w-[18%] py-1.5 text-xs font-semibold text-foreground/90">
+            <TableHead className="w-[18%]">
               Dependencies
             </TableHead>
-            <TableHead className="w-[18%] py-1.5 text-xs font-semibold text-foreground/90">
+            <TableHead className="w-[18%]">
               Configuration
             </TableHead>
-            <TableHead className="w-[18%] py-1.5 text-xs font-semibold text-foreground/90">
+            <TableHead className="w-[18%]">
               Conditions
             </TableHead>
           </TableRow>

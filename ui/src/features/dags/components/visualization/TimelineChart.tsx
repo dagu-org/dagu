@@ -79,32 +79,44 @@ function calculateDuration(startMs: number, endMs: number): string {
 }
 
 /**
- * Status colors matching the Graph component (sepia theme)
+ * Unified status colors matching Graph.tsx and global.css
  */
 const statusColors: Record<NodeStatus, { bg: string; border: string }> = {
   [NodeStatus.NotStarted]: {
-    bg: 'var(--muted)',
-    border: 'var(--muted-foreground)',
+    bg: 'var(--status-neutral)',
+    border: 'var(--status-neutral)',
   },
-  [NodeStatus.Running]: { bg: 'var(--success)', border: 'var(--success)' },
+  [NodeStatus.Running]: {
+    bg: 'var(--status-running)',
+    border: 'var(--status-running)',
+  },
   [NodeStatus.Failed]: {
-    bg: 'var(--destructive)',
-    border: 'var(--destructive)',
+    bg: 'var(--status-error)',
+    border: 'var(--status-error)',
   },
-  [NodeStatus.Aborted]: { bg: 'var(--warning)', border: 'var(--warning)' },
-  [NodeStatus.Success]: { bg: 'var(--success)', border: 'var(--success)' },
+  [NodeStatus.Aborted]: {
+    bg: 'var(--status-aborted)',
+    border: 'var(--status-aborted)',
+  },
+  [NodeStatus.Success]: {
+    bg: 'var(--status-success)',
+    border: 'var(--status-success)',
+  },
   [NodeStatus.Skipped]: {
-    bg: 'var(--muted)',
-    border: 'var(--muted-foreground)',
+    bg: 'var(--status-neutral)',
+    border: 'var(--status-neutral)',
   },
   [NodeStatus.PartialSuccess]: {
-    bg: 'var(--warning)',
-    border: 'var(--warning)',
+    bg: 'var(--status-warning)',
+    border: 'var(--status-warning)',
   },
-  [NodeStatus.Waiting]: { bg: 'var(--warning)', border: 'var(--warning)' },
+  [NodeStatus.Waiting]: {
+    bg: 'var(--status-warning)',
+    border: 'var(--status-warning)',
+  },
   [NodeStatus.Rejected]: {
-    bg: 'var(--destructive)',
-    border: 'var(--destructive)',
+    bg: 'var(--status-error)',
+    border: 'var(--status-error)',
   },
 };
 

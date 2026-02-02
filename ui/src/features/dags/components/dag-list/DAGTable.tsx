@@ -341,7 +341,7 @@ const defaultColumns = [
             table.toggleAllRowsExpanded();
           }
         }}
-        className="flex items-center justify-center text-muted-foreground cursor-pointer h-6 w-6 focus:outline-none focus:ring-1 focus:ring-primary rounded"
+        className="flex items-center justify-center text-muted-foreground cursor-pointer h-6 w-6 focus:outline-none rounded"
       >
         {table.getIsAllRowsExpanded() ? (
           <>
@@ -360,7 +360,7 @@ const defaultColumns = [
       if (row.getCanExpand()) {
         return (
           <div
-            className="flex items-center justify-center min-h-[2.5rem] text-muted-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary rounded"
+            className="flex items-center justify-center min-h-[2.5rem] text-muted-foreground cursor-pointer focus:outline-none rounded"
             role="button"
             tabIndex={0}
             onClick={(e) => {
@@ -442,7 +442,7 @@ const defaultColumns = [
                     <Badge
                       key={tag}
                       variant="outline"
-                      className="text-xs px-1 py-0 h-3.5 rounded-sm border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary transition-colors duration-200 cursor-pointer font-normal whitespace-normal break-words focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                      className="text-xs px-1 py-0 h-3.5 rounded-sm border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary transition-colors duration-200 cursor-pointer font-normal whitespace-normal break-words focus-visible:outline-none"
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => {
