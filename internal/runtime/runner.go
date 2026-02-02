@@ -797,6 +797,42 @@ func (r *Runner) isCanceled() bool {
 }
 
 func isReady(ctx context.Context, plan *Plan, node *Node) bool {
+	// Check router activation: if any dependency is a router step, verify this node was activated
+	for _, depID := range plan.Dependencies(node.id) {
+		dep := plan.GetNode(depID)
+
+		// Check if this dependency is a router step
+		depStep := dep.Step()
+		if (&depStep).IsRouter() {
+			depStatus := dep.State().Status
+
+			// Only check activation if the router has completed successfully
+			if depStatus == core.NodeSucceeded || depStatus == core.NodePartiallySucceeded {
+				routerResult := dep.Data.GetRouterResult()
+				if routerResult != nil {
+					// Check if this node is in the activated steps list
+					activated := false
+					for _, activatedStep := range routerResult.ActivatedSteps {
+						if activatedStep == node.Name() {
+							activated = true
+							break
+						}
+					}
+
+					// If not activated by this router, skip the node
+					if !activated {
+						logger.Debug(ctx, "Node not activated by router",
+							tag.Step(node.Name()),
+							tag.Dependency(dep.Name()))
+						node.SetStatus(core.NodeSkippedByRouter)
+						return false
+					}
+				}
+			}
+		}
+	}
+
+	// Check regular dependency statuses
 	for _, depID := range plan.Dependencies(node.id) {
 		dep := plan.GetNode(depID)
 		status := dep.State().Status
