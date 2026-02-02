@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -75,6 +74,15 @@ var historyFlags = []commandLineFlag{
 }
 
 func runHistory(ctx *Context, args []string) error {
+	// Validate format early
+	format, err := ctx.StringParam("format")
+	if err != nil {
+		return fmt.Errorf("failed to get format parameter: %w", err)
+	}
+	if format != "" && format != "table" && format != "json" {
+		return fmt.Errorf("invalid format '%s'. Valid formats: table, json", format)
+	}
+
 	// Parse and validate flags
 	opts, err := buildHistoryOptions(ctx, args)
 	if err != nil {
@@ -93,20 +101,12 @@ func runHistory(ctx *Context, args []string) error {
 		return nil
 	}
 
-	// Get output format
-	format, err := ctx.StringParam("format")
-	if err != nil {
-		return fmt.Errorf("failed to get format parameter: %w", err)
-	}
-
 	// Render output based on format
 	switch format {
 	case "json":
 		return renderHistoryJSON(statuses)
-	case "table":
+	default: // "table" or ""
 		return renderHistoryTable(statuses)
-	default:
-		return fmt.Errorf("invalid format '%s'. Valid formats: table, json", format)
 	}
 }
 
@@ -114,7 +114,7 @@ func runHistory(ctx *Context, args []string) error {
 func buildHistoryOptions(ctx *Context, args []string) ([]exec.ListDAGRunStatusesOption, error) {
 	var opts []exec.ListDAGRunStatusesOption
 
-	// DAG name from positional argument
+	// DAG name filter
 	if len(args) > 0 {
 		dagName, err := extractDAGName(ctx, args[0])
 		if err != nil {
@@ -123,21 +123,51 @@ func buildHistoryOptions(ctx *Context, args []string) ([]exec.ListDAGRunStatuses
 		opts = append(opts, exec.WithExactName(dagName))
 	}
 
-	// Date range: --last takes precedence over --from/--to
-	lastDuration, err := ctx.StringParam("last")
+	// Date range filters
+	dateOpts, err := buildDateRangeOptions(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get 'last' parameter: %w", err)
+		return nil, err
+	}
+	opts = append(opts, dateOpts...)
+
+	// Status filter
+	if statusOpt, err := buildStatusOption(ctx); err != nil {
+		return nil, err
+	} else if statusOpt != nil {
+		opts = append(opts, statusOpt)
 	}
 
-	fromDate, err := ctx.StringParam("from")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get 'from' parameter: %w", err)
+	// Run ID filter
+	if runIDOpt, err := buildRunIDOption(ctx); err != nil {
+		return nil, err
+	} else if runIDOpt != nil {
+		opts = append(opts, runIDOpt)
 	}
 
-	toDate, err := ctx.StringParam("to")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get 'to' parameter: %w", err)
+	// Tags filter
+	if tagsOpt, err := buildTagsOption(ctx); err != nil {
+		return nil, err
+	} else if tagsOpt != nil {
+		opts = append(opts, tagsOpt)
 	}
+
+	// Limit filter
+	if limitOpt, err := buildLimitOption(ctx); err != nil {
+		return nil, err
+	} else if limitOpt != nil {
+		opts = append(opts, limitOpt)
+	}
+
+	return opts, nil
+}
+
+// buildDateRangeOptions constructs date range filtering options.
+func buildDateRangeOptions(ctx *Context) ([]exec.ListDAGRunStatusesOption, error) {
+	var opts []exec.ListDAGRunStatusesOption
+
+	lastDuration, _ := ctx.StringParam("last")
+	fromDate, _ := ctx.StringParam("from")
+	toDate, _ := ctx.StringParam("to")
 
 	// Validate conflicting flags
 	if lastDuration != "" && (fromDate != "" || toDate != "") {
@@ -145,151 +175,165 @@ func buildHistoryOptions(ctx *Context, args []string) ([]exec.ListDAGRunStatuses
 	}
 
 	if lastDuration != "" {
-		// Parse relative duration
+		// Handle relative duration
 		duration, err := parseRelativeDuration(lastDuration)
 		if err != nil {
 			return nil, fmt.Errorf("invalid --last value '%s': %w. Valid formats: 7d, 24h, 1w, 30d", lastDuration, err)
 		}
 		fromTime := time.Now().UTC().Add(-duration)
 		opts = append(opts, exec.WithFrom(exec.NewUTC(fromTime)))
-	} else {
-		// Parse absolute dates
-		if fromDate != "" {
-			fromTime, err := parseAbsoluteDateTime(fromDate)
-			if err != nil {
-				return nil, fmt.Errorf("invalid --from date '%s': %w. Expected format: 2006-01-02 or 2006-01-02T15:04:05Z", fromDate, err)
-			}
-			opts = append(opts, exec.WithFrom(exec.NewUTC(fromTime)))
-		} else if toDate == "" {
-			// Default: last 30 days if no date filters specified
-			defaultFrom := time.Now().UTC().AddDate(0, 0, -30)
-			opts = append(opts, exec.WithFrom(exec.NewUTC(defaultFrom)))
-		}
-
-		if toDate != "" {
-			toTime, err := parseAbsoluteDateTime(toDate)
-			if err != nil {
-				return nil, fmt.Errorf("invalid --to date '%s': %w. Expected format: 2006-01-02 or 2006-01-02T15:04:05Z", toDate, err)
-			}
-			opts = append(opts, exec.WithTo(exec.NewUTC(toTime)))
-		}
-
-		// Validate from < to
-		if fromDate != "" && toDate != "" {
-			fromTime, _ := parseAbsoluteDateTime(fromDate)
-			toTime, _ := parseAbsoluteDateTime(toDate)
-			if fromTime.After(toTime) {
-				return nil, fmt.Errorf("--from date (%s) must be before --to date (%s)", fromDate, toDate)
-			}
-		}
+		return opts, nil
 	}
 
-	// Status filter
-	statusStr, err := ctx.StringParam("status")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get 'status' parameter: %w", err)
-	}
-	if statusStr != "" {
-		status, err := parseStatus(statusStr)
+	// Handle absolute dates
+	var fromTime, toTime time.Time
+	var err error
+
+	if fromDate != "" {
+		fromTime, err = parseAbsoluteDateTime(fromDate)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("invalid --from date '%s': %w. Expected format: 2006-01-02 or 2006-01-02T15:04:05Z", fromDate, err)
 		}
-		opts = append(opts, exec.WithStatuses([]core.Status{status}))
+		opts = append(opts, exec.WithFrom(exec.NewUTC(fromTime)))
+	} else if toDate == "" {
+		// Default: last 30 days if no date filters specified
+		defaultFrom := time.Now().UTC().AddDate(0, 0, -30)
+		opts = append(opts, exec.WithFrom(exec.NewUTC(defaultFrom)))
 	}
 
-	// Run ID filter
-	runID, err := ctx.StringParam("run-id")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get 'run-id' parameter: %w", err)
-	}
-	if runID != "" {
-		opts = append(opts, exec.WithDAGRunID(runID))
-	}
+	if toDate != "" {
+		toTime, err = parseAbsoluteDateTime(toDate)
+		if err != nil {
+			return nil, fmt.Errorf("invalid --to date '%s': %w. Expected format: 2006-01-02 or 2006-01-02T15:04:05Z", toDate, err)
+		}
+		opts = append(opts, exec.WithTo(exec.NewUTC(toTime)))
 
-	// Tags filter
-	tagsStr, err := ctx.StringParam("tags")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get 'tags' parameter: %w", err)
-	}
-	if tagsStr != "" {
-		tags := parseTags(tagsStr)
-		if len(tags) > 0 {
-			opts = append(opts, exec.WithTags(tags))
+		// Validate date range if both dates are provided
+		if fromDate != "" && fromTime.After(toTime) {
+			return nil, fmt.Errorf("--from date (%s) must be before --to date (%s)", fromDate, toDate)
 		}
-	}
-
-	// Limit (default: 100, max: 1000)
-	limitStr, err := ctx.StringParam("limit")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get 'limit' parameter: %w", err)
-	}
-	limit := 100 // default
-	if limitStr != "" {
-		parsedLimit, err := strconv.Atoi(limitStr)
-		if err != nil || parsedLimit < 1 {
-			return nil, fmt.Errorf("invalid --limit value '%s': must be a positive integer", limitStr)
-		}
-		if parsedLimit > 1000 {
-			fmt.Fprintf(os.Stderr, "Warning: limit capped at 1000 (requested: %d)\n", parsedLimit)
-			limit = 1000
-		} else {
-			limit = parsedLimit
-		}
-	}
-	// Note: The store enforces a max of 1000, but we set it explicitly here
-	if limit > 0 {
-		opts = append(opts, exec.WithLimit(limit))
 	}
 
 	return opts, nil
 }
 
+// buildStatusOption constructs status filtering option.
+func buildStatusOption(ctx *Context) (exec.ListDAGRunStatusesOption, error) {
+	statusStr, err := ctx.StringParam("status")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get 'status' parameter: %w", err)
+	}
+	if statusStr == "" {
+		return nil, nil
+	}
+
+	status, err := parseStatus(statusStr)
+	if err != nil {
+		return nil, err
+	}
+	return exec.WithStatuses([]core.Status{status}), nil
+}
+
+// buildRunIDOption constructs run ID filtering option.
+func buildRunIDOption(ctx *Context) (exec.ListDAGRunStatusesOption, error) {
+	runID, err := ctx.StringParam("run-id")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get 'run-id' parameter: %w", err)
+	}
+	if runID == "" {
+		return nil, nil
+	}
+	return exec.WithDAGRunID(runID), nil
+}
+
+// buildTagsOption constructs tags filtering option.
+func buildTagsOption(ctx *Context) (exec.ListDAGRunStatusesOption, error) {
+	tagsStr, err := ctx.StringParam("tags")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get 'tags' parameter: %w", err)
+	}
+	if tagsStr == "" {
+		return nil, nil
+	}
+
+	tags := parseTags(tagsStr)
+	if len(tags) == 0 {
+		return nil, nil
+	}
+	return exec.WithTags(tags), nil
+}
+
+// buildLimitOption constructs limit option with validation.
+func buildLimitOption(ctx *Context) (exec.ListDAGRunStatusesOption, error) {
+	const (
+		defaultLimit = 100
+		maxLimit     = 1000
+	)
+
+	limitStr, err := ctx.StringParam("limit")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get 'limit' parameter: %w", err)
+	}
+
+	limit := defaultLimit
+	if limitStr != "" {
+		parsedLimit, err := strconv.Atoi(limitStr)
+		if err != nil || parsedLimit < 1 {
+			return nil, fmt.Errorf("invalid --limit value '%s': must be a positive integer", limitStr)
+		}
+		if parsedLimit > maxLimit {
+			fmt.Fprintf(os.Stderr, "Warning: limit capped at %d (requested: %d)\n", maxLimit, parsedLimit)
+			limit = maxLimit
+		} else {
+			limit = parsedLimit
+		}
+	}
+
+	return exec.WithLimit(limit), nil
+}
+
 // parseRelativeDuration parses relative time duration strings like "7d", "24h", "1w".
 func parseRelativeDuration(s string) (time.Duration, error) {
-	// Match pattern: number followed by unit (d=days, h=hours, w=weeks)
-	re := regexp.MustCompile(`^(\d+)([dhw])$`)
-	matches := re.FindStringSubmatch(s)
-	if matches == nil {
+	if len(s) < 2 {
 		return 0, fmt.Errorf("invalid format (expected: 7d, 24h, 1w)")
 	}
 
-	value, err := strconv.Atoi(matches[1])
-	if err != nil {
-		return 0, fmt.Errorf("invalid number: %w", err)
+	// Extract number and unit parts
+	numStr := s[:len(s)-1]
+	unit := s[len(s)-1]
+
+	value, err := strconv.Atoi(numStr)
+	if err != nil || value < 0 {
+		return 0, fmt.Errorf("invalid format (expected: 7d, 24h, 1w)")
 	}
 
-	unit := matches[2]
 	switch unit {
-	case "h":
+	case 'h':
 		return time.Duration(value) * time.Hour, nil
-	case "d":
+	case 'd':
 		return time.Duration(value) * 24 * time.Hour, nil
-	case "w":
+	case 'w':
 		return time.Duration(value) * 7 * 24 * time.Hour, nil
 	default:
-		return 0, fmt.Errorf("invalid unit '%s' (valid: h, d, w)", unit)
+		return 0, fmt.Errorf("invalid format (expected: 7d, 24h, 1w)")
 	}
 }
 
 // parseAbsoluteDateTime parses absolute date/time strings in UTC.
 // Supported formats: "2006-01-02" (midnight UTC) and "2006-01-02T15:04:05Z" (RFC3339).
 func parseAbsoluteDateTime(s string) (time.Time, error) {
-	// Try RFC3339 format first
-	t, err := time.Parse(time.RFC3339, s)
-	if err == nil {
-		return t.UTC(), nil
+	// Define supported formats in order of preference
+	formats := []string{
+		time.RFC3339,
+		"2006-01-02T15:04:05",
+		"2006-01-02",
 	}
 
-	// Try date-only format (treat as midnight UTC)
-	t, err = time.Parse("2006-01-02", s)
-	if err == nil {
-		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC), nil
-	}
-
-	// Try datetime format without timezone (treat as UTC)
-	t, err = time.Parse("2006-01-02T15:04:05", s)
-	if err == nil {
-		return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), 0, time.UTC), nil
+	for _, format := range formats {
+		if t, err := time.Parse(format, s); err == nil {
+			// Ensure UTC timezone for consistency
+			return t.In(time.UTC), nil
+		}
 	}
 
 	return time.Time{}, fmt.Errorf("unsupported date format")
@@ -297,22 +341,21 @@ func parseAbsoluteDateTime(s string) (time.Time, error) {
 
 // parseStatus converts status string to core.Status with validation.
 func parseStatus(s string) (core.Status, error) {
-	// Normalize input (lowercase, trim)
 	s = strings.ToLower(strings.TrimSpace(s))
 
-	// Map of valid status strings to core.Status
-	validStatuses := map[string]core.Status{
+	// Status mappings with canonical names and common aliases
+	statusMap := map[string]core.Status{
 		"not_started":         core.NotStarted,
 		"notstarted":          core.NotStarted,
 		"running":             core.Running,
 		"succeeded":           core.Succeeded,
-		"success":             core.Succeeded, // Alias
+		"success":             core.Succeeded,
 		"failed":              core.Failed,
-		"failure":             core.Failed, // Alias
+		"failure":             core.Failed,
 		"aborted":             core.Aborted,
-		"canceled":            core.Aborted, // Alias
-		"cancelled":           core.Aborted, // Alias
-		"cancel":              core.Aborted, // Alias
+		"canceled":            core.Aborted,
+		"cancelled":           core.Aborted,
+		"cancel":              core.Aborted,
 		"queued":              core.Queued,
 		"partially_succeeded": core.PartiallySucceeded,
 		"partiallysucceeded":  core.PartiallySucceeded,
@@ -320,12 +363,11 @@ func parseStatus(s string) (core.Status, error) {
 		"rejected":            core.Rejected,
 	}
 
-	status, ok := validStatuses[s]
-	if !ok {
-		return core.NotStarted, fmt.Errorf("invalid status '%s'. Valid values: running, succeeded, failed, aborted, queued, waiting, rejected, not_started, partially_succeeded", s)
+	if status, ok := statusMap[s]; ok {
+		return status, nil
 	}
 
-	return status, nil
+	return core.NotStarted, fmt.Errorf("invalid status '%s'. Valid values: running, succeeded, failed, aborted, queued, waiting, rejected, not_started, partially_succeeded", s)
 }
 
 // parseTags splits comma-separated tags and trims whitespace.
@@ -385,7 +427,6 @@ func renderHistoryTable(statuses []*exec.DAGRunStatus) error {
 
 // renderHistoryJSON displays DAG run history as JSON.
 func renderHistoryJSON(statuses []*exec.DAGRunStatus) error {
-	// Convert to a more user-friendly JSON structure
 	type historyEntry struct {
 		Name       string   `json:"name"`
 		DAGRunID   string   `json:"dagRunId"`
@@ -402,34 +443,23 @@ func renderHistoryJSON(statuses []*exec.DAGRunStatus) error {
 	entries := make([]historyEntry, 0, len(statuses))
 	for _, status := range statuses {
 		entry := historyEntry{
-			Name:      status.Name,
-			DAGRunID:  status.DAGRunID,
-			Status:    status.Status.String(),
-			StartedAt: status.StartedAt,
-			Params:    status.Params,
-			Tags:      status.Tags,
-			WorkerID:  status.WorkerID,
-			Error:     status.Error,
+			Name:       status.Name,
+			DAGRunID:   status.DAGRunID,
+			Status:     status.Status.String(),
+			StartedAt:  status.StartedAt,
+			FinishedAt: status.FinishedAt,
+			Duration:   formatDuration(status),
+			Params:     status.Params,
+			Tags:       status.Tags,
+			WorkerID:   status.WorkerID,
+			Error:      status.Error,
 		}
-
-		// Add finished time if available
-		if status.FinishedAt != "" {
-			entry.FinishedAt = status.FinishedAt
-		}
-
-		// Calculate duration
-		entry.Duration = formatDuration(status)
-
 		entries = append(entries, entry)
 	}
 
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(entries); err != nil {
-		return fmt.Errorf("failed to encode JSON: %w", err)
-	}
-
-	return nil
+	return encoder.Encode(entries)
 }
 
 // formatStatusText converts core.Status to human-readable text.
@@ -465,18 +495,12 @@ func formatTimestamp(ts string) string {
 		return "-"
 	}
 
-	// Parse the timestamp (expecting RFC3339 or "2006-01-02 15:04:05")
-	t, err := time.Parse(time.RFC3339, ts)
-	if err != nil {
-		// Try alternative format
-		t, err = time.Parse("2006-01-02 15:04:05", ts)
-		if err != nil {
-			return ts // Return as-is if unparseable
-		}
+	t := parseTimeString(ts)
+	if t.IsZero() {
+		return ts // Return as-is if unparseable
 	}
 
-	// Format in UTC with standard display format
-	return t.UTC().Format("2006-01-02 15:04:05")
+	return t.Format("2006-01-02 15:04:05")
 }
 
 // formatDuration calculates and formats the duration of a DAG run.
@@ -486,31 +510,34 @@ func formatDuration(status *exec.DAGRunStatus) string {
 		return "-"
 	}
 
-	startTime, err := time.Parse(time.RFC3339, status.StartedAt)
-	if err != nil {
-		// Try alternative format
-		startTime, err = time.Parse("2006-01-02 15:04:05", status.StartedAt)
-		if err != nil {
-			return "-"
-		}
+	startTime := parseTimeString(status.StartedAt)
+	if startTime.IsZero() {
+		return "-"
 	}
 
-	var endTime time.Time
+	endTime := time.Now().UTC()
 	if status.FinishedAt != "" {
-		endTime, err = time.Parse(time.RFC3339, status.FinishedAt)
-		if err != nil {
-			endTime, err = time.Parse("2006-01-02 15:04:05", status.FinishedAt)
-			if err != nil {
-				endTime = time.Now().UTC()
-			}
+		if parsed := parseTimeString(status.FinishedAt); !parsed.IsZero() {
+			endTime = parsed
 		}
-	} else {
-		// For running DAGs, use current time
-		endTime = time.Now().UTC()
 	}
 
-	duration := endTime.Sub(startTime)
-	return formatDurationHuman(duration)
+	return formatDurationHuman(endTime.Sub(startTime))
+}
+
+// parseTimeString attempts to parse a time string in common formats.
+func parseTimeString(ts string) time.Time {
+	formats := []string{
+		time.RFC3339,
+		"2006-01-02 15:04:05",
+	}
+
+	for _, format := range formats {
+		if t, err := time.Parse(format, ts); err == nil {
+			return t.UTC()
+		}
+	}
+	return time.Time{}
 }
 
 // formatDurationHuman formats a duration in a human-readable way.
@@ -520,40 +547,39 @@ func formatDurationHuman(d time.Duration) string {
 		return "-"
 	}
 
-	// Handle sub-second durations
 	if d < time.Second {
 		return "< 1s"
 	}
 
-	// Calculate components
+	// Calculate time components
 	days := int(d.Hours()) / 24
 	hours := int(d.Hours()) % 24
 	minutes := int(d.Minutes()) % 60
 	seconds := int(d.Seconds()) % 60
 
-	// Format based on magnitude
+	// Build duration string with two most significant components
+	var parts []string
+
 	if days > 0 {
+		parts = append(parts, fmt.Sprintf("%dd", days))
 		if hours > 0 {
-			return fmt.Sprintf("%dd%dh", days, hours)
+			parts = append(parts, fmt.Sprintf("%dh", hours))
 		}
-		return fmt.Sprintf("%dd", days)
-	}
-
-	if hours > 0 {
+	} else if hours > 0 {
+		parts = append(parts, fmt.Sprintf("%dh", hours))
 		if minutes > 0 {
-			return fmt.Sprintf("%dh%dm", hours, minutes)
+			parts = append(parts, fmt.Sprintf("%dm", minutes))
 		}
-		return fmt.Sprintf("%dh", hours)
-	}
-
-	if minutes > 0 {
+	} else if minutes > 0 {
+		parts = append(parts, fmt.Sprintf("%dm", minutes))
 		if seconds > 0 {
-			return fmt.Sprintf("%dm%ds", minutes, seconds)
+			parts = append(parts, fmt.Sprintf("%ds", seconds))
 		}
-		return fmt.Sprintf("%dm", minutes)
+	} else {
+		parts = append(parts, fmt.Sprintf("%ds", seconds))
 	}
 
-	return fmt.Sprintf("%ds", seconds)
+	return strings.Join(parts, "")
 }
 
 // formatParams formats parameters for table display.

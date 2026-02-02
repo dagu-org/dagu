@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
@@ -108,24 +107,6 @@ func displayTreeStatus(dag *core.DAG, dagStatus *exec.DAGRunStatus) {
 
 	renderer := output.NewRenderer(config)
 	fmt.Print(renderer.RenderDAGStatus(dag, dagStatus))
-}
-
-func extractDAGName(ctx *Context, name string) (string, error) {
-	if !strings.HasSuffix(name, ".yaml") && !strings.HasSuffix(name, ".yml") {
-		return name, nil
-	}
-
-	dagStore, err := ctx.dagStore(dagStoreConfig{})
-	if err != nil {
-		return "", fmt.Errorf("failed to initialize DAG store: %w", err)
-	}
-
-	dag, err := dagStore.GetMetadata(ctx, name)
-	if err != nil {
-		return "", fmt.Errorf("failed to read DAG metadata from file %s: %w", name, err)
-	}
-
-	return dag.Name, nil
 }
 
 // extractAttemptForStatus returns the appropriate DAGRunAttempt based on the provided IDs.
