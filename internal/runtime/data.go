@@ -26,6 +26,26 @@ type NodeData struct {
 	State NodeState
 }
 
+// RouterResult stores the result of router pattern matching and step activation.
+// This is populated when a router step is executed and provides visibility into
+// which patterns matched and which steps were activated.
+type RouterResult struct {
+	// EvaluatedValue is the actual value that was evaluated (after expression evaluation).
+	// For example, if the router value was "@exitCode", this might be "0" or "500".
+	EvaluatedValue string
+	// MatchedPatterns contains the patterns that matched, in order of evaluation.
+	// For exclusive mode, this will contain at most one pattern.
+	// For multi-select mode, this can contain multiple patterns.
+	// Examples: ["/^5[0-9]{2}$/"], ["[500, 502, 503]"], ["success"]
+	MatchedPatterns []string
+	// ActivatedSteps contains the step names that were activated by this router.
+	// These are the steps that should run based on the matched patterns.
+	// If no patterns matched, this will contain the default steps (if configured).
+	ActivatedSteps []string
+	// EvaluatedAt is the timestamp when the router evaluation occurred.
+	EvaluatedAt time.Time
+}
+
 type NodeState struct {
 	// Status represents the state of the node.
 	Status core.NodeStatus
@@ -81,6 +101,9 @@ type NodeState struct {
 	RejectedBy string
 	// RejectionReason stores the optional reason for rejection.
 	RejectionReason string
+	// RouterResult stores the result of router pattern matching and step activation.
+	// Only populated for router steps after evaluation.
+	RouterResult *RouterResult
 }
 
 // Parallel represents the evaluated parallel execution configuration for a node.
@@ -556,4 +579,49 @@ func (d *Data) SetApprovalInputs(inputs map[string]string) {
 	for k, v := range inputs {
 		d.inner.State.ApprovalInputs[k] = v
 	}
+}
+
+// GetRouterResult returns a copy of the router result.
+// Returns nil if this is not a router step or if routing hasn't been evaluated yet.
+func (d *Data) GetRouterResult() *RouterResult {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	if d.inner.State.RouterResult == nil {
+		return nil
+	}
+
+	// Return a deep copy to prevent external mutation
+	result := &RouterResult{
+		EvaluatedValue:  d.inner.State.RouterResult.EvaluatedValue,
+		EvaluatedAt:     d.inner.State.RouterResult.EvaluatedAt,
+		MatchedPatterns: make([]string, len(d.inner.State.RouterResult.MatchedPatterns)),
+		ActivatedSteps:  make([]string, len(d.inner.State.RouterResult.ActivatedSteps)),
+	}
+	copy(result.MatchedPatterns, d.inner.State.RouterResult.MatchedPatterns)
+	copy(result.ActivatedSteps, d.inner.State.RouterResult.ActivatedSteps)
+
+	return result
+}
+
+// SetRouterResult sets the router evaluation result.
+// The result parameter is deep-copied to prevent external mutation.
+func (d *Data) SetRouterResult(result *RouterResult) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if result == nil {
+		d.inner.State.RouterResult = nil
+		return
+	}
+
+	// Deep copy to prevent external mutation
+	d.inner.State.RouterResult = &RouterResult{
+		EvaluatedValue:  result.EvaluatedValue,
+		EvaluatedAt:     result.EvaluatedAt,
+		MatchedPatterns: make([]string, len(result.MatchedPatterns)),
+		ActivatedSteps:  make([]string, len(result.ActivatedSteps)),
+	}
+	copy(d.inner.State.RouterResult.MatchedPatterns, result.MatchedPatterns)
+	copy(d.inner.State.RouterResult.ActivatedSteps, result.ActivatedSteps)
 }

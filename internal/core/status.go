@@ -68,6 +68,7 @@ const (
 	NodeAborted
 	NodeSucceeded
 	NodeSkipped
+	NodeSkippedByRouter
 	NodePartiallySucceeded
 	NodeWaiting
 	NodeRejected
@@ -88,6 +89,7 @@ func (s NodeStatus) IsDone() bool {
 	return s == NodeSucceeded ||
 		s == NodeFailed ||
 		s == NodeSkipped ||
+		s == NodeSkippedByRouter ||
 		s == NodeAborted ||
 		s == NodePartiallySucceeded ||
 		s == NodeRejected
@@ -108,6 +110,8 @@ func (s NodeStatus) String() string {
 		return "succeeded"
 	case NodeSkipped:
 		return "skipped"
+	case NodeSkippedByRouter:
+		return "skipped_by_router"
 	case NodePartiallySucceeded:
 		return "partially_succeeded"
 	case NodeWaiting:

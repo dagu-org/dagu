@@ -94,6 +94,11 @@ type Step struct {
 	// If set, the step runs in its own container instead of the DAG-level container.
 	// This uses the same configuration format as the DAG-level container field.
 	Container *Container `json:"container,omitempty"`
+	// Router contains routing configuration for conditional branching.
+	// When set, this step becomes a router that evaluates patterns and activates
+	// downstream steps based on matching conditions. Router steps cannot have
+	// command/script/container/call/parallel fields.
+	Router *RouterConfig `json:"router,omitempty"`
 	// LLM contains the configuration for LLM-based executors (chat, agent, etc.).
 	// Used with explicit type: chat (or future type: agent).
 	LLM *LLMConfig `json:"llm,omitempty"`
@@ -329,3 +334,41 @@ const (
 	// ExecutorTypeHITL is the executor type for HITL (Human In The Loop) steps.
 	ExecutorTypeHITL = "hitl"
 )
+
+// IsRouter returns true if this step is a router step.
+// Router steps evaluate patterns and conditionally activate downstream steps.
+func (s *Step) IsRouter() bool {
+	return s.Router != nil
+}
+
+// GetRoutedStepNames returns all step names referenced in this router's routes and default.
+// Returns nil if this is not a router step.
+// The returned slice contains unique step names (no duplicates).
+func (s *Step) GetRoutedStepNames() []string {
+	if s.Router == nil {
+		return nil
+	}
+
+	seen := make(map[string]bool)
+	var result []string
+
+	// Collect from routes
+	for _, stepNames := range s.Router.Routes {
+		for _, name := range stepNames {
+			if !seen[name] {
+				seen[name] = true
+				result = append(result, name)
+			}
+		}
+	}
+
+	// Collect from default
+	for _, name := range s.Router.Default {
+		if !seen[name] {
+			seen[name] = true
+			result = append(result, name)
+		}
+	}
+
+	return result
+}
