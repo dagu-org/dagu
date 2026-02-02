@@ -993,20 +993,20 @@ function NodeStatusTableRow({
                 <div className="flex items-center justify-between mb-2">
                   {/* Simple tabs for out/err */}
                   {hasStdout && hasStderr ? (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setActiveLogTab('stdout');
                         }}
                         className={cn(
-                          'px-3 py-1 text-xs font-medium transition-colors rounded',
+                          'px-3 py-1.5 text-xs font-medium transition-all border-b-2',
                           activeLogTab === 'stdout'
-                            ? 'bg-primary text-white'
-                            : 'bg-card text-foreground hover:bg-muted border border-border'
+                            ? 'text-foreground border-primary'
+                            : 'text-muted-foreground border-transparent hover:text-foreground'
                         )}
                       >
-                        out
+                        stdout
                       </button>
                       <button
                         onClick={(e) => {
@@ -1014,13 +1014,13 @@ function NodeStatusTableRow({
                           setActiveLogTab('stderr');
                         }}
                         className={cn(
-                          'px-3 py-1 text-xs font-medium transition-colors rounded',
+                          'px-3 py-1.5 text-xs font-medium transition-all border-b-2',
                           activeLogTab === 'stderr'
-                            ? 'bg-primary text-white'
-                            : 'bg-card text-foreground hover:bg-muted border border-border'
+                            ? 'text-foreground border-primary'
+                            : 'text-muted-foreground border-transparent hover:text-foreground'
                         )}
                       >
-                        err
+                        stderr
                       </button>
                     </div>
                   ) : (
