@@ -1,7 +1,8 @@
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils';
 import { getResponsiveTitleClass } from '@/lib/text-utils';
-import { Menu, X } from 'lucide-react';
+import { Menu, Terminal, X } from 'lucide-react';
+import { useAgentChatContext } from '@/features/agent';
 import * as React from 'react';
 import { mainListItems as MainListItems } from '../menu';
 
@@ -75,6 +76,7 @@ type LayoutProps = {
  */
 function Content({ navbarColor, children }: LayoutProps) {
   const config = useConfig();
+  const { toggleChat } = useAgentChatContext();
   const hasCustomColor: boolean = Boolean(
     navbarColor && navbarColor.trim() !== ''
   );
@@ -158,7 +160,17 @@ function Content({ navbarColor, children }: LayoutProps) {
           >
             {config.title || 'Dagu'}
           </span>
-          <div className="w-8" />
+          {config.agentEnabled ? (
+            <button
+              onClick={toggleChat}
+              className="p-2 rounded-md hover:bg-muted transition-colors"
+              aria-label="Agent Console"
+            >
+              <Terminal className="h-5 w-5" />
+            </button>
+          ) : (
+            <div className="w-8" />
+          )}
         </header>
 
         {/* Scrollable Content - More Compact Padding */}
