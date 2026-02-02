@@ -564,8 +564,12 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
           display: none !important;
         }
         .vis-item .vis-item-overflow {
-          overflow: visible;
-          color: var(--foreground);
+          overflow: visible !important;
+          color: var(--foreground) !important;
+        }
+        .vis-item-content {
+          position: absolute !important;
+          display: inline-block !important;
         }
         .vis-panel.vis-top {
           position: sticky;
@@ -616,15 +620,17 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
           border-color: var(--border) !important;
         }
         .vis-item .vis-item-content {
-          position: absolute;
+          position: absolute !important;
           left: 100% !important;
-          padding-left: 8px;
-          transform: translateY(-50%);
-          top: 50%;
-          white-space: nowrap;
+          padding-left: 8px !important;
+          transform: translateY(-50%) !important;
+          top: 50% !important;
+          white-space: nowrap !important;
           font-size: 10px !important;
-          font-weight: 400;
+          font-weight: 400 !important;
           color: var(--foreground) !important;
+          writing-mode: horizontal-tb !important;
+          text-orientation: mixed !important;
         }
         .vis-item {
           overflow: visible !important;
