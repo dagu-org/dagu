@@ -64,6 +64,7 @@ func ValidateSteps(dag *DAG) error {
 	validateNameIDConflicts(dag, stepNames, stepIDs, &errs)
 	resolveStepDependencies(dag)
 	validateDependenciesExist(dag, stepNames, &errs)
+	validateRouterTargets(dag, stepNames, &errs)
 
 	for _, step := range dag.Steps {
 		errs = append(errs, validateStep(step)...)
@@ -154,6 +155,35 @@ func validateDependenciesExist(dag *DAG, stepNames map[string]struct{}, errs *Er
 	}
 }
 
+// validateRouterTargets checks that all router route targets reference existing steps.
+func validateRouterTargets(dag *DAG, stepNames map[string]struct{}, errs *ErrorList) {
+	for _, step := range dag.Steps {
+		if step.Router == nil {
+			continue
+		}
+
+		// Validate routes - each route maps to a list of step names
+		for pattern, targets := range step.Router.Routes {
+			for _, targetStep := range targets {
+				if _, exists := stepNames[targetStep]; !exists {
+					*errs = append(*errs, NewValidationError("router.routes", pattern,
+						fmt.Errorf("router step %s has route '%s' targeting non-existent step '%s'",
+							step.Name, pattern, targetStep)))
+				}
+			}
+		}
+
+		// Validate default targets
+		for _, targetStep := range step.Router.Default {
+			if _, exists := stepNames[targetStep]; !exists {
+				*errs = append(*errs, NewValidationError("router.default", targetStep,
+					fmt.Errorf("router step %s has default target referencing non-existent step '%s'",
+						step.Name, targetStep)))
+			}
+		}
+	}
+}
+
 func validateStep(step Step) ErrorList {
 	var errs ErrorList
 
@@ -166,6 +196,7 @@ func validateStep(step Step) ErrorList {
 	}
 
 	errs = append(errs, validateParallelConfig(step)...)
+	errs = append(errs, validateRouterConfig(step)...)
 
 	if err := validateStepWithValidator(step); err != nil {
 		errs = append(errs, err)
@@ -191,6 +222,40 @@ func validateParallelConfig(step Step) ErrorList {
 
 	if len(step.Parallel.Items) == 0 && step.Parallel.Variable == "" {
 		errs = append(errs, NewValidationError("parallel", step.Parallel, fmt.Errorf("parallel must have either items array or variable reference")))
+	}
+
+	return errs
+}
+
+func validateRouterConfig(step Step) ErrorList {
+	if step.Router == nil {
+		return nil
+	}
+
+	var errs ErrorList
+
+	// Router steps cannot have command/script/container/parallel/subDAG fields
+	hasCommand := len(step.Commands) > 0 || step.Command != "" || step.Script != ""
+	hasSubDAG := step.SubDAG != nil
+	hasContainer := step.Container != nil
+	hasParallel := step.Parallel != nil
+
+	if hasCommand {
+		errs = append(errs, NewValidationError("router", step.Router, fmt.Errorf("router steps cannot have command, script, or commands fields")))
+	}
+	if hasSubDAG {
+		errs = append(errs, NewValidationError("router", step.Router, fmt.Errorf("router steps cannot have run (subDAG) field")))
+	}
+	if hasContainer {
+		errs = append(errs, NewValidationError("router", step.Router, fmt.Errorf("router steps cannot have container field")))
+	}
+	if hasParallel {
+		errs = append(errs, NewValidationError("router", step.Router, fmt.Errorf("router steps cannot have parallel field")))
+	}
+
+	// Validate and compile router patterns
+	if err := step.Router.Validate(); err != nil {
+		errs = append(errs, NewValidationError("router", step.Router, err))
 	}
 
 	return errs

@@ -52,6 +52,24 @@ type SubDAGRun struct {
 	DAGName string `json:"dagName,omitempty"`
 }
 
+// RouterResult stores the result of router pattern matching and step activation.
+// This is populated when a router step is executed and provides visibility into
+// which patterns matched and which steps were activated.
+type RouterResult struct {
+	// EvaluatedValue is the actual value that was evaluated (after expression evaluation).
+	// For example, if the router value was "@exitCode", this might be "0" or "500".
+	EvaluatedValue string `json:"evaluatedValue,omitempty"`
+	// EvaluatedAt is the timestamp when the router was evaluated (RFC3339 format).
+	EvaluatedAt string `json:"evaluatedAt,omitempty"`
+	// MatchedPatterns contains the patterns that matched, in order of evaluation.
+	// For exclusive mode, this will contain at most one pattern.
+	// Empty if no patterns matched (default route was used).
+	MatchedPatterns []string `json:"matchedPatterns,omitempty"`
+	// ActivatedSteps contains the step names that were activated by this router.
+	// These are the steps that should be executed next based on the pattern matching.
+	ActivatedSteps []string `json:"activatedSteps,omitempty"`
+}
+
 // NewNodesFromSteps converts a list of DAG steps to persistence Node objects.
 func NewNodesFromSteps(steps []core.Step) []*Node {
 	var ret []*Node

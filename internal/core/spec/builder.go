@@ -279,7 +279,8 @@ func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names m
 // In chain execution, each step depends on all previous steps unless explicitly configured otherwise.
 func injectChainDependencies(dag *core.DAG, prevSteps []*core.Step, step *core.Step) {
 	// Early returns for cases where we shouldn't inject dependencies
-	if dag.Type != core.TypeChain || step.ExplicitlyNoDeps || len(prevSteps) == 0 {
+	// Router steps control their own execution flow and should not have automatic dependencies
+	if dag.Type != core.TypeChain || step.ExplicitlyNoDeps || len(prevSteps) == 0 || step.IsRouter() {
 		return
 	}
 

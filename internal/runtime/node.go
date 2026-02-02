@@ -236,6 +236,26 @@ func (n *Node) Execute(ctx context.Context) error {
 		}
 	}
 
+	// Capture router result from router executors
+	if routerResultProvider, ok := cmd.(executor.RouterResultProvider); ok {
+		routerResult := routerResultProvider.GetRouterResult()
+		if routerResult != nil {
+			// Convert exec.RouterResult to runtime.RouterResult for storage
+			// Parse the RFC3339 timestamp string
+			evaluatedAt, err := time.Parse(time.RFC3339, routerResult.EvaluatedAt)
+			if err != nil {
+				// If parsing fails, use current time as fallback
+				evaluatedAt = time.Now()
+			}
+			n.SetRouterResult(&RouterResult{
+				EvaluatedValue:  routerResult.EvaluatedValue,
+				EvaluatedAt:     evaluatedAt,
+				MatchedPatterns: routerResult.MatchedPatterns,
+				ActivatedSteps:  routerResult.ActivatedSteps,
+			})
+		}
+	}
+
 	if err := n.captureOutput(ctx); err != nil {
 		return err
 	}

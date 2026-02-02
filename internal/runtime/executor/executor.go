@@ -112,3 +112,10 @@ type SubRunProvider interface {
 type ToolDefinitionProvider interface {
 	GetToolDefinitions() []exec.ToolDefinition
 }
+
+// RouterResultProvider is an interface for executors that perform routing/branching.
+// This is used by router executors to report which patterns matched and which steps
+// were activated for conditional execution.
+type RouterResultProvider interface {
+	GetRouterResult() *exec.RouterResult
+}
