@@ -79,8 +79,8 @@ func runHistory(ctx *Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get format parameter: %w", err)
 	}
-	if format != "" && format != "table" && format != "json" {
-		return fmt.Errorf("invalid format '%s'. Valid formats: table, json", format)
+	if format != "" && format != "table" && format != "json" && format != "csv" {
+		return fmt.Errorf("invalid format '%s'. Valid formats: table, json, csv", format)
 	}
 
 	// Parse and validate flags
@@ -105,6 +105,8 @@ func runHistory(ctx *Context, args []string) error {
 	switch format {
 	case "json":
 		return renderHistoryJSON(statuses)
+	case "csv":
+		return renderHistoryCSV(statuses)
 	default: // "table" or ""
 		return renderHistoryTable(statuses)
 	}
@@ -423,6 +425,61 @@ func renderHistoryTable(statuses []*exec.DAGRunStatus) error {
 	}
 
 	return nil
+}
+
+// renderHistoryCSV displays DAG run history as comma-separated values.
+func renderHistoryCSV(statuses []*exec.DAGRunStatus) error {
+	w := os.Stdout
+
+	// Header
+	if _, err := fmt.Fprintln(w, "DAG NAME,RUN ID,STATUS,STARTED (UTC),DURATION,PARAMS"); err != nil {
+		return fmt.Errorf("failed to write CSV header: %w", err)
+	}
+
+	// Rows
+	for _, status := range statuses {
+		dagName := escapeCSV(status.Name)
+		runID := escapeCSV(status.DAGRunID)
+		statusText := escapeCSV(formatStatusText(status.Status))
+		startedAt := escapeCSV(formatTimestamp(status.StartedAt))
+		duration := escapeCSV(formatDuration(status))
+		params := escapeCSV(formatParams(status.Params))
+
+		if _, err := fmt.Fprintf(w, "%s,%s,%s,%s,%s,%s\n",
+			dagName,
+			runID,
+			statusText,
+			startedAt,
+			duration,
+			params,
+		); err != nil {
+			return fmt.Errorf("failed to write CSV row: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// escapeCSV escapes a string for CSV output according to RFC 4180.
+// If the value contains comma, double quote, or newline, it is quoted
+// and internal double quotes are escaped by doubling them.
+func escapeCSV(s string) string {
+	// Check if quoting is needed
+	needsQuoting := false
+	for _, ch := range s {
+		if ch == ',' || ch == '"' || ch == '\n' || ch == '\r' {
+			needsQuoting = true
+			break
+		}
+	}
+
+	if !needsQuoting {
+		return s
+	}
+
+	// Quote and escape
+	escaped := strings.ReplaceAll(s, `"`, `""`)
+	return `"` + escaped + `"`
 }
 
 // renderHistoryJSON displays DAG run history as JSON.

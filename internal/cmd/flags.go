@@ -330,7 +330,7 @@ var (
 
 	historyStatusFlag = commandLineFlag{
 		name:  "status",
-		usage: "Filter by execution status (running, succeeded, failed, aborted, skipped, none)",
+		usage: "Filter by execution status (running, succeeded, failed, aborted, queued, waiting, rejected, not_started, partially_succeeded)",
 	}
 
 	historyRunIDFlag = commandLineFlag{
@@ -347,7 +347,7 @@ var (
 		name:         "format",
 		shorthand:    "f",
 		defaultValue: "table",
-		usage:        "Output format: table or json (default: table)",
+		usage:        "Output format: table, json, or csv (default: table)",
 	}
 
 	historyLimitFlag = commandLineFlag{

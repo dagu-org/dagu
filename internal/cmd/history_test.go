@@ -1,11 +1,15 @@
 package cmd
 
 import (
+	"bytes"
+	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -592,19 +596,139 @@ func TestFormatParams(t *testing.T) {
 }
 
 func TestRunIDNeverTruncated(t *testing.T) {
-	t.Parallel()
+	// Note: not parallel - manipulates os.Stdout
 
-	// This test verifies that run IDs are NEVER truncated in any formatting function
+	// This test verifies that run IDs are NEVER truncated in table output
 	// This is critical for usability as users need to copy-paste full run IDs
 
 	longRunID := "dag-run_20260201_120000Z_" + strings.Repeat("abcdef123456", 10)
 
-	// Test formatParams doesn't affect run ID (run IDs are in a separate column)
-	params := "param1=value1 param2=value2"
-	formattedParams := formatParams(params)
-	assert.NotEqual(t, longRunID, formattedParams, "formatParams should not be used for run IDs")
+	// Create a mock DAGRunStatus with the long run ID
+	statuses := []*exec.DAGRunStatus{
+		{
+			Name:      "test-dag",
+			DAGRunID:  longRunID,
+			Status:    core.Succeeded,
+			StartedAt: "2026-02-01T12:00:00Z",
+			Params:    "param1=value1",
+		},
+	}
 
-	// Run IDs should be passed through directly without any truncation
-	// The table formatter should display them in full
-	assert.Equal(t, longRunID, longRunID, "Run ID should remain unchanged")
+	// Capture stdout to verify table output
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stdout = w
+
+	// Render table
+	err = renderHistoryTable(statuses)
+	require.NoError(t, err)
+
+	// Restore stdout and read captured output
+	w.Close()
+	os.Stdout = oldStdout
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, r)
+	require.NoError(t, err)
+
+	output := buf.String()
+
+	// Verify the full run ID appears in the output without truncation
+	assert.Contains(t, output, longRunID, "Run ID must appear in full without any truncation")
+	assert.Equal(t, strings.Count(output, longRunID), 1, "Run ID should appear exactly once in output")
+}
+
+func TestCSVOutput(t *testing.T) {
+	// Note: not parallel - manipulates os.Stdout
+
+	statuses := []*exec.DAGRunStatus{
+		{
+			Name:      "test-dag",
+			DAGRunID:  "run-001",
+			Status:    core.Succeeded,
+			StartedAt: "2026-02-01T12:00:00Z",
+			Params:    "param1=value1",
+		},
+		{
+			Name:      "another-dag",
+			DAGRunID:  "run-002",
+			Status:    core.Failed,
+			StartedAt: "2026-02-01T13:00:00Z",
+			Params:    "",
+		},
+	}
+
+	// Capture stdout
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stdout = w
+
+	// Render CSV
+	err = renderHistoryCSV(statuses)
+	require.NoError(t, err)
+
+	// Restore stdout and read output
+	w.Close()
+	os.Stdout = oldStdout
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, r)
+	require.NoError(t, err)
+
+	output := buf.String()
+
+	// Verify header
+	assert.Contains(t, output, "DAG NAME,RUN ID,STATUS,STARTED (UTC),DURATION,PARAMS")
+
+	// Verify data rows
+	assert.Contains(t, output, "test-dag,run-001,Succeeded")
+	assert.Contains(t, output, "another-dag,run-002,Failed")
+}
+
+func TestCSVEscaping(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "no escaping needed",
+			input:    "simple-value",
+			expected: "simple-value",
+		},
+		{
+			name:     "contains comma",
+			input:    "value,with,commas",
+			expected: `"value,with,commas"`,
+		},
+		{
+			name:     "contains double quote",
+			input:    `value"with"quotes`,
+			expected: `"value""with""quotes"`,
+		},
+		{
+			name:     "contains newline",
+			input:    "value\nwith\nnewlines",
+			expected: "\"value\nwith\nnewlines\"",
+		},
+		{
+			name:     "contains comma and quote",
+			input:    `value,"with",both`,
+			expected: `"value,""with"",both"`,
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := escapeCSV(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }
