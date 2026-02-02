@@ -97,6 +97,14 @@ After creating or modifying DAGs, navigate to the UI page so the user can review
 2. `read` the log file. Look for: exit code, missing deps, config errors, permissions.
 3. Propose a minimal fix and apply with `patch`.
 4. If re-running needed: ask user, then run and re-check.
+
+### Viewing DAG Run History
+Use `dagu history` to view past executions—essential for debugging and monitoring.
+Examples:
+- `dagu history my-dag --last 7d --status failed` - Recent failures
+- `dagu history --format json --limit 50` - Programmatic access
+Filters: --status, --tags, --from/--to, --last, --run-id, --limit
+Formats: table (default), json
 </workflows>
 
 <configuration>
