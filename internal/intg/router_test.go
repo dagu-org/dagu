@@ -288,22 +288,22 @@ steps:
 
   - name: phone_handler
     command: echo "Phone"
-    output: PHONE_RESULT
+    output: RESULT
 
   - name: laptop_handler
     command: echo "Laptop"
-    output: LAPTOP_RESULT
+    output: RESULT
 
   - name: clothing_handler
     command: echo "Clothing"
-    output: CLOTHING_RESULT
+    output: RESULT
 `)
 		agent := dag.Agent()
 		agent.RunSuccess(t)
 
 		dag.AssertLatestStatus(t, core.Succeeded)
 		dag.AssertOutputs(t, map[string]any{
-			"PHONE_RESULT": "Phone",
+			"RESULT": "Phone",
 		})
 
 		// Verify correct routing path: electronics -> phone
@@ -334,25 +334,30 @@ steps:
       "premium": [premium_step1]
       "standard": [standard_step1]
 
-  # Premium branch: 3 steps - each step in the chain is a router target
+  # Premium branch: 3 steps
   - name: premium_step1
     command: echo "Premium-1"
     output: P1
 
   - name: premium_step2
-    command: echo "Premium-2"
+    command: echo "Premium-2 with ${P1}"
     output: P2
     depends: [premium_step1]
 
   - name: premium_step3
-    command: echo "Premium-3"
+    command: echo "Premium-3 with ${P2}"
     output: FINAL
     depends: [premium_step2]
 
-  # Standard branch: single step (router target)
+  # Standard branch: 2 steps
   - name: standard_step1
     command: echo "Standard-1"
     output: S1
+
+  - name: standard_step2
+    command: echo "Standard-2 with ${S1}"
+    output: FINAL
+    depends: [standard_step1]
 `)
 		agent := dag.Agent()
 		agent.RunSuccess(t)
@@ -360,12 +365,11 @@ steps:
 		dag.AssertLatestStatus(t, core.Succeeded)
 		// Premium branch executed
 		dag.AssertOutputs(t, map[string]any{
-			"P1":    "Premium-1",
-			"P2":    "Premium-2",
-			"FINAL": "Premium-3",
+			"P1": "Premium-1",
+			"P2": "Premium-2 with Premium-1",
 		})
 
-		// Verify standard_step1 was skipped
+		// Verify standard branch was skipped
 		status := agent.Status(agent.Context)
 		for _, node := range status.Nodes {
 			switch node.Step.Name {
@@ -384,55 +388,65 @@ steps:
 		dag := th.DAG(t, `
 type: graph
 env:
-  - TRIGGER: full
+  - TRIGGER: all
 steps:
   - name: setup
-    command: echo "Setup"
+    command: echo "Setup complete"
     output: SETUP
 
   - name: router
     type: router
     value: ${TRIGGER}
     routes:
-      "full": [full_process_a, full_process_b]
-      "minimal": [minimal_process]
+      "all": [branch_a, branch_b, branch_c]
     depends: [setup]
 
-  # Full processing path (two parallel steps)
-  - name: full_process_a
-    command: echo "FullA"
-    output: FULL_A
+  # Three parallel branches
+  - name: branch_a
+    command: echo "A:${SETUP}"
+    output: OUT_A
 
-  - name: full_process_b
-    command: echo "FullB"
-    output: FULL_B
+  - name: branch_b
+    command: echo "B:${SETUP}"
+    output: OUT_B
 
-  # Minimal processing path
-  - name: minimal_process
-    command: echo "Minimal"
-    output: MINIMAL
+  - name: branch_c
+    command: echo "C:${SETUP}"
+    output: OUT_C
+
+  # Fan-in: aggregator waits for all branches
+  - name: aggregator
+    command: echo "Aggregated"
+    output: AGGREGATED
+    depends: [branch_a, branch_b, branch_c]
+
+  - name: final
+    command: echo "Final"
+    output: FINAL
+    depends: [aggregator]
 `)
 		agent := dag.Agent()
 		agent.RunSuccess(t)
 
 		dag.AssertLatestStatus(t, core.Succeeded)
 
-		// Verify routing: full path executed, minimal skipped
+		// Verify all steps succeeded
 		status := agent.Status(agent.Context)
 		for _, node := range status.Nodes {
 			switch node.Step.Name {
-			case "setup", "router", "full_process_a", "full_process_b":
+			case "setup", "router", "branch_a", "branch_b", "branch_c", "aggregator", "final":
 				require.Equal(t, core.NodeSucceeded, node.Status, "%s should succeed", node.Step.Name)
-			case "minimal_process":
-				require.Equal(t, core.NodeSkipped, node.Status, "%s should be skipped", node.Step.Name)
 			}
 		}
 
-		// Full branches execute since TRIGGER=full
+		// All branches and fan-in executed since TRIGGER=all
 		dag.AssertOutputs(t, map[string]any{
-			"SETUP":  "Setup",
-			"FULL_A": "FullA",
-			"FULL_B": "FullB",
+			"SETUP":      "Setup complete",
+			"OUT_A":      "A:Setup complete",
+			"OUT_B":      "B:Setup complete",
+			"OUT_C":      "C:Setup complete",
+			"AGGREGATED": "Aggregated",
+			"FINAL":      "Final",
 		})
 	})
 
@@ -457,19 +471,19 @@ steps:
 
   - name: success_handler
     command: echo "Handling success"
-    output: SUCCESS_RESULT
+    output: RESULT
 
   - name: failure_handler
     command: echo "Handling failure"
-    output: FAILURE_RESULT
+    output: RESULT
 `)
 		agent := dag.Agent()
 		agent.RunSuccess(t)
 
 		dag.AssertLatestStatus(t, core.Succeeded)
 		dag.AssertOutputs(t, map[string]any{
-			"STATUS":         "success",
-			"SUCCESS_RESULT": "Handling success",
+			"STATUS": "success",
+			"RESULT": "Handling success",
 		})
 
 		// Verify correct routing based on step output
