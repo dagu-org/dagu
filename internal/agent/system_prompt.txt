@@ -140,5 +140,12 @@ Use `read_schema` to look up DAG YAML structure:
 - Handlers: `path: "handlerOn"`
 - Output/parallel: `path: "steps.output"`, `path: "steps.parallel"`
 
+Params are defined as a list of key-value pairs:
+```yaml
+params:
+- FOO: BAR
+- BAZ: QUX
+```
+
 Check schema before creating or editing DAGs.
 </schema_reference>
