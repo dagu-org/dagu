@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -79,8 +80,9 @@ func runHistory(ctx *Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get format parameter: %w", err)
 	}
-	if format != "" && format != "table" && format != "json" && format != "csv" {
-		return fmt.Errorf("invalid format '%s'. Valid formats: table, json, csv", format)
+
+	if err := validateFormat(format); err != nil {
+		return err
 	}
 
 	// Parse and validate flags
@@ -102,6 +104,26 @@ func runHistory(ctx *Context, args []string) error {
 	}
 
 	// Render output based on format
+	return renderHistory(format, statuses)
+}
+
+// validateFormat checks if the output format is valid.
+func validateFormat(format string) error {
+	validFormats := map[string]bool{
+		"":      true, // default
+		"table": true,
+		"json":  true,
+		"csv":   true,
+	}
+
+	if !validFormats[format] {
+		return fmt.Errorf("invalid format '%s'. Valid formats: table, json, csv", format)
+	}
+	return nil
+}
+
+// renderHistory renders DAG run history in the specified format.
+func renderHistory(format string, statuses []*exec.DAGRunStatus) error {
 	switch format {
 	case "json":
 		return renderHistoryJSON(statuses)
@@ -225,6 +247,7 @@ func buildStatusOption(ctx *Context) (exec.ListDAGRunStatusesOption, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get 'status' parameter: %w", err)
 	}
+
 	if statusStr == "" {
 		return nil, nil
 	}
@@ -233,6 +256,7 @@ func buildStatusOption(ctx *Context) (exec.ListDAGRunStatusesOption, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return exec.WithStatuses([]core.Status{status}), nil
 }
 
@@ -242,9 +266,11 @@ func buildRunIDOption(ctx *Context) (exec.ListDAGRunStatusesOption, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get 'run-id' parameter: %w", err)
 	}
+
 	if runID == "" {
 		return nil, nil
 	}
+
 	return exec.WithDAGRunID(runID), nil
 }
 
@@ -254,15 +280,16 @@ func buildTagsOption(ctx *Context) (exec.ListDAGRunStatusesOption, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get 'tags' parameter: %w", err)
 	}
+
 	if tagsStr == "" {
 		return nil, nil
 	}
 
-	tags := parseTags(tagsStr)
-	if len(tags) == 0 {
-		return nil, nil
+	if tags := parseTags(tagsStr); len(tags) > 0 {
+		return exec.WithTags(tags), nil
 	}
-	return exec.WithTags(tags), nil
+
+	return nil, nil
 }
 
 // buildLimitOption constructs limit option with validation.
@@ -296,29 +323,33 @@ func buildLimitOption(ctx *Context) (exec.ListDAGRunStatusesOption, error) {
 
 // parseRelativeDuration parses relative time duration strings like "7d", "24h", "1w".
 func parseRelativeDuration(s string) (time.Duration, error) {
+	const expectedFormat = "invalid format (expected: 7d, 24h, 1w)"
+
 	if len(s) < 2 {
-		return 0, fmt.Errorf("invalid format (expected: 7d, 24h, 1w)")
+		return 0, errors.New(expectedFormat)
 	}
 
 	// Extract number and unit parts
-	numStr := s[:len(s)-1]
+	valueStr := s[:len(s)-1]
 	unit := s[len(s)-1]
 
-	value, err := strconv.Atoi(numStr)
+	value, err := strconv.Atoi(valueStr)
 	if err != nil || value < 0 {
-		return 0, fmt.Errorf("invalid format (expected: 7d, 24h, 1w)")
+		return 0, errors.New(expectedFormat)
 	}
 
-	switch unit {
-	case 'h':
-		return time.Duration(value) * time.Hour, nil
-	case 'd':
-		return time.Duration(value) * 24 * time.Hour, nil
-	case 'w':
-		return time.Duration(value) * 7 * 24 * time.Hour, nil
-	default:
-		return 0, fmt.Errorf("invalid format (expected: 7d, 24h, 1w)")
+	// Convert to duration based on unit
+	unitMultipliers := map[byte]time.Duration{
+		'h': time.Hour,
+		'd': 24 * time.Hour,
+		'w': 7 * 24 * time.Hour,
 	}
+
+	if multiplier, ok := unitMultipliers[unit]; ok {
+		return time.Duration(value) * multiplier, nil
+	}
+
+	return 0, errors.New(expectedFormat)
 }
 
 // parseAbsoluteDateTime parses absolute date/time strings in UTC.
@@ -343,29 +374,32 @@ func parseAbsoluteDateTime(s string) (time.Time, error) {
 
 // parseStatus converts status string to core.Status with validation.
 func parseStatus(s string) (core.Status, error) {
-	s = strings.ToLower(strings.TrimSpace(s))
+	normalized := strings.ToLower(strings.TrimSpace(s))
 
-	// Status mappings with canonical names and common aliases
+	// Map of all accepted status values to their core.Status equivalents
 	statusMap := map[string]core.Status{
+		// Canonical names
 		"not_started":         core.NotStarted,
-		"notstarted":          core.NotStarted,
 		"running":             core.Running,
 		"succeeded":           core.Succeeded,
-		"success":             core.Succeeded,
 		"failed":              core.Failed,
-		"failure":             core.Failed,
 		"aborted":             core.Aborted,
-		"canceled":            core.Aborted,
-		"cancelled":           core.Aborted,
-		"cancel":              core.Aborted,
 		"queued":              core.Queued,
 		"partially_succeeded": core.PartiallySucceeded,
-		"partiallysucceeded":  core.PartiallySucceeded,
 		"waiting":             core.Waiting,
 		"rejected":            core.Rejected,
+
+		// Common aliases
+		"notstarted":         core.NotStarted,
+		"success":            core.Succeeded,
+		"failure":            core.Failed,
+		"canceled":           core.Aborted,
+		"cancelled":          core.Aborted,
+		"cancel":             core.Aborted,
+		"partiallysucceeded": core.PartiallySucceeded,
 	}
 
-	if status, ok := statusMap[s]; ok {
+	if status, ok := statusMap[normalized]; ok {
 		return status, nil
 	}
 
@@ -429,30 +463,17 @@ func renderHistoryTable(statuses []*exec.DAGRunStatus) error {
 
 // renderHistoryCSV displays DAG run history as comma-separated values.
 func renderHistoryCSV(statuses []*exec.DAGRunStatus) error {
-	w := os.Stdout
+	const csvHeader = "DAG NAME,RUN ID,STATUS,STARTED (UTC),DURATION,PARAMS"
 
-	// Header
-	if _, err := fmt.Fprintln(w, "DAG NAME,RUN ID,STATUS,STARTED (UTC),DURATION,PARAMS"); err != nil {
+	// Write header
+	if _, err := fmt.Fprintln(os.Stdout, csvHeader); err != nil {
 		return fmt.Errorf("failed to write CSV header: %w", err)
 	}
 
-	// Rows
+	// Write rows
 	for _, status := range statuses {
-		dagName := escapeCSV(status.Name)
-		runID := escapeCSV(status.DAGRunID)
-		statusText := escapeCSV(formatStatusText(status.Status))
-		startedAt := escapeCSV(formatTimestamp(status.StartedAt))
-		duration := escapeCSV(formatDuration(status))
-		params := escapeCSV(formatParams(status.Params))
-
-		if _, err := fmt.Fprintf(w, "%s,%s,%s,%s,%s,%s\n",
-			dagName,
-			runID,
-			statusText,
-			startedAt,
-			duration,
-			params,
-		); err != nil {
+		row := formatCSVRow(status)
+		if _, err := fmt.Fprintln(os.Stdout, row); err != nil {
 			return fmt.Errorf("failed to write CSV row: %w", err)
 		}
 	}
@@ -460,26 +481,35 @@ func renderHistoryCSV(statuses []*exec.DAGRunStatus) error {
 	return nil
 }
 
-// escapeCSV escapes a string for CSV output according to RFC 4180.
-// If the value contains comma, double quote, or newline, it is quoted
-// and internal double quotes are escaped by doubling them.
-func escapeCSV(s string) string {
-	// Check if quoting is needed
-	needsQuoting := false
-	for _, ch := range s {
-		if ch == ',' || ch == '"' || ch == '\n' || ch == '\r' {
-			needsQuoting = true
-			break
-		}
+// formatCSVRow formats a single DAG run status as a CSV row.
+func formatCSVRow(status *exec.DAGRunStatus) string {
+	fields := []string{
+		escapeCSV(status.Name),
+		escapeCSV(status.DAGRunID),
+		escapeCSV(formatStatusText(status.Status)),
+		escapeCSV(formatTimestamp(status.StartedAt)),
+		escapeCSV(formatDuration(status)),
+		escapeCSV(formatParams(status.Params)),
 	}
+	return strings.Join(fields, ",")
+}
 
-	if !needsQuoting {
+// escapeCSV escapes a string for CSV output according to RFC 4180.
+// Values containing special characters (comma, quote, newline) are quoted.
+// Internal quotes are escaped by doubling.
+func escapeCSV(s string) string {
+	if !needsCSVQuoting(s) {
 		return s
 	}
 
-	// Quote and escape
+	// Escape quotes by doubling them, then wrap in quotes
 	escaped := strings.ReplaceAll(s, `"`, `""`)
 	return `"` + escaped + `"`
+}
+
+// needsCSVQuoting checks if a string requires quoting in CSV format.
+func needsCSVQuoting(s string) bool {
+	return strings.ContainsAny(s, ",\"\n\r")
 }
 
 // renderHistoryJSON displays DAG run history as JSON.
@@ -615,28 +645,24 @@ func formatDurationHuman(d time.Duration) string {
 	seconds := int(d.Seconds()) % 60
 
 	// Build duration string with two most significant components
-	var parts []string
-
-	if days > 0 {
-		parts = append(parts, fmt.Sprintf("%dd", days))
-		if hours > 0 {
-			parts = append(parts, fmt.Sprintf("%dh", hours))
-		}
-	} else if hours > 0 {
-		parts = append(parts, fmt.Sprintf("%dh", hours))
-		if minutes > 0 {
-			parts = append(parts, fmt.Sprintf("%dm", minutes))
-		}
-	} else if minutes > 0 {
-		parts = append(parts, fmt.Sprintf("%dm", minutes))
-		if seconds > 0 {
-			parts = append(parts, fmt.Sprintf("%ds", seconds))
-		}
-	} else {
-		parts = append(parts, fmt.Sprintf("%ds", seconds))
+	switch {
+	case days > 0:
+		return formatTimeComponents(days, "d", hours, "h")
+	case hours > 0:
+		return formatTimeComponents(hours, "h", minutes, "m")
+	case minutes > 0:
+		return formatTimeComponents(minutes, "m", seconds, "s")
+	default:
+		return fmt.Sprintf("%ds", seconds)
 	}
+}
 
-	return strings.Join(parts, "")
+// formatTimeComponents formats up to two time components.
+func formatTimeComponents(major int, majorUnit string, minor int, minorUnit string) string {
+	if minor > 0 {
+		return fmt.Sprintf("%d%s%d%s", major, majorUnit, minor, minorUnit)
+	}
+	return fmt.Sprintf("%d%s", major, majorUnit)
 }
 
 // formatParams formats parameters for table display.

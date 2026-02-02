@@ -625,7 +625,7 @@ func TestRunIDNeverTruncated(t *testing.T) {
 	require.NoError(t, err)
 
 	// Restore stdout and read captured output
-	w.Close()
+	require.NoError(t, w.Close())
 	os.Stdout = oldStdout
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, r)
@@ -669,7 +669,7 @@ func TestCSVOutput(t *testing.T) {
 	require.NoError(t, err)
 
 	// Restore stdout and read output
-	w.Close()
+	require.NoError(t, w.Close())
 	os.Stdout = oldStdout
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, r)
