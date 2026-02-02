@@ -95,7 +95,7 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
   }, [handleRefresh]);
 
   return (
-    <div className="bg-card rounded-2xl p-6 mb-6 border border-border shadow-sm">
+    <div className="bg-card rounded-2xl p-6 border border-border shadow-sm">
       {/* Header with title and actions */}
       <div className="flex items-start justify-between gap-6 mb-4">
         <div className="flex-1 min-w-0">

@@ -181,7 +181,7 @@ function QueueCard({
       className={cn(
         'card-obsidian transition-all duration-300 dark:hover:bg-white/[0.05] dark:hover:border-white/10',
         isSelected &&
-          'ring-1 ring-primary/40 shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)]'
+          'shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)]'
       )}
     >
       {/* Queue Header */}

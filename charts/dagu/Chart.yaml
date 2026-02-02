@@ -1,0 +1,6 @@
+apiVersion: v2
+name: dagu
+description: A DAG-based workflow engine
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

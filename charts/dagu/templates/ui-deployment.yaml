@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dagu.fullname" . }}-ui
+  labels:
+    {{- include "dagu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ui
+spec:
+  replicas: {{ .Values.ui.replicas }}
+  selector:
+    matchLabels:
+      {{- include "dagu.labels" . | nindent 6 }}
+      app.kubernetes.io/component: ui
+  template:
+    metadata:
+      labels:
+        {{- include "dagu.labels" . | nindent 8 }}
+        app.kubernetes.io/component: ui
+    spec:
+      # Disable Kubernetes Service env var injection to avoid overriding
+      # dagu config values (e.g., scheduler.port) with Service URLs
+      enableServiceLinks: false
+      containers:
+        - name: ui
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - dagu
+            - server
+            - --config
+            - /etc/dagu/dagu.yaml
+          env:
+            - name: DAGU_PORT
+              value: {{ .Values.ui.service.port | quote }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.ui.service.port }}
+              protocol: TCP
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: config
+              mountPath: /etc/dagu
+          livenessProbe:
+            httpGet:
+              path: /api/v2/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/v2/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.ui.resources | nindent 12 }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "dagu.fullname" . }}-data
+        - name: config
+          configMap:
+            name: {{ include "dagu.fullname" . }}-config

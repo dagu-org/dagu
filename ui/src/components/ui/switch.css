@@ -15,7 +15,6 @@
 
 .switch-root:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--ring);
 }
 
 .switch-root:disabled {
@@ -33,7 +32,7 @@
   background-color: #334155;
 }
 
-/* Dark mode checked */
+/* Dark mode checked - filled with primary color */
 .dark .switch-root[data-state='checked'] {
   background-color: var(--primary);
 }

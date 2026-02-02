@@ -2,7 +2,7 @@ import { NodeStatus, Status } from '@/api/v2/schema';
 
 /**
  * Get Tailwind CSS utility class for Status or NodeStatus enum.
- * Uses utility classes defined in global.css (lines 280-297).
+ * Uses utility classes defined in global.css.
  *
  * @param status - The Status or NodeStatus enum value
  * @returns The corresponding CSS utility class name
@@ -26,18 +26,18 @@ export function getStatusClass(status?: Status | NodeStatus): string {
     case Status.Queued:
     case Status.NotStarted:
     case NodeStatus.NotStarted:
-      return 'status-info';
-
     case NodeStatus.Skipped:
-      return 'status-info';
+      return 'status-neutral';
 
     case Status.PartialSuccess:
     case Status.Waiting:
-    case Status.Aborted:
     case NodeStatus.PartialSuccess:
     case NodeStatus.Waiting:
-    case NodeStatus.Aborted:
       return 'status-warning';
+
+    case Status.Aborted:
+    case NodeStatus.Aborted:
+      return 'status-aborted';
 
     default:
       return 'status-muted';
@@ -65,49 +65,57 @@ export function getStatusColors(
   switch (baseClass) {
     case 'status-success':
       return {
-        bgClass: 'bg-green-700',
-        textClass: 'text-green-700',
-        borderClass: 'border-green-700',
+        bgClass: 'bg-[#1e8e3e] dark:bg-[#81c995]',
+        textClass: 'text-[#1e8e3e] dark:text-[#81c995]',
+        borderClass: 'border-[#1e8e3e] dark:border-[#81c995]',
         animation: '',
       };
 
     case 'status-failed':
       return {
-        bgClass: 'bg-red-500',
-        textClass: 'text-red-500',
-        borderClass: 'border-red-500',
+        bgClass: 'bg-[#d93025] dark:bg-[#f28b82]',
+        textClass: 'text-[#d93025] dark:text-[#f28b82]',
+        borderClass: 'border-[#d93025] dark:border-[#f28b82]',
         animation: '',
       };
 
     case 'status-running':
       return {
-        bgClass: 'bg-[#66ff66]',
-        textClass: 'text-green-600',
-        borderClass: 'border-[#66ff66]',
+        bgClass: 'bg-[#34a853] dark:bg-[#81c995]',
+        textClass: 'text-[#34a853] dark:text-[#81c995]',
+        borderClass: 'border-[#34a853] dark:border-[#81c995]',
         animation: '',
       };
 
-    case 'status-info':
+    case 'status-neutral':
       return {
-        bgClass: 'bg-info',
-        textClass: 'text-info',
-        borderClass: 'border-info',
+        bgClass: 'bg-[#5f6368] dark:bg-[#9aa0a6]',
+        textClass: 'text-[#5f6368] dark:text-[#9aa0a6]',
+        borderClass: 'border-[#5f6368] dark:border-[#9aa0a6]',
         animation: '',
       };
 
     case 'status-warning':
       return {
-        bgClass: 'bg-warning',
-        textClass: 'text-warning',
-        borderClass: 'border-warning',
+        bgClass: 'bg-[#e37400] dark:bg-[#fdd663]',
+        textClass: 'text-[#e37400] dark:text-[#fdd663]',
+        borderClass: 'border-[#e37400] dark:border-[#fdd663]',
         animation: isWaiting ? 'animate-pulse' : '',
+      };
+
+    case 'status-aborted':
+      return {
+        bgClass: 'bg-[#d946ef] dark:bg-[#e879f9]',
+        textClass: 'text-[#d946ef] dark:text-[#e879f9]',
+        borderClass: 'border-[#d946ef] dark:border-[#e879f9]',
+        animation: '',
       };
 
     default:
       return {
-        bgClass: 'bg-muted',
-        textClass: 'text-muted-foreground',
-        borderClass: 'border-muted-foreground',
+        bgClass: 'bg-[#5f6368] dark:bg-[#9aa0a6]',
+        textClass: 'text-[#5f6368] dark:text-[#9aa0a6]',
+        borderClass: 'border-[#5f6368] dark:border-[#9aa0a6]',
         animation: '',
       };
   }

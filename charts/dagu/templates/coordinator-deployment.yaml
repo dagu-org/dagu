@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dagu.fullname" . }}-coordinator
+  labels:
+    {{- include "dagu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: coordinator
+spec:
+  replicas: {{ .Values.coordinator.replicas }}
+  selector:
+    matchLabels:
+      {{- include "dagu.labels" . | nindent 6 }}
+      app.kubernetes.io/component: coordinator
+  template:
+    metadata:
+      labels:
+        {{- include "dagu.labels" . | nindent 8 }}
+        app.kubernetes.io/component: coordinator
+    spec:
+      # Disable Kubernetes Service env var injection to avoid overriding
+      # dagu config values (e.g., scheduler.port) with Service URLs
+      enableServiceLinks: false
+      containers:
+        - name: coordinator
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - dagu
+            - coordinator
+            - --config
+            - /etc/dagu/dagu.yaml
+          env:
+            - name: DAGU_COORDINATOR_HOST
+              value: "0.0.0.0"
+            - name: DAGU_COORDINATOR_ADVERTISE
+              value: "{{ include "dagu.fullname" . }}-coordinator.{{ .Release.Namespace }}.svc.cluster.local"
+          ports:
+            - name: grpc
+              containerPort: 50055
+              protocol: TCP
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: config
+              mountPath: /etc/dagu
+          livenessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.coordinator.resources | nindent 12 }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "dagu.fullname" . }}-data
+        - name: config
+          configMap:
+            name: {{ include "dagu.fullname" . }}-config

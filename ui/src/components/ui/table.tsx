@@ -29,7 +29,7 @@ function TableHeader({
   return (
     <RadixTable.Header
       data-slot="table-header"
-      className={cn(className)}
+      className={cn('bg-muted', className)}
       {...props}
     />
   );
@@ -71,7 +71,7 @@ function TableHead({
   return (
     <RadixTable.ColumnHeaderCell
       data-slot="table-head"
-      className={cn('text-foreground font-medium', className)}
+      className={cn('h-8 py-1.5 px-3 text-xs font-medium text-muted-foreground', className)}
       {...props}
     />
   );
@@ -84,7 +84,7 @@ function TableCell({
   return (
     <RadixTable.Cell
       data-slot="table-cell"
-      className={cn(className)}
+      className={cn('py-2 px-3 text-xs', className)}
       {...props}
     />
   );

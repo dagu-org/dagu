@@ -22,7 +22,7 @@ const defaultPreferences: UserPreferences = {
   pageLimit: 50,
   dagRunsViewMode: 'list',
   logWrap: true,
-  theme: 'dark',
+  theme: 'light', // Default to light theme (from main branch)
   safeMode: false,
 };
 

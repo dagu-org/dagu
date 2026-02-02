@@ -82,7 +82,7 @@ function HistoryTableRow({ data, onSelect, idx }: Props) {
             onClick={() => onSelect(i)}
             className={cn(
               'max-w-[22px] min-w-[22px] p-2 text-center cursor-pointer',
-              'hover:bg-accent transition-all duration-200',
+              'hover:bg-muted/50 transition-all duration-200',
               isSelected && 'bg-accent'
             )}
           >
