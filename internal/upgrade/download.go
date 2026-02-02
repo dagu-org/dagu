@@ -69,11 +69,11 @@ func Download(ctx context.Context, opts DownloadOptions) error {
 
 	var contentLength int64
 	if opts.OnProgress != nil {
-		headResp, headErr := client.R().
+		sizeResp, sizeErr := client.R().
 			SetContext(ctx).
 			Head(opts.URL)
-		if headErr == nil && headResp.StatusCode() == 200 {
-			contentLength = headResp.RawResponse.ContentLength
+		if sizeErr == nil && sizeResp.StatusCode() == 200 {
+			contentLength = sizeResp.RawResponse.ContentLength
 		}
 	}
 
