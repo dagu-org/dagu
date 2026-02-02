@@ -126,7 +126,7 @@ function Search() {
   }, []);
 
   return (
-    <div className="w-full">
+    <div className="max-w-7xl">
       <div className="w-full">
         <Title>Search DAG Definitions</Title>
         <div className="flex items-center gap-2 pt-2">

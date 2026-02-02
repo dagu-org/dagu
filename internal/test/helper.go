@@ -716,6 +716,12 @@ func (b *SyncBuffer) String() string {
 	return b.buf.String()
 }
 
+func (b *SyncBuffer) Reset() {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	b.buf.Reset()
+}
+
 // createDefaultContext creates a context with default logger settings
 func createDefaultContext() context.Context {
 	ctx := context.Background()

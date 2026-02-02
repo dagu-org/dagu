@@ -155,7 +155,7 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4 max-w-7xl">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold">Users</h1>
@@ -179,8 +179,8 @@ export default function UsersPage() {
         </div>
       )}
 
-      <div className="card-obsidian">
-        <Table>
+      <div className="card-obsidian overflow-auto min-h-0">
+        <Table className="text-xs">
           <TableHeader>
             <TableRow>
               <TableHead className="w-[200px]">Username</TableHead>

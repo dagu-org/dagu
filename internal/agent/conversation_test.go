@@ -335,3 +335,37 @@ func TestConversationManager_GetModel(t *testing.T) {
 		_ = cm.Cancel(context.Background())
 	})
 }
+
+func TestConversationManager_SetSafeMode(t *testing.T) {
+	t.Parallel()
+
+	t.Run("SetSafeMode does not panic", func(t *testing.T) {
+		t.Parallel()
+
+		cm := NewConversationManager(ConversationManagerConfig{
+			SafeMode: false,
+		})
+
+		// Should not panic and should complete without error
+		assert.NotPanics(t, func() {
+			cm.SetSafeMode(true)
+		})
+	})
+
+	t.Run("SetSafeMode is thread-safe", func(t *testing.T) {
+		t.Parallel()
+
+		cm := NewConversationManager(ConversationManagerConfig{})
+
+		var wg sync.WaitGroup
+		for i := 0; i < 10; i++ {
+			wg.Add(1)
+			go func(val bool) {
+				defer wg.Done()
+				cm.SetSafeMode(val)
+			}(i%2 == 0)
+		}
+		wg.Wait()
+		// If we reach here without race condition, test passes
+	})
+}

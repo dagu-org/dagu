@@ -82,7 +82,7 @@ export function RejectionModal({ visible, dismissModal, step, onReject }: Props)
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="w-full px-3 py-2 text-sm border border-border rounded bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+              className="w-full px-3 py-2 text-sm border border-border rounded bg-background focus:outline-none focus:border-ring resize-none"
               placeholder="Enter a reason for rejection..."
               rows={3}
             />

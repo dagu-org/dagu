@@ -29,6 +29,8 @@
             writeDags: "{{ permissionsWriteDags }}" === "true",
             runDags: "{{ permissionsRunDags }}" === "true",
           },
+          updateAvailable: "{{ updateAvailable }}" === "true",
+          latestVersion: "{{ latestVersion }}",
           paths: {
             dagsDir: "{{ js pathDAGsDir }}",
             logDir: "{{ js pathLogDir }}",

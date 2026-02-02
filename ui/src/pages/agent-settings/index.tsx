@@ -149,7 +149,7 @@ export default function AgentSettingsPage(): React.ReactNode {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-7xl">
       <div>
         <h1 className="text-lg font-semibold">Agent Settings</h1>
         <p className="text-sm text-muted-foreground">

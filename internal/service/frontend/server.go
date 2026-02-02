@@ -52,6 +52,7 @@ import (
 	"github.com/dagu-org/dagu/internal/service/oidcprovision"
 	"github.com/dagu-org/dagu/internal/service/resource"
 	"github.com/dagu-org/dagu/internal/tunnel"
+	"github.com/dagu-org/dagu/internal/upgrade"
 )
 
 // Server represents the HTTP server for the frontend application.
@@ -189,6 +190,11 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		}
 	}
 
+	// Check for updates asynchronously (populates cache for next startup)
+	go func() { _, _ = upgrade.CheckAndUpdateCache(config.Version) }()
+
+	updateAvailable, latestVersion := getUpdateInfo()
+
 	srv := &Server{
 		config:           cfg,
 		agentAPI:         agentAPI,
@@ -215,6 +221,8 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 			OIDCButtonLabel:       oidcButtonLabel,
 			TerminalEnabled:       cfg.Server.Terminal.Enabled && authSvc != nil,
 			GitSyncEnabled:        cfg.GitSync.Enabled,
+			UpdateAvailable:       updateAvailable,
+			LatestVersion:         latestVersion,
 			AgentEnabledChecker:   agentConfigStore,
 		},
 	}
@@ -231,6 +239,15 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	srv.apiV2 = apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, allAPIOptions...)
 
 	return srv, nil
+}
+
+// getUpdateInfo returns update availability and latest version from cache.
+func getUpdateInfo() (updateAvailable bool, latestVersion string) {
+	cache := upgrade.GetCachedUpdateInfo()
+	if cache == nil {
+		return false, ""
+	}
+	return cache.UpdateAvailable, cache.LatestVersion
 }
 
 type builtinAuthResult struct {

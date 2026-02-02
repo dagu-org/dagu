@@ -37,6 +37,7 @@ func init() {
 	rootCmd.AddCommand(cmd.Dry())
 	rootCmd.AddCommand(cmd.Validate())
 	rootCmd.AddCommand(cmd.Status())
+	rootCmd.AddCommand(cmd.History())
 	rootCmd.AddCommand(cmd.Version())
 	rootCmd.AddCommand(cmd.Server())
 	rootCmd.AddCommand(cmd.Scheduler())
@@ -47,6 +48,7 @@ func init() {
 	rootCmd.AddCommand(cmd.Migrate())
 	rootCmd.AddCommand(cmd.Cleanup())
 	rootCmd.AddCommand(cmd.Sync())
+	rootCmd.AddCommand(cmd.Upgrade())
 
 	config.Version = version
 }

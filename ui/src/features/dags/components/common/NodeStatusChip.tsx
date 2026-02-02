@@ -4,7 +4,7 @@
  * @module features/dags/components/common
  */
 import { cn } from '@/lib/utils';
-import { getStatusClass, getNodeStatusIcon } from '@/lib/status-utils';
+import { getStatusClass } from '@/lib/status-utils';
 import MatrixText from '@/ui/MatrixText';
 import React, { useEffect, useState } from 'react';
 import { NodeStatus } from '../../../../api/v2/schema';
@@ -41,7 +41,6 @@ type Props = {
  */
 function NodeStatusChip({ status, children, size = 'md' }: Props) {
   const statusClass = getStatusClass(status);
-  const statusIcon = getNodeStatusIcon(status);
 
   // Size classes
   const sizeClasses = {
@@ -52,19 +51,21 @@ function NodeStatusChip({ status, children, size = 'md' }: Props) {
 
   const isRunning = status === NodeStatus.Running;
 
-  // Render a pill-shaped badge with icon and text
+  // Render a minimal badge - animated spinner for running, text-only for others
   return (
     <div
       className={cn(
-        'inline-flex items-center rounded-full border font-bold uppercase tracking-wider',
+        'inline-flex items-center font-medium',
         statusClass,
         sizeClasses[size]
       )}
     >
-      <span className="mr-1.5 inline-flex" aria-hidden="true">
-        {isRunning ? <BrailleSpinner /> : statusIcon}
-      </span>
-      <span className="font-bold break-keep text-nowrap whitespace-nowrap">
+      {isRunning && (
+        <span className="mr-1.5 inline-flex" aria-hidden="true">
+          <BrailleSpinner />
+        </span>
+      )}
+      <span className="font-medium break-keep text-nowrap whitespace-nowrap">
         {isRunning && typeof children === 'string' ? (
           <MatrixText text={children} />
         ) : (

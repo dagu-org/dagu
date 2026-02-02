@@ -93,3 +93,24 @@ func rebuildDAGFromYAML(ctx context.Context, dag *core.DAG) (*core.DAG, error) {
 
 	return dag, nil
 }
+
+// extractDAGName extracts the DAG name from a file path or name.
+// If the input is a file path (.yaml or .yml), it loads the DAG metadata
+// to extract the name. Otherwise, it returns the input as-is.
+func extractDAGName(ctx *Context, name string) (string, error) {
+	if !strings.HasSuffix(name, ".yaml") && !strings.HasSuffix(name, ".yml") {
+		return name, nil
+	}
+
+	dagStore, err := ctx.dagStore(dagStoreConfig{})
+	if err != nil {
+		return "", fmt.Errorf("failed to initialize DAG store: %w", err)
+	}
+
+	dag, err := dagStore.GetMetadata(ctx, name)
+	if err != nil {
+		return "", fmt.Errorf("failed to read DAG metadata from file %s: %w", name, err)
+	}
+
+	return dag.Name, nil
+}

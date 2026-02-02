@@ -75,7 +75,8 @@ type funcsConfig struct {
 	TerminalEnabled       bool
 	GitSyncEnabled        bool
 
-	// Dynamic config sources (queried on each render)
+	UpdateAvailable     bool
+	LatestVersion       string
 	AgentEnabledChecker AgentEnabledChecker
 }
 
@@ -110,6 +111,9 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 			}
 			return boolStr(cfg.AgentEnabledChecker.IsEnabled(context.Background()))
 		},
+
+		"updateAvailable": func() string { return boolStr(cfg.UpdateAvailable) },
+		"latestVersion":   func() string { return cfg.LatestVersion },
 
 		// Path configuration functions
 		"pathDAGsDir":            func() string { return cfg.Paths.DAGsDir },

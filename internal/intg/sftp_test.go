@@ -43,6 +43,7 @@ func TestSFTPExecutorIntegration(t *testing.T) {
 
 		// Upload file to remote
 		dagConfig := fmt.Sprintf(`
+type: graph
 steps:
   - name: upload-file
     type: sftp
@@ -87,6 +88,7 @@ steps:
 		downloadPath := filepath.Join(downloadDir, "downloaded.txt")
 
 		dagConfig := fmt.Sprintf(`
+type: graph
 steps:
   - name: create-remote-file
     type: ssh
@@ -140,6 +142,7 @@ steps:
 
 		// Upload directory to remote
 		dagConfig := fmt.Sprintf(`
+type: graph
 steps:
   - name: upload-dir
     type: sftp
@@ -186,6 +189,7 @@ steps:
 		downloadPath := filepath.Join(downloadDir, "downloaded_dir")
 
 		dagConfig := fmt.Sprintf(`
+type: graph
 steps:
   - name: create-remote-dir
     type: ssh

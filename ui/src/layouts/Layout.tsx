@@ -1,7 +1,9 @@
+import { UpdateBanner } from '@/components/UpdateBanner';
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils';
 import { getResponsiveTitleClass } from '@/lib/text-utils';
-import { Menu, X } from 'lucide-react';
+import { Menu, Terminal, X } from 'lucide-react';
+import { useAgentChatContext } from '@/features/agent';
 import * as React from 'react';
 import { mainListItems as MainListItems } from '../menu';
 
@@ -75,6 +77,7 @@ type LayoutProps = {
  */
 function Content({ navbarColor, children }: LayoutProps) {
   const config = useConfig();
+  const { toggleChat } = useAgentChatContext();
   const hasCustomColor: boolean = Boolean(
     navbarColor && navbarColor.trim() !== ''
   );
@@ -108,18 +111,21 @@ function Content({ navbarColor, children }: LayoutProps) {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
-      {/* Sidebar - Desktop */}
+      {/* Sidebar - Desktop - GCP Style */}
       <aside
         className={cn(
-          'hidden md:block h-full transition-all duration-300 ease-in-out border-r border-border/40 z-20',
-          isSidebarExpanded ? 'w-60' : 'w-[68px]',
+          'hidden md:block h-full border-r border-border z-20',
+          isSidebarExpanded ? 'w-[240px]' : 'w-[56px]',
           !hasCustomColor && 'bg-sidebar text-sidebar-foreground',
           hasCustomColor && 'custom-sidebar-color'
         )}
-        style={sidebarStyle}
+        style={{
+          ...sidebarStyle,
+          transition: 'width 280ms cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
       >
         <div className="flex flex-col h-full">
-          <nav className="flex-1 overflow-y-auto min-h-0 px-3 py-4">
+          <nav className="flex-1 overflow-y-auto min-h-0 px-2 py-3">
             <MainListItems
               isOpen={isSidebarExpanded}
               onToggle={toggleSidebar}
@@ -129,19 +135,19 @@ function Content({ navbarColor, children }: LayoutProps) {
         </div>
       </aside>
 
-      {/* Main Content Area */}
+      {/* Main Content Area - GCP Style */}
       <div className="flex flex-col flex-1 h-full overflow-hidden relative bg-background">
-        {/* Mobile Header Bar */}
+        {/* Mobile Header Bar - Minimal Design */}
         <header
           className={cn(
-            'md:hidden flex items-center justify-between h-14 px-4 flex-shrink-0 border-b border-border/40',
-            !hasCustomColor && 'bg-sidebar text-sidebar-foreground',
+            'md:hidden flex items-center justify-between h-14 px-4 flex-shrink-0 border-b border-border',
+            !hasCustomColor && 'bg-background text-foreground',
             hasCustomColor && 'custom-sidebar-color'
           )}
           style={sidebarStyle}
         >
           <button
-            className="p-2 rounded-md hover:bg-white/5 transition-colors"
+            className="p-2 rounded-md hover:bg-muted transition-colors"
             onClick={() => setIsMobileSidebarOpen(true)}
             aria-label="Open menu"
           >
@@ -149,40 +155,51 @@ function Content({ navbarColor, children }: LayoutProps) {
           </button>
           <span
             className={cn(
-              'font-semibold tracking-tight uppercase opacity-80 whitespace-normal leading-tight text-center px-2',
+              'font-semibold tracking-tight whitespace-normal leading-tight text-center px-2',
               getResponsiveTitleClass(config.title || 'Dagu', 'header-mobile')
             )}
           >
             {config.title || 'Dagu'}
           </span>
-          <div className="w-8" />
+          {config.agentEnabled ? (
+            <button
+              onClick={toggleChat}
+              className="p-2 rounded-md hover:bg-muted transition-colors"
+              aria-label="Agent Console"
+            >
+              <Terminal className="h-5 w-5" />
+            </button>
+          ) : (
+            <div className="w-8" />
+          )}
         </header>
 
-        {/* Scrollable Content */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 lg:p-8">
-          <div className="w-full h-full">{children}</div>
+        {/* Scrollable Content - More Compact Padding */}
+        <main className="flex-1 overflow-auto">
+          <UpdateBanner />
+          <div className="p-4 md:p-6 w-full h-full">{children}</div>
         </main>
       </div>
 
-      {/* Mobile Sidebar - Overlay */}
+      {/* Mobile Sidebar - Overlay - GCP Style */}
       {isMobileSidebarOpen && (
         <div
-          className="fixed inset-0 bg-background/80 z-50 md:hidden flex backdrop-blur-md"
+          className="fixed inset-0 bg-background/60 z-50 md:hidden flex backdrop-blur-sm"
           onClick={() => setIsMobileSidebarOpen(false)}
         >
           <div
             className={cn(
-              'h-full w-64 overflow-hidden shadow-2xl border-r border-border/40',
+              'h-full w-64 overflow-hidden shadow-lg border-r border-border',
               !hasCustomColor && 'bg-sidebar text-sidebar-foreground',
               hasCustomColor && 'custom-sidebar-color'
             )}
             style={sidebarStyle}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center p-4 border-b border-border/10">
+            <div className="flex justify-between items-center p-4 border-b border-sidebar-border">
               <span
                 className={cn(
-                  'font-bold whitespace-normal leading-tight',
+                  'font-semibold whitespace-normal leading-tight',
                   getResponsiveTitleClass(config.title || 'Dagu', 'sidebar-mobile')
                 )}
               >
@@ -190,13 +207,13 @@ function Content({ navbarColor, children }: LayoutProps) {
               </span>
               <button
                 onClick={() => setIsMobileSidebarOpen(false)}
-                className="p-1 hover:bg-white/5 rounded-md transition-colors"
+                className="p-1.5 hover:bg-sidebar-hover rounded-md transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="flex flex-col h-full pt-2">
-              <nav className="flex-1 overflow-y-auto min-h-0 px-3">
+              <nav className="flex-1 overflow-y-auto min-h-0 px-2">
                 <MainListItems
                   isOpen={true}
                   onNavItemClick={() => setIsMobileSidebarOpen(false)}

@@ -13,6 +13,7 @@ func TestWaitStepApproval(t *testing.T) {
 		th := test.Setup(t)
 
 		testDAG := th.DAG(t, `
+type: graph
 steps:
   - name: wait-step
     type: hitl
@@ -43,6 +44,7 @@ steps:
 		th := test.Setup(t)
 
 		testDAG := th.DAG(t, `
+type: graph
 steps:
   - name: before-wait
     command: echo "before"
@@ -77,6 +79,7 @@ steps:
 		th := test.Setup(t)
 
 		testDAG := th.DAG(t, `
+type: graph
 steps:
   - name: branch-a-1
     command: echo "a1"

@@ -175,6 +175,8 @@ type ChatRequest struct {
 	Model string `json:"model,omitempty"`
 	// DAGContexts provides DAG references for context-aware responses.
 	DAGContexts []DAGContext `json:"dag_contexts,omitempty"`
+	// SafeMode enables approval prompts for dangerous commands when true.
+	SafeMode bool `json:"safe_mode,omitempty"`
 }
 
 // ResolvedDAGContext contains server-resolved information for a DAG.
@@ -229,6 +231,8 @@ type ToolContext struct {
 	EmitUserPrompt EmitUserPromptFunc
 	// WaitUserResponse blocks until user responds to a prompt.
 	WaitUserResponse WaitUserResponseFunc
+	// SafeMode enables approval prompts for dangerous commands when true.
+	SafeMode bool
 }
 
 // AgentTool extends llm.Tool with an execution function.

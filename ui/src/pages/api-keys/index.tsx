@@ -113,7 +113,7 @@ export default function APIKeysPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4 max-w-7xl">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold">API Keys</h1>
@@ -137,8 +137,8 @@ export default function APIKeysPage() {
         </div>
       )}
 
-      <div className="card-obsidian">
-        <Table>
+      <div className="card-obsidian overflow-auto">
+        <Table className="text-xs">
           <TableHeader>
             <TableRow>
               <TableHead className="w-[200px]">Name</TableHead>

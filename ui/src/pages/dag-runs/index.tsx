@@ -695,7 +695,7 @@ function DAGRuns() {
   const tzLabel = formatTimezoneOffset();
 
   return (
-    <div className="">
+    <div className="max-w-7xl">
       <div className="flex items-center justify-between mb-2">
         <Title>DAG Runs</Title>
         <ToggleGroup aria-label="View mode">

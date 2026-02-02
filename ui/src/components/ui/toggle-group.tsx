@@ -101,7 +101,7 @@ export function ToggleButton({
       className={cn(
         'inline-flex items-center justify-center h-8 px-4 text-xs font-bold transition-all rounded-md cursor-pointer',
         isSelected
-          ? 'bg-primary text-primary-foreground shadow-sm scale-100'
+          ? 'bg-primary text-primary-foreground shadow-sm scale-100 dark:bg-transparent dark:border dark:border-primary dark:text-primary'
           : 'text-muted-foreground hover:bg-muted hover:text-foreground active:scale-95',
         className
       )}

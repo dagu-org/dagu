@@ -323,31 +323,31 @@ function DAGRunTable({
       <Table className="w-full text-xs">
         <TableHeader>
           <TableRow>
-            <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+            <TableHead>
               DAG Name
             </TableHead>
-            <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+            <TableHead>
               Run ID
             </TableHead>
-            <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+            <TableHead>
               Status
             </TableHead>
-            <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+            <TableHead>
               <div>Queued At</div>
               <div className="text-xs text-muted-foreground font-normal">
                 {timezoneInfo}
               </div>
             </TableHead>
-            <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+            <TableHead>
               <div>Started At</div>
               <div className="text-xs text-muted-foreground font-normal">
                 {timezoneInfo}
               </div>
             </TableHead>
-            <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+            <TableHead>
               Duration
             </TableHead>
-            <TableHead className="text-muted-foreground h-10 px-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] text-xs">
+            <TableHead>
               Worker
             </TableHead>
           </TableRow>

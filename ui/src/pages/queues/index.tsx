@@ -185,7 +185,7 @@ function Queues() {
   }
 
   return (
-    <div className="flex flex-col gap-2 w-full h-full overflow-hidden">
+    <div className="flex flex-col gap-4 max-w-7xl h-full overflow-hidden">
       <Title>Queues</Title>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 flex-shrink-0">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">

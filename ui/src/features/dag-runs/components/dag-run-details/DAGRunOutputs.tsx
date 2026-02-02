@@ -191,12 +191,12 @@ function DAGRunOutputs({ dagName, dagRunId }: Props) {
       <div className="border border-border rounded-lg overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow className="hover:bg-transparent">
+            <TableRow>
               <TableHead className="w-[200px]">
                 <button
                   type="button"
                   onClick={() => handleSort('name')}
-                  className="flex items-center gap-1 cursor-pointer select-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 rounded"
+                  className="flex items-center gap-1 cursor-pointer select-none focus:outline-none rounded"
                   aria-label="Sort by key"
                 >
                   Key
@@ -207,7 +207,7 @@ function DAGRunOutputs({ dagName, dagRunId }: Props) {
                 <button
                   type="button"
                   onClick={() => handleSort('value')}
-                  className="flex items-center gap-1 cursor-pointer select-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 rounded"
+                  className="flex items-center gap-1 cursor-pointer select-none focus:outline-none rounded"
                   aria-label="Sort by value"
                 >
                   Value
@@ -229,18 +229,18 @@ function DAGRunOutputs({ dagName, dagRunId }: Props) {
               </TableRow>
             ) : (
               filteredOutputs.map(([key, value]) => (
-                <TableRow key={key}>
-                  <TableCell className="font-mono text-sm font-medium">
+                <TableRow key={key} className="hover:bg-muted/50">
+                  <TableCell className="font-mono font-medium">
                     {key}
                   </TableCell>
-                  <TableCell className="font-mono text-sm text-muted-foreground whitespace-normal break-words">
+                  <TableCell className="font-mono text-muted-foreground whitespace-normal break-words">
                     {value}
                   </TableCell>
                   <TableCell>
                     <button
                       type="button"
                       onClick={() => handleCopy(key, value)}
-                      className="p-1 hover:bg-accent rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+                      className="p-1 hover:bg-accent rounded focus:outline-none"
                       title="Copy value"
                       aria-label={`Copy value for ${key}`}
                     >

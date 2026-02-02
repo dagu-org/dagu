@@ -225,7 +225,7 @@ export default function WebhooksPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4 max-w-7xl">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold">Webhooks</h1>
@@ -241,8 +241,8 @@ export default function WebhooksPage() {
         </div>
       )}
 
-      <div className="card-obsidian">
-        <Table>
+      <div className="card-obsidian overflow-auto">
+        <Table className="text-xs">
           <TableHeader>
             <TableRow>
               <TableHead className="w-[250px]">DAG</TableHead>

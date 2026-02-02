@@ -8,7 +8,6 @@ export * from './context/AgentChatContext';
 export * from './hooks/useAgentChat';
 
 // Components
-export * from './components/AgentChatButton';
 export * from './components/AgentChatModal';
 export * from './components/ChatInput';
 export * from './components/ChatMessages';

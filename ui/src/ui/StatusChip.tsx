@@ -26,16 +26,16 @@ function StatusChip({
     lg: 'text-base py-1.5 px-4',
   };
 
-  // Render a pill-shaped badge with text
+  // Render a minimal badge with text
   return (
     <div
       className={cn(
-        'inline-flex items-center rounded-full border font-bold uppercase tracking-wider',
+        'inline-flex items-center font-medium',
         statusClass,
         sizeClasses[size]
       )}
     >
-      <span className="font-bold break-keep text-nowrap whitespace-nowrap">
+      <span className="font-medium break-keep text-nowrap whitespace-nowrap">
         {isRunning && typeof children === 'string' ? (
           <MatrixText text={children} />
         ) : (

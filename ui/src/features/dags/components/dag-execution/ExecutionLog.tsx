@@ -345,7 +345,7 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
   return (
     <div className="w-full h-full flex flex-col">
       {/* Controls for log navigation */}
-      <div className="flex flex-col gap-2 mb-2 bg-muted rounded">
+      <div className="flex flex-col gap-2 mb-2 p-4 bg-muted rounded">
         <div className="flex flex-wrap items-center gap-2">
           {/* Responsive button container */}
           <div className="flex flex-wrap gap-1">
@@ -376,7 +376,7 @@ function ExecutionLog({ name, dagRunId, dagRun }: Props) {
           </div>
 
           <select
-            className="h-7 px-2 text-xs border border-border rounded-md bg-surface text-foreground flex-shrink-0 focus:outline-none focus:ring-1 focus:ring-ring"
+            className="h-7 px-2 text-xs border border-border rounded-md bg-surface text-foreground flex-shrink-0 focus:outline-none focus:border-ring"
             value={pageSize}
             onChange={(e) => setPageSize(Number(e.target.value))}
             disabled={isNavigating}
