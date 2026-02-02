@@ -111,12 +111,15 @@ function Content({ navbarColor, children }: LayoutProps) {
       {/* Sidebar - Desktop - GCP Style */}
       <aside
         className={cn(
-          'hidden md:block h-full transition-all duration-200 ease-in-out border-r border-border z-20',
+          'hidden md:block h-full border-r border-border z-20',
           isSidebarExpanded ? 'w-[240px]' : 'w-[56px]',
           !hasCustomColor && 'bg-sidebar text-sidebar-foreground',
           hasCustomColor && 'custom-sidebar-color'
         )}
-        style={sidebarStyle}
+        style={{
+          ...sidebarStyle,
+          transition: 'width 280ms cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
       >
         <div className="flex flex-col h-full">
           <nav className="flex-1 overflow-y-auto min-h-0 px-2 py-3">

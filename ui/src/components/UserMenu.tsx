@@ -46,20 +46,22 @@ export function UserMenu({ isCollapsed = false }: UserMenuProps) {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
-            className={cn(
-              'flex items-center transition-all duration-200 cursor-pointer',
-              isCollapsed
-                ? 'w-7 h-7 justify-center rounded hover:bg-sidebar-foreground/5 text-sidebar-foreground'
-                : 'h-7 px-2 rounded hover:bg-sidebar-foreground/5 text-sidebar-foreground justify-start w-full'
-            )}
+            className="flex items-center gap-2 h-7 px-2 rounded hover:bg-sidebar-foreground/5 text-sidebar-foreground cursor-pointer w-full"
+            style={{ transition: 'background-color 150ms ease' }}
             title={isCollapsed ? user.username : undefined}
           >
             <User className="h-4 w-4 shrink-0" />
-            {!isCollapsed && (
-              <span className="ml-2 text-xs font-medium truncate">
-                {user.username}
-              </span>
-            )}
+            <span
+              className="text-xs font-medium overflow-hidden whitespace-nowrap"
+              style={{
+                transition: 'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms cubic-bezier(0.4, 0, 0.2, 1), max-width 280ms cubic-bezier(0.4, 0, 0.2, 1)',
+                opacity: isCollapsed ? 0 : 1,
+                maxWidth: isCollapsed ? '0px' : '120px',
+                transform: isCollapsed ? 'translateX(-8px)' : 'translateX(0)',
+              }}
+            >
+              {user.username}
+            </span>
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align={isCollapsed ? 'center' : 'end'} side="top" className="w-56">
