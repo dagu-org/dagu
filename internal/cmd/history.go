@@ -341,16 +341,23 @@ func parseTags(s string) []string {
 			tags = append(tags, trimmed)
 		}
 	}
+	if len(tags) == 0 {
+		return nil
+	}
 	return tags
 }
 
 // renderHistoryTable displays DAG run history as an aligned table.
 func renderHistoryTable(statuses []*exec.DAGRunStatus) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	defer w.Flush()
+	defer func() {
+		_ = w.Flush()
+	}()
 
 	// Header
-	fmt.Fprintln(w, "DAG NAME\tRUN ID\tSTATUS\tSTARTED (UTC)\tDURATION\tPARAMS")
+	if _, err := fmt.Fprintln(w, "DAG NAME\tRUN ID\tSTATUS\tSTARTED (UTC)\tDURATION\tPARAMS"); err != nil {
+		return fmt.Errorf("failed to write header: %w", err)
+	}
 
 	// Rows
 	for _, status := range statuses {
@@ -361,14 +368,16 @@ func renderHistoryTable(statuses []*exec.DAGRunStatus) error {
 		duration := formatDuration(status)
 		params := formatParams(status.Params)
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			dagName,
 			runID,
 			statusText,
 			startedAt,
 			duration,
 			params,
-		)
+		); err != nil {
+			return fmt.Errorf("failed to write row: %w", err)
+		}
 	}
 
 	return nil

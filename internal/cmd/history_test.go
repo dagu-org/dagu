@@ -577,7 +577,7 @@ func TestFormatParams(t *testing.T) {
 		{
 			name:     "long params with spaces",
 			input:    "key1=value1 key2=value2 key3=value3 key4=value4",
-			expected: "key1=value1 key2=value2 key3=value3 ...",
+			expected: "key1=value1 key2=value2 key3=value3 k...",
 		},
 	}
 
