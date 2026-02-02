@@ -245,11 +245,8 @@ func replaceWindowsBinary(src, target string, perm os.FileMode) error {
 		return err
 	}
 
-	// Set permissions
-	if err := os.Chmod(target, perm); err != nil {
-		// Non-fatal on Windows
-		_ = err
-	}
+	// Chmod may fail on Windows - ignore error
+	_ = os.Chmod(target, perm)
 
 	// Remove old binary (will fail if it's running, but that's okay)
 	_ = os.Remove(oldPath)

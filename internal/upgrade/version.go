@@ -59,11 +59,6 @@ func IsNewer(current, target *semver.Version) bool {
 	return CompareVersions(current, target) < 0
 }
 
-// VersionWithoutV returns the version string without the 'v' prefix.
-func VersionWithoutV(v *semver.Version) string {
-	return v.String()
-}
-
 // isNumeric checks if a string contains only digits.
 func isNumeric(s string) bool {
 	if s == "" {
@@ -89,15 +84,6 @@ func NormalizeVersionTag(version string) string {
 // ExtractVersionFromTag extracts the version number from a tag like "v1.30.3".
 func ExtractVersionFromTag(tag string) string {
 	return strings.TrimPrefix(tag, "v")
-}
-
-// IsPreRelease checks if a version string represents a pre-release version.
-func IsPreRelease(version string) bool {
-	v, err := ParseVersion(version)
-	if err != nil {
-		return false
-	}
-	return v.Prerelease() != ""
 }
 
 // versionPattern matches semver-like version strings.

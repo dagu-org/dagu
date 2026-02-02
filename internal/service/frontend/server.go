@@ -190,6 +190,8 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		}
 	}
 
+	updateAvailable, latestVersion := getUpdateInfo()
+
 	srv := &Server{
 		config:           cfg,
 		agentAPI:         agentAPI,
@@ -216,8 +218,8 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 			OIDCButtonLabel:       oidcButtonLabel,
 			TerminalEnabled:       cfg.Server.Terminal.Enabled && authSvc != nil,
 			GitSyncEnabled:        cfg.GitSync.Enabled,
-			UpdateAvailable:       getUpdateAvailable(),
-			LatestVersion:         getLatestVersion(),
+			UpdateAvailable:       updateAvailable,
+			LatestVersion:         latestVersion,
 			AgentEnabledChecker:   agentConfigStore,
 		},
 	}
@@ -236,22 +238,13 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	return srv, nil
 }
 
-// getUpdateAvailable checks if an update is available from the cache.
-func getUpdateAvailable() bool {
+// getUpdateInfo returns update availability and latest version from cache.
+func getUpdateInfo() (updateAvailable bool, latestVersion string) {
 	cache := upgrade.GetCachedUpdateInfo()
 	if cache == nil {
-		return false
+		return false, ""
 	}
-	return cache.UpdateAvailable
-}
-
-// getLatestVersion returns the latest version from the cache.
-func getLatestVersion() string {
-	cache := upgrade.GetCachedUpdateInfo()
-	if cache == nil {
-		return ""
-	}
-	return cache.LatestVersion
+	return cache.UpdateAvailable, cache.LatestVersion
 }
 
 type builtinAuthResult struct {

@@ -430,10 +430,38 @@ func TestFindAsset(t *testing.T) {
 }
 
 func TestDetectInstallMethod(t *testing.T) {
-	// This test just verifies the function doesn't panic
 	method := DetectInstallMethod()
+
+	// Verify it returns a valid method
 	if method.String() == "" {
 		t.Error("DetectInstallMethod() returned empty string")
+	}
+
+	// Verify it returns one of the known install methods
+	validMethods := map[InstallMethod]bool{
+		InstallMethodBinary:    true,
+		InstallMethodGoInstall: true,
+		InstallMethodHomebrew:  true,
+		InstallMethodSnap:      true,
+		InstallMethodDocker:    true,
+		InstallMethodUnknown:   true,
+	}
+	if !validMethods[method] {
+		t.Errorf("DetectInstallMethod() returned unknown method: %v", method)
+	}
+
+	// Verify the String() method returns a non-empty, meaningful value
+	methodStr := method.String()
+	knownStrings := []string{"binary", "go install", "homebrew", "snap", "docker", "unknown"}
+	found := false
+	for _, s := range knownStrings {
+		if methodStr == s {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("DetectInstallMethod().String() returned unexpected value: %q", methodStr)
 	}
 }
 
@@ -470,24 +498,29 @@ func TestVerifyChecksum(t *testing.T) {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	// SHA256 of "hello world\n"
-	expectedHash := "a948904f2f0f479b8f8564cbf12dac6b0c0a2e2a5c1a88e6e7e5f0d2e3e8a4f5"
+	// Correct SHA256 of "hello world\n"
+	correctHash := "a948904f2f0f479b8f8197694b30184b0d2ed1c1cd2a1ec0fb85d299a192a447"
 	wrongHash := "0000000000000000000000000000000000000000000000000000000000000000"
 
 	t.Run("matching hash", func(t *testing.T) {
-		// Calculate actual hash first
+		err := VerifyChecksum(tmpFile, correctHash)
+		if err != nil {
+			t.Errorf("VerifyChecksum() unexpected error for correct hash: %v", err)
+		}
+	})
+
+	t.Run("mismatching hash", func(t *testing.T) {
 		err := VerifyChecksum(tmpFile, wrongHash)
 		if err == nil {
 			t.Error("VerifyChecksum() expected error for wrong hash")
 		}
-		// The error message should contain both hashes
 		if !strings.Contains(err.Error(), "checksum mismatch") {
 			t.Errorf("VerifyChecksum() error should mention mismatch: %v", err)
 		}
 	})
 
 	t.Run("file not found", func(t *testing.T) {
-		err := VerifyChecksum("/nonexistent/file", expectedHash)
+		err := VerifyChecksum("/nonexistent/file", correctHash)
 		if err == nil {
 			t.Error("VerifyChecksum() expected error for nonexistent file")
 		}
