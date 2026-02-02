@@ -1,6 +1,6 @@
 import { ReactElement, useCallback, useEffect, useRef } from 'react';
 
-import { AlertCircle, Plus, Terminal, X } from 'lucide-react';
+import { AlertCircle, Plus, Shield, ShieldOff, Terminal, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { useUserPreferences } from '@/contexts/UserPreference';
 
 import { useAgentChatContext } from '../context/AgentChatContext';
 import { useAgentChat } from '../hooks/useAgentChat';
@@ -47,6 +48,7 @@ function findLatestConversation(
 
 export function AgentChatModal(): ReactElement | null {
   const { isOpen, closeChat } = useAgentChatContext();
+  const { preferences, updatePreference } = useUserPreferences();
   const {
     conversationId,
     messages,
@@ -203,6 +205,25 @@ export function AgentChatModal(): ReactElement | null {
           </Select>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            onClick={() => updatePreference('safeMode', !preferences.safeMode)}
+            className={cn(
+              "flex items-center gap-1.5 px-2 py-1 rounded border text-[11px] font-medium uppercase tracking-wide cursor-pointer transition-all select-none",
+              preferences.safeMode
+                ? "bg-muted border-border text-foreground hover:bg-muted/80"
+                : "bg-background border-border/50 text-muted-foreground hover:border-border"
+            )}
+            title={preferences.safeMode
+              ? "Safe Mode ON - Click to disable"
+              : "Safe Mode OFF - Click to enable"}
+          >
+            {preferences.safeMode ? (
+              <Shield className="h-3 w-3" />
+            ) : (
+              <ShieldOff className="h-3 w-3" />
+            )}
+            <span>Safe</span>
+          </button>
           <Button
             variant="ghost"
             size="sm"
