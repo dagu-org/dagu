@@ -126,6 +126,14 @@ func CanSelfUpgrade() (bool, string) {
 	return true, ""
 }
 
+// formatVersion ensures the version has a "v" prefix for consistent display.
+func formatVersion(v string) string {
+	if !strings.HasPrefix(v, "v") {
+		return "v" + v
+	}
+	return v
+}
+
 // FormatResult formats the upgrade result for display.
 func FormatResult(r *Result) string {
 	var sb strings.Builder
@@ -134,7 +142,7 @@ func FormatResult(r *Result) string {
 		sb.WriteString("Dry run - no changes will be made\n\n")
 	}
 
-	fmt.Fprintf(&sb, "Current version: %s\n", r.CurrentVersion)
+	fmt.Fprintf(&sb, "Current version: %s\n", formatVersion(r.CurrentVersion))
 	fmt.Fprintf(&sb, "Target version:  %s\n", r.TargetVersion)
 
 	if !r.UpgradeNeeded && !r.WasUpgraded {
@@ -164,7 +172,7 @@ func FormatResult(r *Result) string {
 func FormatCheckResult(r *Result) string {
 	var sb strings.Builder
 
-	fmt.Fprintf(&sb, "Current version: %s\n", r.CurrentVersion)
+	fmt.Fprintf(&sb, "Current version: %s\n", formatVersion(r.CurrentVersion))
 	fmt.Fprintf(&sb, "Latest version:  %s\n", r.TargetVersion)
 
 	if r.UpgradeNeeded {

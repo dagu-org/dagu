@@ -285,7 +285,8 @@ func CheckWritePermission(targetPath string) error {
 // VerifyBinary runs the installed binary with "version" argument to verify it works.
 func VerifyBinary(binaryPath, expectedVersion string) error {
 	cmd := exec.Command(binaryPath, "version") //nolint:gosec // binaryPath is the path we just installed to
-	output, err := cmd.Output()
+	// Use CombinedOutput to capture both stdout and stderr (older versions write to stderr)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("binary verification failed: %w", err)
 	}
