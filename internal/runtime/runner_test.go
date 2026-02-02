@@ -3131,3 +3131,309 @@ func TestWaitStep(t *testing.T) {
 		result.assertNodeStatus(t, "final", core.NodeNotStarted)
 	})
 }
+
+func TestRouter(t *testing.T) {
+	t.Run("RouterExclusiveMode_ActivatesMatchedStep", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t)
+
+		// Router step that activates success_handler on exit code 0
+		// 1 -> router -> success_handler
+		//              -> error_handler (should be skipped)
+		router := routerStep("router", &core.RouterConfig{
+			Value: "@exitCode",
+			Mode:  core.RouterModeExclusive,
+			Routes: map[string][]string{
+				"0": {"success_handler"},
+				"1": {"error_handler"},
+			},
+		}, "1")
+
+		plan := r.newPlan(t,
+			successStep("1"),
+			router,
+			successStep("success_handler", "router"),
+			successStep("error_handler", "router"),
+		)
+
+		result := plan.assertRun(t, core.Succeeded)
+
+		result.assertNodeStatus(t, "1", core.NodeSucceeded)
+		result.assertNodeStatus(t, "router", core.NodeSucceeded)
+		result.assertNodeStatus(t, "success_handler", core.NodeSucceeded)
+		result.assertNodeStatus(t, "error_handler", core.NodeSkippedByRouter)
+	})
+
+	t.Run("RouterExclusiveMode_UsesDefaultRoute", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t)
+
+		// Router with no matching patterns should use default
+		router := routerStep("router", &core.RouterConfig{
+			Value: "@exitCode",
+			Mode:  core.RouterModeExclusive,
+			Routes: map[string][]string{
+				"1": {"error_handler"},
+			},
+			Default: []string{"default_handler"},
+		})
+
+		plan := r.newPlan(t,
+			router,
+			successStep("error_handler", "router"),
+			successStep("default_handler", "router"),
+		)
+
+		result := plan.assertRun(t, core.Succeeded)
+
+		result.assertNodeStatus(t, "router", core.NodeSucceeded)
+		result.assertNodeStatus(t, "error_handler", core.NodeSkippedByRouter)
+		result.assertNodeStatus(t, "default_handler", core.NodeSucceeded)
+	})
+
+	t.Run("RouterMultiSelectMode_ActivatesMultipleSteps", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t)
+
+		// Multi-select router should activate all matching steps
+		router := routerStep("router", &core.RouterConfig{
+			Value: "@value",
+			Mode:  core.RouterModeMultiSelect,
+			Routes: map[string][]string{
+				"":      {"empty_handler", "log_step"},
+				"error": {"error_handler"},
+			},
+		})
+
+		plan := r.newPlan(t,
+			router,
+			successStep("empty_handler", "router"),
+			successStep("log_step", "router"),
+			successStep("error_handler", "router"),
+		)
+
+		result := plan.assertRun(t, core.Succeeded)
+
+		result.assertNodeStatus(t, "router", core.NodeSucceeded)
+		result.assertNodeStatus(t, "empty_handler", core.NodeSucceeded)
+		result.assertNodeStatus(t, "log_step", core.NodeSucceeded)
+		result.assertNodeStatus(t, "error_handler", core.NodeSkippedByRouter)
+	})
+
+	t.Run("RouterWithDownstreamDependencies", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t)
+
+		// Test that downstream dependencies work correctly
+		// router -> activated -> final
+		//        -> skipped (should also skip downstream)
+		router := routerStep("router", &core.RouterConfig{
+			Value: "@exitCode",
+			Mode:  core.RouterModeExclusive,
+			Routes: map[string][]string{
+				"0": {"activated"},
+			},
+			Default: []string{},
+		})
+
+		plan := r.newPlan(t,
+			router,
+			successStep("activated", "router"),
+			successStep("skipped", "router"),
+			successStep("final_activated", "activated"),
+			successStep("final_skipped", "skipped"),
+		)
+
+		result := plan.assertRun(t, core.Succeeded)
+
+		result.assertNodeStatus(t, "router", core.NodeSucceeded)
+		result.assertNodeStatus(t, "activated", core.NodeSucceeded)
+		result.assertNodeStatus(t, "skipped", core.NodeSkippedByRouter)
+		result.assertNodeStatus(t, "final_activated", core.NodeSucceeded)
+		// Nodes depending on skipped nodes should also be aborted
+		result.assertNodeStatus(t, "final_skipped", core.NodeAborted)
+	})
+
+	t.Run("RouterInChain", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t)
+
+		// Test router in a chain: 1 -> router -> 2 -> 3
+		router := routerStep("router", &core.RouterConfig{
+			Value: "@exitCode",
+			Mode:  core.RouterModeExclusive,
+			Routes: map[string][]string{
+				"0": {"step2"},
+			},
+		}, "1")
+
+		plan := r.newPlan(t,
+			successStep("1"),
+			router,
+			successStep("step2", "router"),
+			successStep("step3", "step2"),
+		)
+
+		result := plan.assertRun(t, core.Succeeded)
+
+		result.assertNodeStatus(t, "1", core.NodeSucceeded)
+		result.assertNodeStatus(t, "router", core.NodeSucceeded)
+		result.assertNodeStatus(t, "step2", core.NodeSucceeded)
+		result.assertNodeStatus(t, "step3", core.NodeSucceeded)
+	})
+
+	t.Run("RouterWithNoMatchNoDefault", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t)
+
+		// Router with no match and no default - all downstream should be skipped
+		router := routerStep("router", &core.RouterConfig{
+			Value: "@exitCode",
+			Mode:  core.RouterModeExclusive,
+			Routes: map[string][]string{
+				"1": {"error_handler"},
+			},
+			Default: []string{}, // No default
+		})
+
+		plan := r.newPlan(t,
+			router,
+			successStep("error_handler", "router"),
+			successStep("other_handler", "router"),
+		)
+
+		result := plan.assertRun(t, core.Succeeded)
+
+		result.assertNodeStatus(t, "router", core.NodeSucceeded)
+		result.assertNodeStatus(t, "error_handler", core.NodeSkippedByRouter)
+		result.assertNodeStatus(t, "other_handler", core.NodeSkippedByRouter)
+	})
+
+	t.Run("MultipleRoutersInSequence", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t)
+
+		// Test multiple routers in sequence
+		// router1 -> activated1 -> router2 -> activated2
+		router1 := routerStep("router1", &core.RouterConfig{
+			Value: "@exitCode",
+			Mode:  core.RouterModeExclusive,
+			Routes: map[string][]string{
+				"0": {"activated1"},
+			},
+		})
+
+		router2 := routerStep("router2", &core.RouterConfig{
+			Value: "@exitCode",
+			Mode:  core.RouterModeExclusive,
+			Routes: map[string][]string{
+				"0": {"activated2"},
+			},
+		}, "activated1")
+
+		plan := r.newPlan(t,
+			router1,
+			successStep("activated1", "router1"),
+			successStep("skipped1", "router1"),
+			router2,
+			successStep("activated2", "router2"),
+			successStep("skipped2", "router2"),
+		)
+
+		result := plan.assertRun(t, core.Succeeded)
+
+		result.assertNodeStatus(t, "router1", core.NodeSucceeded)
+		result.assertNodeStatus(t, "activated1", core.NodeSucceeded)
+		result.assertNodeStatus(t, "skipped1", core.NodeSkippedByRouter)
+		result.assertNodeStatus(t, "router2", core.NodeSucceeded)
+		result.assertNodeStatus(t, "activated2", core.NodeSucceeded)
+		result.assertNodeStatus(t, "skipped2", core.NodeSkippedByRouter)
+	})
+
+	t.Run("RouterWithParallelBranches", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t)
+
+		// Router with multiple activated branches that can run in parallel
+		router := routerStep("router", &core.RouterConfig{
+			Value: "@exitCode",
+			Mode:  core.RouterModeExclusive,
+			Routes: map[string][]string{
+				"0": {"branch1", "branch2", "branch3"},
+			},
+		})
+
+		plan := r.newPlan(t,
+			router,
+			successStep("branch1", "router"),
+			successStep("branch2", "router"),
+			successStep("branch3", "router"),
+			successStep("skipped", "router"),
+		)
+
+		result := plan.assertRun(t, core.Succeeded)
+
+		result.assertNodeStatus(t, "router", core.NodeSucceeded)
+		result.assertNodeStatus(t, "branch1", core.NodeSucceeded)
+		result.assertNodeStatus(t, "branch2", core.NodeSucceeded)
+		result.assertNodeStatus(t, "branch3", core.NodeSucceeded)
+		result.assertNodeStatus(t, "skipped", core.NodeSkippedByRouter)
+	})
+
+	t.Run("RouterResultStorage", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t)
+
+		// Test that router result is properly stored and accessible
+		router := routerStep("router", &core.RouterConfig{
+			Value: "@exitCode",
+			Mode:  core.RouterModeExclusive,
+			Routes: map[string][]string{
+				"0": {"success_handler"},
+			},
+		})
+
+		plan := r.newPlan(t,
+			router,
+			successStep("success_handler", "router"),
+		)
+
+		result := plan.assertRun(t, core.Succeeded)
+
+		result.assertNodeStatus(t, "router", core.NodeSucceeded)
+		result.assertNodeStatus(t, "success_handler", core.NodeSucceeded)
+
+		// Verify router result is stored
+		routerNode := result.nodeByName(t, "router")
+		routerResult := routerNode.Data.GetRouterResult()
+		require.NotNil(t, routerResult, "router result should be stored")
+		require.NotEmpty(t, routerResult.ActivatedSteps, "activated steps should not be empty")
+		require.Contains(t, routerResult.ActivatedSteps, "success_handler", "success_handler should be in activated steps")
+	})
+
+	t.Run("RouterWithFailedDependency", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t)
+
+		// If router's dependency fails, router shouldn't run
+		router := routerStep("router", &core.RouterConfig{
+			Value: "@exitCode",
+			Mode:  core.RouterModeExclusive,
+			Routes: map[string][]string{
+				"0": {"success_handler"},
+			},
+		}, "failed_step")
+
+		plan := r.newPlan(t,
+			failStep("failed_step"),
+			router,
+			successStep("success_handler", "router"),
+		)
+
+		result := plan.assertRun(t, core.Failed)
+
+		result.assertNodeStatus(t, "failed_step", core.NodeFailed)
+		result.assertNodeStatus(t, "router", core.NodeAborted)
+		result.assertNodeStatus(t, "success_handler", core.NodeAborted)
+	})
+}

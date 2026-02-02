@@ -865,6 +865,18 @@ func isReady(ctx context.Context, plan *Plan, node *Node) bool {
 			node.SetError(ErrUpstreamSkipped)
 			return false
 
+		case core.NodeSkippedByRouter:
+			if dep.ShouldContinue(ctx) {
+				logger.Debug(ctx, "Dependency skipped by router but allowed to continue",
+					tag.Step(node.Name()), tag.Dependency(dep.Name()))
+				continue
+			}
+			logger.Debug(ctx, "Dependency skipped by router",
+				tag.Step(node.Name()), tag.Dependency(dep.Name()))
+			node.SetStatus(core.NodeAborted)
+			node.SetError(ErrUpstreamSkipped)
+			return false
+
 		case core.NodeAborted:
 			logger.Debug(ctx, "Dependency aborted",
 				tag.Step(node.Name()), tag.Dependency(dep.Name()))

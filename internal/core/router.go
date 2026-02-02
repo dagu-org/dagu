@@ -112,6 +112,11 @@ func CompilePattern(pattern string) (*CompiledPattern, error) {
 			return nil, fmt.Errorf("regex too long: %d characters (max 1000)", len(regexStr))
 		}
 
+		// Check for potentially dangerous ReDoS patterns
+		if err := checkReDoSPattern(regexStr); err != nil {
+			return nil, err
+		}
+
 		// Compile with timeout to prevent hangs
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -134,16 +139,33 @@ func CompilePattern(pattern string) (*CompiledPattern, error) {
 		}
 
 		parts := strings.Split(inner, ",")
+		hasNumeric := false
+		hasNonNumeric := false
+
 		for _, part := range parts {
 			trimmed := strings.TrimSpace(part)
 			if trimmed == "" {
 				return nil, fmt.Errorf("empty value in array pattern")
 			}
+
+			// Check if value is numeric
+			if _, err := strconv.Atoi(trimmed); err == nil {
+				hasNumeric = true
+			} else {
+				hasNonNumeric = true
+			}
+
 			cp.Values = append(cp.Values, trimmed)
 		}
 
 		if len(cp.Values) == 0 {
 			return nil, fmt.Errorf("array pattern has no values")
+		}
+
+		// Validate: arrays should be all numeric (for exit codes) or all non-numeric (for values)
+		// Mixed arrays are ambiguous and should be rejected
+		if hasNumeric && hasNonNumeric {
+			return nil, fmt.Errorf("invalid exit code array: mixed numeric and non-numeric values")
 		}
 
 		cp.IsArray = true
@@ -190,6 +212,43 @@ func compileRegexSafe(ctx context.Context, pattern string) (*regexp.Regexp, erro
 	case <-ctx.Done():
 		return nil, fmt.Errorf("regex compilation timeout after 5 seconds")
 	}
+}
+
+// checkReDoSPattern performs basic ReDoS (Regular Expression Denial of Service) detection.
+// It checks for common catastrophic backtracking patterns that can cause exponential runtime.
+func checkReDoSPattern(pattern string) error {
+	// Pattern 1: Nested quantifiers like (a+)+ or (a*)* or (a+)*
+	// These can cause catastrophic backtracking
+	nestedQuantifiers := []string{
+		")+", ")*", ")+*", ")*+", // Direct nesting
+		"++", "**", "+*", "*+",   // Adjacent quantifiers
+	}
+	for _, badPattern := range nestedQuantifiers {
+		if strings.Contains(pattern, badPattern) {
+			return fmt.Errorf("potentially unsafe regex pattern: contains nested quantifiers '%s' which may cause ReDoS", badPattern)
+		}
+	}
+
+	// Pattern 2: Alternation with overlapping patterns like (a|a)* or (a|ab)*
+	// While not all are dangerous, we err on the side of caution
+	// Look for patterns like (X+|X) where X is repeated
+	if strings.Contains(pattern, "(") && strings.Contains(pattern, "|") {
+		// This is a simplified check - in production, you'd want more sophisticated analysis
+		// For now, we'll allow alternations but warn about potential issues
+	}
+
+	// Pattern 3: Greedy quantifiers followed by the same pattern
+	// Like .*. or .+. which can cause excessive backtracking
+	dangerousPatterns := []string{
+		".*.", ".+.",
+	}
+	for _, badPattern := range dangerousPatterns {
+		if strings.Contains(pattern, badPattern) {
+			return fmt.Errorf("potentially unsafe regex pattern: contains '%s' which may cause excessive backtracking", badPattern)
+		}
+	}
+
+	return nil
 }
 
 // containsOperators checks if pattern contains expression operators
@@ -640,11 +699,22 @@ func MatchPattern(compiled *CompiledPattern, value string, exitCode int) (bool, 
 		return compiled.Regex.MatchString(value), nil
 	}
 
-	// Array pattern - check if value is in the array
+	// Array pattern - check if value or exitCode is in the array
 	if compiled.IsArray {
+		// Try to match as exit code (numeric comparison)
+		exitCodeStr := strconv.Itoa(exitCode)
 		for _, v := range compiled.Values {
-			if v == value {
-				return true, nil
+			// Check if array value is numeric
+			if _, err := strconv.Atoi(v); err == nil {
+				// Numeric value in array - compare with exitCode
+				if v == exitCodeStr {
+					return true, nil
+				}
+			} else {
+				// Non-numeric value in array - compare with value string
+				if v == value {
+					return true, nil
+				}
 			}
 		}
 		return false, nil
@@ -663,7 +733,17 @@ func MatchPattern(compiled *CompiledPattern, value string, exitCode int) (bool, 
 		return result, nil
 	}
 
-	// Plain string - exact match
+	// Plain string - try numeric match first, then string match
+	// This handles cases like pattern "500" matching exitCode 500
+	if _, err := strconv.Atoi(compiled.Original); err == nil {
+		// Pattern is numeric - compare with exitCode
+		exitCodeStr := strconv.Itoa(exitCode)
+		if exitCodeStr == compiled.Original {
+			return true, nil
+		}
+	}
+
+	// Fall back to string comparison
 	return value == compiled.Original, nil
 }
 

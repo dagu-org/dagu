@@ -385,6 +385,12 @@ func chatStep(name string, depends ...string) core.Step {
 	return newStep(name, withDepends(depends...), withExecutorType(core.ExecutorTypeChat))
 }
 
+func routerStep(name string, routerConfig *core.RouterConfig, depends ...string) core.Step {
+	step := newStep(name, withDepends(depends...), withExecutorType("router"))
+	step.Router = routerConfig
+	return step
+}
+
 func init() {
 	chat.RegisterMockExecutors()
 }
