@@ -668,6 +668,7 @@ steps:
 			name: "StepContainerWithVolume",
 			dagConfigFunc: func(tempDir string) string {
 				return fmt.Sprintf(`
+type: graph
 steps:
   - name: write-file
     container:

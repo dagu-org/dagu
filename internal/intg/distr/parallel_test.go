@@ -197,6 +197,7 @@ func TestParallel_MixedLocalAndDistributed(t *testing.T) {
 	t.Run("mixedLocalAndDistributedExecution", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		f := newTestFixture(t, `
+type: graph
 steps:
   - name: local-execution
     call: child-local

@@ -164,6 +164,7 @@ steps:
 		t.Parallel()
 
 		dag := th.DAG(t, `
+type: graph
 steps:
   - name: step1
     command: echo "step1"
@@ -337,6 +338,7 @@ steps:
 
 		th := test.Setup(t)
 		dag := th.DAG(t, fmt.Sprintf(`
+type: graph
 container:
   image: %s
 steps:

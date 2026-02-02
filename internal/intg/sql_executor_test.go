@@ -17,6 +17,7 @@ func TestSQLExecutor_SQLite_BasicQuery(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test.db")
 
 	dag := th.DAG(t, fmt.Sprintf(`
+type: graph
 steps:
   - name: init-db
     type: sqlite
@@ -58,6 +59,7 @@ func TestSQLExecutor_SQLite_Transaction(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test.db")
 
 	dag := th.DAG(t, fmt.Sprintf(`
+type: graph
 steps:
   - name: setup
     type: sqlite
@@ -109,6 +111,7 @@ func TestSQLExecutor_SQLite_TransactionRollback(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test.db")
 
 	dag := th.DAG(t, fmt.Sprintf(`
+type: graph
 steps:
   - name: setup
     type: sqlite
@@ -300,6 +303,7 @@ func TestSQLExecutor_SQLite_NamedParams(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test.db")
 
 	dag := th.DAG(t, fmt.Sprintf(`
+type: graph
 steps:
   - name: setup
     type: sqlite
@@ -346,6 +350,7 @@ func TestSQLExecutor_SQLite_MultiStatement(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test.db")
 
 	dag := th.DAG(t, fmt.Sprintf(`
+type: graph
 steps:
   - name: multi-statement
     type: sqlite

@@ -20,6 +20,7 @@ func TestStepIDPropertyAccess(t *testing.T) {
 		{
 			name: "BasicStdout/StderrFileAccess",
 			yaml: `
+type: graph
 steps:
   - id: gen
     command: |
@@ -47,6 +48,7 @@ steps:
 		{
 			name: "ExitCodeAccess",
 			yaml: `
+type: graph
 steps:
   - id: success
     command: exit 0
@@ -72,6 +74,7 @@ steps:
 		{
 			name: "UnknownStepIDRemainsUnchanged",
 			yaml: `
+type: graph
 steps:
   - id: first_step
     command: echo "Hello"
@@ -99,6 +102,7 @@ steps:
 		{
 			name: "RegularVariableTakesPrecedenceOverStepID",
 			yaml: `
+type: graph
 steps:
   - id: check
     command: echo '{"status":"from-step"}'
@@ -158,6 +162,7 @@ func TestStepIDComplexScenarios(t *testing.T) {
 		th := test.Setup(t)
 
 		yaml := `
+type: graph
 steps:
   - id: gen1
     command: echo "data from gen1"
@@ -237,6 +242,7 @@ steps:
 		th := test.Setup(t)
 
 		yaml := `
+type: graph
 steps:
   - id: setup_step
     command: echo '{"env":"test","timeout":30}'
@@ -276,6 +282,7 @@ func TestStepIDErrorCases(t *testing.T) {
 		th := test.Setup(t)
 
 		yaml := `
+type: graph
 steps:
   - id: gen
     command: echo "not json"

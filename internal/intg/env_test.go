@@ -80,6 +80,7 @@ steps:
 	t.Run("StepOutputSubstrings", func(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `
+type: graph
 steps:
   - id: producer
     name: producer

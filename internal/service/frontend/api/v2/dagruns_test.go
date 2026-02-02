@@ -210,7 +210,8 @@ steps:
 func TestApproveDAGRunStep(t *testing.T) {
 	server := test.SetupServer(t)
 
-	dagSpec := `steps:
+	dagSpec := `type: graph
+steps:
   - name: wait-step
     type: hitl
     config:
@@ -274,7 +275,8 @@ func TestApproveDAGRunStep(t *testing.T) {
 func TestApproveDAGRunStepWithInputs(t *testing.T) {
 	server := test.SetupServer(t)
 
-	dagSpec := `steps:
+	dagSpec := `type: graph
+steps:
   - name: wait-step
     type: hitl
     config:
@@ -345,7 +347,8 @@ func TestApproveDAGRunStepWithInputs(t *testing.T) {
 func TestApproveDAGRunStepMissingRequired(t *testing.T) {
 	server := test.SetupServer(t)
 
-	dagSpec := `steps:
+	dagSpec := `type: graph
+steps:
   - name: wait-step
     type: hitl
     config:
@@ -431,7 +434,8 @@ func TestApproveDAGRunStepNotWaiting(t *testing.T) {
 func TestRejectDAGRunStep(t *testing.T) {
 	server := test.SetupServer(t)
 
-	dagSpec := `steps:
+	dagSpec := `type: graph
+steps:
   - name: wait-step
     type: hitl
     config:
