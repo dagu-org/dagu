@@ -311,6 +311,53 @@ var (
 	}
 )
 
+// History command flags
+var (
+	historyFromFlag = commandLineFlag{
+		name:  "from",
+		usage: "Start date/time for filtering runs in UTC (format: 2006-01-02 or 2006-01-02T15:04:05Z)",
+	}
+
+	historyToFlag = commandLineFlag{
+		name:  "to",
+		usage: "End date/time for filtering runs in UTC (format: 2006-01-02 or 2006-01-02T15:04:05Z)",
+	}
+
+	historyLastFlag = commandLineFlag{
+		name:  "last",
+		usage: "Relative time period (examples: 7d, 24h, 1w, 30d). Cannot be combined with --from or --to",
+	}
+
+	historyStatusFlag = commandLineFlag{
+		name:  "status",
+		usage: "Filter by execution status (running, succeeded, failed, aborted, queued, waiting, rejected, not_started, partially_succeeded)",
+	}
+
+	historyRunIDFlag = commandLineFlag{
+		name:  "run-id",
+		usage: "Filter by run ID (supports partial match)",
+	}
+
+	historyTagsFlag = commandLineFlag{
+		name:  "tags",
+		usage: "Filter by DAG tags, comma-separated with AND logic (e.g., 'prod,critical')",
+	}
+
+	historyFormatFlag = commandLineFlag{
+		name:         "format",
+		shorthand:    "f",
+		defaultValue: "table",
+		usage:        "Output format: table, json, or csv (default: table)",
+	}
+
+	historyLimitFlag = commandLineFlag{
+		name:         "limit",
+		shorthand:    "l",
+		defaultValue: "100",
+		usage:        "Maximum number of results to display (default: 100, max: 1000)",
+	}
+)
+
 // baseFlags are included in every command.
 var baseFlags = []commandLineFlag{configFlag, daguHomeFlag, quietFlag, cpuProfileFlag}
 

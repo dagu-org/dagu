@@ -117,6 +117,13 @@ func WithTags(tags []string) ListDAGRunStatusesOption {
 	}
 }
 
+// WithLimit sets the maximum number of results to return when listing dag-runs
+func WithLimit(limit int) ListDAGRunStatusesOption {
+	return func(o *ListDAGRunStatusesOptions) {
+		o.Limit = limit
+	}
+}
+
 // RemoveOldDAGRunsOptions contains options for removing old dag-runs
 type RemoveOldDAGRunsOptions struct {
 	// DryRun if true, only returns the paths that would be removed without actually deleting
