@@ -750,6 +750,7 @@ steps:
 		t.Parallel()
 
 		// Complex multi-DAG with parameters
+		// Using type: graph for sub-DAG that needs explicit dependencies
 		multiDAGContent := `params:
   - ENVIRONMENT: dev
 schedule: "0 2 * * *"
@@ -762,6 +763,7 @@ steps:
 
 ---
 name: extract-module
+type: graph
 params:
   - SOURCE: default_source
   - TABLE: default_table

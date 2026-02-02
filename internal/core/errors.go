@@ -43,6 +43,7 @@ var (
 	ErrContinueOnOutputMustBeStringOrArray = errors.New("continueOn.Output must be a string or an array of strings")
 	ErrContinueOnExitCodeMustBeIntOrArray  = errors.New("continueOn.ExitCode must be an int or an array of ints")
 	ErrDependsMustBeStringOrArray          = errors.New("depends must be a string or an array of strings")
+	ErrDependsNotAllowedInChainType        = errors.New("depends field is not allowed for DAGs with type 'chain'; use type 'graph' for explicit dependencies")
 	ErrStepsMustBeArrayOrMap               = errors.New("steps must be an array or a map")
 )
 

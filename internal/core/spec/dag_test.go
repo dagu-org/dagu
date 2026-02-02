@@ -2363,3 +2363,114 @@ func TestBuildContainerFromSpec_HealthcheckInImageMode(t *testing.T) {
 	assert.Equal(t, 5, result.Healthcheck.Retries)
 	assert.Equal(t, core.WaitForHealthy, result.WaitFor)
 }
+
+func TestChainTypeDependsValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		dag         *dag
+		expectErr   bool
+		errContains string
+	}{
+		{
+			name: "ChainTypeWithExplicitDependsShouldError",
+			dag: &dag{
+				Type: "chain",
+				Steps: []any{
+					map[string]any{"name": "step1", "command": "echo 1"},
+					map[string]any{"name": "step2", "command": "echo 2", "depends": []string{"step1"}},
+				},
+			},
+			expectErr:   true,
+			errContains: "depends field is not allowed for DAGs with type 'chain'",
+		},
+		{
+			name: "ChainTypeWithEmptyDependsShouldError",
+			dag: &dag{
+				Type: "chain",
+				Steps: []any{
+					map[string]any{"name": "step1", "command": "echo 1"},
+					map[string]any{"name": "step2", "command": "echo 2", "depends": []string{}},
+				},
+			},
+			expectErr:   true,
+			errContains: "depends field is not allowed for DAGs with type 'chain'",
+		},
+		{
+			name: "ChainTypeWithoutDependsShouldWork",
+			dag: &dag{
+				Type: "chain",
+				Steps: []any{
+					map[string]any{"name": "step1", "command": "echo 1"},
+					map[string]any{"name": "step2", "command": "echo 2"},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			name: "GraphTypeWithDependsShouldWork",
+			dag: &dag{
+				Type: "graph",
+				Steps: []any{
+					map[string]any{"name": "step1", "command": "echo 1"},
+					map[string]any{"name": "step2", "command": "echo 2", "depends": []string{"step1"}},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			name: "GraphTypeWithEmptyDependsShouldWork",
+			dag: &dag{
+				Type: "graph",
+				Steps: []any{
+					map[string]any{"name": "step1", "command": "echo 1"},
+					map[string]any{"name": "step2", "command": "echo 2", "depends": []string{}},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			name: "DefaultTypeWithDependsShouldError",
+			dag: &dag{
+				// Default type is chain, so depends should not be allowed
+				Steps: []any{
+					map[string]any{"name": "step1", "command": "echo 1"},
+					map[string]any{"name": "step2", "command": "echo 2", "depends": []string{"step1"}},
+				},
+			},
+			expectErr:   true,
+			errContains: "depends field is not allowed for DAGs with type 'chain'",
+		},
+		{
+			name: "ChainTypeNestedParallelWithDependsShouldError",
+			dag: &dag{
+				Type: "chain",
+				Steps: []any{
+					map[string]any{"name": "step1", "command": "echo 1"},
+					[]any{
+						map[string]any{"name": "parallel1", "command": "echo p1", "depends": []string{"step1"}},
+						map[string]any{"name": "parallel2", "command": "echo p2"},
+					},
+				},
+			},
+			expectErr:   true,
+			errContains: "depends field is not allowed for DAGs with type 'chain'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := tt.dag.build(testBuildContext())
+			if tt.expectErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, result)
+			}
+		})
+	}
+}
