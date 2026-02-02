@@ -94,7 +94,7 @@ function DAGSpec({ fileName, localDags }: Props) {
   });
 
   // Fallback to REST polling when SSE fails
-  const { data: pollingData, isLoading } = useQuery(
+  const { data: pollingData, isLoading, mutate: mutateSpec } = useQuery(
     '/dags/{fileName}/spec',
     {
       params: {
@@ -109,6 +109,7 @@ function DAGSpec({ fileName, localDags }: Props) {
     {
       revalidateIfStale: shouldUseFallback,
       revalidateOnFocus: shouldUseFallback,
+      revalidateOnMount: true,
       refreshInterval: shouldUseFallback ? 5000 : 0,
       isPaused: () => !shouldUseFallback && isConnected,
     }
@@ -179,6 +180,9 @@ function DAGSpec({ fileName, localDags }: Props) {
     // Mark as saved to prevent false conflict detection on our own save
     markAsSaved(currentValue);
 
+    // Invalidate the spec cache to ensure fresh data on remount
+    mutateSpec();
+
     // Show success toast notification
     showToast('Changes saved successfully');
   }, [
@@ -189,6 +193,7 @@ function DAGSpec({ fileName, localDags }: Props) {
     saveScrollPosition,
     showToast,
     markAsSaved,
+    mutateSpec,
   ]);
 
   // Restore scroll position after render

@@ -324,7 +324,9 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
               <div className="h-6 flex-shrink-0" />
             </>
           ) : null}
-          {activeTab === 'spec' ? <DAGSpec fileName={fileName} localDags={localDags} /> : null}
+          {activeTab === 'spec' ? (
+            <DAGSpec key={fileName} fileName={fileName} localDags={localDags} />
+          ) : null}
           {activeTab === 'history' ? (
             <>
               <DAGExecutionHistory fileName={fileName || ''} />
