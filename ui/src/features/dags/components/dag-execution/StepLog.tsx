@@ -354,7 +354,7 @@ function StepLog({
   return (
     <div className="w-full h-full flex flex-col">
       {/* Controls for log navigation */}
-      <div className="flex flex-col gap-2 mb-2 bg-muted rounded">
+      <div className="flex flex-col gap-2 mb-2 p-4 bg-muted rounded">
         <div className="flex flex-wrap items-center gap-2">
           {/* Responsive button container */}
           <div className="flex flex-wrap gap-1">
