@@ -10,6 +10,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useUserPreferences } from '@/contexts/UserPreference';
 
@@ -204,44 +210,54 @@ export function AgentChatModal(): ReactElement | null {
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button
-            onClick={() => updatePreference('safeMode', !preferences.safeMode)}
-            className={cn(
-              "flex items-center justify-center px-2 py-1 rounded border cursor-pointer transition-all select-none",
-              preferences.safeMode
-                ? "bg-muted border-border text-foreground hover:bg-muted/80"
-                : "bg-background border-border/50 text-muted-foreground hover:border-border"
-            )}
-            title={preferences.safeMode
-              ? "Safe Mode ON: Dangerous commands require approval"
-              : "Safe Mode OFF: All commands execute immediately"}
-          >
-            {preferences.safeMode ? (
-              <Shield className="h-3 w-3" />
-            ) : (
-              <ShieldOff className="h-3 w-3" />
-            )}
-          </button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={clearConversation}
-            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-            title="New conversation"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={closeChat}
-            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-            title="Close"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+        <TooltipProvider delayDuration={300}>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => updatePreference('safeMode', !preferences.safeMode)}
+                  className={cn(
+                    "flex items-center justify-center px-2 py-1 rounded border cursor-pointer transition-all select-none",
+                    preferences.safeMode
+                      ? "bg-muted border-border text-foreground hover:bg-muted/80"
+                      : "bg-background border-border/50 text-muted-foreground hover:border-border"
+                  )}
+                >
+                  {preferences.safeMode ? (
+                    <Shield className="h-3 w-3" />
+                  ) : (
+                    <ShieldOff className="h-3 w-3" />
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>
+                  {preferences.safeMode
+                    ? "Safe mode enabled: dangerous commands require approval"
+                    : "Safe mode disabled: all commands execute immediately"}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearConversation}
+              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+              title="New conversation"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={closeChat}
+              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+              title="Close"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </TooltipProvider>
       </div>
 
       {error && (
