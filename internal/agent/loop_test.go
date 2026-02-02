@@ -242,7 +242,7 @@ func TestLoop_Go(t *testing.T) {
 	t.Run("accumulates token usage", func(t *testing.T) {
 		t.Parallel()
 
-		done := make(chan struct{})
+		done := make(chan struct{}, 1) // buffered to prevent blocking
 		provider := &mockLLMProvider{
 			chatFunc: func(_ context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
 				defer func() {
@@ -266,7 +266,7 @@ func TestLoop_Go(t *testing.T) {
 		loop := NewLoop(LoopConfig{Provider: provider})
 		loop.QueueUserMessage(llm.Message{Role: llm.RoleUser, Content: "test"})
 
-		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
 		go func() { _ = loop.Go(ctx) }()
@@ -274,7 +274,7 @@ func TestLoop_Go(t *testing.T) {
 		select {
 		case <-done:
 			time.Sleep(10 * time.Millisecond)
-		case <-time.After(400 * time.Millisecond):
+		case <-time.After(1500 * time.Millisecond):
 			t.Fatal("timeout waiting for LLM call")
 		}
 

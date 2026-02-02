@@ -29,6 +29,7 @@ type ConversationManager struct {
 	workingDir      string
 	sequenceID      int64
 	environment     EnvironmentInfo
+	safeMode        bool
 	onWorkingChange func(id string, working bool)
 	onMessage       func(ctx context.Context, msg Message) error
 	pendingPrompts  map[string]chan UserPromptResponse
@@ -46,6 +47,7 @@ type ConversationManagerConfig struct {
 	History         []Message
 	SequenceID      int64
 	Environment     EnvironmentInfo
+	SafeMode        bool
 }
 
 // NewConversationManager creates a new ConversationManager.
@@ -74,6 +76,18 @@ func NewConversationManager(cfg ConversationManagerConfig) *ConversationManager 
 		onMessage:       cfg.OnMessage,
 		sequenceID:      cfg.SequenceID,
 		environment:     cfg.Environment,
+		safeMode:        cfg.SafeMode,
+	}
+}
+
+// SetSafeMode updates the safe mode setting for this conversation.
+func (cm *ConversationManager) SetSafeMode(enabled bool) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	cm.safeMode = enabled
+	// Update active loop if one exists
+	if cm.loop != nil {
+		cm.loop.SetSafeMode(enabled)
 	}
 }
 
@@ -101,9 +115,7 @@ func (cm *ConversationManager) SetWorking(working bool) {
 	if !changed {
 		return
 	}
-
 	cm.logger.Debug("agent working state changed", "working", working)
-
 	cm.subpub.Broadcast(StreamResponse{
 		ConversationState: &ConversationState{
 			ConversationID: id,
@@ -111,7 +123,6 @@ func (cm *ConversationManager) SetWorking(working bool) {
 			Model:          model,
 		},
 	})
-
 	if callback != nil {
 		callback(id, working)
 	}
@@ -260,12 +271,9 @@ func (cm *ConversationManager) SubscribeWithSnapshot(ctx context.Context) (Strea
 // Cancel stops the conversation loop. The context parameter is unused
 // because cancellation is performed synchronously via the internal cancel function.
 func (cm *ConversationManager) Cancel(_ context.Context) error {
-	cancel := cm.clearLoop()
-
-	if cancel != nil {
+	if cancel := cm.clearLoop(); cancel != nil {
 		cancel()
 	}
-
 	cm.SetWorking(false)
 	cm.logger.Info("conversation cancelled")
 	return nil
@@ -284,19 +292,30 @@ func (cm *ConversationManager) clearLoop() context.CancelFunc {
 
 // ensureLoop creates the loop if it doesn't exist.
 func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) error {
-	history, needsInit := cm.prepareLoopInit(model)
+	history, safeMode, needsInit := cm.prepareLoopInit(model)
 	if !needsInit {
 		return nil
 	}
 
-	tools := CreateTools(cm.environment.DAGsDir)
 	loopCtx, cancel := context.WithCancel(context.Background())
+	loopInstance := cm.createLoop(provider, model, history, safeMode)
 
-	loopInstance := NewLoop(LoopConfig{
+	if !cm.trySetLoop(loopInstance, cancel) {
+		cancel()
+		return nil
+	}
+
+	go cm.runLoop(loopCtx, loopInstance)
+	return nil
+}
+
+// createLoop creates a new Loop instance with the current configuration.
+func (cm *ConversationManager) createLoop(provider llm.Provider, model string, history []llm.Message, safeMode bool) *Loop {
+	return NewLoop(LoopConfig{
 		Provider:         provider,
 		Model:            model,
 		History:          history,
-		Tools:            tools,
+		Tools:            CreateTools(cm.environment.DAGsDir),
 		RecordMessage:    cm.createRecordMessageFunc(),
 		Logger:           cm.logger,
 		SystemPrompt:     GenerateSystemPrompt(cm.environment, nil),
@@ -306,49 +325,43 @@ func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) e
 		EmitUIAction:     cm.createEmitUIActionFunc(),
 		EmitUserPrompt:   cm.createEmitUserPromptFunc(),
 		WaitUserResponse: cm.createWaitUserResponseFunc(),
+		SafeMode:         safeMode,
 	})
+}
 
-	if !cm.trySetLoop(loopInstance, cancel) {
-		cancel()
-		return nil
-	}
-
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				cm.logger.Error("conversation loop panicked", "panic", r)
-			}
-			cm.logger.Info("conversation loop goroutine exiting")
-			cm.clearLoop()
-		}()
-
-		err := loopInstance.Go(loopCtx)
-		if err == nil {
-			return
+// runLoop executes the conversation loop and handles cleanup.
+func (cm *ConversationManager) runLoop(ctx context.Context, loop *Loop) {
+	defer func() {
+		if r := recover(); r != nil {
+			cm.logger.Error("conversation loop panicked", "panic", r)
 		}
-
-		if errors.Is(err, context.Canceled) {
-			cm.logger.Info("conversation loop canceled normally")
-		} else {
-			cm.logger.Error("conversation loop stopped with error", "error", err)
-		}
+		cm.logger.Info("conversation loop goroutine exiting")
+		cm.clearLoop()
 	}()
 
-	return nil
+	err := loop.Go(ctx)
+	if err == nil {
+		return
+	}
+	if errors.Is(err, context.Canceled) {
+		cm.logger.Info("conversation loop canceled normally")
+	} else {
+		cm.logger.Error("conversation loop stopped with error", "error", err)
+	}
 }
 
 // prepareLoopInit checks if loop initialization is needed and extracts history.
-// Returns (history, needsInit) where needsInit is false if loop already exists.
-func (cm *ConversationManager) prepareLoopInit(model string) ([]llm.Message, bool) {
+// Returns (history, safeMode, needsInit) where needsInit is false if loop already exists.
+func (cm *ConversationManager) prepareLoopInit(model string) ([]llm.Message, bool, bool) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
 	if cm.loop != nil {
-		return nil, false
+		return nil, false, false
 	}
 
 	cm.model = model
-	return cm.extractLLMHistoryLocked(), true
+	return cm.extractLLMHistoryLocked(), cm.safeMode, true
 }
 
 // trySetLoop attempts to set the loop instance atomically.

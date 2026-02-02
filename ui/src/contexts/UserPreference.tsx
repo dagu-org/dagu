@@ -7,6 +7,7 @@ export type UserPreferences = {
   dagRunsViewMode: DAGRunsViewMode;
   logWrap: boolean;
   theme: 'light' | 'dark';
+  safeMode: boolean;
 };
 
 const UserPreferencesContext = createContext<{
@@ -17,31 +18,32 @@ const UserPreferencesContext = createContext<{
   ) => void;
 }>(null!);
 
+const defaultPreferences: UserPreferences = {
+  pageLimit: 50,
+  dagRunsViewMode: 'list',
+  logWrap: true,
+  theme: 'light', // Default to light theme (from main branch)
+  safeMode: false,
+};
+
+function loadPreferences(): UserPreferences {
+  try {
+    const saved = localStorage.getItem('user_preferences');
+    if (!saved) {
+      return defaultPreferences;
+    }
+    return { ...defaultPreferences, ...JSON.parse(saved) };
+  } catch {
+    return defaultPreferences;
+  }
+}
+
 export function UserPreferencesProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [preferences, setPreferences] = useState<UserPreferences>(() => {
-    try {
-      const saved = localStorage.getItem('user_preferences');
-      const defaultPrefs: UserPreferences = {
-        pageLimit: 50,
-        dagRunsViewMode: 'list', // Default to list view
-        logWrap: true, // Default to wrapped text
-        theme: 'light', // Default to light theme (GCP-inspired)
-      };
-      return saved ? { ...defaultPrefs, ...JSON.parse(saved) } : defaultPrefs;
-    } catch {
-      // Fallback to defaults if parsing fails
-      return {
-        pageLimit: 50,
-        dagRunsViewMode: 'list' as DAGRunsViewMode,
-        logWrap: true,
-        theme: 'light',
-      };
-    }
-  });
+  const [preferences, setPreferences] = useState<UserPreferences>(loadPreferences);
 
   const updatePreference = useCallback(
     <K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) => {

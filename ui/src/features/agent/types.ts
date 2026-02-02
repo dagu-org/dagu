@@ -100,6 +100,7 @@ export interface ChatRequest {
   message: string;
   model?: string;
   dag_contexts?: DAGContext[];
+  safe_mode?: boolean;
 }
 
 export interface NewConversationResponse {
