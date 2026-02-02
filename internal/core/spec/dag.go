@@ -1711,6 +1711,11 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 			if err != nil {
 				return nil, err
 			}
+
+			if err := validateNoDependsForChainType(result, builtStep); err != nil {
+				return nil, err
+			}
+
 			steps = append(steps, *builtStep)
 		}
 		return steps, nil

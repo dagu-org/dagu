@@ -2457,6 +2457,29 @@ func TestChainTypeDependsValidation(t *testing.T) {
 			expectErr:   true,
 			errContains: "depends field is not allowed for DAGs with type 'chain'",
 		},
+		{
+			name: "ChainTypeMapFormWithDependsShouldError",
+			dag: &dag{
+				Type: "chain",
+				Steps: map[string]any{
+					"step1": map[string]any{"command": "echo 1"},
+					"step2": map[string]any{"command": "echo 2", "depends": []string{"step1"}},
+				},
+			},
+			expectErr:   true,
+			errContains: "depends field is not allowed for DAGs with type 'chain'",
+		},
+		{
+			name: "GraphTypeMapFormWithDependsShouldWork",
+			dag: &dag{
+				Type: "graph",
+				Steps: map[string]any{
+					"step1": map[string]any{"command": "echo 1"},
+					"step2": map[string]any{"command": "echo 2", "depends": []string{"step1"}},
+				},
+			},
+			expectErr: false,
+		},
 	}
 
 	for _, tt := range tests {

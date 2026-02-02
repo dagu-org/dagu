@@ -2037,6 +2037,7 @@ func TestResolveStepDependencies_Errors(t *testing.T) {
 		{
 			name: "DependencyOnNonExistentID",
 			yaml: `
+type: graph
 steps:
   - name: step-one
     command: echo "1"
