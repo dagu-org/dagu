@@ -33,6 +33,8 @@ export type Config = {
   terminalEnabled: boolean;
   gitSyncEnabled: boolean;
   agentEnabled: boolean;
+  updateAvailable: boolean;
+  latestVersion: string;
   permissions: {
     writeDags: boolean;
     runDags: boolean;

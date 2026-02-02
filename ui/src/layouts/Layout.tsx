@@ -1,3 +1,4 @@
+import { UpdateBanner } from '@/components/UpdateBanner';
 import { useConfig } from '@/contexts/ConfigContext';
 import { cn } from '@/lib/utils';
 import { getResponsiveTitleClass } from '@/lib/text-utils';
@@ -174,8 +175,9 @@ function Content({ navbarColor, children }: LayoutProps) {
         </header>
 
         {/* Scrollable Content - More Compact Padding */}
-        <main className="flex-1 overflow-auto p-4 md:p-6">
-          <div className="w-full h-full">{children}</div>
+        <main className="flex-1 overflow-auto">
+          <UpdateBanner />
+          <div className="p-4 md:p-6 w-full h-full">{children}</div>
         </main>
       </div>
 
