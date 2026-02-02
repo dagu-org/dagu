@@ -567,10 +567,6 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
           overflow: visible !important;
           color: var(--foreground) !important;
         }
-        .vis-item-content {
-          position: absolute !important;
-          display: inline-block !important;
-        }
         .vis-panel.vis-top {
           position: sticky;
           top: 0;

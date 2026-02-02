@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func backgroundCtx() ToolContext {
@@ -298,6 +299,12 @@ func TestCommandRequiresApproval(t *testing.T) {
 		{"rm after semicolon", "echo test;rm file", true},
 		{"rm after semicolon with space", "echo test; rm file", true},
 		{"rm with && operator", "echo test && rm file", true},
+		{"rm with && no space", "echo test&&rm file", true},
+		{"rm with || operator", "echo test || rm file", true},
+		{"rm with || no space", "echo test||rm file", true},
+		{"rm after newline", "echo test\nrm file", true},
+		{"rm after CRLF", "echo test\r\nrm file", true},
+		{"rm after tab", "echo test\trm file", true},
 		{"command then rm", "ls && rm file", true},
 
 		// chmod commands (dangerous)
@@ -342,7 +349,7 @@ func TestBashTool_SafeMode_SkipsApproval(t *testing.T) {
 
 	_ = tool.Run(ctx, input)
 
-	assert.False(t, promptCalled, "approval should not be requested when SafeMode is false")
+	require.False(t, promptCalled, "approval should not be requested when SafeMode is false")
 }
 
 func TestBashTool_SafeMode_RequestsApproval(t *testing.T) {
@@ -371,9 +378,9 @@ func TestBashTool_SafeMode_RequestsApproval(t *testing.T) {
 
 	_ = tool.Run(ctx, input)
 
-	assert.Equal(t, PromptTypeCommandApproval, capturedPrompt.PromptType)
-	assert.Equal(t, "rm testfile", capturedPrompt.Command)
-	assert.Equal(t, "Approve command?", capturedPrompt.Question)
+	require.Equal(t, PromptTypeCommandApproval, capturedPrompt.PromptType)
+	require.Equal(t, "rm testfile", capturedPrompt.Command)
+	require.Equal(t, "Approve command?", capturedPrompt.Question)
 }
 
 func TestBashTool_SafeMode_UserRejects(t *testing.T) {
@@ -393,8 +400,8 @@ func TestBashTool_SafeMode_UserRejects(t *testing.T) {
 
 	result := tool.Run(ctx, input)
 
-	assert.False(t, result.IsError)
-	assert.Contains(t, result.Content, "rejected by user")
+	require.False(t, result.IsError)
+	require.Contains(t, result.Content, "rejected by user")
 }
 
 func TestBashTool_SafeMode_SafeCommandNoApproval(t *testing.T) {
@@ -412,7 +419,7 @@ func TestBashTool_SafeMode_SafeCommandNoApproval(t *testing.T) {
 
 	result := tool.Run(ctx, input)
 
-	assert.False(t, promptCalled, "safe commands should not request approval even with SafeMode=true")
-	assert.False(t, result.IsError)
-	assert.Contains(t, result.Content, "hello")
+	require.False(t, promptCalled, "safe commands should not request approval even with SafeMode=true")
+	require.False(t, result.IsError)
+	require.Contains(t, result.Content, "hello")
 }

@@ -85,6 +85,10 @@ func (cm *ConversationManager) SetSafeMode(enabled bool) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	cm.safeMode = enabled
+	// Update active loop if one exists
+	if cm.loop != nil {
+		cm.loop.SetSafeMode(enabled)
+	}
 }
 
 // copyMessages returns a shallow copy of the messages slice.
@@ -288,13 +292,13 @@ func (cm *ConversationManager) clearLoop() context.CancelFunc {
 
 // ensureLoop creates the loop if it doesn't exist.
 func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) error {
-	history, needsInit := cm.prepareLoopInit(model)
+	history, safeMode, needsInit := cm.prepareLoopInit(model)
 	if !needsInit {
 		return nil
 	}
 
 	loopCtx, cancel := context.WithCancel(context.Background())
-	loopInstance := cm.createLoop(provider, model, history)
+	loopInstance := cm.createLoop(provider, model, history, safeMode)
 
 	if !cm.trySetLoop(loopInstance, cancel) {
 		cancel()
@@ -306,7 +310,7 @@ func (cm *ConversationManager) ensureLoop(provider llm.Provider, model string) e
 }
 
 // createLoop creates a new Loop instance with the current configuration.
-func (cm *ConversationManager) createLoop(provider llm.Provider, model string, history []llm.Message) *Loop {
+func (cm *ConversationManager) createLoop(provider llm.Provider, model string, history []llm.Message, safeMode bool) *Loop {
 	return NewLoop(LoopConfig{
 		Provider:         provider,
 		Model:            model,
@@ -321,7 +325,7 @@ func (cm *ConversationManager) createLoop(provider llm.Provider, model string, h
 		EmitUIAction:     cm.createEmitUIActionFunc(),
 		EmitUserPrompt:   cm.createEmitUserPromptFunc(),
 		WaitUserResponse: cm.createWaitUserResponseFunc(),
-		SafeMode:         cm.safeMode,
+		SafeMode:         safeMode,
 	})
 }
 
@@ -347,17 +351,17 @@ func (cm *ConversationManager) runLoop(ctx context.Context, loop *Loop) {
 }
 
 // prepareLoopInit checks if loop initialization is needed and extracts history.
-// Returns (history, needsInit) where needsInit is false if loop already exists.
-func (cm *ConversationManager) prepareLoopInit(model string) ([]llm.Message, bool) {
+// Returns (history, safeMode, needsInit) where needsInit is false if loop already exists.
+func (cm *ConversationManager) prepareLoopInit(model string) ([]llm.Message, bool, bool) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
 	if cm.loop != nil {
-		return nil, false
+		return nil, false, false
 	}
 
 	cm.model = model
-	return cm.extractLLMHistoryLocked(), true
+	return cm.extractLLMHistoryLocked(), cm.safeMode, true
 }
 
 // trySetLoop attempts to set the loop instance atomically.

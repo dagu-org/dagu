@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useUserPreferences } from '@/contexts/UserPreference';
+import { AppBarContext } from '@/contexts/AppBarContext';
 import { useAgentChatContext } from '../context/AgentChatContext';
 import { getAuthToken, getAuthHeaders } from '@/lib/authHeaders';
 import {
@@ -38,12 +39,19 @@ async function fetchWithAuth<T>(url: string, options?: RequestInit): Promise<T> 
   return response.json();
 }
 
-function buildStreamUrl(baseUrl: string, conversationId: string): string {
+function buildStreamUrl(baseUrl: string, conversationId: string, remoteNode: string): string {
   const url = new URL(`${baseUrl}/conversations/${conversationId}/stream`, window.location.origin);
   const token = getAuthToken();
   if (token) {
     url.searchParams.set('token', token);
   }
+  url.searchParams.set('remoteNode', remoteNode);
+  return url.toString();
+}
+
+function buildApiUrl(baseUrl: string, path: string, remoteNode: string): string {
+  const url = new URL(`${baseUrl}${path}`, window.location.origin);
+  url.searchParams.set('remoteNode', remoteNode);
   return url.toString();
 }
 
@@ -53,6 +61,7 @@ export function useAgentChat() {
   const config = useConfig();
   const navigate = useNavigate();
   const { preferences } = useUserPreferences();
+  const appBarContext = useContext(AppBarContext);
   const {
     conversationId,
     messages,
@@ -74,6 +83,7 @@ export function useAgentChat() {
   const [error, setError] = useState<string | null>(null);
   const [answeredPrompts, setAnsweredPrompts] = useState<Record<string, string>>({});
   const baseUrl = `${config.apiURL}/agent`;
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
   const closeEventSource = useCallback((): void => {
     if (eventSourceRef.current) {
@@ -94,7 +104,7 @@ export function useAgentChat() {
 
     eventSourceRef.current?.close();
 
-    const eventSource = new EventSource(buildStreamUrl(baseUrl, conversationId));
+    const eventSource = new EventSource(buildStreamUrl(baseUrl, conversationId, remoteNode));
     eventSourceRef.current = eventSource;
 
     eventSource.onmessage = (event) => {
@@ -131,21 +141,21 @@ export function useAgentChat() {
     return () => {
       eventSource.close();
     };
-  }, [conversationId, baseUrl, addMessage, setConversationState, setConversationId, navigate, closeEventSource]);
+  }, [conversationId, baseUrl, remoteNode, addMessage, setConversationState, setConversationId, navigate, closeEventSource]);
 
   const startConversation = useCallback(
     async (message: string, model?: string, dagContexts?: DAGContext[]): Promise<string> => {
       const data = await fetchWithAuth<NewConversationResponse>(
-        `${baseUrl}/conversations/new`,
+        buildApiUrl(baseUrl, '/conversations/new', remoteNode),
         { method: 'POST', body: JSON.stringify(buildChatRequest(message, model, dagContexts, preferences.safeMode)) }
       );
       setConversationId(data.conversation_id);
       // Refresh conversations list to include the new one
-      const convs = await fetchWithAuth<ConversationWithState[]>(`${baseUrl}/conversations`);
+      const convs = await fetchWithAuth<ConversationWithState[]>(buildApiUrl(baseUrl, '/conversations', remoteNode));
       setConversations(convs || []);
       return data.conversation_id;
     },
-    [baseUrl, setConversationId, setConversations, preferences.safeMode]
+    [baseUrl, remoteNode, setConversationId, setConversations, preferences.safeMode]
   );
 
   const sendMessage = useCallback(
@@ -159,7 +169,7 @@ export function useAgentChat() {
           await startConversation(message, model, dagContexts);
           return;
         }
-        await fetchWithAuth(`${baseUrl}/conversations/${conversationId}/chat`, {
+        await fetchWithAuth(buildApiUrl(baseUrl, `/conversations/${conversationId}/chat`, remoteNode), {
           method: 'POST',
           body: JSON.stringify(buildChatRequest(message, model, dagContexts, preferences.safeMode)),
         });
@@ -171,19 +181,19 @@ export function useAgentChat() {
         setIsSending(false);
       }
     },
-    [baseUrl, conversationId, startConversation, setPendingUserMessage, preferences.safeMode]
+    [baseUrl, remoteNode, conversationId, startConversation, setPendingUserMessage, preferences.safeMode]
   );
 
   const cancelConversation = useCallback(async (): Promise<void> => {
     if (!conversationId) return;
-    await fetchWithAuth(`${baseUrl}/conversations/${conversationId}/cancel`, { method: 'POST' });
-  }, [baseUrl, conversationId]);
+    await fetchWithAuth(buildApiUrl(baseUrl, `/conversations/${conversationId}/cancel`, remoteNode), { method: 'POST' });
+  }, [baseUrl, remoteNode, conversationId]);
 
   const respondToPrompt = useCallback(async (response: UserPromptResponse, displayValue: string): Promise<void> => {
     if (!conversationId) return;
 
     try {
-      await fetchWithAuth(`${baseUrl}/conversations/${conversationId}/respond`, {
+      await fetchWithAuth(buildApiUrl(baseUrl, `/conversations/${conversationId}/respond`, remoteNode), {
         method: 'POST',
         body: JSON.stringify(response),
       });
@@ -193,21 +203,21 @@ export function useAgentChat() {
       setAnsweredPrompts(prev => ({ ...prev, [response.prompt_id]: displayValue }));
       setError(err instanceof Error ? err.message : 'Failed to submit response');
     }
-  }, [baseUrl, conversationId]);
+  }, [baseUrl, remoteNode, conversationId]);
 
   const fetchConversations = useCallback(async (): Promise<void> => {
     try {
-      const data = await fetchWithAuth<ConversationWithState[]>(`${baseUrl}/conversations`);
+      const data = await fetchWithAuth<ConversationWithState[]>(buildApiUrl(baseUrl, '/conversations', remoteNode));
       setConversations(data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch conversations');
       setConversations([]);
     }
-  }, [baseUrl, setConversations]);
+  }, [baseUrl, remoteNode, setConversations]);
 
   const selectConversation = useCallback(
     async (id: string): Promise<void> => {
-      const data = await fetchWithAuth<StreamResponse>(`${baseUrl}/conversations/${id}`);
+      const data = await fetchWithAuth<StreamResponse>(buildApiUrl(baseUrl, `/conversations/${id}`, remoteNode));
       setConversationId(id);
       setMessages(data.messages || []);
       setAnsweredPrompts({}); // Clear answered prompts when switching conversations
@@ -215,7 +225,7 @@ export function useAgentChat() {
         setConversationState(data.conversation_state);
       }
     },
-    [baseUrl, setConversationId, setMessages, setConversationState]
+    [baseUrl, remoteNode, setConversationId, setMessages, setConversationState]
   );
 
   const isWorking = isSending || conversationState?.working || false;

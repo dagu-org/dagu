@@ -78,7 +78,14 @@ func matchesDangerousPattern(cmd, pattern string) bool {
 		strings.Contains(cmd, "|"+pattern) ||
 		strings.Contains(cmd, "| "+pattern) ||
 		strings.Contains(cmd, ";"+pattern) ||
-		strings.Contains(cmd, "; "+pattern)
+		strings.Contains(cmd, "; "+pattern) ||
+		strings.Contains(cmd, "&&"+pattern) ||
+		strings.Contains(cmd, "&& "+pattern) ||
+		strings.Contains(cmd, "||"+pattern) ||
+		strings.Contains(cmd, "|| "+pattern) ||
+		strings.Contains(cmd, "\n"+pattern) ||
+		strings.Contains(cmd, "\r\n"+pattern) ||
+		strings.Contains(cmd, "\t"+pattern)
 }
 
 // requestApproval asks the user to approve a command before execution.

@@ -118,6 +118,13 @@ func (l *Loop) QueueUserMessage(message llm.Message) {
 	l.logger.Info("queued user message", "queue_size", len(l.messageQueue))
 }
 
+// SetSafeMode updates the safe mode setting for this loop.
+func (l *Loop) SetSafeMode(enabled bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.safeMode = enabled
+}
+
 // Go runs the conversation loop until the context is canceled.
 func (l *Loop) Go(ctx context.Context) error {
 	if l.provider == nil {
@@ -260,13 +267,17 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		input = json.RawMessage("{}")
 	}
 
+	l.mu.Lock()
+	safeMode := l.safeMode
+	l.mu.Unlock()
+
 	return tool.Run(ToolContext{
 		Context:          ctx,
 		WorkingDir:       l.workingDir,
 		EmitUIAction:     l.emitUIAction,
 		EmitUserPrompt:   l.emitUserPrompt,
 		WaitUserResponse: l.waitUserResponse,
-		SafeMode:         l.safeMode,
+		SafeMode:         safeMode,
 	}, input)
 }
 

@@ -219,6 +219,8 @@ export function AgentChatModal(): ReactElement | null {
                   size="sm"
                   onClick={() => updatePreference('safeMode', !preferences.safeMode)}
                   className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                  aria-label={preferences.safeMode ? 'Disable safe mode' : 'Enable safe mode'}
+                  aria-pressed={preferences.safeMode}
                 >
                   {preferences.safeMode ? (
                     <Shield className="h-4 w-4" />
