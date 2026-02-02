@@ -14,6 +14,7 @@ import (
 func TestExecution_StatusPushing(t *testing.T) {
 	t.Run("statusUpdatesPersistedToCoordinatorStore", func(t *testing.T) {
 		f := newTestFixture(t, `
+type: graph
 name: status-push-test
 workerSelector:
   test: "true"
@@ -104,6 +105,7 @@ steps:
 func TestExecution_StartCommand(t *testing.T) {
 	t.Run("directStartCommandExecution", func(t *testing.T) {
 		f := newTestFixture(t, `
+type: graph
 name: direct-start-test
 workerSelector:
   test: "true"
@@ -129,6 +131,7 @@ steps:
 
 	t.Run("directStartCommandExecution_NoNameField", func(t *testing.T) {
 		f := newTestFixture(t, `
+type: graph
 workerSelector:
   test: "true"
 steps:
@@ -155,6 +158,7 @@ steps:
 func TestExecution_SharedFSMode(t *testing.T) {
 	t.Run("statusWrittenToSharedFilesystem", func(t *testing.T) {
 		f := newTestFixture(t, `
+type: graph
 name: sharedfs-status-test
 workerSelector:
   test: "true"
@@ -204,6 +208,7 @@ steps:
 
 	t.Run("subprocessExecutesDAGCorrectly", func(t *testing.T) {
 		f := newTestFixture(t, `
+type: graph
 name: sharedfs-subprocess-test
 workerSelector:
   env: test
@@ -237,6 +242,7 @@ steps:
 
 	t.Run("directStartWithSharedFS", func(t *testing.T) {
 		f := newTestFixture(t, `
+type: graph
 name: sharedfs-direct-start-test
 workerSelector:
   test: "true"
@@ -260,6 +266,7 @@ steps:
 
 	t.Run("directStartWithSharedFS_NoNameField", func(t *testing.T) {
 		f := newTestFixture(t, `
+type: graph
 workerSelector:
   test: "true"
 steps:
@@ -310,6 +317,7 @@ steps:
 
 	t.Run("queuedStatusBeforeSchedulerStarts", func(t *testing.T) {
 		f := newTestFixture(t, `
+type: graph
 name: scheduler-process-test
 workerSelector:
   env: prod

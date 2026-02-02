@@ -32,7 +32,8 @@ func TestDAGExecution(t *testing.T) {
 	t.Run("Depends", func(t *testing.T) {
 		t.Parallel()
 
-		dag := th.DAG(t, `steps:
+		dag := th.DAG(t, `type: graph
+steps:
   - name: "1"
     command: echo 1
   - name: "2"
@@ -102,7 +103,8 @@ steps:
 
 	t.Run("StepTimeout", func(t *testing.T) {
 		t.Parallel()
-		dag := th.DAG(t, `steps:
+		dag := th.DAG(t, `type: graph
+steps:
   - name: slow
     command: sleep 2
     timeoutSec: 1
@@ -120,7 +122,8 @@ steps:
 	t.Run("NamedParams", func(t *testing.T) {
 		t.Parallel()
 
-		dag := th.DAG(t, `params:
+		dag := th.DAG(t, `type: graph
+params:
   NAME: "Dagu"
   AGE: 30
 
@@ -449,7 +452,8 @@ steps:
 	t.Run("Issue810", func(t *testing.T) {
 		t.Parallel()
 
-		dag := th.DAG(t, `params: bar
+		dag := th.DAG(t, `type: graph
+params: bar
 steps:
   - name: step1
     command: echo start
@@ -635,7 +639,8 @@ func TestComplexDependencies(t *testing.T) {
 	// Setup the test helper with the integration DAGs directory.
 	th := test.Setup(t)
 	// Load the DAG from inline YAML.
-	dag := th.DAG(t, `steps:
+	dag := th.DAG(t, `type: graph
+steps:
   - name: start
     command: echo "start"
     output: START

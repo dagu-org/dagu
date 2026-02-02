@@ -1648,6 +1648,10 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 					return nil, err
 				}
 
+				if err := validateNoDependsForChainType(result, st); err != nil {
+					return nil, err
+				}
+
 				injectChainDependencies(result, prevSteps, st)
 				builtSteps = append(builtSteps, st)
 				prevSteps = []*core.Step{st}
@@ -1660,6 +1664,10 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 					case map[string]any:
 						st, err := buildStepFromRaw(buildCtx, i, vv, names)
 						if err != nil {
+							return nil, err
+						}
+
+						if err := validateNoDependsForChainType(result, st); err != nil {
 							return nil, err
 						}
 
@@ -1703,6 +1711,11 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 			if err != nil {
 				return nil, err
 			}
+
+			if err := validateNoDependsForChainType(result, builtStep); err != nil {
+				return nil, err
+			}
+
 			steps = append(steps, *builtStep)
 		}
 		return steps, nil
@@ -1736,4 +1749,17 @@ func buildMailConfigInternal(def mailConfig) (*core.MailConfig, error) {
 		Prefix:     strings.TrimSpace(def.Prefix),
 		AttachLogs: def.AttachLogs,
 	}, nil
+}
+
+// validateNoDependsForChainType ensures that steps in chain type DAGs do not have explicit depends.
+// Chain type DAGs should have fully automatic sequential execution with no manual dependency control.
+func validateNoDependsForChainType(dag *core.DAG, step *core.Step) error {
+	if dag.Type != core.TypeChain {
+		return nil
+	}
+	if len(step.Depends) > 0 || step.ExplicitlyNoDeps {
+		return core.NewValidationError("depends", step.Depends,
+			fmt.Errorf("step '%s': %w", step.Name, core.ErrDependsNotAllowedInChainType))
+	}
+	return nil
 }

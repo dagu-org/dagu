@@ -253,7 +253,8 @@ func TestAgent_Retry(t *testing.T) {
 	t.Run("RetryDAG", func(t *testing.T) {
 		th := test.Setup(t)
 		// retry DAG that fails
-		dag := th.DAG(t, `steps:
+		dag := th.DAG(t, `type: graph
+steps:
   - name: "1"
     command: "true"
   - name: "2"
@@ -319,7 +320,8 @@ func TestAgent_Retry(t *testing.T) {
 
 	t.Run("StepRetry", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `steps:
+		dag := th.DAG(t, `type: graph
+steps:
   - name: "1"
     command: "true"
   - name: "2"
@@ -614,7 +616,8 @@ func TestAgent_OutputCollection(t *testing.T) {
 		},
 		{
 			name: "LastOneWins",
-			dag: `steps:
+			dag: `type: graph
+steps:
   - name: step1
     command: echo "first"
     output: RESULT

@@ -28,6 +28,7 @@ func TestMinIOContainer_WithMCCommands(t *testing.T) {
 
 	// Use startup: command to run MinIO server, then execute mc commands inside the container
 	dagConfig := fmt.Sprintf(`
+type: graph
 container:
   image: %s
   startup: command

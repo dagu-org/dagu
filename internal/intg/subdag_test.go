@@ -336,6 +336,7 @@ steps:
 		th := test.Setup(t)
 
 		testDAG := th.DAG(t, `
+type: graph
 steps:
   - name: setup
     command: echo "Setting up"
@@ -345,11 +346,13 @@ steps:
     call: task-dag
     params: "TASK_NAME=Task1 SETUP=${SETUP_STATUS}"
     output: TASK1_RESULT
+    depends: [setup]
 
   - name: task2
     call: task-dag
     params: "TASK_NAME=Task2 SETUP=${SETUP_STATUS}"
     output: TASK2_RESULT
+    depends: [setup]
 
   - name: combine
     command: |

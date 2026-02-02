@@ -26,6 +26,7 @@ steps:
 	t.Run("InvalidDependency", func(t *testing.T) {
 		// This DAG has a step depending on a non-existent step
 		dagFile := th.CreateDAGFile(t, "invalid.yaml", `
+type: graph
 steps:
   - echo A
   - name: "b"

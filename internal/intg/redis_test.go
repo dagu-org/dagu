@@ -50,6 +50,7 @@ steps:
 			name: "SetAndGet",
 			dagConfigFunc: func(port int) string {
 				return fmt.Sprintf(`
+type: graph
 container:
   image: %s
   startup: entrypoint
@@ -85,6 +86,7 @@ steps:
 			name: "StepOverridesDB",
 			dagConfigFunc: func(port int) string {
 				return fmt.Sprintf(`
+type: graph
 container:
   image: %s
   startup: entrypoint
@@ -156,6 +158,7 @@ steps:
 			name: "ListOperations",
 			dagConfigFunc: func(port int) string {
 				return fmt.Sprintf(`
+type: graph
 container:
   image: %s
   startup: entrypoint
@@ -194,6 +197,7 @@ steps:
 			name: "HashOperations",
 			dagConfigFunc: func(port int) string {
 				return fmt.Sprintf(`
+type: graph
 container:
   image: %s
   startup: entrypoint
@@ -232,6 +236,7 @@ steps:
 			name: "SetWithTTL",
 			dagConfigFunc: func(port int) string {
 				return fmt.Sprintf(`
+type: graph
 container:
   image: %s
   startup: entrypoint

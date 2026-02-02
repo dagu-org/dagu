@@ -51,6 +51,7 @@ func TestDryCommand_InvalidDependency(t *testing.T) {
 	th := test.SetupCommand(t)
 
 	dagFile := th.CreateDAGFile(t, "invalid.yaml", `
+type: graph
 steps:
   - echo A
   - name: "b"
