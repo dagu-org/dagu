@@ -1056,7 +1056,7 @@
         },
         "value": {
           "type": "string",
-          "description": "Expression to evaluate for router step routing (e.g., '${STATUS}'). Only used when type is 'router'."
+          "description": "Expression to evaluate for router step routing (e.g., '${STATUS}'). Only used when type is 'router'. Router steps require DAG type 'graph'."
         },
         "routes": {
           "type": "object",
@@ -1066,7 +1066,7 @@
               "type": "string"
             }
           },
-          "description": "Map of patterns to target step names for routing. Keys are patterns (exact match or 're:regex'), values are arrays of step names. Target steps automatically depend on the router (no explicit depends needed). Each step can only be targeted by one route. Only used when type is 'router'."
+          "description": "Map of patterns to target step names for routing. Keys are patterns (exact match or 're:regex'), values are arrays of step names. Target steps automatically depend on the router (no explicit depends needed). Each step can only be targeted by one route. Only used when type is 'router'. Router steps require DAG type 'graph'."
         }
       },
       "allOf": [

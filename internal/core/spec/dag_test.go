@@ -2497,3 +2497,143 @@ func TestChainTypeDependsValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestRouterNotAllowedInChainType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		dag         *dag
+		expectErr   bool
+		errContains string
+	}{
+		{
+			name: "ChainTypeWithRouterShouldError",
+			dag: &dag{
+				Type: "chain",
+				Steps: []any{
+					map[string]any{
+						"name":  "router",
+						"type":  "router",
+						"value": "${MODE}",
+						"routes": map[string]any{
+							"a": []string{"step_a"},
+						},
+					},
+					map[string]any{"name": "step_a", "command": "echo A"},
+				},
+			},
+			expectErr:   true,
+			errContains: "router steps require type 'graph'",
+		},
+		{
+			name: "DefaultTypeWithRouterShouldError",
+			dag: &dag{
+				// Default type is chain, so router should not be allowed
+				Steps: []any{
+					map[string]any{
+						"name":  "router",
+						"type":  "router",
+						"value": "${MODE}",
+						"routes": map[string]any{
+							"a": []string{"step_a"},
+						},
+					},
+					map[string]any{"name": "step_a", "command": "echo A"},
+				},
+			},
+			expectErr:   true,
+			errContains: "router steps require type 'graph'",
+		},
+		{
+			name: "GraphTypeWithRouterShouldWork",
+			dag: &dag{
+				Type: "graph",
+				Steps: []any{
+					map[string]any{
+						"name":  "router",
+						"type":  "router",
+						"value": "${MODE}",
+						"routes": map[string]any{
+							"a": []string{"step_a"},
+						},
+					},
+					map[string]any{"name": "step_a", "command": "echo A"},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			name: "ChainTypeNestedParallelWithRouterShouldError",
+			dag: &dag{
+				Type: "chain",
+				Steps: []any{
+					map[string]any{"name": "step1", "command": "echo 1"},
+					[]any{
+						map[string]any{
+							"name":  "router",
+							"type":  "router",
+							"value": "${MODE}",
+							"routes": map[string]any{
+								"a": []string{"step_a"},
+							},
+						},
+						map[string]any{"name": "step_a", "command": "echo A"},
+					},
+				},
+			},
+			expectErr:   true,
+			errContains: "router steps require type 'graph'",
+		},
+		{
+			name: "ChainTypeMapFormWithRouterShouldError",
+			dag: &dag{
+				Type: "chain",
+				Steps: map[string]any{
+					"router": map[string]any{
+						"type":  "router",
+						"value": "${MODE}",
+						"routes": map[string]any{
+							"a": []string{"step_a"},
+						},
+					},
+					"step_a": map[string]any{"command": "echo A"},
+				},
+			},
+			expectErr:   true,
+			errContains: "router steps require type 'graph'",
+		},
+		{
+			name: "GraphTypeMapFormWithRouterShouldWork",
+			dag: &dag{
+				Type: "graph",
+				Steps: map[string]any{
+					"router": map[string]any{
+						"type":  "router",
+						"value": "${MODE}",
+						"routes": map[string]any{
+							"a": []string{"step_a"},
+						},
+					},
+					"step_a": map[string]any{"command": "echo A"},
+				},
+			},
+			expectErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := tt.dag.build(testBuildContext())
+			if tt.expectErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, result)
+			}
+		})
+	}
+}

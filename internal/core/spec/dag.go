@@ -1653,6 +1653,10 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 					return nil, err
 				}
 
+				if err := validateNoRouterForChainType(result, st); err != nil {
+					return nil, err
+				}
+
 				injectChainDependencies(result, prevSteps, st)
 				builtSteps = append(builtSteps, st)
 				prevSteps = []*core.Step{st}
@@ -1669,6 +1673,10 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 						}
 
 						if err := validateNoDependsForChainType(result, st); err != nil {
+							return nil, err
+						}
+
+						if err := validateNoRouterForChainType(result, st); err != nil {
 							return nil, err
 						}
 
@@ -1721,6 +1729,10 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 				return nil, err
 			}
 
+			if err := validateNoRouterForChainType(result, builtStep); err != nil {
+				return nil, err
+			}
+
 			steps = append(steps, *builtStep)
 		}
 		// Transform router steps: inject preconditions into targets
@@ -1769,6 +1781,18 @@ func validateNoDependsForChainType(dag *core.DAG, step *core.Step) error {
 	if len(step.Depends) > 0 || step.ExplicitlyNoDeps {
 		return core.NewValidationError("depends", step.Depends,
 			fmt.Errorf("step '%s': %w", step.Name, core.ErrDependsNotAllowedInChainType))
+	}
+	return nil
+}
+
+// validateNoRouterForChainType returns an error if a router step is used in chain mode
+func validateNoRouterForChainType(dag *core.DAG, step *core.Step) error {
+	if dag.Type != core.TypeChain {
+		return nil
+	}
+	if step.Router != nil {
+		return core.NewValidationError("type", step.Name,
+			fmt.Errorf("step '%s': router steps require type 'graph'; change DAG type from 'chain' to 'graph' to use router steps", step.Name))
 	}
 	return nil
 }
