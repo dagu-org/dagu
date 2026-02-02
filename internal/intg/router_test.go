@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -526,5 +527,40 @@ steps:
 				require.Equal(t, core.NodeSkipped, node.Status, "step_b should be skipped")
 			}
 		}
+	})
+}
+
+func TestRouterValidation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("DuplicateTargetValidation", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+
+		// Write DAG file manually to test validation error
+		dagContent := `
+type: graph
+env:
+  - MODE: full
+steps:
+  - name: router
+    type: router
+    value: ${MODE}
+    routes:
+      "full": [process_a, process_b]
+      "minimal": [process_a]
+
+  - name: process_a
+    command: echo "A"
+
+  - name: process_b
+    command: echo "B"
+`
+		dagFile := th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "duplicate_target_test.yaml", []byte(dagContent))
+
+		_, err := spec.Load(th.Context, dagFile)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "targeted by multiple routes")
 	})
 }

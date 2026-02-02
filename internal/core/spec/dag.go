@@ -1790,9 +1790,20 @@ func transformRouterSteps(steps []core.Step) error {
 		router := steps[i].Router
 		routerName := steps[i].Name
 
+		// Track targets to detect duplicates across routes
+		seenTargets := make(map[string]string) // target -> first pattern that used it
+
 		// For each route, inject precondition into target steps
 		for _, route := range router.Routes {
 			for _, targetName := range route.Targets {
+				// Check for duplicate target
+				if firstPattern, exists := seenTargets[targetName]; exists {
+					return core.NewValidationError("routes", targetName,
+						fmt.Errorf("router %q: step %q is targeted by multiple routes (%q and %q); each step can only be a target of one route",
+							routerName, targetName, firstPattern, route.Pattern))
+				}
+				seenTargets[targetName] = route.Pattern
+
 				target, ok := stepIndex[targetName]
 				if !ok {
 					return core.NewValidationError("routes", targetName,
