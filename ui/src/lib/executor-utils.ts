@@ -48,6 +48,8 @@ export function getExecutorCommand(
       return config.expression ? `jq: ${config.expression}` : null;
     case 'docker':
       return config.image ? `docker: ${config.image}` : null;
+    case 'router':
+      return config.value ? `route: ${config.value}` : 'router';
     default:
       return null;
   }

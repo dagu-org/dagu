@@ -11,7 +11,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { getExecutorCommand } from '@/lib/executor-utils';
-import { ArrowRight, Code, Folder, GitBranch, Mail, RefreshCw } from 'lucide-react';
+import { ArrowRight, Code, Folder, GitBranch, GitFork, Mail, RefreshCw } from 'lucide-react';
 import { components } from '../../../../api/v2/schema';
 import { Badge } from '../../../../components/ui/badge';
 import { TableCell, TableRow } from '../../../../components/ui/table';
@@ -74,6 +74,27 @@ function DAGStepTableRow({ step, index }: Props) {
               <span className="font-medium text-info">
                 Sub-DAG: {subDagName}
               </span>
+            </div>
+          )}
+          {/* Router Configuration */}
+          {step.router && (
+            <div className="mt-1 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs">
+                <GitFork className="h-3.5 w-3.5 text-info" />
+                <span className="font-medium">Router:</span>
+                <code className="bg-muted px-1 rounded">{step.router.value}</code>
+              </div>
+              {step.router.routes && (
+                <div className="text-xs bg-muted/50 rounded p-1.5 space-y-0.5">
+                  {step.router.routes.map((route, idx) => (
+                    <div key={idx} className="flex items-center gap-1 font-mono">
+                      <span className="text-muted-foreground">{route.pattern}</span>
+                      <span className="text-muted-foreground">→</span>
+                      <span>{route.targets?.join(', ')}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

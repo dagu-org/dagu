@@ -191,6 +191,8 @@ function Graph({
       // Check if this is a sub dagRun node (has a 'run' property)
       const isSubDAGRun = !!step.call;
       const hasParallelExecutions = !!step.parallel;
+      // Check if this is a router step
+      const isRouterStep = step.executorConfig?.type === 'router' || !!step.router;
 
       // Add indicator for sub dagRun nodes in the label only
       // Escape any special characters in the label to prevent Mermaid parsing errors
@@ -206,7 +208,16 @@ function Graph({
       }
 
       // Use different shapes based on node type
-      if (isSubDAGRun) {
+      if (isRouterStep) {
+        // Diamond shape for router/decision nodes
+        const routerLabel = step.router?.value
+          ? `${step.name}\\n${step.router.value}`
+          : step.name;
+        dat.push(`${id}@{ shape: diamond, label: "${routerLabel}"};`);
+        if (c) {
+          nodeClasses.set(id, c.replace(':::', ''));
+        }
+      } else if (isSubDAGRun) {
         if (hasParallelExecutions) {
           // Multiple parallel executions - use procs icon
           dat.push(`${id}@{ shape: procs, label: "${label}"};`);

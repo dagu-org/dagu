@@ -4992,6 +4992,26 @@ components:
               type: object
               description: "Executor-specific configuration"
               additionalProperties: true
+        router:
+          type: object
+          description: "Router configuration for switch/case routing"
+          properties:
+            value:
+              type: string
+              description: "Expression to evaluate (e.g., '${STATUS}')"
+            routes:
+              type: array
+              items:
+                type: object
+                properties:
+                  pattern:
+                    type: string
+                    description: "Match pattern (exact or 're:regex')"
+                  targets:
+                    type: array
+                    items:
+                      type: string
+                    description: "Step names to route to"
       required:
         - name
 
