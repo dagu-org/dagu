@@ -8,6 +8,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// applyEvalOptions applies all options and returns the resulting EvalOptions
+func applyEvalOptions(opts []cmdutil.EvalOption) *cmdutil.EvalOptions {
+	evalOpts := cmdutil.NewEvalOptions()
+	for _, opt := range opts {
+		opt(evalOpts)
+	}
+	return evalOpts
+}
+
 func TestExecutorCapabilities_Get(t *testing.T) {
 	registry := &executorCapabilitiesRegistry{
 		caps: make(map[string]ExecutorCapabilities),
@@ -46,22 +55,13 @@ func TestStep_EvalOptions(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("AlwaysIncludesSkipOSEnvExpansion", func(t *testing.T) {
-		// Any step should always have WithoutOSEnvExpansion as the first option
 		step := Step{ExecutorConfig: ExecutorConfig{Type: "any-type"}}
 		opts := step.EvalOptions(ctx)
-		assert.NotNil(t, opts)
-		assert.Len(t, opts, 1, "Should have at least the default SkipOSEnvExpansion option")
-
-		// Verify it sets SkipOSEnvExpansion flag
-		evalOpts := cmdutil.NewEvalOptions()
-		for _, opt := range opts {
-			opt(evalOpts)
-		}
-		assert.True(t, evalOpts.SkipOSEnvExpansion, "SkipOSEnvExpansion should be enabled")
+		assert.Len(t, opts, 1)
+		assert.True(t, applyEvalOptions(opts).SkipOSEnvExpansion)
 	})
 
 	t.Run("WithGetEvalOptions", func(t *testing.T) {
-		// Register executor with GetEvalOptions callback
 		RegisterExecutorCapabilities("eval-opts-test-v2", ExecutorCapabilities{
 			Command: true,
 			GetEvalOptions: func(_ context.Context, _ Step) []cmdutil.EvalOption {
@@ -71,46 +71,28 @@ func TestStep_EvalOptions(t *testing.T) {
 
 		step := Step{ExecutorConfig: ExecutorConfig{Type: "eval-opts-test-v2"}}
 		opts := step.EvalOptions(ctx)
-		// Should have 2 options: WithoutOSEnvExpansion() + WithoutExpandShell()
 		assert.Len(t, opts, 2)
 
-		// Verify both flags are set
-		evalOpts := cmdutil.NewEvalOptions()
-		for _, opt := range opts {
-			opt(evalOpts)
-		}
-		assert.True(t, evalOpts.SkipOSEnvExpansion, "SkipOSEnvExpansion should be enabled")
-		assert.False(t, evalOpts.ExpandShell, "ExpandShell should be disabled")
+		evalOpts := applyEvalOptions(opts)
+		assert.True(t, evalOpts.SkipOSEnvExpansion)
+		assert.False(t, evalOpts.ExpandShell)
 	})
 
 	t.Run("WithoutGetEvalOptions", func(t *testing.T) {
-		// Register executor without GetEvalOptions
 		RegisterExecutorCapabilities("no-eval-opts-test-v2", ExecutorCapabilities{
 			Command: true,
 		})
 
 		step := Step{ExecutorConfig: ExecutorConfig{Type: "no-eval-opts-test-v2"}}
 		opts := step.EvalOptions(ctx)
-		// Should still have 1 option: WithoutOSEnvExpansion()
 		assert.Len(t, opts, 1)
-
-		evalOpts := cmdutil.NewEvalOptions()
-		for _, opt := range opts {
-			opt(evalOpts)
-		}
-		assert.True(t, evalOpts.SkipOSEnvExpansion, "SkipOSEnvExpansion should be enabled")
+		assert.True(t, applyEvalOptions(opts).SkipOSEnvExpansion)
 	})
 
 	t.Run("UnregisteredExecutor", func(t *testing.T) {
 		step := Step{ExecutorConfig: ExecutorConfig{Type: "unregistered-executor-v2"}}
 		opts := step.EvalOptions(ctx)
-		// Should still have 1 option: WithoutOSEnvExpansion()
 		assert.Len(t, opts, 1)
-
-		evalOpts := cmdutil.NewEvalOptions()
-		for _, opt := range opts {
-			opt(evalOpts)
-		}
-		assert.True(t, evalOpts.SkipOSEnvExpansion, "SkipOSEnvExpansion should be enabled")
+		assert.True(t, applyEvalOptions(opts).SkipOSEnvExpansion)
 	})
 }

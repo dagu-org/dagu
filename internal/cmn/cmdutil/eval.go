@@ -650,30 +650,8 @@ func expandReferencesWithStepsInternal(ctx context.Context, input string, dataMa
 		// Try regular variable or environment lookup
 		jsonStr, ok := dataMap[varName]
 		if !ok {
-			// Try EnvScope from context first
-			if scope := GetEnvScope(ctx); scope != nil {
-				if skipOSEnv {
-					// Only use non-OS sourced variables when skipOSEnv is true
-					if entry, exists := scope.GetEntry(varName); exists && entry.Source != EnvSourceOS {
-						jsonStr = entry.Value
-					} else {
-						return match
-					}
-				} else {
-					if envVal, exists := scope.Get(varName); exists {
-						jsonStr = envVal
-					} else {
-						return match
-					}
-				}
-			} else if !skipOSEnv {
-				// Only fall back to os.LookupEnv if not skipping OS env
-				if envVal, exists := os.LookupEnv(varName); exists {
-					jsonStr = envVal
-				} else {
-					return match
-				}
-			} else {
+			jsonStr, ok = lookupEnvVar(ctx, varName, skipOSEnv)
+			if !ok {
 				return match
 			}
 		}
@@ -808,6 +786,24 @@ func lookupVariable(name string, scopes []map[string]string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// lookupEnvVar looks up an environment variable from EnvScope or OS.
+// When skipOSEnv is true, only non-OS-sourced variables are returned.
+func lookupEnvVar(ctx context.Context, varName string, skipOSEnv bool) (string, bool) {
+	if scope := GetEnvScope(ctx); scope != nil {
+		if skipOSEnv {
+			if entry, exists := scope.GetEntry(varName); exists && entry.Source != EnvSourceOS {
+				return entry.Value, true
+			}
+			return "", false
+		}
+		return scope.Get(varName)
+	}
+	if skipOSEnv {
+		return "", false
+	}
+	return os.LookupEnv(varName)
 }
 
 type stepSliceSpec struct {
