@@ -17,6 +17,7 @@ func TestRouterExecutor(t *testing.T) {
 
 		th := test.Setup(t)
 		dag := th.DAG(t, `
+type: graph
 env:
   - INPUT: exact_value
 steps:
@@ -50,6 +51,7 @@ steps:
 
 		th := test.Setup(t)
 		dag := th.DAG(t, `
+type: graph
 env:
   - INPUT: apple_pie
 steps:
@@ -82,6 +84,7 @@ steps:
 
 		th := test.Setup(t)
 		dag := th.DAG(t, `
+type: graph
 env:
   - INPUT: unknown_value
 steps:
@@ -156,6 +159,7 @@ steps:
 
 		th := test.Setup(t)
 		dag := th.DAG(t, `
+type: graph
 env:
   - INPUT: success_code
 steps:
@@ -231,6 +235,7 @@ steps:
 
 		th := test.Setup(t)
 		dag := th.DAG(t, `
+type: graph
 env:
   - STATUS: production
 steps:
@@ -507,6 +512,7 @@ func TestRouterStepStatus(t *testing.T) {
 
 		th := test.Setup(t)
 		dag := th.DAG(t, `
+type: graph
 env:
   - INPUT: route_a
 steps:
