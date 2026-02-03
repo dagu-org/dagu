@@ -7,10 +7,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func applyEvalOptions(opts []cmdutil.EvalOption) *cmdutil.EvalOptions {
+	evalOpts := cmdutil.NewEvalOptions()
+	for _, opt := range opts {
+		opt(evalOpts)
+	}
+	return evalOpts
+}
 
 func TestNewSSHExecutor(t *testing.T) {
 	t.Parallel()
@@ -273,14 +282,52 @@ func TestSSHExecutor_GetEvalOptions(t *testing.T) {
 				ctx = WithSSHClient(ctx, &Client{Shell: tt.dagShell})
 			}
 
-			opts := tt.step.EvalOptions(ctx)
+			opts := applyEvalOptions(tt.step.EvalOptions(ctx))
+
+			assert.True(t, opts.SkipOSEnvExpansion, "SSH eval options must always skip OS env expansion")
 
 			if tt.expectSkipShell {
-				require.Len(t, opts, 1, "expected WithoutExpandShell option")
+				assert.False(t, opts.ExpandShell, "expected shell expansion to be disabled")
 			} else {
-				require.Empty(t, opts, "expected no eval options")
+				assert.True(t, opts.ExpandShell, "expected shell expansion to remain enabled")
 			}
 		})
+	}
+}
+
+func TestSSHExecutor_EvalPreservesOSVars(t *testing.T) {
+	t.Parallel()
+
+	scope := cmdutil.NewEnvScope(nil, false).
+		WithEntry("HOSTNAME", "ignore", cmdutil.EnvSourceOS)
+
+	ctx := cmdutil.WithEnvScope(context.Background(), scope)
+
+	step := core.Step{
+		Commands: []core.CommandEntry{
+			{
+				Command: "echo",
+				Args: []string{
+					"${HOSTNAME#domain}",
+					"Value:$HOSTNAME",
+				},
+			},
+		},
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "ssh",
+			Config: map[string]any{
+				"shell": "/bin/bash",
+			},
+		},
+	}
+
+	opts := step.EvalOptions(ctx)
+	require.NotEmpty(t, opts, "expected WithoutOSEnvExpansion option")
+
+	for _, arg := range step.Commands[0].Args {
+		got, err := cmdutil.EvalString(ctx, arg, opts...)
+		require.NoError(t, err)
+		assert.Equal(t, arg, got, "OS env references should be preserved for remote shell expansion")
 	}
 }
 
