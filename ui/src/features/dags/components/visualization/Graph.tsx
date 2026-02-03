@@ -21,6 +21,18 @@ import React, { useState } from 'react';
 import { components, NodeStatus } from '../../../../api/v2/schema';
 import Mermaid from '../../../../ui/Mermaid';
 
+/**
+ * Escapes special characters in labels for safe Mermaid syntax interpolation.
+ * Prevents parsing errors from quotes, backslashes, or newlines in step names/values.
+ */
+function escapeMermaidLabel(str: string): string {
+  return str
+    .replace(/\\/g, '\\\\') // Escape backslashes first
+    .replace(/"/g, '\\"') // Escape double quotes
+    .replace(/\n/g, '\\n') // Convert newlines to literal \n
+    .replace(/\r/g, ''); // Remove carriage returns
+}
+
 /** Callback type for node click events */
 type onClickNode = (name: string) => void;
 
@@ -191,6 +203,8 @@ function Graph({
       // Check if this is a sub dagRun node (has a 'run' property)
       const isSubDAGRun = !!step.call;
       const hasParallelExecutions = !!step.parallel;
+      // Check if this is a router step
+      const isRouterStep = step.executorConfig?.type === 'router' || !!step.router;
 
       // Add indicator for sub dagRun nodes in the label only
       // Escape any special characters in the label to prevent Mermaid parsing errors
@@ -206,13 +220,25 @@ function Graph({
       }
 
       // Use different shapes based on node type
-      if (isSubDAGRun) {
+      if (isRouterStep) {
+        // Diamond shape for router/decision nodes
+        // Escape labels to prevent Mermaid parsing errors from special characters
+        const routerLabel = step.router?.value
+          ? `${escapeMermaidLabel(step.name)}\\n${escapeMermaidLabel(step.router.value)}`
+          : escapeMermaidLabel(step.name);
+        dat.push(`${id}@{ shape: diamond, label: "${routerLabel}"};`);
+        if (c) {
+          nodeClasses.set(id, c.replace(':::', ''));
+        }
+      } else if (isSubDAGRun) {
+        // Escape label to prevent Mermaid parsing errors
+        const escapedLabel = escapeMermaidLabel(label);
         if (hasParallelExecutions) {
           // Multiple parallel executions - use procs icon
-          dat.push(`${id}@{ shape: procs, label: "${label}"};`);
+          dat.push(`${id}@{ shape: procs, label: "${escapedLabel}"};`);
         } else {
           // Single sub DAG - use subproc icon
-          dat.push(`${id}@{ shape: subproc, label: "${label}"};`);
+          dat.push(`${id}@{ shape: subproc, label: "${escapedLabel}"};`);
         }
         // Store class for later application (remove ::: prefix)
         if (c) {
@@ -220,7 +246,8 @@ function Graph({
         }
       } else {
         // Normal step - use rectangle with inline class syntax
-        dat.push(`${id}["${label}"]${c};`);
+        // Escape label to prevent Mermaid parsing errors
+        dat.push(`${id}["${escapeMermaidLabel(label)}"]${c};`);
       }
 
       // Process dependencies and add connections

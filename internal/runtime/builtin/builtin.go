@@ -12,6 +12,7 @@ import (
 	_ "github.com/dagu-org/dagu/internal/runtime/builtin/jq"
 	_ "github.com/dagu-org/dagu/internal/runtime/builtin/mail"
 	_ "github.com/dagu-org/dagu/internal/runtime/builtin/redis"
+	_ "github.com/dagu-org/dagu/internal/runtime/builtin/router"
 	_ "github.com/dagu-org/dagu/internal/runtime/builtin/s3"
 	_ "github.com/dagu-org/dagu/internal/runtime/builtin/sql"
 	_ "github.com/dagu-org/dagu/internal/runtime/builtin/sql/drivers/postgres"

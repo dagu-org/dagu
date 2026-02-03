@@ -41,6 +41,7 @@ type Props = {
  */
 function DAGSpec({ fileName, localDags }: Props) {
   const appBarContext = React.useContext(AppBarContext);
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const client = useClient();
   const config = useConfig();
   const { showError } = useErrorModal();
@@ -94,12 +95,12 @@ function DAGSpec({ fileName, localDags }: Props) {
   });
 
   // Fallback to REST polling when SSE fails
-  const { data: pollingData, isLoading } = useQuery(
+  const { data: pollingData, isLoading, mutate: mutateSpec } = useQuery(
     '/dags/{fileName}/spec',
     {
       params: {
         query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
+          remoteNode,
         },
         path: {
           fileName: fileName,
@@ -109,6 +110,7 @@ function DAGSpec({ fileName, localDags }: Props) {
     {
       revalidateIfStale: shouldUseFallback,
       revalidateOnFocus: shouldUseFallback,
+      revalidateOnMount: true,
       refreshInterval: shouldUseFallback ? 5000 : 0,
       isPaused: () => !shouldUseFallback && isConnected,
     }
@@ -154,7 +156,7 @@ function DAGSpec({ fileName, localDags }: Props) {
             fileName: fileName,
           },
           query: {
-            remoteNode: appBarContext.selectedRemoteNode || 'local',
+            remoteNode,
           },
         },
         body: {
@@ -179,16 +181,20 @@ function DAGSpec({ fileName, localDags }: Props) {
     // Mark as saved to prevent false conflict detection on our own save
     markAsSaved(currentValue);
 
+    // Invalidate the spec cache to ensure fresh data on remount
+    mutateSpec();
+
     // Show success toast notification
     showToast('Changes saved successfully');
   }, [
     currentValue,
     fileName,
-    appBarContext.selectedRemoteNode,
+    remoteNode,
     client,
     saveScrollPosition,
     showToast,
     markAsSaved,
+    mutateSpec,
   ]);
 
   // Restore scroll position after render

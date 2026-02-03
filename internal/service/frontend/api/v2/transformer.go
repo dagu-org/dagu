@@ -114,6 +114,32 @@ func toStep(obj core.Step) api.Step {
 		}
 	}
 
+	if obj.Router != nil {
+		routes := make([]struct {
+			Pattern string   `json:"pattern"`
+			Targets []string `json:"targets"`
+		}, len(obj.Router.Routes))
+		for i, r := range obj.Router.Routes {
+			routes[i] = struct {
+				Pattern string   `json:"pattern"`
+				Targets []string `json:"targets"`
+			}{
+				Pattern: r.Pattern,
+				Targets: r.Targets,
+			}
+		}
+		step.Router = &struct {
+			Routes []struct {
+				Pattern string   `json:"pattern"`
+				Targets []string `json:"targets"`
+			} `json:"routes"`
+			Value string `json:"value"`
+		}{
+			Value:  obj.Router.Value,
+			Routes: routes,
+		}
+	}
+
 	return step
 }
 

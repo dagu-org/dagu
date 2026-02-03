@@ -1053,6 +1053,23 @@
             "type": "string"
           },
           "description": "List of tool DAG names available to the LLM for function calling. Only valid when type is 'chat'. Tools are other DAGs that can be called by the LLM to perform specific tasks."
+        },
+        "value": {
+          "type": "string",
+          "description": "Expression to evaluate for router step routing (e.g., '${STATUS}'). Only used when type is 'router'. Router steps require DAG type 'graph'."
+        },
+        "routes": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "description": "Map of patterns to target step names for routing. Keys are patterns (exact match or 're:regex'), values are arrays of step names. Target steps automatically depend on the router (no explicit depends needed). Each step can only be targeted by one route. Only used when type is 'router'. Router steps require DAG type 'graph'."
         }
       },
       "allOf": [
@@ -1156,6 +1173,12 @@
             "properties": {
               "config": { "$ref": "#/definitions/s3ExecutorConfig" }
             }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "router" } } },
+          "then": {
+            "required": ["value", "routes"]
           }
         }
       ]
@@ -2846,7 +2869,8 @@
         "hitl",
         "postgres",
         "sqlite",
-        "redis"
+        "redis",
+        "router"
       ],
       "description": "Type of executor to use for this step."
     },

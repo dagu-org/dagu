@@ -2242,6 +2242,17 @@ export interface components {
                     [key: string]: unknown;
                 };
             };
+            /** @description Router configuration for switch/case routing */
+            router?: {
+                /** @description Expression to evaluate (e.g., '${STATUS}') */
+                value: string;
+                routes: {
+                    /** @description Match pattern (exact or 're:regex') */
+                    pattern: string;
+                    /** @description Step names to route to */
+                    targets: string[];
+                }[];
+            };
         };
         /** @description Individual search result item for a DAG */
         SearchResultItem: {
