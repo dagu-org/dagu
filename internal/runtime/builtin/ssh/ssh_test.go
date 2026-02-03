@@ -284,7 +284,7 @@ func TestSSHExecutor_GetEvalOptions(t *testing.T) {
 
 			opts := applyEvalOptions(tt.step.EvalOptions(ctx))
 
-			assert.True(t, opts.SkipOSEnvExpansion, "SSH eval options must always skip OS env expansion")
+			assert.False(t, opts.AllowOSEnvExpansion, "SSH eval options must skip OS env expansion by default")
 
 			if tt.expectSkipShell {
 				assert.False(t, opts.ExpandShell, "expected shell expansion to be disabled")
@@ -322,7 +322,8 @@ func TestSSHExecutor_EvalPreservesOSVars(t *testing.T) {
 	}
 
 	opts := step.EvalOptions(ctx)
-	require.NotEmpty(t, opts, "expected WithoutOSEnvExpansion option")
+	// Default env evaluation should keep OS vars deferred
+	assert.False(t, applyEvalOptions(opts).AllowOSEnvExpansion)
 
 	for _, arg := range step.Commands[0].Args {
 		got, err := cmdutil.EvalString(ctx, arg, opts...)

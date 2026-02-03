@@ -20,12 +20,12 @@ import (
 )
 
 type EvalOptions struct {
-	ExpandEnv          bool
-	Substitute         bool
-	Variables          []map[string]string
-	StepMap            map[string]StepInfo
-	ExpandShell        bool // When false, skip shell-based variable expansion (e.g., for SSH commands)
-	SkipOSEnvExpansion bool // When true, do not expand OS-sourced environment variables
+	ExpandEnv           bool
+	Substitute          bool
+	Variables           []map[string]string
+	StepMap             map[string]StepInfo
+	ExpandShell         bool // When false, skip shell-based variable expansion (e.g., for SSH commands)
+	AllowOSEnvExpansion bool // When true, expand OS-sourced environment variables during evaluation
 }
 
 func NewEvalOptions() *EvalOptions {
@@ -75,13 +75,12 @@ func OnlyReplaceVars() EvalOption {
 	}
 }
 
-// WithoutOSEnvExpansion disables expansion of OS-sourced environment variables.
-// When this option is set, variables like $HOSTNAME, $USER, $PATH will not be
-// expanded during command/script evaluation, allowing them to be resolved at
-// runtime by the shell or remote system.
-func WithoutOSEnvExpansion() EvalOption {
+// WithOSEnvExpansion opts into expanding OS-sourced environment variables
+// (e.g., $HOSTNAME, $USER) during command/script evaluation. By default these
+// variables are preserved for runtime shell expansion.
+func WithOSEnvExpansion() EvalOption {
 	return func(opts *EvalOptions) {
-		opts.SkipOSEnvExpansion = true
+		opts.AllowOSEnvExpansion = true
 	}
 }
 
@@ -139,13 +138,13 @@ func quoteArgIfNeeded(arg string) string {
 func expandVariables(ctx context.Context, value string, options *EvalOptions) string {
 	// Handle step references like ${step.stdout} first
 	if options.StepMap != nil {
-		value = expandReferencesWithStepsInternal(ctx, value, map[string]string{}, options.StepMap, options.SkipOSEnvExpansion)
+		value = expandReferencesWithStepsInternal(ctx, value, map[string]string{}, options.StepMap, options.AllowOSEnvExpansion)
 	}
 
 	// Expand from explicit Variables maps
 	for _, vars := range options.Variables {
 		if options.StepMap != nil {
-			value = expandReferencesWithStepsInternal(ctx, value, vars, options.StepMap, options.SkipOSEnvExpansion)
+			value = expandReferencesWithStepsInternal(ctx, value, vars, options.StepMap, options.AllowOSEnvExpansion)
 		} else {
 			value = ExpandReferences(ctx, value, vars)
 		}
@@ -620,11 +619,11 @@ func resolveJSONPath(ctx context.Context, varName, jsonStr, path string) (string
 // ExpandReferencesWithSteps is like ExpandReferences but also handles step ID property access
 // like ${step_id.stdout}, ${step_id.stderr}, ${step_id.exit_code}
 func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[string]string, stepMap map[string]StepInfo) string {
-	return expandReferencesWithStepsInternal(ctx, input, dataMap, stepMap, false)
+	return expandReferencesWithStepsInternal(ctx, input, dataMap, stepMap, true)
 }
 
-// expandReferencesWithStepsInternal is the internal implementation that supports skipOSEnv flag
-func expandReferencesWithStepsInternal(ctx context.Context, input string, dataMap map[string]string, stepMap map[string]StepInfo, skipOSEnv bool) string {
+// expandReferencesWithStepsInternal is the internal implementation that supports allowOSEnv flag
+func expandReferencesWithStepsInternal(ctx context.Context, input string, dataMap map[string]string, stepMap map[string]StepInfo, allowOSEnv bool) string {
 	return reJSONPathRef.ReplaceAllStringFunc(input, func(match string) string {
 		subMatches := reJSONPathRef.FindStringSubmatch(match)
 		if len(subMatches) < 3 {
@@ -650,7 +649,7 @@ func expandReferencesWithStepsInternal(ctx context.Context, input string, dataMa
 		// Try regular variable or environment lookup
 		jsonStr, ok := dataMap[varName]
 		if !ok {
-			jsonStr, ok = lookupEnvVar(ctx, varName, skipOSEnv)
+			jsonStr, ok = lookupEnvVar(ctx, varName, allowOSEnv)
 			if !ok {
 				return match
 			}
@@ -728,7 +727,7 @@ func expandWithShellContext(ctx context.Context, input string, opts *EvalOptions
 		if !opts.ExpandEnv {
 			return input, nil
 		}
-		if opts.SkipOSEnvExpansion {
+		if !opts.AllowOSEnvExpansion {
 			return ExpandEnvContextSkipOS(ctx, input), nil
 		}
 		return ExpandEnvContext(ctx, input), nil
@@ -736,7 +735,7 @@ func expandWithShellContext(ctx context.Context, input string, opts *EvalOptions
 
 	originalInput := input
 	var placeholders []osVarPlaceholder
-	if opts.SkipOSEnvExpansion {
+	if !opts.AllowOSEnvExpansion {
 		input, placeholders = maskOSEnvVariables(ctx, input, opts)
 	}
 
@@ -762,9 +761,9 @@ func expandWithShellContext(ctx context.Context, input string, opts *EvalOptions
 					return entry.Value
 				}
 			}
-			// Skip OS env lookup if SkipOSEnvExpansion is set
-			// This allows variables like $HOSTNAME to be preserved for shell expansion at runtime
-			if opts.SkipOSEnvExpansion {
+			// Skip OS env lookup when OS env expansion is disabled so variables like
+			// $HOSTNAME remain for runtime shell expansion.
+			if !opts.AllowOSEnvExpansion {
 				return ""
 			}
 			return os.Getenv(name)
@@ -775,7 +774,7 @@ func expandWithShellContext(ctx context.Context, input string, opts *EvalOptions
 	if err != nil {
 		var unexpected expand.UnexpectedCommandError
 		if errors.As(err, &unexpected) {
-			if opts.SkipOSEnvExpansion {
+			if !opts.AllowOSEnvExpansion {
 				return ExpandEnvContextSkipOS(ctx, originalInput), nil
 			}
 			return ExpandEnvContext(ctx, originalInput), nil
@@ -795,10 +794,10 @@ func lookupVariable(name string, scopes []map[string]string) (string, bool) {
 }
 
 // lookupEnvVar looks up an environment variable from EnvScope or OS.
-// When skipOSEnv is true, only non-OS-sourced variables are returned.
-func lookupEnvVar(ctx context.Context, varName string, skipOSEnv bool) (string, bool) {
+// When allowOSEnv is false, only non-OS-sourced variables are returned.
+func lookupEnvVar(ctx context.Context, varName string, allowOSEnv bool) (string, bool) {
 	if scope := GetEnvScope(ctx); scope != nil {
-		if skipOSEnv {
+		if !allowOSEnv {
 			if entry, exists := scope.GetEntry(varName); exists && entry.Source != EnvSourceOS {
 				return entry.Value, true
 			}
@@ -806,7 +805,7 @@ func lookupEnvVar(ctx context.Context, varName string, skipOSEnv bool) (string, 
 		}
 		return scope.Get(varName)
 	}
-	if skipOSEnv {
+	if !allowOSEnv {
 		return "", false
 	}
 	return os.LookupEnv(varName)

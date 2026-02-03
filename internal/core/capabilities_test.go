@@ -54,11 +54,10 @@ func TestStep_EvalOptions(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	t.Run("AlwaysIncludesSkipOSEnvExpansion", func(t *testing.T) {
+	t.Run("DefaultSkipsOSEnvExpansion", func(t *testing.T) {
 		step := Step{ExecutorConfig: ExecutorConfig{Type: "any-type"}}
-		opts := step.EvalOptions(ctx)
-		assert.Len(t, opts, 1)
-		assert.True(t, applyEvalOptions(opts).SkipOSEnvExpansion)
+		evalOpts := applyEvalOptions(step.EvalOptions(ctx))
+		assert.False(t, evalOpts.AllowOSEnvExpansion)
 	})
 
 	t.Run("WithGetEvalOptions", func(t *testing.T) {
@@ -71,11 +70,11 @@ func TestStep_EvalOptions(t *testing.T) {
 
 		step := Step{ExecutorConfig: ExecutorConfig{Type: "eval-opts-test-v2"}}
 		opts := step.EvalOptions(ctx)
-		assert.Len(t, opts, 2)
+		assert.Len(t, opts, 1)
 
 		evalOpts := applyEvalOptions(opts)
-		assert.True(t, evalOpts.SkipOSEnvExpansion)
 		assert.False(t, evalOpts.ExpandShell)
+		assert.False(t, evalOpts.AllowOSEnvExpansion)
 	})
 
 	t.Run("WithoutGetEvalOptions", func(t *testing.T) {
@@ -85,14 +84,14 @@ func TestStep_EvalOptions(t *testing.T) {
 
 		step := Step{ExecutorConfig: ExecutorConfig{Type: "no-eval-opts-test-v2"}}
 		opts := step.EvalOptions(ctx)
-		assert.Len(t, opts, 1)
-		assert.True(t, applyEvalOptions(opts).SkipOSEnvExpansion)
+		assert.Empty(t, opts)
+		assert.False(t, applyEvalOptions(opts).AllowOSEnvExpansion)
 	})
 
 	t.Run("UnregisteredExecutor", func(t *testing.T) {
 		step := Step{ExecutorConfig: ExecutorConfig{Type: "unregistered-executor-v2"}}
 		opts := step.EvalOptions(ctx)
-		assert.Len(t, opts, 1)
-		assert.True(t, applyEvalOptions(opts).SkipOSEnvExpansion)
+		assert.Empty(t, opts)
+		assert.False(t, applyEvalOptions(opts).AllowOSEnvExpansion)
 	})
 }

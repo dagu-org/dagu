@@ -959,6 +959,7 @@ func TestEvalString(t *testing.T) {
 		{
 			name:    "EnvVarExpansion",
 			input:   "$TEST_ENV",
+			opts:    []EvalOption{WithOSEnvExpansion()},
 			want:    "test_value",
 			wantErr: false,
 		},
@@ -971,6 +972,7 @@ func TestEvalString(t *testing.T) {
 		{
 			name:    "CombinedEnvAndCommand",
 			input:   "$TEST_ENV and `echo world`",
+			opts:    []EvalOption{WithOSEnvExpansion()},
 			want:    "test_value and world",
 			wantErr: false,
 		},
@@ -1151,6 +1153,7 @@ func TestEvalIntString(t *testing.T) {
 		{
 			name:    "EnvVarInteger",
 			input:   "$TEST_INT",
+			opts:    []EvalOption{WithOSEnvExpansion()},
 			want:    42,
 			wantErr: false,
 		},
@@ -2146,18 +2149,18 @@ func TestEvalOptions_Defaults(t *testing.T) {
 	assert.True(t, opts.Substitute, "Substitute should default to true")
 	assert.Nil(t, opts.Variables, "Variables should default to nil")
 	assert.Nil(t, opts.StepMap, "StepMap should default to nil")
-	assert.False(t, opts.SkipOSEnvExpansion, "SkipOSEnvExpansion should default to false")
+	assert.False(t, opts.AllowOSEnvExpansion, "AllowOSEnvExpansion should default to false")
 }
 
-func TestWithoutOSEnvExpansion(t *testing.T) {
+func TestWithOSEnvExpansion(t *testing.T) {
 	t.Run("OptionSetsFlag", func(t *testing.T) {
 		opts := NewEvalOptions()
-		WithoutOSEnvExpansion()(opts)
-		assert.True(t, opts.SkipOSEnvExpansion)
+		WithOSEnvExpansion()(opts)
+		assert.True(t, opts.AllowOSEnvExpansion)
 	})
 }
 
-func TestEvalString_WithoutOSEnvExpansion(t *testing.T) {
+func TestEvalString_SkipOSEnvExpansion(t *testing.T) {
 	// Set up test environment variables
 	require.NoError(t, os.Setenv("TEST_OS_VAR", "os_value"))
 	defer func() { _ = os.Unsetenv("TEST_OS_VAR") }()
@@ -2172,46 +2175,43 @@ func TestEvalString_WithoutOSEnvExpansion(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:  "OSVarExpandedWithoutOption",
+			name:  "OSVarNotExpandedByDefault",
 			input: "$TEST_OS_VAR",
 			opts:  nil,
-			want:  "os_value",
-		},
-		{
-			name:  "OSVarNotExpandedWithOption",
-			input: "$TEST_OS_VAR",
-			opts:  []EvalOption{WithoutOSEnvExpansion()},
 			want:  "$TEST_OS_VAR",
 		},
 		{
-			name:  "UserVarExpandedWithOption",
+			name:  "UserVarExpanded",
 			input: "$MY_VAR",
-			opts:  []EvalOption{WithoutOSEnvExpansion(), WithVariables(map[string]string{"MY_VAR": "user_value"})},
+			opts:  []EvalOption{WithVariables(map[string]string{"MY_VAR": "user_value"})},
 			want:  "user_value",
 		},
 		{
-			name:  "MixedVarsWithOption",
+			name:  "MixedVarsDefaultSkipsOSVar",
 			input: "$MY_VAR and $TEST_OS_VAR",
-			opts:  []EvalOption{WithoutOSEnvExpansion(), WithVariables(map[string]string{"MY_VAR": "user_value"})},
+			opts:  []EvalOption{WithVariables(map[string]string{"MY_VAR": "user_value"})},
 			want:  "user_value and $TEST_OS_VAR",
 		},
 		{
 			name:  "WithEnvScopeUserVar",
 			input: "$USER_VAR",
-			opts:  []EvalOption{WithoutOSEnvExpansion()},
 			want:  "scope_value",
 		},
 		{
 			name:  "WithEnvScopeOSVar",
 			input: "$OS_SCOPED_VAR",
-			opts:  []EvalOption{WithoutOSEnvExpansion()},
 			want:  "$OS_SCOPED_VAR",
 		},
 		{
 			name:  "BracedOSVarPreserved",
 			input: "${TEST_OS_VAR}/dir",
-			opts:  []EvalOption{WithoutOSEnvExpansion()},
 			want:  "${TEST_OS_VAR}/dir",
+		},
+		{
+			name:  "OSVarExpandedWithOption",
+			input: "$TEST_OS_VAR",
+			opts:  []EvalOption{WithOSEnvExpansion()},
+			want:  "os_value",
 		},
 	}
 
@@ -2237,8 +2237,8 @@ func TestEvalString_WithoutOSEnvExpansion(t *testing.T) {
 	}
 }
 
-func TestEvalString_WithoutOSEnvExpansion_WithoutShellExpansion(t *testing.T) {
-	// Test the combination of WithoutOSEnvExpansion and WithoutExpandShell
+func TestEvalString_SkipOSEnvExpansion_WithoutShellExpansion(t *testing.T) {
+	// Test the combination of default OS env skipping and WithoutExpandShell
 	ctx := context.Background()
 
 	// Create a scope with user-defined vars
@@ -2256,14 +2256,20 @@ func TestEvalString_WithoutOSEnvExpansion_WithoutShellExpansion(t *testing.T) {
 		{
 			name:  "UserVarExpandedOSVarPreserved",
 			input: "$MY_VAR $OS_VAR",
-			opts:  []EvalOption{WithoutOSEnvExpansion(), WithoutExpandShell()},
+			opts:  []EvalOption{WithoutExpandShell()},
 			want:  "my_value $OS_VAR",
 		},
 		{
 			name:  "BracedUserVarExpandedOSVarPreserved",
 			input: "${MY_VAR} ${OS_VAR}",
-			opts:  []EvalOption{WithoutOSEnvExpansion(), WithoutExpandShell()},
+			opts:  []EvalOption{WithoutExpandShell()},
 			want:  "my_value ${OS_VAR}",
+		},
+		{
+			name:  "OSVarExpandedWhenExplicitlyAllowed",
+			input: "$OS_VAR",
+			opts:  []EvalOption{WithoutExpandShell(), WithOSEnvExpansion()},
+			want:  "os_value",
 		},
 	}
 
@@ -2479,7 +2485,7 @@ func TestWithoutExpandShell(t *testing.T) {
 		{
 			name:    "EnvVarStillExpandsWithoutShellExpansion",
 			input:   "$TEST_VAR",
-			opts:    []EvalOption{WithoutExpandShell()},
+			opts:    []EvalOption{WithoutExpandShell(), WithOSEnvExpansion()},
 			want:    "test_value_for_shell",
 			wantErr: false,
 		},
