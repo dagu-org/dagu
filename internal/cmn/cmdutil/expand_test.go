@@ -99,3 +99,69 @@ func TestExpandEnvContext(t *testing.T) {
 		assert.Equal(t, "", result)
 	})
 }
+
+func TestExpandEnvContextSkipOS(t *testing.T) {
+	t.Run("WithScopeUserVarExpanded", func(t *testing.T) {
+		scope := NewEnvScope(nil, false).
+			WithEntry("MY_VAR", "scope_value", EnvSourceDAGEnv)
+
+		ctx := WithEnvScope(context.Background(), scope)
+		result := ExpandEnvContextSkipOS(ctx, "Value is $MY_VAR")
+		assert.Equal(t, "Value is scope_value", result)
+	})
+
+	t.Run("WithScopeOSVarNotExpanded", func(t *testing.T) {
+		scope := NewEnvScope(nil, false).
+			WithEntry("OS_VAR", "os_value", EnvSourceOS)
+
+		ctx := WithEnvScope(context.Background(), scope)
+		result := ExpandEnvContextSkipOS(ctx, "Value is $OS_VAR")
+		assert.Equal(t, "Value is $OS_VAR", result)
+	})
+
+	t.Run("MixedSourcesOnlyUserExpanded", func(t *testing.T) {
+		scope := NewEnvScope(nil, false).
+			WithEntry("USER_VAR", "user", EnvSourceDAGEnv).
+			WithEntry("OS_VAR", "os", EnvSourceOS).
+			WithEntry("SECRET_VAR", "secret", EnvSourceSecret)
+
+		ctx := WithEnvScope(context.Background(), scope)
+		result := ExpandEnvContextSkipOS(ctx, "$USER_VAR $OS_VAR $SECRET_VAR")
+		assert.Equal(t, "user $OS_VAR secret", result)
+	})
+
+	t.Run("WithoutScopePreservesAll", func(t *testing.T) {
+		ctx := context.Background()
+		result := ExpandEnvContextSkipOS(ctx, "Value is $SOME_VAR")
+		assert.Equal(t, "Value is $SOME_VAR", result)
+	})
+
+	t.Run("NilContextPreservesAll", func(t *testing.T) {
+		result := ExpandEnvContextSkipOS(context.TODO(), "Value is $SOME_VAR")
+		assert.Equal(t, "Value is $SOME_VAR", result)
+	})
+
+	t.Run("BracedVariableSyntax", func(t *testing.T) {
+		scope := NewEnvScope(nil, false).
+			WithEntry("USER_VAR", "user", EnvSourceDAGEnv).
+			WithEntry("OS_VAR", "os", EnvSourceOS)
+
+		ctx := WithEnvScope(context.Background(), scope)
+		result := ExpandEnvContextSkipOS(ctx, "${USER_VAR}/${OS_VAR}")
+		assert.Equal(t, "user/${OS_VAR}", result)
+	})
+
+	t.Run("AllNonOSSourcesExpanded", func(t *testing.T) {
+		scope := NewEnvScope(nil, false).
+			WithEntry("DAG_VAR", "dag", EnvSourceDAGEnv).
+			WithEntry("DOTENV_VAR", "dotenv", EnvSourceDotEnv).
+			WithEntry("PARAM_VAR", "param", EnvSourceParam).
+			WithEntry("OUTPUT_VAR", "output", EnvSourceOutput).
+			WithEntry("SECRET_VAR", "secret", EnvSourceSecret).
+			WithEntry("STEP_VAR", "step", EnvSourceStepEnv)
+
+		ctx := WithEnvScope(context.Background(), scope)
+		result := ExpandEnvContextSkipOS(ctx, "$DAG_VAR $DOTENV_VAR $PARAM_VAR $OUTPUT_VAR $SECRET_VAR $STEP_VAR")
+		assert.Equal(t, "dag dotenv param output secret step", result)
+	})
+}

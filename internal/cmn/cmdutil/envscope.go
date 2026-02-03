@@ -195,6 +195,21 @@ func (e *EnvScope) Expand(s string) string {
 	return expandWithLookup(s, e.Get)
 }
 
+// ExpandSkipOS expands ${VAR} and $VAR in s using this scope,
+// but skips variables with EnvSourceOS. Used for command/script evaluation
+// where OS vars should be left for shell expansion at runtime.
+func (e *EnvScope) ExpandSkipOS(s string) string {
+	if e == nil {
+		return s
+	}
+	return expandWithLookup(s, func(key string) (string, bool) {
+		if entry, ok := e.GetEntry(key); ok && entry.Source != EnvSourceOS {
+			return entry.Value, true
+		}
+		return "", false
+	})
+}
+
 // Debug returns a string representation for debugging
 func (e *EnvScope) Debug() string {
 	if e == nil {

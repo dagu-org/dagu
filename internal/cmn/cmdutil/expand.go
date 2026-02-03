@@ -16,3 +16,13 @@ func ExpandEnvContext(ctx context.Context, s string) string {
 	}
 	return scope.Expand(s)
 }
+
+// ExpandEnvContextSkipOS expands variables but skips OS-sourced ones.
+// Variables not found (including OS vars) are preserved in original form.
+func ExpandEnvContextSkipOS(ctx context.Context, s string) string {
+	scope := GetEnvScope(ctx)
+	if scope == nil {
+		return s // No scope, preserve all variables
+	}
+	return scope.ExpandSkipOS(s)
+}

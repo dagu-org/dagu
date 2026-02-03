@@ -2146,6 +2146,128 @@ func TestEvalOptions_Defaults(t *testing.T) {
 	assert.True(t, opts.Substitute, "Substitute should default to true")
 	assert.Nil(t, opts.Variables, "Variables should default to nil")
 	assert.Nil(t, opts.StepMap, "StepMap should default to nil")
+	assert.False(t, opts.SkipOSEnvExpansion, "SkipOSEnvExpansion should default to false")
+}
+
+func TestWithoutOSEnvExpansion(t *testing.T) {
+	t.Run("OptionSetsFlag", func(t *testing.T) {
+		opts := NewEvalOptions()
+		WithoutOSEnvExpansion()(opts)
+		assert.True(t, opts.SkipOSEnvExpansion)
+	})
+}
+
+func TestEvalString_WithoutOSEnvExpansion(t *testing.T) {
+	// Set up test environment variables
+	require.NoError(t, os.Setenv("TEST_OS_VAR", "os_value"))
+	defer func() { _ = os.Unsetenv("TEST_OS_VAR") }()
+
+	ctx := context.Background()
+
+	tests := []struct {
+		name    string
+		input   string
+		opts    []EvalOption
+		want    string
+		wantErr bool
+	}{
+		{
+			name:  "OSVarExpandedWithoutOption",
+			input: "$TEST_OS_VAR",
+			opts:  nil,
+			want:  "os_value",
+		},
+		{
+			name:  "OSVarNotExpandedWithOption",
+			input: "$TEST_OS_VAR",
+			opts:  []EvalOption{WithoutOSEnvExpansion()},
+			want:  "", // Shell expansion returns empty for unknown vars
+		},
+		{
+			name:  "UserVarExpandedWithOption",
+			input: "$MY_VAR",
+			opts:  []EvalOption{WithoutOSEnvExpansion(), WithVariables(map[string]string{"MY_VAR": "user_value"})},
+			want:  "user_value",
+		},
+		{
+			name:  "MixedVarsWithOption",
+			input: "$MY_VAR and $TEST_OS_VAR",
+			opts:  []EvalOption{WithoutOSEnvExpansion(), WithVariables(map[string]string{"MY_VAR": "user_value"})},
+			want:  "user_value and ", // OS var becomes empty
+		},
+		{
+			name:  "WithEnvScopeUserVar",
+			input: "$USER_VAR",
+			opts:  []EvalOption{WithoutOSEnvExpansion()},
+			want:  "scope_value",
+		},
+		{
+			name:  "WithEnvScopeOSVar",
+			input: "$OS_SCOPED_VAR",
+			opts:  []EvalOption{WithoutOSEnvExpansion()},
+			want:  "", // OS-sourced var in scope should not expand
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testCtx := ctx
+			// For tests that need EnvScope
+			if tt.name == "WithEnvScopeUserVar" || tt.name == "WithEnvScopeOSVar" {
+				scope := NewEnvScope(nil, false).
+					WithEntry("USER_VAR", "scope_value", EnvSourceDAGEnv).
+					WithEntry("OS_SCOPED_VAR", "os_scoped", EnvSourceOS)
+				testCtx = WithEnvScope(ctx, scope)
+			}
+
+			got, err := EvalString(testCtx, tt.input, tt.opts...)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, got)
+			}
+		})
+	}
+}
+
+func TestEvalString_WithoutOSEnvExpansion_WithoutShellExpansion(t *testing.T) {
+	// Test the combination of WithoutOSEnvExpansion and WithoutExpandShell
+	ctx := context.Background()
+
+	// Create a scope with user-defined vars
+	scope := NewEnvScope(nil, false).
+		WithEntry("MY_VAR", "my_value", EnvSourceDAGEnv).
+		WithEntry("OS_VAR", "os_value", EnvSourceOS)
+	ctx = WithEnvScope(ctx, scope)
+
+	tests := []struct {
+		name  string
+		input string
+		opts  []EvalOption
+		want  string
+	}{
+		{
+			name:  "UserVarExpandedOSVarPreserved",
+			input: "$MY_VAR $OS_VAR",
+			opts:  []EvalOption{WithoutOSEnvExpansion(), WithoutExpandShell()},
+			want:  "my_value $OS_VAR",
+		},
+		{
+			name:  "BracedUserVarExpandedOSVarPreserved",
+			input: "${MY_VAR} ${OS_VAR}",
+			opts:  []EvalOption{WithoutOSEnvExpansion(), WithoutExpandShell()},
+			want:  "my_value ${OS_VAR}",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := EvalString(ctx, tt.input, tt.opts...)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func TestParseStepReference(t *testing.T) {

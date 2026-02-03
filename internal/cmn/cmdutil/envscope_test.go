@@ -402,6 +402,76 @@ func TestEnvScope_Expand(t *testing.T) {
 	})
 }
 
+func TestEnvScope_ExpandSkipOS(t *testing.T) {
+	t.Run("UserDefinedVarExpanded", func(t *testing.T) {
+		scope := NewEnvScope(nil, false).
+			WithEntry("NAME", "World", EnvSourceDAGEnv)
+
+		result := scope.ExpandSkipOS("Hello, $NAME!")
+		assert.Equal(t, "Hello, World!", result)
+	})
+
+	t.Run("OSVarNotExpanded", func(t *testing.T) {
+		scope := NewEnvScope(nil, false).
+			WithEntry("OS_VAR", "os_value", EnvSourceOS)
+
+		// OS-sourced variable should NOT be expanded
+		result := scope.ExpandSkipOS("Value: $OS_VAR")
+		assert.Equal(t, "Value: $OS_VAR", result)
+
+		result = scope.ExpandSkipOS("Value: ${OS_VAR}")
+		assert.Equal(t, "Value: ${OS_VAR}", result)
+	})
+
+	t.Run("MixedSources", func(t *testing.T) {
+		scope := NewEnvScope(nil, false).
+			WithEntry("USER_VAR", "user_value", EnvSourceDAGEnv).
+			WithEntry("OS_VAR", "os_value", EnvSourceOS).
+			WithEntry("SECRET_VAR", "secret", EnvSourceSecret)
+
+		result := scope.ExpandSkipOS("$USER_VAR $OS_VAR $SECRET_VAR")
+		assert.Equal(t, "user_value $OS_VAR secret", result)
+	})
+
+	t.Run("NilScope", func(t *testing.T) {
+		var scope *EnvScope
+		result := scope.ExpandSkipOS("$VAR")
+		assert.Equal(t, "$VAR", result)
+	})
+
+	t.Run("VariableNotFound", func(t *testing.T) {
+		scope := NewEnvScope(nil, false)
+		result := scope.ExpandSkipOS("$MISSING")
+		assert.Equal(t, "$MISSING", result)
+	})
+
+	t.Run("AllUserSourcesExpanded", func(t *testing.T) {
+		// Test that all non-OS sources are expanded
+		scope := NewEnvScope(nil, false).
+			WithEntry("DAG_VAR", "dag", EnvSourceDAGEnv).
+			WithEntry("DOTENV_VAR", "dotenv", EnvSourceDotEnv).
+			WithEntry("PARAM_VAR", "param", EnvSourceParam).
+			WithEntry("OUTPUT_VAR", "output", EnvSourceOutput).
+			WithEntry("SECRET_VAR", "secret", EnvSourceSecret).
+			WithEntry("STEP_VAR", "step", EnvSourceStepEnv)
+
+		result := scope.ExpandSkipOS("$DAG_VAR $DOTENV_VAR $PARAM_VAR $OUTPUT_VAR $SECRET_VAR $STEP_VAR")
+		assert.Equal(t, "dag dotenv param output secret step", result)
+	})
+
+	t.Run("ParentScopeWithOSVar", func(t *testing.T) {
+		parent := NewEnvScope(nil, false).
+			WithEntry("PARENT_OS", "parent_os", EnvSourceOS).
+			WithEntry("PARENT_USER", "parent_user", EnvSourceDAGEnv)
+
+		child := NewEnvScope(parent, false).
+			WithEntry("CHILD_VAR", "child", EnvSourceStepEnv)
+
+		result := child.ExpandSkipOS("$PARENT_OS $PARENT_USER $CHILD_VAR")
+		assert.Equal(t, "$PARENT_OS parent_user child", result)
+	})
+}
+
 func TestEnvScope_Debug(t *testing.T) {
 	t.Run("EmptyScope", func(t *testing.T) {
 		scope := NewEnvScope(nil, false)

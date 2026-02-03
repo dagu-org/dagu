@@ -20,11 +20,12 @@ import (
 )
 
 type EvalOptions struct {
-	ExpandEnv   bool
-	Substitute  bool
-	Variables   []map[string]string
-	StepMap     map[string]StepInfo
-	ExpandShell bool // When false, skip shell-based variable expansion (e.g., for SSH commands)
+	ExpandEnv          bool
+	Substitute         bool
+	Variables          []map[string]string
+	StepMap            map[string]StepInfo
+	ExpandShell        bool // When false, skip shell-based variable expansion (e.g., for SSH commands)
+	SkipOSEnvExpansion bool // When true, do not expand OS-sourced environment variables
 }
 
 func NewEvalOptions() *EvalOptions {
@@ -71,6 +72,16 @@ func OnlyReplaceVars() EvalOption {
 	return func(opts *EvalOptions) {
 		opts.ExpandEnv = false
 		opts.Substitute = false
+	}
+}
+
+// WithoutOSEnvExpansion disables expansion of OS-sourced environment variables.
+// When this option is set, variables like $HOSTNAME, $USER, $PATH will not be
+// expanded during command/script evaluation, allowing them to be resolved at
+// runtime by the shell or remote system.
+func WithoutOSEnvExpansion() EvalOption {
+	return func(opts *EvalOptions) {
+		opts.SkipOSEnvExpansion = true
 	}
 }
 
@@ -128,13 +139,13 @@ func quoteArgIfNeeded(arg string) string {
 func expandVariables(ctx context.Context, value string, options *EvalOptions) string {
 	// Handle step references like ${step.stdout} first
 	if options.StepMap != nil {
-		value = ExpandReferencesWithSteps(ctx, value, map[string]string{}, options.StepMap)
+		value = expandReferencesWithStepsInternal(ctx, value, map[string]string{}, options.StepMap, options.SkipOSEnvExpansion)
 	}
 
 	// Expand from explicit Variables maps
 	for _, vars := range options.Variables {
 		if options.StepMap != nil {
-			value = ExpandReferencesWithSteps(ctx, value, vars, options.StepMap)
+			value = expandReferencesWithStepsInternal(ctx, value, vars, options.StepMap, options.SkipOSEnvExpansion)
 		} else {
 			value = ExpandReferences(ctx, value, vars)
 		}
@@ -609,6 +620,11 @@ func resolveJSONPath(ctx context.Context, varName, jsonStr, path string) (string
 // ExpandReferencesWithSteps is like ExpandReferences but also handles step ID property access
 // like ${step_id.stdout}, ${step_id.stderr}, ${step_id.exit_code}
 func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[string]string, stepMap map[string]StepInfo) string {
+	return expandReferencesWithStepsInternal(ctx, input, dataMap, stepMap, false)
+}
+
+// expandReferencesWithStepsInternal is the internal implementation that supports skipOSEnv flag
+func expandReferencesWithStepsInternal(ctx context.Context, input string, dataMap map[string]string, stepMap map[string]StepInfo, skipOSEnv bool) string {
 	return reJSONPathRef.ReplaceAllStringFunc(input, func(match string) string {
 		subMatches := reJSONPathRef.FindStringSubmatch(match)
 		if len(subMatches) < 3 {
@@ -634,15 +650,29 @@ func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[st
 		// Try regular variable or environment lookup
 		jsonStr, ok := dataMap[varName]
 		if !ok {
-			// Try EnvScope from context first, then fall back to os.LookupEnv
+			// Try EnvScope from context first
 			if scope := GetEnvScope(ctx); scope != nil {
-				if envVal, exists := scope.Get(varName); exists {
+				if skipOSEnv {
+					// Only use non-OS sourced variables when skipOSEnv is true
+					if entry, exists := scope.GetEntry(varName); exists && entry.Source != EnvSourceOS {
+						jsonStr = entry.Value
+					} else {
+						return match
+					}
+				} else {
+					if envVal, exists := scope.Get(varName); exists {
+						jsonStr = envVal
+					} else {
+						return match
+					}
+				}
+			} else if !skipOSEnv {
+				// Only fall back to os.LookupEnv if not skipping OS env
+				if envVal, exists := os.LookupEnv(varName); exists {
 					jsonStr = envVal
 				} else {
 					return match
 				}
-			} else if envVal, exists := os.LookupEnv(varName); exists {
-				jsonStr = envVal
 			} else {
 				return match
 			}
@@ -720,6 +750,9 @@ func expandWithShellContext(ctx context.Context, input string, opts *EvalOptions
 		if !opts.ExpandEnv {
 			return input, nil
 		}
+		if opts.SkipOSEnvExpansion {
+			return ExpandEnvContextSkipOS(ctx, input), nil
+		}
 		return ExpandEnvContext(ctx, input), nil
 	}
 
@@ -745,6 +778,11 @@ func expandWithShellContext(ctx context.Context, input string, opts *EvalOptions
 					return entry.Value
 				}
 			}
+			// Skip OS env lookup if SkipOSEnvExpansion is set
+			// This allows variables like $HOSTNAME to be preserved for shell expansion at runtime
+			if opts.SkipOSEnvExpansion {
+				return ""
+			}
 			return os.Getenv(name)
 		}),
 	}
@@ -753,6 +791,9 @@ func expandWithShellContext(ctx context.Context, input string, opts *EvalOptions
 	if err != nil {
 		var unexpected expand.UnexpectedCommandError
 		if errors.As(err, &unexpected) {
+			if opts.SkipOSEnvExpansion {
+				return ExpandEnvContextSkipOS(ctx, input), nil
+			}
 			return ExpandEnvContext(ctx, input), nil
 		}
 		return "", err
