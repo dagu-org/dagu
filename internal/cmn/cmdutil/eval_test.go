@@ -2181,7 +2181,7 @@ func TestEvalString_WithoutOSEnvExpansion(t *testing.T) {
 			name:  "OSVarNotExpandedWithOption",
 			input: "$TEST_OS_VAR",
 			opts:  []EvalOption{WithoutOSEnvExpansion()},
-			want:  "", // Shell expansion returns empty for unknown vars
+			want:  "$TEST_OS_VAR",
 		},
 		{
 			name:  "UserVarExpandedWithOption",
@@ -2193,7 +2193,7 @@ func TestEvalString_WithoutOSEnvExpansion(t *testing.T) {
 			name:  "MixedVarsWithOption",
 			input: "$MY_VAR and $TEST_OS_VAR",
 			opts:  []EvalOption{WithoutOSEnvExpansion(), WithVariables(map[string]string{"MY_VAR": "user_value"})},
-			want:  "user_value and ", // OS var becomes empty
+			want:  "user_value and $TEST_OS_VAR",
 		},
 		{
 			name:  "WithEnvScopeUserVar",
@@ -2205,7 +2205,13 @@ func TestEvalString_WithoutOSEnvExpansion(t *testing.T) {
 			name:  "WithEnvScopeOSVar",
 			input: "$OS_SCOPED_VAR",
 			opts:  []EvalOption{WithoutOSEnvExpansion()},
-			want:  "", // OS-sourced var in scope should not expand
+			want:  "$OS_SCOPED_VAR",
+		},
+		{
+			name:  "BracedOSVarPreserved",
+			input: "${TEST_OS_VAR}/dir",
+			opts:  []EvalOption{WithoutOSEnvExpansion()},
+			want:  "${TEST_OS_VAR}/dir",
 		},
 	}
 

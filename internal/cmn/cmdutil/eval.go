@@ -734,6 +734,12 @@ func expandWithShellContext(ctx context.Context, input string, opts *EvalOptions
 		return ExpandEnvContext(ctx, input), nil
 	}
 
+	originalInput := input
+	var placeholders []osVarPlaceholder
+	if opts.SkipOSEnvExpansion {
+		input, placeholders = maskOSEnvVariables(ctx, input, opts)
+	}
+
 	parser := syntax.NewParser()
 	word, err := parser.Document(strings.NewReader(input))
 	if err != nil {
@@ -770,13 +776,13 @@ func expandWithShellContext(ctx context.Context, input string, opts *EvalOptions
 		var unexpected expand.UnexpectedCommandError
 		if errors.As(err, &unexpected) {
 			if opts.SkipOSEnvExpansion {
-				return ExpandEnvContextSkipOS(ctx, input), nil
+				return ExpandEnvContextSkipOS(ctx, originalInput), nil
 			}
-			return ExpandEnvContext(ctx, input), nil
+			return ExpandEnvContext(ctx, originalInput), nil
 		}
 		return "", err
 	}
-	return result, nil
+	return restoreOSPlaceholders(result, placeholders), nil
 }
 
 func lookupVariable(name string, scopes []map[string]string) (string, bool) {
@@ -804,6 +810,98 @@ func lookupEnvVar(ctx context.Context, varName string, skipOSEnv bool) (string, 
 		return "", false
 	}
 	return os.LookupEnv(varName)
+}
+
+const osVarPlaceholderPrefix = "__DAGU_OS_ENV_PRESERVE__"
+
+type osVarPlaceholder struct {
+	placeholder string
+	original    string
+}
+
+func maskOSEnvVariables(ctx context.Context, input string, opts *EvalOptions) (string, []osVarPlaceholder) {
+	scope := GetEnvScope(ctx)
+	var placeholders []osVarPlaceholder
+	counter := 0
+
+	masked := reVarSubstitution.ReplaceAllStringFunc(input, func(match string) string {
+		key, ok := extractVarKey(match)
+		if !ok {
+			return match
+		}
+
+		if shouldPreserveOriginalEnv(key, scope, opts) {
+			placeholder := fmt.Sprintf("%s%d__", osVarPlaceholderPrefix, counter)
+			counter++
+			placeholders = append(placeholders, osVarPlaceholder{
+				placeholder: placeholder,
+				original:    match,
+			})
+			return placeholder
+		}
+
+		return match
+	})
+
+	return masked, placeholders
+}
+
+func restoreOSPlaceholders(value string, placeholders []osVarPlaceholder) string {
+	if len(placeholders) == 0 {
+		return value
+	}
+	for _, ph := range placeholders {
+		value = strings.ReplaceAll(value, ph.placeholder, ph.original)
+	}
+	return value
+}
+
+func shouldPreserveOriginalEnv(key string, scope *EnvScope, opts *EvalOptions) bool {
+	if strings.Contains(key, ".") {
+		return false
+	}
+
+	varName, ok := extractSimpleVarName(key)
+	if !ok {
+		return false
+	}
+
+	if _, exists := lookupVariable(varName, opts.Variables); exists {
+		return false
+	}
+
+	if scope != nil {
+		if entry, found := scope.GetEntry(varName); found {
+			return entry.Source == EnvSourceOS
+		}
+	}
+
+	_, exists := os.LookupEnv(varName)
+	return exists
+}
+
+func extractSimpleVarName(key string) (string, bool) {
+	if key == "" {
+		return "", false
+	}
+
+	if !isVarNameStart(key[0]) {
+		return "", false
+	}
+
+	i := 1
+	for i < len(key) && isVarNamePart(key[i]) {
+		i++
+	}
+	return key[:i], true
+}
+
+func isVarNameStart(ch byte) bool {
+	return ch == '_' || (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')
+}
+
+func isVarNamePart(ch byte) bool {
+	return isVarNameStart(ch) || (ch >= '0' && ch <= '9')
 }
 
 type stepSliceSpec struct {
