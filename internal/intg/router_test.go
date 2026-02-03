@@ -12,11 +12,15 @@ import (
 func TestRouterExecutor(t *testing.T) {
 	t.Parallel()
 
-	t.Run("ExactMatch", func(t *testing.T) {
-		t.Parallel()
-
-		th := test.Setup(t)
-		dag := th.DAG(t, `
+	tests := []struct {
+		name            string
+		dagYAML         string
+		expectedStatus  core.Status
+		expectedOutputs map[string]any
+	}{
+		{
+			name: "ExactMatch",
+			dagYAML: `
 type: graph
 env:
   - INPUT: exact_value
@@ -35,22 +39,15 @@ steps:
   - name: route_b
     command: echo "Route B executed"
     output: RESULT_B
-`)
-		agent := dag.Agent()
-		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, core.Succeeded)
-		// route_a should execute, route_b should be skipped
-		dag.AssertOutputs(t, map[string]any{
-			"RESULT_A": "Route A executed",
-		})
-	})
-
-	t.Run("RegexMatch", func(t *testing.T) {
-		t.Parallel()
-
-		th := test.Setup(t)
-		dag := th.DAG(t, `
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutputs: map[string]any{
+				"RESULT_A": "Route A executed",
+			},
+		},
+		{
+			name: "RegexMatch",
+			dagYAML: `
 type: graph
 env:
   - INPUT: apple_pie
@@ -69,21 +66,15 @@ steps:
   - name: route_b
     command: echo "Banana route"
     output: RESULT_B
-`)
-		agent := dag.Agent()
-		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, core.Succeeded)
-		dag.AssertOutputs(t, map[string]any{
-			"RESULT_A": "Apple route",
-		})
-	})
-
-	t.Run("CatchAllRoute", func(t *testing.T) {
-		t.Parallel()
-
-		th := test.Setup(t)
-		dag := th.DAG(t, `
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutputs: map[string]any{
+				"RESULT_A": "Apple route",
+			},
+		},
+		{
+			name: "CatchAllRoute",
+			dagYAML: `
 type: graph
 env:
   - INPUT: unknown_value
@@ -102,22 +93,15 @@ steps:
   - name: default_route
     command: echo "Default route"
     output: RESULT_DEFAULT
-`)
-		agent := dag.Agent()
-		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, core.Succeeded)
-		// Only default_route should execute
-		dag.AssertOutputs(t, map[string]any{
-			"RESULT_DEFAULT": "Default route",
-		})
-	})
-
-	t.Run("MultipleTargetsPerRoute", func(t *testing.T) {
-		t.Parallel()
-
-		th := test.Setup(t)
-		dag := th.DAG(t, `
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutputs: map[string]any{
+				"RESULT_DEFAULT": "Default route",
+			},
+		},
+		{
+			name: "MultipleTargetsPerRoute",
+			dagYAML: `
 type: graph
 env:
   - INPUT: trigger
@@ -141,24 +125,17 @@ steps:
     output: RESULT_C
     depends:
       - step_a
-`)
-		agent := dag.Agent()
-		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, core.Succeeded)
-		// Both step_a and step_b should execute
-		dag.AssertOutputs(t, map[string]any{
-			"RESULT_A": "Step A",
-			"RESULT_B": "Step B",
-			"RESULT_C": "Step C",
-		})
-	})
-
-	t.Run("MultipleMatchingRoutes", func(t *testing.T) {
-		t.Parallel()
-
-		th := test.Setup(t)
-		dag := th.DAG(t, `
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutputs: map[string]any{
+				"RESULT_A": "Step A",
+				"RESULT_B": "Step B",
+				"RESULT_C": "Step C",
+			},
+		},
+		{
+			name: "MultipleMatchingRoutes",
+			dagYAML: `
 type: graph
 env:
   - INPUT: success_code
@@ -182,24 +159,17 @@ steps:
   - name: catch_all
     command: echo "Catch all"
     output: CATCH_ALL
-`)
-		agent := dag.Agent()
-		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, core.Succeeded)
-		// All three routes match "success_code"
-		dag.AssertOutputs(t, map[string]any{
-			"SUCCESS":   "Success handler",
-			"CODE":      "Code handler",
-			"CATCH_ALL": "Catch all",
-		})
-	})
-
-	t.Run("NoMatchingRoute", func(t *testing.T) {
-		t.Parallel()
-
-		th := test.Setup(t)
-		dag := th.DAG(t, `
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutputs: map[string]any{
+				"SUCCESS":   "Success handler",
+				"CODE":      "Code handler",
+				"CATCH_ALL": "Catch all",
+			},
+		},
+		{
+			name: "NoMatchingRoute",
+			dagYAML: `
 type: graph
 env:
   - INPUT: no_match
@@ -219,22 +189,15 @@ steps:
     output: ALWAYS
     depends:
       - router
-`)
-		agent := dag.Agent()
-		agent.RunSuccess(t)
-
-		dag.AssertLatestStatus(t, core.Succeeded)
-		// route_a is skipped, always_runs executes
-		dag.AssertOutputs(t, map[string]any{
-			"ALWAYS": "Always runs",
-		})
-	})
-
-	t.Run("RouterWithEnvVarExpansion", func(t *testing.T) {
-		t.Parallel()
-
-		th := test.Setup(t)
-		dag := th.DAG(t, `
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutputs: map[string]any{
+				"ALWAYS": "Always runs",
+			},
+		},
+		{
+			name: "RouterWithEnvVarExpansion",
+			dagYAML: `
 type: graph
 env:
   - STATUS: production
@@ -253,15 +216,29 @@ steps:
   - name: staging_handler
     command: echo "Staging"
     output: ENV
-`)
-		agent := dag.Agent()
-		agent.RunSuccess(t)
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutputs: map[string]any{
+				"ENV": "Production",
+			},
+		},
+	}
 
-		dag.AssertLatestStatus(t, core.Succeeded)
-		dag.AssertOutputs(t, map[string]any{
-			"ENV": "Production",
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			th := test.Setup(t)
+			dag := th.DAG(t, tc.dagYAML)
+			agent := dag.Agent()
+			agent.RunSuccess(t)
+
+			dag.AssertLatestStatus(t, tc.expectedStatus)
+			if tc.expectedOutputs != nil {
+				dag.AssertOutputs(t, tc.expectedOutputs)
+			}
 		})
-	})
+	}
 }
 
 func TestRouterComplexScenarios(t *testing.T) {

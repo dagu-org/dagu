@@ -1436,6 +1436,8 @@ func buildStepRouter(_ StepBuildContext, s *step, result *core.Step) error {
 		return nil
 	}
 
+	// Trim and validate value
+	s.Value = strings.TrimSpace(s.Value)
 	if s.Value == "" {
 		return core.NewValidationError("value", nil,
 			fmt.Errorf("router step requires 'value' field"))
@@ -1448,13 +1450,32 @@ func buildStepRouter(_ StepBuildContext, s *step, result *core.Step) error {
 	// Convert map to ordered entries
 	var routes []core.RouteEntry
 	for pattern, targets := range s.Routes {
+		// Trim and validate pattern
+		pattern = strings.TrimSpace(pattern)
+		if pattern == "" {
+			return core.NewValidationError("routes", nil,
+				fmt.Errorf("route pattern cannot be empty"))
+		}
+
 		if len(targets) == 0 {
 			return core.NewValidationError("routes", pattern,
 				fmt.Errorf("route pattern %q has no targets", pattern))
 		}
+
+		// Trim and validate each target
+		var trimmedTargets []string
+		for _, target := range targets {
+			target = strings.TrimSpace(target)
+			if target == "" {
+				return core.NewValidationError("routes", pattern,
+					fmt.Errorf("route pattern %q has empty target", pattern))
+			}
+			trimmedTargets = append(trimmedTargets, target)
+		}
+
 		routes = append(routes, core.RouteEntry{
 			Pattern: pattern,
-			Targets: targets,
+			Targets: trimmedTargets,
 		})
 	}
 

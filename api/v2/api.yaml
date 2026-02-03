@@ -4995,22 +4995,33 @@ components:
         router:
           type: object
           description: "Router configuration for switch/case routing"
+          required:
+            - value
+            - routes
           properties:
             value:
               type: string
+              minLength: 1
               description: "Expression to evaluate (e.g., '${STATUS}')"
             routes:
               type: array
+              minItems: 1
               items:
                 type: object
+                required:
+                  - pattern
+                  - targets
                 properties:
                   pattern:
                     type: string
+                    minLength: 1
                     description: "Match pattern (exact or 're:regex')"
                   targets:
                     type: array
+                    minItems: 1
                     items:
                       type: string
+                      minLength: 1
                     description: "Step names to route to"
       required:
         - name

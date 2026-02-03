@@ -2245,12 +2245,12 @@ export interface components {
             /** @description Router configuration for switch/case routing */
             router?: {
                 /** @description Expression to evaluate (e.g., '${STATUS}') */
-                value?: string;
-                routes?: {
+                value: string;
+                routes: {
                     /** @description Match pattern (exact or 're:regex') */
-                    pattern?: string;
+                    pattern: string;
                     /** @description Step names to route to */
-                    targets?: string[];
+                    targets: string[];
                 }[];
             };
         };

@@ -41,6 +41,7 @@ type Props = {
  */
 function DAGSpec({ fileName, localDags }: Props) {
   const appBarContext = React.useContext(AppBarContext);
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const client = useClient();
   const config = useConfig();
   const { showError } = useErrorModal();
@@ -99,7 +100,7 @@ function DAGSpec({ fileName, localDags }: Props) {
     {
       params: {
         query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
+          remoteNode,
         },
         path: {
           fileName: fileName,
@@ -155,7 +156,7 @@ function DAGSpec({ fileName, localDags }: Props) {
             fileName: fileName,
           },
           query: {
-            remoteNode: appBarContext.selectedRemoteNode || 'local',
+            remoteNode,
           },
         },
         body: {
@@ -188,7 +189,7 @@ function DAGSpec({ fileName, localDags }: Props) {
   }, [
     currentValue,
     fileName,
-    appBarContext.selectedRemoteNode,
+    remoteNode,
     client,
     saveScrollPosition,
     showToast,
