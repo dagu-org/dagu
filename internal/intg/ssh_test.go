@@ -145,7 +145,7 @@ steps:
 		th := test.Setup(t)
 
 		// Test multi-line script execution
-		// Note: Avoid shell variables with ${} as dagu expands them before sending to SSH
+		// Note: OS env vars like $HOME are left for the remote shell to resolve (RFC 007).
 		dagConfig := sshServer.sshConfig("/bin/sh") + `
 steps:
   - name: script-test
@@ -391,6 +391,80 @@ steps:
 		dag.AssertLatestStatus(t, core.Succeeded)
 		dag.AssertOutputs(t, map[string]any{
 			"TIMEOUT_OUT": "timeout configured",
+		})
+	})
+
+	// RFC 007: OS environment variables should NOT be expanded locally for SSH.
+	// They must be left for the remote shell to resolve.
+
+	t.Run("OSEnvNotExpandedInScript", func(t *testing.T) {
+		th := test.Setup(t)
+
+		// $HOME on the remote SSH server is /home/testuser.
+		// If Dagu incorrectly expands $HOME locally, the output would be
+		// the local user's home directory instead.
+		dagConfig := sshServer.sshConfig("/bin/sh") + `
+steps:
+  - name: os-env-test
+    type: ssh
+    script: |
+      echo "$HOME"
+    output: SSH_HOME_OUT
+`
+		dag := th.DAG(t, dagConfig)
+		dag.Agent().RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"SSH_HOME_OUT": fmt.Sprintf("/home/%s", sshTestUser),
+		})
+	})
+
+	t.Run("DAGVarsExpandedButOSVarsPreserved", func(t *testing.T) {
+		th := test.Setup(t)
+
+		// MY_APP is a DAG env var → should be expanded by Dagu.
+		// $HOME is an OS env var → should be left for the remote shell.
+		dagConfig := sshServer.sshConfig("/bin/sh") + `
+env:
+  - MY_APP: myapp
+steps:
+  - name: mixed-vars-test
+    type: ssh
+    script: |
+      echo "${MY_APP} $HOME"
+    output: SSH_MIXED_OUT
+`
+		dag := th.DAG(t, dagConfig)
+		dag.Agent().RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"SSH_MIXED_OUT": fmt.Sprintf("myapp /home/%s", sshTestUser),
+		})
+	})
+
+	t.Run("StepEnvOSVarsNotExpanded", func(t *testing.T) {
+		th := test.Setup(t)
+
+		// $HOME in step env should NOT be expanded to the local value.
+		// Dagu evaluates step env with WithoutExpandEnv for SSH,
+		// so $HOME stays literal. When the script references $REMOTE_DIR,
+		// Dagu expands it to "$HOME/app" (with $HOME still literal).
+		// The remote shell then resolves $HOME to /home/testuser.
+		dagConfig := sshServer.sshConfig("/bin/sh") + `
+steps:
+  - name: step-env-test
+    type: ssh
+    env:
+      - REMOTE_DIR: "$HOME/app"
+    script: |
+      echo "$REMOTE_DIR"
+    output: SSH_STEP_ENV_OUT
+`
+		dag := th.DAG(t, dagConfig)
+		dag.Agent().RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"SSH_STEP_ENV_OUT": fmt.Sprintf("/home/%s/app", sshTestUser),
 		})
 	})
 
