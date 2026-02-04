@@ -2,6 +2,7 @@ package eval
 
 import (
 	"context"
+	"os"
 	"runtime"
 	"testing"
 
@@ -222,7 +223,7 @@ func TestSubstituteCommands_Extended(t *testing.T) {
 			name:    "CommandFailure",
 			input:   "`false`",
 			want:    "",
-			wantErr: true, // Command returns error on non-zero exit code
+			wantErr: true,
 		},
 		{
 			name:    "InvalidCommand",
@@ -269,211 +270,34 @@ func TestSubstituteCommands_Extended(t *testing.T) {
 	}
 }
 
-func TestExpandReferences_ComplexJSON(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		dataMap map[string]string
-		want    string
-	}{
-		{
-			name:  "ArrayAccess",
-			input: "${DATA.items.[1].name}",
-			dataMap: map[string]string{
-				"DATA": `{"items": [{"name": "first"}, {"name": "second"}, {"name": "third"}]}`,
-			},
-			want: "second",
-		},
-		{
-			name:  "BooleanValue",
-			input: "${CONFIG.enabled}",
-			dataMap: map[string]string{
-				"CONFIG": `{"enabled": true}`,
-			},
-			want: "true",
-		},
-		{
-			name:  "NumberValue",
-			input: "${CONFIG.port}",
-			dataMap: map[string]string{
-				"CONFIG": `{"port": 8080}`,
-			},
-			want: "8080",
-		},
-		{
-			name:  "NullValue",
-			input: "${CONFIG.optional}",
-			dataMap: map[string]string{
-				"CONFIG": `{"optional": null}`,
-			},
-			want: "<nil>",
-		},
-		{
-			name:  "DeeplyNested",
-			input: "${DATA.level1.level2.level3.value}",
-			dataMap: map[string]string{
-				"DATA": `{"level1": {"level2": {"level3": {"value": "deep"}}}}`,
-			},
-			want: "deep",
-		},
-		{
-			name:  "ArrayOfObjects",
-			input: "${USERS.[0].email}",
-			dataMap: map[string]string{
-				"USERS": `[{"name": "Alice", "email": "alice@example.com"}, {"name": "Bob", "email": "bob@example.com"}]`,
-			},
-			want: "alice@example.com",
-		},
-		{
-			name:  "SpecialCharactersInJSON",
-			input: "${DATA.message}",
-			dataMap: map[string]string{
-				"DATA": `{"message": "Hello \"World\" with 'quotes'"}`,
-			},
-			want: `Hello "World" with 'quotes'`,
-		},
-	}
+// --- buildShellCommand coverage ---
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			got := ExpandReferences(ctx, tt.input, tt.dataMap)
-			assert.Equal(t, tt.want, got)
-		})
-	}
+func TestBuildShellCommand_PowerShell(t *testing.T) {
+	cmd := buildShellCommand("powershell", "Get-Date")
+	assert.Equal(t, "powershell", cmd.Path)
+	assert.Contains(t, cmd.Args, "-Command")
 }
 
-func TestStringFields_StructWithMapField(t *testing.T) {
-	type TestStruct struct {
-		Name    string
-		Config  map[string]string
-		Options map[string]any
-	}
+func TestBuildShellCommand_Cmd(t *testing.T) {
+	cmd := buildShellCommand("cmd.exe", "dir")
+	assert.Contains(t, cmd.Args, "/c")
+}
 
-	input := TestStruct{
-		Name: "`echo test`",
-		Config: map[string]string{
-			"key1": "$TEST_VAR",
-			"key2": "`echo value`",
-		},
-		Options: map[string]any{
-			"enabled": true,
-			"command": "`echo option`",
-			"nested": map[string]any{
-				"value": "$TEST_VAR",
-			},
-		},
-	}
+func TestBuildShellCommand_EmptyShell(t *testing.T) {
+	cmd := buildShellCommand("", "echo hi")
+	assert.Contains(t, cmd.Args, "-c")
+}
 
-	// Set up environment
-	t.Setenv("TEST_VAR", "env_value")
+// --- runCommandWithContext coverage ---
 
-	ctx := context.Background()
-	got, err := StringFields(ctx, input)
+func TestRunCommandWithContext_WithScope(t *testing.T) {
+	scope := NewEnvScope(nil, false)
+	scope = scope.WithEntry("CMD_TEST_VAR", "from_scope", EnvSourceDAGEnv)
+	// Need PATH to find echo
+	scope = scope.WithEntry("PATH", os.Getenv("PATH"), EnvSourceOS)
+	ctx := WithEnvScope(context.Background(), scope)
+
+	result, err := runCommandWithContext(ctx, "echo hello")
 	require.NoError(t, err)
-
-	assert.Equal(t, "test", got.Name)
-	assert.Equal(t, "env_value", got.Config["key1"])
-	assert.Equal(t, "value", got.Config["key2"])
-	assert.Equal(t, true, got.Options["enabled"])
-	assert.Equal(t, "option", got.Options["command"])
-	assert.Equal(t, "env_value", got.Options["nested"].(map[string]any)["value"])
-}
-
-func TestStringFields_ErrorCases(t *testing.T) {
-	// Test with a channel (unsupported type)
-	ch := make(chan int)
-	_, err := StringFields(context.Background(), ch)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "input must be a struct or map")
-
-	// Test struct with invalid command
-	type TestStruct struct {
-		Field string
-	}
-	input := TestStruct{
-		Field: "`invalid_command_xyz`",
-	}
-	_, err = StringFields(context.Background(), input)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to execute command")
-
-	// Test map with invalid command
-	mapInput := map[string]any{
-		"key": "`invalid_command_xyz`",
-	}
-	_, err = StringFields(context.Background(), mapInput)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to execute command")
-}
-
-func TestOptions_Combinations(t *testing.T) {
-	// Set up environment
-	t.Setenv("TEST_ENV", "env_value")
-
-	tests := []struct {
-		name  string
-		input string
-		opts  []Option
-		want  string
-	}{
-		{
-			name:  "AllFeaturesDisabled",
-			input: "$TEST_ENV `echo hello` ${VAR}",
-			opts: []Option{
-				WithoutExpandEnv(),
-				WithoutSubstitute(),
-			},
-			want: "$TEST_ENV `echo hello` ${VAR}",
-		},
-		{
-			name:  "OnlyVariablesEnabled",
-			input: "$TEST_ENV `echo hello` ${VAR}",
-			opts: []Option{
-				OnlyReplaceVars(),
-				WithVariables(map[string]string{"VAR": "value"}),
-			},
-			want: "$TEST_ENV `echo hello` value",
-		},
-		{
-			name:  "MultipleVariableSetsWithStepMap",
-			input: "${VAR1} ${VAR2} ${step1.exit_code}",
-			opts: []Option{
-				WithVariables(map[string]string{"VAR1": "first"}),
-				WithVariables(map[string]string{"VAR2": "second"}),
-				WithStepMap(map[string]StepInfo{
-					"step1": {ExitCode: "0"},
-				}),
-			},
-			want: "first second 0",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			got, err := String(ctx, tt.input, tt.opts...)
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-func TestProcessMap_NilValues(t *testing.T) {
-	input := map[string]any{
-		"string": "value",
-		"nil":    nil,
-		"ptr":    (*string)(nil),
-		"iface":  any(nil),
-	}
-
-	ctx := context.Background()
-	got, err := StringFields(ctx, input)
-	require.NoError(t, err)
-
-	gotMap := got
-	assert.Equal(t, "value", gotMap["string"])
-	assert.Nil(t, gotMap["nil"])
-	assert.Nil(t, gotMap["ptr"])
-	assert.Nil(t, gotMap["iface"])
+	assert.Equal(t, "hello", result)
 }

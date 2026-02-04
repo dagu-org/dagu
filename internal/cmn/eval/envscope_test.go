@@ -739,3 +739,55 @@ func TestEnvScope_AllSecrets_EmptyAndNil(t *testing.T) {
 		assert.Equal(t, "parent_secret_val", secrets["PARENT_SECRET"])
 	})
 }
+
+// --- expandWithLookup single-quoted ---
+
+func TestExpandWithLookup_SingleQuoted(t *testing.T) {
+	lookup := func(key string) (string, bool) {
+		if key == "FOO" {
+			return "bar", true
+		}
+		return "", false
+	}
+	result := expandWithLookup("'$FOO' stays", lookup)
+	assert.Equal(t, "'$FOO' stays", result)
+}
+
+// --- EnvScope.Debug no parent ---
+
+func TestEnvScope_Debug_NoParent(t *testing.T) {
+	// NewEnvScope with includeOS=true has entries but no parent
+	s := NewEnvScope(nil, true)
+	debug := s.Debug()
+	assert.Contains(t, debug, "EnvScope{")
+	assert.NotContains(t, debug, "parent: <yes>")
+}
+
+// --- Debug nil scope ---
+
+func TestEnvScope_Debug_NilScope(t *testing.T) {
+	var s *EnvScope
+	debug := s.Debug()
+	assert.Equal(t, "EnvScope{nil}", debug)
+}
+
+// --- collectBySource nil ---
+
+func TestCollectBySource_NilScope(t *testing.T) {
+	var s *EnvScope
+	result := s.AllBySource(EnvSourceDAGEnv)
+	assert.Empty(t, result)
+}
+
+// --- collectBySource with parent chain ---
+
+func TestCollectBySource_WithParent(t *testing.T) {
+	parent := NewEnvScope(nil, false)
+	parent = parent.WithEntry("PKEY", "pval", EnvSourceDAGEnv)
+	child := NewEnvScope(parent, false)
+	child = child.WithEntry("CKEY", "cval", EnvSourceDAGEnv)
+
+	result := child.AllBySource(EnvSourceDAGEnv)
+	assert.Equal(t, "pval", result["PKEY"])
+	assert.Equal(t, "cval", result["CKEY"])
+}

@@ -99,3 +99,57 @@ func TestExpandEnvContext(t *testing.T) {
 		assert.Equal(t, "", result)
 	})
 }
+
+// --- expandWithShellContext coverage ---
+
+func TestExpandWithShellContext_ShellDisabledEnvEnabled(t *testing.T) {
+	ctx := context.Background()
+	opts := NewOptions()
+	opts.ExpandShell = false
+	opts.ExpandEnv = true
+	t.Setenv("MYVAR", "myval")
+
+	result, err := expandWithShellContext(ctx, "$MYVAR", opts)
+	require.NoError(t, err)
+	assert.Equal(t, "myval", result)
+}
+
+func TestExpandWithShellContext_ShellDisabledEnvDisabled(t *testing.T) {
+	ctx := context.Background()
+	opts := NewOptions()
+	opts.ExpandShell = false
+	opts.ExpandEnv = false
+
+	result, err := expandWithShellContext(ctx, "$MYVAR", opts)
+	require.NoError(t, err)
+	assert.Equal(t, "$MYVAR", result)
+}
+
+func TestExpandWithShellContext_EmptyInput(t *testing.T) {
+	ctx := context.Background()
+	opts := NewOptions()
+
+	result, err := expandWithShellContext(ctx, "", opts)
+	require.NoError(t, err)
+	assert.Equal(t, "", result)
+}
+
+func TestExpandWithShellContext_UnexpectedCommand(t *testing.T) {
+	ctx := context.Background()
+	opts := NewOptions()
+	t.Setenv("KEEP", "kept")
+
+	// $(command) triggers UnexpectedCommandError and falls back to ExpandEnvContext
+	result, err := expandWithShellContext(ctx, "$(echo x) $KEEP", opts)
+	require.NoError(t, err)
+	assert.Contains(t, result, "kept")
+}
+
+func TestExpandWithShellContext_NonUnexpectedCommandError(t *testing.T) {
+	ctx := context.Background()
+	opts := NewOptions()
+
+	// ${UNSET_VAR_ABC:?msg} triggers a non-UnexpectedCommand error from expand.Literal
+	_, err := expandWithShellContext(ctx, "${UNSET_VAR_ABC:?required}", opts)
+	assert.Error(t, err)
+}
