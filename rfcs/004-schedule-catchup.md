@@ -20,7 +20,7 @@ Currently, when the Dagu scheduler process is shut down or crashes, scheduled cr
 
 ### Current Behavior
 
-The scheduler advances by exactly 1 minute per tick in `cronLoop()` (`scheduler.go:282-305`). If the scheduler is offline for 2 hours, all jobs scheduled during that period are permanently lost. There is no state tracking of the last processed schedule time and no catch-up mechanism.
+The scheduler advances by exactly 1 minute per tick. If the scheduler is offline for 2 hours, all jobs scheduled during that period are permanently lost. There is no state tracking of the last processed schedule time and no catch-up mechanism.
 
 ## Industry Research
 
@@ -48,17 +48,18 @@ The scheduler advances by exactly 1 minute per tick in `cronLoop()` (`scheduler.
 
 ### New Schedule Configuration
 
-Extend the `schedule` field to support configurable catch-up windows:
+Extend the `schedule` field to support configurable catch-up:
 
 ```yaml
 name: daily-etl
 schedule:
   cron: "0 9 * * *"
-  catchup: true                 # Opt into catch-up processing
+  misfire: runAll               # Policy for missed schedules (enables catch-up)
   catchupWindow: "24h"          # Only backfill the last 24h of missed intervals
-  misfire: runAll               # Policy for missed schedules
   maxCatchupRuns: 12            # Bound the number of executions per restart
 ```
+
+Setting `misfire` to any value other than `ignore` enables catch-up processing. There is no separate boolean toggle — the misfire policy is the single opt-in mechanism.
 
 #### Backward Compatibility
 
@@ -70,273 +71,286 @@ schedule: "0 9 * * *"
 
 schedule:
   cron: "0 9 * * *"
-  catchup: false    # Default: current behavior
+  misfire: ignore    # Default: current behavior, no catch-up
 ```
+
+> **Why no `start`/`end` fields?** Dagu already uses `schedule.start/stop/restart` to separate cron expressions by action. Reusing the same keys for ISO timestamps would break every existing DAG. Relative windows (Temporal-style) also avoid the timezone ambiguity and "first deploy in the past" issues that absolute timestamps create.
 
 ### Schedule Fields
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `cron` | string | required | Cron expression |
-| `catchup` | bool | `false` | Opt-in for catch-up/backfill behaviour |
-| `catchupWindow` | duration | `0` (disabled) | Lookback duration (e.g. `6h`, `24h`, `7d`) to search for missed intervals relative to `now` |
-| `misfire` | string | `ignore` | Policy for missed schedules during downtime |
-| `maxCatchupRuns` | int | `10` | Maximum runs per schedule when `misfire=runAll` |
+| `misfire` | string | `ignore` | Policy for missed schedules. Any value other than `ignore` enables catch-up |
+| `catchupWindow` | duration | `24h` | Lookback duration to search for missed intervals relative to `now`. Applied only when `misfire != ignore` |
+| `maxCatchupRuns` | int | `10` | Maximum catch-up runs per schedule entry per scheduler restart. Applied only when `misfire = runAll` (runOnce always dispatches at most 1) |
 
-> **Why no `start`/`end` fields?** Dagu already uses `schedule.start/stop/restart` to separate cron expressions by action. Reusing the same keys for ISO timestamps would break every existing DAG. Relative windows (Temporal-style) also avoid the timezone ambiguity and “first deploy in the past” issues that absolute timestamps brought.
+#### Duration Format
+
+The `catchupWindow` field uses a duration grammar compatible with Go’s `time.ParseDuration`, extended with a `d` suffix for days:
+
+| Suffix | Meaning | Example |
+|--------|---------|---------|
+| `m` | minutes | `30m` |
+| `h` | hours | `6h` |
+| `d` | days (= 24h) | `7d` |
+
+Durations are parsed as a **sum of `<number><unit>` tokens** with no separators. Tokens can be repeated and combined across units. Examples:
+
+- `2d12h` = 60h
+- `1d30m` = 24h30m
+- `90m` = 90 minutes
+
+Validation rules:
+
+- Tokens must be positive integers followed by a unit.
+- Empty strings, missing units (e.g. `2d12`), and negative values are invalid.
+- `0` or `0h` is invalid when `misfire != ignore`.
 
 ### Misfire Policies
 
 | Policy | Behavior | Use Case |
 |--------|----------|----------|
 | `ignore` | Skip missed runs (current behavior) | Real-time only jobs, transient data |
-| `runOnce` | Execute once if any runs were missed | Most common - ensure job ran at least once |
+| `runOnce` | Execute once if any runs were missed (earliest missed interval) | Most common - ensure job ran at least once |
 | `runAll` | Execute all missed runs up to `maxCatchupRuns` | Data pipelines needing complete backfill |
 
-### Behavior Matrix
+For `runOnce`, the selected run is the **earliest** missed interval within the replay window. Example: if the scheduler was down from 09:00–12:00 and the cron is hourly, `runOnce` fires the 09:00 interval only.
+This choice prioritizes completeness over recency; users who want “most recent only” can narrow `catchupWindow` to a small interval.
 
-| Scenario | `catchup=false` | `catchup=true` |
-|----------|-----------------|----------------|
-| First deploy | Run from now only | Backfill based on `catchupWindow` (e.g. last 24h) |
-| Scheduler restart after 3h downtime | Jobs resume from now | Apply `misfire` + `catchupWindow` to recover the last 3h |
-| DAG disabled then re-enabled | Run from now only | Backfill from the last successful run time, respecting `catchupWindow` |
+### Scope
 
-### Catch-up Trigger Points
+Catch-up applies only to **start** schedules. Stop and restart schedules are excluded:
 
-Catch-up execution begins any time the scheduler detects that real time has advanced beyond the last persisted tick watermark:
+- A missed **stop** is a no-op if the DAG is not currently running. Retroactively stopping a DAG that already completed naturally would be incorrect.
+- A missed **restart** combines a stop and a start. The stop portion has the same issue, and the start portion is covered by catch-up on the start schedule.
 
-1. **Scheduler restarts / unplanned downtime** – when `Start()` loads `state.json` and sees a `LastTickTime` older than “now”, it processes missed intervals for every `catchup=true` schedule before resuming the live loop.
-2. **DAG toggles (disable → enable)** – the per-DAG watermark uses the most recent dag-run start time. If a DAG was paused for hours and then re-enabled, its watermark lags behind and the next scheduler tick triggers catch-up within the configured window.
-3. **Manual backfills while scheduler is down** – creating dag-run attempts advances the per-DAG watermark even if the scheduler wasn’t running at the time, so subsequent restarts only replay the gap after that manual activity.
+If a DAG uses the map-form schedule (`schedule: { start: ..., stop: ..., restart: ... }`), only the `start` entry accepts catch-up fields. The parser rejects catch-up fields on `stop` or `restart` entries.
 
-No catch-up work happens while the scheduler is healthy and processing ticks in real time; the feature is purely for recovering gaps detected via those watermarks.
+### Multiple Schedules on the Same DAG
 
-### Catch-up Window Boundaries
+A DAG may have multiple cron expressions (array form):
 
-When a trigger condition is met, the detector calculates the earliest timestamp worth replaying as:
+```yaml
+schedule:
+  - cron: "0 * * * *"
+    misfire: runAll
+    catchupWindow: "6h"
+  - cron: "30 9 * * *"
+    misfire: runOnce
+    catchupWindow: "24h"
+```
+
+Each schedule entry is evaluated independently during catch-up detection. Overlapping schedule times do **not** deduplicate—each schedule can produce its own run.
+
+Cap ordering:
+
+1. Apply `maxCatchupRuns` per schedule entry.
+2. Merge runs **across schedule entries for the same DAG** ordered by scheduled time.
+3. Apply the global catch-up cap across all DAGs.
+
+`maxCatchupRuns` is a **per-restart budget** applied to the candidate list computed from the current watermarks. After a partial failure, the next restart recomputes from the last persisted watermark and applies a fresh budget to the remaining candidates.
+
+## Design
+
+### Watermarks
+
+Two watermarks determine what needs replaying:
+
+1. **Scheduler watermark** — the last tick time the scheduler successfully dispatched, persisted to disk. On restart, the gap between this timestamp and `now` is the recovery window. If the watermark file is missing or corrupt, it is treated as `now` (no catch-up). The watermark is stored as a small JSON file under the scheduler data directory (e.g. `<dataDir>/scheduler/state.json`) and written atomically.
+2. **Per-DAG watermark** — derived from the most recent dag-run start time. Handles DAGs that were disabled/re-enabled independently of the scheduler lifecycle. Manual/API/inline runs with the same DAG name also advance this watermark.
+
+### Replay Boundaries
+
+When catch-up is triggered, the earliest timestamp worth replaying is:
 
 ```
 replayFrom = max(
     now - catchupWindow,         // user-configured lookback horizon
-    state.LastTickTime,          // scheduler-wide watermark
-    firstSeenAt(dag),            // first time this DAG was observed (from dag-metadata store)
-    latestDagRunStartTime(dag),  // per-DAG watermark derived from history (zero if none)
+    schedulerWatermark,          // last tick the scheduler dispatched
+    firstSeenAt(dag),            // first time this DAG was observed
+    latestDagRunStartTime(dag),  // per-DAG watermark from history
 )
 ```
 
 This ensures:
 
-- You never replay intervals older than the configured window (aligns with Temporal/K8s best practices).
-- Brand-new DAGs are capped at their `firstSeenAt` timestamp, so simply enabling `catchup=true` never replays months of history unless the operator later issues an explicit backfill.
-- DAGs that were paused or backfilled manually inherit the timestamp of their latest run, avoiding duplicate work while still recovering the missing gap after that execution.
+- You never replay intervals older than the configured window.
+- Brand-new DAGs with **no prior runs** get `firstSeenAt = now` on first observation, so catch-up never replays history that predates the DAG's existence.
+- If a DAG has prior run history, `latestDagRunStartTime` supersedes `firstSeenAt` for replay boundaries.
+- DAGs that were paused or backfilled manually inherit the timestamp of their latest run, avoiding duplicate work.
 
-## Technical Design
+### Catch-up Trigger Points
 
-### 1. Scheduler State Persistence
+1. **Scheduler restart** — scheduler watermark lags behind `now`, catch-up runs before the live loop starts.
+2. **DAG re-enable** — per-DAG watermark lags behind `now`, catch-up runs inline on the next tick.
+3. **Manual backfill while scheduler is down** — advances the per-DAG watermark, so the subsequent restart only replays the remaining gap.
 
-Create new persistence layer to track scheduler state:
+No catch-up work happens while the scheduler is healthy and processing ticks in real time.
 
-**Files:** `internal/persis/fileschedulerstate/state.go`, `internal/persis/filedagmeta/store.go`
+### Ordering Guarantees
 
-Two related pieces:
+Catch-up runs execute **synchronously before the live cron loop starts**:
 
-1. **Scheduler watermark** – keep a lightweight `state.json` under `${cfg.Paths.DataDir}/scheduler/state.json` that records `LastTickTime`, `InstanceID`, and `UpdatedAt`. This is scheduler-owned and only written from the cron loop.
-2. **DAG metadata store** – introduce a shared metadata file under `${cfg.Paths.DataDir}/scheduler/dags.json` managed by a new `filedagmeta` package. Each entry tracks `suspended`, `firstSeenAt`, and future attributes (`lastManualRun`, etc.). `exec.DAGStore.ToggleSuspend/IsSuspended` migrate from per-DAG flag files to this store (with legacy import on first access), while the scheduler reads the same metadata to determine `firstSeenAt`.
+1. Load scheduler watermark from disk (missing/corrupt = `now`).
+2. Snapshot all DAGs.
+3. Capture `catchupTo = now`.
+4. Dispatch catch-up runs sequentially with rate limiting, advancing the watermark after each successful dispatch to the scheduled time.
+5. If all catch-up dispatches succeed, set the watermark to `catchupTo`.
+6. Enter the live loop.
 
-This split keeps scheduler-specific state isolated while giving all components (CLI, API, scheduler) a single source of truth for DAG metadata.
+This guarantees no live tick fires while catch-up is in progress.
 
-### 2. Core Types
+For DAG re-enable events, catch-up runs are dispatched inline within the current tick, before any live-scheduled jobs. Existing duplicate-execution guards prevent conflicts if a catch-up run and a live tick target the same schedule time.
 
-- Introduce a `ScheduleConfig` struct on each parsed schedule entry that carries the cron expression plus `catchup`, `catchupWindow`, `misfire`, and `maxCatchupRuns`. This keeps all runtime decisions driven by structured data instead of raw YAML fragments.
-- Define a `MisfirePolicy` enum (`ignore`, `runOnce`, `runAll`) so the scheduler can branch on typed constants.
-- Keep the parsed `cron.Schedule` next to the config to avoid re-parsing expressions during catch-up detection.
+**Cron changes during downtime**: catch-up uses the **current** schedule expression from the snapshot. If a cron expression changed while the scheduler was down, missed intervals are computed against the new expression (not historical ones). This is a known limitation and a deliberate design choice to keep the scheduler stateless with respect to past cron definitions.
 
-### 3. Spec Parser
+### Watermark Semantics
 
-**File: `internal/core/spec/dag.go`**
+The scheduler watermark tracks **dispatch**, not execution completion. This matches the existing fire-and-forget pattern where jobs are launched asynchronously.
 
-Support both simple and extended schedule formats:
+A catch-up run that fails at execution time will **not** be retried on next restart — the watermark has already moved past it. This is intentional: retrying failed runs is a separate concern (retry policies, alerting) and conflating it with catch-up would risk infinite retry loops. Users who need retry-on-failure should configure step-level retries within the DAG.
 
-- Extend the `scheduleConfig` YAML struct with the new fields and keep the legacy string form for backward compatibility.
-- `ScheduleValue` now yields either a simple cron expression or a structured object. During DAG loading, we convert the latter into `core.ScheduleConfig`, parsing `catchupWindow` via `time.ParseDuration` and validating `maxCatchupRuns`.
-- Invalid inputs (bad duration strings, negative limits, unknown misfire policy) become build-time errors surfaced to the user before deployment.
+During catch-up, the watermark advances **per successful dispatch** to the scheduled time. If a catch-up run fails to **dispatch** (e.g. the persistence layer is unavailable), the watermark does not advance past that time and catch-up stops. On next restart the same interval will be retried, providing at-least-once dispatch semantics.
 
-### 4. Catch-up Detection
+Catch-up dispatch is fire-and-forget; it does **not** wait for completion. Existing guards (for example, `skipIfSuccessful` or “already running” checks) are applied when dispatching. If a run is skipped because a guard indicates it has already been handled, it is treated as handled for watermark advancement.
+As a result, `runAll` can yield concurrent executions **only when the DAG allows it**; if a concurrency guard blocks new starts, missed intervals will be skipped and the watermark will advance past them.
 
-- Introduce a dedicated `CatchupDetector` that: (a) clamps the replay window to `now - catchupWindow`, (b) walks cron fire times between that bound and `now` in the configured timezone, and (c) filters out timestamps that already have successful dag-runs on record. It returns an ordered list of candidate times, leaving policy decisions to the scheduler.
+### Environment Variables
 
-### 5. Scheduler Integration
+Catch-up runs expose their intended schedule time so DAGs can process historical data correctly:
 
-**File: `internal/service/scheduler/scheduler.go`**
-
-- **Startup sequencing** – initialize the entry reader and load the last persisted scheduler state before processing catch-up, then take a snapshot of DAGs for deterministic replay.
-- **Watermark selection** – compute the lower bound per DAG by taking the max of `state.LastTickTime`, `dagMetaStore.FirstSeenAt(dag)`, and the most recent dag-run start time from `DAGRunStore`. This covers brand-new deployments, re-enabled DAGs, and manual backfills uniformly.
-- **Catch-up execution** – feed that lower bound into `CatchupDetector`, then apply the configured `misfire` policy plus `maxCatchupRuns`, a global cap (e.g., 100 runs per restart), and a small ticker-based rate limiter (~100 ms) to smooth the load.
-- **State persistence** – advance `state.LastTickTime` only after each `invokeJobs` cycle succeeds, ensuring crashes trigger replays instead of silently skipping work.
-
-### 6. Environment Variables for Catch-up Runs
-
-Catch-up runs should have access to their scheduled time:
-
-```go
-// Set for catch-up runs
-env["DAGU_SCHEDULED_TIME"] = scheduledTime.Format(time.RFC3339)
-env["DAGU_IS_CATCHUP"] = "true"
-```
-
-This allows DAGs to process historical data correctly:
+| Variable | Value | Description |
+|----------|-------|-------------|
+| `DAGU_SCHEDULED_TIME` | RFC 3339 timestamp | The time this run was originally scheduled for |
+| `DAGU_IS_CATCHUP` | `"true"` | Indicates this is a catch-up run, not a live run |
 
 ```yaml
 steps:
-  - name: process-data
+  - name: etl
     command: python etl.py --date=${DAGU_SCHEDULED_TIME}
 ```
 
-## Files to Modify/Create
+### Scheduler-Level Configuration
 
-| File | Action | Description |
-|------|--------|-------------|
-| `internal/core/dag.go` | Modify | Add `ScheduleConfig`, `MisfirePolicy` types |
-| `internal/core/spec/dag.go` | Modify | Add `scheduleConfig` spec, update parser |
-| `internal/core/spec/types/schedule.go` | Create | `ScheduleValue` type for string/object parsing |
-| `internal/persis/fileschedulerstate/state.go` | Create | Scheduler watermark persistence (`LastTickTime`, etc.) |
-| `internal/persis/filedagmeta/store.go` | Create | Shared DAG metadata store (suspended, firstSeenAt, future attributes) |
-| `internal/persis/filedag/store.go` | Modify | Move `ToggleSuspend`/`IsSuspended` to metadata store, migrate legacy flag files |
-| `internal/service/scheduler/catchup.go` | Create | Catch-up detection logic |
-| `internal/service/scheduler/scheduler.go` | Modify | Integrate state tracking and catch-up |
-| `internal/service/scheduler/entryreader.go` | Modify | Add `GetAllDAGs()` method |
+Operator-level guardrails independent of per-DAG settings:
 
-## Example Configurations
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `scheduler.maxGlobalCatchupRuns` | `100` | Maximum total catch-up runs per scheduler restart |
+| `scheduler.catchupRateLimit` | `100ms` | Delay between catch-up dispatches |
 
-### 1. Simple Daily Job (No Catch-up)
+### DAG Metadata Store
+
+The current per-DAG `.suspend` flag files are migrated to a per-DAG metadata store that also tracks `firstSeenAt`. Using per-DAG files (rather than a single shared file) preserves the natural atomicity of the current approach — concurrent writes from CLI, API, and scheduler never contend unless they target the same DAG.
+
+Legacy `.suspend` flag files are lazily imported on first access and then removed.
+
+### DAG Identity and Manual Runs
+
+Watermarks and run history are tracked by **DAG name**. Any run that uses the same DAG name (including inline-spec or manual runs) updates the per-DAG watermark and can affect catch-up for scheduled runs of that name.
+
+Operational guidance:
+
+- Ad-hoc/inline runs that should **not** influence catch-up must use a different DAG name.
+- If the run is the same logical DAG, sharing the name is expected and correct.
+
+### Distributed Scheduler / Failover
+
+The scheduler watermark is tied to the directory lock (`dirLock`). Only the lock holder reads and writes it. When a new instance acquires the lock after a crash, it inherits whatever watermark the previous holder left — if the previous instance crashed without updating it, the new instance detects the gap and runs catch-up. This is the desired behavior.
+
+## Behavior Matrix
+
+| Scenario | `misfire=ignore` (default) | `misfire=runOnce` | `misfire=runAll` |
+|----------|----------------------------|-------------------|------------------|
+| First deploy (no prior runs) | Run from now only | Run from now only (`firstSeenAt = now`, nothing to backfill) | Run from now only (`firstSeenAt = now`, nothing to backfill) |
+| Scheduler restart after 3h downtime | Jobs resume from now | Run the **earliest** missed interval within `catchupWindow` | Run **all** missed intervals within `catchupWindow` (bounded by caps) |
+| DAG disabled then re-enabled | Run from now only | Backfill from the last dag-run start time (earliest missed within window) | Backfill all missed runs since last dag-run (bounded by caps) |
+
+## Safety Mechanisms
+
+1. **Rate Limiting** — configurable delay between catch-up dispatches (default 100ms)
+2. **Global Limit** — configurable max total catch-up runs per restart (default 100)
+3. **Per-Schedule Limit** — `maxCatchupRuns` (default 10) bounds `runAll` per schedule entry
+4. **Duplicate Prevention** — check if a dag-run already exists before dispatching
+5. **Time Boundaries** — `catchupWindow` truncates the replay horizon
+6. **Graceful Degradation** — missing watermark file = no catch-up (safe default)
+7. **Dispatch Atomicity** — watermark advances per successful dispatch; failures leave it at the last successful time
+8. **Scope Restriction** — only start schedules participate in catch-up
+
+## Migration
+
+1. **No breaking changes** — existing DAGs keep running unchanged.
+2. **Default behavior preserved** — `misfire: ignore` is the default, so nothing replays unless explicitly configured.
+3. **Opt-in** — users enable catch-up per DAG by setting `misfire`.
+4. **Pre-existing DAGs** — on first startup after migration, DAGs with prior runs are bounded by the latest run time; DAGs with no runs get `firstSeenAt = now`, preventing replay of ancient schedules.
+5. **Legacy flag files** — lazily imported into the new metadata store, then removed.
+
+## Examples
+
+### Simple Daily Job (No Catch-up)
 
 ```yaml
 name: cleanup
-schedule: "0 3 * * *"  # 3 AM daily
+schedule: "0 3 * * *"
 steps:
   - name: cleanup
     command: rm -rf /tmp/old-files
 ```
 
-### 2. Daily Report with Run-Once Catch-up
+### Daily Report with Run-Once
 
 ```yaml
 name: daily-report
 schedule:
   cron: "0 9 * * *"
-  catchup: true
-  catchupWindow: "12h"
   misfire: runOnce
+  catchupWindow: "12h"
 steps:
   - name: generate
     command: python report.py
 ```
 
-### 3. Hourly ETL with Full Backfill
+### Hourly ETL with Full Backfill
 
 ```yaml
 name: hourly-etl
 schedule:
   cron: "0 * * * *"
-  catchup: true
-  catchupWindow: "72h"
   misfire: runAll
+  catchupWindow: "3d"
   maxCatchupRuns: 48
 steps:
   - name: etl
     command: python etl.py --hour=${DAGU_SCHEDULED_TIME}
 ```
 
-### 4. Limited-Time Campaign
+### Multiple Schedules with Different Policies
 
 ```yaml
-name: promo-job
+name: mixed-schedule
 schedule:
-  cron: "0 12 * * *"
-  catchup: true
-  catchupWindow: "30d"
-  misfire: runAll
+  - cron: "0 * * * *"
+    misfire: runAll
+    catchupWindow: "6h"
+    maxCatchupRuns: 6
+  - cron: "30 9 * * *"
+    misfire: runOnce
+    catchupWindow: "1d"
 steps:
-  - name: send-promo
-    command: python send_promo.py
-```
-
-## Safety Mechanisms
-
-1. **Rate Limiting**: 100ms delay between catch-up executions
-2. **Global Limit**: Maximum 100 catch-up runs per scheduler restart
-3. **Per-DAG Limit**: `maxCatchupRuns` (default 10) for `runAll` policy
-4. **Duplicate Prevention**: Check if run already exists before executing
-5. **Time Boundaries**: `catchupWindow` truncates replay horizon per schedule
-6. **Graceful Degradation**: Missing state file = no catch-up (safe default)
-
-## Migration
-
-1. **No breaking changes** – Existing DAGs keep running; the new metadata store lazily imports any legacy `.suspend` flag files the first time it sees a DAG, then deletes the old artifact.
-2. **Default behavior preserved** – `catchup: false` and `misfire: ignore` remain defaults, so nothing replays unless explicitly configured.
-3. **Opt-in feature** – Users explicitly enable catch-up per DAG and can continue toggling suspension via CLI/API without caring about the underlying storage change.
-
-## Testing Strategy
-
-### Unit Tests
-
-- `internal/core/spec/schedule_test.go` - Parse both simple and extended formats
-- `internal/persis/fileschedulerstate/state_test.go` - State persistence
-- `internal/service/scheduler/catchup_test.go` - Missed schedule detection
-
-### Integration Tests
-
-```go
-func TestSchedulerCatchup(t *testing.T) {
-    // 1. Create DAG with catchup=true, catchupWindow=1h
-    // 2. Start scheduler
-    // 3. Verify backfill runs were created
-}
-
-func TestMisfireRunOnce(t *testing.T) {
-    // 1. Create state file with lastTickTime = 3 hours ago
-    // 2. Create DAG with catchupWindow=24h, misfire=runOnce
-    // 3. Start scheduler
-    // 4. Verify exactly one catch-up run
-}
-
-func TestMisfireRunAll(t *testing.T) {
-    // 1. Create state file with lastTickTime = 3 hours ago
-    // 2. Create DAG with catchupWindow=24h, misfire=runAll, maxCatchupRuns=24
-    // 3. Start scheduler with hourly DAG
-    // 4. Verify 3 catch-up runs
-}
-```
-
-### Manual Verification
-
-```bash
-# Create test DAG
-cat > ~/.config/dagu/dags/test-catchup.yaml << 'EOF'
-name: test-catchup
-schedule:
-  cron: "* * * * *"
-  catchup: true
-  catchupWindow: "10m"
-  misfire: runOnce
-steps:
-  - name: log
-    command: echo "ran at $(date), scheduled for ${DAGU_SCHEDULED_TIME}" >> /tmp/catchup.log
-EOF
-
-# Start scheduler, let run for 3 minutes
-make run-scheduler
-# Stop scheduler for 3 minutes
-# Restart scheduler
-# Check /tmp/catchup.log for catch-up execution
+  - name: process
+    command: python process.py --time=${DAGU_SCHEDULED_TIME}
 ```
 
 ## Future Enhancements
 
-1. **UI for Backfill**: Manual backfill trigger from web UI (like Airflow)
-2. **CLI Backfill Command**: `dagu backfill --start 2026-01-01 --end 2026-02-01 my-dag`
-3. **Partition Support**: Dagster-style partition definitions
-4. **Catchup Progress**: Track and display catch-up progress in UI
+1. **UI for Backfill** — manual backfill trigger from web UI
+2. **CLI Backfill Command** — `dagu backfill --start 2026-01-01 --end 2026-02-01 my-dag`
+3. **Dry-Run Preview** — `dagu catchup --dry-run my-dag`
+4. **Partition Support** — Dagster-style partition definitions
+5. **Catchup Progress** — track and display catch-up progress in UI
+6. **Watermark Inspection** — CLI/API to view and reset scheduler/DAG watermarks
+7. **Catch-up Lag Metadata** — expose the catch-up gap duration (env var or status field) for logging/alerting
 
 ## References
 
