@@ -18,7 +18,7 @@ import dayjs from '@/lib/dayjs';
 import ActionButton from '@/ui/ActionButton';
 import { RefreshCw, Square, X } from 'lucide-react';
 import React from 'react';
-import { components, Status } from '../../../../api/v2/schema';
+import { components, Status } from '../../../../api/v1/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient } from '../../../../hooks/api';

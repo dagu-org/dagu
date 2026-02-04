@@ -70,7 +70,7 @@ func (s *apiTestSetup) get(path string) *httptest.ResponseRecorder {
 // createConversation creates a new conversation and returns its ID.
 func (s *apiTestSetup) createConversation(t *testing.T, message string) string {
 	t.Helper()
-	rec := s.postJSON("/api/v2/agent/conversations/new", ChatRequest{Message: message})
+	rec := s.postJSON("/api/v1/agent/conversations/new", ChatRequest{Message: message})
 	require.Equal(t, http.StatusCreated, rec.Code)
 
 	var resp NewConversationResponse
@@ -151,7 +151,7 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, true, "")
-		rec := setup.postJSON("/api/v2/agent/conversations/new", ChatRequest{Message: "hello"})
+		rec := setup.postJSON("/api/v1/agent/conversations/new", ChatRequest{Message: "hello"})
 
 		assert.Equal(t, http.StatusCreated, rec.Code)
 
@@ -165,7 +165,7 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, true, "")
-		rec := setup.postJSON("/api/v2/agent/conversations/new", ChatRequest{Message: ""})
+		rec := setup.postJSON("/api/v1/agent/conversations/new", ChatRequest{Message: ""})
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
@@ -174,7 +174,7 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, false, false, "")
-		rec := setup.postJSON("/api/v2/agent/conversations/new", ChatRequest{Message: "hello"})
+		rec := setup.postJSON("/api/v1/agent/conversations/new", ChatRequest{Message: "hello"})
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
@@ -184,7 +184,7 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 
 		setup := newAPITestSetup(t, true, true, "")
 
-		req := httptest.NewRequest(http.MethodPost, "/api/v2/agent/conversations/new", bytes.NewReader([]byte("invalid")))
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/conversations/new", bytes.NewReader([]byte("invalid")))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		setup.router.ServeHTTP(rec, req)
@@ -196,7 +196,7 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, false, "")
-		rec := setup.postJSON("/api/v2/agent/conversations/new", ChatRequest{Message: "hello"})
+		rec := setup.postJSON("/api/v1/agent/conversations/new", ChatRequest{Message: "hello"})
 
 		assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
 	})
@@ -205,7 +205,7 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, true, "")
-		rec := setup.postJSON("/api/v2/agent/conversations/new", ChatRequest{
+		rec := setup.postJSON("/api/v1/agent/conversations/new", ChatRequest{
 			Message: "hello",
 			Model:   "custom-model",
 		})
@@ -230,7 +230,7 @@ func TestAPI_HandleNewConversation(t *testing.T) {
 		api.RegisterRoutes(r, nil)
 
 		body, _ := json.Marshal(ChatRequest{Message: "hello"})
-		req := httptest.NewRequest(http.MethodPost, "/api/v2/agent/conversations/new", bytes.NewReader(body))
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/conversations/new", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, req)
@@ -251,7 +251,7 @@ func TestAPI_HandleListConversations(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, false, "")
-		rec := setup.get("/api/v2/agent/conversations")
+		rec := setup.get("/api/v1/agent/conversations")
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 
@@ -266,7 +266,7 @@ func TestAPI_HandleListConversations(t *testing.T) {
 		setup := newAPITestSetup(t, true, true, "")
 		setup.createConversation(t, "hello")
 
-		rec := setup.get("/api/v2/agent/conversations")
+		rec := setup.get("/api/v1/agent/conversations")
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 
@@ -279,7 +279,7 @@ func TestAPI_HandleListConversations(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, false, false, "")
-		rec := setup.get("/api/v2/agent/conversations")
+		rec := setup.get("/api/v1/agent/conversations")
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
@@ -292,7 +292,7 @@ func TestAPI_HandleCancel(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, false, "")
-		rec := setup.postJSON("/api/v2/agent/conversations/non-existent/cancel", nil)
+		rec := setup.postJSON("/api/v1/agent/conversations/non-existent/cancel", nil)
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
@@ -303,7 +303,7 @@ func TestAPI_HandleCancel(t *testing.T) {
 		setup := newAPITestSetup(t, true, true, "")
 		convID := setup.createConversation(t, "hello")
 
-		rec := setup.postJSON("/api/v2/agent/conversations/"+convID+"/cancel", nil)
+		rec := setup.postJSON("/api/v1/agent/conversations/"+convID+"/cancel", nil)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 
@@ -320,7 +320,7 @@ func TestAPI_HandleGetConversation(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, false, "")
-		rec := setup.get("/api/v2/agent/conversations/non-existent")
+		rec := setup.get("/api/v1/agent/conversations/non-existent")
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
@@ -331,7 +331,7 @@ func TestAPI_HandleGetConversation(t *testing.T) {
 		setup := newAPITestSetup(t, true, true, "")
 		convID := setup.createConversation(t, "hello")
 
-		rec := setup.get("/api/v2/agent/conversations/" + convID)
+		rec := setup.get("/api/v1/agent/conversations/" + convID)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
 
@@ -349,7 +349,7 @@ func TestAPI_HandleChat(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, false, "")
-		rec := setup.postJSON("/api/v2/agent/conversations/non-existent/chat", ChatRequest{Message: "hello"})
+		rec := setup.postJSON("/api/v1/agent/conversations/non-existent/chat", ChatRequest{Message: "hello"})
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
@@ -360,7 +360,7 @@ func TestAPI_HandleChat(t *testing.T) {
 		setup := newAPITestSetup(t, true, true, "")
 		convID := setup.createConversation(t, "hello")
 
-		rec := setup.postJSON("/api/v2/agent/conversations/"+convID+"/chat", ChatRequest{Message: "follow up"})
+		rec := setup.postJSON("/api/v1/agent/conversations/"+convID+"/chat", ChatRequest{Message: "follow up"})
 
 		assert.Equal(t, http.StatusAccepted, rec.Code)
 
@@ -375,7 +375,7 @@ func TestAPI_HandleChat(t *testing.T) {
 		setup := newAPITestSetup(t, true, true, "")
 		convID := setup.createConversation(t, "hello")
 
-		rec := setup.postJSON("/api/v2/agent/conversations/"+convID+"/chat", ChatRequest{Message: ""})
+		rec := setup.postJSON("/api/v1/agent/conversations/"+convID+"/chat", ChatRequest{Message: ""})
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
@@ -386,7 +386,7 @@ func TestAPI_HandleChat(t *testing.T) {
 		setup := newAPITestSetup(t, true, true, "")
 		convID := setup.createConversation(t, "hello")
 
-		req := httptest.NewRequest(http.MethodPost, "/api/v2/agent/conversations/"+convID+"/chat", bytes.NewReader([]byte("invalid")))
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/conversations/"+convID+"/chat", bytes.NewReader([]byte("invalid")))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		setup.router.ServeHTTP(rec, req)
@@ -402,7 +402,7 @@ func TestAPI_HandleStream(t *testing.T) {
 		t.Parallel()
 
 		setup := newAPITestSetup(t, true, false, "")
-		rec := setup.get("/api/v2/agent/conversations/non-existent/stream")
+		rec := setup.get("/api/v1/agent/conversations/non-existent/stream")
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
@@ -414,7 +414,7 @@ func TestAPI_HandleStream(t *testing.T) {
 		convID := setup.createConversation(t, "hello")
 
 		ctx, cancel := context.WithCancel(context.Background())
-		req := httptest.NewRequest(http.MethodGet, "/api/v2/agent/conversations/"+convID+"/stream", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/agent/conversations/"+convID+"/stream", nil)
 		req = req.WithContext(ctx)
 		rec := httptest.NewRecorder()
 

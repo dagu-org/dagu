@@ -1,4 +1,4 @@
-import { components } from '@/api/v2/schema';
+import { components } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,

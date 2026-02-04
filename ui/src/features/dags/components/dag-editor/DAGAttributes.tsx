@@ -4,7 +4,7 @@
  * @module features/dags/components/dag-editor
  */
 import { Calendar, CheckSquare, Settings, Tag } from 'lucide-react';
-import { components } from '../../../../api/v2/schema';
+import { components } from '../../../../api/v1/schema';
 import { Badge } from '../../../../components/ui/badge';
 
 /**

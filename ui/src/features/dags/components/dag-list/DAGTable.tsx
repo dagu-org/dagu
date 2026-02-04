@@ -29,7 +29,7 @@ import React, {
   useState,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { components, Status } from '../../../../api/v2/schema';
+import { components, Status } from '../../../../api/v1/schema';
 import type { Config } from '../../../../contexts/ConfigContext';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';

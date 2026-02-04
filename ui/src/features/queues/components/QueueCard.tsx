@@ -1,8 +1,8 @@
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import React from 'react';
 import useSWR from 'swr';
-import type { components } from '../../../api/v2/schema';
-import { PathsQueuesNameItemsGetParametersQueryType } from '../../../api/v2/schema';
+import type { components } from '../../../api/v1/schema';
+import { PathsQueuesNameItemsGetParametersQueryType } from '../../../api/v1/schema';
 import { Button } from '../../../components/ui/button';
 import {
   Tooltip,

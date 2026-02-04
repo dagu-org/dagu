@@ -1,4 +1,4 @@
-import { components } from '../../../api/v2/schema';
+import { components } from '../../../api/v1/schema';
 
 export function getEventHandlers(s: components['schemas']['DAGRunDetails']) {
   const ret: components['schemas']['Node'][] = [];

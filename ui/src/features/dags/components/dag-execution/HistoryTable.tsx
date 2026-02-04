@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { components } from '../../../../api/v2/schema';
+import { components } from '../../../../api/v1/schema';
 import dayjs from '../../../../lib/dayjs';
 import HistoryTableRow from './HistoryTableRow';
 

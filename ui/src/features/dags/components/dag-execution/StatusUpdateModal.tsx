@@ -11,7 +11,7 @@ import {
 } from '@/ui/CustomDialog';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import React from 'react';
-import { components, NodeStatus } from '../../../../api/v2/schema';
+import { components, NodeStatus } from '../../../../api/v1/schema';
 
 /**
  * Props for the StatusUpdateModal component

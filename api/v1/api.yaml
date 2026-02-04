@@ -1,0 +1,6077 @@
+# yaml-language-server: $schema=oapi_20241018_mod.json
+openapi: "3.0.0"
+info:
+  version: "1.0.0"
+  title: "Dagu"
+  contact:
+    name: "Yota Hamada"
+    url: "https://github.com/yottahmd"
+  description: API for controlling and monitoring Dagu server.
+  license:
+    name: "GPL-3.0"
+    url: "https://github.com/dagu-org/dagu/blob/main/LICENSE.md"
+
+servers:
+  - url: "{schema}://{host}/api/v1"
+    description: "Dagu API server"
+    variables:
+      schema:
+        default: http
+        enum: [http, https]
+      host:
+        default: localhost
+        description: "Host name of the server"
+
+tags:
+  - name: "dags"
+    description: "Operations for managing and creating DAG definitions"
+  - name: "dag-runs"
+    description: "Operations for retrieving historical data and logs of DAG-run executions"
+  - name: "system"
+    description: "System operations for monitoring and managing the Dagu server"
+  - name: "monitoring"
+    description: "Prometheus-compatible metrics for monitoring Dagu operations"
+  - name: "queues"
+    description: "Operations for managing and monitoring execution queues"
+  - name: "auth"
+    description: "Authentication operations (login, logout, token management)"
+  - name: "users"
+    description: "User management operations (CRUD, password management)"
+  - name: "api-keys"
+    description: "API key management operations (admin only)"
+  - name: "webhooks"
+    description: "Webhook endpoints for triggering DAG execution"
+  - name: "audit"
+    description: "Audit log operations (admin only)"
+  - name: "sync"
+    description: "Git synchronization operations for DAGs"
+  - name: "agent"
+    description: "AI Agent configuration operations (admin only)"
+
+paths:
+  /health:
+    get:
+      summary: "Check server health status"
+      description: "Returns health information about the Dagu server"
+      operationId: "getHealthStatus"
+      tags:
+        - "system"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        default:
+          description: "Unexpected error"
+
+  /auth/login:
+    post:
+      summary: "Authenticate user and obtain JWT token"
+      description: "Authenticates a user with username and password, returns a JWT token on success"
+      operationId: "login"
+      tags:
+        - "auth"
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: "Authentication successful"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: "Invalid credentials"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/me:
+    get:
+      summary: "Get current authenticated user"
+      description: "Returns information about the currently authenticated user"
+      operationId: "getCurrentUser"
+      tags:
+        - "auth"
+      responses:
+        "200":
+          description: "Current user information"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/change-password:
+    post:
+      summary: "Change current user's password"
+      description: "Allows the authenticated user to change their own password"
+      operationId: "changePassword"
+      tags:
+        - "auth"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+      responses:
+        "200":
+          description: "Password changed successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: "Invalid request (e.g., weak password)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated or wrong current password"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /users:
+    get:
+      summary: "List all users"
+      description: "Returns a list of all users. Requires admin role."
+      operationId: "listUsers"
+      tags:
+        - "users"
+      responses:
+        "200":
+          description: "List of users"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsersListResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Create a new user"
+      description: "Creates a new user account. Requires admin role."
+      operationId: "createUser"
+      tags:
+        - "users"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: "User created successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          description: "Invalid request (e.g., weak password, invalid role)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Conflict - username already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /users/{userId}:
+    get:
+      summary: "Get user by ID"
+      description: "Returns a specific user by their ID. Requires admin role."
+      operationId: "getUser"
+      tags:
+        - "users"
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: "User details"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "User not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    patch:
+      summary: "Update user"
+      description: "Updates a user's information. Requires admin role."
+      operationId: "updateUser"
+      tags:
+        - "users"
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: "User updated successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "User not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Conflict - username already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Delete user"
+      description: "Deletes a user account. Requires admin role. Cannot delete yourself."
+      operationId: "deleteUser"
+      tags:
+        - "users"
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "204":
+          description: "User deleted successfully"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - requires admin role or cannot delete self"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "User not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /users/{userId}/reset-password:
+    post:
+      summary: "Reset user's password"
+      description: "Resets a user's password to a new value. Requires admin role."
+      operationId: "resetUserPassword"
+      tags:
+        - "users"
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+      responses:
+        "200":
+          description: "Password reset successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: "Invalid request (e.g., weak password)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "User not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # API Key Management (Admin only)
+  /api-keys:
+    get:
+      summary: "List all API keys"
+      description: "Returns all API keys. Requires admin role."
+      operationId: "listAPIKeys"
+      tags:
+        - "api-keys"
+      responses:
+        "200":
+          description: "List of API keys"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIKeysListResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Create API key"
+      description: "Full key returned only in this response"
+      operationId: "createAPIKey"
+      tags:
+        - "api-keys"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAPIKeyRequest"
+      responses:
+        "201":
+          description: "Created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateAPIKeyResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Name already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api-keys/{keyId}:
+    get:
+      summary: "Get API key"
+      description: "Returns API key by ID. Requires admin role."
+      operationId: "getAPIKey"
+      tags:
+        - "api-keys"
+      parameters:
+        - $ref: "#/components/parameters/APIKeyId"
+      responses:
+        "200":
+          description: "API key details"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIKeyResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    patch:
+      summary: "Update API key"
+      description: "Updates API key info. Requires admin role."
+      operationId: "updateAPIKey"
+      tags:
+        - "api-keys"
+      parameters:
+        - $ref: "#/components/parameters/APIKeyId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAPIKeyRequest"
+      responses:
+        "200":
+          description: "Updated API key"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIKeyResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Name already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Delete API key"
+      description: "Revokes an API key. Requires admin role."
+      operationId: "deleteAPIKey"
+      tags:
+        - "api-keys"
+      parameters:
+        - $ref: "#/components/parameters/APIKeyId"
+      responses:
+        "204":
+          description: "API key deleted"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /workers:
+    get:
+      summary: "List distributed workers"
+      description: "Retrieves information about distributed workers connected to the coordinator"
+      operationId: "getWorkers"
+      tags:
+        - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkersListResponse"
+        "503":
+          description: "Coordinator service unavailable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags:
+    get:
+      summary: "List all available DAGs"
+      description: "Retrieves DAG definitions with optional filtering by name and tags"
+      operationId: "listDAGs"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: "name"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAGs by name"
+        - name: "tags"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAGs by tags (comma-separated). Returns DAGs that have ALL specified tags."
+        - name: "sort"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            enum: ["name", "nextRun"]
+            default: "name"
+          description: |
+            Field to sort by:
+            - `name`: Sort alphabetically by DAG name (case-insensitive)
+            - `nextRun`: Sort by next scheduled run time. DAGs with earlier next run times appear first in ascending order. DAGs without schedules appear last.
+        - name: "order"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            enum: ["asc", "desc"]
+            default: "asc"
+          description: "Sort order (ascending or descending)"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dags:
+                    type: array
+                    description: "List of DAG definitions with their status and metadata"
+                    items:
+                      $ref: "#/components/schemas/DAGFile"
+                  errors:
+                    type: array
+                    description: "List of errors encountered during the request"
+                    items:
+                      type: string
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+                required:
+                  - dags
+                  - errors
+                  - pagination
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Create a new DAG definition"
+      description: "Creates a new empty DAG file with the specified name"
+      operationId: "createNewDAG"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  $ref: "#/components/schemas/DAGName"
+                spec:
+                  type: string
+                  description: "Optional DAG spec in YAML format to initialize the DAG. If provided, the spec will be validated before creation."
+              required:
+                - name
+      responses:
+        "201":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: "Name of the newly created DAG"
+                required:
+                  - name
+        "400":
+          description: "Invalid DAG spec"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /dags/validate:
+    post:
+      summary: "Validate a DAG specification"
+      description: |
+        Validates a DAG YAML specification without persisting any changes.
+
+        Returns a list of validation errors. When the spec can be partially parsed,
+        the response may also include parsed DAG details built with error-tolerant loading.
+      operationId: "validateDAGSpec"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                spec:
+                  type: string
+                  description: "DAG specification in YAML format"
+                name:
+                  type: string
+                  description: "Optional name to use when the spec omits a name"
+              required:
+                - spec
+      responses:
+        "200":
+          description: "Validation result"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                    description: "True if the spec is valid (no errors)"
+                  dag:
+                    $ref: "#/components/schemas/DAGDetails"
+                  errors:
+                    type: array
+                    description: "List of validation errors"
+                    items:
+                      type: string
+                required:
+                  - valid
+                  - errors
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /dags/{fileName}:
+    get:
+      summary: "Retrieve comprehensive DAG information"
+      description: "Fetches detailed information about a specific DAG definition"
+      operationId: "getDAGDetails"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                description: "Response object for getting details of a DAG"
+                properties:
+                  dag:
+                    $ref: "#/components/schemas/DAGDetails"
+                  localDags:
+                    type: array
+                    description: "List of local DAGs that are part of this DAG"
+                    items:
+                      $ref: "#/components/schemas/LocalDag"
+                  latestDAGRun:
+                    $ref: "#/components/schemas/DAGRunDetails"
+                  suspended:
+                    type: boolean
+                    description: "Whether the DAG is suspended"
+                  errors:
+                    type: array
+                    description: "List of errors encountered during the request"
+                    items:
+                      type: string
+                  spec:
+                    type: string
+                    description: "The DAG specification in YAML format"
+                required:
+                  - latestDAGRun
+                  - suspended
+                  - localDags
+                  - errors
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Delete an existing DAG"
+      description: "Permanently removes a DAG definition from the system"
+      operationId: "deleteDAG"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "204":
+          description: "DAG successfully deleted"
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/start:
+    post:
+      summary: "Create and execute a DAG-run from DAG"
+      description: "Creates a DAG-run from the DAG definition and starts its execution with optional parameters"
+      operationId: "executeDAG"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                params:
+                  type: string
+                  description: "Parameters to pass to the DAG-run in JSON format"
+                dagRunId:
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "Optional ID for the DAG-run, if not provided a new one will be generated"
+                dagName:
+                  type: string
+                  description: "Optional DAG name override to use for the created dag-run"
+                singleton:
+                  type: boolean
+                  description: "If true, prevent starting if DAG is already running (returns 409 conflict)"
+                  default: false
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dagRunId:
+                    $ref: "#/components/schemas/DAGRunId"
+                required:
+                  - dagRunId
+        "409":
+          description: "DAG is already running (singleton mode)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/start-sync:
+    post:
+      summary: "Execute DAG synchronously and wait for completion"
+      description: |
+        Creates a DAG-run from the DAG definition, starts its execution, waits for it to complete (or timeout), and returns the full execution details including node statuses.
+
+        **Important behaviors:**
+        - If the timeout is exceeded, the DAG run continues executing in the background. The 408 response includes the `dagRunId` so clients can monitor or cancel the run.
+        - If the DAG reaches a 'waiting' status (human-in-the-loop approval needed), the endpoint returns immediately with 200 and the current status.
+      operationId: "executeDAGSync"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - timeout
+              properties:
+                params:
+                  type: string
+                  description: "Parameters to pass to the DAG-run in JSON format"
+                dagRunId:
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "Optional ID for the DAG-run, if not provided a new one will be generated"
+                dagName:
+                  type: string
+                  description: "Optional DAG name override to use for the created dag-run"
+                singleton:
+                  type: boolean
+                  description: "If true, prevent starting if DAG is already running (returns 409 conflict)"
+                  default: false
+                timeout:
+                  type: integer
+                  minimum: 1
+                  maximum: 86400
+                  description: "Maximum seconds to wait for DAG execution to complete (required)"
+      responses:
+        "200":
+          description: "DAG-run completed (or reached waiting status)"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - dagRun
+                properties:
+                  dagRun:
+                    $ref: "#/components/schemas/DAGRunDetails"
+        "408":
+          description: "Timeout waiting for DAG execution to complete. The DAG run continues executing in the background."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TimeoutError"
+        "409":
+          description: "DAG is already running (singleton mode) or dagRunId already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/enqueue:
+    post:
+      summary: "Enqueue a DAG-run from DAG"
+      description: "Creates a DAG-run from the DAG definition and adds it to the queue for execution"
+      operationId: "enqueueDAGDAGRun"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                params:
+                  type: string
+                  description: "Parameters to pass to the DAG-run in JSON format"
+                dagRunId:
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "Optional ID for the DAG-run, if not provided a new one will be generated"
+                dagName:
+                  type: string
+                  description: "Optional DAG name override to use for the queued dag-run"
+                queue:
+                  type: string
+                  description: "Override the DAG-level queue definition"
+                singleton:
+                  type: boolean
+                  description: "If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)"
+                  default: false
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dagRunId:
+                    $ref: "#/components/schemas/DAGRunId"
+                required:
+                  - dagRunId
+        "409":
+          description: "DAG is already running or queued (singleton mode)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/dag-runs:
+    get:
+      summary: "Retrieve execution history of a DAG"
+      description: "Fetches history of DAG-runs created from this DAG definition"
+      operationId: "getDAGDAGRunHistory"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dagRuns:
+                    type: array
+                    description: "List of historical DAG-runs created from this DAG"
+                    items:
+                      $ref: "#/components/schemas/DAGRunDetails"
+                  gridData:
+                    type: array
+                    description: "Grid data for visualization"
+                    items:
+                      $ref: "#/components/schemas/DAGGridItem"
+                required:
+                  - dagRuns
+                  - gridData
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/dag-runs/{dagRunId}:
+    get:
+      summary: "Get detailed status of a specific DAG-run"
+      description: "Retrieves status information about a particular DAG-run created from this DAG"
+      tags:
+        - "dags"
+      operationId: "getDAGDAGRunDetails"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+        - $ref: "#/components/parameters/DAGRunId"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dagRun:
+                    $ref: "#/components/schemas/DAGRunDetails"
+                required:
+                  - dagRun
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/spec:
+    get:
+      summary: "Retrieve DAG specification"
+      description: "Fetches the YAML specification of a DAG definition"
+      operationId: "getDAGSpec"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dag:
+                    $ref: "#/components/schemas/DAGDetails"
+                  spec:
+                    type: string
+                    description: "The DAG spec in YAML format"
+                  errors:
+                    type: array
+                    description: "List of errors in the spec"
+                    items:
+                      type: string
+                required:
+                  - spec
+                  - errors
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      summary: "Update DAG spec"
+      description: "Modifies the YAML specification of a DAG definition"
+      operationId: "updateDAGSpec"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                spec:
+                  type: string
+                  description: "The new DAG spec in YAML format"
+              required:
+                - spec
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: array
+                    description: "List of errors in the spec"
+                    items:
+                      type: string
+                required:
+                  - errors
+
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/suspend:
+    post:
+      summary: "Toggle DAG suspension state"
+      description: "Controls whether the scheduler should create DAG-runs from this DAG according to its defined cron schedule"
+      operationId: "updateDAGSuspensionState"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                suspend:
+                  type: boolean
+                  description: "Suspend status to set for the DAG"
+              required:
+                - suspend
+      responses:
+        "200":
+          description: "A successful response"
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/rename:
+    post:
+      summary: "Change DAG file ID"
+      description: "Changes the file ID of the DAG definition"
+      operationId: "renameDAG"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newFileName:
+                  type: string
+                  description: "New file name for the DAG"
+              required:
+                - newFileName
+      responses:
+        "200":
+          description: "A successful response"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/stop-all:
+    post:
+      summary: "Stop all running instances of a DAG"
+      description: "Terminates all currently running DAG-runs for the specified DAG"
+      operationId: "stopAllDAGRuns"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "Successfully stopped all running instances"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    description: "Errors encountered"
+                    items:
+                      type: string
+                    type: array
+                required:
+                  - errors
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/search:
+    get:
+      summary: "Search DAGs"
+      description: "Performs a full-text search across all DAG definitions"
+      operationId: "searchDAGs"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: "q"
+          in: "query"
+          required: true
+          schema:
+            type: "string"
+          description: "A search query string"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                description: "Response object for searching DAGs"
+                properties:
+                  results:
+                    type: array
+                    description: "Search results matching the query"
+                    items:
+                      $ref: "#/components/schemas/SearchResultItem"
+                  errors:
+                    type: array
+                    description: "Errors encountered during the search"
+                    items:
+                      type: string
+                required:
+                  - results
+                  - errors
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/tags:
+    get:
+      summary: "List all available DAG tags"
+      description: "Retrieves all unique tags used across DAG definitions"
+      operationId: "getAllDAGTags"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListTagResponse"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs:
+    get:
+      summary: "List all DAG-runs"
+      description: "Retrieves a list of all DAG-runs with optional filtering by name and status"
+      operationId: "listDAGRuns"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/Status"
+        - $ref: "#/components/parameters/DateTimeFrom"
+        - $ref: "#/components/parameters/DateTimeTo"
+        - $ref: "#/components/parameters/DAGRunIdSearch"
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: "name"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAG-runs by name"
+        - name: "tags"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAG-runs by DAG tags (comma-separated). Returns runs from DAGs that have ALL specified tags."
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dagRuns:
+                    type: array
+                    description: "List of DAG-runs with their status and metadata"
+                    items:
+                      $ref: "#/components/schemas/DAGRunSummary"
+                required:
+                  - dagRuns
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Create and execute a DAG-run from inline spec"
+      description: |
+        Creates a DAG-run directly from a provided DAG specification (YAML) and starts execution.
+
+        This endpoint does not require a pre-existing DAG file; the supplied `spec` is parsed and validated
+        similarly to `/dags/validate`, and the run is executed immediately if valid.
+      operationId: "executeDAGRunFromSpec"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                spec:
+                  type: string
+                  description: "DAG specification in YAML format"
+                name:
+                  type: string
+                  description: "Optional name to use when the spec omits a name"
+                params:
+                  type: string
+                  description: "Parameters to pass to the DAG-run in JSON format"
+                dagRunId:
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "Optional ID for the DAG-run; if omitted, a new one is generated"
+                singleton:
+                  type: boolean
+                  description: "If true, prevent starting if a DAG with the same name is already running (returns 409)"
+                  default: false
+              required:
+                - spec
+      responses:
+        "200":
+          description: "Run created and started"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dagRunId:
+                    $ref: "#/components/schemas/DAGRunId"
+                required:
+                  - dagRunId
+        "400":
+          description: "Invalid DAG spec or parameters"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "A DAG with the same name is already running and singleton is enabled"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/enqueue:
+    post:
+      summary: "Enqueue a DAG-run from inline spec"
+      description: |
+        Creates a DAG-run directly from a provided DAG specification (YAML) and enqueues it for execution.
+
+        This endpoint does not require a pre-existing DAG file; the supplied `spec` is parsed and validated
+        similarly to `/dags/validate`, and the run is persisted to the queue if valid.
+      operationId: "enqueueDAGRunFromSpec"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                spec:
+                  type: string
+                  description: "DAG specification in YAML format"
+                name:
+                  type: string
+                  description: "Optional name to use when the spec omits a name"
+                params:
+                  type: string
+                  description: "Parameters to persist with the queued DAG-run in JSON format"
+                dagRunId:
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "Optional ID for the DAG-run; if omitted a new one will be generated"
+                queue:
+                  type: string
+                  description: "Override the queue to use for this DAG-run"
+              required:
+                - spec
+      responses:
+        "200":
+          description: "DAG-run successfully enqueued"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dagRunId:
+                    $ref: "#/components/schemas/DAGRunId"
+                required:
+                  - dagRunId
+        "400":
+          description: "Invalid DAG spec or parameters"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "A DAG with the same name is already queued beyond maxActiveRuns"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}:
+    get:
+      summary: "List all DAG-runs with a specific name"
+      description: "Retrieves a list of all DAG-runs with optional filtering by name and status"
+      operationId: "listDAGRunsByName"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/Status"
+        - $ref: "#/components/parameters/DateTimeFrom"
+        - $ref: "#/components/parameters/DateTimeTo"
+        - $ref: "#/components/parameters/DAGRunName"
+        - $ref: "#/components/parameters/DAGRunIdSearch"
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dagRuns:
+                    type: array
+                    description: "List of DAG-runs with their status and metadata"
+                    items:
+                      $ref: "#/components/schemas/DAGRunSummary"
+                required:
+                  - dagRuns
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}:
+    get:
+      summary: "Retrieve detailed status of a DAG-run"
+      description: "Fetches detailed status information about a specific DAG-run. Use 'latest' as the dagRunId to retrieve the most recent DAG-run for the specified DAG name."
+      operationId: "getDAGRunDetails"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dagRunDetails:
+                    $ref: "#/components/schemas/DAGRunDetails"
+                required:
+                  - dagRunDetails
+        "404":
+          description: "DAGRun not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/spec:
+    get:
+      summary: "Retrieve DAG specification for a DAG-run"
+      description: "Fetches the YAML specification of the DAG definition associated with this DAG-run"
+      operationId: "getDAGRunSpec"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  spec:
+                    type: string
+                    description: "The DAG spec in YAML format"
+                required:
+                  - spec
+        "404":
+          description: "DAG-run or DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/reschedule:
+    post:
+      summary: "Reschedule DAG-run with a new run ID"
+      description: "Launch a fresh DAG-run from a historic execution while reusing its stored parameters."
+      operationId: "rescheduleDAGRun"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dagRunId:
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "Explicit run ID for the new DAG-run; if omitted a new ID is generated."
+                dagName:
+                  type: string
+                  description: "Optional DAG name override for the new run."
+      responses:
+        "200":
+          description: "Successfully scheduled a new DAG-run"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dagRunId:
+                    $ref: "#/components/schemas/DAGRunId"
+                  queued:
+                    type: boolean
+                    description: "Indicates whether the run was queued instead of starting immediately."
+                required:
+                  - dagRunId
+                  - queued
+        "400":
+          description: "Invalid request parameters"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Historic run not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Conflict (run ID already exists or concurrency guard blocks execution)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs:
+    get:
+      summary: "Get sub DAG runs with timing info"
+      description: "Retrieves timing and status information for all sub DAG runs (including repeated executions) of a specific step. When parentSubDAGRunId is provided, returns sub-runs of that specific sub DAG run (for multi-level nested DAGs)."
+      operationId: "getSubDAGRuns"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "parentSubDAGRunId"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Optional parent sub DAG run ID. When provided, returns sub-runs of this specific sub DAG run instead of the root DAG run. Used for multi-level nested DAGs."
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subRuns:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SubDAGRunDetail"
+                required:
+                  - subRuns
+        "404":
+          description: "DAG run not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/dequeue:
+    get:
+      summary: "Dequeue a queued DAG-run"
+      description: "Dequeue a DAG-run execution that is currently queued"
+      operationId: "dequeueDAGRun"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+      responses:
+        "200":
+          description: "A successful response"
+        "404":
+          description: "DAGRun not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/log:
+    get:
+      summary: "Retrieve full execution log of a DAG-run"
+      description: "Fetches the execution log for a DAG-run"
+      operationId: "getDAGRunLog"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - $ref: "#/components/parameters/Tail"
+        - $ref: "#/components/parameters/Head"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Log"
+        "404":
+          description: "Log file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/log/download:
+    get:
+      summary: "Download full execution log of a DAG-run"
+      description: "Downloads the entire execution log file for a DAG-run"
+      operationId: "downloadDAGRunLog"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+      responses:
+        "200":
+          description: "Log file content"
+          headers:
+            Content-Disposition:
+              schema:
+                type: "string"
+              description: "Attachment filename"
+          content:
+            text/plain:
+              schema:
+                type: "string"
+        "404":
+          description: "Log file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/outputs:
+    get:
+      summary: "Retrieve collected outputs from a DAG-run"
+      description: "Fetches the outputs.json file containing all step outputs collected during the DAG-run execution. Returns the outputs as a JSON object where keys are the output names (converted from UPPER_CASE to camelCase by default, or custom key if specified) and values are the captured output strings."
+      operationId: "getDAGRunOutputs"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+      responses:
+        "200":
+          description: "Successfully retrieved outputs. Returns the collected outputs with metadata. If the DAG-run completed but captured no outputs, returns an empty outputs object."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DAGRunOutputs"
+        "404":
+          description: "DAG-run not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/retry:
+    post:
+      summary: "Retry DAG-run execution"
+      description: "Creates a new DAG-run based on a previous execution"
+      operationId: "retryDAGRun"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dagRunId:
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunId"
+                    - description: "ID of the DAG-run to retry"
+                stepName:
+                  type: string
+                  description: "Optional. If provided, only this step will be retried."
+              required:
+                - dagRunId
+      responses:
+        "200":
+          description: "A successful response"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/stop:
+    post:
+      summary: "Terminate a running DAG-run"
+      description: "Forcefully stops a running DAG-run created from this DAG"
+      operationId: "terminateDAGRun"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+      responses:
+        "200":
+          description: "A successful response"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/steps/{stepName}/log:
+    get:
+      summary: "Retrieve log for a specific step in a DAG-run"
+      description: "Fetches the log for an individual step in a DAG-run"
+      operationId: "getDAGRunStepLog"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - $ref: "#/components/parameters/StepName"
+        - $ref: "#/components/parameters/Tail"
+        - $ref: "#/components/parameters/Head"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Stream"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Log"
+        "404":
+          description: "Log file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/steps/{stepName}/log/download:
+    get:
+      summary: "Download log for a specific step in a DAG-run"
+      description: "Downloads the entire log file for an individual step in a DAG-run"
+      operationId: "downloadDAGRunStepLog"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - $ref: "#/components/parameters/StepName"
+        - $ref: "#/components/parameters/Stream"
+      responses:
+        "200":
+          description: "Log file content"
+          headers:
+            Content-Disposition:
+              schema:
+                type: "string"
+              description: "Attachment filename"
+          content:
+            text/plain:
+              schema:
+                type: "string"
+        "404":
+          description: "Log file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/steps/{stepName}/messages:
+    get:
+      summary: "Retrieve chat messages for a step"
+      description: "Fetches the LLM chat message history for a chat step. Returns empty array for non-chat steps."
+      operationId: "getDAGRunStepMessages"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - $ref: "#/components/parameters/StepName"
+      responses:
+        "200":
+          description: "Chat messages retrieved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessagesResponse"
+        "404":
+          description: "DAG-run or step not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/steps/{stepName}/status:
+    patch:
+      summary: "Manually update a step's execution status"
+      description: "Changes the status of a specific step within a DAG-run"
+      operationId: "updateDAGRunStepStatus"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - $ref: "#/components/parameters/StepName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  $ref: "#/components/schemas/NodeStatus"
+              required:
+                - status
+      responses:
+        "200":
+          description: "A successful response"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "DAGRun or step not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/steps/{stepName}/approve:
+    post:
+      summary: "Approve a waiting step for HITL"
+      description: "Approves a step that is in Waiting status, optionally providing input parameters that will be available as environment variables in subsequent steps"
+      operationId: "approveDAGRunStep"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - $ref: "#/components/parameters/StepName"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveStepRequest"
+      responses:
+        "200":
+          description: "Step approved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApproveStepResponse"
+        "400":
+          description: "Step is not in Waiting status or required inputs missing"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "DAG-run or step not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/steps/{stepName}/reject:
+    post:
+      summary: "Reject a waiting step for HITL"
+      description: "Rejects a step that is in Waiting status, optionally providing a reason for rejection"
+      operationId: "rejectDAGRunStep"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - $ref: "#/components/parameters/StepName"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectStepRequest"
+      responses:
+        "200":
+          description: "Step rejected successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RejectStepResponse"
+        "400":
+          description: "Step is not in Waiting status"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "DAG-run or step not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}:
+    get:
+      summary: "Retrieve detailed status of a sub DAG-run"
+      description: "Fetches detailed status information about a specific sub DAG-run"
+      operationId: "getSubDAGRunDetails"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run to retrieve details for"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dagRunDetails:
+                    $ref: "#/components/schemas/DAGRunDetails"
+                required:
+                  - dagRunDetails
+        "404":
+          description: "Sub DAG-run not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/spec:
+    get:
+      summary: "Get Sub-DAG Run Specification"
+      description: "Returns the YAML specification used for a specific sub-DAG run"
+      operationId: "getSubDAGRunSpec"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run to retrieve the spec for"
+      responses:
+        "200":
+          description: "Sub-DAG specification retrieved successfully"
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - spec
+                properties:
+                  spec:
+                    type: string
+                    description: "YAML specification of the sub-DAG"
+        "404":
+          description: "Sub-DAG run not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/log:
+    get:
+      summary: "Retrieve log for a specific sub DAG-run"
+      description: "Fetches the log for an individual sub DAG-run"
+      operationId: "getSubDAGRunLog"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - $ref: "#/components/parameters/Tail"
+        - $ref: "#/components/parameters/Head"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run to retrieve the log for"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Log"
+        "404":
+          description: "Log file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/log/download:
+    get:
+      summary: "Download log for a specific sub DAG-run"
+      description: "Downloads the entire log file for an individual sub DAG-run"
+      operationId: "downloadSubDAGRunLog"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run to download the log for"
+      responses:
+        "200":
+          description: "Log file content"
+          headers:
+            Content-Disposition:
+              schema:
+                type: "string"
+              description: "Attachment filename"
+          content:
+            text/plain:
+              schema:
+                type: "string"
+        "404":
+          description: "Log file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log:
+    get:
+      summary: "Retrieve log for a specific step in a sub DAG-run"
+      description: "Fetches the log for an individual step in a sub DAG-run"
+      operationId: "getSubDAGRunStepLog"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - $ref: "#/components/parameters/Tail"
+        - $ref: "#/components/parameters/Head"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Stream"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run to retrieve the log for"
+        - $ref: "#/components/parameters/StepName"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Log"
+        "404":
+          description: "Log file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/log/download:
+    get:
+      summary: "Download log for a specific step in a sub DAG-run"
+      description: "Downloads the entire log file for an individual step in a sub DAG-run"
+      operationId: "downloadSubDAGRunStepLog"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run to download the step log for"
+        - $ref: "#/components/parameters/StepName"
+        - $ref: "#/components/parameters/Stream"
+      responses:
+        "200":
+          description: "Log file content"
+          headers:
+            Content-Disposition:
+              schema:
+                type: "string"
+              description: "Attachment filename"
+          content:
+            text/plain:
+              schema:
+                type: "string"
+        "404":
+          description: "Log file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/messages:
+    get:
+      summary: "Retrieve chat messages for a step in a sub DAG-run"
+      description: "Fetches the LLM chat message history for a chat step in a sub DAG-run. Returns empty array for non-chat steps."
+      operationId: "getSubDAGRunStepMessages"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run"
+        - $ref: "#/components/parameters/StepName"
+      responses:
+        "200":
+          description: "Chat messages retrieved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessagesResponse"
+        "404":
+          description: "Sub DAG-run or step not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/status:
+    patch:
+      summary: "Manually update a step's execution status in a sub DAG-run"
+      description: "Changes the status of a specific step within a sub DAG-run"
+      operationId: "updateSubDAGRunStepStatus"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run to update the step status for"
+        - $ref: "#/components/parameters/StepName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  $ref: "#/components/schemas/NodeStatus"
+              required:
+                - status
+      responses:
+        "200":
+          description: "A successful response"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "DAGRun or step not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/approve:
+    post:
+      summary: "Approve a waiting step in a sub DAG-run for HITL"
+      description: "Approves a step that is in Waiting status within a sub DAG-run, optionally providing input parameters that will be available as environment variables in subsequent steps"
+      operationId: "approveSubDAGRunStep"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run containing the step to approve"
+        - $ref: "#/components/parameters/StepName"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveStepRequest"
+      responses:
+        "200":
+          description: "Step approved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApproveStepResponse"
+        "400":
+          description: "Step is not in Waiting status or required inputs missing"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Sub DAG-run or step not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/steps/{stepName}/reject:
+    post:
+      summary: "Reject a waiting step in a sub DAG-run for HITL"
+      description: "Rejects a step that is in Waiting status within a sub DAG-run, optionally providing a reason for rejection"
+      operationId: "rejectSubDAGRunStep"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run containing the step to reject"
+        - $ref: "#/components/parameters/StepName"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectStepRequest"
+      responses:
+        "200":
+          description: "Step rejected successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RejectStepResponse"
+        "400":
+          description: "Step is not in Waiting status"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Sub DAG-run or step not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /queues:
+    get:
+      summary: "List all execution queues with summary statistics"
+      description: "Returns queue list with running/queued counts. Use /queues/{name}/items for paginated item details."
+      operationId: "listQueues"
+      tags:
+        - "queues"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueuesResponse"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /queues/{name}/items:
+    get:
+      summary: "Get paginated items for a specific queue"
+      description: "Returns paginated list of running or queued DAG-runs for the specified queue"
+      operationId: "listQueueItems"
+      tags:
+        - "queues"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - name: name
+          in: path
+          description: "Queue name"
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: query
+          description: "Item type to fetch"
+          required: false
+          schema:
+            type: string
+            enum: ["running", "queued"]
+            default: "queued"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueItemsResponse"
+        "404":
+          description: "Queue not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /services/resources/history:
+    get:
+      summary: "Get resource usage history"
+      description: "Returns historical data for system resources"
+      operationId: "getResourceHistory"
+      tags:
+        - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: duration
+          in: query
+          description: "Duration of history to retrieve (e.g., 30m, 1h)"
+          required: false
+          schema:
+            type: string
+            default: "1h"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceHistory"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /services/scheduler:
+    get:
+      summary: "Get scheduler service status"
+      description: "Returns status information about all registered scheduler instances"
+      operationId: "getSchedulerStatus"
+      tags:
+        - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchedulerStatusResponse"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /services/coordinator:
+    get:
+      summary: "Get coordinator service status"
+      description: "Returns status information about all registered coordinator instances"
+      operationId: "getCoordinatorStatus"
+      tags:
+        - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CoordinatorStatusResponse"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /services/tunnel:
+    get:
+      summary: "Get tunnel service status"
+      description: "Returns status information about the tunnel service (Tailscale)"
+      operationId: "getTunnelStatus"
+      tags:
+        - "system"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TunnelStatusResponse"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /metrics:
+    get:
+      summary: "Get Prometheus metrics"
+      description: "Returns Prometheus-compatible metrics for monitoring Dagu operations"
+      operationId: "getMetrics"
+      tags:
+        - "monitoring"
+      responses:
+        "200":
+          description: "Prometheus metrics in text format"
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  # HELP dagu_info Dagu build information
+                  # TYPE dagu_info gauge
+                  dagu_info{version="1.14.0",build_date="2024-01-01T12:00:00Z",go_version="1.21"} 1
+
+                  # HELP dagu_uptime_seconds Time since server start
+                  # TYPE dagu_uptime_seconds gauge
+                  dagu_uptime_seconds 3600
+
+                  # HELP dagu_dag_runs_currently_running Number of currently running DAG runs
+                  # TYPE dagu_dag_runs_currently_running gauge
+                  dagu_dag_runs_currently_running 5
+
+                  # HELP dagu_dag_runs_queued_total Total number of DAG runs in queue
+                  # TYPE dagu_dag_runs_queued_total gauge
+                  dagu_dag_runs_queued_total 8
+
+                  # HELP dagu_dag_runs_total Total number of DAG runs by status
+                  # TYPE dagu_dag_runs_total counter
+                  dagu_dag_runs_total{status="success"} 2493
+                  dagu_dag_runs_total{status="error"} 15
+                  dagu_dag_runs_total{status="aborted"} 7
+
+                  # HELP dagu_dags_total Total number of DAGs
+                  # TYPE dagu_dags_total gauge
+                  dagu_dags_total 45
+
+                  # HELP dagu_scheduler_running Whether the scheduler is running
+                  # TYPE dagu_scheduler_running gauge
+                  dagu_scheduler_running 1
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /webhooks/{fileName}:
+    post:
+      summary: "Trigger DAG execution via webhook"
+      description: |
+        Triggers a DAG execution via webhook. The DAG must have a webhook configured
+        and enabled. Authentication is performed using a bearer token generated when
+        the webhook was created (format: 'dagu_wh_...').
+
+        The request body is passed to the DAG as the WEBHOOK_PAYLOAD environment
+        variable. The DAG run is enqueued and the endpoint returns immediately
+        with the dag-run ID.
+      operationId: "triggerWebhook"
+      tags:
+        - "webhooks"
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/DAGFileName"
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: Authorization
+          in: header
+          required: false
+          schema:
+            type: string
+          description: "Bearer token for webhook authentication (e.g., 'Bearer dagu_wh_...'). Required for authentication but marked optional in schema so the handler can return proper 401 responses."
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookRequest"
+      responses:
+        "200":
+          description: "DAG run triggered successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookResponse"
+        "400":
+          description: "Invalid request body"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Unauthorized - missing or invalid token"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - webhook disabled or not configured"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "DAG or webhook not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Conflict - DAG run with the specified dagRunId already exists"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /webhooks:
+    get:
+      summary: "List all webhooks"
+      description: "Returns a list of all webhooks across all DAGs. Admin only."
+      operationId: "listWebhooks"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "List of webhooks"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookListResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/webhook:
+    get:
+      summary: "Get webhook for DAG"
+      description: "Returns the webhook configuration for a specific DAG, if one exists."
+      operationId: "getDAGWebhook"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "Webhook configuration"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDetails"
+        "404":
+          description: "No webhook configured for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      summary: "Create webhook for DAG"
+      description: |
+        Creates a new webhook for the specified DAG. Returns the full webhook token,
+        which is only shown once. Store it securely.
+      operationId: "createDAGWebhook"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "201":
+          description: "Webhook created successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookCreateResponse"
+        "409":
+          description: "Webhook already exists for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Delete webhook for DAG"
+      description: "Removes the webhook configuration for the specified DAG."
+      operationId: "deleteDAGWebhook"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "204":
+          description: "Webhook deleted successfully"
+        "404":
+          description: "No webhook configured for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/webhook/regenerate:
+    post:
+      summary: "Regenerate webhook token"
+      description: |
+        Generates a new token for the existing webhook. The old token becomes
+        invalid immediately. Returns the new token, which is only shown once.
+      operationId: "regenerateDAGWebhookToken"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "Token regenerated successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookCreateResponse"
+        "404":
+          description: "No webhook configured for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/webhook/toggle:
+    post:
+      summary: "Toggle webhook enabled state"
+      description: "Enables or disables the webhook without changing the token."
+      operationId: "toggleDAGWebhook"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookToggleRequest"
+      responses:
+        "200":
+          description: "Webhook toggled successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDetails"
+        "404":
+          description: "No webhook configured for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /audit:
+    get:
+      summary: "List audit log entries"
+      description: "Returns audit log entries matching the filter criteria. Admin only."
+      operationId: "listAuditLogs"
+      tags:
+        - "audit"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: category
+          in: query
+          description: "Filter by audit category (e.g., terminal, user, dag)"
+          required: false
+          schema:
+            type: string
+        - name: userId
+          in: query
+          description: "Filter by user ID"
+          required: false
+          schema:
+            type: string
+        - name: startTime
+          in: query
+          description: "Filter entries after this time (ISO 8601 format)"
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: endTime
+          in: query
+          description: "Filter entries before this time (ISO 8601 format)"
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          description: "Maximum number of entries to return (default 100)"
+          required: false
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 1000
+        - name: offset
+          in: query
+          description: "Number of entries to skip (for pagination)"
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        "200":
+          description: "List of audit log entries"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogsResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # Git Sync endpoints
+  /sync/status:
+    get:
+      summary: "Get Git sync status"
+      description: "Returns the overall Git sync status including status of all DAGs"
+      operationId: "getSyncStatus"
+      tags:
+        - "sync"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "Sync status retrieved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncStatusResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /sync/pull:
+    post:
+      summary: "Pull changes from remote repository"
+      description: "Fetches and syncs changes from the remote Git repository"
+      operationId: "syncPull"
+      tags:
+        - "sync"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "Pull completed successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResultResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /sync/publish-all:
+    post:
+      summary: "Publish all modified DAGs"
+      description: "Commits and pushes all modified DAGs to the remote repository"
+      operationId: "syncPublishAll"
+      tags:
+        - "sync"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyncPublishAllRequest"
+      responses:
+        "200":
+          description: "Publish completed successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResultResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /sync/test-connection:
+    post:
+      summary: "Test connection to remote repository"
+      description: "Tests authentication and connectivity to the configured Git repository"
+      operationId: "syncTestConnection"
+      tags:
+        - "sync"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "Connection test result"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncConnectionTestResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /sync/config:
+    get:
+      summary: "Get Git sync configuration"
+      description: "Returns the current Git sync configuration"
+      operationId: "getSyncConfig"
+      tags:
+        - "sync"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "Configuration retrieved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncConfigResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      summary: "Update Git sync configuration"
+      description: "Updates the Git sync configuration"
+      operationId: "updateSyncConfig"
+      tags:
+        - "sync"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyncConfigUpdateRequest"
+      responses:
+        "200":
+          description: "Configuration updated successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncConfigResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /sync/dags/{name}/diff:
+    get:
+      summary: "Get diff for a DAG"
+      description: "Returns the diff between local and remote versions of a DAG"
+      operationId: "getSyncDAGDiff"
+      tags:
+        - "sync"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: name
+          in: path
+          description: "The DAG name (file name without extension)"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Diff retrieved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncDAGDiffResponse"
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{name}/publish:
+    post:
+      summary: "Publish a single DAG"
+      description: "Commits and pushes a single DAG to the remote repository"
+      operationId: "publishDag"
+      tags:
+        - "sync"
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: name
+          in: path
+          description: "The DAG name (file name without extension)"
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyncPublishRequest"
+      responses:
+        "200":
+          description: "DAG published successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResultResponse"
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Conflict detected"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncConflictResponse"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{name}/discard:
+    post:
+      summary: "Discard local changes for a DAG"
+      description: "Discards local changes and reverts to the version in the remote repository"
+      operationId: "discardDagChanges"
+      tags:
+        - "sync"
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: name
+          in: path
+          description: "The DAG name (file name without extension)"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Changes discarded successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/agent:
+    get:
+      summary: "Get agent configuration"
+      description: "Returns the current AI agent configuration. Requires admin role."
+      operationId: "getAgentConfig"
+      tags:
+        - "settings"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "Agent configuration"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentConfigResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    patch:
+      summary: "Update agent configuration"
+      description: "Updates the AI agent configuration. Requires admin role."
+      operationId: "updateAgentConfig"
+      tags:
+        - "settings"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentConfigRequest"
+      responses:
+        "200":
+          description: "Updated agent configuration"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentConfigResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+    apiToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: page number of items to fetch (default is 1)
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    UserId:
+      name: userId
+      in: path
+      description: unique identifier of the user
+      required: true
+      schema:
+        type: string
+        minLength: 1
+
+    APIKeyId:
+      name: keyId
+      in: path
+      description: unique identifier of the API key
+      required: true
+      schema:
+        type: string
+        minLength: 1
+
+    PerPage:
+      name: perPage
+      in: query
+      description: number of items per page (default is 30, max is 100)
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 50
+
+    DAGFileName:
+      name: fileName
+      in: path
+      description: the name of the DAG file
+      required: true
+      schema:
+        $ref: "#/components/schemas/DAGFileName"
+
+    DAGName:
+      name: name
+      in: path
+      description: name of the DAG
+      required: true
+      schema:
+        $ref: "#/components/schemas/DAGName"
+
+    StepName:
+      name: stepName
+      in: path
+      description: name of the step
+      required: true
+      schema:
+        type: string
+
+    RemoteNode:
+      name: remoteNode
+      in: query
+      description: name of the remote node
+      required: false
+      schema:
+        type: string
+        default: "local"
+
+    DAGRunId:
+      name: dagRunId
+      in: path
+      description: ID of the DAG-run or 'latest' to get the most recent DAG-run
+      required: true
+      schema:
+        $ref: "#/components/schemas/DAGRunId"
+
+    DAGRunIdSearch:
+      name: dagRunId
+      in: query
+      description: ID of the DAG-run or 'latest' to get the most recent DAG-run
+      required: false
+      schema:
+        $ref: "#/components/schemas/DAGRunId"
+
+    DAGRunName:
+      name: name
+      in: path
+      description: name of the DAG-run
+      required: true
+      schema:
+        type: string
+
+    Status:
+      name: status
+      in: query
+      description: status of the DAG-run
+      required: false
+      schema:
+        $ref: "#/components/schemas/Status"
+
+    DateTimeFrom:
+      name: fromDate
+      in: query
+      description: start datetime for filtering DAG-runs in ISO 8601 format with timezone
+      required: false
+      schema:
+        $ref: "#/components/schemas/UnixTimestamp"
+
+    DateTimeTo:
+      name: toDate
+      in: query
+      description: end datetime for filtering DAG-runs in ISO 8601 format with timezone
+      required: false
+      schema:
+        $ref: "#/components/schemas/UnixTimestamp"
+
+    Tail:
+      name: tail
+      in: query
+      description: Number of lines to return from the end of the file
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+
+    Head:
+      name: head
+      in: query
+      description: Number of lines to return from the beginning of the file
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+
+    Offset:
+      name: offset
+      in: query
+      description: Line number to start reading from (1-based)
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+
+    Limit:
+      name: limit
+      in: query
+      description: Maximum number of lines to return
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 10000
+
+    Stream:
+      name: stream
+      in: query
+      description: "Whether to return stdout or stderr logs"
+      required: false
+      schema:
+        $ref: "#/components/schemas/Stream"
+
+  schemas:
+    AuditEntry:
+      type: object
+      description: "A single audit log entry"
+      properties:
+        id:
+          type: string
+          description: "Unique identifier for this entry"
+        timestamp:
+          type: string
+          format: date-time
+          description: "When the event occurred"
+        category:
+          type: string
+          description: "Category of the audit event (e.g., terminal, user, dag)"
+        action:
+          type: string
+          description: "The action that was performed (e.g., session_start, command, login)"
+        userId:
+          type: string
+          description: "ID of the user who performed the action"
+        username:
+          type: string
+          description: "Username of the user who performed the action"
+        details:
+          type: string
+          description: "JSON-encoded action-specific details"
+        ipAddress:
+          type: string
+          description: "Client IP address if available"
+      required:
+        - id
+        - timestamp
+        - category
+        - action
+        - userId
+        - username
+
+    AuditLogsResponse:
+      type: object
+      description: "Response containing audit log entries"
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEntry"
+          description: "List of audit log entries"
+        total:
+          type: integer
+          description: "Total number of entries matching the filter (before pagination)"
+      required:
+        - entries
+        - total
+
+    ApproveStepRequest:
+      type: object
+      description: "Request body for approving a waiting step"
+      properties:
+        inputs:
+          type: object
+          additionalProperties:
+            type: string
+          description: "Key-value parameters to provide. These will be available as environment variables in subsequent steps."
+
+    ApproveStepResponse:
+      type: object
+      description: "Response after approving a waiting step"
+      properties:
+        dagRunId:
+          type: string
+          description: "The DAG run ID"
+        stepName:
+          type: string
+          description: "The approved step name"
+        resumed:
+          type: boolean
+          description: "Whether the DAG run was re-enqueued for execution"
+      required:
+        - dagRunId
+        - stepName
+        - resumed
+
+    ChatMessage:
+      type: object
+      description: "A single chat message in an LLM conversation"
+      properties:
+        role:
+          type: string
+          enum: [system, user, assistant, tool]
+          description: "Message role in the conversation"
+        content:
+          type: string
+          description: "Message content"
+        toolCalls:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatToolCall"
+          description: "Tool calls made by the assistant (only for assistant messages)"
+        metadata:
+          $ref: "#/components/schemas/ChatMessageMetadata"
+      required:
+        - role
+        - content
+
+    ChatToolCall:
+      type: object
+      description: "A tool call requested by the LLM"
+      properties:
+        id:
+          type: string
+          description: "Unique identifier for this tool call"
+        name:
+          type: string
+          description: "Name of the tool being called"
+        arguments:
+          type: string
+          description: "JSON string of tool arguments"
+      required:
+        - id
+        - name
+
+    ChatMessageMetadata:
+      type: object
+      description: "Metadata about an LLM API call"
+      properties:
+        provider:
+          type: string
+          description: "LLM provider (openai, anthropic, gemini, etc.)"
+        model:
+          type: string
+          description: "Model identifier used"
+        promptTokens:
+          type: integer
+          minimum: 0
+          description: "Number of tokens in the prompt"
+        completionTokens:
+          type: integer
+          minimum: 0
+          description: "Number of tokens in the completion"
+        totalTokens:
+          type: integer
+          minimum: 0
+          description: "Total tokens (prompt + completion)"
+
+    ChatMessagesResponse:
+      type: object
+      description: "Response containing chat messages for a step"
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatMessage"
+          description: "List of chat messages"
+        toolDefinitions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolDefinition"
+          description: "Tool definitions that were available to the LLM"
+        stepStatus:
+          $ref: "#/components/schemas/NodeStatus"
+        stepStatusLabel:
+          $ref: "#/components/schemas/NodeStatusLabel"
+        hasMore:
+          type: boolean
+          description: "True if step is still running and more messages may arrive"
+      required:
+        - messages
+        - stepStatus
+        - stepStatusLabel
+        - hasMore
+
+    ToolDefinition:
+      type: object
+      description: "A tool definition that was available to the LLM"
+      properties:
+        name:
+          type: string
+          description: "Name of the tool"
+        description:
+          type: string
+          description: "Description of what the tool does"
+        parameters:
+          type: object
+          additionalProperties: true
+          description: "JSON Schema describing the tool's parameters"
+      required:
+        - name
+
+    RejectStepRequest:
+      type: object
+      description: "Request body for rejecting a waiting step"
+      properties:
+        reason:
+          type: string
+          description: "Optional reason for rejecting the step"
+
+    RejectStepResponse:
+      type: object
+      description: "Response after rejecting a waiting step"
+      properties:
+        dagRunId:
+          type: string
+          description: "The DAG run ID"
+        stepName:
+          type: string
+          description: "The rejected step name"
+      required:
+        - dagRunId
+        - stepName
+
+    Error:
+      type: object
+      description: "Generic error response object"
+      properties:
+        code:
+          $ref: "#/components/schemas/ErrorCode"
+        message:
+          type: string
+          description: "Short error message"
+        details:
+          type: object
+          description: "Additional error details"
+      required:
+        - code
+        - message
+
+    TimeoutError:
+      type: object
+      description: "Timeout error response with DAG run tracking information"
+      allOf:
+        - $ref: "#/components/schemas/Error"
+        - type: object
+          properties:
+            dagRunId:
+              allOf:
+                - $ref: "#/components/schemas/DAGRunId"
+                - description: "ID of the DAG run that continues executing in background"
+          required:
+            - dagRunId
+
+    ErrorCode:
+      type: string
+      description: "Error code indicating the type of error"
+      enum:
+        - "forbidden"
+        - "bad_request"
+        - "not_found"
+        - "internal_error"
+        - "unauthorized"
+        - "bad_gateway"
+        - "remote_node_error"
+        - "max_run_reached"
+        - "not_running"
+        - "already_exists"
+        - "auth.unauthorized"
+        - "auth.token_invalid"
+        - "auth.forbidden"
+        - "timeout"
+
+    WebhookRequest:
+      type: object
+      description: "Request body for webhook trigger endpoint"
+      properties:
+        dagRunId:
+          allOf:
+            - $ref: "#/components/schemas/DAGRunId"
+            - description: |
+                Optional idempotency key. If provided and a DAG run with this ID already exists,
+                the endpoint returns 409 Conflict. If not provided, a new UUID is generated.
+        payload:
+          type: object
+          additionalProperties: true
+          description: "Arbitrary JSON payload to pass to the DAG as WEBHOOK_PAYLOAD"
+
+    WebhookResponse:
+      type: object
+      description: "Response from webhook trigger endpoint"
+      required:
+        - dagRunId
+        - dagName
+      properties:
+        dagRunId:
+          $ref: "#/components/schemas/DAGRunId"
+        dagName:
+          type: string
+          description: "Name of the triggered DAG"
+
+    WebhookDetails:
+      type: object
+      description: "Webhook configuration details (token not included)"
+      required:
+        - id
+        - dagName
+        - tokenPrefix
+        - enabled
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: "Unique identifier for the webhook"
+        dagName:
+          type: string
+          description: "Name of the DAG this webhook triggers"
+        tokenPrefix:
+          type: string
+          description: "First 8 characters of the token for identification"
+        enabled:
+          type: boolean
+          description: "Whether the webhook is active"
+        createdAt:
+          type: string
+          format: date-time
+          description: "When the webhook was created"
+        updatedAt:
+          type: string
+          format: date-time
+          description: "When the webhook was last modified"
+        createdBy:
+          type: string
+          description: "User ID who created the webhook"
+        lastUsedAt:
+          type: string
+          format: date-time
+          description: "When the webhook was last triggered"
+
+    WebhookCreateResponse:
+      type: object
+      description: "Response when creating or regenerating a webhook (includes full token)"
+      required:
+        - webhook
+        - token
+      properties:
+        webhook:
+          $ref: "#/components/schemas/WebhookDetails"
+        token:
+          type: string
+          description: "Full webhook token (only shown once, store securely!)"
+
+    WebhookListResponse:
+      type: object
+      description: "List of all webhooks"
+      required:
+        - webhooks
+      properties:
+        webhooks:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookDetails"
+
+    WebhookToggleRequest:
+      type: object
+      description: "Request to toggle webhook enabled state"
+      required:
+        - enabled
+      properties:
+        enabled:
+          type: boolean
+          description: "Whether to enable or disable the webhook"
+
+    Stream:
+      type: string
+      format: string
+      enum:
+        - stdout
+        - stderr
+
+    UnixTimestamp:
+      type: integer
+      format: "int64"
+      description: "Unix timestamp in seconds"
+      example: 1672531199
+
+    DAGFileName:
+      type: string
+      # only allows alphanumeric characters, underscores, and hyphens
+      format: "regex"
+      pattern: "^[a-zA-Z0-9_-]+$"
+      description: "Name of the DAG file"
+
+    DAGName:
+      type: string
+      # only allows alphanumeric characters, underscores, and hyphens
+      format: "regex"
+      pattern: "^[a-zA-Z0-9_-]+$"
+      description: "Name of the DAG"
+
+    Pagination:
+      type: object
+      properties:
+        totalRecords:
+          type: integer
+          description: total number of records
+        currentPage:
+          type: integer
+          description: current page number
+        totalPages:
+          type: integer
+          description: total number of pages
+        nextPage:
+          type: integer
+          description: next page number
+        prevPage:
+          type: integer
+          description: previous page number
+      required:
+        - totalRecords
+        - currentPage
+        - totalPages
+        - nextPage
+        - prevPage
+
+    DAGRunId:
+      type: string
+      description: "Unique identifier for the DAG-run. The special value 'latest' can be used to reference the most recent DAG-run."
+      example: "latest"
+      pattern: "^[a-zA-Z0-9_-]+$"
+
+    HealthResponse:
+      type: object
+      description: "Response object for the health check endpoint"
+      properties:
+        status:
+          type: string
+          enum: ["healthy", "unhealthy"]
+          description: "Overall health status of the server"
+        version:
+          type: string
+          description: "Current version of the server"
+        uptime:
+          type: integer
+          description: "Server uptime in seconds"
+        timestamp:
+          type: string
+          description: "Current server time"
+      required:
+        - status
+        - version
+        - uptime
+        - timestamp
+
+    DAGFile:
+      type: object
+      description: "DAG file with its status information"
+      properties:
+        fileName:
+          type: string
+          description: "File ID of the DAG file"
+        dag:
+          $ref: "#/components/schemas/DAG"
+        latestDAGRun:
+          $ref: "#/components/schemas/DAGRunSummary"
+        suspended:
+          type: boolean
+          description: "Whether the DAG is suspended"
+        errors:
+          type: array
+          description: "List of errors encountered during the request"
+          items:
+            type: string
+      required:
+        - fileName
+        - dag
+        - latestDAGRun
+        - suspended
+        - errors
+
+    DAG:
+      type: object
+      description: "Core DAG configuration containing definition and metadata"
+      properties:
+        group:
+          type: string
+          description: "Logical grouping of related DAGs for organizational purposes"
+        name:
+          type: string
+          description: "Logical name of the DAG"
+        schedule:
+          type: array
+          description: "List of scheduling expressions defining when DAG-runs should be created from this DAG"
+          items:
+            $ref: "#/components/schemas/Schedule"
+        description:
+          type: string
+          description: "Human-readable description of the DAG's purpose and behavior"
+        params:
+          type: array
+          description: "List of parameter names that can be passed to DAG-runs created from this DAG"
+          items:
+            type: string
+        defaultParams:
+          type: string
+          description: "Default parameter values in JSON format if not specified at DAG-run creation"
+        tags:
+          type: array
+          description: "List of tags for categorizing and filtering DAGs"
+          items:
+            type: string
+        queue:
+          type: string
+          description: "Name of the queue this DAG is assigned to. If not specified, the DAG name itself becomes the queue name"
+        maxActiveRuns:
+          type: integer
+          description: "DEPRECATED: This field is ignored for local (DAG-based) queues. For concurrency control, use global queues"
+          deprecated: true
+          x-deprecated-reason: "For concurrency control, configure global queues in config.yaml instead"
+        runConfig:
+          $ref: "#/components/schemas/RunConfig"
+      required:
+        - name
+
+    Schedule:
+      type: object
+      description: "Schedule configuration for DAG-run creation"
+      properties:
+        expression:
+          type: string
+          description: "Cron expression or schedule pattern"
+      required:
+        - expression
+
+    Status:
+      type: integer
+      enum: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+      x-enum-varnames:
+        - "NotStarted"
+        - "Running"
+        - "Failed"
+        - "Aborted"
+        - "Success"
+        - "Queued"
+        - "PartialSuccess"
+        - "Waiting"
+        - "Rejected"
+      description: |
+        Numeric status code indicating current DAG-run state:
+        0: "Not started"
+        1: "Running"
+        2: "Failed"
+        3: "Aborted"
+        4: "Success"
+        5: "Queued"
+        6: "Partial Success"
+        7: "Waiting for approval"
+        8: "Rejected"
+
+    StatusLabel:
+      type: string
+      description: "Human-readable status description for the DAG-run"
+      enum:
+        - "not_started"
+        - "running"
+        - "failed"
+        - "aborted"
+        - "succeeded"
+        - "queued"
+        - "partially_succeeded"
+        - "waiting"
+        - "rejected"
+
+    TriggerType:
+      type: string
+      description: "How the DAG-run was initiated"
+      enum:
+        - "unknown"
+        - "scheduler"
+        - "manual"
+        - "webhook"
+        - "subdag"
+        - "retry"
+
+    NodeStatus:
+      type: integer
+      enum: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+      x-enum-varnames:
+        - "NotStarted"
+        - "Running"
+        - "Failed"
+        - "Aborted"
+        - "Success"
+        - "Skipped"
+        - "PartialSuccess"
+        - "Waiting"
+        - "Rejected"
+      description: |
+        Numeric status code indicating current node state:
+        0: "Not started"
+        1: "Running"
+        2: "Failed"
+        3: "Aborted"
+        4: "Success"
+        5: "Skipped"
+        6: "Partial Success"
+        7: "Waiting for approval"
+        8: "Rejected"
+
+    NodeStatusLabel:
+      type: string
+      description: "Human-readable status description for the node"
+      enum:
+        - "not_started"
+        - "running"
+        - "failed"
+        - "aborted"
+        - "succeeded"
+        - "skipped"
+        - "partially_succeeded"
+        - "waiting"
+        - "rejected"
+
+    SchedulerStatusResponse:
+      type: object
+      description: "Response containing status of all scheduler instances"
+      properties:
+        schedulers:
+          type: array
+          description: "List of all registered scheduler instances"
+          items:
+            $ref: "#/components/schemas/SchedulerInstance"
+      required:
+        - schedulers
+
+    SchedulerInstance:
+      type: object
+      description: "Scheduler instance status information"
+      properties:
+        instanceId:
+          type: string
+          description: "Unique identifier of the scheduler instance"
+        host:
+          type: string
+          description: "Hostname where scheduler is running"
+        status:
+          type: string
+          enum: ["active", "inactive", "unknown"]
+          description: "Scheduler status (active = holds lock and scheduling)"
+        startedAt:
+          type: string
+          description: "RFC3339 timestamp when scheduler started"
+      required:
+        - instanceId
+        - host
+        - status
+        - startedAt
+
+    CoordinatorStatusResponse:
+      type: object
+      description: "Response containing status of all coordinator instances"
+      properties:
+        coordinators:
+          type: array
+          description: "List of all registered coordinator instances"
+          items:
+            $ref: "#/components/schemas/CoordinatorInstance"
+      required:
+        - coordinators
+
+    CoordinatorInstance:
+      type: object
+      description: "Coordinator instance status information"
+      properties:
+        instanceId:
+          type: string
+          description: "Unique identifier of the coordinator instance"
+        host:
+          type: string
+          description: "Hostname where coordinator is running"
+        status:
+          type: string
+          enum: ["active", "inactive", "unknown"]
+          description: "Coordinator status"
+        startedAt:
+          type: string
+          description: "RFC3339 timestamp when coordinator started"
+        port:
+          type: integer
+          description: "Port number the coordinator is listening on"
+      required:
+        - instanceId
+        - host
+        - status
+        - startedAt
+        - port
+
+    TunnelStatusResponse:
+      type: object
+      description: "Response containing tunnel service status"
+      properties:
+        enabled:
+          type: boolean
+          description: "Whether tunneling is enabled in configuration"
+        provider:
+          type: string
+          enum: ["tailscale"]
+          description: "The tunnel provider in use"
+        status:
+          type: string
+          enum: ["disabled", "connecting", "connected", "reconnecting", "error"]
+          description: "Current status of the tunnel"
+        publicUrl:
+          type: string
+          format: uri
+          description: "The public URL provided by the tunnel"
+        error:
+          type: string
+          description: "Error message if tunnel failed"
+        startedAt:
+          type: string
+          format: date-time
+          description: "RFC3339 timestamp when tunnel connected"
+        mode:
+          type: string
+          description: "Tunnel mode (e.g., 'direct' or 'funnel' for Tailscale)"
+        isPublic:
+          type: boolean
+          description: "Whether the tunnel provides public internet access"
+      required:
+        - enabled
+        - status
+
+    WorkerHealthStatus:
+      type: string
+      description: "Health status of the worker based on heartbeat recency"
+      enum:
+        - "healthy"
+        - "warning"
+        - "unhealthy"
+
+    DAGDetails:
+      type: object
+      description: "Detailed DAG configuration information"
+      properties:
+        group:
+          type: string
+          description: "Logical grouping of related DAGs for organizational purposes"
+        name:
+          type: string
+          description: "Unique identifier for the DAG within its group"
+        schedule:
+          type: array
+          description: "List of scheduling expressions defining when DAG-runs should be created from this DAG"
+          items:
+            $ref: "#/components/schemas/Schedule"
+        description:
+          type: string
+          description: "Human-readable description of the DAG's purpose and behavior"
+        env:
+          type: array
+          description: "List of environment variables to set before executing a DAG-run"
+          items:
+            type: string
+        logDir:
+          type: string
+          description: "Directory path for storing log files"
+        handlerOn:
+          $ref: "#/components/schemas/HandlerOn"
+        steps:
+          type: array
+          description: "List of steps to execute in DAG-runs created from this DAG"
+          items:
+            $ref: "#/components/schemas/Step"
+        delay:
+          type: integer
+          description: "Time in seconds to wait before starting a DAG-run"
+        histRetentionDays:
+          type: integer
+          description: "Number of days to retain historical logs"
+        preconditions:
+          type: array
+          description: "Conditions that must be met before a DAG-run can start"
+          items:
+            $ref: "#/components/schemas/Condition"
+        maxActiveRuns:
+          type: integer
+          description: "DEPRECATED: This field is ignored for local (DAG-based) queues. For concurrency control, use global queues"
+          deprecated: true
+          x-deprecated-reason: "For concurrency control, configure global queues in config.yaml instead"
+        queue:
+          type: string
+          description: "Name of the queue this DAG is assigned to. If not specified, the DAG name itself becomes the queue name"
+        maxActiveSteps:
+          type: integer
+          description: "Maximum number of concurrent steps allowed in a DAG run"
+        params:
+          type: array
+          description: "List of parameter names that can be passed to DAG-runs created from this DAG"
+          items:
+            type: string
+        defaultParams:
+          type: string
+          description: "Default parameter values in JSON format if not specified at DAG-run creation"
+        tags:
+          type: array
+          description: "List of tags for categorizing and filtering DAGs"
+          items:
+            type: string
+        runConfig:
+          $ref: "#/components/schemas/RunConfig"
+      required:
+        - name
+
+    RunConfig:
+      type: object
+      description: "Configuration for controlling user interactions when starting DAG runs"
+      properties:
+        disableParamEdit:
+          type: boolean
+          description: "Disable parameter editing when starting the DAG"
+          default: false
+        disableRunIdEdit:
+          type: boolean
+          description: "Disable custom run ID specification"
+          default: false
+      required:
+        - disableParamEdit
+        - disableRunIdEdit
+
+    LocalDag:
+      type: object
+      properties:
+        name:
+          type: string
+          description: "Name of the local DAG"
+        dag:
+          $ref: "#/components/schemas/DAGDetails"
+        errors:
+          type: array
+          description: "List of errors encountered while processing the local DAG"
+          items:
+            type: string
+      required:
+        - name
+        - errors
+
+    HandlerOn:
+      type: object
+      description: "Configuration for event handlers in a DAG-run"
+      properties:
+        failure:
+          $ref: "#/components/schemas/Step"
+        success:
+          $ref: "#/components/schemas/Step"
+        cancel:
+          $ref: "#/components/schemas/Step"
+        exit:
+          $ref: "#/components/schemas/Step"
+
+    DAGRunSummary:
+      type: object
+      description: "Current status of a DAG-run"
+      properties:
+        rootDAGRunName:
+          type: string
+          description: "Name of the root DAG-run"
+        rootDAGRunId:
+          allOf:
+            - $ref: "#/components/schemas/DAGRunId"
+            - description: "ID of the root DAG-run"
+        parentDAGRunName:
+          type: string
+          description: "Name of the parent DAG-run"
+        parentDAGRunId:
+          allOf:
+            - $ref: "#/components/schemas/DAGRunId"
+            - description: "ID of the parent DAG-run"
+        dagRunId:
+          $ref: "#/components/schemas/DAGRunId"
+        name:
+          $ref: "#/components/schemas/DAGName"
+        status:
+          $ref: "#/components/schemas/Status"
+        statusLabel:
+          $ref: "#/components/schemas/StatusLabel"
+        queuedAt:
+          type: string
+          description: "RFC 3339 timestamp when the DAG-run was queued"
+        startedAt:
+          type: string
+          description: "RFC 3339 timestamp when the DAG-run started"
+        finishedAt:
+          type: string
+          description: "RFC 3339 timestamp when the DAG-run finished"
+        log:
+          type: string
+          description: "Path to the log file"
+        params:
+          type: string
+          description: "Runtime parameters passed to the DAG-run in JSON format"
+        workerId:
+          type: string
+          description: "ID of the worker that executed this DAG-run ('local' for local execution)"
+        triggerType:
+          $ref: "#/components/schemas/TriggerType"
+        tags:
+          type: array
+          items:
+            type: string
+          description: "List of tags for categorizing and filtering DAG runs"
+      required:
+        - rootDAGRunName
+        - rootDAGRunId
+        - dagRunId
+        - name
+        - status
+        - statusLabel
+        - startedAt
+        - finishedAt
+        - log
+
+    DAGRunDetails:
+      type: object
+      description: "Detailed status of a DAG-run including sub DAG-run nodes"
+      allOf:
+        - $ref: "#/components/schemas/DAGRunSummary"
+        - type: object
+          description: "Detailed status information for the steps within a DAG-run."
+          properties:
+            nodes:
+              type: array
+              description: "Status of individual steps within the DAG-run"
+              items:
+                $ref: "#/components/schemas/Node"
+            onExit:
+              $ref: "#/components/schemas/Node"
+            onSuccess:
+              $ref: "#/components/schemas/Node"
+            onFailure:
+              $ref: "#/components/schemas/Node"
+            onCancel:
+              $ref: "#/components/schemas/Node"
+            preconditions:
+              type: array
+              description: "List of preconditions that must be met before the DAG-run can start"
+              items:
+                $ref: "#/components/schemas/Condition"
+          required:
+            - nodes
+
+    DAGRunOutputs:
+      type: object
+      description: "Collected outputs from step executions in a DAG-run, including execution metadata. If the DAG-run completed but no outputs were captured, the outputs object will be empty and metadata fields may be empty strings."
+      required:
+        - metadata
+        - outputs
+      properties:
+        metadata:
+          $ref: "#/components/schemas/OutputsMetadata"
+        outputs:
+          type: object
+          description: "Collected step outputs as key-value pairs. Keys are output names (UPPER_CASE converted to camelCase by default, or custom key if specified) and values are the captured output strings. Empty object if no outputs were captured."
+          additionalProperties:
+            type: string
+          example:
+            totalCount: "42"
+            resultFile: "/path/to/result.txt"
+            config: '{"key": "value"}'
+
+    OutputsMetadata:
+      type: object
+      description: "Execution context metadata for the outputs"
+      required:
+        - dagName
+        - dagRunId
+        - attemptId
+        - status
+        - completedAt
+      properties:
+        dagName:
+          $ref: "#/components/schemas/DAGName"
+        dagRunId:
+          $ref: "#/components/schemas/DAGRunId"
+        attemptId:
+          type: string
+          description: "Attempt identifier within the run"
+        status:
+          $ref: "#/components/schemas/StatusLabel"
+        completedAt:
+          type: string
+          format: date-time
+          description: "RFC3339 timestamp when execution completed"
+        params:
+          type: string
+          description: "JSON-serialized parameters passed to the DAG"
+
+    Node:
+      type: object
+      description: "Status of an individual step within a DAG-run"
+      properties:
+        step:
+          $ref: "#/components/schemas/Step"
+        stdout:
+          type: string
+          description: "Path to the standard output log file for this step"
+        stderr:
+          type: string
+          description: "Path to the standard error log file for this step"
+        startedAt:
+          type: string
+          description: "RFC3339 timestamp when the step started"
+        finishedAt:
+          type: string
+          description: "RFC3339 timestamp when the step finished"
+        status:
+          $ref: "#/components/schemas/NodeStatus"
+        statusLabel:
+          $ref: "#/components/schemas/NodeStatusLabel"
+        retryCount:
+          type: integer
+          description: "Number of retry attempts made for this step"
+        doneCount:
+          type: integer
+          description: "Number of successful completions for repeating steps"
+        subRuns:
+          type: array
+          description: "List of sub DAG-runs associated with this step"
+          items:
+            $ref: "#/components/schemas/SubDAGRun"
+        subRunsRepeated:
+          type: array
+          description: "List of repeated sub DAG-runs when using repeatPolicy"
+          items:
+            $ref: "#/components/schemas/SubDAGRun"
+        error:
+          type: string
+          description: "Error message if the step failed"
+        approvedAt:
+          type: string
+          description: "RFC3339 timestamp when the HITL step was approved"
+        approvedBy:
+          type: string
+          description: "Username of who approved the HITL step"
+        approvalInputs:
+          type: object
+          additionalProperties:
+            type: string
+          description: "Key-value inputs provided during HITL approval"
+        rejectedAt:
+          type: string
+          description: "RFC3339 timestamp when the HITL step was rejected"
+        rejectedBy:
+          type: string
+          description: "Username of who rejected the HITL step"
+        rejectionReason:
+          type: string
+          description: "Optional reason for rejection"
+      required:
+        - step
+        - stdout
+        - stderr
+        - startedAt
+        - finishedAt
+        - status
+        - statusLabel
+        - retryCount
+        - doneCount
+
+    SubDAGRun:
+      type: object
+      description: "Metadata for a sub DAG-run"
+      properties:
+        dagRunId:
+          $ref: "#/components/schemas/DAGRunId"
+        params:
+          type: string
+          description: "Parameters passed to the sub DAG-run in JSON format"
+        dagName:
+          type: string
+          description: "Name of the executed sub-DAG. For chat tool calls, this is the tool DAG name."
+      required:
+        - dagRunId
+
+    SubDAGRunDetail:
+      type: object
+      description: "Detailed information for a sub DAG-run including timing and status"
+      properties:
+        dagRunId:
+          $ref: "#/components/schemas/DAGRunId"
+        params:
+          type: string
+          description: "Parameters passed to the sub DAG-run in JSON format"
+        dagName:
+          type: string
+          description: "Name of the executed sub-DAG. For chat tool calls, this is the tool DAG name."
+        status:
+          $ref: "#/components/schemas/Status"
+        statusLabel:
+          $ref: "#/components/schemas/StatusLabel"
+        startedAt:
+          type: string
+          description: "RFC 3339 timestamp when the sub DAG-run started"
+        finishedAt:
+          type: string
+          description: "RFC 3339 timestamp when the sub DAG-run finished"
+      required:
+        - dagRunId
+        - status
+        - statusLabel
+        - startedAt
+
+    Step:
+      type: object
+      description: "Individual task definition that performs a specific operation in a DAG-run"
+      properties:
+        name:
+          type: string
+          description: "Unique identifier for the step within the DAG-run"
+        id:
+          type: string
+          description: "Optional short identifier for the step. Can be used in variable references like ${id.stdout} to access step properties. Must be unique within the DAG if specified"
+        description:
+          type: string
+          description: "Human-readable description of what the step does"
+        dir:
+          type: string
+          description: "Working directory for executing the step's command"
+        commands:
+          type: array
+          description: "List of commands to execute sequentially"
+          items:
+            $ref: "#/components/schemas/CommandEntry"
+        script:
+          type: string
+          description: "Script content if the step executes a script file"
+        stdout:
+          type: string
+          description: "File path for capturing standard output"
+        stderr:
+          type: string
+          description: "File path for capturing standard error"
+        output:
+          type: string
+          description: "Variable name to store the step's output"
+        call:
+          type: string
+          description: "The name of the DAG to execute as a sub DAG-run"
+        params:
+          type: string
+          description: "Parameters to pass to the sub DAG-run in JSON format"
+        parallel:
+          type: object
+          description: "Configuration for parallel execution of the step"
+          properties:
+            items:
+              description: "Array of items to process in parallel. Can be a static array or a reference to a variable containing an array"
+              oneOf:
+                - type: array
+                  items:
+                    type: string
+                - type: string
+            maxConcurrent:
+              type: integer
+              description: "Maximum number of parallel executions. Default is 10 if not specified"
+              minimum: 1
+        depends:
+          type: array
+          description: "List of step names that must complete before this step can start"
+          items:
+            type: string
+        repeatPolicy:
+          $ref: "#/components/schemas/RepeatPolicy"
+        mailOnError:
+          type: boolean
+          description: "Whether to send email notifications on step failure"
+        preconditions:
+          type: array
+          description: "Conditions that must be met before the step can start"
+          items:
+            $ref: "#/components/schemas/Condition"
+        timeoutSec:
+          type: integer
+          description: "Maximum execution time for the step in seconds. If set, this timeout takes precedence over the DAG-level timeout for this step."
+          minimum: 0
+        executorConfig:
+          type: object
+          description: "Executor configuration for this step"
+          properties:
+            type:
+              type: string
+              description: "Type of executor (e.g., 'wait', 'http', 'docker', 'command')"
+            config:
+              type: object
+              description: "Executor-specific configuration"
+              additionalProperties: true
+        router:
+          type: object
+          description: "Router configuration for switch/case routing"
+          required:
+            - value
+            - routes
+          properties:
+            value:
+              type: string
+              minLength: 1
+              description: "Expression to evaluate (e.g., '${STATUS}')"
+            routes:
+              type: array
+              minItems: 1
+              items:
+                type: object
+                required:
+                  - pattern
+                  - targets
+                properties:
+                  pattern:
+                    type: string
+                    minLength: 1
+                    description: "Match pattern (exact or 're:regex')"
+                  targets:
+                    type: array
+                    minItems: 1
+                    items:
+                      type: string
+                      minLength: 1
+                    description: "Step names to route to"
+      required:
+        - name
+
+    SearchResultItem:
+      type: object
+      description: "Individual search result item for a DAG"
+      properties:
+        name:
+          type: string
+          description: "Name of the matching DAG"
+        dag:
+          $ref: "#/components/schemas/DAG"
+        matches:
+          type: array
+          description: "Details of where matches were found"
+          items:
+            $ref: "#/components/schemas/SearchDAGsMatchItem"
+      required:
+        - name
+        - dag
+        - matches
+
+    SearchDAGsMatchItem:
+      type: object
+      description: "Details of a search match within a DAG definition"
+      properties:
+        line:
+          type: string
+          description: "Matching line content"
+        lineNumber:
+          type: integer
+          description: "Line number where match was found"
+        startLine:
+          type: integer
+          description: "Start line for context"
+      required:
+        - line
+        - lineNumber
+        - startLine
+
+    Log:
+      type: object
+      description: "Log information for the execution"
+      properties:
+        content:
+          type: string
+          description: "Log content"
+        lineCount:
+          type: integer
+          description: "Number of lines returned"
+        totalLines:
+          type: integer
+          description: "Total number of lines in the log file"
+        hasMore:
+          type: boolean
+          description: "Whether there are more lines available"
+        isEstimate:
+          type: boolean
+          description: "Whether the line count is an estimate"
+      required:
+        - content
+
+    DAGGridItem:
+      type: object
+      description: "Grid item for visualizing DAG-run execution history"
+      properties:
+        name:
+          type: string
+          description: "Name of the step"
+        history:
+          type: array
+          description: "Status of the step ordered by time"
+          items:
+            $ref: "#/components/schemas/NodeStatus"
+      required:
+        - name
+        - history
+
+    Condition:
+      type: object
+      description: "Precondition that must be satisfied before running a step or DAG-run"
+      properties:
+        condition:
+          type: string
+          description: "Expression or check to evaluate"
+        expected:
+          type: string
+          description: "Expected result of the condition evaluation"
+        negate:
+          type: boolean
+          description: "If true, inverts the condition result (run when condition does NOT match)"
+        error:
+          type: string
+          description: "Error message if the condition is not met"
+        matched:
+          type: boolean
+          description: "Whether the condition was met"
+      required:
+        - condition
+
+    RepeatMode:
+      type: string
+      description: "Repeat execution mode for steps"
+      enum:
+        - "while"
+        - "until"
+      x-enum-varnames:
+        - "While"
+        - "Until"
+
+    RepeatPolicy:
+      type: object
+      description: "Configuration for step repeat behavior"
+      properties:
+        repeat:
+          $ref: "#/components/schemas/RepeatMode"
+        interval:
+          type: integer
+          description: "Time in seconds to wait between repeat attempts"
+        limit:
+          type: integer
+          description: "Maximum number of times to repeat the step"
+        backoff:
+          oneOf:
+            - type: boolean
+              description: "When true, uses default multiplier of 2.0"
+            - type: number
+              format: float
+              description: "Custom exponential backoff multiplier"
+        maxIntervalSec:
+          type: integer
+          description: "Maximum interval in seconds (caps exponential growth)"
+        condition:
+          $ref: "#/components/schemas/Condition"
+        exitCode:
+          type: array
+          description: "List of exit codes that trigger repeat behavior"
+          items:
+            type: integer
+
+    CommandEntry:
+      type: object
+      description: "A command with its arguments"
+      properties:
+        command:
+          type: string
+          description: "The command to execute"
+        args:
+          type: array
+          description: "Arguments for the command"
+          items:
+            type: string
+      required:
+        - command
+
+    ListTagResponse:
+      type: object
+      description: "Response object for listing all tags"
+      properties:
+        tags:
+          type: array
+          description: "List of unique tags"
+          items:
+            type: string
+        errors:
+          type: array
+          description: "List of errors encountered during the request"
+          items:
+            type: string
+      required:
+        - tags
+        - errors
+
+    WorkersListResponse:
+      type: object
+      description: "Response object for listing distributed workers"
+      properties:
+        workers:
+          type: array
+          description: "List of distributed workers"
+          items:
+            $ref: "#/components/schemas/Worker"
+        errors:
+          type: array
+          description: "List of errors encountered during the request"
+          items:
+            type: string
+      required:
+        - workers
+        - errors
+
+    Worker:
+      type: object
+      description: "Information about a distributed worker"
+      properties:
+        id:
+          type: string
+          description: "Unique identifier for the worker"
+        labels:
+          type: object
+          description: "Key-value pairs of labels assigned to the worker"
+          additionalProperties:
+            type: string
+        totalPollers:
+          type: integer
+          description: "Total number of pollers configured for this worker"
+        busyPollers:
+          type: integer
+          description: "Number of pollers currently executing tasks"
+        runningTasks:
+          type: array
+          description: "List of tasks currently being executed by this worker"
+          items:
+            $ref: "#/components/schemas/RunningTask"
+        lastHeartbeatAt:
+          type: string
+          description: "RFC3339 timestamp of the last heartbeat received from this worker"
+        healthStatus:
+          $ref: "#/components/schemas/WorkerHealthStatus"
+      required:
+        - id
+        - labels
+        - totalPollers
+        - busyPollers
+        - runningTasks
+        - lastHeartbeatAt
+        - healthStatus
+
+    RunningTask:
+      type: object
+      description: "Information about a task currently being executed"
+      properties:
+        dagRunId:
+          $ref: "#/components/schemas/DAGRunId"
+        dagName:
+          $ref: "#/components/schemas/DAGName"
+        startedAt:
+          type: string
+          description: "RFC3339 timestamp when the task started"
+        rootDagRunName:
+          $ref: "#/components/schemas/DAGName"
+        rootDagRunId:
+          $ref: "#/components/schemas/DAGRunId"
+        parentDagRunName:
+          $ref: "#/components/schemas/DAGName"
+        parentDagRunId:
+          $ref: "#/components/schemas/DAGRunId"
+      required:
+        - dagRunId
+        - dagName
+        - startedAt
+
+    QueuesResponse:
+      type: object
+      description: "Response containing all queues with their active DAG-runs"
+      properties:
+        queues:
+          type: array
+          description: "List of all queues with their running and queued DAG-runs"
+          items:
+            $ref: "#/components/schemas/Queue"
+        summary:
+          $ref: "#/components/schemas/QueuesSummary"
+      required:
+        - queues
+        - summary
+
+    Queue:
+      type: object
+      description: "A queue/process group with summary statistics"
+      properties:
+        name:
+          type: string
+          description: "Name of the queue (global queue name or DAG name if no queue specified)"
+        type:
+          type: string
+          enum: ["global", "dag-based"]
+          description: "Type of queue - 'global' if explicitly defined, 'dag-based' if using DAG name"
+        maxConcurrency:
+          type: integer
+          description: "Maximum number of concurrent runs allowed. For 'global' queues, this is the configured maxConcurrency. For 'dag-based' queues, this is always 1 (FIFO execution)"
+          minimum: 1
+        runningCount:
+          type: integer
+          description: "Number of currently running DAG-runs"
+          minimum: 0
+        queuedCount:
+          type: integer
+          description: "Number of queued DAG-runs waiting to execute"
+          minimum: 0
+        running:
+          type: array
+          description: "List of currently running DAG-runs (bounded by maxConcurrency)"
+          items:
+            $ref: "#/components/schemas/DAGRunSummary"
+      required:
+        - name
+        - type
+        - runningCount
+        - queuedCount
+        - running
+
+    QueueItemsResponse:
+      type: object
+      description: "Paginated queue items response"
+      properties:
+        items:
+          type: array
+          description: "List of DAG-run summaries"
+          items:
+            $ref: "#/components/schemas/DAGRunSummary"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+      required:
+        - items
+        - pagination
+
+    QueuesSummary:
+      type: object
+      description: "Summary statistics across all queues"
+      properties:
+        totalQueues:
+          type: integer
+          description: "Total number of active queues"
+          minimum: 0
+        totalRunning:
+          type: integer
+          description: "Total DAG-runs currently executing"
+          minimum: 0
+        totalQueued:
+          type: integer
+          description: "Total DAG-runs waiting in queues"
+          minimum: 0
+        totalCapacity:
+          type: integer
+          description: "Sum of all queue maxConcurrency values"
+          minimum: 0
+        utilizationPercentage:
+          type: number
+          format: float
+          description: "System-wide utilization (totalRunning / totalCapacity * 100)"
+          minimum: 0.0
+          maximum: 100.0
+      required:
+        - totalQueues
+        - totalRunning
+        - totalQueued
+        - totalCapacity
+        - utilizationPercentage
+
+    ResourceHistory:
+      type: object
+      properties:
+        cpu:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetricPoint"
+        memory:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetricPoint"
+        disk:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetricPoint"
+        load:
+          type: array
+          items:
+            $ref: "#/components/schemas/MetricPoint"
+
+    MetricPoint:
+      type: object
+      properties:
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix timestamp
+        value:
+          type: number
+          format: double
+      required:
+        - timestamp
+        - value
+
+    UserRole:
+      type: string
+      description: "User role determining access permissions. admin: full access including user management, manager: DAG CRUD and execution, operator: DAG execution only, viewer: read-only"
+      enum:
+        - admin
+        - manager
+        - operator
+        - viewer
+
+    LoginRequest:
+      type: object
+      description: "Request body for user login"
+      properties:
+        username:
+          type: string
+          description: "User's username"
+          minLength: 1
+        password:
+          type: string
+          description: "User's password"
+          minLength: 1
+      required:
+        - username
+        - password
+
+    LoginResponse:
+      type: object
+      description: "Response containing authentication token"
+      properties:
+        token:
+          type: string
+          description: "JWT authentication token"
+        expiresAt:
+          type: string
+          format: date-time
+          description: "Token expiration timestamp"
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - token
+        - expiresAt
+        - user
+
+    ChangePasswordRequest:
+      type: object
+      description: "Request body for changing password"
+      properties:
+        currentPassword:
+          type: string
+          description: "Current password for verification"
+          minLength: 1
+        newPassword:
+          type: string
+          description: "New password to set"
+          minLength: 8
+      required:
+        - currentPassword
+        - newPassword
+
+    ResetPasswordRequest:
+      type: object
+      description: "Request body for admin password reset"
+      properties:
+        newPassword:
+          type: string
+          description: "New password to set for the user"
+          minLength: 8
+      required:
+        - newPassword
+
+    CreateUserRequest:
+      type: object
+      description: "Request body for creating a new user"
+      properties:
+        username:
+          type: string
+          description: "Unique username"
+          minLength: 1
+          maxLength: 64
+        password:
+          type: string
+          description: "User's password"
+          minLength: 8
+        role:
+          $ref: "#/components/schemas/UserRole"
+      required:
+        - username
+        - password
+        - role
+
+    UpdateUserRequest:
+      type: object
+      description: "Request body for updating a user"
+      properties:
+        username:
+          type: string
+          description: "New username (must be unique)"
+          minLength: 1
+          maxLength: 64
+        role:
+          $ref: "#/components/schemas/UserRole"
+        isDisabled:
+          type: boolean
+          description: "Whether to disable the user account"
+
+    User:
+      type: object
+      description: "User information"
+      properties:
+        id:
+          type: string
+          description: "Unique user identifier"
+        username:
+          type: string
+          description: "User's username"
+        role:
+          $ref: "#/components/schemas/UserRole"
+        authProvider:
+          type: string
+          enum: [builtin, oidc]
+          description: "Authentication provider (builtin or oidc)"
+        isDisabled:
+          type: boolean
+          description: "Whether the user account is disabled"
+        createdAt:
+          type: string
+          format: date-time
+          description: "Account creation timestamp"
+        updatedAt:
+          type: string
+          format: date-time
+          description: "Last update timestamp"
+      required:
+        - id
+        - username
+        - role
+        - createdAt
+        - updatedAt
+
+    UserResponse:
+      type: object
+      description: "Response containing user information"
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - user
+
+    UsersListResponse:
+      type: object
+      description: "Response containing list of users"
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+      required:
+        - users
+
+    APIKey:
+      type: object
+      description: "API key information"
+      properties:
+        id:
+          type: string
+          description: "Unique identifier"
+        name:
+          type: string
+          description: "Human-readable name"
+        description:
+          type: string
+          description: "Purpose description"
+        role:
+          $ref: "#/components/schemas/UserRole"
+        keyPrefix:
+          type: string
+          description: "First 8 characters for identification"
+        createdAt:
+          type: string
+          format: date-time
+          description: "Creation timestamp"
+        updatedAt:
+          type: string
+          format: date-time
+          description: "Last update timestamp"
+        createdBy:
+          type: string
+          description: "Creator user ID"
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: "Last authentication timestamp"
+      required:
+        - id
+        - name
+        - role
+        - keyPrefix
+        - createdAt
+        - updatedAt
+        - createdBy
+
+    APIKeyResponse:
+      type: object
+      description: "API key response"
+      properties:
+        apiKey:
+          $ref: "#/components/schemas/APIKey"
+      required:
+        - apiKey
+
+    APIKeysListResponse:
+      type: object
+      description: "List of API keys"
+      properties:
+        apiKeys:
+          type: array
+          items:
+            $ref: "#/components/schemas/APIKey"
+      required:
+        - apiKeys
+
+    CreateAPIKeyRequest:
+      type: object
+      description: "Create API key request"
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: "Human-readable name"
+        description:
+          type: string
+          maxLength: 500
+          description: "Purpose description"
+        role:
+          $ref: "#/components/schemas/UserRole"
+      required:
+        - name
+        - role
+
+    CreateAPIKeyResponse:
+      type: object
+      description: "Create API key response"
+      properties:
+        apiKey:
+          $ref: "#/components/schemas/APIKey"
+        key:
+          type: string
+          description: "Full key secret, only returned once"
+      required:
+        - apiKey
+        - key
+
+    UpdateAPIKeyRequest:
+      type: object
+      description: "Update API key request"
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: "New name"
+        description:
+          type: string
+          maxLength: 500
+          description: "New description"
+        role:
+          $ref: "#/components/schemas/UserRole"
+
+    SuccessResponse:
+      type: object
+      description: "Generic success response"
+      properties:
+        message:
+          type: string
+          description: "Success message"
+      required:
+        - message
+
+    # Git Sync schemas
+    SyncStatus:
+      type: string
+      description: "Sync status of a DAG"
+      enum:
+        - synced
+        - modified
+        - untracked
+        - conflict
+
+    SyncSummary:
+      type: string
+      description: "Summary status for the sync badge"
+      enum:
+        - synced
+        - pending
+        - conflict
+        - error
+
+    SyncDAGState:
+      type: object
+      description: "Sync state for a single DAG"
+      properties:
+        status:
+          $ref: "#/components/schemas/SyncStatus"
+        baseCommit:
+          type: string
+          description: "Commit hash when last synced"
+        lastSyncedHash:
+          type: string
+          description: "Content hash when last synced"
+        lastSyncedAt:
+          type: string
+          format: date-time
+          description: "When the DAG was last synced"
+        modifiedAt:
+          type: string
+          format: date-time
+          description: "When the DAG was last modified locally"
+        localHash:
+          type: string
+          description: "Current local content hash"
+        remoteCommit:
+          type: string
+          description: "Remote commit hash (for conflicts)"
+        remoteAuthor:
+          type: string
+          description: "Author of the remote commit (for conflicts)"
+        remoteMessage:
+          type: string
+          description: "Message of the remote commit (for conflicts)"
+        conflictDetectedAt:
+          type: string
+          format: date-time
+          description: "When the conflict was detected"
+      required:
+        - status
+
+    SyncStatusCounts:
+      type: object
+      description: "Counts of DAGs in each sync status"
+      properties:
+        synced:
+          type: integer
+        modified:
+          type: integer
+        untracked:
+          type: integer
+        conflict:
+          type: integer
+      required:
+        - synced
+        - modified
+        - untracked
+        - conflict
+
+    SyncStatusResponse:
+      type: object
+      description: "Overall Git sync status"
+      properties:
+        enabled:
+          type: boolean
+          description: "Whether Git sync is enabled"
+        repository:
+          type: string
+          description: "Repository URL"
+        branch:
+          type: string
+          description: "Branch being synced"
+        summary:
+          $ref: "#/components/schemas/SyncSummary"
+        lastSyncAt:
+          type: string
+          format: date-time
+          description: "When the last sync occurred"
+        lastSyncCommit:
+          type: string
+          description: "Commit hash of last sync"
+        lastSyncStatus:
+          type: string
+          description: "Status of last sync (success/error)"
+        lastError:
+          type: string
+          description: "Error message from last failed sync"
+        dags:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/SyncDAGState"
+          description: "Sync state for each DAG"
+        counts:
+          $ref: "#/components/schemas/SyncStatusCounts"
+      required:
+        - enabled
+        - summary
+        - counts
+
+    SyncError:
+      type: object
+      description: "Error during sync operation"
+      properties:
+        dagId:
+          type: string
+        message:
+          type: string
+      required:
+        - message
+
+    SyncDAGDiffResponse:
+      type: object
+      description: "Diff between local and remote versions of a DAG"
+      properties:
+        dagId:
+          type: string
+          description: "The DAG identifier"
+        status:
+          $ref: "#/components/schemas/SyncStatus"
+        localContent:
+          type: string
+          description: "Current local file content"
+        remoteContent:
+          type: string
+          description: "Content from remote repository"
+        remoteCommit:
+          type: string
+          description: "Commit hash being compared against"
+        remoteAuthor:
+          type: string
+          description: "Author of the remote commit"
+        remoteMessage:
+          type: string
+          description: "Commit message of the remote version"
+      required:
+        - dagId
+        - status
+        - localContent
+
+    SyncResultResponse:
+      type: object
+      description: "Result of a sync operation"
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        synced:
+          type: array
+          items:
+            type: string
+          description: "DAG IDs that were synced"
+        modified:
+          type: array
+          items:
+            type: string
+          description: "DAG IDs that were modified"
+        conflicts:
+          type: array
+          items:
+            type: string
+          description: "DAG IDs with conflicts"
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncError"
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - success
+        - timestamp
+
+    SyncPublishRequest:
+      type: object
+      description: "Request to publish a DAG"
+      properties:
+        message:
+          type: string
+          description: "Commit message"
+        force:
+          type: boolean
+          default: false
+          description: "Force publish even with conflicts"
+
+    SyncPublishAllRequest:
+      type: object
+      description: "Request to publish all modified DAGs"
+      properties:
+        message:
+          type: string
+          description: "Commit message"
+
+    SyncConflictResponse:
+      type: object
+      description: "Response when a conflict is detected"
+      properties:
+        dagId:
+          type: string
+        remoteCommit:
+          type: string
+        remoteAuthor:
+          type: string
+        remoteMessage:
+          type: string
+        message:
+          type: string
+      required:
+        - dagId
+        - message
+
+    SyncConnectionTestResponse:
+      type: object
+      description: "Result of connection test"
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        error:
+          type: string
+      required:
+        - success
+
+    SyncAuthConfig:
+      type: object
+      description: "Git authentication configuration"
+      properties:
+        type:
+          type: string
+          enum:
+            - token
+            - ssh
+        token:
+          type: string
+          description: "Personal access token (write-only)"
+          writeOnly: true
+        sshKeyPath:
+          type: string
+          description: "Path to SSH private key"
+      required:
+        - type
+
+    SyncAutoSyncConfig:
+      type: object
+      description: "Auto-sync configuration"
+      properties:
+        enabled:
+          type: boolean
+        onStartup:
+          type: boolean
+        interval:
+          type: integer
+          description: "Sync interval in seconds"
+      required:
+        - enabled
+        - onStartup
+        - interval
+
+    SyncCommitConfig:
+      type: object
+      description: "Commit configuration"
+      properties:
+        authorName:
+          type: string
+        authorEmail:
+          type: string
+
+    SyncConfigResponse:
+      type: object
+      description: "Git sync configuration"
+      properties:
+        enabled:
+          type: boolean
+        repository:
+          type: string
+        branch:
+          type: string
+        path:
+          type: string
+        auth:
+          $ref: "#/components/schemas/SyncAuthConfig"
+        autoSync:
+          $ref: "#/components/schemas/SyncAutoSyncConfig"
+        pushEnabled:
+          type: boolean
+        commit:
+          $ref: "#/components/schemas/SyncCommitConfig"
+      required:
+        - enabled
+
+    SyncConfigUpdateRequest:
+      type: object
+      description: "Request to update Git sync configuration"
+      properties:
+        enabled:
+          type: boolean
+        repository:
+          type: string
+        branch:
+          type: string
+        path:
+          type: string
+        auth:
+          $ref: "#/components/schemas/SyncAuthConfig"
+        autoSync:
+          $ref: "#/components/schemas/SyncAutoSyncConfig"
+        pushEnabled:
+          type: boolean
+        commit:
+          $ref: "#/components/schemas/SyncCommitConfig"
+
+    AgentConfigResponse:
+      type: object
+      description: "AI Agent configuration"
+      properties:
+        enabled:
+          type: boolean
+          description: "Whether the AI agent is enabled"
+        llm:
+          $ref: "#/components/schemas/AgentLLMConfig"
+
+    AgentLLMConfig:
+      type: object
+      description: "LLM configuration for the AI agent"
+      properties:
+        provider:
+          type: string
+          description: "LLM provider (anthropic, openai, gemini, openrouter, local)"
+        model:
+          type: string
+          description: "Model ID"
+        apiKeyConfigured:
+          type: boolean
+          description: "Whether an API key is configured (actual key is not returned)"
+        baseUrl:
+          type: string
+          description: "Custom API endpoint URL (optional)"
+
+    UpdateAgentConfigRequest:
+      type: object
+      description: "Request to update AI agent configuration"
+      properties:
+        enabled:
+          type: boolean
+          description: "Whether the AI agent is enabled"
+        llm:
+          $ref: "#/components/schemas/UpdateAgentLLMConfig"
+
+    UpdateAgentLLMConfig:
+      type: object
+      description: "LLM configuration updates"
+      properties:
+        provider:
+          type: string
+          description: "LLM provider (anthropic, openai, gemini, openrouter, local)"
+        model:
+          type: string
+          description: "Model ID"
+        apiKey:
+          type: string
+          description: "API key (only set if changing)"
+        baseUrl:
+          type: string
+          description: "Custom API endpoint URL"
+
+# Apply security requirements globally
+security:
+  - apiToken: []
+  - basicAuth: []
+  - {}

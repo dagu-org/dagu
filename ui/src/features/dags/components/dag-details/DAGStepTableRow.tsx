@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/tooltip';
 import { getExecutorCommand } from '@/lib/executor-utils';
 import { ArrowRight, Code, Folder, GitBranch, GitFork, Mail, RefreshCw } from 'lucide-react';
-import { components } from '../../../../api/v2/schema';
+import { components } from '../../../../api/v1/schema';
 import { Badge } from '../../../../components/ui/badge';
 import { TableCell, TableRow } from '../../../../components/ui/table';
 

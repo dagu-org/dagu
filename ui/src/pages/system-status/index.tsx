@@ -1,6 +1,6 @@
 import { Activity, Calendar, RefreshCw, Server } from 'lucide-react';
 import React from 'react';
-import type { components } from '../../api/v2/schema';
+import type { components } from '../../api/v1/schema';
 import { Button } from '../../components/ui/button';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useConfig } from '../../contexts/ConfigContext';

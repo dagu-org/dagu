@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	api "github.com/dagu-org/dagu/api/v2"
+	api "github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/go-chi/chi/v5"
@@ -91,7 +91,7 @@ func NewAPI(cfg APIConfig) *API {
 // RegisterRoutes registers the agent API routes on the given router.
 // The authMiddleware parameter should be the same auth middleware used for other API routes.
 func (a *API) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler) http.Handler) {
-	r.Route("/api/v2/agent", func(r chi.Router) {
+	r.Route("/api/v1/agent", func(r chi.Router) {
 		// Check if agent is enabled (must be first middleware)
 		r.Use(a.enabledMiddleware())
 
@@ -248,7 +248,7 @@ func (a *API) respondError(w http.ResponseWriter, status int, code api.ErrorCode
 }
 
 // handleNewConversation creates a new conversation and sends the first message.
-// POST /api/v2/agent/conversations/new
+// POST /api/v1/agent/conversations/new
 func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 	var req ChatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -300,7 +300,7 @@ func (a *API) handleNewConversation(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleListConversations lists all conversations for the current user.
-// GET /api/v2/agent/conversations
+// GET /api/v1/agent/conversations
 func (a *API) handleListConversations(w http.ResponseWriter, r *http.Request) {
 	userID := getUserIDFromContext(r.Context())
 
@@ -366,7 +366,7 @@ func (a *API) appendPersistedConversations(ctx context.Context, userID string, a
 }
 
 // handleGetConversation returns conversation details and messages.
-// GET /api/v2/agent/conversations/{id}
+// GET /api/v1/agent/conversations/{id}
 func (a *API) handleGetConversation(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	userID := getUserIDFromContext(r.Context())
@@ -436,7 +436,7 @@ func (a *API) getStoredConversation(ctx context.Context, id, userID string) (*Co
 }
 
 // handleChat sends a message to an existing conversation.
-// POST /api/v2/agent/conversations/{id}/chat
+// POST /api/v1/agent/conversations/{id}/chat
 func (a *API) handleChat(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	userID := getUserIDFromContext(r.Context())
@@ -529,7 +529,7 @@ func (a *API) reactivateConversation(ctx context.Context, id, userID string) (*C
 }
 
 // handleStream provides SSE streaming for conversation updates.
-// GET /api/v2/agent/conversations/{id}/stream
+// GET /api/v1/agent/conversations/{id}/stream
 func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	userID := getUserIDFromContext(r.Context())
@@ -581,7 +581,7 @@ func (a *API) sendSSEMessage(w http.ResponseWriter, data any) {
 }
 
 // handleCancel cancels an active conversation.
-// POST /api/v2/agent/conversations/{id}/cancel
+// POST /api/v1/agent/conversations/{id}/cancel
 func (a *API) handleCancel(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	userID := getUserIDFromContext(r.Context())
@@ -602,7 +602,7 @@ func (a *API) handleCancel(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleUserResponse submits a user's response to an agent prompt.
-// POST /api/v2/agent/conversations/{id}/respond
+// POST /api/v1/agent/conversations/{id}/respond
 func (a *API) handleUserResponse(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	userID := getUserIDFromContext(r.Context())

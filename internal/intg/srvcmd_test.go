@@ -91,7 +91,7 @@ func TestServer_BasePath(t *testing.T) {
 	configFile := writeServerConfig(t, port, "/dagu", false)
 	stopServer := startServer(t, configFile, port)
 
-	requireHealthy(t, fmt.Sprintf("http://127.0.0.1:%s/dagu/api/v2/health", port))
+	requireHealthy(t, fmt.Sprintf("http://127.0.0.1:%s/dagu/api/v1/health", port))
 
 	stopServer()
 }
@@ -111,7 +111,7 @@ func TestServer_RemoteNode(t *testing.T) {
 			configFile := writeServerConfig(t, port, tc.basePath, true)
 			stopServer := startServer(t, configFile, port)
 
-			url := fmt.Sprintf("http://127.0.0.1:%s%s/api/v2/health?remoteNode=dev", port, tc.basePath)
+			url := fmt.Sprintf("http://127.0.0.1:%s%s/api/v1/health?remoteNode=dev", port, tc.basePath)
 			requireHealthy(t, url)
 
 			stopServer()
@@ -132,7 +132,7 @@ basePath: "%s"
 	if includeRemoteNodes {
 		configContent += fmt.Sprintf(`remoteNodes:
   - name: "dev"
-    apiBaseUrl: "http://127.0.0.1:%s%s/api/v2"
+    apiBaseUrl: "http://127.0.0.1:%s%s/api/v1"
 `, port, basePath)
 	}
 

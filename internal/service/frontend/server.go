@@ -44,7 +44,7 @@ import (
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
-	apiv2 "github.com/dagu-org/dagu/internal/service/frontend/api/v2"
+	apiv1 "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
 	"github.com/dagu-org/dagu/internal/service/frontend/auth"
 	"github.com/dagu-org/dagu/internal/service/frontend/metrics"
 	"github.com/dagu-org/dagu/internal/service/frontend/sse"
@@ -57,7 +57,7 @@ import (
 
 // Server represents the HTTP server for the frontend application.
 type Server struct {
-	apiV2            *apiv2.API
+	apiV1            *apiv1.API
 	agentAPI         *agent.API
 	agentConfigStore *fileagentconfig.Store
 	config           *config.Config
@@ -70,7 +70,7 @@ type Server struct {
 	listener         net.Listener
 	sseHub           *sse.Hub
 	metricsRegistry  *prometheus.Registry
-	tunnelAPIOpts    []apiv2.APIOption
+	tunnelAPIOpts    []apiv1.APIOption
 	dagStore         exec.DAGStore
 }
 
@@ -88,7 +88,7 @@ func WithListener(l net.Listener) ServerOption {
 func WithTunnelService(ts *tunnel.Service) ServerOption {
 	return func(s *Server) {
 		if ts != nil {
-			s.tunnelAPIOpts = append(s.tunnelAPIOpts, apiv2.WithTunnelService(ts))
+			s.tunnelAPIOpts = append(s.tunnelAPIOpts, apiv1.WithTunnelService(ts))
 		}
 	}
 }
@@ -106,7 +106,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	}
 
 	var (
-		apiOpts         []apiv2.APIOption
+		apiOpts         []apiv1.APIOption
 		builtinOIDCCfg  *auth.BuiltinOIDCConfig
 		oidcEnabled     bool
 		oidcButtonLabel string
@@ -117,12 +117,12 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		return nil, fmt.Errorf("failed to initialize audit service: %w", err)
 	}
 	if auditSvc != nil {
-		apiOpts = append(apiOpts, apiv2.WithAuditService(auditSvc))
+		apiOpts = append(apiOpts, apiv1.WithAuditService(auditSvc))
 	}
 
 	syncSvc := initSyncService(ctx, cfg)
 	if syncSvc != nil {
-		apiOpts = append(apiOpts, apiv2.WithSyncService(syncSvc))
+		apiOpts = append(apiOpts, apiv1.WithSyncService(syncSvc))
 	}
 
 	agentConfigStore, err := fileagentconfig.New(cfg.Paths.DataDir)
@@ -145,7 +145,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 			return nil, fmt.Errorf("failed to initialize builtin auth service: %w", err)
 		}
 		authSvc = result.AuthService
-		apiOpts = append(apiOpts, apiv2.WithAuthService(result.AuthService))
+		apiOpts = append(apiOpts, apiv1.WithAuthService(result.AuthService))
 
 		oidcCfg := cfg.Server.Auth.OIDC
 		if oidcCfg.IsConfigured() {
@@ -233,10 +233,10 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	allAPIOptions := append(apiOpts, srv.tunnelAPIOpts...)
 	if srv.agentConfigStore != nil {
-		allAPIOptions = append(allAPIOptions, apiv2.WithAgentConfigStore(srv.agentConfigStore))
+		allAPIOptions = append(allAPIOptions, apiv1.WithAgentConfigStore(srv.agentConfigStore))
 	}
 
-	srv.apiV2 = apiv2.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, allAPIOptions...)
+	srv.apiV1 = apiv1.New(dr, drs, qs, ps, drm, cfg, cc, sr, mr, rs, allAPIOptions...)
 
 	return srv, nil
 }
@@ -453,7 +453,7 @@ func (srv *Server) Serve(ctx context.Context) error {
 		RequestHeaders:   srv.config.Core.Debug,
 		MessageFieldName: "msg",
 		ResponseHeaders:  false,
-		QuietDownRoutes:  []string{"/api/v2/events"},
+		QuietDownRoutes:  []string{"/api/v1/events"},
 		QuietDownPeriod:  10 * time.Second,
 	})
 
@@ -471,26 +471,26 @@ func (srv *Server) Serve(ctx context.Context) error {
 	}))
 	r.Use(middleware.RedirectSlashes)
 
-	apiV2BasePath := srv.configureAPIPath()
+	apiV1BasePath := srv.configureAPIPath()
 	scheme := srv.getScheme()
 
 	if err := srv.setupRoutes(ctx, r); err != nil {
 		return err
 	}
 
-	if err := srv.setupAPIRoutes(ctx, r, apiV2BasePath, scheme); err != nil {
+	if err := srv.setupAPIRoutes(ctx, r, apiV1BasePath, scheme); err != nil {
 		return err
 	}
 
 	if srv.config.Server.Terminal.Enabled && srv.authService != nil {
-		srv.setupTerminalRoute(ctx, r, apiV2BasePath)
+		srv.setupTerminalRoute(ctx, r, apiV1BasePath)
 	}
 
 	if srv.agentAPI != nil && srv.agentConfigStore != nil {
 		srv.setupAgentRoutes(ctx, r)
 	}
 
-	srv.setupSSERoute(ctx, r, apiV2BasePath)
+	srv.setupSSERoute(ctx, r, apiV1BasePath)
 
 	addr := net.JoinHostPort(srv.config.Server.Host, strconv.Itoa(srv.config.Server.Port))
 	srv.httpServer = &http.Server{
@@ -511,8 +511,8 @@ func (srv *Server) Serve(ctx context.Context) error {
 }
 
 func (srv *Server) configureAPIPath() string {
-	apiV2BasePath := path.Join(srv.config.Server.BasePath, "api/v2")
-	return ensureLeadingSlash(apiV2BasePath)
+	apiV1BasePath := path.Join(srv.config.Server.BasePath, "api/v1")
+	return ensureLeadingSlash(apiV1BasePath)
 }
 
 func (srv *Server) getScheme() string {
@@ -626,11 +626,11 @@ func (srv *Server) buildOIDCAuthOptions(ctx context.Context) (*auth.Options, err
 	}, nil
 }
 
-func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV2BasePath, scheme string) error {
+func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath, scheme string) error {
 	var setupErr error
-	r.Route(apiV2BasePath, func(r chi.Router) {
-		url := fmt.Sprintf("%s://%s:%d%s", scheme, srv.config.Server.Host, srv.config.Server.Port, apiV2BasePath)
-		if err := srv.apiV2.ConfigureRoutes(ctx, r, url); err != nil {
+	r.Route(apiV1BasePath, func(r chi.Router) {
+		url := fmt.Sprintf("%s://%s:%d%s", scheme, srv.config.Server.Host, srv.config.Server.Port, apiV1BasePath)
+		if err := srv.apiV1.ConfigureRoutes(ctx, r, url); err != nil {
 			logger.Error(ctx, "Failed to configure API routes", tag.Error(err))
 			setupErr = err
 		}
@@ -638,14 +638,14 @@ func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV2BasePath
 	return setupErr
 }
 
-func (srv *Server) setupTerminalRoute(ctx context.Context, r *chi.Mux, apiV2BasePath string) {
+func (srv *Server) setupTerminalRoute(ctx context.Context, r *chi.Mux, apiV1BasePath string) {
 	termHandler := terminal.NewHandler(srv.authService, srv.auditService, terminal.GetDefaultShell())
-	wsPath := path.Join(apiV2BasePath, "terminal/ws")
+	wsPath := path.Join(apiV1BasePath, "terminal/ws")
 	r.Get(wsPath, termHandler.ServeHTTP)
 	logger.Info(ctx, "Terminal WebSocket route configured", slog.String("path", wsPath))
 }
 
-func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV2BasePath string) {
+func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath string) {
 	var sseMetrics *sse.Metrics
 	if srv.metricsRegistry != nil {
 		sseMetrics = sse.NewMetrics(srv.metricsRegistry)
@@ -662,29 +662,29 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV2BasePath 
 
 	handler := sse.NewHandler(srv.sseHub, remoteNodes, srv.authService)
 
-	r.Get(path.Join(apiV2BasePath, "events/dags"), handler.HandleDAGsListEvents)
-	r.Get(path.Join(apiV2BasePath, "events/dags/{fileName}"), handler.HandleDAGEvents)
-	r.Get(path.Join(apiV2BasePath, "events/dags/{fileName}/dag-runs"), handler.HandleDAGHistoryEvents)
-	r.Get(path.Join(apiV2BasePath, "events/dag-runs"), handler.HandleDAGRunsListEvents)
-	r.Get(path.Join(apiV2BasePath, "events/dag-runs/{name}/{dagRunId}"), handler.HandleDAGRunEvents)
-	r.Get(path.Join(apiV2BasePath, "events/dag-runs/{name}/{dagRunId}/logs"), handler.HandleDAGRunLogsEvents)
-	r.Get(path.Join(apiV2BasePath, "events/dag-runs/{name}/{dagRunId}/logs/steps/{stepName}"), handler.HandleStepLogEvents)
-	r.Get(path.Join(apiV2BasePath, "events/queues"), handler.HandleQueuesListEvents)
-	r.Get(path.Join(apiV2BasePath, "events/queues/{name}/items"), handler.HandleQueueItemsEvents)
+	r.Get(path.Join(apiV1BasePath, "events/dags"), handler.HandleDAGsListEvents)
+	r.Get(path.Join(apiV1BasePath, "events/dags/{fileName}"), handler.HandleDAGEvents)
+	r.Get(path.Join(apiV1BasePath, "events/dags/{fileName}/dag-runs"), handler.HandleDAGHistoryEvents)
+	r.Get(path.Join(apiV1BasePath, "events/dag-runs"), handler.HandleDAGRunsListEvents)
+	r.Get(path.Join(apiV1BasePath, "events/dag-runs/{name}/{dagRunId}"), handler.HandleDAGRunEvents)
+	r.Get(path.Join(apiV1BasePath, "events/dag-runs/{name}/{dagRunId}/logs"), handler.HandleDAGRunLogsEvents)
+	r.Get(path.Join(apiV1BasePath, "events/dag-runs/{name}/{dagRunId}/logs/steps/{stepName}"), handler.HandleStepLogEvents)
+	r.Get(path.Join(apiV1BasePath, "events/queues"), handler.HandleQueuesListEvents)
+	r.Get(path.Join(apiV1BasePath, "events/queues/{name}/items"), handler.HandleQueueItemsEvents)
 
-	logger.Info(ctx, "SSE routes configured", slog.String("basePath", apiV2BasePath))
+	logger.Info(ctx, "SSE routes configured", slog.String("basePath", apiV1BasePath))
 }
 
 func (srv *Server) registerSSEFetchers() {
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAG, srv.apiV2.GetDAGDetailsData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGHistory, srv.apiV2.GetDAGHistoryData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGsList, srv.apiV2.GetDAGsListData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRun, srv.apiV2.GetDAGRunDetailsData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRuns, srv.apiV2.GetDAGRunsListData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRunLogs, srv.apiV2.GetDAGRunLogsData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeStepLog, srv.apiV2.GetStepLogData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeQueues, srv.apiV2.GetQueuesListData)
-	srv.sseHub.RegisterFetcher(sse.TopicTypeQueueItems, srv.apiV2.GetQueueItemsData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAG, srv.apiV1.GetDAGDetailsData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGHistory, srv.apiV1.GetDAGHistoryData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGsList, srv.apiV1.GetDAGsListData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRun, srv.apiV1.GetDAGRunDetailsData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRuns, srv.apiV1.GetDAGRunsListData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeDAGRunLogs, srv.apiV1.GetDAGRunLogsData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeStepLog, srv.apiV1.GetStepLogData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeQueues, srv.apiV1.GetQueuesListData)
+	srv.sseHub.RegisterFetcher(sse.TopicTypeQueueItems, srv.apiV1.GetQueueItemsData)
 }
 
 func (srv *Server) setupAgentRoutes(ctx context.Context, r *chi.Mux) {

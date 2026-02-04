@@ -129,7 +129,7 @@ export default function TerminalPage() {
 
     // Build WebSocket URL
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${window.location.host}${config.basePath}/api/v2/terminal/ws?token=${encodeURIComponent(token)}`;
+    const wsUrl = `${wsProtocol}//${window.location.host}${config.basePath}/api/v1/terminal/ws?token=${encodeURIComponent(token)}`;
 
     setConnectionStatus('connecting');
     const ws = new WebSocket(wsUrl);

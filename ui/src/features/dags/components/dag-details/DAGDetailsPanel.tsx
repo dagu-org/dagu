@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Maximize2, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { components } from '../../../../api/v2/schema';
+import { components } from '../../../../api/v1/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { usePageContext } from '../../../../contexts/PageContext';
 import { UnsavedChangesProvider } from '../../../../contexts/UnsavedChangesContext';

@@ -15,7 +15,7 @@ import {
   Terminal,
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { components, Status, TriggerType } from '../../../../api/v2/schema';
+import { components, Status, TriggerType } from '../../../../api/v1/schema';
 
 type Props = {
   status?: components['schemas']['DAGRunDetails'];

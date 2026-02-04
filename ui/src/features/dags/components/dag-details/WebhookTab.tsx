@@ -17,7 +17,7 @@ import {
   WebhookOff,
 } from 'lucide-react';
 import { useCallback, useContext, useEffect, useState } from 'react';
-import { components } from '../../../../api/v2/schema';
+import { components } from '../../../../api/v1/schema';
 import { Button } from '../../../../components/ui/button';
 import {
   Card,
@@ -84,8 +84,8 @@ function WebhookTab({ fileName }: WebhookTabProps) {
   const remoteNode = appBarContext.selectedRemoteNode;
   const webhookUrl =
     remoteNode && remoteNode !== 'local'
-      ? `${window.location.origin}/api/v2/webhooks/${encodeURIComponent(fileName)}?remoteNode=${encodeURIComponent(remoteNode)}`
-      : `${window.location.origin}/api/v2/webhooks/${encodeURIComponent(fileName)}`;
+      ? `${window.location.origin}/api/v1/webhooks/${encodeURIComponent(fileName)}?remoteNode=${encodeURIComponent(remoteNode)}`
+      : `${window.location.origin}/api/v1/webhooks/${encodeURIComponent(fileName)}`;
 
   // API helpers
   const getAuthHeaders = useCallback(() => {

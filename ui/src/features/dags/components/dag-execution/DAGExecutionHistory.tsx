@@ -6,7 +6,7 @@
 import { useErrorModal } from '@/components/ui/error-modal';
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { components, NodeStatus, Status, Stream } from '../../../../api/v2/schema';
+import { components, NodeStatus, Status, Stream } from '../../../../api/v1/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient, useQuery } from '../../../../hooks/api';
 import { useDAGHistorySSE } from '../../../../hooks/useDAGHistorySSE';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Activity, ChevronDown, ChevronRight, Clock } from 'lucide-react';
-import type { components } from '../../../api/v2/schema';
+import type { components } from '../../../api/v1/schema';
 import { cn } from '../../../lib/utils';
 import WorkerHealth from '../../workers/components/WorkerHealth';
 

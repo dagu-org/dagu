@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '../../../lib/utils';
-import type { components } from '../../../api/v2/schema';
+import type { components } from '../../../api/v1/schema';
 
 type WorkerHealthStatus = components['schemas']['WorkerHealthStatus'];
 

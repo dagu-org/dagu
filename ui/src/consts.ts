@@ -1,5 +1,5 @@
 import { CSSProperties } from 'react';
-import { NodeStatus, Status } from './api/v2/schema';
+import { NodeStatus, Status } from './api/v1/schema';
 
 /**
  * Status color mappings - Professional gray theme

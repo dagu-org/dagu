@@ -1,6 +1,6 @@
 import React, { ReactElement, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { components } from '../../../api/v2/schema';
+import { components } from '../../../api/v1/schema';
 import Prism from '../../../assets/js/prism';
 import { DAGDefinition } from '../../dags/components/dag-editor';
 

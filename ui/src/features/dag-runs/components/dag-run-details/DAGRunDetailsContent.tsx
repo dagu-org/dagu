@@ -1,5 +1,5 @@
 import React from 'react';
-import { components } from '../../../../api/v2/schema';
+import { components } from '../../../../api/v1/schema';
 import { DAGStatus } from '../../../../features/dags/components';
 import { DAGRunContext } from '../../contexts/DAGRunContext';
 import DAGRunHeader from './DAGRunHeader';

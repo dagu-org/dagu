@@ -1,4 +1,4 @@
-import { components, StatusLabel } from '@/api/v2/schema';
+import { components, StatusLabel } from '@/api/v1/schema';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';
 import dayjs from '@/lib/dayjs';

@@ -9,7 +9,7 @@ scrape_configs:
 
   # Scrape Dagu server's Prometheus-compatible metrics endpoint
   - job_name: 'dagu-server'
-    metrics_path: /api/v2/metrics
+    metrics_path: /api/v1/metrics
     static_configs:
       - targets: ['dagu-server:8080']
 

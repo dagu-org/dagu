@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ArrowUpDown, Check, Copy, Package, Search } from 'lucide-react';
-import { Status, StatusLabel } from '../../../../api/v2/schema';
+import { Status, StatusLabel } from '../../../../api/v1/schema';
 import { useQuery } from '../../../../hooks/api';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import {

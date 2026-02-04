@@ -1,4 +1,4 @@
-import { StatusLabel } from '@/api/v2/schema';
+import { StatusLabel } from '@/api/v1/schema';
 
 /**
  * Human-readable display labels for status values.

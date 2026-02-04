@@ -7,7 +7,7 @@ import BorderedBox from '@/ui/BorderedBox';
 import { AlertTriangle, Save } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useCookies } from 'react-cookie';
-import { components } from '../../../../api/v2/schema';
+import { components } from '../../../../api/v1/schema';
 import { Button } from '../../../../components/ui/button';
 import { useErrorModal } from '../../../../components/ui/error-modal';
 import { useSimpleToast } from '../../../../components/ui/simple-toast';
