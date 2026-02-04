@@ -436,7 +436,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	if script := n.Step().Script; script != "" {
 		scriptOpts := execEvalOpts
 		if n.Step().ExecutorConfig.IsCommand() {
-			scriptOpts = []cmdutil.EvalOption{cmdutil.OnlyReplaceVars()}
+			scriptOpts = append(scriptOpts, cmdutil.OnlyReplaceVars())
 		}
 		script, err := EvalString(ctx, script, scriptOpts...)
 		if err != nil {

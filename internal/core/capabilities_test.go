@@ -6,6 +6,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExecutorCapabilities_Get(t *testing.T) {
@@ -68,13 +69,21 @@ func TestStep_EvalOptions(t *testing.T) {
 		step := Step{ExecutorConfig: ExecutorConfig{Type: "no-eval-opts-test"}}
 		opts := step.EvalOptions(ctx)
 		// Default: WithoutExpandEnv() to prevent OS env leaking
-		assert.Len(t, opts, 1)
+		require.Len(t, opts, 1)
+
+		evalOpts := cmdutil.NewEvalOptions()
+		opts[0](evalOpts)
+		assert.False(t, evalOpts.ExpandEnv, "ExpandEnv should be disabled")
 	})
 
 	t.Run("UnregisteredExecutor", func(t *testing.T) {
 		step := Step{ExecutorConfig: ExecutorConfig{Type: "unregistered-executor"}}
 		opts := step.EvalOptions(ctx)
 		// Default: WithoutExpandEnv() to prevent OS env leaking
-		assert.Len(t, opts, 1)
+		require.Len(t, opts, 1)
+
+		evalOpts := cmdutil.NewEvalOptions()
+		opts[0](evalOpts)
+		assert.False(t, evalOpts.ExpandEnv, "ExpandEnv should be disabled")
 	})
 }

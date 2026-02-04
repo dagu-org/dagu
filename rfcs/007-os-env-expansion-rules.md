@@ -1,7 +1,7 @@
 ---
 id: "007"
 title: "OS Environment Variable Expansion Rules"
-status: draft
+status: implemented
 amends: "006"
 ---
 
@@ -17,7 +17,7 @@ This RFC improves the v1 variable expansion system documented in RFC 006. Specif
 
 ### The Problem
 
-RFC 006 documents that for non-shell executors (docker, http, ssh, mail, jq), **all variables including OS environment are expanded by Dagu** before passing to the executor (see RFC 006, "Non-Shell Executor Types" section). This breaks user intent when the variable is meant for the target environment, not the local machine.
+RFC 006 originally documented that for non-shell executors (docker, http, ssh, mail, jq), **all variables including OS environment were expanded by Dagu** before passing to the executor (see RFC 006, "Non-Shell Executor Types" section). This broke user intent when the variable was meant for the target environment, not the local machine.
 
 **SSH example (broken today):**
 
@@ -348,7 +348,7 @@ This is a **behavioral change** that could break existing DAGs that rely on impl
 ### Migration Path
 
 1. **Add a deprecation warning.** When Dagu expands an OS-only variable (not defined in DAG scope) inside a non-shell executor config, log a warning:
-   ```
+   ```text
    WARN: OS variable '${HOME}' expanded in ssh executor config.
          This will stop working in a future version.
          To keep this behavior, add 'HOME: "${HOME}"' to your env: block.
@@ -366,7 +366,7 @@ Given that the current behavior is almost always wrong for the affected use case
 
 ### RFC 006 (Variable Expansion Syntax v1)
 
-This RFC directly amends RFC 006. Specifically, it revises the "Non-Shell Executor Types" section which states that all variables including OS environment are expanded for non-shell executors. After this RFC, the rule becomes: **only variables defined in the DAG's scope are expanded**; OS-only variables pass through unchanged.
+This RFC directly amends RFC 006. Specifically, it revises the "Non-Shell Executor Types" section which previously stated that all variables including OS environment were expanded for non-shell executors. After this RFC, the rule is: **only variables defined in the DAG's scope are expanded**; OS-only variables pass through unchanged.
 
 All other behavior documented in RFC 006 remains unchanged:
 - DAG-level `env:` field still expands OS variables at load time (for explicit import)

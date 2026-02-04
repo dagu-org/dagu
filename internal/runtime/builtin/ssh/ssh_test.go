@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -240,6 +241,10 @@ func TestSSHExecutor_GetEvalOptions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			opts := tt.step.EvalOptions(context.Background())
 			require.Len(t, opts, 1, "expected WithoutExpandEnv option")
+
+			evalOpts := cmdutil.NewEvalOptions()
+			opts[0](evalOpts)
+			assert.False(t, evalOpts.ExpandEnv, "ExpandEnv should be disabled")
 		})
 	}
 }

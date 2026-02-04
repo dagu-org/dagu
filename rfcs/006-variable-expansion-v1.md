@@ -132,6 +132,7 @@ OS environment variables are **only expanded in the DAG-level `env:` field** at 
 | `command:` | No | `${HOME}` stays as `${HOME}` |
 | step `env:` | No | Evaluated at runtime |
 | `params:` | No | `${HOME}` stays as `${HOME}` |
+| Non-shell executor config | No | OS vars pass through to target environment (RFC 007) |
 
 **Example:**
 
@@ -153,16 +154,16 @@ This design allows:
 
 ### Non-Shell Executor Types
 
-For non-shell executor types (docker, http, ssh, mail, jq), **all variables including OS environment are expanded by Dagu** before passing to the executor. This differs from shell commands where OS variables pass through to the shell.
+For non-shell executor types (docker, http, ssh, mail, jq), Dagu expands only **DAG-scoped variables** (env, params, secrets, step outputs) before passing to the executor. OS-only environment variables (e.g., `$HOME`, `$PATH`) are **not expanded** — they pass through unchanged, letting the target environment (container, remote shell, etc.) resolve them. See [RFC 007](./007-os-env-expansion-rules.md) for details.
 
-| Executor Type | OS Env Expanded? | Expansion Timing |
-|---------------|------------------|------------------|
-| `command` (shell) | No | Shell handles at runtime |
-| `docker` | Yes | Before container creation |
-| `http` | Yes | Before HTTP request |
-| `ssh` | Yes | Before SSH connection |
-| `mail` | Yes | Before sending email |
-| `jq` | Yes | Before query execution |
+| Executor Type | DAG-Scoped Vars Expanded? | OS Env Expanded? | Expansion Timing |
+|---------------|--------------------------|------------------|------------------|
+| `command` (shell) | No (shell handles) | No (shell handles) | Shell handles at runtime |
+| `docker` | Yes | **No** (RFC 007) | Before container creation |
+| `http` | Yes | **No** (RFC 007) | Before HTTP request |
+| `ssh` | Yes | **No** (RFC 007) | Before SSH connection |
+| `mail` | Yes | **No** (RFC 007) | Before sending email |
+| `jq` | Yes | **No** (RFC 007) | Before query execution |
 
 **Example:**
 
@@ -175,16 +176,16 @@ steps:
   - name: shell-step
     command: echo $HOME
 
-  # Docker: $HOME is expanded by Dagu before container runs
+  # Docker: Only DAG-scoped vars are expanded
   - name: docker-step
     executor:
       type: docker
       config:
         image: "${REGISTRY}/app:latest"  # Expanded to "myregistry.com/app:latest"
         env:
-          - "DATA_DIR=$HOME/data"        # $HOME expanded by Dagu
+          - "DATA_DIR=$HOME/data"        # $HOME NOT expanded — left for container
 
-  # HTTP: All variables expanded before request
+  # HTTP: Only DAG-scoped vars are expanded
   - name: http-step
     executor:
       type: http
@@ -193,19 +194,19 @@ steps:
         headers:
           Authorization: "Bearer ${API_TOKEN}"
 
-  # SSH: Variables expanded before connection
+  # SSH: Only DAG-scoped vars are expanded; OS vars left for remote shell
   - name: ssh-step
     executor:
       type: ssh
       config:
         host: "${REMOTE_HOST}"
         user: "${REMOTE_USER}"
-        command: "ls -la"
+        command: "cd $HOME && ls -la"    # $HOME NOT expanded — left for remote shell
 ```
 
 **Why the difference?**
-- Shell commands can use shell's native variable expansion at runtime
-- Non-shell executors have no built-in variable expansion mechanism, so Dagu must expand all variables before passing configuration to them
+- Shell commands use the shell's native variable expansion at runtime
+- Non-shell executors pass OS variables through to the target environment (container, remote shell, etc.), which resolves them. To use a local OS value in executor config, explicitly import it via the DAG-level `env:` block (e.g., `HOME: "${HOME}"`)
 
 ---
 
