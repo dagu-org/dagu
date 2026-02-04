@@ -412,8 +412,9 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	}
 
 	// Evaluate the executor config if set
+	execEvalOpts := n.Step().EvalOptions(ctx)
 	execConfig := n.Step().ExecutorConfig
-	cfg, err := EvalObject(ctx, n.Step().ExecutorConfig.Config)
+	cfg, err := EvalObject(ctx, n.Step().ExecutorConfig.Config, execEvalOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to eval executor config: %w", err)
 	}
@@ -436,6 +437,8 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 		var opts []cmdutil.EvalOption
 		if n.Step().ExecutorConfig.IsCommand() {
 			opts = append(opts, cmdutil.OnlyReplaceVars())
+		} else {
+			opts = execEvalOpts
 		}
 		script, err := EvalString(ctx, script, opts...)
 		if err != nil {

@@ -99,11 +99,12 @@ func SupportsLLM(executorType string) bool {
 }
 
 // EvalOptions returns eval options for this step's executor type.
-// Returns nil if no special eval options are needed.
+// Unregistered executors default to WithoutExpandEnv() to prevent
+// local OS environment variables from leaking into remote/non-shell contexts.
 func (s Step) EvalOptions(ctx context.Context) []cmdutil.EvalOption {
 	caps := executorCapabilities.Get(s.ExecutorConfig.Type)
 	if caps.GetEvalOptions != nil {
 		return caps.GetEvalOptions(ctx, s)
 	}
-	return nil
+	return []cmdutil.EvalOption{cmdutil.WithoutExpandEnv()}
 }

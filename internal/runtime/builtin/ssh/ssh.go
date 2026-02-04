@@ -232,38 +232,11 @@ func init() {
 		MultipleCommands: true,
 		Script:           true,
 		Shell:            true,
-		GetEvalOptions: func(ctx context.Context, step core.Step) []cmdutil.EvalOption {
-			if hasShellConfigured(ctx, step) {
-				// Shell is configured, shell features (expansion, pipes, etc.) are supported
-				return nil
-			}
-			// No shell configured - skip shell expansion for remote execution
-			return []cmdutil.EvalOption{cmdutil.WithoutExpandShell()}
+		GetEvalOptions: func(_ context.Context, _ core.Step) []cmdutil.EvalOption {
+			// SSH commands run on a remote machine. WithoutExpandEnv prevents
+			// local OS vars from leaking into the remote execution context.
+			return []cmdutil.EvalOption{cmdutil.WithoutExpandEnv()}
 		},
 	}
 	executor.RegisterExecutor("ssh", NewSSHExecutor, nil, caps)
-}
-
-func hasShellConfigured(ctx context.Context, step core.Step) bool {
-	if len(step.ExecutorConfig.Config) > 0 {
-		return isShellValueSet(step.ExecutorConfig.Config["shell"])
-	}
-	if cli := getSSHClientFromContext(ctx); cli != nil && cli.Shell != "" {
-		return true
-	}
-	return step.Shell != ""
-}
-
-// isShellValueSet checks if a shell value from config is non-empty.
-func isShellValueSet(shellValue any) bool {
-	switch v := shellValue.(type) {
-	case string:
-		return strings.TrimSpace(v) != ""
-	case []any:
-		return len(v) > 0
-	case []string:
-		return len(v) > 0
-	default:
-		return false
-	}
 }

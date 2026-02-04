@@ -7,8 +7,8 @@ import (
 )
 
 // EvalObject recursively evaluates the string fields of the given object
-func EvalObject[T any](ctx context.Context, obj T, vars map[string]string) (T, error) {
-	result, err := evalObject(ctx, obj, vars)
+func EvalObject[T any](ctx context.Context, obj T, vars map[string]string, opts ...EvalOption) (T, error) {
+	result, err := evalObject(ctx, obj, vars, opts...)
 	if err != nil {
 		return obj, err
 	}
@@ -21,25 +21,31 @@ func EvalObject[T any](ctx context.Context, obj T, vars map[string]string) (T, e
 }
 
 // evalObject evaluates the given object based on its type.
-func evalObject(ctx context.Context, obj any, vars map[string]string) (any, error) {
+func evalObject(ctx context.Context, obj any, vars map[string]string, opts ...EvalOption) (any, error) {
 	v := reflect.ValueOf(obj)
+
+	// Build combined options: WithVariables(vars) + forwarded opts
+	allOpts := make([]EvalOption, 0, len(opts)+1)
+	allOpts = append(allOpts, WithVariables(vars))
+	allOpts = append(allOpts, opts...)
+
 	// Handle different types
 	// nolint:exhaustive
 	switch v.Kind() {
 	case reflect.String:
 		// Evaluate string values using cmdutil.EvalString
 		strVal := v.String()
-		evalResult, err := EvalString(ctx, strVal, WithVariables(vars))
+		evalResult, err := EvalString(ctx, strVal, allOpts...)
 		if err != nil {
 			return nil, err
 		}
 		return evalResult, nil
 	case reflect.Struct:
 		// Use the existing cmdutil.EvalStringFields for structs
-		return EvalStringFields(ctx, obj, WithVariables(vars))
+		return EvalStringFields(ctx, obj, allOpts...)
 	case reflect.Map:
 		// Process maps recursively
-		result, err := processMapWithVars(ctx, v, vars)
+		result, err := processMapWithVars(ctx, v, vars, opts...)
 		if err != nil {
 			return nil, err
 		}
@@ -48,7 +54,7 @@ func evalObject(ctx context.Context, obj any, vars map[string]string) (any, erro
 		// Process slices and arrays recursively
 		newSlice := reflect.MakeSlice(v.Type(), v.Len(), v.Cap())
 		for i := 0; i < v.Len(); i++ {
-			elemVal, err := EvalObject(ctx, v.Index(i).Interface(), vars)
+			elemVal, err := EvalObject(ctx, v.Index(i).Interface(), vars, opts...)
 			if err != nil {
 				return nil, err
 			}
@@ -63,10 +69,15 @@ func evalObject(ctx context.Context, obj any, vars map[string]string) (any, erro
 
 // processMap recursively processes a map, evaluating string values and recursively processing
 // nested maps and structs.
-func processMapWithVars(ctx context.Context, v reflect.Value, vars map[string]string) (reflect.Value, error) {
+func processMapWithVars(ctx context.Context, v reflect.Value, vars map[string]string, opts ...EvalOption) (reflect.Value, error) {
 	// Create a new map of the same type
 	mapType := v.Type()
 	newMap := reflect.MakeMap(mapType)
+
+	// Build combined options: WithVariables(vars) + forwarded opts
+	allOpts := make([]EvalOption, 0, len(opts)+1)
+	allOpts = append(allOpts, WithVariables(vars))
+	allOpts = append(allOpts, opts...)
 
 	// Iterate over the map entries
 	iter := v.MapRange()
@@ -87,14 +98,14 @@ func processMapWithVars(ctx context.Context, v reflect.Value, vars map[string]st
 		case reflect.String:
 			// Evaluate string values using cmdutil.EvalString
 			strVal := val.String()
-			evalResult, err := EvalString(ctx, strVal, WithVariables(vars))
+			evalResult, err := EvalString(ctx, strVal, allOpts...)
 			if err != nil {
 				return v, err
 			}
 			newVal = reflect.ValueOf(evalResult)
 		case reflect.Map:
 			// Recursively process nested maps
-			newVal, err = processMapWithVars(ctx, val, vars)
+			newVal, err = processMapWithVars(ctx, val, vars, opts...)
 			if err != nil {
 				return v, err
 			}
@@ -102,7 +113,7 @@ func processMapWithVars(ctx context.Context, v reflect.Value, vars map[string]st
 			// Process slices and arrays by evaluating each element
 			newSlice := reflect.MakeSlice(val.Type(), val.Len(), val.Cap())
 			for i := 0; i < val.Len(); i++ {
-				newVal, err := EvalObject(ctx, val.Index(i).Interface(), vars)
+				newVal, err := EvalObject(ctx, val.Index(i).Interface(), vars, opts...)
 				if err != nil {
 					return v, err
 				}
@@ -114,8 +125,7 @@ func processMapWithVars(ctx context.Context, v reflect.Value, vars map[string]st
 		case reflect.Struct:
 			// Process structs using cmdutil.EvalStringFields
 			structVal := val.Interface()
-			evalOpts := WithVariables(vars)
-			processed, err := EvalStringFields(ctx, structVal, evalOpts)
+			processed, err := EvalStringFields(ctx, structVal, allOpts...)
 			if err != nil {
 				return v, err
 			}

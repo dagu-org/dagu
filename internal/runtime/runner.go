@@ -606,6 +606,7 @@ func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) con
 	}
 
 	// Helper to evaluate and store environment variables
+	evalOpts := node.Step().EvalOptions(ctx)
 	evaluatedEnvs := make(map[string]string)
 	addEnvVars := func(envList []string) {
 		for _, v := range envList {
@@ -614,7 +615,7 @@ func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) con
 				logger.Error(ctx, "Invalid environment variable format", slog.String("var", v))
 				continue
 			}
-			evaluatedValue, err := env.EvalString(ctx, value)
+			evaluatedValue, err := env.EvalString(ctx, value, evalOpts...)
 			if err != nil {
 				logger.Error(ctx, "Failed to evaluate environment variable",
 					slog.String("var", v),

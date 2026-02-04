@@ -67,12 +67,14 @@ func TestStep_EvalOptions(t *testing.T) {
 
 		step := Step{ExecutorConfig: ExecutorConfig{Type: "no-eval-opts-test"}}
 		opts := step.EvalOptions(ctx)
-		assert.Nil(t, opts)
+		// Default: WithoutExpandEnv() to prevent OS env leaking
+		assert.Len(t, opts, 1)
 	})
 
 	t.Run("UnregisteredExecutor", func(t *testing.T) {
 		step := Step{ExecutorConfig: ExecutorConfig{Type: "unregistered-executor"}}
 		opts := step.EvalOptions(ctx)
-		assert.Nil(t, opts)
+		// Default: WithoutExpandEnv() to prevent OS env leaking
+		assert.Len(t, opts, 1)
 	})
 }

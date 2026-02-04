@@ -216,10 +216,9 @@ func TestSSHExecutor_GetEvalOptions(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name            string
-		step            core.Step
-		dagShell        string
-		expectSkipShell bool
+		name     string
+		step     core.Step
+		dagShell string
 	}{
 		{
 			name: "StepShellSet",
@@ -227,7 +226,6 @@ func TestSSHExecutor_GetEvalOptions(t *testing.T) {
 				Shell:          "/bin/bash",
 				ExecutorConfig: core.ExecutorConfig{Type: "ssh"},
 			},
-			expectSkipShell: false,
 		},
 		{
 			name: "StepConfigShellSet",
@@ -237,7 +235,6 @@ func TestSSHExecutor_GetEvalOptions(t *testing.T) {
 					Config: map[string]any{"shell": "/bin/bash"},
 				},
 			},
-			expectSkipShell: false,
 		},
 		{
 			name: "StepConfigNoShell",
@@ -247,22 +244,19 @@ func TestSSHExecutor_GetEvalOptions(t *testing.T) {
 					Config: map[string]any{"user": "test"},
 				},
 			},
-			expectSkipShell: true,
 		},
 		{
 			name: "DAGShellSet",
 			step: core.Step{
 				ExecutorConfig: core.ExecutorConfig{Type: "ssh"},
 			},
-			dagShell:        "/bin/bash",
-			expectSkipShell: false,
+			dagShell: "/bin/bash",
 		},
 		{
 			name: "NoShellAnywhere",
 			step: core.Step{
 				ExecutorConfig: core.ExecutorConfig{Type: "ssh"},
 			},
-			expectSkipShell: true,
 		},
 	}
 
@@ -274,12 +268,9 @@ func TestSSHExecutor_GetEvalOptions(t *testing.T) {
 			}
 
 			opts := tt.step.EvalOptions(ctx)
-
-			if tt.expectSkipShell {
-				require.Len(t, opts, 1, "expected WithoutExpandShell option")
-			} else {
-				require.Empty(t, opts, "expected no eval options")
-			}
+			// SSH always returns WithoutExpandEnv to prevent local OS vars
+			// from leaking into remote execution, regardless of shell config.
+			require.Len(t, opts, 1, "expected WithoutExpandEnv option")
 		})
 	}
 }
