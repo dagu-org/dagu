@@ -423,7 +423,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 
 	// Evaluate the sub DAG if set
 	if child := n.Step().SubDAG; child != nil {
-		dagName, err := EvalString(ctx, child.Name)
+		dagName, err := EvalString(ctx, child.Name, execEvalOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to eval sub DAG name: %w", err)
 		}

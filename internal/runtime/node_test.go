@@ -359,6 +359,33 @@ Line 5: Process completed
 	}
 }
 
+func TestSubDAGNameEvaluation(t *testing.T) {
+	// Not parallel: t.Setenv is incompatible with t.Parallel
+	t.Setenv("DAGU_TEST_SUBDAG_OS", "os-leaked")
+
+	ctx := runtime.NewContextForTest(context.Background(), &core.DAG{}, "test-run", "test.log")
+	step := core.Step{Name: "test-step"}
+	env := runtime.NewEnv(ctx, step)
+	env.Scope = env.Scope.WithEntry("USER_DAG", "my-workflow", cmdutil.EnvSourceStepEnv)
+	ctx = runtime.WithEnv(ctx, env)
+
+	// Simulate what setupExecutor does: get eval options, then call EvalString
+	evalOpts := step.EvalOptions(ctx)
+
+	t.Run("UserVarExpanded", func(t *testing.T) {
+		result, err := runtime.EvalString(ctx, "${USER_DAG}", evalOpts...)
+		require.NoError(t, err)
+		assert.Equal(t, "my-workflow", result)
+	})
+
+	t.Run("OSEnvNotExpanded", func(t *testing.T) {
+		result, err := runtime.EvalString(ctx, "$DAGU_TEST_SUBDAG_OS", evalOpts...)
+		require.NoError(t, err)
+		assert.Equal(t, "$DAGU_TEST_SUBDAG_OS", result,
+			"OS env var should not be expanded in sub DAG name")
+	})
+}
+
 func TestNodeBuildSubDAGRuns(t *testing.T) {
 	t.Parallel()
 
