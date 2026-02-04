@@ -43,13 +43,13 @@ spec:
               mountPath: /etc/dagu
           livenessProbe:
             httpGet:
-              path: /api/v2/health
+              path: /api/v1/health
               port: http
             initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /api/v2/health
+              path: /api/v1/health
               port: http
             initialDelaySeconds: 5
             periodSeconds: 5

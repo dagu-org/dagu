@@ -5,7 +5,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
-import { components, Status } from '../../../../api/v2/schema';
+import { components, Status } from '../../../../api/v1/schema';
 import { Button } from '../../../../components/ui/button';
 import { Input } from '../../../../components/ui/input';
 import { ReloadButton } from '../../../../components/ui/reload-button';

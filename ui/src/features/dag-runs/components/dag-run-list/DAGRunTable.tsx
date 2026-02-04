@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { components, Status } from '../../../../api/v2/schema';
+import { components, Status } from '../../../../api/v1/schema';
 import {
   Table,
   TableBody,

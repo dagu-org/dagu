@@ -7,7 +7,7 @@ import {
   Webhook,
 } from 'lucide-react';
 import React, { useState } from 'react';
-import { components } from '../../../../api/v2/schema';
+import { components } from '../../../../api/v1/schema';
 import { DAGStatus } from '../../components';
 import { DAGContext } from '../../contexts/DAGContext';
 import { LinkTab } from '../common';

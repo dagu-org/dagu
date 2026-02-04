@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { components, Status } from '../../../../api/v2/schema';
+import { components, Status } from '../../../../api/v1/schema';
 import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
 import { DAGRunDetailsModal } from '../dag-run-details';

@@ -18,7 +18,7 @@ import {
   ZoomOut,
 } from 'lucide-react';
 import React, { useState } from 'react';
-import { components, NodeStatus } from '../../../../api/v2/schema';
+import { components, NodeStatus } from '../../../../api/v1/schema';
 import Mermaid from '../../../../ui/Mermaid';
 
 /**

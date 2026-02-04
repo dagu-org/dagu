@@ -1,4 +1,4 @@
-import { components, NodeStatus } from '@/api/v2/schema';
+import { components, NodeStatus } from '@/api/v1/schema';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { StepMessagesTable } from './StepMessagesTable';

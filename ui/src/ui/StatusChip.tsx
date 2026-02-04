@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 import { getStatusClass } from '@/lib/status-utils';
 import React from 'react';
-import { Status } from '../api/v2/schema';
+import { Status } from '../api/v1/schema';
 import MatrixText from './MatrixText';
 
 type Props = {

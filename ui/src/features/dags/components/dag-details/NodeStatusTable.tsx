@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { components } from '../../../../api/v2/schema';
+import { components } from '../../../../api/v1/schema';
 import NodeStatusTableRow from './NodeStatusTableRow';
 
 /**

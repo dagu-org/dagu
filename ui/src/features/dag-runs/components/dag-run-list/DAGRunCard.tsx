@@ -1,6 +1,6 @@
 import { Server } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { components, Status } from '../../../../api/v2/schema';
+import { components, Status } from '../../../../api/v1/schema';
 import {
   Card,
   CardContent,

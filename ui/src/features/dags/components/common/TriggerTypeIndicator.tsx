@@ -1,4 +1,4 @@
-import { TriggerType } from '@/api/v2/schema';
+import { TriggerType } from '@/api/v1/schema';
 import type { ReactElement } from 'react';
 
 const labels: Record<TriggerType, string> = {

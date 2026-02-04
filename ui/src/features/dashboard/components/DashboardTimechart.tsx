@@ -9,7 +9,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { DataSet } from 'vis-data';
 import { Timeline } from 'vis-timeline/standalone';
 import 'vis-timeline/styles/vis-timeline-graph2d.css';
-import { components } from '../../../api/v2/schema';
+import { components } from '../../../api/v1/schema';
 import { statusColorMapping } from '../../../consts';
 import { useConfig } from '../../../contexts/ConfigContext';
 import dayjs from '../../../lib/dayjs';

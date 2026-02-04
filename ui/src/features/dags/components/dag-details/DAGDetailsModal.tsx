@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Maximize2, X } from 'lucide-react';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { components } from '../../../../api/v2/schema';
+import { components } from '../../../../api/v1/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 import { useDAGSSE } from '../../../../hooks/useDAGSSE';

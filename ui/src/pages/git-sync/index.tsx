@@ -1,4 +1,4 @@
-import { components, SyncStatus, SyncSummary } from '@/api/v2/schema';
+import { components, SyncStatus, SyncSummary } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,

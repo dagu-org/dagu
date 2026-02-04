@@ -15,7 +15,7 @@
     "typecheck": "tsc",
     "typecheck:watch": "tsc -w",
     "profile": "webpack --profile --config webpack.prod.js --json=compilation-stats.json && webpack-bundle-analyzer ./compilation-stats.json",
-    "gen:api": "openapi-typescript --enum ../api/v2/api.yaml -o src/api/v2/schema.ts"
+    "gen:api": "openapi-typescript --enum ../api/v1/api.yaml -o src/api/v1/schema.ts"
   },
   "repository": {
     "type": "git",

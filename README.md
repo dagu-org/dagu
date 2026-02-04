@@ -273,7 +273,7 @@ Full documentation is available at [docs.dagu.cloud](https://docs.dagu.cloud/).
 | `DAGU_HOST` | `127.0.0.1` | Web UI server host |
 | `DAGU_PORT` | `8080` | Web UI server port |
 | `DAGU_BASE_PATH` | - | Base path for reverse proxy setup |
-| `DAGU_API_BASE_URL` | `/api/v2` | API endpoint base path |
+| `DAGU_API_BASE_URL` | `/api/v1` | API endpoint base path |
 | `DAGU_TZ` | - | Server timezone (e.g., `Asia/Tokyo`) |
 | `DAGU_DEBUG` | `false` | Enable debug mode |
 | `DAGU_LOG_FORMAT` | `text` | Log format (`text` or `json`) |

@@ -3,7 +3,7 @@
  *
  * @module features/dags/components/dag-details
  */
-import { components } from '../../../../api/v2/schema';
+import { components } from '../../../../api/v1/schema';
 import {
   Table,
   TableBody,

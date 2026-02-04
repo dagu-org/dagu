@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { getStatusClass } from '@/lib/status-utils';
 import MatrixText from '@/ui/MatrixText';
 import React, { useEffect, useState } from 'react';
-import { NodeStatus } from '../../../../api/v2/schema';
+import { NodeStatus } from '../../../../api/v1/schema';
 
 const BRAILLE_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 

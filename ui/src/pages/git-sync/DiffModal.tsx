@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { SyncStatus } from '@/api/v2/schema';
+import { SyncStatus } from '@/api/v1/schema';
 import { useUserPreferences } from '@/contexts/UserPreference';
 import { Upload, RotateCcw } from 'lucide-react';
 

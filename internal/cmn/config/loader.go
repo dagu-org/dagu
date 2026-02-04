@@ -1108,7 +1108,7 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("port", 8080)
 	l.v.SetDefault("debug", false)
 	l.v.SetDefault("basePath", "")
-	l.v.SetDefault("apiBasePath", "/api/v2")
+	l.v.SetDefault("apiBasePath", "/api/v1")
 	l.v.SetDefault("latestStatusToday", false)
 	l.v.SetDefault("metrics", "private")
 	l.v.SetDefault("cache", "normal")
