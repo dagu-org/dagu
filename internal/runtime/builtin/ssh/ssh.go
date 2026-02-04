@@ -233,8 +233,7 @@ func init() {
 		Script:           true,
 		Shell:            true,
 		GetEvalOptions: func(_ context.Context, _ core.Step) []cmdutil.EvalOption {
-			// SSH commands run on a remote machine. WithoutExpandEnv prevents
-			// local OS vars from leaking into the remote execution context.
+			// Prevent local OS vars from leaking into remote execution.
 			return []cmdutil.EvalOption{cmdutil.WithoutExpandEnv()}
 		},
 	}

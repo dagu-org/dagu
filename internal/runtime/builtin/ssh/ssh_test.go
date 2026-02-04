@@ -215,45 +215,21 @@ func TestSSHExecutor_ShellPriority(t *testing.T) {
 func TestSSHExecutor_GetEvalOptions(t *testing.T) {
 	t.Parallel()
 
+	// SSH always returns WithoutExpandEnv to prevent local OS vars
+	// from leaking into remote execution, regardless of shell config.
 	tests := []struct {
-		name     string
-		step     core.Step
-		dagShell string
+		name string
+		step core.Step
 	}{
 		{
-			name: "StepShellSet",
+			name: "WithShellConfig",
 			step: core.Step{
 				Shell:          "/bin/bash",
 				ExecutorConfig: core.ExecutorConfig{Type: "ssh"},
 			},
 		},
 		{
-			name: "StepConfigShellSet",
-			step: core.Step{
-				ExecutorConfig: core.ExecutorConfig{
-					Type:   "ssh",
-					Config: map[string]any{"shell": "/bin/bash"},
-				},
-			},
-		},
-		{
-			name: "StepConfigNoShell",
-			step: core.Step{
-				ExecutorConfig: core.ExecutorConfig{
-					Type:   "ssh",
-					Config: map[string]any{"user": "test"},
-				},
-			},
-		},
-		{
-			name: "DAGShellSet",
-			step: core.Step{
-				ExecutorConfig: core.ExecutorConfig{Type: "ssh"},
-			},
-			dagShell: "/bin/bash",
-		},
-		{
-			name: "NoShellAnywhere",
+			name: "WithoutShellConfig",
 			step: core.Step{
 				ExecutorConfig: core.ExecutorConfig{Type: "ssh"},
 			},
@@ -262,14 +238,7 @@ func TestSSHExecutor_GetEvalOptions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			if tt.dagShell != "" {
-				ctx = WithSSHClient(ctx, &Client{Shell: tt.dagShell})
-			}
-
-			opts := tt.step.EvalOptions(ctx)
-			// SSH always returns WithoutExpandEnv to prevent local OS vars
-			// from leaking into remote execution, regardless of shell config.
+			opts := tt.step.EvalOptions(context.Background())
 			require.Len(t, opts, 1, "expected WithoutExpandEnv option")
 		})
 	}

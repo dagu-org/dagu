@@ -434,13 +434,11 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 
 	// Evaluate script if set
 	if script := n.Step().Script; script != "" {
-		var opts []cmdutil.EvalOption
+		scriptOpts := execEvalOpts
 		if n.Step().ExecutorConfig.IsCommand() {
-			opts = append(opts, cmdutil.OnlyReplaceVars())
-		} else {
-			opts = execEvalOpts
+			scriptOpts = []cmdutil.EvalOption{cmdutil.OnlyReplaceVars()}
 		}
-		script, err := EvalString(ctx, script, opts...)
+		script, err := EvalString(ctx, script, scriptOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to eval script: %w", err)
 		}
