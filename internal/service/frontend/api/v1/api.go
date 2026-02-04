@@ -13,7 +13,7 @@ import (
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
@@ -220,7 +220,7 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 }
 
 func (a *API) evaluateAndNormalizeURL(ctx context.Context, baseURL string) string {
-	if evaluated, err := cmdutil.EvalString(ctx, baseURL); err != nil {
+	if evaluated, err := eval.String(ctx, baseURL); err != nil {
 		logger.Warn(ctx, "Failed to evaluate API base URL",
 			tag.URL(baseURL),
 			tag.Error(err))
@@ -232,7 +232,7 @@ func (a *API) evaluateAndNormalizeURL(ctx context.Context, baseURL string) strin
 
 func (a *API) evaluateBasePath(ctx context.Context) string {
 	basePath := a.config.Server.BasePath
-	if evaluated, err := cmdutil.EvalString(ctx, basePath); err != nil {
+	if evaluated, err := eval.String(ctx, basePath); err != nil {
 		logger.Warn(ctx, "Failed to evaluate server base path",
 			tag.Path(basePath),
 			tag.Error(err))

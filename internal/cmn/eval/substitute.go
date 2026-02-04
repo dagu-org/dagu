@@ -1,4 +1,4 @@
-package cmdutil
+package eval
 
 import (
 	"bytes"
@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 )
 
 // buildShellCommand creates an exec.Cmd with appropriate arguments for the shell type
@@ -31,7 +33,7 @@ func buildShellCommand(shell, cmdStr string) *exec.Cmd {
 // runCommandWithContext executes cmdStr in a shell using environment from context.
 // If EnvScope is present in context, uses it; otherwise falls back to os.Environ().
 func runCommandWithContext(ctx context.Context, cmdStr string) (string, error) {
-	sh := GetShellCommand("")
+	sh := cmdutil.GetShellCommand("")
 	cmd := buildShellCommand(sh, cmdStr)
 
 	// Use context-provided env or fall back to os.Environ()

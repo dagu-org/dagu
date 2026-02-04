@@ -1,4 +1,4 @@
-package cmdutil
+package eval
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestEvalObject_String(t *testing.T) {
+func TestObject_String(t *testing.T) {
 	ctx := context.Background()
 	vars := map[string]string{
 		"NAME":  "World",
@@ -17,41 +17,41 @@ func TestEvalObject_String(t *testing.T) {
 
 	t.Run("SimpleVariableSubstitution", func(t *testing.T) {
 		input := "Hello, $NAME!"
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 		assert.Equal(t, "Hello, World!", result)
 	})
 
 	t.Run("MultipleVariables", func(t *testing.T) {
 		input := "$NAME has value $VALUE"
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 		assert.Equal(t, "World has value 42", result)
 	})
 
 	t.Run("BracedVariable", func(t *testing.T) {
 		input := "${NAME}Test"
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 		assert.Equal(t, "WorldTest", result)
 	})
 
 	t.Run("NoVariables", func(t *testing.T) {
 		input := "plain text"
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 		assert.Equal(t, "plain text", result)
 	})
 
 	t.Run("EmptyString", func(t *testing.T) {
 		input := ""
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 		assert.Equal(t, "", result)
 	})
 }
 
-func TestEvalObject_Struct(t *testing.T) {
+func TestObject_Struct(t *testing.T) {
 	ctx := context.Background()
 	vars := map[string]string{
 		"HOST": "localhost",
@@ -70,7 +70,7 @@ func TestEvalObject_Struct(t *testing.T) {
 			Port:    "$PORT",
 			Timeout: 30,
 		}
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 		assert.Equal(t, "localhost", result.Host)
 		assert.Equal(t, "8080", result.Port)
@@ -83,7 +83,7 @@ func TestEvalObject_Struct(t *testing.T) {
 			Port:    "443",
 			Timeout: 60,
 		}
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 		assert.Equal(t, "example.com", result.Host)
 		assert.Equal(t, "443", result.Port)
@@ -91,7 +91,7 @@ func TestEvalObject_Struct(t *testing.T) {
 	})
 }
 
-func TestEvalObject_Map(t *testing.T) {
+func TestObject_Map(t *testing.T) {
 	ctx := context.Background()
 	vars := map[string]string{
 		"KEY":   "resolved_key",
@@ -103,7 +103,7 @@ func TestEvalObject_Map(t *testing.T) {
 			"key1": "$KEY",
 			"key2": "$VALUE",
 		}
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 		assert.Equal(t, "resolved_key", result["key1"])
 		assert.Equal(t, "resolved_value", result["key2"])
@@ -114,7 +114,7 @@ func TestEvalObject_Map(t *testing.T) {
 			"str":    "$KEY",
 			"number": 42,
 		}
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 		assert.Equal(t, "resolved_key", result["str"])
 		assert.Equal(t, 42, result["number"])
@@ -126,7 +126,7 @@ func TestEvalObject_Map(t *testing.T) {
 				"inner": "$VALUE",
 			},
 		}
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 
 		outerMap, ok := result["outer"].(map[string]any)
@@ -136,13 +136,13 @@ func TestEvalObject_Map(t *testing.T) {
 
 	t.Run("EmptyMap", func(t *testing.T) {
 		input := map[string]string{}
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 		assert.Empty(t, result)
 	})
 }
 
-func TestEvalObject_Slice(t *testing.T) {
+func TestObject_Slice(t *testing.T) {
 	ctx := context.Background()
 	vars := map[string]string{
 		"ITEM1": "first",
@@ -151,14 +151,14 @@ func TestEvalObject_Slice(t *testing.T) {
 
 	t.Run("SliceOfStrings", func(t *testing.T) {
 		input := []string{"$ITEM1", "$ITEM2", "literal"}
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"first", "second", "literal"}, result)
 	})
 
 	t.Run("SliceOfInterface", func(t *testing.T) {
 		input := []any{"$ITEM1", 42, "$ITEM2"}
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 		assert.Equal(t, "first", result[0])
 		assert.Equal(t, 42, result[1])
@@ -167,7 +167,7 @@ func TestEvalObject_Slice(t *testing.T) {
 
 	t.Run("EmptySlice", func(t *testing.T) {
 		input := []string{}
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 		assert.Empty(t, result)
 	})
@@ -176,7 +176,7 @@ func TestEvalObject_Slice(t *testing.T) {
 		input := map[string]any{
 			"items": []string{"$ITEM1", "$ITEM2"},
 		}
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 
 		items, ok := result["items"].([]string)
@@ -185,40 +185,40 @@ func TestEvalObject_Slice(t *testing.T) {
 	})
 }
 
-func TestEvalObject_Primitives(t *testing.T) {
+func TestObject_Primitives(t *testing.T) {
 	ctx := context.Background()
 	vars := map[string]string{"VAR": "value"}
 
 	t.Run("IntegerPassthrough", func(t *testing.T) {
 		input := 42
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 		assert.Equal(t, 42, result)
 	})
 
 	t.Run("FloatPassthrough", func(t *testing.T) {
 		input := 3.14
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 		assert.Equal(t, 3.14, result)
 	})
 
 	t.Run("BoolPassthrough", func(t *testing.T) {
 		input := true
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 		assert.True(t, result)
 	})
 
 	t.Run("NilPassthrough", func(t *testing.T) {
 		var input *string = nil
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 		assert.Nil(t, result)
 	})
 }
 
-func TestEvalObject_ComplexScenarios(t *testing.T) {
+func TestObject_ComplexScenarios(t *testing.T) {
 	ctx := context.Background()
 	vars := map[string]string{
 		"HOST":     "api.example.com",
@@ -238,7 +238,7 @@ func TestEvalObject_ComplexScenarios(t *testing.T) {
 				Name: "main",
 			},
 		}
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 
 		endpoint, ok := result["endpoint"].(Endpoint)
@@ -255,7 +255,7 @@ func TestEvalObject_ComplexScenarios(t *testing.T) {
 				},
 			},
 		}
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 
 		level1, ok := result["level1"].(map[string]any)
@@ -270,7 +270,7 @@ func TestEvalObject_ComplexScenarios(t *testing.T) {
 			{URL: "$PROTOCOL://$HOST", Name: "endpoint1"},
 			{URL: "$PROTOCOL://$HOST:$PORT", Name: "endpoint2"},
 		}
-		result, err := EvalObject(ctx, input, vars)
+		result, err := Object(ctx, input, vars)
 		require.NoError(t, err)
 		require.Len(t, result, 2)
 		assert.Equal(t, "https://api.example.com", result[0].URL)
@@ -278,25 +278,25 @@ func TestEvalObject_ComplexScenarios(t *testing.T) {
 	})
 }
 
-func TestEvalObject_EmptyVars(t *testing.T) {
+func TestObject_EmptyVars(t *testing.T) {
 	ctx := context.Background()
 	emptyVars := map[string]string{}
 
 	t.Run("StringWithUndefinedVariable", func(t *testing.T) {
 		input := "Hello, $UNDEFINED!"
-		result, err := EvalObject(ctx, input, emptyVars)
+		result, err := Object(ctx, input, emptyVars)
 		require.NoError(t, err)
-		// Undefined variables should be replaced with empty string
-		assert.Equal(t, "Hello, !", result)
+		// Undefined variables are preserved as-is (consistent with struct field behavior)
+		assert.Equal(t, "Hello, $UNDEFINED!", result)
 	})
 }
 
-func TestEvalObject_NilVars(t *testing.T) {
+func TestObject_NilVars(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("NilVarsMap", func(t *testing.T) {
 		input := "Hello, World!"
-		result, err := EvalObject(ctx, input, nil)
+		result, err := Object(ctx, input, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "Hello, World!", result)
 	})

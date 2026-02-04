@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 )
 
 // EvalString evaluates the given string with the variables within the execution context.
-func EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
+func EvalString(ctx context.Context, s string, opts ...eval.Option) (string, error) {
 	return GetEnv(ctx).EvalString(ctx, s, opts...)
 }
 
@@ -24,7 +24,7 @@ func EvalBool(ctx context.Context, value any) (bool, error) {
 // EvalObject recursively evaluates the string fields of the given object
 // with the variables within the execution context.
 func EvalObject[T any](ctx context.Context, obj T) (T, error) {
-	return cmdutil.EvalObject(ctx, obj, AllEnvsMap(ctx))
+	return eval.Object(ctx, obj, AllEnvsMap(ctx))
 }
 
 // GenerateSubDAGRunID generates a unique run ID based on the current DAG run ID, step name, and parameters.

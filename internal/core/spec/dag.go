@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec/types"
 	"github.com/go-viper/mapstructure/v2"
@@ -469,7 +470,7 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 
 	// Initialize shared envScope state for thread-safe env var handling.
 	// Start with OS environment as base layer.
-	baseScope := cmdutil.NewEnvScope(nil, true)
+	baseScope := eval.NewEnvScope(nil, true)
 
 	// Pre-populate with build env from options (for retry with dotenv).
 	// This allows YAML to reference env vars that were loaded from .env files
@@ -479,7 +480,7 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 		buildEnv[k] = v
 	}
 	if len(buildEnv) > 0 {
-		baseScope = baseScope.WithEntries(buildEnv, cmdutil.EnvSourceDotEnv)
+		baseScope = baseScope.WithEntries(buildEnv, eval.EnvSourceDotEnv)
 	}
 
 	ctx.envScope = &envScopeState{
@@ -698,7 +699,7 @@ func buildEnvs(ctx BuildContext, d *dag) ([]string, error) {
 	// Add vars to the shared envScope state so subsequent transformers can use it.
 	// This replaces the old pattern of using os.Setenv which caused race conditions.
 	if ctx.envScope != nil && len(vars) > 0 {
-		ctx.envScope.scope = ctx.envScope.scope.WithEntries(vars, cmdutil.EnvSourceDAGEnv)
+		ctx.envScope.scope = ctx.envScope.scope.WithEntries(vars, eval.EnvSourceDAGEnv)
 		for k, v := range vars {
 			ctx.envScope.buildEnv[k] = v
 		}

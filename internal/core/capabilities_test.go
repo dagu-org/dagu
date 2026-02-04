@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -49,8 +49,8 @@ func TestStep_EvalOptions(t *testing.T) {
 		// Register executor with GetEvalOptions callback
 		RegisterExecutorCapabilities("eval-opts-test", ExecutorCapabilities{
 			Command: true,
-			GetEvalOptions: func(_ context.Context, _ Step) []cmdutil.EvalOption {
-				return []cmdutil.EvalOption{cmdutil.WithoutExpandShell()}
+			GetEvalOptions: func(_ context.Context, _ Step) []eval.Option {
+				return []eval.Option{eval.WithoutExpandShell()}
 			},
 		})
 

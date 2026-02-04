@@ -24,7 +24,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	authmodel "github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -560,7 +560,7 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 
 func (srv *Server) evaluateBasePath(ctx context.Context) string {
 	basePath := srv.config.Server.BasePath
-	evaluated, err := cmdutil.EvalString(ctx, basePath)
+	evaluated, err := eval.String(ctx, basePath)
 	if err != nil {
 		logger.Warn(ctx, "Failed to evaluate server base path", tag.Path(basePath), tag.Error(err))
 		return basePath

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -29,7 +29,7 @@ func TestEvalString(t *testing.T) {
 	env.Scope = env.Scope.WithEntries(map[string]string{
 		"TEST_VAR":    "hello",
 		"ANOTHER_VAR": "world",
-	}, cmdutil.EnvSourceStepEnv)
+	}, eval.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	tests := []struct {
@@ -83,7 +83,7 @@ func TestEvalBool(t *testing.T) {
 		"ONE_VAR":     "1",
 		"ZERO_VAR":    "0",
 		"INVALID_VAR": "not-a-bool",
-	}, cmdutil.EnvSourceStepEnv)
+	}, eval.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	tests := []struct {
@@ -175,7 +175,7 @@ func TestEvalObject(t *testing.T) {
 		"NAME_VAR":   "John",
 		"DESC_VAR":   "Developer",
 		"NESTED_VAR": "NestedValue",
-	}, cmdutil.EnvSourceStepEnv)
+	}, eval.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	// Create a test struct
@@ -219,7 +219,7 @@ func TestEvalObjectWithExecutorConfig(t *testing.T) {
 		"EXECUTOR_TYPE": "docker",
 		"HOST_VAR":      "localhost",
 		"PORT_VAR":      "8080",
-	}, cmdutil.EnvSourceStepEnv)
+	}, eval.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	// Create an ExecutorConfig with variables
@@ -330,7 +330,7 @@ func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
 		"VAR1": "value1",
 		"VAR2": "value2",
 		"NUM":  "42",
-	}, cmdutil.EnvSourceStepEnv)
+	}, eval.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	tests := []struct {
@@ -492,7 +492,7 @@ func TestEvalStringEdgeCases(t *testing.T) {
 		"EMPTY":   "",
 		"SPACES":  "  ",
 		"SPECIAL": "special!@#",
-	}, cmdutil.EnvSourceStepEnv)
+	}, eval.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	tests := []struct {
@@ -560,7 +560,7 @@ func TestEvalObjectWithDirectStringEvaluation(t *testing.T) {
 		"STRING_VAR": "evaluated_string",
 		"PATH_VAR":   "/path/to/file",
 		"COMBINED":   "prefix",
-	}, cmdutil.EnvSourceStepEnv)
+	}, eval.EnvSourceStepEnv)
 	ctx = runtime.WithEnv(ctx, env)
 
 	tests := []struct {
@@ -650,7 +650,7 @@ func TestEvalBoolEdgeCases(t *testing.T) {
 		"OFF": "off",
 		"T":   "t",
 		"F":   "f",
-	}, cmdutil.EnvSourceStepEnv)
+	}, eval.EnvSourceStepEnv)
 
 	ctx = runtime.WithEnv(ctx, env)
 

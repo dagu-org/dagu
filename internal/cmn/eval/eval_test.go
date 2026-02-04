@@ -1,4 +1,4 @@
-package cmdutil
+package eval
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestEvalStringFields(t *testing.T) {
+func TestStringFields(t *testing.T) {
 	// Set up test environment variables
 	_ = os.Setenv("TEST_VAR", "test_value")
 	_ = os.Setenv("NESTED_VAR", "nested_value")
@@ -83,7 +83,7 @@ func TestEvalStringFields(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			got, err := EvalStringFields(ctx, tt.input)
+			got, err := StringFields(ctx, tt.input)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
@@ -94,9 +94,9 @@ func TestEvalStringFields(t *testing.T) {
 	}
 }
 
-func TestEvalStringFields_AnonymousStruct(t *testing.T) {
+func TestStringFields_AnonymousStruct(t *testing.T) {
 	ctx := context.Background()
-	obj, err := EvalStringFields(ctx, struct {
+	obj, err := StringFields(ctx, struct {
 		Field string
 	}{
 		Field: "`echo hello`",
@@ -105,13 +105,13 @@ func TestEvalStringFields_AnonymousStruct(t *testing.T) {
 	require.Equal(t, "hello", obj.Field)
 }
 
-func TestEvalStringFields_NonStruct(t *testing.T) {
+func TestStringFields_NonStruct(t *testing.T) {
 	ctx := context.Background()
-	_, err := EvalStringFields(ctx, "not a struct")
+	_, err := StringFields(ctx, "not a struct")
 	assert.Error(t, err)
 }
 
-func TestEvalStringFields_NestedStructs(t *testing.T) {
+func TestStringFields_NestedStructs(t *testing.T) {
 	type DeepNested struct {
 		Field string
 	}
@@ -155,22 +155,22 @@ func TestEvalStringFields_NestedStructs(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	got, err := EvalStringFields(ctx, input)
+	got, err := StringFields(ctx, input)
 	require.NoError(t, err)
 	assert.Equal(t, want, got)
 }
 
-func TestEvalStringFields_EmptyStruct(t *testing.T) {
+func TestStringFields_EmptyStruct(t *testing.T) {
 	type Empty struct{}
 
 	input := Empty{}
 	ctx := context.Background()
-	got, err := EvalStringFields(ctx, input)
+	got, err := StringFields(ctx, input)
 	require.NoError(t, err)
 	assert.Equal(t, input, got)
 }
 
-func TestEvalStringFields_PointerFields(t *testing.T) {
+func TestStringFields_PointerFields(t *testing.T) {
 	_ = os.Setenv("PTR_VAR", "pointer_value")
 	defer func() {
 		_ = os.Unsetenv("PTR_VAR")
@@ -196,7 +196,7 @@ func TestEvalStringFields_PointerFields(t *testing.T) {
 		}},
 	}
 
-	result, err := EvalStringFields(ctx, input)
+	result, err := StringFields(ctx, input)
 	require.NoError(t, err)
 	require.NotNil(t, result.Token)
 	assert.Equal(t, "pointer_value", *result.Token)
@@ -206,7 +206,7 @@ func TestEvalStringFields_PointerFields(t *testing.T) {
 	assert.Equal(t, "pointer_value", result.Items[0].Value)
 }
 
-func TestEvalStringFields_NilPointerFields(t *testing.T) {
+func TestStringFields_NilPointerFields(t *testing.T) {
 	t.Setenv("NIL_TEST_VAR", "value")
 
 	type Nested struct {
@@ -231,7 +231,7 @@ func TestEvalStringFields_NilPointerFields(t *testing.T) {
 		Regular:   "$NIL_TEST_VAR",
 	}
 
-	result, err := EvalStringFields(ctx, input)
+	result, err := StringFields(ctx, input)
 	require.NoError(t, err)
 	assert.Nil(t, result.NilString)
 	assert.Nil(t, result.NilStruct)
@@ -240,7 +240,7 @@ func TestEvalStringFields_NilPointerFields(t *testing.T) {
 	assert.Equal(t, "value", result.Regular)
 }
 
-func TestEvalStringFields_PointerToMap(t *testing.T) {
+func TestStringFields_PointerToMap(t *testing.T) {
 	t.Setenv("MAP_PTR_VAR", "map_ptr_value")
 
 	type StructWithPtrMap struct {
@@ -256,7 +256,7 @@ func TestEvalStringFields_PointerToMap(t *testing.T) {
 		}
 		input := StructWithPtrMap{Config: &mapVal}
 
-		result, err := EvalStringFields(ctx, input)
+		result, err := StringFields(ctx, input)
 		require.NoError(t, err)
 		require.NotNil(t, result.Config)
 		assert.Equal(t, "map_ptr_value", (*result.Config)["key1"])
@@ -266,13 +266,13 @@ func TestEvalStringFields_PointerToMap(t *testing.T) {
 	t.Run("PointerToNilMap", func(t *testing.T) {
 		input := StructWithPtrMap{Config: nil}
 
-		result, err := EvalStringFields(ctx, input)
+		result, err := StringFields(ctx, input)
 		require.NoError(t, err)
 		assert.Nil(t, result.Config)
 	})
 }
 
-func TestEvalStringFields_PointerToSlice(t *testing.T) {
+func TestStringFields_PointerToSlice(t *testing.T) {
 	t.Setenv("SLICE_PTR_VAR", "slice_ptr_value")
 
 	type Nested struct {
@@ -290,7 +290,7 @@ func TestEvalStringFields_PointerToSlice(t *testing.T) {
 		items := []string{"$SLICE_PTR_VAR", "${SLICE_PTR_VAR}"}
 		input := StructWithPtrSlice{Items: &items}
 
-		result, err := EvalStringFields(ctx, input)
+		result, err := StringFields(ctx, input)
 		require.NoError(t, err)
 		require.NotNil(t, result.Items)
 		require.Len(t, *result.Items, 2)
@@ -305,7 +305,7 @@ func TestEvalStringFields_PointerToSlice(t *testing.T) {
 		}
 		input := StructWithPtrSlice{Structs: &structs}
 
-		result, err := EvalStringFields(ctx, input)
+		result, err := StringFields(ctx, input)
 		require.NoError(t, err)
 		require.NotNil(t, result.Structs)
 		require.Len(t, *result.Structs, 2)
@@ -316,13 +316,13 @@ func TestEvalStringFields_PointerToSlice(t *testing.T) {
 	t.Run("PointerToNilSlice", func(t *testing.T) {
 		input := StructWithPtrSlice{Items: nil}
 
-		result, err := EvalStringFields(ctx, input)
+		result, err := StringFields(ctx, input)
 		require.NoError(t, err)
 		assert.Nil(t, result.Items)
 	})
 }
 
-func TestEvalStringFields_SliceOfStrings(t *testing.T) {
+func TestStringFields_SliceOfStrings(t *testing.T) {
 	t.Setenv("SLICE_STR_VAR", "slice_str_value")
 
 	type StructWithStringSlice struct {
@@ -337,7 +337,7 @@ func TestEvalStringFields_SliceOfStrings(t *testing.T) {
 			Tags: []string{"$SLICE_STR_VAR", "${SLICE_STR_VAR}", "plain"},
 		}
 
-		result, err := EvalStringFields(ctx, input)
+		result, err := StringFields(ctx, input)
 		require.NoError(t, err)
 		require.Len(t, result.Tags, 3)
 		assert.Equal(t, "slice_str_value", result.Tags[0])
@@ -350,7 +350,7 @@ func TestEvalStringFields_SliceOfStrings(t *testing.T) {
 			Tags: []string{},
 		}
 
-		result, err := EvalStringFields(ctx, input)
+		result, err := StringFields(ctx, input)
 		require.NoError(t, err)
 		assert.Empty(t, result.Tags)
 	})
@@ -360,7 +360,7 @@ func TestEvalStringFields_SliceOfStrings(t *testing.T) {
 			Tags: nil,
 		}
 
-		result, err := EvalStringFields(ctx, input)
+		result, err := StringFields(ctx, input)
 		require.NoError(t, err)
 		assert.Nil(t, result.Tags)
 	})
@@ -370,7 +370,7 @@ func TestEvalStringFields_SliceOfStrings(t *testing.T) {
 			Tags: []string{"`echo hello`", "`echo world`"},
 		}
 
-		result, err := EvalStringFields(ctx, input)
+		result, err := StringFields(ctx, input)
 		require.NoError(t, err)
 		require.Len(t, result.Tags, 2)
 		assert.Equal(t, "hello", result.Tags[0])
@@ -378,7 +378,7 @@ func TestEvalStringFields_SliceOfStrings(t *testing.T) {
 	})
 }
 
-func TestEvalStringFields_SliceOfStructs(t *testing.T) {
+func TestStringFields_SliceOfStructs(t *testing.T) {
 	t.Setenv("STRUCT_SLICE_VAR", "struct_slice_value")
 
 	type Item struct {
@@ -400,7 +400,7 @@ func TestEvalStringFields_SliceOfStructs(t *testing.T) {
 			},
 		}
 
-		result, err := EvalStringFields(ctx, input)
+		result, err := StringFields(ctx, input)
 		require.NoError(t, err)
 		require.Len(t, result.Items, 2)
 		assert.Equal(t, "struct_slice_value", result.Items[0].Name)
@@ -414,13 +414,13 @@ func TestEvalStringFields_SliceOfStructs(t *testing.T) {
 			Items: []Item{},
 		}
 
-		result, err := EvalStringFields(ctx, input)
+		result, err := StringFields(ctx, input)
 		require.NoError(t, err)
 		assert.Empty(t, result.Items)
 	})
 }
 
-func TestEvalStringFields_SliceOfMaps(t *testing.T) {
+func TestStringFields_SliceOfMaps(t *testing.T) {
 	t.Setenv("MAP_SLICE_VAR", "map_slice_value")
 
 	type StructWithMapSlice struct {
@@ -437,7 +437,7 @@ func TestEvalStringFields_SliceOfMaps(t *testing.T) {
 			},
 		}
 
-		result, err := EvalStringFields(ctx, input)
+		result, err := StringFields(ctx, input)
 		require.NoError(t, err)
 		require.Len(t, result.Configs, 2)
 		assert.Equal(t, "map_slice_value", result.Configs[0]["key"])
@@ -453,7 +453,7 @@ func TestEvalStringFields_SliceOfMaps(t *testing.T) {
 			},
 		}
 
-		result, err := EvalStringFields(ctx, input)
+		result, err := StringFields(ctx, input)
 		require.NoError(t, err)
 		require.Len(t, result.Configs, 3)
 		assert.Equal(t, "map_slice_value", result.Configs[0]["key"])
@@ -462,7 +462,7 @@ func TestEvalStringFields_SliceOfMaps(t *testing.T) {
 	})
 }
 
-func TestEvalStringFields_SliceWithNilPointers(t *testing.T) {
+func TestStringFields_SliceWithNilPointers(t *testing.T) {
 	t.Setenv("NIL_PTR_SLICE_VAR", "nil_ptr_slice_value")
 
 	type Nested struct {
@@ -483,7 +483,7 @@ func TestEvalStringFields_SliceWithNilPointers(t *testing.T) {
 			StringPtrs: []*string{&val1, nil, &val2},
 		}
 
-		result, err := EvalStringFields(ctx, input)
+		result, err := StringFields(ctx, input)
 		require.NoError(t, err)
 		require.Len(t, result.StringPtrs, 3)
 		require.NotNil(t, result.StringPtrs[0])
@@ -502,7 +502,7 @@ func TestEvalStringFields_SliceWithNilPointers(t *testing.T) {
 			},
 		}
 
-		result, err := EvalStringFields(ctx, input)
+		result, err := StringFields(ctx, input)
 		require.NoError(t, err)
 		require.Len(t, result.StructPtrs, 3)
 		require.NotNil(t, result.StructPtrs[0])
@@ -513,7 +513,7 @@ func TestEvalStringFields_SliceWithNilPointers(t *testing.T) {
 	})
 }
 
-func TestEvalStringFields_PointerMutation(t *testing.T) {
+func TestStringFields_PointerMutation(t *testing.T) {
 	t.Setenv("MUT_VAR", "expanded")
 
 	t.Run("PointerToString", func(t *testing.T) {
@@ -524,7 +524,7 @@ func TestEvalStringFields_PointerMutation(t *testing.T) {
 		original := "$MUT_VAR"
 		input := S{Token: &original}
 
-		result, err := EvalStringFields(context.Background(), input)
+		result, err := StringFields(context.Background(), input)
 		require.NoError(t, err)
 
 		// Check result is correct
@@ -544,7 +544,7 @@ func TestEvalStringFields_PointerMutation(t *testing.T) {
 		val2 := "${MUT_VAR}"
 		input := S{Items: []*string{&val1, &val2}}
 
-		result, err := EvalStringFields(context.Background(), input)
+		result, err := StringFields(context.Background(), input)
 		require.NoError(t, err)
 
 		// Check result is correct
@@ -570,7 +570,7 @@ func TestEvalStringFields_PointerMutation(t *testing.T) {
 		input := S{Nested: &Nested{Value: "$MUT_VAR"}}
 		originalValue := input.Nested.Value
 
-		result, err := EvalStringFields(context.Background(), input)
+		result, err := StringFields(context.Background(), input)
 		require.NoError(t, err)
 
 		// Check result is correct
@@ -589,7 +589,7 @@ func TestEvalStringFields_PointerMutation(t *testing.T) {
 		items := []string{"$MUT_VAR", "${MUT_VAR}"}
 		input := S{Items: &items}
 
-		result, err := EvalStringFields(context.Background(), input)
+		result, err := StringFields(context.Background(), input)
 		require.NoError(t, err)
 
 		// Check result is correct
@@ -603,7 +603,7 @@ func TestEvalStringFields_PointerMutation(t *testing.T) {
 	})
 }
 
-func TestEvalStringFields_PointerFieldErrors(t *testing.T) {
+func TestStringFields_PointerFieldErrors(t *testing.T) {
 	type Nested struct {
 		Command string
 	}
@@ -620,7 +620,7 @@ func TestEvalStringFields_PointerFieldErrors(t *testing.T) {
 		invalidCmd := "`invalid_command_xyz123`"
 		input := StructWithPointerErrors{StringPtr: &invalidCmd}
 
-		_, err := EvalStringFields(ctx, input)
+		_, err := StringFields(ctx, input)
 		assert.Error(t, err)
 	})
 
@@ -629,7 +629,7 @@ func TestEvalStringFields_PointerFieldErrors(t *testing.T) {
 			StructPtr: &Nested{Command: "`invalid_command_xyz123`"},
 		}
 
-		_, err := EvalStringFields(ctx, input)
+		_, err := StringFields(ctx, input)
 		assert.Error(t, err)
 	})
 
@@ -639,12 +639,12 @@ func TestEvalStringFields_PointerFieldErrors(t *testing.T) {
 		}
 		input := StructWithPointerErrors{MapPtr: &mapVal}
 
-		_, err := EvalStringFields(ctx, input)
+		_, err := StringFields(ctx, input)
 		assert.Error(t, err)
 	})
 }
 
-func TestEvalStringFields_SliceFieldErrors(t *testing.T) {
+func TestStringFields_SliceFieldErrors(t *testing.T) {
 	type Nested struct {
 		Command string
 	}
@@ -663,7 +663,7 @@ func TestEvalStringFields_SliceFieldErrors(t *testing.T) {
 			Strings: []string{"valid", "`invalid_command_xyz123`"},
 		}
 
-		_, err := EvalStringFields(ctx, input)
+		_, err := StringFields(ctx, input)
 		assert.Error(t, err)
 	})
 
@@ -675,7 +675,7 @@ func TestEvalStringFields_SliceFieldErrors(t *testing.T) {
 			},
 		}
 
-		_, err := EvalStringFields(ctx, input)
+		_, err := StringFields(ctx, input)
 		assert.Error(t, err)
 	})
 
@@ -686,7 +686,7 @@ func TestEvalStringFields_SliceFieldErrors(t *testing.T) {
 			StringPtrs: []*string{&valid, &invalid},
 		}
 
-		_, err := EvalStringFields(ctx, input)
+		_, err := StringFields(ctx, input)
 		assert.Error(t, err)
 	})
 
@@ -698,7 +698,7 @@ func TestEvalStringFields_SliceFieldErrors(t *testing.T) {
 			},
 		}
 
-		_, err := EvalStringFields(ctx, input)
+		_, err := StringFields(ctx, input)
 		assert.Error(t, err)
 	})
 }
@@ -766,7 +766,8 @@ func TestReplaceVars(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := replaceVars(tt.template, tt.vars)
+			r := &resolver{variables: []map[string]string{tt.vars}}
+			got := r.replaceVars(tt.template)
 			if got != tt.want {
 				t.Errorf("replaceVars() = %v, want %v", got, tt.want)
 			}
@@ -869,72 +870,7 @@ func TestExpandReferences(t *testing.T) {
 	}
 }
 
-func TestBuildCommandEscapedString(t *testing.T) {
-	tests := []struct {
-		name    string
-		command string
-		args    []string
-		want    string
-	}{
-		{
-			name:    "CommandWithNoArgs",
-			command: "echo",
-			args:    []string{},
-			want:    "echo",
-		},
-		{
-			name:    "CommandWithSimpleArgs",
-			command: "echo",
-			args:    []string{"hello", "world"},
-			want:    "echo hello world",
-		},
-		{
-			name:    "ArgsWithSpacesNeedQuoting",
-			command: "echo",
-			args:    []string{"hello world", "foo bar"},
-			want:    `echo "hello world" "foo bar"`,
-		},
-		{
-			name:    "AlreadyQuotedWithDoubleQuotes",
-			command: "echo",
-			args:    []string{`"hello world"`, "test"},
-			want:    `echo "hello world" test`,
-		},
-		{
-			name:    "AlreadyQuotedWithSingleQuotes",
-			command: "echo",
-			args:    []string{`'hello world'`, "test"},
-			want:    `echo 'hello world' test`,
-		},
-		{
-			name:    "KeyValuePairAlreadyQuoted",
-			command: "docker",
-			args:    []string{"run", "-e", `VAR="value with spaces"`},
-			want:    `docker run -e VAR="value with spaces"`,
-		},
-		{
-			name:    "ArgWithDoubleQuotesInside",
-			command: "echo",
-			args:    []string{`hello "world" test`},
-			want:    `echo "hello \"world\" test"`,
-		},
-		{
-			name:    "MixedArgs",
-			command: "command",
-			args:    []string{"simple", "with space", `"already quoted"`, `key="value"`, "test=value"},
-			want:    `command simple "with space" "already quoted" key="value" test=value`,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := BuildCommandEscapedString(tt.command, tt.args)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-func TestEvalString(t *testing.T) {
+func TestString(t *testing.T) {
 	// Set up test environment
 	_ = os.Setenv("TEST_ENV", "test_value")
 	_ = os.Setenv("TEST_JSON", `{"key": "value"}`)
@@ -946,7 +882,7 @@ func TestEvalString(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
-		opts    []EvalOption
+		opts    []Option
 		want    string
 		wantErr bool
 	}{
@@ -977,35 +913,35 @@ func TestEvalString(t *testing.T) {
 		{
 			name:    "WithVariables",
 			input:   "${FOO} and ${BAR}",
-			opts:    []EvalOption{WithVariables(map[string]string{"FOO": "foo", "BAR": "bar"})},
+			opts:    []Option{WithVariables(map[string]string{"FOO": "foo", "BAR": "bar"})},
 			want:    "foo and bar",
 			wantErr: false,
 		},
 		{
 			name:    "WithoutEnvExpansion",
 			input:   "$TEST_ENV",
-			opts:    []EvalOption{WithoutExpandEnv()},
+			opts:    []Option{WithoutExpandEnv()},
 			want:    "$TEST_ENV",
 			wantErr: false,
 		},
 		{
 			name:    "WithoutSubstitution",
 			input:   "`echo hello`",
-			opts:    []EvalOption{WithoutSubstitute()},
+			opts:    []Option{WithoutSubstitute()},
 			want:    "`echo hello`",
 			wantErr: false,
 		},
 		{
 			name:    "ShellSubstringExpansion",
 			input:   "prefix ${UID:0:5} suffix",
-			opts:    []EvalOption{WithVariables(map[string]string{"UID": "HBL01_22OCT2025_0536"})},
+			opts:    []Option{WithVariables(map[string]string{"UID": "HBL01_22OCT2025_0536"})},
 			want:    "prefix HBL01 suffix",
 			wantErr: false,
 		},
 		{
 			name:    "OnlyReplaceVars",
 			input:   "$TEST_ENV and `echo hello` and ${FOO}",
-			opts:    []EvalOption{OnlyReplaceVars(), WithVariables(map[string]string{"FOO": "foo"})},
+			opts:    []Option{OnlyReplaceVars(), WithVariables(map[string]string{"FOO": "foo"})},
 			want:    "$TEST_ENV and `echo hello` and foo",
 			wantErr: false,
 		},
@@ -1018,14 +954,14 @@ func TestEvalString(t *testing.T) {
 		{
 			name:    "JSONReference",
 			input:   "${TEST_JSON.key}",
-			opts:    []EvalOption{WithVariables(map[string]string{"TEST_JSON": os.Getenv("TEST_JSON")})},
+			opts:    []Option{WithVariables(map[string]string{"TEST_JSON": os.Getenv("TEST_JSON")})},
 			want:    "value",
 			wantErr: false,
 		},
 		{
 			name:  "MultipleVariableSets",
 			input: "${FOO} ${BAR}",
-			opts: []EvalOption{
+			opts: []Option{
 				WithVariables(map[string]string{"FOO": "first"}),
 				WithVariables(map[string]string{"BAR": "second"}),
 			},
@@ -1035,70 +971,70 @@ func TestEvalString(t *testing.T) {
 		{
 			name:    "QuotedJSONVariableEscaping",
 			input:   `params: aJson="${ITEM}"`,
-			opts:    []EvalOption{WithVariables(map[string]string{"ITEM": `{"file": "file1.txt", "config": "prod"}`})},
+			opts:    []Option{WithVariables(map[string]string{"ITEM": `{"file": "file1.txt", "config": "prod"}`})},
 			want:    `params: aJson=` + strconv.Quote(`{"file": "file1.txt", "config": "prod"}`),
 			wantErr: false,
 		},
 		{
 			name:    "QuotedFilePathWithSpaces",
 			input:   `path: "FILE=\"${ITEM}\""`,
-			opts:    []EvalOption{WithVariables(map[string]string{"ITEM": "/path/to/my file.txt"})},
+			opts:    []Option{WithVariables(map[string]string{"ITEM": "/path/to/my file.txt"})},
 			want:    `path: "FILE=\"/path/to/my file.txt\""`,
 			wantErr: false,
 		},
 		{
 			name:    "QuotedStringWithInternalQuotes",
 			input:   `value: "VAR=\"${ITEM}\""`,
-			opts:    []EvalOption{WithVariables(map[string]string{"ITEM": `say "hello"`})},
+			opts:    []Option{WithVariables(map[string]string{"ITEM": `say "hello"`})},
 			want:    `value: "VAR=\"say "hello"\""`,
 			wantErr: false,
 		},
 		{
 			name:    "MixedQuotedAndUnquotedVariables",
 			input:   `unquoted ${ITEM} and quoted "value=\"${ITEM}\""`,
-			opts:    []EvalOption{WithVariables(map[string]string{"ITEM": `{"test": "value"}`})},
+			opts:    []Option{WithVariables(map[string]string{"ITEM": `{"test": "value"}`})},
 			want:    `unquoted {"test": "value"} and quoted "value=\"{"test": "value"}\""`,
 			wantErr: false,
 		},
 		{
 			name:    "QuotedEmptyString",
 			input:   `empty: "VAL=\"${EMPTY}\""`,
-			opts:    []EvalOption{WithVariables(map[string]string{"EMPTY": ""})},
+			opts:    []Option{WithVariables(map[string]string{"EMPTY": ""})},
 			want:    `empty: "VAL=\"\""`,
 			wantErr: false,
 		},
 		{
 			name:    "QuotedJSONPathReference",
 			input:   `config: "file=\"${CONFIG.file}\""`,
-			opts:    []EvalOption{WithVariables(map[string]string{"CONFIG": `{"file": "/path/to/config.json", "env": "prod"}`})},
+			opts:    []Option{WithVariables(map[string]string{"CONFIG": `{"file": "/path/to/config.json", "env": "prod"}`})},
 			want:    `config: "file=\"/path/to/config.json\""`,
 			wantErr: false,
 		},
 		{
 			name:    "QuotedJSONPathWithSpaces",
 			input:   `path: "value=\"${DATA.path}\""`,
-			opts:    []EvalOption{WithVariables(map[string]string{"DATA": `{"path": "/my dir/file name.txt"}`})},
+			opts:    []Option{WithVariables(map[string]string{"DATA": `{"path": "/my dir/file name.txt"}`})},
 			want:    `path: "value=\"/my dir/file name.txt\""`,
 			wantErr: false,
 		},
 		{
 			name:    "QuotedNestedJSONPath",
 			input:   `nested: "result=\"${OBJ.nested.deep}\""`,
-			opts:    []EvalOption{WithVariables(map[string]string{"OBJ": `{"nested": {"deep": "found it"}}`})},
+			opts:    []Option{WithVariables(map[string]string{"OBJ": `{"nested": {"deep": "found it"}}`})},
 			want:    `nested: "result=\"found it\""`,
 			wantErr: false,
 		},
 		{
 			name:    "QuotedJSONPathWithQuotesInValue",
 			input:   `msg: "text=\"${MSG.content}\""`,
-			opts:    []EvalOption{WithVariables(map[string]string{"MSG": `{"content": "He said \"hello\""}`})},
+			opts:    []Option{WithVariables(map[string]string{"MSG": `{"content": "He said \"hello\""}`})},
 			want:    `msg: "text=\"He said "hello"\""`,
 			wantErr: false,
 		},
 		{
 			name:  "MixedQuotedJSONPathAndSimpleVariable",
 			input: `params: "${SIMPLE}" and config="file=\"${CONFIG.file}\""`,
-			opts: []EvalOption{WithVariables(map[string]string{
+			opts: []Option{WithVariables(map[string]string{
 				"SIMPLE": "value",
 				"CONFIG": `{"file": "app.conf"}`,
 			})},
@@ -1108,7 +1044,7 @@ func TestEvalString(t *testing.T) {
 		{
 			name:    "QuotedNonExistentJSONPath",
 			input:   `missing: "val=\"${CONFIG.missing}\""`,
-			opts:    []EvalOption{WithVariables(map[string]string{"CONFIG": `{"file": "app.conf"}`})},
+			opts:    []Option{WithVariables(map[string]string{"CONFIG": `{"file": "app.conf"}`})},
 			want:    `missing: "val=\"<nil>\""`,
 			wantErr: false,
 		},
@@ -1117,7 +1053,7 @@ func TestEvalString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			got, err := EvalString(ctx, tt.input, tt.opts...)
+			got, err := String(ctx, tt.input, tt.opts...)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -1128,7 +1064,7 @@ func TestEvalString(t *testing.T) {
 	}
 }
 
-func TestEvalIntString(t *testing.T) {
+func TestIntString(t *testing.T) {
 	// Set up test environment
 	_ = os.Setenv("TEST_INT", "42")
 	defer func() {
@@ -1138,7 +1074,7 @@ func TestEvalIntString(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
-		opts    []EvalOption
+		opts    []Option
 		want    int
 		wantErr bool
 	}{
@@ -1163,7 +1099,7 @@ func TestEvalIntString(t *testing.T) {
 		{
 			name:    "WithVariables",
 			input:   "${NUM}",
-			opts:    []EvalOption{WithVariables(map[string]string{"NUM": "999"})},
+			opts:    []Option{WithVariables(map[string]string{"NUM": "999"})},
 			want:    999,
 			wantErr: false,
 		},
@@ -1182,7 +1118,7 @@ func TestEvalIntString(t *testing.T) {
 		{
 			name:    "WithoutSubstitute_SkipsCommandSubstitution",
 			input:   "123",
-			opts:    []EvalOption{WithoutSubstitute()},
+			opts:    []Option{WithoutSubstitute()},
 			want:    123,
 			wantErr: false,
 		},
@@ -1191,7 +1127,7 @@ func TestEvalIntString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			got, err := EvalIntString(ctx, tt.input, tt.opts...)
+			got, err := IntString(ctx, tt.input, tt.opts...)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -1202,7 +1138,7 @@ func TestEvalIntString(t *testing.T) {
 	}
 }
 
-func TestEvalStringFields_Map(t *testing.T) {
+func TestStringFields_Map(t *testing.T) {
 	// Set up test environment
 	_ = os.Setenv("MAP_ENV", "map_value")
 	defer func() {
@@ -1212,7 +1148,7 @@ func TestEvalStringFields_Map(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   map[string]any
-		opts    []EvalOption
+		opts    []Option
 		want    map[string]any
 		wantErr bool
 	}{
@@ -1283,7 +1219,7 @@ func TestEvalStringFields_Map(t *testing.T) {
 			input: map[string]any{
 				"key": "${VAR}",
 			},
-			opts: []EvalOption{WithVariables(map[string]string{"VAR": "value"})},
+			opts: []Option{WithVariables(map[string]string{"VAR": "value"})},
 			want: map[string]any{
 				"key": "value",
 			},
@@ -1304,7 +1240,7 @@ func TestEvalStringFields_Map(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			got, err := EvalStringFields(ctx, tt.input, tt.opts...)
+			got, err := StringFields(ctx, tt.input, tt.opts...)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -1477,18 +1413,18 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 	}
 }
 
-func TestEvalString_WithStepMap(t *testing.T) {
+func TestString_WithStepMap(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
-		opts    []EvalOption
+		opts    []Option
 		want    string
 		wantErr bool
 	}{
 		{
 			name:  "StepReferenceWithNoVariables",
 			input: "Output: ${step1.stdout}",
-			opts: []EvalOption{
+			opts: []Option{
 				WithStepMap(map[string]StepInfo{
 					"step1": {
 						Stdout: "/tmp/output.txt",
@@ -1501,7 +1437,7 @@ func TestEvalString_WithStepMap(t *testing.T) {
 		{
 			name:  "StepReferenceWithVariables",
 			input: "Var: ${VAR}, Step: ${step1.exit_code}",
-			opts: []EvalOption{
+			opts: []Option{
 				WithVariables(map[string]string{"VAR": "value"}),
 				WithStepMap(map[string]StepInfo{
 					"step1": {
@@ -1515,7 +1451,7 @@ func TestEvalString_WithStepMap(t *testing.T) {
 		{
 			name:  "StepStdoutSlice",
 			input: "Slice: ${step1.stdout:0:3}",
-			opts: []EvalOption{
+			opts: []Option{
 				WithStepMap(map[string]StepInfo{
 					"step1": {
 						Stdout: "HBL01_22OCT2025_0536",
@@ -1530,7 +1466,7 @@ func TestEvalString_WithStepMap(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			got, err := EvalString(ctx, tt.input, tt.opts...)
+			got, err := String(ctx, tt.input, tt.opts...)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -1541,18 +1477,18 @@ func TestEvalString_WithStepMap(t *testing.T) {
 	}
 }
 
-func TestEvalIntString_WithStepMap(t *testing.T) {
+func TestIntString_WithStepMap(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
-		opts    []EvalOption
+		opts    []Option
 		want    int
 		wantErr bool
 	}{
 		{
 			name:  "StepExitCodeAsInteger",
 			input: "${step1.exit_code}",
-			opts: []EvalOption{
+			opts: []Option{
 				WithStepMap(map[string]StepInfo{
 					"step1": {
 						ExitCode: "42",
@@ -1567,7 +1503,7 @@ func TestEvalIntString_WithStepMap(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			got, err := EvalIntString(ctx, tt.input, tt.opts...)
+			got, err := IntString(ctx, tt.input, tt.opts...)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -1590,7 +1526,7 @@ func TestProcessStructFields_WithStepMap(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	got, err := EvalStringFields(ctx, input,
+	got, err := StringFields(ctx, input,
 		WithStepMap(map[string]StepInfo{
 			"step1": {
 				Stdout: "/tmp/out.txt",
@@ -1613,7 +1549,7 @@ func TestProcessMap_WithStepMap(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	got, err := EvalStringFields(ctx, input,
+	got, err := StringFields(ctx, input,
 		WithStepMap(map[string]StepInfo{
 			"step1": {
 				Stdout:   "/tmp/output",
@@ -1670,7 +1606,8 @@ func TestReplaceVars_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := replaceVars(tt.template, tt.vars)
+			r := &resolver{variables: []map[string]string{tt.vars}}
+			got := r.replaceVars(tt.template)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -1783,7 +1720,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 	}
 }
 
-func TestEvalStringWithSteps(t *testing.T) {
+func TestStringWithSteps(t *testing.T) {
 	ctx := context.Background()
 
 	stepMap := map[string]StepInfo{
@@ -1823,16 +1760,16 @@ func TestEvalStringWithSteps(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := EvalString(ctx, tt.input, WithStepMap(stepMap))
+			got, err := String(ctx, tt.input, WithStepMap(stepMap))
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
-// TestEvalStringFields_MultipleVariablesWithStepMapOnLast tests the specific case
+// TestStringFields_MultipleVariablesWithStepMapOnLast tests the specific case
 // where we have multiple variable sets and StepMap is applied only with the last set
-func TestEvalStringFields_MultipleVariablesWithStepMapOnLast(t *testing.T) {
+func TestStringFields_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 	type TestStruct struct {
 		Field1 string
 		Field2 string
@@ -1904,22 +1841,22 @@ func TestEvalStringFields_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 			ctx := context.Background()
 
 			// Build options with multiple variable sets
-			opts := []EvalOption{}
+			opts := []Option{}
 			for _, vars := range tt.varSets {
 				opts = append(opts, WithVariables(vars))
 			}
 			// Add StepMap as the last option
 			opts = append(opts, WithStepMap(stepMap))
 
-			result, err := EvalStringFields(ctx, tt.input, opts...)
+			result, err := StringFields(ctx, tt.input, opts...)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-// TestEvalString_MultipleVariablesWithStepMapOnLast tests EvalString with multiple variable sets
-func TestEvalString_MultipleVariablesWithStepMapOnLast(t *testing.T) {
+// TestString_MultipleVariablesWithStepMapOnLast tests String with multiple variable sets
+func TestString_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 	ctx := context.Background()
 
 	stepMap := map[string]StepInfo{
@@ -1948,14 +1885,14 @@ func TestEvalString_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Build options with multiple variable sets
-			opts := []EvalOption{}
+			opts := []Option{}
 			for _, vars := range tt.varSets {
 				opts = append(opts, WithVariables(vars))
 			}
 			// Add StepMap
 			opts = append(opts, WithStepMap(stepMap))
 
-			result, err := EvalString(ctx, tt.input, opts...)
+			result, err := String(ctx, tt.input, opts...)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -2133,14 +2070,15 @@ func TestReplaceVarsWithScope(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := replaceVarsWithScope(tt.template, tt.scope)
+			r := &resolver{scope: tt.scope}
+			got := r.replaceVars(tt.template)
 			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
-func TestEvalOptions_Defaults(t *testing.T) {
-	opts := NewEvalOptions()
+func TestOptions_Defaults(t *testing.T) {
+	opts := NewOptions()
 	assert.True(t, opts.ExpandEnv, "ExpandEnv should default to true")
 	assert.True(t, opts.ExpandShell, "ExpandShell should default to true")
 	assert.True(t, opts.Substitute, "Substitute should default to true")
@@ -2323,49 +2261,49 @@ func TestWithoutExpandShell(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
-		opts    []EvalOption
+		opts    []Option
 		want    string
 		wantErr bool
 	}{
 		{
 			name:    "ShellExpansionEnabled",
 			input:   "${VAR:0:3}",
-			opts:    []EvalOption{WithVariables(map[string]string{"VAR": "HelloWorld"})},
+			opts:    []Option{WithVariables(map[string]string{"VAR": "HelloWorld"})},
 			want:    "Hel",
 			wantErr: false,
 		},
 		{
 			name:    "ShellExpansionDisabledPreservesSubstring",
 			input:   "${VAR:0:3}",
-			opts:    []EvalOption{WithVariables(map[string]string{"VAR": "HelloWorld"}), WithoutExpandShell()},
+			opts:    []Option{WithVariables(map[string]string{"VAR": "HelloWorld"}), WithoutExpandShell()},
 			want:    "${VAR:0:3}", // When shell expansion is disabled, preserve substring syntax for remote shell
 			wantErr: false,
 		},
 		{
 			name:    "SimpleVarStillWorks",
 			input:   "${VAR}",
-			opts:    []EvalOption{WithVariables(map[string]string{"VAR": "value"}), WithoutExpandShell()},
+			opts:    []Option{WithVariables(map[string]string{"VAR": "value"}), WithoutExpandShell()},
 			want:    "value",
 			wantErr: false,
 		},
 		{
 			name:    "EnvVarStillExpandsWithoutShellExpansion",
 			input:   "$TEST_VAR",
-			opts:    []EvalOption{WithoutExpandShell()},
+			opts:    []Option{WithoutExpandShell()},
 			want:    "test_value_for_shell",
 			wantErr: false,
 		},
 		{
 			name:    "CommandSubstitutionStillWorks",
 			input:   "`echo hello`",
-			opts:    []EvalOption{WithoutExpandShell()},
+			opts:    []Option{WithoutExpandShell()},
 			want:    "hello",
 			wantErr: false,
 		},
 		{
 			name:    "MixedContentWithShellDisabled",
 			input:   "prefix ${VAR} suffix",
-			opts:    []EvalOption{WithVariables(map[string]string{"VAR": "middle"}), WithoutExpandShell()},
+			opts:    []Option{WithVariables(map[string]string{"VAR": "middle"}), WithoutExpandShell()},
 			want:    "prefix middle suffix",
 			wantErr: false,
 		},
@@ -2376,7 +2314,7 @@ func TestWithoutExpandShell(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := EvalString(ctx, tt.input, tt.opts...)
+			got, err := String(ctx, tt.input, tt.opts...)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {

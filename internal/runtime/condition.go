@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 )
@@ -101,7 +101,7 @@ func matchCondition(ctx context.Context, c *core.Condition) error {
 }
 
 func evalCommand(ctx context.Context, shell []string, c *core.Condition) error {
-	commandToRun, err := EvalString(ctx, c.Condition, cmdutil.OnlyReplaceVars())
+	commandToRun, err := EvalString(ctx, c.Condition, eval.OnlyReplaceVars())
 	if err != nil {
 		return fmt.Errorf("failed to evaluate command: %w", err)
 	}

@@ -1,4 +1,4 @@
-package cmdutil
+package eval
 
 import (
 	"context"
@@ -343,7 +343,7 @@ func TestExpandReferences_ComplexJSON(t *testing.T) {
 	}
 }
 
-func TestEvalStringFields_StructWithMapField(t *testing.T) {
+func TestStringFields_StructWithMapField(t *testing.T) {
 	type TestStruct struct {
 		Name    string
 		Config  map[string]string
@@ -369,7 +369,7 @@ func TestEvalStringFields_StructWithMapField(t *testing.T) {
 	t.Setenv("TEST_VAR", "env_value")
 
 	ctx := context.Background()
-	got, err := EvalStringFields(ctx, input)
+	got, err := StringFields(ctx, input)
 	require.NoError(t, err)
 
 	assert.Equal(t, "test", got.Name)
@@ -380,10 +380,10 @@ func TestEvalStringFields_StructWithMapField(t *testing.T) {
 	assert.Equal(t, "env_value", got.Options["nested"].(map[string]any)["value"])
 }
 
-func TestEvalStringFields_ErrorCases(t *testing.T) {
+func TestStringFields_ErrorCases(t *testing.T) {
 	// Test with a channel (unsupported type)
 	ch := make(chan int)
-	_, err := EvalStringFields(context.Background(), ch)
+	_, err := StringFields(context.Background(), ch)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "input must be a struct or map")
 
@@ -394,33 +394,33 @@ func TestEvalStringFields_ErrorCases(t *testing.T) {
 	input := TestStruct{
 		Field: "`invalid_command_xyz`",
 	}
-	_, err = EvalStringFields(context.Background(), input)
+	_, err = StringFields(context.Background(), input)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to process struct fields")
+	assert.Contains(t, err.Error(), "failed to execute command")
 
 	// Test map with invalid command
 	mapInput := map[string]any{
 		"key": "`invalid_command_xyz`",
 	}
-	_, err = EvalStringFields(context.Background(), mapInput)
+	_, err = StringFields(context.Background(), mapInput)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to process map")
+	assert.Contains(t, err.Error(), "failed to execute command")
 }
 
-func TestEvalOptions_Combinations(t *testing.T) {
+func TestOptions_Combinations(t *testing.T) {
 	// Set up environment
 	t.Setenv("TEST_ENV", "env_value")
 
 	tests := []struct {
 		name  string
 		input string
-		opts  []EvalOption
+		opts  []Option
 		want  string
 	}{
 		{
 			name:  "AllFeaturesDisabled",
 			input: "$TEST_ENV `echo hello` ${VAR}",
-			opts: []EvalOption{
+			opts: []Option{
 				WithoutExpandEnv(),
 				WithoutSubstitute(),
 			},
@@ -429,7 +429,7 @@ func TestEvalOptions_Combinations(t *testing.T) {
 		{
 			name:  "OnlyVariablesEnabled",
 			input: "$TEST_ENV `echo hello` ${VAR}",
-			opts: []EvalOption{
+			opts: []Option{
 				OnlyReplaceVars(),
 				WithVariables(map[string]string{"VAR": "value"}),
 			},
@@ -438,7 +438,7 @@ func TestEvalOptions_Combinations(t *testing.T) {
 		{
 			name:  "MultipleVariableSetsWithStepMap",
 			input: "${VAR1} ${VAR2} ${step1.exit_code}",
-			opts: []EvalOption{
+			opts: []Option{
 				WithVariables(map[string]string{"VAR1": "first"}),
 				WithVariables(map[string]string{"VAR2": "second"}),
 				WithStepMap(map[string]StepInfo{
@@ -452,7 +452,7 @@ func TestEvalOptions_Combinations(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			got, err := EvalString(ctx, tt.input, tt.opts...)
+			got, err := String(ctx, tt.input, tt.opts...)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})
@@ -468,7 +468,7 @@ func TestProcessMap_NilValues(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	got, err := EvalStringFields(ctx, input)
+	got, err := StringFields(ctx, input)
 	require.NoError(t, err)
 
 	gotMap := got
