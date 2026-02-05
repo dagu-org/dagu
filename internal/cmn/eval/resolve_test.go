@@ -58,6 +58,16 @@ func TestResolveJSONSource_FromScope(t *testing.T) {
 	assert.Equal(t, `{"a":1}`, val)
 }
 
+func TestResolveJSONSource_FromScopeWithExpandOS(t *testing.T) {
+	scope := NewEnvScope(nil, false)
+	scope = scope.WithEntry("JSONVAR", `{"a":1}`, EnvSourceDAGEnv)
+	r := &resolver{scope: scope, expandOS: true}
+
+	val, ok := r.resolveJSONSource("JSONVAR")
+	assert.True(t, ok)
+	assert.Equal(t, `{"a":1}`, val)
+}
+
 func TestResolveJSONSource_FromOSEnv(t *testing.T) {
 	t.Setenv("JSONOSVAR", `{"b":2}`)
 	r := &resolver{expandOS: true}

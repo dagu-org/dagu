@@ -174,6 +174,16 @@ func TestExpandEnvScopeOnly_OSEntriesSkipped(t *testing.T) {
 	assert.Equal(t, "$OS_VAR and dag_value", result)
 }
 
+func TestExpandWithShellContext_ParseError(t *testing.T) {
+	ctx := context.Background()
+	opts := NewOptions()
+	opts.ExpandOS = true
+
+	// Unterminated parameter expansion triggers a parse error from syntax.NewParser().Document()
+	_, err := expandWithShellContext(ctx, "${", opts)
+	assert.Error(t, err)
+}
+
 func TestExpandWithShellContext_NonUnexpectedCommandError(t *testing.T) {
 	ctx := context.Background()
 	opts := NewOptions()
