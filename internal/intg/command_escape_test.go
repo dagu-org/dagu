@@ -1,6 +1,7 @@
 package intg_test
 
 import (
+	"os"
 	"runtime"
 	"testing"
 
@@ -70,6 +71,11 @@ steps:
 	t.Run("ScriptWithoutShell_Direct", func(t *testing.T) {
 		t.Parallel()
 
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			t.Fatalf("failed to resolve home directory: %v", err)
+		}
+
 		dag := th.DAG(t, `
 shell: direct
 steps:
@@ -82,7 +88,7 @@ steps:
 		agent := dag.Agent()
 		agent.RunSuccess(t)
 		dag.AssertOutputs(t, map[string]any{
-			"OUT": "$HOME",
+			"OUT": homeDir,
 		})
 	})
 }
