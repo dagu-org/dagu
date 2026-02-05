@@ -93,7 +93,7 @@ func substituteCommandsWithContext(ctx context.Context, input string) (string, e
 	}
 
 	// Unclosed backtick: append the partial command as-is.
-	if cmdBuilder.Len() > 0 {
+	if inCommand {
 		result.WriteRune('`')
 		result.WriteString(cmdBuilder.String())
 	}

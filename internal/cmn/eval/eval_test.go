@@ -2,6 +2,7 @@ package eval
 
 import (
 	"context"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,6 +10,9 @@ import (
 )
 
 func TestStringFields(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping backtick tests on Windows")
+	}
 	t.Setenv("TEST_VAR", "test_value")
 	t.Setenv("NESTED_VAR", "nested_value")
 
@@ -87,6 +91,9 @@ func TestStringFields(t *testing.T) {
 }
 
 func TestStringFields_AnonymousStruct(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping backtick tests on Windows")
+	}
 	ctx := context.Background()
 	obj, err := StringFields(ctx, struct {
 		Field string
@@ -104,6 +111,9 @@ func TestStringFields_NonStruct(t *testing.T) {
 }
 
 func TestStringFields_NestedStructs(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping backtick tests on Windows")
+	}
 	type DeepNested struct {
 		Field string
 	}
@@ -158,6 +168,9 @@ func TestStringFields_EmptyStruct(t *testing.T) {
 }
 
 func TestStringFields_Map(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping backtick tests on Windows")
+	}
 	t.Setenv("MAP_ENV", "map_value")
 
 	tests := []struct {
@@ -409,6 +422,9 @@ func TestStringFields_ErrorCases(t *testing.T) {
 	})
 
 	t.Run("StructWithInvalidCommand", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("Skipping backtick tests on Windows")
+		}
 		type TestStruct struct {
 			Field string
 		}
@@ -420,6 +436,9 @@ func TestStringFields_ErrorCases(t *testing.T) {
 	})
 
 	t.Run("MapWithInvalidCommand", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("Skipping backtick tests on Windows")
+		}
 		_, err := StringFields(context.Background(), map[string]any{
 			"key": "`invalid_command_xyz`",
 		})

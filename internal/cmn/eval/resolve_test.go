@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // --- resolveForShell coverage ---
@@ -15,8 +16,8 @@ func TestResolveForShell_FromScope(t *testing.T) {
 	r := &resolver{scope: scope}
 
 	val, ok := r.resolveForShell("SCOPEVAR")
-	assert.True(t, ok)
-	assert.Equal(t, "scopeval", val)
+	require.True(t, ok)
+	require.Equal(t, "scopeval", val)
 }
 
 func TestResolveForShell_SkipsOSScope(t *testing.T) {
@@ -26,8 +27,8 @@ func TestResolveForShell_SkipsOSScope(t *testing.T) {
 	r := &resolver{scope: scope, expandOS: true}
 
 	val, ok := r.resolveForShell("OSVAR")
-	assert.True(t, ok)
-	assert.Equal(t, "live_os_value", val)
+	require.True(t, ok)
+	require.Equal(t, "live_os_value", val)
 }
 
 func TestResolveForShell_OSEnvFallback(t *testing.T) {
@@ -35,8 +36,8 @@ func TestResolveForShell_OSEnvFallback(t *testing.T) {
 	r := &resolver{expandOS: true}
 
 	val, ok := r.resolveForShell("TESTOSVAR")
-	assert.True(t, ok)
-	assert.Equal(t, "osval", val)
+	require.True(t, ok)
+	require.Equal(t, "osval", val)
 }
 
 func TestResolveForShell_NotFound(t *testing.T) {
@@ -53,8 +54,8 @@ func TestResolveJSONSource_FromScope(t *testing.T) {
 	r := &resolver{scope: scope}
 
 	val, ok := r.resolveJSONSource("JSONVAR")
-	assert.True(t, ok)
-	assert.Equal(t, `{"a":1}`, val)
+	require.True(t, ok)
+	require.Equal(t, `{"a":1}`, val)
 }
 
 func TestResolveJSONSource_FromScopeWithExpandOS(t *testing.T) {
@@ -63,8 +64,8 @@ func TestResolveJSONSource_FromScopeWithExpandOS(t *testing.T) {
 	r := &resolver{scope: scope, expandOS: true}
 
 	val, ok := r.resolveJSONSource("JSONVAR")
-	assert.True(t, ok)
-	assert.Equal(t, `{"a":1}`, val)
+	require.True(t, ok)
+	require.Equal(t, `{"a":1}`, val)
 }
 
 func TestResolveJSONSource_FromOSEnv(t *testing.T) {
@@ -72,8 +73,8 @@ func TestResolveJSONSource_FromOSEnv(t *testing.T) {
 	r := &resolver{expandOS: true}
 
 	val, ok := r.resolveJSONSource("JSONOSVAR")
-	assert.True(t, ok)
-	assert.Equal(t, `{"b":2}`, val)
+	require.True(t, ok)
+	require.Equal(t, `{"b":2}`, val)
 }
 
 func TestResolveJSONSource_NotFound(t *testing.T) {
@@ -90,8 +91,8 @@ func TestResolver_Resolve_FromScope(t *testing.T) {
 	r := &resolver{scope: scope}
 
 	val, ok := r.resolve("SCOPEVAR")
-	assert.True(t, ok)
-	assert.Equal(t, "val", val)
+	require.True(t, ok)
+	require.Equal(t, "val", val)
 }
 
 func TestResolver_Resolve_SkipsOSSource(t *testing.T) {
@@ -111,8 +112,8 @@ func TestResolveReference_JSONFromScope(t *testing.T) {
 	r := &resolver{scope: scope}
 
 	val, ok := r.resolveReference(context.Background(), "JDATA", ".x")
-	assert.True(t, ok)
-	assert.Equal(t, "y", val)
+	require.True(t, ok)
+	require.Equal(t, "y", val)
 }
 
 func TestResolveReference_JSONFromOSEnv(t *testing.T) {
@@ -120,8 +121,8 @@ func TestResolveReference_JSONFromOSEnv(t *testing.T) {
 	r := &resolver{expandOS: true}
 
 	val, ok := r.resolveReference(context.Background(), "OSJSON", ".a")
-	assert.True(t, ok)
-	assert.Equal(t, "b", val)
+	require.True(t, ok)
+	require.Equal(t, "b", val)
 }
 
 func TestResolveReference_NotFound(t *testing.T) {
@@ -145,8 +146,8 @@ func TestResolveForShell_WithExpandOS(t *testing.T) {
 	r := &resolver{expandOS: true}
 
 	val, ok := r.resolveForShell("SHELL_TEST_VAR")
-	assert.True(t, ok)
-	assert.Equal(t, "os_value", val)
+	require.True(t, ok)
+	require.Equal(t, "os_value", val)
 }
 
 func TestResolveJSONSource_WithoutExpandOS(t *testing.T) {
@@ -169,8 +170,8 @@ func TestResolveJSONSource_WithoutExpandOS(t *testing.T) {
 		WithEntry("SCOPE_DAG", `{"c":3}`, EnvSourceDAGEnv)
 	r3 := &resolver{scope: scope2, expandOS: false}
 	val, ok := r3.resolveJSONSource("SCOPE_DAG")
-	assert.True(t, ok)
-	assert.Equal(t, `{"c":3}`, val)
+	require.True(t, ok)
+	require.Equal(t, `{"c":3}`, val)
 }
 
 // --- expandReferences short submatch ---
@@ -181,7 +182,7 @@ func TestExpandReferences_ShortSubmatch(t *testing.T) {
 		"DATA": `{"key":"val"}`,
 	}
 	result := ExpandReferences(ctx, "$DATA.key", dataMap)
-	assert.Equal(t, "val", result)
+	require.Equal(t, "val", result)
 }
 
 // --- replaceVars ---
@@ -251,7 +252,7 @@ func TestReplaceVars(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &resolver{variables: []map[string]string{tt.vars}}
 			got := r.replaceVars(tt.template)
-			assert.Equal(t, tt.want, got)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -299,7 +300,7 @@ func TestReplaceVars_EdgeCases(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &resolver{variables: []map[string]string{tt.vars}}
 			got := r.replaceVars(tt.template)
-			assert.Equal(t, tt.want, got)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -388,7 +389,7 @@ func TestReplaceVarsWithScope(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &resolver{scope: tt.scope}
 			got := r.replaceVars(tt.template)
-			assert.Equal(t, tt.want, got)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -443,8 +444,8 @@ func TestExtractVarKey(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gotK, gotOK := extractVarKey(tt.match)
-			assert.Equal(t, tt.wantK, gotK)
-			assert.Equal(t, tt.wantOK, gotOK)
+			require.Equal(t, tt.wantK, gotK)
+			require.Equal(t, tt.wantOK, gotOK)
 		})
 	}
 }
@@ -532,7 +533,7 @@ func TestExpandReferences(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			got := ExpandReferences(ctx, tt.input, tt.dataMap)
-			assert.Equal(t, tt.want, got)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -639,7 +640,7 @@ func TestExpandReferencesWithSteps(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			got := ExpandReferencesWithSteps(ctx, tt.input, tt.dataMap, tt.stepMap)
-			assert.Equal(t, tt.want, got)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -801,7 +802,7 @@ func TestExpandReferencesWithSteps_Extended(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			got := ExpandReferencesWithSteps(ctx, tt.input, tt.dataMap, tt.stepMap)
-			assert.Equal(t, tt.want, got)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }

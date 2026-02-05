@@ -9,6 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func setupTestContext() context.Context {
@@ -67,8 +68,8 @@ func TestEvalString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := runtime.EvalString(ctx, tt.input)
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expected, result)
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -148,8 +149,8 @@ func TestEvalBool(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expected, result)
+				require.NoError(t, err)
+				require.Equal(t, tt.expected, result)
 			}
 		})
 	}
@@ -200,12 +201,12 @@ func TestEvalObject(t *testing.T) {
 
 	// Test EvalObject
 	result, err := runtime.EvalObject(ctx, testObj)
-	assert.NoError(t, err)
-	assert.Equal(t, expected, result)
+	require.NoError(t, err)
+	require.Equal(t, expected, result)
 
 	// Test with a non-struct type
 	_, err = runtime.EvalObject(ctx, "not a struct")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 // TestEvalObjectWithExecutorConfig tests that EvalObject works correctly with the ExecutorConfig struct
@@ -248,20 +249,20 @@ func TestEvalObjectWithExecutorConfig(t *testing.T) {
 
 	// Test EvalObject
 	result, err := runtime.EvalObject(ctx, config.Config)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Check Config map values
-	assert.Equal(t, expected.Config["host"], result["host"])
-	assert.Equal(t, expected.Config["port"], result["port"])
+	require.Equal(t, expected.Config["host"], result["host"])
+	require.Equal(t, expected.Config["port"], result["port"])
 
 	// Check nested map
 	nestedResult, ok := result["nested"].(map[string]any)
-	assert.True(t, ok, "nested should be a map[string]any")
+	require.True(t, ok, "nested should be a map[string]any")
 
 	nestedExpected, ok := expected.Config["nested"].(map[string]any)
-	assert.True(t, ok, "expected nested should be a map[string]any")
+	require.True(t, ok, "expected nested should be a map[string]any")
 
-	assert.Equal(t, nestedExpected["value"], nestedResult["value"])
+	require.Equal(t, nestedExpected["value"], nestedResult["value"])
 }
 
 func TestGenerateSubDAGRunID(t *testing.T) {
@@ -476,8 +477,8 @@ func TestEvalObjectWithComplexNestedStructures(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := runtime.EvalObject(ctx, tt.input)
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expected, result)
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -545,8 +546,8 @@ func TestEvalStringEdgeCases(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expected, result)
+				require.NoError(t, err)
+				require.Equal(t, tt.expected, result)
 			}
 		})
 	}
@@ -629,8 +630,8 @@ func TestEvalObjectWithDirectStringEvaluation(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expected, result)
+				require.NoError(t, err)
+				require.Equal(t, tt.expected, result)
 			}
 		})
 	}
@@ -728,8 +729,8 @@ func TestEvalBoolEdgeCases(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expected, result)
+				require.NoError(t, err)
+				require.Equal(t, tt.expected, result)
 			}
 		})
 	}

@@ -94,7 +94,11 @@ func walkMap(ctx context.Context, v reflect.Value, transform stringTransform) (r
 
 	iter := v.MapRange()
 	for iter.Next() {
-		walked, err := walkValue(ctx, unwrapIndirections(iter.Value()), transform)
+		val := iter.Value()
+		if v.Type().Elem().Kind() == reflect.Interface {
+			val = unwrapIndirections(val)
+		}
+		walked, err := walkValue(ctx, val, transform)
 		if err != nil {
 			return v, err
 		}

@@ -107,10 +107,12 @@ func TestBuildShellCommand_ComplexCommands(t *testing.T) {
 			cmd := buildShellCommand(tt.shell, tt.cmdStr)
 			require.NotNil(t, cmd)
 
-			if _, err := exec.LookPath(cmd.Path); err == nil {
-				assert.Contains(t, cmd.Args, "-c")
-				assert.Contains(t, cmd.Args, tt.cmdStr)
+			if _, err := exec.LookPath(cmd.Path); err != nil {
+				t.Skipf("shell %q not available: %v", cmd.Path, err)
+				return
 			}
+			assert.Contains(t, cmd.Args, "-c")
+			assert.Contains(t, cmd.Args, tt.cmdStr)
 		})
 	}
 }

@@ -63,7 +63,11 @@ func StringFields[T any](ctx context.Context, obj T, opts ...Option) (T, error) 
 	if err != nil {
 		return obj, err
 	}
-	return result.Interface().(T), nil
+	val, ok := result.Interface().(T)
+	if !ok {
+		return obj, fmt.Errorf("type assertion failed: expected %T, got %T", obj, result.Interface())
+	}
+	return val, nil
 }
 
 // ExpandReferences finds all ${NAME.path} references in the input string, resolves
@@ -105,5 +109,9 @@ func Object[T any](ctx context.Context, obj T, vars map[string]string) (T, error
 	if err != nil {
 		return obj, err
 	}
-	return result.Interface().(T), nil
+	val, ok := result.Interface().(T)
+	if !ok {
+		return obj, fmt.Errorf("type assertion failed: expected %T, got %T", obj, result.Interface())
+	}
+	return val, nil
 }

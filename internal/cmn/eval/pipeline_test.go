@@ -295,11 +295,11 @@ func TestString(t *testing.T) {
 			ctx := context.Background()
 			got, err := String(ctx, tt.input, tt.opts...)
 			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.want, got)
+				require.Error(t, err)
+				return
 			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -359,11 +359,11 @@ func TestIntString(t *testing.T) {
 			ctx := context.Background()
 			got, err := IntString(ctx, tt.input, tt.opts...)
 			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.want, got)
+				require.Error(t, err)
+				return
 			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

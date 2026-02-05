@@ -73,7 +73,7 @@ func extractPOSIXVarName(inner string) string {
 func expandPOSIXExpression(expr string, env *shellEnviron) (string, error) {
 	word, err := syntax.NewParser().Document(strings.NewReader(expr))
 	if err != nil {
-		return "", err
+		return expr, nil // preserve malformed expression
 	}
 	if word == nil {
 		return "", nil

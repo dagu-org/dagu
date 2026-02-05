@@ -15,7 +15,32 @@ func TestResolveStepProperty(t *testing.T) {
 		path    string
 		stepMap map[string]StepInfo
 		wantOK  bool
+		wantVal string
 	}{
+		{
+			name:    "ValidStdout",
+			step:    "step1",
+			path:    ".stdout",
+			stepMap: map[string]StepInfo{"step1": {Stdout: "/tmp/out", ExitCode: "0"}},
+			wantOK:  true,
+			wantVal: "/tmp/out",
+		},
+		{
+			name:    "ValidExitCode",
+			step:    "step1",
+			path:    ".exit_code",
+			stepMap: map[string]StepInfo{"step1": {Stdout: "out", ExitCode: "42"}},
+			wantOK:  true,
+			wantVal: "42",
+		},
+		{
+			name:    "ValidStderr",
+			step:    "step1",
+			path:    ".stderr",
+			stepMap: map[string]StepInfo{"step1": {Stderr: "/tmp/err"}},
+			wantOK:  true,
+			wantVal: "/tmp/err",
+		},
 		{
 			name:    "EmptyStderr",
 			step:    "step1",
@@ -34,8 +59,11 @@ func TestResolveStepProperty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, ok := resolveStepProperty(context.Background(), tt.step, tt.path, tt.stepMap)
-			assert.Equal(t, tt.wantOK, ok)
+			val, ok := resolveStepProperty(context.Background(), tt.step, tt.path, tt.stepMap)
+			require.Equal(t, tt.wantOK, ok)
+			if tt.wantOK {
+				require.Equal(t, tt.wantVal, val)
+			}
 		})
 	}
 }

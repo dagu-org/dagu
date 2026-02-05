@@ -940,7 +940,9 @@ func TestRunner(t *testing.T) {
 		err := os.WriteFile(file, []byte("notyet"), 0644)
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			_ = os.Remove(file)
+			if err := os.Remove(file); err != nil && !os.IsNotExist(err) {
+				t.Logf("cleanup: failed to remove %s: %v", file, err)
+			}
 		})
 		plan := r.newPlan(t,
 			newStep("1",

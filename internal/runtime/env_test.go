@@ -29,9 +29,9 @@ func TestDAGShell(t *testing.T) {
 	})
 
 	t.Run("ExpandsEnvVarsInShell", func(t *testing.T) {
-		// No t.Parallel() because we use t.Setenv
-		t.Setenv("TEST_SHELL", "/bin/zsh")
+		t.Parallel()
 		dag := &core.DAG{
+			Env:   []string{"TEST_SHELL=/bin/zsh"},
 			Shell: "$TEST_SHELL",
 		}
 		ctx := runtime.NewContext(context.Background(), dag, "test-run", "test.log")
@@ -40,9 +40,9 @@ func TestDAGShell(t *testing.T) {
 	})
 
 	t.Run("ExpandsEnvVarsInShellArgs", func(t *testing.T) {
-		// No t.Parallel() because we use t.Setenv
-		t.Setenv("TEST_SHELL_ARG", "-c")
+		t.Parallel()
 		dag := &core.DAG{
+			Env:       []string{"TEST_SHELL_ARG=-c"},
 			Shell:     "/bin/bash",
 			ShellArgs: []string{"$TEST_SHELL_ARG"},
 		}
@@ -118,9 +118,10 @@ func TestEnvShell(t *testing.T) {
 	})
 
 	t.Run("ExpandsStepShellWithEnvVars", func(t *testing.T) {
-		// No t.Parallel() because we use t.Setenv
-		t.Setenv("MY_STEP_SHELL", "/bin/fish")
-		dag := &core.DAG{}
+		t.Parallel()
+		dag := &core.DAG{
+			Env: []string{"MY_STEP_SHELL=/bin/fish"},
+		}
 		ctx := runtime.NewContext(context.Background(), dag, "test-run", "test.log")
 		step := core.Step{
 			Name:  "test-step",
@@ -132,9 +133,9 @@ func TestEnvShell(t *testing.T) {
 	})
 
 	t.Run("ExpandsDAGShellWithEnvVars", func(t *testing.T) {
-		// No t.Parallel() because we use t.Setenv
-		t.Setenv("MY_DAG_SHELL", "/bin/ksh")
+		t.Parallel()
 		dag := &core.DAG{
+			Env:   []string{"MY_DAG_SHELL=/bin/ksh"},
 			Shell: "$MY_DAG_SHELL",
 		}
 		ctx := runtime.NewContext(context.Background(), dag, "test-run", "test.log")
@@ -219,7 +220,7 @@ func TestEnv_AllEnvsMap(t *testing.T) {
 
 			// Check that all expected keys exist with correct values
 			for key, expectedValue := range tt.expected {
-				assert.Equal(t, expectedValue, result[key], "key %s should have value %s", key, expectedValue)
+				require.Equal(t, expectedValue, result[key], "key %s should have value %s", key, expectedValue)
 			}
 		})
 	}

@@ -147,6 +147,10 @@ func TestSubstituteCommandsEdgeCases(t *testing.T) {
 }
 
 func TestSubstituteCommands_Extended(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping tests on Windows")
+	}
+
 	tests := []struct {
 		name    string
 		input   string
@@ -264,6 +268,10 @@ func TestBuildShellCommand_Variants(t *testing.T) {
 }
 
 func TestRunCommandWithContext_WithScope(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping tests on Windows")
+	}
+
 	scope := NewEnvScope(nil, false)
 	scope = scope.WithEntry("CMD_TEST_VAR", "from_scope", EnvSourceDAGEnv)
 	scope = scope.WithEntry("PATH", os.Getenv("PATH"), EnvSourceOS)

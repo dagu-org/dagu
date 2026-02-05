@@ -336,14 +336,19 @@ func BuildCommandEscapedString(command string, args []string) string {
 
 // quoteArgIfNeeded returns the argument quoted if it contains spaces and is not already quoted.
 func quoteArgIfNeeded(arg string) string {
+	// Empty string needs explicit quoting
+	if arg == "" {
+		return `""`
+	}
+
 	// Already quoted with double or single quotes
 	if (strings.HasPrefix(arg, `"`) && strings.HasSuffix(arg, `"`)) ||
 		(strings.HasPrefix(arg, `'`) && strings.HasSuffix(arg, `'`)) {
 		return arg
 	}
 
-	// No spaces means no quoting needed
-	if !strings.ContainsAny(arg, " ") {
+	// No whitespace means no quoting needed
+	if strings.IndexFunc(arg, unicode.IsSpace) < 0 {
 		return arg
 	}
 
