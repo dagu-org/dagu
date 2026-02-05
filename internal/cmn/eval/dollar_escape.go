@@ -81,16 +81,6 @@ func unescapeDollarsInCommand(ctx context.Context, cmd string) string {
 	return unescapeDollars(ctx, cmd)
 }
 
-// stripSingleQuotedVars removes surrounding single quotes from variable references.
-func stripSingleQuotedVars(input string) string {
-	return reVarSubstitution.ReplaceAllStringFunc(input, func(match string) string {
-		if match[0] == '\'' && match[len(match)-1] == '\'' {
-			return match[1 : len(match)-1]
-		}
-		return match
-	})
-}
-
 type quoteSpan struct {
 	start int
 	end   int

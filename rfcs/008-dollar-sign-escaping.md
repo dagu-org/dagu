@@ -8,10 +8,11 @@ status: draft
 
 ## Summary
 
-Add two escape mechanisms to the v1 variable expansion system so that users can include literal `$` characters in DAG field values. Specifically:
+Add a single escape mechanism to the v1 variable expansion system so that users can include literal `$` characters in DAG field values:
 
 1. **`$$` → literal `$`**: A doubled dollar sign produces a single literal `$` in the output.
-2. **Single-quote stripping**: `'$VAR'` already suppresses expansion (per RFC 006), but the surrounding quotes are currently preserved in the output. This RFC changes the behavior so quotes are stripped, producing `$VAR` instead of `'$VAR'`.
+
+This escape is applied only when Dagu is the final evaluator (non-shell executors/config fields). Shell-executed commands are left untouched so shell semantics (including `$$` PID) remain intact.
 
 This is a targeted fix for issue [#1628](https://github.com/dagu-org/dagu/issues/1628).
 
@@ -57,13 +58,13 @@ Dagu interprets `$word123` as a variable reference.
 
 ### Every Escape Attempt Fails
 
-Users have tried every reasonable escape convention — none work:
+Users have tried every reasonable escape convention — none produce a clean literal `$` without side effects:
 
 | Attempt | Input | Expected | Actual |
 |---------|-------|----------|--------|
 | Backslash | `\$HOME` | `$HOME` | `\$HOME` (backslash preserved, `$HOME` still expanded) |
 | Double dollar | `$$HOME` | `$HOME` | `$$HOME` (no `$$` support) or `$<value>` |
-| Single quotes | `'$HOME'` | `$HOME` | `'$HOME'` (quotes preserved in output) |
+| Single quotes | `'$HOME'` | `'$HOME'` | `'$HOME'` (works, but quotes remain) |
 | Double backslash | `\\$HOME` | `\$HOME` | `\\` + expanded value |
 | Backtick wrap | `` `echo '$HOME'` `` | `$HOME` | Runs shell command, fragile |
 
@@ -87,7 +88,7 @@ var reVarSubstitution = regexp.MustCompile(
 
 This regex captures any `$` followed by a valid identifier or brace-delimited expression. There is no escape sequence that prevents a `$` from being interpreted as the start of a variable reference.
 
-The `extractVarKey` function (`resolve.go:115-123`) handles single-quoted matches by returning `false` to skip expansion — but the original match (including surrounding quotes) is preserved verbatim, leaving the quotes in the output.
+The `extractVarKey` function (`resolve.go:115-123`) handles single-quoted matches by returning `false` to skip expansion — but the original match (including surrounding quotes) is preserved verbatim, leaving the quotes in the output. This behavior is unchanged.
 
 ---
 
@@ -110,21 +111,9 @@ A doubled `$$` is converted to a single `$` before variable expansion runs. This
 | `$$$$` | `$$` (each pair collapses) |
 | `$HOME` | value of HOME (unchanged behavior) |
 
-### Fix 2: Single-Quote Stripping
+### Single Quotes (No Change)
 
-When the regex matches a single-quoted variable reference like `'$VAR'` or `'${VAR}'`, the current behavior preserves the quotes in the output. This RFC changes the behavior to **strip the surrounding single quotes**, so the output is the literal variable reference without quotes.
-
-**Examples:**
-
-| Input | Current Output | Proposed Output |
-|-------|---------------|-----------------|
-| `'$HOME'` | `'$HOME'` | `$HOME` |
-| `'${VAR}'` | `'${VAR}'` | `${VAR}` |
-| `echo '$HOME'` | `echo '$HOME'` | `echo $HOME` |
-
-This makes single quotes behave as a true escape mechanism rather than a passthrough that leaks quoting artifacts into the output.
-
-**Note:** Single quotes only suppress Dagu expansion when they immediately wrap a variable reference (`'$...'`). Quotes elsewhere in a string are not affected.
+Single-quoted variables like `'$VAR'` and `'${VAR}'` continue to suppress Dagu expansion and remain preserved verbatim in the output. This keeps quoting behavior explicit and avoids surprising transformations.
 
 ---
 
@@ -137,12 +126,14 @@ Complete before/after for all escape patterns from issue #1628:
 | `$HOME` | Expanded to env value | Expanded to env value | No change |
 | `$$HOME` | `$$HOME` or broken | `$HOME` (literal) | `$$` escape |
 | `\$HOME` | `\` + expanded value | `\` + expanded value | No change (not an escape) |
-| `'$HOME'` | `'$HOME'` (with quotes) | `$HOME` (without quotes) | Quote stripping |
-| `'${VAR}'` | `'${VAR}'` (with quotes) | `${VAR}` (without quotes) | Quote stripping |
+| `'$HOME'` | `'$HOME'` (with quotes) | `'$HOME'` (with quotes) | No change |
+| `'${VAR}'` | `'${VAR}'` (with quotes) | `'${VAR}'` (with quotes) | No change |
 | `$$9.99` | Broken | `$9.99` | `$$` escape |
 | `$${query}` | Broken | `${query}` | `$$` escape |
 | `p@ss$$word` | Broken | `p@ss$word` | `$$` escape |
 | `$$$$` | Broken | `$$` | Double `$$` collapse |
+
+\* `$$` escape is applied only in non-shell evaluation contexts. Shell-executed commands are left unchanged.
 
 ---
 
@@ -163,8 +154,8 @@ When RFC 005 ships and v1 syntax is deprecated, the `$$` escape becomes relevant
 
 RFC 006 documents the current v1 behavior including the single-quote escape mechanism. This RFC amends RFC 006's "Escape Mechanisms" section:
 
-- **Before (RFC 006):** Single-quoted variables are "preserved literally and not expanded" — but the quotes remain in output.
-- **After (this RFC):** Single-quoted variables are preserved literally, quotes are stripped from output, and `$$` is available as an additional escape.
+- **Before (RFC 006):** Single-quoted variables are "preserved literally and not expanded".
+- **After (this RFC):** Single-quoted variables are still preserved literally, and `$$` is available as an additional escape in non-shell contexts.
 
 ### RFC 007 — OS Environment Variable Expansion Rules (implemented)
 
@@ -196,25 +187,10 @@ RFC 007 restricts which variables are expanded for non-shell executors. This RFC
 {"input": "${HOME}",      "expected": "<value of HOME>"}
 ```
 
-### Single-Quote Stripping Tests
-
-```go
-// Quotes stripped, expansion suppressed
-{"input": "'$HOME'",      "expected": "$HOME"}
-{"input": "'${VAR}'",     "expected": "${VAR}"}
-
-// Quotes only stripped around variable references
-{"input": "'hello'",      "expected": "'hello'"}  // no variable, no stripping
-
-// Mixed with real expansion
-{"input": "'$LITERAL' and ${REAL}", "expected": "$LITERAL and <value>"}
-```
-
 ### Edge Cases to Verify
 
 - `$$` at end of string: `"cost$$"` → `"cost$"`
 - `$$` adjacent to real variable: `"$$$HOME"` → `$` + value of HOME
 - `$$` in command substitution context: `` `echo $$` `` — should produce literal `$` before backtick evaluation
-- `$$` in single-quoted context: `'$$HOME'` — quote stripping produces `$$HOME`, then `$$` collapses to `$HOME`? Or should `$$` processing happen first? (Order matters — document the chosen precedence.)
+- `$$` in single-quoted context: `'$$HOME'` — unchanged (quotes preserved).
 - Empty string and strings with no `$`: unchanged
-

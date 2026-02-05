@@ -21,7 +21,10 @@ type pipeline struct {
 
 // execute runs all enabled phases in order on the input string.
 func (p *pipeline) execute(ctx context.Context, input string, opts *Options) (string, error) {
-	ctx, value := withDollarEscapes(ctx, input)
+	value := input
+	if opts.EscapeDollar {
+		ctx, value = withDollarEscapes(ctx, input)
+	}
 	for _, ph := range p.phases {
 		if ph.enabled != nil && !ph.enabled(opts) {
 			continue
@@ -56,12 +59,6 @@ var defaultPipeline = &pipeline{
 			name:    "shell-expand",
 			execute: shellExpandPhase,
 			enabled: func(opts *Options) bool { return opts.ExpandEnv },
-		},
-		{
-			name: "strip-single-quoted-vars",
-			execute: func(_ context.Context, input string, _ *Options) (string, error) {
-				return stripSingleQuotedVars(input), nil
-			},
 		},
 		{
 			name: "unescape-dollar",
@@ -134,7 +131,9 @@ func shellExpandPhase(ctx context.Context, input string, opts *Options) (string,
 // evalStringValue applies variable expansion, substitution, and env expansion to a string.
 // Used by StringFields and Object for struct/map field processing.
 func evalStringValue(ctx context.Context, value string, opts *Options) (string, error) {
-	ctx, value = withDollarEscapes(ctx, value)
+	if opts.EscapeDollar {
+		ctx, value = withDollarEscapes(ctx, value)
+	}
 	value = expandVariables(ctx, value, opts)
 	if opts.Substitute {
 		var err error
@@ -146,6 +145,5 @@ func evalStringValue(ctx context.Context, value string, opts *Options) (string, 
 	if opts.ExpandEnv {
 		value = regexExpandEnv(ctx, value, opts)
 	}
-	value = stripSingleQuotedVars(value)
 	return unescapeDollars(ctx, value), nil
 }

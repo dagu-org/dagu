@@ -13,6 +13,7 @@ func TestOptions_Defaults(t *testing.T) {
 	assert.True(t, opts.ExpandEnv, "ExpandEnv should default to true")
 	assert.True(t, opts.ExpandShell, "ExpandShell should default to true")
 	assert.True(t, opts.Substitute, "Substitute should default to true")
+	assert.True(t, opts.EscapeDollar, "EscapeDollar should default to true")
 	assert.False(t, opts.ExpandOS, "ExpandOS should default to false")
 	assert.Nil(t, opts.Variables, "Variables should default to nil")
 	assert.Nil(t, opts.StepMap, "StepMap should default to nil")

@@ -438,7 +438,7 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	if script := n.Step().Script; script != "" {
 		var opts []eval.Option
 		if n.Step().ExecutorConfig.IsCommand() {
-			opts = append(opts, eval.OnlyReplaceVars())
+			opts = append(opts, eval.OnlyReplaceVars(), eval.WithoutDollarEscape())
 		}
 		script, err := EvalString(ctx, script, opts...)
 		if err != nil {

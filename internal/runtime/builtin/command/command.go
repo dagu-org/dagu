@@ -335,7 +335,10 @@ func init() {
 			env := runtime.GetEnv(ctx)
 			if len(env.Shell(ctx)) > 0 {
 				// Shell will handle env expansion
-				return []eval.Option{eval.WithoutExpandEnv()}
+				return []eval.Option{
+					eval.WithoutExpandEnv(),
+					eval.WithoutDollarEscape(),
+				}
 			}
 			// No shell — Dagu must expand OS variables since no shell will do it.
 			return []eval.Option{eval.WithOSExpansion()}

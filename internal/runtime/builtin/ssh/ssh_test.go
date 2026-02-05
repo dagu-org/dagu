@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -274,11 +275,15 @@ func TestSSHExecutor_GetEvalOptions(t *testing.T) {
 			}
 
 			opts := tt.step.EvalOptions(ctx)
+			evalOpts := eval.NewOptions()
+			for _, opt := range opts {
+				opt(evalOpts)
+			}
 
 			if tt.expectSkipShell {
-				require.Len(t, opts, 1, "expected WithoutExpandShell option")
+				require.False(t, evalOpts.ExpandShell, "expected WithoutExpandShell option")
 			} else {
-				require.Empty(t, opts, "expected no eval options")
+				require.False(t, evalOpts.EscapeDollar, "expected WithoutDollarEscape option")
 			}
 		})
 	}

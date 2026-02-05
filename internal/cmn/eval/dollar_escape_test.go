@@ -62,14 +62,19 @@ func TestString_DollarEscape(t *testing.T) {
 			expected: "'$$HOME'",
 		},
 		{
-			name:     "SingleQuotedStripped",
+			name:     "SingleQuotedPreserved",
 			input:    "'$HOME'",
-			expected: "$HOME",
+			expected: "'$HOME'",
 		},
 		{
-			name:     "SingleQuotedBracedStripped",
+			name:     "SingleQuotedBracedPreserved",
 			input:    "'${REAL}'",
-			expected: "${REAL}",
+			expected: "'${REAL}'",
+		},
+		{
+			name:     "SingleQuotedPositionalPreserved",
+			input:    "'$1'",
+			expected: "'$1'",
 		},
 	}
 
@@ -91,4 +96,12 @@ func TestString_DollarEscape_Backtick(t *testing.T) {
 	got, err := String(ctx, "`echo $$`")
 	require.NoError(t, err)
 	assert.Equal(t, "$", got)
+}
+
+func TestString_DollarEscape_Disabled(t *testing.T) {
+	ctx := context.Background()
+
+	got, err := String(ctx, "Price: $$9.99", WithoutDollarEscape())
+	require.NoError(t, err)
+	assert.Equal(t, "Price: $$9.99", got)
 }
