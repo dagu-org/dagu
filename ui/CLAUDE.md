@@ -440,7 +440,7 @@ const response = await client.POST('/endpoint/{name}/action', {
 ```
 
 #### Adding remoteNode to new API endpoints:
-When adding new endpoints to `api/v2/api.yaml`, include the RemoteNode parameter reference:
+When adding new endpoints to `api/v1/api.yaml`, include the RemoteNode parameter reference:
 ```yaml
 /new-endpoint:
   get:
