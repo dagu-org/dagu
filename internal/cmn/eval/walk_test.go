@@ -528,12 +528,15 @@ func TestStringFields_SliceFieldErrors(t *testing.T) {
 }
 
 func TestStringFields_StructWithMapField(t *testing.T) {
+	t.Setenv("TEST_VAR", "env_value")
+
 	type TestStruct struct {
 		Name    string
 		Config  map[string]string
 		Options map[string]any
 	}
 
+	ctx := context.Background()
 	input := TestStruct{
 		Name: "`echo test`",
 		Config: map[string]string{
@@ -549,9 +552,6 @@ func TestStringFields_StructWithMapField(t *testing.T) {
 		},
 	}
 
-	t.Setenv("TEST_VAR", "env_value")
-
-	ctx := context.Background()
 	got, err := StringFields(ctx, input, WithOSExpansion())
 	require.NoError(t, err)
 
@@ -563,7 +563,7 @@ func TestStringFields_StructWithMapField(t *testing.T) {
 	assert.Equal(t, "env_value", got.Options["nested"].(map[string]any)["value"])
 }
 
-func TestProcessMap_NilValues(t *testing.T) {
+func TestStringFields_MapNilValues(t *testing.T) {
 	input := map[string]any{
 		"string": "value",
 		"nil":    nil,

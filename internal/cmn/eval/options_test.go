@@ -84,6 +84,7 @@ func TestWithoutExpandShell(t *testing.T) {
 
 func TestOptions_Combinations(t *testing.T) {
 	t.Setenv("TEST_ENV", "env_value")
+	ctx := context.Background()
 
 	tests := []struct {
 		name  string
@@ -125,7 +126,6 @@ func TestOptions_Combinations(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
 			got, err := String(ctx, tt.input, tt.opts...)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)

@@ -14,6 +14,11 @@ func TestResolveJSONPath_Errors(t *testing.T) {
 		path    string
 	}{
 		{
+			name:    "InvalidJSON",
+			jsonStr: `{"a":`,
+			path:    ".a",
+		},
+		{
 			name:    "ParseError",
 			jsonStr: `{"a":1}`,
 			path:    ".[invalid",

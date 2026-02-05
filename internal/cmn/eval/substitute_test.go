@@ -11,7 +11,6 @@ import (
 )
 
 func TestSubstituteCommands(t *testing.T) {
-	// Skip tests on Windows as they require different commands
 	if runtime.GOOS == "windows" {
 		t.Skip("Skipping tests on Windows")
 	}
@@ -22,7 +21,6 @@ func TestSubstituteCommands(t *testing.T) {
 		want     string
 		wantErr  bool
 		setupEnv map[string]string
-		skipOnOS []string
 	}{
 		{
 			name:  "NoCommandSubstitutionNeeded",
@@ -86,13 +84,6 @@ func TestSubstituteCommands(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			for _, skipOS := range tt.skipOnOS {
-				if runtime.GOOS == skipOS {
-					t.Skipf("Skipping test on %s", skipOS)
-					return
-				}
-			}
-
 			for k, v := range tt.setupEnv {
 				t.Setenv(k, v)
 			}

@@ -314,65 +314,44 @@ func TestReplaceVarsWithScope(t *testing.T) {
 		{
 			name:     "UserDefinedVarExpanded",
 			template: "Hello ${NAME}",
-			scope: func() *EnvScope {
-				s := NewEnvScope(nil, false)
-				return s.WithEntry("NAME", "World", EnvSourceDAGEnv)
-			}(),
-			want: "Hello World",
+			scope:    NewEnvScope(nil, false).WithEntry("NAME", "World", EnvSourceDAGEnv),
+			want:     "Hello World",
 		},
 		{
 			name:     "OSVarNotExpanded",
 			template: "Path is $PATH",
-			scope: func() *EnvScope {
-				s := NewEnvScope(nil, true)
-				return s
-			}(),
-			want: "Path is $PATH",
+			scope:    NewEnvScope(nil, true),
+			want:     "Path is $PATH",
 		},
 		{
 			name:     "JSONPathSkipped",
 			template: "${step.stdout}",
-			scope: func() *EnvScope {
-				s := NewEnvScope(nil, false)
-				return s.WithEntry("step", "ignored", EnvSourceDAGEnv)
-			}(),
-			want: "${step.stdout}",
+			scope:    NewEnvScope(nil, false).WithEntry("step", "ignored", EnvSourceDAGEnv),
+			want:     "${step.stdout}",
 		},
 		{
 			name:     "SingleQuotedSkipped",
 			template: "'${NAME}' stays",
-			scope: func() *EnvScope {
-				s := NewEnvScope(nil, false)
-				return s.WithEntry("NAME", "World", EnvSourceDAGEnv)
-			}(),
-			want: "'${NAME}' stays",
+			scope:    NewEnvScope(nil, false).WithEntry("NAME", "World", EnvSourceDAGEnv),
+			want:     "'${NAME}' stays",
 		},
 		{
 			name:     "MixedExpansion",
 			template: "User ${USER} env $HOME",
-			scope: func() *EnvScope {
-				s := NewEnvScope(nil, true)
-				return s.WithEntry("USER", "alice", EnvSourceDAGEnv)
-			}(),
-			want: "User alice env $HOME",
+			scope:    NewEnvScope(nil, true).WithEntry("USER", "alice", EnvSourceDAGEnv),
+			want:     "User alice env $HOME",
 		},
 		{
 			name:     "StepEnvExpanded",
 			template: "${STEP_VAR}",
-			scope: func() *EnvScope {
-				s := NewEnvScope(nil, false)
-				return s.WithEntry("STEP_VAR", "step_value", EnvSourceStepEnv)
-			}(),
-			want: "step_value",
+			scope:    NewEnvScope(nil, false).WithEntry("STEP_VAR", "step_value", EnvSourceStepEnv),
+			want:     "step_value",
 		},
 		{
 			name:     "SecretExpanded",
 			template: "key=${SECRET}",
-			scope: func() *EnvScope {
-				s := NewEnvScope(nil, false)
-				return s.WithEntry("SECRET", "s3cr3t", EnvSourceSecret)
-			}(),
-			want: "key=s3cr3t",
+			scope:    NewEnvScope(nil, false).WithEntry("SECRET", "s3cr3t", EnvSourceSecret),
+			want:     "key=s3cr3t",
 		},
 		{
 			name:     "NilScope",
@@ -383,33 +362,24 @@ func TestReplaceVarsWithScope(t *testing.T) {
 		{
 			name:     "MissingVar",
 			template: "${MISSING}",
-			scope: func() *EnvScope {
-				s := NewEnvScope(nil, false)
-				return s.WithEntry("OTHER", "value", EnvSourceDAGEnv)
-			}(),
-			want: "${MISSING}",
+			scope:    NewEnvScope(nil, false).WithEntry("OTHER", "value", EnvSourceDAGEnv),
+			want:     "${MISSING}",
 		},
 		{
 			name:     "MultipleVars",
 			template: "${A} ${B} ${C}",
-			scope: func() *EnvScope {
-				s := NewEnvScope(nil, false)
-				s = s.WithEntry("A", "1", EnvSourceDAGEnv)
-				s = s.WithEntry("B", "2", EnvSourceStepEnv)
-				s = s.WithEntry("C", "3", EnvSourceSecret)
-				return s
-			}(),
+			scope: NewEnvScope(nil, false).
+				WithEntry("A", "1", EnvSourceDAGEnv).
+				WithEntry("B", "2", EnvSourceStepEnv).
+				WithEntry("C", "3", EnvSourceSecret),
 			want: "1 2 3",
 		},
 		{
 			name:     "ShortAndBracedSyntax",
 			template: "$FOO and ${BAR}",
-			scope: func() *EnvScope {
-				s := NewEnvScope(nil, false)
-				s = s.WithEntry("FOO", "foo", EnvSourceDAGEnv)
-				s = s.WithEntry("BAR", "bar", EnvSourceDAGEnv)
-				return s
-			}(),
+			scope: NewEnvScope(nil, false).
+				WithEntry("FOO", "foo", EnvSourceDAGEnv).
+				WithEntry("BAR", "bar", EnvSourceDAGEnv),
 			want: "foo and bar",
 		},
 	}

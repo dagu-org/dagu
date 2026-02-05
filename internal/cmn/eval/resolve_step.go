@@ -37,17 +37,20 @@ func resolveStepProperty(ctx context.Context, stepName, path string, stepMap map
 	var value string
 	switch property {
 	case ".stdout":
+		if stepInfo.Stdout == "" {
+			logger.Debug(ctx, "Step stdout is empty", tag.Step(stepName))
+			return "", false
+		}
 		value = stepInfo.Stdout
 	case ".stderr":
+		if stepInfo.Stderr == "" {
+			logger.Debug(ctx, "Step stderr is empty", tag.Step(stepName))
+			return "", false
+		}
 		value = stepInfo.Stderr
 	case ".exitCode", ".exit_code":
 		value = stepInfo.ExitCode
 	default:
-		return "", false
-	}
-
-	if value == "" && (property == ".stdout" || property == ".stderr") {
-		logger.Debug(ctx, "Step "+property[1:]+" is empty", tag.Step(stepName))
 		return "", false
 	}
 
@@ -71,13 +74,10 @@ type stepSliceSpec struct {
 func parseStepReference(path string) (string, stepSliceSpec, error) {
 	spec := stepSliceSpec{}
 
-	colonIdx := strings.Index(path, ":")
-	if colonIdx == -1 {
+	property, sliceNotation, hasSlice := strings.Cut(path, ":")
+	if !hasSlice {
 		return path, spec, nil
 	}
-
-	property := path[:colonIdx]
-	sliceNotation := path[colonIdx+1:]
 
 	if sliceNotation == "" {
 		return "", spec, fmt.Errorf("slice specification missing values")

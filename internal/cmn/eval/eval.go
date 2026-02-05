@@ -15,19 +15,22 @@ func expandVariables(ctx context.Context, value string, opts *Options) string {
 	return value
 }
 
+// buildOptions creates Options from the given functional options.
+func buildOptions(opts []Option) *Options {
+	options := NewOptions()
+	for _, opt := range opts {
+		opt(options)
+	}
+	return options
+}
+
 // String substitutes environment variables and commands in the input string
 // by running the default pipeline: quoted-refs, variables, substitute, shell-expand.
 func String(ctx context.Context, input string, opts ...Option) (string, error) {
 	if input == "" {
 		return "", nil
 	}
-
-	options := NewOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
-
-	return defaultPipeline.execute(ctx, input, options)
+	return defaultPipeline.execute(ctx, input, buildOptions(opts))
 }
 
 // IntString evaluates the input string via String and converts the result to an integer.
@@ -46,28 +49,21 @@ func IntString(ctx context.Context, input string, opts ...Option) (int, error) {
 // StringFields recursively processes all string fields in a struct or map by expanding
 // environment variables and substituting command outputs.
 func StringFields[T any](ctx context.Context, obj T, opts ...Option) (T, error) {
-	options := NewOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
-
 	v := reflect.ValueOf(obj)
-
-	// nolint:exhaustive
-	switch v.Kind() {
-	case reflect.Struct, reflect.Map:
-		transform := func(ctx context.Context, s string) (string, error) {
-			return evalStringValue(ctx, s, options)
-		}
-		result, err := walkValue(ctx, v, transform)
-		if err != nil {
-			return obj, err
-		}
-		return result.Interface().(T), nil
-
-	default:
+	if v.Kind() != reflect.Struct && v.Kind() != reflect.Map {
 		return obj, fmt.Errorf("input must be a struct or map, got %T", obj)
 	}
+
+	options := buildOptions(opts)
+	transform := func(ctx context.Context, s string) (string, error) {
+		return evalStringValue(ctx, s, options)
+	}
+
+	result, err := walkValue(ctx, v, transform)
+	if err != nil {
+		return obj, err
+	}
+	return result.Interface().(T), nil
 }
 
 // ExpandReferences finds all ${NAME.path} references in the input string, resolves
@@ -95,7 +91,7 @@ func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[st
 func Object[T any](ctx context.Context, obj T, vars map[string]string) (T, error) {
 	options := NewOptions()
 	options.ExpandOS = true
-	WithVariables(vars)(options)
+	options.Variables = append(options.Variables, vars)
 
 	transform := func(ctx context.Context, s string) (string, error) {
 		return evalStringValue(ctx, s, options)
@@ -106,10 +102,5 @@ func Object[T any](ctx context.Context, obj T, vars map[string]string) (T, error
 	if err != nil {
 		return obj, err
 	}
-
-	out, ok := result.Interface().(T)
-	if !ok {
-		return obj, fmt.Errorf("expected type %T but got %T", obj, result.Interface())
-	}
-	return out, nil
+	return result.Interface().(T), nil
 }

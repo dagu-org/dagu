@@ -257,10 +257,10 @@ func TestStringFields_Map(t *testing.T) {
 			got, err := StringFields(ctx, tt.input, tt.opts...)
 			if tt.wantErr {
 				assert.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.want, got)
+				return
 			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -401,30 +401,31 @@ func TestStringFields_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 }
 
 func TestStringFields_ErrorCases(t *testing.T) {
-	// Test with a channel (unsupported type)
-	ch := make(chan int)
-	_, err := StringFields(context.Background(), ch)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "input must be a struct or map")
+	t.Run("UnsupportedType", func(t *testing.T) {
+		ch := make(chan int)
+		_, err := StringFields(context.Background(), ch)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "input must be a struct or map")
+	})
 
-	// Test struct with invalid command
-	type TestStruct struct {
-		Field string
-	}
-	input := TestStruct{
-		Field: "`invalid_command_xyz`",
-	}
-	_, err = StringFields(context.Background(), input)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to execute command")
+	t.Run("StructWithInvalidCommand", func(t *testing.T) {
+		type TestStruct struct {
+			Field string
+		}
+		_, err := StringFields(context.Background(), TestStruct{
+			Field: "`invalid_command_xyz`",
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to execute command")
+	})
 
-	// Test map with invalid command
-	mapInput := map[string]any{
-		"key": "`invalid_command_xyz`",
-	}
-	_, err = StringFields(context.Background(), mapInput)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to execute command")
+	t.Run("MapWithInvalidCommand", func(t *testing.T) {
+		_, err := StringFields(context.Background(), map[string]any{
+			"key": "`invalid_command_xyz`",
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to execute command")
+	})
 }
 
 func TestObject_String(t *testing.T) {
@@ -698,26 +699,15 @@ func TestObject_ComplexScenarios(t *testing.T) {
 }
 
 func TestObject_EmptyVars(t *testing.T) {
-	ctx := context.Background()
-	emptyVars := map[string]string{}
-
-	t.Run("StringWithUndefinedVariable", func(t *testing.T) {
-		input := "Hello, $UNDEFINED!"
-		result, err := Object(ctx, input, emptyVars)
-		require.NoError(t, err)
-		assert.Equal(t, "Hello, $UNDEFINED!", result)
-	})
+	result, err := Object(context.Background(), "Hello, $UNDEFINED!", map[string]string{})
+	require.NoError(t, err)
+	assert.Equal(t, "Hello, $UNDEFINED!", result)
 }
 
 func TestObject_NilVars(t *testing.T) {
-	ctx := context.Background()
-
-	t.Run("NilVarsMap", func(t *testing.T) {
-		input := "Hello, World!"
-		result, err := Object(ctx, input, nil)
-		require.NoError(t, err)
-		assert.Equal(t, "Hello, World!", result)
-	})
+	result, err := Object(context.Background(), "Hello, World!", nil)
+	require.NoError(t, err)
+	assert.Equal(t, "Hello, World!", result)
 }
 
 func TestObject_ErrorPropagation(t *testing.T) {

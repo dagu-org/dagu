@@ -55,26 +55,23 @@ func runCommandWithContext(ctx context.Context, cmdStr string) (string, error) {
 // substituteCommandsWithContext replaces backtick-delimited commands in input
 // with their execution output, using the EnvScope from context if available.
 func substituteCommandsWithContext(ctx context.Context, input string) (string, error) {
-	var result strings.Builder
-	var cmdBuilder strings.Builder
+	var result, cmdBuilder strings.Builder
 	inCommand := false
 
 	runes := []rune(input)
-	i := 0
-	for i < len(runes) {
+	for i := 0; i < len(runes); i++ {
 		r := runes[i]
 
-		// Escaped backtick: preserve literally and skip ahead.
+		// Escaped backtick: preserve literally.
 		if r == '\\' && i+1 < len(runes) && runes[i+1] == '`' {
 			result.WriteString("\\`")
-			i += 2
+			i++
 			continue
 		}
 
 		if r == '`' {
 			if inCommand {
 				if cmdBuilder.Len() == 0 {
-					// Empty backticks: preserve as-is.
 					result.WriteString("``")
 				} else {
 					output, err := runCommandWithContext(ctx, cmdBuilder.String())
@@ -93,8 +90,6 @@ func substituteCommandsWithContext(ctx context.Context, input string) (string, e
 		} else {
 			result.WriteRune(r)
 		}
-
-		i++
 	}
 
 	// Unclosed backtick: append the partial command as-is.

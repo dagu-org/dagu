@@ -60,9 +60,8 @@ var defaultPipeline = &pipeline{
 	},
 }
 
-// expandQuotedRefs handles quoted JSON references like "${FOO.bar}" and simple variables
-// like "${VAR}" that appear within double quotes. These are resolved and re-quoted so
-// that the JSON remains valid after expansion.
+// expandQuotedRefs handles quoted references like "${FOO.bar}" and "${VAR}" within
+// double quotes. Resolved values are re-quoted so surrounding JSON stays valid.
 func expandQuotedRefs(ctx context.Context, input string, opts *Options) (string, error) {
 	r := newResolver(ctx, opts)
 	result := reQuotedJSONRef.ReplaceAllStringFunc(input, func(match string) string {
@@ -96,33 +95,32 @@ func substitutePhase(ctx context.Context, input string, _ *Options) (string, err
 	return substituteCommandsWithContext(ctx, input)
 }
 
+// regexExpandEnv performs regex-based variable expansion. When ExpandOS is true,
+// os.LookupEnv is available as a fallback; otherwise only scoped entries are used.
+func regexExpandEnv(ctx context.Context, input string, opts *Options) string {
+	if opts.ExpandOS {
+		return ExpandEnvContext(ctx, input)
+	}
+	return expandEnvScopeOnly(ctx, input)
+}
+
 // shellExpandPhase performs shell-style variable expansion.
-// When ExpandShell is true (default), uses selective POSIX expansion via mvdan.cc/sh:
+// When ExpandShell is true (default), uses selective POSIX expansion via mvdan.cc/sh;
 // defined variables with POSIX operators are expanded, undefined variables are preserved.
-// When ExpandShell is false, falls back to regex-based expansion.
-// ExpandOS controls only whether os.LookupEnv is available as a fallback source.
-// On POSIX expansion errors, falls back to regex-based expansion for robustness.
+// When ExpandShell is false or POSIX expansion fails, falls back to regex-based expansion.
 func shellExpandPhase(ctx context.Context, input string, opts *Options) (string, error) {
 	if !opts.ExpandShell {
-		if opts.ExpandOS {
-			return ExpandEnvContext(ctx, input), nil
-		}
-		return expandEnvScopeOnly(ctx, input), nil
+		return regexExpandEnv(ctx, input, opts), nil
 	}
 	expanded, err := expandWithShellContext(ctx, input, opts)
 	if err != nil {
-		if opts.ExpandOS {
-			return ExpandEnvContext(ctx, input), nil
-		}
-		return expandEnvScopeOnly(ctx, input), nil
+		return regexExpandEnv(ctx, input, opts), nil
 	}
 	return expanded, nil
 }
 
 // evalStringValue applies variable expansion, substitution, and env expansion to a string.
 // Used by StringFields and Object for struct/map field processing.
-// Uses simple env expansion (ExpandEnvContext) rather than full shell expansion,
-// which preserves undefined variables as-is.
 func evalStringValue(ctx context.Context, value string, opts *Options) (string, error) {
 	value = expandVariables(ctx, value, opts)
 	if opts.Substitute {
@@ -133,11 +131,7 @@ func evalStringValue(ctx context.Context, value string, opts *Options) (string, 
 		}
 	}
 	if opts.ExpandEnv {
-		if opts.ExpandOS {
-			value = ExpandEnvContext(ctx, value)
-		} else {
-			value = expandEnvScopeOnly(ctx, value)
-		}
+		value = regexExpandEnv(ctx, value, opts)
 	}
 	return value, nil
 }

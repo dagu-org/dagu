@@ -42,15 +42,12 @@ func TestResolveStepProperty(t *testing.T) {
 
 func TestParseStepReference(t *testing.T) {
 	tests := []struct {
-		name          string
-		path          string
-		wantProp      string
-		wantHasStart  bool
-		wantStart     int
-		wantHasLength bool
-		wantLength    int
-		wantErr       bool
-		errMsg        string
+		name     string
+		path     string
+		wantProp string
+		wantSpec stepSliceSpec
+		wantErr  bool
+		errMsg   string
 	}{
 		{
 			name:     "NoSlice",
@@ -58,20 +55,16 @@ func TestParseStepReference(t *testing.T) {
 			wantProp: ".stdout",
 		},
 		{
-			name:         "WithStartOnly",
-			path:         ".stdout:3",
-			wantProp:     ".stdout",
-			wantHasStart: true,
-			wantStart:    3,
+			name:     "WithStartOnly",
+			path:     ".stdout:3",
+			wantProp: ".stdout",
+			wantSpec: stepSliceSpec{hasStart: true, start: 3},
 		},
 		{
-			name:          "WithStartAndLength",
-			path:          ".stdout:3:5",
-			wantProp:      ".stdout",
-			wantHasStart:  true,
-			wantStart:     3,
-			wantHasLength: true,
-			wantLength:    5,
+			name:     "WithStartAndLength",
+			path:     ".stdout:3:5",
+			wantProp: ".stdout",
+			wantSpec: stepSliceSpec{hasStart: true, start: 3, hasLength: true, length: 5},
 		},
 		{
 			name:    "EmptySliceSpec",
@@ -116,21 +109,16 @@ func TestParseStepReference(t *testing.T) {
 			errMsg:  "slice length must be non-negative",
 		},
 		{
-			name:          "ZeroStart",
-			path:          ".exit_code:0:10",
-			wantProp:      ".exit_code",
-			wantHasStart:  true,
-			wantStart:     0,
-			wantHasLength: true,
-			wantLength:    10,
+			name:     "ZeroStart",
+			path:     ".exit_code:0:10",
+			wantProp: ".exit_code",
+			wantSpec: stepSliceSpec{hasStart: true, start: 0, hasLength: true, length: 10},
 		},
 		{
-			name:          "EmptyLengthPart",
-			path:          ".stdout:5:",
-			wantProp:      ".stdout",
-			wantHasStart:  true,
-			wantStart:     5,
-			wantHasLength: false,
+			name:     "EmptyLengthPart",
+			path:     ".stdout:5:",
+			wantProp: ".stdout",
+			wantSpec: stepSliceSpec{hasStart: true, start: 5},
 		},
 	}
 
@@ -144,14 +132,7 @@ func TestParseStepReference(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantProp, prop)
-			assert.Equal(t, tt.wantHasStart, spec.hasStart)
-			if tt.wantHasStart {
-				assert.Equal(t, tt.wantStart, spec.start)
-			}
-			assert.Equal(t, tt.wantHasLength, spec.hasLength)
-			if tt.wantHasLength {
-				assert.Equal(t, tt.wantLength, spec.length)
-			}
+			assert.Equal(t, tt.wantSpec, spec)
 		})
 	}
 }

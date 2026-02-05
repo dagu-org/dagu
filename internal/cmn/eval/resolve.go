@@ -69,10 +69,7 @@ func (r *resolver) resolve(name string) (string, bool) {
 // resolveForShell looks up a variable for shell expansion.
 // Like resolve but includes OS environment as a final fallback when expandOS is true.
 func (r *resolver) resolveForShell(name string) (string, bool) {
-	if val, ok := r.lookupVariable(name); ok {
-		return val, true
-	}
-	if val, ok := r.lookupScopeNonOS(name); ok {
+	if val, ok := r.resolve(name); ok {
 		return val, true
 	}
 	if r.expandOS {
@@ -102,17 +99,15 @@ func (r *resolver) resolveJSONSource(name string) (string, bool) {
 	if val, ok := r.lookupVariable(name); ok {
 		return val, true
 	}
-	if r.expandOS && r.scope != nil {
-		if val, ok := r.scope.Get(name); ok {
-			return val, true
-		}
-	} else if val, ok := r.lookupScopeNonOS(name); ok {
-		return val, true
-	}
 	if r.expandOS {
+		if r.scope != nil {
+			if val, ok := r.scope.Get(name); ok {
+				return val, true
+			}
+		}
 		return os.LookupEnv(name)
 	}
-	return "", false
+	return r.lookupScopeNonOS(name)
 }
 
 // extractVarKey extracts the variable key from a regex match.

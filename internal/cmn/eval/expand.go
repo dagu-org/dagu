@@ -108,18 +108,18 @@ func expandWithShellContext(ctx context.Context, input string, opts *Options) (s
 	last := 0
 	for _, loc := range matches {
 		b.WriteString(input[last:loc[0]])
+		last = loc[1]
 		match := input[loc[0]:loc[1]]
 
-		// Single-quoted: preserve
+		// Single-quoted: preserve as-is.
 		if match[0] == '\'' {
 			b.WriteString(match)
-			last = loc[1]
 			continue
 		}
 
-		// Extract variable name
+		// Extract variable name and detect POSIX operators.
 		var varName string
-		hasPOSIXOp := false
+		var hasPOSIXOp bool
 		if loc[2] >= 0 { // Group 1: ${...}
 			inner := input[loc[2]:loc[3]]
 			varName = extractPOSIXVarName(inner)
@@ -128,18 +128,15 @@ func expandWithShellContext(ctx context.Context, input string, opts *Options) (s
 			varName = input[loc[4]:loc[5]]
 		}
 
-		_, defined := r.resolveForShell(varName)
+		val, defined := r.resolveForShell(varName)
 
-		// Undefined variable handling depends on ExpandOS:
-		// - ExpandOS=false: preserve for later OS shell evaluation
-		// - ExpandOS=true: let POSIX rules apply (defaults, errors, etc.)
+		// Undefined without OS expansion: preserve for later shell evaluation.
 		if !defined && !opts.ExpandOS {
 			b.WriteString(match)
-			last = loc[1]
 			continue
 		}
 
-		// Has POSIX operator: expand via shell parser
+		// POSIX operator present: expand via shell parser.
 		if hasPOSIXOp {
 			expanded, err := expandPOSIXExpression(match, env)
 			if err != nil {
@@ -147,11 +144,8 @@ func expandWithShellContext(ctx context.Context, input string, opts *Options) (s
 			}
 			b.WriteString(expanded)
 		} else {
-			// Simple ${VAR} or $VAR: resolve directly
-			val, _ := r.resolveForShell(varName)
 			b.WriteString(val)
 		}
-		last = loc[1]
 	}
 	b.WriteString(input[last:])
 	return b.String(), nil

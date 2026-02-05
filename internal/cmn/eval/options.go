@@ -7,11 +7,12 @@ type Options struct {
 	ExpandOS    bool // Enable os.LookupEnv fallback and OS-sourced scope entries
 	Substitute  bool // Enable backtick command substitution
 
-	Variables []map[string]string
-	StepMap   map[string]StepInfo
+	Variables []map[string]string // Ordered variable maps for expansion
+	StepMap   map[string]StepInfo // Step info map for step reference expansion
 }
 
-// NewOptions returns default Options with all features enabled.
+// NewOptions returns default Options with ExpandEnv, ExpandShell, and
+// Substitute enabled. ExpandOS is disabled by default.
 func NewOptions() *Options {
 	return &Options{
 		ExpandEnv:   true,

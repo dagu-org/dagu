@@ -16,7 +16,7 @@ const (
 	EnvSourceDAGEnv  EnvSource = "dag_env"  // From DAG env: field
 	EnvSourceDotEnv  EnvSource = "dotenv"   // From .env file
 	EnvSourceParam   EnvSource = "param"    // From params
-	EnvSourceOutput  EnvSource = "output"   // From step output (renamed from EnvSourceStep)
+	EnvSourceOutput  EnvSource = "output"   // From step output
 	EnvSourceSecret  EnvSource = "secret"   // From secrets
 	EnvSourceStepEnv EnvSource = "step_env" // From step.env field
 )
@@ -36,8 +36,8 @@ type EnvEntry struct {
 // It does NOT modify the global os.Env.
 type EnvScope struct {
 	mu      sync.RWMutex
-	entries map[string]EnvEntry // key -> entry with metadata
-	parent  *EnvScope           // optional parent scope for layering
+	entries map[string]EnvEntry
+	parent  *EnvScope
 }
 
 // NewEnvScope creates a new EnvScope, optionally inheriting from parent.
@@ -144,24 +144,9 @@ func (e *EnvScope) ToSlice() []string {
 	return result
 }
 
-// ToMap returns all variables as a map
+// ToMap returns all variables as a map, with child entries overriding parent entries.
 func (e *EnvScope) ToMap() map[string]string {
-	if e == nil {
-		return make(map[string]string)
-	}
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	all := make(map[string]string)
-	if e.parent != nil {
-		for k, v := range e.parent.ToMap() {
-			all[k] = v
-		}
-	}
-	for k, entry := range e.entries {
-		all[k] = entry.Value
-	}
-	return all
+	return e.collectAll(func(_ EnvEntry) bool { return true })
 }
 
 // expandWithLookup expands $VAR and ${VAR} using the provided lookup function.
@@ -275,9 +260,6 @@ func (e *EnvScope) collect(result map[string]string, include func(EnvEntry) bool
 // Provenance returns a human-readable description of where a variable came from.
 // Returns empty string if the variable is not found.
 func (e *EnvScope) Provenance(key string) string {
-	if e == nil {
-		return ""
-	}
 	entry, ok := e.GetEntry(key)
 	if !ok {
 		return ""

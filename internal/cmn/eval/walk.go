@@ -16,7 +16,7 @@ func walkValue(ctx context.Context, v reflect.Value, transform stringTransform) 
 		v = v.Elem()
 	}
 
-	// nolint:exhaustive
+	//nolint:exhaustive
 	switch v.Kind() {
 	case reflect.String:
 		s, err := transform(ctx, v.String())
@@ -62,7 +62,7 @@ func walkStruct(ctx context.Context, v reflect.Value, transform stringTransform)
 	result := reflect.New(v.Type()).Elem()
 	result.Set(v)
 
-	for i := 0; i < result.NumField(); i++ {
+	for i := range result.NumField() {
 		field := result.Field(i)
 		if !field.CanSet() {
 			continue
@@ -77,6 +77,15 @@ func walkStruct(ctx context.Context, v reflect.Value, transform stringTransform)
 	return result, nil
 }
 
+// unwrapIndirections peels away interface and pointer wrappers from a reflect.Value,
+// returning the underlying concrete value.
+func unwrapIndirections(v reflect.Value) reflect.Value {
+	for (v.Kind() == reflect.Interface || v.Kind() == reflect.Ptr) && !v.IsNil() {
+		v = v.Elem()
+	}
+	return v
+}
+
 // walkMap creates a new map and walks each value entry.
 // Map values are fully unwrapped (both interfaces and pointers) before walking,
 // so a map[string]any with *string values will produce string values in the output.
@@ -85,13 +94,7 @@ func walkMap(ctx context.Context, v reflect.Value, transform stringTransform) (r
 
 	iter := v.MapRange()
 	for iter.Next() {
-		val := iter.Value()
-
-		for (val.Kind() == reflect.Interface || val.Kind() == reflect.Ptr) && !val.IsNil() {
-			val = val.Elem()
-		}
-
-		walked, err := walkValue(ctx, val, transform)
+		walked, err := walkValue(ctx, unwrapIndirections(iter.Value()), transform)
 		if err != nil {
 			return v, err
 		}
@@ -104,7 +107,7 @@ func walkMap(ctx context.Context, v reflect.Value, transform stringTransform) (r
 func walkSlice(ctx context.Context, v reflect.Value, transform stringTransform) (reflect.Value, error) {
 	newSlice := reflect.MakeSlice(v.Type(), v.Len(), v.Cap())
 
-	for i := 0; i < v.Len(); i++ {
+	for i := range v.Len() {
 		walked, err := walkValue(ctx, v.Index(i), transform)
 		if err != nil {
 			return v, err
