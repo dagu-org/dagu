@@ -520,7 +520,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 
 			// Evaluate CmdWithArgs if present
 			cmdWithArgs := cmdEntry.CmdWithArgs
-			if cmdWithArgs != "" && step.ExecutorConfig.IsCommand() {
+			if cmdWithArgs != "" {
 				evaluated, err := EvalString(ctx, cmdWithArgs, evalOptions...)
 				if err != nil {
 					return fmt.Errorf("failed to eval command with args: %w", err)

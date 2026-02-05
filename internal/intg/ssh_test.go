@@ -368,6 +368,51 @@ steps:
 		})
 	})
 
+	t.Run("OSEnvVarNotExpandedLocally", func(t *testing.T) {
+		th := test.Setup(t)
+
+		// $HOME must NOT be expanded to the local machine's home directory.
+		// The remote shell should resolve it to the SSH user's home directory.
+		dagConfig := sshServer.sshConfig("/bin/sh") + `
+steps:
+  - name: remote-home
+    type: ssh
+    command: echo $HOME
+    output: REMOTE_HOME
+`
+		dag := th.DAG(t, dagConfig)
+		dag.Agent().RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+		// Remote $HOME should be /home/testuser, not the local $HOME
+		dag.AssertOutputs(t, map[string]any{
+			"REMOTE_HOME": fmt.Sprintf("/home/%s", sshTestUser),
+		})
+	})
+
+	t.Run("DAGScopedVarExpandedInSSH", func(t *testing.T) {
+		th := test.Setup(t)
+
+		// Variables defined in the DAG env scope SHOULD be expanded,
+		// while OS-only variables like $USER should be left for the remote shell.
+		dagConfig := sshServer.sshConfig("/bin/sh") + `
+env:
+  GREETING: hello
+steps:
+  - name: mixed-vars
+    type: ssh
+    command: echo "$GREETING from $USER"
+    output: MIXED_OUT
+`
+		dag := th.DAG(t, dagConfig)
+		dag.Agent().RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+		// GREETING is DAG-scoped → expanded by Dagu to "hello"
+		// $USER is OS-only → left for the remote shell → resolves to sshTestUser
+		dag.AssertOutputs(t, map[string]any{
+			"MIXED_OUT": fmt.Sprintf("hello from %s", sshTestUser),
+		})
+	})
+
 	t.Run("TimeoutConfiguration", func(t *testing.T) {
 		th := test.Setup(t)
 
