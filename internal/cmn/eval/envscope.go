@@ -106,23 +106,16 @@ func (e *EnvScope) WithStepOutputs(outputs map[string]string, stepID string) *En
 	return newScope
 }
 
-// Get retrieves a variable, checking this scope then parent scopes
+// Get retrieves a variable value, checking this scope then parent scopes.
 func (e *EnvScope) Get(key string) (string, bool) {
-	if e == nil {
+	entry, ok := e.GetEntry(key)
+	if !ok {
 		return "", false
 	}
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-	if entry, ok := e.entries[key]; ok {
-		return entry.Value, true
-	}
-	if e.parent != nil {
-		return e.parent.Get(key)
-	}
-	return "", false
+	return entry.Value, true
 }
 
-// GetEntry retrieves the full entry with metadata
+// GetEntry retrieves the full entry with metadata, checking this scope then parent scopes.
 func (e *EnvScope) GetEntry(key string) (EnvEntry, bool) {
 	if e == nil {
 		return EnvEntry{}, false
@@ -215,7 +208,6 @@ func (e *EnvScope) Debug() string {
 	return b.String()
 }
 
-// Context key for EnvScope
 type envScopeKey struct{}
 
 // WithEnvScope returns a context with the given EnvScope
@@ -238,31 +230,7 @@ func GetEnvScope(ctx context.Context) *EnvScope {
 // AllBySource returns all entries with the given source.
 // This is useful for getting all secrets for masking, all params, etc.
 func (e *EnvScope) AllBySource(source EnvSource) map[string]string {
-	if e == nil {
-		return make(map[string]string)
-	}
-	result := make(map[string]string)
-	e.collectBySource(source, result)
-	return result
-}
-
-func (e *EnvScope) collectBySource(source EnvSource, result map[string]string) {
-	if e == nil {
-		return
-	}
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	// First collect from parent (so child entries override)
-	if e.parent != nil {
-		e.parent.collectBySource(source, result)
-	}
-	// Then add entries from this scope
-	for k, entry := range e.entries {
-		if entry.Source == source {
-			result[k] = entry.Value
-		}
-	}
+	return e.collectAll(func(entry EnvEntry) bool { return entry.Source == source })
 }
 
 // AllSecrets returns all entries with EnvSourceSecret.
@@ -272,27 +240,33 @@ func (e *EnvScope) AllSecrets() map[string]string {
 }
 
 // AllUserEnvs returns all entries excluding OS environment.
-// This replaces exec.Context.UserEnvsMap().
 func (e *EnvScope) AllUserEnvs() map[string]string {
+	return e.collectAll(func(entry EnvEntry) bool { return entry.Source != EnvSourceOS })
+}
+
+// collectAll gathers entries matching include across the full scope chain.
+// Parent entries are collected first so child entries override them.
+func (e *EnvScope) collectAll(include func(EnvEntry) bool) map[string]string {
+	if e == nil {
+		return make(map[string]string)
+	}
 	result := make(map[string]string)
-	e.collectUserEnvs(result)
+	e.collect(result, include)
 	return result
 }
 
-func (e *EnvScope) collectUserEnvs(result map[string]string) {
+func (e *EnvScope) collect(result map[string]string, include func(EnvEntry) bool) {
 	if e == nil {
 		return
 	}
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	// First collect from parent (so child entries override)
 	if e.parent != nil {
-		e.parent.collectUserEnvs(result)
+		e.parent.collect(result, include)
 	}
-	// Then add entries from this scope (excluding OS source)
 	for k, entry := range e.entries {
-		if entry.Source != EnvSourceOS {
+		if include(entry) {
 			result[k] = entry.Value
 		}
 	}

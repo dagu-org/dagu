@@ -25,43 +25,37 @@ func TestSubstituteCommands(t *testing.T) {
 		skipOnOS []string
 	}{
 		{
-			name:    "NoCommandSubstitutionNeeded",
-			input:   "hello world",
-			want:    "hello world",
-			wantErr: false,
+			name:  "NoCommandSubstitutionNeeded",
+			input: "hello world",
+			want:  "hello world",
 		},
 		{
-			name:    "SimpleEchoCommand",
-			input:   "prefix `echo hello` suffix",
-			want:    "prefix hello suffix",
-			wantErr: false,
+			name:  "SimpleEchoCommand",
+			input: "prefix `echo hello` suffix",
+			want:  "prefix hello suffix",
 		},
 		{
-			name:    "MultipleCommands",
-			input:   "`echo foo` and `echo bar`",
-			want:    "foo and bar",
-			wantErr: false,
+			name:  "MultipleCommands",
+			input: "`echo foo` and `echo bar`",
+			want:  "foo and bar",
 		},
 		{
-			name:    "NestedQuotes",
-			input:   "`echo \"hello world\"`",
-			want:    "hello world",
-			wantErr: false,
+			name:  "NestedQuotes",
+			input: "`echo \"hello world\"`",
+			want:  "hello world",
 		},
 		{
-			name:    "CommandWithEnvironmentVariable",
-			input:   "`echo $TEST_VAR`",
-			want:    "test_value",
-			wantErr: false,
+			name:  "CommandWithEnvironmentVariable",
+			input: "`echo $TEST_VAR`",
+			want:  "test_value",
 			setupEnv: map[string]string{
 				"TEST_VAR": "test_value",
 			},
 		},
 		{
-			name:    "CommandWithSpaces",
-			input:   "`echo 'hello   world'`",
-			want:    "hello   world",
-			wantErr: false,
+			name:  "CommandWithSpaces",
+			input: "`echo 'hello   world'`",
+			want:  "hello   world",
 		},
 		{
 			name:    "InvalidCommand",
@@ -69,10 +63,9 @@ func TestSubstituteCommands(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "EmptyBackticks",
-			input:   "``",
-			want:    "``",
-			wantErr: false,
+			name:  "EmptyBackticks",
+			input: "``",
+			want:  "``",
 		},
 		{
 			name:    "CommandThatReturnsError",
@@ -80,45 +73,36 @@ func TestSubstituteCommands(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "CommandWithPipeline",
-			input:   "`echo hello | tr 'a-z' 'A-Z'`",
-			want:    "HELLO",
-			wantErr: false,
+			name:  "CommandWithPipeline",
+			input: "`echo hello | tr 'a-z' 'A-Z'`",
+			want:  "HELLO",
 		},
 		{
-			name:    "MultipleLinesInOutput",
-			input:   "`printf 'line1\\nline2'`",
-			want:    "line1\nline2",
-			wantErr: false,
+			name:  "MultipleLinesInOutput",
+			input: "`printf 'line1\\nline2'`",
+			want:  "line1\nline2",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Skip if test should be skipped on current OS
-			for _, os := range tt.skipOnOS {
-				if runtime.GOOS == os {
-					t.Skipf("Skipping test on %s", os)
+			for _, skipOS := range tt.skipOnOS {
+				if runtime.GOOS == skipOS {
+					t.Skipf("Skipping test on %s", skipOS)
 					return
 				}
 			}
 
-			// Setup environment if needed
 			for k, v := range tt.setupEnv {
 				t.Setenv(k, v)
 			}
 
-			// Run test
 			got, err := substituteCommandsWithContext(context.Background(), tt.input)
-
-			// Check error
 			if tt.wantErr {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
-
-			// Compare output
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -132,34 +116,29 @@ func TestSubstituteCommandsEdgeCases(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "EmptyInput",
-			input:   "",
-			want:    "",
-			wantErr: false,
+			name:  "EmptyInput",
+			input: "",
+			want:  "",
 		},
 		{
-			name:    "OnlySpaces",
-			input:   "     ",
-			want:    "     ",
-			wantErr: false,
+			name:  "OnlySpaces",
+			input: "     ",
+			want:  "     ",
 		},
 		{
-			name:    "UnmatchedBackticks",
-			input:   "hello `world",
-			want:    "hello `world",
-			wantErr: false,
+			name:  "UnmatchedBackticks",
+			input: "hello `world",
+			want:  "hello `world",
 		},
 		{
-			name:    "EscapedBackticks",
-			input:   "hello \\`world\\`",
-			want:    "hello \\`world\\`",
-			wantErr: false,
+			name:  "EscapedBackticks",
+			input: "hello \\`world\\`",
+			want:  "hello \\`world\\`",
 		},
 		{
-			name:    "MultipleBackticksWithoutCommand",
-			input:   "``````",
-			want:    "``````",
-			wantErr: false,
+			name:  "MultipleBackticksWithoutCommand",
+			input: "``````",
+			want:  "``````",
 		},
 	}
 
@@ -184,76 +163,64 @@ func TestSubstituteCommands_Extended(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "SimpleCommandSubstitution",
-			input:   "`echo hello`",
-			want:    "hello",
-			wantErr: false,
+			name:  "SimpleCommandSubstitution",
+			input: "`echo hello`",
+			want:  "hello",
 		},
 		{
-			name:    "CommandInMiddleOfString",
-			input:   "prefix `echo test` suffix",
-			want:    "prefix test suffix",
-			wantErr: false,
+			name:  "CommandInMiddleOfString",
+			input: "prefix `echo test` suffix",
+			want:  "prefix test suffix",
 		},
 		{
-			name:    "MultipleCommands",
-			input:   "`echo one` and `echo two`",
-			want:    "one and two",
-			wantErr: false,
+			name:  "MultipleCommands",
+			input: "`echo one` and `echo two`",
+			want:  "one and two",
 		},
 		{
-			name:    "NestedBackticksNotSupported",
-			input:   "`echo `echo nested``",
-			want:    "echo nested``",
-			wantErr: false,
+			name:  "NestedBackticksNotSupported",
+			input: "`echo `echo nested``",
+			want:  "echo nested``",
 		},
 		{
-			name:    "CommandWithArgs",
-			input:   "`echo hello world`",
-			want:    "hello world",
-			wantErr: false,
+			name:  "CommandWithArgs",
+			input: "`echo hello world`",
+			want:  "hello world",
 		},
 		{
-			name:    "EmptyCommand",
-			input:   "``",
-			want:    "``",
-			wantErr: false,
+			name:  "EmptyCommand",
+			input: "``",
+			want:  "``",
 		},
 		{
 			name:    "CommandFailure",
 			input:   "`false`",
-			want:    "",
 			wantErr: true,
 		},
 		{
 			name:    "InvalidCommand",
 			input:   "`command_that_does_not_exist`",
-			want:    "",
 			wantErr: true,
 		},
 		{
-			name:    "NoCommandSubstitution",
-			input:   "plain text without backticks",
-			want:    "plain text without backticks",
-			wantErr: false,
+			name:  "NoCommandSubstitution",
+			input: "plain text without backticks",
+			want:  "plain text without backticks",
 		},
 		{
-			name:    "EscapedBackticks",
-			input:   "text with \\`escaped\\` backticks",
-			want:    "text with \\`escaped\\` backticks",
-			wantErr: false,
+			name:  "EscapedBackticks",
+			input: "text with \\`escaped\\` backticks",
+			want:  "text with \\`escaped\\` backticks",
 		},
 		{
-			name:    "CommandWithNewlineOutput",
-			input:   "`printf 'line1\nline2'`",
-			want:    "line1\nline2",
-			wantErr: false,
+			name:  "CommandWithNewlineOutput",
+			input: "`printf 'line1\nline2'`",
+			want:  "line1\nline2",
 		},
 		{
-			name:    "CommandWithTrailingNewlineRemoved",
-			input:   "`echo -n hello`",
-			want:    "hello",
-			wantErr: false,
+			name:  "CommandWithTrailingNewlineRemoved",
+			input: "`echo -n hello`",
+			want:  "hello",
 		},
 	}
 
@@ -270,30 +237,44 @@ func TestSubstituteCommands_Extended(t *testing.T) {
 	}
 }
 
-// --- buildShellCommand coverage ---
+func TestBuildShellCommand_Variants(t *testing.T) {
+	tests := []struct {
+		name        string
+		shell       string
+		cmdStr      string
+		wantArgFlag string
+	}{
+		{
+			name:        "PowerShell",
+			shell:       "powershell",
+			cmdStr:      "Get-Date",
+			wantArgFlag: "-Command",
+		},
+		{
+			name:        "CmdExe",
+			shell:       "cmd.exe",
+			cmdStr:      "dir",
+			wantArgFlag: "/c",
+		},
+		{
+			name:        "EmptyShellFallback",
+			shell:       "",
+			cmdStr:      "echo hi",
+			wantArgFlag: "-c",
+		},
+	}
 
-func TestBuildShellCommand_PowerShell(t *testing.T) {
-	cmd := buildShellCommand("powershell", "Get-Date")
-	assert.Equal(t, "powershell", cmd.Path)
-	assert.Contains(t, cmd.Args, "-Command")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := buildShellCommand(tt.shell, tt.cmdStr)
+			assert.Contains(t, cmd.Args, tt.wantArgFlag)
+		})
+	}
 }
-
-func TestBuildShellCommand_Cmd(t *testing.T) {
-	cmd := buildShellCommand("cmd.exe", "dir")
-	assert.Contains(t, cmd.Args, "/c")
-}
-
-func TestBuildShellCommand_EmptyShell(t *testing.T) {
-	cmd := buildShellCommand("", "echo hi")
-	assert.Contains(t, cmd.Args, "-c")
-}
-
-// --- runCommandWithContext coverage ---
 
 func TestRunCommandWithContext_WithScope(t *testing.T) {
 	scope := NewEnvScope(nil, false)
 	scope = scope.WithEntry("CMD_TEST_VAR", "from_scope", EnvSourceDAGEnv)
-	// Need PATH to find echo
 	scope = scope.WithEntry("PATH", os.Getenv("PATH"), EnvSourceOS)
 	ctx := WithEnvScope(context.Background(), scope)
 

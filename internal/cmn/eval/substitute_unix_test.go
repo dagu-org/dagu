@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 package eval
 
@@ -14,46 +13,46 @@ import (
 
 func TestBuildShellCommand(t *testing.T) {
 	tests := []struct {
-		name         string
-		shell        string
-		cmdStr       string
-		expectedArgs []string
+		name     string
+		shell    string
+		cmdStr   string
+		wantArgs []string
 	}{
 		{
-			name:         "BashShell",
-			shell:        "/bin/bash",
-			cmdStr:       "echo hello",
-			expectedArgs: []string{"-c", "echo hello"},
+			name:     "BashShell",
+			shell:    "/bin/bash",
+			cmdStr:   "echo hello",
+			wantArgs: []string{"-c", "echo hello"},
 		},
 		{
-			name:         "ShShell",
-			shell:        "/bin/sh",
-			cmdStr:       "echo hello",
-			expectedArgs: []string{"-c", "echo hello"},
+			name:     "ShShell",
+			shell:    "/bin/sh",
+			cmdStr:   "echo hello",
+			wantArgs: []string{"-c", "echo hello"},
 		},
 		{
-			name:         "ZshShell",
-			shell:        "/bin/zsh",
-			cmdStr:       "echo hello",
-			expectedArgs: []string{"-c", "echo hello"},
+			name:     "ZshShell",
+			shell:    "/bin/zsh",
+			cmdStr:   "echo hello",
+			wantArgs: []string{"-c", "echo hello"},
 		},
 		{
-			name:         "EmptyShellFallback",
-			shell:        "",
-			cmdStr:       "echo hello",
-			expectedArgs: []string{"-c", "echo hello"},
+			name:     "EmptyShellFallback",
+			shell:    "",
+			cmdStr:   "echo hello",
+			wantArgs: []string{"-c", "echo hello"},
 		},
 		{
-			name:         "PowershellDetectionEvenOnUnix",
-			shell:        "/usr/local/bin/powershell",
-			cmdStr:       "echo hello",
-			expectedArgs: []string{"-Command", "echo hello"},
+			name:     "PowershellDetectionEvenOnUnix",
+			shell:    "/usr/local/bin/powershell",
+			cmdStr:   "echo hello",
+			wantArgs: []string{"-Command", "echo hello"},
 		},
 		{
-			name:         "PwshDetection",
-			shell:        "/usr/local/bin/pwsh",
-			cmdStr:       "echo hello",
-			expectedArgs: []string{"-Command", "echo hello"},
+			name:     "PwshDetection",
+			shell:    "/usr/local/bin/pwsh",
+			cmdStr:   "echo hello",
+			wantArgs: []string{"-Command", "echo hello"},
 		},
 	}
 
@@ -62,26 +61,19 @@ func TestBuildShellCommand(t *testing.T) {
 			cmd := buildShellCommand(tt.shell, tt.cmdStr)
 			require.NotNil(t, cmd)
 
-			// For shells with explicit paths, just verify the command uses that shell
 			if tt.shell != "" {
 				assert.Equal(t, tt.shell, cmd.Path)
 			} else {
-				// For empty shell, just verify we got something
 				assert.NotEmpty(t, cmd.Path)
 			}
 
-			assert.Equal(t, len(tt.expectedArgs), len(cmd.Args)-1) // -1 because Args[0] is the command itself
-
-			// Check args (skip first arg which is the command path)
-			for i, expectedArg := range tt.expectedArgs {
-				assert.Equal(t, expectedArg, cmd.Args[i+1])
-			}
+			// Args[0] is the command path; the rest are the flags and arguments.
+			assert.Equal(t, tt.wantArgs, cmd.Args[1:])
 		})
 	}
 }
 
 func TestRunCommandWithContext_WithBuildShellCommand(t *testing.T) {
-	// This test verifies that runCommandWithContext works correctly with buildShellCommand
 	output, err := runCommandWithContext(context.Background(), "echo test123")
 	require.NoError(t, err)
 	assert.Equal(t, "test123", output)
@@ -115,10 +107,7 @@ func TestBuildShellCommand_ComplexCommands(t *testing.T) {
 			cmd := buildShellCommand(tt.shell, tt.cmdStr)
 			require.NotNil(t, cmd)
 
-			// Verify it's a valid command that can be created
-			_, err := exec.LookPath(cmd.Path)
-			// Don't fail if the shell isn't found, just verify the command was built
-			if err == nil {
+			if _, err := exec.LookPath(cmd.Path); err == nil {
 				assert.Contains(t, cmd.Args, "-c")
 				assert.Contains(t, cmd.Args, tt.cmdStr)
 			}

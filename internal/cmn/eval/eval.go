@@ -8,7 +8,6 @@ import (
 )
 
 // expandVariables expands variable references in the input string using the provided options.
-// It uses a resolver that aggregates all variable sources: explicit maps, EnvScope, and step map.
 func expandVariables(ctx context.Context, value string, opts *Options) string {
 	r := newResolver(ctx, opts)
 	value = r.expandReferences(ctx, value)
@@ -16,8 +15,8 @@ func expandVariables(ctx context.Context, value string, opts *Options) string {
 	return value
 }
 
-// String substitutes environment variables and commands in the input string.
-// It runs the default pipeline: quoted-refs → variables → substitute → shell-expand.
+// String substitutes environment variables and commands in the input string
+// by running the default pipeline: quoted-refs, variables, substitute, shell-expand.
 func String(ctx context.Context, input string, opts ...Option) (string, error) {
 	if input == "" {
 		return "", nil
@@ -31,8 +30,7 @@ func String(ctx context.Context, input string, opts ...Option) (string, error) {
 	return defaultPipeline.execute(ctx, input, options)
 }
 
-// IntString evaluates the input string and converts the result to an integer.
-// It uses the same pipeline as String to ensure consistent evaluation ordering.
+// IntString evaluates the input string via String and converts the result to an integer.
 func IntString(ctx context.Context, input string, opts ...Option) (int, error) {
 	value, err := String(ctx, input, opts...)
 	if err != nil {
@@ -45,9 +43,8 @@ func IntString(ctx context.Context, input string, opts ...Option) (int, error) {
 	return v, nil
 }
 
-// StringFields processes all string fields in a struct or map by expanding environment
-// variables and substituting command outputs. It takes a struct or map value and returns a new
-// modified struct or map value.
+// StringFields recursively processes all string fields in a struct or map by expanding
+// environment variables and substituting command outputs.
 func StringFields[T any](ctx context.Context, obj T, opts ...Option) (T, error) {
 	options := NewOptions()
 	for _, opt := range opts {
@@ -73,19 +70,15 @@ func StringFields[T any](ctx context.Context, obj T, opts ...Option) (T, error) 
 	}
 }
 
-// ExpandReferences finds all occurrences of ${NAME.foo.bar} in the input string,
-// where "NAME" matches a key in the dataMap. The dataMap value is expected to be
-// JSON. It then uses gojq to extract the .foo.bar sub-path from that JSON
-// document. If successful, it replaces the original placeholder with the sub-path value.
-//
-// If dataMap[name] is invalid JSON or the sub-path does not exist,
-// the placeholder is left as-is.
+// ExpandReferences finds all ${NAME.path} references in the input string, resolves
+// each NAME from dataMap as JSON, and replaces the placeholder with the extracted
+// sub-path value via gojq. Unresolvable placeholders are left as-is.
 func ExpandReferences(ctx context.Context, input string, dataMap map[string]string) string {
 	return ExpandReferencesWithSteps(ctx, input, dataMap, nil)
 }
 
-// ExpandReferencesWithSteps is like ExpandReferences but also handles step ID property access
-// like ${step_id.stdout}, ${step_id.stderr}, ${step_id.exit_code}
+// ExpandReferencesWithSteps is like ExpandReferences but also resolves step property
+// references such as ${step_id.stdout}, ${step_id.stderr}, and ${step_id.exit_code}.
 func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[string]string, stepMap map[string]StepInfo) string {
 	r := &resolver{
 		variables: []map[string]string{dataMap},
@@ -96,9 +89,9 @@ func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[st
 	return r.expandReferences(ctx, input)
 }
 
-// Object recursively evaluates the string fields of the given object.
-// It uses variable expansion, command substitution, and basic env expansion
-// (via evalStringValue). OS environment is included for backward compatibility.
+// Object recursively evaluates the string fields of the given object using variable
+// expansion, command substitution, and env expansion. OS environment is included
+// for backward compatibility.
 func Object[T any](ctx context.Context, obj T, vars map[string]string) (T, error) {
 	options := NewOptions()
 	options.ExpandOS = true
@@ -114,8 +107,9 @@ func Object[T any](ctx context.Context, obj T, vars map[string]string) (T, error
 		return obj, err
 	}
 
-	if _, ok := result.Interface().(T); !ok {
+	out, ok := result.Interface().(T)
+	if !ok {
 		return obj, fmt.Errorf("expected type %T but got %T", obj, result.Interface())
 	}
-	return result.Interface().(T), nil
+	return out, nil
 }

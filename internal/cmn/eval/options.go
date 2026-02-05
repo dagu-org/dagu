@@ -2,12 +2,13 @@ package eval
 
 // Options controls the behavior of string evaluation.
 type Options struct {
-	ExpandEnv   bool
-	Substitute  bool
-	Variables   []map[string]string
-	StepMap     map[string]StepInfo
-	ExpandShell bool // When false, skip shell-based variable expansion (e.g., for SSH commands)
-	ExpandOS    bool // When false, skip os.LookupEnv and OS-sourced scope entries
+	ExpandEnv   bool // Enable environment variable expansion
+	ExpandShell bool // Enable shell-based variable expansion (e.g., ${VAR:0:3})
+	ExpandOS    bool // Enable os.LookupEnv fallback and OS-sourced scope entries
+	Substitute  bool // Enable backtick command substitution
+
+	Variables []map[string]string
+	StepMap   map[string]StepInfo
 }
 
 // NewOptions returns default Options with all features enabled.

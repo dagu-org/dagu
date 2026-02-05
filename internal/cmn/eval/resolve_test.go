@@ -2,7 +2,6 @@ package eval
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -252,9 +251,7 @@ func TestReplaceVars(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &resolver{variables: []map[string]string{tt.vars}}
 			got := r.replaceVars(tt.template)
-			if got != tt.want {
-				t.Errorf("replaceVars() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -559,18 +556,13 @@ func TestExpandReferences(t *testing.T) {
 		},
 	}
 
-	_ = os.Setenv("TEST_JSON_VAR", `{"bar": "World"}`)
-	t.Cleanup(func() {
-		_ = os.Unsetenv("TEST_JSON_VAR")
-	})
+	t.Setenv("TEST_JSON_VAR", `{"bar": "World"}`)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			got := ExpandReferences(ctx, tt.input, tt.dataMap)
-			if got != tt.want {
-				t.Errorf("ExpandReferences() = %q, want %q", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

@@ -8,35 +8,49 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestResolveStepProperty_EmptyStderr(t *testing.T) {
-	ctx := context.Background()
-	stepMap := map[string]StepInfo{
-		"step1": {Stdout: "out", Stderr: "", ExitCode: "0"},
+func TestResolveStepProperty(t *testing.T) {
+	tests := []struct {
+		name    string
+		step    string
+		path    string
+		stepMap map[string]StepInfo
+		wantOK  bool
+	}{
+		{
+			name:    "EmptyStderr",
+			step:    "step1",
+			path:    ".stderr",
+			stepMap: map[string]StepInfo{"step1": {Stdout: "out", Stderr: "", ExitCode: "0"}},
+			wantOK:  false,
+		},
+		{
+			name:    "UnknownProperty",
+			step:    "step1",
+			path:    ".unknown_prop",
+			stepMap: map[string]StepInfo{"step1": {Stdout: "out", ExitCode: "0"}},
+			wantOK:  false,
+		},
 	}
-	_, ok := resolveStepProperty(ctx, "step1", ".stderr", stepMap)
-	assert.False(t, ok)
-}
 
-func TestResolveStepProperty_DefaultProperty(t *testing.T) {
-	ctx := context.Background()
-	stepMap := map[string]StepInfo{
-		"step1": {Stdout: "out", ExitCode: "0"},
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ok := resolveStepProperty(context.Background(), tt.step, tt.path, tt.stepMap)
+			assert.Equal(t, tt.wantOK, ok)
+		})
 	}
-	_, ok := resolveStepProperty(ctx, "step1", ".unknown_prop", stepMap)
-	assert.False(t, ok)
 }
 
 func TestParseStepReference(t *testing.T) {
 	tests := []struct {
-		name       string
-		path       string
-		wantProp   string
-		wantHasS   bool
-		wantStart  int
-		wantHasL   bool
-		wantLength int
-		wantErr    bool
-		errMsg     string
+		name          string
+		path          string
+		wantProp      string
+		wantHasStart  bool
+		wantStart     int
+		wantHasLength bool
+		wantLength    int
+		wantErr       bool
+		errMsg        string
 	}{
 		{
 			name:     "NoSlice",
@@ -44,20 +58,20 @@ func TestParseStepReference(t *testing.T) {
 			wantProp: ".stdout",
 		},
 		{
-			name:      "WithStartOnly",
-			path:      ".stdout:3",
-			wantProp:  ".stdout",
-			wantHasS:  true,
-			wantStart: 3,
+			name:         "WithStartOnly",
+			path:         ".stdout:3",
+			wantProp:     ".stdout",
+			wantHasStart: true,
+			wantStart:    3,
 		},
 		{
-			name:       "WithStartAndLength",
-			path:       ".stdout:3:5",
-			wantProp:   ".stdout",
-			wantHasS:   true,
-			wantStart:  3,
-			wantHasL:   true,
-			wantLength: 5,
+			name:          "WithStartAndLength",
+			path:          ".stdout:3:5",
+			wantProp:      ".stdout",
+			wantHasStart:  true,
+			wantStart:     3,
+			wantHasLength: true,
+			wantLength:    5,
 		},
 		{
 			name:    "EmptySliceSpec",
@@ -102,21 +116,21 @@ func TestParseStepReference(t *testing.T) {
 			errMsg:  "slice length must be non-negative",
 		},
 		{
-			name:       "ZeroStart",
-			path:       ".exit_code:0:10",
-			wantProp:   ".exit_code",
-			wantHasS:   true,
-			wantStart:  0,
-			wantHasL:   true,
-			wantLength: 10,
+			name:          "ZeroStart",
+			path:          ".exit_code:0:10",
+			wantProp:      ".exit_code",
+			wantHasStart:  true,
+			wantStart:     0,
+			wantHasLength: true,
+			wantLength:    10,
 		},
 		{
-			name:      "EmptyLengthPart",
-			path:      ".stdout:5:",
-			wantProp:  ".stdout",
-			wantHasS:  true,
-			wantStart: 5,
-			wantHasL:  false,
+			name:          "EmptyLengthPart",
+			path:          ".stdout:5:",
+			wantProp:      ".stdout",
+			wantHasStart:  true,
+			wantStart:     5,
+			wantHasLength: false,
 		},
 	}
 
@@ -130,12 +144,12 @@ func TestParseStepReference(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantProp, prop)
-			assert.Equal(t, tt.wantHasS, spec.hasStart)
-			if tt.wantHasS {
+			assert.Equal(t, tt.wantHasStart, spec.hasStart)
+			if tt.wantHasStart {
 				assert.Equal(t, tt.wantStart, spec.start)
 			}
-			assert.Equal(t, tt.wantHasL, spec.hasLength)
-			if tt.wantHasL {
+			assert.Equal(t, tt.wantHasLength, spec.hasLength)
+			if tt.wantHasLength {
 				assert.Equal(t, tt.wantLength, spec.length)
 			}
 		})

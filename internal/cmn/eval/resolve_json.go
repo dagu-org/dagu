@@ -36,11 +36,11 @@ func resolveJSONPath(ctx context.Context, varName, jsonStr, path string) (string
 		return "", false
 	}
 
-	if _, isErr := v.(error); isErr {
+	if err, ok := v.(error); ok {
 		logger.Warn(ctx, "Error evaluating path in data",
 			tag.Path(path),
 			slog.String("var", varName),
-			tag.Error(v))
+			tag.Error(err))
 		return "", false
 	}
 

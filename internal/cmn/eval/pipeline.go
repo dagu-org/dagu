@@ -69,20 +69,19 @@ var defaultPipeline = &pipeline{
 func expandQuotedRefs(ctx context.Context, input string, opts *Options) (string, error) {
 	r := newResolver(ctx, opts)
 	result := reQuotedJSONRef.ReplaceAllStringFunc(input, func(match string) string {
-		// Extract the reference (VAR or VAR.path)
-		ref := match[3 : len(match)-2] // Remove "$ and }"
+		ref := match[3 : len(match)-2] // Strip leading "$ { and trailing } "
 
-		if strings.Contains(ref, ".") {
-			dotIdx := strings.Index(ref, ".")
-			varName := ref[:dotIdx]
-			path := ref[dotIdx:]
-			if resolved, ok := r.resolveReference(ctx, varName, path); ok {
-				return strconv.Quote(resolved)
-			}
+		var val string
+		var ok bool
+
+		if dotIdx := strings.Index(ref, "."); dotIdx >= 0 {
+			val, ok = r.resolveReference(ctx, ref[:dotIdx], ref[dotIdx:])
 		} else {
-			if val, ok := r.resolve(ref); ok {
-				return strconv.Quote(val)
-			}
+			val, ok = r.resolve(ref)
+		}
+
+		if ok {
+			return strconv.Quote(val)
 		}
 		return match
 	})

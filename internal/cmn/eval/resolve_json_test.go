@@ -7,22 +7,35 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestResolveJSONPath_ParseError(t *testing.T) {
-	ctx := context.Background()
-	_, ok := resolveJSONPath(ctx, "VAR", `{"a":1}`, ".[invalid")
-	assert.False(t, ok)
-}
+func TestResolveJSONPath_Errors(t *testing.T) {
+	tests := []struct {
+		name    string
+		jsonStr string
+		path    string
+	}{
+		{
+			name:    "ParseError",
+			jsonStr: `{"a":1}`,
+			path:    ".[invalid",
+		},
+		{
+			name:    "NoResult",
+			jsonStr: `{"a":1}`,
+			path:    "empty",
+		},
+		{
+			name:    "ErrorResult",
+			jsonStr: `"not_an_object"`,
+			path:    ".bar.baz",
+		},
+	}
 
-func TestResolveJSONPath_NoResult(t *testing.T) {
-	ctx := context.Background()
-	_, ok := resolveJSONPath(ctx, "VAR", `{"a":1}`, "empty")
-	assert.False(t, ok)
-}
-
-func TestResolveJSONPath_ErrorResult(t *testing.T) {
-	ctx := context.Background()
-	_, ok := resolveJSONPath(ctx, "VAR", `"not_an_object"`, ".bar.baz")
-	assert.False(t, ok)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ok := resolveJSONPath(context.Background(), "VAR", tt.jsonStr, tt.path)
+			assert.False(t, ok)
+		})
+	}
 }
 
 func TestExpandReferences_ComplexJSON(t *testing.T) {
@@ -90,9 +103,9 @@ func TestExpandReferences_ComplexJSON(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
 			got := ExpandReferences(ctx, tt.input, tt.dataMap)
 			assert.Equal(t, tt.want, got)
 		})

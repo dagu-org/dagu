@@ -37,22 +37,17 @@ func resolveStepProperty(ctx context.Context, stepName, path string, stepMap map
 	var value string
 	switch property {
 	case ".stdout":
-		if stepInfo.Stdout == "" {
-			logger.Debug(ctx, "Step stdout is empty",
-				tag.Step(stepName))
-			return "", false
-		}
 		value = stepInfo.Stdout
 	case ".stderr":
-		if stepInfo.Stderr == "" {
-			logger.Debug(ctx, "Step stderr is empty",
-				tag.Step(stepName))
-			return "", false
-		}
 		value = stepInfo.Stderr
 	case ".exitCode", ".exit_code":
 		value = stepInfo.ExitCode
 	default:
+		return "", false
+	}
+
+	if value == "" && (property == ".stdout" || property == ".stderr") {
+		logger.Debug(ctx, "Step "+property[1:]+" is empty", tag.Step(stepName))
 		return "", false
 	}
 
@@ -136,13 +131,10 @@ func applyStepSlice(value string, spec stepSliceSpec) string {
 		return ""
 	}
 
-	endIdx := len(runes)
+	end := len(runes)
 	if spec.hasLength {
-		endIdx = spec.start + spec.length
-		if endIdx > len(runes) {
-			endIdx = len(runes)
-		}
+		end = min(spec.start+spec.length, len(runes))
 	}
 
-	return string(runes[spec.start:endIdx])
+	return string(runes[spec.start:end])
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -268,8 +267,6 @@ func TestEnvScope_ToSlice(t *testing.T) {
 			WithEntry("B", "2", EnvSourceDAGEnv)
 
 		result := scope.ToSlice()
-		sort.Strings(result)
-
 		assert.Len(t, result, 2)
 		assert.Contains(t, result, "A=1")
 		assert.Contains(t, result, "B=2")
@@ -740,8 +737,6 @@ func TestEnvScope_AllSecrets_EmptyAndNil(t *testing.T) {
 	})
 }
 
-// --- expandWithLookup single-quoted ---
-
 func TestExpandWithLookup_SingleQuoted(t *testing.T) {
 	lookup := func(key string) (string, bool) {
 		if key == "FOO" {
@@ -753,39 +748,30 @@ func TestExpandWithLookup_SingleQuoted(t *testing.T) {
 	assert.Equal(t, "'$FOO' stays", result)
 }
 
-// --- EnvScope.Debug no parent ---
-
 func TestEnvScope_Debug_NoParent(t *testing.T) {
-	// NewEnvScope with includeOS=true has entries but no parent
-	s := NewEnvScope(nil, true)
-	debug := s.Debug()
+	scope := NewEnvScope(nil, true)
+	debug := scope.Debug()
 	assert.Contains(t, debug, "EnvScope{")
 	assert.NotContains(t, debug, "parent: <yes>")
 }
 
-// --- Debug nil scope ---
-
 func TestEnvScope_Debug_NilScope(t *testing.T) {
-	var s *EnvScope
-	debug := s.Debug()
+	var scope *EnvScope
+	debug := scope.Debug()
 	assert.Equal(t, "EnvScope{nil}", debug)
 }
 
-// --- collectBySource nil ---
-
 func TestCollectBySource_NilScope(t *testing.T) {
-	var s *EnvScope
-	result := s.AllBySource(EnvSourceDAGEnv)
+	var scope *EnvScope
+	result := scope.AllBySource(EnvSourceDAGEnv)
 	assert.Empty(t, result)
 }
 
-// --- collectBySource with parent chain ---
-
 func TestCollectBySource_WithParent(t *testing.T) {
-	parent := NewEnvScope(nil, false)
-	parent = parent.WithEntry("PKEY", "pval", EnvSourceDAGEnv)
-	child := NewEnvScope(parent, false)
-	child = child.WithEntry("CKEY", "cval", EnvSourceDAGEnv)
+	parent := NewEnvScope(nil, false).
+		WithEntry("PKEY", "pval", EnvSourceDAGEnv)
+	child := NewEnvScope(parent, false).
+		WithEntry("CKEY", "cval", EnvSourceDAGEnv)
 
 	result := child.AllBySource(EnvSourceDAGEnv)
 	assert.Equal(t, "pval", result["PKEY"])

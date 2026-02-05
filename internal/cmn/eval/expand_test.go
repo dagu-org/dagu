@@ -2,7 +2,6 @@ package eval
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,8 +20,7 @@ func TestExpandEnvContext(t *testing.T) {
 
 	t.Run("ScopeTakesPrecedenceOverOSEnv", func(t *testing.T) {
 		key := "TEST_EXPAND_PRECEDENCE"
-		require.NoError(t, os.Setenv(key, "os_value"))
-		defer func() { _ = os.Unsetenv(key) }()
+		t.Setenv(key, "os_value")
 
 		scope := NewEnvScope(nil, false).
 			WithEntry(key, "scope_value", EnvSourceDAGEnv)
@@ -34,18 +32,15 @@ func TestExpandEnvContext(t *testing.T) {
 
 	t.Run("WithoutScopeFallsBackToOSExpandEnv", func(t *testing.T) {
 		key := "TEST_EXPAND_OS_FALLBACK"
-		require.NoError(t, os.Setenv(key, "os_value"))
-		defer func() { _ = os.Unsetenv(key) }()
+		t.Setenv(key, "os_value")
 
-		ctx := context.Background()
-		result := ExpandEnvContext(ctx, "Value is $"+key)
+		result := ExpandEnvContext(context.Background(), "Value is $"+key)
 		assert.Equal(t, "Value is os_value", result)
 	})
 
 	t.Run("NilContextFallsBackToOSExpandEnv", func(t *testing.T) {
 		key := "TEST_EXPAND_NIL_CTX"
-		require.NoError(t, os.Setenv(key, "nil_ctx_value"))
-		defer func() { _ = os.Unsetenv(key) }()
+		t.Setenv(key, "nil_ctx_value")
 
 		result := ExpandEnvContext(nil, "Value is $"+key) //nolint:staticcheck // testing nil context handling
 		assert.Equal(t, "Value is nil_ctx_value", result)
@@ -55,13 +50,8 @@ func TestExpandEnvContext(t *testing.T) {
 		scope := NewEnvScope(nil, false)
 		ctx := WithEnvScope(context.Background(), scope)
 
-		// $VAR syntax preserved
-		result := ExpandEnvContext(ctx, "Hello $NONEXISTENT!")
-		assert.Equal(t, "Hello $NONEXISTENT!", result)
-
-		// ${VAR} syntax preserved
-		result = ExpandEnvContext(ctx, "Hello ${NONEXISTENT}!")
-		assert.Equal(t, "Hello ${NONEXISTENT}!", result)
+		assert.Equal(t, "Hello $NONEXISTENT!", ExpandEnvContext(ctx, "Hello $NONEXISTENT!"))
+		assert.Equal(t, "Hello ${NONEXISTENT}!", ExpandEnvContext(ctx, "Hello ${NONEXISTENT}!"))
 	})
 
 	t.Run("BracedVariableSyntax", func(t *testing.T) {
@@ -100,96 +90,88 @@ func TestExpandEnvContext(t *testing.T) {
 	})
 }
 
-// --- expandWithShellContext coverage ---
+func TestExpandWithShellContext(t *testing.T) {
+	t.Run("ShellDisabledEnvEnabled", func(t *testing.T) {
+		t.Setenv("MYVAR", "myval")
 
-func TestExpandWithShellContext_ShellDisabledEnvEnabled(t *testing.T) {
-	ctx := context.Background()
-	opts := NewOptions()
-	opts.ExpandShell = false
-	opts.ExpandEnv = true
-	opts.ExpandOS = true
-	t.Setenv("MYVAR", "myval")
+		opts := NewOptions()
+		opts.ExpandShell = false
+		opts.ExpandEnv = true
+		opts.ExpandOS = true
 
-	result, err := expandWithShellContext(ctx, "$MYVAR", opts)
-	require.NoError(t, err)
-	assert.Equal(t, "myval", result)
+		result, err := expandWithShellContext(context.Background(), "$MYVAR", opts)
+		require.NoError(t, err)
+		assert.Equal(t, "myval", result)
+	})
+
+	t.Run("ShellDisabledEnvDisabled", func(t *testing.T) {
+		opts := NewOptions()
+		opts.ExpandShell = false
+		opts.ExpandEnv = false
+
+		result, err := expandWithShellContext(context.Background(), "$MYVAR", opts)
+		require.NoError(t, err)
+		assert.Equal(t, "$MYVAR", result)
+	})
+
+	t.Run("EmptyInput", func(t *testing.T) {
+		result, err := expandWithShellContext(context.Background(), "", NewOptions())
+		require.NoError(t, err)
+		assert.Equal(t, "", result)
+	})
+
+	t.Run("UnexpectedCommandFallback", func(t *testing.T) {
+		t.Setenv("KEEP", "kept")
+
+		opts := NewOptions()
+		opts.ExpandOS = true
+
+		// $(command) triggers UnexpectedCommandError and falls back to ExpandEnvContext
+		result, err := expandWithShellContext(context.Background(), "$(echo x) $KEEP", opts)
+		require.NoError(t, err)
+		assert.Contains(t, result, "kept")
+	})
+
+	t.Run("ParseError", func(t *testing.T) {
+		opts := NewOptions()
+		opts.ExpandOS = true
+
+		_, err := expandWithShellContext(context.Background(), "${", opts)
+		assert.Error(t, err)
+	})
+
+	t.Run("NonUnexpectedCommandError", func(t *testing.T) {
+		opts := NewOptions()
+		opts.ExpandOS = true
+
+		// ${UNSET_VAR_ABC:?msg} triggers a non-UnexpectedCommand error from expand.Literal
+		_, err := expandWithShellContext(context.Background(), "${UNSET_VAR_ABC:?required}", opts)
+		assert.Error(t, err)
+	})
 }
 
-func TestExpandWithShellContext_ShellDisabledEnvDisabled(t *testing.T) {
-	ctx := context.Background()
-	opts := NewOptions()
-	opts.ExpandShell = false
-	opts.ExpandEnv = false
+func TestExpandEnvScopeOnly(t *testing.T) {
+	t.Run("WithScope", func(t *testing.T) {
+		scope := NewEnvScope(nil, false).
+			WithEntry("DAG_VAR", "dag_value", EnvSourceDAGEnv)
+		ctx := WithEnvScope(context.Background(), scope)
 
-	result, err := expandWithShellContext(ctx, "$MYVAR", opts)
-	require.NoError(t, err)
-	assert.Equal(t, "$MYVAR", result)
-}
+		result := expandEnvScopeOnly(ctx, "Value is $DAG_VAR")
+		assert.Equal(t, "Value is dag_value", result)
+	})
 
-func TestExpandWithShellContext_EmptyInput(t *testing.T) {
-	ctx := context.Background()
-	opts := NewOptions()
+	t.Run("NilScope", func(t *testing.T) {
+		result := expandEnvScopeOnly(context.Background(), "Value is $DAG_VAR")
+		assert.Equal(t, "Value is $DAG_VAR", result)
+	})
 
-	result, err := expandWithShellContext(ctx, "", opts)
-	require.NoError(t, err)
-	assert.Equal(t, "", result)
-}
+	t.Run("OSEntriesSkipped", func(t *testing.T) {
+		scope := NewEnvScope(nil, false).
+			WithEntry("OS_VAR", "os_value", EnvSourceOS).
+			WithEntry("DAG_VAR", "dag_value", EnvSourceDAGEnv)
+		ctx := WithEnvScope(context.Background(), scope)
 
-func TestExpandWithShellContext_UnexpectedCommand(t *testing.T) {
-	ctx := context.Background()
-	opts := NewOptions()
-	opts.ExpandOS = true
-	t.Setenv("KEEP", "kept")
-
-	// $(command) triggers UnexpectedCommandError and falls back to ExpandEnvContext
-	result, err := expandWithShellContext(ctx, "$(echo x) $KEEP", opts)
-	require.NoError(t, err)
-	assert.Contains(t, result, "kept")
-}
-
-// --- expandEnvScopeOnly tests ---
-
-func TestExpandEnvScopeOnly_WithScope(t *testing.T) {
-	scope := NewEnvScope(nil, false).
-		WithEntry("DAG_VAR", "dag_value", EnvSourceDAGEnv)
-	ctx := WithEnvScope(context.Background(), scope)
-
-	result := expandEnvScopeOnly(ctx, "Value is $DAG_VAR")
-	assert.Equal(t, "Value is dag_value", result)
-}
-
-func TestExpandEnvScopeOnly_NilScope(t *testing.T) {
-	ctx := context.Background()
-	result := expandEnvScopeOnly(ctx, "Value is $DAG_VAR")
-	assert.Equal(t, "Value is $DAG_VAR", result)
-}
-
-func TestExpandEnvScopeOnly_OSEntriesSkipped(t *testing.T) {
-	scope := NewEnvScope(nil, false).
-		WithEntry("OS_VAR", "os_value", EnvSourceOS).
-		WithEntry("DAG_VAR", "dag_value", EnvSourceDAGEnv)
-	ctx := WithEnvScope(context.Background(), scope)
-
-	result := expandEnvScopeOnly(ctx, "$OS_VAR and $DAG_VAR")
-	assert.Equal(t, "$OS_VAR and dag_value", result)
-}
-
-func TestExpandWithShellContext_ParseError(t *testing.T) {
-	ctx := context.Background()
-	opts := NewOptions()
-	opts.ExpandOS = true
-
-	// Unterminated parameter expansion triggers a parse error from syntax.NewParser().Document()
-	_, err := expandWithShellContext(ctx, "${", opts)
-	assert.Error(t, err)
-}
-
-func TestExpandWithShellContext_NonUnexpectedCommandError(t *testing.T) {
-	ctx := context.Background()
-	opts := NewOptions()
-	opts.ExpandOS = true
-
-	// ${UNSET_VAR_ABC:?msg} triggers a non-UnexpectedCommand error from expand.Literal
-	_, err := expandWithShellContext(ctx, "${UNSET_VAR_ABC:?required}", opts)
-	assert.Error(t, err)
+		result := expandEnvScopeOnly(ctx, "$OS_VAR and $DAG_VAR")
+		assert.Equal(t, "$OS_VAR and dag_value", result)
+	})
 }

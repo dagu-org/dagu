@@ -2,7 +2,6 @@ package eval
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,10 +9,7 @@ import (
 )
 
 func TestStringFields_PointerFields(t *testing.T) {
-	_ = os.Setenv("PTR_VAR", "pointer_value")
-	defer func() {
-		_ = os.Unsetenv("PTR_VAR")
-	}()
+	t.Setenv("PTR_VAR", "pointer_value")
 
 	type PointerNested struct {
 		Value string
@@ -579,9 +575,8 @@ func TestProcessMap_NilValues(t *testing.T) {
 	got, err := StringFields(ctx, input)
 	require.NoError(t, err)
 
-	gotMap := got
-	assert.Equal(t, "value", gotMap["string"])
-	assert.Nil(t, gotMap["nil"])
-	assert.Nil(t, gotMap["ptr"])
-	assert.Nil(t, gotMap["iface"])
+	assert.Equal(t, "value", got["string"])
+	assert.Nil(t, got["nil"])
+	assert.Nil(t, got["ptr"])
+	assert.Nil(t, got["iface"])
 }

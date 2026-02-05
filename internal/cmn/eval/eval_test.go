@@ -2,7 +2,6 @@ package eval
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,13 +9,8 @@ import (
 )
 
 func TestStringFields(t *testing.T) {
-	// Set up test environment variables
-	_ = os.Setenv("TEST_VAR", "test_value")
-	_ = os.Setenv("NESTED_VAR", "nested_value")
-	defer func() {
-		_ = os.Unsetenv("TEST_VAR")
-		_ = os.Unsetenv("NESTED_VAR")
-	}()
+	t.Setenv("TEST_VAR", "test_value")
+	t.Setenv("NESTED_VAR", "nested_value")
 
 	type Nested struct {
 		NestedField   string
@@ -68,7 +62,6 @@ func TestStringFields(t *testing.T) {
 				},
 				unexported: "should not change",
 			},
-			wantErr: false,
 		},
 		{
 			name: "InvalidCommand",
@@ -135,13 +128,8 @@ func TestStringFields_NestedStructs(t *testing.T) {
 		},
 	}
 
-	// Set up environment
-	_ = os.Setenv("TEST_VAR", "test_value")
-	_ = os.Setenv("NESTED_VAR", "deep_nested_value")
-	defer func() {
-		_ = os.Unsetenv("TEST_VAR")
-		_ = os.Unsetenv("NESTED_VAR")
-	}()
+	t.Setenv("TEST_VAR", "test_value")
+	t.Setenv("NESTED_VAR", "deep_nested_value")
 
 	want := Root{
 		Field: "test_value",
@@ -170,11 +158,7 @@ func TestStringFields_EmptyStruct(t *testing.T) {
 }
 
 func TestStringFields_Map(t *testing.T) {
-	// Set up test environment
-	_ = os.Setenv("MAP_ENV", "map_value")
-	defer func() {
-		_ = os.Unsetenv("MAP_ENV")
-	}()
+	t.Setenv("MAP_ENV", "map_value")
 
 	tests := []struct {
 		name    string
@@ -190,13 +174,12 @@ func TestStringFields_Map(t *testing.T) {
 				"key2": "`echo hello`",
 				"key3": "plain",
 			},
-			opts:    []Option{WithOSExpansion()},
+			opts: []Option{WithOSExpansion()},
 			want: map[string]any{
 				"key1": "map_value",
 				"key2": "hello",
 				"key3": "plain",
 			},
-			wantErr: false,
 		},
 		{
 			name: "NestedMap",
@@ -211,7 +194,6 @@ func TestStringFields_Map(t *testing.T) {
 					"inner": "map_value",
 				},
 			},
-			wantErr: false,
 		},
 		{
 			name: "MapWithNonStringValues",
@@ -228,7 +210,6 @@ func TestStringFields_Map(t *testing.T) {
 				"bool":   true,
 				"nil":    nil,
 			},
-			wantErr: false,
 		},
 		{
 			name: "MapWithStructValue",
@@ -247,7 +228,6 @@ func TestStringFields_Map(t *testing.T) {
 					Field: "map_value",
 				},
 			},
-			wantErr: false,
 		},
 		{
 			name: "WithVariablesOption",
@@ -258,18 +238,16 @@ func TestStringFields_Map(t *testing.T) {
 			want: map[string]any{
 				"key": "value",
 			},
-			wantErr: false,
 		},
 		{
 			name: "MapWithPointerValues",
 			input: map[string]any{
 				"ptr": ptrString("$MAP_ENV"),
 			},
-			opts:    []Option{WithOSExpansion()},
+			opts: []Option{WithOSExpansion()},
 			want: map[string]any{
 				"ptr": "map_value",
 			},
-			wantErr: false,
 		},
 	}
 
@@ -338,8 +316,6 @@ func TestProcessMap_WithStepMap(t *testing.T) {
 	assert.Equal(t, "0", nested["exit_code"])
 }
 
-// TestStringFields_MultipleVariablesWithStepMapOnLast tests the specific case
-// where we have multiple variable sets and StepMap is applied only with the last set
 func TestStringFields_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 	type TestStruct struct {
 		Field1 string
@@ -411,12 +387,10 @@ func TestStringFields_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			// Build options with multiple variable sets
-			opts := []Option{}
+			var opts []Option
 			for _, vars := range tt.varSets {
 				opts = append(opts, WithVariables(vars))
 			}
-			// Add StepMap as the last option
 			opts = append(opts, WithStepMap(stepMap))
 
 			result, err := StringFields(ctx, tt.input, opts...)
@@ -452,8 +426,6 @@ func TestStringFields_ErrorCases(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to execute command")
 }
-
-// --- Object tests (merged from eval_obj_test.go) ---
 
 func TestObject_String(t *testing.T) {
 	ctx := context.Background()
@@ -758,7 +730,6 @@ func TestObject_ErrorPropagation(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// Helper function to create string pointer
 func ptrString(s string) *string {
 	return &s
 }

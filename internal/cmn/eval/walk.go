@@ -9,10 +9,9 @@ import (
 type stringTransform func(ctx context.Context, s string) (string, error)
 
 // walkValue recursively walks a reflect.Value, applying transform to all string leaves.
-// It handles strings, structs, maps, slices, arrays, pointers, and interfaces.
+// It handles strings, structs, maps, slices, pointers, and interfaces.
 // Non-string leaf values are returned unchanged.
 func walkValue(ctx context.Context, v reflect.Value, transform stringTransform) (reflect.Value, error) {
-	// Unwrap interfaces to get the concrete value
 	for v.Kind() == reflect.Interface && !v.IsNil() {
 		v = v.Elem()
 	}
@@ -47,7 +46,7 @@ func walkValue(ctx context.Context, v reflect.Value, transform stringTransform) 
 		}
 		return walkMap(ctx, v, transform)
 
-	case reflect.Slice, reflect.Array:
+	case reflect.Slice:
 		if v.IsNil() {
 			return v, nil
 		}
@@ -88,7 +87,6 @@ func walkMap(ctx context.Context, v reflect.Value, transform stringTransform) (r
 	for iter.Next() {
 		val := iter.Value()
 
-		// Unwrap interfaces and pointers for map values
 		for (val.Kind() == reflect.Interface || val.Kind() == reflect.Ptr) && !val.IsNil() {
 			val = val.Elem()
 		}

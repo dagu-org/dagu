@@ -2,7 +2,6 @@ package eval
 
 import (
 	"context"
-	"os"
 	"strconv"
 	"testing"
 
@@ -125,12 +124,8 @@ func TestString_ShellExpandFallback(t *testing.T) {
 // --- String / IntString pipeline tests ---
 
 func TestString(t *testing.T) {
-	_ = os.Setenv("TEST_ENV", "test_value")
-	_ = os.Setenv("TEST_JSON", `{"key": "value"}`)
-	defer func() {
-		_ = os.Unsetenv("TEST_ENV")
-		_ = os.Unsetenv("TEST_JSON")
-	}()
+	t.Setenv("TEST_ENV", "test_value")
+	t.Setenv("TEST_JSON", `{"key": "value"}`)
 
 	tests := []struct {
 		name    string
@@ -209,7 +204,7 @@ func TestString(t *testing.T) {
 		{
 			name:    "JSONReference",
 			input:   "${TEST_JSON.key}",
-			opts:    []Option{WithVariables(map[string]string{"TEST_JSON": os.Getenv("TEST_JSON")})},
+			opts:    []Option{WithVariables(map[string]string{"TEST_JSON": `{"key": "value"}`})},
 			want:    "value",
 			wantErr: false,
 		},
@@ -320,10 +315,7 @@ func TestString(t *testing.T) {
 }
 
 func TestIntString(t *testing.T) {
-	_ = os.Setenv("TEST_INT", "42")
-	defer func() {
-		_ = os.Unsetenv("TEST_INT")
-	}()
+	t.Setenv("TEST_INT", "42")
 
 	tests := []struct {
 		name    string
@@ -705,7 +697,7 @@ func TestString_MultipleVariablesWithStepMapOnLast(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			opts := []Option{}
+			var opts []Option
 			for _, vars := range tt.varSets {
 				opts = append(opts, WithVariables(vars))
 			}

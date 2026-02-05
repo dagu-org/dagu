@@ -2,7 +2,6 @@ package eval
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,71 +26,58 @@ func TestOptions_WithOSExpansion(t *testing.T) {
 }
 
 func TestWithoutExpandShell(t *testing.T) {
+	t.Setenv("TEST_VAR", "test_value_for_shell")
 	ctx := context.Background()
 
 	tests := []struct {
-		name    string
-		input   string
-		opts    []Option
-		want    string
-		wantErr bool
+		name  string
+		input string
+		opts  []Option
+		want  string
 	}{
 		{
-			name:    "ShellExpansionEnabled",
-			input:   "${VAR:0:3}",
-			opts:    []Option{WithVariables(map[string]string{"VAR": "HelloWorld"}), WithOSExpansion()},
-			want:    "Hel",
-			wantErr: false,
+			name:  "ShellExpansionEnabled",
+			input: "${VAR:0:3}",
+			opts:  []Option{WithVariables(map[string]string{"VAR": "HelloWorld"}), WithOSExpansion()},
+			want:  "Hel",
 		},
 		{
-			name:    "ShellExpansionDisabledPreservesSubstring",
-			input:   "${VAR:0:3}",
-			opts:    []Option{WithVariables(map[string]string{"VAR": "HelloWorld"}), WithoutExpandShell()},
-			want:    "${VAR:0:3}",
-			wantErr: false,
+			name:  "ShellExpansionDisabledPreservesSubstring",
+			input: "${VAR:0:3}",
+			opts:  []Option{WithVariables(map[string]string{"VAR": "HelloWorld"}), WithoutExpandShell()},
+			want:  "${VAR:0:3}",
 		},
 		{
-			name:    "SimpleVarStillWorks",
-			input:   "${VAR}",
-			opts:    []Option{WithVariables(map[string]string{"VAR": "value"}), WithoutExpandShell()},
-			want:    "value",
-			wantErr: false,
+			name:  "SimpleVarStillWorks",
+			input: "${VAR}",
+			opts:  []Option{WithVariables(map[string]string{"VAR": "value"}), WithoutExpandShell()},
+			want:  "value",
 		},
 		{
-			name:    "EnvVarStillExpandsWithoutShellExpansion",
-			input:   "$TEST_VAR",
-			opts:    []Option{WithoutExpandShell(), WithOSExpansion()},
-			want:    "test_value_for_shell",
-			wantErr: false,
+			name:  "EnvVarStillExpandsWithoutShellExpansion",
+			input: "$TEST_VAR",
+			opts:  []Option{WithoutExpandShell(), WithOSExpansion()},
+			want:  "test_value_for_shell",
 		},
 		{
-			name:    "CommandSubstitutionStillWorks",
-			input:   "`echo hello`",
-			opts:    []Option{WithoutExpandShell()},
-			want:    "hello",
-			wantErr: false,
+			name:  "CommandSubstitutionStillWorks",
+			input: "`echo hello`",
+			opts:  []Option{WithoutExpandShell()},
+			want:  "hello",
 		},
 		{
-			name:    "MixedContentWithShellDisabled",
-			input:   "prefix ${VAR} suffix",
-			opts:    []Option{WithVariables(map[string]string{"VAR": "middle"}), WithoutExpandShell()},
-			want:    "prefix middle suffix",
-			wantErr: false,
+			name:  "MixedContentWithShellDisabled",
+			input: "prefix ${VAR} suffix",
+			opts:  []Option{WithVariables(map[string]string{"VAR": "middle"}), WithoutExpandShell()},
+			want:  "prefix middle suffix",
 		},
 	}
-
-	require.NoError(t, os.Setenv("TEST_VAR", "test_value_for_shell"))
-	defer func() { _ = os.Unsetenv("TEST_VAR") }()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := String(ctx, tt.input, tt.opts...)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.want, got)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

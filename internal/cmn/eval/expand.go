@@ -16,7 +16,6 @@ import (
 func ExpandEnvContext(ctx context.Context, s string) string {
 	scope := GetEnvScope(ctx)
 	if scope == nil {
-		// No scope - use OS lookup but preserve unknown vars
 		return expandWithLookup(s, os.LookupEnv)
 	}
 	return scope.Expand(s)
@@ -40,10 +39,10 @@ func expandEnvScopeOnly(ctx context.Context, s string) string {
 // expandWithShellContext performs POSIX shell-style variable expansion using mvdan.cc/sh.
 // Falls back to ExpandEnvContext on parse errors or unexpected command substitutions.
 func expandWithShellContext(ctx context.Context, input string, opts *Options) (string, error) {
+	if !opts.ExpandShell && !opts.ExpandEnv {
+		return input, nil
+	}
 	if !opts.ExpandShell {
-		if !opts.ExpandEnv {
-			return input, nil
-		}
 		return ExpandEnvContext(ctx, input), nil
 	}
 
@@ -59,17 +58,15 @@ func expandWithShellContext(ctx context.Context, input string, opts *Options) (s
 	r := newResolver(ctx, opts)
 	cfg := &expand.Config{
 		Env: expand.FuncEnviron(func(name string) string {
-			if val, ok := r.resolveForShell(name); ok {
-				return val
-			}
-			return ""
+			val, _ := r.resolveForShell(name)
+			return val
 		}),
 	}
 
 	result, err := expand.Literal(cfg, word)
 	if err != nil {
-		var unexpected expand.UnexpectedCommandError
-		if errors.As(err, &unexpected) {
+		var cmdErr expand.UnexpectedCommandError
+		if errors.As(err, &cmdErr) {
 			return ExpandEnvContext(ctx, input), nil
 		}
 		return "", err
