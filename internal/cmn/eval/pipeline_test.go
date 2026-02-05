@@ -679,7 +679,7 @@ func TestStringFields_DefaultNoOSExpansion(t *testing.T) {
 	assert.Equal(t, "${SF_VAR}", result.Field)
 }
 
-func TestObject_PreservesOSExpansion(t *testing.T) {
+func TestObject_NoOSExpansion(t *testing.T) {
 	t.Setenv("OBJ_VAR", "obj_value")
 
 	type S struct {
@@ -688,7 +688,116 @@ func TestObject_PreservesOSExpansion(t *testing.T) {
 	ctx := context.Background()
 	result, err := Object(ctx, S{Field: "$OBJ_VAR"}, map[string]string{})
 	require.NoError(t, err)
-	assert.Equal(t, "obj_value", result.Field)
+	assert.Equal(t, "$OBJ_VAR", result.Field, "OS vars should be preserved, not expanded")
+}
+
+func TestObject_ExplicitVarsStillWork(t *testing.T) {
+	type S struct {
+		Field string
+	}
+	ctx := context.Background()
+	result, err := Object(ctx, S{Field: "$MY_VAR"}, map[string]string{"MY_VAR": "hello"})
+	require.NoError(t, err)
+	assert.Equal(t, "hello", result.Field, "Explicit vars map should still expand")
+}
+
+func TestObject_ScopeVarsStillWork(t *testing.T) {
+	type S struct {
+		Field string
+	}
+	scope := NewEnvScope(nil, false).
+		WithEntry("SCOPE_VAR", "scope_value", EnvSourceDAGEnv)
+	ctx := WithEnvScope(context.Background(), scope)
+
+	result, err := Object(ctx, S{Field: "${SCOPE_VAR}"}, map[string]string{})
+	require.NoError(t, err)
+	assert.Equal(t, "scope_value", result.Field, "Non-OS scope entries should still expand")
+}
+
+func TestObject_OSScopeEntriesSkipped(t *testing.T) {
+	type S struct {
+		Field string
+	}
+	scope := NewEnvScope(nil, false).
+		WithEntry("OS_VAR", "os_value", EnvSourceOS)
+	ctx := WithEnvScope(context.Background(), scope)
+
+	result, err := Object(ctx, S{Field: "${OS_VAR}"}, map[string]string{})
+	require.NoError(t, err)
+	assert.Equal(t, "${OS_VAR}", result.Field, "OS-sourced scope entries should be skipped")
+}
+
+// --- Integration-style tests: executor config evaluation ---
+
+// TestObject_SSHExecutorNoOSExpansion simulates evaluating an SSH executor config.
+// OS variables like $HOME must be preserved for the remote shell,
+// while DAG-defined variables must be expanded.
+func TestObject_SSHExecutorNoOSExpansion(t *testing.T) {
+	t.Setenv("HOME", "/home/localuser")
+
+	type SSHConfig struct {
+		Host    string
+		Command string
+	}
+
+	// REMOTE_HOST is provided as a DAG-scoped variable via the vars map.
+	// $HOME is an OS variable that should NOT be expanded.
+	vars := map[string]string{"REMOTE_HOST": "remotehost.example.com"}
+	cfg := SSHConfig{
+		Host:    "${REMOTE_HOST}",
+		Command: "tar czf $HOME/backup.tar.gz /data",
+	}
+
+	result, err := Object(context.Background(), cfg, vars)
+	require.NoError(t, err)
+	assert.Equal(t, "remotehost.example.com", result.Host, "DAG var should be expanded")
+	assert.Equal(t, "tar czf $HOME/backup.tar.gz /data", result.Command, "$HOME should be preserved for remote shell")
+}
+
+// TestObject_DockerExecutorNoOSExpansion simulates evaluating a Docker executor config.
+// OS variables like $HOME in container env should be preserved as literal text,
+// while DAG-defined variables like REGISTRY should be expanded.
+func TestObject_DockerExecutorNoOSExpansion(t *testing.T) {
+	t.Setenv("HOME", "/home/localuser")
+
+	type DockerConfig struct {
+		Image string
+		Env   []string
+	}
+
+	vars := map[string]string{"REGISTRY": "myregistry.com"}
+	cfg := DockerConfig{
+		Image: "${REGISTRY}/app",
+		Env:   []string{"WORKDIR=$HOME/app", "TAG=${REGISTRY}/latest"},
+	}
+
+	result, err := Object(context.Background(), cfg, vars)
+	require.NoError(t, err)
+	assert.Equal(t, "myregistry.com/app", result.Image, "DAG var should be expanded in image")
+	assert.Equal(t, "WORKDIR=$HOME/app", result.Env[0], "$HOME should be preserved for container env")
+	assert.Equal(t, "TAG=myregistry.com/latest", result.Env[1], "DAG var should be expanded in env")
+}
+
+// TestObject_ExplicitOSImportStillWorks verifies that when an OS variable like HOME
+// is explicitly imported into the DAG env scope, it gets expanded even through Object().
+func TestObject_ExplicitOSImportStillWorks(t *testing.T) {
+	t.Setenv("HOME", "/home/testuser")
+
+	type SSHConfig struct {
+		Command string
+	}
+
+	// Simulate a DAG that explicitly imports HOME via env: block.
+	// At DAG load time, HOME="${HOME}" would have been expanded with WithOSExpansion(),
+	// resulting in the vars map containing the resolved value.
+	vars := map[string]string{"HOME": "/home/testuser"}
+	cfg := SSHConfig{
+		Command: "echo ${HOME}",
+	}
+
+	result, err := Object(context.Background(), cfg, vars)
+	require.NoError(t, err)
+	assert.Equal(t, "echo /home/testuser", result.Command, "Explicitly imported OS var should be expanded")
 }
 
 func TestString_MultipleVariablesWithStepMapOnLast(t *testing.T) {

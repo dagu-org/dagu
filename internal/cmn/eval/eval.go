@@ -75,22 +75,25 @@ func ExpandReferences(ctx context.Context, input string, dataMap map[string]stri
 
 // ExpandReferencesWithSteps is like ExpandReferences but also resolves step property
 // references such as ${step_id.stdout}, ${step_id.stderr}, and ${step_id.exit_code}.
+// OS environment is not expanded — only explicit dataMap entries and non-OS scope
+// entries are used for resolution.
 func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[string]string, stepMap map[string]StepInfo) string {
 	r := &resolver{
 		variables: []map[string]string{dataMap},
 		stepMap:   stepMap,
 		scope:     GetEnvScope(ctx),
-		expandOS:  true,
+		expandOS:  false,
 	}
 	return r.expandReferences(ctx, input)
 }
 
 // Object recursively evaluates the string fields of the given object using variable
-// expansion, command substitution, and env expansion. OS environment is included
-// for backward compatibility.
+// expansion, command substitution, and env expansion. OS environment is NOT expanded
+// by default — only explicitly provided vars and non-OS scope entries are used.
+// This prevents OS variables like $HOME from being expanded in non-shell executor
+// configs (SSH, Docker, S3, etc.) where they should be preserved for the remote env.
 func Object[T any](ctx context.Context, obj T, vars map[string]string) (T, error) {
 	options := NewOptions()
-	options.ExpandOS = true
 	options.Variables = append(options.Variables, vars)
 
 	transform := func(ctx context.Context, s string) (string, error) {

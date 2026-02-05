@@ -519,10 +519,10 @@ func TestExpandReferences(t *testing.T) {
 			want: "Multi: 1, 2 , and 3",
 		},
 		{
-			name:    "LookupFromEnvironment",
+			name:    "LookupFromEnvironmentNotExpanded",
 			input:   "${TEST_JSON_VAR.bar}",
 			dataMap: map[string]string{},
-			want:    "World",
+			want:    "${TEST_JSON_VAR.bar}",
 		},
 	}
 
