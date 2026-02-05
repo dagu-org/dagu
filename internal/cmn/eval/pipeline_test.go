@@ -94,6 +94,32 @@ func TestShellExpandPhase_NonCommandError(t *testing.T) {
 	assert.Contains(t, result, "UNSET_XYZ_99")
 }
 
+func TestShellExpandPhase_ShellDisabledWithExpandOS(t *testing.T) {
+	t.Setenv("SHELL_TEST_VAR", "os_val")
+	ctx := context.Background()
+	opts := NewOptions()
+	opts.ExpandShell = false
+	opts.ExpandOS = true
+
+	// ExpandShell=false + ExpandOS=true: uses ExpandEnvContext (includes OS env)
+	result, err := shellExpandPhase(ctx, "$SHELL_TEST_VAR", opts)
+	require.NoError(t, err)
+	assert.Equal(t, "os_val", result)
+}
+
+func TestShellExpandPhase_ErrorFallbackWithoutExpandOS(t *testing.T) {
+	ctx := context.Background()
+	opts := NewOptions()
+	opts.Variables = []map[string]string{{"VAR": ""}}
+	// ExpandOS=false: error fallback uses expandEnvScopeOnly
+
+	// ${VAR:?msg} errors because VAR is defined but empty, and :? treats empty as unset
+	result, err := shellExpandPhase(ctx, "${VAR:?required}", opts)
+	require.NoError(t, err)
+	// Error triggers fallback to expandEnvScopeOnly, which preserves the expression
+	assert.Equal(t, "${VAR:?required}", result)
+}
+
 // --- Pipeline execute with disabled phase ---
 
 func TestPipeline_DisabledPhases(t *testing.T) {
@@ -184,7 +210,7 @@ func TestString(t *testing.T) {
 		{
 			name:    "ShellSubstringExpansion",
 			input:   "prefix ${UID:0:5} suffix",
-			opts:    []Option{WithVariables(map[string]string{"UID": "HBL01_22OCT2025_0536"}), WithOSExpansion()},
+			opts:    []Option{WithVariables(map[string]string{"UID": "HBL01_22OCT2025_0536"})},
 			want:    "prefix HBL01 suffix",
 			wantErr: false,
 		},
@@ -643,6 +669,58 @@ func TestString_POSIXMixedWithKnownVars(t *testing.T) {
 		WithVariables(map[string]string{"KNOWN": "value"}))
 	require.NoError(t, err)
 	assert.Equal(t, "value ${UNDEFINED:-default}", result)
+}
+
+// --- POSIX expansion with user-defined variables (core bug fix) ---
+
+func TestString_POSIXSubstringWithUserVar(t *testing.T) {
+	result, err := String(context.Background(), "prefix ${UID:0:5} suffix",
+		WithVariables(map[string]string{"UID": "HBL01_22OCT2025_0536"}))
+	require.NoError(t, err)
+	assert.Equal(t, "prefix HBL01 suffix", result)
+}
+
+func TestString_POSIXDefaultWithDefinedVar(t *testing.T) {
+	result, err := String(context.Background(), "${VAR:-fallback}",
+		WithVariables(map[string]string{"VAR": "actual"}))
+	require.NoError(t, err)
+	assert.Equal(t, "actual", result)
+}
+
+func TestString_POSIXDefaultWithUndefinedVarPreserved(t *testing.T) {
+	result, err := String(context.Background(), "${MISSING:-fallback}")
+	require.NoError(t, err)
+	assert.Equal(t, "${MISSING:-fallback}", result)
+}
+
+func TestString_POSIXWithScope(t *testing.T) {
+	scope := NewEnvScope(nil, false).
+		WithEntry("SCOPE_VAR", "HelloWorld", EnvSourceDAGEnv)
+	ctx := WithEnvScope(context.Background(), scope)
+	result, err := String(ctx, "${SCOPE_VAR:0:5}")
+	require.NoError(t, err)
+	assert.Equal(t, "Hello", result)
+}
+
+func TestString_POSIXMixedDefinedAndUndefined(t *testing.T) {
+	result, err := String(context.Background(), "${UID:0:3} ${MISSING:-kept}",
+		WithVariables(map[string]string{"UID": "ABCDEF"}))
+	require.NoError(t, err)
+	assert.Equal(t, "ABC ${MISSING:-kept}", result)
+}
+
+func TestString_POSIXLengthOperator(t *testing.T) {
+	result, err := String(context.Background(), "${#VAR}",
+		WithVariables(map[string]string{"VAR": "HelloWorld"}))
+	require.NoError(t, err)
+	assert.Equal(t, "10", result)
+}
+
+func TestString_POSIXEmptyVarWithDefault(t *testing.T) {
+	result, err := String(context.Background(), "${VAR:-fallback}",
+		WithVariables(map[string]string{"VAR": ""}))
+	require.NoError(t, err)
+	assert.Equal(t, "fallback", result)
 }
 
 func TestStringFields_DefaultNoOSExpansion(t *testing.T) {

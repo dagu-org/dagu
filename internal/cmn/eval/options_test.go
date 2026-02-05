@@ -38,7 +38,7 @@ func TestWithoutExpandShell(t *testing.T) {
 		{
 			name:  "ShellExpansionEnabled",
 			input: "${VAR:0:3}",
-			opts:  []Option{WithVariables(map[string]string{"VAR": "HelloWorld"}), WithOSExpansion()},
+			opts:  []Option{WithVariables(map[string]string{"VAR": "HelloWorld"})},
 			want:  "Hel",
 		},
 		{

@@ -940,7 +940,7 @@ func TestRunner(t *testing.T) {
 		err := os.WriteFile(file, []byte("notyet"), 0644)
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			os.Remove(file)
+			_ = os.Remove(file)
 		})
 		plan := r.newPlan(t,
 			newStep("1",

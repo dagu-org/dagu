@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/dagu-org/dagu/internal/cmn/logger"
-	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 )
 
 // phase represents a single step in the evaluation pipeline.
@@ -99,18 +96,25 @@ func substitutePhase(ctx context.Context, input string, _ *Options) (string, err
 	return substituteCommandsWithContext(ctx, input)
 }
 
-// shellExpandPhase performs shell-style variable expansion using mvdan.cc/sh.
-// Falls back to simple regex-based expansion on failure.
-// When ExpandOS is false, bypasses shell expansion entirely and uses scope-only expansion.
+// shellExpandPhase performs shell-style variable expansion.
+// When ExpandShell is true (default), uses selective POSIX expansion via mvdan.cc/sh:
+// defined variables with POSIX operators are expanded, undefined variables are preserved.
+// When ExpandShell is false, falls back to regex-based expansion.
+// ExpandOS controls only whether os.LookupEnv is available as a fallback source.
+// On POSIX expansion errors, falls back to regex-based expansion for robustness.
 func shellExpandPhase(ctx context.Context, input string, opts *Options) (string, error) {
-	if !opts.ExpandOS {
+	if !opts.ExpandShell {
+		if opts.ExpandOS {
+			return ExpandEnvContext(ctx, input), nil
+		}
 		return expandEnvScopeOnly(ctx, input), nil
 	}
 	expanded, err := expandWithShellContext(ctx, input, opts)
 	if err != nil {
-		logger.Debug(ctx, "Shell expansion failed, falling back to ExpandEnvContext",
-			tag.Error(err))
-		return ExpandEnvContext(ctx, input), nil
+		if opts.ExpandOS {
+			return ExpandEnvContext(ctx, input), nil
+		}
+		return expandEnvScopeOnly(ctx, input), nil
 	}
 	return expanded, nil
 }

@@ -2,7 +2,6 @@ package eval
 
 import (
 	"context"
-	"errors"
 	"os"
 	"strings"
 
@@ -36,8 +35,59 @@ func expandEnvScopeOnly(ctx context.Context, s string) string {
 	})
 }
 
-// expandWithShellContext performs POSIX shell-style variable expansion using mvdan.cc/sh.
-// Falls back to ExpandEnvContext on parse errors or unexpected command substitutions.
+// shellEnviron implements expand.Environ for POSIX shell expansion.
+// Unlike expand.FuncEnviron, it properly distinguishes between
+// variables set to empty string and unset variables.
+type shellEnviron struct {
+	resolver *resolver
+}
+
+func (e *shellEnviron) Get(name string) expand.Variable {
+	val, ok := e.resolver.resolveForShell(name)
+	if !ok {
+		return expand.Variable{}
+	}
+	return expand.Variable{Set: true, Exported: true, Kind: expand.String, Str: val}
+}
+
+func (e *shellEnviron) Each(func(name string, vr expand.Variable) bool) {}
+
+// extractPOSIXVarName returns the base variable name from inside a ${...} expression.
+// For "VAR:0:3" this returns "VAR"; for "#VAR" (length operator) this returns "VAR".
+func extractPOSIXVarName(inner string) string {
+	// ${#VAR} is the length operator — # precedes the var name
+	if strings.HasPrefix(inner, "#") && !strings.ContainsAny(inner, ":%/+-=?") {
+		return inner[1:]
+	}
+	for i, c := range inner {
+		switch c {
+		case ':', '-', '+', '=', '?', '#', '%', '/', '.':
+			return inner[:i]
+		}
+	}
+	return inner
+}
+
+// expandPOSIXExpression expands a single POSIX expression (e.g. "${VAR:0:3}")
+// using the mvdan.cc/sh shell parser and expander.
+func expandPOSIXExpression(expr string, env *shellEnviron) (string, error) {
+	word, err := syntax.NewParser().Document(strings.NewReader(expr))
+	if err != nil {
+		return "", err
+	}
+	if word == nil {
+		return "", nil
+	}
+	return expand.Literal(&expand.Config{Env: env}, word)
+}
+
+// expandWithShellContext performs selective POSIX shell-style variable expansion.
+// For each variable expression in the input:
+//   - Defined variables with POSIX operators (e.g. ${VAR:0:3}) are expanded via mvdan.cc/sh.
+//   - Defined simple variables (${VAR}, $VAR) are resolved directly.
+//   - When ExpandOS is false (default): undefined variables are preserved for later OS shell evaluation.
+//   - When ExpandOS is true: undefined variables follow POSIX rules (empty, defaults applied, etc.).
+//   - Single-quoted variables are preserved as-is.
 func expandWithShellContext(ctx context.Context, input string, opts *Options) (string, error) {
 	if !opts.ExpandShell && !opts.ExpandEnv {
 		return input, nil
@@ -46,30 +96,63 @@ func expandWithShellContext(ctx context.Context, input string, opts *Options) (s
 		return ExpandEnvContext(ctx, input), nil
 	}
 
-	parser := syntax.NewParser()
-	word, err := parser.Document(strings.NewReader(input))
-	if err != nil {
-		return "", err
-	}
-	if word == nil {
-		return "", nil
-	}
-
 	r := newResolver(ctx, opts)
-	cfg := &expand.Config{
-		Env: expand.FuncEnviron(func(name string) string {
-			val, _ := r.resolveForShell(name)
-			return val
-		}),
+	env := &shellEnviron{resolver: r}
+
+	matches := reVarSubstitution.FindAllStringSubmatchIndex(input, -1)
+	if len(matches) == 0 {
+		return input, nil
 	}
 
-	result, err := expand.Literal(cfg, word)
-	if err != nil {
-		var cmdErr expand.UnexpectedCommandError
-		if errors.As(err, &cmdErr) {
-			return ExpandEnvContext(ctx, input), nil
+	var b strings.Builder
+	last := 0
+	for _, loc := range matches {
+		b.WriteString(input[last:loc[0]])
+		match := input[loc[0]:loc[1]]
+
+		// Single-quoted: preserve
+		if match[0] == '\'' {
+			b.WriteString(match)
+			last = loc[1]
+			continue
 		}
-		return "", err
+
+		// Extract variable name
+		var varName string
+		hasPOSIXOp := false
+		if loc[2] >= 0 { // Group 1: ${...}
+			inner := input[loc[2]:loc[3]]
+			varName = extractPOSIXVarName(inner)
+			hasPOSIXOp = inner != varName
+		} else { // Group 2: $VAR
+			varName = input[loc[4]:loc[5]]
+		}
+
+		_, defined := r.resolveForShell(varName)
+
+		// Undefined variable handling depends on ExpandOS:
+		// - ExpandOS=false: preserve for later OS shell evaluation
+		// - ExpandOS=true: let POSIX rules apply (defaults, errors, etc.)
+		if !defined && !opts.ExpandOS {
+			b.WriteString(match)
+			last = loc[1]
+			continue
+		}
+
+		// Has POSIX operator: expand via shell parser
+		if hasPOSIXOp {
+			expanded, err := expandPOSIXExpression(match, env)
+			if err != nil {
+				return "", err
+			}
+			b.WriteString(expanded)
+		} else {
+			// Simple ${VAR} or $VAR: resolve directly
+			val, _ := r.resolveForShell(varName)
+			b.WriteString(val)
+		}
+		last = loc[1]
 	}
-	return result, nil
+	b.WriteString(input[last:])
+	return b.String(), nil
 }

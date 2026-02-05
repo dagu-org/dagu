@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"mvdan.cc/sh/v3/expand"
 )
 
 func TestExpandEnvContext(t *testing.T) {
@@ -120,24 +121,27 @@ func TestExpandWithShellContext(t *testing.T) {
 		assert.Equal(t, "", result)
 	})
 
-	t.Run("UnexpectedCommandFallback", func(t *testing.T) {
+	t.Run("CommandSubstitutionPreserved", func(t *testing.T) {
 		t.Setenv("KEEP", "kept")
 
 		opts := NewOptions()
 		opts.ExpandOS = true
 
-		// $(command) triggers UnexpectedCommandError and falls back to ExpandEnvContext
+		// $(command) is not a variable expression, so it's preserved as literal text.
+		// $KEEP is resolved via OS env.
 		result, err := expandWithShellContext(context.Background(), "$(echo x) $KEEP", opts)
 		require.NoError(t, err)
-		assert.Contains(t, result, "kept")
+		assert.Equal(t, "$(echo x) kept", result)
 	})
 
-	t.Run("ParseError", func(t *testing.T) {
+	t.Run("MalformedInputPreserved", func(t *testing.T) {
 		opts := NewOptions()
 		opts.ExpandOS = true
 
-		_, err := expandWithShellContext(context.Background(), "${", opts)
-		assert.Error(t, err)
+		// Unclosed ${ doesn't match the variable regex, so it's returned as-is
+		result, err := expandWithShellContext(context.Background(), "${", opts)
+		require.NoError(t, err)
+		assert.Equal(t, "${", result)
 	})
 
 	t.Run("NonUnexpectedCommandError", func(t *testing.T) {
@@ -147,6 +151,98 @@ func TestExpandWithShellContext(t *testing.T) {
 		// ${UNSET_VAR_ABC:?msg} triggers a non-UnexpectedCommand error from expand.Literal
 		_, err := expandWithShellContext(context.Background(), "${UNSET_VAR_ABC:?required}", opts)
 		assert.Error(t, err)
+	})
+
+	t.Run("UndefinedSimpleVarWithExpandOS", func(t *testing.T) {
+		opts := NewOptions()
+		opts.ExpandOS = true
+
+		// Undefined simple $VAR with ExpandOS=true resolves to empty string
+		result, err := expandWithShellContext(context.Background(), "prefix $UNDEF_XYZ suffix", opts)
+		require.NoError(t, err)
+		assert.Equal(t, "prefix  suffix", result)
+	})
+
+	t.Run("DefinedPOSIXWithoutExpandOS", func(t *testing.T) {
+		opts := NewOptions()
+		opts.Variables = []map[string]string{{"VAR": "HelloWorld"}}
+
+		// Defined var with POSIX op works even without ExpandOS
+		result, err := expandWithShellContext(context.Background(), "${VAR:0:5}", opts)
+		require.NoError(t, err)
+		assert.Equal(t, "Hello", result)
+	})
+
+	t.Run("SingleQuotedPreserved", func(t *testing.T) {
+		opts := NewOptions()
+		opts.Variables = []map[string]string{{"VAR": "value"}}
+
+		result, err := expandWithShellContext(context.Background(), "'${VAR}'", opts)
+		require.NoError(t, err)
+		assert.Equal(t, "'${VAR}'", result)
+	})
+}
+
+func TestShellEnviron(t *testing.T) {
+	t.Run("EachIsNoOp", func(t *testing.T) {
+		env := &shellEnviron{resolver: &resolver{}}
+		called := false
+		env.Each(func(_ string, _ expand.Variable) bool {
+			called = true
+			return true
+		})
+		assert.False(t, called)
+	})
+
+	t.Run("GetDefined", func(t *testing.T) {
+		r := &resolver{variables: []map[string]string{{"FOO": "bar"}}}
+		env := &shellEnviron{resolver: r}
+		v := env.Get("FOO")
+		assert.True(t, v.Set)
+		assert.Equal(t, "bar", v.Str)
+	})
+
+	t.Run("GetUndefined", func(t *testing.T) {
+		env := &shellEnviron{resolver: &resolver{}}
+		v := env.Get("MISSING")
+		assert.False(t, v.Set)
+	})
+}
+
+func TestExtractPOSIXVarName(t *testing.T) {
+	tests := []struct {
+		inner string
+		want  string
+	}{
+		{"VAR", "VAR"},
+		{"VAR:0:3", "VAR"},
+		{"VAR:-default", "VAR"},
+		{"VAR:+alt", "VAR"},
+		{"VAR:=val", "VAR"},
+		{"VAR:?msg", "VAR"},
+		{"#VAR", "VAR"},
+		{"VAR#pattern", "VAR"},
+		{"VAR%pattern", "VAR"},
+		{"VAR/old/new", "VAR"},
+		{"VAR.path.field", "VAR"},
+		{"VAR-default", "VAR"},
+		{"VAR+alt", "VAR"},
+		{"VAR=val", "VAR"},
+		{"VAR?msg", "VAR"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.inner, func(t *testing.T) {
+			assert.Equal(t, tt.want, extractPOSIXVarName(tt.inner))
+		})
+	}
+}
+
+func TestExpandPOSIXExpression(t *testing.T) {
+	t.Run("EmptyInput", func(t *testing.T) {
+		env := &shellEnviron{resolver: &resolver{}}
+		result, err := expandPOSIXExpression("", env)
+		require.NoError(t, err)
+		assert.Equal(t, "", result)
 	})
 }
 
