@@ -24,7 +24,7 @@ func TestResolveForShell_SkipsOSScope(t *testing.T) {
 	t.Setenv("OSVAR", "live_os_value")
 	scope := NewEnvScope(nil, false)
 	scope = scope.WithEntry("OSVAR", "frozen_value", EnvSourceOS)
-	r := &resolver{scope: scope}
+	r := &resolver{scope: scope, expandOS: true}
 
 	val, ok := r.resolveForShell("OSVAR")
 	assert.True(t, ok)
@@ -33,7 +33,7 @@ func TestResolveForShell_SkipsOSScope(t *testing.T) {
 
 func TestResolveForShell_OSEnvFallback(t *testing.T) {
 	t.Setenv("TESTOSVAR", "osval")
-	r := &resolver{}
+	r := &resolver{expandOS: true}
 
 	val, ok := r.resolveForShell("TESTOSVAR")
 	assert.True(t, ok)
@@ -60,7 +60,7 @@ func TestResolveJSONSource_FromScope(t *testing.T) {
 
 func TestResolveJSONSource_FromOSEnv(t *testing.T) {
 	t.Setenv("JSONOSVAR", `{"b":2}`)
-	r := &resolver{}
+	r := &resolver{expandOS: true}
 
 	val, ok := r.resolveJSONSource("JSONOSVAR")
 	assert.True(t, ok)
@@ -108,7 +108,7 @@ func TestResolveReference_JSONFromScope(t *testing.T) {
 
 func TestResolveReference_JSONFromOSEnv(t *testing.T) {
 	t.Setenv("OSJSON", `{"a":"b"}`)
-	r := &resolver{}
+	r := &resolver{expandOS: true}
 
 	val, ok := r.resolveReference(context.Background(), "OSJSON", ".a")
 	assert.True(t, ok)
@@ -119,6 +119,49 @@ func TestResolveReference_NotFound(t *testing.T) {
 	r := &resolver{}
 	_, ok := r.resolveReference(context.Background(), "NOPE12345", ".x")
 	assert.False(t, ok)
+}
+
+// --- ExpandOS resolver tests ---
+
+func TestResolveForShell_WithoutExpandOS(t *testing.T) {
+	t.Setenv("SHELL_TEST_VAR", "os_value")
+	r := &resolver{expandOS: false}
+
+	_, ok := r.resolveForShell("SHELL_TEST_VAR")
+	assert.False(t, ok, "should not find OS var when expandOS=false")
+}
+
+func TestResolveForShell_WithExpandOS(t *testing.T) {
+	t.Setenv("SHELL_TEST_VAR", "os_value")
+	r := &resolver{expandOS: true}
+
+	val, ok := r.resolveForShell("SHELL_TEST_VAR")
+	assert.True(t, ok)
+	assert.Equal(t, "os_value", val)
+}
+
+func TestResolveJSONSource_WithoutExpandOS(t *testing.T) {
+	t.Setenv("JSON_OS_VAR", `{"a":1}`)
+
+	// OS env should not be found
+	r := &resolver{expandOS: false}
+	_, ok := r.resolveJSONSource("JSON_OS_VAR")
+	assert.False(t, ok)
+
+	// OS-sourced scope entries should not be found
+	scope := NewEnvScope(nil, false).
+		WithEntry("SCOPE_OS", `{"b":2}`, EnvSourceOS)
+	r2 := &resolver{scope: scope, expandOS: false}
+	_, ok = r2.resolveJSONSource("SCOPE_OS")
+	assert.False(t, ok)
+
+	// Non-OS scope entries should still be found
+	scope2 := NewEnvScope(nil, false).
+		WithEntry("SCOPE_DAG", `{"c":3}`, EnvSourceDAGEnv)
+	r3 := &resolver{scope: scope2, expandOS: false}
+	val, ok := r3.resolveJSONSource("SCOPE_DAG")
+	assert.True(t, ok)
+	assert.Equal(t, `{"c":3}`, val)
 }
 
 // --- expandReferences short submatch ---

@@ -82,7 +82,7 @@ func TestStringFields(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			got, err := StringFields(ctx, tt.input)
+			got, err := StringFields(ctx, tt.input, WithOSExpansion())
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
@@ -154,7 +154,7 @@ func TestStringFields_NestedStructs(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	got, err := StringFields(ctx, input)
+	got, err := StringFields(ctx, input, WithOSExpansion())
 	require.NoError(t, err)
 	assert.Equal(t, want, got)
 }
@@ -190,6 +190,7 @@ func TestStringFields_Map(t *testing.T) {
 				"key2": "`echo hello`",
 				"key3": "plain",
 			},
+			opts:    []Option{WithOSExpansion()},
 			want: map[string]any{
 				"key1": "map_value",
 				"key2": "hello",
@@ -204,6 +205,7 @@ func TestStringFields_Map(t *testing.T) {
 					"inner": "$MAP_ENV",
 				},
 			},
+			opts: []Option{WithOSExpansion()},
 			want: map[string]any{
 				"outer": map[string]any{
 					"inner": "map_value",
@@ -219,6 +221,7 @@ func TestStringFields_Map(t *testing.T) {
 				"bool":   true,
 				"nil":    nil,
 			},
+			opts: []Option{WithOSExpansion()},
 			want: map[string]any{
 				"string": "map_value",
 				"int":    42,
@@ -236,6 +239,7 @@ func TestStringFields_Map(t *testing.T) {
 					Field: "$MAP_ENV",
 				},
 			},
+			opts: []Option{WithOSExpansion()},
 			want: map[string]any{
 				"struct": struct {
 					Field string
@@ -261,6 +265,7 @@ func TestStringFields_Map(t *testing.T) {
 			input: map[string]any{
 				"ptr": ptrString("$MAP_ENV"),
 			},
+			opts:    []Option{WithOSExpansion()},
 			want: map[string]any{
 				"ptr": "map_value",
 			},

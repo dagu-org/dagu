@@ -411,13 +411,13 @@ func (c *Context) OpenLogFile(
 // GenLogFileName generates a log file name based on the DAG and dag-run ID.
 func (c *Context) GenLogFileName(dag *core.DAG, dagRunID string) (string, error) {
 	// Read the global configuration for log directory.
-	baseLogDir, err := eval.String(c, c.Config.Paths.LogDir)
+	baseLogDir, err := eval.String(c, c.Config.Paths.LogDir, eval.WithOSExpansion())
 	if err != nil {
 		return "", fmt.Errorf("failed to expand log directory: %w", err)
 	}
 
 	// Read the log directory configuration from the DAG.
-	dagLogDir, err := eval.String(c, dag.LogDir)
+	dagLogDir, err := eval.String(c, dag.LogDir, eval.WithOSExpansion())
 	if err != nil {
 		return "", fmt.Errorf("failed to expand DAG log directory: %w", err)
 	}

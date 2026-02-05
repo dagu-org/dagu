@@ -22,6 +22,21 @@ func ExpandEnvContext(ctx context.Context, s string) string {
 	return scope.Expand(s)
 }
 
+// expandEnvScopeOnly expands $VAR and ${VAR} using only non-OS-sourced
+// entries from the EnvScope in context. Unknown variables are preserved.
+func expandEnvScopeOnly(ctx context.Context, s string) string {
+	scope := GetEnvScope(ctx)
+	if scope == nil {
+		return s
+	}
+	return expandWithLookup(s, func(key string) (string, bool) {
+		if entry, ok := scope.GetEntry(key); ok && entry.Source != EnvSourceOS {
+			return entry.Value, true
+		}
+		return "", false
+	})
+}
+
 // expandWithShellContext performs POSIX shell-style variable expansion using mvdan.cc/sh.
 // Falls back to ExpandEnvContext on parse errors or unexpected command substitutions.
 func expandWithShellContext(ctx context.Context, input string, opts *Options) (string, error) {

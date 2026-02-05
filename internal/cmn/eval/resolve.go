@@ -23,6 +23,7 @@ type resolver struct {
 	variables []map[string]string
 	stepMap   map[string]StepInfo
 	scope     *EnvScope
+	expandOS  bool
 }
 
 // newResolver creates a resolver from the given context and options.
@@ -31,6 +32,7 @@ func newResolver(ctx context.Context, opts *Options) *resolver {
 		variables: opts.Variables,
 		stepMap:   opts.StepMap,
 		scope:     GetEnvScope(ctx),
+		expandOS:  opts.ExpandOS,
 	}
 }
 
@@ -52,7 +54,7 @@ func (r *resolver) resolve(name string) (string, bool) {
 }
 
 // resolveForShell looks up a variable for shell expansion.
-// Like resolve but includes OS environment as a final fallback.
+// Like resolve but includes OS environment as a final fallback when expandOS is true.
 func (r *resolver) resolveForShell(name string) (string, bool) {
 	for _, vars := range r.variables {
 		if val, ok := vars[name]; ok {
@@ -65,8 +67,10 @@ func (r *resolver) resolveForShell(name string) (string, bool) {
 			return entry.Value, true
 		}
 	}
-	if val, exists := os.LookupEnv(name); exists {
-		return val, true
+	if r.expandOS {
+		if val, exists := os.LookupEnv(name); exists {
+			return val, true
+		}
 	}
 	return "", false
 }
@@ -86,8 +90,8 @@ func (r *resolver) resolveReference(ctx context.Context, varName, path string) (
 }
 
 // resolveJSONSource looks up a variable's raw value for use as a JSON source document.
-// Unlike resolve, this checks all sources including OS-sourced scope entries,
-// because JSON path resolution needs the actual value regardless of source.
+// Unlike resolve, this checks all sources including OS-sourced scope entries
+// when expandOS is true, because JSON path resolution needs the actual value regardless of source.
 func (r *resolver) resolveJSONSource(name string) (string, bool) {
 	for _, vars := range r.variables {
 		if val, ok := vars[name]; ok {
@@ -95,12 +99,22 @@ func (r *resolver) resolveJSONSource(name string) (string, bool) {
 		}
 	}
 	if r.scope != nil {
-		if val, exists := r.scope.Get(name); exists {
-			return val, true
+		if r.expandOS {
+			// Include all scope entries (including OS)
+			if val, exists := r.scope.Get(name); exists {
+				return val, true
+			}
+		} else {
+			// Exclude OS-sourced entries
+			if entry, ok := r.scope.GetEntry(name); ok && entry.Source != EnvSourceOS {
+				return entry.Value, true
+			}
 		}
 	}
-	if val, exists := os.LookupEnv(name); exists {
-		return val, true
+	if r.expandOS {
+		if val, exists := os.LookupEnv(name); exists {
+			return val, true
+		}
 	}
 	return "", false
 }

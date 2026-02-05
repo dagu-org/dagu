@@ -7,6 +7,7 @@ type Options struct {
 	Variables   []map[string]string
 	StepMap     map[string]StepInfo
 	ExpandShell bool // When false, skip shell-based variable expansion (e.g., for SSH commands)
+	ExpandOS    bool // When false, skip os.LookupEnv and OS-sourced scope entries
 }
 
 // NewOptions returns default Options with all features enabled.
@@ -53,6 +54,15 @@ func WithoutExpandShell() Option {
 func WithoutSubstitute() Option {
 	return func(opts *Options) {
 		opts.Substitute = false
+	}
+}
+
+// WithOSExpansion enables OS environment variable resolution.
+// When set, os.LookupEnv is used as a fallback and OS-sourced scope entries
+// are included. Without this option, undefined variables are preserved as-is.
+func WithOSExpansion() Option {
+	return func(opts *Options) {
+		opts.ExpandOS = true
 	}
 }
 

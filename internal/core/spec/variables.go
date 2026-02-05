@@ -93,7 +93,7 @@ func evaluatePairs(ctx BuildContext, pairs []pair) (map[string]string, error) {
 			scopeCtx := eval.WithEnvScope(evalCtx, scope)
 
 			var err error
-			value, err = eval.String(scopeCtx, value, eval.WithVariables(vars))
+			value, err = eval.String(scopeCtx, value, eval.WithVariables(vars), eval.WithOSExpansion())
 			if err != nil {
 				return nil, core.NewValidationError("env", p.val, fmt.Errorf("%w: %s", ErrInvalidEnvValue, p.val))
 			}

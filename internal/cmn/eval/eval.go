@@ -91,15 +91,17 @@ func ExpandReferencesWithSteps(ctx context.Context, input string, dataMap map[st
 		variables: []map[string]string{dataMap},
 		stepMap:   stepMap,
 		scope:     GetEnvScope(ctx),
+		expandOS:  true,
 	}
 	return r.expandReferences(ctx, input)
 }
 
 // Object recursively evaluates the string fields of the given object.
 // It uses variable expansion, command substitution, and basic env expansion
-// (via evalStringValue), preserving undefined variables as-is.
+// (via evalStringValue). OS environment is included for backward compatibility.
 func Object[T any](ctx context.Context, obj T, vars map[string]string) (T, error) {
 	options := NewOptions()
+	options.ExpandOS = true
 	WithVariables(vars)(options)
 
 	transform := func(ctx context.Context, s string) (string, error) {

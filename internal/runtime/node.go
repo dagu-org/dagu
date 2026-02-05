@@ -915,7 +915,7 @@ func (n *Node) setupRetryPolicy(ctx context.Context) error {
 	// Evaluate the configuration if it's configured as a string
 	// e.g. environment variable or command substitution
 	if step.RetryPolicy.LimitStr != "" {
-		v, err := eval.IntString(ctx, step.RetryPolicy.LimitStr)
+		v, err := eval.IntString(ctx, step.RetryPolicy.LimitStr, eval.WithOSExpansion())
 		if err != nil {
 			return fmt.Errorf("failed to substitute retry limit %q: %w", step.RetryPolicy.LimitStr, err)
 		}
@@ -924,7 +924,7 @@ func (n *Node) setupRetryPolicy(ctx context.Context) error {
 	}
 
 	if step.RetryPolicy.IntervalSecStr != "" {
-		v, err := eval.IntString(ctx, step.RetryPolicy.IntervalSecStr)
+		v, err := eval.IntString(ctx, step.RetryPolicy.IntervalSecStr, eval.WithOSExpansion())
 		if err != nil {
 			return fmt.Errorf("failed to substitute retry interval %q: %w", step.RetryPolicy.IntervalSecStr, err)
 		}

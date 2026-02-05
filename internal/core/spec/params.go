@@ -149,6 +149,7 @@ func evalParamValue(ctx BuildContext, raw string, accumulatedVars map[string]str
 		evalCtx = eval.WithEnvScope(evalCtx, ctx.envScope.scope)
 	}
 
+	evalOptions = append(evalOptions, eval.WithOSExpansion())
 	return eval.String(evalCtx, raw, evalOptions...)
 }
 
@@ -326,7 +327,7 @@ func parseStringParams(ctx BuildContext, input string) ([]paramPair, error) {
 					func(match string) string {
 						var err error
 						cmdStr := strings.Trim(match, "`")
-						cmdStr, err = eval.String(ctx.ctx, cmdStr)
+						cmdStr, err = eval.String(ctx.ctx, cmdStr, eval.WithOSExpansion())
 						if err != nil {
 							cmdErr = err
 							// Leave the original command if it fails

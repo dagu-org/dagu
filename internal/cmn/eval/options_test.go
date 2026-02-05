@@ -14,8 +14,16 @@ func TestOptions_Defaults(t *testing.T) {
 	assert.True(t, opts.ExpandEnv, "ExpandEnv should default to true")
 	assert.True(t, opts.ExpandShell, "ExpandShell should default to true")
 	assert.True(t, opts.Substitute, "Substitute should default to true")
+	assert.False(t, opts.ExpandOS, "ExpandOS should default to false")
 	assert.Nil(t, opts.Variables, "Variables should default to nil")
 	assert.Nil(t, opts.StepMap, "StepMap should default to nil")
+}
+
+func TestOptions_WithOSExpansion(t *testing.T) {
+	opts := NewOptions()
+	assert.False(t, opts.ExpandOS)
+	WithOSExpansion()(opts)
+	assert.True(t, opts.ExpandOS)
 }
 
 func TestWithoutExpandShell(t *testing.T) {
@@ -31,7 +39,7 @@ func TestWithoutExpandShell(t *testing.T) {
 		{
 			name:    "ShellExpansionEnabled",
 			input:   "${VAR:0:3}",
-			opts:    []Option{WithVariables(map[string]string{"VAR": "HelloWorld"})},
+			opts:    []Option{WithVariables(map[string]string{"VAR": "HelloWorld"}), WithOSExpansion()},
 			want:    "Hel",
 			wantErr: false,
 		},
@@ -52,7 +60,7 @@ func TestWithoutExpandShell(t *testing.T) {
 		{
 			name:    "EnvVarStillExpandsWithoutShellExpansion",
 			input:   "$TEST_VAR",
-			opts:    []Option{WithoutExpandShell()},
+			opts:    []Option{WithoutExpandShell(), WithOSExpansion()},
 			want:    "test_value_for_shell",
 			wantErr: false,
 		},

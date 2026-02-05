@@ -378,7 +378,7 @@ func (d *DAG) loadSingleDotEnvFile(ctx context.Context, resolver *fileutil.FileR
 		return
 	}
 
-	evaluatedPath, err := eval.String(ctx, filePath)
+	evaluatedPath, err := eval.String(ctx, filePath, eval.WithOSExpansion())
 	if err != nil {
 		logger.Warn(ctx, "Failed to evaluate filepath", tag.File(filePath), tag.Error(err))
 		return

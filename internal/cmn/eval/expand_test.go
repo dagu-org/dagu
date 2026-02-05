@@ -107,6 +107,7 @@ func TestExpandWithShellContext_ShellDisabledEnvEnabled(t *testing.T) {
 	opts := NewOptions()
 	opts.ExpandShell = false
 	opts.ExpandEnv = true
+	opts.ExpandOS = true
 	t.Setenv("MYVAR", "myval")
 
 	result, err := expandWithShellContext(ctx, "$MYVAR", opts)
@@ -137,6 +138,7 @@ func TestExpandWithShellContext_EmptyInput(t *testing.T) {
 func TestExpandWithShellContext_UnexpectedCommand(t *testing.T) {
 	ctx := context.Background()
 	opts := NewOptions()
+	opts.ExpandOS = true
 	t.Setenv("KEEP", "kept")
 
 	// $(command) triggers UnexpectedCommandError and falls back to ExpandEnvContext
@@ -145,9 +147,37 @@ func TestExpandWithShellContext_UnexpectedCommand(t *testing.T) {
 	assert.Contains(t, result, "kept")
 }
 
+// --- expandEnvScopeOnly tests ---
+
+func TestExpandEnvScopeOnly_WithScope(t *testing.T) {
+	scope := NewEnvScope(nil, false).
+		WithEntry("DAG_VAR", "dag_value", EnvSourceDAGEnv)
+	ctx := WithEnvScope(context.Background(), scope)
+
+	result := expandEnvScopeOnly(ctx, "Value is $DAG_VAR")
+	assert.Equal(t, "Value is dag_value", result)
+}
+
+func TestExpandEnvScopeOnly_NilScope(t *testing.T) {
+	ctx := context.Background()
+	result := expandEnvScopeOnly(ctx, "Value is $DAG_VAR")
+	assert.Equal(t, "Value is $DAG_VAR", result)
+}
+
+func TestExpandEnvScopeOnly_OSEntriesSkipped(t *testing.T) {
+	scope := NewEnvScope(nil, false).
+		WithEntry("OS_VAR", "os_value", EnvSourceOS).
+		WithEntry("DAG_VAR", "dag_value", EnvSourceDAGEnv)
+	ctx := WithEnvScope(context.Background(), scope)
+
+	result := expandEnvScopeOnly(ctx, "$OS_VAR and $DAG_VAR")
+	assert.Equal(t, "$OS_VAR and dag_value", result)
+}
+
 func TestExpandWithShellContext_NonUnexpectedCommandError(t *testing.T) {
 	ctx := context.Background()
 	opts := NewOptions()
+	opts.ExpandOS = true
 
 	// ${UNSET_VAR_ABC:?msg} triggers a non-UnexpectedCommand error from expand.Literal
 	_, err := expandWithShellContext(ctx, "${UNSET_VAR_ABC:?required}", opts)

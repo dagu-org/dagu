@@ -77,6 +77,7 @@ func TestExpandQuotedRefs_WithStepRef(t *testing.T) {
 func TestShellExpandPhase_FallbackOnError(t *testing.T) {
 	ctx := context.Background()
 	opts := NewOptions()
+	opts.ExpandOS = true
 	t.Setenv("TESTVAR", "value123")
 
 	result, err := shellExpandPhase(ctx, "$(echo hello) $TESTVAR", opts)
@@ -87,6 +88,7 @@ func TestShellExpandPhase_FallbackOnError(t *testing.T) {
 func TestShellExpandPhase_NonCommandError(t *testing.T) {
 	ctx := context.Background()
 	opts := NewOptions()
+	opts.ExpandOS = true
 
 	result, err := shellExpandPhase(ctx, "${UNSET_XYZ_99:?required}", opts)
 	require.NoError(t, err)
@@ -115,7 +117,7 @@ func TestString_ShellExpandFallback(t *testing.T) {
 	t.Setenv("FBVAR", "fbval")
 	ctx := context.Background()
 
-	result, err := String(ctx, "$(echo x) $FBVAR")
+	result, err := String(ctx, "$(echo x) $FBVAR", WithOSExpansion())
 	require.NoError(t, err)
 	assert.Contains(t, result, "fbval")
 }
@@ -146,6 +148,7 @@ func TestString(t *testing.T) {
 		{
 			name:    "EnvVarExpansion",
 			input:   "$TEST_ENV",
+			opts:    []Option{WithOSExpansion()},
 			want:    "test_value",
 			wantErr: false,
 		},
@@ -158,6 +161,7 @@ func TestString(t *testing.T) {
 		{
 			name:    "CombinedEnvAndCommand",
 			input:   "$TEST_ENV and `echo world`",
+			opts:    []Option{WithOSExpansion()},
 			want:    "test_value and world",
 			wantErr: false,
 		},
@@ -185,7 +189,7 @@ func TestString(t *testing.T) {
 		{
 			name:    "ShellSubstringExpansion",
 			input:   "prefix ${UID:0:5} suffix",
-			opts:    []Option{WithVariables(map[string]string{"UID": "HBL01_22OCT2025_0536"})},
+			opts:    []Option{WithVariables(map[string]string{"UID": "HBL01_22OCT2025_0536"}), WithOSExpansion()},
 			want:    "prefix HBL01 suffix",
 			wantErr: false,
 		},
@@ -337,6 +341,7 @@ func TestIntString(t *testing.T) {
 		{
 			name:    "EnvVarInteger",
 			input:   "$TEST_INT",
+			opts:    []Option{WithOSExpansion()},
 			want:    42,
 			wantErr: false,
 		},
@@ -534,6 +539,142 @@ func TestStringWithSteps(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+// --- ExpandOS tests ---
+
+func TestString_DefaultNoOSExpansion(t *testing.T) {
+	t.Setenv("HOME", "/home/testuser")
+	ctx := context.Background()
+
+	// Default: ExpandOS=false, so OS vars should be preserved
+	result, err := String(ctx, "${HOME}")
+	require.NoError(t, err)
+	assert.Equal(t, "${HOME}", result)
+}
+
+func TestString_WithOSExpansion(t *testing.T) {
+	t.Setenv("TEST_OS_VAR", "resolved_value")
+	ctx := context.Background()
+
+	result, err := String(ctx, "${TEST_OS_VAR}", WithOSExpansion())
+	require.NoError(t, err)
+	assert.Equal(t, "resolved_value", result)
+}
+
+func TestString_ExplicitVarsWorkWithoutOSExpansion(t *testing.T) {
+	ctx := context.Background()
+
+	result, err := String(ctx, "${MY_VAR}",
+		WithVariables(map[string]string{"MY_VAR": "hello"}))
+	require.NoError(t, err)
+	assert.Equal(t, "hello", result)
+}
+
+func TestString_ScopeNonOSEntriesWorkWithoutOSExpansion(t *testing.T) {
+	scope := NewEnvScope(nil, false).
+		WithEntry("SCOPE_VAR", "scope_value", EnvSourceDAGEnv)
+	ctx := WithEnvScope(context.Background(), scope)
+
+	result, err := String(ctx, "${SCOPE_VAR}")
+	require.NoError(t, err)
+	assert.Equal(t, "scope_value", result)
+}
+
+func TestString_ScopeOSEntriesSkippedWithoutOSExpansion(t *testing.T) {
+	scope := NewEnvScope(nil, false).
+		WithEntry("OS_VAR", "os_value", EnvSourceOS)
+	ctx := WithEnvScope(context.Background(), scope)
+
+	result, err := String(ctx, "${OS_VAR}")
+	require.NoError(t, err)
+	assert.Equal(t, "${OS_VAR}", result)
+}
+
+func TestString_OSEnvUsedWithOSExpansion(t *testing.T) {
+	t.Setenv("REAL_OS_VAR", "real_os_value")
+	ctx := context.Background()
+
+	// WithOSExpansion enables os.LookupEnv fallback
+	result, err := String(ctx, "${REAL_OS_VAR}", WithOSExpansion())
+	require.NoError(t, err)
+	assert.Equal(t, "real_os_value", result)
+}
+
+func TestString_POSIXDefaultPreserved(t *testing.T) {
+	ctx := context.Background()
+
+	// Without ExpandOS, POSIX syntax is preserved because shell expander is bypassed
+	result, err := String(ctx, "${UNDEFINED:-default}")
+	require.NoError(t, err)
+	assert.Equal(t, "${UNDEFINED:-default}", result)
+}
+
+func TestString_POSIXAssignPreserved(t *testing.T) {
+	ctx := context.Background()
+
+	result, err := String(ctx, "${VAR:=value}")
+	require.NoError(t, err)
+	assert.Equal(t, "${VAR:=value}", result)
+}
+
+func TestString_POSIXAlternatePreserved(t *testing.T) {
+	ctx := context.Background()
+
+	result, err := String(ctx, "${VAR:+alt}")
+	require.NoError(t, err)
+	assert.Equal(t, "${VAR:+alt}", result)
+}
+
+func TestString_POSIXSubstringPreserved(t *testing.T) {
+	ctx := context.Background()
+
+	result, err := String(ctx, "${VAR:0:5}")
+	require.NoError(t, err)
+	assert.Equal(t, "${VAR:0:5}", result)
+}
+
+func TestString_POSIXDefaultExpanded(t *testing.T) {
+	ctx := context.Background()
+
+	// With ExpandOS, shell expander parses POSIX syntax
+	result, err := String(ctx, "${UNDEFINED:-default}", WithOSExpansion())
+	require.NoError(t, err)
+	assert.Equal(t, "default", result)
+}
+
+func TestString_POSIXMixedWithKnownVars(t *testing.T) {
+	ctx := context.Background()
+
+	// Known var expanded, unknown POSIX syntax preserved
+	result, err := String(ctx, "${KNOWN} ${UNDEFINED:-default}",
+		WithVariables(map[string]string{"KNOWN": "value"}))
+	require.NoError(t, err)
+	assert.Equal(t, "value ${UNDEFINED:-default}", result)
+}
+
+func TestStringFields_DefaultNoOSExpansion(t *testing.T) {
+	t.Setenv("SF_VAR", "should_not_appear")
+
+	type S struct {
+		Field string
+	}
+	ctx := context.Background()
+	result, err := StringFields(ctx, S{Field: "${SF_VAR}"})
+	require.NoError(t, err)
+	assert.Equal(t, "${SF_VAR}", result.Field)
+}
+
+func TestObject_PreservesOSExpansion(t *testing.T) {
+	t.Setenv("OBJ_VAR", "obj_value")
+
+	type S struct {
+		Field string
+	}
+	ctx := context.Background()
+	result, err := Object(ctx, S{Field: "$OBJ_VAR"}, map[string]string{})
+	require.NoError(t, err)
+	assert.Equal(t, "obj_value", result.Field)
 }
 
 func TestString_MultipleVariablesWithStepMapOnLast(t *testing.T) {

@@ -220,7 +220,7 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 }
 
 func (a *API) evaluateAndNormalizeURL(ctx context.Context, baseURL string) string {
-	if evaluated, err := eval.String(ctx, baseURL); err != nil {
+	if evaluated, err := eval.String(ctx, baseURL, eval.WithOSExpansion()); err != nil {
 		logger.Warn(ctx, "Failed to evaluate API base URL",
 			tag.URL(baseURL),
 			tag.Error(err))
@@ -232,7 +232,7 @@ func (a *API) evaluateAndNormalizeURL(ctx context.Context, baseURL string) strin
 
 func (a *API) evaluateBasePath(ctx context.Context) string {
 	basePath := a.config.Server.BasePath
-	if evaluated, err := eval.String(ctx, basePath); err != nil {
+	if evaluated, err := eval.String(ctx, basePath, eval.WithOSExpansion()); err != nil {
 		logger.Warn(ctx, "Failed to evaluate server base path",
 			tag.Path(basePath),
 			tag.Error(err))

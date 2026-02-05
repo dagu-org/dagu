@@ -560,7 +560,7 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 
 func (srv *Server) evaluateBasePath(ctx context.Context) string {
 	basePath := srv.config.Server.BasePath
-	evaluated, err := eval.String(ctx, basePath)
+	evaluated, err := eval.String(ctx, basePath, eval.WithOSExpansion())
 	if err != nil {
 		logger.Warn(ctx, "Failed to evaluate server base path", tag.Path(basePath), tag.Error(err))
 		return basePath

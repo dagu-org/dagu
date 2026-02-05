@@ -102,7 +102,11 @@ func substitutePhase(ctx context.Context, input string, _ *Options) (string, err
 
 // shellExpandPhase performs shell-style variable expansion using mvdan.cc/sh.
 // Falls back to simple regex-based expansion on failure.
+// When ExpandOS is false, bypasses shell expansion entirely and uses scope-only expansion.
 func shellExpandPhase(ctx context.Context, input string, opts *Options) (string, error) {
+	if !opts.ExpandOS {
+		return expandEnvScopeOnly(ctx, input), nil
+	}
 	expanded, err := expandWithShellContext(ctx, input, opts)
 	if err != nil {
 		logger.Debug(ctx, "Shell expansion failed, falling back to ExpandEnvContext",
@@ -126,7 +130,11 @@ func evalStringValue(ctx context.Context, value string, opts *Options) (string, 
 		}
 	}
 	if opts.ExpandEnv {
-		value = ExpandEnvContext(ctx, value)
+		if opts.ExpandOS {
+			value = ExpandEnvContext(ctx, value)
+		} else {
+			value = expandEnvScopeOnly(ctx, value)
+		}
 	}
 	return value, nil
 }
