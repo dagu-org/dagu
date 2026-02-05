@@ -202,6 +202,12 @@ func (e *parallelExecutor) SetStderr(out io.Writer) {
 // DetermineNodeStatus implements NodeStatusDeterminer.
 func (e *parallelExecutor) DetermineNodeStatus() (core.NodeStatus, error) {
 	if len(e.results) == 0 {
+		if len(e.errors) > 0 {
+			return core.NodeFailed, fmt.Errorf(
+				"all %d sub DAG execution(s) failed; first error: %v",
+				len(e.runParamsList), e.errors[0],
+			)
+		}
 		return core.NodeFailed, fmt.Errorf("no results available for node status determination")
 	}
 
