@@ -27,8 +27,8 @@ func withDollarEscapes(ctx context.Context, input string) (context.Context, stri
 	}
 
 	spans := singleQuoteSpans(input)
-	singleToken := uniqueToken(input, "__DAGU_DOLLAR_ESC_SINGLE__", nil)
-	doubleToken := uniqueToken(input, "__DAGU_DOLLAR_ESC_DOUBLE__", []string{singleToken})
+	singleToken := uniqueToken(input, "__DAGU_DOLLAR_ESC_SINGLE__")
+	doubleToken := uniqueToken(input, "__DAGU_DOLLAR_ESC_DOUBLE__")
 
 	var b strings.Builder
 	b.Grow(len(input))
@@ -76,11 +76,6 @@ func unescapeDollars(ctx context.Context, input string) string {
 	return out
 }
 
-// unescapeDollarsInCommand restores $$ and $ in a backtick command before execution.
-func unescapeDollarsInCommand(ctx context.Context, cmd string) string {
-	return unescapeDollars(ctx, cmd)
-}
-
 type quoteSpan struct {
 	start int
 	end   int
@@ -105,21 +100,11 @@ func singleQuoteSpans(input string) []quoteSpan {
 	return spans
 }
 
-func uniqueToken(input, base string, disallow []string) string {
+func uniqueToken(input, base string) string {
 	for {
 		id := atomic.AddUint64(&dollarEscapeSeq, 1)
 		token := fmt.Sprintf("%s%d__", base, id)
-		if strings.Contains(input, token) {
-			continue
-		}
-		conflict := false
-		for _, d := range disallow {
-			if d != "" && strings.Contains(token, d) {
-				conflict = true
-				break
-			}
-		}
-		if !conflict {
+		if !strings.Contains(input, token) {
 			return token
 		}
 	}

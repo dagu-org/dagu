@@ -554,9 +554,7 @@ func isShellValueSet(shellValue any) bool {
 				if strings.TrimSpace(s) != "" {
 					return true
 				}
-				continue
-			}
-			if item != nil {
+			} else if item != nil {
 				return true
 			}
 		}

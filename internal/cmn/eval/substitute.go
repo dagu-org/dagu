@@ -74,7 +74,7 @@ func substituteCommandsWithContext(ctx context.Context, input string) (string, e
 				if cmdBuilder.Len() == 0 {
 					result.WriteString("``")
 				} else {
-					cmdStr := unescapeDollarsInCommand(ctx, cmdBuilder.String())
+					cmdStr := unescapeDollars(ctx, cmdBuilder.String())
 					output, err := runCommandWithContext(ctx, cmdStr)
 					if err != nil {
 						return "", err
