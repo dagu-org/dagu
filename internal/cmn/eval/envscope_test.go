@@ -1,10 +1,9 @@
-package cmdutil
+package eval
 
 import (
 	"context"
 	"fmt"
 	"os"
-	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -268,8 +267,6 @@ func TestEnvScope_ToSlice(t *testing.T) {
 			WithEntry("B", "2", EnvSourceDAGEnv)
 
 		result := scope.ToSlice()
-		sort.Strings(result)
-
 		assert.Len(t, result, 2)
 		assert.Contains(t, result, "A=1")
 		assert.Contains(t, result, "B=2")
@@ -738,4 +735,45 @@ func TestEnvScope_AllSecrets_EmptyAndNil(t *testing.T) {
 		assert.Len(t, secrets, 1)
 		assert.Equal(t, "parent_secret_val", secrets["PARENT_SECRET"])
 	})
+}
+
+func TestExpandWithLookup_SingleQuoted(t *testing.T) {
+	lookup := func(key string) (string, bool) {
+		if key == "FOO" {
+			return "bar", true
+		}
+		return "", false
+	}
+	result := expandWithLookup("'$FOO' stays", lookup)
+	assert.Equal(t, "'$FOO' stays", result)
+}
+
+func TestEnvScope_Debug_NoParent(t *testing.T) {
+	scope := NewEnvScope(nil, true)
+	debug := scope.Debug()
+	assert.Contains(t, debug, "EnvScope{")
+	assert.NotContains(t, debug, "parent: <yes>")
+}
+
+func TestEnvScope_Debug_NilScope(t *testing.T) {
+	var scope *EnvScope
+	debug := scope.Debug()
+	assert.Equal(t, "EnvScope{nil}", debug)
+}
+
+func TestCollectBySource_NilScope(t *testing.T) {
+	var scope *EnvScope
+	result := scope.AllBySource(EnvSourceDAGEnv)
+	assert.Empty(t, result)
+}
+
+func TestCollectBySource_WithParent(t *testing.T) {
+	parent := NewEnvScope(nil, false).
+		WithEntry("PKEY", "pval", EnvSourceDAGEnv)
+	child := NewEnvScope(parent, false).
+		WithEntry("CKEY", "cval", EnvSourceDAGEnv)
+
+	result := child.AllBySource(EnvSourceDAGEnv)
+	assert.Equal(t, "pval", result["PKEY"])
+	assert.Equal(t, "cval", result["CKEY"])
 }

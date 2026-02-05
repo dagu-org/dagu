@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
@@ -29,7 +30,7 @@ type Env struct {
 	// Unified scope chain for ALL environment variable lookups.
 	// This is THE single source of truth for $VAR and ${VAR} expansion.
 	// Layers (highest to lowest precedence): StepEnv > Outputs > Secrets > DAGEnv > OS
-	Scope *cmdutil.EnvScope
+	Scope *eval.EnvScope
 
 	// The current step being executed within this environment context
 	Step core.Step
@@ -38,7 +39,7 @@ type Env struct {
 	// allowing steps to reference outputs from other steps using expressions
 	// like ${stepID.stdout} or ${stepID.exitCode} in their configurations.
 	// NOTE: This is a SEPARATE system from env var expansion.
-	StepMap map[string]cmdutil.StepInfo
+	StepMap map[string]eval.StepInfo
 
 	// Resolved absolute path for the step's working directory, determined by:
 	// 1. Step's Dir field if specified (resolved to absolute path)
@@ -84,15 +85,15 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 	// and adds step-specific environment variables
 	scope := rCtx.EnvScope
 	if scope == nil {
-		scope = cmdutil.NewEnvScope(nil, true) // Fallback: OS layer only
+		scope = eval.NewEnvScope(nil, true) // Fallback: OS layer only
 	}
-	scope = scope.WithEntries(stepEnvs, cmdutil.EnvSourceStepEnv)
+	scope = scope.WithEntries(stepEnvs, eval.EnvSourceStepEnv)
 
 	return Env{
 		Context:    rCtx,
 		Scope:      scope,
 		Step:       step,
-		StepMap:    make(map[string]cmdutil.StepInfo),
+		StepMap:    make(map[string]eval.StepInfo),
 		WorkingDir: workingDir,
 	}
 }
@@ -233,7 +234,7 @@ func DAGShell(ctx context.Context) []string {
 
 	scope := rCtx.EnvScope
 	if scope == nil {
-		scope = cmdutil.NewEnvScope(nil, true) // Fallback: OS layer only
+		scope = eval.NewEnvScope(nil, true) // Fallback: OS layer only
 	}
 
 	shell, err := evalShellWithScope(ctx, scope, dag.Shell, dag.ShellArgs)
@@ -248,17 +249,17 @@ func DAGShell(ctx context.Context) []string {
 }
 
 // evalShellWithScope evaluates shell command and arguments using the given scope.
-func evalShellWithScope(ctx context.Context, scope *cmdutil.EnvScope, shell string, shellArgs []string) ([]string, error) {
-	ctx = cmdutil.WithEnvScope(ctx, scope)
+func evalShellWithScope(ctx context.Context, scope *eval.EnvScope, shell string, shellArgs []string) ([]string, error) {
+	ctx = eval.WithEnvScope(ctx, scope)
 
-	shellCmd, err := cmdutil.EvalString(ctx, shell)
+	shellCmd, err := eval.String(ctx, shell)
 	if err != nil {
 		return nil, fmt.Errorf("failed to evaluate shell: %w", err)
 	}
 
 	result := []string{shellCmd}
 	for _, arg := range shellArgs {
-		evaluated, err := cmdutil.EvalString(ctx, arg)
+		evaluated, err := eval.String(ctx, arg)
 		if err != nil {
 			logger.Error(ctx, "Failed to evaluate shell argument",
 				tag.String("arg", arg),
@@ -293,8 +294,8 @@ func (e Env) MailerConfig(ctx context.Context) (mailer.Config, error) {
 		return mailer.Config{}, nil
 	}
 	// Use Scope for variable resolution
-	ctx = cmdutil.WithEnvScope(ctx, e.Scope)
-	return cmdutil.EvalStringFields(ctx, mailer.Config{
+	ctx = eval.WithEnvScope(ctx, e.Scope)
+	return eval.StringFields(ctx, mailer.Config{
 		Host:     e.DAG.SMTP.Host,
 		Port:     e.DAG.SMTP.Port,
 		Username: e.DAG.SMTP.Username,
@@ -305,14 +306,14 @@ func (e Env) MailerConfig(ctx context.Context) (mailer.Config, error) {
 // EvalString evaluates the given string with the variables within the execution context.
 // Uses EnvScope as THE single source of truth for $VAR and ${VAR} expansion.
 // StepMap is used separately for ${step.stdout} style references.
-func (e Env) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
+func (e Env) EvalString(ctx context.Context, s string, opts ...eval.Option) (string, error) {
 	// Use EnvScope for variable resolution via context
-	ctx = cmdutil.WithEnvScope(ctx, e.Scope)
+	ctx = eval.WithEnvScope(ctx, e.Scope)
 
 	// StepMap for ${step.stdout} syntax (separate system from env vars)
-	opts = append(opts, cmdutil.WithStepMap(e.StepMap))
+	opts = append(opts, eval.WithStepMap(e.StepMap))
 
-	return cmdutil.EvalString(ctx, s, opts...)
+	return eval.String(ctx, s, opts...)
 }
 
 // EvalBool evaluates the given value with the variables within the execution context
@@ -340,7 +341,7 @@ func (e Env) WithEnvVars(envs ...string) Env {
 	for i := 0; i < len(envs); i += 2 {
 		newEnvs[envs[i]] = envs[i+1]
 	}
-	e.Scope = e.Scope.WithEntries(newEnvs, cmdutil.EnvSourceStepEnv)
+	e.Scope = e.Scope.WithEntries(newEnvs, eval.EnvSourceStepEnv)
 	return e
 }
 

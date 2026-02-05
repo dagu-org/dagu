@@ -249,6 +249,14 @@ No change needed. The DAG-level `env:` field evaluation already uses OS environm
 
 No change needed. Shell commands already use `WithoutExpandEnv()` and pass environment variables through the shell's native `cmd.Env` array. Shell handles `$VAR` at runtime.
 
+### 6a. Preserve Command-Without-Shell Behavior
+
+When a command step has no shell available (rare — only when the system default
+shell is unset), there is no target environment to resolve `$VAR` at runtime.
+The process receives literal `$HOME` in argv with no shell to expand it.
+In this case, the command executor explicitly opts into OS expansion so Dagu
+resolves variables on behalf of the missing shell.
+
 ### 7. Update SSH Executor
 
 **File: `internal/runtime/builtin/ssh/ssh.go`**
@@ -379,6 +387,7 @@ The updated non-shell executor table from RFC 006 becomes:
 | Executor Type | DAG-scoped vars expanded? | OS env expanded? |
 |---------------|--------------------------|------------------|
 | `command` (shell) | No (shell handles) | No (shell handles) |
+| `command` (no shell) | Yes | **Yes** (no change) |
 | `docker` | Yes | **No** (was: Yes) |
 | `http` | Yes | **No** (was: Yes) |
 | `ssh` | Yes | **No** (was: Yes) |

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -493,9 +493,9 @@ func TestS3ConfigVariableEvaluation(t *testing.T) {
 			"AWS_PROFILE":           "test-profile",
 		}
 
-		// Use cmdutil.EvalObject to evaluate the config
+		// Use eval.Object to evaluate the config
 		ctx := context.Background()
-		evaluated, err := cmdutil.EvalObject(ctx, cfg, vars)
+		evaluated, err := eval.Object(ctx, cfg, vars)
 		require.NoError(t, err)
 
 		// Verify all variables were expanded
@@ -525,7 +525,7 @@ func TestS3ConfigVariableEvaluation(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		evaluated, err := cmdutil.EvalObject(ctx, cfg, vars)
+		evaluated, err := eval.Object(ctx, cfg, vars)
 		require.NoError(t, err)
 
 		assert.Equal(t, "eu-west-1", evaluated.Region)
@@ -544,7 +544,7 @@ func TestS3ConfigVariableEvaluation(t *testing.T) {
 		vars := map[string]string{} // Empty vars
 
 		ctx := context.Background()
-		evaluated, err := cmdutil.EvalObject(ctx, cfg, vars)
+		evaluated, err := eval.Object(ctx, cfg, vars)
 		require.NoError(t, err)
 
 		// Undefined variables are preserved as-is
@@ -566,7 +566,7 @@ func TestS3ConfigVariableEvaluation(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		evaluated, err := cmdutil.EvalObject(ctx, cfg, vars)
+		evaluated, err := eval.Object(ctx, cfg, vars)
 		require.NoError(t, err)
 
 		assert.Equal(t, "us-east-1", evaluated.Region)

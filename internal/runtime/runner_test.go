@@ -933,22 +933,24 @@ func TestRunner(t *testing.T) {
 		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 
-	t.Run("RepeatPolicyRepeatsUntilEnvVarConditionMatchesExpected", func(t *testing.T) {
+	t.Run("RepeatPolicyRepeatsUntilFileConditionMatchesExpected", func(t *testing.T) {
 		r := setupRunner(t)
-		// This step will repeat until the environment variable TEST_REPEAT_MATCH_EXPR equals 'done'
-		err := os.Setenv("TEST_REPEAT_MATCH_EXPR", "notyet")
+		// This step will repeat until the file content equals 'done'
+		file := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_envvar_%s", uuid.Must(uuid.NewV7()).String()))
+		err := os.WriteFile(file, []byte("notyet"), 0644)
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			err := os.Unsetenv("TEST_REPEAT_MATCH_EXPR")
-			require.NoError(t, err)
+			if err := os.Remove(file); err != nil && !os.IsNotExist(err) {
+				t.Logf("cleanup: failed to remove %s: %v", file, err)
+			}
 		})
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand("echo $TEST_REPEAT_MATCH_EXPR"),
+				withCommand(fmt.Sprintf("cat %s", file)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: "$TEST_REPEAT_MATCH_EXPR",
+						Condition: fmt.Sprintf("`cat %s`", file),
 						Expected:  "done",
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
@@ -957,7 +959,7 @@ func TestRunner(t *testing.T) {
 		)
 		go func() {
 			time.Sleep(300 * time.Millisecond)
-			err := os.Setenv("TEST_REPEAT_MATCH_EXPR", "done")
+			err := os.WriteFile(file, []byte("done"), 0644)
 			require.NoError(t, err)
 		}()
 		result := plan.assertRun(t, core.Succeeded)

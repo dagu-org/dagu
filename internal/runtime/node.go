@@ -14,8 +14,8 @@ import (
 
 	"syscall"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/cmn/collections"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
@@ -433,9 +433,9 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 
 	// Evaluate script if set
 	if script := n.Step().Script; script != "" {
-		var opts []cmdutil.EvalOption
+		var opts []eval.Option
 		if n.Step().ExecutorConfig.IsCommand() {
-			opts = append(opts, cmdutil.OnlyReplaceVars())
+			opts = append(opts, eval.OnlyReplaceVars())
 		}
 		script, err := EvalString(ctx, script, opts...)
 		if err != nil {
@@ -520,7 +520,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 
 			// Evaluate CmdWithArgs if present
 			cmdWithArgs := cmdEntry.CmdWithArgs
-			if cmdWithArgs != "" && step.ExecutorConfig.IsCommand() {
+			if cmdWithArgs != "" {
 				evaluated, err := EvalString(ctx, cmdWithArgs, evalOptions...)
 				if err != nil {
 					return fmt.Errorf("failed to eval command with args: %w", err)
@@ -589,9 +589,9 @@ func (n *Node) SetupEnv(ctx context.Context) context.Context {
 	defer n.mu.RUnlock()
 	env := GetEnv(ctx)
 	env.Scope = env.Scope.WithEntry(
-		exec.EnvKeyDAGRunStepStdoutFile, n.GetStdout(), cmdutil.EnvSourceStepEnv,
+		exec.EnvKeyDAGRunStepStdoutFile, n.GetStdout(), eval.EnvSourceStepEnv,
 	).WithEntry(
-		exec.EnvKeyDAGRunStepStderrFile, n.GetStderr(), cmdutil.EnvSourceStepEnv,
+		exec.EnvKeyDAGRunStepStderrFile, n.GetStderr(), eval.EnvSourceStepEnv,
 	)
 	ctx = logger.WithValues(ctx, tag.Step(n.Name()))
 	return WithEnv(ctx, env)
@@ -821,7 +821,7 @@ func (n *Node) BuildSubDAGRuns(ctx context.Context, subDAG *core.SubDAG) ([]SubD
 				"ITEM": param,
 			}
 			params := subDAG.Params
-			evaluatedStepParams, err := EvalString(ctx, params, cmdutil.WithVariables(variables))
+			evaluatedStepParams, err := EvalString(ctx, params, eval.WithVariables(variables))
 			if err != nil {
 				return nil, fmt.Errorf("failed to eval step params: %w", err)
 			}
@@ -915,7 +915,7 @@ func (n *Node) setupRetryPolicy(ctx context.Context) error {
 	// Evaluate the configuration if it's configured as a string
 	// e.g. environment variable or command substitution
 	if step.RetryPolicy.LimitStr != "" {
-		v, err := cmdutil.EvalIntString(ctx, step.RetryPolicy.LimitStr)
+		v, err := eval.IntString(ctx, step.RetryPolicy.LimitStr, eval.WithOSExpansion())
 		if err != nil {
 			return fmt.Errorf("failed to substitute retry limit %q: %w", step.RetryPolicy.LimitStr, err)
 		}
@@ -924,7 +924,7 @@ func (n *Node) setupRetryPolicy(ctx context.Context) error {
 	}
 
 	if step.RetryPolicy.IntervalSecStr != "" {
-		v, err := cmdutil.EvalIntString(ctx, step.RetryPolicy.IntervalSecStr)
+		v, err := eval.IntString(ctx, step.RetryPolicy.IntervalSecStr, eval.WithOSExpansion())
 		if err != nil {
 			return fmt.Errorf("failed to substitute retry interval %q: %w", step.RetryPolicy.IntervalSecStr, err)
 		}

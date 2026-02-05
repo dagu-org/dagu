@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
@@ -201,8 +202,14 @@ func (e *sshExecutor) buildScript() string {
 	return fmt.Sprintf("__dagu_exec(){\n%s}\n__dagu_exec\n", body.String())
 }
 
-// buildCommandString constructs a simple command string from a CommandEntry.
+// buildCommandString constructs a command string from a CommandEntry.
+// For SSH, we prefer CmdWithArgs (the original command string) so that
+// variable references like $HOME are passed through to the remote shell
+// without being single-quoted.
 func (e *sshExecutor) buildCommandString(cmd core.CommandEntry) string {
+	if cmd.CmdWithArgs != "" {
+		return cmd.CmdWithArgs
+	}
 	if len(cmd.Args) == 0 {
 		return cmd.Command
 	}
@@ -232,13 +239,13 @@ func init() {
 		MultipleCommands: true,
 		Script:           true,
 		Shell:            true,
-		GetEvalOptions: func(ctx context.Context, step core.Step) []cmdutil.EvalOption {
+		GetEvalOptions: func(ctx context.Context, step core.Step) []eval.Option {
 			if hasShellConfigured(ctx, step) {
 				// Shell is configured, shell features (expansion, pipes, etc.) are supported
 				return nil
 			}
 			// No shell configured - skip shell expansion for remote execution
-			return []cmdutil.EvalOption{cmdutil.WithoutExpandShell()}
+			return []eval.Option{eval.WithoutExpandShell()}
 		},
 	}
 	executor.RegisterExecutor("ssh", NewSSHExecutor, nil, caps)

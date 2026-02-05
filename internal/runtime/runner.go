@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/cmn/signal"
@@ -639,7 +639,7 @@ func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) con
 
 	// Update scope with evaluated step env vars
 	if len(evaluatedEnvs) > 0 {
-		env.Scope = env.Scope.WithEntries(evaluatedEnvs, cmdutil.EnvSourceStepEnv)
+		env.Scope = env.Scope.WithEntries(evaluatedEnvs, eval.EnvSourceStepEnv)
 	}
 
 	return WithEnv(ctx, env)
@@ -655,14 +655,14 @@ func (r *Runner) setupEnvironEventHandler(ctx context.Context, plan *Plan, node 
 	env.Scope = env.Scope.WithEntry(
 		exec.EnvKeyDAGRunStatus,
 		r.Status(ctx, plan).String(),
-		cmdutil.EnvSourceStepEnv,
+		eval.EnvSourceStepEnv,
 	)
 
 	// Copy extra env vars from existing scope that aren't already set
 	if existingEnv.Scope != nil {
-		for k, v := range existingEnv.Scope.AllBySource(cmdutil.EnvSourceStepEnv) {
+		for k, v := range existingEnv.Scope.AllBySource(eval.EnvSourceStepEnv) {
 			if _, exists := env.Scope.Get(k); !exists {
-				env.Scope = env.Scope.WithEntry(k, v, cmdutil.EnvSourceStepEnv)
+				env.Scope = env.Scope.WithEntry(k, v, eval.EnvSourceStepEnv)
 			}
 		}
 	}

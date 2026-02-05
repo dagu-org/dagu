@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
@@ -20,7 +20,7 @@ type Context struct {
 	DAG                *core.DAG
 	DB                 Database
 	BaseEnv            *config.BaseEnv
-	EnvScope           *cmdutil.EnvScope // Unified environment scope - THE single source for all env vars
+	EnvScope           *eval.EnvScope // Unified environment scope - THE single source for all env vars
 	CoordinatorCli     Dispatcher
 	Shell              string           // Default shell for this DAG (from DAG.Shell)
 	LogEncodingCharset string           // Character encoding for log files (e.g., "utf-8", "shift_jis", "euc-jp")
@@ -229,10 +229,10 @@ func NewContext(
 
 	// Build EnvScope with proper source tracking and layering
 	// Precedence (highest to lowest): Secrets > DAG Env > Params > OS
-	scope := cmdutil.NewEnvScope(nil, true) // OS layer
-	scope = scope.WithEntries(envs, cmdutil.EnvSourceDAGEnv)
+	scope := eval.NewEnvScope(nil, true) // OS layer
+	scope = scope.WithEntries(envs, eval.EnvSourceDAGEnv)
 	if len(secretEnvs) > 0 {
-		scope = scope.WithEntries(secretEnvs, cmdutil.EnvSourceSecret)
+		scope = scope.WithEntries(secretEnvs, eval.EnvSourceSecret)
 	}
 
 	return context.WithValue(ctx, dagCtxKey{}, Context{

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/go-viper/mapstructure/v2"
 )
@@ -31,7 +31,7 @@ type BuildContext struct {
 // envScopeState holds mutable state that needs to be shared across transformers.
 // Using a pointer allows value-passed BuildContext to share state.
 type envScopeState struct {
-	scope    *cmdutil.EnvScope
+	scope    *eval.EnvScope
 	buildEnv map[string]string // Also store as map for WithVariables
 }
 

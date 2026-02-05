@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec/types"
 )
@@ -75,10 +75,10 @@ func evaluatePairs(ctx BuildContext, pairs []pair) (map[string]string, error) {
 
 	// Build base scope once outside the loop to reduce allocations.
 	// We chain new entries immutably as we evaluate each pair.
-	var scope *cmdutil.EnvScope
+	var scope *eval.EnvScope
 	var evalCtx context.Context
 	if !ctx.opts.Has(BuildFlagNoEval) {
-		scope = cmdutil.NewEnvScope(nil, true)
+		scope = eval.NewEnvScope(nil, true)
 		evalCtx = ctx.ctx
 		if evalCtx == nil {
 			evalCtx = context.Background()
@@ -90,16 +90,16 @@ func evaluatePairs(ctx BuildContext, pairs []pair) (map[string]string, error) {
 
 		if !ctx.opts.Has(BuildFlagNoEval) {
 			// Chain the new variable to scope for subsequent evaluations
-			scopeCtx := cmdutil.WithEnvScope(evalCtx, scope)
+			scopeCtx := eval.WithEnvScope(evalCtx, scope)
 
 			var err error
-			value, err = cmdutil.EvalString(scopeCtx, value, cmdutil.WithVariables(vars))
+			value, err = eval.String(scopeCtx, value, eval.WithVariables(vars), eval.WithOSExpansion())
 			if err != nil {
 				return nil, core.NewValidationError("env", p.val, fmt.Errorf("%w: %s", ErrInvalidEnvValue, p.val))
 			}
 
 			// Add evaluated value to scope for next iteration
-			scope = scope.WithEntry(p.key, value, cmdutil.EnvSourceDAGEnv)
+			scope = scope.WithEntry(p.key, value, eval.EnvSourceDAGEnv)
 		}
 
 		vars[p.key] = value
