@@ -246,7 +246,8 @@ func (e *SubDAGExecutor) Execute(ctx context.Context, runParams RunParams, workD
 
 	// Discard subprocess output (logging is handled internally by the sub-DAG)
 	cmd.Stdout = io.Discard
-	cmd.Stderr = io.Discard
+	stderrTail := NewTailWriter(io.Discard, 4096)
+	cmd.Stderr = stderrTail
 
 	// Ensure we clear command reference when done
 	defer func() {
@@ -284,7 +285,14 @@ func (e *SubDAGExecutor) Execute(ctx context.Context, runParams RunParams, workD
 	rCtx := exec1.GetContext(ctx)
 	result, resultErr := rCtx.DB.GetSubDAGRunStatus(ctx, runParams.RunID, rCtx.RootDAGRun)
 	if resultErr != nil {
-		return nil, fmt.Errorf("failed to find result for the sub dag-run %q: %w", runParams.RunID, resultErr)
+		errMsg := fmt.Sprintf("sub dag-run %q failed and wrote no status", runParams.RunID)
+		if waitErr != nil {
+			errMsg += fmt.Sprintf(" (process: %v)", waitErr)
+		}
+		if tail := strings.TrimSpace(stderrTail.Tail()); tail != "" {
+			errMsg += fmt.Sprintf("; stderr: %s", tail)
+		}
+		return nil, fmt.Errorf("%s: %w", errMsg, resultErr)
 	}
 
 	if result.Status.IsSuccess() {

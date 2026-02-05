@@ -240,11 +240,14 @@ func (n *Node) Execute(ctx context.Context) error {
 		return err
 	}
 
-	if err := n.determineNodeStatus(cmd); err != nil {
-		return err
-	}
+	statusErr := n.determineNodeStatus(cmd)
 
-	return n.Error()
+	// Prefer the execution error over the status determination error,
+	// since the execution error describes the root cause.
+	if execErr := n.Error(); execErr != nil {
+		return execErr
+	}
+	return statusErr
 }
 
 // setupContextWithTimeout configures the execution context with step-level timeout if specified.
