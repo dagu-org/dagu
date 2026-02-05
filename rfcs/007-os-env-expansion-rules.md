@@ -1,7 +1,7 @@
 ---
 id: "007"
 title: "OS Environment Variable Expansion Rules"
-status: draft
+status: implemented
 amends: "006"
 ---
 
