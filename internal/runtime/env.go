@@ -311,7 +311,7 @@ func (e Env) EvalString(ctx context.Context, s string, opts ...eval.Option) (str
 	ctx = eval.WithEnvScope(ctx, e.Scope)
 
 	// StepMap for ${step.stdout} syntax (separate system from env vars)
-	opts = append(opts, eval.WithStepMap(e.StepMap), eval.WithOSExpansion())
+	opts = append(opts, eval.WithStepMap(e.StepMap))
 
 	return eval.String(ctx, s, opts...)
 }

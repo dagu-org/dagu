@@ -440,10 +440,15 @@ func TestNodeBuildSubDAGRuns(t *testing.T) {
 		{
 			name: "ParallelWithNoItems",
 			parallel: &core.ParallelConfig{
-				Variable: "${NONEXISTENT}",
+				Variable: "${EMPTY_VAR}",
 			},
 			subDAG: &core.SubDAG{
 				Name: "sub-dag",
+			},
+			setupEnv: func(ctx context.Context) context.Context {
+				env := runtime.GetEnv(ctx)
+				env.Scope = env.Scope.WithEntry("EMPTY_VAR", "", eval.EnvSourceStepEnv)
+				return runtime.WithEnv(ctx, env)
 			},
 			expectError:   true,
 			errorContains: "requires at least one item",

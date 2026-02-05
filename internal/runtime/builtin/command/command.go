@@ -337,7 +337,8 @@ func init() {
 				// Shell will handle env expansion
 				return []eval.Option{eval.WithoutExpandEnv()}
 			}
-			return nil
+			// No shell — Dagu must expand OS variables since no shell will do it.
+			return []eval.Option{eval.WithOSExpansion()}
 		},
 	}
 	executor.RegisterExecutor("", NewCommand, validateCommandStep, caps)

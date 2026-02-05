@@ -60,7 +60,7 @@ func TestEvalString(t *testing.T) {
 		{
 			name:     "NonExistentVariable",
 			input:    "${NON_EXISTENT}",
-			expected: "",
+			expected: "${NON_EXISTENT}",
 		},
 	}
 

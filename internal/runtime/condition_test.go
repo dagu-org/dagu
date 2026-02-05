@@ -3,9 +3,9 @@ package runtime_test
 import (
 	"context"
 	"errors"
-	"os"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/stretchr/testify/require"
@@ -150,15 +150,13 @@ func TestEvalConditions(t *testing.T) {
 		},
 	}
 
-	// Set environment variable for testing
-	_ = os.Setenv("TEST_CONDITION", "100")
-	t.Cleanup(func() {
-		_ = os.Unsetenv("TEST_CONDITION")
-	})
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := newTestContext()
+			// Add TEST_CONDITION to the env scope (not OS env)
+			env := runtime.GetEnv(ctx)
+			env.Scope = env.Scope.WithEntry("TEST_CONDITION", "100", eval.EnvSourceDAGEnv)
+			ctx = runtime.WithEnv(ctx, env)
 			err := runtime.EvalConditions(ctx, []string{"sh"}, tt.conditions)
 
 			if tt.wantErr {
