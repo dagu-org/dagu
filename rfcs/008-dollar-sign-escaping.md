@@ -10,9 +10,9 @@ status: draft
 
 Add a single escape mechanism to the v1 variable expansion system so that users can include literal `$` characters in DAG field values:
 
-1. **`$$` → literal `$`**: A doubled dollar sign produces a single literal `$` in the output.
+1. **`\$` → literal `$`**: A backslash immediately before `$` produces a single literal `$` in the output.
 
-This escape is applied only when Dagu is the final evaluator (non-shell executors/config fields). Shell-executed commands are left untouched so shell semantics (including `$$` PID) remain intact.
+This escape is applied only when Dagu is the final evaluator (non-shell executors/config fields). Shell-executed commands are left untouched so shell semantics remain intact.
 
 This is a targeted fix for issue [#1628](https://github.com/dagu-org/dagu/issues/1628).
 
@@ -62,8 +62,8 @@ Users have tried every reasonable escape convention — none produce a clean lit
 
 | Attempt | Input | Expected | Actual |
 |---------|-------|----------|--------|
-| Backslash | `\$HOME` | `$HOME` | `\$HOME` (backslash preserved, `$HOME` still expanded) |
-| Double dollar | `$$HOME` | `$HOME` | `$$HOME` (no `$$` support) or `$<value>` |
+| Backslash | `\$HOME` | `$HOME` | `\` + expanded value |
+| Double dollar | `$$HOME` | `$HOME` | `$$HOME` (no escape) or `$<value>` |
 | Single quotes | `'$HOME'` | `'$HOME'` | `'$HOME'` (works, but quotes remain) |
 | Double backslash | `\\$HOME` | `\$HOME` | `\\` + expanded value |
 | Backtick wrap | `` `echo '$HOME'` `` | `$HOME` | Runs shell command, fragile |
@@ -94,21 +94,21 @@ The `extractVarKey` function (`resolve.go:115-123`) handles single-quoted matche
 
 ## Proposal
 
-### Fix 1: `$$` Produces Literal `$`
+### Fix 1: `\$` Produces Literal `$`
 
-A doubled `$$` is converted to a single `$` before variable expansion runs. This is a pre-processing step inserted at the beginning of the pipeline, before any regex matching occurs.
+A backslash immediately preceding `$` is converted to a single literal `$` before variable expansion runs. This is a pre-processing step inserted at the beginning of the pipeline, before any regex matching occurs.
 
-**Convention alignment:** This matches the escape convention used by Make, Terraform (`$${}`), and GitHub Actions (`$${{ }}`). It is the most intuitive escape for users already familiar with shell-adjacent tools.
+**Convention alignment:** This matches standard shell escaping and avoids introducing a new escape syntax.
 
 **Examples:**
 
 | Input | Output |
 |-------|--------|
-| `$$HOME` | `$HOME` (literal, not expanded) |
-| `$${userId}` | `${userId}` (literal braces preserved) |
-| `Price: $$9.99` | `Price: $9.99` |
-| `p@ss$$word` | `p@ss$word` |
-| `$$$$` | `$$` (each pair collapses) |
+| `\$HOME` | `$HOME` (literal, not expanded) |
+| `\${userId}` | `${userId}` (literal braces preserved) |
+| `Price: \$9.99` | `Price: $9.99` |
+| `p@ss\$word` | `p@ss$word` |
+| `\$\$` | `$$` (escape both dollars) |
 | `$HOME` | value of HOME (unchanged behavior) |
 
 ### Single Quotes (No Change)
@@ -117,23 +117,18 @@ Single-quoted variables like `'$VAR'` and `'${VAR}'` continue to suppress Dagu e
 
 ---
 
-## Behavior Table
+## Behavior (Proposed)
 
-Complete before/after for all escape patterns from issue #1628:
+| Input | Output | Notes |
+|-------|--------|-------|
+| `$HOME` | Expanded to env value | No change |
+| `\$HOME` | `$HOME` | Backslash escape |
+| `\${VAR}` | `${VAR}` | Backslash escape |
+| `\\$HOME` | `\\` + expanded value | Even backslashes do not escape `$` |
+| `'$HOME'` | `'$HOME'` (with quotes) | No change |
+| `\$\$` | `$$` | Escape both dollars |
 
-| Input | Before (current) | After (proposed) | Mechanism |
-|-------|------------------|-------------------|-----------|
-| `$HOME` | Expanded to env value | Expanded to env value | No change |
-| `$$HOME` | `$$HOME` or broken | `$HOME` (literal) | `$$` escape |
-| `\$HOME` | `\` + expanded value | `\` + expanded value | No change (not an escape) |
-| `'$HOME'` | `'$HOME'` (with quotes) | `'$HOME'` (with quotes) | No change |
-| `'${VAR}'` | `'${VAR}'` (with quotes) | `'${VAR}'` (with quotes) | No change |
-| `$$9.99` | Broken | `$9.99` | `$$` escape |
-| `$${query}` | Broken | `${query}` | `$$` escape |
-| `p@ss$$word` | Broken | `p@ss$word` | `$$` escape |
-| `$$$$` | Broken | `$$` | Double `$$` collapse |
-
-\* `$$` escape is applied only in non-shell evaluation contexts. Shell-executed commands are left unchanged.
+`\$` escape is applied only in non-shell evaluation contexts. Shell-executed commands are left unchanged.
 
 ---
 
@@ -146,16 +141,14 @@ RFC 005 proposes the `${{ context.VAR }}` syntax which eliminates `$VAR`/`${VAR}
 This RFC (008) is complementary:
 - **RFC 008** fixes the immediate inability to escape `$` in v1 syntax.
 - **RFC 005** makes escaping unnecessary long-term by using a distinct syntax.
-- The `$$` convention aligns with RFC 005's own escape mechanism: `$${{ expr }}` produces a literal `${{ expr }}`.
-
-When RFC 005 ships and v1 syntax is deprecated, the `$$` escape becomes relevant only for edge cases where a literal `$` is needed in a non-shell context (e.g., `$$9.99` in an HTTP body). The mechanism remains useful.
+- `\$` remains useful for literal `$` in non-shell contexts (e.g., `\$9.99` in an HTTP body).
 
 ### RFC 006 — Variable Expansion Syntax v1 (implemented)
 
 RFC 006 documents the current v1 behavior including the single-quote escape mechanism. This RFC amends RFC 006's "Escape Mechanisms" section:
 
 - **Before (RFC 006):** Single-quoted variables are "preserved literally and not expanded".
-- **After (this RFC):** Single-quoted variables are still preserved literally, and `$$` is available as an additional escape in non-shell contexts.
+- **After (this RFC):** Single-quoted variables are still preserved literally, and `\$` is available as an additional escape in non-shell contexts.
 
 ### RFC 007 — OS Environment Variable Expansion Rules (implemented)
 
@@ -165,32 +158,31 @@ RFC 007 restricts which variables are expanded for non-shell executors. This RFC
 
 ## Testing Strategy
 
-### `$$` Escape Tests
+### `\$` Escape Tests
 
 ```go
-// Basic: $$ → $
-{"input": "$$HOME",       "expected": "$HOME"}
-{"input": "Price: $$9.99", "expected": "Price: $9.99"}
-{"input": "p@ss$$word",   "expected": "p@ss$word"}
+// Basic: \$ → $
+{"input": "\\$HOME",       "expected": "$HOME"}
+{"input": "Price: \\${PRICE}", "expected": "Price: ${PRICE}"}
+{"input": "Price: \\$9.99", "expected": "Price: $9.99"}
+{"input": "p@ss\\$word",   "expected": "p@ss$word"}
 
-// Double escape: $$$$ → $$
-{"input": "$$$$",         "expected": "$$"}
+// Escape both dollars: \$\$ → $$
+{"input": "\\$\\$", "expected": "$$"}
 
-// Mixed: $$ literal + real expansion
-{"input": "$$literal and ${REAL}", "expected": "$literal and <value>"}
+// Mixed: literal + real expansion
+{"input": "\\$literal and ${REAL}", "expected": "$literal and <value>"}
 
-// $$ inside braces
-{"input": "$${not_a_var}", "expected": "${not_a_var}"}
-
-// $$ does not interfere with valid variables
-{"input": "$HOME",        "expected": "<value of HOME>"}
-{"input": "${HOME}",      "expected": "<value of HOME>"}
+// \$ does not interfere with valid variables
+{"input": "$HOME",   "expected": "<value of HOME>"}
+{"input": "${HOME}", "expected": "<value of HOME>"}
 ```
 
 ### Edge Cases to Verify
 
-- `$$` at end of string: `"cost$$"` → `"cost$"`
-- `$$` adjacent to real variable: `"$$$HOME"` → `$` + value of HOME
-- `$$` in command substitution context: `` `echo $$` `` — should produce literal `$` before backtick evaluation
-- `$$` in single-quoted context: `'$$HOME'` — unchanged (quotes preserved).
+- `\$` at end of string: `"cost\\$"` → `"cost$"`
+- Odd vs even backslashes: `"\\\\$HOME"` → `"\\" + <value>`; `"\\\\\\$HOME"` → `"\\$HOME"`
+- `\$` adjacent to real variable: `"\\$HOME and $HOME"` → `"$HOME and <value>"`
+- `\$` in command substitution context: `` `echo \\$` `` — should produce literal `$` before backtick evaluation
+- `\$` in single-quoted context: `"'\\$HOME'"` — unchanged (quotes preserved)
 - Empty string and strings with no `$`: unchanged

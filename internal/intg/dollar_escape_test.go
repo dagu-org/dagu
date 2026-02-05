@@ -15,13 +15,13 @@ import (
 func TestDollarEscape(t *testing.T) {
 	t.Parallel()
 
-	t.Run("DoubleDollarLiteralInJQ", func(t *testing.T) {
+	t.Run("BackslashDollarLiteralInJQ", func(t *testing.T) {
 		t.Parallel()
 
 		th := test.Setup(t)
 		dag := th.DAG(t, `
 env:
-  - PRICE: "$$9.99"
+  - PRICE: '\$9.99'
 steps:
   - name: jq-price
     type: jq
@@ -65,12 +65,12 @@ steps:
 		})
 	})
 
-	t.Run("DoubleDollarLiteralInHTTPBody", func(t *testing.T) {
+	t.Run("BackslashDollarLiteralInHTTPBody", func(t *testing.T) {
 		t.Parallel()
 
 		bodyCh := make(chan string, 1)
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			defer r.Body.Close()
+			defer func() { _ = r.Body.Close() }()
 			body, err := io.ReadAll(r.Body)
 			if err == nil {
 				bodyCh <- string(body)
@@ -88,7 +88,7 @@ steps:
     config:
       headers:
         Content-Type: application/json
-      body: '{"price":"$$9.99"}'
+      body: '{"price":"\$9.99"}'
       silent: true
     command: POST %s/price
 `, server.URL))

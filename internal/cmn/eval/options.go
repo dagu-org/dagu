@@ -6,7 +6,7 @@ type Options struct {
 	ExpandShell  bool // Enable shell-based variable expansion (e.g., ${VAR:0:3})
 	ExpandOS     bool // Enable os.LookupEnv fallback and OS-sourced scope entries
 	Substitute   bool // Enable backtick command substitution
-	EscapeDollar bool // Enable $$ → $ escape before variable expansion
+	EscapeDollar bool // Enable \$ → $ escape before variable expansion
 
 	Variables []map[string]string // Ordered variable maps for expansion
 	StepMap   map[string]StepInfo // Step info map for step reference expansion
@@ -61,7 +61,7 @@ func WithoutSubstitute() Option {
 	}
 }
 
-// WithoutDollarEscape preserves $$ sequences for downstream executors.
+// WithoutDollarEscape preserves backslash-dollar sequences for downstream executors.
 func WithoutDollarEscape() Option {
 	return func(opts *Options) {
 		opts.EscapeDollar = false
