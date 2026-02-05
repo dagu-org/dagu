@@ -567,7 +567,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			ShellArgs:     a.dag.SSH.ShellArgs,
 			Timeout:       sshTimeout,
 			Bastion:       bastionCfg,
-		}, runtime.AllEnvsMap(ctx))
+		}, runtime.GetEnv(ctx).UserEnvsMap())
 		if err != nil {
 			initErr = fmt.Errorf("failed to evaluate ssh config: %w", err)
 			return initErr
@@ -1202,7 +1202,7 @@ func (a *Agent) buildSecretBaseDirs(envScope *eval.EnvScope) []string {
 // environment variables and secrets. Results are stored in agent fields to
 // avoid mutating the original DAG struct.
 func (a *Agent) evaluateMailConfigs(ctx context.Context) error {
-	vars := runtime.AllEnvsMap(ctx)
+	vars := runtime.GetEnv(ctx).UserEnvsMap()
 
 	// Evaluate SMTP config if defined
 	if a.dag.SMTP != nil {
@@ -1251,7 +1251,7 @@ func (a *Agent) evaluateRegistryAuths(ctx context.Context) error {
 		return nil
 	}
 
-	vars := runtime.AllEnvsMap(ctx)
+	vars := runtime.GetEnv(ctx).UserEnvsMap()
 	a.evaluatedRegistryAuths = make(map[string]*core.AuthConfig)
 
 	for registry, auth := range a.dag.RegistryAuths {
@@ -1300,7 +1300,7 @@ func (a *Agent) evaluateS3Config(ctx context.Context) error {
 		return nil
 	}
 
-	vars := runtime.AllEnvsMap(ctx)
+	vars := runtime.GetEnv(ctx).UserEnvsMap()
 	evaluated, err := eval.Object(ctx, *a.dag.S3, vars)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate s3 config: %w", err)
