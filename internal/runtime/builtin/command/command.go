@@ -333,7 +333,8 @@ func init() {
 		Shell:            true,
 		GetEvalOptions: func(ctx context.Context, step core.Step) []eval.Option {
 			env := runtime.GetEnv(ctx)
-			if len(env.Shell(ctx)) > 0 {
+			shell := env.Shell(ctx)
+			if len(shell) > 0 && shell[0] != "direct" {
 				// Shell will handle env expansion
 				return []eval.Option{
 					eval.WithoutExpandEnv(),
