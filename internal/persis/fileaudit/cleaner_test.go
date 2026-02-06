@@ -106,15 +106,15 @@ func TestPurgeExpiredFiles_IgnoresNonJsonl(t *testing.T) {
 	assert.True(t, fileExists(t, dir, "2020-01-01.log"),
 		"non-jsonl file should not be deleted")
 	assert.True(t, fileExists(t, dir, "notes.jsonl"),
-		"jsonl file with unparseable date name should not be deleted")
+		"jsonl file with unparsable date name should not be deleted")
 	assert.True(t, fileExists(t, dir, "README.md"),
 		"non-jsonl file should not be deleted")
 }
 
-func TestPurgeExpiredFiles_SkipsUnparseableNames(t *testing.T) {
+func TestPurgeExpiredFiles_SkipsUnparsableNames(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create .jsonl files with unparseable date names
+	// Create .jsonl files with unparsable date names
 	createTestFile(t, dir, "not-a-date.jsonl")
 	createTestFile(t, dir, "2020-13-01.jsonl") // invalid month
 	createTestFile(t, dir, "2020-01-32.jsonl") // invalid day
@@ -124,7 +124,7 @@ func TestPurgeExpiredFiles_SkipsUnparseableNames(t *testing.T) {
 	c := newTestCleaner(dir, 7)
 	c.purgeExpiredFiles()
 
-	// All files should still exist — unparseable names are skipped
+	// All files should still exist — unparsable names are skipped
 	assert.True(t, fileExists(t, dir, "not-a-date.jsonl"))
 	assert.True(t, fileExists(t, dir, "2020-13-01.jsonl"))
 	assert.True(t, fileExists(t, dir, "2020-01-32.jsonl"))

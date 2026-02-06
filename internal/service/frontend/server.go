@@ -843,11 +843,7 @@ func (srv *Server) setupGracefulShutdown(ctx context.Context) {
 		logger.Info(ctx, "Received shutdown signal", slog.String("signal", sig.String()))
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	srv.httpServer.SetKeepAlivesEnabled(false)
-	if err := srv.httpServer.Shutdown(shutdownCtx); err != nil {
+	if err := srv.Shutdown(ctx); err != nil {
 		logger.Error(ctx, "Failed to shutdown server gracefully", tag.Error(err))
 	}
 }

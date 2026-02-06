@@ -54,7 +54,8 @@ func (c *cleaner) stop() {
 }
 
 // purgeExpiredFiles removes audit log files whose date is strictly before
-// the current time minus retentionDays (UTC).
+// the cutoff (today minus retentionDays, UTC). For example, retentionDays=7
+// keeps today plus the 7 previous days (8 calendar days of files).
 func (c *cleaner) purgeExpiredFiles() {
 	if c.retentionDays <= 0 {
 		return
