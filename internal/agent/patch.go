@@ -78,6 +78,10 @@ func NewPatchTool(dagsDir string) *AgentTool {
 		Run: func(ctx ToolContext, input json.RawMessage) ToolOut {
 			return patchRun(ctx, input, dagsDir)
 		},
+		Audit: &AuditInfo{
+			Action:          "file_patch",
+			DetailExtractor: ExtractFields("path", "operation"),
+		},
 	}
 }
 

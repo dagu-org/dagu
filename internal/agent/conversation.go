@@ -30,6 +30,9 @@ type ConversationManager struct {
 	sequenceID      int64
 	environment     EnvironmentInfo
 	safeMode        bool
+	hooks           *Hooks
+	username        string
+	ipAddress       string
 	onWorkingChange func(id string, working bool)
 	onMessage       func(ctx context.Context, msg Message) error
 	pendingPrompts  map[string]chan UserPromptResponse
@@ -48,6 +51,9 @@ type ConversationManagerConfig struct {
 	SequenceID      int64
 	Environment     EnvironmentInfo
 	SafeMode        bool
+	Hooks           *Hooks
+	Username        string
+	IPAddress       string
 }
 
 // NewConversationManager creates a new ConversationManager.
@@ -77,6 +83,9 @@ func NewConversationManager(cfg ConversationManagerConfig) *ConversationManager 
 		sequenceID:      cfg.SequenceID,
 		environment:     cfg.Environment,
 		safeMode:        cfg.SafeMode,
+		hooks:           cfg.Hooks,
+		username:        cfg.Username,
+		ipAddress:       cfg.IPAddress,
 	}
 }
 
@@ -326,6 +335,10 @@ func (cm *ConversationManager) createLoop(provider llm.Provider, model string, h
 		EmitUserPrompt:   cm.createEmitUserPromptFunc(),
 		WaitUserResponse: cm.createWaitUserResponseFunc(),
 		SafeMode:         safeMode,
+		Hooks:            cm.hooks,
+		UserID:           cm.userID,
+		Username:         cm.username,
+		IPAddress:        cm.ipAddress,
 	})
 }
 

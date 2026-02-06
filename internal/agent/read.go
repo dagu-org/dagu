@@ -50,6 +50,10 @@ func NewReadTool() *AgentTool {
 			},
 		},
 		Run: readRun,
+		Audit: &AuditInfo{
+			Action:          "file_read",
+			DetailExtractor: ExtractFields("path"),
+		},
 	}
 }
 

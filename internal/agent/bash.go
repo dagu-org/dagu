@@ -56,6 +56,10 @@ func NewBashTool() *AgentTool {
 			},
 		},
 		Run: bashRun,
+		Audit: &AuditInfo{
+			Action:          "bash_exec",
+			DetailExtractor: ExtractFields("command"),
+		},
 	}
 }
 

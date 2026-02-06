@@ -2,6 +2,8 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -351,6 +353,135 @@ func TestLoop_ExecuteTool(t *testing.T) {
 		})
 
 		assert.False(t, result.IsError)
+	})
+
+	t.Run("invokes after hook", func(t *testing.T) {
+		t.Parallel()
+
+		hooks := NewHooks()
+		var capturedInfo ToolExecInfo
+		var capturedResult ToolOut
+
+		hooks.OnAfterToolExec(func(_ context.Context, info ToolExecInfo, result ToolOut) {
+			capturedInfo = info
+			capturedResult = result
+		})
+
+		loop := NewLoop(LoopConfig{
+			Provider:       &mockLLMProvider{},
+			Tools:          CreateTools(""),
+			ConversationID: "conv-hook",
+			UserID:         "user-1",
+			Username:       "alice",
+			IPAddress:      "10.0.0.1",
+			Hooks:          hooks,
+		})
+
+		result := loop.executeTool(context.Background(), llm.ToolCall{
+			ID:   "test-id",
+			Type: "function",
+			Function: llm.ToolCallFunction{
+				Name:      "think",
+				Arguments: `{"thought": "testing hooks"}`,
+			},
+		})
+
+		assert.False(t, result.IsError)
+		assert.Equal(t, "think", capturedInfo.ToolName)
+		assert.Equal(t, "conv-hook", capturedInfo.ConversationID)
+		assert.Equal(t, "user-1", capturedInfo.UserID)
+		assert.Equal(t, "alice", capturedInfo.Username)
+		assert.Equal(t, "10.0.0.1", capturedInfo.IPAddress)
+		assert.Equal(t, result.Content, capturedResult.Content)
+		// think tool has nil Audit (not audited)
+		assert.Nil(t, capturedInfo.Audit)
+	})
+
+	t.Run("populates Audit from tool", func(t *testing.T) {
+		t.Parallel()
+
+		hooks := NewHooks()
+		var capturedInfo ToolExecInfo
+
+		hooks.OnAfterToolExec(func(_ context.Context, info ToolExecInfo, _ ToolOut) {
+			capturedInfo = info
+		})
+
+		auditInfo := &AuditInfo{
+			Action: "test_action",
+			DetailExtractor: func(input json.RawMessage) map[string]any {
+				return map[string]any{"raw": string(input)}
+			},
+		}
+
+		customTool := &AgentTool{
+			Tool: llm.Tool{
+				Type: "function",
+				Function: llm.ToolFunction{
+					Name:        "audited_tool",
+					Description: "A tool with audit info",
+					Parameters:  map[string]any{"type": "object", "properties": map[string]any{}},
+				},
+			},
+			Run: func(_ ToolContext, _ json.RawMessage) ToolOut {
+				return ToolOut{Content: "ok"}
+			},
+			Audit: auditInfo,
+		}
+
+		loop := NewLoop(LoopConfig{
+			Provider: &mockLLMProvider{},
+			Tools:    []*AgentTool{customTool},
+			Hooks:    hooks,
+		})
+
+		loop.executeTool(context.Background(), llm.ToolCall{
+			ID:   "test-id",
+			Type: "function",
+			Function: llm.ToolCallFunction{
+				Name:      "audited_tool",
+				Arguments: `{"key":"val"}`,
+			},
+		})
+
+		require.NotNil(t, capturedInfo.Audit)
+		assert.Equal(t, "test_action", capturedInfo.Audit.Action)
+		details := capturedInfo.Audit.DetailExtractor(capturedInfo.Input)
+		assert.Equal(t, `{"key":"val"}`, details["raw"])
+	})
+
+	t.Run("before hook blocks execution", func(t *testing.T) {
+		t.Parallel()
+
+		hooks := NewHooks()
+		hooks.OnBeforeToolExec(func(_ context.Context, _ ToolExecInfo) error {
+			return errors.New("forbidden")
+		})
+
+		toolCalled := false
+		hooks.OnAfterToolExec(func(_ context.Context, _ ToolExecInfo, _ ToolOut) {
+			toolCalled = true
+		})
+
+		loop := NewLoop(LoopConfig{
+			Provider: &mockLLMProvider{},
+			Tools:    CreateTools(""),
+			Hooks:    hooks,
+		})
+
+		result := loop.executeTool(context.Background(), llm.ToolCall{
+			ID:   "test-id",
+			Type: "function",
+			Function: llm.ToolCallFunction{
+				Name:      "think",
+				Arguments: `{"thought": "should not run"}`,
+			},
+		})
+
+		assert.True(t, result.IsError)
+		assert.Contains(t, result.Content, "Blocked by policy")
+		assert.Contains(t, result.Content, "forbidden")
+		assert.False(t, toolCalled, "after hook should not be called when before hook blocks")
 	})
 }
 

@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"mime"
@@ -132,7 +133,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	var agentAPI *agent.API
 	if agentConfigStore != nil {
-		agentAPI, err = initAgentAPI(ctx, agentConfigStore, &cfg.Paths, dr)
+		agentAPI, err = initAgentAPI(ctx, agentConfigStore, &cfg.Paths, dr, auditSvc)
 		if err != nil {
 			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
 		}
@@ -373,10 +374,15 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 
 // initAgentAPI creates and returns an agent API.
 // The API uses the config store to check enabled status and get provider dynamically.
-func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, paths *config.PathsConfig, dagStore exec.DAGStore) (*agent.API, error) {
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, paths *config.PathsConfig, dagStore exec.DAGStore, auditSvc *audit.Service) (*agent.API, error) {
 	convStore, err := fileconversation.New(paths.ConversationsDir)
 	if err != nil {
 		logger.Warn(ctx, "Failed to create conversation store, persistence disabled", tag.Error(err))
+	}
+
+	hooks := agent.NewHooks()
+	if auditSvc != nil {
+		hooks.OnAfterToolExec(newAgentAuditHook(auditSvc))
 	}
 
 	api := agent.NewAPI(agent.APIConfig{
@@ -385,6 +391,7 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, paths *conf
 		Logger:            slog.Default(),
 		ConversationStore: convStore,
 		DAGStore:          dagStore,
+		Hooks:             hooks,
 		Environment: agent.EnvironmentInfo{
 			DAGsDir:        paths.DAGsDir,
 			LogDir:         paths.LogDir,
@@ -398,6 +405,30 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, paths *conf
 	logger.Info(ctx, "Agent API initialized")
 
 	return api, nil
+}
+
+// newAgentAuditHook returns a hook that logs agent tool executions to the audit service.
+func newAgentAuditHook(auditSvc *audit.Service) agent.AfterToolExecHookFunc {
+	return func(_ context.Context, info agent.ToolExecInfo, result agent.ToolOut) {
+		if info.Audit == nil {
+			return // tool opted out of audit
+		}
+
+		details := make(map[string]any)
+		if info.Audit.DetailExtractor != nil {
+			details = info.Audit.DetailExtractor(info.Input)
+		}
+		if result.IsError {
+			details["failed"] = true
+		}
+		details["conversation_id"] = info.ConversationID
+
+		detailsJSON, _ := json.Marshal(details)
+		entry := audit.NewEntry(audit.CategoryAgent, info.Audit.Action, info.UserID, info.Username).
+			WithDetails(string(detailsJSON)).
+			WithIPAddress(info.IPAddress)
+		_ = auditSvc.Log(context.Background(), entry)
+	}
 }
 
 // sanitizedRequestLogger wraps httplog's RequestLogger with URL sanitization
