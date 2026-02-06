@@ -314,6 +314,19 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 
 	core.InitializeDefaults(mainDAG)
 
+	// Apply working directory fallback if not set by YAML, base config, or DefaultWorkingDir.
+	if mainDAG.WorkingDir == "" {
+		if filePath != "" {
+			mainDAG.WorkingDir = filepath.Dir(filePath)
+		} else {
+			wd, err := getDefaultWorkingDir()
+			if err != nil {
+				return nil, fmt.Errorf("failed to determine working directory: %w", err)
+			}
+			mainDAG.WorkingDir = wd
+		}
+	}
+
 	return mainDAG, nil
 }
 

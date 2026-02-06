@@ -26,12 +26,16 @@ Note the naming inconsistency: the step's Go field is `Dir` (JSON: `dir`) while 
 
 ### Build-Time Resolution (DAG Loading)
 
-When a DAG YAML file is loaded, the `buildWorkingDir` function (`internal/core/spec/dag.go:954-965`) resolves the DAG-level working directory with this priority:
+When a DAG YAML file is loaded, the `buildWorkingDir` function (`internal/core/spec/dag.go:954-963`) resolves the DAG-level working directory with this priority:
 
 1. **Explicit `workingDir` in YAML** — if the DAG file specifies a `workingDir` field
 2. **`DefaultWorkingDir` from load options** — passed via `--default-working-dir` CLI flag (used for sub-DAG inheritance)
-3. **Directory of the DAG file** — `filepath.Dir(dagFile)`
-4. **Fallback** — current working directory (`os.Getwd()`), then user home directory
+3. **Empty string** — allows inheritance from base config during the merge step
+
+After the merge with base config, `loadDAG` applies a fallback if `WorkingDir` is still empty:
+
+4. **Directory of the DAG file** — `filepath.Dir(dagFile)`
+5. **Fallback** — current working directory (`os.Getwd()`), then user home directory
 
 The `resolveWorkingDirPath` function (`internal/core/spec/dag.go:967-978`) determines what happens to the raw value:
 
@@ -159,6 +163,17 @@ Resolution order:
 
 Note: A default `.env` file is always prepended to the candidate list (`dag.go:368`), meaning `.env` in the working directory is always searched for regardless of whether it's explicitly listed in the YAML `dotenv` field.
 
+### Base Config Inheritance (`base.yaml`)
+
+When `workingDir` is set in a base config file (`base.yaml`), it serves as a global default for all DAGs:
+
+- **Child DAGs without explicit `workingDir`** inherit the base value
+- **Child DAGs with explicit `workingDir`** override the base value
+
+This works because `buildWorkingDir` returns `""` when no explicit `workingDir` is set (no YAML field, no `DefaultWorkingDir` option). When `mergo.Merge` runs with `WithOverride`, the child's empty `WorkingDir` does not overwrite the base's explicit value. The fallback chain (`filepath.Dir(dagFile)` → `os.Getwd()` → home) is applied post-merge in `loadDAG` only if `WorkingDir` is still empty after merging.
+
+Previously, `buildWorkingDir` always returned a non-empty value via its fallback chain, which caused the child DAG's fallback value to overwrite the base's explicit `workingDir` during the merge step. This was fixed by moving the fallback logic to post-merge.
+
 ### Schema File Resolution
 
 JSON schema files referenced in DAG parameters (`internal/core/spec/schema.go`) are resolved in order:
@@ -177,11 +192,15 @@ JSON schema files referenced in DAG parameters (`internal/core/spec/schema.go`) 
 ### Build Time (DAG Loading)
 
 ```
-DAG workingDir:
+DAG workingDir (per-document, buildWorkingDir):
   explicit YAML value?     → store (resolve relative against DAG file dir)
   DefaultWorkingDir option? → use as-is
-  DAG file exists?         → filepath.Dir(dagFile)
-  fallback                 → os.Getwd() or os.UserHomeDir()
+  otherwise                → return "" (allow base config inheritance)
+
+Post-merge fallback (loadDAG, after merge + InitializeDefaults):
+  WorkingDir still empty?
+    DAG file exists?       → filepath.Dir(dagFile)
+    fallback               → os.Getwd() or os.UserHomeDir()
 
 Step workingDir:
   → stored as raw trimmed value (no resolution)

@@ -1268,10 +1268,10 @@ func TestBuildWorkingDir(t *testing.T) {
 			expected: "/custom/path",
 		},
 		{
-			name:     "DefaultFromFileDirectory",
+			name:     "EmptyWhenNoExplicitValue",
 			dag:      &dag{},
 			ctx:      BuildContext{file: "/path/to/dag.yaml"},
-			expected: "/path/to",
+			expected: "",
 		},
 		{
 			name: "FromOptionsDefault",
@@ -1356,7 +1356,7 @@ func TestBuildWorkingDir_FallbackToCurrentDir(t *testing.T) {
 
 	result, err := buildWorkingDir(ctx, d)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result) // Should fall back to cwd or home
+	assert.Empty(t, result) // Returns empty; fallback applied post-merge in loadDAG
 }
 
 func TestBuildWorkingDir_DefaultWorkingDir(t *testing.T) {
@@ -1397,7 +1397,7 @@ func TestBuildWorkingDir_FallbackToFileDir(t *testing.T) {
 
 	result, err := buildWorkingDir(ctx, d)
 	require.NoError(t, err)
-	assert.Equal(t, tmpDir, result)
+	assert.Empty(t, result) // Returns empty; fallback applied post-merge in loadDAG
 }
 
 func TestBuildShell(t *testing.T) {
