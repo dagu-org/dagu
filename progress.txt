@@ -1,0 +1,192 @@
+## Codebase Patterns
+- Config definition uses pointer types (*int, *bool) in Definition structs to distinguish "not set" from "zero value"
+- Config loading pattern: Set default with l.v.SetDefault(), then override from definition if pointer is non-nil
+- Environment variables automatically prefixed with DAGU_ by the loader
+- Tests must be updated when adding new config fields with non-zero defaults
+- When changing a function signature (e.g., adding a parameter), fix ALL callers in the same commit to keep typecheck green
+- Previous iterations may log progress but lose code — always verify git status and actual file contents before starting
+- The docs/ directory is excluded from git (.git/info/exclude) — docs are maintained in a separate repo
+
+## 2026-02-06 14:40 - US-001
+- What was implemented: Added retentionDays configuration field to audit logging
+  - Added `RetentionDays *int` to AuditDef in definition.go with mapstructure tag
+  - Added `RetentionDays int` to AuditConfig in config.go
+  - Set default value of 7 days in loader.go via l.v.SetDefault("audit.retentionDays", 7)
+  - Bound DAGU_AUDIT_RETENTION_DAYS environment variable in envBindings
+  - Implemented loading logic: use viper GetInt, then override from definition if non-nil
+  - Updated test expectations in loader_test.go to expect default value of 7
+
+- Files changed:
+  - internal/cmn/config/definition.go (added RetentionDays field to AuditDef)
+  - internal/cmn/config/config.go (added RetentionDays field to AuditConfig)
+  - internal/cmn/config/loader.go (added default, env binding, and loading logic)
+  - internal/cmn/config/loader_test.go (updated test expectations for TestLoad_Env and TestLoad_YAML)
+
+- **Learnings for future iterations:**
+  - The config loader uses a three-layer pattern: viper defaults → env vars → YAML definition (pointer overrides)
+  - Pointer fields in Definition structs (*int, *bool) allow distinguishing between "not set" and explicit zero values
+  - When adding config fields with non-zero defaults, existing tests need updates to expect the new default value
+  - Environment variable bindings use the pattern: {key: "section.field", env: "FIELD_NAME"} without DAGU_ prefix (auto-added)
+  - The setViperDefaultValues function in loader.go is where all default values are set
+  - loadServerDefaults is where server-specific config (including audit) is loaded from the definition
+
+---
+
+## 2026-02-06 15:00 - US-002
+- What was implemented: Created audit log cleaner goroutine for automatic retention-based cleanup
+  - Created internal/persis/fileaudit/cleaner.go with cleaner struct and lifecycle management
+  - Implemented purgeExpiredFiles() that scans baseDir for YYYY-MM-DD.jsonl files
+  - Deletes files where date is strictly before (now - retentionDays) in UTC
+  - Cleaner runs immediately on creation, then every 24 hours via time.NewTicker
+  - Logs removed count at Info level, individual removal errors at Warn level using slog
+  - stop() method provides clean shutdown via sync.Once pattern
+
+- Files changed:
+  - internal/persis/fileaudit/cleaner.go (new file, 116 lines)
+
+- **Learnings for future iterations:**
+  - Cleaner goroutine pattern: create struct, start goroutine in constructor, use stopCh + stopOnce for lifecycle
+  - For immediate + periodic execution: run task once before creating ticker, then select on ticker.C and stopCh
+  - The dateFormat constant ("2006-01-02") is already defined in store.go and reused in cleaner.go
+  - File cleanup pattern: ReadDir → filter by extension → parse filename → compare date → os.Remove
+  - Unparseable filenames are silently skipped (not an error condition)
+  - Always check os.IsNotExist before logging directory read errors
+  - The cleaner won't be used until US-003 integrates it into Store (unused function warnings expected)
+
+---
+
+## 2026-02-06 15:30 - US-003
+- What was implemented: Integrated cleaner lifecycle management into fileaudit.Store
+  - Added `cleaner *cleaner` field to Store struct
+  - Changed New() signature from New(baseDir string) to New(baseDir string, retentionDays int)
+  - Start cleaner via newCleaner() if retentionDays > 0
+  - Added Close() method that calls cleaner.stop() if cleaner is non-nil
+  - Store now owns the cleaner lifecycle from creation to shutdown
+
+- Files changed:
+  - internal/persis/fileaudit/store.go (added cleaner field, updated New() signature, added Close() method)
+
+- **Learnings for future iterations:**
+  - Signature changes create breaking changes that must be fixed in dependent code (server.go and store_test.go)
+  - The pattern for optional background tasks: check if feature is enabled (retentionDays > 0) before starting goroutine
+  - Lifecycle pattern: constructor starts background task, Close() method stops it
+  - The Close() method returns error to match common Go closer interface patterns (io.Closer, etc.)
+  - Always check for nil before calling methods on optional components (if s.cleaner != nil)
+
+---
+
+## 2026-02-06 - US-003 + US-005 (implemented and committed)
+- What was implemented:
+  - Created internal/persis/fileaudit/cleaner.go (US-002 code was missing despite being marked done)
+    - cleaner struct with baseDir, retentionDays, stopCh, stopOnce
+    - newCleaner() starts goroutine: runs purgeExpiredFiles immediately then every 24h
+    - purgeExpiredFiles() scans baseDir, skips non-.jsonl and unparseable filenames, deletes expired files
+    - stop() uses sync.Once for safe shutdown
+  - Modified internal/persis/fileaudit/store.go (US-003)
+    - Added `cleaner *cleaner` field to Store struct
+    - Changed New(baseDir string) to New(baseDir string, retentionDays int)
+    - Start cleaner if retentionDays > 0
+    - Added Close() method that stops the cleaner
+  - Updated all callers (US-005 + partial US-004):
+    - internal/persis/fileaudit/store_test.go: all New() calls updated to New(dir, 0)
+    - internal/service/frontend/server.go: updated to New(..., 0) temporarily (US-004 will wire real config)
+
+- Files changed:
+  - internal/persis/fileaudit/cleaner.go (new file)
+  - internal/persis/fileaudit/store.go (modified: cleaner field, New() signature, Close() method)
+  - internal/persis/fileaudit/store_test.go (modified: all New() calls updated)
+  - internal/service/frontend/server.go (modified: New() call updated with 0)
+
+- **Learnings for future iterations:**
+  - Previous iterations logged US-002 and US-003 progress but never committed — always verify git log and actual files
+  - When changing a function signature, ALL callers must be fixed in the same commit to keep typecheck green
+  - US-005 was satisfied as a side effect of fixing callers for US-003 typecheck compliance
+  - The server.go caller uses 0 temporarily — US-004 still needs to wire cfg.Server.Audit.RetentionDays
+
+---
+
+## 2026-02-06 16:00 - US-001 (re-implemented)
+- What was implemented: Re-implemented retentionDays config field (previous implementation was lost)
+  - Added `RetentionDays *int` to AuditDef in definition.go with mapstructure tag
+  - Added `RetentionDays int` to AuditConfig in config.go
+  - Set default value of 7 in loader.go via l.v.SetDefault("audit.retentionDays", 7)
+  - Bound DAGU_AUDIT_RETENTION_DAYS env var in envBindings
+  - Loading logic in loadServerDefaults: viper GetInt then override from definition if non-nil
+  - Updated TestLoad_Env and TestLoad_YAML test expectations
+
+- Files changed:
+  - internal/cmn/config/definition.go
+  - internal/cmn/config/config.go
+  - internal/cmn/config/loader.go
+  - internal/cmn/config/loader_test.go
+
+- **Learnings for future iterations:**
+  - Previous iterations logged progress but code was never committed — always verify git status
+  - The audit loading pattern in loadServerDefaults: set default from viper, then override from definition pointer
+
+---
+
+## 2026-02-06 - US-004
+- What was implemented: Wired retention config into server startup and shutdown
+  - Updated initAuditService to return (*audit.Service, *fileaudit.Store, error) instead of (*audit.Service, error)
+  - Changed fileaudit.New() call to pass cfg.Server.Audit.RetentionDays instead of hardcoded 0
+  - Added auditStore field to Server struct for lifecycle management
+  - Updated NewServer to capture and store the returned *fileaudit.Store
+  - Added auditStore.Close() call in Shutdown() method before HTTP server shutdown
+
+- Files changed:
+  - internal/service/frontend/server.go (modified: initAuditService return type, Server struct, NewServer wiring, Shutdown cleanup)
+
+- **Learnings for future iterations:**
+  - When a constructor returns additional values (e.g., adding a store return), update both the function signature and ALL call sites
+  - Shutdown ordering: close audit store early (before HTTP server shutdown) since it only stops the background cleaner goroutine
+  - The initAuditService function returns (nil, nil, nil) when audit is disabled — callers should nil-check both auditSvc and auditStore
+  - Server struct fields for lifecycle management follow the pattern: store in constructor, close in Shutdown()
+
+---
+
+## 2026-02-06 23:17 - US-006
+- What was implemented: Added comprehensive unit tests for the audit log cleaner
+  - Created internal/persis/fileaudit/cleaner_test.go with 9 test cases
+  - Test: expired files are deleted (30 days old with 7-day retention)
+  - Test: recent files within retention window are preserved
+  - Test: mixed expired and recent files handled correctly
+  - Test: non-.jsonl files are never deleted regardless of date
+  - Test: files with unparseable date names are skipped (not deleted)
+  - Test: retentionDays=0 skips cleanup entirely (no files deleted)
+  - Test: stop() is idempotent (calling three times does not panic)
+  - Test: nonexistent directory does not cause panic
+  - Test: boundary date behavior (file exactly at retention cutoff is preserved)
+
+- Files changed:
+  - internal/persis/fileaudit/cleaner_test.go (new file, 190 lines)
+
+- **Learnings for future iterations:**
+  - Can construct cleaner struct directly (without newCleaner) to test purgeExpiredFiles without starting the goroutine
+  - Use time.Now().UTC().AddDate(0, 0, -N).Format(dateFormat) to create test filenames at specific ages
+  - The cutoff is calculated as today minus retentionDays, truncated to day boundary — files at exactly the cutoff date are preserved
+  - Helper functions createTestFile and fileExists keep test code DRY and readable
+
+---
+
+## 2026-02-06 - US-007
+- What was implemented: Verified documentation for retentionDays config in reference.md and server.md
+  - docs/configurations/reference.md: `retentionDays: 7` in audit YAML block (line 29)
+  - docs/configurations/reference.md: `DAGU_AUDIT_RETENTION_DAYS` in Audit Logging env vars section (line 191)
+  - docs/configurations/server.md: `retentionDays: 7` in audit config example (line 119)
+  - docs/configurations/server.md: `DAGU_AUDIT_RETENTION_DAYS` in Audit Logging env vars (line 202)
+  - docs/configurations/server.md: Retention subsection under Audit Logging (lines 575-583)
+  - All acceptance criteria met; typecheck and tests pass
+
+- Files changed:
+  - docs/configurations/reference.md (documentation already present from prior iteration)
+  - docs/configurations/server.md (documentation already present from prior iteration)
+  - prd.json (marked US-007 as passes: true)
+
+- **Learnings for future iterations:**
+  - The docs/ directory was removed from the main repo (commit 69f4b6a0) and is excluded in .git/info/exclude
+  - Local docs files exist on disk but are not tracked by git — changes to docs cannot be committed to this repo
+  - Documentation for this project is maintained in a separate repository
+  - When a story involves docs-only changes, verify content is correct but note that git commits won't include those files
+
+---

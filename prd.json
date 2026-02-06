@@ -1,0 +1,121 @@
+{
+  "project": "Dagu",
+  "branchName": "ralph/audit-log-retention",
+  "description": "Add configurable automatic retention-based cleanup of audit log files to prevent unbounded disk growth",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Add retentionDays to audit configuration",
+      "description": "As an operator, I want to configure audit log retention days so that old audit files are automatically cleaned up.",
+      "acceptanceCriteria": [
+        "Add `RetentionDays *int` field with mapstructure tag to `AuditDef` in internal/cmn/config/definition.go",
+        "Add `RetentionDays int` field to `AuditConfig` in internal/cmn/config/config.go",
+        "Add default `l.v.SetDefault(\"audit.retentionDays\", 7)` in loader.go",
+        "Bind env var DAGU_AUDIT_RETENTION_DAYS via `{key: \"audit.retentionDays\", env: \"AUDIT_RETENTION_DAYS\"}` in loader.go",
+        "Load the value in loader.go: use viper GetInt, then override from definition if non-nil pointer",
+        "Typecheck passes",
+        "Tests pass: go test ./internal/cmn/config/..."
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Follow the existing pattern for audit.enabled loading. The env var prefix DAGU_ is added automatically by the loader."
+    },
+    {
+      "id": "US-002",
+      "title": "Create audit log cleaner goroutine",
+      "description": "As a developer, I need a background cleaner that periodically purges expired audit log files based on retention days.",
+      "acceptanceCriteria": [
+        "Create new file internal/persis/fileaudit/cleaner.go",
+        "Cleaner struct holds baseDir string, retentionDays int, stopCh chan struct{}, stopOnce sync.Once",
+        "newCleaner(baseDir, retentionDays) starts a goroutine that runs purgeExpiredFiles immediately then every 24h via time.NewTicker",
+        "purgeExpiredFiles lists directory entries, skips non-.jsonl files and unparseable filenames",
+        "Deletes files whose parsed YYYY-MM-DD date (UTC) is strictly before time.Now().UTC() minus retentionDays",
+        "Logs removed count at Info level, individual removal errors at Warn level using slog",
+        "stop() method closes stopCh via sync.Once to cleanly shut down the goroutine",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Follow the pattern in internal/persis/fileserviceregistry/cleaner.go for goroutine lifecycle. Use direct deletion (no quarantine). The date format constant already exists in store.go as dateFormat = \"2006-01-02\"."
+    },
+    {
+      "id": "US-003",
+      "title": "Integrate cleaner into fileaudit.Store",
+      "description": "As a developer, I need the fileaudit.Store to own the cleaner lifecycle so retention runs automatically when the store is created.",
+      "acceptanceCriteria": [
+        "Add `cleaner *cleaner` field to the Store struct in internal/persis/fileaudit/store.go",
+        "Change New(baseDir string) signature to New(baseDir string, retentionDays int)",
+        "If retentionDays > 0, start cleaner via newCleaner(baseDir, retentionDays)",
+        "Add Close() method on Store that calls cleaner.stop() if cleaner is non-nil",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "This changes the New() signature which will break existing callers — the server wiring (US-004) and existing tests (US-005) must be updated."
+    },
+    {
+      "id": "US-004",
+      "title": "Wire retention config into server startup and shutdown",
+      "description": "As an operator, I need the server to pass retention config to the audit store and clean up on shutdown.",
+      "acceptanceCriteria": [
+        "Update initAuditService in internal/service/frontend/server.go to pass cfg.Server.Audit.RetentionDays to fileaudit.New()",
+        "initAuditService returns the fileaudit.Store alongside the audit.Service (update return type)",
+        "Add auditStore field to Server struct for lifecycle management",
+        "Call auditStore.Close() in the Shutdown() method before HTTP server shutdown",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "initAuditService currently returns (*audit.Service, error). Change to return (*audit.Service, *fileaudit.Store, error). Update the call site in NewServer accordingly."
+    },
+    {
+      "id": "US-005",
+      "title": "Update existing store tests for new New() signature",
+      "description": "As a developer, I need existing fileaudit tests to pass after the New() signature change.",
+      "acceptanceCriteria": [
+        "Update all calls to fileaudit.New(dir) to fileaudit.New(dir, 0) in internal/persis/fileaudit/store_test.go",
+        "Using 0 disables retention (keep forever) so existing test behavior is unchanged",
+        "Typecheck passes",
+        "Tests pass: go test ./internal/persis/fileaudit/..."
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "There are approximately 6 calls to New(dir) in store_test.go that need the second argument added."
+    },
+    {
+      "id": "US-006",
+      "title": "Add cleaner unit tests",
+      "description": "As a developer, I want tests verifying the cleaner correctly purges expired files and leaves valid ones.",
+      "acceptanceCriteria": [
+        "Create internal/persis/fileaudit/cleaner_test.go",
+        "Test: expired files (date before today-retentionDays) are deleted",
+        "Test: recent files (within retention window) are preserved",
+        "Test: non-.jsonl files in the directory are never deleted",
+        "Test: files with unparseable names are skipped (not deleted, not errored)",
+        "Test: retentionDays=0 skips cleanup entirely (no files deleted)",
+        "Test: stop() is idempotent (calling twice does not panic)",
+        "Typecheck passes",
+        "Tests pass: go test ./internal/persis/fileaudit/..."
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "Test purgeExpiredFiles directly rather than waiting for the ticker. Create temp directories with fake YYYY-MM-DD.jsonl files at various dates."
+    },
+    {
+      "id": "US-007",
+      "title": "Update documentation for retentionDays config",
+      "description": "As an operator, I want the documentation to describe the retentionDays setting so I know how to configure audit log retention.",
+      "acceptanceCriteria": [
+        "In docs/configurations/reference.md: add `retentionDays: 7` line under the audit block (after `enabled: true`, around line 28)",
+        "In docs/configurations/reference.md: add `DAGU_AUDIT_RETENTION_DAYS` to the Audit Logging env vars section (after `DAGU_AUDIT_ENABLED`, around line 189)",
+        "In docs/configurations/server.md: add `retentionDays: 7` to the audit config example (around line 564)",
+        "In docs/configurations/server.md: add `export DAGU_AUDIT_RETENTION_DAYS=30` to the env var example (around line 569)",
+        "In docs/configurations/server.md: add a 'Retention' subsection under Audit Logging explaining: default 7 days, 0 = keep forever, cleanup runs on startup then every 24h, dates are UTC, only YYYY-MM-DD.jsonl files are affected",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": "Two files to update: docs/configurations/reference.md and docs/configurations/server.md. Keep the style consistent with existing documentation — short, example-driven, no excessive prose."
+    }
+  ]
+}
