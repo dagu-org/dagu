@@ -565,9 +565,6 @@ func (l *ConfigLoader) loadServerDefaults(cfg *Config, def Definition) {
 	}
 
 	cfg.Server.Audit.RetentionDays = l.v.GetInt("audit.retentionDays")
-	if def.Audit != nil && def.Audit.RetentionDays != nil {
-		cfg.Server.Audit.RetentionDays = *def.Audit.RetentionDays
-	}
 }
 
 func (l *ConfigLoader) loadUIConfig(cfg *Config, def Definition) {

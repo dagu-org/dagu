@@ -70,8 +70,9 @@ func (c *cleaner) purgeExpiredFiles() {
 		return
 	}
 
-	cutoff := time.Now().UTC().AddDate(0, 0, -c.retentionDays)
-	cutoffDate := time.Date(cutoff.Year(), cutoff.Month(), cutoff.Day(), 0, 0, 0, 0, time.UTC)
+	now := time.Now().UTC()
+	cutoff := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).
+		AddDate(0, 0, -c.retentionDays)
 
 	removed := 0
 	for _, entry := range entries {
@@ -84,15 +85,13 @@ func (c *cleaner) purgeExpiredFiles() {
 			continue
 		}
 
-		// Parse date from filename (YYYY-MM-DD.jsonl)
 		datePart := strings.TrimSuffix(name, auditFileExtension)
 		fileDate, err := time.Parse(dateFormat, datePart)
 		if err != nil {
-			// Skip files with unparseable names
 			continue
 		}
 
-		if fileDate.Before(cutoffDate) {
+		if fileDate.Before(cutoff) {
 			filePath := filepath.Join(c.baseDir, name)
 			if err := os.Remove(filePath); err != nil {
 				slog.Warn("fileaudit: failed to remove expired audit file",

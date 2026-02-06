@@ -17,6 +17,11 @@ func createTestFile(t *testing.T, dir, name string) {
 	require.NoError(t, err)
 }
 
+// newTestCleaner creates a cleaner for testing without starting the background goroutine.
+func newTestCleaner(baseDir string, retentionDays int) *cleaner {
+	return &cleaner{baseDir: baseDir, retentionDays: retentionDays, stopCh: make(chan struct{})}
+}
+
 // fileExists returns true if the named file exists in the directory.
 func fileExists(t *testing.T, dir, name string) bool {
 	t.Helper()
@@ -38,7 +43,7 @@ func TestPurgeExpiredFiles_DeletesExpired(t *testing.T) {
 	expiredDate := time.Now().UTC().AddDate(0, 0, -30).Format(dateFormat)
 	createTestFile(t, dir, expiredDate+auditFileExtension)
 
-	c := &cleaner{baseDir: dir, retentionDays: 7, stopCh: make(chan struct{})}
+	c := newTestCleaner(dir, 7)
 	c.purgeExpiredFiles()
 
 	assert.False(t, fileExists(t, dir, expiredDate+auditFileExtension),
@@ -56,7 +61,7 @@ func TestPurgeExpiredFiles_PreservesRecent(t *testing.T) {
 	todayDate := time.Now().UTC().Format(dateFormat)
 	createTestFile(t, dir, todayDate+auditFileExtension)
 
-	c := &cleaner{baseDir: dir, retentionDays: 7, stopCh: make(chan struct{})}
+	c := newTestCleaner(dir, 7)
 	c.purgeExpiredFiles()
 
 	assert.True(t, fileExists(t, dir, recentDate+auditFileExtension),
@@ -75,7 +80,7 @@ func TestPurgeExpiredFiles_MixedFiles(t *testing.T) {
 	createTestFile(t, dir, expiredDate+auditFileExtension)
 	createTestFile(t, dir, recentDate+auditFileExtension)
 
-	c := &cleaner{baseDir: dir, retentionDays: 7, stopCh: make(chan struct{})}
+	c := newTestCleaner(dir, 7)
 	c.purgeExpiredFiles()
 
 	assert.False(t, fileExists(t, dir, expiredDate+auditFileExtension),
@@ -93,7 +98,7 @@ func TestPurgeExpiredFiles_IgnoresNonJsonl(t *testing.T) {
 	createTestFile(t, dir, "notes.jsonl") // .jsonl but not a date name
 	createTestFile(t, dir, "README.md")
 
-	c := &cleaner{baseDir: dir, retentionDays: 7, stopCh: make(chan struct{})}
+	c := newTestCleaner(dir, 7)
 	c.purgeExpiredFiles()
 
 	assert.True(t, fileExists(t, dir, "2020-01-01.txt"),
@@ -116,7 +121,7 @@ func TestPurgeExpiredFiles_SkipsUnparseableNames(t *testing.T) {
 	createTestFile(t, dir, "random.jsonl")
 	createTestFile(t, dir, "01-02-2020.jsonl") // wrong format
 
-	c := &cleaner{baseDir: dir, retentionDays: 7, stopCh: make(chan struct{})}
+	c := newTestCleaner(dir, 7)
 	c.purgeExpiredFiles()
 
 	// All files should still exist — unparseable names are skipped
@@ -134,7 +139,7 @@ func TestPurgeExpiredFiles_ZeroRetentionSkipsCleanup(t *testing.T) {
 	oldDate := time.Now().UTC().AddDate(0, 0, -30).Format(dateFormat)
 	createTestFile(t, dir, oldDate+auditFileExtension)
 
-	c := &cleaner{baseDir: dir, retentionDays: 0, stopCh: make(chan struct{})}
+	c := newTestCleaner(dir, 0)
 	c.purgeExpiredFiles()
 
 	assert.True(t, fileExists(t, dir, oldDate+auditFileExtension),
@@ -155,11 +160,7 @@ func TestCleaner_StopIsIdempotent(t *testing.T) {
 }
 
 func TestPurgeExpiredFiles_NonexistentDirectory(t *testing.T) {
-	c := &cleaner{
-		baseDir:       filepath.Join(t.TempDir(), "nonexistent"),
-		retentionDays: 7,
-		stopCh:        make(chan struct{}),
-	}
+	c := newTestCleaner(filepath.Join(t.TempDir(), "nonexistent"), 7)
 
 	// Should not panic on nonexistent directory
 	assert.NotPanics(t, func() {
@@ -180,7 +181,7 @@ func TestPurgeExpiredFiles_BoundaryDate(t *testing.T) {
 	createTestFile(t, dir, boundaryDate+auditFileExtension)
 	createTestFile(t, dir, expiredDate+auditFileExtension)
 
-	c := &cleaner{baseDir: dir, retentionDays: 7, stopCh: make(chan struct{})}
+	c := newTestCleaner(dir, 7)
 	c.purgeExpiredFiles()
 
 	assert.True(t, fileExists(t, dir, boundaryDate+auditFileExtension),
