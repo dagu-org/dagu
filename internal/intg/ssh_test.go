@@ -55,6 +55,17 @@ func (s *sshServerContainer) sshConfig(shell string) string {
 `, s.hostPort, sshTestUser, s.keyPath, shell)
 }
 
+// sshConfigNoShell returns SSH configuration without an explicit shell.
+func (s *sshServerContainer) sshConfigNoShell() string {
+	return fmt.Sprintf(`ssh:
+  host: 127.0.0.1
+  port: "%s"
+  user: %s
+  key: "%s"
+  strictHostKey: false
+`, s.hostPort, sshTestUser, s.keyPath)
+}
+
 // sshPasswordConfig returns SSH configuration using password authentication.
 func (s *sshServerContainer) sshPasswordConfig(shell string) string {
 	return fmt.Sprintf(`ssh:
@@ -386,6 +397,80 @@ steps:
 		// Remote $HOME should be /home/testuser, not the local $HOME
 		dag.AssertOutputs(t, map[string]any{
 			"REMOTE_HOME": fmt.Sprintf("/home/%s", sshTestUser),
+		})
+	})
+
+	t.Run("DollarEscape_Command_WithShell", func(t *testing.T) {
+		th := test.Setup(t)
+
+		dagConfig := sshServer.sshConfig("/bin/sh") + `
+steps:
+  - name: escape-command-shell
+    type: ssh
+    command: echo "\$HOME"
+    output: ESCAPE_CMD_SHELL_OUT
+`
+		dag := th.DAG(t, dagConfig)
+		dag.Agent().RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"ESCAPE_CMD_SHELL_OUT": "$HOME",
+		})
+	})
+
+	t.Run("DollarEscape_Command_WithoutShell", func(t *testing.T) {
+		th := test.Setup(t)
+
+		dagConfig := sshServer.sshConfigNoShell() + `
+steps:
+  - name: escape-command-noshell
+    type: ssh
+    command: echo "\$HOME"
+    output: ESCAPE_CMD_NOSHELL_OUT
+`
+		dag := th.DAG(t, dagConfig)
+		dag.Agent().RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"ESCAPE_CMD_NOSHELL_OUT": fmt.Sprintf("/home/%s", sshTestUser),
+		})
+	})
+
+	t.Run("DollarEscape_Script_WithShell", func(t *testing.T) {
+		th := test.Setup(t)
+
+		dagConfig := sshServer.sshConfig("/bin/sh") + `
+steps:
+  - name: escape-script-shell
+    type: ssh
+    script: |
+      echo "\$HOME"
+    output: ESCAPE_SCRIPT_SHELL_OUT
+`
+		dag := th.DAG(t, dagConfig)
+		dag.Agent().RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"ESCAPE_SCRIPT_SHELL_OUT": "$HOME",
+		})
+	})
+
+	t.Run("DollarEscape_Script_WithoutShell", func(t *testing.T) {
+		th := test.Setup(t)
+
+		dagConfig := sshServer.sshConfigNoShell() + `
+steps:
+  - name: escape-script-noshell
+    type: ssh
+    script: |
+      echo "\$HOME"
+    output: ESCAPE_SCRIPT_NOSHELL_OUT
+`
+		dag := th.DAG(t, dagConfig)
+		dag.Agent().RunSuccess(t)
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"ESCAPE_SCRIPT_NOSHELL_OUT": fmt.Sprintf("/home/%s", sshTestUser),
 		})
 	})
 

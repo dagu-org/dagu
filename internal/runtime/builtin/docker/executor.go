@@ -12,6 +12,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/signal"
 	"github.com/dagu-org/dagu/internal/core"
@@ -504,8 +506,30 @@ func init() {
 		Command:          true,
 		MultipleCommands: true,
 		Container:        true,
+		GetEvalOptions: func(ctx context.Context, step core.Step) []eval.Option {
+			if hasShellConfigured(ctx, step) {
+				return []eval.Option{eval.WithoutDollarEscape()}
+			}
+			return nil
+		},
 		// Env vars are expanded on host before passing to container (default behavior)
 	}
 	executor.RegisterExecutor("docker", newDocker, nil, caps)
 	executor.RegisterExecutor("container", newDocker, nil, caps)
+}
+
+func hasShellConfigured(ctx context.Context, step core.Step) bool {
+	if step.Container != nil {
+		return cmdutil.HasShellArgs(step.Container.Shell)
+	}
+	if len(step.ExecutorConfig.Config) > 0 {
+		return cmdutil.IsShellValueSet(step.ExecutorConfig.Config["shell"])
+	}
+
+	env := runtime.GetEnv(ctx)
+	if env.DAG != nil && env.DAG.Container != nil {
+		return cmdutil.HasShellArgs(env.DAG.Container.Shell)
+	}
+
+	return false
 }

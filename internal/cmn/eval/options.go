@@ -2,10 +2,11 @@ package eval
 
 // Options controls the behavior of string evaluation.
 type Options struct {
-	ExpandEnv   bool // Enable environment variable expansion
-	ExpandShell bool // Enable shell-based variable expansion (e.g., ${VAR:0:3})
-	ExpandOS    bool // Enable os.LookupEnv fallback and OS-sourced scope entries
-	Substitute  bool // Enable backtick command substitution
+	ExpandEnv    bool // Enable environment variable expansion
+	ExpandShell  bool // Enable shell-based variable expansion (e.g., ${VAR:0:3})
+	ExpandOS     bool // Enable os.LookupEnv fallback and OS-sourced scope entries
+	Substitute   bool // Enable backtick command substitution
+	EscapeDollar bool // Enable \$ → $ escape before variable expansion
 
 	Variables []map[string]string // Ordered variable maps for expansion
 	StepMap   map[string]StepInfo // Step info map for step reference expansion
@@ -15,9 +16,10 @@ type Options struct {
 // Substitute enabled. ExpandOS is disabled by default.
 func NewOptions() *Options {
 	return &Options{
-		ExpandEnv:   true,
-		ExpandShell: true,
-		Substitute:  true,
+		ExpandEnv:    true,
+		ExpandShell:  true,
+		Substitute:   true,
+		EscapeDollar: true,
 	}
 }
 
@@ -56,6 +58,13 @@ func WithoutExpandShell() Option {
 func WithoutSubstitute() Option {
 	return func(opts *Options) {
 		opts.Substitute = false
+	}
+}
+
+// WithoutDollarEscape preserves backslash-dollar sequences for downstream executors.
+func WithoutDollarEscape() Option {
+	return func(opts *Options) {
+		opts.EscapeDollar = false
 	}
 }
 

@@ -119,6 +119,23 @@ steps:
 		})
 	})
 
+	t.Run("ShellPreservesBackslashDollar", func(t *testing.T) {
+		t.Parallel()
+
+		dag := th.DAG(t, `
+shell: /bin/sh
+steps:
+  - name: test
+    command: 'echo "\$HOME"'
+    output: OUT
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+		dag.AssertOutputs(t, map[string]any{
+			"OUT": "$HOME",
+		})
+	})
+
 	t.Run("ShellWithMultipleCommands", func(t *testing.T) {
 		t.Parallel()
 
