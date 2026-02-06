@@ -45,7 +45,11 @@ func (h *Hooks) OnAfterToolExec(fn AfterToolExecHookFunc) {
 
 // RunBeforeToolExec invokes all before-execution hooks in order.
 // Returns the first non-nil error, which blocks execution.
+// Safe to call on a nil receiver (returns nil).
 func (h *Hooks) RunBeforeToolExec(ctx context.Context, info ToolExecInfo) error {
+	if h == nil {
+		return nil
+	}
 	for _, fn := range h.beforeToolExec {
 		if err := fn(ctx, info); err != nil {
 			return err
@@ -55,7 +59,11 @@ func (h *Hooks) RunBeforeToolExec(ctx context.Context, info ToolExecInfo) error 
 }
 
 // RunAfterToolExec invokes all after-execution hooks in order.
+// Safe to call on a nil receiver (no-op).
 func (h *Hooks) RunAfterToolExec(ctx context.Context, info ToolExecInfo, result ToolOut) {
+	if h == nil {
+		return
+	}
 	for _, fn := range h.afterToolExec {
 		fn(ctx, info, result)
 	}

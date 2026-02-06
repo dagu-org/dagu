@@ -283,7 +283,6 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		input = json.RawMessage("{}")
 	}
 
-	// Build hook context
 	info := ToolExecInfo{
 		ToolName:       tc.Function.Name,
 		Input:          input,
@@ -293,11 +292,8 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		IPAddress:      l.ipAddress,
 	}
 
-	// Pre-execution hooks (guardrails)
-	if l.hooks != nil {
-		if err := l.hooks.RunBeforeToolExec(ctx, info); err != nil {
-			return toolError("Blocked by policy: %v", err)
-		}
+	if err := l.hooks.RunBeforeToolExec(ctx, info); err != nil {
+		return toolError("Blocked by policy: %v", err)
 	}
 
 	l.mu.Lock()
@@ -313,10 +309,7 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		SafeMode:         safeMode,
 	}, input)
 
-	// Post-execution hooks (audit)
-	if l.hooks != nil {
-		l.hooks.RunAfterToolExec(ctx, info, result)
-	}
+	l.hooks.RunAfterToolExec(ctx, info, result)
 
 	return result
 }
