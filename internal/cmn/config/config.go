@@ -129,7 +129,8 @@ type TerminalConfig struct {
 
 // AuditConfig contains configuration for the audit logging feature.
 type AuditConfig struct {
-	Enabled bool // Default: true
+	Enabled       bool // Default: true
+	RetentionDays int  // Default: 7; 0 = keep forever
 }
 
 // Permission represents a permission string used in the application.

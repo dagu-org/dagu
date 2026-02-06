@@ -165,7 +165,7 @@ func TestLoad_Env(t *testing.T) {
 			StrictValidation:  false,
 			Metrics:           MetricsAccessPrivate,
 			Terminal:          TerminalConfig{Enabled: true},
-			Audit:             AuditConfig{Enabled: false},
+			Audit:             AuditConfig{Enabled: false, RetentionDays: 7},
 		},
 		Paths: PathsConfig{
 			DAGsDir:            filepath.Join(testPaths, "dags"),
@@ -422,7 +422,7 @@ scheduler:
 			},
 			Metrics:  MetricsAccessPrivate,
 			Terminal: TerminalConfig{Enabled: false},
-			Audit:    AuditConfig{Enabled: true},
+			Audit:    AuditConfig{Enabled: true, RetentionDays: 7},
 		},
 		Paths: PathsConfig{
 			DAGsDir:            "/var/dagu/dags",
